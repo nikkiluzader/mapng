@@ -1,0 +1,7 @@
+{
+  "name": "MapNG",
+  "description": "A BeamNG terrain heightmap generator.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
