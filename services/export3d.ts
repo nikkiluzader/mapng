@@ -327,11 +327,11 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
 
     // Create Trees (InstancedMesh)
     if (treesList.length > 0) {
-        const trunkGeo = new THREE.CylinderGeometry(0.5 * unitsPerMeter, 0.8 * unitsPerMeter, 6.0 * unitsPerMeter, 8);
+        const trunkGeo = new THREE.CylinderGeometry(0.5 * unitsPerMeter, 0.5 * unitsPerMeter, 6.0 * unitsPerMeter, 8);
         const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9 });
         const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, treesList.length);
 
-        const foliageGeo = new THREE.IcosahedronGeometry(3.5 * unitsPerMeter, 0);
+        const foliageGeo = new THREE.SphereGeometry(3.5 * unitsPerMeter, 16, 16);
         const foliageMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.8 });
         const foliageMesh = new THREE.InstancedMesh(foliageGeo, foliageMat, treesList.length);
 

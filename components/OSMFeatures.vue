@@ -322,8 +322,8 @@ watch(features, () => {
 const trunkRef = ref<THREE.InstancedMesh | null>(null);
 const foliageRef = ref<THREE.InstancedMesh | null>(null);
 
-const treeTrunkArgs = computed<[number, number, number, number]>(() => [0.5 * unitsPerMeter.value, 0.8 * unitsPerMeter.value, 6.0 * unitsPerMeter.value, 8]);
-const treeFoliageArgs = computed<[number, number]>(() => [3.5 * unitsPerMeter.value, 0]);
+const treeTrunkArgs = computed<[number, number, number, number]>(() => [0.5 * unitsPerMeter.value, 0.5 * unitsPerMeter.value, 6.0 * unitsPerMeter.value, 8]);
+const treeFoliageArgs = computed<[number, number, number]>(() => [3.5 * unitsPerMeter.value, 16, 16]);
 
 watch(features, () => {
     if (features.value.trees.length === 0) return;
@@ -401,7 +401,7 @@ watch(features, () => {
       ref="foliageRef"
       :args="[undefined, undefined, features.trees.length]"
     >
-      <TresIcosahedronGeometry :args="treeFoliageArgs" />
+      <TresSphereGeometry :args="treeFoliageArgs" />
       <TresMeshStandardMaterial :color="0x22c55e" :roughness="0.8" />
     </TresInstancedMesh>
   </TresGroup>
