@@ -98,7 +98,7 @@ The output files will be in the `dist` directory.
 
 ## 📄 License
 
-This project is open-source and available under the [GNU GPLv3](https://www.gnu.org/licenses/gpl-3.0.en.html)
+This project is open-source and available under the [MIT License](https://mit-license.org/)
 
 ---
 
