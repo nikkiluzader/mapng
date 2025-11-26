@@ -325,33 +325,60 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
         }
     }
 
-    // Create Trees (InstancedMesh)
+    // Create Trees (Merged Mesh with Vertex Colors)
     if (treesList.length > 0) {
-        const trunkGeo = new THREE.CylinderGeometry(0.5 * unitsPerMeter, 0.5 * unitsPerMeter, 6.0 * unitsPerMeter, 8);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5d4037, roughness: 0.9 });
-        const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, treesList.length);
+        const geometries: THREE.BufferGeometry[] = [];
+        
+        const baseTrunk = new THREE.CylinderGeometry(0.5 * unitsPerMeter, 0.5 * unitsPerMeter, 6.0 * unitsPerMeter, 8);
+        const baseFoliage = new THREE.SphereGeometry(3.5 * unitsPerMeter, 16, 16);
 
-        const foliageGeo = new THREE.SphereGeometry(3.5 * unitsPerMeter, 16, 16);
-        const foliageMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.8 });
-        const foliageMesh = new THREE.InstancedMesh(foliageGeo, foliageMat, treesList.length);
+        // Add vertex colors
+        const addColor = (geo: THREE.BufferGeometry, colorHex: number) => {
+            const count = geo.attributes.position.count;
+            const colors = new Float32Array(count * 3);
+            const color = new THREE.Color(colorHex);
+            for (let i = 0; i < count; i++) {
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+            }
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        };
 
-        const dummy = new THREE.Object3D();
-        treesList.forEach((pos, i) => {
+        addColor(baseTrunk, 0x5d4037);
+        addColor(baseFoliage, 0x22c55e);
+
+        const matrix = new THREE.Matrix4();
+        const quaternion = new THREE.Quaternion();
+        const scale = new THREE.Vector3(1, 1, 1);
+        const position = new THREE.Vector3();
+
+        treesList.forEach((pos) => {
             // Trunk
-            dummy.position.set(pos.x, pos.y + (3.0 * unitsPerMeter), pos.z);
-            dummy.rotation.set(0, 0, 0);
-            dummy.scale.set(1, 1, 1);
-            dummy.updateMatrix();
-            trunkMesh.setMatrixAt(i, dummy.matrix);
+            const trunk = baseTrunk.clone();
+            position.set(pos.x, pos.y + (3.0 * unitsPerMeter), pos.z);
+            matrix.compose(position, quaternion, scale);
+            trunk.applyMatrix4(matrix);
+            geometries.push(trunk);
 
             // Foliage
-            dummy.position.set(pos.x, pos.y + (7.0 * unitsPerMeter), pos.z);
-            dummy.updateMatrix();
-            foliageMesh.setMatrixAt(i, dummy.matrix);
+            const foliage = baseFoliage.clone();
+            position.set(pos.x, pos.y + (7.0 * unitsPerMeter), pos.z);
+            matrix.compose(position, quaternion, scale);
+            foliage.applyMatrix4(matrix);
+            geometries.push(foliage);
         });
 
-        group.add(trunkMesh);
-        group.add(foliageMesh);
+        if (geometries.length > 0) {
+            const merged = mergeGeometries(geometries);
+            const material = new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                roughness: 0.9 
+            });
+            const mesh = new THREE.Mesh(merged, material);
+            mesh.name = "Trees";
+            group.add(mesh);
+        }
     }
 
     return group;
