@@ -509,6 +509,44 @@ watch(() => props.terrainData, () => {
       return { height: height * unitsPerMeter.value, minHeight: minHeight * unitsPerMeter.value, color };
   };
 
+  // Helper to resample path for better terrain draping
+  const resamplePath = (points: LatLng[], maxLenMeters: number = 5): LatLng[] => {
+      const result: LatLng[] = [];
+      if (points.length < 2) return points;
+      
+      result.push(points[0]);
+      
+      for (let i = 0; i < points.length - 1; i++) {
+          const p1 = points[i];
+          const p2 = points[i+1];
+          
+          // Approximate distance in meters
+          const R = 6371e3;
+          const φ1 = p1.lat * Math.PI/180;
+          const φ2 = p2.lat * Math.PI/180;
+          const Δφ = (p2.lat-p1.lat) * Math.PI/180;
+          const Δλ = (p2.lng-p1.lng) * Math.PI/180;
+          const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                    Math.cos(φ1) * Math.cos(φ2) *
+                    Math.sin(Δλ/2) * Math.sin(Δλ/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          const d = R * c;
+          
+          if (d > maxLenMeters) {
+              const segments = Math.ceil(d / maxLenMeters);
+              for (let j = 1; j < segments; j++) {
+                  const t = j / segments;
+                  result.push({
+                      lat: p1.lat + (p2.lat - p1.lat) * t,
+                      lng: p1.lng + (p2.lng - p1.lng) * t
+                  });
+              }
+          }
+          result.push(p2);
+      }
+      return result;
+  };
+
   data.osmFeatures.forEach((f: any) => {
     if (!f.geometry[0]) return;
 
@@ -534,7 +572,9 @@ watch(() => props.terrainData, () => {
             return vec;
           });
       } else {
-          points = f.geometry.map((p: LatLng) => {
+          // Resample road points to drape better over terrain
+          const resampled = resamplePath(f.geometry, 1); // Resample every 1 meter
+          points = resampled.map((p: LatLng) => {
             const vec = latLngToScene(p.lat, p.lng);
             vec.y = getTerrainHeight(p.lat, p.lng) + config.offset;
             return vec;
