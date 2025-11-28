@@ -293,8 +293,10 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
 };
 
 export const fetchOSMData = async (bounds: Bounds, retries = 1): Promise<OSMFeature[]> => {
+    console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
     try {
         const query = buildQuery(bounds);
+        
         const response = await fetch(OVERPASS_API_URL, {
             method: 'POST',
             body: `data=${encodeURIComponent(query)}`,
@@ -304,20 +306,25 @@ export const fetchOSMData = async (bounds: Bounds, retries = 1): Promise<OSMFeat
         });
 
         if (!response.ok) {
+            console.error(`[OSM] API Error: ${response.status} ${response.statusText}`);
             throw new Error(`Overpass API error: ${response.statusText}`);
         }
 
         const data = await response.json();
-        return parseOverpassResponse(data, bounds);
+        console.log(`[OSM] Received ${data.elements?.length || 0} elements.`);
+        
+        const features = parseOverpassResponse(data, bounds);
+        console.log(`[OSM] Parsed ${features.length} features.`);
+        return features;
 
     } catch (error) {
+        console.error(`[OSM] Error fetching data:`, error);
         if (retries > 0) {
-            console.warn("Retrying OSM fetch...", error);
+            console.warn("[OSM] Retrying OSM fetch...");
             // Wait 1 second before retrying
             await new Promise(resolve => setTimeout(resolve, 1000));
             return fetchOSMData(bounds, retries - 1);
         }
-        console.warn("Failed to fetch OSM data:", error);
         return []; 
     }
 };

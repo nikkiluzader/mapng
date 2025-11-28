@@ -42,7 +42,7 @@
       </div>
 
       <!-- USGS Toggle -->
-      <div class="flex flex-col gap-1 p-2 rounded bg-gray-50 border border-gray-200">
+      <div class="flex flex-col gap-1 p-2 rounded bg-gray-50 border border-gray-200" :class="{ 'opacity-50 pointer-events-none': useGPXZ }">
           <div class="flex items-center justify-between">
             <label class="text-xs text-gray-700 flex items-center gap-2 cursor-pointer">
                 <Mountain :size="12" class="text-blue-600" />
@@ -59,6 +59,37 @@
              <span v-if="usgsStatus === null" class="text-gray-400">Checking...</span>
              <span v-else-if="usgsStatus" class="text-emerald-600 font-medium">● Online</span>
              <span v-else class="text-red-500 font-medium">● Offline / Unreachable</span>
+          </div>
+      </div>
+
+      <!-- GPXZ Toggle -->
+      <div class="flex flex-col gap-2 p-2 rounded bg-gray-50 border border-gray-200">
+          <div class="flex items-center justify-between">
+            <label class="text-xs text-gray-700 flex items-center gap-2 cursor-pointer">
+                <Globe :size="12" class="text-purple-600" />
+                Use GPXZ Elevation API
+            </label>
+            <input 
+                type="checkbox" 
+                v-model="useGPXZ"
+                class="accent-[#FF6600] w-4 h-4 cursor-pointer"
+            />
+          </div>
+          
+          <div v-if="useGPXZ" class="space-y-2 animate-in fade-in slide-in-from-top-1">
+              <input 
+                type="password" 
+                v-model="gpxzApiKey"
+                placeholder="Enter GPXZ API Key"
+                class="w-full bg-white border border-gray-300 rounded px-2 py-1 text-xs text-gray-900 focus:ring-1 focus:ring-[#FF6600] outline-none"
+              />
+              <p class="text-[10px] text-gray-500 leading-tight">
+                  Key is not stored. Free tier: 100 req/day.
+                  <a href="https://www.gpxz.io/" target="_blank" class="text-[#FF6600] hover:underline">Get a key</a>
+              </p>
+              <p v-if="isAreaTooLargeForGPXZ" class="text-[10px] text-red-600 font-medium leading-tight">
+                  ⚠️ Area ({{ areaSqKm.toFixed(2) }} km²) exceeds GPXZ limit (10 km²). Reduce resolution.
+              </p>
           </div>
       </div>
     </div>
@@ -92,8 +123,8 @@
     <!-- Generate Buttons -->
     <div class="pt-2 grid grid-cols-2 gap-3">
       <button
-        @click="$emit('generate', true, fetchOSM, useUSGS)"
-        :disabled="isGenerating"
+        @click="$emit('generate', true, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
+        :disabled="isGenerating || (useGPXZ && (!gpxzApiKey || isAreaTooLargeForGPXZ))"
         class="py-3 bg-[#FF6600] hover:bg-[#E65C00] text-white font-bold rounded-md shadow-lg shadow-orange-900/10 flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300"
       >
           <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
@@ -107,8 +138,8 @@
       </button>
 
       <button
-        @click="$emit('generate', false, fetchOSM, useUSGS)"
-        :disabled="isGenerating"
+        @click="$emit('generate', false, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
+        :disabled="isGenerating || (useGPXZ && (!gpxzApiKey || isAreaTooLargeForGPXZ))"
         class="py-3 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold rounded-md shadow-sm flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
            <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
@@ -201,8 +232,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson } from 'lucide-vue-next';
+import { ref, computed, onMounted, watch } from 'vue';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Globe } from 'lucide-vue-next';
 import { LatLng, TerrainData } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
@@ -219,16 +250,27 @@ const props = defineProps<Props>();
 defineEmits<{
   locationChange: [loc: LatLng];
   resolutionChange: [res: number];
-  generate: [showPreview: boolean, fetchOSM: boolean, useUSGS: boolean];
+  generate: [showPreview: boolean, fetchOSM: boolean, useUSGS: boolean, useGPXZ: boolean, gpxzApiKey: string];
 }>();
 
 const isExportingGLB = ref(false);
 const fetchOSM = ref(false);
 const useUSGS = ref(false);
+const useGPXZ = ref(false);
+const gpxzApiKey = ref('');
 const usgsStatus = ref<boolean | null>(null);
 
 onMounted(async () => {
     usgsStatus.value = await checkUSGSStatus();
+});
+
+// Exclusive toggles
+watch(useGPXZ, (newVal) => {
+    if (newVal) useUSGS.value = false;
+});
+
+watch(useUSGS, (newVal) => {
+    if (newVal) useGPXZ.value = false;
 });
 
 // Calculate resolution scale (Meters per Pixel) at Zoom 15 (Fixed Fetch Zoom)
@@ -243,15 +285,25 @@ const metersPerPixel = computed(() => {
   if (useUSGS.value && (isCONUS || isAlaska || isHawaii)) {
       return 1.0;
   }
+  // GPXZ is typically high res (1m or better), so we can assume 1m/px for display purposes if enabled
+  if (useGPXZ.value) {
+      return 1.0;
+  }
   return (156543.03 * Math.cos(props.center.lat * Math.PI / 180)) / 32768;
 });
 
 // Calculate Area
 const totalWidthMeters = computed(() => props.resolution * metersPerPixel.value);
 const totalAreaSqM = computed(() => totalWidthMeters.value * totalWidthMeters.value);
+const areaSqKm = computed(() => totalAreaSqM.value / 1000000);
+
+const isAreaTooLargeForGPXZ = computed(() => {
+    return useGPXZ.value && areaSqKm.value > 10;
+});
+
 const areaDisplay = computed(() => {
   return totalAreaSqM.value > 1000000 
-    ? `${(totalAreaSqM.value / 1000000).toFixed(2)} km²`
+    ? `${areaSqKm.value.toFixed(2)} km²`
     : `${Math.round(totalAreaSqM.value).toLocaleString()} m²`;
 });
 

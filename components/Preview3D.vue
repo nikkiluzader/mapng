@@ -5,7 +5,9 @@
       <TresAmbientLight :intensity="0.5" />
       <TresDirectionalLight :position="[50, 50, 25]" :intensity="1" :cast-shadow="true" />
       
-      <Environment :preset="preset" :background="true" />
+      <Suspense>
+        <Environment :preset="preset" :background="true" />
+      </Suspense>
       
       <TerrainMesh :terrain-data="terrainData" :quality="quality" />
       

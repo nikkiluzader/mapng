@@ -42,11 +42,13 @@ const getProj4Def = async (code: number): Promise<string> => {
     const epsg = `EPSG:${code}`;
     if (proj4.defs(epsg)) return epsg;
     
+    console.log(`[Proj4] Fetching definition for ${epsg}...`);
     try {
         const response = await fetch(`https://epsg.io/${code}.proj4`);
         if (!response.ok) throw new Error("Proj4 fetch failed");
         const def = await response.text();
         proj4.defs(epsg, def);
+        console.log(`[Proj4] Loaded definition for ${epsg}`);
         return epsg;
     } catch (e) {
         console.warn(`Failed to fetch definition for EPSG:${code}`, e);
@@ -55,6 +57,213 @@ const getProj4Def = async (code: number): Promise<string> => {
 };
 
 const NO_DATA_VALUE = -99999;
+
+const resampleGeoTIFF = async (image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array, startX: number, startY: number, width: number, height: number): Promise<Float32Array | null> => {
+    const tiffWidth = image.getWidth();
+    const tiffHeight = image.getHeight();
+    const [originX, originY] = image.getOrigin();
+    const [resX, resY] = image.getResolution(); 
+    
+    const geoKeys = image.getGeoKeys();
+    const epsgCode = geoKeys.ProjectedCSTypeGeoKey || geoKeys.GeographicTypeGeoKey;
+    
+    if (!epsgCode) {
+        console.warn("No EPSG code found in GeoTIFF");
+        return null;
+    }
+    
+    const projName = await getProj4Def(epsgCode);
+    if (!projName) return null;
+
+    // Converter from WGS84 (Lat/Lon) to TIFF CRS
+    const converter = proj4('EPSG:4326', projName);
+    
+    const heightMap = new Float32Array(width * height);
+    heightMap.fill(NO_DATA_VALUE);
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            // Get Lat/Lon for this pixel in the Web Mercator grid
+            const loc = unproject(startX + x, startY + y, TERRAIN_ZOOM);
+            
+            // Convert Lat/Lon to TIFF CRS
+            const [tiffX, tiffY] = converter.forward([loc.lng, loc.lat]);
+            
+            // Map to TIFF pixel coordinates
+            const px = (tiffX - originX) / resX;
+            const py = (tiffY - originY) / resY;
+            
+            if (px >= 0 && px < tiffWidth - 1 && py >= 0 && py < tiffHeight - 1) {
+                // Bilinear Interpolation
+                const x0 = Math.floor(px);
+                const y0 = Math.floor(py);
+                const dx = px - x0;
+                const dy = py - y0;
+                
+                const i00 = y0 * tiffWidth + x0;
+                const i10 = i00 + 1;
+                const i01 = (y0 + 1) * tiffWidth + x0;
+                const i11 = i01 + 1;
+                
+                const h00 = raster[i00];
+                const h10 = raster[i10];
+                const h01 = raster[i01];
+                const h11 = raster[i11];
+                
+                const h = (1 - dy) * ((1 - dx) * h00 + dx * h10) + dy * ((1 - dx) * h01 + dx * h11);
+                heightMap[y * width + x] = h;
+            }
+        }
+    }
+    return heightMap;
+};
+
+const resampleCompositeGeoTIFF = async (
+    tiles: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array, bounds: Bounds }[],
+    startX: number,
+    startY: number,
+    width: number,
+    height: number
+): Promise<Float32Array | null> => {
+    const heightMap = new Float32Array(width * height);
+    heightMap.fill(NO_DATA_VALUE);
+
+    // Pre-calculate tile metadata to avoid repeated calls
+    const tileMeta = await Promise.all(tiles.map(async (t) => {
+        const tiffWidth = t.image.getWidth();
+        const tiffHeight = t.image.getHeight();
+        const [originX, originY] = t.image.getOrigin();
+        const [resX, resY] = t.image.getResolution();
+        return { ...t, tiffWidth, tiffHeight, originX, originY, resX, resY };
+    }));
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const loc = unproject(startX + x, startY + y, TERRAIN_ZOOM);
+            
+            // Find which tile covers this location
+            // Since we use projection=latlon, coordinates are directly comparable
+            const tile = tileMeta.find(t => 
+                loc.lat <= t.bounds.north && loc.lat >= t.bounds.south &&
+                loc.lng >= t.bounds.west && loc.lng <= t.bounds.east
+            );
+
+            if (tile) {
+                // Map to TIFF pixel coordinates (Lat/Lon projection)
+                // originX is West (min X), originY is North (max Y) usually for GeoTIFF
+                // resX is positive, resY is usually negative (top-down)
+                
+                const px = (loc.lng - tile.originX) / tile.resX;
+                const py = (loc.lat - tile.originY) / tile.resY;
+
+                if (px >= 0 && px < tile.tiffWidth - 1 && py >= 0 && py < tile.tiffHeight - 1) {
+                    // Bilinear Interpolation
+                    const x0 = Math.floor(px);
+                    const y0 = Math.floor(py);
+                    const dx = px - x0;
+                    const dy = py - y0;
+                    
+                    const i00 = y0 * tile.tiffWidth + x0;
+                    const i10 = i00 + 1;
+                    const i01 = (y0 + 1) * tile.tiffWidth + x0;
+                    const i11 = i01 + 1;
+                    
+                    const h00 = tile.raster[i00];
+                    const h10 = tile.raster[i10];
+                    const h01 = tile.raster[i01];
+                    const h11 = tile.raster[i11];
+                    
+                    const h = (1 - dy) * ((1 - dx) * h00 + dx * h10) + dy * ((1 - dx) * h01 + dx * h11);
+                    heightMap[y * width + x] = h;
+                }
+            }
+        }
+    }
+    return heightMap;
+};
+
+const fetchGPXZTerrain = async (startX: number, startY: number, width: number, height: number, apiKey: string): Promise<Float32Array | null> => {
+    try {
+        const nw = unproject(startX, startY, TERRAIN_ZOOM);
+        const se = unproject(startX + width, startY + height, TERRAIN_ZOOM);
+        const bounds = { north: nw.lat, west: nw.lng, south: se.lat, east: se.lng };
+
+        // Calculate Area in km²
+        // Approx: 1 deg lat = 111km. 1 deg lon = 111km * cos(lat)
+        const latDist = (bounds.north - bounds.south) * 111.32;
+        const avgLatRad = (bounds.north + bounds.south) / 2 * Math.PI / 180;
+        const lonDist = (bounds.east - bounds.west) * 111.32 * Math.cos(avgLatRad);
+        const areaKm2 = latDist * lonDist;
+
+        console.log(`[GPXZ] Requested Area: ${areaKm2.toFixed(2)} km²`);
+
+        const MAX_AREA_KM2 = 9.5; // Safety margin below 10km²
+        const tileRequests: Bounds[] = [];
+
+        if (areaKm2 > MAX_AREA_KM2) {
+            // Split into grid
+            const cols = Math.ceil(lonDist / Math.sqrt(MAX_AREA_KM2));
+            const rows = Math.ceil(latDist / Math.sqrt(MAX_AREA_KM2));
+            
+            const latStep = (bounds.north - bounds.south) / rows;
+            const lonStep = (bounds.east - bounds.west) / cols;
+
+            console.log(`[GPXZ] Area too large. Splitting into ${cols}x${rows} grid.`);
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    // Note: North is max lat, South is min lat.
+                    // Iterating r from 0 (top) to rows (bottom)
+                    const subNorth = bounds.north - (r * latStep);
+                    const subSouth = bounds.north - ((r + 1) * latStep);
+                    const subWest = bounds.west + (c * lonStep);
+                    const subEast = bounds.west + ((c + 1) * lonStep);
+                    
+                    tileRequests.push({
+                        north: subNorth,
+                        south: subSouth,
+                        west: subWest,
+                        east: subEast
+                    });
+                }
+            }
+        } else {
+            tileRequests.push(bounds);
+        }
+
+        // Fetch all tiles
+        const tiles = await pMap(tileRequests, async (b) => {
+             // Force projection=latlon to simplify stitching
+             const url = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${b.north}&bbox_bottom=${b.south}&bbox_left=${b.west}&bbox_right=${b.east}&res_m=1&projection=latlon`;
+             
+             console.log(`[GPXZ] Fetching tile: ${url}`);
+             const response = await fetch(url, { headers: { 'x-api-key': apiKey } });
+             
+             if (!response.ok) {
+                 console.error(`[GPXZ] Tile Error: ${response.status}`);
+                 return null;
+             }
+             
+             const arrayBuffer = await response.arrayBuffer();
+             const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+             const image = await tiff.getImage();
+             const rasters = await image.readRasters();
+             const raster = rasters[0] as Float32Array | Int16Array;
+             
+             return { image, raster, bounds: b };
+        }, 4); // Concurrency 4
+
+        const validTiles = tiles.filter((t): t is NonNullable<typeof t> => t !== null);
+        
+        if (validTiles.length === 0) return null;
+
+        return await resampleCompositeGeoTIFF(validTiles, startX, startY, width, height);
+
+    } catch (e) {
+        console.error("Failed to fetch GPXZ terrain:", e);
+        return null;
+    }
+};
 
 const fetchUSGSTerrain = async (startX: number, startY: number, width: number, height: number): Promise<Float32Array | null> => {
     try {
@@ -67,13 +276,20 @@ const fetchUSGSTerrain = async (startX: number, startY: number, width: number, h
         const bbox = `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`;
         const url = `${USGS_PRODUCT_API}?datasets=${encodeURIComponent(USGS_DATASET)}&bbox=${bbox}&prodFormats=GeoTIFF&max=1`;
         
+        console.log(`[USGS] Querying products: ${url}`);
+
         const response = await fetch(url);
         const data = await response.json();
         
-        if (!data.items || data.items.length === 0) return null;
+        if (!data.items || data.items.length === 0) {
+            console.log(`[USGS] No products found for bounds.`);
+            return null;
+        }
         
         // 2. Download GeoTIFF
         const downloadUrl = data.items[0].downloadURL;
+        console.log(`[USGS] Downloading GeoTIFF from: ${downloadUrl}`);
+
         const tiffResponse = await fetch(downloadUrl);
         const arrayBuffer = await tiffResponse.arrayBuffer();
         
@@ -83,68 +299,7 @@ const fetchUSGSTerrain = async (startX: number, startY: number, width: number, h
         const rasters = await image.readRasters();
         const raster = rasters[0] as Float32Array | Int16Array; // Height data
         
-        // 4. Get Projection
-        const geoKeys = image.getGeoKeys();
-        const epsgCode = geoKeys.ProjectedCSTypeGeoKey || geoKeys.GeographicTypeGeoKey;
-        
-        if (!epsgCode) {
-            console.warn("No EPSG code found in GeoTIFF");
-            return null;
-        }
-        
-        const projName = await getProj4Def(epsgCode);
-        if (!projName) return null;
-        
-        // 5. Resample to requested grid
-        const heightMap = new Float32Array(width * height);
-        heightMap.fill(NO_DATA_VALUE); // Initialize with NO_DATA
-
-        const tiffWidth = image.getWidth();
-        const tiffHeight = image.getHeight();
-        const [originX, originY] = image.getOrigin();
-        const [resX, resY] = image.getResolution(); 
-        
-        // Converter from WGS84 (Lat/Lon) to TIFF CRS
-        const converter = proj4('EPSG:4326', projName);
-        
-        for (let y = 0; y < height; y++) {
-            for (let x = 0; x < width; x++) {
-                // Get Lat/Lon for this pixel in the Web Mercator grid
-                const loc = unproject(startX + x, startY + y, TERRAIN_ZOOM);
-                
-                // Convert Lat/Lon to TIFF CRS
-                const [tiffX, tiffY] = converter.forward([loc.lng, loc.lat]);
-                
-                // Map to TIFF pixel coordinates
-                const px = (tiffX - originX) / resX;
-                const py = (tiffY - originY) / resY;
-                
-                if (px >= 0 && px < tiffWidth - 1 && py >= 0 && py < tiffHeight - 1) {
-                    // Bilinear Interpolation
-                    const x0 = Math.floor(px);
-                    const y0 = Math.floor(py);
-                    const dx = px - x0;
-                    const dy = py - y0;
-                    
-                    const i00 = y0 * tiffWidth + x0;
-                    const i10 = i00 + 1;
-                    const i01 = (y0 + 1) * tiffWidth + x0;
-                    const i11 = i01 + 1;
-                    
-                    const h00 = raster[i00];
-                    const h10 = raster[i10];
-                    const h01 = raster[i01];
-                    const h11 = raster[i11];
-                    
-                    const h = (1 - dy) * ((1 - dx) * h00 + dx * h10) + dy * ((1 - dx) * h01 + dx * h11);
-                    heightMap[y * width + x] = h;
-                }
-                // Else remains NO_DATA_VALUE
-            }
-        }
-        
-        console.log("Successfully loaded USGS 1m DEM data");
-        return heightMap;
+        return await resampleGeoTIFF(image, raster, startX, startY, width, height);
         
     } catch (e) {
         console.warn("Failed to load USGS terrain, falling back to global provider:", e);
@@ -182,7 +337,7 @@ async function pMap<T, R>(
   return results;
 }
 
-export const fetchTerrainData = async (center: LatLng, resolution: number, includeOSM: boolean = false, useUSGS: boolean = false): Promise<TerrainData> => {
+export const fetchTerrainData = async (center: LatLng, resolution: number, includeOSM: boolean = false, useUSGS: boolean = false, useGPXZ: boolean = false, gpxzApiKey: string = ''): Promise<TerrainData> => {
   // 1. Calculate World Pixel Coordinates for the Center
   const centerPx = project(center.lat, center.lng, TERRAIN_ZOOM);
   
@@ -204,14 +359,20 @@ export const fetchTerrainData = async (center: LatLng, resolution: number, inclu
       east: se.lng
   };
 
-  // Try USGS first if in USA (CONUS, Alaska, Hawaii) AND enabled
+  // Try GPXZ if enabled
+  let gpxzHeightMap: Float32Array | null = null;
+  if (useGPXZ && gpxzApiKey) {
+      gpxzHeightMap = await fetchGPXZTerrain(startX, startY, resolution, resolution, gpxzApiKey);
+  }
+
+  // Try USGS first if in USA (CONUS, Alaska, Hawaii) AND enabled AND GPXZ not used
   let usgsHeightMap: Float32Array | null = null;
   
   const isCONUS = bounds.north < 50 && bounds.south > 24 && bounds.west > -125 && bounds.east < -66;
   const isAlaska = bounds.north < 72 && bounds.south > 50 && bounds.west > -170 && bounds.east < -129;
   const isHawaii = bounds.north < 23 && bounds.south > 18 && bounds.west > -161 && bounds.east < -154;
 
-  if (useUSGS && (isCONUS || isAlaska || isHawaii)) {
+  if (!useGPXZ && useUSGS && (isCONUS || isAlaska || isHawaii)) {
       usgsHeightMap = await fetchUSGSTerrain(startX, startY, resolution, resolution);
   }
 
@@ -297,8 +458,15 @@ export const fetchTerrainData = async (center: LatLng, resolution: number, inclu
         h = i > 0 ? heightMap[(i / 4) - 1] : 0;
     }
 
+    // If we have GPXZ data for this pixel, use it instead
+    if (gpxzHeightMap) {
+        const gpxzVal = gpxzHeightMap[i / 4];
+        if (gpxzVal !== NO_DATA_VALUE) {
+            h = gpxzVal;
+        }
+    }
     // If we have USGS data for this pixel, use it instead
-    if (usgsHeightMap) {
+    else if (usgsHeightMap) {
         const usgsVal = usgsHeightMap[i / 4];
         if (usgsVal !== NO_DATA_VALUE) {
             h = usgsVal;

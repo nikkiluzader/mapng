@@ -98,14 +98,23 @@
         </div>
         
         <!-- 3D Preview View -->
-        <div :class="['absolute inset-0 bg-gray-900 transition-opacity duration-500', previewMode ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
-          <Preview3D v-if="previewMode && terrainData" :terrain-data="terrainData" />
-          <div v-else-if="previewMode && !terrainData && !isLoading" class="flex flex-col items-center justify-center h-full text-gray-500 space-y-4">
-            <Layers :size="64" class="text-gray-300" />
-            <p>Select an area and generate a preview.</p>
-          </div>
+        <div :class="['absolute inset-0 transition-all duration-500 bg-black', previewMode ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
+          <Suspense>
+            <template #default>
+              <Preview3D 
+                v-if="terrainData && previewMode"
+                :terrain-data="terrainData" 
+              />
+            </template>
+            <template #fallback>
+              <div class="w-full h-full flex items-center justify-center text-white flex-col gap-4">
+                <Loader2 class="animate-spin text-[#FF6600]" :size="48" />
+                <div class="text-lg font-medium">Loading 3D Scene...</div>
+              </div>
+            </template>
+          </Suspense>
         </div>
-
+        
         <!-- Loading Overlay -->
         <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
           <div class="text-center p-8 rounded-2xl bg-white border border-gray-200 shadow-2xl">
@@ -309,10 +318,10 @@ const setResolution = (newResolution: number) => {
   resolution.value = newResolution;
 };
 
-const handleGenerate = async (showPreview: boolean, fetchOSM: boolean, useUSGS: boolean) => {
+const handleGenerate = async (showPreview: boolean, fetchOSM: boolean, useUSGS: boolean, useGPXZ: boolean, gpxzApiKey: string) => {
   isLoading.value = true;
   try {
-    const data = await fetchTerrainData(center.value, resolution.value, fetchOSM, useUSGS);
+    const data = await fetchTerrainData(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, gpxzApiKey);
     terrainData.value = data;
     
     if (showPreview) {

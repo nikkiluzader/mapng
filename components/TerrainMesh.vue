@@ -61,9 +61,10 @@ watch([() => props.terrainData, () => props.quality], () => {
     // Update UVs to match the physical position
     // Texture (0,0) is top-left, Mesh UV (0,0) is bottom-left
     // u maps 0->1 (Left->Right) => UV.x
-    // v maps 0->1 (Top->Bottom) => UV.y should be 1->0
+    // v maps 0->1 (Top->Bottom) => UV.y
+    // We disable flipY on the texture, so (0,0) UV corresponds to Top-Left of the image
     uvs[i * 2] = u;
-    uvs[i * 2 + 1] = 1 - v;
+    uvs[i * 2 + 1] = v;
   }
 
   geo.computeVertexNormals();
@@ -83,6 +84,8 @@ const texture = computed(() => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
+    tex.flipY = false; // Disable flipY to avoid WebGL warnings and overhead
+    tex.premultiplyAlpha = false; // Ensure no alpha premultiplication
     return tex;
   }
   return null;
