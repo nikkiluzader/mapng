@@ -12,11 +12,14 @@
   "dependencies": {
     "@tresjs/cientos": "^4.0.0",
     "@tresjs/core": "^4.0.0",
+    "@types/proj4": "^2.5.6",
     "@vue-leaflet/vue-leaflet": "^0.10.0",
     "@vueuse/core": "^11.0.0",
     "fast-png": "^6.1.0",
+    "geotiff": "^2.1.4-beta.1",
     "leaflet": "^1.9.4",
     "lucide-vue-next": "^0.460.0",
+    "proj4": "^2.20.2",
     "three": "^0.162.0",
     "vue": "^3.5.0"
   },

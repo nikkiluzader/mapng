@@ -122,7 +122,7 @@ const buildQuery = (bounds: Bounds) => {
     const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
     
     return `
-        [out:json][timeout:25];
+        [out:json][timeout:60];
         (
           node["natural"="tree"](${bbox});
           way["highway"](${bbox});
@@ -292,7 +292,7 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
     return clippedFeatures;
 };
 
-export const fetchOSMData = async (bounds: Bounds): Promise<OSMFeature[]> => {
+export const fetchOSMData = async (bounds: Bounds, retries = 1): Promise<OSMFeature[]> => {
     try {
         const query = buildQuery(bounds);
         const response = await fetch(OVERPASS_API_URL, {
@@ -311,6 +311,12 @@ export const fetchOSMData = async (bounds: Bounds): Promise<OSMFeature[]> => {
         return parseOverpassResponse(data, bounds);
 
     } catch (error) {
+        if (retries > 0) {
+            console.warn("Retrying OSM fetch...", error);
+            // Wait 1 second before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return fetchOSMData(bounds, retries - 1);
+        }
         console.warn("Failed to fetch OSM data:", error);
         return []; 
     }

@@ -40,6 +40,27 @@
               class="accent-[#FF6600] w-4 h-4 cursor-pointer"
           />
       </div>
+
+      <!-- USGS Toggle -->
+      <div class="flex flex-col gap-1 p-2 rounded bg-gray-50 border border-gray-200">
+          <div class="flex items-center justify-between">
+            <label class="text-xs text-gray-700 flex items-center gap-2 cursor-pointer">
+                <Mountain :size="12" class="text-blue-600" />
+                Use USGS 1m DEM (USA Only)
+            </label>
+            <input 
+                type="checkbox" 
+                v-model="useUSGS"
+                class="accent-[#FF6600] w-4 h-4 cursor-pointer"
+            />
+          </div>
+          <div class="flex items-center gap-1 text-[10px]">
+             <span class="text-gray-500">National Map Status:</span>
+             <span v-if="usgsStatus === null" class="text-gray-400">Checking...</span>
+             <span v-else-if="usgsStatus" class="text-emerald-600 font-medium">● Online</span>
+             <span v-else class="text-red-500 font-medium">● Offline / Unreachable</span>
+          </div>
+      </div>
     </div>
 
     <hr class="border-gray-200" />
@@ -71,7 +92,7 @@
     <!-- Generate Buttons -->
     <div class="pt-2 grid grid-cols-2 gap-3">
       <button
-        @click="$emit('generate', true, fetchOSM)"
+        @click="$emit('generate', true, fetchOSM, useUSGS)"
         :disabled="isGenerating"
         class="py-3 bg-[#FF6600] hover:bg-[#E65C00] text-white font-bold rounded-md shadow-lg shadow-orange-900/10 flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300"
       >
@@ -86,7 +107,7 @@
       </button>
 
       <button
-        @click="$emit('generate', false, fetchOSM)"
+        @click="$emit('generate', false, fetchOSM, useUSGS)"
         :disabled="isGenerating"
         class="py-3 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold rounded-md shadow-sm flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -180,10 +201,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson } from 'lucide-vue-next';
 import { LatLng, TerrainData } from '../types';
 import { exportToGLB } from '../services/export3d';
+import { checkUSGSStatus } from '../services/terrain';
 
 interface Props {
   center: LatLng;
@@ -197,14 +219,30 @@ const props = defineProps<Props>();
 defineEmits<{
   locationChange: [loc: LatLng];
   resolutionChange: [res: number];
-  generate: [showPreview: boolean, fetchOSM: boolean];
+  generate: [showPreview: boolean, fetchOSM: boolean, useUSGS: boolean];
 }>();
 
 const isExportingGLB = ref(false);
 const fetchOSM = ref(false);
+const useUSGS = ref(false);
+const usgsStatus = ref<boolean | null>(null);
+
+onMounted(async () => {
+    usgsStatus.value = await checkUSGSStatus();
+});
 
 // Calculate resolution scale (Meters per Pixel) at Zoom 15 (Fixed Fetch Zoom)
 const metersPerPixel = computed(() => {
+  const lat = props.center.lat;
+  const lng = props.center.lng;
+
+  const isCONUS = lat < 50 && lat > 24 && lng > -125 && lng < -66;
+  const isAlaska = lat < 72 && lat > 50 && lng > -170 && lng < -129;
+  const isHawaii = lat < 23 && lat > 18 && lng > -161 && lng < -154;
+  
+  if (useUSGS.value && (isCONUS || isAlaska || isHawaii)) {
+      return 1.0;
+  }
   return (156543.03 * Math.cos(props.center.lat * Math.PI / 180)) / 32768;
 });
 

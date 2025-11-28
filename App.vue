@@ -301,10 +301,10 @@ const setResolution = (newResolution: number) => {
   resolution.value = newResolution;
 };
 
-const handleGenerate = async (showPreview: boolean, fetchOSM: boolean) => {
+const handleGenerate = async (showPreview: boolean, fetchOSM: boolean, useUSGS: boolean) => {
   isLoading.value = true;
   try {
-    const data = await fetchTerrainData(center.value, resolution.value, fetchOSM);
+    const data = await fetchTerrainData(center.value, resolution.value, fetchOSM, useUSGS);
     terrainData.value = data;
     
     if (showPreview) {
