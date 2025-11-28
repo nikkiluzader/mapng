@@ -21,6 +21,7 @@ Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle sim
 ## ✨ Key Features
 
 - **🌍 Global Coverage**: Access terrain data for anywhere on Earth using AWS Terrain Tiles.
+- **🏔️ GPXZ Integration**: Optional support for premium high-resolution global elevation data via GPXZ API.
 - **🇺🇸 High-Res USA Data**: Optional integration with USGS National Map for 1-meter resolution DEMs (CONUS, Alaska, Hawaii).
 - **🗺️ Precision Selection**: Interactive 2D map (Leaflet) with Satellite, Topo, and OSM layers for precise area selection.
 - **🏔️ 3D Preview**: Real-time 3D visualization of the generated terrain using Three.js (via TresJS).
@@ -97,6 +98,7 @@ The output files will be in the `dist` directory.
 - **Elevation**: 
   - [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Global, ~30m)
   - [USGS National Map](https://tnmaccess.nationalmap.gov/api/v1/docs) (USA, 1m)
+  - [GPXZ](https://gpxz.io/) (Global, High-Res)
 - **Imagery**: [Esri World Imagery](https://www.esri.com/en-us/arcgis/products/world-imagery)
 - **Vector Data**: [OpenStreetMap](https://www.openstreetmap.org/) via Overpass API
 

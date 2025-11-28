@@ -225,6 +225,10 @@
                 <div class="text-xs text-gray-500 mt-1">1m resolution DEM (USA Only)</div>
               </div>
               <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                <div class="font-medium text-gray-900">GPXZ API</div>
+                <div class="text-xs text-gray-500 mt-1">Premium global high-res elevation data</div>
+              </div>
+              <div class="bg-gray-50 p-3 rounded border border-gray-200">
                 <div class="font-medium text-gray-900">Overpass API (OSM)</div>
                 <div class="text-xs text-gray-500 mt-1">Live vector data for roads, buildings, and vegetation</div>
               </div>
