@@ -103,7 +103,7 @@ interface Props {
 
 defineProps<Props>();
 
-const quality = ref<Quality>('low');
+const quality = ref<Quality>('high');
 const preset = ref<Preset>('dawn');
 const showAreas = ref(false);
 const presets: Preset[] = ['city', 'dawn', 'sunset', 'night', 'forest', 'studio', 'umbrellas', 'snow', 'hangar', 'urban', 'modern', 'shangai'];
