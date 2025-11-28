@@ -8,9 +8,14 @@ type Quality = 'low' | 'medium' | 'high';
 interface Props {
   terrainData: TerrainData;
   quality: Quality;
+  showSatellite?: boolean;
+  wireframe?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  showSatellite: true,
+  wireframe: false
+});
 
 const SCENE_SIZE = 100;
 const geometry = shallowRef<THREE.PlaneGeometry | null>(null);
@@ -102,11 +107,13 @@ const texture = computed(() => {
     :geometry="geometry"
   >
     <TresMeshStandardMaterial 
-      :map="texture"
-      :color="texture ? 0xffffff : 0x64748b"
+      :key="showSatellite ? 'sat' : 'solid'"
+      :map="showSatellite ? texture : null"
+      :color="showSatellite ? 0xffffff : 0x6B705C"
       :roughness="1"
       :metalness="0"
       :side="2"
+      :wireframe="wireframe"
     />
   </TresMesh>
 </template>

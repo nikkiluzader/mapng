@@ -9,7 +9,12 @@
         <Environment :preset="preset" :background="true" />
       </Suspense>
       
-      <TerrainMesh :terrain-data="terrainData" :quality="quality" />
+      <TerrainMesh 
+        :terrain-data="terrainData" 
+        :quality="quality" 
+        :show-satellite="showSatellite"
+        :wireframe="showWireframe"
+      />
       
       <OSMFeatures 
         v-if="terrainData.osmFeatures && terrainData.osmFeatures.length > 0" 
@@ -75,6 +80,26 @@
           <label class="text-xs text-gray-500 flex items-center gap-1">
               <Layers :size="12" /> Overlays
           </label>
+          
+          <!-- Satellite Toggle -->
+          <label class="flex items-center gap-2 cursor-pointer group/check">
+              <div class="relative">
+                  <input type="checkbox" v-model="showSatellite" class="peer sr-only" />
+                  <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"></div>
+              </div>
+              <span class="text-xs text-gray-700 group-hover/check:text-gray-900">Satellite Texture</span>
+          </label>
+
+          <!-- Wireframe Toggle -->
+          <label class="flex items-center gap-2 cursor-pointer group/check">
+              <div class="relative">
+                  <input type="checkbox" v-model="showWireframe" class="peer sr-only" />
+                  <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"></div>
+              </div>
+              <span class="text-xs text-gray-700 group-hover/check:text-gray-900">Wireframe Mode</span>
+          </label>
+
+          <!-- OSM Areas Toggle -->
           <label class="flex items-center gap-2 cursor-pointer group/check">
               <div class="relative">
                   <input type="checkbox" v-model="showAreas" class="peer sr-only" />
@@ -108,6 +133,8 @@ defineProps<Props>();
 const quality = ref<Quality>('high');
 const preset = ref<Preset>('dawn');
 const showAreas = ref(false);
+const showSatellite = ref(true);
+const showWireframe = ref(false);
 const presets: Preset[] = ['city', 'dawn', 'sunset', 'night', 'forest', 'studio', 'umbrellas', 'snow', 'hangar', 'urban', 'modern', 'shangai'];
 
 // Static camera config to prevent re-renders resetting position
