@@ -1,6 +1,7 @@
 export interface LatLng {
   lat: number;
   lng: number;
+  tags?: Record<string, string>;
 }
 
 export interface Bounds {
@@ -14,6 +15,7 @@ export interface OSMFeature {
     id: string;
     type: 'road' | 'building' | 'vegetation' | 'water' | 'barrier';
     geometry: LatLng[]; // List of points defining the feature
+    holes?: LatLng[][]; // List of inner rings (holes)
     tags?: Record<string, string>;
 }
 

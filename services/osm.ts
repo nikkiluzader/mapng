@@ -124,10 +124,11 @@ const buildQuery = (bounds: Bounds) => {
     return `
         [out:json][timeout:25];
         (
+          node["natural"="tree"](${bbox});
           way["highway"](${bbox});
           way["building"](${bbox});
-          way["natural"~"wood|scrub"](${bbox});
-          way["landuse"~"forest|grass|meadow|park"](${bbox});
+          way["natural"~"wood|scrub|tree_row|grass|meadow|heath|moor|wetland|sand|beach|bare_rock|scree|dirt"](${bbox});
+          way["landuse"~"forest|grass|meadow|park|orchard|vineyard|farmland|quarry"](${bbox});
           way["historic"](${bbox});
           way["barrier"](${bbox});
           way["man_made"="bridge"](${bbox});
@@ -147,10 +148,24 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
     const rawFeatures: OSMFeature[] = [];
     const consumedWayIds = new Set<number>();
 
-    // 1. Index Nodes
+    // 1. Index Nodes & Process Standalone Nodes
     for (const el of data.elements) {
         if (el.type === 'node') {
-            nodes[el.id] = { lat: el.lat, lng: el.lon };
+            nodes[el.id] = { lat: el.lat, lng: el.lon, tags: el.tags };
+            
+            // Check for standalone tree nodes
+            if (el.tags && el.tags.natural === 'tree') {
+                 // Check if inside bounds (simple check)
+                 if (el.lat <= bounds.north && el.lat >= bounds.south && 
+                     el.lon <= bounds.east && el.lon >= bounds.west) {
+                     rawFeatures.push({
+                        id: el.id.toString(),
+                        type: 'vegetation',
+                        geometry: [{ lat: el.lat, lng: el.lon }],
+                        tags: el.tags
+                     });
+                 }
+            }
         }
     }
 
@@ -176,6 +191,17 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
         
         if (isBuilding && r.members) {
             const outers = r.members.filter((m: any) => m.type === 'way' && m.role === 'outer');
+            const inners = r.members.filter((m: any) => m.type === 'way' && m.role === 'inner');
+            
+            const holeGeometries: LatLng[][] = [];
+            for (const member of inners) {
+                 const w = ways[member.ref];
+                 if (w) {
+                     holeGeometries.push(w.nodes);
+                     consumedWayIds.add(member.ref);
+                 }
+            }
+
             for (const member of outers) {
                 const w = ways[member.ref];
                 if (w) {
@@ -184,6 +210,7 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
                         id: `${r.id}_${member.ref}`,
                         type,
                         geometry: w.nodes,
+                        holes: holeGeometries,
                         tags: { ...tags, ...w.tags }
                     });
                     consumedWayIds.add(member.ref);
@@ -201,8 +228,8 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
         const tags = w.tags;
         let type: OSMFeature['type'] | null = null;
 
-        if (tags.building || tags.historic) type = 'building';
-        else if (tags.natural === 'wood' || tags.natural === 'scrub' || tags.landuse) type = 'vegetation';
+        if (tags.building || (tags.historic && tags.historic !== 'district')) type = 'building';
+        else if (tags.natural || tags.landuse) type = 'vegetation';
         else if (tags.highway) type = 'road';
         else if (tags.man_made === 'bridge') type = 'road';
         else if (tags.barrier) type = 'barrier';
@@ -221,6 +248,12 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
     const clippedFeatures: OSMFeature[] = [];
 
     for (const f of rawFeatures) {
+        if (f.geometry.length === 1) {
+             // It's a point (tree), already checked bounds
+             clippedFeatures.push(f);
+             continue;
+        }
+
         if (f.type === 'road' || f.type === 'barrier') {
             const clippedSegments = clipLineString(f.geometry, bounds);
             clippedSegments.forEach((segment, index) => {
@@ -236,9 +269,21 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
             // Polygon clipping
             const clippedPoly = clipPolygon(f.geometry, bounds);
             if (clippedPoly.length > 2) {
+                // Clip holes too
+                const clippedHoles: LatLng[][] = [];
+                if (f.holes) {
+                    for (const hole of f.holes) {
+                        const clippedHole = clipPolygon(hole, bounds);
+                        if (clippedHole.length > 2) {
+                            clippedHoles.push(clippedHole);
+                        }
+                    }
+                }
+
                 clippedFeatures.push({
                     ...f,
-                    geometry: clippedPoly
+                    geometry: clippedPoly,
+                    holes: clippedHoles.length > 0 ? clippedHoles : undefined
                 });
             }
         }
