@@ -9,7 +9,11 @@
       
       <TerrainMesh :terrain-data="terrainData" :quality="quality" />
       
-      <OSMFeatures v-if="terrainData.osmFeatures && terrainData.osmFeatures.length > 0" :terrain-data="terrainData" />
+      <OSMFeatures 
+        v-if="terrainData.osmFeatures && terrainData.osmFeatures.length > 0" 
+        :terrain-data="terrainData" 
+        :show-areas="showAreas"
+      />
       
       <OrbitControls 
         make-default
@@ -52,7 +56,7 @@
        </div>
 
        <!-- Environment Selector -->
-       <div class="space-y-2">
+       <div class="space-y-2 mb-4">
           <label class="text-xs text-gray-500 flex items-center gap-1">
               <Settings :size="12" /> Environment
           </label>
@@ -63,6 +67,20 @@
               <option v-for="p in presets" :key="p" :value="p">{{ p }}</option>
           </select>
        </div>
+
+       <!-- Overlays -->
+       <div class="space-y-2">
+          <label class="text-xs text-gray-500 flex items-center gap-1">
+              <Layers :size="12" /> Overlays
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer group/check">
+              <div class="relative">
+                  <input type="checkbox" v-model="showAreas" class="peer sr-only" />
+                  <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"></div>
+              </div>
+              <span class="text-xs text-gray-700 group-hover/check:text-gray-900">Ground Materials</span>
+          </label>
+       </div>
     </div>
   </div>
 </template>
@@ -71,7 +89,7 @@
 import { ref } from 'vue';
 import { TresCanvas } from '@tresjs/core';
 import { OrbitControls, Environment } from '@tresjs/cientos';
-import { Settings, Gauge } from 'lucide-vue-next';
+import { Settings, Gauge, Layers } from 'lucide-vue-next';
 import { TerrainData } from '../types';
 import TerrainMesh from './TerrainMesh.vue';
 import OSMFeatures from './OSMFeatures.vue';
@@ -87,6 +105,7 @@ defineProps<Props>();
 
 const quality = ref<Quality>('low');
 const preset = ref<Preset>('dawn');
+const showAreas = ref(false);
 const presets: Preset[] = ['city', 'dawn', 'sunset', 'night', 'forest', 'studio', 'umbrellas', 'snow', 'hangar', 'urban', 'modern', 'shangai'];
 
 // Static camera config to prevent re-renders resetting position

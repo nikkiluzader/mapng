@@ -6,9 +6,12 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 
 interface Props {
   terrainData: TerrainData;
+  showAreas?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  showAreas: false
+});
 
 const SCENE_SIZE = 100;
 const TILE_SIZE = 256;
@@ -824,7 +827,7 @@ watch(features, () => {
 
     <!-- Areas - Merged -->
     <TresMesh 
-      v-if="mergedAreasGeometry"
+      v-if="mergedAreasGeometry && showAreas"
       :geometry="mergedAreasGeometry"
     >
       <TresMeshStandardMaterial 
