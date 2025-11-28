@@ -212,6 +212,10 @@
                 <div class="text-xs text-gray-500 mt-1">High-res satellite texture overlays</div>
               </div>
               <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                <div class="font-medium text-gray-900">USGS National Map</div>
+                <div class="text-xs text-gray-500 mt-1">1m resolution DEM (USA Only)</div>
+              </div>
+              <div class="bg-gray-50 p-3 rounded border border-gray-200">
                 <div class="font-medium text-gray-900">Overpass API (OSM)</div>
                 <div class="text-xs text-gray-500 mt-1">Live vector data for roads, buildings, and vegetation</div>
               </div>
@@ -228,6 +232,10 @@
               <div class="bg-gray-50 p-3 rounded border border-gray-200">
                 <div class="font-medium text-gray-900">fast-png</div>
                 <div class="text-xs text-gray-500 mt-1">16-bit precision heightmap encoding</div>
+              </div>
+              <div class="bg-gray-50 p-3 rounded border border-gray-200">
+                <div class="font-medium text-gray-900">geotiff.js & proj4</div>
+                <div class="text-xs text-gray-500 mt-1">GeoTIFF parsing & coordinate projection</div>
               </div>
               <div class="bg-gray-50 p-3 rounded border border-gray-200">
                 <div class="font-medium text-gray-900">BufferGeometryUtils</div>
