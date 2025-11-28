@@ -29,8 +29,15 @@
         </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight text-gray-900">MapNG</h1>
-          <p class="text-xs text-gray-500">BeamNG Heightmap Generator</p>
+          <p class="text-xs text-gray-500">BeamNG Terrain Generator</p>
         </div>
+        <button 
+          @click="showAbout = true"
+          class="ml-auto text-gray-400 hover:text-[#FF6600] transition-colors p-1 rounded-full hover:bg-orange-50"
+          title="What is this?"
+        >
+          <CircleHelp :size="20" />
+        </button>
       </div>
       
       <div class="flex-1 overflow-y-auto custom-scrollbar p-5 bg-gray-50/50">
@@ -130,7 +137,71 @@
       </div>
     </main>
 
-    <!-- Tech Stack Modal -->
+    <!-- About Modal -->
+  <div v-if="showAbout" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="showAbout = false">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="p-6 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+        <div class="flex items-center gap-3">
+          <div class="p-2 bg-[#FF6600] rounded-lg shadow-sm">
+            <Layers :size="20" class="text-white" />
+          </div>
+          <div>
+            <h2 class="text-lg font-bold text-gray-900">About MapNG</h2>
+            <p class="text-xs text-gray-500">BeamNG.drive Terrain Generator</p>
+          </div>
+        </div>
+        <button @click="showAbout = false" class="text-gray-400 hover:text-gray-900 transition-colors">
+          <X :size="20" />
+        </button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto custom-scrollbar space-y-6 text-sm text-gray-600 leading-relaxed">
+        <div class="bg-orange-50 border border-orange-100 rounded-lg p-4 text-orange-900">
+          <p class="font-medium">MapNG is a specialized tool designed to streamline the creation of real-world terrain maps for BeamNG.drive.</p>
+        </div>
+
+        <div class="space-y-4">
+          <h3 class="font-bold text-gray-900 flex items-center gap-2">
+            <Globe :size="16" class="text-[#FF6600]" />
+            What does it do?
+          </h3>
+          <p>
+            It allows modders to select any location on Earth, visualize it in 3D, and export high-precision heightmaps and 3D models ready for game engine import. Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle simulation: high-resolution height data, accurate scale, and integrated road network data.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <h4 class="font-bold text-gray-900 text-xs uppercase tracking-wider">Key Features</h4>
+            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+              <li>Global Elevation Data (AWS)</li>
+              <li>1m Resolution USA Data (USGS)</li>
+              <li>Premium High-Res Global Data (GPXZ)</li>
+              <li>3D Preview with Satellite Imagery</li>
+              <li>OSM Road & Building Integration</li>
+            </ul>
+          </div>
+          <div class="space-y-2">
+            <h4 class="font-bold text-gray-900 text-xs uppercase tracking-wider">Export Formats</h4>
+            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+              <li>16-bit PNG Heightmaps</li>
+              <li>High-Res Satellite Textures</li>
+              <li>GLB 3D Models</li>
+              <li>GeoJSON Vector Data</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-gray-100">
+          <p class="text-xs text-gray-500 text-center">
+            Created by <a href="https://github.com/nikkiluzader" target="_blank" class="text-[#FF6600] hover:underline">Nikki Luzader</a> • Open Source on <a href="https://github.com/nikkiluzader/mapng" target="_blank" class="text-[#FF6600] hover:underline">GitHub</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tech Stack Modal -->
     <div v-if="showStackInfo" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div class="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col animate-in zoom-in-95 duration-200">
         <!-- Header -->
@@ -268,7 +339,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Globe, Layers, Loader2, Code, X, Monitor, MousePointer2 } from 'lucide-vue-next';
+import { Globe, Layers, Loader2, Code, X, Monitor, MousePointer2, CircleHelp } from 'lucide-vue-next';
 import ControlPanel from './components/ControlPanel.vue';
 import MapSelector from './components/MapSelector.vue';
 import Preview3D from './components/Preview3D.vue';
@@ -282,6 +353,7 @@ const terrainData = ref<TerrainData | null>(null);
 const isLoading = ref<boolean>(false);
 const previewMode = ref<boolean>(false);
 const showStackInfo = ref<boolean>(false);
+const showAbout = ref<boolean>(false);
 
 // Attempt to get user location on load
 onMounted(() => {
