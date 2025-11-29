@@ -386,6 +386,7 @@ export const fetchTerrainData = async (
 
   // Try USGS first if in USA (CONUS, Alaska, Hawaii) AND enabled AND GPXZ not used
   let usgsHeightMap: Float32Array | null = null;
+  let usgsFallback = false;
   
   const isCONUS = bounds.north < 50 && bounds.south > 24 && bounds.west > -125 && bounds.east < -66;
   const isAlaska = bounds.north < 72 && bounds.south > 50 && bounds.west > -170 && bounds.east < -129;
@@ -396,19 +397,26 @@ export const fetchTerrainData = async (
       usgsHeightMap = await fetchUSGSTerrain(startX, startY, resolution, resolution);
 
       if (usgsHeightMap) {
-          // Check for missing data in USGS response
-          let hasMissingData = false;
-          for(let i = 0; i < usgsHeightMap.length; i++) {
-              if(usgsHeightMap[i] === NO_DATA_VALUE) {
-                  hasMissingData = true;
-                  break;
+          // Check for valid data density
+          let validCount = 0;
+          const total = usgsHeightMap.length;
+          for(let i = 0; i < total; i++) {
+              if(usgsHeightMap[i] !== NO_DATA_VALUE) {
+                  validCount++;
               }
           }
           
-          if (hasMissingData) {
-              console.warn("[USGS] Data incomplete (contains voids). Falling back to global terrain.");
+          // Only fallback if we have effectively NO valid data (e.g. < 0.1% valid)
+          // User requested to keep data even if it has holes, as long as it's not completely empty.
+          if (validCount < total * 0.001) {
+              console.warn(`[USGS] Data mostly incomplete (${validCount}/${total} valid). Falling back to global terrain.`);
               usgsHeightMap = null;
+              usgsFallback = true;
           }
+      } else {
+          // If fetchUSGSTerrain returned null (e.g. API error or no products), we also consider this a fallback scenario
+          // if the user explicitly requested USGS.
+          usgsFallback = true;
       }
   }
 
@@ -533,7 +541,8 @@ export const fetchTerrainData = async (
     maxHeight,
     satelliteTextureUrl: satCanvas.toDataURL('image/jpeg', 0.9),
     bounds,
-    osmFeatures
+    osmFeatures,
+    usgsFallback
   };
 };
 

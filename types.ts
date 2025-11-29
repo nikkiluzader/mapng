@@ -28,6 +28,7 @@ export interface TerrainData {
   satelliteTextureUrl?: string; // Optional satellite imagery URL (blob)
   bounds: Bounds; // Geographic bounds of the generated area
   osmFeatures: OSMFeature[]; // Vector data
+  usgsFallback?: boolean; // Flag indicating if USGS data was missing/corrupt and fallback occurred
 }
 
 export interface MapState {

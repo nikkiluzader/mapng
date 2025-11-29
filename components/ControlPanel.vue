@@ -287,6 +287,14 @@ watch(useUSGS, (newVal) => {
     if (newVal) useGPXZ.value = false;
 });
 
+// Watch for terrain data updates to handle fallback scenarios
+watch(() => props.terrainData, (newData) => {
+    if (newData?.usgsFallback) {
+        useUSGS.value = false;
+        alert("USGS 1m data for this area was missing or corrupt. Falling back on the Standard Terrarium dataset.\n\nMeters per pixel has been adjusted to the standard dataset resolution.");
+    }
+});
+
 // Calculate resolution scale (Meters per Pixel) at Zoom 15 (Fixed Fetch Zoom)
 const metersPerPixel = computed(() => {
   const lat = props.center.lat;
