@@ -124,12 +124,12 @@
         
         <!-- Loading Overlay -->
         <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
-          <div class="text-center p-8 rounded-2xl bg-white border border-gray-200 shadow-2xl">
+          <div class="text-center p-8 rounded-2xl bg-white border border-gray-200 shadow-2xl min-w-[300px]">
             <Loader2 :size="48" class="text-[#FF6600] animate-spin mx-auto mb-4" />
-            <h3 class="text-xl text-gray-900 font-bold mb-1">Processing Terrain</h3>
-            <p class="text-gray-500 text-sm mb-4">Fetching high-res tiles & computing...</p>
+            <h3 class="text-xl text-gray-900 font-bold mb-2">Processing Terrain</h3>
+            <p class="text-gray-600 text-sm font-medium mb-4 animate-pulse">{{ loadingStatus }}</p>
             <div class="text-xs text-gray-400 max-w-xs mx-auto">
-                <span v-if="resolution >= 2048">High resolution (2048+) may take 10-20 seconds.</span>
+                <span v-if="resolution >= 2048">High resolution (2048+) may take 1-2 minutes.</span>
                 <span v-if="resolution >= 4096" class="block text-amber-500 mt-1">Very large area (4k/8k). Please wait...</span>
             </div>
           </div>
@@ -351,6 +351,7 @@ const zoom = ref<number>(13);
 const resolution = ref<number>(1024);
 const terrainData = ref<TerrainData | null>(null);
 const isLoading = ref<boolean>(false);
+const loadingStatus = ref<string>("Initializing...");
 const previewMode = ref<boolean>(false);
 const showStackInfo = ref<boolean>(false);
 const showAbout = ref<boolean>(false);
@@ -396,11 +397,21 @@ const setResolution = (newResolution: number) => {
 
 const handleGenerate = async (showPreview: boolean, fetchOSM: boolean, useUSGS: boolean, useGPXZ: boolean, gpxzApiKey: string) => {
   isLoading.value = true;
+  loadingStatus.value = "Starting terrain generation...";
   try {
-    const data = await fetchTerrainData(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, gpxzApiKey);
+    const data = await fetchTerrainData(
+        center.value, 
+        resolution.value, 
+        fetchOSM, 
+        useUSGS, 
+        useGPXZ, 
+        gpxzApiKey,
+        (status) => { loadingStatus.value = status; }
+    );
     terrainData.value = data;
     
     if (showPreview) {
+        loadingStatus.value = "Rendering 3D scene...";
         previewMode.value = true;
     }
   } catch (error) {

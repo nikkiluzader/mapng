@@ -337,8 +337,17 @@ async function pMap<T, R>(
   return results;
 }
 
-export const fetchTerrainData = async (center: LatLng, resolution: number, includeOSM: boolean = false, useUSGS: boolean = false, useGPXZ: boolean = false, gpxzApiKey: string = ''): Promise<TerrainData> => {
+export const fetchTerrainData = async (
+    center: LatLng, 
+    resolution: number, 
+    includeOSM: boolean = false, 
+    useUSGS: boolean = false, 
+    useGPXZ: boolean = false, 
+    gpxzApiKey: string = '',
+    onProgress?: (status: string) => void
+): Promise<TerrainData> => {
   // 1. Calculate World Pixel Coordinates for the Center
+  onProgress?.("Calculating coordinates...");
   const centerPx = project(center.lat, center.lng, TERRAIN_ZOOM);
   
   // 2. Calculate the bounding box in Pixel Coordinates
@@ -362,6 +371,7 @@ export const fetchTerrainData = async (center: LatLng, resolution: number, inclu
   // Try GPXZ if enabled
   let gpxzHeightMap: Float32Array | null = null;
   if (useGPXZ && gpxzApiKey) {
+      onProgress?.("Fetching high-res GPXZ elevation data...");
       gpxzHeightMap = await fetchGPXZTerrain(startX, startY, resolution, resolution, gpxzApiKey);
   }
 
@@ -373,6 +383,7 @@ export const fetchTerrainData = async (center: LatLng, resolution: number, inclu
   const isHawaii = bounds.north < 23 && bounds.south > 18 && bounds.west > -161 && bounds.east < -154;
 
   if (!useGPXZ && useUSGS && (isCONUS || isAlaska || isHawaii)) {
+      onProgress?.("Fetching USGS 1m DEM data...");
       usgsHeightMap = await fetchUSGSTerrain(startX, startY, resolution, resolution);
   }
 
@@ -408,6 +419,7 @@ export const fetchTerrainData = async (center: LatLng, resolution: number, inclu
 
   // 6. Fetch Tiles with Concurrency Limit
   // 8192px = 1024 tiles. We need to be gentle.
+  onProgress?.("Fetching global terrain & satellite tiles...");
   await pMap(requests, async ({ tx, ty }) => {
      const tilePixelX = tx * TILE_SIZE;
      const tilePixelY = ty * TILE_SIZE;
@@ -436,6 +448,7 @@ export const fetchTerrainData = async (center: LatLng, resolution: number, inclu
   }, 20); // Concurrency limit of 20
 
   // 7. Process Heightmap Data
+  onProgress?.("Processing heightmap data...");
   let heightMap: Float32Array;
   let minHeight = Infinity;
   let maxHeight = -Infinity;
@@ -482,9 +495,11 @@ export const fetchTerrainData = async (center: LatLng, resolution: number, inclu
   // 8. Fetch OSM Data (Optional)
   let osmFeatures: OSMFeature[] = [];
   if (includeOSM) {
+      onProgress?.("Fetching OpenStreetMap data...");
       osmFeatures = await fetchOSMData(bounds);
   }
 
+  onProgress?.("Finalizing terrain data...");
   return {
     heightMap,
     width: resolution,
