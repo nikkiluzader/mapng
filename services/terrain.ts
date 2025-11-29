@@ -78,6 +78,8 @@ const resampleGeoTIFF = async (image: GeoTIFF.GeoTIFFImage, raster: Float32Array
     // Converter from WGS84 (Lat/Lon) to TIFF CRS
     const converter = proj4('EPSG:4326', projName);
     
+    const noData = image.getGDALNoData();
+
     const heightMap = new Float32Array(width * height);
     heightMap.fill(NO_DATA_VALUE);
 
@@ -110,6 +112,13 @@ const resampleGeoTIFF = async (image: GeoTIFF.GeoTIFFImage, raster: Float32Array
                 const h01 = raster[i01];
                 const h11 = raster[i11];
                 
+                // Check for NoData or invalid values
+                if ((noData !== null && (h00 === noData || h10 === noData || h01 === noData || h11 === noData)) ||
+                    (h00 < -10000 || h10 < -10000 || h01 < -10000 || h11 < -10000)) {
+                    heightMap[y * width + x] = NO_DATA_VALUE;
+                    continue;
+                }
+
                 const h = (1 - dy) * ((1 - dx) * h00 + dx * h10) + dy * ((1 - dx) * h01 + dx * h11);
                 heightMap[y * width + x] = h;
             }
@@ -385,6 +394,22 @@ export const fetchTerrainData = async (
   if (!useGPXZ && useUSGS && (isCONUS || isAlaska || isHawaii)) {
       onProgress?.("Fetching USGS 1m DEM data...");
       usgsHeightMap = await fetchUSGSTerrain(startX, startY, resolution, resolution);
+
+      if (usgsHeightMap) {
+          // Check for missing data in USGS response
+          let hasMissingData = false;
+          for(let i = 0; i < usgsHeightMap.length; i++) {
+              if(usgsHeightMap[i] === NO_DATA_VALUE) {
+                  hasMissingData = true;
+                  break;
+              }
+          }
+          
+          if (hasMissingData) {
+              console.warn("[USGS] Data incomplete (contains voids). Falling back to global terrain.");
+              usgsHeightMap = null;
+          }
+      }
   }
 
   // 3. Determine which tiles cover this pixel range
