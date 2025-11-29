@@ -87,8 +87,8 @@
                   Key is not stored. Free tier: 100 req/day.
                   <a href="https://www.gpxz.io/" target="_blank" class="text-[#FF6600] hover:underline">Get a key</a>
               </p>
-              <p v-if="isAreaTooLargeForGPXZ" class="text-[10px] text-red-600 font-medium leading-tight">
-                  ⚠️ Area ({{ areaSqKm.toFixed(2) }} km²) exceeds GPXZ limit (10 km²). Reduce resolution.
+              <p v-if="isAreaLargeForGPXZ" class="text-[10px] text-orange-600 font-medium leading-tight">
+                  ⚠️ Large area ({{ areaSqKm.toFixed(2) }} km²). Will use multiple API calls.
               </p>
           </div>
       </div>
@@ -124,7 +124,7 @@
     <div class="pt-2 grid grid-cols-2 gap-3">
       <button
         @click="$emit('generate', true, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
-        :disabled="isGenerating || (useGPXZ && (!gpxzApiKey || isAreaTooLargeForGPXZ))"
+        :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
         class="py-3 bg-[#FF6600] hover:bg-[#E65C00] text-white font-bold rounded-md shadow-lg shadow-orange-900/10 flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300"
       >
           <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
@@ -139,7 +139,7 @@
 
       <button
         @click="$emit('generate', false, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
-        :disabled="isGenerating || (useGPXZ && (!gpxzApiKey || isAreaTooLargeForGPXZ))"
+        :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
         class="py-3 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold rounded-md shadow-sm flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
            <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
@@ -297,7 +297,7 @@ const totalWidthMeters = computed(() => props.resolution * metersPerPixel.value)
 const totalAreaSqM = computed(() => totalWidthMeters.value * totalWidthMeters.value);
 const areaSqKm = computed(() => totalAreaSqM.value / 1000000);
 
-const isAreaTooLargeForGPXZ = computed(() => {
+const isAreaLargeForGPXZ = computed(() => {
     return useGPXZ.value && areaSqKm.value > 10;
 });
 
