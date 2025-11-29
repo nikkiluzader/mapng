@@ -1,15 +1,15 @@
 <template>
   <!-- Mobile Restriction Overlay -->
-  <div class="flex md:hidden fixed inset-0 z-[999] bg-white flex-col items-center justify-center p-8 text-center text-gray-900">
-    <div class="bg-gray-50 p-6 rounded-2xl border border-gray-200 shadow-2xl max-w-sm flex flex-col items-center">
+  <div class="flex md:hidden fixed inset-0 z-[999] bg-white dark:bg-gray-900 flex-col items-center justify-center p-8 text-center text-gray-900 dark:text-white">
+    <div class="bg-gray-50 dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl max-w-sm flex flex-col items-center">
       <div class="p-4 bg-[#FF6600]/10 rounded-full mb-6">
         <Monitor :size="48" class="text-[#FF6600]" />
       </div>
-      <h1 class="text-2xl font-bold text-gray-900 mb-2">Desktop Required</h1>
-      <p class="text-gray-600 text-sm leading-relaxed mb-6">
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-2">Desktop Required</h1>
+      <p class="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-6">
         MapNG is a high-performance terrain generation tool designed for BeamNG modding.
       </p>
-      <p class="text-gray-500 text-xs mb-6">
+      <p class="text-gray-500 dark:text-gray-400 text-xs mb-6">
         To ensure the best experience with 3D rendering, precise map selection, and file management, please access this application on a desktop or laptop computer.
       </p>
       <div class="flex items-center gap-2 text-xs font-medium text-[#FF6600] bg-[#FF6600]/10 px-4 py-2 rounded-full border border-[#FF6600]/20">
@@ -20,27 +20,27 @@
   </div>
 
   <!-- Main Application - Hidden on Mobile -->
-  <div class="hidden md:flex h-screen w-full flex-col md:flex-row overflow-hidden bg-white text-gray-900">
+  <div class="hidden md:flex h-screen w-full flex-col md:flex-row overflow-hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
     <!-- Sidebar / Control Panel -->
-    <aside class="w-full md:w-80 lg:w-96 flex-shrink-0 flex flex-col border-r border-gray-200 bg-white z-10 relative shadow-xl">
-      <div class="p-5 border-b border-gray-200 flex items-center gap-3 bg-white">
+    <aside class="w-full md:w-80 lg:w-96 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 z-10 relative shadow-xl">
+      <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 bg-white dark:bg-gray-900">
         <div class="p-2 bg-[#FF6600] rounded-lg shadow-lg shadow-orange-500/30">
           <Layers :size="24" class="text-white" />
         </div>
         <div>
-          <h1 class="text-xl font-bold tracking-tight text-gray-900">MapNG</h1>
-          <p class="text-xs text-gray-500">BeamNG Terrain Generator</p>
+          <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">MapNG</h1>
+          <p class="text-xs text-gray-500 dark:text-gray-400">BeamNG Terrain Generator</p>
         </div>
         <button 
           @click="showAbout = true"
-          class="ml-auto text-gray-400 hover:text-[#FF6600] transition-colors p-1 rounded-full hover:bg-orange-50"
+          class="ml-auto text-gray-400 hover:text-[#FF6600] transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
           title="What is this?"
         >
           <CircleHelp :size="20" />
         </button>
       </div>
       
-      <div class="flex-1 overflow-y-auto custom-scrollbar p-5 bg-gray-50/50">
+      <div class="flex-1 overflow-y-auto custom-scrollbar p-5 bg-gray-50/50 dark:bg-gray-800/50">
         <ControlPanel 
           :center="center" 
           :resolution="resolution"
@@ -52,15 +52,26 @@
         />
       </div>
       
-      <div class="p-4 border-t border-gray-200 text-xs text-gray-500 text-center bg-white space-y-1">
-         <p>AWS Terrain • Esri • OSM</p>
-         <p class="italic opacity-70">App generated with Gemini 3</p>
-         <a href="mailto:nikkiluzader@gmail.com" class="text-[#FF6600] hover:text-[#E65C00] transition-colors block mt-1">
+      <div class="p-4 border-t border-gray-200 dark:border-gray-700 text-xs text-gray-500 dark:text-gray-400 text-center bg-white dark:bg-gray-900 space-y-3">
+         <div class="flex items-center justify-between px-2">
+            <span class="font-medium">MapNG v1.0</span>
+            <button 
+              @click="toggleDarkMode"
+              class="p-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              :title="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+            >
+              <Sun v-if="isDarkMode" :size="14" />
+              <Moon v-else :size="14" />
+            </button>
+         </div>
+         
+         <a href="mailto:nikkiluzader@gmail.com" class="text-[#FF6600] hover:text-[#E65C00] transition-colors block">
            Contact: nikkiluzader@gmail.com
          </a>
+         
          <button 
            @click="showStackInfo = true"
-           class="text-gray-600 hover:text-[#FF6600] transition-colors flex items-center justify-center gap-1 w-full mt-3 pt-3 border-t border-gray-100"
+           class="text-gray-600 dark:text-gray-400 hover:text-[#FF6600] dark:hover:text-[#FF6600] transition-colors flex items-center justify-center gap-1 w-full pt-3 border-t border-gray-100 dark:border-gray-800"
          >
            <Code :size="12" /> View Tech Stack
          </button>
@@ -68,13 +79,13 @@
     </aside>
 
     <!-- Main Content Area -->
-    <main class="flex-1 relative flex flex-col h-full bg-gray-100">
+    <main class="flex-1 relative flex flex-col h-full bg-gray-100 dark:bg-gray-950">
       <!-- Toggle View Tabs -->
-      <div class="absolute top-4 right-4 z-20 flex bg-white/90 backdrop-blur rounded-lg p-1 shadow-xl border border-gray-200">
+      <div class="absolute top-4 right-4 z-20 flex bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-lg p-1 shadow-xl border border-gray-200 dark:border-gray-700">
         <button
           @click="switchTo2D"
           :class="['px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2',
-            !previewMode ? 'bg-gray-800 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900']"
+            !previewMode ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
         >
           <Globe :size="16" />
           2D Map
@@ -83,7 +94,7 @@
           @click="previewMode = true"
           :disabled="!terrainData"
           :class="['px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2',
-            previewMode ? 'bg-[#FF6600] text-white shadow-sm' : 'text-gray-500 hover:text-gray-900',
+            previewMode ? 'bg-[#FF6600] text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
             !terrainData ? 'opacity-50 cursor-not-allowed' : '']"
         >
           <Layers :size="16" />
@@ -99,6 +110,7 @@
             :center="center" 
             :zoom="zoom" 
             :resolution="resolution"
+            :is-dark-mode="isDarkMode"
             @move="setCenter" 
             @zoom="setZoom"
           />
@@ -139,29 +151,29 @@
 
     <!-- About Modal -->
   <div v-if="showAbout" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="showAbout = false">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-      <div class="p-6 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+    <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
         <div class="flex items-center gap-3">
           <div class="p-2 bg-[#FF6600] rounded-lg shadow-sm">
             <Layers :size="20" class="text-white" />
           </div>
           <div>
-            <h2 class="text-lg font-bold text-gray-900">About MapNG</h2>
-            <p class="text-xs text-gray-500">BeamNG.drive Terrain Generator</p>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">About MapNG</h2>
+            <p class="text-xs text-gray-500 dark:text-gray-400">BeamNG.drive Terrain Generator</p>
           </div>
         </div>
-        <button @click="showAbout = false" class="text-gray-400 hover:text-gray-900 transition-colors">
+        <button @click="showAbout = false" class="text-gray-400 dark:text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
           <X :size="20" />
         </button>
       </div>
       
-      <div class="p-6 overflow-y-auto custom-scrollbar space-y-6 text-sm text-gray-600 leading-relaxed">
-        <div class="bg-orange-50 border border-orange-100 rounded-lg p-4 text-orange-900">
+      <div class="p-6 overflow-y-auto custom-scrollbar space-y-6 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+        <div class="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 rounded-lg p-4 text-orange-900 dark:text-orange-100">
           <p class="font-medium">MapNG is a specialized tool designed to streamline the creation of real-world terrain maps for BeamNG.drive.</p>
         </div>
 
         <div class="space-y-4">
-          <h3 class="font-bold text-gray-900 flex items-center gap-2">
+          <h3 class="font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Globe :size="16" class="text-[#FF6600]" />
             What does it do?
           </h3>
@@ -172,7 +184,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <h4 class="font-bold text-gray-900 text-xs uppercase tracking-wider">Key Features</h4>
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Key Features</h4>
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
               <li>Global Elevation Data (AWS)</li>
               <li>1m Resolution USA Data (USGS)</li>
@@ -182,7 +194,7 @@
             </ul>
           </div>
           <div class="space-y-2">
-            <h4 class="font-bold text-gray-900 text-xs uppercase tracking-wider">Export Formats</h4>
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Export Formats</h4>
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
               <li>16-bit PNG Heightmaps</li>
               <li>High-Res Satellite Textures</li>
@@ -192,8 +204,8 @@
           </div>
         </div>
 
-        <div class="pt-4 border-t border-gray-100">
-          <p class="text-xs text-gray-500 text-center">
+        <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
+          <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
             Created by <a href="https://github.com/nikkiluzader" target="_blank" class="text-[#FF6600] hover:underline">Nikki Luzader</a> • Open Source on <a href="https://github.com/nikkiluzader/mapng" target="_blank" class="text-[#FF6600] hover:underline">GitHub</a>
           </p>
         </div>
@@ -203,18 +215,18 @@
 
   <!-- Tech Stack Modal -->
     <div v-if="showStackInfo" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div class="bg-white border border-gray-200 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col animate-in zoom-in-95 duration-200">
+      <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto custom-scrollbar flex flex-col animate-in zoom-in-95 duration-200">
         <!-- Header -->
-        <div class="p-5 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur z-10">
+        <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between sticky top-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur z-10">
           <div class="flex items-center gap-3">
-            <div class="p-2 bg-gray-100 rounded-lg">
+            <div class="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
               <Code :size="20" class="text-[#FF6600]" />
             </div>
-            <h2 class="text-lg font-bold text-gray-900">MapNG Tech Stack</h2>
+            <h2 class="text-lg font-bold text-gray-900 dark:text-white">MapNG Tech Stack</h2>
           </div>
           <button 
             @click="showStackInfo = false" 
-            class="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-900"
+            class="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors text-gray-400 hover:text-gray-900 dark:hover:text-white"
           >
             <X :size="20" />
           </button>
@@ -225,21 +237,21 @@
           <section class="space-y-3">
             <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">Core Framework</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Vue 3</div>
-                <div class="text-xs text-gray-500 mt-1">Composition API & reactivity</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Vue 3</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Composition API & reactivity</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">TypeScript</div>
-                <div class="text-xs text-gray-500 mt-1">Strict type safety & interfaces</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">TypeScript</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Strict type safety & interfaces</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Tailwind CSS</div>
-                <div class="text-xs text-gray-500 mt-1">Utility-first styling</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Tailwind CSS</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Utility-first styling</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Vite</div>
-                <div class="text-xs text-gray-500 mt-1">Next-generation frontend tooling</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Vite</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Next-generation frontend tooling</div>
               </div>
             </div>
           </section>
@@ -247,21 +259,21 @@
           <section class="space-y-3">
             <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">3D & Graphics</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Three.js</div>
-                <div class="text-xs text-gray-500 mt-1">WebGL 3D engine</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Three.js</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">WebGL 3D engine</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">TresJS</div>
-                <div class="text-xs text-gray-500 mt-1">Vue 3 renderer for Three.js</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">TresJS</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Vue 3 renderer for Three.js</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Cientos</div>
-                <div class="text-xs text-gray-500 mt-1">Helpers for OrbitControls, Skybox, Shadows</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Cientos</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Helpers for OrbitControls, Skybox, Shadows</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">InstancedMesh</div>
-                <div class="text-xs text-gray-500 mt-1">High-performance tree rendering</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">InstancedMesh</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">High-performance tree rendering</div>
               </div>
             </div>
           </section>
@@ -269,13 +281,13 @@
           <section class="space-y-3">
             <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">Mapping & GIS</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-               <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Leaflet & Vue-Leaflet</div>
-                <div class="text-xs text-gray-500 mt-1">Interactive 2D map interface</div>
+               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Leaflet & Vue-Leaflet</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Interactive 2D map interface</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Web Mercator Projection</div>
-                <div class="text-xs text-gray-500 mt-1">Custom implementation for pixel-perfect terrain stitching</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Web Mercator Projection</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Custom implementation for pixel-perfect terrain stitching</div>
               </div>
             </div>
           </section>
@@ -283,25 +295,25 @@
           <section class="space-y-3">
             <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">Data Sources</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-               <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">AWS Elevation Tiles</div>
-                <div class="text-xs text-gray-500 mt-1">Raw heightmap data source (Terrarium format)</div>
+               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">AWS Elevation Tiles</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Raw heightmap data source (Terrarium format)</div>
               </div>
-               <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Esri World Imagery</div>
-                <div class="text-xs text-gray-500 mt-1">High-res satellite texture overlays</div>
+               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Esri World Imagery</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">High-res satellite texture overlays</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">USGS National Map</div>
-                <div class="text-xs text-gray-500 mt-1">1m resolution DEM (USA Only)</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">USGS National Map</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">1m resolution DEM (USA Only)</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">GPXZ API</div>
-                <div class="text-xs text-gray-500 mt-1">Premium global high-res elevation data</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">GPXZ API</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Premium global high-res elevation data</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">Overpass API (OSM)</div>
-                <div class="text-xs text-gray-500 mt-1">Live vector data for roads, buildings, and vegetation</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Overpass API (OSM)</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Live vector data for roads, buildings, and vegetation</div>
               </div>
             </div>
           </section>
@@ -309,28 +321,29 @@
           <section class="space-y-3">
             <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">Export & Processing</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">GLTFExporter</div>
-                <div class="text-xs text-gray-500 mt-1">Standard 3D model export (GLB)</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">GLTFExporter</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Standard 3D model export (GLB)</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">fast-png</div>
-                <div class="text-xs text-gray-500 mt-1">16-bit precision heightmap encoding</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">fast-png</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">16-bit precision heightmap encoding</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">geotiff.js & proj4</div>
-                <div class="text-xs text-gray-500 mt-1">GeoTIFF parsing & coordinate projection</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">geotiff.js & proj4</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">GeoTIFF parsing & coordinate projection</div>
               </div>
-              <div class="bg-gray-50 p-3 rounded border border-gray-200">
-                <div class="font-medium text-gray-900">BufferGeometryUtils</div>
-                <div class="text-xs text-gray-500 mt-1">Mesh optimization & merging</div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">BufferGeometryUtils</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Mesh optimization & merging</div>
               </div>
             </div>
           </section>
         </div>
         
-        <div class="p-5 border-t border-gray-200 bg-gray-50 text-center">
-          <p class="text-xs text-gray-500">Built to assist with BeamNG.drive modding workflows.</p>
+        <div class="p-5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-center">
+          <p class="text-xs text-gray-500 dark:text-gray-400">Built to assist with BeamNG.drive modding workflows.</p>
+          <p class="italic opacity-70 text-xs text-gray-400 dark:text-gray-500 mt-2">App enhanced with Gemini 3</p>
         </div>
       </div>
     </div>
@@ -339,7 +352,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Globe, Layers, Loader2, Code, X, Monitor, MousePointer2, CircleHelp } from 'lucide-vue-next';
+import { Globe, Layers, Loader2, Code, X, Monitor, MousePointer2, CircleHelp, Sun, Moon } from 'lucide-vue-next';
 import ControlPanel from './components/ControlPanel.vue';
 import MapSelector from './components/MapSelector.vue';
 import Preview3D from './components/Preview3D.vue';
@@ -355,9 +368,31 @@ const loadingStatus = ref<string>("Initializing...");
 const previewMode = ref<boolean>(false);
 const showStackInfo = ref<boolean>(false);
 const showAbout = ref<boolean>(false);
+const isDarkMode = ref<boolean>(false);
+
+const toggleDarkMode = () => {
+  isDarkMode.value = !isDarkMode.value;
+  if (isDarkMode.value) {
+    document.documentElement.classList.add('dark');
+    localStorage.setItem('theme', 'dark');
+  } else {
+    document.documentElement.classList.remove('dark');
+    localStorage.setItem('theme', 'light');
+  }
+};
 
 // Attempt to get user location on load
 onMounted(() => {
+  // Check for saved theme. Default to light mode if no preference is saved.
+  // This ignores system preference to ensure a consistent default as requested.
+  if (localStorage.theme === 'dark') {
+    isDarkMode.value = true;
+    document.documentElement.classList.add('dark');
+  } else {
+    isDarkMode.value = false;
+    document.documentElement.classList.remove('dark');
+  }
+
   if ("geolocation" in navigator) {
     navigator.geolocation.getCurrentPosition(
       (position) => {

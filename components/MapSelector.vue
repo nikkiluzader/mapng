@@ -12,8 +12,8 @@
       <!-- Base Layers -->
       <l-tile-layer
         v-if="selectedLayer === 'osm'"
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
+        :url="osmUrl"
+        :attribution="osmAttribution"
         layer-type="base"
       />
 
@@ -52,26 +52,26 @@
     </l-map>
 
     <!-- Custom Layer Control -->
-    <div class="absolute bottom-6 right-4 z-[400] bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden text-gray-800 text-xs">
-        <div class="bg-gray-50 px-3 py-2 border-b border-gray-200 font-medium flex items-center gap-2">
+    <div class="absolute bottom-6 right-4 z-[400] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 overflow-hidden text-gray-800 dark:text-gray-200 text-xs">
+        <div class="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b border-gray-200 dark:border-gray-600 font-medium flex items-center gap-2">
             <Layers :size="14" class="text-[#FF6600]" />
             Map Layers
         </div>
         <div class="p-2 space-y-1">
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
+            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
                 <input type="radio" v-model="selectedLayer" value="osm" class="accent-[#FF6600]" />
                 <span>OpenStreetMap</span>
             </label>
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
+            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
                 <input type="radio" v-model="selectedLayer" value="satellite" class="accent-[#FF6600]" />
                 <span>Satellite</span>
             </label>
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
+            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
                 <input type="radio" v-model="selectedLayer" value="topo" class="accent-[#FF6600]" />
                 <span>Topo Map</span>
             </label>
-            <div class="h-px bg-gray-100 my-1"></div>
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
+            <div class="h-px bg-gray-100 dark:bg-gray-600 my-1"></div>
+            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
                 <input type="checkbox" v-model="showLabels" class="accent-[#FF6600]" />
                 <span>Show Labels</span>
             </label>
@@ -115,9 +115,12 @@ interface Props {
   center: LatLng;
   zoom: number;
   resolution: number;
+  isDarkMode?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  isDarkMode: false
+});
 
 const emit = defineEmits<{
   move: [center: LatLng];
@@ -129,6 +132,18 @@ const currentCenter = ref<LatLng>(props.center);
 const currentZoom = ref<number>(props.zoom);
 const selectedLayer = ref('osm');
 const showLabels = ref(true);
+
+const osmUrl = computed(() => {
+  return props.isDarkMode 
+    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+});
+
+const osmAttribution = computed(() => {
+  return props.isDarkMode
+    ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+});
 
 // Calculate bounds based on resolution
 const bounds = computed(() => {
