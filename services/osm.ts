@@ -124,16 +124,20 @@ const buildQuery = (bounds: Bounds) => {
     return `
         [out:json][timeout:60];
         (
-          node["natural"="tree"](${bbox});
+          way["natural"="tree"](${bbox});
+          way["natural"="water"](${bbox});
+          way["waterway"](${bbox});
           way["highway"](${bbox});
           way["building"](${bbox});
           way["natural"~"wood|scrub|tree_row|grass|meadow|heath|moor|wetland|sand|beach|bare_rock|scree|dirt"](${bbox});
-          way["landuse"~"forest|grass|meadow|park|orchard|vineyard|farmland|quarry"](${bbox});
+          way["landuse"~"forest|grass|meadow|park|orchard|vineyard|farmland|quarry|reservoir|basin"](${bbox});
           way["historic"](${bbox});
           way["barrier"](${bbox});
           way["man_made"="bridge"](${bbox});
           relation["building"](${bbox});
           relation["historic"](${bbox});
+          relation["natural"="water"](${bbox});
+          relation["waterway"](${bbox});
         );
         out body;
         >;
@@ -229,6 +233,7 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
         let type: OSMFeature['type'] | null = null;
 
         if (tags.building || (tags.historic && tags.historic !== 'district')) type = 'building';
+        else if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin') type = 'water';
         else if (tags.natural || tags.landuse) type = 'vegetation';
         else if (tags.highway) type = 'road';
         else if (tags.man_made === 'bridge') type = 'road';

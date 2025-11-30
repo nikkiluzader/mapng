@@ -187,6 +187,30 @@
                 <Download v-if="!isExportingTexture" :size="12" class="opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
 
+            <button 
+                @click="downloadOSMTexture"
+                :disabled="!terrainData.osmTextureUrl || isExportingOSMTexture"
+                class="flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <div class="flex items-center gap-2">
+                    <Loader2 v-if="isExportingOSMTexture" :size="12" class="animate-spin text-[#FF6600]" />
+                    <span>OSM Texture (PNG)</span>
+                </div>
+                <Download v-if="!isExportingOSMTexture" :size="12" class="opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            </button>
+
+            <button 
+                @click="downloadHybridTexture"
+                :disabled="!terrainData.hybridTextureUrl || isExportingHybridTexture"
+                class="flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                <div class="flex items-center gap-2">
+                    <Loader2 v-if="isExportingHybridTexture" :size="12" class="animate-spin text-[#FF6600]" />
+                    <span>Hybrid Texture (PNG)</span>
+                </div>
+                <Download v-if="!isExportingHybridTexture" :size="12" class="opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            </button>
+
              <button 
                 @click="downloadOSM"
                 :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isExportingOSM"
@@ -267,6 +291,8 @@ defineEmits<{
 const isExportingGLB = ref(false);
 const isExportingHeightmap = ref(false);
 const isExportingTexture = ref(false);
+const isExportingOSMTexture = ref(false);
+const isExportingHybridTexture = ref(false);
 const isExportingOSM = ref(false);
 const fetchOSM = ref(false);
 const useUSGS = ref(false);
@@ -392,6 +418,36 @@ const downloadTexture = async () => {
     link.click();
     
     isExportingTexture.value = false;
+};
+
+const downloadOSMTexture = async () => {
+    if(!props.terrainData?.osmTextureUrl) return;
+    isExportingOSMTexture.value = true;
+    
+    // Simulate a small delay for UX consistency
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const link = document.createElement('a');
+    link.download = `OSM_Texture_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
+    link.href = props.terrainData.osmTextureUrl;
+    link.click();
+    
+    isExportingOSMTexture.value = false;
+};
+
+const downloadHybridTexture = async () => {
+    if(!props.terrainData?.hybridTextureUrl) return;
+    isExportingHybridTexture.value = true;
+    
+    // Simulate a small delay for UX consistency
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    const link = document.createElement('a');
+    link.download = `Hybrid_Texture_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
+    link.href = props.terrainData.hybridTextureUrl;
+    link.click();
+    
+    isExportingHybridTexture.value = false;
 };
 
 const downloadOSM = async () => {

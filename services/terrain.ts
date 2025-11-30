@@ -1,11 +1,12 @@
 import { LatLng, TerrainData, Bounds, OSMFeature } from "../types";
 import { fetchOSMData } from "./osm";
+import { generateOSMTexture, generateHybridTexture } from "./osmTexture";
 import * as GeoTIFF from 'geotiff';
 import proj4 from 'proj4';
 
 // Constants
 const TILE_SIZE = 256;
-const TERRAIN_ZOOM = 15; // Fixed high detail zoom level
+export const TERRAIN_ZOOM = 15; // Fixed high detail zoom level
 const TILE_API_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium";
 const SATELLITE_API_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile";
 const USGS_PRODUCT_API = "https://tnmaccess.nationalmap.gov/api/v1/products";
@@ -14,7 +15,7 @@ const USGS_DATASET = "Digital Elevation Model (DEM) 1 meter";
 // Math Helpers for Web Mercator Projection (Source of Truth for Fetching)
 const MAX_LATITUDE = 85.05112878;
 
-const project = (lat: number, lng: number, zoom: number) => {
+export const project = (lat: number, lng: number, zoom: number) => {
   const d = Math.PI / 180;
   const max = MAX_LATITUDE;
   const latClamped = Math.max(Math.min(max, lat), -max);
@@ -533,7 +534,8 @@ export const fetchTerrainData = async (
   }
 
   onProgress?.("Finalizing terrain data...");
-  return {
+  
+  const terrainData: TerrainData = {
     heightMap,
     width: resolution,
     height: resolution,
@@ -544,6 +546,15 @@ export const fetchTerrainData = async (
     osmFeatures,
     usgsFallback
   };
+
+  if (includeOSM && osmFeatures.length > 0) {
+      onProgress?.("Generating OSM texture...");
+      terrainData.osmTextureUrl = await generateOSMTexture(terrainData);
+      onProgress?.("Generating Hybrid texture...");
+      terrainData.hybridTextureUrl = await generateHybridTexture(terrainData);
+  }
+
+  return terrainData;
 };
 
 const loadImage = (url: string): Promise<HTMLImageElement | null> => {

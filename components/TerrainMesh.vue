@@ -8,12 +8,12 @@ type Quality = 'low' | 'medium' | 'high';
 interface Props {
   terrainData: TerrainData;
   quality: Quality;
-  showSatellite?: boolean;
+  textureType?: 'satellite' | 'osm' | 'hybrid' | 'none';
   wireframe?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  showSatellite: true,
+  textureType: 'satellite',
   wireframe: false
 });
 
@@ -84,11 +84,21 @@ watch([() => props.terrainData, () => props.quality], () => {
 
 // Load texture
 const texture = computed(() => {
-  if (props.terrainData.satelliteTextureUrl) {
-    const tex = new THREE.TextureLoader().load(props.terrainData.satelliteTextureUrl);
+  let url = null;
+  if (props.textureType === 'satellite') {
+    url = props.terrainData.satelliteTextureUrl;
+  } else if (props.textureType === 'osm') {
+    url = props.terrainData.osmTextureUrl;
+  } else if (props.textureType === 'hybrid') {
+    url = props.terrainData.hybridTextureUrl;
+  }
+
+  if (url) {
+    const tex = new THREE.TextureLoader().load(url);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
+    tex.anisotropy = 16; // Maximize texture sharpness at oblique angles
     tex.flipY = false; // Disable flipY to avoid WebGL warnings and overhead
     tex.premultiplyAlpha = false; // Ensure no alpha premultiplication
     return tex;
@@ -107,9 +117,9 @@ const texture = computed(() => {
     :geometry="geometry"
   >
     <TresMeshStandardMaterial 
-      :key="showSatellite ? 'sat' : 'solid'"
-      :map="showSatellite ? texture : null"
-      :color="showSatellite ? 0xffffff : 0x6B705C"
+      :key="texture ? 'tex' : 'solid'"
+      :map="texture"
+      :color="texture ? 0xffffff : 0x6B705C"
       :roughness="1"
       :metalness="0"
       :side="2"

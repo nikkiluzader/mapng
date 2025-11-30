@@ -12,14 +12,8 @@
       <TerrainMesh 
         :terrain-data="terrainData" 
         :quality="quality" 
-        :show-satellite="showSatellite"
+        :texture-type="textureType"
         :wireframe="showWireframe"
-      />
-      
-      <OSMFeatures 
-        v-if="terrainData.osmFeatures && terrainData.osmFeatures.length > 0" 
-        :terrain-data="terrainData" 
-        :show-areas="showAreas"
       />
       
       <OrbitControls 
@@ -78,17 +72,51 @@
        <!-- Overlays -->
        <div class="space-y-2">
           <label class="text-xs text-gray-500 flex items-center gap-1">
-              <Layers :size="12" /> Overlays
+              <Layers :size="12" /> Texture Mode
           </label>
           
-          <!-- Satellite Toggle -->
-          <label class="flex items-center gap-2 cursor-pointer group/check">
-              <div class="relative">
-                  <input type="checkbox" v-model="showSatellite" class="peer sr-only" />
-                  <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"></div>
-              </div>
-              <span class="text-xs text-gray-700 group-hover/check:text-gray-900">Satellite Texture</span>
-          </label>
+          <div class="flex bg-gray-100 rounded-md p-1 border border-gray-200 mb-2">
+              <button
+                  @click="textureType = 'satellite'"
+                  :class="['flex-1 text-xs py-1.5 rounded transition-colors',
+                      textureType === 'satellite' 
+                      ? 'bg-[#FF6600] text-white shadow-sm font-medium' 
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-white']"
+              >
+                  Satellite
+              </button>
+              <button
+                  @click="textureType = 'osm'"
+                  :disabled="!terrainData.osmTextureUrl"
+                  :title="!terrainData.osmTextureUrl ? 'No OSM data available' : 'Show OSM Layer'"
+                  :class="['flex-1 text-xs py-1.5 rounded transition-colors',
+                      textureType === 'osm' 
+                      ? 'bg-[#FF6600] text-white shadow-sm font-medium' 
+                      : !terrainData.osmTextureUrl ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-900 hover:bg-white']"
+              >
+                  OSM
+              </button>
+              <button
+                  @click="textureType = 'hybrid'"
+                  :disabled="!terrainData.hybridTextureUrl"
+                  :title="!terrainData.hybridTextureUrl ? 'No Hybrid data available' : 'Show Hybrid Layer'"
+                  :class="['flex-1 text-xs py-1.5 rounded transition-colors',
+                      textureType === 'hybrid' 
+                      ? 'bg-[#FF6600] text-white shadow-sm font-medium' 
+                      : !terrainData.hybridTextureUrl ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-900 hover:bg-white']"
+              >
+                  Hybrid
+              </button>
+              <button
+                  @click="textureType = 'none'"
+                  :class="['flex-1 text-xs py-1.5 rounded transition-colors',
+                      textureType === 'none' 
+                      ? 'bg-[#FF6600] text-white shadow-sm font-medium' 
+                      : 'text-gray-500 hover:text-gray-900 hover:bg-white']"
+              >
+                  None
+              </button>
+          </div>
 
           <!-- Wireframe Toggle -->
           <label class="flex items-center gap-2 cursor-pointer group/check">
@@ -97,15 +125,6 @@
                   <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"></div>
               </div>
               <span class="text-xs text-gray-700 group-hover/check:text-gray-900">Wireframe Mode</span>
-          </label>
-
-          <!-- OSM Areas Toggle -->
-          <label class="flex items-center gap-2 cursor-pointer group/check">
-              <div class="relative">
-                  <input type="checkbox" v-model="showAreas" class="peer sr-only" />
-                  <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"></div>
-              </div>
-              <span class="text-xs text-gray-700 group-hover/check:text-gray-900">Ground Materials</span>
           </label>
        </div>
     </div>
@@ -119,7 +138,6 @@ import { OrbitControls, Environment } from '@tresjs/cientos';
 import { Settings, Gauge, Layers } from 'lucide-vue-next';
 import { TerrainData } from '../types';
 import TerrainMesh from './TerrainMesh.vue';
-import OSMFeatures from './OSMFeatures.vue';
 
 type Quality = 'low' | 'medium' | 'high';
 type Preset = 'sunset' | 'dawn' | 'night' | 'forest' | 'studio' | 'city' | 'umbrellas' | 'snow' | 'hangar' | 'urban' | 'modern' | 'shangai';
@@ -132,8 +150,7 @@ defineProps<Props>();
 
 const quality = ref<Quality>('high');
 const preset = ref<Preset>('dawn');
-const showAreas = ref(false);
-const showSatellite = ref(true);
+const textureType = ref<'satellite' | 'osm' | 'hybrid' | 'none'>('satellite');
 const showWireframe = ref(false);
 const presets: Preset[] = ['city', 'dawn', 'sunset', 'night', 'forest', 'studio', 'umbrellas', 'snow', 'hangar', 'urban', 'modern', 'shangai'];
 

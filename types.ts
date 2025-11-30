@@ -26,6 +26,8 @@ export interface TerrainData {
   minHeight: number;
   maxHeight: number;
   satelliteTextureUrl?: string; // Optional satellite imagery URL (blob)
+  osmTextureUrl?: string; // Optional OSM feature texture URL (blob)
+  hybridTextureUrl?: string; // Optional Hybrid (Satellite + OSM Roads/Buildings) texture URL
   bounds: Bounds; // Geographic bounds of the generated area
   osmFeatures: OSMFeature[]; // Vector data
   usgsFallback?: boolean; // Flag indicating if USGS data was missing/corrupt and fallback occurred
