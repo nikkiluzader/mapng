@@ -14,23 +14,27 @@
 
 ## 📖 Overview
 
-**MapNG** is a specialized web application designed to streamline the creation of real-world terrain maps for **BeamNG.drive**. It allows modders to select any location on Earth, visualize it in 3D with satellite imagery and OpenStreetMap (OSM) features, and export high-precision heightmaps and 3D models ready for game engine import.
+**MapNG** is a specialized web application designed to streamline the creation of real-world terrain maps for **BeamNG.drive**. It allows modders to select any location on Earth, visualize it in 3D, and export high-precision heightmaps and detailed textures ready for game engine import.
 
-Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle simulation maps: high-resolution height data, accurate scale, and integrated road network data.
+Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle simulation maps: high-resolution height data, accurate scale, and integrated road network textures.
 
 ## ✨ Key Features
 
 - **🌍 Global Coverage**: Access terrain data for anywhere on Earth using AWS Terrain Tiles.
-- **🏔️ GPXZ Integration**: Optional support for premium high-resolution global elevation data via GPXZ API.
-- **🇺🇸 High-Res USA Data**: Optional integration with USGS National Map for 1-meter resolution DEMs (CONUS, Alaska, Hawaii).
-- **🗺️ Precision Selection**: Interactive 2D map (Leaflet) with Satellite, Topo, and OSM layers for precise area selection.
-- **🏔️ 3D Preview**: Real-time 3D visualization of the generated terrain using Three.js (via TresJS).
-- **🏙️ OSM Integration**: Automatically fetches and renders 3D roads, buildings, and vegetation based on OpenStreetMap data.
-- **📏 Accurate Scaling**: Custom Web Mercator implementation ensures pixel-perfect terrain stitching and real-world scale (1:1).
+- **🏔️ Multiple Elevation Sources**:
+  - **Standard**: Global ~30m resolution (AWS Terrarium).
+  - **USGS 1m**: High-precision 1-meter DEMs for USA (CONUS, Alaska, Hawaii).
+  - **GPXZ**: Premium high-resolution global elevation data (requires API key).
+- **🗺️ Precision Selection**: Interactive 2D map for precise area selection.
+- **🎨 Advanced Texture Generation**:
+  - **Satellite**: High-res satellite imagery.
+  - **OSM "Blueprint"**: 8K resolution vector-based texture showing roads, buildings, and vegetation with standard Carto/OSB styling.
+  - **Hybrid**: Composite texture overlaying OSM roads and buildings onto satellite imagery.
+- **🏔️ 3D Preview**: Real-time 3D visualization of the terrain with switchable texture modes (Satellite, OSM, Hybrid).
 - **💾 Export Options**:
   - **Heightmap**: 16-bit PNG (Grayscale) for maximum elevation precision.
-  - **Texture**: High-res satellite imagery (JPG).
-  - **3D Model**: Full GLB export including terrain, roads, buildings, and trees.
+  - **Textures**: 8192px PNGs for OSM and Hybrid modes, JPG for Satellite.
+  - **3D Model**: GLB export of the terrain mesh.
   - **Vector Data**: GeoJSON export of OSM features.
 
 ## 🛠️ Tech Stack
@@ -40,10 +44,10 @@ Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle sim
 - **Styling**: Tailwind CSS
 - **3D Engine**: Three.js / TresJS / Cientos
 - **Mapping**: Leaflet / Vue-Leaflet
-- **Data Processing**:
-  - `fast-png` for 16-bit image encoding
-  - `geotiff` & `proj4` for USGS DEM parsing
-  - `three-stdlib` for geometry merging and GLTF export
+- **Core Processing**:
+  - **HTML5 Canvas API**: High-performance 8K texture generation.
+  - `fast-png`: 16-bit image encoding.
+  - `geotiff` & `proj4`: USGS DEM parsing and reprojection.
 
 ## 🚀 Getting Started
 
@@ -83,22 +87,33 @@ The output files will be in the `dist` directory.
 
 ## 📖 Usage Guide
 
-1. **Select Location**: Use the 2D map to navigate to your desired location. The dashed orange box indicates the export area.
+1. **Select Location**: Use the 2D map to navigate to your desired location.
 2. **Configure Settings**:
-   - **Resolution**: Choose from 512px (Fast) up to 8192px (Ultra).
-   - **OSM Features**: Toggle "Include 3D Features" to fetch roads and buildings.
+   - **Resolution**: Choose output size (up to 8192px).
+   - **OSM Features**: Check "Include OSM Features" to fetch vector data for textures.
+   - **Elevation Source**: Select between Standard (30m), USGS (1m USA), or GPXZ (Premium Global).
 3. **Generate**:
    - Click **"Preview 3D"** to render the terrain in the browser.
    - Click **"Direct DL"** to skip rendering and prepare files for download.
 4. **Export**:
-   - Use the export panel to download the **Heightmap (PNG)**, **Satellite Image**, or **GLB Model**.
+   - Use the grid of export buttons to download specific assets:
+     - **Heightmap**: 16-bit PNG.
+     - **Satellite**: JPG texture.
+     - **OSM Texture**: 8K "Blueprint" style PNG.
+     - **Hybrid Texture**: 8K Satellite + Road overlay PNG.
+     - **OSM Data**: Raw GeoJSON.
+     - **GLB Model**: 3D mesh file.
+
+## ⚠️ Disclaimer
+
+**Data Accuracy**: All terrain data, heightmaps, and textures generated by MapNG are **estimations** based on available satellite and elevation datasets. While we strive for high precision (especially with USGS/GPXZ data), the output may not perfectly match real-world dimensions due to projection distortions, data resolution limits, and interpolation. This tool is intended for modding and creative use, not for engineering or navigation.
 
 ## 📊 Data Sources
 
 - **Elevation**: 
-  - [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) (Global, ~30m)
-  - [USGS National Map](https://tnmaccess.nationalmap.gov/api/v1/docs) (USA, 1m)
-  - [GPXZ](https://gpxz.io/) (Global, High-Res)
+  - [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)
+  - [USGS National Map](https://tnmaccess.nationalmap.gov/api/v1/docs)
+  - [GPXZ](https://gpxz.io/)
 - **Imagery**: [Esri World Imagery](https://www.esri.com/en-us/arcgis/products/world-imagery)
 - **Vector Data**: [OpenStreetMap](https://www.openstreetmap.org/) via Overpass API
 
