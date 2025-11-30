@@ -506,6 +506,7 @@ const handleGenerate = async (showPreview: boolean, fetchOSM: boolean, useUSGS: 
 
 const switchTo2D = () => {
   previewMode.value = false;
-  terrainData.value = null;
+  // Do not clear terrainData here, so users can switch back and forth
+  // without losing their generated exports.
 };
 </script>

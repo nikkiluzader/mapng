@@ -156,15 +156,15 @@
           <template v-else>
               <div class="flex items-center gap-2">
                    <FileDown :size="16" />
-                   <span>Direct DL</span>
+                   <span>Generate Data</span>
               </div>
-              <span class="text-[10px] font-normal text-gray-500 dark:text-gray-400">Skip render, get files</span>
+              <span class="text-[10px] font-normal text-gray-500 dark:text-gray-400">Skip 3D view, get files</span>
           </template>
       </button>
     </div>
 
     <!-- Export Panel -->
-    <div v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600 animate-in fade-in slide-in-from-top-2">
+    <div ref="exportPanel" v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
         <div class="flex items-center justify-between">
             <label class="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                 <Download :size="16" />
@@ -297,8 +297,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Globe } from 'lucide-vue-next';
+import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson } from 'lucide-vue-next';
 import { LatLng, TerrainData } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
@@ -318,6 +318,7 @@ defineEmits<{
   generate: [showPreview: boolean, fetchOSM: boolean, useUSGS: boolean, useGPXZ: boolean, gpxzApiKey: string];
 }>();
 
+const exportPanel = ref<HTMLElement | null>(null);
 const isExportingGLB = ref(false);
 const isExportingHeightmap = ref(false);
 const isExportingTexture = ref(false);
@@ -333,6 +334,14 @@ const usgsStatus = ref<boolean | null>(null);
 
 onMounted(async () => {
     usgsStatus.value = await checkUSGSStatus();
+});
+
+// Watch for generation completion to scroll to export panel
+watch(() => props.isGenerating, async (newVal) => {
+    if (!newVal && props.terrainData) {
+        await nextTick();
+        exportPanel.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 });
 
 // Sync elevation source with flags
