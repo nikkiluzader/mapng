@@ -32,7 +32,7 @@
       <div class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
           <label class="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2 cursor-pointer">
               <Trees :size="12" class="text-emerald-600 dark:text-emerald-400" />
-              Include 3D Features (OSM)
+              Include OSM Features
           </label>
           <input 
               type="checkbox" 
@@ -41,56 +41,66 @@
           />
       </div>
 
-      <!-- USGS Toggle -->
-      <div class="flex flex-col gap-1 p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600" :class="{ 'opacity-50 pointer-events-none': useGPXZ }">
-          <div class="flex items-center justify-between">
-            <label class="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2 cursor-pointer">
-                <Mountain :size="12" class="text-blue-600 dark:text-blue-400" />
-                Use USGS 1m DEM (USA Only)
+      <!-- Elevation Source Selection -->
+      <div class="space-y-2">
+        <label class="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <Mountain :size="12" />
+            Elevation Data Source
+        </label>
+        
+        <div class="space-y-2 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600">
+            <!-- Default -->
+            <label class="flex items-start gap-2 cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors">
+                <input type="radio" v-model="elevationSource" value="default" class="mt-0.5 accent-[#FF6600]" />
+                <div class="space-y-0.5">
+                    <span class="block text-xs font-medium text-gray-900 dark:text-white">Standard (30m Global)</span>
+                    <span class="block text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                        Amazon Terrarium (SRTM). Reliable global coverage. Good for general terrain.
+                    </span>
+                </div>
             </label>
-            <input 
-                type="checkbox" 
-                v-model="useUSGS"
-                class="accent-[#FF6600] w-4 h-4 cursor-pointer"
-            />
-          </div>
-          <div class="flex items-center gap-1 text-[10px]">
-             <span class="text-gray-500 dark:text-gray-400">National Map Status:</span>
-             <span v-if="usgsStatus === null" class="text-gray-400 dark:text-gray-500">Checking...</span>
-             <span v-else-if="usgsStatus" class="text-emerald-600 dark:text-emerald-400 font-medium">● Online</span>
-             <span v-else class="text-red-500 dark:text-red-400 font-medium">● Offline / Unreachable</span>
-          </div>
-      </div>
 
-      <!-- GPXZ Toggle -->
-      <div class="flex flex-col gap-2 p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-          <div class="flex items-center justify-between">
-            <label class="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2 cursor-pointer">
-                <Globe :size="12" class="text-purple-600 dark:text-purple-400" />
-                Use GPXZ Elevation API
+            <!-- USGS -->
+            <label class="flex items-start gap-2 cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors">
+                <input type="radio" v-model="elevationSource" value="usgs" class="mt-0.5 accent-[#FF6600]" />
+                <div class="space-y-0.5">
+                    <div class="flex items-center gap-2">
+                        <span class="block text-xs font-medium text-gray-900 dark:text-white">USGS 1m DEM (USA Only)</span>
+                        <span v-if="usgsStatus" class="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold px-1 bg-emerald-100 dark:bg-emerald-900/30 rounded">ONLINE</span>
+                        <span v-else-if="usgsStatus === false" class="text-[9px] text-red-600 dark:text-red-400 font-bold px-1 bg-red-100 dark:bg-red-900/30 rounded">OFFLINE</span>
+                    </div>
+                    <span class="block text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                        High-precision data for USA. Falls back to Standard if data is missing/corrupt.
+                    </span>
+                </div>
             </label>
-            <input 
-                type="checkbox" 
-                v-model="useGPXZ"
-                class="accent-[#FF6600] w-4 h-4 cursor-pointer"
-            />
-          </div>
-          
-          <div v-if="useGPXZ" class="space-y-2 animate-in fade-in slide-in-from-top-1">
-              <input 
-                type="password" 
-                v-model="gpxzApiKey"
-                placeholder="Enter GPXZ API Key"
-                class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
-              />
-              <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                  Key is not stored. Free tier: 100 req/day.
-                  <a href="https://www.gpxz.io/" target="_blank" class="text-[#FF6600] hover:underline">Get a key</a>
-              </p>
-              <p v-if="isAreaLargeForGPXZ" class="text-[10px] text-orange-600 dark:text-orange-400 font-medium leading-tight">
-                  ⚠️ Large area ({{ areaSqKm.toFixed(2) }} km²). Will use multiple API calls.
-              </p>
-          </div>
+
+            <!-- GPXZ -->
+            <label class="flex items-start gap-2 cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors">
+                <input type="radio" v-model="elevationSource" value="gpxz" class="mt-0.5 accent-[#FF6600]" />
+                <div class="space-y-0.5 w-full">
+                    <span class="block text-xs font-medium text-gray-900 dark:text-white">GPXZ (Premium Global)</span>
+                    <span class="block text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                        Highest quality global data. Requires API Key. <a href="https://www.gpxz.io/docs/dataset#coverage" target="_blank" class="text-[#FF6600] hover:underline" @click.stop>Check Coverage</a>
+                    </span>
+                    
+                    <div v-if="elevationSource === 'gpxz'" class="mt-2 animate-in fade-in slide-in-from-top-1">
+                        <input 
+                            type="password" 
+                            v-model="gpxzApiKey"
+                            placeholder="Enter GPXZ API Key"
+                            class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
+                        />
+                        <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-1">
+                            Free tier: 100 req/day. <a href="https://www.gpxz.io/" target="_blank" class="text-[#FF6600] hover:underline">Get a key</a>
+                        </p>
+                        <p v-if="isAreaLargeForGPXZ" class="text-[10px] text-orange-600 dark:text-orange-400 font-medium leading-tight mt-1">
+                            ⚠️ Large area ({{ areaSqKm.toFixed(2) }} km²). Uses multiple API calls.
+                        </p>
+                    </div>
+                </div>
+            </label>
+        </div>
       </div>
     </div>
 
@@ -317,6 +327,7 @@ const isExportingOSM = ref(false);
 const fetchOSM = ref(false);
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
+const elevationSource = ref<'default' | 'usgs' | 'gpxz'>('default');
 const gpxzApiKey = ref('');
 const usgsStatus = ref<boolean | null>(null);
 
@@ -324,19 +335,16 @@ onMounted(async () => {
     usgsStatus.value = await checkUSGSStatus();
 });
 
-// Exclusive toggles
-watch(useGPXZ, (newVal) => {
-    if (newVal) useUSGS.value = false;
-});
-
-watch(useUSGS, (newVal) => {
-    if (newVal) useGPXZ.value = false;
+// Sync elevation source with flags
+watch(elevationSource, (newVal) => {
+    useUSGS.value = newVal === 'usgs';
+    useGPXZ.value = newVal === 'gpxz';
 });
 
 // Watch for terrain data updates to handle fallback scenarios
 watch(() => props.terrainData, (newData) => {
     if (newData?.usgsFallback) {
-        useUSGS.value = false;
+        elevationSource.value = 'default';
         alert("USGS 1m data for this area was missing or corrupt. Falling back on the Standard Terrarium dataset.\n\nMeters per pixel has been adjusted to the standard dataset resolution.");
     }
 });
