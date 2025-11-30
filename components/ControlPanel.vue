@@ -163,77 +163,97 @@
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ terrainData.width }}x{{ terrainData.height }}</span>
         </div>
         
-        <div class="grid grid-cols-1 gap-2">
+        <div class="grid grid-cols-2 gap-2">
+            <!-- Heightmap -->
             <button 
                 @click="downloadHeightmap"
                 :disabled="isExportingHeightmap"
-                class="flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24"
             >
-                <div class="flex items-center gap-2">
-                    <Loader2 v-if="isExportingHeightmap" :size="12" class="animate-spin text-[#FF6600]" />
-                    <span>Heightmap (16-bit PNG)</span>
+                <div class="w-full h-full flex items-center justify-center mb-1">
+                    <Loader2 v-if="isExportingHeightmap" :size="24" class="animate-spin text-[#FF6600]" />
+                    <Mountain v-else :size="32" class="text-gray-400 dark:text-gray-500" />
                 </div>
-                <Download v-if="!isExportingHeightmap" :size="12" class="opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                <span class="text-[10px] font-medium">Heightmap</span>
+                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+                <Download v-if="!isExportingHeightmap" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
+
+            <!-- Satellite Texture -->
             <button 
                 @click="downloadTexture"
                 :disabled="isExportingTexture"
-                class="flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
             >
-                <div class="flex items-center gap-2">
-                    <Loader2 v-if="isExportingTexture" :size="12" class="animate-spin text-[#FF6600]" />
-                    <span>Satellite Image (JPG)</span>
+                <div class="w-full h-full flex items-center justify-center mb-1 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
+                    <Loader2 v-if="isExportingTexture" :size="24" class="animate-spin text-[#FF6600]" />
+                    <img v-else-if="terrainData.satelliteTextureUrl" :src="terrainData.satelliteTextureUrl" class="w-full h-full object-cover" />
+                    <Box v-else :size="32" class="text-gray-400 dark:text-gray-500" />
                 </div>
-                <Download v-if="!isExportingTexture" :size="12" class="opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                <span class="text-[10px] font-medium">Satellite</span>
+                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px JPG</span>
+                <Download v-if="!isExportingTexture" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
 
+            <!-- OSM Texture -->
             <button 
                 @click="downloadOSMTexture"
                 :disabled="!terrainData.osmTextureUrl || isExportingOSMTexture"
-                class="flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
             >
-                <div class="flex items-center gap-2">
-                    <Loader2 v-if="isExportingOSMTexture" :size="12" class="animate-spin text-[#FF6600]" />
-                    <span>OSM Texture (PNG)</span>
+                <div class="w-full h-full flex items-center justify-center mb-1 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
+                    <Loader2 v-if="isExportingOSMTexture" :size="24" class="animate-spin text-[#FF6600]" />
+                    <img v-else-if="terrainData.osmTextureUrl" :src="terrainData.osmTextureUrl" class="w-full h-full object-cover" />
+                    <Trees v-else :size="32" class="text-gray-400 dark:text-gray-500" />
                 </div>
-                <Download v-if="!isExportingOSMTexture" :size="12" class="opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                <span class="text-[10px] font-medium">OSM Texture</span>
+                <span class="text-[9px] text-gray-500 dark:text-gray-400">8192px PNG</span>
+                <Download v-if="!isExportingOSMTexture" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
 
+            <!-- Hybrid Texture -->
             <button 
                 @click="downloadHybridTexture"
                 :disabled="!terrainData.hybridTextureUrl || isExportingHybridTexture"
-                class="flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
             >
-                <div class="flex items-center gap-2">
-                    <Loader2 v-if="isExportingHybridTexture" :size="12" class="animate-spin text-[#FF6600]" />
-                    <span>Hybrid Texture (PNG)</span>
+                <div class="w-full h-full flex items-center justify-center mb-1 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
+                    <Loader2 v-if="isExportingHybridTexture" :size="24" class="animate-spin text-[#FF6600]" />
+                    <img v-else-if="terrainData.hybridTextureUrl" :src="terrainData.hybridTextureUrl" class="w-full h-full object-cover" />
+                    <Layers v-else :size="32" class="text-gray-400 dark:text-gray-500" />
                 </div>
-                <Download v-if="!isExportingHybridTexture" :size="12" class="opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                <span class="text-[10px] font-medium">Hybrid</span>
+                <span class="text-[9px] text-gray-500 dark:text-gray-400">8192px PNG</span>
+                <Download v-if="!isExportingHybridTexture" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
 
+            <!-- OSM GeoJSON -->
              <button 
                 @click="downloadOSM"
                 :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isExportingOSM"
-                class="flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24"
             >
-                <div class="flex items-center gap-2">
-                    <Loader2 v-if="isExportingOSM" :size="12" class="animate-spin text-[#FF6600]" />
-                    <span>OSM Data (GeoJSON)</span>
+                <div class="w-full h-full flex items-center justify-center mb-1">
+                    <Loader2 v-if="isExportingOSM" :size="24" class="animate-spin text-[#FF6600]" />
+                    <FileJson v-else :size="32" class="text-gray-400 dark:text-gray-500" />
                 </div>
-                <FileJson v-if="!isExportingOSM" :size="12" class="opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                <span class="text-[10px] font-medium">OSM Data (JSON)</span>
+                <Download v-if="!isExportingOSM" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
             
-            <div class="grid grid-cols-1 gap-2">
-                <button 
-                    @click="handleGLBExport"
-                    :disabled="isExportingGLB"
-                    class="flex items-center justify-center gap-2 px-2 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50"
-                >
-                    <Loader2 v-if="isExportingGLB" :size="12" class="animate-spin text-[#FF6600]" />
-                    <Box v-else :size="12" class="text-gray-500 dark:text-gray-400" />
-                    <span>GLB Model</span>
-                </button>
-            </div>
+            <!-- GLB Model -->
+            <button 
+                @click="handleGLBExport"
+                :disabled="isExportingGLB"
+                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 h-24"
+            >
+                <div class="w-full h-full flex items-center justify-center mb-1">
+                    <Loader2 v-if="isExportingGLB" :size="24" class="animate-spin text-[#FF6600]" />
+                    <Box v-else :size="32" class="text-gray-400 dark:text-gray-500" />
+                </div>
+                <span class="text-[10px] font-medium">GLB Model</span>
+                <Download v-if="!isExportingGLB" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            </button>
         </div>
 
         <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-2">

@@ -178,7 +178,7 @@
             What does it do?
           </h3>
           <p>
-            It allows modders to select any location on Earth, visualize it in 3D, and export high-precision heightmaps and 3D models ready for game engine import. Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle simulation: high-resolution height data, accurate scale, and integrated road network data.
+            It allows modders to select any location on Earth, visualize it in 3D, and export high-precision heightmaps, detailed textures, and 3D models ready for game engine import. Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle simulation: high-resolution height data, accurate scale, and integrated road networks with satellite imagery.
           </p>
         </div>
 
@@ -191,6 +191,7 @@
               <li>Premium High-Res Global Data (GPXZ)</li>
               <li>3D Preview with Satellite Imagery</li>
               <li>OSM Road & Building Integration</li>
+              <li>Hybrid Texture Generation</li>
             </ul>
           </div>
           <div class="space-y-2">
@@ -198,6 +199,7 @@
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
               <li>16-bit PNG Heightmaps</li>
               <li>High-Res Satellite Textures</li>
+              <li>High-Res OSM & Hybrid Textures</li>
               <li>GLB 3D Models</li>
               <li>GeoJSON Vector Data</li>
             </ul>
@@ -271,10 +273,6 @@
                 <div class="font-medium text-gray-900 dark:text-white">Cientos</div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Helpers for OrbitControls, Skybox, Shadows</div>
               </div>
-              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">InstancedMesh</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">High-performance tree rendering</div>
-              </div>
             </div>
           </section>
 
@@ -288,6 +286,10 @@
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Web Mercator Projection</div>
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Custom implementation for pixel-perfect terrain stitching</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">HTML5 Canvas API</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">High-res texture generation (8k+)</div>
               </div>
             </div>
           </section>
