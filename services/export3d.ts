@@ -274,7 +274,7 @@ const createAreaGeometry = (points: THREE.Vector3[], data: TerrainData) => {
         const metersPerDegree = 111320 * Math.cos(latRad);
         const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
         const unitsPerMeter = SCENE_SIZE / realWidthMeters;
-        const EXAGGERATION = 1.5;
+        const EXAGGERATION = 1.0;
 
         return (h - data.minHeight) * unitsPerMeter * EXAGGERATION;
     };
@@ -314,7 +314,7 @@ const createTerrainMesh = async (data: TerrainData): Promise<THREE.Mesh> => {
       const metersPerDegree = 111320 * Math.cos(latRad);
       const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
       const unitsPerMeter = SCENE_SIZE / realWidthMeters;
-      const EXAGGERATION = 1.5;
+      const EXAGGERATION = 1.0;
 
       // Apply heightmap data to vertices
       for (let i = 0; i < vertices.length / 3; i++) {
