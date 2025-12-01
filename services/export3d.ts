@@ -89,7 +89,7 @@ const getTerrainHeight = (data: TerrainData, lat: number, lng: number): number =
     const metersPerDegree = 111320 * Math.cos(latRad);
     const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
     const unitsPerMeter = SCENE_SIZE / realWidthMeters;
-    const EXAGGERATION = 1.5;
+    const EXAGGERATION = 1.0;
 
     return (h - data.minHeight) * unitsPerMeter * EXAGGERATION;
 };
