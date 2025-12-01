@@ -22,9 +22,10 @@ Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle sim
 
 - **🌍 Global Coverage**: Access terrain data for anywhere on Earth using AWS Terrain Tiles.
 - **🏔️ Multiple Elevation Sources**:
-  - **Standard**: Global ~30m resolution (AWS Terrarium).
+  - **Standard**: Global ~30m resolution (AWS Terrarium). Upsampled to 1m/px using bilinear interpolation for smooth surfaces.
   - **USGS 1m**: High-precision 1-meter DEMs for USA (CONUS, Alaska, Hawaii).
   - **GPXZ**: Premium high-resolution global elevation data (requires API key).
+- **📏 Consistent 1m/px Output**: All heightmaps are generated at exactly 1 meter per pixel resolution, regardless of the source data. This ensures consistent scaling in game engines.
 - **🗺️ Precision Selection**: Interactive 2D map for precise area selection.
 - **🎨 Advanced Texture Generation**:
   - **Satellite**: High-res satellite imagery.

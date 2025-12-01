@@ -194,12 +194,22 @@
               <li>Global Elevation Data (AWS)</li>
               <li>1m Resolution USA Data (USGS)</li>
               <li>Premium High-Res Global Data (GPXZ)</li>
+              <li>Consistent 1m/px Output Resolution</li>
               <li>3D Preview with Satellite Imagery</li>
               <li>OSM Road & Building Integration</li>
               <li>Hybrid Texture Generation</li>
             </ul>
           </div>
           <div class="space-y-2">
+             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Resolution Note</h4>
+             <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <strong>All heightmaps are exported at 1 meter per pixel.</strong><br/>
+                When using the Standard (30m) dataset, the terrain is upsampled using bilinear interpolation to ensure smoothness, but it will not contain the fine details found in the 1m USGS or GPXZ datasets.
+             </p>
+          </div>
+        </div>
+
+        <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Export Formats</h4>
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
               <li>16-bit PNG Heightmaps</li>
@@ -208,7 +218,6 @@
               <li>GLB 3D Models</li>
               <li>GeoJSON Vector Data</li>
             </ul>
-          </div>
         </div>
 
         <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -241,8 +250,8 @@
         </p>
         
         <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-lg p-4 text-amber-900 dark:text-amber-100 text-xs">
-          <p class="font-medium mb-1">Not Exact 1:1 Scale</p>
-          <p>While we strive for high precision (especially with USGS/GPXZ data), the output may not perfectly match real-world dimensions due to projection distortions, data resolution limits, and interpolation.</p>
+          <p class="font-medium mb-1">Resolution & Scale</p>
+          <p>All heightmaps are exported at 1 meter per pixel resolution to ensure consistent scaling in game engines. However, when using the Standard (30m) dataset, the terrain is upsampled. This means it will be smooth but lack the fine details found in true 1m datasets like USGS or GPXZ.</p>
         </div>
 
         <p class="text-xs text-gray-500 dark:text-gray-400">
