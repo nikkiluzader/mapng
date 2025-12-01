@@ -32,7 +32,7 @@ export const project = (lat: number, lng: number, zoom: number) => {
 
 const NO_DATA_VALUE = -99999;
 
-const fetchGPXZRaw = async (bounds: Bounds, apiKey: string): Promise<{ image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array } | null> => {
+const fetchGPXZRaw = async (bounds: Bounds, apiKey: string): Promise<{ image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] | null> => {
     try {
         // Calculate Area in km²
         const latDist = (bounds.north - bounds.south) * 111.32;
@@ -58,7 +58,7 @@ const fetchGPXZRaw = async (bounds: Bounds, apiKey: string): Promise<{ image: Ge
         const rasters = await image.readRasters();
         const raster = rasters[0] as Float32Array | Int16Array;
         
-        return { image, raster };
+        return [{ image, raster }];
 
     } catch (e) {
         console.error("Failed to fetch GPXZ terrain:", e);
@@ -66,15 +66,52 @@ const fetchGPXZRaw = async (bounds: Bounds, apiKey: string): Promise<{ image: Ge
     }
 };
 
-const fetchUSGSRaw = async (bounds: Bounds): Promise<{ image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array } | null> => {
+const fetchUSGSRaw = async (bounds: Bounds): Promise<{ image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] | null> => {
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000;
+
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
     try {
         // 1. Query USGS API
-        const bbox = `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`;
-        const url = `${USGS_PRODUCT_API}?datasets=${encodeURIComponent(USGS_DATASET)}&bbox=${bbox}&prodFormats=GeoTIFF&max=1`;
+        // Round coordinates to 6 decimal places to improve cache hit rate and reduce query string length
+        const bbox = `${bounds.west.toFixed(6)},${bounds.south.toFixed(6)},${bounds.east.toFixed(6)},${bounds.north.toFixed(6)}`;
+        // Limit to 4 tiles to cover corners/overlaps without overloading memory
+        const url = `${USGS_PRODUCT_API}?datasets=${encodeURIComponent(USGS_DATASET)}&bbox=${bbox}&prodFormats=GeoTIFF&max=4`;
         
         console.log(`[USGS] Querying products: ${url}`);
 
-        const response = await fetch(url);
+        let response: Response | null = null;
+        let attempts = 0;
+
+        while (attempts < MAX_RETRIES) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
+                response = await fetch(url, { 
+                    signal: controller.signal,
+                    // Ensure no custom headers are sent to avoid preflight OPTIONS request which fails on USGS
+                    headers: {} 
+                });
+                clearTimeout(timeoutId);
+
+                if (response.ok) break;
+                
+                console.warn(`[USGS] API Query failed: ${response.status}. Retrying...`);
+            } catch (err) {
+                console.warn(`[USGS] Network error: ${err}. Retrying...`);
+            }
+            
+            attempts++;
+            await sleep(RETRY_DELAY * attempts);
+        }
+
+        if (!response || !response.ok) {
+            console.warn(`[USGS] Failed to query API after ${MAX_RETRIES} attempts.`);
+            return null;
+        }
+
         const data = await response.json();
         
         if (!data.items || data.items.length === 0) {
@@ -82,20 +119,43 @@ const fetchUSGSRaw = async (bounds: Bounds): Promise<{ image: GeoTIFF.GeoTIFFIma
             return null;
         }
         
-        // 2. Download GeoTIFF
-        const downloadUrl = data.items[0].downloadURL;
-        console.log(`[USGS] Downloading GeoTIFF from: ${downloadUrl}`);
+        console.log(`[USGS] Found ${data.items.length} tiles. Downloading sequentially to handle overlap...`);
 
-        const tiffResponse = await fetch(downloadUrl);
-        const arrayBuffer = await tiffResponse.arrayBuffer();
+        const results: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] = [];
+
+        // 2. Download GeoTIFFs sequentially
+        // We process sequentially to avoid memory exhaustion with large 1m tiles
+        for (const item of data.items) {
+            const downloadUrl = item.downloadURL;
+            console.log(`[USGS] Downloading GeoTIFF from: ${downloadUrl}`);
+
+            try {
+                const tiffResponse = await fetch(downloadUrl);
+                if (!tiffResponse.ok) {
+                    console.warn(`[USGS] Failed to download tile: ${tiffResponse.status}`);
+                    continue;
+                }
+
+                const arrayBuffer = await tiffResponse.arrayBuffer();
+                
+                // 3. Parse GeoTIFF
+                const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+                const image = await tiff.getImage();
+                const rasters = await image.readRasters();
+                const raster = rasters[0] as Float32Array | Int16Array; // Height data
+                
+                results.push({ image, raster });
+            } catch (e) {
+                console.warn(`[USGS] Failed to parse tile ${downloadUrl}`, e);
+            }
+        }
         
-        // 3. Parse GeoTIFF
-        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-        const image = await tiff.getImage();
-        const rasters = await image.readRasters();
-        const raster = rasters[0] as Float32Array | Int16Array; // Height data
+        if (results.length === 0) {
+            console.warn("[USGS] All tile downloads failed.");
+            return null;
+        }
         
-        return { image, raster };
+        return results;
         
     } catch (e) {
         console.warn("Failed to load USGS terrain:", e);
@@ -174,7 +234,7 @@ export const fetchTerrainData = async (
     };
 
   // 2. Try GPXZ / USGS
-  let rawData: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array } | null = null;
+  let rawData: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] | null = null;
   let usgsFallback = false;
 
   if (useGPXZ && gpxzApiKey) {
@@ -422,7 +482,14 @@ export const fetchTerrainData = async (
 
 export const checkUSGSStatus = async (): Promise<boolean> => {
     try {
-        const response = await fetch(`${USGS_PRODUCT_API}?max=1`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        // Use empty headers to avoid preflight OPTIONS request
+        const response = await fetch(`${USGS_PRODUCT_API}?max=1`, { 
+            headers: {},
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
         return response.ok;
     } catch (e) {
         return false;

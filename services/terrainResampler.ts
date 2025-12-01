@@ -9,7 +9,7 @@ import { LatLng, Bounds } from '../types';
 export const resampleToMeterGrid = async (
     source: {
         type: 'geotiff' | 'sampler',
-        data?: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array },
+        data?: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[],
         sampler?: (lat: number, lng: number) => number
     },
     center: LatLng,
@@ -29,57 +29,79 @@ export const resampleToMeterGrid = async (
     const halfWidth = width / 2;
     const halfHeight = height / 2;
 
-    // Pre-calculate GeoTIFF converter if needed
-    let tiffConverter: any = null;
-    let tiffWidth = 0;
-    let tiffHeight = 0;
-    let tiffOriginX = 0;
-    let tiffOriginY = 0;
-    let tiffResX = 0;
-    let tiffResY = 0;
-    let tiffRaster: Float32Array | Int16Array | null = null;
-    let noData = -99999; // Match terrain.ts NO_DATA_VALUE
+    // Pre-calculate GeoTIFF converters
+    interface PreparedTile {
+        raster: Float32Array | Int16Array;
+        width: number;
+        height: number;
+        originX: number;
+        originY: number;
+        resX: number;
+        resY: number;
+        noData: number;
+        converter: any;
+    }
+
+    const tiles: PreparedTile[] = [];
 
     if (source.type === 'geotiff' && source.data) {
-        const image = source.data.image;
-        tiffRaster = source.data.raster;
-        tiffWidth = image.getWidth();
-        tiffHeight = image.getHeight();
-        [tiffOriginX, tiffOriginY] = image.getOrigin();
-        [tiffResX, tiffResY] = image.getResolution();
-        noData = image.getGDALNoData() ?? -99999;
+        for (const item of source.data) {
+            const image = item.image;
+            const raster = item.raster;
+            const width = image.getWidth();
+            const height = image.getHeight();
+            const [originX, originY] = image.getOrigin();
+            const [resX, resY] = image.getResolution();
+            const noData = image.getGDALNoData() ?? -99999;
 
-        const geoKeys = image.getGeoKeys();
-        const epsgCode = geoKeys.ProjectedCSTypeGeoKey || geoKeys.GeographicTypeGeoKey;
-        
-        if (epsgCode) {
-            const epsg = `EPSG:${epsgCode}`;
+            const geoKeys = image.getGeoKeys();
+            const epsgCode = geoKeys.ProjectedCSTypeGeoKey || geoKeys.GeographicTypeGeoKey;
             
-            // Check if definition exists, if not fetch it
-            try {
-                if (!proj4.defs(epsg)) {
-                    console.log(`[Resampler] Fetching Proj4 definition for ${epsg}...`);
-                    const response = await fetch(`https://epsg.io/${epsgCode}.proj4`);
-                    if (response.ok) {
-                        const def = await response.text();
-                        proj4.defs(epsg, def);
-                        console.log(`[Resampler] Loaded definition for ${epsg}`);
-                    } else {
-                        console.warn(`[Resampler] Failed to fetch definition for ${epsg}`);
+            let converter: any = null;
+
+            if (epsgCode) {
+                const epsg = `EPSG:${epsgCode}`;
+                
+                // Check if definition exists, if not fetch it
+                try {
+                    if (!proj4.defs(epsg)) {
+                        console.log(`[Resampler] Fetching Proj4 definition for ${epsg}...`);
+                        const response = await fetch(`https://epsg.io/${epsgCode}.proj4`);
+                        if (response.ok) {
+                            const def = await response.text();
+                            proj4.defs(epsg, def);
+                            console.log(`[Resampler] Loaded definition for ${epsg}`);
+                        } else {
+                            console.warn(`[Resampler] Failed to fetch definition for ${epsg}`);
+                        }
+                    }
+                    
+                    converter = proj4('EPSG:4326', epsg);
+                } catch (e) {
+                    console.warn(`Proj4 definition for ${epsg} missing or invalid, assuming WGS84 if 4326`, e);
+                    if (epsgCode === 4326) {
+                        converter = { forward: (p: number[]) => p };
                     }
                 }
-                
-                tiffConverter = proj4('EPSG:4326', epsg);
-            } catch (e) {
-                console.warn(`Proj4 definition for ${epsg} missing or invalid, assuming WGS84 if 4326`, e);
-                if (epsgCode === 4326) {
-                    tiffConverter = { forward: (p: number[]) => p };
-                }
+            } else {
+                // Fallback for missing EPSG code (common in some web-served GeoTIFFs like GPXZ)
+                console.warn("[Resampler] No EPSG code found in GeoTIFF keys. Assuming EPSG:4326 (Lat/Lon).");
+                converter = { forward: (p: number[]) => p };
             }
-        } else {
-            // Fallback for missing EPSG code (common in some web-served GeoTIFFs like GPXZ)
-            console.warn("[Resampler] No EPSG code found in GeoTIFF keys. Assuming EPSG:4326 (Lat/Lon).");
-            tiffConverter = { forward: (p: number[]) => p };
+
+            if (converter) {
+                tiles.push({
+                    raster,
+                    width,
+                    height,
+                    originX,
+                    originY,
+                    resX,
+                    resY,
+                    noData,
+                    converter
+                });
+            }
         }
     }
 
@@ -122,16 +144,23 @@ export const resampleToMeterGrid = async (
 
             let h = -99999; // Match terrain.ts NO_DATA_VALUE
 
-            if (source.type === 'geotiff' && tiffConverter && tiffRaster) {
-                // Convert Lat/Lon to TIFF CRS
-                const [tx, ty] = tiffConverter.forward([lng, lat]);
-                
-                // Map to TIFF pixel space
-                const px = (tx - tiffOriginX) / tiffResX;
-                const py = (ty - tiffOriginY) / tiffResY;
+            if (source.type === 'geotiff' && tiles.length > 0) {
+                // Try to find a tile that covers this point
+                for (const tile of tiles) {
+                    // Convert Lat/Lon to TIFF CRS
+                    const [tx, ty] = tile.converter.forward([lng, lat]);
+                    
+                    // Map to TIFF pixel space
+                    const px = (tx - tile.originX) / tile.resX;
+                    const py = (ty - tile.originY) / tile.resY;
 
-                if (px >= 0 && px < tiffWidth - 1 && py >= 0 && py < tiffHeight - 1) {
-                    h = bilinear(tiffRaster, tiffWidth, px, py, noData);
+                    if (px >= 0 && px < tile.width - 1 && py >= 0 && py < tile.height - 1) {
+                        const val = bilinear(tile.raster, tile.width, px, py, tile.noData);
+                        if (val !== tile.noData) {
+                            h = val;
+                            break; // Found valid data, stop searching
+                        }
+                    }
                 }
             } else if (source.type === 'sampler' && source.sampler) {
                 h = source.sampler(lat, lng);
