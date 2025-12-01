@@ -1,65 +1,34 @@
 import * as THREE from 'three';
 import { TerrainData, LatLng } from '../types';
+import proj4 from 'proj4';
 // @ts-ignore
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // --- Constants & Helpers (Duplicated from OSMFeatures.vue for consistency) ---
 const SCENE_SIZE = 100;
-const TILE_SIZE = 256;
-const TERRAIN_ZOOM = 15;
-const MAX_LATITUDE = 85.05112878;
 
-/**
- * Converts latitude/longitude into a flat 2D pixel coordinate space using Web Mercator
- * at a fixed zoom level. The output coordinates represent positions on a virtual
- * square map grid where one full side spans `TILE_SIZE * 2^zoom` pixels.
- *
- * This projection ensures consistent alignment between terrain height sampling and
- * OSM feature placement by matching the coordinate system used by standard
- * web-mapping tile engines.
- *
- * @param lat — Geographic latitude in degrees
- * @param lng — Geographic longitude in degrees
- * @returns `{ x, y }` — 2D pixel space coordinates on the Mercator world map grid
- */
-const latLngToMercator = (lat: number, lng: number) => {
-  // --- Mercator math semantics ---
-  const LNG_RANGE_OFFSET = 180;       // shifts [-180,180] → [0,360]
-  const LNG_FULL_SPAN = 360;          // planet wraps every 360°
-  const EQUATOR_Y = 0.5;              // normalized vertical midpoint anchor
-  const LAT_SCALE = 0.25;             // 1/4 standard Mercator stretch coefficient
-  const DEG_TO_RAD = Math.PI / 180;   // degree → radian conversion factor
+const getMetricProjector = (data: TerrainData) => {
+    const centerLat = (data.bounds.north + data.bounds.south) / 2;
+    const centerLng = (data.bounds.east + data.bounds.west) / 2;
+    const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
+    const toMetric = proj4('EPSG:4326', localProjDef);
+    const halfWidth = data.width / 2;
+    const halfHeight = data.height / 2;
 
-  // 1. Clamp latitude to avoid infinite poles
-  const latClamped = Math.max(
-    Math.min(MAX_LATITUDE, lat),
-    -MAX_LATITUDE
-  );
-
-  // 2. Precompute sin latitude for Mercator Y distortion curve
-  const sinLatitude = Math.sin(latClamped * DEG_TO_RAD);
-
-  // 3. Compute virtual full "world pixel canvas size" at fixed zoom (256 * 2^15)
-  const worldPixelSpan = TILE_SIZE * Math.pow(2, TERRAIN_ZOOM);
-
-  // 4. Convert longitude → linear X across the world
-  const x = worldPixelSpan * (lng + LNG_RANGE_OFFSET) / LNG_FULL_SPAN;
-
-  // 5. Convert latitude → stretched Y (inverted to match tile coordinates)
-  const y = worldPixelSpan * (
-    EQUATOR_Y -
-    LAT_SCALE * Math.log((1 + sinLatitude) / (1 - sinLatitude)) / Math.PI
-  );
-
-  return { x, y };
+    return (lat: number, lng: number) => {
+        const [localX, localY] = toMetric.forward([lng, lat]);
+        const x = localX + halfWidth;
+        const y = halfHeight - localY;
+        return { x, y };
+    };
 };
 
 const getTerrainHeight = (data: TerrainData, lat: number, lng: number): number => {
-    const p = latLngToMercator(lat, lng);
-    const nw = latLngToMercator(data.bounds.north, data.bounds.west);
+    const toPixel = getMetricProjector(data);
+    const p = toPixel(lat, lng);
     
-    const localX = p.x - Math.round(nw.x);
-    const localY = p.y - Math.round(nw.y);
+    const localX = p.x;
+    const localY = p.y;
 
     if (localX < 0 || localX >= data.width - 1 || localY < 0 || localY >= data.height - 1) {
         return 0;
@@ -85,9 +54,8 @@ const getTerrainHeight = (data: TerrainData, lat: number, lng: number): number =
 
     const h = (1 - wy) * ((1 - wx) * h00 + wx * h10) + wy * ((1 - wx) * h01 + wx * h11);
     
-    const latRad = (data.bounds.north + data.bounds.south) / 2 * Math.PI / 180;
-    const metersPerDegree = 111320 * Math.cos(latRad);
-    const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
+    // Since 1px = 1m, realWidthMeters = data.width
+    const realWidthMeters = data.width;
     const unitsPerMeter = SCENE_SIZE / realWidthMeters;
     const EXAGGERATION = 1.0;
 
@@ -95,11 +63,11 @@ const getTerrainHeight = (data: TerrainData, lat: number, lng: number): number =
 };
 
 const latLngToScene = (data: TerrainData, lat: number, lng: number) => {
-    const p = latLngToMercator(lat, lng);
-    const nw = latLngToMercator(data.bounds.north, data.bounds.west);
+    const toPixel = getMetricProjector(data);
+    const p = toPixel(lat, lng);
     
-    const localX = p.x - Math.round(nw.x);
-    const localY = p.y - Math.round(nw.y);
+    const localX = p.x;
+    const localY = p.y;
     
     const u = localX / (data.width - 1);
     const v = localY / (data.height - 1);

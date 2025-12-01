@@ -145,25 +145,22 @@ const osmAttribution = computed(() => {
     : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 });
 
-// Calculate bounds based on resolution
+// Calculate bounds based on resolution (1m/px means resolution = meters)
 const bounds = computed(() => {
-  if (!mapRef.value?.leafletObject) return null;
-  
-  const map = mapRef.value.leafletObject;
   const center = currentCenter.value;
-  const TERRAIN_ZOOM = 15;
+  const sizeMeters = props.resolution;
   
-  // Project the LatLng to World Pixels at Zoom 15
-  const centerPoint = map.project([center.lat, center.lng], TERRAIN_ZOOM);
-  const halfRes = props.resolution / 2;
+  const metersPerDegLat = 111320;
+  const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
   
-  // Calculate bounds in pixel space
-  const nwPoint = L.point(centerPoint.x - halfRes, centerPoint.y - halfRes);
-  const sePoint = L.point(centerPoint.x + halfRes, centerPoint.y + halfRes);
+  const latSpan = sizeMeters / metersPerDegLat;
+  const lngSpan = sizeMeters / metersPerDegLng;
   
-  // Convert back to LatLng
-  const nw = map.unproject(nwPoint, TERRAIN_ZOOM);
-  const se = map.unproject(sePoint, TERRAIN_ZOOM);
+  const halfLat = latSpan / 2;
+  const halfLng = lngSpan / 2;
+  
+  const nw = L.latLng(center.lat + halfLat, center.lng - halfLng);
+  const se = L.latLng(center.lat - halfLat, center.lng + halfLng);
   
   return L.latLngBounds(nw, se);
 });

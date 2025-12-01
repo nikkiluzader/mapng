@@ -22,7 +22,7 @@
           </select>
           <div class="text-[10px] text-gray-500 dark:text-gray-400 pt-1 space-y-1">
               <p>• Downloads match selected size exactly.</p>
-              <p>• Always fetches max detail (Zoom 15).</p>
+              <p>• Fetches max detail (Terrain Z15, Sat Z17).</p>
               <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium">⚠️ Large area. May require high RAM.</p>
               <p>• Current Scale: <span class="text-[#FF6600]">{{ metersPerPixel.toFixed(2) }}m/px</span></p>
           </div>
@@ -128,6 +128,21 @@
             step="0.0001"
           />
       </div>
+      
+      <select 
+          @change="handleLocationSelect"
+          class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
+      >
+          <option 
+            v-for="(loc, index) in interestingLocations" 
+            :key="index" 
+            :value="index"
+            :disabled="loc.disabled"
+            :selected="index === 0"
+          >
+            {{ loc.name }}
+          </option>
+      </select>
     </div>
 
     <!-- Generate Buttons -->
@@ -312,7 +327,7 @@ interface Props {
 
 const props = defineProps<Props>();
 
-defineEmits<{
+const emit = defineEmits<{
   locationChange: [loc: LatLng];
   resolutionChange: [res: number];
   generate: [showPreview: boolean, fetchOSM: boolean, useUSGS: boolean, useGPXZ: boolean, gpxzApiKey: string];
@@ -331,6 +346,27 @@ const useGPXZ = ref(false);
 const elevationSource = ref<'default' | 'usgs' | 'gpxz'>('default');
 const gpxzApiKey = ref('');
 const usgsStatus = ref<boolean | null>(null);
+
+const interestingLocations = [
+  { name: "Select a location...", lat: 0, lng: 0, disabled: true },
+  { name: "Devils Tower, USA", lat: 44.59056, lng: -104.71511 },
+  { name: "Grand Canyon, USA", lat: 36.1069, lng: -112.1129 },
+  { name: "Mount Everest, Nepal", lat: 27.9881, lng: 86.9250 },
+  { name: "Mount Fuji, Japan", lat: 35.3606, lng: 138.7274 },
+  { name: "Matterhorn, Switzerland", lat: 45.9763, lng: 7.6586 },
+  { name: "Zugspitze, Germany", lat: 47.4211, lng: 10.9853 },
+  { name: "Yosemite Valley, USA", lat: 37.7456, lng: -119.5936 }
+];
+
+const handleLocationSelect = (e: Event) => {
+    const idx = parseInt((e.target as HTMLSelectElement).value);
+    if (idx > 0) {
+        const loc = interestingLocations[idx];
+        emit('locationChange', { lat: loc.lat, lng: loc.lng });
+        // Reset selection to default
+        (e.target as HTMLSelectElement).selectedIndex = 0;
+    }
+};
 
 onMounted(async () => {
     usgsStatus.value = await checkUSGSStatus();
@@ -358,23 +394,10 @@ watch(() => props.terrainData, (newData) => {
     }
 });
 
-// Calculate resolution scale (Meters per Pixel) at Zoom 15 (Fixed Fetch Zoom)
+// Calculate resolution scale (Meters per Pixel)
+// With the new pipeline, we enforce 1m/px for all sources.
 const metersPerPixel = computed(() => {
-  const lat = props.center.lat;
-  const lng = props.center.lng;
-
-  const isCONUS = lat < 50 && lat > 24 && lng > -125 && lng < -66;
-  const isAlaska = lat < 72 && lat > 50 && lng > -170 && lng < -129;
-  const isHawaii = lat < 23 && lat > 18 && lng > -161 && lng < -154;
-  
-  if (useUSGS.value && (isCONUS || isAlaska || isHawaii)) {
-      return 1.0;
-  }
-  // GPXZ is typically high res (1m or better), so we can assume 1m/px for display purposes if enabled
-  if (useGPXZ.value) {
-      return 1.0;
-  }
-  return (156543.03 * Math.cos(props.center.lat * Math.PI / 180)) / 32768;
+  return 1.0;
 });
 
 // Calculate Area

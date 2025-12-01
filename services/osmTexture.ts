@@ -1,5 +1,5 @@
 import { TerrainData, OSMFeature, LatLng } from "../types";
-import { project, TERRAIN_ZOOM } from "./terrain";
+import proj4 from 'proj4';
 
 // Colors mixed from standard OSM Carto and OpenStreetBrowser
 // Carto: https://github.com/gravitystorm/openstreetmap-carto/blob/master/style/landcover.mss
@@ -109,14 +109,18 @@ export const generateOSMTexture = async (terrainData: TerrainData): Promise<stri
     ctx.fillStyle = COLORS.defaultLanduse;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Helper to project LatLng to Canvas coordinates
-    const nw = project(terrainData.bounds.north, terrainData.bounds.west, TERRAIN_ZOOM);
-    
+    // Helper to project LatLng to Canvas coordinates (Metric)
+    const centerLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
+    const centerLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
+    const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
+    const toMetric = proj4('EPSG:4326', localProjDef);
+    const halfWidth = terrainData.width / 2;
+    const halfHeight = terrainData.height / 2;
+
     const toPixel = (lat: number, lng: number) => {
-        const p = project(lat, lng, TERRAIN_ZOOM);
-        // Match the offset logic from TerrainMesh/OSMFeatures
-        const x = (p.x - Math.round(nw.x)) * SCALE_FACTOR;
-        const y = (p.y - Math.round(nw.y)) * SCALE_FACTOR;
+        const [localX, localY] = toMetric.forward([lng, lat]);
+        const x = (localX + halfWidth) * SCALE_FACTOR;
+        const y = (halfHeight - localY) * SCALE_FACTOR;
         return { x, y };
     };
 
@@ -189,7 +193,7 @@ export const generateOSMTexture = async (terrainData: TerrainData): Promise<stri
         // Footpaths and tracks (Light Grey)
         if (highway === 'footway' || highway === 'path' || highway === 'pedestrian' || highway === 'cycleway' || highway === 'steps' || highway === 'track') {
              ctx.strokeStyle = COLORS.path; 
-             ctx.lineWidth = 1 * SCALE_FACTOR;
+             ctx.lineWidth = 2 * SCALE_FACTOR;
              ctx.stroke();
         } 
         // Vehicle roads (Solid Dark Grey)
@@ -198,11 +202,11 @@ export const generateOSMTexture = async (terrainData: TerrainData): Promise<stri
             
             // Vary width by importance
             if (highway === 'motorway' || highway === 'trunk') {
-                ctx.lineWidth = 4 * SCALE_FACTOR;
+                ctx.lineWidth = 8 * SCALE_FACTOR;
             } else if (highway === 'primary' || highway === 'secondary') {
-                ctx.lineWidth = 3 * SCALE_FACTOR;
+                ctx.lineWidth = 6 * SCALE_FACTOR;
             } else {
-                ctx.lineWidth = 2 * SCALE_FACTOR;
+                ctx.lineWidth = 4 * SCALE_FACTOR;
             }
             ctx.stroke();
         }
@@ -271,13 +275,18 @@ export const generateHybridTexture = async (terrainData: TerrainData): Promise<s
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    // Helper to project LatLng to Canvas coordinates
-    const nw = project(terrainData.bounds.north, terrainData.bounds.west, TERRAIN_ZOOM);
-    
+    // Helper to project LatLng to Canvas coordinates (Metric)
+    const centerLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
+    const centerLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
+    const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
+    const toMetric = proj4('EPSG:4326', localProjDef);
+    const halfWidth = terrainData.width / 2;
+    const halfHeight = terrainData.height / 2;
+
     const toPixel = (lat: number, lng: number) => {
-        const p = project(lat, lng, TERRAIN_ZOOM);
-        const x = (p.x - Math.round(nw.x)) * SCALE_FACTOR;
-        const y = (p.y - Math.round(nw.y)) * SCALE_FACTOR;
+        const [localX, localY] = toMetric.forward([lng, lat]);
+        const x = (localX + halfWidth) * SCALE_FACTOR;
+        const y = (halfHeight - localY) * SCALE_FACTOR;
         return { x, y };
     };
 
@@ -324,7 +333,7 @@ export const generateHybridTexture = async (terrainData: TerrainData): Promise<s
         // Footpaths and tracks (Light Grey)
         if (highway === 'footway' || highway === 'path' || highway === 'pedestrian' || highway === 'cycleway' || highway === 'steps' || highway === 'track') {
              ctx.strokeStyle = COLORS.path; 
-             ctx.lineWidth = 1 * SCALE_FACTOR;
+             ctx.lineWidth = 2 * SCALE_FACTOR;
              ctx.stroke();
         } 
         // Vehicle roads (Solid Dark Grey)
@@ -333,11 +342,11 @@ export const generateHybridTexture = async (terrainData: TerrainData): Promise<s
             
             // Vary width by importance
             if (highway === 'motorway' || highway === 'trunk') {
-                ctx.lineWidth = 4 * SCALE_FACTOR;
+                ctx.lineWidth = 8 * SCALE_FACTOR;
             } else if (highway === 'primary' || highway === 'secondary') {
-                ctx.lineWidth = 3 * SCALE_FACTOR;
+                ctx.lineWidth = 6 * SCALE_FACTOR;
             } else {
-                ctx.lineWidth = 2 * SCALE_FACTOR;
+                ctx.lineWidth = 4 * SCALE_FACTOR;
             }
             ctx.stroke();
         }

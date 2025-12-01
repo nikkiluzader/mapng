@@ -59,9 +59,15 @@ watch([() => props.terrainData, () => props.quality], () => {
     const globalX = (u * SCENE_SIZE) - (SCENE_SIZE / 2);
     const globalZ = (v * SCENE_SIZE) - (SCENE_SIZE / 2);
 
+    let h = data.heightMap[dataIndex];
+    // Handle NO_DATA_VALUE (-99999) by clamping to minHeight to avoid deep spikes
+    if (h < -10000) {
+      h = data.minHeight;
+    }
+
     vertices[i * 3] = globalX;
     vertices[i * 3 + 1] = -(globalZ);
-    vertices[i * 3 + 2] = (data.heightMap[dataIndex] - data.minHeight) * unitsPerMeter * EXAGGERATION;
+    vertices[i * 3 + 2] = (h - data.minHeight) * unitsPerMeter * EXAGGERATION;
 
     // Update UVs to match the physical position
     // Texture (0,0) is top-left, Mesh UV (0,0) is bottom-left
