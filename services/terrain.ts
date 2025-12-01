@@ -308,12 +308,11 @@ export const fetchTerrainData = async (
   const requests: TileRequest[] = [];
   
   // Terrain Requests
-  if (!rawData) {
-      for (let tx = minTileX; tx <= maxTileX; tx++) {
-        for (let ty = minTileY; ty <= maxTileY; ty++) {
-          requests.push({ tx, ty, type: 'terrain' });
-        }
-      }
+  // Always fetch global tiles to serve as fallback for holes in high-res data
+  for (let tx = minTileX; tx <= maxTileX; tx++) {
+    for (let ty = minTileY; ty <= maxTileY; ty++) {
+      requests.push({ tx, ty, type: 'terrain' });
+    }
   }
 
   // Satellite Requests
@@ -348,7 +347,8 @@ export const fetchTerrainData = async (
   }, 20);
 
   // Create Samplers from Canvases
-  const terrainDataImg = !rawData ? tCtx.getImageData(0, 0, canvasWidth, canvasHeight) : null;
+  // Always create the terrain data image so we have a fallback sampler
+  const terrainDataImg = tCtx.getImageData(0, 0, canvasWidth, canvasHeight);
   const satDataImg = sCtx.getImageData(0, 0, satCanvasWidth, satCanvasHeight);
 
   // Helper to get pixel from Mercator Canvas
@@ -371,7 +371,7 @@ export const fetchTerrainData = async (
       };
   };
 
-  if (!rawData && terrainDataImg) {
+  if (terrainDataImg) {
       heightSampler = (lat, lng) => {
           // Bilinear Interpolation for smoother terrain
           const p = project(lat, lng, TERRAIN_ZOOM);

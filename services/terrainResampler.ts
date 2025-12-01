@@ -162,7 +162,10 @@ export const resampleToMeterGrid = async (
                         }
                     }
                 }
-            } else if (source.type === 'sampler' && source.sampler) {
+            } 
+            
+            // Fallback to sampler if GeoTIFF failed or returned NoData
+            if (h === -99999 && source.sampler) {
                 h = source.sampler(lat, lng);
             }
 
