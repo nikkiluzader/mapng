@@ -354,7 +354,7 @@ const interestingLocations = [
   { name: "Mount Everest, Nepal", lat: 27.9881, lng: 86.9250 },
   { name: "Mount Fuji, Japan", lat: 35.3606, lng: 138.7274 },
   { name: "Matterhorn, Switzerland", lat: 45.9763, lng: 7.6586 },
-  { name: "Zugspitze, Germany", lat: 47.4211, lng: 10.9853 },
+  { name: "Rossfeld Panoramastraße, Germany", lat: 47.6087, lng: 13.0234 },
   { name: "Yosemite Valley, USA", lat: 37.7456, lng: -119.5936 }
 ];
 

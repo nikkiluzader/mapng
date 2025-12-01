@@ -25,10 +25,10 @@ watch([() => props.terrainData, () => props.quality], () => {
   const data = toRaw(props.terrainData);
   if (!data) return;
 
-  const MAX_MESH_RESOLUTION = 1024;
+  const MAX_MESH_RESOLUTION = 2048;
   const baseStride = Math.ceil(Math.max(data.width, data.height) / MAX_MESH_RESOLUTION);
   const qualityMultiplier = props.quality === 'high' ? 1 : props.quality === 'medium' ? 2 : 4;
-  const stride = baseStride * qualityMultiplier;
+  const stride = Math.max(1, baseStride * qualityMultiplier);
 
   const widthSteps = Math.ceil((data.width - 1) / stride);
   const heightSteps = Math.ceil((data.height - 1) / stride);
