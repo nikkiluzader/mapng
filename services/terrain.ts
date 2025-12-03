@@ -37,33 +37,148 @@ export const project = (lat: number, lng: number, zoom: number) => {
 
 const NO_DATA_VALUE = -99999;
 
-const fetchGPXZRaw = async (bounds: Bounds, apiKey: string): Promise<{ image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] | null> => {
+const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status: string) => void): Promise<{ data: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[], smooth: boolean } | null> => {
     try {
+        // 1. Check Resolution via Points API
+        // We check the center point to see what dataset is being used
+        const centerLat = (bounds.north + bounds.south) / 2;
+        const centerLng = (bounds.east + bounds.west) / 2;
+        
+        let shouldSmooth = false;
+        try {
+            const pointsUrl = `https://api.gpxz.io/v1/elevation/points?latlons=${centerLat},${centerLng}`;
+            const pointsResp = await fetch(pointsUrl, { headers: { 'x-api-key': apiKey } });
+            if (pointsResp.ok) {
+                const pointsData = await pointsResp.json();
+                if (pointsData.results && pointsData.results.length > 0) {
+                    const res = pointsData.results[0].resolution;
+                    console.log(`[GPXZ] Dataset Resolution: ${res}m`);
+                    // If resolution is worse than 2m (e.g. 10m, 30m), enable smoothing
+                    if (res > 2) {
+                        shouldSmooth = true;
+                        console.log("[GPXZ] Low resolution detected. Enabling smoothing.");
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn("[GPXZ] Failed to check resolution:", e);
+        }
+
+        // 2. Calculate Area & Tiles
         // Calculate Area in km²
         const latDist = (bounds.north - bounds.south) * 111.32;
         const avgLatRad = (bounds.north + bounds.south) / 2 * Math.PI / 180;
         const lonDist = (bounds.east - bounds.west) * 111.32 * Math.cos(avgLatRad);
         const areaKm2 = latDist * lonDist;
 
-        console.log(`[GPXZ] Requested Area: ${areaKm2.toFixed(2)} km²`);
+        console.log(`[GPXZ] Total Requested Area: ${areaKm2.toFixed(2)} km²`);
 
-        const url = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${bounds.north}&bbox_bottom=${bounds.south}&bbox_left=${bounds.west}&bbox_right=${bounds.east}&res_m=1&projection=latlon`;
-             
-        console.log(`[GPXZ] Fetching tile: ${url}`);
-        const response = await fetch(url, { headers: { 'x-api-key': apiKey } });
+        // GPXZ Limit is 10km². We use a safe chunk size of ~9km² (3km x 3km)
+        const TARGET_CHUNK_SIDE_KM = 3;
+        const BUFFER_DEG = 0.002; // ~220m overlap to prevent seams
         
-        if (!response.ok) {
-            console.error(`[GPXZ] Tile Error: ${response.status}`);
-            return null;
+        // Calculate grid size
+        const latSpan = bounds.north - bounds.south;
+        const lngSpan = bounds.east - bounds.west;
+        
+        const metersPerDegLat = 111320;
+        const metersPerDegLng = 111320 * Math.cos(avgLatRad);
+        
+        const chunkLatDeg = (TARGET_CHUNK_SIDE_KM * 1000) / metersPerDegLat;
+        const chunkLngDeg = (TARGET_CHUNK_SIDE_KM * 1000) / metersPerDegLng;
+        
+        const rows = Math.ceil(latSpan / chunkLatDeg);
+        const cols = Math.ceil(lngSpan / chunkLngDeg);
+        
+        const requests: Bounds[] = [];
+        
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const s = bounds.south + r * (latSpan / rows);
+                const n = bounds.south + (r + 1) * (latSpan / rows);
+                const w = bounds.west + c * (lngSpan / cols);
+                const e = bounds.west + (c + 1) * (lngSpan / cols);
+                
+                // Normalize longitudes to [-180, 180]
+                const normW = normalizeLng(w);
+                const normE = normalizeLng(e);
+                
+                // Check for dateline crossing
+                if (w < e && normW > normE) {
+                    // Split into two requests
+                    // Add buffer to internal edges too
+                    requests.push({ 
+                        north: n + BUFFER_DEG, 
+                        south: s - BUFFER_DEG, 
+                        west: normW - BUFFER_DEG, 
+                        east: 180 
+                    });
+                    requests.push({ 
+                        north: n + BUFFER_DEG, 
+                        south: s - BUFFER_DEG, 
+                        west: -180, 
+                        east: normE + BUFFER_DEG 
+                    });
+                } else {
+                    requests.push({ 
+                        north: n + BUFFER_DEG, 
+                        south: s - BUFFER_DEG, 
+                        west: normW - BUFFER_DEG, 
+                        east: normE + BUFFER_DEG 
+                    });
+                }
+            }
         }
         
-        const arrayBuffer = await response.arrayBuffer();
-        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-        const image = await tiff.getImage();
-        const rasters = await image.readRasters();
-        const raster = rasters[0] as Float32Array | Int16Array;
+        console.log(`[GPXZ] Split into ${requests.length} tiles (with overlap).`);
+        onProgress?.(`Fetching ${requests.length} GPXZ tiles...`);
+
+        const results = await pMap(requests, async (reqBounds) => {
+             // Enforce 1 request per second rate limit for free tier
+             await new Promise(r => setTimeout(r, 1100));
+
+             const url = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=1&projection=latlon`;
+             
+             // Retry logic for 429 Rate Limit
+             let response: Response | null = null;
+             let retries = 0;
+             const MAX_RETRIES = 3;
+             
+             while (retries < MAX_RETRIES) {
+                 response = await fetch(url, { headers: { 'x-api-key': apiKey } });
+                 
+                 if (response.status === 429) {
+                     const waitTime = 2000 * Math.pow(2, retries); // Exponential backoff: 2s, 4s, 8s
+                     console.warn(`[GPXZ] Rate limit hit (429). Retrying in ${waitTime}ms...`);
+                     await new Promise(r => setTimeout(r, waitTime));
+                     retries++;
+                     continue;
+                 }
+                 
+                 break;
+             }
+
+             if (!response || !response.ok) {
+                 console.error(`[GPXZ] Tile Error: ${response?.status}`);
+                 return null;
+             }
+             
+             const version = response.headers.get('X-DATASET-VERSION');
+             if (version) console.debug(`[GPXZ] Dataset Version: ${version}`);
+
+             const arrayBuffer = await response.arrayBuffer();
+             const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+             const image = await tiff.getImage();
+             const rasters = await image.readRasters();
+             const raster = rasters[0] as Float32Array | Int16Array;
+             
+             return { image, raster };
+        }, 1); // Concurrency 1 for strict rate limiting
+
+        const validResults = results.filter((r): r is { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array } => r !== null);
         
-        return [{ image, raster }];
+        if (validResults.length === 0) return null;
+        return { data: validResults, smooth: shouldSmooth };
 
     } catch (e) {
         console.error("Failed to fetch GPXZ terrain:", e);
@@ -247,10 +362,15 @@ export const fetchTerrainData = async (
   // 2. Try GPXZ / USGS
   let rawData: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] | null = null;
   let usgsFallback = false;
+  let shouldSmooth = false;
 
   if (useGPXZ && gpxzApiKey) {
       onProgress?.("Fetching high-res GPXZ elevation data...");
-      rawData = await fetchGPXZRaw(fetchBounds, gpxzApiKey);
+      const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress);
+      if (gpxzResult) {
+          rawData = gpxzResult.data;
+          shouldSmooth = gpxzResult.smooth;
+      }
   }
 
   const isCONUS = fetchBounds.north < 50 && fetchBounds.south > 24 && fetchBounds.west > -125 && fetchBounds.east < -66;
@@ -443,7 +563,9 @@ export const fetchTerrainData = async (
       },
       center,
       width,
-      height
+      height,
+      'bilinear',
+      shouldSmooth
   );
 
   // 5. Resample Satellite Texture to Metric Grid

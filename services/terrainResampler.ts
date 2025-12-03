@@ -15,7 +15,8 @@ export const resampleToMeterGrid = async (
     center: LatLng,
     width: number,
     height: number,
-    _interpolation: 'bilinear' | 'cubic' = 'bilinear'
+    _interpolation: 'bilinear' | 'cubic' = 'bilinear',
+    smooth: boolean = false
 ): Promise<{ heightMap: Float32Array, bounds: Bounds }> => {
     
     const heightMap = new Float32Array(width * height);
@@ -171,6 +172,66 @@ export const resampleToMeterGrid = async (
 
             heightMap[y * width + x] = h;
         }
+    }
+
+    // Apply smoothing if requested
+    if (smooth) {
+        console.log("[Resampler] Applying smoothing pass (Dual Separable Box Blur)...");
+        
+        // We use two passes of a separable box blur to approximate a Gaussian blur.
+        // This effectively removes the blocky artifacts from 30m resolution data.
+        const radius = 8; 
+        const tempMap = new Float32Array(heightMap.length);
+        
+        const blurH = (src: Float32Array, dst: Float32Array) => {
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let sum = 0;
+                    let count = 0;
+                    const start = Math.max(0, x - radius);
+                    const end = Math.min(width - 1, x + radius);
+                    
+                    for (let k = start; k <= end; k++) {
+                        const val = src[y * width + k];
+                        if (val !== -99999) {
+                            sum += val;
+                            count++;
+                        }
+                    }
+                    if (count > 0) dst[y * width + x] = sum / count;
+                    else dst[y * width + x] = -99999;
+                }
+            }
+        };
+
+        const blurV = (src: Float32Array, dst: Float32Array) => {
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    let sum = 0;
+                    let count = 0;
+                    const start = Math.max(0, y - radius);
+                    const end = Math.min(height - 1, y + radius);
+                    
+                    for (let k = start; k <= end; k++) {
+                        const val = src[k * width + x];
+                        if (val !== -99999) {
+                            sum += val;
+                            count++;
+                        }
+                    }
+                    if (count > 0) dst[y * width + x] = sum / count;
+                    else dst[y * width + x] = -99999;
+                }
+            }
+        };
+
+        // Pass 1
+        blurH(heightMap, tempMap);
+        blurV(tempMap, heightMap);
+        
+        // Pass 2
+        blurH(heightMap, tempMap);
+        blurV(tempMap, heightMap);
     }
 
     // Calculate actual bounds of the generated grid
