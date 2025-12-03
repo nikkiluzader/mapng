@@ -313,7 +313,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson } from 'lucide-vue-next';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers } from 'lucide-vue-next';
 import { LatLng, TerrainData } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
