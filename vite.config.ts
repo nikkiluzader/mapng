@@ -9,6 +9,9 @@ export default defineConfig({
       ...templateCompilerOptions
     })
   ],
+  optimizeDeps: {
+    exclude: ['geotiff']
+  },
   css: {
     devSourcemap: false
   },
