@@ -13,6 +13,11 @@ const SATELLITE_API_URL = "https://server.arcgisonline.com/ArcGIS/rest/services/
 const USGS_PRODUCT_API = "https://tnmaccess.nationalmap.gov/api/v1/products";
 const USGS_DATASET = "Digital Elevation Model (DEM) 1 meter";
 
+// Helper to normalize longitude to -180 to 180
+const normalizeLng = (lng: number) => {
+  return ((lng + 180) % 360 + 360) % 360 - 180;
+};
+
 // Math Helpers for Web Mercator Projection (Source of Truth for Fetching)
 const MAX_LATITUDE = 85.05112878;
 
@@ -213,6 +218,12 @@ export const fetchTerrainData = async (
     onProgress?: (status: string) => void
 ): Promise<TerrainData> => {
   
+  // Normalize longitude to handle world wrapping
+  const normalizedCenter = {
+      lat: center.lat,
+      lng: normalizeLng(center.lng)
+  };
+
   // 1. Define Target Metric Grid
   // Resolution is treated as "Output Size in Pixels" AND "Extent in Meters" (1m/px)
   const width = resolution;
@@ -222,15 +233,15 @@ export const fetchTerrainData = async (
   
   // Calculate approximate Lat/Lon bounds for fetching
   const metersPerDegLat = 111320;
-  const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+  const metersPerDegLng = 111320 * Math.cos(normalizedCenter.lat * Math.PI / 180);
   const latSpan = height / metersPerDegLat;
   const lngSpan = width / metersPerDegLng;
   
   const fetchBounds: Bounds = {
-      north: center.lat + latSpan / 2,
-      south: center.lat - latSpan / 2,
-      east: center.lng + lngSpan / 2,
-      west: center.lng - lngSpan / 2
+      north: normalizedCenter.lat + latSpan / 2,
+      south: normalizedCenter.lat - latSpan / 2,
+      east: normalizedCenter.lng + lngSpan / 2,
+      west: normalizedCenter.lng - lngSpan / 2
     };
 
   // 2. Try GPXZ / USGS
@@ -326,7 +337,11 @@ export const fetchTerrainData = async (
      if (type === 'terrain') {
          const drawX = (tx - minTileX) * TILE_SIZE;
          const drawY = (ty - minTileY) * TILE_SIZE;
-         const terrainUrl = `${TILE_API_URL}/${TERRAIN_ZOOM}/${tx}/${ty}.png`;
+         
+         const numTiles = Math.pow(2, TERRAIN_ZOOM);
+         const wrappedTx = (tx % numTiles + numTiles) % numTiles;
+         
+         const terrainUrl = `${TILE_API_URL}/${TERRAIN_ZOOM}/${wrappedTx}/${ty}.png`;
          const tImg = await loadImage(terrainUrl);
          if(tImg) tCtx.drawImage(tImg, drawX, drawY);
          else {
@@ -336,7 +351,11 @@ export const fetchTerrainData = async (
      } else {
          const drawX = (tx - satMinTileX) * TILE_SIZE;
          const drawY = (ty - satMinTileY) * TILE_SIZE;
-         const satUrl = `${SATELLITE_API_URL}/${SATELLITE_ZOOM}/${ty}/${tx}`;
+         
+         const numTiles = Math.pow(2, SATELLITE_ZOOM);
+         const wrappedTx = (tx % numTiles + numTiles) % numTiles;
+
+         const satUrl = `${SATELLITE_API_URL}/${SATELLITE_ZOOM}/${ty}/${wrappedTx}`;
          const sImg = await loadImage(satUrl);
          if(sImg) sCtx.drawImage(sImg, drawX, drawY);
          else {
