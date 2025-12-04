@@ -49,6 +49,7 @@
           @location-change="handleLocationChange"
           @resolution-change="setResolution"
           @generate="handleGenerate"
+          @fetch-osm="handleFetchOSM"
         />
       </div>
       
@@ -412,7 +413,7 @@ import ControlPanel from './components/ControlPanel.vue';
 import MapSelector from './components/MapSelector.vue';
 import Preview3D from './components/Preview3D.vue';
 import { LatLng, TerrainData } from './types';
-import { fetchTerrainData } from './services/terrain';
+import { fetchTerrainData, addOSMToTerrain } from './services/terrain';
 
 const center = ref<LatLng>({ lat: 35.1983, lng: -111.6513 }); // Flagstaff, AZ default
 const zoom = ref<number>(13);
@@ -510,6 +511,25 @@ const handleGenerate = async (showPreview: boolean, fetchOSM: boolean, useUSGS: 
     alert("Failed to fetch terrain data. The requested area might be too large or service is down.");
   } finally {
     isLoading.value = false;
+  }
+};
+
+const handleFetchOSM = async () => {
+  if (!terrainData.value) return;
+  
+  isLoading.value = true;
+  loadingStatus.value = "Fetching OSM data...";
+  
+  try {
+      const updatedData = await addOSMToTerrain(terrainData.value, (status) => {
+          loadingStatus.value = status;
+      });
+      terrainData.value = updatedData;
+  } catch (error) {
+      console.error("Failed to fetch OSM data:", error);
+      alert("Failed to fetch OSM data.");
+  } finally {
+      isLoading.value = false;
   }
 };
 

@@ -1,6 +1,10 @@
 import { Bounds, LatLng, OSMFeature } from "../types";
 
-const OVERPASS_API_URL = "https://overpass-api.de/api/interpreter";
+const OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter"
+];
 
 // --- Clipping Helpers ---
 
@@ -121,8 +125,9 @@ const buildQuery = (bounds: Bounds) => {
     // Overpass expects (south, west, north, east)
     const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
     
+    // Increased timeout to 180s and maxsize to handle larger areas
     return `
-        [out:json][timeout:60];
+        [out:json][timeout:180][maxsize:1073741824];
         (
           way["natural"="tree"](${bbox});
           way["natural"="water"](${bbox});
@@ -297,39 +302,41 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
     return clippedFeatures;
 };
 
-export const fetchOSMData = async (bounds: Bounds, retries = 1): Promise<OSMFeature[]> => {
+export const fetchOSMData = async (bounds: Bounds): Promise<OSMFeature[]> => {
     console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
-    try {
-        const query = buildQuery(bounds);
-        
-        const response = await fetch(OVERPASS_API_URL, {
-            method: 'POST',
-            body: `data=${encodeURIComponent(query)}`,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
+    
+    const query = buildQuery(bounds);
+    
+    for (const endpoint of OVERPASS_ENDPOINTS) {
+        try {
+            console.log(`[OSM] Trying endpoint: ${endpoint}`);
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                body: `data=${encodeURIComponent(query)}`,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            });
+
+            if (!response.ok) {
+                console.warn(`[OSM] API Error from ${endpoint}: ${response.status} ${response.statusText}`);
+                continue; // Try next endpoint
             }
-        });
 
-        if (!response.ok) {
-            console.error(`[OSM] API Error: ${response.status} ${response.statusText}`);
-            throw new Error(`Overpass API error: ${response.statusText}`);
-        }
+            const data = await response.json();
+            console.log(`[OSM] Received ${data.elements?.length || 0} elements from ${endpoint}.`);
+            
+            const features = parseOverpassResponse(data, bounds);
+            console.log(`[OSM] Parsed ${features.length} features.`);
+            return features;
 
-        const data = await response.json();
-        console.log(`[OSM] Received ${data.elements?.length || 0} elements.`);
-        
-        const features = parseOverpassResponse(data, bounds);
-        console.log(`[OSM] Parsed ${features.length} features.`);
-        return features;
-
-    } catch (error) {
-        console.error(`[OSM] Error fetching data:`, error);
-        if (retries > 0) {
-            console.warn("[OSM] Retrying OSM fetch...");
-            // Wait 1 second before retrying
+        } catch (error) {
+            console.error(`[OSM] Error fetching data from ${endpoint}:`, error);
+            // Wait a bit before trying the next one
             await new Promise(resolve => setTimeout(resolve, 1000));
-            return fetchOSMData(bounds, retries - 1);
         }
-        return []; 
     }
+
+    console.error("[OSM] All endpoints failed.");
+    return [];
 };

@@ -180,6 +180,20 @@
 
     <!-- Export Panel -->
     <div ref="exportPanel" v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
+        <!-- Missing OSM Warning / Action -->
+        <div v-if="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0" class="bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 flex items-center justify-between">
+            <div class="text-[10px] text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                <Trees :size="12" />
+                <span>OSM Data missing</span>
+            </div>
+            <button 
+                @click="$emit('fetchOsm')"
+                class="text-[10px] font-medium bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors"
+            >
+                Fetch Now
+            </button>
+        </div>
+
         <div class="flex items-center justify-between">
             <label class="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
                 <Download :size="16" />
@@ -331,6 +345,7 @@ const emit = defineEmits<{
   locationChange: [loc: LatLng];
   resolutionChange: [res: number];
   generate: [showPreview: boolean, fetchOSM: boolean, useUSGS: boolean, useGPXZ: boolean, gpxzApiKey: string];
+  fetchOsm: [];
 }>();
 
 const exportPanel = ref<HTMLElement | null>(null);

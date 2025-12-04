@@ -636,3 +636,22 @@ export const checkUSGSStatus = async (): Promise<boolean> => {
         return false;
     }
 };
+
+export const addOSMToTerrain = async (
+    terrainData: TerrainData,
+    onProgress?: (status: string) => void
+): Promise<TerrainData> => {
+    onProgress?.("Fetching OpenStreetMap data...");
+    const osmFeatures = await fetchOSMData(terrainData.bounds);
+    
+    const newTerrainData = { ...terrainData, osmFeatures };
+    
+    if (osmFeatures.length > 0) {
+        onProgress?.("Generating OSM texture...");
+        newTerrainData.osmTextureUrl = await generateOSMTexture(newTerrainData);
+        onProgress?.("Generating Hybrid texture...");
+        newTerrainData.hybridTextureUrl = await generateHybridTexture(newTerrainData);
+    }
+    
+    return newTerrainData;
+};
