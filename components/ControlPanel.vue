@@ -279,6 +279,36 @@
                 <span class="text-[10px] font-medium">OSM Data (JSON)</span>
                 <Download v-if="!isExportingOSM" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
+
+            <!-- Road Mask -->
+            <button 
+                @click="downloadRoadMask"
+                :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isExportingRoadMask"
+                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24"
+            >
+                <div class="w-full h-full flex items-center justify-center mb-1">
+                    <Loader2 v-if="isExportingRoadMask" :size="24" class="animate-spin text-[#FF6600]" />
+                    <Route v-else :size="32" class="text-gray-400 dark:text-gray-500" />
+                </div>
+                <span class="text-[10px] font-medium">Road Mask</span>
+                <span class="text-[9px] text-gray-500 dark:text-gray-400">16-bit PNG</span>
+                <Download v-if="!isExportingRoadMask" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            </button>
+
+            <!-- GeoTIFF -->
+            <button 
+                @click="downloadGeoTIFF"
+                :disabled="isExportingGeoTIFF"
+                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24"
+            >
+                <div class="w-full h-full flex items-center justify-center mb-1">
+                    <Loader2 v-if="isExportingGeoTIFF" :size="24" class="animate-spin text-[#FF6600]" />
+                    <FileCode v-else :size="32" class="text-gray-400 dark:text-gray-500" />
+                </div>
+                <span class="text-[10px] font-medium">GeoTIFF</span>
+                <span class="text-[9px] text-gray-500 dark:text-gray-400">32-bit Float</span>
+                <Download v-if="!isExportingGeoTIFF" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            </button>
             
             <!-- GLB Model -->
             <button 
@@ -327,7 +357,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers } from 'lucide-vue-next';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode } from 'lucide-vue-next';
 import { LatLng, TerrainData } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
@@ -355,6 +385,8 @@ const isExportingTexture = ref(false);
 const isExportingOSMTexture = ref(false);
 const isExportingHybridTexture = ref(false);
 const isExportingOSM = ref(false);
+const isExportingRoadMask = ref(false);
+const isExportingGeoTIFF = ref(false);
 const fetchOSM = ref(false);
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
@@ -580,6 +612,142 @@ const downloadOSM = async () => {
     
     URL.revokeObjectURL(url);
     isExportingOSM.value = false;
+};
+
+const downloadRoadMask = async () => {
+    if (!props.terrainData || !props.terrainData.osmFeatures) return;
+    isExportingRoadMask.value = true;
+
+    try {
+        // Dynamic import for proj4 and fast-png
+        const proj4 = (await import('proj4')).default;
+        // @ts-ignore
+        const { encode } = await import('fast-png');
+
+        const width = props.terrainData.width;
+        const height = props.terrainData.height;
+        
+        // Create canvas for drawing
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("Could not get canvas context");
+
+        // Fill black
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, width, height);
+
+        // Setup projection
+        const center = props.center;
+        const localProjDef = `+proj=tmerc +lat_0=${center.lat} +lon_0=${center.lng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
+        const toLocal = proj4('EPSG:4326', localProjDef);
+
+        // Draw roads
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8; 
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        props.terrainData.osmFeatures.forEach(feature => {
+            if (feature.type === 'road') {
+                // Exclude footpaths and non-drivable paths
+                const highway = feature.tags?.highway;
+                const exclude = ['footway', 'path', 'pedestrian', 'steps', 'cycleway', 'bridleway', 'corridor'];
+                if (highway && exclude.includes(highway)) return;
+
+                ctx.beginPath();
+                feature.geometry.forEach((pt, index) => {
+                    const [x, y] = toLocal.forward([pt.lng, pt.lat]);
+                    // Map to pixel coords
+                    // Top-left of grid is (-width/2, height/2)
+                    const u = x + width / 2;
+                    const v = height / 2 - y;
+                    
+                    if (index === 0) ctx.moveTo(u, v);
+                    else ctx.lineTo(u, v);
+                });
+                ctx.stroke();
+            }
+        });
+
+        // Convert to 16-bit grayscale PNG
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = new Uint16Array(width * height);
+        
+        for (let i = 0; i < data.length; i++) {
+            // If pixel is lit, set to max 16-bit value
+            // Check red channel (index 0, 4, 8...)
+            if (imageData.data[i * 4] > 128) { 
+                data[i] = 65535;
+            } else {
+                data[i] = 0;
+            }
+        }
+
+        const pngData = encode({
+            width,
+            height,
+            data,
+            depth: 16,
+            channels: 1,
+        });
+
+        const blob = new Blob([new Uint8Array(pngData)], { type: 'image/png' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `RoadMask_16bit_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+
+    } catch (e) {
+        console.error("Road mask export failed:", e);
+        alert("Failed to export road mask.");
+    } finally {
+        isExportingRoadMask.value = false;
+    }
+};
+
+const downloadGeoTIFF = async () => {
+    if (!props.terrainData) return;
+    isExportingGeoTIFF.value = true;
+
+    try {
+        const { writeArrayBuffer } = await import('geotiff');
+        
+        const width = props.terrainData.width;
+        const height = props.terrainData.height;
+        const data = props.terrainData.heightMap; // Float32Array
+
+        const metadata = {
+            width,
+            height,
+            ImageWidth: width,
+            ImageLength: height,
+            SampleFormat: [3], // 3 = IEEE Floating Point
+            BitsPerSample: [32],
+            PhotometricInterpretation: 1, // BlackIsZero
+            SamplesPerPixel: 1,
+            ModelPixelScale: [1, 1, 0], // Scale X, Scale Y, Scale Z
+            ModelTiepoint: [0, 0, 0, -width/2, height/2, 0], // i, j, k, x, y, z
+        };
+
+        const arrayBuffer = await writeArrayBuffer(data, metadata);
+        const blob = new Blob([arrayBuffer], { type: 'image/tiff' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `Heightmap_GeoTIFF_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.tif`;
+        link.href = url;
+        link.click();
+        URL.revokeObjectURL(url);
+
+    } catch (e) {
+        console.error("GeoTIFF export failed:", e);
+        alert("Failed to export GeoTIFF.");
+    } finally {
+        isExportingGeoTIFF.value = false;
+    }
 };
 
 const handleGLBExport = async () => {
