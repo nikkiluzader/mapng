@@ -47,7 +47,7 @@
         color="#FF6600"
         :weight="2"
         :fill-opacity="0.1"
-        :options="{ dashArray: '10, 10' }"
+        :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
     </l-map>
 
@@ -81,7 +81,7 @@
     <!-- Center Crosshair -->
     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none">
         <div class="w-8 h-8 text-[#FF6600] drop-shadow-lg flex items-center justify-center">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-full h-full filter drop-shadow-md">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="w-full h-full filter drop-shadow-md">
                 <line x1="12" y1="4" x2="12" y2="20" />
                 <line x1="4" y1="12" x2="20" y2="12" />
                 <rect x="10" y="10" width="4" height="4" stroke-width="1" />
