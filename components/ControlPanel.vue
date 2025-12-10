@@ -365,6 +365,7 @@ import ModOfTheDay from './ModOfTheDay.vue';
 import { LatLng, TerrainData } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
+import { latLonToUTM, getGeoKeyDirectory } from '../services/geoUtils';
 
 interface Props {
   center: LatLng;
@@ -724,6 +725,14 @@ const downloadGeoTIFF = async () => {
         const height = props.terrainData.height;
         const data = props.terrainData.heightMap; // Float32Array
 
+        // Calculate UTM coordinates for proper georeferencing
+        const centerUTM = latLonToUTM(props.center.lat, props.center.lng);
+        
+        // Calculate Top Left (North West) corner
+        // Assuming 1m per pixel resolution as per MapNG standard
+        const topLeftX = centerUTM.x - (width / 2);
+        const topLeftY = centerUTM.y + (height / 2);
+
         const metadata = {
             width,
             height,
@@ -733,15 +742,16 @@ const downloadGeoTIFF = async () => {
             BitsPerSample: [32],
             PhotometricInterpretation: 1, // BlackIsZero
             SamplesPerPixel: 1,
-            ModelPixelScale: [1, 1, 0], // Scale X, Scale Y, Scale Z
-            ModelTiepoint: [0, 0, 0, -width/2, height/2, 0], // i, j, k, x, y, z
+            ModelPixelScale: [1, 1, 0], // Scale X, Scale Y, Scale Z (1m/px)
+            ModelTiepoint: [0, 0, 0, topLeftX, topLeftY, 0], // i, j, k, x, y, z
+            GeoKeyDirectoryTag: getGeoKeyDirectory(centerUTM.epsg)
         };
 
         const arrayBuffer = await writeArrayBuffer(data, metadata);
         const blob = new Blob([arrayBuffer], { type: 'image/tiff' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.download = `Heightmap_GeoTIFF_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.tif`;
+        link.download = `Heightmap_GeoTIFF_UTM${centerUTM.zone}${centerUTM.isSouth ? 'S' : 'N'}_${props.resolution}px.tif`;
         link.href = url;
         link.click();
         URL.revokeObjectURL(url);
