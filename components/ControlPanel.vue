@@ -352,12 +352,16 @@
             </div>
         </div>
     </div>
+
+    <hr class="border-gray-200 dark:border-gray-600" />
+    <ModOfTheDay />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode } from 'lucide-vue-next';
+import ModOfTheDay from './ModOfTheDay.vue';
 import { LatLng, TerrainData } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
