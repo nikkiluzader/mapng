@@ -52,6 +52,10 @@
         </div>
       </a>
     </div>
+    
+    <p v-if="mod" class="text-[10px] text-gray-400 dark:text-gray-500 text-center italic">
+      *Most recently updated map on BeamNG.com
+    </p>
   </div>
 </template>
 
