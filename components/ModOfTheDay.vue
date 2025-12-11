@@ -14,39 +14,44 @@
     </div>
 
     <div v-else-if="mod" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-      <a :href="mod['Resource URL']" target="_blank" class="block group">
-        <div class="relative h-32 w-full overflow-hidden bg-gray-100 dark:bg-gray-900">
+      <a :href="mod['Resource URL']" target="_blank" class="flex p-3 gap-3 group">
+        <!-- Image Container -->
+        <div class="relative w-20 h-20 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-900 border border-gray-100 dark:border-gray-700">
             <img 
                 v-if="mod['Thumbnail URL']" 
                 :src="mod['Thumbnail URL']" 
                 :alt="mod.Title"
-                class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                class="w-full h-full object-cover"
             />
             <div v-else class="w-full h-full flex items-center justify-center text-gray-400">
-                <ImageOff :size="24" />
-            </div>
-            <div class="absolute top-2 right-2 bg-black/60 backdrop-blur text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
-                <Star :size="10" class="text-yellow-400 fill-yellow-400" />
-                {{ mod.Rating }}
+                <ImageOff :size="20" />
             </div>
         </div>
         
-        <div class="p-3 space-y-2">
+        <!-- Info Container -->
+        <div class="flex-1 min-w-0 flex flex-col h-20 justify-between">
             <div>
-                <h3 class="font-medium text-gray-900 dark:text-white text-sm leading-tight group-hover:text-[#FF6600] transition-colors line-clamp-1" :title="mod.Title">
+                <h3 class="font-bold text-gray-900 dark:text-white text-sm leading-tight group-hover:text-[#FF6600] transition-colors line-clamp-2 mb-1" :title="mod.Title">
                     {{ mod.Title }}
                 </h3>
-                <p class="text-xs text-gray-500 dark:text-gray-400">by {{ mod.Author }}</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">by {{ mod.Author }}</p>
             </div>
 
-            <div class="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400 border-t border-gray-100 dark:border-gray-700 pt-2">
-                <div class="flex items-center gap-1" title="Downloads">
-                    <Download :size="12" />
-                    {{ mod.Downloads }}
+            <div class="flex items-center justify-between text-[10px] text-gray-500 dark:text-gray-400">
+                <div class="flex items-center gap-1 text-yellow-600 dark:text-yellow-500 font-medium bg-yellow-50 dark:bg-yellow-900/20 px-1.5 py-0.5 rounded">
+                    <Star :size="10" class="fill-current" />
+                    {{ mod.Rating }}
                 </div>
-                <div class="flex items-center gap-1" title="Version">
-                    <Tag :size="12" />
-                    v{{ mod.Version }}
+                
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-1" title="Version">
+                        <Tag :size="10" />
+                        v{{ mod.Version }}
+                    </div>
+                    <div class="flex items-center gap-1" title="Downloads">
+                        <Download :size="10" />
+                        {{ mod.Downloads }}
+                    </div>
                 </div>
             </div>
         </div>
