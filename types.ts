@@ -37,3 +37,11 @@ export interface MapState {
   center: LatLng;
   zoom: number;
 }
+
+export interface NominatimResult {
+  lat: number;
+  lng: number;
+  displayName: string;
+  type: string;
+  boundingBox?: Bounds;
+}
