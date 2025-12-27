@@ -74,7 +74,8 @@ export const searchLocation = async (query: string): Promise<NominatimResult[]> 
                     lat: parseFloat(item.lat),
                     lng: parseFloat(item.lon),
                     displayName: item.display_name,
-                    type: item.type || item.class || 'place',
+                    // Prefer addresstype (city, town, village) over generic type (administrative)
+                    type: item.addresstype || item.type || item.class || 'place',
                     boundingBox
                 };
             });
@@ -103,26 +104,101 @@ export const getShortName = (displayName: string): string => {
 
 // Get location type icon hint
 export const getLocationTypeIcon = (type: string): string => {
-    const typeMap: Record<string, string> = {
-        'city': '🏙️',
-        'town': '🏘️',
-        'village': '🏘️',
-        'hamlet': '🏠',
-        'mountain': '⛰️',
-        'peak': '⛰️',
-        'hill': '⛰️',
-        'valley': '🏞️',
-        'river': '🌊',
-        'lake': '💧',
-        'forest': '🌲',
-        'park': '🌳',
-        'road': '🛣️',
-        'motorway': '🛣️',
-        'administrative': '📍',
-        'country': '🌍',
-        'state': '🗺️',
-        'county': '🗺️'
-    };
+    console.log('[Nominatim] getLocationTypeIcon called with type:', type);
     
-    return typeMap[type.toLowerCase()] || '📍';
+    const iconGroups: [string, string[]][] = [
+        ['🏙️', ['city']],
+        ['🏘️', ['town', 'village', 'suburb', 'neighbourhood', 'neighborhood', 'quarter', 'residential']],
+        ['🏠', ['hamlet', 'isolated_dwelling', 'house']],
+        ['⛰️', ['mountain', 'peak', 'hill', 'ridge', 'saddle', 'fell']],
+        ['🌋', ['volcano']],
+        ['🧗', ['cliff']],
+        ['🪨', ['rock', 'stone']],
+        ['🕳️', ['cave_entrance']],
+        ['🧊', ['glacier']],
+        ['🏞️', ['valley', 'national_park']],
+        ['🌾', ['grassland', 'farmland', 'meadow']],
+        ['🌿', ['heath', 'scrub', 'wetland']],
+        ['🌲', ['wood', 'forest']],
+        ['🌳', ['tree', 'park', 'nature_reserve', 'protected_area']],
+        ['🌊', ['river', 'stream', 'canal', 'bay', 'sea', 'ocean']],
+        ['💧', ['lake', 'reservoir', 'pond', 'water', 'spring', 'waterfall']],
+        ['🏖️', ['beach', 'coastline']],
+        ['🚜', ['farmyard']],
+        ['🍎', ['orchard']],
+        ['🍇', ['vineyard']],
+        ['🌷', ['garden']],
+        ['⚰️', ['cemetery']],
+        ['🏭', ['industrial']],
+        ['🏢', ['commercial', 'building', 'apartments']],
+        ['🛒', ['retail', 'marketplace', 'supermarket']],
+        ['🎖️', ['military']],
+        ['⛏️', ['quarry']],
+        ['🛣️', ['road', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'highway']],
+        ['🚶', ['path', 'footway']],
+        ['🚴', ['cycleway']],
+        ['🛤️', ['track']],
+        ['🚂', ['railway']],
+        ['🚌', ['bus_stop']],
+        ['🚉', ['station']],
+        ['✈️', ['aerodrome', 'airport']],
+        ['🚁', ['helipad']],
+        ['🏨', ['hotel']],
+        ['🏥', ['hospital']],
+        ['🏫', ['school']],
+        ['🎓', ['university', 'college']],
+        ['📚', ['library']],
+        ['🏛️', ['museum', 'townhall', 'embassy', 'archaeological_site', 'administrative', 'municipality']],
+        ['🎭', ['theatre']],
+        ['🎬', ['cinema']],
+        ['🍽️', ['restaurant']],
+        ['☕', ['cafe']],
+        ['🍺', ['pub']],
+        ['🍸', ['bar']],
+        ['🍔', ['fast_food']],
+        ['🏦', ['bank']],
+        ['💳', ['atm']],
+        ['💊', ['pharmacy']],
+        ['⛽', ['fuel']],
+        ['🅿️', ['parking']],
+        ['👮', ['police']],
+        ['🚒', ['fire_station']],
+        ['📮', ['post_office', 'postcode']],
+        ['⚖️', ['courthouse']],
+        ['⛪', ['church']],
+        ['🕌', ['mosque']],
+        ['🕍', ['synagogue']],
+        ['🛕', ['temple']],
+        ['🏟️', ['stadium']],
+        ['🏋️', ['sports_centre']],
+        ['🏊', ['swimming_pool']],
+        ['⛳', ['golf_course']],
+        ['🛍️', ['shop']],
+        ['🗺️', ['boundary', 'state', 'region', 'province', 'county', 'district']],
+        ['🌍', ['country']],
+        ['⭐', ['attraction']],
+        ['👁️', ['viewpoint']],
+        ['🎨', ['artwork']],
+        ['🗿', ['monument']],
+        ['🪦', ['memorial']],
+        ['🏰', ['castle']],
+        ['🏚️', ['ruins']],
+        ['⛺', ['camp_site']],
+        ['🚐', ['caravan_site']],
+        ['🧺', ['picnic_site']],
+        ['🎢', ['theme_park']],
+        ['🦁', ['zoo']],
+        ['🐠', ['aquarium']],
+        ['📍', ['locality', 'place']]
+    ];
+    
+    const lowerType = type.toLowerCase();
+    
+    for (const [icon, types] of iconGroups) {
+        if (types.includes(lowerType)) {
+            return icon;
+        }
+    }
+    
+    return '📍';
 };
