@@ -37,7 +37,7 @@ export const project = (lat: number, lng: number, zoom: number) => {
 
 const NO_DATA_VALUE = -99999;
 
-const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status: string) => void): Promise<{ data: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[], smooth: boolean } | null> => {
+const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status: string) => void): Promise<{ data: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[], smooth: boolean, rawArrayBuffers: ArrayBuffer[] } | null> => {
     try {
         // 1. Check Resolution via Points API
         // We check the center point to see what dataset is being used
@@ -172,13 +172,17 @@ const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status
              const rasters = await image.readRasters();
              const raster = rasters[0] as Float32Array | Int16Array;
              
-             return { image, raster };
+             await tiff.close();
+             
+             return { image, raster, arrayBuffer };
         }, 1); // Concurrency 1 for strict rate limiting
 
-        const validResults = results.filter((r): r is { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array } => r !== null);
+        const validResults = results.filter((r): r is { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array, arrayBuffer: ArrayBuffer } => r !== null);
         
         if (validResults.length === 0) return null;
-        return { data: validResults, smooth: shouldSmooth };
+        
+        const rawArrayBuffers = validResults.map(r => r.arrayBuffer);
+        return { data: validResults, smooth: shouldSmooth, rawArrayBuffers };
 
     } catch (e) {
         console.error("Failed to fetch GPXZ terrain:", e);
@@ -186,7 +190,7 @@ const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status
     }
 };
 
-const fetchUSGSRaw = async (bounds: Bounds): Promise<{ image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] | null> => {
+const fetchUSGSRaw = async (bounds: Bounds): Promise<{ data: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[], rawArrayBuffers: ArrayBuffer[] } | null> => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1000;
 
@@ -242,6 +246,7 @@ const fetchUSGSRaw = async (bounds: Bounds): Promise<{ image: GeoTIFF.GeoTIFFIma
         console.log(`[USGS] Found ${data.items.length} tiles. Downloading sequentially to handle overlap...`);
 
         const results: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] = [];
+        const rawArrayBuffers: ArrayBuffer[] = [];
 
         // 2. Download GeoTIFFs sequentially
         // We process sequentially to avoid memory exhaustion with large 1m tiles
@@ -264,7 +269,10 @@ const fetchUSGSRaw = async (bounds: Bounds): Promise<{ image: GeoTIFF.GeoTIFFIma
                 const rasters = await image.readRasters();
                 const raster = rasters[0] as Float32Array | Int16Array; // Height data
                 
+                await tiff.close();
+                
                 results.push({ image, raster });
+                rawArrayBuffers.push(arrayBuffer);
             } catch (e) {
                 console.warn(`[USGS] Failed to parse tile ${downloadUrl}`, e);
             }
@@ -275,7 +283,7 @@ const fetchUSGSRaw = async (bounds: Bounds): Promise<{ image: GeoTIFF.GeoTIFFIma
             return null;
         }
         
-        return results;
+        return { data: results, rawArrayBuffers };
         
     } catch (e) {
         console.warn("Failed to load USGS terrain:", e);
@@ -363,6 +371,7 @@ export const fetchTerrainData = async (
   let rawData: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] | null = null;
   let usgsFallback = false;
   let shouldSmooth = false;
+  let sourceGeoTiffs: { arrayBuffers: ArrayBuffer[], source: 'gpxz' | 'usgs' | 'global' } | undefined = undefined;
 
   if (useGPXZ && gpxzApiKey) {
       onProgress?.("Fetching high-res GPXZ elevation data...");
@@ -370,6 +379,7 @@ export const fetchTerrainData = async (
       if (gpxzResult) {
           rawData = gpxzResult.data;
           shouldSmooth = gpxzResult.smooth;
+          sourceGeoTiffs = { arrayBuffers: gpxzResult.rawArrayBuffers, source: 'gpxz' };
       }
   }
 
@@ -379,8 +389,11 @@ export const fetchTerrainData = async (
 
   if (!rawData && useUSGS && (isCONUS || isAlaska || isHawaii)) {
       onProgress?.("Fetching USGS 1m DEM data...");
-      rawData = await fetchUSGSRaw(fetchBounds);
-      if (!rawData) {
+      const usgsResult = await fetchUSGSRaw(fetchBounds);
+      if (usgsResult) {
+          rawData = usgsResult.data;
+          sourceGeoTiffs = { arrayBuffers: usgsResult.rawArrayBuffers, source: 'usgs' };
+      } else {
           usgsFallback = true;
           console.warn("[USGS] Failed to fetch raw data, falling back to global tiles.");
       }
@@ -608,7 +621,8 @@ export const fetchTerrainData = async (
     satelliteTextureUrl: finalSatCanvas.toDataURL('image/jpeg', 0.9),
     bounds: finalBounds,
     osmFeatures,
-    usgsFallback
+    usgsFallback,
+    sourceGeoTiffs
   };
 
   if (includeOSM && osmFeatures.length > 0) {
