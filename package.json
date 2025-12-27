@@ -17,6 +17,7 @@
     "@vueuse/core": "^11.0.0",
     "fast-png": "^6.1.0",
     "geotiff": "^2.1.4-beta.1",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lucide-vue-next": "^0.460.0",
     "proj4": "^2.20.2",

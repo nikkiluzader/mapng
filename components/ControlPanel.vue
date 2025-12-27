@@ -306,7 +306,7 @@
                     <FileCode v-else :size="32" class="text-gray-400 dark:text-gray-500" />
                 </div>
                 <span class="text-[10px] font-medium">GeoTIFF</span>
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">32-bit Float</span>
+                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
                 <Download v-if="!isExportingGeoTIFF" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
             
@@ -365,7 +365,7 @@ import ModOfTheDay from './ModOfTheDay.vue';
 import { LatLng, TerrainData } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
-import { latLonToUTM, getGeoKeyDirectory } from '../services/geoUtils';
+import { exportGeoTiff } from '../services/exportGeoTiff';
 
 interface Props {
   center: LatLng;
@@ -719,43 +719,13 @@ const downloadGeoTIFF = async () => {
     isExportingGeoTIFF.value = true;
 
     try {
-        const { writeArrayBuffer } = await import('geotiff');
-        
-        const width = props.terrainData.width;
-        const height = props.terrainData.height;
-        const data = props.terrainData.heightMap; // Float32Array
-
-        // Calculate UTM coordinates for proper georeferencing
-        const centerUTM = latLonToUTM(props.center.lat, props.center.lng);
-        
-        // Calculate Top Left (North West) corner
-        // Assuming 1m per pixel resolution as per MapNG standard
-        const topLeftX = centerUTM.x - (width / 2);
-        const topLeftY = centerUTM.y + (height / 2);
-
-        const metadata = {
-            width,
-            height,
-            ImageWidth: width,
-            ImageLength: height,
-            SampleFormat: [3], // 3 = IEEE Floating Point
-            BitsPerSample: [32],
-            PhotometricInterpretation: 1, // BlackIsZero
-            SamplesPerPixel: 1,
-            ModelPixelScale: [1, 1, 0], // Scale X, Scale Y, Scale Z (1m/px)
-            ModelTiepoint: [0, 0, 0, topLeftX, topLeftY, 0], // i, j, k, x, y, z
-            GeoKeyDirectoryTag: getGeoKeyDirectory(centerUTM.epsg)
-        };
-
-        const arrayBuffer = await writeArrayBuffer(data, metadata);
-        const blob = new Blob([arrayBuffer], { type: 'image/tiff' });
+        const { blob, filename } = await exportGeoTiff(props.terrainData, props.center);
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.download = `Heightmap_GeoTIFF_UTM${centerUTM.zone}${centerUTM.isSouth ? 'S' : 'N'}_${props.resolution}px.tif`;
+        link.download = filename;
         link.href = url;
         link.click();
         URL.revokeObjectURL(url);
-
     } catch (e) {
         console.error("GeoTIFF export failed:", e);
         alert("Failed to export GeoTIFF.");
