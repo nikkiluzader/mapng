@@ -8,6 +8,13 @@ export interface UTMCoords {
     epsg: number;
 }
 
+export interface GeoTiffCoordsWGS84 {
+    topLeftLat: number;
+    topLeftLng: number;
+    pixelSizeLat: number;
+    pixelSizeLng: number;
+}
+
 export const getUTMZone = (lng: number): number => {
     return Math.floor((lng + 180) / 6) + 1;
 };
@@ -22,30 +29,25 @@ export const latLonToUTM = (lat: number, lng: number): UTMCoords => {
     const epsg = getEPSGCode(lat, zone);
     
     const utmProj = `+proj=utm +zone=${zone} ${isSouth ? '+south ' : ''}+datum=WGS84 +units=m +no_defs`;
-    const wgs84 = 'EPSG:4326';
-
-    const [x, y] = proj4(wgs84, utmProj, [lng, lat]);
+    const [x, y] = proj4('EPSG:4326', utmProj, [lng, lat]);
 
     return { x, y, zone, isSouth, epsg };
 };
 
-export const getGeoKeyDirectory = (epsg: number): number[] => {
-    // GeoTIFF Key IDs
-    const GTModelTypeGeoKey = 1024;
-    const GTRasterTypeGeoKey = 1025;
-    const GeographicTypeGeoKey = 2048;
-    const ProjectedCSTypeGeoKey = 3072;
-
-    // Values
-    const ModelTypeProjected = 1; // Projection Coordinate System
-    const RasterPixelIsArea = 1;  // Standard for images
-    const GCS_WGS_84 = 4326;
-
-    return [
-        1, 1, 0, 4, // Header: Version 1.1.0, 4 Keys
-        GTModelTypeGeoKey, 0, 1, ModelTypeProjected,
-        GTRasterTypeGeoKey, 0, 1, RasterPixelIsArea,
-        GeographicTypeGeoKey, 0, 1, GCS_WGS_84,
-        ProjectedCSTypeGeoKey, 0, 1, epsg
-    ];
+export const getGeoTiffCoordsWGS84 = (centerLat: number, centerLng: number, width: number, height: number): GeoTiffCoordsWGS84 => {
+    const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
+    const toWGS84 = proj4(localProjDef, 'EPSG:4326');
+    
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+    
+    const [topLeftLng, topLeftLat] = toWGS84.forward([-halfWidth, halfHeight]);
+    const [bottomRightLng, bottomRightLat] = toWGS84.forward([halfWidth, -halfHeight]);
+    
+    return {
+        topLeftLat,
+        topLeftLng,
+        pixelSizeLat: (bottomRightLat - topLeftLat) / height,
+        pixelSizeLng: (bottomRightLng - topLeftLng) / width
+    };
 };

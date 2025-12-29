@@ -31,6 +31,11 @@ export interface TerrainData {
   bounds: Bounds; // Geographic bounds of the generated area
   osmFeatures: OSMFeature[]; // Vector data
   usgsFallback?: boolean; // Flag indicating if USGS data was missing/corrupt and fallback occurred
+  // Raw source GeoTIFF data for passthrough export (preserves original projection)
+  sourceGeoTiffs?: {
+    arrayBuffers: ArrayBuffer[];
+    source: 'gpxz' | 'usgs' | 'global';
+  };
 }
 
 export interface MapState {
