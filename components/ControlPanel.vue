@@ -364,7 +364,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, Search } from 'lucide-vue-next';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode } from 'lucide-vue-next';
 import ModOfTheDay from './ModOfTheDay.vue';
 import LocationSearch from './LocationSearch.vue';
 import { LatLng, TerrainData, NominatimResult } from '../types';

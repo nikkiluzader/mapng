@@ -132,6 +132,7 @@ const currentCenter = ref<LatLng>(props.center);
 const currentZoom = ref<number>(props.zoom);
 const selectedLayer = ref('osm');
 const showLabels = ref(true);
+const isMovingProgrammatically = ref(false);
 
 const osmUrl = computed(() => {
   return props.isDarkMode 
@@ -167,6 +168,7 @@ const bounds = computed(() => {
 
 // Handle map move
 const handleMove = () => {
+  if (isMovingProgrammatically.value) return;
   if (!mapRef.value?.leafletObject) return;
   const map = mapRef.value.leafletObject;
   const c = map.getCenter();
@@ -182,6 +184,21 @@ const handleZoom = () => {
   emit('zoom', currentZoom.value);
 };
 
+const onMoveEnd = () => {
+    isMovingProgrammatically.value = false;
+    // Ensure we sync final position
+    if (mapRef.value?.leafletObject) {
+        const map = mapRef.value.leafletObject;
+        const c = map.getCenter();
+        currentCenter.value = { lat: c.lat, lng: c.lng };
+        emit('move', currentCenter.value);
+    }
+};
+
+const onDragStart = () => {
+    isMovingProgrammatically.value = false;
+};
+
 // Watch for external center changes (e.g., from AI search)
 watch(() => props.center, (newCenter: LatLng) => {
   const dist = Math.sqrt(
@@ -192,6 +209,14 @@ watch(() => props.center, (newCenter: LatLng) => {
   // Only move if significantly different to avoid fighting user drag
   if (dist > 0.0001 && mapRef.value?.leafletObject) {
     const map = mapRef.value.leafletObject;
+    isMovingProgrammatically.value = true;
+    
+    map.off('moveend', onMoveEnd);
+    map.off('dragstart', onDragStart);
+    
+    map.on('moveend', onMoveEnd);
+    map.on('dragstart', onDragStart);
+    
     map.setView([newCenter.lat, newCenter.lng], props.zoom, { animate: true });
     currentCenter.value = newCenter;
   }
