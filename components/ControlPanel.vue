@@ -112,6 +112,10 @@
         <MapPin :size="16" class="text-gray-700 dark:text-gray-300" />
         Center Coordinates
       </label>
+      
+      <!-- Location Search -->
+      <LocationSearch @select="handleSearchSelect" />
+      
       <div class="grid grid-cols-2 gap-2">
           <input
             type="number"
@@ -360,9 +364,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode } from 'lucide-vue-next';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, Search } from 'lucide-vue-next';
 import ModOfTheDay from './ModOfTheDay.vue';
-import { LatLng, TerrainData } from '../types';
+import LocationSearch from './LocationSearch.vue';
+import { LatLng, TerrainData, NominatimResult } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
 import { exportGeoTiff } from '../services/exportGeoTiff';
@@ -418,6 +423,11 @@ const handleLocationSelect = (e: Event) => {
         // Reset selection to default
         (e.target as HTMLSelectElement).selectedIndex = 0;
     }
+};
+
+// Handle Nominatim search result selection
+const handleSearchSelect = (result: NominatimResult) => {
+    emit('locationChange', { lat: result.lat, lng: result.lng });
 };
 
 onMounted(async () => {
