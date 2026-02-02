@@ -5,9 +5,9 @@
 **High-Performance Terrain Generator for BeamNG.drive Modding**
 
 [![Vue 3](https://img.shields.io/badge/Vue-3.x-42b883?style=flat-square&logo=vue.js)](https://vuejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Three.js](https://img.shields.io/badge/Three.js-r160+-black?style=flat-square&logo=three.js)](https://threejs.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.x-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
+
 </div>
 
 ---
@@ -41,7 +41,7 @@ Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle sim
 ## 🛠️ Tech Stack
 
 - **Frontend Framework**: Vue 3 (Composition API) + Vite
-- **Language**: TypeScript
+- **Language**: JavaScript (ES6+)
 - **Styling**: Tailwind CSS
 - **3D Engine**: Three.js / TresJS / Cientos
 - **Mapping**: Leaflet / Vue-Leaflet
