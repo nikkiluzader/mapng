@@ -16,7 +16,18 @@ export default defineConfig({
     devSourcemap: false
   },
   build: {
-    sourcemap: false
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'three': ['three'],
+          'leaflet': ['leaflet'],
+          'geotiff': ['geotiff'],
+          'proj4': ['proj4']
+        }
+      }
+    }
   },
   define: {
     'process.env': {}

@@ -64,12 +64,12 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, onMounted } from 'vue';
 import { Trophy, Download, Star, Tag, ImageOff } from 'lucide-vue-next';
-import { fetchModOfTheDay, type ModOfTheDay } from '../services/modOfTheDay';
+import { fetchModOfTheDay } from '../services/modOfTheDay';
 
-const mod = ref<ModOfTheDay | null>(null);
+const mod = ref(null);
 const loading = ref(true);
 const error = ref(false);
 

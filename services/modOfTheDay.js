@@ -1,18 +1,6 @@
 
-export interface ModOfTheDay {
-    Title: string;
-    "Resource URL": string;
-    Version: string;
-    "Thumbnail URL": string;
-    Author: string;
-    "Posted Date": string;
-    "Updated Date": string;
-    Downloads: string;
-    Subscriptions: string;
-    Rating: string;
-}
 
-export async function fetchModOfTheDay(): Promise<ModOfTheDay> {
+export async function fetchModOfTheDay() {
     // Updated URL to point directly to the sheet data
     const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSbBk4haED28w-IscFPBq5e5ECDj62TJjCzGiL1f5z8jldR7GXqVP-oeY6AmNZQ5PpJ07zfWJI1vRxp/pubhtml/sheet?headers=false&gid=0";
     
@@ -43,12 +31,12 @@ export async function fetchModOfTheDay(): Promise<ModOfTheDay> {
     const values = [...rowCells].map(td => td.textContent?.trim() || "");
 
     // Build the final key/value object
-    const result: any = {};
+    const result = {};
     headers.forEach((header, i) => {
         if (header) {
             result[header] = values[i] ?? "";
         }
     });
 
-    return result as ModOfTheDay;
+    return result;
 }

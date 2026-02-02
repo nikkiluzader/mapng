@@ -298,8 +298,8 @@
                 <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Composition API & reactivity</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">TypeScript</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Strict type safety & interfaces</div>
+                <div class="font-medium text-gray-900 dark:text-white">JavaScript (ES6+)</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Modern standard JavaScript</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Tailwind CSS</div>
@@ -406,26 +406,25 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, onMounted } from 'vue';
 import { Globe, Layers, Loader2, Code, X, Monitor, MousePointer2, CircleHelp, Sun, Moon, AlertTriangle } from 'lucide-vue-next';
 import ControlPanel from './components/ControlPanel.vue';
 import MapSelector from './components/MapSelector.vue';
 import Preview3D from './components/Preview3D.vue';
-import { LatLng, TerrainData } from './types';
 import { fetchTerrainData, addOSMToTerrain } from './services/terrain';
 
-const center = ref<LatLng>({ lat: 35.1983, lng: -111.6513 }); // Flagstaff, AZ default
-const zoom = ref<number>(13);
-const resolution = ref<number>(1024);
-const terrainData = ref<TerrainData | null>(null);
-const isLoading = ref<boolean>(false);
-const loadingStatus = ref<string>("Initializing...");
-const previewMode = ref<boolean>(false);
-const showStackInfo = ref<boolean>(false);
-const showAbout = ref<boolean>(false);
-const showDisclaimer = ref<boolean>(false);
-const isDarkMode = ref<boolean>(false);
+const center = ref({ lat: 35.1983, lng: -111.6513 }); // Flagstaff, AZ default
+const zoom = ref(13);
+const resolution = ref(1024);
+const terrainData = ref(null);
+const isLoading = ref(false);
+const loadingStatus = ref("Initializing...");
+const previewMode = ref(false);
+const showStackInfo = ref(false);
+const showAbout = ref(false);
+const showDisclaimer = ref(false);
+const isDarkMode = ref(false);
 
 const toggleDarkMode = () => {
   isDarkMode.value = !isDarkMode.value;
@@ -470,24 +469,24 @@ onMounted(() => {
   }
 });
 
-const handleLocationChange = (newCenter: LatLng) => {
+const handleLocationChange = (newCenter) => {
   center.value = newCenter;
   terrainData.value = null;
 };
 
-const setCenter = (newCenter: LatLng) => {
+const setCenter = (newCenter) => {
   center.value = newCenter;
 };
 
-const setZoom = (newZoom: number) => {
+const setZoom = (newZoom) => {
   zoom.value = newZoom;
 };
 
-const setResolution = (newResolution: number) => {
+const setResolution = (newResolution) => {
   resolution.value = newResolution;
 };
 
-const handleGenerate = async (showPreview: boolean, fetchOSM: boolean, useUSGS: boolean, useGPXZ: boolean, gpxzApiKey: string) => {
+const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey) => {
   isLoading.value = true;
   loadingStatus.value = "Starting terrain generation...";
   try {

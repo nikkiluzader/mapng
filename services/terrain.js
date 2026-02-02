@@ -1,4 +1,3 @@
-import { LatLng, TerrainData, Bounds, OSMFeature } from "../types";
 import { fetchOSMData } from "./osm";
 import { generateOSMTexture, generateHybridTexture } from "./osmTexture";
 import * as GeoTIFF from 'geotiff';
@@ -14,14 +13,14 @@ const USGS_PRODUCT_API = "https://tnmaccess.nationalmap.gov/api/v1/products";
 const USGS_DATASET = "Digital Elevation Model (DEM) 1 meter";
 
 // Helper to normalize longitude to -180 to 180
-const normalizeLng = (lng: number) => {
+const normalizeLng = (lng) => {
   return ((lng + 180) % 360 + 360) % 360 - 180;
 };
 
 // Math Helpers for Web Mercator Projection (Source of Truth for Fetching)
 const MAX_LATITUDE = 85.05112878;
 
-export const project = (lat: number, lng: number, zoom: number) => {
+export const project = (lat, lng, zoom) => {
   const d = Math.PI / 180;
   const max = MAX_LATITUDE;
   const latClamped = Math.max(Math.min(max, lat), -max);
@@ -37,7 +36,7 @@ export const project = (lat: number, lng: number, zoom: number) => {
 
 const NO_DATA_VALUE = -99999;
 
-const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status: string) => void): Promise<{ data: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[], smooth: boolean, rawArrayBuffers: ArrayBuffer[] } | null> => {
+const fetchGPXZRaw = async (bounds, apiKey, onProgress) => {
     try {
         // 1. Check Resolution via Points API
         // We check the center point to see what dataset is being used
@@ -90,7 +89,7 @@ const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status
         const rows = Math.ceil(latSpan / chunkLatDeg);
         const cols = Math.ceil(lngSpan / chunkLngDeg);
         
-        const requests: Bounds[] = [];
+        const requests = [];
         
         for (let r = 0; r < rows; r++) {
             for (let c = 0; c < cols; c++) {
@@ -140,7 +139,7 @@ const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status
              const url = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=1&projection=latlon`;
              
              // Retry logic for 429 Rate Limit
-             let response: Response | null = null;
+             let response = null;
              let retries = 0;
              const MAX_RETRIES = 3;
              
@@ -170,14 +169,14 @@ const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status
              const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
              const image = await tiff.getImage();
              const rasters = await image.readRasters();
-             const raster = rasters[0] as Float32Array | Int16Array;
+             const raster = rasters[0];
              
              await tiff.close();
              
              return { image, raster, arrayBuffer };
         }, 1); // Concurrency 1 for strict rate limiting
 
-        const validResults = results.filter((r): r is { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array, arrayBuffer: ArrayBuffer } => r !== null);
+        const validResults = results.filter((r) => r !== null);
         
         if (validResults.length === 0) return null;
         
@@ -190,11 +189,11 @@ const fetchGPXZRaw = async (bounds: Bounds, apiKey: string, onProgress?: (status
     }
 };
 
-const fetchUSGSRaw = async (bounds: Bounds): Promise<{ data: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[], rawArrayBuffers: ArrayBuffer[] } | null> => {
+const fetchUSGSRaw = async (bounds) => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1000;
 
-    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
     try {
         // 1. Query USGS API
@@ -205,7 +204,7 @@ const fetchUSGSRaw = async (bounds: Bounds): Promise<{ data: { image: GeoTIFF.Ge
         
         console.log(`[USGS] Querying products: ${url}`);
 
-        let response: Response | null = null;
+        let response = null;
         let attempts = 0;
 
         while (attempts < MAX_RETRIES) {
@@ -245,8 +244,8 @@ const fetchUSGSRaw = async (bounds: Bounds): Promise<{ data: { image: GeoTIFF.Ge
         
         console.log(`[USGS] Found ${data.items.length} tiles. Downloading sequentially to handle overlap...`);
 
-        const results: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] = [];
-        const rawArrayBuffers: ArrayBuffer[] = [];
+        const results = [];
+        const rawArrayBuffers = [];
 
         // 2. Download GeoTIFFs sequentially
         // We process sequentially to avoid memory exhaustion with large 1m tiles
@@ -267,7 +266,7 @@ const fetchUSGSRaw = async (bounds: Bounds): Promise<{ data: { image: GeoTIFF.Ge
                 const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
                 const image = await tiff.getImage();
                 const rasters = await image.readRasters();
-                const raster = rasters[0] as Float32Array | Int16Array; // Height data
+                const raster = rasters[0]; // Height data
                 
                 await tiff.close();
                 
@@ -292,15 +291,15 @@ const fetchUSGSRaw = async (bounds: Bounds): Promise<{ data: { image: GeoTIFF.Ge
 };
 
 // Helper for concurrency control
-async function pMap<T, R>(
-  items: T[],
-  mapper: (item: T) => Promise<R>,
-  concurrency: number
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
+async function pMap(
+  items,
+  mapper,
+  concurrency
+) {
+  const results = new Array(items.length);
   let index = 0;
   
-  const next = async (): Promise<void> => {
+  const next = async () => {
     while (index < items.length) {
       const i = index++;
       try {
@@ -321,7 +320,7 @@ async function pMap<T, R>(
   return results;
 }
 
-const loadImage = (url: string): Promise<HTMLImageElement | null> => {
+const loadImage = (url) => {
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = "Anonymous";
@@ -332,14 +331,14 @@ const loadImage = (url: string): Promise<HTMLImageElement | null> => {
 }
 
 export const fetchTerrainData = async (
-    center: LatLng, 
-    resolution: number, 
-    includeOSM: boolean = false, 
-    useUSGS: boolean = false, 
-    useGPXZ: boolean = false, 
-    gpxzApiKey: string = '',
-    onProgress?: (status: string) => void
-): Promise<TerrainData> => {
+    center, 
+    resolution, 
+    includeOSM = false, 
+    useUSGS = false, 
+    useGPXZ = false, 
+    gpxzApiKey = '',
+    onProgress
+) => {
   
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
@@ -360,7 +359,7 @@ export const fetchTerrainData = async (
   const latSpan = height / metersPerDegLat;
   const lngSpan = width / metersPerDegLng;
   
-  const fetchBounds: Bounds = {
+  const fetchBounds = {
       north: normalizedCenter.lat + latSpan / 2,
       south: normalizedCenter.lat - latSpan / 2,
       east: normalizedCenter.lng + lngSpan / 2,
@@ -368,10 +367,10 @@ export const fetchTerrainData = async (
     };
 
   // 2. Try GPXZ / USGS
-  let rawData: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[] | null = null;
+  let rawData = null;
   let usgsFallback = false;
   let shouldSmooth = false;
-  let sourceGeoTiffs: { arrayBuffers: ArrayBuffer[], source: 'gpxz' | 'usgs' | 'global' } | undefined = undefined;
+  let sourceGeoTiffs = undefined;
 
   if (useGPXZ && gpxzApiKey) {
       onProgress?.("Fetching high-res GPXZ elevation data...");
@@ -400,8 +399,8 @@ export const fetchTerrainData = async (
   }
 
   // 3. Prepare Samplers
-  let heightSampler: ((lat: number, lng: number) => number) | null = null;
-  let colorSampler: ((lat: number, lng: number) => { r: number, g: number, b: number, a: number }) | null = null;
+  let heightSampler = null;
+  let colorSampler = null;
 
   // We always need global tiles for Satellite Texture, and as fallback for Height
   onProgress?.("Fetching global tiles...");
@@ -448,8 +447,8 @@ export const fetchTerrainData = async (
   if (!tCtx || !sCtx) throw new Error("Failed to create canvas contexts");
 
   // Fetch tiles
-  interface TileRequest { tx: number; ty: number; type: 'terrain' | 'satellite' }
-  const requests: TileRequest[] = [];
+  
+  const requests = [];
   
   // Terrain Requests
   // Always fetch global tiles to serve as fallback for holes in high-res data
@@ -504,7 +503,7 @@ export const fetchTerrainData = async (
   const satDataImg = sCtx.getImageData(0, 0, satCanvasWidth, satCanvasHeight);
 
   // Helper to get pixel from Mercator Canvas
-  const getMercatorPixel = (lat: number, lng: number, data: ImageData, zoom: number, minTx: number, minTy: number) => {
+  const getMercatorPixel = (lat, lng, data, zoom, minTx, minTy) => {
       const p = project(lat, lng, zoom);
       const localX = p.x - (minTx * TILE_SIZE);
       const localY = p.y - (minTy * TILE_SIZE);
@@ -538,7 +537,7 @@ export const fetchTerrainData = async (
           const w = terrainDataImg.width;
           const h = terrainDataImg.height;
 
-          const getH = (x: number, y: number) => {
+          const getH = (x, y) => {
              const cx = Math.max(0, Math.min(w - 1, x));
              const cy = Math.max(0, Math.min(h - 1, y));
              const i = (cy * w + cx) * 4;
@@ -604,7 +603,7 @@ export const fetchTerrainData = async (
   if (maxHeight === -Infinity) maxHeight = 0;
 
   // 7. Fetch OSM Data
-  let osmFeatures: OSMFeature[] = [];
+  let osmFeatures = [];
   if (includeOSM) {
       onProgress?.("Fetching OpenStreetMap data...");
       osmFeatures = await fetchOSMData(finalBounds);
@@ -612,7 +611,7 @@ export const fetchTerrainData = async (
 
   onProgress?.("Finalizing terrain data...");
   
-  const terrainData: TerrainData = {
+  const terrainData = {
     heightMap,
     width,
     height,
@@ -635,7 +634,7 @@ export const fetchTerrainData = async (
   return terrainData;
 };
 
-export const checkUSGSStatus = async (): Promise<boolean> => {
+export const checkUSGSStatus = async () => {
     try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -652,9 +651,9 @@ export const checkUSGSStatus = async (): Promise<boolean> => {
 };
 
 export const addOSMToTerrain = async (
-    terrainData: TerrainData,
-    onProgress?: (status: string) => void
-): Promise<TerrainData> => {
+    terrainData,
+    onProgress
+) => {
     onProgress?.("Fetching OpenStreetMap data...");
     const osmFeatures = await fetchOSMData(terrainData.bounds);
     

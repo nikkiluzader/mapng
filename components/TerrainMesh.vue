@@ -1,24 +1,16 @@
-<script setup lang="ts">
+<script setup>
 import { computed, shallowRef, watch, toRaw, markRaw } from 'vue';
 import * as THREE from 'three';
-import { TerrainData } from '../types';
 
-type Quality = 'low' | 'medium' | 'high';
-
-interface Props {
-  terrainData: TerrainData;
-  quality: Quality;
-  textureType?: 'satellite' | 'osm' | 'hybrid' | 'none';
-  wireframe?: boolean;
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  textureType: 'satellite',
-  wireframe: false
+const props = defineProps({
+  terrainData: { required: true },
+  quality: { required: true },
+  textureType: { default: 'satellite' },
+  wireframe: { default: false, type: Boolean }
 });
 
 const SCENE_SIZE = 100;
-const geometry = shallowRef<THREE.PlaneGeometry | null>(null);
+const geometry = shallowRef(null);
 
 // Generate terrain geometry
 watch([() => props.terrainData, () => props.quality], () => {
@@ -34,8 +26,8 @@ watch([() => props.terrainData, () => props.quality], () => {
   const heightSteps = Math.ceil((data.height - 1) / stride);
 
   const geo = new THREE.PlaneGeometry(SCENE_SIZE, SCENE_SIZE, widthSteps, heightSteps);
-  const vertices = geo.attributes.position.array as Float32Array;
-  const uvs = geo.attributes.uv.array as Float32Array;
+  const vertices = geo.attributes.position.array;
+  const uvs = geo.attributes.uv.array;
 
   // Calculate scale factor (units per meter)
   const latRad = (data.bounds.north + data.bounds.south) / 2 * Math.PI / 180;

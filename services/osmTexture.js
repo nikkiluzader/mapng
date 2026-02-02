@@ -1,4 +1,3 @@
-import { TerrainData, OSMFeature, LatLng } from "../types";
 import proj4 from 'proj4';
 
 // Colors mixed from standard OSM Carto and OpenStreetBrowser
@@ -42,7 +41,7 @@ const COLORS = {
     defaultLanduse: "#f2f2f2"
 };
 
-const getFeatureColor = (tags: Record<string, string> | undefined): string => {
+const getFeatureColor = (tags) => {
     if (!tags) return COLORS.defaultLanduse;
 
     // --- Vegetation ---
@@ -90,7 +89,7 @@ const getFeatureColor = (tags: Record<string, string> | undefined): string => {
     return COLORS.defaultLanduse;
 };
 
-export const generateOSMTexture = async (terrainData: TerrainData): Promise<string> => {
+export const generateOSMTexture = async (terrainData) => {
     // Target extremely high resolution (8192px) to ensure "SVG-like" sharpness.
     // We use the raw vector data to render this, which is superior to fetching raster tiles
     // because it allows for infinite scaling without pixelation (until rasterization) and
@@ -117,14 +116,14 @@ export const generateOSMTexture = async (terrainData: TerrainData): Promise<stri
     const halfWidth = terrainData.width / 2;
     const halfHeight = terrainData.height / 2;
 
-    const toPixel = (lat: number, lng: number) => {
+    const toPixel = (lat, lng) => {
         const [localX, localY] = toMetric.forward([lng, lat]);
         const x = (localX + halfWidth) * SCALE_FACTOR;
         const y = (halfHeight - localY) * SCALE_FACTOR;
         return { x, y };
     };
 
-    const drawPath = (points: LatLng[]) => {
+    const drawPath = (points) => {
         if (points.length < 2) return;
         const start = toPixel(points[0].lat, points[0].lng);
         ctx.moveTo(start.x, start.y);
@@ -134,7 +133,7 @@ export const generateOSMTexture = async (terrainData: TerrainData): Promise<stri
         }
     };
 
-    const drawPolygon = (feature: OSMFeature) => {
+    const drawPolygon = (feature) => {
         ctx.beginPath();
         drawPath(feature.geometry);
         ctx.closePath();
@@ -248,7 +247,7 @@ export const generateOSMTexture = async (terrainData: TerrainData): Promise<stri
     });
 };
 
-export const generateHybridTexture = async (terrainData: TerrainData): Promise<string> => {
+export const generateHybridTexture = async (terrainData) => {
     // Target extremely high resolution (8192px) to ensure "SVG-like" sharpness.
     const TARGET_RESOLUTION = 8192;
     let SCALE_FACTOR = Math.ceil(TARGET_RESOLUTION / terrainData.width);
@@ -283,14 +282,14 @@ export const generateHybridTexture = async (terrainData: TerrainData): Promise<s
     const halfWidth = terrainData.width / 2;
     const halfHeight = terrainData.height / 2;
 
-    const toPixel = (lat: number, lng: number) => {
+    const toPixel = (lat, lng) => {
         const [localX, localY] = toMetric.forward([lng, lat]);
         const x = (localX + halfWidth) * SCALE_FACTOR;
         const y = (halfHeight - localY) * SCALE_FACTOR;
         return { x, y };
     };
 
-    const drawPath = (points: LatLng[]) => {
+    const drawPath = (points) => {
         if (points.length < 2) return;
         const start = toPixel(points[0].lat, points[0].lng);
         ctx.moveTo(start.x, start.y);
@@ -300,7 +299,7 @@ export const generateHybridTexture = async (terrainData: TerrainData): Promise<s
         }
     };
 
-    const drawPolygon = (feature: OSMFeature) => {
+    const drawPolygon = (feature) => {
         ctx.beginPath();
         drawPath(feature.geometry);
         ctx.closePath();

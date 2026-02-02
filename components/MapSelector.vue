@@ -91,12 +91,11 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { LMap, LTileLayer, LRectangle } from '@vue-leaflet/vue-leaflet';
 import { Layers } from 'lucide-vue-next';
 import L from 'leaflet';
-import { LatLng } from '../types';
 import 'leaflet/dist/leaflet.css';
 
 // Fix Leaflet icon assets
@@ -111,25 +110,19 @@ L.Icon.Default.mergeOptions({
 // Static options to prevent reactivity issues
 const mapOptions = { scrollWheelZoom: true };
 
-interface Props {
-  center: LatLng;
-  zoom: number;
-  resolution: number;
-  isDarkMode?: boolean;
-}
 
-const props = withDefaults(defineProps<Props>(), {
-  isDarkMode: false
+const props = defineProps({
+  center: { type: Object, required: true },
+  zoom: { type: Number, required: true },
+  resolution: { type: [Number, String], required: true },
+  isDarkMode: { type: Boolean, default: false }
 });
 
-const emit = defineEmits<{
-  move: [center: LatLng];
-  zoom: [zoom: number];
-}>();
+const emit = defineEmits(['move', 'zoom']);
 
-const mapRef = ref<any>(null);
-const currentCenter = ref<LatLng>(props.center);
-const currentZoom = ref<number>(props.zoom);
+const mapRef = ref(null);
+const currentCenter = ref(props.center);
+const currentZoom = ref(props.zoom);
 const selectedLayer = ref('osm');
 const showLabels = ref(true);
 const isMovingProgrammatically = ref(false);
@@ -200,7 +193,7 @@ const onDragStart = () => {
 };
 
 // Watch for external center changes (e.g., from AI search)
-watch(() => props.center, (newCenter: LatLng) => {
+watch(() => props.center, (newCenter) => {
   const dist = Math.sqrt(
     Math.pow(currentCenter.value.lat - newCenter.lat, 2) + 
     Math.pow(currentCenter.value.lng - newCenter.lng, 2)
@@ -223,7 +216,7 @@ watch(() => props.center, (newCenter: LatLng) => {
 }, { deep: true });
 
 // Watch for zoom changes
-watch(() => props.zoom, (newZoom: number) => {
+watch(() => props.zoom, (newZoom) => {
   if (newZoom !== currentZoom.value && mapRef.value?.leafletObject) {
     const map = mapRef.value.leafletObject;
     map.setZoom(newZoom);

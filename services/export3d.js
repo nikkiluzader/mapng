@@ -1,13 +1,11 @@
 import * as THREE from 'three';
-import { TerrainData, LatLng } from '../types';
 import proj4 from 'proj4';
-// @ts-ignore
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // --- Constants & Helpers (Duplicated from OSMFeatures.vue for consistency) ---
 const SCENE_SIZE = 100;
 
-const getMetricProjector = (data: TerrainData) => {
+const getMetricProjector = (data) => {
     const centerLat = (data.bounds.north + data.bounds.south) / 2;
     const centerLng = (data.bounds.east + data.bounds.west) / 2;
     const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
@@ -15,7 +13,7 @@ const getMetricProjector = (data: TerrainData) => {
     const halfWidth = data.width / 2;
     const halfHeight = data.height / 2;
 
-    return (lat: number, lng: number) => {
+    return (lat, lng) => {
         const [localX, localY] = toMetric.forward([lng, lat]);
         const x = localX + halfWidth;
         const y = halfHeight - localY;
@@ -23,7 +21,7 @@ const getMetricProjector = (data: TerrainData) => {
     };
 };
 
-const getTerrainHeight = (data: TerrainData, lat: number, lng: number): number => {
+const getTerrainHeight = (data, lat, lng) => {
     const toPixel = getMetricProjector(data);
     const p = toPixel(lat, lng);
     
@@ -62,7 +60,7 @@ const getTerrainHeight = (data: TerrainData, lat: number, lng: number): number =
     return (h - data.minHeight) * unitsPerMeter * EXAGGERATION;
 };
 
-const latLngToScene = (data: TerrainData, lat: number, lng: number) => {
+const latLngToScene = (data, lat, lng) => {
     const toPixel = getMetricProjector(data);
     const p = toPixel(lat, lng);
     
@@ -78,16 +76,16 @@ const latLngToScene = (data: TerrainData, lat: number, lng: number) => {
     return new THREE.Vector3(sceneX, 0, sceneZ);
 };
 
-const createRoadGeometry = (points: THREE.Vector3[], width: number) => {
+const createRoadGeometry = (points, width) => {
   const geometry = new THREE.BufferGeometry();
-  const vertices: number[] = [];
-  const indices: number[] = [];
-  const uvs: number[] = [];
+  const vertices = [];
+  const indices = [];
+  const uvs = [];
 
   for (let i = 0; i < points.length; i++) {
     const point = points[i];
     
-    let perpendicular: THREE.Vector3;
+    let perpendicular;
     if (i === 0 && points.length > 1) {
       const forward = new THREE.Vector3().subVectors(points[1], points[0]).normalize();
       perpendicular = new THREE.Vector3(-forward.z, 0, forward.x);
@@ -124,7 +122,7 @@ const createRoadGeometry = (points: THREE.Vector3[], width: number) => {
 };
 
 // Create building geometry
-const createBuildingGeometry = (points: THREE.Vector3[], holes: THREE.Vector3[][] = [], height: number = 0.5) => {
+const createBuildingGeometry = (points, holes = [], height = 0.5) => {
     const shape = new THREE.Shape();
     points.forEach((p, i) => {
         if (i === 0) shape.moveTo(p.x, -p.z);
@@ -147,13 +145,13 @@ const createBuildingGeometry = (points: THREE.Vector3[], holes: THREE.Vector3[][
     };
     
     return new THREE.ExtrudeGeometry(shape, extrudeSettings);
-};const createBarrierGeometry = (points: THREE.Vector3[], width: number, height: number) => {
+};const createBarrierGeometry = (points, width, height) => {
   const roadGeo = createRoadGeometry(points, width);
   const pos = roadGeo.attributes.position;
   const count = pos.count;
   
-  const newVertices: number[] = [];
-  const newIndices: number[] = [];
+  const newVertices = [];
+  const newIndices = [];
   
   for (let i = 0; i < count; i++) {
       newVertices.push(pos.getX(i), pos.getY(i), pos.getZ(i));
@@ -162,7 +160,7 @@ const createBuildingGeometry = (points: THREE.Vector3[], holes: THREE.Vector3[][
       newVertices.push(pos.getX(i), pos.getY(i) + height, pos.getZ(i));
   }
   
-  const indexAttr = roadGeo.index!;
+  const indexAttr = roadGeo.index;
   for (let i = 0; i < indexAttr.count; i+=3) {
       const a = indexAttr.getX(i);
       const b = indexAttr.getX(i+1);
@@ -196,7 +194,7 @@ const createBuildingGeometry = (points: THREE.Vector3[], holes: THREE.Vector3[][
   return geo;
 };
 
-const createAreaGeometry = (points: THREE.Vector3[], data: TerrainData) => {
+const createAreaGeometry = (points, data) => {
     const shape = new THREE.Shape();
     points.forEach((p, i) => {
         if (i === 0) shape.moveTo(p.x, -p.z);
@@ -209,7 +207,7 @@ const createAreaGeometry = (points: THREE.Vector3[], data: TerrainData) => {
     const pos = geometry.attributes.position;
     
     // Helper to get height from scene coordinates (duplicated from OSMFeatures.vue logic)
-    const getHeightAtScenePos = (x: number, z: number) => {
+    const getHeightAtScenePos = (x, z) => {
         const u = (x + SCENE_SIZE/2) / SCENE_SIZE;
         const v = (z + SCENE_SIZE/2) / SCENE_SIZE;
         
@@ -262,7 +260,7 @@ const createAreaGeometry = (points: THREE.Vector3[], data: TerrainData) => {
  * Helper to generate the Three.js Mesh from TerrainData.
  * Shared by exporters to ensure identical output.
  */
-const createTerrainMesh = async (data: TerrainData): Promise<THREE.Mesh> => {
+const createTerrainMesh = async (data) => {
   return new Promise((resolve, reject) => {
     try {
       // 1. Create Geometry
@@ -310,7 +308,7 @@ const createTerrainMesh = async (data: TerrainData): Promise<THREE.Mesh> => {
       });
 
       // 3. Helper to finalize mesh with texture
-      const finalize = (tex?: THREE.Texture) => {
+      const finalize = (tex) => {
         if (tex) {
             material.map = tex;
         }
@@ -347,7 +345,7 @@ const createTerrainMesh = async (data: TerrainData): Promise<THREE.Mesh> => {
   });
 };
 
-const createOSMGroup = (data: TerrainData): THREE.Group => {
+const createOSMGroup = (data) => {
     const group = new THREE.Group();
     if (!data.osmFeatures || data.osmFeatures.length === 0) return group;
 
@@ -356,15 +354,15 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
     const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
     const unitsPerMeter = SCENE_SIZE / realWidthMeters;
 
-    const roadsList: any[] = [];
-    const buildingsList: any[] = [];
-    const treesList: THREE.Vector3[] = [];
-    const bushesList: THREE.Vector3[] = [];
-    const barriersList: any[] = [];
-    const areasList: any[] = [];
+    const roadsList = [];
+    const buildingsList = [];
+    const treesList = [];
+    const bushesList = [];
+    const barriersList = [];
+    const areasList = [];
 
     // Helper to determine road properties
-    const getRoadConfig = (tags: any) => {
+    const getRoadConfig = (tags) => {
         const type = tags.highway;
         const isBridge = tags.bridge || tags.man_made === 'bridge';
         let widthMeters = 6;
@@ -387,7 +385,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
         return { width: widthMeters * unitsPerMeter, color, ignore, isBridge, offset: offset * unitsPerMeter };
     };
 
-    const getBarrierConfig = (tags: any) => {
+    const getBarrierConfig = (tags) => {
         const type = tags.barrier;
         let height = 1.5 * unitsPerMeter;
         let width = 0.2 * unitsPerMeter;
@@ -411,7 +409,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
         return { height, width, color };
     };
 
-    const getAreaConfig = (tags: any) => {
+    const getAreaConfig = (tags) => {
         let color = 0x000000;
         let valid = false;
         
@@ -436,7 +434,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
         return { color, valid };
     };
 
-    const getBuildingConfig = (tags: any, areaMeters: number = 0) => {
+    const getBuildingConfig = (tags, areaMeters = 0) => {
         let height = 0;
         let minHeight = 0;
         let color = 0xe2e8f0; // default white/grey
@@ -500,8 +498,8 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
     };
 
     // Helper to resample path for better terrain draping
-    const resamplePath = (points: LatLng[], maxLenMeters: number = 5): LatLng[] => {
-        const result: LatLng[] = [];
+    const resamplePath = (points, maxLenMeters = 5) => {
+        const result = [];
         if (points.length < 2) return points;
         
         result.push(points[0]);
@@ -537,14 +535,14 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
         return result;
     };
 
-    data.osmFeatures.forEach((f: any) => {
+    data.osmFeatures.forEach((f) => {
         if (!f.geometry[0]) return;
 
         if (f.type === 'road' && f.geometry.length >= 2) {
             const config = getRoadConfig(f.tags);
             if (config.ignore) return;
 
-            let points: THREE.Vector3[];
+            let points;
             
             if (config.isBridge) {
                 const startP = f.geometry[0];
@@ -552,7 +550,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
                 const startH = getTerrainHeight(data, startP.lat, startP.lng);
                 const endH = getTerrainHeight(data, endP.lat, endP.lng);
                 
-                points = f.geometry.map((p: LatLng, i: number) => {
+                points = f.geometry.map((p, i) => {
                     const vec = latLngToScene(data, p.lat, p.lng);
                     const t = i / (f.geometry.length - 1);
                     vec.y = (startH * (1 - t) + endH * t) + (0.5 * unitsPerMeter);
@@ -561,7 +559,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
             } else {
                 // Resample road points to drape better over terrain
                 const resampled = resamplePath(f.geometry, 1); // Resample every 1 meter
-                points = resampled.map((p: LatLng) => {
+                points = resampled.map((p) => {
                     const vec = latLngToScene(data, p.lat, p.lng);
                     vec.y = getTerrainHeight(data, p.lat, p.lng) + config.offset;
                     return vec;
@@ -570,7 +568,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
             roadsList.push({ points, width: config.width, color: config.color });
         }
         else if (f.type === 'building' && f.geometry.length > 2) {
-            const points = f.geometry.map((p: LatLng) => latLngToScene(data, p.lat, p.lng));
+            const points = f.geometry.map((p) => latLngToScene(data, p.lat, p.lng));
             
             // Calculate area in meters
             let area = 0;
@@ -584,12 +582,12 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
 
             const config = getBuildingConfig(f.tags, areaMeters);
             
-            const holes = f.holes ? f.holes.map((hole: LatLng[]) => {
+            const holes = f.holes ? f.holes.map((hole) => {
                 return hole.map(p => latLngToScene(data, p.lat, p.lng));
             }) : [];
 
             let avgHeight = 0;
-            f.geometry.forEach((p: LatLng) => { avgHeight += getTerrainHeight(data, p.lat, p.lng); });
+            f.geometry.forEach((p) => { avgHeight += getTerrainHeight(data, p.lat, p.lng); });
             avgHeight /= f.geometry.length;
             
             const y = avgHeight + config.minHeight;
@@ -600,7 +598,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
         }
         else if (f.type === 'barrier' && f.geometry.length >= 2) {
             const config = getBarrierConfig(f.tags);
-            const points = f.geometry.map((p: LatLng) => {
+            const points = f.geometry.map((p) => {
                 const vec = latLngToScene(data, p.lat, p.lng);
                 vec.y = getTerrainHeight(data, p.lat, p.lng);
                 return vec;
@@ -612,14 +610,14 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
             const areaConfig = getAreaConfig(f.tags);
 
             if (areaConfig.valid && f.geometry.length > 2) {
-                const points = f.geometry.map((p: LatLng) => {
+                const points = f.geometry.map((p) => {
                     const vec = latLngToScene(data, p.lat, p.lng);
                     vec.y = getTerrainHeight(data, p.lat, p.lng);
                     return vec;
                 });
                 areasList.push({ points, color: areaConfig.color });
             } else {
-                f.geometry.forEach((p: LatLng) => {
+                f.geometry.forEach((p) => {
                     const vec = latLngToScene(data, p.lat, p.lng);
                     vec.y = getTerrainHeight(data, p.lat, p.lng);
                     if (isTree) {
@@ -633,7 +631,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
     });
 
     // Helper for vertex colors
-    const addColor = (geo: THREE.BufferGeometry, colorHex: number) => {
+    const addColor = (geo, colorHex) => {
         const count = geo.attributes.position.count;
         const colors = new Float32Array(count * 3);
         const color = new THREE.Color(colorHex);
@@ -647,7 +645,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
 
     // Create Road Mesh
     if (roadsList.length > 0) {
-        const geometries: THREE.BufferGeometry[] = [];
+        const geometries = [];
         roadsList.forEach(road => {
             const geo = createRoadGeometry(road.points, road.width);
             addColor(geo, road.color);
@@ -663,7 +661,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
 
     // Create Building Mesh
     if (buildingsList.length > 0) {
-        const geometries: THREE.BufferGeometry[] = [];
+        const geometries = [];
         buildingsList.forEach(building => {
             const geo = createBuildingGeometry(building.points, building.holes, building.height);
             geo.rotateX(-Math.PI / 2);
@@ -692,7 +690,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
 
     // Create Barrier Mesh
     if (barriersList.length > 0) {
-        const geometries: THREE.BufferGeometry[] = [];
+        const geometries = [];
         barriersList.forEach(barrier => {
             const geo = createBarrierGeometry(barrier.points, barrier.width, barrier.height);
             addColor(geo, barrier.color);
@@ -708,7 +706,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
 
     // Create Area Mesh
     if (areasList.length > 0) {
-        const geometries: THREE.BufferGeometry[] = [];
+        const geometries = [];
         areasList.forEach(area => {
             const geo = createAreaGeometry(area.points, data);
             addColor(geo, area.color);
@@ -726,7 +724,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
 
     // Create Trees (Merged Mesh with Vertex Colors)
     if (treesList.length > 0) {
-        const geometries: THREE.BufferGeometry[] = [];
+        const geometries = [];
         
         const baseTrunk = new THREE.CylinderGeometry(0.5 * unitsPerMeter, 0.5 * unitsPerMeter, 6.0 * unitsPerMeter, 8);
         const baseFoliage = new THREE.SphereGeometry(3.5 * unitsPerMeter, 16, 16);
@@ -769,7 +767,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
 
     // Create Bushes (Merged Mesh with Vertex Colors)
     if (bushesList.length > 0) {
-        const geometries: THREE.BufferGeometry[] = [];
+        const geometries = [];
         const baseBush = new THREE.SphereGeometry(1.5 * unitsPerMeter, 8, 8);
         
         addColor(baseBush, 0x86efac);
@@ -802,7 +800,7 @@ const createOSMGroup = (data: TerrainData): THREE.Group => {
     return group;
 };
 
-export const exportToGLB = async (data: TerrainData): Promise<void> => {
+export const exportToGLB = async (data) => {
   const terrainMesh = await createTerrainMesh(data);
   const osmGroup = createOSMGroup(data);
   
@@ -819,8 +817,8 @@ export const exportToGLB = async (data: TerrainData): Promise<void> => {
     const exporter = new GLTFExporter();
     exporter.parse(
       scene,
-      (gltf: any) => {
-        const blob = new Blob([gltf as ArrayBuffer], { type: 'model/gltf-binary' });
+      (gltf) => {
+const blob = new Blob([gltf], { type: 'model/gltf-binary' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
         const date = new Date().toISOString().slice(0, 10);
@@ -829,7 +827,7 @@ export const exportToGLB = async (data: TerrainData): Promise<void> => {
         URL.revokeObjectURL(link.href);
         resolve();
       },
-      (err: any) => reject(err),
+      (err) => reject(err),
       { binary: true }
     );
   });

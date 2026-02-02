@@ -11,7 +11,7 @@
           <span class="text-xs text-gray-500 dark:text-gray-400">Resolution (Output Size)</span>
           <select 
               :value="resolution" 
-              @change="$emit('resolutionChange', parseInt(($event.target as HTMLSelectElement).value))"
+              @change="$emit('resolutionChange', parseInt($event.target.value))"
               class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-[#FF6600] focus:border-[#FF6600] outline-none"
           >
               <option :value="512">512 x 512 px (Fast)</option>
@@ -120,14 +120,14 @@
           <input
             type="number"
             :value="center.lat.toFixed(5)"
-            @input="$emit('locationChange', { ...center, lat: parseFloat(($event.target as HTMLInputElement).value) })"
+            @input="$emit('locationChange', { ...center, lat: parseFloat($event.target.value) })"
             class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
             step="0.0001"
           />
           <input
             type="number"
             :value="center.lng.toFixed(5)"
-            @input="$emit('locationChange', { ...center, lng: parseFloat(($event.target as HTMLInputElement).value) })"
+            @input="$emit('locationChange', { ...center, lng: parseFloat($event.target.value) })"
             class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
             step="0.0001"
           />
@@ -362,33 +362,23 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode } from 'lucide-vue-next';
 import ModOfTheDay from './ModOfTheDay.vue';
 import LocationSearch from './LocationSearch.vue';
-import { LatLng, TerrainData, NominatimResult } from '../types';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
 import { exportGeoTiff } from '../services/exportGeoTiff';
+import proj4 from 'proj4';
+import { encode } from 'fast-png';
 
-interface Props {
-  center: LatLng;
-  resolution: number;
-  isGenerating: boolean;
-  terrainData: TerrainData | null;
-}
 
-const props = defineProps<Props>();
+const props = defineProps(['center', 'resolution', 'isGenerating', 'terrainData']);
 
-const emit = defineEmits<{
-  locationChange: [loc: LatLng];
-  resolutionChange: [res: number];
-  generate: [showPreview: boolean, fetchOSM: boolean, useUSGS: boolean, useGPXZ: boolean, gpxzApiKey: string];
-  fetchOsm: [];
-}>();
+const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm']);
 
-const exportPanel = ref<HTMLElement | null>(null);
+const exportPanel = ref(null);
 const isExportingGLB = ref(false);
 const isExportingHeightmap = ref(false);
 const isExportingTexture = ref(false);
@@ -400,9 +390,9 @@ const isExportingGeoTIFF = ref(false);
 const fetchOSM = ref(false);
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
-const elevationSource = ref<'default' | 'usgs' | 'gpxz'>('default');
+const elevationSource = ref('default');
 const gpxzApiKey = ref('');
-const usgsStatus = ref<boolean | null>(null);
+const usgsStatus = ref(null);
 
 const interestingLocations = [
   { name: "Select a location...", lat: 0, lng: 0, disabled: true },
@@ -415,18 +405,18 @@ const interestingLocations = [
   { name: "Yosemite Valley, USA", lat: 37.7456, lng: -119.5936 }
 ];
 
-const handleLocationSelect = (e: Event) => {
-    const idx = parseInt((e.target as HTMLSelectElement).value);
+const handleLocationSelect = (e) => {
+    const idx = parseInt(e.target.value);
     if (idx > 0) {
         const loc = interestingLocations[idx];
         emit('locationChange', { lat: loc.lat, lng: loc.lng });
         // Reset selection to default
-        (e.target as HTMLSelectElement).selectedIndex = 0;
+        e.target.selectedIndex = 0;
     }
 };
 
 // Handle Nominatim search result selection
-const handleSearchSelect = (result: NominatimResult) => {
+const handleSearchSelect = (result) => {
     emit('locationChange', { lat: result.lat, lng: result.lng });
 };
 
@@ -482,9 +472,7 @@ const downloadHeightmap = async () => {
   isExportingHeightmap.value = true;
 
   try {
-      // Dynamic import for fast-png
-      // @ts-ignore
-      const { encode } = await import('fast-png');
+      // Dynamic import removed (now static)
 
       const width = props.terrainData.width;
       const height = props.terrainData.height;
@@ -583,11 +571,11 @@ const downloadOSM = async () => {
     // Simulate processing delay
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const features = props.terrainData.osmFeatures.map((f: any) => {
-        const coordinates = f.geometry.map((p: any) => [p.lng, p.lat]);
+    const features = props.terrainData.osmFeatures.map((f) => {
+        const coordinates = f.geometry.map((p) => [p.lng, p.lat]);
         
         let geometryType = 'LineString';
-        let geometryCoordinates: any = coordinates;
+        let geometryCoordinates = coordinates;
 
         const isClosed = coordinates.length > 3 && 
             coordinates[0][0] === coordinates[coordinates.length-1][0] && 
@@ -634,10 +622,7 @@ const downloadRoadMask = async () => {
     isExportingRoadMask.value = true;
 
     try {
-        // Dynamic import for proj4 and fast-png
-        const proj4 = (await import('proj4')).default;
-        // @ts-ignore
-        const { encode } = await import('fast-png');
+        // Dynamic imports removed (now static)
 
         const width = props.terrainData.width;
         const height = props.terrainData.height;

@@ -81,27 +81,24 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
 import { Search, Loader2, X, MapPinOff } from 'lucide-vue-next';
 import { searchLocation, getShortName, getLocationTypeIcon } from '../services/nominatim';
-import { NominatimResult } from '../types';
 
-const emit = defineEmits<{
-  select: [result: NominatimResult];
-}>();
+const emit = defineEmits(['select']);
 
-const containerRef = ref<HTMLElement | null>(null);
-const inputRef = ref<HTMLInputElement | null>(null);
+const containerRef = ref(null);
+const inputRef = ref(null);
 
 const searchQuery = ref('');
-const results = ref<NominatimResult[]>([]);
+const results = ref([]);
 const isLoading = ref(false);
 const showResults = ref(false);
 const noResults = ref(false);
 const highlightedIndex = ref(-1);
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+let debounceTimer = null;
 
 const handleInput = () => {
   noResults.value = false;
@@ -149,7 +146,7 @@ const handleFocus = () => {
   }
 };
 
-const handleKeydown = (e: KeyboardEvent) => {
+const handleKeydown = (e) => {
   if (!showResults.value || results.value.length === 0) {
     if (e.key === 'Enter') {
       performSearch();
@@ -180,7 +177,7 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 };
 
-const selectResult = (result: NominatimResult) => {
+const selectResult = (result) => {
   emit('select', result);
   searchQuery.value = getShortName(result.displayName);
   showResults.value = false;
@@ -197,17 +194,17 @@ const clearSearch = () => {
   inputRef.value?.focus();
 };
 
-const getShortDisplayName = (displayName: string): string => {
+const getShortDisplayName = (displayName) => {
   return getShortName(displayName);
 };
 
-const getTypeIcon = (type: string): string => {
+const getTypeIcon = (type) => {
   return getLocationTypeIcon(type);
 };
 
 // Close dropdown when clicking outside
-const handleClickOutside = (e: MouseEvent) => {
-  if (containerRef.value && !containerRef.value.contains(e.target as Node)) {
+const handleClickOutside = (e) => {
+  if (containerRef.value && !containerRef.value.contains(e.target)) {
     showResults.value = false;
   }
 };

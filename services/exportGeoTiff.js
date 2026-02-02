@@ -1,17 +1,12 @@
 import { writeArrayBuffer } from 'geotiff';
 import JSZip from 'jszip';
-import { TerrainData, LatLng } from '../types';
 import { getGeoTiffCoordsWGS84 } from './geoUtils';
 
-export interface GeoTiffExportResult {
-    blob: Blob;
-    filename: string;
-}
 
 export const exportGeoTiff = async (
-    terrainData: TerrainData,
-    center: LatLng
-): Promise<GeoTiffExportResult> => {
+    terrainData,
+    center
+) => {
     const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
     
     if (terrainData.sourceGeoTiffs) {

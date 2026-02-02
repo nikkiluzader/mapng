@@ -40,7 +40,7 @@
           </label>
           <div class="flex bg-gray-100 rounded-md p-1 border border-gray-200">
               <button
-                  v-for="q in (['low', 'medium', 'high'] as Quality[])"
+                  v-for="q in ['low', 'medium', 'high']"
                   :key="q"
                   @click="quality = q"
                   :class="['flex-1 text-xs py-1.5 rounded capitalize transition-colors',
@@ -131,30 +131,23 @@
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref } from 'vue';
 import { TresCanvas } from '@tresjs/core';
 import { OrbitControls, Environment } from '@tresjs/cientos';
 import { Settings, Gauge, Layers } from 'lucide-vue-next';
-import { TerrainData } from '../types';
 import TerrainMesh from './TerrainMesh.vue';
 
-type Quality = 'low' | 'medium' | 'high';
-type Preset = 'sunset' | 'dawn' | 'night' | 'forest' | 'studio' | 'city' | 'umbrellas' | 'snow' | 'hangar' | 'urban' | 'modern' | 'shangai';
 
-interface Props {
-  terrainData: TerrainData;
-}
+defineProps(['terrainData']);
 
-defineProps<Props>();
-
-const quality = ref<Quality>('high');
-const preset = ref<Preset>('dawn');
-const textureType = ref<'satellite' | 'osm' | 'hybrid' | 'none'>('satellite');
+const quality = ref('high');
+const preset = ref('dawn');
+const textureType = ref('satellite');
 const showWireframe = ref(false);
-const presets: Preset[] = ['city', 'dawn', 'sunset', 'night', 'forest', 'studio', 'umbrellas', 'snow', 'hangar', 'urban', 'modern', 'shangai'];
+const presets = ['city', 'dawn', 'sunset', 'night', 'forest', 'studio', 'umbrellas', 'snow', 'hangar', 'urban', 'modern', 'shangai'];
 
 // Static camera config to prevent re-renders resetting position
-const cameraPosition: [number, number, number] = [0, 60, 90];
-const cameraArgs: [number, number, number, number] = [40, 1, 0.1, 1000];
+const cameraPosition = [0, 60, 90];
+const cameraArgs = [40, 1, 0.1, 1000];
 </script>

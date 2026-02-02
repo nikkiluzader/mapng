@@ -1,4 +1,3 @@
-import { NominatimResult, Bounds } from "../types";
 
 const NOMINATIM_ENDPOINTS = [
     "https://nominatim.openstreetmap.org/search",
@@ -9,7 +8,7 @@ const NOMINATIM_ENDPOINTS = [
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 1000;
 
-const waitForRateLimit = async (): Promise<void> => {
+const waitForRateLimit = async () => {
     const now = Date.now();
     const timeSinceLastRequest = now - lastRequestTime;
     
@@ -22,7 +21,7 @@ const waitForRateLimit = async (): Promise<void> => {
     lastRequestTime = Date.now();
 };
 
-export const searchLocation = async (query: string): Promise<NominatimResult[]> => {
+export const searchLocation = async (query) => {
     if (!query || query.trim().length < 2) {
         return [];
     }
@@ -58,9 +57,9 @@ export const searchLocation = async (query: string): Promise<NominatimResult[]> 
                 continue;
             }
 
-            return data.map((item: any): NominatimResult => {
+            return data.map((item) => {
                 // Parse bounding box if available [south, north, west, east]
-                let boundingBox: Bounds | undefined;
+                let boundingBox;
                 if (item.boundingbox && item.boundingbox.length === 4) {
                     boundingBox = {
                         south: parseFloat(item.boundingbox[0]),
@@ -91,7 +90,7 @@ export const searchLocation = async (query: string): Promise<NominatimResult[]> 
 };
 
 // Get a shorter, more readable name from the full display name
-export const getShortName = (displayName: string): string => {
+export const getShortName = (displayName) => {
     const parts = displayName.split(',').map(p => p.trim());
     
     // Return first 2-3 meaningful parts
@@ -103,10 +102,10 @@ export const getShortName = (displayName: string): string => {
 };
 
 // Get location type icon hint
-export const getLocationTypeIcon = (type: string): string => {
+export const getLocationTypeIcon = (type) => {
     console.log('[Nominatim] getLocationTypeIcon called with type:', type);
     
-    const iconGroups: [string, string[]][] = [
+    const iconGroups = [
         ['🏙️', ['city']],
         ['🏘️', ['town', 'village', 'suburb', 'neighbourhood', 'neighborhood', 'quarter', 'residential']],
         ['🏠', ['hamlet', 'isolated_dwelling', 'house']],

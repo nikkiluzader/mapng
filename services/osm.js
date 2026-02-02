@@ -1,4 +1,3 @@
-import { Bounds, LatLng, OSMFeature } from "../types";
 
 const OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
@@ -9,7 +8,7 @@ const OVERPASS_ENDPOINTS = [
 // --- Clipping Helpers ---
 
 // Check if a point is inside a half-plane defined by a boundary edge
-const isInside = (p: LatLng, bounds: Bounds, edge: 'N'|'S'|'E'|'W'): boolean => {
+const isInside = (p, bounds, edge) => {
    switch(edge) {
        case 'N': return p.lat <= bounds.north;
        case 'S': return p.lat >= bounds.south;
@@ -19,7 +18,7 @@ const isInside = (p: LatLng, bounds: Bounds, edge: 'N'|'S'|'E'|'W'): boolean => 
 };
 
 // Calculate intersection of a line segment (a->b) with a boundary edge
-const intersect = (a: LatLng, b: LatLng, bounds: Bounds, edge: 'N'|'S'|'E'|'W'): LatLng => {
+const intersect = (a, b, bounds, edge) => {
    // Latitude = y, Longitude = x
    const x1 = a.lng, y1 = a.lat;
    const x2 = b.lng, y2 = b.lat;
@@ -42,9 +41,9 @@ const intersect = (a: LatLng, b: LatLng, bounds: Bounds, edge: 'N'|'S'|'E'|'W'):
 };
 
 // Sutherland-Hodgman algorithm for Polygon clipping
-const clipPolygon = (points: LatLng[], bounds: Bounds): LatLng[] => {
+const clipPolygon = (points, bounds) => {
     let output = points;
-    const edges: ('N'|'S'|'E'|'W')[] = ['N', 'S', 'E', 'W'];
+    const edges = ['N', 'S', 'E', 'W'];
     
     for (const edge of edges) {
         const input = output;
@@ -68,15 +67,15 @@ const clipPolygon = (points: LatLng[], bounds: Bounds): LatLng[] => {
 };
 
 // Line clipping that handles splitting lines into multiple segments
-const clipLineString = (points: LatLng[], bounds: Bounds): LatLng[][] => {
-    let segments: LatLng[][] = [points];
-    const edges: ('N'|'S'|'E'|'W')[] = ['N', 'S', 'E', 'W'];
+const clipLineString = (points, bounds) => {
+    let segments = [points];
+    const edges = ['N', 'S', 'E', 'W'];
 
     for (const edge of edges) {
-        const nextSegments: LatLng[][] = [];
+        const nextSegments = [];
         
         for (const segment of segments) {
-            let currentSplit: LatLng[] = [];
+            let currentSplit = [];
             
             for (let i = 0; i < segment.length; i++) {
                 const p = segment[i];
@@ -121,7 +120,7 @@ const clipLineString = (points: LatLng[], bounds: Bounds): LatLng[][] => {
 // --- Main Service ---
 
 // Helper to construct the Overpass QL query
-const buildQuery = (bounds: Bounds) => {
+const buildQuery = (bounds) => {
     // Overpass expects (south, west, north, east)
     const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
     
@@ -150,12 +149,12 @@ const buildQuery = (bounds: Bounds) => {
     `;
 };
 
-const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
-    const nodes: Record<number, LatLng> = {};
-    const ways: Record<number, { nodes: LatLng[], tags: Record<string, string> }> = {};
-    const relations: any[] = [];
-    const rawFeatures: OSMFeature[] = [];
-    const consumedWayIds = new Set<number>();
+const parseOverpassResponse = (data, bounds) => {
+    const nodes = {};
+    const ways = {};
+    const relations = [];
+    const rawFeatures = [];
+    const consumedWayIds = new Set();
 
     // 1. Index Nodes & Process Standalone Nodes
     for (const el of data.elements) {
@@ -181,9 +180,9 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
     // 2. Index Ways
     for (const el of data.elements) {
         if (el.type === 'way' && el.nodes && el.nodes.length > 0) {
-            const geometry: LatLng[] = el.nodes
-                .map((id: number) => nodes[id])
-                .filter((n: LatLng | undefined) => n !== undefined);
+            const geometry = el.nodes
+                .map((id) => nodes[id])
+                .filter((n) => n !== undefined);
             
             if (geometry.length > 1) {
                 ways[el.id] = { nodes: geometry, tags: el.tags || {} };
@@ -199,10 +198,10 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
         const isBuilding = tags.building || tags.historic;
         
         if (isBuilding && r.members) {
-            const outers = r.members.filter((m: any) => m.type === 'way' && m.role === 'outer');
-            const inners = r.members.filter((m: any) => m.type === 'way' && m.role === 'inner');
+            const outers = r.members.filter((m) => m.type === 'way' && m.role === 'outer');
+            const inners = r.members.filter((m) => m.type === 'way' && m.role === 'inner');
             
-            const holeGeometries: LatLng[][] = [];
+            const holeGeometries = [];
             for (const member of inners) {
                  const w = ways[member.ref];
                  if (w) {
@@ -235,7 +234,7 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
 
         const w = ways[id];
         const tags = w.tags;
-        let type: OSMFeature['type'] | null = null;
+        let type = null;
 
         if (tags.building || (tags.historic && tags.historic !== 'district')) type = 'building';
         else if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin') type = 'water';
@@ -255,7 +254,7 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
     }
 
     // 5. CLIP FEATURES
-    const clippedFeatures: OSMFeature[] = [];
+    const clippedFeatures = [];
 
     for (const f of rawFeatures) {
         if (f.geometry.length === 1) {
@@ -280,7 +279,7 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
             const clippedPoly = clipPolygon(f.geometry, bounds);
             if (clippedPoly.length > 2) {
                 // Clip holes too
-                const clippedHoles: LatLng[][] = [];
+                const clippedHoles = [];
                 if (f.holes) {
                     for (const hole of f.holes) {
                         const clippedHole = clipPolygon(hole, bounds);
@@ -302,7 +301,7 @@ const parseOverpassResponse = (data: any, bounds: Bounds): OSMFeature[] => {
     return clippedFeatures;
 };
 
-export const fetchOSMData = async (bounds: Bounds): Promise<OSMFeature[]> => {
+export const fetchOSMData = async (bounds) => {
     console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
     
     const query = buildQuery(bounds);

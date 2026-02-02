@@ -1,23 +1,18 @@
 import proj4 from 'proj4';
 import * as GeoTIFF from 'geotiff';
-import { LatLng, Bounds } from '../types';
 
 /**
  * Resamples a source raster (GeoTIFF or generic sampler) to a 1 meter/pixel grid
  * centered at the given location.
  */
 export const resampleToMeterGrid = async (
-    source: {
-        type: 'geotiff' | 'sampler',
-        data?: { image: GeoTIFF.GeoTIFFImage, raster: Float32Array | Int16Array }[],
-        sampler?: (lat: number, lng: number) => number
-    },
-    center: LatLng,
-    width: number,
-    height: number,
-    _interpolation: 'bilinear' | 'cubic' = 'bilinear',
-    smooth: boolean = false
-): Promise<{ heightMap: Float32Array, bounds: Bounds }> => {
+    source,
+    center,
+    width,
+    height,
+    _interpolation = 'bilinear',
+    smooth = false
+) => {
     
     const heightMap = new Float32Array(width * height);
     
@@ -31,19 +26,8 @@ export const resampleToMeterGrid = async (
     const halfHeight = height / 2;
 
     // Pre-calculate GeoTIFF converters
-    interface PreparedTile {
-        raster: Float32Array | Int16Array;
-        width: number;
-        height: number;
-        originX: number;
-        originY: number;
-        resX: number;
-        resY: number;
-        noData: number;
-        converter: any;
-    }
 
-    const tiles: PreparedTile[] = [];
+    const tiles = [];
 
     if (source.type === 'geotiff' && source.data) {
         for (const item of source.data) {
@@ -58,7 +42,7 @@ export const resampleToMeterGrid = async (
             const geoKeys = image.getGeoKeys();
             const epsgCode = geoKeys.ProjectedCSTypeGeoKey || geoKeys.GeographicTypeGeoKey;
             
-            let converter: any = null;
+            let converter = null;
 
             if (epsgCode) {
                 const epsg = `EPSG:${epsgCode}`;
@@ -81,13 +65,13 @@ export const resampleToMeterGrid = async (
                 } catch (e) {
                     console.warn(`Proj4 definition for ${epsg} missing or invalid, assuming WGS84 if 4326`, e);
                     if (epsgCode === 4326) {
-                        converter = { forward: (p: number[]) => p };
+                        converter = { forward: (p) => p };
                     }
                 }
             } else {
                 // Fallback for missing EPSG code (common in some web-served GeoTIFFs like GPXZ)
                 console.warn("[Resampler] No EPSG code found in GeoTIFF keys. Assuming EPSG:4326 (Lat/Lon).");
-                converter = { forward: (p: number[]) => p };
+                converter = { forward: (p) => p };
             }
 
             if (converter) {
@@ -107,7 +91,7 @@ export const resampleToMeterGrid = async (
     }
 
     // Helper for bilinear interpolation
-    const bilinear = (raster: Float32Array | Int16Array, w: number, x: number, y: number, noDataVal: number) => {
+    const bilinear = (raster, w, x, y, noDataVal) => {
         const x0 = Math.floor(x);
         const y0 = Math.floor(y);
         const dx = x - x0;
@@ -183,7 +167,7 @@ export const resampleToMeterGrid = async (
         const radius = 8; 
         const tempMap = new Float32Array(heightMap.length);
         
-        const blurH = (src: Float32Array, dst: Float32Array) => {
+        const blurH = (src, dst) => {
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     let sum = 0;
@@ -204,7 +188,7 @@ export const resampleToMeterGrid = async (
             }
         };
 
-        const blurV = (src: Float32Array, dst: Float32Array) => {
+        const blurV = (src, dst) => {
             for (let x = 0; x < width; x++) {
                 for (let y = 0; y < height; y++) {
                     let sum = 0;
@@ -254,13 +238,11 @@ export const resampleToMeterGrid = async (
  * centered at the given location.
  */
 export const resampleImageToMeterGrid = async (
-    source: {
-        sampler: (lat: number, lng: number) => { r: number, g: number, b: number, a: number }
-    },
-    center: LatLng,
-    width: number,
-    height: number
-): Promise<HTMLCanvasElement> => {
+    source,
+    center,
+    width,
+    height
+) => {
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
