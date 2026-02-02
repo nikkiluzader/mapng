@@ -398,6 +398,7 @@ const interestingLocations = [
   { name: "Select a location...", lat: 0, lng: 0, disabled: true },
   { name: "Devils Tower, USA", lat: 44.59056, lng: -104.71511 },
   { name: "Grand Canyon, USA", lat: 36.05758, lng: -112.14236 },
+  { name: "Johnson Valley OHV, USA", lat: 34.49523, lng: -116.82180 },
   { name: "Mount Everest, Nepal", lat: 27.9881, lng: 86.9250 },
   { name: "Mount Fuji, Japan", lat: 35.3606, lng: 138.7274 },
   { name: "Matterhorn, Switzerland", lat: 45.9763, lng: 7.6586 },
