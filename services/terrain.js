@@ -452,9 +452,11 @@ export const fetchTerrainData = async (
   
   // Terrain Requests
   // Always fetch global tiles to serve as fallback for holes in high-res data
-  for (let tx = minTileX; tx <= maxTileX; tx++) {
-    for (let ty = minTileY; ty <= maxTileY; ty++) {
-      requests.push({ tx, ty, type: 'terrain' });
+  if (!sourceGeoTiffs || sourceGeoTiffs.source !== 'gpxz') {
+    for (let tx = minTileX; tx <= maxTileX; tx++) {
+      for (let ty = minTileY; ty <= maxTileY; ty++) {
+        requests.push({ tx, ty, type: 'terrain' });
+      }
     }
   }
 

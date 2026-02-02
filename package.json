@@ -26,6 +26,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.3",
     "autoprefixer": "^10.4.22",
+    "baseline-browser-mapping": "^2.9.19",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "vite": "^5.2.0"
