@@ -22,7 +22,11 @@
   <!-- Main Application - Hidden on Mobile -->
   <div class="hidden md:flex h-screen w-full flex-col md:flex-row overflow-hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
     <!-- Sidebar / Control Panel -->
-    <aside class="w-full md:w-80 lg:w-96 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 z-10 relative shadow-xl">
+    <aside 
+        :class="['flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 z-10 relative shadow-xl transition-all duration-500 ease-in-out',
+            viewMode === 'playground' ? 'w-0 opacity-0 overflow-hidden border-none' : 'w-full md:w-80 lg:w-96 opacity-100'
+        ]"
+    >
       <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 bg-white dark:bg-gray-900">
         <div class="p-2 bg-[#FF6600] rounded-lg shadow-lg shadow-orange-500/30">
           <Layers :size="24" class="text-white" />
@@ -50,6 +54,7 @@
           @resolution-change="setResolution"
           @generate="handleGenerate"
           @fetch-osm="handleFetchOSM"
+          @export-playground="handleExportPlayground"
         />
       </div>
       
@@ -85,25 +90,50 @@
     </aside>
 
     <!-- Main Content Area -->
-    <main class="flex-1 relative flex flex-col h-full bg-gray-100 dark:bg-gray-950">
-      <!-- Toggle View Tabs -->
-      <div class="absolute top-4 right-4 z-20 flex bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-lg p-1 shadow-xl border border-gray-200 dark:border-gray-700">
+    <main class="flex-1 relative flex flex-col h-full bg-gray-100 dark:bg-gray-950 overflow-hidden">
+      
+      <!-- App Mode Toggle (Top Right Global) -->
+      <div 
+        :class="['absolute top-3 z-40 flex bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-lg p-1 shadow-xl border border-gray-200 dark:border-gray-700 transition-all duration-500 ease-in-out',
+          viewMode === 'playground' ? 'right-[21rem]' : 'right-4'
+        ]"
+      >
         <button
-          @click="switchTo2D"
+          @click="viewMode = viewMode === 'playground' ? 'map' : viewMode"
           :class="['px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2',
-            !previewMode ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+            viewMode !== 'playground' ? 'bg-[#FF6600] text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
         >
-          <Globe :size="16" />
+          <Layers :size="16" />
+          MapNG
+        </button>
+        <button
+          @click="viewMode = 'playground'"
+          :class="['px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2',
+            viewMode === 'playground' ? 'bg-purple-600 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+        >
+          <Code :size="16" />
+          Playground
+        </button>
+      </div>
+
+      <!-- MapNG Sub-Toggle (Only visible when in MapNG mode) -->
+      <div v-if="viewMode !== 'playground'" class="absolute top-16 right-4 z-40 flex bg-white/90 dark:bg-gray-900/90 backdrop-blur rounded-lg p-1 shadow-xl border border-gray-200 dark:border-gray-700">
+         <button
+          @click="switchTo2D"
+          :class="['px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5',
+            viewMode === 'map' ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+        >
+          <Globe :size="14" />
           2D Map
         </button>
         <button
-          @click="previewMode = true"
+          @click="viewMode = 'preview'"
           :disabled="!terrainData"
-          :class="['px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2',
-            previewMode ? 'bg-[#FF6600] text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+          :class="['px-3 py-1.5 rounded text-xs font-medium transition-all flex items-center gap-1.5',
+            viewMode === 'preview' ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
             !terrainData ? 'opacity-50 cursor-not-allowed' : '']"
         >
-          <Layers :size="16" />
+          <Layers :size="14" />
           3D Preview
         </button>
       </div>
@@ -111,7 +141,7 @@
       <!-- Views -->
       <div class="flex-1 relative w-full h-full">
         <!-- Map View -->
-        <div :class="['absolute inset-0 transition-all duration-500', previewMode ? 'opacity-0 invisible' : 'opacity-100 visible']">
+        <div :class="['absolute inset-0 transition-all duration-500', viewMode === 'map' ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
           <MapSelector 
             :center="center" 
             :zoom="zoom" 
@@ -123,11 +153,11 @@
         </div>
         
         <!-- 3D Preview View -->
-        <div :class="['absolute inset-0 transition-all duration-500 bg-black', previewMode ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
+        <div :class="['absolute inset-0 transition-all duration-500 bg-black', viewMode === 'preview' ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
           <Suspense>
             <template #default>
               <Preview3D 
-                v-if="terrainData && previewMode"
+                v-if="terrainData && viewMode === 'preview'"
                 :terrain-data="terrainData" 
               />
             </template>
@@ -138,6 +168,11 @@
               </div>
             </template>
           </Suspense>
+        </div>
+
+        <!-- Playground View -->
+        <div v-if="viewMode === 'playground'" class="absolute inset-0 z-30">
+            <PlaygroundView :initial-zip="playgroundZip" />
         </div>
         
         <!-- Loading Overlay -->
@@ -409,9 +444,12 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { Globe, Layers, Loader2, Code, X, Monitor, MousePointer2, CircleHelp, Sun, Moon, AlertTriangle } from 'lucide-vue-next';
+import JSZip from 'jszip';
+import { encodeTer } from './services/ter-new';
 import ControlPanel from './components/ControlPanel.vue';
 import MapSelector from './components/MapSelector.vue';
 import Preview3D from './components/Preview3D.vue';
+import PlaygroundView from './components/PlaygroundView.vue';
 import { fetchTerrainData, addOSMToTerrain } from './services/terrain';
 
 const center = ref({ lat: 35.1983, lng: -111.6513 }); // Flagstaff, AZ default
@@ -420,7 +458,8 @@ const resolution = ref(1024);
 const terrainData = ref(null);
 const isLoading = ref(false);
 const loadingStatus = ref("Initializing...");
-const previewMode = ref(false);
+const viewMode = ref('map'); // 'map', 'preview', 'playground'
+const playgroundZip = ref(null);
 const showStackInfo = ref(false);
 const showAbout = ref(false);
 const showDisclaimer = ref(false);
@@ -503,7 +542,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
     
     if (showPreview) {
         loadingStatus.value = "Rendering 3D scene...";
-        previewMode.value = true;
+        viewMode.value = 'preview';
     }
   } catch (error) {
     console.error("Failed to generate terrain:", error);
@@ -532,8 +571,107 @@ const handleFetchOSM = async () => {
   }
 };
 
+const handleExportPlayground = async () => {
+    if (!terrainData.value) return;
+    
+    isLoading.value = true;
+    loadingStatus.value = "Preparing Playground data...";
+    
+    try {
+        const zip = new JSZip();
+        // Use a clone to avoid reactive overhead during heavy loops if possible, but simple access is fine.
+        const td = terrainData.value;
+        const width = td.width;
+        const height = td.height; // Assuming square
+        
+        // Calculate Real World Size in Meters for accurate Aspect Ratio
+        const latRad = (td.bounds.north + td.bounds.south) / 2 * Math.PI / 180;
+        const metersPerDegree = 111320 * Math.cos(latRad);
+        const realWidthMeters = (td.bounds.east - td.bounds.west) * metersPerDegree;
+        
+        const sizeMeters = realWidthMeters || width; // Fallback to width if calc fails
+        
+        // 1. Prepare Heightmap (Uint16)
+        // Convert Float32 heightMap to Uint16
+        const hMap = new Uint16Array(width * height);
+        const range = td.maxHeight - td.minHeight;
+        
+        for (let i = 0; i < td.heightMap.length; i++) {
+             const h = td.heightMap[i];
+             let val = 0;
+             if (range > 0) {
+                 val = Math.floor(((h - td.minHeight) / range) * 65535);
+             }
+             val = Math.max(0, Math.min(65535, val));
+             hMap[i] = val;
+        }
+
+        // 2. Prepare LayerMap (Uint8) 
+        const lMap = new Uint8Array(width * height);
+        lMap.fill(0); 
+        
+        // 3. Encode .ter
+        const terBuffer = encodeTer({
+            version: 9,
+            size: width, 
+            heightMap: hMap,
+            layerMap: lMap,
+            materials: ['grass', 'asphalt', 'rock'] 
+        });
+        
+        zip.file("main.ter", terBuffer);
+        
+        // 4. Config JSON
+        const config = {
+            maxHeight: range, // BeamNG uses maxHeight as the vertical range (scale)
+            minHeight: td.minHeight,
+            worldSizeMeters: sizeMeters
+        };
+        // Use standard BeamNG config file name
+        zip.file("theTerrain.json", JSON.stringify(config));
+        
+        // 5. Textures
+        if (td.satelliteTextureUrl) {
+            const res = await fetch(td.satelliteTextureUrl);
+            const blob = await res.blob();
+            // Naming it so Playground auto-detects it as base map
+            zip.file("t_terrain_base_b.color.jpg", blob); 
+        }
+
+        if (td.osmTextureUrl) {
+            const res = await fetch(td.osmTextureUrl);
+            const blob = await res.blob();
+            zip.file("osm_texture.png", blob); 
+        }
+
+        if (td.hybridTextureUrl) {
+            const res = await fetch(td.hybridTextureUrl);
+            const blob = await res.blob();
+            zip.file("hybrid_texture.png", blob); 
+        }
+        
+        // Also save original settings for debugging
+        zip.file("mapng_metadata.json", JSON.stringify({
+             center: center.value,
+             resolution: resolution.value,
+             minHeight: td.minHeight,
+             maxHeight: td.maxHeight
+        }));
+
+        playgroundZip.value = zip;
+        viewMode.value = 'playground';
+        
+    } catch (e) {
+        console.error("Failed to export to playground", e);
+        alert("Failed to load playground: " + e.message);
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+
 const switchTo2D = () => {
-  previewMode.value = false;
+  viewMode.value = 'map';
   // Do not clear terrainData here, so users can switch back and forth
   // without losing their generated exports.
 };
