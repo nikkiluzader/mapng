@@ -205,14 +205,6 @@
             </label>
             <span class="text-xs text-gray-500 dark:text-gray-400">{{ terrainData.width }}x{{ terrainData.height }}</span>
         </div>
-
-        <button 
-            @click="$emit('exportPlayground')"
-            class="w-full py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-md shadow-md flex items-center justify-center gap-2 transition-all mb-1"
-        >
-            <Gamepad2 :size="18" />
-            <span class="text-xs font-bold uppercase tracking-wide">Visualize in Playground</span>
-        </button>
         
         <div class="grid grid-cols-2 gap-2">
             <!-- Heightmap -->
@@ -372,7 +364,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, Gamepad2 } from 'lucide-vue-next';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode } from 'lucide-vue-next';
 import ModOfTheDay from './ModOfTheDay.vue';
 import LocationSearch from './LocationSearch.vue';
 import { exportToGLB } from '../services/export3d';
@@ -384,7 +376,7 @@ import { encode } from 'fast-png';
 
 const props = defineProps(['center', 'resolution', 'isGenerating', 'terrainData']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm', 'exportPlayground']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm']);
 
 const exportPanel = ref(null);
 const isExportingGLB = ref(false);
