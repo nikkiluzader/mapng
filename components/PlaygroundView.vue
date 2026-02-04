@@ -304,12 +304,8 @@ async function loadZip(zip, name) {
         const buffer = await terFile.async('arraybuffer')
         const terData = parseTer(buffer)
         
-        // Check if this is a MapNG generated file (Linear/Top-Left oriented)
-        // or a Standard BeamNG file (Inverted/Bottom-Left oriented likely)
-        const isMapNG = zip.file("mapng_metadata.json") !== null
-        
         // Attach config info to terData for mesh creation
-        terData.config = { maxHeight, sizeMeters, isMapNG }
+        terData.config = { maxHeight, sizeMeters }
 
         loadedLevelData.value = terData
         await createTerrainMesh(terData, zip)
@@ -377,16 +373,7 @@ async function createTerrainMesh(terData, zip) {
           const z = Math.min(hRes - 1, Math.max(0, Math.floor( iy * ratio )))
           const x = Math.min(hRes - 1, Math.max(0, hx))
           
-          let sourceIndex;
-          if (terData.config?.isMapNG) {
-             // MapNG generates Top-Left data, matching standard image iteration
-             sourceIndex = Math.floor(z * hRes + x)
-          } else {
-             // Standard BeamNG .ter files often use Bottom-Left origin or require inversion
-             // to match the Top-Down plane generation
-             sourceIndex = Math.floor(((hRes - 1) - z) * hRes + x)
-          }
-
+          const sourceIndex = Math.floor(z * hRes + x)
           const rawH = terData.heightMap[sourceIndex] || 0
           
           // Calculate world height
