@@ -117,20 +117,28 @@
       <LocationSearch @select="handleSearchSelect" />
       
       <div class="grid grid-cols-2 gap-2">
-          <input
-            type="number"
-            :value="center.lat.toFixed(5)"
-            @input="$emit('locationChange', { ...center, lat: parseFloat($event.target.value) })"
-            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
-            step="0.0001"
-          />
-          <input
-            type="number"
-            :value="center.lng.toFixed(5)"
-            @input="$emit('locationChange', { ...center, lng: parseFloat($event.target.value) })"
-            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
-            step="0.0001"
-          />
+          <div class="space-y-1">
+              <label class="text-[10px] text-gray-500 dark:text-gray-400 font-medium px-1 uppercase tracking-wider">Latitude</label>
+              <input
+                type="text"
+                v-model="latInput"
+                @change="handleManualLocationChange"
+                @keydown.enter="$event.target.blur()"
+                class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
+                placeholder="Latitude"
+              />
+          </div>
+          <div class="space-y-1">
+              <label class="text-[10px] text-gray-500 dark:text-gray-400 font-medium px-1 uppercase tracking-wider">Longitude</label>
+              <input
+                type="text"
+                v-model="lngInput"
+                @change="handleManualLocationChange"
+                @keydown.enter="$event.target.blur()"
+                class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
+                placeholder="Longitude"
+              />
+          </div>
       </div>
       
       <select 
@@ -377,6 +385,29 @@ import { encode } from 'fast-png';
 const props = defineProps(['center', 'resolution', 'isGenerating', 'terrainData']);
 
 const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm']);
+
+// Local state for formatted coordinate inputs to allow high precision typing
+const latInput = ref(props.center.lat.toString());
+const lngInput = ref(props.center.lng.toString());
+
+const handleManualLocationChange = () => {
+    const lat = parseFloat(latInput.value);
+    const lng = parseFloat(lngInput.value);
+    
+    if (!isNaN(lat) && !isNaN(lng)) {
+        emit('locationChange', { ...props.center, lat, lng });
+    }
+};
+
+// Sync inputs with props when they change from other sources (map move, search, dropdown)
+watch(() => props.center, (newVal) => {
+    if (parseFloat(latInput.value) !== newVal.lat) {
+        latInput.value = newVal.lat.toString();
+    }
+    if (parseFloat(lngInput.value) !== newVal.lng) {
+        lngInput.value = newVal.lng.toString();
+    }
+}, { deep: true });
 
 const exportPanel = ref(null);
 const isExportingGLB = ref(false);
