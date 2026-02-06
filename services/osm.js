@@ -253,9 +253,10 @@ const parseOverpassResponse = (data, bounds) => {
     // 3. Process Relations (Multipolygons)
     for (const r of relations) {
         const tags = r.tags || {};
-        const isBuilding = tags.building || tags.historic;
+        const isBuilding = !!tags.building || ['castle', 'fort', 'monastery', 'tower', 'ruins'].includes(tags.historic);
         const isWater = tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin';
-        const isVegetation = (tags.natural && !isWater) || tags.landuse;
+        const isLanduse = !!tags.landuse || !!tags.leisure || (!!tags.historic && !isBuilding);
+        const isVegetation = (tags.natural && !isWater) || isLanduse;
 
         let type = null;
         if (isBuilding) type = 'building';
@@ -293,9 +294,13 @@ const parseOverpassResponse = (data, bounds) => {
         const tags = w.tags;
         let type = null;
 
-        if (tags.building || (tags.historic && tags.historic !== 'district')) type = 'building';
-        else if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin') type = 'water';
-        else if (tags.natural || tags.landuse) type = 'vegetation';
+        const isBuilding = !!tags.building || ['castle', 'fort', 'monastery', 'tower', 'ruins'].includes(tags.historic);
+        const isWater = tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin';
+        const isLanduse = !!tags.landuse || !!tags.leisure || (!!tags.historic && !isBuilding);
+
+        if (isBuilding) type = 'building';
+        else if (isWater) type = 'water';
+        else if (isLanduse || tags.natural) type = 'vegetation';
         else if (tags.highway) type = 'road';
         else if (tags.man_made === 'bridge') type = 'road';
         else if (tags.barrier) type = 'barrier';

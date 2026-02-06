@@ -315,8 +315,6 @@ export const createOSMGroup = (data) => {
     const bushesList = [];
     const barriersList = [];
 
-    // Helper to determine barrier properties
-
     const getBarrierConfig = (tags) => {
         const type = tags.barrier;
         let height = 1.5 * unitsPerMeter;
@@ -337,65 +335,35 @@ export const createOSMGroup = (data) => {
             height = 1.2 * unitsPerMeter;
             width = 0.8 * unitsPerMeter;
         }
-
         return { height, width, color };
     };
-
 
     const getBuildingConfig = (tags, areaMeters = 0) => {
         let height = 0;
         let minHeight = 0;
-        let color = 0xf8f9fa; // premium off-white
-
-        if (tags.height) {
-            height = parseFloat(tags.height);
-        } else if (tags['building:levels']) {
-            height = parseFloat(tags['building:levels']) * 3;
-        } else {
-            // Infer height from building type if explicit height is missing
+        let color = 0xf8f9fa;
+        if (tags.height) height = parseFloat(tags.height);
+        else if (tags['building:levels']) height = parseFloat(tags['building:levels']) * 3;
+        else {
             const type = tags.building;
-            if (type === 'house' || type === 'detached' || type === 'bungalow' || type === 'residential') {
-                height = 6 + (Math.random() * 2 - 1); // ~2 stories
-            } else if (type === 'garage' || type === 'garages' || type === 'shed' || type === 'roof') {
-                height = 3 + (Math.random() * 1 - 0.5); // 1 story
-            } else if (type === 'apartments' || type === 'office' || type === 'commercial' || type === 'hotel') {
-                height = 14 + (Math.random() * 4 - 2); // ~4-5 stories
-            } else if (type === 'industrial' || type === 'warehouse' || type === 'retail') {
-                height = 8 + (Math.random() * 2 - 1);
-            } else if (type === 'church' || type === 'cathedral') {
-                height = 20 + (Math.random() * 5); // Taller churches
-            } else if (type === 'civic' || type === 'public' || type === 'hospital' || type === 'university') {
-                height = 12 + (Math.random() * 3);
-            } else {
-                // Generic building=yes or similar
-                // Use area heuristic
-                if (areaMeters > 2000) {
-                    height = 16 + (Math.random() * 4); // Large commercial/public
-                } else if (areaMeters > 500) {
-                    height = 10 + (Math.random() * 3); // Medium commercial
-                } else if (areaMeters < 50) {
-                    height = 3 + (Math.random() * 1); // Small shed/garage
-                } else {
-                    height = 6 + (Math.random() * 2); // Standard house/shop
-                }
-
-                // Boost for specific amenities if generic building tag
-                if (tags.amenity === 'bank' || tags.tourism === 'hotel') {
-                    height += 6;
-                }
-                if (tags.amenity === 'place_of_worship') {
-                    height += 8;
-                }
+            if (type === 'house' || type === 'detached' || type === 'bungalow' || type === 'residential') height = 6 + (Math.random() * 2 - 1);
+            else if (type === 'garage' || type === 'garages' || type === 'shed' || type === 'roof') height = 3 + (Math.random() * 1 - 0.5);
+            else if (type === 'apartments' || type === 'office' || type === 'commercial' || type === 'hotel') height = 14 + (Math.random() * 4 - 2);
+            else if (type === 'industrial' || type === 'warehouse' || type === 'retail') height = 8 + (Math.random() * 2 - 1);
+            else if (type === 'church' || type === 'cathedral') height = 20 + (Math.random() * 5);
+            else if (type === 'civic' || type === 'public' || type === 'hospital' || type === 'university') height = 12 + (Math.random() * 3);
+            else {
+                if (areaMeters > 2000) height = 16 + (Math.random() * 4);
+                else if (areaMeters > 500) height = 10 + (Math.random() * 3);
+                else if (areaMeters < 50) height = 3 + (Math.random() * 1);
+                else height = 6 + (Math.random() * 2);
+                if (tags.amenity === 'bank' || tags.tourism === 'hotel') height += 6;
+                if (tags.amenity === 'place_of_worship') height += 8;
             }
         }
-
         if (isNaN(height)) height = 6;
-
-        if (tags.min_height) {
-            minHeight = parseFloat(tags.min_height);
-        } else if (tags['building:min_level']) {
-            minHeight = parseFloat(tags['building:min_level']) * 3;
-        }
+        if (tags.min_height) minHeight = parseFloat(tags.min_height);
+        else if (tags['building:min_level']) minHeight = parseFloat(tags['building:min_level']) * 3;
         if (isNaN(minHeight)) minHeight = 0;
 
         if (tags['building:colour'] || tags['building:color']) {
@@ -409,41 +377,25 @@ export const createOSMGroup = (data) => {
             else if (mat === 'glass') color = 0x93c5fd;
             else if (mat === 'metal') color = 0x4b5563;
         }
-
         return { height: height * unitsPerMeter, minHeight: minHeight * unitsPerMeter, color };
     };
 
-    // Helper to resample path for better terrain draping
     const resamplePath = (points, maxLenMeters = 5) => {
         const result = [];
         if (points.length < 2) return points;
-
         result.push(points[0]);
-
         for (let i = 0; i < points.length - 1; i++) {
-            const p1 = points[i];
-            const p2 = points[i + 1];
-
-            // Approximate distance in meters
+            const p1 = points[i], p2 = points[i + 1];
             const R = 6371e3;
-            const φ1 = p1.lat * Math.PI / 180;
-            const φ2 = p2.lat * Math.PI / 180;
-            const Δφ = (p2.lat - p1.lat) * Math.PI / 180;
-            const Δλ = (p2.lng - p1.lng) * Math.PI / 180;
-            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-                Math.cos(φ1) * Math.cos(φ2) *
-                Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-            const d = R * c;
-
+            const φ1 = p1.lat * Math.PI / 180, φ2 = p2.lat * Math.PI / 180;
+            const Δφ = (p2.lat - p1.lat) * Math.PI / 180, Δλ = (p2.lng - p1.lng) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)), d = R * c;
             if (d > maxLenMeters) {
                 const segments = Math.ceil(d / maxLenMeters);
                 for (let j = 1; j < segments; j++) {
                     const t = j / segments;
-                    result.push({
-                        lat: p1.lat + (p2.lat - p1.lat) * t,
-                        lng: p1.lng + (p2.lng - p1.lng) * t
-                    });
+                    result.push({ lat: p1.lat + (p2.lat - p1.lat) * t, lng: p1.lng + (p2.lng - p1.lng) * t });
                 }
             }
             result.push(p2);
@@ -451,271 +403,142 @@ export const createOSMGroup = (data) => {
         return result;
     };
 
-
     data.osmFeatures.forEach((f) => {
         if (!f.geometry[0]) return;
-
-        else if (f.type === 'building' && f.geometry.length > 2) {
+        if (f.type === 'building' && f.geometry.length > 2) {
             const points = f.geometry.map((p) => latLngToScene(data, p.lat, p.lng));
-
-            // Calculate area in meters
             let area = 0;
             for (let i = 0; i < points.length; i++) {
                 const j = (i + 1) % points.length;
-                area += points[i].x * points[j].z;
-                area -= points[j].x * points[i].z;
+                area += points[i].x * points[j].z - points[j].x * points[i].z;
             }
-            area = Math.abs(area) / 2;
-            const areaMeters = area / (unitsPerMeter * unitsPerMeter);
+            const areaMeters = Math.abs(area) / 2 / (unitsPerMeter * unitsPerMeter);
+
+            // Safeguard: Skip extruding buildings that are impossibly large (likely landuse errors)
+            // 50,000 sqm is a very large building (like a massive mall or factory)
+            const isLargeIndustry = ['industrial', 'warehouse', 'retail', 'commercial'].includes(f.tags.building);
+            if (areaMeters > 50000 && !isLargeIndustry) {
+                return;
+            }
 
             const config = getBuildingConfig(f.tags, areaMeters);
-
-            const holes = f.holes ? f.holes.map((hole) => {
-                return hole.map(p => latLngToScene(data, p.lat, p.lng));
-            }) : [];
-
-            let avgHeight = 0;
-            f.geometry.forEach((p) => { avgHeight += getTerrainHeight(data, p.lat, p.lng); });
-            avgHeight /= f.geometry.length;
-
-            const y = avgHeight + config.minHeight;
-            // Ensure minimum height is small enough to allow variation (e.g. 0.1 units instead of 1.0)
-            const depth = Math.max(0.1, config.height - config.minHeight);
-
-            buildingsList.push({ points, holes, y, height: depth, color: config.color });
-        }
-        else if (f.type === 'barrier' && f.geometry.length >= 2) {
+            const holes = (f.holes || []).map(h => h.map(p => latLngToScene(data, p.lat, p.lng)));
+            let avgH = 0; f.geometry.forEach(p => avgH += getTerrainHeight(data, p.lat, p.lng));
+            buildingsList.push({ points, holes, y: (avgH / f.geometry.length) + config.minHeight, height: Math.max(0.1, config.height - config.minHeight), color: config.color });
+        } else if (f.type === 'barrier' && f.geometry.length >= 2) {
             const config = getBarrierConfig(f.tags);
-            const points = f.geometry.map((p) => {
-                const vec = latLngToScene(data, p.lat, p.lng);
-                vec.y = getTerrainHeight(data, p.lat, p.lng);
-                return vec;
+            const points = f.geometry.map(p => {
+                const v = latLngToScene(data, p.lat, p.lng);
+                v.y = getTerrainHeight(data, p.lat, p.lng);
+                return v;
             });
             barriersList.push({ points, originalPoints: f.geometry, width: config.width, height: config.height, color: config.color });
-        }
-        else if (f.type === 'vegetation') {
-            const isTree = f.tags.natural === 'tree' || f.tags.natural === 'wood' || f.tags.landuse === 'forest' || f.tags.natural === 'tree_row' || f.tags.landuse === 'orchard' || f.tags.natural === 'tree_group';
-            const isBush = f.tags.natural === 'scrub' || f.tags.natural === 'heath' || f.tags.barrier === 'hedge' || f.tags.natural === 'scrubland';
-
-            // Only trees and bushes are rendered as 3D objects
+        } else if (f.type === 'vegetation') {
+            const isTree = f.tags.natural === 'tree' || f.tags.natural === 'wood' || f.tags.landuse === 'forest' || f.tags.natural === 'tree_row' || f.tags.natural === 'tree_group';
+            const isBush = f.tags.natural === 'scrub' || f.tags.natural === 'heath' || f.tags.barrier === 'hedge';
             if (!isTree && !isBush) return;
-
-            // If it's a closed vegetation area (like forest), scatter objects
             if (f.geometry.length > 3 && f.geometry[0].lat === f.geometry[f.geometry.length - 1].lat) {
-                const points = f.geometry.map((p) => latLngToScene(data, p.lat, p.lng));
-
-                // Get bbox of polygon in scene space
+                const points = f.geometry.map(p => latLngToScene(data, p.lat, p.lng));
                 let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-                points.forEach(p => {
-                    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-                    minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
-                });
-
-                // Calculate approximate area to determine density
-                const width = maxX - minX;
-                const height = maxZ - minZ;
-                const area = width * height;
-
-                // Cap object count per polygon for performance
+                points.forEach(p => { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); });
                 const density = (isTree ? 0.04 : 0.02) / (unitsPerMeter * unitsPerMeter);
-                const count = Math.min(250, Math.floor(area * density));
-
+                const count = Math.min(250, Math.floor((maxX - minX) * (maxZ - minZ) * density));
                 for (let i = 0; i < count; i++) {
-                    const rx = minX + Math.random() * width;
-                    const rz = minZ + Math.random() * height;
-                    const testPoint = { x: rx, z: rz };
-
-                    if (isPointInPolygon(testPoint, points)) {
-                        const vec = new THREE.Vector3(rx, getHeightAtScenePos(data, rx, rz), rz);
-                        if (isTree) treesList.push(vec);
-                        else bushesList.push(vec);
+                    const rx = minX + Math.random() * (maxX - minX), rz = minZ + Math.random() * (maxZ - minZ);
+                    if (isPointInPolygon({ x: rx, z: rz }, points)) {
+                        const v = new THREE.Vector3(rx, getHeightAtScenePos(data, rx, rz), rz);
+                        if (isTree) treesList.push(v); else bushesList.push(v);
                     }
                 }
-            }
-            else {
-                f.geometry.forEach((p) => {
-                    const vec = latLngToScene(data, p.lat, p.lng);
-                    vec.y = getHeightAtScenePos(data, vec.x, vec.z);
-                    if (isTree) {
-                        treesList.push(vec);
-                    } else {
-                        bushesList.push(vec);
-                    }
+            } else {
+                f.geometry.forEach(p => {
+                    const v = latLngToScene(data, p.lat, p.lng);
+                    v.y = getHeightAtScenePos(data, v.x, v.z);
+                    if (isTree) treesList.push(v); else bushesList.push(v);
                 });
             }
         }
     });
 
-    // Helper for vertex colors
     const addColor = (geo, colorHex) => {
-        const count = geo.attributes.position.count;
-        const colors = new Float32Array(count * 3);
-        const color = new THREE.Color(colorHex);
-        for (let i = 0; i < count; i++) {
-            colors[i * 3] = color.r;
-            colors[i * 3 + 1] = color.g;
-            colors[i * 3 + 2] = color.b;
-        }
+        const count = geo.attributes.position.count, colors = new Float32Array(count * 3), c = new THREE.Color(colorHex);
+        for (let i = 0; i < count; i++) { colors[i * 3] = c.r; colors[i * 3 + 1] = c.g; colors[i * 3 + 2] = c.b; }
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     };
 
-
-    // Create Building Mesh
     if (buildingsList.length > 0) {
-        const geometries = [];
-        buildingsList.forEach(building => {
-            const geo = createBuildingGeometry(building.points, building.holes, building.height);
-            geo.rotateX(-Math.PI / 2);
-            geo.translate(0, building.y, 0);
-
-            // Add color attribute with texture/noise
-            const pos = geo.attributes.position;
-            const count = pos.count;
-            const colors = new Float32Array(count * 3);
-            const baseColor = new THREE.Color(building.color);
-
+        const geos = [];
+        buildingsList.forEach(b => {
+            const geo = createBuildingGeometry(b.points, b.holes, b.height);
+            geo.rotateX(-Math.PI / 2); geo.translate(0, b.y, 0);
+            const pos = geo.attributes.position, count = pos.count, colors = new Float32Array(count * 3), baseC = new THREE.Color(b.color);
             for (let i = 0; i < count; i++) {
-                // Determine if this is a side vertex or a top vertex
-                // ExtrudeGeometry puts sides first usually, but we can check the Y coordinate
-                // or just apply noise globally
-                const py = pos.getY(i);
-                const isTop = py > building.height * 0.99;
-
-                // Add noise/texture variation
-                const noise = (Math.random() * 0.05) - 0.025;
-                const darken = isTop ? 1.0 : 0.85; // Sides are slightly darker for depth
-
-                colors[i * 3] = Math.min(1, Math.max(0, baseColor.r * darken + noise));
-                colors[i * 3 + 1] = Math.min(1, Math.max(0, baseColor.g * darken + noise));
-                colors[i * 3 + 2] = Math.min(1, Math.max(0, baseColor.b * darken + noise));
+                const isTop = pos.getY(i) > b.height * 0.99, noise = (Math.random() * 0.05) - 0.025, dark = isTop ? 1.0 : 0.85;
+                colors[i * 3] = Math.min(1, Math.max(0, baseC.r * dark + noise));
+                colors[i * 3 + 1] = Math.min(1, Math.max(0, baseC.g * dark + noise));
+                colors[i * 3 + 2] = Math.min(1, Math.max(0, baseC.b * dark + noise));
             }
             geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-            geometries.push(geo);
+            geos.push(geo);
         });
-        if (geometries.length > 0) {
-            const merged = mergeGeometries(geometries);
-            const material = new THREE.MeshStandardMaterial({ vertexColors: true });
-            const mesh = new THREE.Mesh(merged, material);
-            group.add(mesh);
-        }
+        const merged = mergeGeometries(geos);
+        group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true })));
     }
 
-    // Create Barrier Mesh
     if (barriersList.length > 0) {
-        const geometries = [];
-        barriersList.forEach(barrier => {
-            const geo = createBarrierGeometry(barrier.points, barrier.width, barrier.height);
-            addColor(geo, barrier.color);
-            geometries.push(geo);
+        const geos = [];
+        barriersList.forEach(b => {
+            const geo = createBarrierGeometry(b.points, b.width, b.height);
+            addColor(geo, b.color); geos.push(geo);
         });
-        if (geometries.length > 0) {
-            const merged = mergeGeometries(geometries);
-            const material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide });
-            const mesh = new THREE.Mesh(merged, material);
-            group.add(mesh);
-        }
+        const merged = mergeGeometries(geos);
+        group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide })));
     }
 
+    const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), scale = new THREE.Vector3(1, 1, 1), position = new THREE.Vector3();
 
-
-
-    // Create Trees (Merged Mesh with Vertex Colors)
     if (treesList.length > 0) {
-        const geometries = [];
-
-        const baseTrunk = new THREE.CylinderGeometry(0.5 * unitsPerMeter, 0.5 * unitsPerMeter, 6.0 * unitsPerMeter, 8);
-        const baseFoliage = new THREE.SphereGeometry(3.5 * unitsPerMeter, 16, 16);
-
-        addColor(baseTrunk, 0x5d4037);
-        addColor(baseFoliage, 0x22c55e);
-
-        const matrix = new THREE.Matrix4();
-        const quaternion = new THREE.Quaternion();
-        const scale = new THREE.Vector3(1, 1, 1);
-        const position = new THREE.Vector3();
-
-        treesList.forEach((pos) => {
-            // Trunk
-            const trunk = baseTrunk.clone();
-            position.set(pos.x, pos.y + (3.0 * unitsPerMeter), pos.z);
-            matrix.compose(position, quaternion, scale);
-            trunk.applyMatrix4(matrix);
-            geometries.push(trunk);
-
-            // Foliage
-            const foliage = baseFoliage.clone();
-            position.set(pos.x, pos.y + (7.0 * unitsPerMeter), pos.z);
-            matrix.compose(position, quaternion, scale);
-            foliage.applyMatrix4(matrix);
-            geometries.push(foliage);
+        const geos = [];
+        const baseT = new THREE.CylinderGeometry(0.5 * unitsPerMeter, 0.5 * unitsPerMeter, 6.0 * unitsPerMeter, 8);
+        const baseF = new THREE.SphereGeometry(3.5 * unitsPerMeter, 16, 16);
+        addColor(baseT, 0x5d4037); addColor(baseF, 0x22c55e);
+        treesList.forEach(pos => {
+            const t = baseT.clone(); position.set(pos.x, pos.y + 3 * unitsPerMeter, pos.z);
+            matrix.compose(position, quaternion, scale); t.applyMatrix4(matrix); geos.push(t);
+            const f = baseF.clone(); position.set(pos.x, pos.y + 7 * unitsPerMeter, pos.z);
+            matrix.compose(position, quaternion, scale); f.applyMatrix4(matrix); geos.push(f);
         });
-
-        if (geometries.length > 0) {
-            const merged = mergeGeometries(geometries);
-            const material = new THREE.MeshStandardMaterial({
-                vertexColors: true,
-                roughness: 0.9
-            });
-            const mesh = new THREE.Mesh(merged, material);
-            mesh.name = "Trees";
-            group.add(mesh);
-        }
+        const merged = mergeGeometries(geos);
+        group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })));
     }
 
-    // Create Bushes (Merged Mesh with Vertex Colors)
     if (bushesList.length > 0) {
-        const geometries = [];
-        const baseBush = new THREE.SphereGeometry(1.5 * unitsPerMeter, 8, 8);
-
-        addColor(baseBush, 0x86efac);
-
-        const matrix = new THREE.Matrix4();
-        const quaternion = new THREE.Quaternion();
-        const scale = new THREE.Vector3(1, 1, 1);
-        const position = new THREE.Vector3();
-
-        bushesList.forEach((pos) => {
-            const bush = baseBush.clone();
-            position.set(pos.x, pos.y + (1.0 * unitsPerMeter), pos.z);
-            matrix.compose(position, quaternion, scale);
-            bush.applyMatrix4(matrix);
-            geometries.push(bush);
+        const geos = [];
+        const baseB = new THREE.SphereGeometry(1.5 * unitsPerMeter, 8, 8);
+        addColor(baseB, 0x86efac);
+        bushesList.forEach(pos => {
+            const b = baseB.clone(); position.set(pos.x, pos.y + unitsPerMeter, pos.z);
+            matrix.compose(position, quaternion, scale); b.applyMatrix4(matrix); geos.push(b);
         });
-
-        if (geometries.length > 0) {
-            const merged = mergeGeometries(geometries);
-            const material = new THREE.MeshStandardMaterial({
-                vertexColors: true,
-                roughness: 0.9
-            });
-            const mesh = new THREE.Mesh(merged, material);
-            mesh.name = "Bushes";
-            group.add(mesh);
-        }
+        const merged = mergeGeometries(geos);
+        group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })));
     }
 
     return group;
 };
 
 export const exportToGLB = async (data) => {
-    const terrainMesh = await createTerrainMesh(data);
-    const osmGroup = createOSMGroup(data);
+    try {
+        const terrainMesh = await createTerrainMesh(data);
+        const osmGroup = createOSMGroup(data);
+        const scene = new THREE.Scene();
+        scene.add(terrainMesh);
+        scene.add(osmGroup);
 
-    const scene = new THREE.Scene();
-    scene.add(terrainMesh);
-    scene.add(osmGroup);
-
-    // Dynamic import for GLTFExporter
-    // Using 'three/examples/jsm/...' ensures compatibility with the installed 'three' package
-    // @ts-ignore
-    const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
-
-    return new Promise((resolve, reject) => {
-        const exporter = new GLTFExporter();
-        exporter.parse(
-            scene,
-            (gltf) => {
+        const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
+        return new Promise((resolve, reject) => {
+            const exporter = new GLTFExporter();
+            exporter.parse(scene, (gltf) => {
                 const blob = new Blob([gltf], { type: 'model/gltf-binary' });
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
@@ -724,9 +547,9 @@ export const exportToGLB = async (data) => {
                 link.click();
                 URL.revokeObjectURL(link.href);
                 resolve();
-            },
-            (err) => reject(err),
-            { binary: true }
-        );
-    });
+            }, (err) => reject(err), { binary: true });
+        });
+    } catch (err) {
+        console.error("Export failed:", err);
+    }
 };
