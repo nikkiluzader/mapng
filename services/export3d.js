@@ -345,7 +345,7 @@ export const createOSMGroup = (data) => {
     const getBuildingConfig = (tags, areaMeters = 0) => {
         let height = 0;
         let minHeight = 0;
-        let color = 0xe2e8f0; // default white/grey
+        let color = 0xf8f9fa; // premium off-white
 
         if (tags.height) {
             height = parseFloat(tags.height);
@@ -398,8 +398,16 @@ export const createOSMGroup = (data) => {
         }
         if (isNaN(minHeight)) minHeight = 0;
 
-        if (tags['building:colour']) {
-            color = new THREE.Color(tags['building:colour']).getHex();
+        if (tags['building:colour'] || tags['building:color']) {
+            color = new THREE.Color(tags['building:colour'] || tags['building:color']).getHex();
+        } else if (tags['building:material']) {
+            const mat = tags['building:material'];
+            if (mat === 'brick') color = 0x9a3412;
+            else if (mat === 'concrete') color = 0x9ca3af;
+            else if (mat === 'stone') color = 0x6b7280;
+            else if (mat === 'wood') color = 0x78350f;
+            else if (mat === 'glass') color = 0x93c5fd;
+            else if (mat === 'metal') color = 0x4b5563;
         }
 
         return { height: height * unitsPerMeter, minHeight: minHeight * unitsPerMeter, color };
@@ -560,14 +568,26 @@ export const createOSMGroup = (data) => {
             geo.rotateX(-Math.PI / 2);
             geo.translate(0, building.y, 0);
 
-            // Add color attribute
-            const count = geo.attributes.position.count;
+            // Add color attribute with texture/noise
+            const pos = geo.attributes.position;
+            const count = pos.count;
             const colors = new Float32Array(count * 3);
-            const color = new THREE.Color(building.color);
+            const baseColor = new THREE.Color(building.color);
+
             for (let i = 0; i < count; i++) {
-                colors[i * 3] = color.r;
-                colors[i * 3 + 1] = color.g;
-                colors[i * 3 + 2] = color.b;
+                // Determine if this is a side vertex or a top vertex
+                // ExtrudeGeometry puts sides first usually, but we can check the Y coordinate
+                // or just apply noise globally
+                const py = pos.getY(i);
+                const isTop = py > building.height * 0.99;
+
+                // Add noise/texture variation
+                const noise = (Math.random() * 0.05) - 0.025;
+                const darken = isTop ? 1.0 : 0.85; // Sides are slightly darker for depth
+
+                colors[i * 3] = Math.min(1, Math.max(0, baseColor.r * darken + noise));
+                colors[i * 3 + 1] = Math.min(1, Math.max(0, baseColor.g * darken + noise));
+                colors[i * 3 + 2] = Math.min(1, Math.max(0, baseColor.b * darken + noise));
             }
             geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 

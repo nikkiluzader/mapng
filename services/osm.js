@@ -134,20 +134,77 @@ const buildQuery = (bounds) => {
           way["waterway"](${bbox});
           way["highway"](${bbox});
           way["building"](${bbox});
-          way["natural"~"wood|scrub|tree_row|grass|meadow|heath|moor|wetland|sand|beach|bare_rock|scree|dirt"](${bbox});
-          way["landuse"~"forest|grass|meadow|park|orchard|vineyard|farmland|quarry|reservoir|basin"](${bbox});
+          way["natural"~"wood|scrub|tree_row|grass|meadow|heath|moor|wetland|sand|beach|bare_rock|scree|dirt|earth|bare_soil"](${bbox});
+          way["landuse"~"forest|grass|meadow|park|orchard|vineyard|farmland|quarry|reservoir|basin|residential|commercial|industrial|retail|construction|brownfield|cemetery|military"](${bbox});
+          way["leisure"~"park|garden|golf_course|playground|sports_centre|track|pitch|stadium|common|recreation_ground"](${bbox});
           way["historic"](${bbox});
           way["barrier"](${bbox});
           way["man_made"="bridge"](${bbox});
           relation["building"](${bbox});
           relation["historic"](${bbox});
-          relation["natural"="water"](${bbox});
+          relation["natural"](${bbox});
+          relation["landuse"](${bbox});
+          relation["leisure"](${bbox});
           relation["waterway"](${bbox});
         );
         out body;
         >;
         out skel qt;
     `;
+};
+
+// Helper to join way segments into closed rings
+const joinWays = (wayNodesList) => {
+    if (wayNodesList.length === 0) return [];
+
+    const rings = [];
+    const pool = [...wayNodesList];
+
+    while (pool.length > 0) {
+        let currentRing = [...pool.shift()];
+        let changed = true;
+
+        while (changed) {
+            changed = false;
+            const startNode = currentRing[0];
+            const endNode = currentRing[currentRing.length - 1];
+
+            // Check if ring is already closed
+            if (startNode.lat === endNode.lat && startNode.lng === endNode.lng && currentRing.length > 2) {
+                break;
+            }
+
+            for (let i = 0; i < pool.length; i++) {
+                const way = pool[i];
+                const wayStart = way[0];
+                const wayEnd = way[way.length - 1];
+
+                if (endNode.lat === wayStart.lat && endNode.lng === wayStart.lng) {
+                    currentRing.push(...way.slice(1));
+                    pool.splice(i, 1);
+                    changed = true;
+                    break;
+                } else if (endNode.lat === wayEnd.lat && endNode.lng === wayEnd.lng) {
+                    currentRing.push(...[...way].reverse().slice(1));
+                    pool.splice(i, 1);
+                    changed = true;
+                    break;
+                } else if (startNode.lat === wayEnd.lat && startNode.lng === wayEnd.lng) {
+                    currentRing.unshift(...way.slice(0, -1));
+                    pool.splice(i, 1);
+                    changed = true;
+                    break;
+                } else if (startNode.lat === wayStart.lat && startNode.lng === wayStart.lng) {
+                    currentRing.unshift(...[...way].reverse().slice(0, -1));
+                    pool.splice(i, 1);
+                    changed = true;
+                    break;
+                }
+            }
+        }
+        rings.push(currentRing);
+    }
+    return rings;
 };
 
 const parseOverpassResponse = (data, bounds) => {
@@ -186,44 +243,43 @@ const parseOverpassResponse = (data, bounds) => {
                 .filter((n) => n !== undefined);
 
             if (geometry.length > 1) {
-                ways[el.id] = { nodes: geometry, tags: el.tags || {} };
+                ways[el.id] = { id: el.id, nodes: geometry, tags: el.tags || {} };
             }
         } else if (el.type === 'relation') {
             relations.push(el);
         }
     }
 
-    // 3. Process Relations
+    // 3. Process Relations (Multipolygons)
     for (const r of relations) {
         const tags = r.tags || {};
         const isBuilding = tags.building || tags.historic;
+        const isWater = tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin';
+        const isVegetation = (tags.natural && !isWater) || tags.landuse;
 
-        if (isBuilding && r.members) {
-            const outers = r.members.filter((m) => m.type === 'way' && m.role === 'outer');
-            const inners = r.members.filter((m) => m.type === 'way' && m.role === 'inner');
+        let type = null;
+        if (isBuilding) type = 'building';
+        else if (isWater) type = 'water';
+        else if (isVegetation) type = 'vegetation';
 
-            const holeGeometries = [];
-            for (const member of inners) {
-                const w = ways[member.ref];
-                if (w) {
-                    holeGeometries.push(w.nodes);
-                    consumedWayIds.add(member.ref);
-                }
-            }
+        if (type && r.members) {
+            const outerWays = r.members.filter(m => m.type === 'way' && (m.role === 'outer' || !m.role)).map(m => ways[m.ref]).filter(Boolean);
+            const innerWays = r.members.filter(m => m.type === 'way' && m.role === 'inner').map(m => ways[m.ref]).filter(Boolean);
 
-            for (const member of outers) {
-                const w = ways[member.ref];
-                if (w) {
-                    const type = 'building';
-                    rawFeatures.push({
-                        id: `${r.id}_${member.ref}`,
-                        type,
-                        geometry: w.nodes,
-                        holes: holeGeometries,
-                        tags: { ...tags, ...w.tags }
-                    });
-                    consumedWayIds.add(member.ref);
-                }
+            outerWays.forEach(w => consumedWayIds.add(w.id));
+            innerWays.forEach(w => consumedWayIds.add(w.id));
+
+            const outerRings = joinWays(outerWays.map(w => w.nodes));
+            const innerRings = joinWays(innerWays.map(w => w.nodes));
+
+            for (const outer of outerRings) {
+                rawFeatures.push({
+                    id: `rel_${r.id}`,
+                    type,
+                    geometry: outer,
+                    holes: innerRings.length > 0 ? innerRings : undefined,
+                    tags
+                });
             }
         }
     }
