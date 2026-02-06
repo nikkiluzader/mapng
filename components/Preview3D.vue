@@ -19,16 +19,18 @@
         :visible="show3DFeatures"
       />
       
-      <OrbitControls 
+      <CameraControls 
         ref="controlsRef"
         make-default
-        :enable-damping="true" 
-        :damping-factor="0.1" 
-        :screen-space-panning="true"
-        :min-distance="0.01"
-        :max-distance="20000"
-        :pan-speed="2.0"
-        :zoom-speed="1.5"
+        :smooth-time="0.25"
+        :min-distance="1"
+        :max-distance="1000"
+        :min-polar-angle="0"
+        :max-polar-angle="Math.PI * 0.48"
+        :azimuth-rotate-speed="1.0"
+        :polar-rotate-speed="1.0"
+        :dolly-speed="1.0"
+        :truck-speed="2.0"
       />
     </TresCanvas>
 
@@ -208,7 +210,8 @@
 <script setup>
 import { ref, computed, watch, reactive, shallowRef } from 'vue';
 import { TresCanvas } from '@tresjs/core';
-import { OrbitControls, Environment } from '@tresjs/cientos';
+import { CameraControls, Environment } from '@tresjs/cientos';
+import * as CameraControlsLib from 'camera-controls';
 import { Settings, Gauge, Layers, Box, RotateCcw, ChevronDown, Loader2 } from 'lucide-vue-next';
 import TerrainMesh from './TerrainMesh.vue';
 import OSMFeatures3D from './OSMFeatures3D.vue';
@@ -240,6 +243,23 @@ const availableCategories = computed(() => {
         cats.add(getFeatureCategory(f));
     });
     return Array.from(cats).sort();
+});
+
+// Initialize controls configuration
+watch(controlsRef, (controls) => {
+    if (controls) {
+        const instance = controls.instance || controls;
+        // Map-centric controls: Left click to pan (truck), Right click to rotate
+        instance.mouseButtons.left = CameraControlsLib.ACTION.TRUCK;
+        instance.mouseButtons.right = CameraControlsLib.ACTION.ROTATE;
+        instance.mouseButtons.wheel = CameraControlsLib.ACTION.DOLLY;
+        instance.touches.one = CameraControlsLib.ACTION.TOUCH_TRUCK;
+        
+        // Settings for "Best Possible Implementation"
+        instance.verticalDragToForward = true;
+        instance.dollyToCursor = true; // Essential for map feel
+        instance.infinityDolly = false;
+    }
 });
 
 // Initialize layer state
@@ -298,15 +318,13 @@ const presets = ['city', 'dawn', 'sunset', 'night', 'forest', 'studio', 'umbrell
 
 const resetCamera = () => {
     if (controlsRef.value) {
-        // @ts-ignore - Handle different cientos/three versions
         const controls = controlsRef.value.instance || controlsRef.value;
-        if (controls.object) {
-            controls.object.position.set(0, 60, 90);
-            controls.target.set(0, 0, 0);
-            controls.update();
-        } else if (typeof controls.reset === 'function') {
-            controls.reset();
-        }
+        // Cinematic smooth reset to default view
+        controls.setLookAt(
+            0, 80, 100, // Position
+            0, 0, 0,    // Target
+            true        // Enable transition
+        );
     }
 };
 
