@@ -34,7 +34,7 @@ watch([() => props.terrainData, () => props.quality], () => {
   const metersPerDegree = 111320 * Math.cos(latRad);
   const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
   const unitsPerMeter = SCENE_SIZE / realWidthMeters;
-  const EXAGGERATION = 1.5;
+  const EXAGGERATION = 1.0;
 
   for (let i = 0; i < vertices.length / 3; i++) {
     const colIndex = i % (widthSteps + 1);

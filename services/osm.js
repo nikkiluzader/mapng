@@ -9,47 +9,47 @@ const OVERPASS_ENDPOINTS = [
 
 // Check if a point is inside a half-plane defined by a boundary edge
 const isInside = (p, bounds, edge) => {
-   switch(edge) {
-       case 'N': return p.lat <= bounds.north;
-       case 'S': return p.lat >= bounds.south;
-       case 'E': return p.lng <= bounds.east;
-       case 'W': return p.lng >= bounds.west;
-   }
+    switch (edge) {
+        case 'N': return p.lat <= bounds.north;
+        case 'S': return p.lat >= bounds.south;
+        case 'E': return p.lng <= bounds.east;
+        case 'W': return p.lng >= bounds.west;
+    }
 };
 
 // Calculate intersection of a line segment (a->b) with a boundary edge
 const intersect = (a, b, bounds, edge) => {
-   // Latitude = y, Longitude = x
-   const x1 = a.lng, y1 = a.lat;
-   const x2 = b.lng, y2 = b.lat;
-   
-   let x = 0, y = 0;
+    // Latitude = y, Longitude = x
+    const x1 = a.lng, y1 = a.lat;
+    const x2 = b.lng, y2 = b.lat;
 
-   // Avoid divide by zero if line is parallel (though isInside check usually prevents this being called purely parallel outside)
-   if (edge === 'N' || edge === 'S') {
-       const boundaryY = edge === 'N' ? bounds.north : bounds.south;
-       y = boundaryY;
-       if (y2 === y1) x = x1; // Parallel
-       else x = x1 + (x2 - x1) * (boundaryY - y1) / (y2 - y1);
-   } else {
-       const boundaryX = edge === 'E' ? bounds.east : bounds.west;
-       x = boundaryX;
-       if (x2 === x1) y = y1; // Parallel
-       else y = y1 + (y2 - y1) * (boundaryX - x1) / (x2 - x1);
-   }
-   return { lat: y, lng: x };
+    let x = 0, y = 0;
+
+    // Avoid divide by zero if line is parallel (though isInside check usually prevents this being called purely parallel outside)
+    if (edge === 'N' || edge === 'S') {
+        const boundaryY = edge === 'N' ? bounds.north : bounds.south;
+        y = boundaryY;
+        if (y2 === y1) x = x1; // Parallel
+        else x = x1 + (x2 - x1) * (boundaryY - y1) / (y2 - y1);
+    } else {
+        const boundaryX = edge === 'E' ? bounds.east : bounds.west;
+        x = boundaryX;
+        if (x2 === x1) y = y1; // Parallel
+        else y = y1 + (y2 - y1) * (boundaryX - x1) / (x2 - x1);
+    }
+    return { lat: y, lng: x };
 };
 
 // Sutherland-Hodgman algorithm for Polygon clipping
 const clipPolygon = (points, bounds) => {
     let output = points;
     const edges = ['N', 'S', 'E', 'W'];
-    
+
     for (const edge of edges) {
         const input = output;
         output = [];
         if (input.length === 0) break;
-        
+
         let S = input[input.length - 1];
         for (const E of input) {
             if (isInside(E, bounds, edge)) {
@@ -73,13 +73,13 @@ const clipLineString = (points, bounds) => {
 
     for (const edge of edges) {
         const nextSegments = [];
-        
+
         for (const segment of segments) {
             let currentSplit = [];
-            
+
             for (let i = 0; i < segment.length; i++) {
                 const p = segment[i];
-                const prev = i > 0 ? segment[i-1] : null;
+                const prev = i > 0 ? segment[i - 1] : null;
 
                 const pIn = isInside(p, bounds, edge);
                 const prevIn = prev ? isInside(prev, bounds, edge) : null;
@@ -113,7 +113,7 @@ const clipLineString = (points, bounds) => {
         }
         segments = nextSegments;
     }
-    
+
     return segments;
 };
 
@@ -123,12 +123,13 @@ const clipLineString = (points, bounds) => {
 const buildQuery = (bounds) => {
     // Overpass expects (south, west, north, east)
     const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
-    
+
     // Increased timeout to 180s and maxsize to handle larger areas
     return `
         [out:json][timeout:180][maxsize:1073741824];
         (
-          way["natural"="tree"](${bbox});
+          node["natural"="tree"](${bbox});
+          node["natural"="peak"](${bbox});
           way["natural"="water"](${bbox});
           way["waterway"](${bbox});
           way["highway"](${bbox});
@@ -160,19 +161,19 @@ const parseOverpassResponse = (data, bounds) => {
     for (const el of data.elements) {
         if (el.type === 'node') {
             nodes[el.id] = { lat: el.lat, lng: el.lon, tags: el.tags };
-            
+
             // Check for standalone tree nodes
             if (el.tags && el.tags.natural === 'tree') {
-                 // Check if inside bounds (simple check)
-                 if (el.lat <= bounds.north && el.lat >= bounds.south && 
-                     el.lon <= bounds.east && el.lon >= bounds.west) {
-                     rawFeatures.push({
+                // Check if inside bounds (simple check)
+                if (el.lat <= bounds.north && el.lat >= bounds.south &&
+                    el.lon <= bounds.east && el.lon >= bounds.west) {
+                    rawFeatures.push({
                         id: el.id.toString(),
                         type: 'vegetation',
                         geometry: [{ lat: el.lat, lng: el.lon }],
                         tags: el.tags
-                     });
-                 }
+                    });
+                }
             }
         }
     }
@@ -183,7 +184,7 @@ const parseOverpassResponse = (data, bounds) => {
             const geometry = el.nodes
                 .map((id) => nodes[id])
                 .filter((n) => n !== undefined);
-            
+
             if (geometry.length > 1) {
                 ways[el.id] = { nodes: geometry, tags: el.tags || {} };
             }
@@ -196,18 +197,18 @@ const parseOverpassResponse = (data, bounds) => {
     for (const r of relations) {
         const tags = r.tags || {};
         const isBuilding = tags.building || tags.historic;
-        
+
         if (isBuilding && r.members) {
             const outers = r.members.filter((m) => m.type === 'way' && m.role === 'outer');
             const inners = r.members.filter((m) => m.type === 'way' && m.role === 'inner');
-            
+
             const holeGeometries = [];
             for (const member of inners) {
-                 const w = ways[member.ref];
-                 if (w) {
-                     holeGeometries.push(w.nodes);
-                     consumedWayIds.add(member.ref);
-                 }
+                const w = ways[member.ref];
+                if (w) {
+                    holeGeometries.push(w.nodes);
+                    consumedWayIds.add(member.ref);
+                }
             }
 
             for (const member of outers) {
@@ -258,9 +259,9 @@ const parseOverpassResponse = (data, bounds) => {
 
     for (const f of rawFeatures) {
         if (f.geometry.length === 1) {
-             // It's a point (tree), already checked bounds
-             clippedFeatures.push(f);
-             continue;
+            // It's a point (tree), already checked bounds
+            clippedFeatures.push(f);
+            continue;
         }
 
         if (f.type === 'road' || f.type === 'barrier') {
@@ -303,9 +304,9 @@ const parseOverpassResponse = (data, bounds) => {
 
 export const fetchOSMData = async (bounds) => {
     console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
-    
+
     const query = buildQuery(bounds);
-    
+
     for (const endpoint of OVERPASS_ENDPOINTS) {
         try {
             console.log(`[OSM] Trying endpoint: ${endpoint}`);
@@ -324,7 +325,7 @@ export const fetchOSMData = async (bounds) => {
 
             const data = await response.json();
             console.log(`[OSM] Received ${data.elements?.length || 0} elements from ${endpoint}.`);
-            
+
             const features = parseOverpassResponse(data, bounds);
             console.log(`[OSM] Parsed ${features.length} features.`);
             return features;
