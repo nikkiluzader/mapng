@@ -121,10 +121,8 @@ const clipLineString = (points, bounds) => {
 
 // Helper to construct the Overpass QL query
 const buildQuery = (bounds) => {
-    // Overpass expects (south, west, north, east)
     const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
 
-    // Increased timeout to 180s and maxsize to handle larger areas
     return `
         [out:json][timeout:180][maxsize:1073741824];
         (
@@ -133,6 +131,8 @@ const buildQuery = (bounds) => {
           way["natural"="water"](${bbox});
           way["waterway"](${bbox});
           way["highway"](${bbox});
+          way["highway:area"](${bbox});
+          way["area:highway"](${bbox});
           way["building"](${bbox});
           way["natural"~"wood|scrub|tree_row|grass|meadow|heath|moor|wetland|sand|beach|bare_rock|scree|dirt|earth|bare_soil"](${bbox});
           way["landuse"~"forest|grass|meadow|park|orchard|vineyard|farmland|quarry|reservoir|basin|residential|commercial|industrial|retail|construction|brownfield|cemetery|military"](${bbox});
@@ -146,11 +146,17 @@ const buildQuery = (bounds) => {
           relation["landuse"](${bbox});
           relation["leisure"](${bbox});
           relation["waterway"](${bbox});
+          relation["route"~"road|highway"](${bbox});
+          relation["highway"](${bbox});
         );
-        out body;
-        >;
-        out skel qt;
+        out body geom;
     `;
+};
+
+// Helper to convert Overpass geometry format {lat, lon} to our {lat, lng}
+const convertGeom = (geom) => {
+    if (!geom) return [];
+    return geom.map(p => ({ lat: p.lat, lng: p.lon }));
 };
 
 // Helper to join way segments into closed rings
@@ -208,51 +214,63 @@ const joinWays = (wayNodesList) => {
 };
 
 const parseOverpassResponse = (data, bounds) => {
-    const nodes = {};
     const ways = {};
     const relations = [];
     const rawFeatures = [];
     const consumedWayIds = new Set();
 
-    // 1. Index Nodes & Process Standalone Nodes
+    // 1. First Pass: Index Nodes (Trees) and Ways
     for (const el of data.elements) {
         if (el.type === 'node') {
-            nodes[el.id] = { lat: el.lat, lng: el.lon, tags: el.tags };
-
-            // Check for standalone tree nodes
             if (el.tags && el.tags.natural === 'tree') {
-                // Check if inside bounds (simple check)
-                if (el.lat <= bounds.north && el.lat >= bounds.south &&
-                    el.lon <= bounds.east && el.lon >= bounds.west) {
-                    rawFeatures.push({
-                        id: el.id.toString(),
-                        type: 'vegetation',
-                        geometry: [{ lat: el.lat, lng: el.lon }],
-                        tags: el.tags
-                    });
-                }
+                rawFeatures.push({ id: el.id.toString(), type: 'vegetation', geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags });
             }
-        }
-    }
-
-    // 2. Index Ways
-    for (const el of data.elements) {
-        if (el.type === 'way' && el.nodes && el.nodes.length > 0) {
-            const geometry = el.nodes
-                .map((id) => nodes[id])
-                .filter((n) => n !== undefined);
-
+        } else if (el.type === 'way') {
+            const geometry = convertGeom(el.geometry);
             if (geometry.length > 1) {
                 ways[el.id] = { id: el.id, nodes: geometry, tags: el.tags || {} };
             }
         } else if (el.type === 'relation') {
             relations.push(el);
+            // Also index members of relations if they have geometry
+            if (el.members) {
+                el.members.forEach(m => {
+                    if (m.type === 'way' && m.geometry && !ways[m.ref]) {
+                        ways[m.ref] = { id: m.ref, nodes: convertGeom(m.geometry), tags: {} };
+                    }
+                });
+            }
         }
     }
 
-    // 3. Process Relations (Multipolygons)
+    // 2. PASS 1: Tag Inheritance from Relations to Ways
     for (const r of relations) {
         const tags = r.tags || {};
+        if (!r.members) continue;
+
+        const isRoute = tags.type === 'route' || tags.type === 'superroute' || !!tags.highway || !!tags.network;
+        const isSite = tags.type === 'site' || !!tags.historic || tags.type === 'heritage';
+
+        if (isRoute || isSite) {
+            r.members.forEach(m => {
+                if (m.type === 'way' && ways[m.ref]) {
+                    const w = ways[m.ref];
+                    const inheritedProps = ['highway', 'name', 'lanes', 'oneway', 'surface', 'layer', 'bridge', 'tunnel'];
+                    inheritedProps.forEach(prop => {
+                        if (!w.tags[prop] && tags[prop]) {
+                            w.tags[prop] = tags[prop];
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    // 3. PASS 2: Process Area Relations (Multipolygons)
+    for (const r of relations) {
+        const tags = r.tags || {};
+        if (tags.type === 'route' || tags.type === 'superroute') continue;
+
         const isBuilding = !!tags.building || ['castle', 'fort', 'monastery', 'tower', 'ruins'].includes(tags.historic);
         const isWater = tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin';
         const isLanduse = !!tags.landuse || !!tags.leisure || (!!tags.historic && !isBuilding);
@@ -267,52 +285,50 @@ const parseOverpassResponse = (data, bounds) => {
             const outerWays = r.members.filter(m => m.type === 'way' && (m.role === 'outer' || !m.role)).map(m => ways[m.ref]).filter(Boolean);
             const innerWays = r.members.filter(m => m.type === 'way' && m.role === 'inner').map(m => ways[m.ref]).filter(Boolean);
 
-            outerWays.forEach(w => consumedWayIds.add(w.id));
-            innerWays.forEach(w => consumedWayIds.add(w.id));
+            outerWays.forEach(w => { if (!w.tags.highway && !w.tags.barrier) consumedWayIds.add(w.id); });
+            innerWays.forEach(w => { if (!w.tags.highway && !w.tags.barrier) consumedWayIds.add(w.id); });
 
             const outerRings = joinWays(outerWays.map(w => w.nodes));
             const innerRings = joinWays(innerWays.map(w => w.nodes));
 
             for (const outer of outerRings) {
-                rawFeatures.push({
-                    id: `rel_${r.id}`,
-                    type,
-                    geometry: outer,
-                    holes: innerRings.length > 0 ? innerRings : undefined,
-                    tags
-                });
+                rawFeatures.push({ id: `rel_${r.id}`, type, geometry: outer, holes: innerRings.length > 0 ? innerRings : undefined, tags });
             }
         }
     }
 
-    // 4. Process Standalone Ways
+    // 4. PASS 3: Process All Standalone Ways
+    const roadsToMerge = new Map();
+
     for (const idStr in ways) {
         const id = parseInt(idStr);
-        if (consumedWayIds.has(id)) continue;
-
         const w = ways[id];
         const tags = w.tags;
-        let type = null;
 
-        const isBuilding = !!tags.building || ['castle', 'fort', 'monastery', 'tower', 'ruins'].includes(tags.historic);
-        const isWater = tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin';
-        const isLanduse = !!tags.landuse || !!tags.leisure || (!!tags.historic && !isBuilding);
+        if (tags.highway || tags.man_made === 'bridge') {
+            const sig = `${tags.highway}|${tags.name || ''}|${tags.lanes || ''}|${tags.oneway || ''}|${tags.layer || 0}`;
+            if (!roadsToMerge.has(sig)) roadsToMerge.set(sig, []);
+            roadsToMerge.get(sig).push(w);
+        } else if (tags.barrier) {
+            rawFeatures.push({ id: id.toString(), type: 'barrier', geometry: w.nodes, tags });
+        } else if (!consumedWayIds.has(id)) {
+            const isBuilding = !!tags.building || ['castle', 'fort', 'monastery', 'tower', 'ruins'].includes(tags.historic);
+            const isWater = tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin';
+            const isLanduse = !!tags.landuse || !!tags.leisure || (!!tags.historic && !isBuilding);
 
-        if (isBuilding) type = 'building';
-        else if (isWater) type = 'water';
-        else if (isLanduse || tags.natural) type = 'vegetation';
-        else if (tags.highway) type = 'road';
-        else if (tags.man_made === 'bridge') type = 'road';
-        else if (tags.barrier) type = 'barrier';
-
-        if (type) {
-            rawFeatures.push({
-                id: id.toString(),
-                type,
-                geometry: w.nodes,
-                tags
-            });
+            if (isBuilding) rawFeatures.push({ id: id.toString(), type: 'building', geometry: w.nodes, tags });
+            else if (isWater) rawFeatures.push({ id: id.toString(), type: 'water', geometry: w.nodes, tags });
+            else if (isLanduse || tags.natural) rawFeatures.push({ id: id.toString(), type: 'vegetation', geometry: w.nodes, tags });
         }
+    }
+
+    for (const [sig, segmentList] of roadsToMerge) {
+        const joined = joinWays(segmentList.map(s => s.nodes));
+        joined.forEach((geometry, index) => {
+            if (geometry.length > 1) {
+                rawFeatures.push({ id: `merged_${sig}_${index}`, type: 'road', geometry, tags: segmentList[0].tags });
+            }
+        });
     }
 
     // 5. CLIP FEATURES

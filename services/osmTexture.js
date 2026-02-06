@@ -211,9 +211,11 @@ const drawRoadWithMarkings = (ctx, feature, toPixel, SCALE_FACTOR, isHybrid = fa
     else if (highway === 'primary' || highway === 'primary_link') baseWidth = 12;
     else if (highway === 'secondary' || highway === 'secondary_link') baseWidth = 10;
     else if (highway === 'tertiary' || highway === 'tertiary_link') baseWidth = 8;
-    else if (highway === 'residential' || highway === 'unclassified') baseWidth = 7;
-    else if (highway === 'service') baseWidth = 5;
-    else baseWidth = 4;
+    else if (highway === 'residential' || highway === 'unclassified' || highway === 'living_street') baseWidth = 7;
+    else if (highway === 'pedestrian') baseWidth = 5;
+    else if (highway === 'service') baseWidth = 4;
+    else if (highway === 'footway' || highway === 'cycleway' || highway === 'path') baseWidth = 2.5;
+    else baseWidth = 3;
 
     if (isNaN(lanes)) {
         if (baseWidth >= 12) lanes = 4;
@@ -230,6 +232,10 @@ const drawRoadWithMarkings = (ctx, feature, toPixel, SCALE_FACTOR, isHybrid = fa
     drawPathData(ctx, centerPoints);
     ctx.strokeStyle = COLORS.road;
     ctx.lineWidth = totalWidthPx;
+
+    // Improved aesthetics for junctions and overlaps
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     ctx.setLineDash([]);
     ctx.stroke();
 
@@ -296,6 +302,30 @@ const renderFeaturesToCanvas = (ctx, features, toPixel, SCALE_FACTOR) => {
     const water = features.filter(f => f.type === 'water');
     const vegetation = features.filter(f => f.type === 'vegetation');
     const roads = features.filter(f => f.type === 'road');
+
+    // Sort roads by importance and layer for correct overlapping
+    const roadPriority = {
+        'motorway': 100, 'motorway_link': 100,
+        'trunk': 90, 'trunk_link': 90,
+        'primary': 80, 'primary_link': 80,
+        'secondary': 70, 'secondary_link': 70,
+        'tertiary': 60, 'tertiary_link': 60,
+        'residential': 50,
+        'unclassified': 40,
+        'service': 30,
+        'path': 20, 'footway': 20, 'cycleway': 20
+    };
+
+    roads.sort((a, b) => {
+        const layerA = parseInt(a.tags.layer) || 0;
+        const layerB = parseInt(b.tags.layer) || 0;
+        if (layerA !== layerB) return layerA - layerB;
+
+        const prioA = roadPriority[a.tags.highway] || 10;
+        const prioB = roadPriority[b.tags.highway] || 10;
+        return prioA - prioB;
+    });
+
     const buildings = features.filter(f => f.type === 'building');
     const barriers = features.filter(f => f.type === 'barrier');
 
