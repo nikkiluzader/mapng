@@ -22,42 +22,8 @@ const getMetricProjector = (data) => {
 };
 
 const getTerrainHeight = (data, lat, lng) => {
-    const toPixel = getMetricProjector(data);
-    const p = toPixel(lat, lng);
-
-    const localX = p.x;
-    const localY = p.y;
-
-    if (localX < 0 || localX >= data.width - 1 || localY < 0 || localY >= data.height - 1) {
-        return 0;
-    }
-
-    const x0 = Math.floor(localX);
-    const x1 = x0 + 1;
-    const y0 = Math.floor(localY);
-    const y1 = y0 + 1;
-
-    const wx = localX - x0;
-    const wy = localY - y0;
-
-    const i00 = y0 * data.width + x0;
-    const i10 = y0 * data.width + x1;
-    const i01 = y1 * data.width + x0;
-    const i11 = y1 * data.width + x1;
-
-    const h00 = data.heightMap[i00];
-    const h10 = data.heightMap[i10];
-    const h01 = data.heightMap[i01];
-    const h11 = data.heightMap[i11];
-
-    const h = (1 - wy) * ((1 - wx) * h00 + wx * h10) + wy * ((1 - wx) * h01 + wx * h11);
-
-    // Since 1px = 1m, realWidthMeters = data.width
-    const realWidthMeters = data.width;
-    const unitsPerMeter = SCENE_SIZE / realWidthMeters;
-    const EXAGGERATION = 1.0;
-
-    return (h - data.minHeight) * unitsPerMeter * EXAGGERATION;
+    const scenePos = latLngToScene(data, lat, lng);
+    return getHeightAtScenePos(data, scenePos.x, scenePos.z);
 };
 
 const latLngToScene = (data, lat, lng) => {
@@ -99,10 +65,10 @@ const getHeightAtScenePos = (data, x, z) => {
     const i01 = y1 * data.width + x0;
     const i11 = y1 * data.width + x1;
 
-    const h00 = data.heightMap[i00];
-    const h10 = data.heightMap[i10];
-    const h01 = data.heightMap[i01];
-    const h11 = data.heightMap[i11];
+    const h00 = data.heightMap[i00] < -10000 ? data.minHeight : data.heightMap[i00];
+    const h10 = data.heightMap[i10] < -10000 ? data.minHeight : data.heightMap[i10];
+    const h01 = data.heightMap[i01] < -10000 ? data.minHeight : data.heightMap[i01];
+    const h11 = data.heightMap[i11] < -10000 ? data.minHeight : data.heightMap[i11];
 
     const h = (1 - wy) * ((1 - wx) * h00 + wx * h10) + wy * ((1 - wx) * h01 + wx * h11);
 
@@ -233,76 +199,6 @@ const createBuildingGeometry = (points, holes = [], height = 0.5) => {
     return geo;
 };
 
-const createAreaGeometry = (points, data) => {
-    // 1. Get Bounding Box
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    points.forEach(p => {
-        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-        minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
-    });
-
-    const width = maxX - minX;
-    const height = maxZ - minZ;
-
-    // 2. Create a grid-based subdivided plane for molding
-    const segmentsX = Math.min(32, Math.ceil(width * 0.5));
-    const segmentsZ = Math.min(32, Math.ceil(height * 0.5));
-
-    const geo = new THREE.PlaneGeometry(width, height, segmentsX, segmentsZ);
-    geo.rotateX(-Math.PI / 2);
-    geo.translate((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
-
-    const pos = geo.attributes.position;
-    const index = geo.index;
-    const newIndices = [];
-
-    // 3. Helper for point-in-polygon check
-    const poly2d = points.map(p => ({ x: p.x, z: p.z }));
-    const vertexInPoly = new Uint8Array(pos.count);
-
-    for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i);
-        const z = pos.getZ(i);
-
-        if (isPointInPolygon({ x, z }, poly2d)) {
-            vertexInPoly[i] = 1;
-            pos.setY(i, getHeightAtScenePos(data, x, z) + 0.1);
-        }
-    }
-
-    // 4. Rebuild indices
-    for (let i = 0; i < index.count; i += 3) {
-        const a = index.getX(i);
-        const b = index.getX(i + 1);
-        const c = index.getX(i + 2);
-        if (vertexInPoly[a] && vertexInPoly[b] && vertexInPoly[c]) {
-            newIndices.push(a, b, c);
-        }
-    }
-
-    // 5. Fallback
-    if (newIndices.length === 0) {
-        const shape = new THREE.Shape();
-        points.forEach((p, i) => {
-            if (i === 0) shape.moveTo(p.x, -p.z);
-            else shape.lineTo(p.x, -p.z);
-        });
-        const shapeGeo = new THREE.ShapeGeometry(shape);
-        shapeGeo.rotateX(-Math.PI / 2);
-        const shapePos = shapeGeo.attributes.position;
-        for (let i = 0; i < shapePos.count; i++) {
-            const x = shapePos.getX(i);
-            const z = shapePos.getZ(i);
-            shapePos.setY(i, getHeightAtScenePos(data, x, z) + 0.1);
-        }
-        shapeGeo.computeVertexNormals();
-        return shapeGeo;
-    }
-
-    geo.setIndex(newIndices);
-    geo.computeVertexNormals();
-    return geo;
-};
 
 const isPointInPolygon = (point, poly) => {
     let inside = false;
@@ -414,36 +310,12 @@ export const createOSMGroup = (data) => {
     const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
     const unitsPerMeter = SCENE_SIZE / realWidthMeters;
 
-    const roadsList = [];
     const buildingsList = [];
     const treesList = [];
     const bushesList = [];
     const barriersList = [];
-    const areasList = [];
 
-    // Helper to determine road properties
-    const getRoadConfig = (tags) => {
-        const type = tags.highway;
-        const isBridge = tags.bridge || tags.man_made === 'bridge';
-        let widthMeters = 6;
-        let color = 0x454545; // Unified Road Color
-        let ignore = false;
-        let offset = 0.1; // Unified Road Offset
-
-        switch (type) {
-            case 'motorway': case 'trunk': case 'primary':
-                widthMeters = 12; break;
-            case 'secondary': case 'tertiary':
-                widthMeters = 10; break;
-            case 'residential': case 'unclassified': case 'living_street':
-                widthMeters = 8; break;
-            case 'service':
-                widthMeters = 4; break;
-            case 'footway': case 'path': case 'cycleway': case 'steps': case 'pedestrian': case 'track':
-                widthMeters = 2; color = 0xE0E0E0; offset = 0.15; break;
-        }
-        return { width: widthMeters * unitsPerMeter, color, ignore, isBridge, offset: offset * unitsPerMeter };
-    };
+    // Helper to determine barrier properties
 
     const getBarrierConfig = (tags) => {
         const type = tags.barrier;
@@ -469,30 +341,6 @@ export const createOSMGroup = (data) => {
         return { height, width, color };
     };
 
-    const getAreaConfig = (tags) => {
-        let color = 0x000000;
-        let valid = false;
-
-        if (tags.natural === 'wetland') {
-            color = 0x3e4e40;
-            valid = true;
-        } else if (tags.landuse === 'grass' || tags.landuse === 'meadow' || tags.natural === 'grassland' || tags.natural === 'heath' || tags.landuse === 'park') {
-            color = 0x90ee90;
-            if (tags.natural === 'heath') color = 0xd2b48c;
-            valid = true;
-        } else if (tags.natural === 'sand' || tags.natural === 'beach') {
-            color = 0xf4a460; // Sandy brown
-            valid = true;
-        } else if (tags.natural === 'bare_rock' || tags.natural === 'scree' || tags.landuse === 'quarry') {
-            color = 0x808080; // Grey
-            valid = true;
-        } else if (tags.natural === 'dirt') {
-            color = 0x8b4513; // Saddle brown
-            valid = true;
-        }
-
-        return { color, valid };
-    };
 
     const getBuildingConfig = (tags, areaMeters = 0) => {
         let height = 0;
@@ -595,40 +443,10 @@ export const createOSMGroup = (data) => {
         return result;
     };
 
-    const grassesList = [];
 
     data.osmFeatures.forEach((f) => {
         if (!f.geometry[0]) return;
 
-        if (f.type === 'road' && f.geometry.length >= 2) {
-            const config = getRoadConfig(f.tags);
-            if (config.ignore) return;
-
-            let points;
-
-            if (config.isBridge) {
-                const startP = f.geometry[0];
-                const endP = f.geometry[f.geometry.length - 1];
-                const startH = getTerrainHeight(data, startP.lat, startP.lng);
-                const endH = getTerrainHeight(data, endP.lat, endP.lng);
-
-                points = f.geometry.map((p, i) => {
-                    const vec = latLngToScene(data, p.lat, p.lng);
-                    const t = i / (f.geometry.length - 1);
-                    vec.y = (startH * (1 - t) + endH * t) + (0.5 * unitsPerMeter);
-                    return vec;
-                });
-            } else {
-                // Resample road points to drape better over terrain
-                const resampled = resamplePath(f.geometry, 1); // Resample every 1 meter
-                points = resampled.map((p) => {
-                    const vec = latLngToScene(data, p.lat, p.lng);
-                    vec.y = getTerrainHeight(data, p.lat, p.lng) + config.offset;
-                    return vec;
-                });
-            }
-            roadsList.push({ points, width: config.width, color: config.color });
-        }
         else if (f.type === 'building' && f.geometry.length > 2) {
             const points = f.geometry.map((p) => latLngToScene(data, p.lat, p.lng));
 
@@ -669,18 +487,13 @@ export const createOSMGroup = (data) => {
         }
         else if (f.type === 'vegetation') {
             const isTree = f.tags.natural === 'tree' || f.tags.natural === 'wood' || f.tags.landuse === 'forest' || f.tags.natural === 'tree_row' || f.tags.landuse === 'orchard' || f.tags.natural === 'tree_group';
-            const areaConfig = getAreaConfig(f.tags);
+            const isBush = f.tags.natural === 'scrub' || f.tags.natural === 'heath' || f.tags.barrier === 'hedge' || f.tags.natural === 'scrubland';
 
-            if (areaConfig.valid && f.geometry.length > 2) {
-                const points = f.geometry.map((p) => {
-                    const vec = latLngToScene(data, p.lat, p.lng);
-                    vec.y = getTerrainHeight(data, p.lat, p.lng);
-                    return vec;
-                });
-                areasList.push({ points, color: areaConfig.color });
-            }
-            // If it's a closed vegetation area, scatter objects instead of just boundary
-            else if (f.geometry.length > 3 && f.geometry[0].lat === f.geometry[f.geometry.length - 1].lat) {
+            // Only trees and bushes are rendered as 3D objects
+            if (!isTree && !isBush) return;
+
+            // If it's a closed vegetation area (like forest), scatter objects
+            if (f.geometry.length > 3 && f.geometry[0].lat === f.geometry[f.geometry.length - 1].lat) {
                 const points = f.geometry.map((p) => latLngToScene(data, p.lat, p.lng));
 
                 // Get bbox of polygon in scene space
@@ -696,9 +509,8 @@ export const createOSMGroup = (data) => {
                 const area = width * height;
 
                 // Cap object count per polygon for performance
-                const isGrass = f.tags.landuse === 'grass' || f.tags.landuse === 'meadow' || f.tags.natural === 'grassland';
-                const density = (isTree ? 0.04 : isGrass ? 0.15 : 0.02) / (unitsPerMeter * unitsPerMeter);
-                const count = Math.min(isGrass ? 500 : 250, Math.floor(area * density));
+                const density = (isTree ? 0.04 : 0.02) / (unitsPerMeter * unitsPerMeter);
+                const count = Math.min(250, Math.floor(area * density));
 
                 for (let i = 0; i < count; i++) {
                     const rx = minX + Math.random() * width;
@@ -706,14 +518,8 @@ export const createOSMGroup = (data) => {
                     const testPoint = { x: rx, z: rz };
 
                     if (isPointInPolygon(testPoint, points)) {
-                        const u = (rx + SCENE_SIZE / 2) / SCENE_SIZE;
-                        const v = (rz + SCENE_SIZE / 2) / SCENE_SIZE;
-                        const lat = data.bounds.south + (1 - v) * (data.bounds.north - data.bounds.south);
-                        const lng = data.bounds.west + u * (data.bounds.east - data.bounds.west);
-
                         const vec = new THREE.Vector3(rx, getHeightAtScenePos(data, rx, rz), rz);
                         if (isTree) treesList.push(vec);
-                        else if (isGrass) grassesList.push(vec);
                         else bushesList.push(vec);
                     }
                 }
@@ -745,21 +551,6 @@ export const createOSMGroup = (data) => {
         geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     };
 
-    // Create Road Mesh
-    if (roadsList.length > 0) {
-        const geometries = [];
-        roadsList.forEach(road => {
-            const geo = createRoadGeometry(road.points, road.width);
-            addColor(geo, road.color);
-            geometries.push(geo);
-        });
-        if (geometries.length > 0) {
-            const merged = mergeGeometries(geometries);
-            const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.05, side: THREE.DoubleSide });
-            const mesh = new THREE.Mesh(merged, material);
-            group.add(mesh);
-        }
-    }
 
     // Create Building Mesh
     if (buildingsList.length > 0) {
@@ -806,21 +597,6 @@ export const createOSMGroup = (data) => {
         }
     }
 
-    // Create Area Mesh
-    if (areasList.length > 0) {
-        const geometries = [];
-        areasList.forEach(area => {
-            const geo = createAreaGeometry(area.points, data);
-            addColor(geo, area.color);
-            geometries.push(geo);
-        });
-        if (geometries.length > 0) {
-            const merged = mergeGeometries(geometries);
-            const material = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide });
-            const mesh = new THREE.Mesh(merged, material);
-            group.add(mesh);
-        }
-    }
 
 
 
@@ -895,47 +671,6 @@ export const createOSMGroup = (data) => {
             });
             const mesh = new THREE.Mesh(merged, material);
             mesh.name = "Bushes";
-            group.add(mesh);
-        }
-    }
-
-    // Create Grass Mesh (Merged Mesh with Vertex Colors)
-    if (grassesList.length > 0) {
-        const geometries = [];
-        const baseGrass = new THREE.PlaneGeometry(0.8 * unitsPerMeter, 0.8 * unitsPerMeter);
-        baseGrass.rotateY(Math.PI / 4);
-
-        addColor(baseGrass, 0x4ade80); // Lighter grass green
-
-        const matrix = new THREE.Matrix4();
-        const quaternion = new THREE.Quaternion();
-        const scale = new THREE.Vector3(1, 1, 1);
-        const position = new THREE.Vector3();
-
-        grassesList.forEach((pos) => {
-            const grass1 = baseGrass.clone();
-            position.set(pos.x, pos.y + (0.4 * unitsPerMeter), pos.z);
-            matrix.compose(position, quaternion, scale);
-            grass1.applyMatrix4(matrix);
-            geometries.push(grass1);
-
-            const grass2 = baseGrass.clone();
-            grass2.rotateY(Math.PI / 2);
-            matrix.compose(position, quaternion, scale);
-            grass2.applyMatrix4(matrix);
-            geometries.push(grass2);
-        });
-
-        if (geometries.length > 0) {
-            const merged = mergeGeometries(geometries);
-            const material = new THREE.MeshStandardMaterial({
-                vertexColors: true,
-                side: THREE.DoubleSide,
-                roughness: 1.0,
-                alphaTest: 0.5
-            });
-            const mesh = new THREE.Mesh(merged, material);
-            mesh.name = "Grass";
             group.add(mesh);
         }
     }

@@ -5,9 +5,7 @@
       <TresAmbientLight :intensity="0.5" />
       <TresDirectionalLight :position="[50, 50, 25]" :intensity="1" :cast-shadow="true" />
       
-      <Suspense>
-        <Environment :preset="preset" :background="true" />
-      </Suspense>
+      <Environment :preset="preset" :background="true" />
       
       <TerrainMesh 
         :terrain-data="terrainData" 
@@ -171,7 +169,7 @@ defineProps(['terrainData']);
 const controlsRef = ref(null);
 const quality = ref('high');
 const preset = ref('dawn');
-const textureType = ref('satellite');
+const textureType = ref('hybrid');
 const showWireframe = ref(false);
 const show3DFeatures = ref(true);
 const presets = ['city', 'dawn', 'sunset', 'night', 'forest', 'studio', 'umbrellas', 'snow', 'hangar', 'urban', 'modern', 'shangai'];

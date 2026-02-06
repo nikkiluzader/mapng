@@ -21,7 +21,7 @@ const COLORS = {
     // Bare (Standard Carto)
     bare: "#eee5dc",        // bare_rock, scree, blockfield, shingle
     sand: "#f5e9c6",        // sand, beach, shoal
-    
+
     // Developed / Landuse (Using OpenStreetBrowser for distinct zoning)
     residential: "#ccb18b", // OSB: brownish/orange
     commercial: "#d195b6",  // OSB: pinkish
@@ -31,7 +31,7 @@ const COLORS = {
     military: "#93a65b",    // OSB: olive green
     cemetery: "#8acb94",    // OSB: green
     sport: "#8bccb3",       // OSB: teal
-    
+
     // Defaults
     building: "#d9d0c9",
     buildingStroke: "#c4b6ab",
@@ -48,14 +48,14 @@ const getFeatureColor = (tags) => {
     if (tags.landuse === 'forest' || tags.natural === 'wood' || tags.natural === 'tree_row') return COLORS.forest;
     if (tags.natural === 'scrub' || tags.natural === 'tundra' || tags.natural === 'fell') return COLORS.scrub;
     if (tags.natural === 'heath') return COLORS.heath;
-    if (tags.landuse === 'grass' || tags.landuse === 'meadow' || tags.natural === 'grassland' || 
-        tags.leisure === 'park' || tags.leisure === 'garden' || tags.landuse === 'village_green' || 
+    if (tags.landuse === 'grass' || tags.landuse === 'meadow' || tags.natural === 'grassland' ||
+        tags.leisure === 'park' || tags.leisure === 'garden' || tags.landuse === 'village_green' ||
         tags.landuse === 'allotments' || tags.leisure === 'common') return COLORS.grass;
     if (tags.landuse === 'orchard' || tags.landuse === 'vineyard' || tags.landuse === 'plant_nursery') return COLORS.orchard;
     if (tags.landuse === 'farmland' || tags.landuse === 'greenhouse_horticulture' || tags.landuse === 'farm') return COLORS.farmland;
 
     // --- Water ---
-    if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin' || 
+    if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin' ||
         tags.landuse === 'salt_pond' || tags.natural === 'reef') return COLORS.water;
     if (tags.natural === 'wetland' || tags.landuse === 'wetland' || tags.natural === 'marsh') return COLORS.wetland;
     if (tags.natural === 'glacier' || tags.landuse === 'glacier') return COLORS.glacier;
@@ -66,24 +66,24 @@ const getFeatureColor = (tags) => {
     if (tags.natural === 'sand' || tags.natural === 'beach' || tags.natural === 'shoal' || tags.landuse === 'desert') return COLORS.sand;
 
     // --- Developed / Landuse (OSB Logic) ---
-    if (tags.landuse === 'education' || tags.amenity === 'school' || tags.amenity === 'university' || 
+    if (tags.landuse === 'education' || tags.amenity === 'school' || tags.amenity === 'university' ||
         tags.amenity === 'college' || tags.amenity === 'kindergarten') return COLORS.education;
 
-    if (tags.landuse === 'industrial' || tags.landuse === 'quarry' || tags.landuse === 'landfill' || 
-        tags.landuse === 'construction' || tags.landuse === 'railway' || tags.power === 'sub_station' || 
+    if (tags.landuse === 'industrial' || tags.landuse === 'quarry' || tags.landuse === 'landfill' ||
+        tags.landuse === 'construction' || tags.landuse === 'railway' || tags.power === 'sub_station' ||
         tags.power === 'generator') return COLORS.industrial;
 
     if (tags.landuse === 'residential') return COLORS.residential;
-    
+
     if (tags.landuse === 'commercial' || tags.amenity === 'office') return COLORS.commercial;
-    
+
     if (tags.landuse === 'retail' || tags.shop || tags.amenity === 'marketplace') return COLORS.retail;
-    
+
     if (tags.landuse === 'military' || tags.military) return COLORS.military;
-    
+
     if (tags.landuse === 'cemetery' || tags.amenity === 'grave_yard') return COLORS.cemetery;
-    
-    if (tags.leisure === 'golf_course' || tags.leisure === 'playground' || tags.leisure === 'sports_centre' || 
+
+    if (tags.leisure === 'golf_course' || tags.leisure === 'playground' || tags.leisure === 'sports_centre' ||
         tags.leisure === 'track' || tags.leisure === 'pitch' || tags.leisure === 'stadium') return COLORS.sport;
 
     return COLORS.defaultLanduse;
@@ -137,7 +137,7 @@ export const generateOSMTexture = async (terrainData) => {
         ctx.beginPath();
         drawPath(feature.geometry);
         ctx.closePath();
-        
+
         if (feature.holes) {
             for (const hole of feature.holes) {
                 drawPath(hole);
@@ -148,7 +148,7 @@ export const generateOSMTexture = async (terrainData) => {
 
     // Sort features by type to draw in correct order
     const features = terrainData.osmFeatures;
-    
+
     const water = features.filter(f => f.type === 'water');
     const vegetation = features.filter(f => f.type === 'vegetation');
     const roads = features.filter(f => f.type === 'road');
@@ -159,7 +159,7 @@ export const generateOSMTexture = async (terrainData) => {
     for (const f of vegetation) {
         const color = getFeatureColor(f.tags);
         ctx.fillStyle = color;
-        
+
         if (f.geometry.length === 1) {
             // Draw tree point
             const p = toPixel(f.geometry[0].lat, f.geometry[0].lng);
@@ -182,23 +182,23 @@ export const generateOSMTexture = async (terrainData) => {
     // 3. Draw Roads
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    
+
     for (const f of roads) {
         ctx.beginPath();
         drawPath(f.geometry);
-        
+
         const highway = f.tags?.highway;
-        
+
         // Footpaths and tracks (Light Grey)
         if (highway === 'footway' || highway === 'path' || highway === 'pedestrian' || highway === 'cycleway' || highway === 'steps' || highway === 'track') {
-             ctx.strokeStyle = COLORS.path; 
-             ctx.lineWidth = 2 * SCALE_FACTOR;
-             ctx.stroke();
-        } 
+            ctx.strokeStyle = COLORS.path;
+            ctx.lineWidth = 2 * SCALE_FACTOR;
+            ctx.stroke();
+        }
         // Vehicle roads (Solid Dark Grey)
         else {
-            ctx.strokeStyle = COLORS.road; 
-            
+            ctx.strokeStyle = COLORS.road;
+
             // Vary width by importance
             if (highway === 'motorway' || highway === 'trunk') {
                 ctx.lineWidth = 8 * SCALE_FACTOR;
@@ -215,7 +215,7 @@ export const generateOSMTexture = async (terrainData) => {
     ctx.lineWidth = 0.5 * SCALE_FACTOR;
     for (const f of buildings) {
         let color = COLORS.building;
-        
+
         // Try to find a more specific color based on tags
         const specificColor = getFeatureColor(f.tags);
         if (specificColor !== COLORS.defaultLanduse) {
@@ -224,12 +224,12 @@ export const generateOSMTexture = async (terrainData) => {
 
         ctx.fillStyle = color;
         ctx.strokeStyle = COLORS.buildingStroke;
-        
+
         drawPolygon(f);
         ctx.fill('evenodd');
         ctx.stroke();
     }
-    
+
     // 5. Draw Barriers
     ctx.strokeStyle = COLORS.barrier;
     ctx.lineWidth = 1 * SCALE_FACTOR;
@@ -303,7 +303,7 @@ export const generateHybridTexture = async (terrainData) => {
         ctx.beginPath();
         drawPath(feature.geometry);
         ctx.closePath();
-        
+
         if (feature.holes) {
             for (const hole of feature.holes) {
                 drawPath(hole);
@@ -314,31 +314,44 @@ export const generateHybridTexture = async (terrainData) => {
 
     // Sort features by type to draw in correct order
     const features = terrainData.osmFeatures;
-    
+
+    const vegetation = features.filter(f => f.type === 'vegetation');
     const roads = features.filter(f => f.type === 'road');
     const buildings = features.filter(f => f.type === 'building');
     const barriers = features.filter(f => f.type === 'barrier');
 
-    // 2. Draw Roads
+    // 2. Draw Vegetation (with some transparency to let satellite show through)
+    ctx.globalAlpha = 0.5;
+    for (const f of vegetation) {
+        if (f.geometry.length > 2) {
+            const color = getFeatureColor(f.tags);
+            ctx.fillStyle = color;
+            drawPolygon(f);
+            ctx.fill('evenodd');
+        }
+    }
+    ctx.globalAlpha = 1.0;
+
+    // 3. Draw Roads
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    
+
     for (const f of roads) {
         ctx.beginPath();
         drawPath(f.geometry);
-        
+
         const highway = f.tags?.highway;
-        
+
         // Footpaths and tracks (Light Grey)
         if (highway === 'footway' || highway === 'path' || highway === 'pedestrian' || highway === 'cycleway' || highway === 'steps' || highway === 'track') {
-             ctx.strokeStyle = COLORS.path; 
-             ctx.lineWidth = 2 * SCALE_FACTOR;
-             ctx.stroke();
-        } 
+            ctx.strokeStyle = COLORS.path;
+            ctx.lineWidth = 2 * SCALE_FACTOR;
+            ctx.stroke();
+        }
         // Vehicle roads (Solid Dark Grey)
         else {
-            ctx.strokeStyle = COLORS.road; 
-            
+            ctx.strokeStyle = COLORS.road;
+
             // Vary width by importance
             if (highway === 'motorway' || highway === 'trunk') {
                 ctx.lineWidth = 8 * SCALE_FACTOR;
@@ -355,7 +368,7 @@ export const generateHybridTexture = async (terrainData) => {
     ctx.lineWidth = 0.5 * SCALE_FACTOR;
     for (const f of buildings) {
         let color = COLORS.building;
-        
+
         // Try to find a more specific color based on tags
         const specificColor = getFeatureColor(f.tags);
         if (specificColor !== COLORS.defaultLanduse) {
@@ -364,12 +377,12 @@ export const generateHybridTexture = async (terrainData) => {
 
         ctx.fillStyle = color;
         ctx.strokeStyle = COLORS.buildingStroke;
-        
+
         drawPolygon(f);
         ctx.fill('evenodd');
         ctx.stroke();
     }
-    
+
     // 4. Draw Barriers
     ctx.strokeStyle = COLORS.barrier;
     ctx.lineWidth = 1 * SCALE_FACTOR;
