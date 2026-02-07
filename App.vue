@@ -122,22 +122,8 @@
           />
         </div>
         
-        <!-- 3D Preview View -->
-        <div :class="['absolute inset-0 transition-all duration-500 bg-black', previewMode ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
-          <Suspense>
-            <template #default>
-              <Preview3D 
-                v-if="terrainData && previewMode"
-                :terrain-data="terrainData" 
-              />
-            </template>
-            <template #fallback>
-              <div class="w-full h-full flex items-center justify-center text-white flex-col gap-4">
-                <Loader2 class="animate-spin text-[#FF6600]" :size="48" />
-                <div class="text-lg font-medium">Loading 3D Scene...</div>
-              </div>
-            </template>
-          </Suspense>
+        <div v-if="terrainData && previewMode" class="absolute inset-0 transition-all duration-500 bg-black">
+          <Preview3D :terrain-data="terrainData" />
         </div>
         
         <!-- Loading Overlay -->
