@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import proj4 from 'proj4';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { textures } from './textureGenerator.js';
 
 // --- Constants & Helpers (Duplicated from OSMFeatures.vue for consistency) ---
 export const SCENE_SIZE = 100;
@@ -84,6 +85,7 @@ const getHeightAtScenePos = (data, x, z) => {
 const createRoadGeometry = (data, points, width, offset = 0, options = {}) => {
     const geometry = new THREE.BufferGeometry();
     const vertices = [];
+    const uvs = [];
     const indices = [];
     
     const latRad = (data.bounds.north + data.bounds.south) / 2 * Math.PI / 180;
@@ -96,7 +98,6 @@ const createRoadGeometry = (data, points, width, offset = 0, options = {}) => {
         const p = points[i];
         if (i > 0) accumulatedDist += p.distanceTo(points[i-1]);
         
-        // Dash logic: 2m dash, 2m gap
         const isDashGap = options.dashed && (Math.floor(accumulatedDist / (4 * unitsPerMeter)) % 2 === 1);
         
         let forward;
@@ -122,6 +123,11 @@ const createRoadGeometry = (data, points, width, offset = 0, options = {}) => {
         vertices.push(lx, ly + elev, lz);
         vertices.push(rx, ry + elev, rz);
 
+        // UVs: X is side-to-side (0 to 1), Y is along the road length
+        const v = accumulatedDist / (5 * unitsPerMeter); // Texture repeats every 5 meters
+        uvs.push(0, v);
+        uvs.push(1, v);
+
         if (i < points.length - 1 && !isDashGap) {
             const base = i * 2;
             indices.push(base, base + 2, base + 1);
@@ -130,6 +136,7 @@ const createRoadGeometry = (data, points, width, offset = 0, options = {}) => {
     }
 
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
     return geometry;
@@ -496,14 +503,55 @@ export const createOSMGroup = (data) => {
             roofHeight = roofLevels > 0 ? roofLevels * DEFAULT_HEIGHT_LEVEL : 3.0;
         }
 
-        // Colors & Materials
-        const parseColor = (colorTag, defaultColor) => {
+        // --- Color & Material Logic (OSM2World inspired) ---
+        const BUILDING_COLORS = {
+            "white": 0xfcfcfc,
+            "black": 0x4c4c4c,
+            "grey": 0x646464, "gray": 0x646464,
+            "red": 0xffbebe, // Soft pink/red for buildings
+            "green": 0xbeffbe,
+            "blue": 0xbebeff,
+            "yellow": 0xffffaf,
+            "pink": 0xe1afe1,
+            "orange": 0xffe196,
+            "brown": 0xaa8250
+        };
+
+        const ROOF_COLORS = {
+            "red": 0xcc0000,
+            "green": 0x96c882,
+            "blue": 0x6432c8,
+            "brown": 0x786e6e
+        };
+
+        const MATERIAL_COLORS = {
+            'brick': 0xb91c1c,
+            'concrete': 0x9ca3af,
+            'stone': 0x6b7280,
+            'wood': 0x92400e,
+            'glass': 0x1e293b,
+            'metal': 0x4b5563
+        };
+
+        const parseO2WColor = (colorTag, colorPalette, defaultColor) => {
             if (!colorTag) return defaultColor;
+            if (colorPalette[colorTag.toLowerCase()]) return colorPalette[colorTag.toLowerCase()];
             try { return new THREE.Color(colorTag).getHex(); } catch(e) { return defaultColor; }
         };
 
-        const wallColor = parseColor(tags['building:colour'] || tags['building:color'] || tags.colour || tags.color, 0xf8f9fa);
-        const roofColor = parseColor(tags['roof:colour'] || tags['roof:color'] || tags['building:roof:colour'], 0x333333);
+        // Material overrides
+        const wallMaterial = tags['building:material'] || tags['material'];
+        const roofMaterial = tags['roof:material'] || tags['building:roof:material'];
+
+        let wallColor = parseO2WColor(tags['building:colour'] || tags['building:color'] || tags.colour || tags.color, BUILDING_COLORS, 0xefd1a1);
+        if (wallMaterial && MATERIAL_COLORS[wallMaterial.toLowerCase()] && !tags['building:colour']) {
+            wallColor = MATERIAL_COLORS[wallMaterial.toLowerCase()];
+        }
+
+        let roofColor = parseO2WColor(tags['roof:colour'] || tags['roof:color'] || tags['building:roof:colour'], ROOF_COLORS, 0x9b3131);
+        if (roofMaterial && MATERIAL_COLORS[roofMaterial.toLowerCase()] && !tags['roof:colour']) {
+            roofColor = MATERIAL_COLORS[roofMaterial.toLowerCase()];
+        }
 
         return { 
             height: height * unitsPerMeter, 
@@ -674,14 +722,36 @@ export const createOSMGroup = (data) => {
             const wallColors = new Float32Array(pos.count * 3);
             const wallC = new THREE.Color(b.wallColor);
             for (let i = 0; i < pos.count; i++) {
-                const isTop = pos.getY(i) > b.y + b.height * 0.99;
-                const isBottom = pos.getY(i) < b.y + b.height * 0.01;
-                const dark = (isTop || isBottom) ? 1.0 : 0.85;
+                const py = pos.getY(i);
+                const isTop = py > b.y + b.height * 0.99;
+                const isBottom = py < b.y + b.height * 0.01;
+                // Tint sides slightly darker for depth, and use O2W specific shading factor
+                const dark = (isTop || isBottom) ? 1.0 : 0.88;
                 wallColors[i * 3] = wallC.r * dark;
                 wallColors[i * 3 + 1] = wallC.g * dark;
                 wallColors[i * 3 + 2] = wallC.b * dark;
             }
             wallGeo.setAttribute('color', new THREE.BufferAttribute(wallColors, 3));
+            
+            // Wall UVs based on perimeter
+            const wallUv = wallGeo.attributes.uv;
+            if (wallUv) {
+                const perimeterPoints = [];
+                b.points.forEach(p => perimeterPoints.push(new THREE.Vector2(p.x, p.z)));
+                
+                let totalDist = 0;
+                for (let i = 0; i < perimeterPoints.length; i++) {
+                    const p1 = perimeterPoints[i];
+                    const p2 = perimeterPoints[(i + 1) % perimeterPoints.length];
+                    totalDist += p1.distanceTo(p2);
+                }
+
+                const uvScale = 4 * unitsPerMeter;
+                for (let i = 0; i < wallUv.count; i++) {
+                    // ExtrudeGeometry side UVs: X is along perimeter (0-1), Y is along depth (0-1)
+                    wallUv.setXY(i, wallUv.getX(i) * (totalDist / uvScale), wallUv.getY(i) * (b.height / uvScale));
+                }
+            }
             
             // Filter out top/bottom caps from wallGeo (we'll draw our own roof)
             // Actually ExtrudeGeometry groups them. Side is group 0, Caps are group 1.
@@ -720,6 +790,14 @@ export const createOSMGroup = (data) => {
                 roofGeo = new THREE.BufferGeometry();
                 roofGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                 roofGeo.setAttribute('color', new THREE.Float32BufferAttribute(roofColorArr, 3));
+                
+                // Roof UVs: Just use X, Z world space scaled by some factor
+                const roofUvs = [];
+                for (let i = 0; i < vertices.length / 3; i++) {
+                    roofUvs.push(vertices[i*3] / (4 * unitsPerMeter), vertices[i*3 + 2] / (4 * unitsPerMeter));
+                }
+                roofGeo.setAttribute('uv', new THREE.Float32BufferAttribute(roofUvs, 2));
+                
                 roofGeo.setIndex(indices);
                 roofGeo.computeVertexNormals();
             } else {
@@ -740,6 +818,13 @@ export const createOSMGroup = (data) => {
                 roofGeo = new THREE.ShapeGeometry(roofShape);
                 roofGeo.rotateX(-Math.PI / 2);
                 roofGeo.translate(0, roofY + 0.01, 0);
+                
+                // Scale UVs for ShapeGeometry
+                const roofUvAttr = roofGeo.attributes.uv;
+                for (let i = 0; i < roofUvAttr.count; i++) {
+                    roofUvAttr.setXY(i, roofUvAttr.getX(i) / (4 * unitsPerMeter), roofUvAttr.getY(i) / (4 * unitsPerMeter));
+                }
+                
                 addColor(roofGeo, b.roofColor);
             }
             roofGeos.push(roofGeo.toNonIndexed());
@@ -782,12 +867,34 @@ export const createOSMGroup = (data) => {
             }
         });
 
-        const allGeos = [...wallGeos, ...roofGeos, ...windowGeos];
-        const merged = mergeGeometries(allGeos);
-        if (merged) {
-            group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 })));
+        const wallMerged = mergeGeometries(wallGeos);
+        if (wallMerged) {
+            group.add(new THREE.Mesh(wallMerged, new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                roughness: 0.7, 
+                map: textures.wall 
+            })));
         }
-        allGeos.forEach(g => g.dispose());
+        const roofMerged = mergeGeometries(roofGeos);
+        if (roofMerged) {
+            group.add(new THREE.Mesh(roofMerged, new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                roughness: 0.8, 
+                map: textures.roof 
+            })));
+        }
+        const windowMerged = mergeGeometries(windowGeos);
+        if (windowMerged) {
+            group.add(new THREE.Mesh(windowMerged, new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                roughness: 0.1, 
+                metalness: 0.5 
+            })));
+        }
+
+        wallGeos.forEach(g => g.dispose());
+        roofGeos.forEach(g => g.dispose());
+        windowGeos.forEach(g => g.dispose());
     }
 
     if (barriersList.length > 0) {
@@ -809,7 +916,11 @@ export const createOSMGroup = (data) => {
         const compatibleGeos = roadsList.map(g => g.toNonIndexed());
         const merged = mergeGeometries(compatibleGeos);
         if (merged) {
-            group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 })));
+            group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ 
+                vertexColors: true, 
+                roughness: 0.8, 
+                map: textures.road 
+            })));
         }
         compatibleGeos.forEach(g => g.dispose());
         roadsList.forEach(g => g.dispose());

@@ -8,11 +8,12 @@
               :args="cameraArgs"
               :position="cameraPosition"
             />
-            <TresAmbientLight :intensity="0.5" />
+            <TresAmbientLight :intensity="0.3" />
             <TresDirectionalLight
               :position="[50, 50, 25]"
-              :intensity="1"
+              :intensity="0.8"
               :cast-shadow="true"
+              color="#fff4e0"
             />
 
             <Environment :preset="preset" :background="true" />
@@ -251,17 +252,6 @@ const show3DFeatures = ref(true);
 const customOsmUrl = ref(null);
 const customHybridUrl = ref(null);
 
-// Initialize textures automatically
-watch(
-  () => props.terrainData,
-  async (newData) => {
-    if (newData?.osmFeatures) {
-      await regenerateTextures();
-    }
-  },
-  { immediate: true },
-);
-
 const regenerateTextures = async () => {
   if (!props.terrainData) return;
   try {
@@ -274,6 +264,17 @@ const regenerateTextures = async () => {
     console.error("Failed to regenerate textures:", e);
   }
 };
+
+// Initialize textures automatically
+watch(
+  () => props.terrainData,
+  async (newData) => {
+    if (newData?.osmFeatures) {
+      await regenerateTextures();
+    }
+  },
+  { immediate: true },
+);
 
 // Override prop data for rendering
 const activeOsmTexture = computed(
