@@ -220,7 +220,7 @@ const drawRoadWithMarkings = (ctx, feature, toPixel, SCALE_FACTOR) => {
     drawPathData(ctx, centerPoints);
     ctx.strokeStyle = COLORS.road;
     ctx.lineWidth = layout.totalWidth * SCALE_FACTOR;
-    ctx.lineCap = 'round';
+    ctx.lineCap = 'butt';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
@@ -330,6 +330,20 @@ const renderFeaturesToCanvas = (ctx, features, toPixel, SCALE_FACTOR, options = 
             ctx.lineWidth = 2 * SCALE_FACTOR;
             ctx.stroke();
         } else {
+            // Draw clean connections (circles) at start/end to smooth transitions between widths
+            const layout = getLaneLayout(f.tags || {});
+            const width = layout.totalWidth * SCALE_FACTOR;
+            const pts = f.geometry.map(p => toPixel(p.lat, p.lng));
+            
+            if (pts.length > 0) {
+                ctx.fillStyle = COLORS.road;
+                [pts[0], pts[pts.length - 1]].forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
             drawRoadWithMarkings(ctx, f, toPixel, SCALE_FACTOR);
         }
     });
