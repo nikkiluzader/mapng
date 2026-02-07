@@ -110,8 +110,8 @@ const texture = computed(() => {
     v-if="geometry"
     :rotation="[-Math.PI / 2, 0, 0]" 
     :position="[0, 0, 0]"
-    :cast-shadow="true"
-    :receive-shadow="true"
+    cast-shadow
+    receive-shadow
     :geometry="geometry"
   >
     <TresMeshStandardMaterial 

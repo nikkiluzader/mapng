@@ -435,8 +435,7 @@ export const createOSMGroup = (data) => {
     const treesList = [];
     const bushesList = [];
     const barriersList = [];
-    const roadsList = [];
-    const markingsList = [];
+    const waterList = [];
 
     const getBarrierConfig = (tags) => {
         const type = tags.barrier;
@@ -670,23 +669,27 @@ export const createOSMGroup = (data) => {
                     });
                 }
             }
-        } else if (f.type === 'road' && f.geometry.length >= 2) {
-            const config = getRoadConfig(f.tags);
+        } else if (f.type === 'water' && f.geometry.length > 2) {
+            const shape = new THREE.Shape();
             const points = f.geometry.map(p => latLngToScene(data, p.lat, p.lng));
-            
-            config.lanes.forEach(lane => {
-                const geo = createRoadGeometry(data, points, lane.width, lane.offset, {
-                    dashed: lane.dashed,
-                    type: lane.type
-                });
-                if (lane.type === 'marking') {
-                    addColor(geo, lane.color || 0xffffff);
-                    markingsList.push(geo);
-                } else {
-                    addColor(geo, lane.color || 0x404040); 
-                    roadsList.push(geo);
-                }
+            points.forEach((p, i) => {
+                if (i === 0) shape.moveTo(p.x, -p.z);
+                else shape.lineTo(p.x, -p.z);
             });
+            (f.holes || []).forEach(hole => {
+                const path = new THREE.Path();
+                hole.forEach((p, i) => {
+                    const sp = latLngToScene(data, p.lat, p.lng);
+                    if (i === 0) path.moveTo(sp.x, -sp.z);
+                    else path.lineTo(sp.x, -sp.z);
+                });
+                shape.holes.push(path);
+            });
+            const geo = new THREE.ShapeGeometry(shape);
+            geo.rotateX(-Math.PI / 2);
+            let avgH = 0; f.geometry.forEach(p => avgH += getTerrainHeight(data, p.lat, p.lng));
+            geo.translate(0, (avgH / f.geometry.length) - 0.05 * unitsPerMeter, 0); // Slightly below ground
+            waterList.push(geo);
         }
     });
 
@@ -869,27 +872,39 @@ export const createOSMGroup = (data) => {
 
         const wallMerged = mergeGeometries(wallGeos);
         if (wallMerged) {
-            group.add(new THREE.Mesh(wallMerged, new THREE.MeshStandardMaterial({ 
+            const wallMesh = new THREE.Mesh(wallMerged, new THREE.MeshStandardMaterial({ 
                 vertexColors: true, 
                 roughness: 0.7, 
                 map: textures.wall 
-            })));
+            }));
+            wallMesh.castShadow = true;
+            wallMesh.receiveShadow = true;
+            wallMesh.name = 'buildings';
+            group.add(wallMesh);
         }
         const roofMerged = mergeGeometries(roofGeos);
         if (roofMerged) {
-            group.add(new THREE.Mesh(roofMerged, new THREE.MeshStandardMaterial({ 
+            const roofMesh = new THREE.Mesh(roofMerged, new THREE.MeshStandardMaterial({ 
                 vertexColors: true, 
                 roughness: 0.8, 
                 map: textures.roof 
-            })));
+            }));
+            roofMesh.castShadow = true;
+            roofMesh.receiveShadow = true;
+            roofMesh.name = 'buildings';
+            group.add(roofMesh);
         }
         const windowMerged = mergeGeometries(windowGeos);
         if (windowMerged) {
-            group.add(new THREE.Mesh(windowMerged, new THREE.MeshStandardMaterial({ 
+            const windowMesh = new THREE.Mesh(windowMerged, new THREE.MeshStandardMaterial({ 
                 vertexColors: true, 
                 roughness: 0.1, 
                 metalness: 0.5 
-            })));
+            }));
+            windowMesh.castShadow = true;
+            windowMesh.receiveShadow = true;
+            windowMesh.name = 'buildings';
+            group.add(windowMesh);
         }
 
         wallGeos.forEach(g => g.dispose());
@@ -906,37 +921,14 @@ export const createOSMGroup = (data) => {
         const compatibleGeos = geos.map(g => g.toNonIndexed());
         const merged = mergeGeometries(compatibleGeos);
         if (merged) {
-            group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+            const barrierMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+            barrierMesh.castShadow = true;
+            barrierMesh.receiveShadow = true;
+            barrierMesh.name = 'barriers';
+            group.add(barrierMesh);
         }
         compatibleGeos.forEach(g => g.dispose());
         geos.forEach(g => g.dispose());
-    }
-
-    if (roadsList.length > 0) {
-        const compatibleGeos = roadsList.map(g => g.toNonIndexed());
-        const merged = mergeGeometries(compatibleGeos);
-        if (merged) {
-            group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ 
-                vertexColors: true, 
-                roughness: 0.8, 
-                map: textures.road 
-            })));
-        }
-        compatibleGeos.forEach(g => g.dispose());
-        roadsList.forEach(g => g.dispose());
-    }
-
-    if (markingsList.length > 0) {
-        const compatibleGeos = markingsList.map(g => g.toNonIndexed());
-        const merged = mergeGeometries(compatibleGeos);
-        if (merged) {
-            // Markings slightly higher and shinier
-            const markingsMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.1, metalness: 0.1 }));
-            markingsMesh.position.y += 0.05; 
-            group.add(markingsMesh);
-        }
-        compatibleGeos.forEach(g => g.dispose());
-        markingsList.forEach(g => g.dispose());
     }
 
     const matrix = new THREE.Matrix4(), quaternion = new THREE.Quaternion(), scale = new THREE.Vector3(1, 1, 1), position = new THREE.Vector3();
@@ -963,7 +955,11 @@ export const createOSMGroup = (data) => {
                 });
                 const merged = mergeGeometries(geos);
                 if (merged) {
-                    group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })));
+                    const treeMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 }));
+                    treeMesh.castShadow = true;
+                    treeMesh.receiveShadow = true;
+                    treeMesh.name = 'vegetation';
+                    group.add(treeMesh);
                 }
                 geos.forEach(g => g.dispose());
                 baseGeo.dispose();
@@ -988,10 +984,34 @@ export const createOSMGroup = (data) => {
         });
         const merged = mergeGeometries(geos);
         if (merged) {
-            group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })));
+            const bushMesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
+            bushMesh.castShadow = true;
+            bushMesh.receiveShadow = true;
+            bushMesh.name = 'vegetation';
+            group.add(bushMesh);
         }
         geos.forEach(g => g.dispose());
         baseB.dispose();
+    }
+
+    if (waterList.length > 0) {
+        const merged = mergeGeometries(waterList);
+        if (merged) {
+            const waterMesh = new THREE.Mesh(merged, new THREE.MeshPhysicalMaterial({
+                color: '#3facff', // Bright blue
+                map: textures.water,
+                transparent: true,
+                opacity: 0.8,
+                roughness: 0.1,
+                metalness: 0.1,
+                ior: 1.33,
+                transmission: 0.2
+            }));
+            waterMesh.receiveShadow = true;
+            waterMesh.name = 'water';
+            group.add(waterMesh);
+        }
+        waterList.forEach(g => g.dispose());
     }
 
     return group;

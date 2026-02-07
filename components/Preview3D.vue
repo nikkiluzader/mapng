@@ -1,6 +1,6 @@
 <template>
   <div class="w-full h-full bg-black relative group">
-    <TresCanvas window-size clear-color="#000000">
+    <TresCanvas window-size clear-color="#000000" shadows>
       <Suspense>
         <template #default>
           <TresGroup>
@@ -8,12 +8,20 @@
               :args="cameraArgs"
               :position="cameraPosition"
             />
-            <TresAmbientLight :intensity="0.3" />
+            <TresAmbientLight :intensity="0.2" />
             <TresDirectionalLight
-              :position="[50, 50, 25]"
-              :intensity="0.8"
-              :cast-shadow="true"
-              color="#fff4e0"
+              :position="[50, 80, 50]"
+              :intensity="2.0"
+              cast-shadow
+              :shadow-mapSize-width="2048"
+              :shadow-mapSize-height="2048"
+              :shadow-camera-left="-100"
+              :shadow-camera-right="100"
+              :shadow-camera-top="100"
+              :shadow-camera-bottom="-100"
+              :shadow-camera-near="0.1"
+              :shadow-camera-far="500"
+              :shadow-bias="-0.002"
             />
 
             <Environment :preset="preset" :background="true" />
@@ -27,7 +35,7 @@
 
             <OSMFeatures3D
               :terrain-data="terrainData"
-              :visible="show3DFeatures"
+              :feature-visibility="featureVisibility"
             />
 
             <OrbitControls
@@ -192,22 +200,28 @@
             >
           </label>
 
-          <label class="flex items-center gap-2 cursor-pointer group/check">
-            <div class="relative">
-              <input
-                type="checkbox"
-                v-model="show3DFeatures"
-                class="peer sr-only"
-              />
-              <div
-                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"
-              ></div>
+          <div class="space-y-2">
+            <label class="text-xs text-gray-500 flex items-center gap-1 font-medium mb-1">
+              <Layers :size="12" /> 3D Features
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+              <label v-for="(val, key) in featureVisibility" :key="key" class="flex items-center gap-2 cursor-pointer group/check">
+                <div class="relative">
+                  <input
+                    type="checkbox"
+                    v-model="featureVisibility[key]"
+                    class="peer sr-only"
+                  />
+                  <div
+                    class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#FF6600]"
+                  ></div>
+                </div>
+                <span class="text-[10px] capitalize text-gray-700 group-hover/check:text-gray-900 font-medium select-none">
+                  {{ key }}
+                </span>
+              </label>
             </div>
-            <span
-              class="text-xs text-gray-700 group-hover/check:text-gray-900 font-medium"
-              >Render 3D Objects</span
-            >
-          </label>
+          </div>
         </div>
 
         <div class="pt-4 border-t border-gray-100">
@@ -248,7 +262,12 @@ const quality = ref("high");
 const preset = ref("dawn");
 const textureType = ref("hybrid");
 const showWireframe = ref(false);
-const show3DFeatures = ref(true);
+const featureVisibility = reactive({
+  buildings: true,
+  water: false,
+  vegetation: true,
+  barriers: true,
+});
 const customOsmUrl = ref(null);
 const customHybridUrl = ref(null);
 

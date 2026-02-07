@@ -63,8 +63,41 @@ const generateRoofTexture = () => {
     return generateSubtleNoiseTexture(0xffffff, 0.25);
 };
 
+const generateWaterTexture = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 512;
+    const ctx = canvas.getContext('2d');
+
+    // Deep water blue
+    ctx.fillStyle = '#0a5d8a';
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Ripple noise
+    for (let i = 0; i < 200; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const radius = 5 + Math.random() * 15;
+        const alpha = 0.05 + Math.random() * 0.1;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.anisotropy = 16;
+    texture.needsUpdate = true;
+    return texture;
+};
+
 export const textures = {
     road: generateRoadTexture(),
     wall: generateWallTexture(),
     roof: generateRoofTexture(),
+    water: generateWaterTexture(),
 };
