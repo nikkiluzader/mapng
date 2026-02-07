@@ -460,95 +460,59 @@ export const createOSMGroup = (data) => {
      */
     const getBuildingConfig = (tags, areaMeters = 0) => {
         const DEFAULT_HEIGHT_LEVEL = 3.0;
-        const DEFAULT_ROOF_LEVELS = 1;
         
-        let buildingLevels = parseFloat(tags['building:levels']) || 0;
-        let minLevel = parseFloat(tags['building:min_level']) || 0;
-        let roofLevels = parseFloat(tags['roof:levels']) || 0;
+        let buildingLevels = parseFloat(tags['building:levels'] || tags.levels) || 0;
+        let minLevel = parseFloat(tags['building:min_level'] || tags.min_level) || 0;
+        let roofLevels = parseFloat(tags['roof:levels'] || tags['building:roof:levels']) || 0;
+        let roofHeight = parseFloat(tags['roof:height'] || tags['building:roof:height']) || 0;
         
-        // 1. Determine base height and levels for fallback
-        let type = tags.building || 'yes';
+        const type = tags.building || tags['building:part'] || 'yes';
         let defaultLevels = 1;
         if (['house', 'detached', 'duplex', 'terrace'].includes(type)) defaultLevels = 2;
         else if (['apartments', 'office', 'commercial', 'retail', 'hotel'].includes(type)) defaultLevels = 4;
-        else if (['industrial', 'warehouse', 'factory'].includes(type)) defaultLevels = 1;
-        else if (type === 'church' || type === 'cathedral') defaultLevels = 1;
         
         if (buildingLevels === 0) {
-            if (tags.height) {
-                buildingLevels = Math.max(1, Math.round(parseFloat(tags.height) / DEFAULT_HEIGHT_LEVEL));
-            } else if (areaMeters > 2000) {
-                buildingLevels = 5;
-            } else {
-                buildingLevels = defaultLevels;
-            }
+            if (tags.height) buildingLevels = Math.max(1, Math.round(parseFloat(tags.height) / DEFAULT_HEIGHT_LEVEL));
+            else if (areaMeters > 2000) buildingLevels = 5;
+            else buildingLevels = defaultLevels;
         }
 
-        // 2. Calculate Final Height
         let height = 0;
         if (tags.height) {
             height = parseFloat(tags.height);
         } else {
-            // Include roof levels in approximation if explicitly tagged
             height = (buildingLevels + roofLevels) * DEFAULT_HEIGHT_LEVEL;
-            
-            // Adjustments for specific types
             if (type === 'church' || type === 'cathedral') height = 20 + Math.random() * 10;
-            if (type === 'temple' || type === 'mosque') height = 15 + Math.random() * 5;
-            if (type === 'garage' || type === 'shed') height = 3.5;
-            if (type === 'roof') height = 4;
+            else if (type === 'garage' || type === 'shed') height = 3.5;
+            else if (type === 'roof') height = 4;
         }
 
-        // 3. Calculate Min Height (Elevation from ground)
         let minHeight = 0;
-        if (tags.min_height) {
-            minHeight = parseFloat(tags.min_height);
-        } else if (minLevel > 0) {
-            minHeight = minLevel * DEFAULT_HEIGHT_LEVEL;
-        } else if (tags['building:min_level']) {
-            minHeight = parseFloat(tags['building:min_level']) * DEFAULT_HEIGHT_LEVEL;
+        if (tags.min_height) minHeight = parseFloat(tags.min_height);
+        else if (minLevel > 0) minHeight = minLevel * DEFAULT_HEIGHT_LEVEL;
+
+        const roofShape = tags['roof:shape'] || tags['building:roof:shape'] || 'flat';
+        if (roofHeight === 0 && roofShape !== 'flat') {
+            roofHeight = roofLevels > 0 ? roofLevels * DEFAULT_HEIGHT_LEVEL : 3.0;
         }
 
-        // 4. Color and Material Mapping
-        let color = 0xf8f9fa; // Default off-white
-        
-        // Use tagged color first
-        const taggedColor = tags['building:colour'] || tags['building:color'] || tags['colour'] || tags['color'];
-        if (taggedColor) {
-            try {
-                color = new THREE.Color(taggedColor).getHex();
-            } catch (e) {}
-        } else {
-            // Material based color mapping
-            const mat = tags['building:material'] || tags['material'];
-            const materialColors = {
-                'brick': 0xb91c1c,      // Reddish brick
-                'concrete': 0x9ca3af,   // Grey
-                'stone': 0x6b7280,      // Dark grey
-                'wood': 0x78350f,       // Brown
-                'glass': 0xbae6fd,      // Light blue
-                'metal': 0x64748b,      // Slate
-                'stucco': 0xfef3c7,     // Cream
-                'plaster': 0xfff7ed,    // Off-white
-                'steel': 0x94a3b8       // Light slate
-            };
-            if (mat && materialColors[mat]) {
-                color = materialColors[mat];
-            } else {
-                // Type based subtle variation
-                if (type === 'residential' || type === 'house') color = 0xfdfbf7;
-                else if (type === 'industrial') color = 0xe5e7eb;
-                else if (type === 'hospital') color = 0xffffff;
-            }
-        }
+        // Colors & Materials
+        const parseColor = (colorTag, defaultColor) => {
+            if (!colorTag) return defaultColor;
+            try { return new THREE.Color(colorTag).getHex(); } catch(e) { return defaultColor; }
+        };
 
-        // Sanity Check: Ensure height is greater than minHeight
-        if (height <= minHeight) height = minHeight + 1.0;
+        const wallColor = parseColor(tags['building:colour'] || tags['building:color'] || tags.colour || tags.color, 0xf8f9fa);
+        const roofColor = parseColor(tags['roof:colour'] || tags['roof:color'] || tags['building:roof:colour'], 0x333333);
 
         return { 
             height: height * unitsPerMeter, 
             minHeight: minHeight * unitsPerMeter, 
-            color 
+            wallColor, 
+            roofColor,
+            roofShape,
+            roofHeight: roofHeight * unitsPerMeter,
+            levels: buildingLevels
         };
     };
 
@@ -596,7 +560,12 @@ export const createOSMGroup = (data) => {
             const config = getBuildingConfig(f.tags, areaMeters);
             const holes = (f.holes || []).map(h => h.map(p => latLngToScene(data, p.lat, p.lng)));
             let avgH = 0; f.geometry.forEach(p => avgH += getTerrainHeight(data, p.lat, p.lng));
-            buildingsList.push({ points, holes, y: (avgH / f.geometry.length) + config.minHeight, height: Math.max(0.1, config.height - config.minHeight), color: config.color });
+            buildingsList.push({ 
+                points, holes, 
+                y: (avgH / f.geometry.length) + config.minHeight, 
+                height: Math.max(0.1, config.height - config.minHeight),
+                ...config
+            });
         } else if (f.type === 'barrier' && f.geometry.length >= 2) {
             const config = getBarrierConfig(f.tags);
             const points = f.geometry.map(p => {
@@ -675,27 +644,150 @@ export const createOSMGroup = (data) => {
 
 
     if (buildingsList.length > 0) {
-        const geos = [];
+        const wallGeos = [];
+        const roofGeos = [];
+        const windowGeos = [];
+
         buildingsList.forEach(b => {
-            const geo = createBuildingGeometry(b.points, b.holes, b.height);
-            geo.rotateX(-Math.PI / 2); geo.translate(0, b.y, 0);
-            const pos = geo.attributes.position, count = pos.count, colors = new Float32Array(count * 3), baseC = new THREE.Color(b.color);
-            for (let i = 0; i < count; i++) {
-                const isTop = pos.getY(i) > b.height * 0.99, noise = (Math.random() * 0.05) - 0.025, dark = isTop ? 1.0 : 0.85;
-                colors[i * 3] = Math.min(1, Math.max(0, baseC.r * dark + noise));
-                colors[i * 3 + 1] = Math.min(1, Math.max(0, baseC.g * dark + noise));
-                colors[i * 3 + 2] = Math.min(1, Math.max(0, baseC.b * dark + noise));
+            // 1. Create Wall Geometry (Sides only)
+            const shape = new THREE.Shape();
+            b.points.forEach((p, i) => {
+                if (i === 0) shape.moveTo(p.x, -p.z);
+                else shape.lineTo(p.x, -p.z);
+            });
+            b.holes.forEach(holePoints => {
+                const holePath = new THREE.Path();
+                holePoints.forEach((p, i) => {
+                    if (i === 0) holePath.moveTo(p.x, -p.z);
+                    else holePath.lineTo(p.x, -p.z);
+                });
+                shape.holes.push(holePath);
+            });
+
+            const wallExtrude = { depth: b.height, bevelEnabled: false };
+            const wallGeo = new THREE.ExtrudeGeometry(shape, wallExtrude);
+            wallGeo.rotateX(-Math.PI / 2);
+            wallGeo.translate(0, b.y, 0);
+
+            // Wall vertex colors (Darker sides)
+            const pos = wallGeo.attributes.position;
+            const wallColors = new Float32Array(pos.count * 3);
+            const wallC = new THREE.Color(b.wallColor);
+            for (let i = 0; i < pos.count; i++) {
+                const isTop = pos.getY(i) > b.y + b.height * 0.99;
+                const isBottom = pos.getY(i) < b.y + b.height * 0.01;
+                const dark = (isTop || isBottom) ? 1.0 : 0.85;
+                wallColors[i * 3] = wallC.r * dark;
+                wallColors[i * 3 + 1] = wallC.g * dark;
+                wallColors[i * 3 + 2] = wallC.b * dark;
             }
-            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-            geos.push(geo);
+            wallGeo.setAttribute('color', new THREE.BufferAttribute(wallColors, 3));
+            
+            // Filter out top/bottom caps from wallGeo (we'll draw our own roof)
+            // Actually ExtrudeGeometry groups them. Side is group 0, Caps are group 1.
+            // For now, we'll just keep the sides and hide the caps by making them transparent or just drawing over them.
+            // Better: just use the side geometry.
+            wallGeos.push(wallGeo.toNonIndexed());
+
+            // 2. Create Roof Geometry
+            let roofGeo;
+            const roofY = b.y + b.height;
+            if (b.roofShape === 'pyramidal' || b.roofShape === 'gabled') {
+                const vertices = [];
+                const indices = [];
+                const roofColorArr = [];
+                const rc = new THREE.Color(b.roofColor);
+
+                // Simple pyramidal: center point elevated
+                let centroidX = 0, centroidZ = 0;
+                b.points.forEach(p => { centroidX += p.x; centroidZ += p.z; });
+                centroidX /= b.points.length;
+                centroidZ /= b.points.length;
+
+                // Vertices: outer ring at roofY, apex at roofY + roofHeight
+                b.points.forEach(p => {
+                    vertices.push(p.x, roofY, p.z);
+                    roofColorArr.push(rc.r, rc.g, rc.b);
+                });
+                const apexIdx = b.points.length;
+                vertices.push(centroidX, roofY + b.roofHeight, centroidZ);
+                roofColorArr.push(rc.r * 1.1, rc.g * 1.1, rc.b * 1.1);
+
+                for (let i = 0; i < b.points.length; i++) {
+                    indices.push(i, (i + 1) % b.points.length, apexIdx);
+                }
+
+                roofGeo = new THREE.BufferGeometry();
+                roofGeo.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                roofGeo.setAttribute('color', new THREE.Float32BufferAttribute(roofColorArr, 3));
+                roofGeo.setIndex(indices);
+                roofGeo.computeVertexNormals();
+            } else {
+                // Flat roof (Default)
+                const roofShape = new THREE.Shape();
+                b.points.forEach((p, i) => {
+                    if (i === 0) roofShape.moveTo(p.x, -p.z);
+                    else roofShape.lineTo(p.x, -p.z);
+                });
+                b.holes.forEach(holePoints => {
+                    const holePath = new THREE.Path();
+                    holePoints.forEach((p, i) => {
+                        if (i === 0) holePath.moveTo(p.x, -p.z);
+                        else holePath.lineTo(p.x, -p.z);
+                    });
+                    roofShape.holes.push(holePath);
+                });
+                roofGeo = new THREE.ShapeGeometry(roofShape);
+                roofGeo.rotateX(-Math.PI / 2);
+                roofGeo.translate(0, roofY + 0.01, 0);
+                addColor(roofGeo, b.roofColor);
+            }
+            roofGeos.push(roofGeo.toNonIndexed());
+
+            // 3. Procedural Windows
+            if (b.levels > 1 && b.height > 2 * unitsPerMeter) {
+                const winColor = new THREE.Color(0x1e293b); // Slate 800
+                const winWidth = 1.0 * unitsPerMeter;
+                const winHeight = 1.2 * unitsPerMeter;
+                const winPadding = 2.0 * unitsPerMeter;
+
+                for (let i = 0; i < b.points.length; i++) {
+                    const p1 = b.points[i];
+                    const p2 = b.points[(i + 1) % b.points.length];
+                    const dx = p2.x - p1.x;
+                    const dz = p2.z - p1.z;
+                    const len = Math.sqrt(dx * dx + dz * dz);
+                    const numWindows = Math.floor(len / winPadding);
+                    
+                    if (numWindows > 0) {
+                        const normalX = -dz / len;
+                        const normalZ = dx / len;
+
+                        for (let j = 0; j < numWindows; j++) {
+                            const t = (j + 0.5) / numWindows;
+                            const wx = p1.x + dx * t + normalX * 0.05;
+                            const wz = p1.z + dz * t + normalZ * 0.05;
+
+                            for (let l = 0; l < b.levels; l++) {
+                                const wy = b.y + (l + 0.5) * (b.height / b.levels);
+                                const winGeo = new THREE.PlaneGeometry(winWidth, winHeight);
+                                winGeo.lookAt(new THREE.Vector3(normalX, 0, normalZ));
+                                winGeo.translate(wx, wy, wz);
+                                addColor(winGeo, 0x1e293b);
+                                windowGeos.push(winGeo.toNonIndexed());
+                            }
+                        }
+                    }
+                }
+            }
         });
-        const compatibleGeos = geos.map(g => g.toNonIndexed());
-        const merged = mergeGeometries(compatibleGeos);
+
+        const allGeos = [...wallGeos, ...roofGeos, ...windowGeos];
+        const merged = mergeGeometries(allGeos);
         if (merged) {
-            group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true })));
+            group.add(new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6 })));
         }
-        compatibleGeos.forEach(g => g.dispose());
-        geos.forEach(g => g.dispose());
+        allGeos.forEach(g => g.dispose());
     }
 
     if (barriersList.length > 0) {
