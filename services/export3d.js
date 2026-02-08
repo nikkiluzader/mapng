@@ -830,7 +830,11 @@ export const createOSMGroup = (data) => {
                 
                 addColor(roofGeo, b.roofColor);
             }
-            roofGeos.push(roofGeo.toNonIndexed());
+            if (roofGeo.index) {
+                roofGeos.push(roofGeo.toNonIndexed());
+            } else {
+                roofGeos.push(roofGeo);
+            }
 
             // 3. Procedural Windows
             if (b.levels > 1 && b.height > 2 * unitsPerMeter) {
@@ -850,6 +854,7 @@ export const createOSMGroup = (data) => {
                     if (numWindows > 0) {
                         const normalX = -dz / len;
                         const normalZ = dx / len;
+                        const winAngle = Math.atan2(normalX, normalZ);
 
                         for (let j = 0; j < numWindows; j++) {
                             const t = (j + 0.5) / numWindows;
@@ -859,7 +864,7 @@ export const createOSMGroup = (data) => {
                             for (let l = 0; l < b.levels; l++) {
                                 const wy = b.y + (l + 0.5) * (b.height / b.levels);
                                 const winGeo = new THREE.PlaneGeometry(winWidth, winHeight);
-                                winGeo.lookAt(new THREE.Vector3(normalX, 0, normalZ));
+                                winGeo.rotateY(winAngle);
                                 winGeo.translate(wx, wy, wz);
                                 addColor(winGeo, 0x1e293b);
                                 windowGeos.push(winGeo.toNonIndexed());
@@ -870,41 +875,49 @@ export const createOSMGroup = (data) => {
             }
         });
 
-        const wallMerged = mergeGeometries(wallGeos);
-        if (wallMerged) {
-            const wallMesh = new THREE.Mesh(wallMerged, new THREE.MeshStandardMaterial({ 
-                vertexColors: true, 
-                roughness: 0.7, 
-                map: textures.wall 
-            }));
-            wallMesh.castShadow = true;
-            wallMesh.receiveShadow = true;
-            wallMesh.name = 'buildings';
-            group.add(wallMesh);
+        if (wallGeos.length > 0) {
+            const wallMerged = mergeGeometries(wallGeos);
+            if (wallMerged) {
+                const wallMesh = new THREE.Mesh(wallMerged, new THREE.MeshStandardMaterial({ 
+                    vertexColors: true, 
+                    roughness: 0.8, 
+                    map: textures.wall 
+                }));
+                wallMesh.castShadow = true;
+                wallMesh.receiveShadow = true;
+                wallMesh.name = 'buildings';
+                group.add(wallMesh);
+            }
         }
-        const roofMerged = mergeGeometries(roofGeos);
-        if (roofMerged) {
-            const roofMesh = new THREE.Mesh(roofMerged, new THREE.MeshStandardMaterial({ 
-                vertexColors: true, 
-                roughness: 0.8, 
-                map: textures.roof 
-            }));
-            roofMesh.castShadow = true;
-            roofMesh.receiveShadow = true;
-            roofMesh.name = 'buildings';
-            group.add(roofMesh);
+
+        if (roofGeos.length > 0) {
+            const roofMerged = mergeGeometries(roofGeos);
+            if (roofMerged) {
+                const roofMesh = new THREE.Mesh(roofMerged, new THREE.MeshStandardMaterial({ 
+                    vertexColors: true, 
+                    roughness: 0.8, 
+                    map: textures.roof 
+                }));
+                roofMesh.castShadow = true;
+                roofMesh.receiveShadow = true;
+                roofMesh.name = 'buildings';
+                group.add(roofMesh);
+            }
         }
-        const windowMerged = mergeGeometries(windowGeos);
-        if (windowMerged) {
-            const windowMesh = new THREE.Mesh(windowMerged, new THREE.MeshStandardMaterial({ 
-                vertexColors: true, 
-                roughness: 0.1, 
-                metalness: 0.5 
-            }));
-            windowMesh.castShadow = true;
-            windowMesh.receiveShadow = true;
-            windowMesh.name = 'buildings';
-            group.add(windowMesh);
+
+        if (windowGeos.length > 0) {
+            const windowMerged = mergeGeometries(windowGeos);
+            if (windowMerged) {
+                const windowMesh = new THREE.Mesh(windowMerged, new THREE.MeshStandardMaterial({ 
+                    vertexColors: true, 
+                    roughness: 0.1, 
+                    metalness: 0.5 
+                }));
+                windowMesh.castShadow = true;
+                windowMesh.receiveShadow = true;
+                windowMesh.name = 'buildings';
+                group.add(windowMesh);
+            }
         }
 
         wallGeos.forEach(g => g.dispose());

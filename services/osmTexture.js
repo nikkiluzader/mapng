@@ -34,6 +34,13 @@ const COLORS = {
     cemetery: "#aacbaf",    // OSB: light green
     sport: "#8bccb3",       // OSB: teal
     park: "#c8df9f",        // OSB: leisure=park
+    parking: "#eeeeee",     // Standard greyish
+    aeroway: "#e9d1ff",     // Light purple for airport grounds
+    apron: "#dadae0",       // Grey for aprons
+    runway: "#bbbbcc",      // Darker grey for runways
+    power: "#bbbbbb",       // Industrial grey
+    tourism: "#734a08",     // Brownish (attractions)
+    hospital: "#ffeccf",    // Light beige/red tint
 
     // Defaults
     building: "#d9d0c9",
@@ -53,26 +60,47 @@ const getFeatureColor = (tags) => {
     if (!tags) return COLORS.defaultLanduse;
 
     // --- OSM2World inspired surface mapping ---
-    const surface = tags.surface || tags.landcover || tags.landuse || tags.natural || tags.leisure;
-
+    // Priority 1: Water
     if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin') return COLORS.water;
     if (tags.natural === 'wetland') return COLORS.wetland;
+    if (tags.natural === 'glacier') return COLORS.glacier;
+
+    // Priority 2: Specific High-Level Categories
+    if (tags.aeroway) {
+        if (['runway', 'taxiway'].includes(tags.aeroway)) return COLORS.runway;
+        if (tags.aeroway === 'apron') return COLORS.apron;
+        return COLORS.aeroway;
+    }
+    
+    if (tags.amenity === 'parking') return COLORS.parking;
+    if (tags.amenity === 'school' || tags.amenity === 'university' || tags.amenity === 'college' || tags.amenity === 'kindergarten') return COLORS.education;
+    if (tags.amenity === 'hospital' || tags.amenity === 'clinic') return COLORS.hospital;
+
+    if (tags.power === 'plant' || tags.power === 'substation') return COLORS.power;
+    if (tags.man_made === 'pier' || tags.man_made === 'breakwater' || tags.man_made === 'groyne') return COLORS.bare;
+    if (tags.man_made === 'bridge') return COLORS.building; // Or generic grey
+
+    // Priority 3: Surface / Landuse / Leisure generic mapping
+    const surface = tags.surface || tags.landcover || tags.landuse || tags.natural || tags.leisure || tags.tourism;
 
     if (['forest', 'wood'].includes(surface)) return COLORS.forest;
-    if (['grass', 'meadow', 'grassland', 'fell', 'park', 'village_green', 'garden'].includes(surface)) return COLORS.grass;
+    if (['grass', 'meadow', 'grassland', 'fell', 'park', 'village_green', 'garden', 'recreation_ground', 'common'].includes(surface)) return COLORS.grass;
     if (['scrub', 'heath', 'tundra'].includes(surface)) return COLORS.scrub;
+    if (['orchard', 'vineyard', 'plant_nursery'].includes(surface)) return COLORS.orchard;
+    if (['farmland', 'farmyard', 'greenhouse_horticulture'].includes(surface)) return COLORS.farmland;
     
     if (['sand', 'beach'].includes(surface)) return COLORS.sand;
     if (['bare_rock', 'rock', 'scree', 'shingle'].includes(surface)) return COLORS.bare;
     if (['glacier', 'snow'].includes(surface)) return COLORS.glacier;
-    if (['mud', 'ground', 'dirt', 'earth', 'construction'].includes(surface)) return COLORS.dirt;
+    if (['mud', 'ground', 'dirt', 'earth', 'construction', 'brownfield'].includes(surface)) return COLORS.dirt;
 
     if (['residential'].includes(surface)) return COLORS.residential;
     if (['commercial', 'retail'].includes(surface)) return COLORS.commercial;
-    if (['industrial', 'quarry', 'railway'].includes(surface)) return COLORS.industrial;
+    if (['industrial', 'quarry', 'railway', 'garages', 'depot'].includes(surface)) return COLORS.industrial;
     if (['military'].includes(surface)) return COLORS.military;
     if (['cemetery'].includes(surface)) return COLORS.cemetery;
-    if (['pitch', 'track', 'stadium', 'golf_course', 'playground'].includes(surface)) return COLORS.sport;
+    if (['pitch', 'track', 'stadium', 'golf_course', 'playground', 'sports_centre'].includes(surface)) return COLORS.sport;
+    if (['attraction', 'zoo', 'camp_site', 'theme_park'].includes(surface)) return COLORS.tourism;
 
     return COLORS.defaultLanduse;
 };
@@ -285,7 +313,7 @@ const renderFeaturesToCanvas = (ctx, features, toPixel, SCALE_FACTOR, options = 
     };
 
     // 1. Draw Landcover & Landuse (Sorted by area)
-    const landcover = features.filter(f => ['vegetation', 'water'].includes(f.type));
+    const landcover = features.filter(f => ['vegetation', 'water', 'landuse'].includes(f.type));
     const sortedLC = landcover.map(f => ({ f, area: getFeatureArea(f) })).sort((a, b) => b.area - a.area);
     
     if (options.alpha) ctx.globalAlpha = options.alpha;
@@ -427,7 +455,7 @@ export const generateHybridTexture = async (terrainData) => {
         return { x: (lx + halfW) * SCALE_FACTOR, y: (halfH - ly) * SCALE_FACTOR };
     };
 
-    renderFeaturesToCanvas(ctx, terrainData.osmFeatures, toPixel, SCALE_FACTOR, { alpha: 0.4 });
+    renderFeaturesToCanvas(ctx, terrainData.osmFeatures, toPixel, SCALE_FACTOR, { alpha: 1.0 });
 
     return new Promise(r => canvas.toBlob(b => r(b ? URL.createObjectURL(b) : ''), 'image/png'));
 };

@@ -126,28 +126,40 @@ const buildQuery = (bounds) => {
     return `
         [out:json][timeout:180][maxsize:1073741824];
         (
-          node["natural"="tree"](${bbox});
-          node["natural"="peak"](${bbox});
-          way["natural"="water"](${bbox});
-          way["waterway"](${bbox});
-          way["highway"](${bbox});
-          way["highway:area"](${bbox});
-          way["area:highway"](${bbox});
-          way["building"](${bbox});
-          way["natural"~"wood|scrub|tree_row|grass|meadow|heath|moor|wetland|sand|beach|bare_rock|scree|dirt|earth|bare_soil"](${bbox});
-          way["landuse"~"forest|grass|meadow|park|orchard|vineyard|farmland|quarry|reservoir|basin|residential|commercial|industrial|retail|construction|brownfield|cemetery|military"](${bbox});
-          way["leisure"~"park|garden|golf_course|playground|sports_centre|track|pitch|stadium|common|recreation_ground"](${bbox});
-          way["historic"](${bbox});
-          way["barrier"](${bbox});
-          way["man_made"="bridge"](${bbox});
-          relation["building"](${bbox});
-          relation["historic"](${bbox});
-          relation["natural"](${bbox});
-          relation["landuse"](${bbox});
-          relation["leisure"](${bbox});
-          relation["waterway"](${bbox});
-          relation["route"~"road|highway"](${bbox});
-          relation["highway"](${bbox});
+            way["highway"](${bbox});
+            way["building"](${bbox});
+            way["natural"](${bbox});
+            way["landuse"](${bbox});
+            way["leisure"](${bbox});
+            way["amenity"](${bbox});
+            way["waterway"](${bbox});
+            way["barrier"](${bbox});
+            way["historic"](${bbox});
+            way["aeroway"](${bbox});
+            way["tourism"](${bbox});
+            way["man_made"](${bbox});
+            way["public_transport"](${bbox});
+            way["power"](${bbox});
+            way["military"](${bbox});
+            way["place"](${bbox});
+            
+            node["natural"="tree"](${bbox});
+            
+            relation["building"](${bbox});
+            relation["landuse"](${bbox});
+            relation["natural"](${bbox});
+            relation["waterway"](${bbox});
+            relation["leisure"](${bbox});
+            relation["highway"](${bbox});
+            relation["amenity"](${bbox});
+            relation["aeroway"](${bbox});
+            relation["tourism"](${bbox});
+            relation["man_made"](${bbox});
+            relation["public_transport"](${bbox});
+            relation["power"](${bbox});
+            relation["military"](${bbox});
+            relation["place"](${bbox});
+            relation["historic"](${bbox});
         );
         out body geom;
     `;
@@ -266,25 +278,31 @@ const parseOverpassResponse = (data, bounds) => {
         }
     }
 
+    // Helper to determine feature type
+    const getFeatureType = (tags) => {
+        if (!!tags.building || ['castle', 'fort', 'monastery', 'tower', 'ruins'].includes(tags.historic)) return 'building';
+        if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin') return 'water';
+        if (tags.barrier) return 'barrier';
+        
+        // Comprehensive Landuse Check
+        if (tags.landuse || tags.leisure || tags.natural || tags.amenity || tags.aeroway || tags.tourism || tags.man_made || tags.public_transport || tags.power || tags.military || tags.place || tags.historic) {
+            return 'landuse'; 
+        }
+        return null;
+    };
+
     // 3. PASS 2: Process Area Relations (Multipolygons)
     for (const r of relations) {
         const tags = r.tags || {};
         if (tags.type === 'route' || tags.type === 'superroute') continue;
 
-        const isBuilding = !!tags.building || ['castle', 'fort', 'monastery', 'tower', 'ruins'].includes(tags.historic);
-        const isWater = tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin';
-        const isLanduse = !!tags.landuse || !!tags.leisure || (!!tags.historic && !isBuilding);
-        const isVegetation = (tags.natural && !isWater) || isLanduse;
-
-        let type = null;
-        if (isBuilding) type = 'building';
-        else if (isWater) type = 'water';
-        else if (isVegetation) type = 'vegetation';
-
+        const type = getFeatureType(tags);
+        
         if (type && r.members) {
             const outerWays = r.members.filter(m => m.type === 'way' && (m.role === 'outer' || !m.role)).map(m => ways[m.ref]).filter(Boolean);
             const innerWays = r.members.filter(m => m.type === 'way' && m.role === 'inner').map(m => ways[m.ref]).filter(Boolean);
 
+            // Mark ways as consumed if they are part of a relation
             outerWays.forEach(w => { if (!w.tags.highway && !w.tags.barrier) consumedWayIds.add(w.id); });
             innerWays.forEach(w => { if (!w.tags.highway && !w.tags.barrier) consumedWayIds.add(w.id); });
 
@@ -305,20 +323,15 @@ const parseOverpassResponse = (data, bounds) => {
         const w = ways[id];
         const tags = w.tags;
 
-        if (tags.highway || tags.man_made === 'bridge') {
+        if (tags.highway || tags.man_made === 'bridge') { // Roads / Bridges
             const sig = `${tags.highway}|${tags.name || ''}|${tags.lanes || ''}|${tags.oneway || ''}|${tags.layer || 0}`;
             if (!roadsToMerge.has(sig)) roadsToMerge.set(sig, []);
             roadsToMerge.get(sig).push(w);
-        } else if (tags.barrier) {
-            rawFeatures.push({ id: id.toString(), type: 'barrier', geometry: w.nodes, tags });
         } else if (!consumedWayIds.has(id)) {
-            const isBuilding = !!tags.building || ['castle', 'fort', 'monastery', 'tower', 'ruins'].includes(tags.historic);
-            const isWater = tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin';
-            const isLanduse = !!tags.landuse || !!tags.leisure || (!!tags.historic && !isBuilding);
-
-            if (isBuilding) rawFeatures.push({ id: id.toString(), type: 'building', geometry: w.nodes, tags });
-            else if (isWater) rawFeatures.push({ id: id.toString(), type: 'water', geometry: w.nodes, tags });
-            else if (isLanduse || tags.natural) rawFeatures.push({ id: id.toString(), type: 'vegetation', geometry: w.nodes, tags });
+            const type = getFeatureType(tags);
+            if (type) {
+                rawFeatures.push({ id: id.toString(), type: type, geometry: w.nodes, tags });
+            }
         }
     }
 
