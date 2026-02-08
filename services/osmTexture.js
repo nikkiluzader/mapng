@@ -62,7 +62,7 @@ const getFeatureColor = (tags) => {
     // --- OSM2World inspired surface mapping ---
     // Priority 1: Water
     if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir' || tags.landuse === 'basin') return COLORS.water;
-    if (tags.natural === 'wetland') return COLORS.wetland;
+    if (tags.natural === 'wetland' || tags.wetland) return COLORS.wetland;
     if (tags.natural === 'glacier') return COLORS.glacier;
 
     // Priority 2: Specific High-Level Categories

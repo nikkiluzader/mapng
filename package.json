@@ -10,7 +10,7 @@
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
-    "@tresjs/cientos": "^4.0.0",
+    "@tresjs/cientos": "^4.3.1",
     "@tresjs/core": "^4.0.0",
     "@vue-leaflet/vue-leaflet": "^0.10.0",
     "@vueuse/core": "^11.0.0",
