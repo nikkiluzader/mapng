@@ -501,8 +501,40 @@ const renderFeaturesToCanvas = (
       ctx.arc(p.x, p.y, 1.5 * SCALE_FACTOR, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      drawPolygon(f);
-      ctx.fill("evenodd");
+      // Fix for waterways flooding land:
+      // If it's a linear waterway (stream/river centerline) and NOT an area, draw as line.
+      const isLinearWater =
+        f.tags.waterway &&
+        !["riverbank", "dock", "boatyard", "dam"].includes(f.tags.waterway) &&
+        f.tags.area !== "yes";
+
+      // Geometry check: is closed?
+      const p1 = f.geometry[0];
+      const p2 = f.geometry[f.geometry.length - 1];
+      const isClosed =
+        Math.abs(p1.lat - p2.lat) < 1e-9 && Math.abs(p1.lng - p2.lng) < 1e-9;
+
+      if (isLinearWater && !isClosed) {
+        ctx.beginPath();
+        drawPath(f.geometry);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.strokeStyle = ctx.fillStyle; // Use same color
+
+        // Width adaptivity
+        let w = 1.5; // Stream default
+        if (f.tags.width) w = parseFloat(f.tags.width);
+        else if (f.tags.waterway === "river") w = 6;
+        else if (f.tags.waterway === "canal") w = 4;
+        else if (f.tags.waterway === "drain" || f.tags.waterway === "ditch")
+          w = 1;
+
+        ctx.lineWidth = w * SCALE_FACTOR;
+        ctx.stroke();
+      } else {
+        drawPolygon(f);
+        ctx.fill("evenodd");
+      }
     }
   }
   ctx.globalAlpha = 1.0;
