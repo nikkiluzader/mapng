@@ -265,27 +265,6 @@ import { RGBELoader } from 'three-stdlib';
 
 const hdrPresets = {
   "Kloofendal Pure Sky": "kloofendal_48d_partly_cloudy_puresky_4k.hdr",
-  "Overcast Soil Pure Sky": "overcast_soil_puresky_4k.hdr",
-  "Rustig Koppie Pure Sky": "rustig_koppie_puresky_4k.hdr",
-  "Table Mountain Pure Sky": "table_mountain_2_puresky_4k.hdr",
-  "Modern Buildings": "modern_buildings_2_4k.hdr",
-  "Shanghai Bund": "shanghai_bund_4k.hdr",
-  "Golf Course Sunrise": "golf_course_sunrise_4k.hdr",
-  "Alps Field": "alps_field_4k.hdr",
-  "Symmetrical Garden": "symmetrical_garden_02_4k.hdr",
-  "Old Hall": "old_hall_4k.hdr",
-  "Dikhololo Night": "dikhololo_night_4k.hdr",
-  "Blue Studio": "blue_photo_studio_4k.hdr",
-  "Brown Studio": "brown_photostudio_02_4k.hdr",
-  "Winter Evening": "winter_evening_4k.hdr",
-  "Autumn Park": "autumn_park_1k.hdr",
-  "Noon Grass": "noon_grass_4k.hdr",
-  "Rosendal Plains": "rosendal_plains_2_4k.hdr",
-  "White Cliff Top": "white_cliff_top_4k.hdr",
-  "Drakensberg Mountain": "drakensberg_solitary_mountain_4k.hdr",
-  "Goegap": "goegap_4k.hdr",
-  "Kiara Dawn": "kiara_1_dawn_4k.hdr",
-  "Studio Small": "studio_small_09_4k.hdr"
 };
 
 const quality = ref("high");
