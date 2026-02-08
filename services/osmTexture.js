@@ -5,25 +5,25 @@ import proj4 from "proj4";
 // OSB: https://wiki.openstreetmap.org/wiki/OpenStreetBrowser/Landuse-_and_Building_Colors
 const COLORS = {
   // Vegetation (Standard Carto is good for these)
-  forest: "#add19e", // wood, forest
-  scrub: "#c8d7ab", // scrub, tundra, fell
-  heath: "#d6d99f", // heath
-  grass: "#85b95a", // typical green grass
-  orchard: "#aedfa3", // orchard, vineyard, plant_nursery
-  farmland: "#eef0d5", // farmland, greenhouse_horticulture
+  forest: "#4a7a52", // Deep Forest Green
+  scrub: "#7c8c60", // Muted Olive
+  heath: "#9aa376", // Darker Heath
+  grass: "#4d7c38", // Deep Grass Green
+  orchard: "#7bb56e", // Rich Orchard
+  farmland: "#c5c9a3", // Muted Farmland
 
   // Water (Standard Carto)
-  water: "#aad3df", // water, basin, salt_pond, reef
-  wetland: "#8A9A5B", // wetland (Moss Green - distinct from heath)
-  swamp: "#2F3F34", // wetland=swamp (Dark Swamp Green)
-  glacier: "#ddecec", // glacier
-  mud: "#e6dcd1", // mud
+  water: "#4a7c9b", // Deep River Blue
+  wetland: "#6b7d4c", // Dark Moss
+  swamp: "#1e2b23", // Very Dark Swamp
+  glacier: "#cce0e0", // Slightly darker ice
+  mud: "#d1c4b8", // Darker Mud
 
   // Bare (Standard Carto)
-  bare: "#eee5dc", // bare_rock, scree, blockfield, shingle
-  sand: "#f5e9c6", // sand, beach, shoal
-  dirt: "#d9ccb5", // earth, dirt, brownfield, construction
-  quarry: "#c3c3c3", // quarry, mining
+  bare: "#d6cdc4", // bare_rock, scree, blockfield, shingle
+  sand: "#e0d3b0", // sand, beach, shoal
+  dirt: "#bfae96", // earth, dirt, brownfield, construction
+  quarry: "#a8a8a8", // quarry, mining
 
   // Developed / Landuse (Using OpenStreetBrowser for distinct zoning)
   residential: "#ccb18b", // OSB: brownish/orange

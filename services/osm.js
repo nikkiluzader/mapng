@@ -563,7 +563,98 @@ const parseOverpassResponse = (data, bounds) => {
     }
   }
 
-  return clippedFeatures;
+  // 6. POST-PROCESS: Procedural Vegetation
+  const isPointInPolygon = (point, vs) => {
+    let x = point.lng,
+      y = point.lat;
+    let inside = false;
+    for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+      let xi = vs[i].lng,
+        yi = vs[i].lat;
+      let xj = vs[j].lng,
+        yj = vs[j].lat;
+      let intersect =
+        yi > y != yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  };
+
+  const proceduralTrees = [];
+
+  for (const f of clippedFeatures) {
+    const tags = f.tags || {};
+    const isWood =
+      tags.natural === "wood" ||
+      tags.landuse === "forest" ||
+      tags.natural === "scrub";
+    const isWetland = tags.natural === "wetland" || tags.wetland;
+
+    // User requested procedural trees in wood, forest, wetland, etc.
+    if ((isWood || isWetland) && f.geometry.length > 2) {
+      // Compute approx bounds to determine area and sampling range
+      let minLat = 90,
+        maxLat = -90,
+        minLng = 180,
+        maxLng = -180;
+      f.geometry.forEach((p) => {
+        if (p.lat < minLat) minLat = p.lat;
+        if (p.lat > maxLat) maxLat = p.lat;
+        if (p.lng < minLng) minLng = p.lng;
+        if (p.lng > maxLng) maxLng = p.lng;
+      });
+
+      const widthM =
+        (maxLng - minLng) * 111000 * Math.cos((minLat * Math.PI) / 180);
+      const heightM = (maxLat - minLat) * 111000;
+      const areaM2 = Math.abs(widthM * heightM * 0.5); // Rough area estimation
+
+      // Density settings (meters between trees)
+      let treeSpacing = 15;
+      if (tags.natural === "scrub") treeSpacing = 20;
+      if (isWetland) treeSpacing = 25; // Sparse in wetlands
+      if (tags.landuse === "forest" || tags.natural === "wood")
+        treeSpacing = 12; // Dense in forests
+
+      // Limit count to avoid performance kill on huge polygons
+      const treeCount = Math.min(
+        2000,
+        Math.floor(areaM2 / (treeSpacing * treeSpacing)),
+      );
+
+      for (let i = 0; i < treeCount; i++) {
+        const pt = {
+          lat: minLat + Math.random() * (maxLat - minLat),
+          lng: minLng + Math.random() * (maxLng - minLng),
+        };
+
+        // Verify point is inside the polygon
+        if (isPointInPolygon(pt, f.geometry)) {
+          // Verify point is NOT inside any holes (e.g. lake in forest)
+          let inHole = false;
+          if (f.holes) {
+            for (const hole of f.holes) {
+              if (isPointInPolygon(pt, hole)) {
+                inHole = true;
+                break;
+              }
+            }
+          }
+
+          if (!inHole) {
+            proceduralTrees.push({
+              id: `${f.id}_proc_tree_${i}`,
+              type: "vegetation",
+              geometry: [{ lat: pt.lat, lng: pt.lng }],
+              tags: { natural: "tree", procedurally_generated: "yes" },
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return [...clippedFeatures, ...proceduralTrees];
 };
 
 export const fetchOSMData = async (bounds) => {
