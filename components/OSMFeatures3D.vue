@@ -1,5 +1,5 @@
 <script setup>
-import { shallowRef, watch, toRaw } from 'vue';
+import { shallowRef, watch, toRaw, onUnmounted } from 'vue';
 import { createOSMGroup } from '../services/export3d';
 
 const props = defineProps({
@@ -22,19 +22,25 @@ const updateVisibility = () => {
   }
 };
 
-watch(() => props.terrainData, (data) => {
-  if (group.value) {
-    // Clean up old group geometries and materials
-    group.value.traverse((child) => {
-      if (child.isMesh) {
-        child.geometry.dispose();
+const disposeGroup = (grp) => {
+  if (!grp) return;
+  grp.traverse((child) => {
+    if (child.isMesh) {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
         if (Array.isArray(child.material)) {
           child.material.forEach(m => m.dispose());
         } else {
           child.material.dispose();
         }
       }
-    });
+    }
+  });
+};
+
+watch(() => props.terrainData, (data) => {
+  if (group.value) {
+    disposeGroup(group.value);
   }
 
   if (data) {
@@ -47,6 +53,13 @@ watch(() => props.terrainData, (data) => {
 }, { immediate: true });
 
 watch(() => props.featureVisibility, updateVisibility, { deep: true });
+
+onUnmounted(() => {
+  if (group.value) {
+    disposeGroup(group.value);
+    group.value = null;
+  }
+});
 </script>
 
 <template>

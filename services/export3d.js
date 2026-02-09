@@ -11,13 +11,25 @@ const getMetricProjector = (data) => {
   const centerLng = (data.bounds.east + data.bounds.west) / 2;
   const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
   const toMetric = proj4("EPSG:4326", localProjDef);
-  const halfWidth = data.width / 2;
-  const halfHeight = data.height / 2;
+
+  // Calculate metric bounds to normalize coordinates
+  const [minX, minY] = toMetric.forward([data.bounds.west, data.bounds.south]);
+  const [maxX, maxY] = toMetric.forward([data.bounds.east, data.bounds.north]);
+
+  const widthM = Math.abs(maxX - minX);
+  const heightM = Math.abs(maxY - minY);
 
   return (lat, lng) => {
     const [localX, localY] = toMetric.forward([lng, lat]);
-    const x = localX + halfWidth;
-    const y = halfHeight - localY;
+
+    // Normalize 0..1 based on metric bounds
+    let u = (localX - minX) / widthM;
+    let v = (localY - minY) / heightM;
+
+    // Map to pixels (Y flipped for image coords)
+    const x = u * (data.width - 1);
+    const y = (1 - v) * (data.height - 1);
+
     return { x, y };
   };
 };

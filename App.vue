@@ -475,6 +475,14 @@ const setResolution = (newResolution) => {
 const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey) => {
   isLoading.value = true;
   loadingStatus.value = "Starting terrain generation...";
+  
+  // Flush old data to free memory before loading new large datasets
+  if (terrainData.value) {
+      terrainData.value = null;
+      // Allow a brief moment for Vue to unmount 3D components and trigger disposal
+      await new Promise(r => setTimeout(r, 100));
+  }
+
   try {
     const data = await fetchTerrainData(
         center.value, 

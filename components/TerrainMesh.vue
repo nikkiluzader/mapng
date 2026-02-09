@@ -1,5 +1,5 @@
 <script setup>
-import { computed, shallowRef, watch, toRaw, markRaw } from 'vue';
+import { computed, shallowRef, watch, toRaw, markRaw, onUnmounted } from 'vue';
 import * as THREE from 'three';
 
 const props = defineProps({
@@ -11,6 +11,7 @@ const props = defineProps({
 
 const SCENE_SIZE = 100;
 const geometry = shallowRef(null);
+const texture = shallowRef(null);
 
 // Generate terrain geometry
 watch([() => props.terrainData, () => props.quality], () => {
@@ -61,11 +62,6 @@ watch([() => props.terrainData, () => props.quality], () => {
     vertices[i * 3 + 1] = -(globalZ);
     vertices[i * 3 + 2] = (h - data.minHeight) * unitsPerMeter * EXAGGERATION;
 
-    // Update UVs to match the physical position
-    // Texture (0,0) is top-left, Mesh UV (0,0) is bottom-left
-    // u maps 0->1 (Left->Right) => UV.x
-    // v maps 0->1 (Top->Bottom) => UV.y
-    // We disable flipY on the texture, so (0,0) UV corresponds to Top-Left of the image
     uvs[i * 2] = u;
     uvs[i * 2 + 1] = v;
   }
@@ -80,15 +76,22 @@ watch([() => props.terrainData, () => props.quality], () => {
   geometry.value = markRaw(geo);
 }, { immediate: true });
 
-// Load texture
-const texture = computed(() => {
+// Load texture with explicit disposal logic
+watch(() => [props.textureType, props.terrainData], () => {
+  // Dispose previous texture to free GPU memory
+  if (texture.value) {
+    texture.value.dispose();
+  }
+
   let url = null;
+  const data = props.terrainData || {};
+  
   if (props.textureType === 'satellite') {
-    url = props.terrainData.satelliteTextureUrl;
+    url = data.satelliteTextureUrl;
   } else if (props.textureType === 'osm') {
-    url = props.terrainData.osmTextureUrl;
+    url = data.osmTextureUrl;
   } else if (props.textureType === 'hybrid') {
-    url = props.terrainData.hybridTextureUrl;
+    url = data.hybridTextureUrl;
   }
 
   if (url) {
@@ -96,12 +99,18 @@ const texture = computed(() => {
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.minFilter = THREE.LinearFilter;
     tex.magFilter = THREE.LinearFilter;
-    tex.anisotropy = 16; // Maximize texture sharpness at oblique angles
-    tex.flipY = false; // Disable flipY to avoid WebGL warnings and overhead
-    tex.premultiplyAlpha = false; // Ensure no alpha premultiplication
-    return tex;
+    tex.anisotropy = 16;
+    tex.flipY = false;
+    tex.premultiplyAlpha = false;
+    texture.value = markRaw(tex);
+  } else {
+    texture.value = null;
   }
-  return null;
+}, { immediate: true });
+
+onUnmounted(() => {
+  if (geometry.value) geometry.value.dispose();
+  if (texture.value) texture.value.dispose();
 });
 </script>
 
