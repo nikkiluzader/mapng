@@ -496,6 +496,14 @@ const renderFeaturesToCanvas = (
   for (const { f } of sortedLC) {
     ctx.fillStyle = getFeatureColor(f.tags);
     if (f.geometry.length === 1) {
+      // Skip vegetation points (trees, shrubs) as they are rendered as 3D models
+      if (
+        f.type === "vegetation" ||
+        f.tags.natural === "tree" ||
+        f.tags.natural === "shrub"
+      )
+        continue;
+
       const p = toPixel(f.geometry[0].lat, f.geometry[0].lng);
       ctx.beginPath();
       ctx.arc(p.x, p.y, 1.5 * SCALE_FACTOR, 0, Math.PI * 2);

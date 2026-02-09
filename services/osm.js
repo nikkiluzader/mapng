@@ -523,8 +523,16 @@ const parseOverpassResponse = (data, bounds) => {
 
   for (const f of rawFeatures) {
     if (f.geometry.length === 1) {
-      // It's a point (tree), already checked bounds
-      clippedFeatures.push(f);
+      // Check if point is inside bounds (crucial for interpolated trees)
+      const p = f.geometry[0];
+      if (
+        p.lat >= bounds.south &&
+        p.lat <= bounds.north &&
+        p.lng >= bounds.west &&
+        p.lng <= bounds.east
+      ) {
+        clippedFeatures.push(f);
+      }
       continue;
     }
 
