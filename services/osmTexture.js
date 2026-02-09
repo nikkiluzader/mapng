@@ -27,15 +27,15 @@ const COLORS = {
 
   // Developed / Landuse (Using OpenStreetBrowser for distinct zoning)
   residential: "#ccb18b", // OSB: brownish/orange
-  commercial: "#d195b6", // OSB: pinkish
-  industrial: "#b7b8cc", // OSB: bluish grey
-  retail: "#ffe285", // OSB: yellow
+  commercial: "#999999", // Cement grey
+  industrial: "#999999", // Cement grey
+  retail: "#999999", // Cement grey
   education: "#e39ccf", // OSB: pink
   military: "#9d9d7c", // OSB: olive green
   cemetery: "#aacbaf", // OSB: light green
   sport: "#8bccb3", // OSB: teal
   park: "#c8df9f", // OSB: leisure=park
-  parking: "#eeeeee", // Standard greyish
+  parking: "#999999", // Cement grey
   aeroway: "#e9d1ff", // Light purple for airport grounds
   apron: "#dadae0", // Grey for aprons
   runway: "#bbbbcc", // Darker grey for runways
@@ -709,11 +709,20 @@ export const generateHybridTexture = async (terrainData) => {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Could not get 2D context");
 
-  // Background: Use seamless noise instead of satellite
-  // The user requested to replace satellite image with a base grey/noise texture.
-  const noisePattern = ctx.createPattern(createNoisePattern(), "repeat");
-  ctx.fillStyle = noisePattern;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // Background: Satellite Image
+  if (terrainData.satelliteTextureUrl) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = terrainData.satelliteTextureUrl;
+    await new Promise((r) => {
+      img.onload = r;
+      img.onerror = r;
+    }); // robust load
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 
   const centerLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
   const centerLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
@@ -727,7 +736,9 @@ export const generateHybridTexture = async (terrainData) => {
     return { x: (lx + halfW) * SCALE_FACTOR, y: (halfH - ly) * SCALE_FACTOR };
   };
 
-  renderFeaturesToCanvas(ctx, terrainData.osmFeatures, toPixel, SCALE_FACTOR, {
+  // Only render roads for Hybrid mode
+  const roadFeatures = terrainData.osmFeatures.filter((f) => f.type === "road");
+  renderFeaturesToCanvas(ctx, roadFeatures, toPixel, SCALE_FACTOR, {
     alpha: 1.0,
   });
 

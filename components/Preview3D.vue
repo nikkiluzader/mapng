@@ -269,7 +269,7 @@ const hdrPresets = {
 
 const quality = ref("high");
 const preset = ref("Kloofendal Pure Sky");
-const textureType = ref("hybrid");
+const textureType = ref("osm");
 const showWireframe = ref(false);
 const featureVisibility = reactive({
   buildings: true,
