@@ -58,8 +58,8 @@ const COLORS = {
   markingRed: "rgba(255, 50, 50, 0.8)",
 };
 
-const getFeatureColor = (tags) => {
-  if (!tags) return COLORS.defaultLanduse;
+const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
+  if (!tags) return baseColor;
 
   // --- OSM2World inspired surface mapping ---
   // Priority 1: Water
@@ -173,7 +173,7 @@ const getFeatureColor = (tags) => {
   if (["attraction", "zoo", "camp_site", "theme_park"].includes(surface))
     return COLORS.tourism;
 
-  return COLORS.defaultLanduse;
+  return baseColor;
 };
 
 // Help map tags to user-friendly categories (simplified for internal use)
@@ -468,6 +468,8 @@ const renderFeaturesToCanvas = (
     }
   };
 
+  const baseColor = options.baseColor || COLORS.defaultLanduse;
+
   // 1. Draw Landcover & Landuse (Sorted by area, with Grass/Water priority layers)
   const landcover = features.filter((f) =>
     ["vegetation", "water", "landuse"].includes(f.type),
@@ -535,7 +537,7 @@ const renderFeaturesToCanvas = (
 
   if (options.alpha) ctx.globalAlpha = options.alpha;
   for (const { f } of sortedLC) {
-    ctx.fillStyle = getFeatureColor(f.tags);
+    ctx.fillStyle = getFeatureColor(f.tags, baseColor);
     if (f.geometry.length === 1) {
       // Skip vegetation points (trees, shrubs) as they are rendered as 3D models
       if (
@@ -669,7 +671,7 @@ const renderFeaturesToCanvas = (
   const buildings = features.filter((f) => f.type === "building");
   ctx.lineWidth = 0.5 * SCALE_FACTOR;
   buildings.forEach((f) => {
-    ctx.fillStyle = getFeatureColor(f.tags);
+    ctx.fillStyle = getFeatureColor(f.tags, baseColor);
     ctx.strokeStyle = COLORS.buildingStroke;
     drawPolygon(f);
     ctx.fill("evenodd");
@@ -687,7 +689,7 @@ const renderFeaturesToCanvas = (
   });
 };
 
-const createNoisePattern = () => {
+const createNoisePattern = (baseColor) => {
   const size = 512;
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -695,7 +697,7 @@ const createNoisePattern = () => {
   const ctx = canvas.getContext("2d");
 
   // Base fill
-  ctx.fillStyle = COLORS.defaultLanduse;
+  ctx.fillStyle = baseColor || COLORS.defaultLanduse;
   ctx.fillRect(0, 0, size, size);
 
   // Add noise
@@ -726,7 +728,7 @@ const createNoisePattern = () => {
   return canvas;
 };
 
-export const generateOSMTexture = async (terrainData) => {
+export const generateOSMTexture = async (terrainData, options = {}) => {
   const TARGET_RESOLUTION = 8192;
   let SCALE_FACTOR = Math.max(
     1,
@@ -751,18 +753,27 @@ export const generateOSMTexture = async (terrainData) => {
   };
 
   // Use noise pattern for background instead of solid color
-  const noisePattern = ctx.createPattern(createNoisePattern(), "repeat");
+  const noisePattern = ctx.createPattern(
+    createNoisePattern(options.baseColor),
+    "repeat",
+  );
   ctx.fillStyle = noisePattern;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  renderFeaturesToCanvas(ctx, terrainData.osmFeatures, toPixel, SCALE_FACTOR);
+  renderFeaturesToCanvas(
+    ctx,
+    terrainData.osmFeatures,
+    toPixel,
+    SCALE_FACTOR,
+    options,
+  );
 
   return new Promise((r) =>
     canvas.toBlob((b) => r(b ? URL.createObjectURL(b) : ""), "image/png"),
   );
 };
 
-export const generateHybridTexture = async (terrainData) => {
+export const generateHybridTexture = async (terrainData, options = {}) => {
   const TARGET_RESOLUTION = 8192;
   let SCALE_FACTOR = Math.max(
     1,
@@ -804,6 +815,7 @@ export const generateHybridTexture = async (terrainData) => {
   // Only render roads for Hybrid mode
   const roadFeatures = terrainData.osmFeatures.filter((f) => f.type === "road");
   renderFeaturesToCanvas(ctx, roadFeatures, toPixel, SCALE_FACTOR, {
+    ...options,
     alpha: 1.0,
   });
 

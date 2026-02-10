@@ -40,7 +40,7 @@
               class="accent-[#FF6600] w-4 h-4 cursor-pointer"
           />
       </div>
-
+ 
       <!-- Elevation Source Selection -->
       <div class="space-y-2">
         <label class="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">

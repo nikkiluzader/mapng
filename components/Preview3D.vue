@@ -224,6 +224,26 @@
           </div>
         </div>
 
+          <!-- OSM Background Color -->
+          <div v-if="terrainData.osmFeatures && terrainData.osmFeatures.length > 0" class="space-y-2 pt-2 border-t border-gray-100">
+            <label class="text-xs text-gray-500 flex items-center gap-1 font-medium mb-1">
+              <Settings :size="12" /> OSM Background Color
+            </label>
+            <div class="flex flex-wrap gap-1.5 p-1.5 bg-gray-50 rounded border border-gray-200">
+              <button 
+                v-for="color in baseColorOptions" 
+                :key="color.value"
+                @click="baseColor = color.value"
+                :title="color.name"
+                :class="[
+                  'w-6 h-6 rounded-full border-2 transition-all shadow-sm',
+                  baseColor === color.value ? 'border-[#FF6600] scale-110 shadow-md' : 'border-transparent hover:scale-105'
+                ]"
+                :style="{ backgroundColor: color.value }"
+              ></button>
+            </div>
+          </div>
+
         <div class="pt-4 border-t border-gray-100">
           <button
             @click="resetCamera"
@@ -256,12 +276,9 @@ import {
 } from "../services/osmTexture";
 
 const props = defineProps(["terrainData"]);
+const emit = defineEmits(["update-textures"]);
 
 const controlsRef = ref(null);
-// ... imports
-import { RGBELoader } from 'three-stdlib';
-
-// ... existing code
 
 const hdrPresets = {
   "Kloofendal Pure Sky": "kloofendal_48d_partly_cloudy_puresky_4k.hdr",
@@ -279,19 +296,44 @@ const featureVisibility = reactive({
 });
 const customOsmUrl = ref(null);
 const customHybridUrl = ref(null);
+const isRegenerating = ref(false);
+
+const baseColor = ref('#f2f2f2');
+const baseColorOptions = [
+  { name: "Off White (Default)", value: "#f2f2f2" },
+  { name: "Forest Green", value: "#4a7a52" },
+  { name: "Sandy Gold", value: "#e0d3b0" },
+  { name: "Rocky Grey", value: "#8a8a8a" },
+  { name: "Dirt Brown", value: "#bfae96" },
+  { name: "Deep Moss", value: "#4d5d4a" }
+];
 
 const regenerateTextures = async () => {
   if (!props.terrainData) return;
+  isRegenerating.value = true;
   try {
-    const osmUrl = await generateOSMTexture(props.terrainData);
-    const hybridUrl = await generateHybridTexture(props.terrainData);
-
+    const options = { baseColor: baseColor.value };
+    const osmUrl = await generateOSMTexture(props.terrainData, options);
+    const hybridUrl = await generateHybridTexture(props.terrainData, options);
+ 
     customOsmUrl.value = osmUrl;
     customHybridUrl.value = hybridUrl;
+    
+    emit("update-textures", {
+      osmTextureUrl: osmUrl,
+      hybridTextureUrl: hybridUrl,
+    });
   } catch (e) {
     console.error("Failed to regenerate textures:", e);
+  } finally {
+    isRegenerating.value = false;
   }
 };
+
+// Re-render when baseColor changes
+watch(baseColor, () => {
+  regenerateTextures();
+});
 
 // Initialize textures automatically
 watch(

@@ -123,7 +123,10 @@
         </div>
         
         <div v-if="terrainData && previewMode" class="absolute inset-0 transition-all duration-500 bg-black">
-          <Preview3D :terrain-data="terrainData" />
+          <Preview3D 
+            :terrain-data="terrainData" 
+            @update-textures="handleUpdateTextures"
+          />
         </div>
         
         <!-- Loading Overlay -->
@@ -523,6 +526,16 @@ const handleFetchOSM = async () => {
       alert("Failed to fetch OSM data.");
   } finally {
       isLoading.value = false;
+  }
+};
+
+const handleUpdateTextures = ({ osmTextureUrl, hybridTextureUrl }) => {
+  if (terrainData.value) {
+    terrainData.value = {
+      ...terrainData.value,
+      osmTextureUrl,
+      hybridTextureUrl
+    };
   }
 };
 
