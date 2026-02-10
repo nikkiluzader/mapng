@@ -427,13 +427,17 @@ const usgsStatus = ref(null);
 
 const interestingLocations = [
   { name: "Select a location...", lat: 0, lng: 0, disabled: true },
+  { name: "Angeles Crest Highway, USA", lat: 34.389292767087476, lng: -118.08463811874391 },
   { name: "Devils Tower, USA", lat: 44.59056, lng: -104.71511 },
   { name: "Grand Canyon, USA", lat: 36.05758, lng: -112.14236 },
   { name: "Johnson Valley OHV, USA", lat: 34.49523, lng: -116.82180 },
+  { name: "Lombard Street, San Francisco, USA", lat: 37.80213155813396, lng: -122.41888135671617 },
+  { name: "Million Dollar Highway, USA", lat: 37.9180, lng: -107.7002 },
   { name: "Mount Everest, Nepal", lat: 27.9881, lng: 86.9250 },
   { name: "Mount Fuji, Japan", lat: 35.3606, lng: 138.7274 },
   { name: "Matterhorn, Switzerland", lat: 45.9763, lng: 7.6586 },
   { name: "Rossfeld Panoramastraße, Germany", lat: 47.6087, lng: 13.0234 },
+  { name: "Tail of the Dragon, USA", lat: 35.50323405090838, lng: -83.94679069519044 },
   { name: "Yosemite Valley, USA", lat: 37.7456, lng: -119.5936 }
 ];
 

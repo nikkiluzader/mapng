@@ -48,6 +48,7 @@ const COLORS = {
   buildingStroke: "#c4b6ab",
   road: "#404040",
   path: "#cccccc",
+  track: "#bfae96", // Light brown dirt color
   barrier: "#C4A484",
   defaultLanduse: "#f2f2f2",
 
@@ -194,14 +195,41 @@ const getFeatureArea = (feature) => {
   return Math.abs(area);
 };
 
+// --- Path Smoothing Helpers ---
+
+const subdivideAndSmooth = (points, iterations = 1) => {
+  if (points.length < 3) return points;
+  let current = points;
+  for (let i = 0; i < iterations; i++) {
+    const next = [];
+    // Keep start point
+    next.push(current[0]);
+    for (let j = 0; j < current.length - 1; j++) {
+      const p1 = current[j];
+      const p2 = current[j + 1];
+
+      // Chaikin's algorithm: generate two new points at 1/4 and 3/4 positions
+      next.push({
+        x: p1.x * 0.75 + p2.x * 0.25,
+        y: p1.y * 0.75 + p2.y * 0.25,
+      });
+      next.push({
+        x: p1.x * 0.25 + p2.x * 0.75,
+        y: p1.y * 0.25 + p2.y * 0.75,
+      });
+    }
+    // Keep end point
+    next.push(current[current.length - 1]);
+    current = next;
+  }
+  return current;
+};
+
 // --- Procedural Road Marking Helpers ---
 
-const getOffsetPath = (points, offsetMeters, toPixel, SCALE_FACTOR) => {
-  if (points.length < 2) return [];
+const getOffsetPath = (projected, offsetMeters, SCALE_FACTOR) => {
+  if (projected.length < 2) return [];
   const offsetPath = [];
-
-  // Project points once for speed and accuracy
-  const projected = points.map((p) => toPixel(p.lat, p.lng));
 
   for (let i = 0; i < projected.length; i++) {
     const p = projected[i];
@@ -342,7 +370,10 @@ const drawRoadWithMarkings = (ctx, feature, toPixel, SCALE_FACTOR) => {
 
   // 1. Draw Base Pavement (Combined)
   ctx.beginPath();
-  const centerPoints = geometry.map((p) => toPixel(p.lat, p.lng));
+  let centerPoints = geometry.map((p) => toPixel(p.lat, p.lng));
+  // Smooth road centerlines
+  centerPoints = subdivideAndSmooth(centerPoints, 3);
+
   drawPathData(ctx, centerPoints);
   ctx.strokeStyle = COLORS.road;
   ctx.lineWidth = layout.totalWidth * SCALE_FACTOR;
@@ -355,12 +386,7 @@ const drawRoadWithMarkings = (ctx, feature, toPixel, SCALE_FACTOR) => {
     if (lane.type === "vehicle") return; // Pavement already covers it
 
     ctx.beginPath();
-    const offsetPath = getOffsetPath(
-      geometry,
-      lane.offset,
-      toPixel,
-      SCALE_FACTOR,
-    );
+    const offsetPath = getOffsetPath(centerPoints, lane.offset, SCALE_FACTOR);
     drawPathData(ctx, offsetPath);
 
     ctx.strokeStyle = lane.color || COLORS.road;
@@ -375,14 +401,14 @@ const drawRoadWithMarkings = (ctx, feature, toPixel, SCALE_FACTOR) => {
       ctx.beginPath();
       drawPathData(
         ctx,
-        getOffsetPath(geometry, lane.offset - 0.15, toPixel, SCALE_FACTOR),
+        getOffsetPath(centerPoints, lane.offset - 0.15, SCALE_FACTOR),
       );
       ctx.stroke();
 
       ctx.beginPath();
       drawPathData(
         ctx,
-        getOffsetPath(geometry, lane.offset + 0.15, toPixel, SCALE_FACTOR),
+        getOffsetPath(centerPoints, lane.offset + 0.15, SCALE_FACTOR),
       );
       ctx.stroke();
     } else {
@@ -417,11 +443,26 @@ const renderFeaturesToCanvas = (
 
   const drawPolygon = (feature) => {
     ctx.beginPath();
-    drawPath(feature.geometry);
+    let pts = feature.geometry.map((p) => toPixel(p.lat, p.lng));
+    pts = subdivideAndSmooth(pts, 3);
+    if (pts.length > 0) {
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+    }
     ctx.closePath();
+
     if (feature.holes) {
       for (const hole of feature.holes) {
-        drawPath(hole);
+        let holePts = hole.map((p) => toPixel(p.lat, p.lng));
+        holePts = subdivideAndSmooth(holePts, 3);
+        if (holePts.length > 0) {
+          ctx.moveTo(holePts[0].x, holePts[0].y);
+          for (let i = 1; i < holePts.length; i++) {
+            ctx.lineTo(holePts[i].x, holePts[i].y);
+          }
+        }
         ctx.closePath();
       }
     }
@@ -523,8 +564,11 @@ const renderFeaturesToCanvas = (
         Math.abs(p1.lat - p2.lat) < 1e-9 && Math.abs(p1.lng - p2.lng) < 1e-9;
 
       if (isLinearWater && !isClosed) {
+        let pts = f.geometry.map((p) => toPixel(p.lat, p.lng));
+        pts = subdivideAndSmooth(pts, 3);
+
         ctx.beginPath();
-        drawPath(f.geometry);
+        drawPathData(ctx, pts);
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
         ctx.strokeStyle = ctx.fillStyle; // Use same color
@@ -566,6 +610,9 @@ const renderFeaturesToCanvas = (
     path: 20,
     footway: 20,
     cycleway: 20,
+    pedestrian: 20,
+    track: 15,
+    steps: 10,
   };
   roads.sort((a, b) => {
     const layerA = parseInt(a.tags.layer) || 0;
@@ -584,16 +631,26 @@ const renderFeaturesToCanvas = (
         highway,
       )
     ) {
+      let pts = f.geometry.map((p) => toPixel(p.lat, p.lng));
+      pts = subdivideAndSmooth(pts, 3);
+
       ctx.beginPath();
-      drawPath(f.geometry);
-      ctx.strokeStyle = COLORS.path;
+      drawPathData(ctx, pts);
+      // Footpaths and tracks are light brown dirt color
+      if (["footway", "path", "track"].includes(highway)) {
+        ctx.strokeStyle = COLORS.track;
+      } else {
+        ctx.strokeStyle = COLORS.path;
+      }
       ctx.lineWidth = 2 * SCALE_FACTOR;
       ctx.stroke();
     } else {
       // Draw clean connections (circles) at start/end to smooth transitions between widths
       const layout = getLaneLayout(f.tags || {});
       const width = layout.totalWidth * SCALE_FACTOR;
-      const pts = f.geometry.map((p) => toPixel(p.lat, p.lng));
+      let pts = f.geometry.map((p) => toPixel(p.lat, p.lng));
+      // Smooth road centerlines
+      pts = subdivideAndSmooth(pts, 3);
 
       if (pts.length > 0) {
         ctx.fillStyle = COLORS.road;
