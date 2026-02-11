@@ -337,9 +337,9 @@ watch(baseColor, () => {
 
 // Initialize textures automatically
 watch(
-  () => props.terrainData,
-  async (newData) => {
-    if (newData?.osmFeatures) {
+  () => props.terrainData?.osmFeatures,
+  async (newFeatures) => {
+    if (newFeatures) {
       await regenerateTextures();
     }
   },

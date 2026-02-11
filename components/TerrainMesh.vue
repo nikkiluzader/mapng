@@ -14,7 +14,7 @@ const geometry = shallowRef(null);
 const texture = shallowRef(null);
 
 // Generate terrain geometry
-watch([() => props.terrainData, () => props.quality], () => {
+watch([() => props.terrainData?.heightMap, () => props.quality], () => {
   const data = toRaw(props.terrainData);
   if (!data) return;
 
@@ -76,22 +76,19 @@ watch([() => props.terrainData, () => props.quality], () => {
   geometry.value = markRaw(geo);
 }, { immediate: true });
 
-// Load texture with explicit disposal logic
-watch(() => [props.textureType, props.terrainData], () => {
+const activeTextureUrl = computed(() => {
+  const data = props.terrainData || {};
+  if (props.textureType === 'satellite') return data.satelliteTextureUrl;
+  if (props.textureType === 'osm') return data.osmTextureUrl;
+  if (props.textureType === 'hybrid') return data.hybridTextureUrl;
+  return null;
+});
+
+// Load texture when the active URL changes
+watch(activeTextureUrl, (url) => {
   // Dispose previous texture to free GPU memory
   if (texture.value) {
     texture.value.dispose();
-  }
-
-  let url = null;
-  const data = props.terrainData || {};
-  
-  if (props.textureType === 'satellite') {
-    url = data.satelliteTextureUrl;
-  } else if (props.textureType === 'osm') {
-    url = data.osmTextureUrl;
-  } else if (props.textureType === 'hybrid') {
-    url = data.hybridTextureUrl;
   }
 
   if (url) {
