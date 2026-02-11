@@ -49,8 +49,9 @@ const COLORS = {
   road: "#404040",
   path: "#cccccc",
   track: "#bfae96", // Light brown dirt color
+  sidewalk: "#e5e5e5", // Light grey concrete color
   barrier: "#C4A484",
-  defaultLanduse: "#f2f2f2",
+  defaultLanduse: "#999999", // Cement grey color
 
   // Markings
   markingWhite: "rgba(255, 255, 255, 0.7)",
@@ -638,8 +639,10 @@ const renderFeaturesToCanvas = (
 
       ctx.beginPath();
       drawPathData(ctx, pts);
-      // Footpaths and tracks are light brown dirt color
-      if (["footway", "path", "track"].includes(highway)) {
+      // Use light grey for sidewalks/concrete, dirt for other paths/tracks
+      if (f.tags?.footway === "sidewalk" || f.tags?.surface === "concrete") {
+        ctx.strokeStyle = COLORS.sidewalk;
+      } else if (["footway", "path", "track"].includes(highway)) {
         ctx.strokeStyle = COLORS.track;
       } else {
         ctx.strokeStyle = COLORS.path;

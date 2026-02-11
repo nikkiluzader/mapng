@@ -298,11 +298,11 @@ const customOsmUrl = ref(null);
 const customHybridUrl = ref(null);
 const isRegenerating = ref(false);
 
-const baseColor = ref('#f2f2f2');
+const baseColor = ref('#999999');
 const baseColorOptions = [
-  { name: "Off White (Default)", value: "#f2f2f2" },
+  { name: "Cement Grey (Default)", value: "#999999" },
   { name: "Forest Green", value: "#4a7a52" },
-  { name: "Sandy Gold", value: "#e0d3b0" },
+  { name: "Sandy Gold", value: "#ad8d60" },
   { name: "Rocky Grey", value: "#8a8a8a" },
   { name: "Dirt Brown", value: "#bfae96" },
   { name: "Deep Moss", value: "#4d5d4a" }

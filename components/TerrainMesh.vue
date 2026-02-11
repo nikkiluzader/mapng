@@ -136,7 +136,7 @@ onUnmounted(() => {
     <TresMeshStandardMaterial 
       :key="texture ? 'tex' : 'solid'"
       :map="texture"
-      :color="texture ? 0xffffff : 0x6B705C"
+      :color="texture ? 0xffffff : 0xad8d60"
       :roughness="1"
       :metalness="0"
       :side="2"
