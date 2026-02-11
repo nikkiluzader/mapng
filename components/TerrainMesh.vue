@@ -1,5 +1,5 @@
 <script setup>
-import { computed, shallowRef, watch, toRaw, markRaw, onUnmounted } from 'vue';
+import { computed, shallowRef, reactive, watch, toRaw, markRaw, onUnmounted } from 'vue';
 import * as THREE from 'three';
 
 const props = defineProps({
@@ -11,7 +11,6 @@ const props = defineProps({
 
 const SCENE_SIZE = 100;
 const geometry = shallowRef(null);
-const texture = shallowRef(null);
 
 // Generate terrain geometry
 watch([() => props.terrainData?.heightMap, () => props.quality], () => {
@@ -76,38 +75,52 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
   geometry.value = markRaw(geo);
 }, { immediate: true });
 
-const activeTextureUrl = computed(() => {
-  const data = props.terrainData || {};
-  if (props.textureType === 'satellite') return data.satelliteTextureUrl;
-  if (props.textureType === 'osm') return data.osmTextureUrl;
-  if (props.textureType === 'hybrid') return data.hybridTextureUrl;
-  return null;
+const textureCache = reactive({
+  satellite: null,
+  osm: null,
+  hybrid: null
 });
 
-// Load texture when the active URL changes
-watch(activeTextureUrl, (url) => {
-  // Dispose previous texture to free GPU memory
-  if (texture.value) {
-    texture.value.dispose();
-  }
+// Helper to load and configure a texture
+const loadTexture = (url) => {
+  if (!url) return null;
+  const tex = new THREE.TextureLoader().load(url);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 16; // We'll set this more accurately in the watcher if needed, but 16 is safe
+  tex.flipY = false;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  return markRaw(tex);
+};
 
-  if (url) {
-    const tex = new THREE.TextureLoader().load(url);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.minFilter = THREE.LinearFilter;
-    tex.magFilter = THREE.LinearFilter;
-    tex.anisotropy = 16;
-    tex.flipY = false;
-    tex.premultiplyAlpha = false;
-    texture.value = markRaw(tex);
-  } else {
-    texture.value = null;
-  }
+// Watch individual URLs and update the cache
+watch(() => props.terrainData?.satelliteTextureUrl, (url) => {
+  if (textureCache.satellite) textureCache.satellite.dispose();
+  textureCache.satellite = loadTexture(url);
 }, { immediate: true });
+
+watch(() => props.terrainData?.osmTextureUrl, (url) => {
+  if (textureCache.osm) textureCache.osm.dispose();
+  textureCache.osm = loadTexture(url);
+}, { immediate: true });
+
+watch(() => props.terrainData?.hybridTextureUrl, (url) => {
+  if (textureCache.hybrid) textureCache.hybrid.dispose();
+  textureCache.hybrid = loadTexture(url);
+}, { immediate: true });
+
+// The currently active texture is just a lookup in our cache
+const texture = computed(() => {
+  return textureCache[props.textureType] || null;
+});
 
 onUnmounted(() => {
   if (geometry.value) geometry.value.dispose();
-  if (texture.value) texture.value.dispose();
+  Object.values(textureCache).forEach(tex => {
+    if (tex) tex.dispose();
+  });
 });
 </script>
 
