@@ -729,6 +729,8 @@ const createNoisePattern = (baseColor) => {
 };
 
 export const generateOSMTexture = async (terrainData, options = {}) => {
+  const onProgress = options.onProgress;
+  onProgress?.("Baking procedural noise...");
   const TARGET_RESOLUTION = 8192;
   let SCALE_FACTOR = Math.max(
     1,
@@ -760,6 +762,7 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
   ctx.fillStyle = noisePattern;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  onProgress?.("Drawing vector maps (roads, buildings, landuse)...");
   renderFeaturesToCanvas(
     ctx,
     terrainData.osmFeatures,
@@ -774,6 +777,8 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
 };
 
 export const generateHybridTexture = async (terrainData, options = {}) => {
+  const onProgress = options.onProgress;
+  onProgress?.("Blending satellite imagery with vector overlays...");
   const TARGET_RESOLUTION = 8192;
   let SCALE_FACTOR = Math.max(
     1,

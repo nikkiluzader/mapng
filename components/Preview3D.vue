@@ -227,7 +227,7 @@
           <!-- OSM Background Color -->
           <div v-if="terrainData.osmFeatures && terrainData.osmFeatures.length > 0" class="space-y-2 pt-2 border-t border-gray-100">
             <label class="text-xs text-gray-500 flex items-center gap-1 font-medium mb-1">
-              <Settings :size="12" /> OSM Background Color
+              <Settings :size="12" /> OSM Background Color (for missing data)
             </label>
             <div class="flex flex-wrap gap-1.5 p-1.5 bg-gray-50 rounded border border-gray-200">
               <button 
@@ -335,7 +335,7 @@ watch(baseColor, () => {
   regenerateTextures();
 });
 
-// Initialize textures automatically
+// Initialize textures automatically when terrain data is loaded
 watch(
   () => props.terrainData?.osmFeatures,
   async (newFeatures) => {

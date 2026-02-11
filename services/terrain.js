@@ -200,7 +200,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress) => {
   }
 };
 
-const fetchUSGSRaw = async (bounds) => {
+const fetchUSGSRaw = async (bounds, onProgress) => {
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 1000;
 
@@ -255,18 +255,17 @@ const fetchUSGSRaw = async (bounds) => {
       return null;
     }
 
-    console.log(
-      `[USGS] Found ${data.items.length} tiles. Downloading sequentially to handle overlap...`,
-    );
+    onProgress?.(`Found ${data.items.length} USGS tiles. Downloading...`);
 
     const results = [];
     const rawArrayBuffers = [];
 
     // 2. Download GeoTIFFs sequentially
     // We process sequentially to avoid memory exhaustion with large 1m tiles
-    for (const item of data.items) {
+    for (let i = 0; i < data.items.length; i++) {
+      const item = data.items[i];
       const downloadUrl = item.downloadURL;
-      console.log(`[USGS] Downloading GeoTIFF from: ${downloadUrl}`);
+      onProgress?.(`Downloading USGS tile ${i + 1}/${data.items.length}...`);
 
       try {
         const tiffResponse = await fetch(downloadUrl);
@@ -415,8 +414,7 @@ export const fetchTerrainData = async (
     fetchBounds.east < -154;
 
   if (!rawData && useUSGS && (isCONUS || isAlaska || isHawaii)) {
-    onProgress?.("Fetching USGS 1m DEM data...");
-    const usgsResult = await fetchUSGSRaw(fetchBounds);
+    const usgsResult = await fetchUSGSRaw(fetchBounds, onProgress);
     if (usgsResult) {
       rawData = usgsResult.data;
       sourceGeoTiffs = {
@@ -500,9 +498,20 @@ export const fetchTerrainData = async (
     }
   }
 
+  onProgress?.(
+    `Downloading ${requests.filter((r) => r.type === "terrain").length} terrain and ${requests.filter((r) => r.type === "satellite").length} satellite tiles...`,
+  );
+
+  let completed = 0;
   await pMap(
     requests,
     async ({ tx, ty, type }) => {
+      completed++;
+      if (completed % 10 === 0 || completed === requests.length) {
+        onProgress?.(
+          `Downloaded ${completed}/${requests.length} global tiles...`,
+        );
+      }
       if (type === "terrain") {
         const drawX = (tx - minTileX) * TILE_SIZE;
         const drawY = (ty - minTileY) * TILE_SIZE;
@@ -671,7 +680,7 @@ export const fetchTerrainData = async (
   };
 
   if (includeOSM && osmFeatures.length > 0) {
-    const options = { Roads: true, baseColor };
+    const options = { Roads: true, baseColor, onProgress };
     onProgress?.("Generating OSM texture...");
     terrainData.osmTextureUrl = await generateOSMTexture(terrainData, options);
     onProgress?.("Generating Hybrid texture...");
@@ -711,7 +720,7 @@ export const addOSMToTerrain = async (
   const newTerrainData = { ...terrainData, osmFeatures };
 
   if (osmFeatures.length > 0) {
-    const options = { Roads: true, baseColor };
+    const options = { Roads: true, baseColor, onProgress };
     onProgress?.("Generating OSM texture...");
     newTerrainData.osmTextureUrl = await generateOSMTexture(
       newTerrainData,

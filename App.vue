@@ -122,11 +122,23 @@
           />
         </div>
         
-        <div v-if="terrainData && previewMode" class="absolute inset-0 transition-all duration-500 bg-black">
-          <Preview3D 
-            :terrain-data="terrainData" 
-            @update-textures="handleUpdateTextures"
-          />
+        <!-- 3D Preview View -->
+        <div :class="['absolute inset-0 transition-all duration-500 bg-black', previewMode ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
+          <Suspense>
+            <template #default>
+              <Preview3D 
+                v-if="terrainData && previewMode"
+                :terrain-data="terrainData" 
+                @update-textures="handleUpdateTextures"
+              />
+            </template>
+            <template #fallback>
+              <div class="w-full h-full flex items-center justify-center text-white flex-col gap-4">
+                <Loader2 class="animate-spin text-[#FF6600]" :size="48" />
+                <div class="text-lg font-medium text-white">Loading 3D Scene...</div>
+              </div>
+            </template>
+          </Suspense>
         </div>
         
         <!-- Loading Overlay -->
@@ -494,6 +506,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
         useUSGS, 
         useGPXZ, 
         gpxzApiKey,
+        undefined,
         (status) => { loadingStatus.value = status; }
     );
     terrainData.value = data;
@@ -517,7 +530,7 @@ const handleFetchOSM = async () => {
   loadingStatus.value = "Fetching OSM data...";
   
   try {
-      const updatedData = await addOSMToTerrain(terrainData.value, (status) => {
+      const updatedData = await addOSMToTerrain(terrainData.value, undefined, (status) => {
           loadingStatus.value = status;
       });
       terrainData.value = updatedData;
