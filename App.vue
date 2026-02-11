@@ -151,6 +151,12 @@
                 <span v-if="resolution >= 2048">High resolution (2048+) may take 1-2 minutes.</span>
                 <span v-if="resolution >= 4096" class="block text-amber-500 mt-1">Very large area (4k/8k). Please wait...</span>
             </div>
+            <button
+              @click="cancelGeneration"
+              class="mt-5 px-6 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       </div>
@@ -415,9 +421,11 @@ import MapSelector from './components/MapSelector.vue';
 import Preview3D from './components/Preview3D.vue';
 import { fetchTerrainData, addOSMToTerrain } from './services/terrain';
 
-const center = ref({ lat: 35.1983, lng: -111.6513 }); // Flagstaff, AZ default
-const zoom = ref(13);
-const resolution = ref(1024);
+const center = ref(
+  JSON.parse(localStorage.getItem('mapng_center') || 'null') || { lat: 35.1983, lng: -111.6513 }
+);
+const zoom = ref(parseInt(localStorage.getItem('mapng_zoom')) || 13);
+const resolution = ref(parseInt(localStorage.getItem('mapng_resolution')) || 1024);
 const terrainData = ref(null);
 const isLoading = ref(false);
 const loadingStatus = ref("Initializing...");
@@ -426,6 +434,7 @@ const showStackInfo = ref(false);
 const showAbout = ref(false);
 const showDisclaimer = ref(false);
 const isDarkMode = ref(false);
+let abortController = null;
 
 const toggleDarkMode = () => {
   isDarkMode.value = !isDarkMode.value;
@@ -473,21 +482,38 @@ onMounted(() => {
 const handleLocationChange = (newCenter) => {
   center.value = newCenter;
   terrainData.value = null;
+  // Cancel any in-flight generation when location changes
+  if (abortController) {
+    abortController.abort();
+    abortController = null;
+  }
 };
 
 const setCenter = (newCenter) => {
   center.value = newCenter;
+  localStorage.setItem('mapng_center', JSON.stringify(newCenter));
 };
 
 const setZoom = (newZoom) => {
   zoom.value = newZoom;
+  localStorage.setItem('mapng_zoom', String(newZoom));
 };
 
 const setResolution = (newResolution) => {
   resolution.value = newResolution;
+  localStorage.setItem('mapng_resolution', String(newResolution));
 };
 
 const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey) => {
+  // Cancel any in-flight generation
+  if (abortController) {
+    abortController.abort();
+    abortController = null;
+  }
+
+  abortController = new AbortController();
+  const { signal } = abortController;
+
   isLoading.value = true;
   loadingStatus.value = "Starting terrain generation...";
   
@@ -507,7 +533,8 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
         useGPXZ, 
         gpxzApiKey,
         undefined,
-        (status) => { loadingStatus.value = status; }
+        (status) => { loadingStatus.value = status; },
+        signal
     );
     terrainData.value = data;
     
@@ -516,10 +543,16 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
         previewMode.value = true;
     }
   } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log("Terrain generation cancelled.");
+      loadingStatus.value = "Cancelled.";
+      return;
+    }
     console.error("Failed to generate terrain:", error);
     alert("Failed to fetch terrain data. The requested area might be too large or service is down.");
   } finally {
     isLoading.value = false;
+    abortController = null;
   }
 };
 
@@ -549,6 +582,13 @@ const handleUpdateTextures = ({ osmTextureUrl, hybridTextureUrl }) => {
       osmTextureUrl,
       hybridTextureUrl
     };
+  }
+};
+
+const cancelGeneration = () => {
+  if (abortController) {
+    abortController.abort();
+    abortController = null;
   }
 };
 

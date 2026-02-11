@@ -1,5 +1,6 @@
 import proj4 from 'proj4';
 import * as GeoTIFF from 'geotiff';
+import { createLocalToWGS84 } from './geoUtils';
 
 /**
  * Resamples a source raster (GeoTIFF or generic sampler) to a 1 meter/pixel grid
@@ -16,10 +17,8 @@ export const resampleToMeterGrid = async (
     
     const heightMap = new Float32Array(width * height);
     
-    // Define a local projection centered on the target area
-    // Transverse Mercator is good for local scale accuracy
-    const localProjDef = `+proj=tmerc +lat_0=${center.lat} +lon_0=${center.lng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
-    const toWGS84 = proj4(localProjDef, 'EPSG:4326');
+    // Use shared local Transverse Mercator projection
+    const toWGS84 = createLocalToWGS84(center.lat, center.lng);
 
     // Calculate the extent in meters (centered at 0,0 in local proj)
     const halfWidth = width / 2;
@@ -252,9 +251,8 @@ export const resampleImageToMeterGrid = async (
     const imageData = ctx.createImageData(width, height);
     const data = imageData.data;
 
-    // Define local projection (same as heightmap)
-    const localProjDef = `+proj=tmerc +lat_0=${center.lat} +lon_0=${center.lng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
-    const toWGS84 = proj4(localProjDef, 'EPSG:4326');
+    // Use shared local Transverse Mercator projection
+    const toWGS84 = createLocalToWGS84(center.lat, center.lng);
 
     const halfWidth = width / 2;
     const halfHeight = height / 2;

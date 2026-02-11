@@ -5,6 +5,10 @@ import {
   resampleToMeterGrid,
   resampleImageToMeterGrid,
 } from "./terrainResampler";
+import {
+  resampleHeightMapOffThread,
+  resampleImageOffThread,
+} from "./workerResampler";
 
 // Constants
 const TILE_SIZE = 256;
@@ -40,8 +44,9 @@ export const project = (lat, lng, zoom) => {
 
 const NO_DATA_VALUE = -99999;
 
-const fetchGPXZRaw = async (bounds, apiKey, onProgress) => {
+const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
   try {
+    signal?.throwIfAborted();
     // 1. Check Resolution via Points API
     // We check the center point to see what dataset is being used
     const centerLat = (bounds.north + bounds.south) / 2;
@@ -52,6 +57,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress) => {
       const pointsUrl = `https://api.gpxz.io/v1/elevation/points?latlons=${centerLat},${centerLng}`;
       const pointsResp = await fetch(pointsUrl, {
         headers: { "x-api-key": apiKey },
+        signal,
       });
       if (pointsResp.ok) {
         const pointsData = await pointsResp.json();
@@ -143,6 +149,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress) => {
       async (reqBounds) => {
         // Enforce 1 request per second rate limit for free tier
         await new Promise((r) => setTimeout(r, 1100));
+        signal?.throwIfAborted();
 
         const url = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=1&projection=latlon`;
 
@@ -152,7 +159,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress) => {
         const MAX_RETRIES = 3;
 
         while (retries < MAX_RETRIES) {
-          response = await fetch(url, { headers: { "x-api-key": apiKey } });
+          response = await fetch(url, { headers: { "x-api-key": apiKey }, signal });
 
           if (response.status === 429) {
             const waitTime = 2000 * Math.pow(2, retries); // Exponential backoff: 2s, 4s, 8s
@@ -200,13 +207,14 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress) => {
   }
 };
 
-const fetchUSGSRaw = async (bounds, onProgress) => {
+const fetchUSGSRaw = async (bounds, onProgress, signal) => {
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 1000;
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   try {
+    signal?.throwIfAborted();
     // 1. Query USGS API
     // Round coordinates to 6 decimal places to improve cache hit rate and reduce query string length
     const bbox = `${bounds.west.toFixed(6)},${bounds.south.toFixed(6)},${bounds.east.toFixed(6)},${bounds.north.toFixed(6)}`;
@@ -224,7 +232,7 @@ const fetchUSGSRaw = async (bounds, onProgress) => {
         const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
         response = await fetch(url, {
-          signal: controller.signal,
+          signal: signal || controller.signal,
           // Ensure no custom headers are sent to avoid preflight OPTIONS request which fails on USGS
           headers: {},
         });
@@ -266,9 +274,10 @@ const fetchUSGSRaw = async (bounds, onProgress) => {
       const item = data.items[i];
       const downloadUrl = item.downloadURL;
       onProgress?.(`Downloading USGS tile ${i + 1}/${data.items.length}...`);
+      signal?.throwIfAborted();
 
       try {
-        const tiffResponse = await fetch(downloadUrl);
+        const tiffResponse = await fetch(downloadUrl, { signal });
         if (!tiffResponse.ok) {
           console.warn(
             `[USGS] Failed to download tile: ${tiffResponse.status}`,
@@ -306,12 +315,13 @@ const fetchUSGSRaw = async (bounds, onProgress) => {
 };
 
 // Helper for concurrency control
-async function pMap(items, mapper, concurrency) {
+async function pMap(items, mapper, concurrency, signal) {
   const results = new Array(items.length);
   let index = 0;
 
   const next = async () => {
     while (index < items.length) {
+      signal?.throwIfAborted();
       const i = index++;
       try {
         results[i] = await mapper(items[i]);
@@ -331,12 +341,15 @@ async function pMap(items, mapper, concurrency) {
   return results;
 }
 
-const loadImage = (url) => {
-  return new Promise((resolve) => {
+const loadImage = (url, signal) => {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) { reject(signal.reason); return; }
     const img = new Image();
     img.crossOrigin = "Anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => resolve(null);
+    const onAbort = () => { img.src = ''; reject(signal.reason); };
+    signal?.addEventListener('abort', onAbort, { once: true });
+    img.onload = () => { signal?.removeEventListener('abort', onAbort); resolve(img); };
+    img.onerror = () => { signal?.removeEventListener('abort', onAbort); resolve(null); };
     img.src = url;
   });
 };
@@ -350,6 +363,7 @@ export const fetchTerrainData = async (
   gpxzApiKey = "",
   baseColor = undefined,
   onProgress,
+  signal,
 ) => {
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
@@ -386,7 +400,7 @@ export const fetchTerrainData = async (
 
   if (useGPXZ && gpxzApiKey) {
     onProgress?.("Fetching high-res GPXZ elevation data...");
-    const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress);
+    const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress, signal);
     if (gpxzResult) {
       rawData = gpxzResult.data;
       shouldSmooth = gpxzResult.smooth;
@@ -414,7 +428,7 @@ export const fetchTerrainData = async (
     fetchBounds.east < -154;
 
   if (!rawData && useUSGS && (isCONUS || isAlaska || isHawaii)) {
-    const usgsResult = await fetchUSGSRaw(fetchBounds, onProgress);
+    const usgsResult = await fetchUSGSRaw(fetchBounds, onProgress, signal);
     if (usgsResult) {
       rawData = usgsResult.data;
       sourceGeoTiffs = {
@@ -520,7 +534,7 @@ export const fetchTerrainData = async (
         const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
 
         const terrainUrl = `${TILE_API_URL}/${TERRAIN_ZOOM}/${wrappedTx}/${ty}.png`;
-        const tImg = await loadImage(terrainUrl);
+        const tImg = await loadImage(terrainUrl, signal);
         if (tImg) tCtx.drawImage(tImg, drawX, drawY);
         else {
           tCtx.fillStyle = "black";
@@ -534,7 +548,7 @@ export const fetchTerrainData = async (
         const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
 
         const satUrl = `${SATELLITE_API_URL}/${SATELLITE_ZOOM}/${ty}/${wrappedTx}`;
-        const sImg = await loadImage(satUrl);
+        const sImg = await loadImage(satUrl, signal);
         if (sImg) sCtx.drawImage(sImg, drawX, drawY);
         else {
           sCtx.fillStyle = "#1a1a1a";
@@ -543,6 +557,7 @@ export const fetchTerrainData = async (
       }
     },
     20,
+    signal,
   );
 
   // Create Samplers from Canvases
@@ -621,27 +636,53 @@ export const fetchTerrainData = async (
   };
 
   // 4. Resample Heightmap to Metric Grid
+  signal?.throwIfAborted();
   onProgress?.("Resampling heightmap to 1m/px...");
-  const { heightMap, bounds: finalBounds } = await resampleToMeterGrid(
+
+  // Prepare serializable fallback sampler data for the web worker
+  const fallbackSamplerData = terrainDataImg ? {
+    pixels: terrainDataImg.data,
+    width: terrainDataImg.width,
+    height: terrainDataImg.height,
+    zoom: TERRAIN_ZOOM,
+    minTileX,
+    minTileY,
+  } : null;
+
+  const { heightMap, bounds: finalBounds } = await resampleHeightMapOffThread(
     {
       type: rawData ? "geotiff" : "sampler",
       data: rawData || undefined,
       sampler: heightSampler || undefined,
     },
-    center,
+    normalizedCenter,
     width,
     height,
     "bilinear",
     shouldSmooth,
+    fallbackSamplerData,
   );
 
   // 5. Resample Satellite Texture to Metric Grid
+  signal?.throwIfAborted();
   onProgress?.("Resampling satellite texture...");
-  const finalSatCanvas = await resampleImageToMeterGrid(
+
+  // Prepare serializable satellite data for the web worker
+  const imageSamplerData = {
+    pixels: satDataImg.data,
+    width: satDataImg.width,
+    height: satDataImg.height,
+    zoom: SATELLITE_ZOOM,
+    minTileX: satMinTileX,
+    minTileY: satMinTileY,
+  };
+
+  const finalSatCanvas = await resampleImageOffThread(
     { sampler: colorSampler },
-    center,
+    normalizedCenter,
     width,
     height,
+    imageSamplerData,
   );
 
   // 6. Calculate Min/Max
@@ -660,6 +701,7 @@ export const fetchTerrainData = async (
   // 7. Fetch OSM Data
   let osmFeatures = [];
   if (includeOSM) {
+    signal?.throwIfAborted();
     onProgress?.("Fetching OpenStreetMap data...");
     osmFeatures = await fetchOSMData(finalBounds);
   }

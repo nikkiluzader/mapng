@@ -1,4 +1,4 @@
-import proj4 from "proj4";
+import { createWGS84ToLocal } from "./geoUtils.js";
 
 // Colors mixed from standard OSM Carto and OpenStreetBrowser
 // Carto: https://github.com/gravitystorm/openstreetmap-carto/blob/master/style/landcover.mss
@@ -747,8 +747,7 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
 
   const centerLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
   const centerLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
-  const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
-  const toMetric = proj4("EPSG:4326", localProjDef);
+  const toMetric = createWGS84ToLocal(centerLat, centerLng);
   const halfW = terrainData.width / 2,
     halfH = terrainData.height / 2;
 
@@ -810,8 +809,7 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
 
   const centerLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
   const centerLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
-  const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
-  const toMetric = proj4("EPSG:4326", localProjDef);
+  const toMetric = createWGS84ToLocal(centerLat, centerLng);
   const halfW = terrainData.width / 2,
     halfH = terrainData.height / 2;
 

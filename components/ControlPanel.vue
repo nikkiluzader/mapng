@@ -378,7 +378,7 @@ import LocationSearch from './LocationSearch.vue';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
 import { exportGeoTiff } from '../services/exportGeoTiff';
-import proj4 from 'proj4';
+import { createWGS84ToLocal } from '../services/geoUtils';
 import { encode } from 'fast-png';
 
 
@@ -418,11 +418,11 @@ const isExportingHybridTexture = ref(false);
 const isExportingOSM = ref(false);
 const isExportingRoadMask = ref(false);
 const isExportingGeoTIFF = ref(false);
-const fetchOSM = ref(true);
+const fetchOSM = ref(localStorage.getItem('mapng_fetchOSM') !== 'false');
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
-const elevationSource = ref('default');
-const gpxzApiKey = ref('');
+const elevationSource = ref(localStorage.getItem('mapng_elevationSource') || 'default');
+const gpxzApiKey = ref(localStorage.getItem('mapng_gpxzApiKey') || '');
 const usgsStatus = ref(null);
 
 const interestingLocations = [
@@ -457,6 +457,9 @@ const handleSearchSelect = (result) => {
 };
 
 onMounted(async () => {
+    // Initialize flags from persisted elevation source
+    useUSGS.value = elevationSource.value === 'usgs';
+    useGPXZ.value = elevationSource.value === 'gpxz';
     usgsStatus.value = await checkUSGSStatus();
 });
 
@@ -472,6 +475,17 @@ watch(() => props.isGenerating, async (newVal) => {
 watch(elevationSource, (newVal) => {
     useUSGS.value = newVal === 'usgs';
     useGPXZ.value = newVal === 'gpxz';
+    localStorage.setItem('mapng_elevationSource', newVal);
+});
+
+// Persist OSM toggle
+watch(fetchOSM, (newVal) => {
+    localStorage.setItem('mapng_fetchOSM', String(newVal));
+});
+
+// Persist GPXZ API key
+watch(gpxzApiKey, (newVal) => {
+    localStorage.setItem('mapng_gpxzApiKey', newVal);
 });
 
 // Watch for terrain data updates to handle fallback scenarios
@@ -676,8 +690,7 @@ const downloadRoadMask = async () => {
 
         // Setup projection
         const center = props.center;
-        const localProjDef = `+proj=tmerc +lat_0=${center.lat} +lon_0=${center.lng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
-        const toLocal = proj4('EPSG:4326', localProjDef);
+        const toLocal = createWGS84ToLocal(center.lat, center.lng);
 
         // Draw roads
         ctx.strokeStyle = 'white';

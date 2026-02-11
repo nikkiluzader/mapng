@@ -1,38 +1,13 @@
 import * as THREE from "three";
-import proj4 from "proj4";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { textures } from "./textureGenerator.js";
+import { createMetricProjector } from "./geoUtils.js";
 
-// --- Constants & Helpers (Duplicated from OSMFeatures.vue for consistency) ---
+// --- Constants & Helpers ---
 export const SCENE_SIZE = 100;
 
-const getMetricProjector = (data) => {
-  const centerLat = (data.bounds.north + data.bounds.south) / 2;
-  const centerLng = (data.bounds.east + data.bounds.west) / 2;
-  const localProjDef = `+proj=tmerc +lat_0=${centerLat} +lon_0=${centerLng} +k=1 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`;
-  const toMetric = proj4("EPSG:4326", localProjDef);
-
-  // Calculate metric bounds to normalize coordinates
-  const [minX, minY] = toMetric.forward([data.bounds.west, data.bounds.south]);
-  const [maxX, maxY] = toMetric.forward([data.bounds.east, data.bounds.north]);
-
-  const widthM = Math.abs(maxX - minX);
-  const heightM = Math.abs(maxY - minY);
-
-  return (lat, lng) => {
-    const [localX, localY] = toMetric.forward([lng, lat]);
-
-    // Normalize 0..1 based on metric bounds
-    let u = (localX - minX) / widthM;
-    let v = (localY - minY) / heightM;
-
-    // Map to pixels (Y flipped for image coords)
-    const x = u * (data.width - 1);
-    const y = (1 - v) * (data.height - 1);
-
-    return { x, y };
-  };
-};
+const getMetricProjector = (data) =>
+  createMetricProjector(data.bounds, data.width, data.height);
 
 const getTerrainHeight = (data, lat, lng) => {
   const scenePos = latLngToScene(data, lat, lng);
