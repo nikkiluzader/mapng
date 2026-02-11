@@ -1,6 +1,6 @@
 <template>
   <div class="w-full h-full bg-black relative group">
-    <TresCanvas window-size clear-color="#000000" shadows>
+    <TresCanvas window-size :clear-color="textureType === 'none' ? '#ad8d60' : '#000000'" shadows :shadow-map-type="THREE_CONST.PCFShadowMap">
       <Suspense>
         <template #default>
           <TresGroup>
@@ -8,10 +8,10 @@
               :args="cameraArgs"
               :position="cameraPosition"
             />
-            <TresAmbientLight :intensity="0.2" />
+            <TresAmbientLight :intensity="0.1" />
             <TresDirectionalLight
-              :position="[50, 80, 50]"
-              :intensity="2.0"
+              :position="[150, 80, 100]"
+              :intensity="3.5"
               cast-shadow
               :shadow-mapSize-width="2048"
               :shadow-mapSize-height="2048"
@@ -19,9 +19,9 @@
               :shadow-camera-right="100"
               :shadow-camera-top="100"
               :shadow-camera-bottom="-100"
-              :shadow-camera-near="0.1"
-              :shadow-camera-far="500"
-              :shadow-bias="-0.002"
+              :shadow-camera-near="50"
+              :shadow-camera-far="600"
+              :shadow-bias="-0.0005"
             />
 
             <Environment :files="currentHdrFile" :background="true" />
@@ -260,6 +260,8 @@
 
 <script setup>
 import { ref, computed, watch, reactive, shallowRef, toRaw } from "vue";
+import * as THREE from "three";
+const THREE_CONST = THREE; // Expose to template
 import { TresCanvas } from "@tresjs/core";
 import { OrbitControls, Environment } from "@tresjs/cientos";
 import {
