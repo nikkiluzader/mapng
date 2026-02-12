@@ -6,7 +6,7 @@ const props = defineProps({
   terrainData: { required: true },
   featureVisibility: { 
     type: Object, 
-    default: () => ({ buildings: true, water: true, vegetation: true, barriers: true }) 
+    default: () => ({ buildings: true, vegetation: true, barriers: true }) 
   }
 });
 

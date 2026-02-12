@@ -464,10 +464,11 @@ const createTerrainMesh = async (data) => {
       };
 
       // 4. Load Texture (Async)
-      if (data.satelliteTextureUrl) {
+      const textureUrl = data.osmTextureUrl || data.satelliteTextureUrl;
+      if (textureUrl) {
         const loader = new THREE.TextureLoader();
         loader.load(
-          data.satelliteTextureUrl,
+          textureUrl,
           (tex) => {
             tex.colorSpace = THREE.SRGBColorSpace;
             tex.minFilter = THREE.LinearFilter;
@@ -504,7 +505,7 @@ export const createOSMGroup = (data) => {
   const treesList = [];
   const bushesList = [];
   const barriersList = [];
-  const waterList = [];
+
 
   const getBarrierConfig = (tags) => {
     const type = tags.barrier;
@@ -859,28 +860,6 @@ export const createOSMGroup = (data) => {
           });
         }
       }
-    } else if (f.type === "water" && f.geometry.length > 2) {
-      const shape = new THREE.Shape();
-      const points = f.geometry.map((p) => latLngToScene(data, p.lat, p.lng));
-      points.forEach((p, i) => {
-        if (i === 0) shape.moveTo(p.x, -p.z);
-        else shape.lineTo(p.x, -p.z);
-      });
-      (f.holes || []).forEach((hole) => {
-        const path = new THREE.Path();
-        hole.forEach((p, i) => {
-          const sp = latLngToScene(data, p.lat, p.lng);
-          if (i === 0) path.moveTo(sp.x, -sp.z);
-          else path.lineTo(sp.x, -sp.z);
-        });
-        shape.holes.push(path);
-      });
-      const geo = new THREE.ShapeGeometry(shape);
-      geo.rotateX(-Math.PI / 2);
-      let avgH = 0;
-      f.geometry.forEach((p) => (avgH += getTerrainHeight(data, p.lat, p.lng)));
-      geo.translate(0, avgH / f.geometry.length - 0.05 * unitsPerMeter, 0); // Slightly below ground
-      waterList.push(geo);
     }
   });
 
@@ -1259,29 +1238,6 @@ export const createOSMGroup = (data) => {
     }
     geos.forEach((g) => g.dispose());
     baseB.dispose();
-  }
-
-  if (waterList.length > 0) {
-    const merged = mergeGeometries(waterList);
-    if (merged) {
-      const waterMesh = new THREE.Mesh(
-        merged,
-        new THREE.MeshPhysicalMaterial({
-          color: "#3facff", // Bright blue
-          map: textures.water,
-          transparent: true,
-          opacity: 0.8,
-          roughness: 0.1,
-          metalness: 0.1,
-          ior: 1.33,
-          transmission: 0.2,
-        }),
-      );
-      waterMesh.receiveShadow = true;
-      waterMesh.name = "water";
-      group.add(waterMesh);
-    }
-    waterList.forEach((g) => g.dispose());
   }
 
   return group;

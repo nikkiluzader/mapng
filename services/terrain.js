@@ -724,12 +724,16 @@ export const fetchTerrainData = async (
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, baseColor, onProgress };
     onProgress?.("Generating OSM texture...");
-    terrainData.osmTextureUrl = await generateOSMTexture(terrainData, options);
+    const osmResult = await generateOSMTexture(terrainData, options);
+    terrainData.osmTextureUrl = osmResult.url;
+    terrainData.osmTextureCanvas = osmResult.canvas;
     onProgress?.("Generating Hybrid texture...");
-    terrainData.hybridTextureUrl = await generateHybridTexture(
+    const hybridResult = await generateHybridTexture(
       terrainData,
       options,
     );
+    terrainData.hybridTextureUrl = hybridResult.url;
+    terrainData.hybridTextureCanvas = hybridResult.canvas;
   }
 
   return terrainData;
@@ -764,15 +768,19 @@ export const addOSMToTerrain = async (
   if (osmFeatures.length > 0) {
     const options = { Roads: true, baseColor, onProgress };
     onProgress?.("Generating OSM texture...");
-    newTerrainData.osmTextureUrl = await generateOSMTexture(
+    const osmResult = await generateOSMTexture(
       newTerrainData,
       options,
     );
+    newTerrainData.osmTextureUrl = osmResult.url;
+    newTerrainData.osmTextureCanvas = osmResult.canvas;
     onProgress?.("Generating Hybrid texture...");
-    newTerrainData.hybridTextureUrl = await generateHybridTexture(
+    const hybridResult = await generateHybridTexture(
       newTerrainData,
       options,
     );
+    newTerrainData.hybridTextureUrl = hybridResult.url;
+    newTerrainData.hybridTextureCanvas = hybridResult.canvas;
   }
 
   return newTerrainData;

@@ -81,17 +81,40 @@ const textureCache = reactive({
   hybrid: null
 });
 
-// Helper to load and configure a texture
+// Track canvas refs for direct CanvasTexture usage
+const canvasCache = reactive({
+  osm: null,
+  hybrid: null
+});
+
+// Helper to load and configure a texture from URL
 const loadTexture = (url) => {
   if (!url) return null;
   const tex = new THREE.TextureLoader().load(url);
   tex.colorSpace = THREE.SRGBColorSpace;
-  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.magFilter = THREE.LinearFilter;
-  tex.anisotropy = 16; // We'll set this more accurately in the watcher if needed, but 16 is safe
+  tex.anisotropy = 16;
   tex.flipY = false;
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
+  return markRaw(tex);
+};
+
+// Helper to create texture directly from canvas (skips PNG encode/decode)
+const loadCanvasTexture = (canvas) => {
+  if (!canvas) return null;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = 16;
+  tex.flipY = false;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.needsUpdate = true;
   return markRaw(tex);
 };
 
@@ -103,12 +126,28 @@ watch(() => props.terrainData?.satelliteTextureUrl, (url) => {
 
 watch(() => props.terrainData?.osmTextureUrl, (url) => {
   if (textureCache.osm) textureCache.osm.dispose();
-  textureCache.osm = loadTexture(url);
+  // Prefer direct canvas if available (sharper, avoids PNG round-trip)
+  const canvas = props.terrainData?.osmTextureCanvas;
+  if (canvas) {
+    canvasCache.osm = canvas;
+    textureCache.osm = loadCanvasTexture(canvas);
+  } else {
+    canvasCache.osm = null;
+    textureCache.osm = loadTexture(url);
+  }
 }, { immediate: true });
 
 watch(() => props.terrainData?.hybridTextureUrl, (url) => {
   if (textureCache.hybrid) textureCache.hybrid.dispose();
-  textureCache.hybrid = loadTexture(url);
+  // Prefer direct canvas if available
+  const canvas = props.terrainData?.hybridTextureCanvas;
+  if (canvas) {
+    canvasCache.hybrid = canvas;
+    textureCache.hybrid = loadCanvasTexture(canvas);
+  } else {
+    canvasCache.hybrid = null;
+    textureCache.hybrid = loadTexture(url);
+  }
 }, { immediate: true });
 
 // The currently active texture is just a lookup in our cache

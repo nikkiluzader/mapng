@@ -292,12 +292,13 @@ const textureType = ref("osm");
 const showWireframe = ref(false);
 const featureVisibility = reactive({
   buildings: true,
-  water: false,
   vegetation: true,
   barriers: true,
 });
 const customOsmUrl = ref(null);
 const customHybridUrl = ref(null);
+const customOsmCanvas = ref(null);
+const customHybridCanvas = ref(null);
 const isRegenerating = ref(false);
 
 const baseColor = ref('#999999');
@@ -315,15 +316,19 @@ const regenerateTextures = async () => {
   isRegenerating.value = true;
   try {
     const options = { baseColor: baseColor.value };
-    const osmUrl = await generateOSMTexture(props.terrainData, options);
-    const hybridUrl = await generateHybridTexture(props.terrainData, options);
+    const osmResult = await generateOSMTexture(props.terrainData, options);
+    const hybridResult = await generateHybridTexture(props.terrainData, options);
  
-    customOsmUrl.value = osmUrl;
-    customHybridUrl.value = hybridUrl;
+    customOsmUrl.value = osmResult.url;
+    customHybridUrl.value = hybridResult.url;
+    customOsmCanvas.value = osmResult.canvas;
+    customHybridCanvas.value = hybridResult.canvas;
     
     emit("update-textures", {
-      osmTextureUrl: osmUrl,
-      hybridTextureUrl: hybridUrl,
+      osmTextureUrl: osmResult.url,
+      hybridTextureUrl: hybridResult.url,
+      osmTextureCanvas: osmResult.canvas,
+      hybridTextureCanvas: hybridResult.canvas,
     });
   } catch (e) {
     console.error("Failed to regenerate textures:", e);
@@ -342,7 +347,17 @@ watch(
   () => props.terrainData?.osmFeatures,
   async (newFeatures) => {
     if (newFeatures) {
-      await regenerateTextures();
+      // If terrain.js already generated textures with canvas, use them
+      // directly instead of re-rendering (avoids duplicate 16k render)
+      const td = props.terrainData;
+      if (td?.osmTextureCanvas && td?.osmTextureUrl) {
+        customOsmUrl.value = td.osmTextureUrl;
+        customOsmCanvas.value = td.osmTextureCanvas;
+        customHybridUrl.value = td.hybridTextureUrl || null;
+        customHybridCanvas.value = td.hybridTextureCanvas || null;
+      } else {
+        await regenerateTextures();
+      }
     }
   },
   { immediate: true },
@@ -361,6 +376,8 @@ const mergedTerrainData = computed(() => {
     ...props.terrainData,
     osmTextureUrl: activeOsmTexture.value,
     hybridTextureUrl: activeHybridTexture.value,
+    osmTextureCanvas: customOsmCanvas.value || props.terrainData?.osmTextureCanvas,
+    hybridTextureCanvas: customHybridCanvas.value || props.terrainData?.hybridTextureCanvas,
     satelliteTextureUrl: props.terrainData?.satelliteTextureUrl,
   };
 });
