@@ -1,6 +1,6 @@
 <template>
   <div class="w-full h-full bg-black relative group">
-    <TresCanvas window-size :clear-color="textureType === 'none' ? '#ad8d60' : '#000000'" shadows :shadow-map-type="THREE_CONST.PCFShadowMap">
+    <TresCanvas window-size :clear-color="textureType === 'none' ? '#ad8d60' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="1.0">
       <Suspense>
         <template #default>
           <TresGroup>
@@ -8,23 +8,18 @@
               :args="cameraArgs"
               :position="cameraPosition"
             />
-            <TresAmbientLight :intensity="0.1" />
-            <TresDirectionalLight
-              :position="[150, 80, 100]"
-              :intensity="3.5"
-              cast-shadow
-              :shadow-mapSize-width="2048"
-              :shadow-mapSize-height="2048"
-              :shadow-camera-left="-100"
-              :shadow-camera-right="100"
-              :shadow-camera-top="100"
-              :shadow-camera-bottom="-100"
-              :shadow-camera-near="50"
-              :shadow-camera-far="600"
-              :shadow-bias="-0.0005"
+            <CSMLight
+              :light-direction="[-1, -0.5, -0.65]"
+              :cascades="4"
+              :shadow-map-size="4096"
+              :max-far="500"
+              :light-intensity="3.5"
+              :ambient-intensity="0.02"
+              :shadow-bias="-0.0001"
+              :light-margin="50"
             />
 
-            <Environment :files="currentHdrFile" :background="true" />
+            <Environment :files="currentHdrFile" :background="true" :environment-intensity="0.05" />
 
             <TerrainMesh
               :terrain-data="mergedTerrainData"
@@ -261,7 +256,6 @@
 <script setup>
 import { ref, computed, watch, reactive, shallowRef, toRaw } from "vue";
 import * as THREE from "three";
-const THREE_CONST = THREE; // Expose to template
 import { TresCanvas } from "@tresjs/core";
 import { OrbitControls, Environment } from "@tresjs/cientos";
 import {
@@ -272,6 +266,7 @@ import {
 } from "lucide-vue-next";
 import TerrainMesh from "./TerrainMesh.vue";
 import OSMFeatures3D from "./OSMFeatures3D.vue";
+import CSMLight from "./CSMLight.vue";
 import {
   generateOSMTexture,
   generateHybridTexture,
