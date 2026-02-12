@@ -51,6 +51,7 @@
           @resolution-change="setResolution"
           @generate="handleGenerate"
           @fetch-osm="handleFetchOSM"
+          @surrounding-tiles-change="(v) => surroundingTilePositions = v"
         />
       </div>
       
@@ -118,6 +119,7 @@
             :zoom="zoom" 
             :resolution="resolution"
             :is-dark-mode="isDarkMode"
+            :surrounding-tile-positions="surroundingTilePositions"
             @move="setCenter" 
             @zoom="setZoom"
           />
@@ -436,6 +438,7 @@ const showStackInfo = ref(false);
 const showAbout = ref(false);
 const showDisclaimer = ref(false);
 const isDarkMode = ref(false);
+const surroundingTilePositions = ref([]);
 let abortController = null;
 
 const toggleDarkMode = () => {

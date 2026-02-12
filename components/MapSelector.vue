@@ -49,6 +49,17 @@
         :fill-opacity="0.1"
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
+
+      <!-- Surrounding Tile Bounding Boxes -->
+      <l-rectangle
+        v-for="rect in surroundingBounds"
+        :key="rect.key"
+        :bounds="[[rect.south, rect.west], [rect.north, rect.east]]"
+        color="#3B82F6"
+        :weight="1.5"
+        :fill-opacity="0.06"
+        :options="{ dashArray: '4, 6', lineCap: 'round' }"
+      />
     </l-map>
 
     <!-- Custom Layer Control -->
@@ -97,6 +108,7 @@ import { LMap, LTileLayer, LRectangle } from '@vue-leaflet/vue-leaflet';
 import { Layers } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { getAdjacentBounds, POSITION_LABELS } from '../services/surroundingTiles';
 
 // Fix Leaflet icon assets
 // @ts-ignore
@@ -115,7 +127,8 @@ const props = defineProps({
   center: { type: Object, required: true },
   zoom: { type: Number, required: true },
   resolution: { type: [Number, String], required: true },
-  isDarkMode: { type: Boolean, default: false }
+  isDarkMode: { type: Boolean, default: false },
+  surroundingTilePositions: { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(['move', 'zoom']);
@@ -157,6 +170,33 @@ const bounds = computed(() => {
   const se = L.latLng(center.lat - halfLat, center.lng + halfLng);
   
   return L.latLngBounds(nw, se);
+});
+
+// Compute surrounding tile bounding boxes from current center + resolution
+const surroundingBounds = computed(() => {
+  if (!props.surroundingTilePositions?.length) return [];
+
+  const center = currentCenter.value;
+  const sizeMeters = Number(props.resolution);
+  
+  const metersPerDegLat = 111320;
+  const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+  
+  const latSpan = sizeMeters / metersPerDegLat;
+  const lngSpan = sizeMeters / metersPerDegLng;
+  
+  const centerBounds = {
+    north: center.lat + latSpan / 2,
+    south: center.lat - latSpan / 2,
+    east:  center.lng + lngSpan / 2,
+    west:  center.lng - lngSpan / 2,
+  };
+
+  return props.surroundingTilePositions.map(pos => ({
+    key: pos,
+    label: POSITION_LABELS[pos],
+    ...getAdjacentBounds(centerBounds, pos),
+  }));
 });
 
 // Handle map move

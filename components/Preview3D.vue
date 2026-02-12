@@ -33,6 +33,12 @@
               :feature-visibility="featureVisibility"
             />
 
+            <SurroundingTerrain3D
+              :terrain-data="terrainData"
+              :visible="showSurroundings"
+              quality="low"
+            />
+
             <OrbitControls
               ref="controlsRef"
               make-default
@@ -183,6 +189,23 @@
             <div class="relative">
               <input
                 type="checkbox"
+                v-model="showSurroundings"
+                class="peer sr-only"
+              />
+              <div
+                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"
+              ></div>
+            </div>
+            <span class="text-xs text-gray-700 group-hover/check:text-gray-900"
+              >Surrounding Terrain</span
+            >
+          </label>
+          <p v-if="showSurroundings" class="text-[10px] text-gray-400 ml-11 -mt-1">Low-res adjacent tiles. May take a moment to load.</p>
+
+          <label class="flex items-center gap-2 cursor-pointer group/check">
+            <div class="relative">
+              <input
+                type="checkbox"
                 v-model="showWireframe"
                 class="peer sr-only"
               />
@@ -267,6 +290,7 @@ import {
 import TerrainMesh from "./TerrainMesh.vue";
 import OSMFeatures3D from "./OSMFeatures3D.vue";
 import CSMLight from "./CSMLight.vue";
+import SurroundingTerrain3D from "./SurroundingTerrain3D.vue";
 import {
   generateOSMTexture,
   generateHybridTexture,
@@ -285,6 +309,7 @@ const quality = ref("high");
 const preset = ref("Kloofendal Pure Sky");
 const textureType = ref("osm");
 const showWireframe = ref(false);
+const showSurroundings = ref(false);
 const featureVisibility = reactive({
   buildings: true,
   vegetation: true,

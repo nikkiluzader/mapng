@@ -156,8 +156,6 @@
           </option>
       </select>
     </div>
-
-    <!-- Generate Buttons -->
     <div class="pt-2 grid grid-cols-2 gap-3">
       <button
         @click="$emit('generate', true, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
@@ -209,6 +207,17 @@
           </template>
       </button>
     </div>
+
+    <hr class="border-gray-200 dark:border-gray-600" />
+
+    <!-- Surrounding Tiles -->
+    <SurroundingTiles 
+      :terrain-data="terrainData"
+      :center="center"
+      :resolution="resolution"
+      @update:selected-positions="(v) => $emit('surroundingTilesChange', v)"
+      @update:show-on-map="() => {}"
+    />
 
     <!-- Export Panel -->
     <div ref="exportPanel" v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
@@ -383,6 +392,7 @@
                 </div>
             </div>
         </div>
+
     </div>
 
     <hr class="border-gray-200 dark:border-gray-600" />
@@ -395,6 +405,7 @@ import { ref, computed, onMounted, watch, nextTick } from 'vue';
 import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, CircleCheck } from 'lucide-vue-next';
 import ModOfTheDay from './ModOfTheDay.vue';
 import LocationSearch from './LocationSearch.vue';
+import SurroundingTiles from './SurroundingTiles.vue';
 import { exportToGLB } from '../services/export3d';
 import { checkUSGSStatus } from '../services/terrain';
 import { exportGeoTiff } from '../services/exportGeoTiff';
@@ -404,7 +415,7 @@ import { encode } from 'fast-png';
 
 const props = defineProps(['center', 'resolution', 'isGenerating', 'terrainData', 'generationCacheKey']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm', 'surroundingTilesChange']);
 
 // Local state for formatted coordinate inputs to allow high precision typing
 const latInput = ref(props.center.lat.toString());
