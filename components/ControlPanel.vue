@@ -162,9 +162,19 @@
       <button
         @click="$emit('generate', true, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
         :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
-        class="py-3 bg-[#FF6600] hover:bg-[#E65C00] text-white font-bold rounded-md shadow-lg shadow-orange-900/10 flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"
+        :class="['py-3 font-bold rounded-md shadow-lg flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed',
+          isCached
+            ? 'bg-[#FF6600] hover:bg-[#E65C00] text-white shadow-orange-900/10'
+            : 'bg-[#FF6600] hover:bg-[#E65C00] text-white shadow-orange-900/10 disabled:bg-gray-300 dark:disabled:bg-gray-700']"
       >
           <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
+          <template v-else-if="isCached">
+              <div class="flex items-center gap-2">
+                   <Mountain :size="16" />
+                   <span>Preview 3D</span>
+              </div>
+              <span class="text-[10px] font-normal opacity-90">Using cached data</span>
+          </template>
           <template v-else>
               <div class="flex items-center gap-2">
                    <Mountain :size="16" />
@@ -176,10 +186,20 @@
 
       <button
         @click="$emit('generate', false, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
-        :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
-        class="py-3 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-bold rounded-md shadow-sm flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        :disabled="isGenerating || isCached || (useGPXZ && !gpxzApiKey)"
+        :class="['py-3 font-bold rounded-md shadow-sm flex flex-col items-center justify-center gap-1 transition-all disabled:cursor-not-allowed',
+          isCached
+            ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50']"
       >
            <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
+          <template v-else-if="isCached">
+              <div class="flex items-center gap-2">
+                   <CircleCheck :size="16" />
+                   <span>Data Ready</span>
+              </div>
+              <span class="text-[10px] font-normal text-emerald-600 dark:text-emerald-400">Download below</span>
+          </template>
           <template v-else>
               <div class="flex items-center gap-2">
                    <FileDown :size="16" />
@@ -372,7 +392,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode } from 'lucide-vue-next';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, CircleCheck } from 'lucide-vue-next';
 import ModOfTheDay from './ModOfTheDay.vue';
 import LocationSearch from './LocationSearch.vue';
 import { exportToGLB } from '../services/export3d';
@@ -382,7 +402,7 @@ import { createWGS84ToLocal } from '../services/geoUtils';
 import { encode } from 'fast-png';
 
 
-const props = defineProps(['center', 'resolution', 'isGenerating', 'terrainData']);
+const props = defineProps(['center', 'resolution', 'isGenerating', 'terrainData', 'generationCacheKey']);
 
 const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm']);
 
@@ -506,6 +526,21 @@ const metersPerPixel = computed(() => {
 const totalWidthMeters = computed(() => props.resolution * metersPerPixel.value);
 const totalAreaSqM = computed(() => totalWidthMeters.value * totalWidthMeters.value);
 const areaSqKm = computed(() => totalAreaSqM.value / 1000000);
+
+// Check if the current parameters match the last successful generation
+const isCached = computed(() => {
+  if (!props.generationCacheKey || !props.terrainData) return false;
+  const currentKey = JSON.stringify({
+    lat: props.center.lat,
+    lng: props.center.lng,
+    resolution: props.resolution,
+    osm: fetchOSM.value,
+    usgs: useUSGS.value,
+    gpxz: useGPXZ.value,
+    gpxzKey: useGPXZ.value ? gpxzApiKey.value : '',
+  });
+  return currentKey === props.generationCacheKey;
+});
 
 const isAreaLargeForGPXZ = computed(() => {
     return useGPXZ.value && areaSqKm.value > 10;

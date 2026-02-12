@@ -46,6 +46,7 @@
           :resolution="resolution"
           :terrain-data="terrainData"
           :is-generating="isLoading"
+          :generation-cache-key="lastGenerationKey"
           @location-change="handleLocationChange"
           @resolution-change="setResolution"
           @generate="handleGenerate"
@@ -427,6 +428,7 @@ const center = ref(
 const zoom = ref(parseInt(localStorage.getItem('mapng_zoom')) || 13);
 const resolution = ref(parseInt(localStorage.getItem('mapng_resolution')) || 1024);
 const terrainData = ref(null);
+const lastGenerationKey = ref(null);
 const isLoading = ref(false);
 const loadingStatus = ref("Initializing...");
 const previewMode = ref(false);
@@ -482,6 +484,7 @@ onMounted(() => {
 const handleLocationChange = (newCenter) => {
   center.value = newCenter;
   terrainData.value = null;
+  lastGenerationKey.value = null;
   // Cancel any in-flight generation when location changes
   if (abortController) {
     abortController.abort();
@@ -504,7 +507,68 @@ const setResolution = (newResolution) => {
   localStorage.setItem('mapng_resolution', String(newResolution));
 };
 
+// Build a cache key from the parameters that affect terrain generation.
+// If this key matches the last generation, we can skip re-fetching.
+const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey) => {
+  return JSON.stringify({
+    lat: c.lat,
+    lng: c.lng,
+    resolution: res,
+    osm,
+    usgs,
+    gpxz,
+    gpxzKey: gpxz ? gpxzKey : '',
+  });
+};
+
 const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey) => {
+  const requestKey = buildGenerationKey(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, gpxzApiKey);
+
+  // If we already have terrain data for the exact same parameters, reuse it
+  if (terrainData.value && lastGenerationKey.value) {
+    const cachedParams = JSON.parse(lastGenerationKey.value);
+    const newParams = JSON.parse(requestKey);
+
+    // Check if only the OSM toggle changed (was off, now on)
+    const onlyOsmAdded =
+      !cachedParams.osm && newParams.osm &&
+      cachedParams.lat === newParams.lat &&
+      cachedParams.lng === newParams.lng &&
+      cachedParams.resolution === newParams.resolution &&
+      cachedParams.usgs === newParams.usgs &&
+      cachedParams.gpxz === newParams.gpxz &&
+      cachedParams.gpxzKey === newParams.gpxzKey;
+
+    if (requestKey === lastGenerationKey.value) {
+      // Exact match — skip fetch entirely, just switch view if needed
+      if (showPreview) previewMode.value = true;
+      return;
+    }
+
+    if (onlyOsmAdded) {
+      // Terrain + textures are identical, just add OSM data on top
+      isLoading.value = true;
+      loadingStatus.value = "Adding OSM data to existing terrain...";
+      try {
+        const updatedData = await addOSMToTerrain(terrainData.value, undefined, (status) => {
+          loadingStatus.value = status;
+        });
+        terrainData.value = updatedData;
+        lastGenerationKey.value = requestKey;
+        if (showPreview) {
+          loadingStatus.value = "Rendering 3D scene...";
+          previewMode.value = true;
+        }
+      } catch (error) {
+        console.error("Failed to add OSM data:", error);
+        alert("Failed to fetch OSM data.");
+      } finally {
+        isLoading.value = false;
+      }
+      return;
+    }
+  }
+
   // Cancel any in-flight generation
   if (abortController) {
     abortController.abort();
@@ -520,6 +584,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
   // Flush old data to free memory before loading new large datasets
   if (terrainData.value) {
       terrainData.value = null;
+      lastGenerationKey.value = null;
       // Allow a brief moment for Vue to unmount 3D components and trigger disposal
       await new Promise(r => setTimeout(r, 100));
   }
@@ -537,6 +602,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
         signal
     );
     terrainData.value = data;
+    lastGenerationKey.value = requestKey;
     
     if (showPreview) {
         loadingStatus.value = "Rendering 3D scene...";
