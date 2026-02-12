@@ -352,18 +352,24 @@
             </button>
             
             <!-- GLB Model -->
-            <button 
-                @click="handleGLBExport"
-                :disabled="isExportingGLB"
-                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 h-24"
-            >
-                <div class="w-full h-full flex items-center justify-center mb-1">
-                    <Loader2 v-if="isExportingGLB" :size="24" class="animate-spin text-[#FF6600]" />
-                    <Box v-else :size="32" class="text-gray-400 dark:text-gray-500" />
-                </div>
-                <span class="text-[10px] font-medium">GLB Model</span>
-                <Download v-if="!isExportingGLB" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-            </button>
+            <div class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 h-24">
+                <button 
+                    @click="handleGLBExport"
+                    :disabled="isExportingGLB"
+                    class="w-full h-full flex flex-col items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors group disabled:opacity-50"
+                >
+                    <div class="w-full h-full flex items-center justify-center mb-1">
+                        <Loader2 v-if="isExportingGLB" :size="24" class="animate-spin text-[#FF6600]" />
+                        <Box v-else :size="32" class="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <span class="text-[10px] font-medium">GLB Model</span>
+                    <Download v-if="!isExportingGLB" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                </button>
+                <label class="flex items-center gap-1 mt-0.5 cursor-pointer" @click.stop>
+                    <input type="checkbox" v-model="glbIncludeSurroundings" class="accent-[#FF6600] w-3 h-3" />
+                    <span class="text-[9px] text-gray-500 dark:text-gray-400">+ Surroundings</span>
+                </label>
+            </div>
         </div>
 
         <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-2">
@@ -449,6 +455,7 @@ const isExportingHybridTexture = ref(false);
 const isExportingOSM = ref(false);
 const isExportingRoadMask = ref(false);
 const isExportingGeoTIFF = ref(false);
+const glbIncludeSurroundings = ref(false);
 const fetchOSM = ref(localStorage.getItem('mapng_fetchOSM') !== 'false');
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
@@ -828,7 +835,9 @@ const handleGLBExport = async () => {
   if (!props.terrainData) return;
   isExportingGLB.value = true;
   try {
-    await exportToGLB(props.terrainData);
+    await exportToGLB(props.terrainData, {
+      includeSurroundings: glbIncludeSurroundings.value,
+    });
   } catch (error) {
     console.error("GLB Export failed:", error);
     alert("Failed to export GLB.");

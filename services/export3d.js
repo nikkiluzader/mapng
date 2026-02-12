@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { textures } from "./textureGenerator.js";
 import { createMetricProjector } from "./geoUtils.js";
+import { fetchSurroundingTiles, POSITIONS } from "./surroundingTiles.js";
 
 // --- Constants & Helpers ---
 export const SCENE_SIZE = 100;
@@ -1243,14 +1244,23 @@ export const createOSMGroup = (data) => {
   return group;
 };
 
-export const exportToGLB = async (data) => {
+export const exportToGLB = async (data, options = {}) => {
+  const { includeSurroundings = false, onProgress } = options;
   try {
+    onProgress?.('Building terrain mesh...');
     const terrainMesh = await createTerrainMesh(data);
     const osmGroup = createOSMGroup(data);
     const scene = new THREE.Scene();
     scene.add(terrainMesh);
     scene.add(osmGroup);
 
+    if (includeSurroundings) {
+      onProgress?.('Fetching surrounding tiles for GLB...');
+      const surroundingGroup = await createSurroundingMeshes(data, onProgress);
+      if (surroundingGroup) scene.add(surroundingGroup);
+    }
+
+    onProgress?.('Encoding GLB...');
     const { GLTFExporter } =
       await import("three/examples/jsm/exporters/GLTFExporter.js");
     return new Promise((resolve, reject) => {
@@ -1265,6 +1275,7 @@ export const exportToGLB = async (data) => {
           link.download = `MapNG_Model_${date}.glb`;
           link.click();
           URL.revokeObjectURL(link.href);
+          onProgress?.('Done!');
           resolve();
         },
         (err) => reject(err),
@@ -1273,5 +1284,123 @@ export const exportToGLB = async (data) => {
     });
   } catch (err) {
     console.error("Export failed:", err);
+  }
+};
+
+// --- Surrounding Tiles for GLB ---
+
+const SURROUND_OFFSETS = {
+  NW: { x: -1, z: -1 },
+  N:  { x:  0, z: -1 },
+  NE: { x:  1, z: -1 },
+  W:  { x: -1, z:  0 },
+  E:  { x:  1, z:  0 },
+  SW: { x: -1, z:  1 },
+  S:  { x:  0, z:  1 },
+  SE: { x:  1, z:  1 },
+};
+
+const GLB_SURROUND_RES = 256;
+const GLB_SURROUND_SAT_ZOOM = 14;
+
+const createSurroundingMeshes = async (data, onProgress) => {
+  try {
+    const allPositions = POSITIONS.map(p => p.key);
+    const results = await fetchSurroundingTiles(
+      data.bounds,
+      allPositions,
+      GLB_SURROUND_RES,
+      GLB_SURROUND_SAT_ZOOM,
+      onProgress,
+    );
+
+    const latRad = ((data.bounds.north + data.bounds.south) / 2 * Math.PI) / 180;
+    const metersPerDegree = 111320 * Math.cos(latRad);
+    const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
+    const unitsPerMeter = SCENE_SIZE / realWidthMeters;
+
+    const group = new THREE.Group();
+    group.name = 'surrounding_terrain';
+
+    for (const [pos, tileData] of Object.entries(results)) {
+      const offset = SURROUND_OFFSETS[pos];
+      if (!offset) continue;
+
+      onProgress?.(`Building mesh for tile ${pos}...`);
+
+      const w = tileData.width;
+      const h = tileData.height;
+      const stride = 2;
+      const segsX = Math.floor((w - 1) / stride);
+      const segsY = Math.floor((h - 1) / stride);
+
+      const geo = new THREE.PlaneGeometry(SCENE_SIZE, SCENE_SIZE, segsX, segsY);
+      const verts = geo.attributes.position.array;
+
+      for (let i = 0; i < verts.length / 3; i++) {
+        const col = i % (segsX + 1);
+        const row = Math.floor(i / (segsX + 1));
+
+        const u = col / segsX;
+        const v = row / segsY;
+
+        const mapCol = Math.min(Math.round(u * (w - 1)), w - 1);
+        const mapRow = Math.min(Math.round(v * (h - 1)), h - 1);
+        const idx = mapRow * w + mapCol;
+
+        let elev = tileData.heightMap[idx];
+        if (elev < -10000) elev = tileData.minHeight;
+
+        const localX = u * SCENE_SIZE - SCENE_SIZE / 2;
+        const localZ = v * SCENE_SIZE - SCENE_SIZE / 2;
+
+        verts[i * 3]     = localX + offset.x * SCENE_SIZE;
+        verts[i * 3 + 1] = -(localZ + offset.z * SCENE_SIZE);
+        verts[i * 3 + 2] = (elev - data.minHeight) * unitsPerMeter;
+      }
+
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshStandardMaterial({
+        roughness: 1,
+        metalness: 0,
+        side: THREE.DoubleSide,
+        color: 0xffffff,
+      });
+
+      // Load satellite texture
+      if (tileData.satelliteDataUrl) {
+        try {
+          const tex = await new Promise((resolve, reject) => {
+            new THREE.TextureLoader().load(
+              tileData.satelliteDataUrl,
+              (t) => {
+                t.colorSpace = THREE.SRGBColorSpace;
+                t.minFilter = THREE.LinearFilter;
+                t.magFilter = THREE.LinearFilter;
+                resolve(t);
+              },
+              undefined,
+              reject,
+            );
+          });
+          mat.map = tex;
+        } catch {
+          // texture load failed, use solid color
+        }
+      }
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.updateMatrixWorld();
+      mesh.name = `terrain_${pos}`;
+      mesh.receiveShadow = true;
+      group.add(mesh);
+    }
+
+    return group;
+  } catch (e) {
+    console.error('[GLB Surroundings] Failed:', e);
+    return null;
   }
 };
