@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="16" fill="#FF6600"/>
+  <g fill="white" opacity="0.95">
+    <!-- Terrain/mountain shapes -->
+    <polygon points="15,75 35,35 55,75"/>
+    <polygon points="40,75 60,25 85,75"/>
+    <!-- Grid lines suggesting heightmap -->
+    <line x1="10" y1="80" x2="90" y2="80" stroke="white" stroke-width="2" opacity="0.5"/>
+    <line x1="10" y1="85" x2="90" y2="85" stroke="white" stroke-width="1.5" opacity="0.3"/>
+  </g>
+</svg>
