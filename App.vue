@@ -24,8 +24,15 @@
     <!-- Sidebar / Control Panel -->
     <aside class="w-full md:w-80 lg:w-96 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 z-10 relative shadow-xl">
       <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 bg-white dark:bg-gray-900">
-        <div class="p-2 bg-[#FF6600] rounded-lg shadow-lg shadow-orange-500/30">
-          <Layers :size="24" class="text-white" />
+        <div class="p-1.5 bg-[#FF6600] rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-7 h-7">
+            <g fill="white" opacity="0.95">
+              <polygon points="15,75 35,35 55,75"/>
+              <polygon points="40,75 60,25 85,75"/>
+              <line x1="10" y1="80" x2="90" y2="80" stroke="white" stroke-width="2" opacity="0.5"/>
+              <line x1="10" y1="85" x2="90" y2="85" stroke="white" stroke-width="1.5" opacity="0.3"/>
+            </g>
+          </svg>
         </div>
         <div>
           <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">MapNG</h1>
