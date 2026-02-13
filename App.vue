@@ -185,7 +185,7 @@
       
       <div class="p-6 overflow-y-auto custom-scrollbar space-y-6 text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
         <div class="bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/30 rounded-lg p-4 text-orange-900 dark:text-orange-100">
-          <p class="font-medium">MapNG is a specialized tool designed to streamline the creation of real-world terrain maps for BeamNG.drive.</p>
+          <p class="font-medium">MapNG is a specialized web application that converts real-world geographic data into game-engine-ready terrain assets for BeamNG.drive modding.</p>
         </div>
 
         <div class="space-y-4">
@@ -194,40 +194,85 @@
             What does it do?
           </h3>
           <p>
-            It allows modders to select any location on Earth, visualize it in 3D, and export high-precision heightmaps, detailed textures, and 3D models ready for game engine import. Unlike generic terrain tools, MapNG focuses on the specific needs of vehicle simulation: high-resolution height data, accurate scale, and integrated road networks with satellite imagery.
+            Select any location on Earth, configure your terrain settings, and MapNG will generate high-precision heightmaps, detailed textures, and full 3D models ready for game engine import — all at a consistent 1 meter per pixel scale. The app features an interactive 3D preview with HDR lighting, cascaded shadow maps, and procedurally generated 3D buildings, trees, and road networks rendered directly from OpenStreetMap data.
           </p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Key Features</h4>
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Elevation Sources</h4>
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
-              <li>Global Elevation Data (AWS)</li>
-              <li>1m Resolution USA Data (USGS)</li>
-              <li>Premium High-Res Global Data (GPXZ)</li>
-              <li>Consistent 1m/px Output Resolution</li>
-              <li>3D Preview with Satellite Imagery</li>
-              <li>OSM Road & Building Integration</li>
-              <li>Hybrid Texture Generation</li>
+              <li>Standard 30m Global (AWS Terrarium/SRTM)</li>
+              <li>USGS 1m DEM (USA — CONUS, Alaska, Hawaii)</li>
+              <li>GPXZ Premium High-Res (Global, API key)</li>
             </ul>
+          </div>
+          <div class="space-y-2">
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">3D Preview</h4>
+            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+              <li>HDR environment lighting &amp; CSM shadows</li>
+              <li>Satellite, OSM, Hybrid &amp; bare texture modes</li>
+              <li>3D buildings, trees, bushes &amp; barriers</li>
+              <li>Surrounding terrain tiles (8 directions)</li>
+              <li>Quality &amp; wireframe controls</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Export Formats (8 Types)</h4>
+            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+              <li>16-bit PNG Heightmap</li>
+              <li>Satellite Texture (JPG)</li>
+              <li>16K OSM "Blueprint" Texture (PNG)</li>
+              <li>Hybrid Satellite + Roads Texture (PNG)</li>
+              <li>Road Mask (16-bit PNG)</li>
+              <li>GeoTIFF (WGS84 or source CRS)</li>
+              <li>GeoJSON Vector Data</li>
+              <li>GLB 3D Model (+ optional surroundings)</li>
+            </ul>
+          </div>
+          <div class="space-y-2">
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">OSM Texture Features</h4>
+            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+              <li>40+ land-use color categories</li>
+              <li>Lane-accurate road rendering with markings</li>
+              <li>Junction fills with Bézier-curved corners</li>
+              <li>Crosswalk detection &amp; zebra stripes</li>
+              <li>Chaikin's algorithm for smooth curves</li>
+              <li>Customizable OSM background color</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="space-y-2">
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Surrounding Tiles</h4>
+            <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+              Download up to 8 adjacent terrain tiles as a ZIP package with heightmaps, satellite textures, and metadata — perfect for building multi-tile BeamNG worlds.
+            </p>
           </div>
           <div class="space-y-2">
              <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Resolution Note</h4>
              <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <strong>All heightmaps are exported at 1 meter per pixel.</strong><br/>
-                When using the Standard (30m) dataset, the terrain is upsampled using bilinear interpolation to ensure smoothness, but it will not contain the fine details found in the 1m USGS or GPXZ datasets.
+                Output sizes range from 512px to 8192px (0.26 km² to 67 km²). Standard 30m data is bilinearly upsampled for smooth surfaces.
              </p>
           </div>
         </div>
 
         <div class="space-y-2">
-            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Export Formats</h4>
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Additional Features</h4>
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
-              <li>16-bit PNG Heightmaps</li>
-              <li>High-Res Satellite Textures</li>
-              <li>High-Res OSM & Hybrid Textures</li>
-              <li>GLB 3D Models</li>
-              <li>GeoJSON Vector Data</li>
+              <li>Nominatim location search with 100+ categorized icons</li>
+              <li>13 preset scenic locations (Grand Canyon, Mt. Fuji, Tail of the Dragon, etc.)</li>
+              <li>"Mod of the Day" – highlights the latest BeamNG map mod</li>
+              <li>Web Worker-based off-thread terrain processing</li>
+              <li>Light &amp; dark mode with persistent preferences</li>
+              <li>Automatic geolocation on first visit</li>
+              <li>Generation caching — skip reprocessing when switching views</li>
+              <li>Abort support for long-running generation tasks</li>
             </ul>
         </div>
 
@@ -305,37 +350,57 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Vue 3</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Composition API & reactivity</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Composition API & reactive state management</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">JavaScript (ES6+)</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Modern standard JavaScript</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Modern standard with dynamic imports & async/await</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Tailwind CSS</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Utility-first styling</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Utility-first styling with dark mode support</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Vite</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Next-generation frontend tooling</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Fast dev server & optimized production builds</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">VueUse</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Composable utility functions for Vue 3</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Lucide Icons</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Beautiful, consistent icon set (Vue components)</div>
               </div>
             </div>
           </section>
 
           <section class="space-y-3">
-            <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">3D & Graphics</h3>
+            <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">3D Engine & Rendering</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Three.js</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">WebGL 3D engine</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">WebGL 3D engine — geometry, materials, textures, export</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">TresJS</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Vue 3 renderer for Three.js</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Declarative Vue 3 renderer for Three.js scenes</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Cientos</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Helpers for OrbitControls, Skybox, Shadows</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">OrbitControls, HDR environment, shadows, sky</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Cascaded Shadow Maps</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">4-cascade CSM with 4096px shadow maps & PCF filtering</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">HDR Environment</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">4K puresky HDRI for realistic ambient & reflection lighting</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">GLTFExporter</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Full 3D model export with terrain, OSM features & surroundings</div>
               </div>
             </div>
           </section>
@@ -345,15 +410,41 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Leaflet & Vue-Leaflet</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Interactive 2D map interface</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Interactive 2D map with 3 base layers & dark mode</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">Web Mercator Projection</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Custom implementation for pixel-perfect terrain stitching</div>
+                <div class="font-medium text-gray-900 dark:text-white">proj4 & GeoTIFF</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">CRS reprojection, DEM parsing & GeoTIFF export</div>
               </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Local Transverse Mercator</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Custom metric projection for pixel-perfect 1m/px grids</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Nominatim Geocoding</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Dual-endpoint search with 100+ type-categorized results</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="space-y-3">
+            <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">Texture & Image Processing</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">HTML5 Canvas API</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">High-res texture generation (8k+)</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">16K procedural texture generation with 40+ land-use colors</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">fast-png</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">16-bit precision heightmap & road mask encoding</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">OSM Lane Renderer</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Lane markings, junction fills, crosswalks, Chaikin smoothing</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Web Workers</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Off-thread terrain & image resampling with transferable buffers</div>
               </div>
             </div>
           </section>
@@ -362,46 +453,38 @@
             <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">Data Sources</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">AWS Elevation Tiles</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Raw heightmap data source (Terrarium format)</div>
-              </div>
-               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">Esri World Imagery</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">High-res satellite texture overlays</div>
+                <div class="font-medium text-gray-900 dark:text-white">AWS Terrain Tiles</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Global 30m SRTM elevation (Terrarium encoding @ Z15)</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">USGS National Map</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">1m resolution DEM (USA Only)</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">1m DEM via TNM Access API (CONUS, Alaska, Hawaii)</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">GPXZ API</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Premium global high-res elevation data</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Premium global hi-res elevation with auto-chunking & rate limiting</div>
+              </div>
+               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Esri World Imagery</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">High-res satellite textures at Z17 (~1.2m/px)</div>
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Overpass API (OSM)</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Live vector data for roads, buildings, and vegetation</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Roads, buildings, land-use, vegetation, barriers (3 failover endpoints)</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">JSZip</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Client-side ZIP packaging for multi-tile & GeoTIFF exports</div>
               </div>
             </div>
           </section>
 
           <section class="space-y-3">
-            <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">Export & Processing</h3>
+            <h3 class="text-sm font-semibold text-[#FF6600] uppercase tracking-wider">Deployment</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">GLTFExporter</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Standard 3D model export (GLB)</div>
-              </div>
-              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">fast-png</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">16-bit precision heightmap encoding</div>
-              </div>
-              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">geotiff.js & proj4</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">GeoTIFF parsing & coordinate projection</div>
-              </div>
-              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-                <div class="font-medium text-gray-900 dark:text-white">BufferGeometryUtils</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Mesh optimization & merging</div>
+                <div class="font-medium text-gray-900 dark:text-white">Cloudflare Pages</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Global edge-deployed static hosting via Wrangler CLI</div>
               </div>
             </div>
           </section>
@@ -409,7 +492,7 @@
         
         <div class="p-5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-center">
           <p class="text-xs text-gray-500 dark:text-gray-400">Built to assist with BeamNG.drive modding workflows.</p>
-          <p class="italic opacity-70 text-xs text-gray-400 dark:text-gray-500 mt-2">App enhanced with Gemini 3</p>
+          <p class="italic opacity-70 text-xs text-gray-400 dark:text-gray-500 mt-2">App enhanced with Claude</p>
         </div>
       </div>
     </div>
