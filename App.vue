@@ -152,18 +152,18 @@
         </div>
         
         <!-- Loading Overlay -->
-        <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm">
-          <div class="text-center p-8 rounded-2xl bg-white border border-gray-200 shadow-2xl min-w-[300px]">
+        <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm">
+          <div class="text-center p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl min-w-[300px]">
             <Loader2 :size="48" class="text-[#FF6600] animate-spin mx-auto mb-4" />
-            <h3 class="text-xl text-gray-900 font-bold mb-2">Processing Terrain</h3>
-            <p class="text-gray-600 text-sm font-medium mb-4 animate-pulse">{{ loadingStatus }}</p>
-            <div class="text-xs text-gray-400 max-w-xs mx-auto">
+            <h3 class="text-xl text-gray-900 dark:text-white font-bold mb-2">Processing Terrain</h3>
+            <p class="text-gray-600 dark:text-gray-400 text-sm font-medium mb-4 animate-pulse">{{ loadingStatus }}</p>
+            <div class="text-xs text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
                 <span v-if="resolution >= 2048">High resolution (2048+) may take 1-2 minutes.</span>
                 <span v-if="resolution >= 4096" class="block text-amber-500 mt-1">Very large area (4k/8k). Please wait...</span>
             </div>
             <button
               @click="cancelGeneration"
-              class="mt-5 px-6 py-2 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border border-gray-300"
+              class="mt-5 px-6 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-300 dark:border-gray-600"
             >
               Cancel
             </button>
