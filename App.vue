@@ -90,7 +90,7 @@
          >
            <Code :size="12" /> View Tech Stack
          </button>
-         <span class="text-[10px] text-gray-400 dark:text-gray-500" :title="'Built: ' + buildTime">Build {{ buildHash }}</span>
+         <span class="text-[10px] text-gray-400 dark:text-gray-500">Build {{ buildHash }} · {{ buildTime }}</span>
       </div>
     </aside>
 
