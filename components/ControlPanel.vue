@@ -43,12 +43,18 @@
  
       <!-- Elevation Source Selection -->
       <div class="space-y-2">
-        <label class="text-xs font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-            <Mountain :size="12" />
+        <button 
+          @click="showElevationSource = !showElevationSource"
+          class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
+        >
+          <span class="flex items-center gap-2">
+            <Mountain :size="16" class="text-gray-500 dark:text-gray-400 group-hover:text-[#FF6600] transition-colors" />
             Elevation Data Source
-        </label>
+          </span>
+          <ChevronDown :size="14" :class="['transition-transform duration-200', showElevationSource ? 'rotate-180' : '']" />
+        </button>
         
-        <div class="space-y-2 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600">
+        <div v-if="showElevationSource" class="space-y-2 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600">
             <!-- Default -->
             <label class="flex items-start gap-2 cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors">
                 <input type="radio" v-model="elevationSource" value="default" class="mt-0.5 accent-[#FF6600]" />
@@ -108,12 +114,19 @@
 
     <!-- Coordinates -->
     <div class="space-y-2">
-      <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-        <MapPin :size="16" class="text-gray-700 dark:text-gray-300" />
-        Center Coordinates
-      </label>
+      <button 
+        @click="showCoordinates = !showCoordinates"
+        class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
+      >
+        <span class="flex items-center gap-2">
+          <MapPin :size="16" class="text-gray-500 dark:text-gray-400 group-hover:text-[#FF6600] transition-colors" />
+          Center Coordinates
+        </span>
+        <ChevronDown :size="14" :class="['transition-transform duration-200', showCoordinates ? 'rotate-180' : '']" />
+      </button>
       
       <!-- Location Search -->
+      <template v-if="showCoordinates">
       <LocationSearch @select="handleSearchSelect" />
       
       <div class="grid grid-cols-2 gap-2">
@@ -155,6 +168,7 @@
             {{ loc.name }}
           </option>
       </select>
+      </template>
     </div>
     <div class="pt-2 grid grid-cols-2 gap-3">
       <button
@@ -402,13 +416,27 @@
     </div>
 
     <hr class="border-gray-200 dark:border-gray-600" />
-    <ModOfTheDay />
+    
+    <!-- Mod of the Day (Collapsible) -->
+    <div class="space-y-2">
+      <button 
+        @click="showModOfTheDay = !showModOfTheDay"
+        class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
+      >
+        <span class="flex items-center gap-2">
+          <Trophy :size="16" class="text-yellow-500 group-hover:text-[#FF6600] transition-colors" />
+          Mod of the Day
+        </span>
+        <ChevronDown :size="14" :class="['transition-transform duration-200', showModOfTheDay ? 'rotate-180' : '']" />
+      </button>
+      <ModOfTheDay v-if="showModOfTheDay" :headless="true" />
+    </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, CircleCheck } from 'lucide-vue-next';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, CircleCheck, ChevronDown, Trophy } from 'lucide-vue-next';
 import ModOfTheDay from './ModOfTheDay.vue';
 import LocationSearch from './LocationSearch.vue';
 import SurroundingTiles from './SurroundingTiles.vue';
@@ -462,6 +490,11 @@ const useGPXZ = ref(false);
 const elevationSource = ref(localStorage.getItem('mapng_elevationSource') || 'default');
 const gpxzApiKey = ref(localStorage.getItem('mapng_gpxzApiKey') || '');
 const usgsStatus = ref(null);
+
+// Collapsible section states (persisted via localStorage, hidden by default)
+const showElevationSource = ref(localStorage.getItem('mapng_showElevationSource') === 'true');
+const showCoordinates = ref(localStorage.getItem('mapng_showCoordinates') === 'true');
+const showModOfTheDay = ref(localStorage.getItem('mapng_showModOfTheDay') === 'true');
 
 const interestingLocations = [
   { name: "Select a location...", lat: 0, lng: 0, disabled: true },
@@ -525,6 +558,11 @@ watch(fetchOSM, (newVal) => {
 watch(gpxzApiKey, (newVal) => {
     localStorage.setItem('mapng_gpxzApiKey', newVal);
 });
+
+// Persist collapsible section states
+watch(showElevationSource, (v) => localStorage.setItem('mapng_showElevationSource', String(v)));
+watch(showCoordinates, (v) => localStorage.setItem('mapng_showCoordinates', String(v)));
+watch(showModOfTheDay, (v) => localStorage.setItem('mapng_showModOfTheDay', String(v)));
 
 // Watch for terrain data updates to handle fallback scenarios
 watch(() => props.terrainData, (newData) => {

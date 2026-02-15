@@ -1,6 +1,6 @@
 <template>
   <div class="space-y-2">
-    <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+    <label v-if="!headless" class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
       <Trophy :size="16" class="text-yellow-500" />
       Mod of the Day
     </label>
@@ -68,6 +68,10 @@
 import { ref, onMounted } from 'vue';
 import { Trophy, Download, Star, Tag, ImageOff } from 'lucide-vue-next';
 import { fetchModOfTheDay } from '../services/modOfTheDay';
+
+const props = defineProps({
+  headless: { type: Boolean, default: false }
+});
 
 const mod = ref(null);
 const loading = ref(true);
