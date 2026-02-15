@@ -191,6 +191,7 @@
                 type="text"
                 v-model="latInput"
                 @change="handleManualLocationChange"
+                @paste="handleCoordinatePaste($event, 'lat')"
                 @keydown.enter="$event.target.blur()"
                 class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
                 placeholder="Latitude"
@@ -202,6 +203,7 @@
                 type="text"
                 v-model="lngInput"
                 @change="handleManualLocationChange"
+                @paste="handleCoordinatePaste($event, 'lng')"
                 @keydown.enter="$event.target.blur()"
                 class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
                 placeholder="Longitude"
@@ -466,6 +468,30 @@ const handleManualLocationChange = () => {
     if (!isNaN(lat) && !isNaN(lng)) {
         emit('locationChange', { ...props.center, lat, lng });
     }
+};
+
+// Handle pasting coordinates — supports "lat, lng" or "lat lng" pairs pasted into either field
+const handleCoordinatePaste = (e, field) => {
+    const pasted = (e.clipboardData || window.clipboardData).getData('text').trim();
+    
+    // Try to detect a coordinate pair (comma, space, or tab separated)
+    const match = pasted.match(/^([\-]?\d+\.?\d*)\s*[,\s\t]+\s*([\-]?\d+\.?\d*)$/);
+    if (match) {
+        e.preventDefault();
+        const a = parseFloat(match[1]);
+        const b = parseFloat(match[2]);
+        if (!isNaN(a) && !isNaN(b)) {
+            latInput.value = a.toString();
+            lngInput.value = b.toString();
+            emit('locationChange', { ...props.center, lat: a, lng: b });
+        }
+        return;
+    }
+    
+    // Single value paste — let it go through, then trigger update
+    nextTick(() => {
+        handleManualLocationChange();
+    });
 };
 
 // Sync inputs with props when they change from other sources (map move, search, dropdown)
