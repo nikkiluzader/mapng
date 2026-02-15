@@ -393,16 +393,14 @@ const isPointInPolygon = (point, poly) => {
  * Helper to generate the Three.js Mesh from TerrainData.
  * Shared by exporters to ensure identical output.
  */
-const createTerrainMesh = async (data) => {
+const createTerrainMesh = async (data, maxMeshResolution = 1024) => {
   return new Promise((resolve, reject) => {
     try {
       // 1. Create Geometry
-      // Max resolution logic same as Preview3D
-      const MAX_MESH_RESOLUTION = 1024;
       const baseStride = Math.ceil(
-        Math.max(data.width, data.height) / MAX_MESH_RESOLUTION,
+        Math.max(data.width, data.height) / maxMeshResolution,
       );
-      const stride = baseStride;
+      const stride = Math.max(baseStride, 1);
 
       const segmentsX = Math.floor((data.width - 1) / stride);
       const segmentsY = Math.floor((data.height - 1) / stride);
@@ -1245,10 +1243,10 @@ export const createOSMGroup = (data) => {
 };
 
 export const exportToGLB = async (data, options = {}) => {
-  const { includeSurroundings = false, onProgress } = options;
+  const { includeSurroundings = false, onProgress, maxMeshResolution = 1024 } = options;
   try {
     onProgress?.('Building terrain mesh...');
-    const terrainMesh = await createTerrainMesh(data);
+    const terrainMesh = await createTerrainMesh(data, maxMeshResolution);
     const osmGroup = createOSMGroup(data);
     const scene = new THREE.Scene();
     scene.add(terrainMesh);
@@ -1256,7 +1254,7 @@ export const exportToGLB = async (data, options = {}) => {
 
     if (includeSurroundings) {
       onProgress?.('Fetching surrounding tiles for GLB...');
-      const surroundingGroup = await createSurroundingMeshes(data, onProgress);
+      const surroundingGroup = await createSurroundingMeshes(data, onProgress, Math.floor(maxMeshResolution / 4));
       if (surroundingGroup) scene.add(surroundingGroup);
     }
 
@@ -1288,10 +1286,10 @@ export const exportToGLB = async (data, options = {}) => {
 };
 
 export const exportToDAE = async (data, options = {}) => {
-  const { includeSurroundings = false, onProgress } = options;
+  const { includeSurroundings = false, onProgress, maxMeshResolution = 256 } = options;
   try {
     onProgress?.('Building terrain mesh...');
-    const terrainMesh = await createTerrainMesh(data);
+    const terrainMesh = await createTerrainMesh(data, maxMeshResolution);
     const osmGroup = createOSMGroup(data);
     const scene = new THREE.Scene();
     scene.add(terrainMesh);
@@ -1299,7 +1297,7 @@ export const exportToDAE = async (data, options = {}) => {
 
     if (includeSurroundings) {
       onProgress?.('Fetching surrounding tiles for DAE...');
-      const surroundingGroup = await createSurroundingMeshes(data, onProgress);
+      const surroundingGroup = await createSurroundingMeshes(data, onProgress, Math.floor(maxMeshResolution / 4));
       if (surroundingGroup) scene.add(surroundingGroup);
     }
 
@@ -1358,7 +1356,7 @@ const SURROUND_OFFSETS = {
 const GLB_SURROUND_RES = 256;
 const GLB_SURROUND_SAT_ZOOM = 14;
 
-const createSurroundingMeshes = async (data, onProgress) => {
+const createSurroundingMeshes = async (data, onProgress, maxMeshResolution = 128) => {
   try {
     const allPositions = POSITIONS.map(p => p.key);
     const results = await fetchSurroundingTiles(
@@ -1385,7 +1383,7 @@ const createSurroundingMeshes = async (data, onProgress) => {
 
       const w = tileData.width;
       const h = tileData.height;
-      const stride = 2;
+      const stride = Math.max(Math.ceil(Math.max(w, h) / maxMeshResolution), 1);
       const segsX = Math.floor((w - 1) / stride);
       const segsY = Math.floor((h - 1) / stride);
 

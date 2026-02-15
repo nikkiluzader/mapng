@@ -239,6 +239,23 @@
       @update:show-on-map="() => {}"
     />
 
+    <hr class="border-gray-200 dark:border-gray-600" />
+    
+    <!-- Mod of the Day (Collapsible) -->
+    <div class="space-y-2">
+      <button 
+        @click="showModOfTheDay = !showModOfTheDay"
+        class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
+      >
+        <span class="flex items-center gap-2">
+          <Trophy :size="16" class="text-yellow-500 group-hover:text-[#FF6600] transition-colors" />
+          Mod of the Day
+        </span>
+        <ChevronDown :size="14" :class="['transition-transform duration-200', showModOfTheDay ? 'rotate-180' : '']" />
+      </button>
+      <ModOfTheDay v-if="showModOfTheDay" :headless="true" />
+    </div>
+
     <!-- Export Panel -->
     <div ref="exportPanel" v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
         <!-- Missing OSM Warning / Action -->
@@ -255,162 +272,215 @@
             </button>
         </div>
 
-        <div class="flex items-center justify-between">
-            <label class="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+        <button
+            @click="showExports = !showExports"
+            class="w-full flex items-center justify-between text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-[#FF6600] transition-colors group"
+        >
+            <span class="flex items-center gap-2">
                 <Download :size="16" />
                 Ready to Export
-            </label>
-            <span class="text-xs text-gray-500 dark:text-gray-400">{{ terrainData.width }}x{{ terrainData.height }}</span>
-        </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400 font-normal">{{ terrainData.width }}x{{ terrainData.height }}</span>
+            </span>
+            <ChevronDown :size="14" :class="['transition-transform duration-200', showExports ? 'rotate-180' : '']" />
+        </button>
         
-        <div class="grid grid-cols-2 gap-2">
-            <!-- Heightmap -->
-            <button 
-                @click="downloadHeightmap"
-                :disabled="isExportingHeightmap"
-                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24"
+      <template v-if="showExports">
+        <!-- 2D Assets -->
+        <div class="space-y-1.5">
+            <button
+                @click="showExport2D = !showExport2D"
+                class="w-full flex items-center justify-between group"
             >
-                <div class="w-full h-full flex items-center justify-center mb-1">
-                    <Loader2 v-if="isExportingHeightmap" :size="24" class="animate-spin text-[#FF6600]" />
-                    <Mountain v-else :size="32" class="text-gray-400 dark:text-gray-500" />
-                </div>
-                <span class="text-[10px] font-medium">Heightmap</span>
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
-                <Download v-if="!isExportingHeightmap" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">2D Assets</h4>
+                <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExport2D ? 'rotate-180' : '']" />
+            </button>
+            <div v-if="showExport2D" class="grid grid-cols-2 gap-1.5">
+                <!-- Heightmap -->
+                <button 
+                    @click="downloadHeightmap"
+                    :disabled="isExportingHeightmap"
+                    class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
+                >
+                    <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
+                        <Loader2 v-if="isExportingHeightmap" :size="20" class="animate-spin text-[#FF6600]" />
+                        <img v-else-if="heightmapPreviewUrl" :src="heightmapPreviewUrl" class="w-full h-full object-cover" />
+                        <Mountain v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <span class="text-[9px] font-medium">Heightmap</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">16-bit PNG</span>
+                    <Download v-if="!isExportingHeightmap" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                </button>
+
+                <!-- Satellite Texture -->
+                <button 
+                    @click="downloadTexture"
+                    :disabled="isExportingTexture"
+                    class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
+                >
+                    <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
+                        <Loader2 v-if="isExportingTexture" :size="20" class="animate-spin text-[#FF6600]" />
+                        <img v-else-if="terrainData.satelliteTextureUrl" :src="terrainData.satelliteTextureUrl" class="w-full h-full object-cover" />
+                        <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <span class="text-[9px] font-medium">Satellite</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+                    <Download v-if="!isExportingTexture" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                </button>
+
+                <!-- OSM Texture -->
+                <button 
+                    @click="downloadOSMTexture"
+                    :disabled="!terrainData.osmTextureUrl || isExportingOSMTexture"
+                    class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
+                >
+                    <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
+                        <Loader2 v-if="isExportingOSMTexture" :size="20" class="animate-spin text-[#FF6600]" />
+                        <img v-else-if="terrainData.osmTextureUrl" :src="terrainData.osmTextureUrl" class="w-full h-full object-cover" />
+                        <Trees v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <span class="text-[9px] font-medium">OSM Texture</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">8192px PNG</span>
+                    <Download v-if="!isExportingOSMTexture" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                </button>
+
+                <!-- Hybrid Texture -->
+                <button 
+                    @click="downloadHybridTexture"
+                    :disabled="!terrainData.hybridTextureUrl || isExportingHybridTexture"
+                    class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
+                >
+                    <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
+                        <Loader2 v-if="isExportingHybridTexture" :size="20" class="animate-spin text-[#FF6600]" />
+                        <img v-else-if="terrainData.hybridTextureUrl" :src="terrainData.hybridTextureUrl" class="w-full h-full object-cover" />
+                        <Layers v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <span class="text-[9px] font-medium">Hybrid</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">8192px PNG</span>
+                    <Download v-if="!isExportingHybridTexture" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                </button>
+
+                <!-- Road Mask -->
+                <button 
+                    @click="downloadRoadMask"
+                    :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isExportingRoadMask"
+                    class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
+                >
+                    <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
+                        <Loader2 v-if="isExportingRoadMask" :size="20" class="animate-spin text-[#FF6600]" />
+                        <img v-else-if="roadMaskPreviewUrl" :src="roadMaskPreviewUrl" class="w-full h-full object-cover" />
+                        <Route v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <span class="text-[9px] font-medium">Road Mask</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">16-bit PNG</span>
+                    <Download v-if="!isExportingRoadMask" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                </button>
+            </div>
+        </div>
+
+        <!-- 3D Models -->
+        <div class="space-y-1.5">
+            <button
+                @click="showExport3D = !showExport3D"
+                class="w-full flex items-center justify-between group"
+            >
+                <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">3D Models</h4>
+                <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExport3D ? 'rotate-180' : '']" />
             </button>
 
-            <!-- Satellite Texture -->
-            <button 
-                @click="downloadTexture"
-                :disabled="isExportingTexture"
-                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
-            >
-                <div class="w-full h-full flex items-center justify-center mb-1 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-                    <Loader2 v-if="isExportingTexture" :size="24" class="animate-spin text-[#FF6600]" />
-                    <img v-else-if="terrainData.satelliteTextureUrl" :src="terrainData.satelliteTextureUrl" class="w-full h-full object-cover" />
-                    <Box v-else :size="32" class="text-gray-400 dark:text-gray-500" />
+            <template v-if="showExport3D">
+            <!-- Shared 3D options -->
+            <div class="flex items-center gap-3 px-1 py-1 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-[9px] text-gray-500 dark:text-gray-400">Mesh:</span>
+                    <select v-model="modelMeshResolution" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+                        <option value="128">Low (~33K tris)</option>
+                        <option value="256">Med (~131K tris)</option>
+                        <option value="512">High (~524K tris)</option>
+                        <option value="1024">Ultra (~2M tris)</option>
+                    </select>
                 </div>
-                <span class="text-[10px] font-medium">Satellite</span>
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px JPG</span>
-                <Download v-if="!isExportingTexture" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-            </button>
+                <label class="flex items-center gap-1 cursor-pointer">
+                    <input type="checkbox" v-model="modelIncludeSurroundings" class="accent-[#FF6600] w-3 h-3" />
+                    <span class="text-[9px] text-gray-500 dark:text-gray-400">+ Surroundings</span>
+                </label>
+            </div>
 
-            <!-- OSM Texture -->
-            <button 
-                @click="downloadOSMTexture"
-                :disabled="!terrainData.osmTextureUrl || isExportingOSMTexture"
-                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
-            >
-                <div class="w-full h-full flex items-center justify-center mb-1 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-                    <Loader2 v-if="isExportingOSMTexture" :size="24" class="animate-spin text-[#FF6600]" />
-                    <img v-else-if="terrainData.osmTextureUrl" :src="terrainData.osmTextureUrl" class="w-full h-full object-cover" />
-                    <Trees v-else :size="32" class="text-gray-400 dark:text-gray-500" />
-                </div>
-                <span class="text-[10px] font-medium">OSM Texture</span>
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">8192px PNG</span>
-                <Download v-if="!isExportingOSMTexture" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-            </button>
-
-            <!-- Hybrid Texture -->
-            <button 
-                @click="downloadHybridTexture"
-                :disabled="!terrainData.hybridTextureUrl || isExportingHybridTexture"
-                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
-            >
-                <div class="w-full h-full flex items-center justify-center mb-1 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-                    <Loader2 v-if="isExportingHybridTexture" :size="24" class="animate-spin text-[#FF6600]" />
-                    <img v-else-if="terrainData.hybridTextureUrl" :src="terrainData.hybridTextureUrl" class="w-full h-full object-cover" />
-                    <Layers v-else :size="32" class="text-gray-400 dark:text-gray-500" />
-                </div>
-                <span class="text-[10px] font-medium">Hybrid</span>
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">8192px PNG</span>
-                <Download v-if="!isExportingHybridTexture" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-            </button>
-
-            <!-- OSM GeoJSON -->
-             <button 
-                @click="downloadOSM"
-                :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isExportingOSM"
-                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24"
-            >
-                <div class="w-full h-full flex items-center justify-center mb-1">
-                    <Loader2 v-if="isExportingOSM" :size="24" class="animate-spin text-[#FF6600]" />
-                    <FileJson v-else :size="32" class="text-gray-400 dark:text-gray-500" />
-                </div>
-                <span class="text-[10px] font-medium">OSM Data (JSON)</span>
-                <Download v-if="!isExportingOSM" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-            </button>
-
-            <!-- Road Mask -->
-            <button 
-                @click="downloadRoadMask"
-                :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isExportingRoadMask"
-                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24"
-            >
-                <div class="w-full h-full flex items-center justify-center mb-1">
-                    <Loader2 v-if="isExportingRoadMask" :size="24" class="animate-spin text-[#FF6600]" />
-                    <Route v-else :size="32" class="text-gray-400 dark:text-gray-500" />
-                </div>
-                <span class="text-[10px] font-medium">Road Mask</span>
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">16-bit PNG</span>
-                <Download v-if="!isExportingRoadMask" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-            </button>
-
-            <!-- GeoTIFF -->
-            <button 
-                @click="downloadGeoTIFF"
-                :disabled="isExportingGeoTIFF"
-                class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24"
-            >
-                <div class="w-full h-full flex items-center justify-center mb-1">
-                    <Loader2 v-if="isExportingGeoTIFF" :size="24" class="animate-spin text-[#FF6600]" />
-                    <FileCode v-else :size="32" class="text-gray-400 dark:text-gray-500" />
-                </div>
-                <span class="text-[10px] font-medium">GeoTIFF</span>
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
-                <Download v-if="!isExportingGeoTIFF" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-            </button>
-            
-            <!-- GLB Model -->
-            <div class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 h-24">
+            <div class="grid grid-cols-2 gap-1.5">
+                <!-- GLB Model -->
                 <button 
                     @click="handleGLBExport"
                     :disabled="isExportingGLB"
-                    class="w-full h-full flex flex-col items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors group disabled:opacity-50"
+                    class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
                 >
-                    <div class="w-full h-full flex items-center justify-center mb-1">
-                        <Loader2 v-if="isExportingGLB" :size="24" class="animate-spin text-[#FF6600]" />
-                        <Box v-else :size="32" class="text-gray-400 dark:text-gray-500" />
+                    <div class="w-full h-full flex items-center justify-center mb-0.5">
+                        <Loader2 v-if="isExportingGLB" :size="20" class="animate-spin text-[#FF6600]" />
+                        <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
                     </div>
-                    <span class="text-[10px] font-medium">GLB Model</span>
-                    <Download v-if="!isExportingGLB" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                    <span class="text-[9px] font-medium">GLB Model</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">.glb binary</span>
+                    <Download v-if="!isExportingGLB" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
                 </button>
-                <label class="flex items-center gap-1 mt-0.5 cursor-pointer" @click.stop>
-                    <input type="checkbox" v-model="glbIncludeSurroundings" class="accent-[#FF6600] w-3 h-3" />
-                    <span class="text-[9px] text-gray-500 dark:text-gray-400">+ Surroundings</span>
-                </label>
-            </div>
 
-            <!-- DAE (Collada) Model -->
-            <div class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 h-24">
+                <!-- DAE (Collada) Model -->
                 <button 
                     @click="handleDAEExport"
                     :disabled="isExportingDAE"
-                    class="w-full h-full flex flex-col items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded transition-colors group disabled:opacity-50"
+                    class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
                 >
-                    <div class="w-full h-full flex items-center justify-center mb-1">
-                        <Loader2 v-if="isExportingDAE" :size="24" class="animate-spin text-[#FF6600]" />
-                        <FileCode v-else :size="32" class="text-gray-400 dark:text-gray-500" />
+                    <div class="w-full h-full flex items-center justify-center mb-0.5">
+                        <Loader2 v-if="isExportingDAE" :size="20" class="animate-spin text-[#FF6600]" />
+                        <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
                     </div>
-                    <span class="text-[10px] font-medium">Collada DAE</span>
-                    <Download v-if="!isExportingDAE" :size="12" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                    <span class="text-[9px] font-medium">Collada DAE</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">.dae + textures</span>
+                    <Download v-if="!isExportingDAE" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
                 </button>
-                <label class="flex items-center gap-1 mt-0.5 cursor-pointer" @click.stop>
-                    <input type="checkbox" v-model="daeIncludeSurroundings" class="accent-[#FF6600] w-3 h-3" />
-                    <span class="text-[9px] text-gray-500 dark:text-gray-400">+ Surroundings</span>
-                </label>
+            </div>
+            </template>
+        </div>
+
+        <!-- Geo Data -->
+        <div class="space-y-1.5">
+            <button
+                @click="showExportGeo = !showExportGeo"
+                class="w-full flex items-center justify-between group"
+            >
+                <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">Geo Data</h4>
+                <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExportGeo ? 'rotate-180' : '']" />
+            </button>
+            <div v-if="showExportGeo" class="grid grid-cols-2 gap-1.5">
+                <!-- GeoTIFF -->
+                <button 
+                    @click="downloadGeoTIFF"
+                    :disabled="isExportingGeoTIFF"
+                    class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
+                >
+                    <div class="w-full h-full flex items-center justify-center mb-0.5">
+                        <Loader2 v-if="isExportingGeoTIFF" :size="20" class="animate-spin text-[#FF6600]" />
+                        <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <span class="text-[9px] font-medium">GeoTIFF</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
+                    <Download v-if="!isExportingGeoTIFF" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                </button>
+
+                <!-- OSM GeoJSON -->
+                <button 
+                    @click="downloadOSM"
+                    :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isExportingOSM"
+                    class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
+                >
+                    <div class="w-full h-full flex items-center justify-center mb-0.5">
+                        <Loader2 v-if="isExportingOSM" :size="20" class="animate-spin text-[#FF6600]" />
+                        <FileJson v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <span class="text-[9px] font-medium">GeoJSON</span>
+                    <span class="text-[8px] text-gray-500 dark:text-gray-400">OSM vectors</span>
+                    <Download v-if="!isExportingOSM" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+                </button>
             </div>
         </div>
+      </template>
 
         <div class="bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-2">
             <div class="grid grid-cols-3 gap-1 text-[10px] text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600 pb-2">
@@ -439,23 +509,6 @@
             </div>
         </div>
 
-    </div>
-
-    <hr class="border-gray-200 dark:border-gray-600" />
-    
-    <!-- Mod of the Day (Collapsible) -->
-    <div class="space-y-2">
-      <button 
-        @click="showModOfTheDay = !showModOfTheDay"
-        class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
-      >
-        <span class="flex items-center gap-2">
-          <Trophy :size="16" class="text-yellow-500 group-hover:text-[#FF6600] transition-colors" />
-          Mod of the Day
-        </span>
-        <ChevronDown :size="14" :class="['transition-transform duration-200', showModOfTheDay ? 'rotate-180' : '']" />
-      </button>
-      <ModOfTheDay v-if="showModOfTheDay" :headless="true" />
     </div>
   </div>
 </template>
@@ -536,6 +589,9 @@ const isExportingGeoTIFF = ref(false);
 const glbIncludeSurroundings = ref(false);
 const isExportingDAE = ref(false);
 const daeIncludeSurroundings = ref(false);
+const daeMeshResolution = ref('256');
+const modelMeshResolution = ref('256');
+const modelIncludeSurroundings = ref(false);
 const fetchOSM = ref(localStorage.getItem('mapng_fetchOSM') !== 'false');
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
@@ -547,6 +603,10 @@ const usgsStatus = ref(null);
 const showElevationSource = ref(localStorage.getItem('mapng_showElevationSource') === 'true');
 const showCoordinates = ref(localStorage.getItem('mapng_showCoordinates') === 'true');
 const showModOfTheDay = ref(localStorage.getItem('mapng_showModOfTheDay') === 'true');
+const showExports = ref(localStorage.getItem('mapng_showExports') !== 'false'); // default open
+const showExport2D = ref(localStorage.getItem('mapng_showExport2D') !== 'false'); // default open
+const showExport3D = ref(localStorage.getItem('mapng_showExport3D') !== 'false'); // default open
+const showExportGeo = ref(localStorage.getItem('mapng_showExportGeo') !== 'false'); // default open
 
 const interestingLocations = [
   { name: "Select a location...", lat: 0, lng: 0, disabled: true },
@@ -615,6 +675,10 @@ watch(gpxzApiKey, (newVal) => {
 watch(showElevationSource, (v) => localStorage.setItem('mapng_showElevationSource', String(v)));
 watch(showCoordinates, (v) => localStorage.setItem('mapng_showCoordinates', String(v)));
 watch(showModOfTheDay, (v) => localStorage.setItem('mapng_showModOfTheDay', String(v)));
+watch(showExports, (v) => localStorage.setItem('mapng_showExports', String(v)));
+watch(showExport2D, (v) => localStorage.setItem('mapng_showExport2D', String(v)));
+watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v)));
+watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
 // Watch for terrain data updates to handle fallback scenarios
 watch(() => props.terrainData, (newData) => {
@@ -658,6 +722,74 @@ const areaDisplay = computed(() => {
   return totalAreaSqM.value > 1000000 
     ? `${areaSqKm.value.toFixed(2)} km²`
     : `${Math.round(totalAreaSqM.value).toLocaleString()} m²`;
+});
+
+// Generate a small grayscale heightmap preview
+const heightmapPreviewUrl = computed(() => {
+    if (!props.terrainData?.heightMap) return null;
+    const src = props.terrainData;
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const imgData = ctx.createImageData(size, size);
+    const range = src.maxHeight - src.minHeight;
+    const stepX = src.width / size;
+    const stepY = src.height / size;
+    for (let y = 0; y < size; y++) {
+        for (let x = 0; x < size; x++) {
+            const srcX = Math.min(Math.floor(x * stepX), src.width - 1);
+            const srcY = Math.min(Math.floor(y * stepY), src.height - 1);
+            const h = src.heightMap[srcY * src.width + srcX];
+            const v = range > 0 ? Math.floor(((h - src.minHeight) / range) * 255) : 0;
+            const idx = (y * size + x) * 4;
+            imgData.data[idx] = v;
+            imgData.data[idx + 1] = v;
+            imgData.data[idx + 2] = v;
+            imgData.data[idx + 3] = 255;
+        }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    return canvas.toDataURL('image/png');
+});
+
+// Generate a small road mask preview
+const roadMaskPreviewUrl = computed(() => {
+    if (!props.terrainData?.osmFeatures || props.terrainData.osmFeatures.length === 0) return null;
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    const src = props.terrainData;
+    const scaleX = size / src.width;
+    const scaleY = size / src.height;
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, size, size);
+    const toLocal = createWGS84ToLocal(props.center.lat, props.center.lng);
+    ctx.strokeStyle = 'white';
+    ctx.lineWidth = Math.max(2, 8 * scaleX);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    src.osmFeatures.forEach(feature => {
+        if (feature.type !== 'road') return;
+        const highway = feature.tags?.highway;
+        const exclude = ['footway', 'path', 'pedestrian', 'steps', 'cycleway', 'bridleway', 'corridor'];
+        if (highway && exclude.includes(highway)) return;
+        ctx.beginPath();
+        feature.geometry.forEach((pt, index) => {
+            const [x, y] = toLocal.forward([pt.lng, pt.lat]);
+            const u = (x + src.width / 2) * scaleX;
+            const v = (src.height / 2 - y) * scaleY;
+            if (index === 0) ctx.moveTo(u, v);
+            else ctx.lineTo(u, v);
+        });
+        ctx.stroke();
+    });
+    return canvas.toDataURL('image/png');
 });
 
 const downloadHeightmap = async () => {
@@ -712,15 +844,38 @@ const downloadTexture = async () => {
     if(!props.terrainData?.satelliteTextureUrl) return;
     isExportingTexture.value = true;
     
-    // Simulate a small delay for UX consistency or if we were doing processing
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+        // Convert satellite to PNG for consistency
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = props.terrainData.satelliteTextureUrl;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
 
-    const link = document.createElement('a');
-    link.download = `Satellite_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.jpg`;
-    link.href = props.terrainData.satelliteTextureUrl;
-    link.click();
-    
-    isExportingTexture.value = false;
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `Satellite_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            isExportingTexture.value = false;
+        }, 'image/png');
+    } catch {
+        // Fallback to direct download
+        const link = document.createElement('a');
+        link.download = `Satellite_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
+        link.href = props.terrainData.satelliteTextureUrl;
+        link.click();
+        isExportingTexture.value = false;
+    }
 };
 
 const downloadOSMTexture = async () => {
@@ -926,7 +1081,8 @@ const handleGLBExport = async () => {
   isExportingGLB.value = true;
   try {
     await exportToGLB(props.terrainData, {
-      includeSurroundings: glbIncludeSurroundings.value,
+      includeSurroundings: modelIncludeSurroundings.value,
+      maxMeshResolution: parseInt(modelMeshResolution.value),
     });
   } catch (error) {
     console.error("GLB Export failed:", error);
@@ -941,7 +1097,8 @@ const handleDAEExport = async () => {
   isExportingDAE.value = true;
   try {
     await exportToDAE(props.terrainData, {
-      includeSurroundings: daeIncludeSurroundings.value,
+      includeSurroundings: modelIncludeSurroundings.value,
+      maxMeshResolution: parseInt(modelMeshResolution.value),
     });
   } catch (error) {
     console.error("DAE Export failed:", error);
