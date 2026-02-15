@@ -1,5 +1,60 @@
 <template>
   <div class="space-y-6">
+    <!-- Action Buttons -->
+    <div class="grid grid-cols-2 gap-3">
+      <button
+        @click="$emit('generate', true, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
+        :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
+        :class="['py-3 font-bold rounded-md shadow-lg flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed',
+          isCached
+            ? 'bg-[#FF6600] hover:bg-[#E65C00] text-white shadow-orange-900/10'
+            : 'bg-[#FF6600] hover:bg-[#E65C00] text-white shadow-orange-900/10 disabled:bg-gray-300 dark:disabled:bg-gray-700']"
+      >
+          <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
+          <template v-else-if="isCached">
+              <div class="flex items-center gap-2">
+                   <Mountain :size="16" />
+                   <span>Preview 3D</span>
+              </div>
+              <span class="text-[10px] font-normal opacity-90">Using cached data</span>
+          </template>
+          <template v-else>
+              <div class="flex items-center gap-2">
+                   <Mountain :size="16" />
+                   <span>Preview 3D</span>
+              </div>
+              <span class="text-[10px] font-normal opacity-90">View before download</span>
+          </template>
+      </button>
+
+      <button
+        @click="$emit('generate', false, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
+        :disabled="isGenerating || isCached || (useGPXZ && !gpxzApiKey)"
+        :class="['py-3 font-bold rounded-md shadow-sm flex flex-col items-center justify-center gap-1 transition-all disabled:cursor-not-allowed',
+          isCached
+            ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50']"
+      >
+           <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
+          <template v-else-if="isCached">
+              <div class="flex items-center gap-2">
+                   <CircleCheck :size="16" />
+                   <span>Data Ready</span>
+              </div>
+              <span class="text-[10px] font-normal text-emerald-600 dark:text-emerald-400">Download below</span>
+          </template>
+          <template v-else>
+              <div class="flex items-center gap-2">
+                   <FileDown :size="16" />
+                   <span>Generate Data</span>
+              </div>
+              <span class="text-[10px] font-normal text-gray-500 dark:text-gray-400">Skip 3D view, get files</span>
+          </template>
+      </button>
+    </div>
+
+    <hr class="border-gray-200 dark:border-gray-600" />
+
     <!-- Resolution & Settings -->
     <div class="space-y-4">
       <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
@@ -169,57 +224,6 @@
           </option>
       </select>
       </template>
-    </div>
-    <div class="pt-2 grid grid-cols-2 gap-3">
-      <button
-        @click="$emit('generate', true, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
-        :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
-        :class="['py-3 font-bold rounded-md shadow-lg flex flex-col items-center justify-center gap-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed',
-          isCached
-            ? 'bg-[#FF6600] hover:bg-[#E65C00] text-white shadow-orange-900/10'
-            : 'bg-[#FF6600] hover:bg-[#E65C00] text-white shadow-orange-900/10 disabled:bg-gray-300 dark:disabled:bg-gray-700']"
-      >
-          <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
-          <template v-else-if="isCached">
-              <div class="flex items-center gap-2">
-                   <Mountain :size="16" />
-                   <span>Preview 3D</span>
-              </div>
-              <span class="text-[10px] font-normal opacity-90">Using cached data</span>
-          </template>
-          <template v-else>
-              <div class="flex items-center gap-2">
-                   <Mountain :size="16" />
-                   <span>Preview 3D</span>
-              </div>
-              <span class="text-[10px] font-normal opacity-90">View before download</span>
-          </template>
-      </button>
-
-      <button
-        @click="$emit('generate', false, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
-        :disabled="isGenerating || isCached || (useGPXZ && !gpxzApiKey)"
-        :class="['py-3 font-bold rounded-md shadow-sm flex flex-col items-center justify-center gap-1 transition-all disabled:cursor-not-allowed',
-          isCached
-            ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 disabled:opacity-50']"
-      >
-           <span v-if="isGenerating" class="animate-pulse text-xs">Processing...</span>
-          <template v-else-if="isCached">
-              <div class="flex items-center gap-2">
-                   <CircleCheck :size="16" />
-                   <span>Data Ready</span>
-              </div>
-              <span class="text-[10px] font-normal text-emerald-600 dark:text-emerald-400">Download below</span>
-          </template>
-          <template v-else>
-              <div class="flex items-center gap-2">
-                   <FileDown :size="16" />
-                   <span>Generate Data</span>
-              </div>
-              <span class="text-[10px] font-normal text-gray-500 dark:text-gray-400">Skip 3D view, get files</span>
-          </template>
-      </button>
     </div>
 
     <hr class="border-gray-200 dark:border-gray-600" />
