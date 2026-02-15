@@ -90,6 +90,7 @@
          >
            <Code :size="12" /> View Tech Stack
          </button>
+         <span class="text-[10px] text-gray-400 dark:text-gray-500" :title="'Built: ' + buildTime">Build {{ buildHash }}</span>
       </div>
     </aside>
 
@@ -530,6 +531,10 @@ const showDisclaimer = ref(false);
 const isDarkMode = ref(false);
 const surroundingTilePositions = ref([]);
 let abortController = null;
+
+// Build info (injected by Vite at build time)
+const buildHash = __BUILD_HASH__;
+const buildTime = new Date(__BUILD_TIME__).toLocaleString();
 
 const toggleDarkMode = () => {
   isDarkMode.value = !isDarkMode.value;
