@@ -1287,6 +1287,61 @@ export const exportToGLB = async (data, options = {}) => {
   }
 };
 
+export const exportToDAE = async (data, options = {}) => {
+  const { includeSurroundings = false, onProgress } = options;
+  try {
+    onProgress?.('Building terrain mesh...');
+    const terrainMesh = await createTerrainMesh(data);
+    const osmGroup = createOSMGroup(data);
+    const scene = new THREE.Scene();
+    scene.add(terrainMesh);
+    scene.add(osmGroup);
+
+    if (includeSurroundings) {
+      onProgress?.('Fetching surrounding tiles for DAE...');
+      const surroundingGroup = await createSurroundingMeshes(data, onProgress);
+      if (surroundingGroup) scene.add(surroundingGroup);
+    }
+
+    onProgress?.('Encoding Collada...');
+    const { ColladaExporter } = await import('./ColladaExporter.js');
+    const exporter = new ColladaExporter();
+    const result = exporter.parse(scene);
+
+    const daeBlob = new Blob([result.data], { type: 'model/vnd.collada+xml' });
+
+    // If there are textures, pack everything into a ZIP
+    if (result.textures && result.textures.length > 0) {
+      onProgress?.('Packaging textures...');
+      const { default: JSZip } = await import('jszip');
+      const zip = new JSZip();
+      zip.file('model.dae', result.data);
+      for (const tex of result.textures) {
+        zip.file(`${tex.directory}${tex.name}.${tex.ext}`, tex.data);
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      const date = new Date().toISOString().slice(0, 10);
+      link.download = `MapNG_Model_${date}.dae.zip`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } else {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(daeBlob);
+      const date = new Date().toISOString().slice(0, 10);
+      link.download = `MapNG_Model_${date}.dae`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+
+    onProgress?.('Done!');
+  } catch (err) {
+    console.error("DAE Export failed:", err);
+    throw err;
+  }
+};
+
 // --- Surrounding Tiles for GLB ---
 
 const SURROUND_OFFSETS = {

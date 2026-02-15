@@ -229,7 +229,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-2">
-            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Export Formats (8 Types)</h4>
+            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Export Formats (9 Types)</h4>
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
               <li>16-bit PNG Heightmap</li>
               <li>Satellite Texture (JPG)</li>
@@ -239,6 +239,7 @@
               <li>GeoTIFF (WGS84 or source CRS)</li>
               <li>GeoJSON Vector Data</li>
               <li>GLB 3D Model (+ optional surroundings)</li>
+              <li>Collada DAE (+ optional surroundings)</li>
             </ul>
           </div>
           <div class="space-y-2">
