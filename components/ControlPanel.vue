@@ -155,6 +155,31 @@
                         <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-1">
                             Free tier: 100 req/day. <a href="https://www.gpxz.io/" target="_blank" class="text-[#FF6600] hover:underline">Get a key</a>
                         </p>
+                        <!-- GPXZ Account Status -->
+                        <div v-if="gpxzApiKey" class="mt-2">
+                          <button @click="checkGPXZStatus" :disabled="isCheckingGPXZ"
+                            class="text-[10px] text-[#FF6600] hover:underline disabled:opacity-50 disabled:no-underline">
+                            {{ isCheckingGPXZ ? 'Checking...' : (gpxzStatus ? 'Refresh Status' : 'Check Account') }}
+                          </button>
+                          <div v-if="gpxzStatus" class="mt-1 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 p-2 space-y-1">
+                            <div class="flex items-center justify-between text-[10px]">
+                              <span class="text-gray-500 dark:text-gray-400">Plan</span>
+                              <span :class="['font-bold uppercase', gpxzStatus.plan === 'free' ? 'text-gray-600 dark:text-gray-300' : 'text-emerald-600 dark:text-emerald-400']">{{ gpxzStatus.plan }}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px]">
+                              <span class="text-gray-500 dark:text-gray-400">Today</span>
+                              <span class="text-gray-700 dark:text-gray-300">{{ gpxzStatus.used }} / {{ gpxzStatus.limit }}</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mt-0.5">
+                              <div class="h-1 rounded-full transition-all" :class="gpxzStatus.remaining < 20 ? 'bg-red-500' : 'bg-emerald-500'" :style="{ width: Math.min(100, (gpxzStatus.used / gpxzStatus.limit) * 100) + '%' }"></div>
+                            </div>
+                            <div class="flex items-center justify-between text-[10px]">
+                              <span class="text-gray-500 dark:text-gray-400">Concurrency</span>
+                              <span class="text-gray-700 dark:text-gray-300">{{ gpxzStatus.concurrency }}x parallel</span>
+                            </div>
+                            <p v-if="!gpxzStatus.valid" class="text-[10px] text-red-500 font-medium">⚠️ Invalid API key</p>
+                          </div>
+                        </div>
                         <p v-if="isAreaLargeForGPXZ" class="text-[10px] text-orange-600 dark:text-orange-400 font-medium leading-tight mt-1">
                             ⚠️ Large area ({{ areaSqKm.toFixed(2) }} km²). Uses multiple API calls.
                         </p>
@@ -520,7 +545,7 @@ import ModOfTheDay from './ModOfTheDay.vue';
 import LocationSearch from './LocationSearch.vue';
 import SurroundingTiles from './SurroundingTiles.vue';
 import { exportToGLB, exportToDAE } from '../services/export3d';
-import { checkUSGSStatus } from '../services/terrain';
+import { checkUSGSStatus, probeGPXZLimits, getGPXZRateLimitInfo } from '../services/terrain';
 import { exportGeoTiff } from '../services/exportGeoTiff';
 import { createWGS84ToLocal } from '../services/geoUtils';
 import { encode } from 'fast-png';
@@ -597,6 +622,8 @@ const useUSGS = ref(false);
 const useGPXZ = ref(false);
 const elevationSource = ref(localStorage.getItem('mapng_elevationSource') || 'default');
 const gpxzApiKey = ref(localStorage.getItem('mapng_gpxzApiKey') || '');
+const gpxzStatus = ref(null); // { plan, used, limit, remaining, concurrency, valid }
+const isCheckingGPXZ = ref(false);
 const usgsStatus = ref(null);
 
 // Collapsible section states (persisted via localStorage, hidden by default)
@@ -669,7 +696,21 @@ watch(fetchOSM, (newVal) => {
 // Persist GPXZ API key
 watch(gpxzApiKey, (newVal) => {
     localStorage.setItem('mapng_gpxzApiKey', newVal);
+    // Reset status when key changes
+    gpxzStatus.value = null;
 });
+
+// Check GPXZ account status
+const checkGPXZStatus = async () => {
+    if (!gpxzApiKey.value) return;
+    isCheckingGPXZ.value = true;
+    try {
+        const info = await probeGPXZLimits(gpxzApiKey.value);
+        gpxzStatus.value = info;
+    } finally {
+        isCheckingGPXZ.value = false;
+    }
+};
 
 // Persist collapsible section states
 watch(showElevationSource, (v) => localStorage.setItem('mapng_showElevationSource', String(v)));

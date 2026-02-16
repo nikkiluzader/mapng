@@ -1316,7 +1316,9 @@ export const exportToGLB = async (data, options = {}) => {
           const link = document.createElement("a");
           link.href = URL.createObjectURL(blob);
           const date = new Date().toISOString().slice(0, 10);
-          link.download = `MapNG_Model_${date}.glb`;
+          const lat = ((data.bounds.north + data.bounds.south) / 2).toFixed(4);
+          const lng = ((data.bounds.east + data.bounds.west) / 2).toFixed(4);
+          link.download = `MapNG_Model_${date}_${lat}_${lng}.glb`;
           link.click();
           URL.revokeObjectURL(link.href);
           onProgress?.('Done!');
@@ -1378,8 +1380,10 @@ export const exportToDAE = async (data, options = {}) => {
     const link = document.createElement('a');
     link.href = URL.createObjectURL(outputBlob);
     const date = new Date().toISOString().slice(0, 10);
+    const lat = ((data.bounds.north + data.bounds.south) / 2).toFixed(4);
+    const lng = ((data.bounds.east + data.bounds.west) / 2).toFixed(4);
     const ext = result.textures?.length > 0 ? '.dae.zip' : '.dae';
-    link.download = `MapNG_Model_${date}${ext}`;
+    link.download = `MapNG_Model_${date}_${lat}_${lng}${ext}`;
     link.click();
     URL.revokeObjectURL(link.href);
 

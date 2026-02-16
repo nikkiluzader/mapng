@@ -386,7 +386,9 @@ export async function runBatchJob(state, onProgress, onTileComplete, onError, si
       }
 
       const date = new Date().toISOString().slice(0, 10);
-      triggerDownload(zipBlob, `MapNG_Batch_${label}_${date}.zip`);
+      const lat = tile.center.lat.toFixed(4);
+      const lng = tile.center.lng.toFixed(4);
+      triggerDownload(zipBlob, `MapNG_Batch_${label}_${date}_${lat}_${lng}.zip`);
 
       // ── 4. Generate thumbnail snapshot ───────────────────
       tile.snapshot = generateTileSnapshot(terrainData);

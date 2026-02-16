@@ -159,6 +159,31 @@
               <p class="text-[10px] text-amber-600 dark:text-amber-500 font-medium mt-1">
                 ⚠️ Batch jobs with GPXZ use many API calls ({{ totalTiles }} tiles × multiple requests each).
               </p>
+              <!-- GPXZ Account Status -->
+              <div class="mt-2">
+                <button @click="checkGPXZStatus" :disabled="isCheckingGPXZ || !gpxzApiKey"
+                  class="text-[10px] text-[#FF6600] hover:underline disabled:opacity-50 disabled:no-underline">
+                  {{ isCheckingGPXZ ? 'Checking...' : (gpxzStatus ? 'Refresh Status' : 'Check Account') }}
+                </button>
+                <div v-if="gpxzStatus" class="mt-1 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 p-2 space-y-1">
+                  <div class="flex items-center justify-between text-[10px]">
+                    <span class="text-gray-500 dark:text-gray-400">Plan</span>
+                    <span :class="['font-bold uppercase', gpxzStatus.plan === 'free' ? 'text-gray-600 dark:text-gray-300' : 'text-emerald-600 dark:text-emerald-400']">{{ gpxzStatus.plan }}</span>
+                  </div>
+                  <div class="flex items-center justify-between text-[10px]">
+                    <span class="text-gray-500 dark:text-gray-400">Today</span>
+                    <span class="text-gray-700 dark:text-gray-300">{{ gpxzStatus.used }} / {{ gpxzStatus.limit }}</span>
+                  </div>
+                  <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 mt-0.5">
+                    <div class="h-1 rounded-full transition-all" :class="gpxzStatus.remaining < 20 ? 'bg-red-500' : 'bg-emerald-500'" :style="{ width: Math.min(100, (gpxzStatus.used / gpxzStatus.limit) * 100) + '%' }"></div>
+                  </div>
+                  <div class="flex items-center justify-between text-[10px]">
+                    <span class="text-gray-500 dark:text-gray-400">Concurrency</span>
+                    <span class="text-gray-700 dark:text-gray-300">{{ gpxzStatus.concurrency }}x parallel</span>
+                  </div>
+                  <p v-if="!gpxzStatus.valid" class="text-[10px] text-red-500 font-medium">⚠️ Invalid API key</p>
+                </div>
+              </div>
             </div>
           </div>
         </label>
@@ -337,6 +362,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { Grid3X3, Box, Trees, Mountain, MapPin, Download, ChevronDown, Play, RotateCcw, X, AlertTriangle } from 'lucide-vue-next';
 import LocationSearch from './LocationSearch.vue';
+import { probeGPXZLimits } from '../services/terrain';
 
 const props = defineProps({
   center: { type: Object, required: true },
@@ -358,6 +384,8 @@ const gridRows = ref(parseInt(localStorage.getItem('mapng_batch_rows')) || 3);
 const includeOSM = ref(localStorage.getItem('mapng_batch_osm') !== 'false');
 const elevationSource = ref(localStorage.getItem('mapng_batch_elevation') || 'default');
 const gpxzApiKey = ref(localStorage.getItem('mapng_gpxzApiKey') || '');
+const gpxzStatus = ref(null);
+const isCheckingGPXZ = ref(false);
 const showElevationSource = ref(false);
 const showCoordinates = ref(false);
 const meshResolution = ref(parseInt(localStorage.getItem('mapng_batch_mesh')) || 256);
@@ -487,7 +515,22 @@ watch(gridRows, (v) => {
 // Persist settings
 watch(includeOSM, (v) => localStorage.setItem('mapng_batch_osm', String(v)));
 watch(elevationSource, (v) => localStorage.setItem('mapng_batch_elevation', v));
-watch(gpxzApiKey, (v) => localStorage.setItem('mapng_gpxzApiKey', v));
+watch(gpxzApiKey, (v) => {
+  localStorage.setItem('mapng_gpxzApiKey', v);
+  gpxzStatus.value = null;
+});
+
+// Check GPXZ account status
+const checkGPXZStatus = async () => {
+  if (!gpxzApiKey.value) return;
+  isCheckingGPXZ.value = true;
+  try {
+    const info = await probeGPXZLimits(gpxzApiKey.value);
+    gpxzStatus.value = info;
+  } finally {
+    isCheckingGPXZ.value = false;
+  }
+};
 watch(meshResolution, (v) => localStorage.setItem('mapng_batch_mesh', String(v)));
 watch(exports, (v) => localStorage.setItem('mapng_batch_exports', JSON.stringify(v)), { deep: true });
 

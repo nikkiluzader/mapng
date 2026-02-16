@@ -42,12 +42,95 @@ export const project = (lat, lng, zoom) => {
   return { x, y };
 };
 
+// ─── GPXZ Rate Limit Discovery & State ─────────────────────────────
+// Cached state about the user's GPXZ plan limits
+let gpxzRateLimitInfo = null;
+
+/**
+ * Probe the GPXZ API to discover the user's plan limits.
+ * Makes a lightweight /v1/elevation/point request and reads rate-limit headers.
+ * Returns { used, limit, remaining, resetSec, rps, concurrency, plan }
+ */
+export async function probeGPXZLimits(apiKey, signal) {
+  try {
+    const resp = await fetch(
+      'https://api.gpxz.io/v1/elevation/point?lat=0&lon=0',
+      { headers: { 'x-api-key': apiKey }, signal }
+    );
+
+    const used = parseInt(resp.headers.get('x-ratelimit-used') || '0', 10);
+    const limit = parseInt(resp.headers.get('x-ratelimit-limit') || '100', 10);
+    const remaining = parseInt(resp.headers.get('x-ratelimit-remaining') || '0', 10);
+    const resetSec = parseInt(resp.headers.get('x-ratelimit-reset') || '0', 10);
+
+    // Determine plan tier and concurrency from daily limit
+    // Free: 100/day, 1 rps → concurrency 1
+    // Small: 2,500/day, 10 rps → concurrency 8
+    // Large: 7,500/day, 25 rps → concurrency 20
+    // Advanced: >7,500/day → concurrency 20
+    let plan, rps, concurrency;
+    if (limit <= 100) {
+      plan = 'free';
+      rps = 1;
+      concurrency = 1;
+    } else if (limit <= 2500) {
+      plan = 'small';
+      rps = 10;
+      concurrency = 8;
+    } else {
+      plan = 'large';
+      rps = 25;
+      concurrency = 20;
+    }
+
+    const info = { used, limit, remaining, resetSec, rps, concurrency, plan, valid: resp.ok };
+    gpxzRateLimitInfo = info;
+    console.log(`[GPXZ] Plan: ${plan} | Limit: ${limit}/day | Used: ${used} | Remaining: ${remaining} | Concurrency: ${concurrency}`);
+    return info;
+  } catch (e) {
+    console.warn('[GPXZ] Failed to probe rate limits:', e);
+    // Fallback to free-tier assumptions
+    const fallback = { used: 0, limit: 100, remaining: 100, resetSec: 0, rps: 1, concurrency: 1, plan: 'free', valid: false };
+    gpxzRateLimitInfo = fallback;
+    return fallback;
+  }
+}
+
+/**
+ * Update cached rate limit info from response headers (called after each request).
+ */
+function updateRateLimitFromHeaders(response) {
+  if (!gpxzRateLimitInfo) return;
+  const used = response.headers.get('x-ratelimit-used');
+  const remaining = response.headers.get('x-ratelimit-remaining');
+  if (used) gpxzRateLimitInfo.used = parseInt(used, 10);
+  if (remaining) gpxzRateLimitInfo.remaining = parseInt(remaining, 10);
+}
+
+/** Get the last known GPXZ rate limit info */
+export function getGPXZRateLimitInfo() {
+  return gpxzRateLimitInfo;
+}
+
 const NO_DATA_VALUE = -99999;
 
 const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
   try {
     signal?.throwIfAborted();
-    // 1. Check Resolution via Points API
+    // 1. Probe rate limits if not already known
+    if (!gpxzRateLimitInfo) {
+      onProgress?.('Checking GPXZ account limits...');
+      await probeGPXZLimits(apiKey, signal);
+    }
+
+    const rateInfo = gpxzRateLimitInfo;
+    const concurrency = rateInfo?.concurrency || 1;
+    const rps = rateInfo?.rps || 1;
+    // Delay between requests per worker to stay under rps limit
+    // e.g. 8 workers at 10 rps → each worker delays 800ms between requests
+    const perWorkerDelayMs = Math.ceil((concurrency / rps) * 1000);
+
+    // 2. Check Resolution via Points API
     // We check the center point to see what dataset is being used
     const centerLat = (bounds.north + bounds.south) / 2;
     const centerLng = (bounds.east + bounds.west) / 2;
@@ -141,14 +224,15 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
       }
     }
 
-    console.log(`[GPXZ] Split into ${requests.length} tiles (with overlap).`);
-    onProgress?.(`Fetching ${requests.length} GPXZ tiles...`);
+    console.log(`[GPXZ] Split into ${requests.length} tiles (with overlap). Concurrency: ${concurrency}, delay: ${perWorkerDelayMs}ms`);
+    onProgress?.(`Fetching ${requests.length} GPXZ tiles (${rateInfo?.plan || 'free'} plan, ${concurrency}x concurrent)...`);
 
+    let completedChunks = 0;
     const results = await pMap(
       requests,
       async (reqBounds) => {
-        // Enforce 1 request per second rate limit for free tier
-        await new Promise((r) => setTimeout(r, 1100));
+        // Rate limit delay — adjusted per worker for the plan's rps limit
+        await new Promise((r) => setTimeout(r, perWorkerDelayMs));
         signal?.throwIfAborted();
 
         const url = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=1&projection=latlon`;
@@ -156,16 +240,21 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
         // Retry logic for 429 Rate Limit
         let response = null;
         let retries = 0;
-        const MAX_RETRIES = 3;
+        const MAX_RETRIES = 5;
 
         while (retries < MAX_RETRIES) {
           response = await fetch(url, { headers: { "x-api-key": apiKey }, signal });
 
           if (response.status === 429) {
-            const waitTime = 2000 * Math.pow(2, retries); // Exponential backoff: 2s, 4s, 8s
+            // Use retry-after header if available, otherwise exponential backoff
+            const retryAfter = response.headers.get('retry-after');
+            const waitTime = retryAfter
+              ? parseInt(retryAfter, 10) * 1000 + 200 // Add small buffer
+              : 2000 * Math.pow(2, retries); // Exponential backoff: 2s, 4s, 8s, 16s, 32s
             console.warn(
-              `[GPXZ] Rate limit hit (429). Retrying in ${waitTime}ms...`,
+              `[GPXZ] Rate limit hit (429). Retrying in ${waitTime}ms... (attempt ${retries + 1}/${MAX_RETRIES})`,
             );
+            onProgress?.(`Rate limited — retrying in ${Math.ceil(waitTime / 1000)}s...`);
             await new Promise((r) => setTimeout(r, waitTime));
             retries++;
             continue;
@@ -178,6 +267,14 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
           console.error(`[GPXZ] Tile Error: ${response?.status}`);
           return null;
         }
+
+        // Update cached rate limit info from response headers
+        updateRateLimitFromHeaders(response);
+
+        completedChunks++;
+        const remaining = gpxzRateLimitInfo?.remaining;
+        const quotaInfo = remaining != null ? ` (${remaining} API calls remaining today)` : '';
+        onProgress?.(`Fetching GPXZ tiles... ${completedChunks}/${requests.length}${quotaInfo}`);
 
         const version = response.headers.get("X-DATASET-VERSION");
         if (version) console.debug(`[GPXZ] Dataset Version: ${version}`);
@@ -192,8 +289,8 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
 
         return { image, raster, arrayBuffer };
       },
-      1,
-    ); // Concurrency 1 for strict rate limiting
+      concurrency,
+    );
 
     const validResults = results.filter((r) => r !== null);
 
