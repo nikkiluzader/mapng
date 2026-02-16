@@ -393,10 +393,10 @@
                 <div class="flex items-center gap-1.5">
                     <span class="text-[9px] text-gray-500 dark:text-gray-400">Mesh:</span>
                     <select v-model="modelMeshResolution" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
-                        <option value="128">Low (~33K tris)</option>
-                        <option value="256">Med (~131K tris)</option>
-                        <option value="512">High (~524K tris)</option>
-                        <option value="1024">Ultra (~2M tris)</option>
+                        <option value="128">Low</option>
+                        <option value="256">Medium</option>
+                        <option value="512">High</option>
+                        <option value="1024">Ultra</option>
                     </select>
                 </div>
                 <label class="flex items-center gap-1 cursor-pointer">

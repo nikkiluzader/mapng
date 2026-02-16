@@ -318,19 +318,21 @@ const createTreeMesh = (type, unitsPerMeter) => {
       0.25 * unitsPerMeter,
       trunkHeight,
       8,
-    ).toNonIndexed();
+    );
+    if (trunkGeo.index) trunkGeo = trunkGeo.toNonIndexed();
     trunkGeo.translate(0, trunkHeight / 2, 0);
     addColor(trunkGeo, 0x5d4037);
 
     if (type === "palm") {
       const fronds = [];
       for (let i = 0; i < 8; i++) {
-        const frondGeo = new THREE.CylinderGeometry(
+        let frondGeo = new THREE.CylinderGeometry(
           0.01 * unitsPerMeter,
           0.2 * unitsPerMeter,
           3.5 * unitsPerMeter,
           4,
-        ).toNonIndexed();
+        );
+        if (frondGeo.index) frondGeo = frondGeo.toNonIndexed();
         frondGeo.translate(0, 1.75 * unitsPerMeter, 0);
         frondGeo.rotateZ(-Math.PI / 4); // Droop down
         frondGeo.rotateY((i / 8) * Math.PI * 2);
@@ -343,12 +345,13 @@ const createTreeMesh = (type, unitsPerMeter) => {
       trunkGeo.dispose();
       return merged;
     } else if (type === "coniferous") {
-      const crownGeo = new THREE.CylinderGeometry(
+      let crownGeo = new THREE.CylinderGeometry(
         0,
         2.5 * unitsPerMeter,
         7 * unitsPerMeter,
         8,
-      ).toNonIndexed();
+      );
+      if (crownGeo.index) crownGeo = crownGeo.toNonIndexed();
       crownGeo.translate(0, 6.5 * unitsPerMeter, 0);
       addColor(crownGeo, 0x064e3b);
       const merged = mergeGeometries([trunkGeo, crownGeo]);
@@ -356,10 +359,11 @@ const createTreeMesh = (type, unitsPerMeter) => {
       trunkGeo.dispose();
       return merged;
     } else {
-      const crownGeo = new THREE.IcosahedronGeometry(
+      let crownGeo = new THREE.IcosahedronGeometry(
         3 * unitsPerMeter,
         1,
-      ).toNonIndexed();
+      );
+      if (crownGeo.index) crownGeo = crownGeo.toNonIndexed();
       crownGeo.scale(1, 1.2, 1);
       crownGeo.translate(0, 7 * unitsPerMeter, 0);
       addColor(crownGeo, 0x166534);
@@ -934,7 +938,7 @@ export const createOSMGroup = (data) => {
       // Actually ExtrudeGeometry groups them. Side is group 0, Caps are group 1.
       // For now, we'll just keep the sides and hide the caps by making them transparent or just drawing over them.
       // Better: just use the side geometry.
-      wallGeos.push(wallGeo.toNonIndexed());
+      wallGeos.push(wallGeo.index ? wallGeo.toNonIndexed() : wallGeo);
 
       // 2. Create Roof Geometry
       let roofGeo;
@@ -1061,7 +1065,7 @@ export const createOSMGroup = (data) => {
                 winGeo.rotateY(winAngle);
                 winGeo.translate(wx, wy, wz);
                 addColor(winGeo, 0x1e293b);
-                windowGeos.push(winGeo.toNonIndexed());
+                windowGeos.push(winGeo.index ? winGeo.toNonIndexed() : winGeo);
               }
             }
           }
@@ -1135,7 +1139,7 @@ export const createOSMGroup = (data) => {
       addColor(geo, b.color);
       geos.push(geo);
     });
-    const compatibleGeos = geos.map((g) => g.toNonIndexed());
+    const compatibleGeos = geos.map((g) => g.index ? g.toNonIndexed() : g);
     const merged = mergeGeometries(compatibleGeos);
     if (merged) {
       const barrierMesh = new THREE.Mesh(
@@ -1205,10 +1209,11 @@ export const createOSMGroup = (data) => {
 
   if (bushesList.length > 0) {
     const geos = [];
-    const baseB = new THREE.IcosahedronGeometry(
+    let baseB = new THREE.IcosahedronGeometry(
       1.2 * unitsPerMeter,
       0,
-    ).toNonIndexed();
+    );
+    if (baseB.index) baseB = baseB.toNonIndexed();
     addColor(baseB, 0x166534);
     bushesList.forEach((pos) => {
       const b = baseB.clone();
@@ -1306,14 +1311,15 @@ export const exportToDAE = async (data, options = {}) => {
     const exporter = new ColladaExporter();
     const result = exporter.parse(scene);
 
-    const daeBlob = new Blob([result.data], { type: 'model/vnd.collada+xml' });
+    // result.data is now a Blob (built from string parts to avoid allocation overflow)
+    const daeBlob = result.data;
 
     // If there are textures, pack everything into a ZIP
     if (result.textures && result.textures.length > 0) {
       onProgress?.('Packaging textures...');
       const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
-      zip.file('model.dae', result.data);
+      zip.file('model.dae', daeBlob);
       for (const tex of result.textures) {
         zip.file(`${tex.directory}${tex.name}.${tex.ext}`, tex.data);
       }

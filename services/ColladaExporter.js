@@ -194,24 +194,38 @@ class ColladaExporter {
         return new arr.constructor(arr.buffer, st * arr.BYTES_PER_ELEMENT, ct);
     }
 
-    // Returns the string for a geometry's attribute
-    function getAttribute(attr, name, params, type, isColor = false) {
+    // Returns the string parts for a geometry's attribute as an array
+    // to avoid creating one giant string that overflows allocation limits
+    function getAttributeParts(attr, name, params, type, isColor = false) {
       const array = attrBufferToArray(attr, isColor);
-      const res =
+      const parts = [];
+      parts.push(
         `<source id="${name}">` +
-        `<float_array id="${name}-array" count="${array.length}">` +
-        array.join(" ") +
-        "</float_array>" +
-        "<technique_common>" +
+        `<float_array id="${name}-array" count="${array.length}">`
+      );
+
+      // Write float data in chunks to avoid allocation overflow
+      const CHUNK = 65536;
+      for (let i = 0; i < array.length; i += CHUNK) {
+        if (i > 0) parts.push(' ');
+        const end = Math.min(i + CHUNK, array.length);
+        const slice = Array.prototype.slice.call(array, i, end);
+        parts.push(slice.join(' '));
+      }
+
+      parts.push(
+        '</float_array>' +
+        '<technique_common>' +
         `<accessor source="#${name}-array" count="${Math.floor(
           array.length / attr.itemSize
         )}" stride="${attr.itemSize}">` +
-        params.map((n) => `<param name="${n}" type="${type}" />`).join("") +
-        "</accessor>" +
-        "</technique_common>" +
-        "</source>";
+        params.map((n) => `<param name="${n}" type="${type}" />`).join('') +
+        '</accessor>' +
+        '</technique_common>' +
+        '</source>'
+      );
 
-      return res;
+      return parts;
     }
 
     // Returns the string for a node's transform information
@@ -247,41 +261,44 @@ class ColladaExporter {
         const gname = bufferGeometry.name
           ? ` name="${bufferGeometry.name}"`
           : "";
-        let gnode = `<geometry id="${meshid}"${gname}><mesh>`;
+
+        // Use array of parts to avoid building one giant string
+        const gparts = [];
+        gparts.push(`<geometry id="${meshid}"${gname}><mesh>`);
 
         // define the geometry node and the vertices for the geometry
         const posName = `${meshid}-position`;
         const vertName = `${meshid}-vertices`;
-        gnode += getAttribute(
+        gparts.push(...getAttributeParts(
           bufferGeometry.attributes.position,
           posName,
           ["X", "Y", "Z"],
           "float"
-        );
-        gnode += `<vertices id="${vertName}"><input semantic="POSITION" source="#${posName}" /></vertices>`;
+        ));
+        gparts.push(`<vertices id="${vertName}"><input semantic="POSITION" source="#${posName}" /></vertices>`);
 
         // serialize normals
         let triangleInputs = `<input semantic="VERTEX" source="#${vertName}" offset="0" />`;
         if ("normal" in bufferGeometry.attributes) {
           const normName = `${meshid}-normal`;
-          gnode += getAttribute(
+          gparts.push(...getAttributeParts(
             bufferGeometry.attributes.normal,
             normName,
             ["X", "Y", "Z"],
             "float"
-          );
+          ));
           triangleInputs += `<input semantic="NORMAL" source="#${normName}" offset="0" />`;
         }
 
         // serialize uvs
         if ("uv" in bufferGeometry.attributes) {
           const uvName = `${meshid}-texcoord`;
-          gnode += getAttribute(
+          gparts.push(...getAttributeParts(
             bufferGeometry.attributes.uv,
             uvName,
             ["S", "T"],
             "float"
-          );
+          ));
           triangleInputs += `<input semantic="TEXCOORD" source="#${uvName}" offset="0" set="0" />`;
         }
 
@@ -294,25 +311,25 @@ class ColladaExporter {
             : null;
         if (uv2Key) {
           const uvName = `${meshid}-texcoord2`;
-          gnode += getAttribute(
+          gparts.push(...getAttributeParts(
             bufferGeometry.attributes[uv2Key],
             uvName,
             ["S", "T"],
             "float"
-          );
+          ));
           triangleInputs += `<input semantic="TEXCOORD" source="#${uvName}" offset="0" set="1" />`;
         }
 
         // serialize colors
         if ("color" in bufferGeometry.attributes) {
           const colName = `${meshid}-color`;
-          gnode += getAttribute(
+          gparts.push(...getAttributeParts(
             bufferGeometry.attributes.color,
             colName,
             ["R", "G", "B"],
             "float",
             true
-          );
+          ));
           triangleInputs += `<input semantic="COLOR" source="#${colName}" offset="0" />`;
         }
 
@@ -328,16 +345,25 @@ class ColladaExporter {
           const group = groups[i];
           const subarr = subArray(indexArray, group.start, group.count);
           const polycount = subarr.length / 3;
-          gnode += `<triangles material="MESH_MATERIAL_${group.materialIndex}" count="${polycount}">`;
-          gnode += triangleInputs;
+          gparts.push(`<triangles material="MESH_MATERIAL_${group.materialIndex}" count="${polycount}">`);
+          gparts.push(triangleInputs);
 
-          gnode += `<p>${subarr.join(" ")}</p>`;
-          gnode += "</triangles>";
+          // Chunk index array too for large meshes
+          gparts.push('<p>');
+          const ICHUNK = 65536;
+          for (let j = 0; j < subarr.length; j += ICHUNK) {
+            if (j > 0) gparts.push(' ');
+            const end = Math.min(j + ICHUNK, subarr.length);
+            const slice = Array.prototype.slice.call(subarr, j, end);
+            gparts.push(slice.join(' '));
+          }
+          gparts.push('</p>');
+          gparts.push('</triangles>');
         }
 
-        gnode += "</mesh></geometry>";
+        gparts.push('</mesh></geometry>');
 
-        libraryGeometries.push(gnode);
+        libraryGeometries.push(gparts);
 
         info = { meshid: meshid, bufferGeometry: bufferGeometry };
         geometryInfo.set(bufferGeometry, info);
@@ -584,44 +610,53 @@ class ColladaExporter {
       version === "1.4.1"
         ? "http://www.collada.org/2005/11/COLLADASchema"
         : "https://www.khronos.org/collada/";
-    let dae =
+
+    // Build DAE as array of string parts to avoid allocation overflow
+    // on large scenes. No pretty-printing (format) is applied to keep
+    // memory bounded.
+    const daeParts = [];
+    daeParts.push(
       '<?xml version="1.0" encoding="UTF-8" standalone="no" ?>' +
       `<COLLADA xmlns="${specLink}" version="${version}">` +
       "<asset>" +
-      ("<contributor>" +
-        "<authoring_tool>three.js Collada Exporter</authoring_tool>" +
-        (options.author !== null
-          ? `<author>${options.author}</author>`
-          : "") +
-        "</contributor>" +
-        `<created>${new Date().toISOString()}</created>` +
-        `<modified>${new Date().toISOString()}</modified>` +
-        (options.unitName !== null
-          ? `<unit name="${options.unitName}" meter="${options.unitMeter}" />`
-          : "") +
-        `<up_axis>${options.upAxis}</up_axis>`) +
-      "</asset>";
+      "<contributor>" +
+      "<authoring_tool>three.js Collada Exporter</authoring_tool>" +
+      (options.author !== null
+        ? `<author>${options.author}</author>`
+        : "") +
+      "</contributor>" +
+      `<created>${new Date().toISOString()}</created>` +
+      `<modified>${new Date().toISOString()}</modified>` +
+      (options.unitName !== null
+        ? `<unit name="${options.unitName}" meter="${options.unitMeter}" />`
+        : "") +
+      `<up_axis>${options.upAxis}</up_axis>` +
+      "</asset>"
+    );
 
-    dae += `<library_images>${libraryImages.join("")}</library_images>`;
+    daeParts.push(`<library_images>${libraryImages.join("")}</library_images>`);
 
-    dae += `<library_effects>${libraryEffects.join("")}</library_effects>`;
+    daeParts.push(`<library_effects>${libraryEffects.join("")}</library_effects>`);
 
-    dae += `<library_materials>${libraryMaterials.join(
-      ""
-    )}</library_materials>`;
+    daeParts.push(`<library_materials>${libraryMaterials.join("")}</library_materials>`);
 
-    dae += `<library_geometries>${libraryGeometries.join(
-      ""
-    )}</library_geometries>`;
+    // Geometry library: each entry is an array of parts, flatten them
+    daeParts.push('<library_geometries>');
+    for (const geoParts of libraryGeometries) {
+      for (const part of geoParts) {
+        daeParts.push(part);
+      }
+    }
+    daeParts.push('</library_geometries>');
 
-    dae += `<library_visual_scenes><visual_scene id="Scene" name="scene">${libraryVisualScenes}</visual_scene></library_visual_scenes>`;
+    daeParts.push(`<library_visual_scenes><visual_scene id="Scene" name="scene">${libraryVisualScenes}</visual_scene></library_visual_scenes>`);
 
-    dae += '<scene><instance_visual_scene url="#Scene"/></scene>';
+    daeParts.push('<scene><instance_visual_scene url="#Scene"/></scene>');
 
-    dae += "</COLLADA>";
+    daeParts.push("</COLLADA>");
 
     const res = {
-      data: format(dae),
+      data: new Blob(daeParts, { type: 'model/vnd.collada+xml' }),
       textures,
     };
 
