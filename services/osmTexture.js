@@ -1095,34 +1095,38 @@ const renderFeaturesToCanvas = (
   });
 };
 
+// Cache noise patterns by color to avoid regenerating each time
+const _noiseCache = new Map();
 const createNoisePattern = (baseColor) => {
-  const size = 512;
+  const key = baseColor || COLORS.defaultLanduse;
+  if (_noiseCache.has(key)) return _noiseCache.get(key);
+
+  const size = 256; // 256px is sufficient for a repeating noise tile
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext("2d");
 
   // Base fill
-  ctx.fillStyle = baseColor || COLORS.defaultLanduse;
+  ctx.fillStyle = key;
   ctx.fillRect(0, 0, size, size);
 
-  // Add noise
+  // Add noise — use pixel buffer directly for speed
   const imageData = ctx.getImageData(0, 0, size, size);
   const data = imageData.data;
 
   for (let i = 0; i < data.length; i += 4) {
-    // Subtle monochromatic noise
     const val = (Math.random() - 0.5) * 20;
-    data[i] = Math.max(0, Math.min(255, data[i] + val)); // R
-    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + val)); // G
-    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + val)); // B
+    data[i] = Math.max(0, Math.min(255, data[i] + val));
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + val));
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + val));
   }
 
   ctx.putImageData(imageData, 0, 0);
 
-  // Add some larger grit/details
+  // Larger grit
   ctx.fillStyle = "rgba(0,0,0,0.03)";
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 50; i++) {
     const x = Math.random() * size;
     const y = Math.random() * size;
     const r = Math.random() * 2 + 1;
@@ -1131,17 +1135,24 @@ const createNoisePattern = (baseColor) => {
     ctx.fill();
   }
 
+  _noiseCache.set(key, canvas);
   return canvas;
 };
 
 export const generateOSMTexture = async (terrainData, options = {}) => {
   const onProgress = options.onProgress;
   onProgress?.("Baking procedural noise...");
-  const TARGET_RESOLUTION = 16384;
+  // Cap texture at 8192px max to avoid 1GB+ RGBA buffers (16384^2 = 1GB)
+  const MAX_TEX_SIZE = 8192;
+  const TARGET_RESOLUTION = MAX_TEX_SIZE;
   let SCALE_FACTOR = Math.max(
     2,
     Math.ceil(TARGET_RESOLUTION / terrainData.width),
   );
+  // Ensure final canvas doesn't exceed max
+  if (terrainData.width * SCALE_FACTOR > MAX_TEX_SIZE) {
+    SCALE_FACTOR = Math.max(1, Math.floor(MAX_TEX_SIZE / terrainData.width));
+  }
   const canvas = document.createElement("canvas");
   canvas.width = terrainData.width * SCALE_FACTOR;
   canvas.height = terrainData.height * SCALE_FACTOR;
@@ -1185,11 +1196,15 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
 export const generateHybridTexture = async (terrainData, options = {}) => {
   const onProgress = options.onProgress;
   onProgress?.("Blending satellite imagery with vector overlays...");
-  const TARGET_RESOLUTION = 16384;
+  const MAX_TEX_SIZE = 8192;
+  const TARGET_RESOLUTION = MAX_TEX_SIZE;
   let SCALE_FACTOR = Math.max(
     2,
     Math.ceil(TARGET_RESOLUTION / terrainData.width),
   );
+  if (terrainData.width * SCALE_FACTOR > MAX_TEX_SIZE) {
+    SCALE_FACTOR = Math.max(1, Math.floor(MAX_TEX_SIZE / terrainData.width));
+  }
   const canvas = document.createElement("canvas");
   canvas.width = terrainData.width * SCALE_FACTOR;
   canvas.height = terrainData.height * SCALE_FACTOR;

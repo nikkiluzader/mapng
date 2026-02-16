@@ -233,66 +233,116 @@ const convertGeom = (geom) => {
   return geom.map((p) => ({ lat: p.lat, lng: p.lon }));
 };
 
-// Helper to join way segments into closed rings
+// Helper to join way segments into closed rings — O(n) via endpoint index
 const joinWays = (wayNodesList) => {
   if (wayNodesList.length === 0) return [];
 
   const rings = [];
-  const pool = [...wayNodesList];
+  // Build endpoint → way index lookup for O(1) matching
+  const makeKey = (node) => `${node.lat},${node.lng}`;
+  const pool = wayNodesList.map((w, i) => ({ nodes: [...w], id: i }));
+  const alive = new Set(pool.map((_, i) => i));
 
-  while (pool.length > 0) {
-    let currentRing = [...pool.shift()];
+  // Index: key → Set of pool indices where that key is an endpoint
+  const startIndex = new Map();
+  const endIndex = new Map();
+
+  const addToIndex = (idx, entry) => {
+    const sk = makeKey(entry.nodes[0]);
+    const ek = makeKey(entry.nodes[entry.nodes.length - 1]);
+    if (!startIndex.has(sk)) startIndex.set(sk, new Set());
+    startIndex.get(sk).add(idx);
+    if (!endIndex.has(ek)) endIndex.set(ek, new Set());
+    endIndex.get(ek).add(idx);
+  };
+  const removeFromIndex = (idx, entry) => {
+    const sk = makeKey(entry.nodes[0]);
+    const ek = makeKey(entry.nodes[entry.nodes.length - 1]);
+    startIndex.get(sk)?.delete(idx);
+    endIndex.get(ek)?.delete(idx);
+  };
+
+  pool.forEach((entry, idx) => addToIndex(idx, entry));
+
+  while (alive.size > 0) {
+    const firstIdx = alive.values().next().value;
+    const ring = pool[firstIdx];
+    alive.delete(firstIdx);
+    removeFromIndex(firstIdx, ring);
+
     let changed = true;
-
     while (changed) {
       changed = false;
-      const startNode = currentRing[0];
-      const endNode = currentRing[currentRing.length - 1];
+      const startNode = ring.nodes[0];
+      const endNode = ring.nodes[ring.nodes.length - 1];
+      const sk = makeKey(startNode);
+      const ek = makeKey(endNode);
 
-      // Check if ring is already closed
-      if (
-        startNode.lat === endNode.lat &&
-        startNode.lng === endNode.lng &&
-        currentRing.length > 2
-      ) {
-        break;
+      // Already closed?
+      if (sk === ek && ring.nodes.length > 2) break;
+
+      // Try to find a way whose start matches our end
+      const endMatches = startIndex.get(ek);
+      if (endMatches) {
+        for (const idx of endMatches) {
+          if (!alive.has(idx)) continue;
+          const way = pool[idx];
+          alive.delete(idx);
+          removeFromIndex(idx, way);
+          ring.nodes.push(...way.nodes.slice(1));
+          changed = true;
+          break;
+        }
       }
+      if (changed) continue;
 
-      for (let i = 0; i < pool.length; i++) {
-        const way = pool[i];
-        const wayStart = way[0];
-        const wayEnd = way[way.length - 1];
+      // Try to find a way whose end matches our end (reverse it)
+      const endEndMatches = endIndex.get(ek);
+      if (endEndMatches) {
+        for (const idx of endEndMatches) {
+          if (!alive.has(idx)) continue;
+          const way = pool[idx];
+          alive.delete(idx);
+          removeFromIndex(idx, way);
+          way.nodes.reverse();
+          ring.nodes.push(...way.nodes.slice(1));
+          changed = true;
+          break;
+        }
+      }
+      if (changed) continue;
 
-        if (endNode.lat === wayStart.lat && endNode.lng === wayStart.lng) {
-          currentRing.push(...way.slice(1));
-          pool.splice(i, 1);
+      // Try to find a way whose end matches our start
+      const startMatches = endIndex.get(sk);
+      if (startMatches) {
+        for (const idx of startMatches) {
+          if (!alive.has(idx)) continue;
+          const way = pool[idx];
+          alive.delete(idx);
+          removeFromIndex(idx, way);
+          ring.nodes.unshift(...way.nodes.slice(0, -1));
           changed = true;
           break;
-        } else if (endNode.lat === wayEnd.lat && endNode.lng === wayEnd.lng) {
-          currentRing.push(...[...way].reverse().slice(1));
-          pool.splice(i, 1);
-          changed = true;
-          break;
-        } else if (
-          startNode.lat === wayEnd.lat &&
-          startNode.lng === wayEnd.lng
-        ) {
-          currentRing.unshift(...way.slice(0, -1));
-          pool.splice(i, 1);
-          changed = true;
-          break;
-        } else if (
-          startNode.lat === wayStart.lat &&
-          startNode.lng === wayStart.lng
-        ) {
-          currentRing.unshift(...[...way].reverse().slice(0, -1));
-          pool.splice(i, 1);
+        }
+      }
+      if (changed) continue;
+
+      // Try to find a way whose start matches our start (reverse it)
+      const startStartMatches = startIndex.get(sk);
+      if (startStartMatches) {
+        for (const idx of startStartMatches) {
+          if (!alive.has(idx)) continue;
+          const way = pool[idx];
+          alive.delete(idx);
+          removeFromIndex(idx, way);
+          way.nodes.reverse();
+          ring.nodes.unshift(...way.nodes.slice(0, -1));
           changed = true;
           break;
         }
       }
     }
-    rings.push(currentRing);
+    rings.push(ring.nodes);
   }
   return rings;
 };

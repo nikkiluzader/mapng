@@ -161,49 +161,59 @@ export const resampleToMeterGrid = async (
     if (smooth) {
         console.log("[Resampler] Applying smoothing pass (Dual Separable Box Blur)...");
         
-        // We use two passes of a separable box blur to approximate a Gaussian blur.
-        // This effectively removes the blocky artifacts from 30m resolution data.
+        // O(1) per-pixel box blur using running sum (sliding window).
+        // ~17x faster than naive O(radius) approach for radius=8.
         const radius = 8; 
         const tempMap = new Float32Array(heightMap.length);
+        const NO_DATA = -99999;
         
         const blurH = (src, dst) => {
             for (let y = 0; y < height; y++) {
+                const rowOff = y * width;
+                let sum = 0, count = 0;
+                // Initialize window for x=0
+                for (let k = 0; k <= radius && k < width; k++) {
+                    const val = src[rowOff + k];
+                    if (val !== NO_DATA) { sum += val; count++; }
+                }
                 for (let x = 0; x < width; x++) {
-                    let sum = 0;
-                    let count = 0;
-                    const start = Math.max(0, x - radius);
-                    const end = Math.min(width - 1, x + radius);
-                    
-                    for (let k = start; k <= end; k++) {
-                        const val = src[y * width + k];
-                        if (val !== -99999) {
-                            sum += val;
-                            count++;
-                        }
+                    // Add right edge entering the window
+                    const addX = x + radius;
+                    if (addX < width && addX > radius) { // only if not already counted in init
+                        const val = src[rowOff + addX];
+                        if (val !== NO_DATA) { sum += val; count++; }
                     }
-                    if (count > 0) dst[y * width + x] = sum / count;
-                    else dst[y * width + x] = -99999;
+                    // Remove left edge leaving the window
+                    const remX = x - radius - 1;
+                    if (remX >= 0) {
+                        const val = src[rowOff + remX];
+                        if (val !== NO_DATA) { sum -= val; count--; }
+                    }
+                    dst[rowOff + x] = count > 0 ? sum / count : NO_DATA;
                 }
             }
         };
 
         const blurV = (src, dst) => {
             for (let x = 0; x < width; x++) {
+                let sum = 0, count = 0;
+                // Initialize window for y=0
+                for (let k = 0; k <= radius && k < height; k++) {
+                    const val = src[k * width + x];
+                    if (val !== NO_DATA) { sum += val; count++; }
+                }
                 for (let y = 0; y < height; y++) {
-                    let sum = 0;
-                    let count = 0;
-                    const start = Math.max(0, y - radius);
-                    const end = Math.min(height - 1, y + radius);
-                    
-                    for (let k = start; k <= end; k++) {
-                        const val = src[k * width + x];
-                        if (val !== -99999) {
-                            sum += val;
-                            count++;
-                        }
+                    const addY = y + radius;
+                    if (addY < height && addY > radius) {
+                        const val = src[addY * width + x];
+                        if (val !== NO_DATA) { sum += val; count++; }
                     }
-                    if (count > 0) dst[y * width + x] = sum / count;
-                    else dst[y * width + x] = -99999;
+                    const remY = y - radius - 1;
+                    if (remY >= 0) {
+                        const val = src[remY * width + x];
+                        if (val !== NO_DATA) { sum -= val; count--; }
+                    }
+                    dst[y * width + x] = count > 0 ? sum / count : NO_DATA;
                 }
             }
         };

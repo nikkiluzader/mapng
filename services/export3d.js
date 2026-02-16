@@ -8,8 +8,31 @@ import { fetchSurroundingTiles, POSITIONS } from "./surroundingTiles.js";
 // --- Constants & Helpers ---
 export const SCENE_SIZE = 100;
 
-const getMetricProjector = (data) =>
-  createMetricProjector(data.bounds, data.width, data.height);
+// Cached per-dataset projection and constants to avoid recomputation
+let _cachedDataId = null;
+let _cachedProjector = null;
+let _cachedUnitsPerMeter = 0;
+let _cachedMinHeight = 0;
+let _cachedWidth = 0;
+let _cachedHeight = 0;
+let _cachedHeightMap = null;
+
+const _ensureCache = (data) => {
+  // Use bounds as identity — same bounds = same projection
+  const dataId = `${data.bounds.north},${data.bounds.south},${data.bounds.east},${data.bounds.west},${data.width},${data.height}`;
+  if (_cachedDataId !== dataId) {
+    _cachedDataId = dataId;
+    _cachedProjector = createMetricProjector(data.bounds, data.width, data.height);
+    const latRad = (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
+    const metersPerDegree = 111320 * Math.cos(latRad);
+    const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
+    _cachedUnitsPerMeter = SCENE_SIZE / realWidthMeters;
+    _cachedMinHeight = data.minHeight;
+    _cachedWidth = data.width;
+    _cachedHeight = data.height;
+    _cachedHeightMap = data.heightMap;
+  }
+};
 
 const getTerrainHeight = (data, lat, lng) => {
   const scenePos = latLngToScene(data, lat, lng);
@@ -17,14 +40,11 @@ const getTerrainHeight = (data, lat, lng) => {
 };
 
 const latLngToScene = (data, lat, lng) => {
-  const toPixel = getMetricProjector(data);
-  const p = toPixel(lat, lng);
+  _ensureCache(data);
+  const p = _cachedProjector(lat, lng);
 
-  const localX = p.x;
-  const localY = p.y;
-
-  const u = localX / (data.width - 1);
-  const v = localY / (data.height - 1);
+  const u = p.x / (_cachedWidth - 1);
+  const v = p.y / (_cachedHeight - 1);
 
   const sceneX = u * SCENE_SIZE - SCENE_SIZE / 2;
   const sceneZ = v * SCENE_SIZE - SCENE_SIZE / 2;
@@ -32,50 +52,55 @@ const latLngToScene = (data, lat, lng) => {
   return new THREE.Vector3(sceneX, 0, sceneZ);
 };
 
-// Helper to get height from scene coordinates
+// Reusable Vector3 for latLngToScene when caller only needs x/z
+const _tmpSceneVec = new THREE.Vector3();
+const latLngToSceneFast = (data, lat, lng) => {
+  _ensureCache(data);
+  const p = _cachedProjector(lat, lng);
+  const u = p.x / (_cachedWidth - 1);
+  const v = p.y / (_cachedHeight - 1);
+  _tmpSceneVec.x = u * SCENE_SIZE - SCENE_SIZE / 2;
+  _tmpSceneVec.y = 0;
+  _tmpSceneVec.z = v * SCENE_SIZE - SCENE_SIZE / 2;
+  return _tmpSceneVec;
+};
+
+// Helper to get height from scene coordinates — uses cached constants
 const getHeightAtScenePos = (data, x, z) => {
+  _ensureCache(data);
   const u = (x + SCENE_SIZE / 2) / SCENE_SIZE;
   const v = (z + SCENE_SIZE / 2) / SCENE_SIZE;
 
   if (u < 0 || u > 1 || v < 0 || v > 1) return 0;
 
-  const localX = u * (data.width - 1);
-  const localZ = v * (data.height - 1);
+  const localX = u * (_cachedWidth - 1);
+  const localZ = v * (_cachedHeight - 1);
 
   const x0 = Math.floor(localX);
-  const x1 = Math.min(x0 + 1, data.width - 1);
+  const x1 = Math.min(x0 + 1, _cachedWidth - 1);
   const y0 = Math.floor(localZ);
-  const y1 = Math.min(y0 + 1, data.height - 1);
+  const y1 = Math.min(y0 + 1, _cachedHeight - 1);
 
   const wx = localX - x0;
   const wy = localZ - y0;
 
-  const i00 = y0 * data.width + x0;
-  const i10 = y0 * data.width + x1;
-  const i01 = y1 * data.width + x0;
-  const i11 = y1 * data.width + x1;
+  const hm = _cachedHeightMap;
+  const w = _cachedWidth;
+  const minH = _cachedMinHeight;
 
-  const h00 =
-    data.heightMap[i00] < -10000 ? data.minHeight : data.heightMap[i00];
-  const h10 =
-    data.heightMap[i10] < -10000 ? data.minHeight : data.heightMap[i10];
-  const h01 =
-    data.heightMap[i01] < -10000 ? data.minHeight : data.heightMap[i01];
-  const h11 =
-    data.heightMap[i11] < -10000 ? data.minHeight : data.heightMap[i11];
+  const i00 = y0 * w + x0;
+  const i10 = y0 * w + x1;
+  const i01 = y1 * w + x0;
+  const i11 = y1 * w + x1;
 
-  const h =
-    (1 - wy) * ((1 - wx) * h00 + wx * h10) + wy * ((1 - wx) * h01 + wx * h11);
+  const h00 = hm[i00] < -10000 ? minH : hm[i00];
+  const h10 = hm[i10] < -10000 ? minH : hm[i10];
+  const h01 = hm[i01] < -10000 ? minH : hm[i01];
+  const h11 = hm[i11] < -10000 ? minH : hm[i11];
 
-  const latRad =
-    (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
-  const metersPerDegree = 111320 * Math.cos(latRad);
-  const realWidthMeters =
-    (data.bounds.east - data.bounds.west) * metersPerDegree;
-  const unitsPerMeter = SCENE_SIZE / realWidthMeters;
-  const EXAGGERATION = 1.0;
+  const h = (1 - wy) * ((1 - wx) * h00 + wx * h10) + wy * ((1 - wx) * h01 + wx * h11);
 
-  return (h - data.minHeight) * unitsPerMeter * EXAGGERATION;
+  return (h - minH) * _cachedUnitsPerMeter;
 };
 
 const createRoadGeometry = (data, points, width, offset = 0, options = {}) => {
@@ -84,12 +109,11 @@ const createRoadGeometry = (data, points, width, offset = 0, options = {}) => {
   const uvs = [];
   const indices = [];
 
-  const latRad =
-    (((data.bounds.north + data.bounds.south) / 2) * Math.PI) / 180;
-  const metersPerDegree = 111320 * Math.cos(latRad);
-  const realWidthMeters =
-    (data.bounds.east - data.bounds.west) * metersPerDegree;
-  const unitsPerMeter = SCENE_SIZE / realWidthMeters;
+  _ensureCache(data);
+  const unitsPerMeter = _cachedUnitsPerMeter;
+
+  // Reuse Vector3 objects to avoid allocation per iteration
+  const forward = new THREE.Vector3();
 
   let accumulatedDist = 0;
   for (let i = 0; i < points.length; i++) {
@@ -100,25 +124,21 @@ const createRoadGeometry = (data, points, width, offset = 0, options = {}) => {
       options.dashed &&
       Math.floor(accumulatedDist / (4 * unitsPerMeter)) % 2 === 1;
 
-    let forward;
     if (i < points.length - 1) {
-      forward = new THREE.Vector3()
-        .subVectors(points[i + 1], points[i])
-        .normalize();
+      forward.subVectors(points[i + 1], points[i]).normalize();
     } else {
-      forward = new THREE.Vector3()
-        .subVectors(points[i], points[i - 1])
-        .normalize();
+      forward.subVectors(points[i], points[i - 1]).normalize();
     }
 
-    const perpendicular = new THREE.Vector3(-forward.z, 0, forward.x);
+    const perpX = -forward.z;
+    const perpZ = forward.x;
     const halfWidth = (width / 2) * unitsPerMeter;
     const off = offset * unitsPerMeter;
 
-    const lx = p.x + perpendicular.x * (off - halfWidth);
-    const lz = p.z + perpendicular.z * (off - halfWidth);
-    const rx = p.x + perpendicular.x * (off + halfWidth);
-    const rz = p.z + perpendicular.z * (off + halfWidth);
+    const lx = p.x + perpX * (off - halfWidth);
+    const lz = p.z + perpZ * (off - halfWidth);
+    const rx = p.x + perpX * (off + halfWidth);
+    const rz = p.z + perpZ * (off + halfWidth);
 
     const ly = getHeightAtScenePos(data, lx, lz);
     const ry = getHeightAtScenePos(data, rx, rz);
@@ -127,8 +147,7 @@ const createRoadGeometry = (data, points, width, offset = 0, options = {}) => {
     vertices.push(lx, ly + elev, lz);
     vertices.push(rx, ry + elev, rz);
 
-    // UVs: X is side-to-side (0 to 1), Y is along the road length
-    const v = accumulatedDist / (5 * unitsPerMeter); // Texture repeats every 5 meters
+    const v = accumulatedDist / (5 * unitsPerMeter);
     uvs.push(0, v);
     uvs.push(1, v);
 
@@ -1107,11 +1126,15 @@ export const createOSMGroup = (data) => {
         roofGeos.push(roofGeo);
       }
 
-      // 3. Procedural Windows
+      // 3. Procedural Windows — stamp vertices directly into arrays to avoid
+      // thousands of PlaneGeometry allocations (major GC pressure reduction)
       if (b.levels > 1 && b.height > 2 * unitsPerMeter) {
         const winWidth = 1.0 * unitsPerMeter;
         const winHeight = 1.2 * unitsPerMeter;
         const winPadding = 2.0 * unitsPerMeter;
+        const halfW = winWidth / 2;
+        const halfH = winHeight / 2;
+        const wc = new THREE.Color(0x1e293b);
 
         for (let i = 0; i < b.points.length; i++) {
           const p1 = b.points[i];
@@ -1124,20 +1147,49 @@ export const createOSMGroup = (data) => {
           if (numWindows > 0) {
             const normalX = -dz / len;
             const normalZ = dx / len;
-            const winAngle = Math.atan2(normalX, normalZ);
+            // Plane tangent vectors: right = along wall, up = Y axis
+            // Use wall tangent (dx, dz) for rotation so windows are flat against the wall
+            const angle = Math.atan2(dx, dz);
+            const cosA = Math.cos(angle);
+            const sinA = Math.sin(angle);
 
             for (let j = 0; j < numWindows; j++) {
               const t = (j + 0.5) / numWindows;
-              const wx = p1.x + dx * t + normalX * winNormalOffset;
-              const wz = p1.z + dz * t + normalZ * winNormalOffset;
+              const cx = p1.x + dx * t + normalX * winNormalOffset;
+              const cz = p1.z + dz * t + normalZ * winNormalOffset;
 
               for (let l = 0; l < b.levels; l++) {
-                const wy = b.y + (l + 0.5) * (b.height / b.levels);
-                const winGeo = new THREE.PlaneGeometry(winWidth, winHeight);
-                winGeo.rotateY(winAngle);
-                winGeo.translate(wx, wy, wz);
-                addColor(winGeo, 0x1e293b);
-                windowGeos.push(winGeo.index ? winGeo.toNonIndexed() : winGeo);
+                const cy = b.y + (l + 0.5) * (b.height / b.levels);
+                // 4 corners of window plane rotated around Y
+                // PlaneGeometry default: vertices at (-halfW,-halfH,0), (halfW,-halfH,0), (-halfW,halfH,0), (halfW,halfH,0)
+                // After rotateY(angle): x' = x*cos + z*sin, z' = -x*sin + z*cos (z=0 for plane)
+                const lx = -halfW * sinA; // rotated local -halfW
+                const lz = -halfW * cosA;
+                const rx = halfW * sinA;  // rotated local +halfW
+                const rz = halfW * cosA;
+
+                // 6 vertices (2 triangles) for one quad
+                const verts = new Float32Array(18);
+                const colors = new Float32Array(18);
+                // tri 1: bottom-left, bottom-right, top-left
+                verts[0] = cx + lx; verts[1] = cy - halfH; verts[2] = cz + lz;
+                verts[3] = cx + rx; verts[4] = cy - halfH; verts[5] = cz + rz;
+                verts[6] = cx + lx; verts[7] = cy + halfH; verts[8] = cz + lz;
+                // tri 2: top-left, bottom-right, top-right
+                verts[9] = cx + lx; verts[10] = cy + halfH; verts[11] = cz + lz;
+                verts[12] = cx + rx; verts[13] = cy - halfH; verts[14] = cz + rz;
+                verts[15] = cx + rx; verts[16] = cy + halfH; verts[17] = cz + rz;
+                for (let ci = 0; ci < 6; ci++) {
+                  colors[ci * 3] = wc.r;
+                  colors[ci * 3 + 1] = wc.g;
+                  colors[ci * 3 + 2] = wc.b;
+                }
+                const wGeo = new THREE.BufferGeometry();
+                wGeo.setAttribute("position", new THREE.BufferAttribute(verts, 3));
+                wGeo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+                wGeo.setAttribute("uv", new THREE.BufferAttribute(new Float32Array(12), 2));
+                wGeo.computeVertexNormals();
+                windowGeos.push(wGeo);
               }
             }
           }
@@ -1247,77 +1299,92 @@ export const createOSMGroup = (data) => {
     quaternion = new THREE.Quaternion(),
     scale = new THREE.Vector3(1, 1, 1),
     position = new THREE.Vector3();
+  const yAxis = new THREE.Vector3(0, 1, 0);
+
+  // Optimized vegetation: pre-allocate combined buffer and stamp transforms
+  // instead of cloning base geometry N times then merging
+  const stampInstances = (baseGeo, instances, getMat) => {
+    const basePos = baseGeo.attributes.position;
+    const baseCol = baseGeo.attributes.color;
+    const vertCount = basePos.count;
+    const totalVerts = vertCount * instances.length;
+    const combinedPos = new Float32Array(totalVerts * 3);
+    const combinedCol = new Float32Array(totalVerts * 3);
+    const tmpV = new THREE.Vector3();
+
+    for (let i = 0; i < instances.length; i++) {
+      const mat = getMat(instances[i]);
+      const off = i * vertCount * 3;
+      for (let v = 0; v < vertCount; v++) {
+        tmpV.set(basePos.getX(v), basePos.getY(v), basePos.getZ(v));
+        tmpV.applyMatrix4(mat);
+        combinedPos[off + v * 3] = tmpV.x;
+        combinedPos[off + v * 3 + 1] = tmpV.y;
+        combinedPos[off + v * 3 + 2] = tmpV.z;
+        combinedCol[off + v * 3] = baseCol.getX(v);
+        combinedCol[off + v * 3 + 1] = baseCol.getY(v);
+        combinedCol[off + v * 3 + 2] = baseCol.getZ(v);
+      }
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(combinedPos, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(combinedCol, 3));
+    geo.computeVertexNormals();
+    return geo;
+  };
 
   if (treesList.length > 0) {
     const types = ["deciduous", "coniferous", "palm"];
     types.forEach((type) => {
       const list = treesList.filter((t) => t.type === type);
-      if (list.length > 0) {
-        const geos = [];
-        const baseGeo = createTreeMesh(type, unitsPerMeter);
-        if (!baseGeo) return;
-        list.forEach((tree) => {
-          const g = baseGeo.clone();
-          position.set(tree.pos.x, tree.pos.y, tree.pos.z);
-          // Use tree.pos to generate a stable random scale/rotation
-          // Reduced variation per user request (0.95 to 1.05 range for uniform appearance)
-          const seed = Math.abs((tree.pos.x * 123.45 + tree.pos.z * 678.9) % 1);
-          const s = 0.95 + seed * 0.1;
-          scale.set(s, s, s);
-          quaternion.setFromAxisAngle(
-            new THREE.Vector3(0, 1, 0),
-            seed * Math.PI * 2,
-          );
-          matrix.compose(position, quaternion, scale);
-          g.applyMatrix4(matrix);
-          geos.push(g);
-        });
-        const merged = mergeGeometries(geos);
-        if (merged) {
-          const treeMesh = new THREE.Mesh(
-            merged,
-            new THREE.MeshStandardMaterial({
-              vertexColors: true,
-              roughness: 0.8,
-            }),
-          );
-          treeMesh.castShadow = true;
-          treeMesh.receiveShadow = true;
-          treeMesh.name = "vegetation";
-          group.add(treeMesh);
-        }
-        geos.forEach((g) => g.dispose());
-        baseGeo.dispose();
+      if (list.length === 0) return;
+      const baseGeo = createTreeMesh(type, unitsPerMeter);
+      if (!baseGeo) return;
+
+      const combined = stampInstances(baseGeo, list, (tree) => {
+        const seed = Math.abs((tree.pos.x * 123.45 + tree.pos.z * 678.9) % 1);
+        const s = 0.95 + seed * 0.1;
+        position.set(tree.pos.x, tree.pos.y, tree.pos.z);
+        scale.set(s, s, s);
+        quaternion.setFromAxisAngle(yAxis, seed * Math.PI * 2);
+        return matrix.compose(position, quaternion, scale).clone();
+      });
+
+      if (combined) {
+        const treeMesh = new THREE.Mesh(
+          combined,
+          new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            roughness: 0.8,
+          }),
+        );
+        treeMesh.castShadow = true;
+        treeMesh.receiveShadow = true;
+        treeMesh.name = "vegetation";
+        group.add(treeMesh);
       }
+      baseGeo.dispose();
     });
   }
 
   if (bushesList.length > 0) {
-    const geos = [];
-    let baseB = new THREE.IcosahedronGeometry(
-      1.2 * unitsPerMeter,
-      0,
-    );
+    let baseB = new THREE.IcosahedronGeometry(1.2 * unitsPerMeter, 0);
     if (baseB.index) baseB = baseB.toNonIndexed();
     addColor(baseB, 0x166534);
-    bushesList.forEach((pos) => {
-      const b = baseB.clone();
+
+    const combined = stampInstances(baseB, bushesList, (pos) => {
       const seed = (pos.x * 543.21 + pos.z * 123.4) % 1;
       const s = 0.7 + seed * 0.6;
       scale.set(s, s * 0.8, s);
-      quaternion.setFromAxisAngle(
-        new THREE.Vector3(0, 1, 0),
-        seed * Math.PI * 2,
-      );
+      quaternion.setFromAxisAngle(yAxis, seed * Math.PI * 2);
       position.set(pos.x, pos.y + 0.5 * s * unitsPerMeter, pos.z);
-      matrix.compose(position, quaternion, scale);
-      b.applyMatrix4(matrix);
-      geos.push(b);
+      return matrix.compose(position, quaternion, scale).clone();
     });
-    const merged = mergeGeometries(geos);
-    if (merged) {
+
+    if (combined) {
       const bushMesh = new THREE.Mesh(
-        merged,
+        combined,
         new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
       );
       bushMesh.castShadow = true;
@@ -1325,7 +1392,6 @@ export const createOSMGroup = (data) => {
       bushMesh.name = "vegetation";
       group.add(bushMesh);
     }
-    geos.forEach((g) => g.dispose());
     baseB.dispose();
   }
 

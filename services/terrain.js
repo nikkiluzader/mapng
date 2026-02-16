@@ -805,13 +805,24 @@ export const fetchTerrainData = async (
 
   onProgress?.("Finalizing terrain data...");
 
+  // Use toBlob + createObjectURL instead of toDataURL for satellite texture.
+  // toDataURL creates a massive base64 string (~33% larger than binary) and blocks the main thread.
+  // toBlob is async and createObjectURL is a zero-copy reference to the blob.
+  const satelliteTextureUrl = await new Promise((resolve) => {
+    finalSatCanvas.toBlob(
+      (blob) => resolve(blob ? URL.createObjectURL(blob) : ""),
+      "image/jpeg",
+      0.9,
+    );
+  });
+
   const terrainData = {
     heightMap,
     width,
     height,
     minHeight,
     maxHeight,
-    satelliteTextureUrl: finalSatCanvas.toDataURL("image/jpeg", 0.9),
+    satelliteTextureUrl,
     bounds: finalBounds,
     osmFeatures,
     usgsFallback,
