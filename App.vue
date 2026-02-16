@@ -253,7 +253,7 @@
             What does it do?
           </h3>
           <p>
-            Select any location on Earth, configure your terrain settings, and MapNG will generate high-precision heightmaps, detailed textures, and full 3D models ready for game engine import — all at a consistent 1 meter per pixel scale. The app features an interactive 3D preview with HDR lighting, cascaded shadow maps, and procedurally generated 3D buildings, trees, and road networks rendered directly from OpenStreetMap data.
+            Select any location on Earth, configure your terrain settings, and MapNG will generate high-precision heightmaps, detailed textures, and full 3D models ready for game engine import — all at a consistent 1 meter per pixel scale. The app features an interactive 3D preview with HDR lighting, cascaded shadow maps, and procedurally generated 3D buildings, trees, and road networks rendered directly from OpenStreetMap data. For large-scale projects, Batch Job mode can process entire grids of tiles automatically.
           </p>
         </div>
 
@@ -263,7 +263,7 @@
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
               <li>Standard 30m Global (AWS Terrarium/SRTM)</li>
               <li>USGS 1m DEM (USA — CONUS, Alaska, Hawaii)</li>
-              <li>GPXZ Premium High-Res (Global, API key)</li>
+              <li>GPXZ Premium High-Res (Global, concurrent requests for paid plans)</li>
             </ul>
           </div>
           <div class="space-y-2">
@@ -323,11 +323,31 @@
         </div>
 
         <div class="space-y-2">
+          <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-2">
+            <Grid3X3 :size="14" class="text-[#FF6600]" />
+            Batch Job Mode
+            <span class="text-[8px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold">Beta</span>
+          </h4>
+          <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+            Process large areas by defining a grid of tiles (up to 20×20). Each tile is generated sequentially with all selected exports packaged into individual ZIP files. Features include:
+          </p>
+          <ul class="space-y-1 list-disc list-inside marker:text-[#FF6600] text-xs">
+            <li>Configurable grid dimensions, resolution, and export selections</li>
+            <li>Live progress tracking with color-coded tile grid and satellite thumbnails</li>
+            <li>Persistent state — pause, resume, and retry failed tiles</li>
+            <li>Automatic memory cleanup between tiles for stability</li>
+            <li>GPXZ concurrent requests for paid plans (up to 20× parallel)</li>
+            <li>Per-tile coordinate-stamped filenames for easy organization</li>
+          </ul>
+        </div>
+
+        <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Additional Features</h4>
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
               <li>Nominatim location search with 100+ categorized icons</li>
               <li>13 preset scenic locations (Grand Canyon, Mt. Fuji, Tail of the Dragon, etc.)</li>
               <li>"Mod of the Day" – highlights the latest BeamNG map mod</li>
+              <li>GPXZ plan auto-detection with concurrent request support</li>
               <li>Web Worker-based off-thread terrain processing</li>
               <li>Light &amp; dark mode with persistent preferences</li>
               <li>Automatic geolocation on first visit</li>
@@ -522,7 +542,7 @@
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">GPXZ API</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Premium global hi-res elevation with auto-chunking & rate limiting</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Premium global hi-res elevation with auto-chunking, rate-limit probing &amp; concurrent requests for paid plans</div>
               </div>
                <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">Esri World Imagery</div>
@@ -534,7 +554,7 @@
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">JSZip</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Client-side ZIP packaging for multi-tile & GeoTIFF exports</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Client-side ZIP packaging for batch jobs, multi-tile &amp; GeoTIFF exports</div>
               </div>
             </div>
           </section>

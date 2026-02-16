@@ -24,7 +24,7 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 ### Elevation Data Sources
 - **Standard (30m Global)**: AWS Terrarium tiles (SRTM). Reliable worldwide coverage, bilinearly upsampled to 1m/px for smooth surfaces.
 - **USGS 1m DEM (USA)**: High-precision 1-meter resolution Digital Elevation Models covering CONUS, Alaska, and Hawaii via the TNM Access API. Auto-falls back to Standard if data is missing.
-- **GPXZ (Premium Global)**: High-resolution global elevation data with auto-chunking for large areas, rate limiting, and exponential backoff. Requires API key (free tier: 100 req/day).
+- **GPXZ (Premium Global)**: High-resolution global elevation data with auto-chunking for large areas. Automatic plan detection via rate-limit headers enables concurrent requests for paid plans (up to 20× parallel). Exponential backoff with `retry-after` header support. Free tier: 100 req/day at 1 req/sec.
 
 ### Interactive 2D Map
 - **Leaflet** map with 3 switchable base layers: OpenStreetMap, Satellite (Esri), and Topographic.
@@ -55,7 +55,7 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 - **Chaikin's algorithm** for smooth polyline curves on all road and path segments.
 - **Hybrid texture** compositing: Satellite imagery base with semi-transparent road overlay.
 
-### Export Formats (8 Types)
+### Export Formats (9 Types)
 
 | Format | Details |
 |---|---|
@@ -67,6 +67,7 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 | **GeoTIFF** | WGS84 or source CRS; multi-tile ZIP for USGS/GPXZ sources |
 | **GeoJSON** | Full OSM vector data with proper geometry types |
 | **GLB 3D Model** | Complete terrain mesh with optional 8-tile surroundings |
+| **Collada DAE** | DAE model with optional texture ZIP packaging |
 
 ### Surrounding Tiles
 - Interactive 3×3 grid for selecting up to 8 adjacent tiles (NW, N, NE, W, E, SW, S, SE).
@@ -76,6 +77,8 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 
 ### Additional Features
 - **"Mod of the Day"**: Displays the most recently updated map mod from BeamNG.com.
+- **Batch Job mode (Beta)**: Process grids of tiles (up to 20×20) with sequential processing, per-tile ZIP downloads, persistent state for pause/resume, and retry for failed tiles.
+- **GPXZ plan auto-detection**: Probes rate-limit headers to enable concurrent requests for paid plans (Small: 8×, Large: 20×).
 - **Dark & light mode** with persistent localStorage preference.
 - **Automatic geolocation** on first visit (with graceful fallback).
 - **Generation caching**: Detects when current parameters match the last generation to skip reprocessing. Supports incremental OSM addition without re-fetching terrain.
@@ -99,7 +102,7 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 | **GIS Processing** | proj4, geotiff.js, Local Transverse Mercator projection |
 | **Image Encoding** | fast-png (16-bit), HTML5 Canvas (16K textures) |
 | **3D Export** | Three.js GLTFExporter |
-| **Packaging** | JSZip (multi-tile & GeoTIFF ZIPs) |
+| **Packaging** | JSZip (batch jobs, multi-tile & GeoTIFF ZIPs) |
 | **Performance** | Web Workers (transferable buffers), bilinear resampling |
 | **Deployment** | Cloudflare Pages (Wrangler CLI) |
 
@@ -161,6 +164,16 @@ npm run deploy
    - Heightmap (16-bit PNG), Satellite (JPG), OSM Texture (PNG), Hybrid Texture (PNG)
    - Road Mask (16-bit PNG), GeoTIFF, GeoJSON, GLB Model
 6. **Surrounding Tiles** (optional): Select adjacent tiles, configure satellite quality, and download as a ZIP package for multi-tile worlds.
+
+### Batch Job Mode (Beta)
+
+1. **Switch to Batch Job mode** using the mode toggle at the top of the control panel.
+2. **Configure the grid**: Set columns and rows (up to 20×20), tile resolution (512–8192px), and center coordinates.
+3. **Select exports**: Choose which file types to include in each tile's ZIP package.
+4. **Start the batch**: Each tile is processed sequentially — terrain is fetched, exports are generated, and a ZIP is downloaded automatically.
+5. **Monitor progress**: A live modal shows a color-coded tile grid with satellite thumbnails, progress bar, ETA, and per-tile status.
+6. **Pause & resume**: Close the browser and resume later — batch state is saved to localStorage. Failed tiles can be retried.
+7. **GPXZ users**: Paid plan limits are auto-detected, enabling concurrent API requests (up to 20× faster).
 
 ## Data Sources
 
