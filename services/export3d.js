@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import JSZip from "jszip";
 import { textures } from "./textureGenerator.js";
 import { createMetricProjector } from "./geoUtils.js";
 import { fetchSurroundingTiles, POSITIONS } from "./surroundingTiles.js";
@@ -313,7 +314,7 @@ const addColor = (geo, colorHex) => {
 const createTreeMesh = (type, unitsPerMeter) => {
   try {
     const trunkHeight = (type === "palm" ? 5 : 6) * unitsPerMeter;
-    const trunkGeo = new THREE.CylinderGeometry(
+    let trunkGeo = new THREE.CylinderGeometry(
       0.15 * unitsPerMeter,
       0.25 * unitsPerMeter,
       trunkHeight,
@@ -503,6 +504,10 @@ export const createOSMGroup = (data) => {
   const realWidthMeters =
     (data.bounds.east - data.bounds.west) * metersPerDegree;
   const unitsPerMeter = SCENE_SIZE / realWidthMeters;
+
+  // Global vegetation caps to prevent memory explosion on large tiles
+  const MAX_TOTAL_TREES = 5000;
+  const MAX_TOTAL_BUSHES = 5000;
 
   const buildingsList = [];
   const treesList = [];
@@ -798,7 +803,10 @@ export const createOSMGroup = (data) => {
             maxZ = Math.max(maxZ, p.z);
           });
           const density = 0.04 / (unitsPerMeter * unitsPerMeter);
+          const remaining = MAX_TOTAL_TREES - treesList.length;
+          if (remaining <= 0) return;
           const count = Math.min(
+            remaining,
             250,
             Math.floor((maxX - minX) * (maxZ - minZ) * density),
           );
@@ -818,6 +826,7 @@ export const createOSMGroup = (data) => {
           }
         } else {
           f.geometry.forEach((p) => {
+            if (treesList.length >= MAX_TOTAL_TREES) return;
             const v = latLngToScene(data, p.lat, p.lng);
             v.y = getHeightAtScenePos(data, v.x, v.z);
             treesList.push({ pos: v, type: treeType });
@@ -842,7 +851,10 @@ export const createOSMGroup = (data) => {
             maxZ = Math.max(maxZ, p.z);
           });
           const density = 0.02 / (unitsPerMeter * unitsPerMeter);
+          const bushRemaining = MAX_TOTAL_BUSHES - bushesList.length;
+          if (bushRemaining <= 0) return;
           const count = Math.min(
+            bushRemaining,
             250,
             Math.floor((maxX - minX) * (maxZ - minZ) * density),
           );
@@ -857,6 +869,7 @@ export const createOSMGroup = (data) => {
           }
         } else {
           f.geometry.forEach((p) => {
+            if (bushesList.length >= MAX_TOTAL_BUSHES) return;
             const v = latLngToScene(data, p.lat, p.lng);
             v.y = getHeightAtScenePos(data, v.x, v.z);
             bushesList.push(v);
@@ -865,6 +878,13 @@ export const createOSMGroup = (data) => {
       }
     }
   });
+
+  if (treesList.length >= MAX_TOTAL_TREES) {
+    console.warn(`[OSM] Tree count capped at ${MAX_TOTAL_TREES} to prevent memory issues`);
+  }
+  if (bushesList.length >= MAX_TOTAL_BUSHES) {
+    console.warn(`[OSM] Bush count capped at ${MAX_TOTAL_BUSHES} to prevent memory issues`);
+  }
 
   if (buildingsList.length > 0) {
     const wallGeos = [];
@@ -1247,8 +1267,21 @@ export const createOSMGroup = (data) => {
   return group;
 };
 
+const disposeScene = (scene) => {
+  scene.traverse(obj => {
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+      materials.forEach(m => {
+        if (m.map) m.map.dispose();
+        m.dispose();
+      });
+    }
+  });
+};
+
 export const exportToGLB = async (data, options = {}) => {
-  const { includeSurroundings = false, onProgress, maxMeshResolution = 1024 } = options;
+  const { includeSurroundings = false, onProgress, maxMeshResolution = 1024, returnBlob = false } = options;
   try {
     onProgress?.('Building terrain mesh...');
     const terrainMesh = await createTerrainMesh(data, maxMeshResolution);
@@ -1272,6 +1305,14 @@ export const exportToGLB = async (data, options = {}) => {
         scene,
         (gltf) => {
           const blob = new Blob([gltf], { type: "model/gltf-binary" });
+          disposeScene(scene);
+
+          if (returnBlob) {
+            onProgress?.('Done!');
+            resolve(blob);
+            return;
+          }
+
           const link = document.createElement("a");
           link.href = URL.createObjectURL(blob);
           const date = new Date().toISOString().slice(0, 10);
@@ -1281,17 +1322,18 @@ export const exportToGLB = async (data, options = {}) => {
           onProgress?.('Done!');
           resolve();
         },
-        (err) => reject(err),
+        (err) => { disposeScene(scene); reject(err); },
         { binary: true },
       );
     });
   } catch (err) {
     console.error("Export failed:", err);
+    if (returnBlob) throw err;
   }
 };
 
 export const exportToDAE = async (data, options = {}) => {
-  const { includeSurroundings = false, onProgress, maxMeshResolution = 256 } = options;
+  const { includeSurroundings = false, onProgress, maxMeshResolution = 256, returnBlob = false } = options;
   try {
     onProgress?.('Building terrain mesh...');
     const terrainMesh = await createTerrainMesh(data, maxMeshResolution);
@@ -1311,33 +1353,35 @@ export const exportToDAE = async (data, options = {}) => {
     const exporter = new ColladaExporter();
     const result = exporter.parse(scene);
 
-    // result.data is now a Blob (built from string parts to avoid allocation overflow)
-    const daeBlob = result.data;
+    disposeScene(scene);
 
-    // If there are textures, pack everything into a ZIP
+    const daeBlob = result.data;
+    let outputBlob;
+
     if (result.textures && result.textures.length > 0) {
       onProgress?.('Packaging textures...');
-      const { default: JSZip } = await import('jszip');
       const zip = new JSZip();
       zip.file('model.dae', daeBlob);
       for (const tex of result.textures) {
         zip.file(`${tex.directory}${tex.name}.${tex.ext}`, tex.data);
       }
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(zipBlob);
-      const date = new Date().toISOString().slice(0, 10);
-      link.download = `MapNG_Model_${date}.dae.zip`;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      outputBlob = await zip.generateAsync({ type: 'blob' });
     } else {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(daeBlob);
-      const date = new Date().toISOString().slice(0, 10);
-      link.download = `MapNG_Model_${date}.dae`;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      outputBlob = daeBlob;
     }
+
+    if (returnBlob) {
+      onProgress?.('Done!');
+      return outputBlob;
+    }
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(outputBlob);
+    const date = new Date().toISOString().slice(0, 10);
+    const ext = result.textures?.length > 0 ? '.dae.zip' : '.dae';
+    link.download = `MapNG_Model_${date}${ext}`;
+    link.click();
+    URL.revokeObjectURL(link.href);
 
     onProgress?.('Done!');
   } catch (err) {

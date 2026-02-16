@@ -47,8 +47,31 @@
         </button>
       </div>
       
+      <!-- Mode Toggle -->
+      <div class="flex p-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 gap-1">
+        <button
+          @click="batchMode = false"
+          :class="['flex-1 py-1.5 text-xs font-medium rounded-md flex items-center justify-center gap-1.5 transition-all',
+            !batchMode ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800']"
+        >
+          <Map :size="12" />
+          Single Tile
+        </button>
+        <button
+          @click="batchMode = true"
+          :class="['flex-1 py-1.5 text-xs font-medium rounded-md flex items-center justify-center gap-1.5 transition-all',
+            batchMode ? 'bg-[#FF6600] text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800']"
+        >
+          <Grid3X3 :size="12" />
+          Batch Job
+          <span class="text-[8px] uppercase tracking-wider opacity-75 bg-white/20 px-1 rounded">Beta</span>
+        </button>
+      </div>
+
       <div class="flex-1 overflow-y-auto custom-scrollbar p-5 bg-gray-50/50 dark:bg-gray-800/50">
+        <!-- Single mode -->
         <ControlPanel 
+          v-if="!batchMode"
           :center="center" 
           :resolution="resolution"
           :terrain-data="terrainData"
@@ -59,6 +82,22 @@
           @generate="handleGenerate"
           @fetch-osm="handleFetchOSM"
           @surrounding-tiles-change="(v) => surroundingTilePositions = v"
+        />
+
+        <!-- Batch mode -->
+        <BatchControlPanel
+          v-if="batchMode"
+          :center="center"
+          :resolution="resolution"
+          :is-running="batchRunning"
+          :saved-state="savedBatchState"
+          @location-change="handleLocationChange"
+          @resolution-change="setResolution"
+          @start-batch="handleStartBatch"
+          @resume-batch="handleResumeBatch"
+          @clear-saved-batch="handleClearSavedBatch"
+          @update:grid-cols="(v) => batchGridCols = v"
+          @update:grid-rows="(v) => batchGridRows = v"
         />
       </div>
       
@@ -128,6 +167,7 @@
             :resolution="resolution"
             :is-dark-mode="isDarkMode"
             :surrounding-tile-positions="surroundingTilePositions"
+            :batch-grid="batchGridTiles"
             @move="setCenter" 
             @zoom="setZoom"
           />
@@ -172,6 +212,17 @@
         </div>
       </div>
     </main>
+
+    <!-- Batch Progress Modal -->
+    <BatchProgressModal
+      v-if="showBatchProgress && batchState"
+      :state="batchState"
+      :current-step="batchCurrentStep"
+      @close="handleBatchProgressClose"
+      @cancel="handleBatchCancel"
+      @resume="handleResumeBatch"
+      @retry-failed="handleRetryFailed"
+    />
 
     <!-- About Modal -->
   <div v-if="showAbout" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="showAbout = false">
@@ -509,12 +560,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import { Globe, Layers, Loader2, Code, X, Monitor, MousePointer2, CircleHelp, Sun, Moon, AlertTriangle } from 'lucide-vue-next';
+import { ref, computed, onMounted } from 'vue';
+import { Globe, Layers, Loader2, Code, X, Monitor, MousePointer2, CircleHelp, Sun, Moon, AlertTriangle, Grid3X3, Map } from 'lucide-vue-next';
 import ControlPanel from './components/ControlPanel.vue';
+import BatchControlPanel from './components/BatchControlPanel.vue';
+import BatchProgressModal from './components/BatchProgressModal.vue';
 import MapSelector from './components/MapSelector.vue';
 import Preview3D from './components/Preview3D.vue';
 import { fetchTerrainData, addOSMToTerrain } from './services/terrain';
+import {
+  computeGridTiles,
+  createBatchJobState,
+  runBatchJob,
+  saveBatchState,
+  loadBatchState,
+  clearBatchState,
+  resetFailedTiles,
+} from './services/batchJob';
 
 const center = ref(
   JSON.parse(localStorage.getItem('mapng_center') || 'null') || { lat: 35.1983, lng: -111.6513 }
@@ -532,6 +594,28 @@ const showDisclaimer = ref(false);
 const isDarkMode = ref(false);
 const surroundingTilePositions = ref([]);
 let abortController = null;
+
+// ── Batch Mode State ──────────────────────────────────────────
+const batchMode = ref(false);
+const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
+const batchGridRows = ref(parseInt(localStorage.getItem('mapng_batch_rows')) || 3);
+const batchState = ref(null);       // The active/saved batch job state
+const batchRunning = ref(false);    // True while the runner is executing
+const batchCurrentStep = ref('');   // Current step description for progress modal
+const showBatchProgress = ref(false);
+let batchAbortController = null;
+
+// Saved batch state from localStorage (for resume)
+const savedBatchState = ref(loadBatchState());
+
+// Compute batch grid tiles for map overlay (live preview while configuring)
+const batchGridTiles = computed(() => {
+  if (!batchMode.value) return [];
+  // If a batch is active (running/paused/done), use its tile data
+  if (batchState.value) return batchState.value.tiles;
+  // Otherwise compute preview grid from config
+  return computeGridTiles(center.value, resolution.value, batchGridCols.value, batchGridRows.value);
+});
 
 // Build info (injected by Vite at build time)
 const buildHash = __BUILD_HASH__;
@@ -763,5 +847,98 @@ const switchTo2D = () => {
   previewMode.value = false;
   // Do not clear terrainData here, so users can switch back and forth
   // without losing their generated exports.
+};
+
+// ─── Batch Job Handlers ─────────────────────────────────────────────
+
+const handleStartBatch = (config) => {
+  const state = createBatchJobState(config);
+  batchState.value = state;
+  showBatchProgress.value = true;
+  executeBatchJob(state);
+};
+
+const handleResumeBatch = () => {
+  let state = batchState.value || savedBatchState.value;
+  if (!state) return;
+
+  // If resuming from saved state, hydrate it
+  if (!batchState.value) {
+    batchState.value = state;
+  }
+
+  showBatchProgress.value = true;
+  executeBatchJob(batchState.value);
+};
+
+const handleRetryFailed = () => {
+  if (!batchState.value) return;
+  resetFailedTiles(batchState.value);
+  // Force reactivity update
+  batchState.value = { ...batchState.value };
+  executeBatchJob(batchState.value);
+};
+
+const handleBatchCancel = () => {
+  if (batchAbortController) {
+    batchAbortController.abort();
+    batchAbortController = null;
+  }
+};
+
+const handleBatchProgressClose = () => {
+  showBatchProgress.value = false;
+  // If the job is fully complete with no errors, clear saved state
+  if (batchState.value?.status === 'completed') {
+    clearBatchState();
+    savedBatchState.value = null;
+    batchState.value = null;
+  }
+  // If paused or has errors, keep state for resume
+  savedBatchState.value = loadBatchState();
+};
+
+const handleClearSavedBatch = () => {
+  clearBatchState();
+  savedBatchState.value = null;
+  batchState.value = null;
+};
+
+const executeBatchJob = async (state) => {
+  batchRunning.value = true;
+  batchAbortController = new AbortController();
+
+  try {
+    await runBatchJob(
+      state,
+      // onProgress
+      ({ tileIndex, step, tile }) => {
+        batchCurrentStep.value = step;
+        // Force reactivity on tile status changes
+        batchState.value = { ...batchState.value };
+      },
+      // onTileComplete
+      (tile) => {
+        batchState.value = { ...batchState.value };
+      },
+      // onError
+      (tile, error) => {
+        console.error(`[Batch] Tile R${tile.row + 1}C${tile.col + 1} failed:`, error);
+        batchState.value = { ...batchState.value };
+      },
+      batchAbortController.signal
+    );
+  } catch (error) {
+    if (error.name !== 'AbortError') {
+      console.error('[Batch] Unexpected error:', error);
+    }
+  } finally {
+    batchRunning.value = false;
+    batchAbortController = null;
+    batchCurrentStep.value = '';
+    // Force final state update
+    batchState.value = { ...batchState.value };
+    savedBatchState.value = loadBatchState();
+  }
 };
 </script>

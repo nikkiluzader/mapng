@@ -42,7 +42,7 @@
       />
       
       <l-rectangle 
-        v-if="bounds"
+        v-if="bounds && !hasBatchGrid"
         :bounds="[[bounds.getSouthWest().lat, bounds.getSouthWest().lng], [bounds.getNorthEast().lat, bounds.getNorthEast().lng]]" 
         color="#FF6600"
         :weight="2"
@@ -50,9 +50,21 @@
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
 
-      <!-- Surrounding Tile Bounding Boxes -->
+      <!-- Batch Grid Tiles -->
+      <l-rectangle
+        v-for="tile in batchGrid"
+        :key="'batch-' + tile.index"
+        :bounds="[[tile.bounds.south, tile.bounds.west], [tile.bounds.north, tile.bounds.east]]"
+        :color="batchTileColor(tile)"
+        :weight="tile.status === 'processing' ? 2.5 : 1.5"
+        :fill-opacity="batchTileFillOpacity(tile)"
+        :options="{ dashArray: tile.status === 'pending' ? '4, 6' : undefined, lineCap: 'round' }"
+      />
+
+      <!-- Surrounding Tile Bounding Boxes (hidden during batch mode) -->
       <l-rectangle
         v-for="rect in surroundingBounds"
+        v-if="!hasBatchGrid"
         :key="rect.key"
         :bounds="[[rect.south, rect.west], [rect.north, rect.east]]"
         color="#3B82F6"
@@ -129,7 +141,28 @@ const props = defineProps({
   resolution: { type: [Number, String], required: true },
   isDarkMode: { type: Boolean, default: false },
   surroundingTilePositions: { type: Array, default: () => [] },
+  batchGrid: { type: Array, default: () => [] },
 });
+
+const hasBatchGrid = computed(() => props.batchGrid && props.batchGrid.length > 0);
+
+const batchTileColor = (tile) => {
+  switch (tile.status) {
+    case 'processing': return '#3B82F6';
+    case 'completed': return '#10B981';
+    case 'failed': return '#EF4444';
+    default: return '#FF6600';
+  }
+};
+
+const batchTileFillOpacity = (tile) => {
+  switch (tile.status) {
+    case 'processing': return 0.2;
+    case 'completed': return 0.15;
+    case 'failed': return 0.2;
+    default: return 0.05;
+  }
+};
 
 const emit = defineEmits(['move', 'zoom']);
 
