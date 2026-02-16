@@ -891,6 +891,10 @@ export const createOSMGroup = (data) => {
     const roofGeos = [];
     const windowGeos = [];
 
+    // Small offset scaled to real-world units to prevent z-fighting
+    const roofZOffset = 0.005 * unitsPerMeter; // 5mm
+    const winNormalOffset = 0.03 * unitsPerMeter; // 3cm from wall surface
+
     buildingsList.forEach((b) => {
       // 1. Create Wall Geometry (Sides only)
       const shape = new THREE.Shape();
@@ -945,7 +949,6 @@ export const createOSMGroup = (data) => {
 
         const uvScale = 4 * unitsPerMeter;
         for (let i = 0; i < wallUv.count; i++) {
-          // ExtrudeGeometry side UVs: X is along perimeter (0-1), Y is along depth (0-1)
           wallUv.setXY(
             i,
             wallUv.getX(i) * (totalDist / uvScale),
@@ -954,10 +957,6 @@ export const createOSMGroup = (data) => {
         }
       }
 
-      // Filter out top/bottom caps from wallGeo (we'll draw our own roof)
-      // Actually ExtrudeGeometry groups them. Side is group 0, Caps are group 1.
-      // For now, we'll just keep the sides and hide the caps by making them transparent or just drawing over them.
-      // Better: just use the side geometry.
       wallGeos.push(wallGeo.index ? wallGeo.toNonIndexed() : wallGeo);
 
       // 2. Create Roof Geometry
@@ -969,7 +968,6 @@ export const createOSMGroup = (data) => {
         const roofColorArr = [];
         const rc = new THREE.Color(b.roofColor);
 
-        // Simple pyramidal: center point elevated
         let centroidX = 0,
           centroidZ = 0;
         b.points.forEach((p) => {
@@ -979,7 +977,6 @@ export const createOSMGroup = (data) => {
         centroidX /= b.points.length;
         centroidZ /= b.points.length;
 
-        // Vertices: outer ring at roofY, apex at roofY + roofHeight
         b.points.forEach((p) => {
           vertices.push(p.x, roofY, p.z);
           roofColorArr.push(rc.r, rc.g, rc.b);
@@ -1002,7 +999,6 @@ export const createOSMGroup = (data) => {
           new THREE.Float32BufferAttribute(roofColorArr, 3),
         );
 
-        // Roof UVs: Just use X, Z world space scaled by some factor
         const roofUvs = [];
         for (let i = 0; i < vertices.length / 3; i++) {
           roofUvs.push(
@@ -1034,7 +1030,7 @@ export const createOSMGroup = (data) => {
         });
         roofGeo = new THREE.ShapeGeometry(roofShape);
         roofGeo.rotateX(-Math.PI / 2);
-        roofGeo.translate(0, roofY + 0.01, 0);
+        roofGeo.translate(0, roofY + roofZOffset, 0);
 
         // Scale UVs for ShapeGeometry
         const roofUvAttr = roofGeo.attributes.uv;
@@ -1056,7 +1052,6 @@ export const createOSMGroup = (data) => {
 
       // 3. Procedural Windows
       if (b.levels > 1 && b.height > 2 * unitsPerMeter) {
-        const winColor = new THREE.Color(0x1e293b); // Slate 800
         const winWidth = 1.0 * unitsPerMeter;
         const winHeight = 1.2 * unitsPerMeter;
         const winPadding = 2.0 * unitsPerMeter;
@@ -1076,8 +1071,8 @@ export const createOSMGroup = (data) => {
 
             for (let j = 0; j < numWindows; j++) {
               const t = (j + 0.5) / numWindows;
-              const wx = p1.x + dx * t + normalX * 0.05;
-              const wz = p1.z + dz * t + normalZ * 0.05;
+              const wx = p1.x + dx * t + normalX * winNormalOffset;
+              const wz = p1.z + dz * t + normalZ * winNormalOffset;
 
               for (let l = 0; l < b.levels; l++) {
                 const wy = b.y + (l + 0.5) * (b.height / b.levels);
@@ -1093,63 +1088,73 @@ export const createOSMGroup = (data) => {
       }
     });
 
-    if (wallGeos.length > 0) {
-      const wallMerged = mergeGeometries(wallGeos);
-      if (wallMerged) {
-        const wallMesh = new THREE.Mesh(
-          wallMerged,
+    // Merge each category, then combine into a single mesh with material groups
+    // This prevents float32 precision drift between separate meshes at large tile sizes
+    const wallMerged = wallGeos.length > 0 ? mergeGeometries(wallGeos) : null;
+    const roofMerged = roofGeos.length > 0 ? mergeGeometries(roofGeos) : null;
+    const windowMerged = windowGeos.length > 0 ? mergeGeometries(windowGeos) : null;
+
+    const partsToMerge = [];
+    const groupDefs = [];
+    let vertexOffset = 0;
+
+    if (wallMerged) {
+      const count = wallMerged.attributes.position.count;
+      partsToMerge.push(wallMerged);
+      groupDefs.push({ start: vertexOffset, count, materialIndex: 0 });
+      vertexOffset += count;
+    }
+    if (roofMerged) {
+      const count = roofMerged.attributes.position.count;
+      partsToMerge.push(roofMerged);
+      groupDefs.push({ start: vertexOffset, count, materialIndex: 1 });
+      vertexOffset += count;
+    }
+    if (windowMerged) {
+      const count = windowMerged.attributes.position.count;
+      partsToMerge.push(windowMerged);
+      groupDefs.push({ start: vertexOffset, count, materialIndex: 2 });
+      vertexOffset += count;
+    }
+
+    if (partsToMerge.length > 0) {
+      const combined = mergeGeometries(partsToMerge);
+      if (combined) {
+        combined.clearGroups();
+        groupDefs.forEach((g) =>
+          combined.addGroup(g.start, g.count, g.materialIndex),
+        );
+
+        const buildingMesh = new THREE.Mesh(combined, [
           new THREE.MeshStandardMaterial({
             vertexColors: true,
             roughness: 0.8,
             map: textures.wall,
           }),
-        );
-        wallMesh.castShadow = true;
-        wallMesh.receiveShadow = true;
-        wallMesh.name = "buildings";
-        group.add(wallMesh);
-      }
-    }
-
-    if (roofGeos.length > 0) {
-      const roofMerged = mergeGeometries(roofGeos);
-      if (roofMerged) {
-        const roofMesh = new THREE.Mesh(
-          roofMerged,
           new THREE.MeshStandardMaterial({
             vertexColors: true,
             roughness: 0.8,
             map: textures.roof,
           }),
-        );
-        roofMesh.castShadow = true;
-        roofMesh.receiveShadow = true;
-        roofMesh.name = "buildings";
-        group.add(roofMesh);
-      }
-    }
-
-    if (windowGeos.length > 0) {
-      const windowMerged = mergeGeometries(windowGeos);
-      if (windowMerged) {
-        const windowMesh = new THREE.Mesh(
-          windowMerged,
           new THREE.MeshStandardMaterial({
             vertexColors: true,
             roughness: 0.1,
             metalness: 0.5,
           }),
-        );
-        windowMesh.castShadow = true;
-        windowMesh.receiveShadow = true;
-        windowMesh.name = "buildings";
-        group.add(windowMesh);
+        ]);
+        buildingMesh.castShadow = true;
+        buildingMesh.receiveShadow = true;
+        buildingMesh.name = "buildings";
+        group.add(buildingMesh);
       }
     }
 
     wallGeos.forEach((g) => g.dispose());
     roofGeos.forEach((g) => g.dispose());
     windowGeos.forEach((g) => g.dispose());
+    if (wallMerged) wallMerged.dispose();
+    if (roofMerged) roofMerged.dispose();
+    if (windowMerged) windowMerged.dispose();
   }
 
   if (barriersList.length > 0) {
