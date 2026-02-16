@@ -1,6 +1,6 @@
 <template>
   <div class="w-full h-full bg-black relative overflow-hidden">
-    <TresCanvas window-size :clear-color="textureType === 'none' ? '#ad8d60' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="1.0">
+    <TresCanvas window-size :clear-color="textureType === 'none' ? '#ad8d60' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="1.0" :renderer="{ logarithmicDepthBuffer: true }">
       <Suspense>
         <template #default>
           <TresGroup>
@@ -441,5 +441,5 @@ const resetCamera = () => {
 
 // Static camera config to prevent re-renders resetting position
 const cameraPosition = [0, 60, 90];
-const cameraArgs = [50, 1, 0.1, 50000];
+const cameraArgs = [50, 1, 0.5, 5000];
 </script>

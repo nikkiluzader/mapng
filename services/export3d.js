@@ -912,23 +912,80 @@ export const createOSMGroup = (data) => {
       });
 
       const wallExtrude = { depth: b.height, bevelEnabled: false };
-      const wallGeo = new THREE.ExtrudeGeometry(shape, wallExtrude);
-      wallGeo.rotateX(-Math.PI / 2);
-      wallGeo.translate(0, b.y, 0);
+      const wallGeoRaw = new THREE.ExtrudeGeometry(shape, wallExtrude);
+      wallGeoRaw.rotateX(-Math.PI / 2);
+      wallGeoRaw.translate(0, b.y, 0);
+
+      // Strip cap faces from ExtrudeGeometry to prevent z-fighting with roof.
+      // ExtrudeGeometry groups: group 0 = front+back caps, group 1 = side walls.
+      // We need to remove the caps and keep only the sides.
+      const rawGroups = wallGeoRaw.groups;
+      let wallGeo;
+      if (rawGroups.length > 1 && wallGeoRaw.index) {
+        // Find the side group (materialIndex 1 in ExtrudeGeometry)
+        const sideGroup = rawGroups.find((g) => g.materialIndex === 1);
+        if (sideGroup) {
+          const oldIndex = wallGeoRaw.index;
+          const oldPos = wallGeoRaw.attributes.position;
+          const oldUv = wallGeoRaw.attributes.uv;
+
+          const sideIndexCount = sideGroup.count;
+          const sideStart = sideGroup.start;
+
+          // Collect unique vertex indices used by side faces
+          const usedSet = new Set();
+          for (let i = 0; i < sideIndexCount; i++) {
+            usedSet.add(oldIndex.getX(sideStart + i));
+          }
+          const usedVerts = Array.from(usedSet).sort((a, b) => a - b);
+          const vertMap = new Map();
+          usedVerts.forEach((v, idx) => vertMap.set(v, idx));
+
+          const newPos = new Float32Array(usedVerts.length * 3);
+          const newUv = oldUv ? new Float32Array(usedVerts.length * 2) : null;
+          usedVerts.forEach((oldIdx, newIdx) => {
+            newPos[newIdx * 3] = oldPos.getX(oldIdx);
+            newPos[newIdx * 3 + 1] = oldPos.getY(oldIdx);
+            newPos[newIdx * 3 + 2] = oldPos.getZ(oldIdx);
+            if (newUv) {
+              newUv[newIdx * 2] = oldUv.getX(oldIdx);
+              newUv[newIdx * 2 + 1] = oldUv.getY(oldIdx);
+            }
+          });
+
+          const newIndices = new Uint32Array(sideIndexCount);
+          for (let i = 0; i < sideIndexCount; i++) {
+            newIndices[i] = vertMap.get(oldIndex.getX(sideStart + i));
+          }
+
+          wallGeo = new THREE.BufferGeometry();
+          wallGeo.setAttribute("position", new THREE.BufferAttribute(newPos, 3));
+          if (newUv) wallGeo.setAttribute("uv", new THREE.BufferAttribute(newUv, 2));
+          wallGeo.setIndex(new THREE.BufferAttribute(newIndices, 1));
+          wallGeo.computeVertexNormals();
+          wallGeoRaw.dispose();
+        } else {
+          wallGeo = wallGeoRaw;
+        }
+      } else {
+        wallGeo = wallGeoRaw;
+      }
+
+      // Convert to non-indexed for merging
+      if (wallGeo.index) {
+        const tmp = wallGeo.toNonIndexed();
+        wallGeo.dispose();
+        wallGeo = tmp;
+      }
 
       // Wall vertex colors (Darker sides)
       const pos = wallGeo.attributes.position;
       const wallColors = new Float32Array(pos.count * 3);
       const wallC = new THREE.Color(b.wallColor);
       for (let i = 0; i < pos.count; i++) {
-        const py = pos.getY(i);
-        const isTop = py > b.y + b.height * 0.99;
-        const isBottom = py < b.y + b.height * 0.01;
-        // Tint sides slightly darker for depth, and use O2W specific shading factor
-        const dark = isTop || isBottom ? 1.0 : 0.88;
-        wallColors[i * 3] = wallC.r * dark;
-        wallColors[i * 3 + 1] = wallC.g * dark;
-        wallColors[i * 3 + 2] = wallC.b * dark;
+        wallColors[i * 3] = wallC.r * 0.88;
+        wallColors[i * 3 + 1] = wallC.g * 0.88;
+        wallColors[i * 3 + 2] = wallC.b * 0.88;
       }
       wallGeo.setAttribute("color", new THREE.BufferAttribute(wallColors, 3));
 
@@ -957,7 +1014,7 @@ export const createOSMGroup = (data) => {
         }
       }
 
-      wallGeos.push(wallGeo.index ? wallGeo.toNonIndexed() : wallGeo);
+      wallGeos.push(wallGeo);
 
       // 2. Create Roof Geometry
       let roofGeo;
@@ -1130,6 +1187,9 @@ export const createOSMGroup = (data) => {
             vertexColors: true,
             roughness: 0.8,
             map: textures.wall,
+            polygonOffset: true,
+            polygonOffsetFactor: 1,
+            polygonOffsetUnits: 1,
           }),
           new THREE.MeshStandardMaterial({
             vertexColors: true,
