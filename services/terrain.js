@@ -144,6 +144,8 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
 
     let shouldSmooth = false;
     try {
+      // Wait before the points check to avoid 429 from the probe request
+      await new Promise((r) => setTimeout(r, perWorkerDelayMs));
       const pointsUrl = `/api/gpxz/v1/elevation/points?latlons=${centerLat},${centerLng}`;
       const pointsResp = await fetch(pointsUrl, {
         headers: { "x-api-key": apiKey },
@@ -244,13 +246,26 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
 
         const url = `/api/gpxz/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=1&projection=latlon`;
 
-        // Retry logic for 429 Rate Limit
-        let response = null;
+        // Retry logic for 429 Rate Limit AND network errors
+        let result = null;
         let retries = 0;
         const MAX_RETRIES = 5;
 
         while (retries < MAX_RETRIES) {
-          response = await fetch(url, { headers: { "x-api-key": apiKey }, signal });
+          let response = null;
+          try {
+            response = await fetch(url, { headers: { "x-api-key": apiKey }, signal });
+          } catch (fetchErr) {
+            // Network error (ERR_QUIC_PROTOCOL_ERROR, Failed to fetch, etc.)
+            const waitTime = 2000 * Math.pow(2, retries);
+            console.warn(
+              `[GPXZ] Network error: ${fetchErr.message}. Retrying in ${waitTime}ms... (attempt ${retries + 1}/${MAX_RETRIES})`,
+            );
+            onProgress?.(`Network error — retrying in ${Math.ceil(waitTime / 1000)}s...`);
+            await new Promise((r) => setTimeout(r, waitTime));
+            retries++;
+            continue;
+          }
 
           if (response.status === 429) {
             // Use retry-after header if available, otherwise exponential backoff
@@ -267,34 +282,47 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
             continue;
           }
 
-          break;
+          if (!response.ok) {
+            console.error(`[GPXZ] Tile Error: ${response.status}`);
+            return null;
+          }
+
+          // Update cached rate limit info from response headers
+          updateRateLimitFromHeaders(response);
+
+          // Read the body — this can also fail mid-stream on flaky connections
+          try {
+            const arrayBuffer = await response.arrayBuffer();
+            const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+            const image = await tiff.getImage();
+            const rasters = await image.readRasters();
+            const raster = rasters[0];
+            await tiff.close();
+            result = { image, raster, arrayBuffer };
+            break;
+          } catch (bodyErr) {
+            const waitTime = 2000 * Math.pow(2, retries);
+            console.warn(
+              `[GPXZ] Body read error: ${bodyErr.message}. Retrying in ${waitTime}ms... (attempt ${retries + 1}/${MAX_RETRIES})`,
+            );
+            onProgress?.(`Download interrupted — retrying in ${Math.ceil(waitTime / 1000)}s...`);
+            await new Promise((r) => setTimeout(r, waitTime));
+            retries++;
+            continue;
+          }
         }
 
-        if (!response || !response.ok) {
-          console.error(`[GPXZ] Tile Error: ${response?.status}`);
+        if (!result) {
+          console.error(`[GPXZ] Tile failed after ${MAX_RETRIES} retries`);
           return null;
         }
-
-        // Update cached rate limit info from response headers
-        updateRateLimitFromHeaders(response);
 
         completedChunks++;
         const remaining = gpxzRateLimitInfo?.remaining;
         const quotaInfo = remaining != null ? ` (${remaining} API calls remaining today)` : '';
         onProgress?.(`Fetching GPXZ tiles... ${completedChunks}/${requests.length}${quotaInfo}`);
 
-        const version = response.headers.get("X-DATASET-VERSION");
-        if (version) console.debug(`[GPXZ] Dataset Version: ${version}`);
-
-        const arrayBuffer = await response.arrayBuffer();
-        const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
-        const image = await tiff.getImage();
-        const rasters = await image.readRasters();
-        const raster = rasters[0];
-
-        await tiff.close();
-
-        return { image, raster, arrayBuffer };
+        return result;
       },
       concurrency,
     );
