@@ -128,7 +128,9 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
     const rps = rateInfo?.rps || 1;
     // Delay between requests per worker to stay under rps limit
     // e.g. 8 workers at 10 rps → each worker delays 800ms between requests
-    const perWorkerDelayMs = Math.ceil((concurrency / rps) * 1000);
+    // Free tier gets a 200ms buffer to avoid 429s from timing jitter
+    const rawDelay = Math.ceil((concurrency / rps) * 1000);
+    const perWorkerDelayMs = (rateInfo?.plan === 'free') ? Math.max(rawDelay, 1200) : rawDelay;
 
     // 2. Check Resolution via Points API
     // We check the center point to see what dataset is being used
