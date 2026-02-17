@@ -54,13 +54,14 @@ let gpxzRateLimitInfo = null;
 export async function probeGPXZLimits(apiKey, signal) {
   try {
     const resp = await fetch(
-      'https://api.gpxz.io/v1/elevation/point?lat=0&lon=0',
+      '/api/gpxz/v1/elevation/point?lat=0&lon=0',
       { headers: { 'x-api-key': apiKey }, signal }
     );
 
     const used = parseInt(resp.headers.get('x-ratelimit-used') || '0', 10);
     const limit = parseInt(resp.headers.get('x-ratelimit-limit') || '100', 10);
-    const remaining = parseInt(resp.headers.get('x-ratelimit-remaining') || '0', 10);
+    const remainingHeader = resp.headers.get('x-ratelimit-remaining');
+    const remaining = remainingHeader !== null ? parseInt(remainingHeader, 10) : Math.max(0, limit - used);
     const resetSec = parseInt(resp.headers.get('x-ratelimit-reset') || '0', 10);
 
     // Determine plan tier and concurrency from daily limit
@@ -104,7 +105,11 @@ function updateRateLimitFromHeaders(response) {
   const used = response.headers.get('x-ratelimit-used');
   const remaining = response.headers.get('x-ratelimit-remaining');
   if (used) gpxzRateLimitInfo.used = parseInt(used, 10);
-  if (remaining) gpxzRateLimitInfo.remaining = parseInt(remaining, 10);
+  if (remaining !== null) {
+    gpxzRateLimitInfo.remaining = parseInt(remaining, 10);
+  } else if (used) {
+    gpxzRateLimitInfo.remaining = Math.max(0, gpxzRateLimitInfo.limit - gpxzRateLimitInfo.used);
+  }
 }
 
 /** Get the last known GPXZ rate limit info */
@@ -139,7 +144,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
 
     let shouldSmooth = false;
     try {
-      const pointsUrl = `https://api.gpxz.io/v1/elevation/points?latlons=${centerLat},${centerLng}`;
+      const pointsUrl = `/api/gpxz/v1/elevation/points?latlons=${centerLat},${centerLng}`;
       const pointsResp = await fetch(pointsUrl, {
         headers: { "x-api-key": apiKey },
         signal,
@@ -237,7 +242,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
         await new Promise((r) => setTimeout(r, perWorkerDelayMs));
         signal?.throwIfAborted();
 
-        const url = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=1&projection=latlon`;
+        const url = `/api/gpxz/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=1&projection=latlon`;
 
         // Retry logic for 429 Rate Limit
         let response = null;

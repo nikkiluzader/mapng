@@ -42,5 +42,14 @@ export default defineConfig({
     'process.env': {},
     '__BUILD_HASH__': JSON.stringify(commitHash),
     '__BUILD_TIME__': JSON.stringify(new Date().toISOString()),
-  }
+  },
+  server: {
+    proxy: {
+      '/api/gpxz': {
+        target: 'https://api.gpxz.io',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/gpxz/, ''),
+      },
+    },
+  },
 });
