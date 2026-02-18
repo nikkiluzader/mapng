@@ -222,6 +222,15 @@ const buildQuery = (bounds) => {
     node["natural"="shrub"](${bbox});
     node["natural"="scrub"](${bbox});
     node["natural"="wood"](${bbox});
+
+    // --- Street furniture & urban infrastructure (point features) ---
+    node["highway"="street_lamp"](${bbox});
+    node["barrier"="bollard"](${bbox});
+    node["amenity"="bench"](${bbox});
+    node["traffic_sign"](${bbox});
+    node["highway"="stop"](${bbox});
+    node["highway"="give_way"](${bbox});
+    node["highway"="traffic_signals"](${bbox});
   );
   out body geom;
 `;
@@ -353,16 +362,33 @@ const parseOverpassResponse = (data, bounds) => {
   const rawFeatures = [];
   const consumedWayIds = new Set();
 
-  // 1. First Pass: Index Nodes (Trees) and Ways
+  // 1. First Pass: Index Nodes (Trees + Street Furniture) and Ways
   for (const el of data.elements) {
     if (el.type === "node") {
-      if (el.tags && el.tags.natural === "tree") {
-        rawFeatures.push({
-          id: el.id.toString(),
-          type: "vegetation",
-          geometry: [{ lat: el.lat, lng: el.lon }],
-          tags: el.tags,
-        });
+      if (el.tags) {
+        if (el.tags.natural === "tree") {
+          rawFeatures.push({
+            id: el.id.toString(),
+            type: "vegetation",
+            geometry: [{ lat: el.lat, lng: el.lon }],
+            tags: el.tags,
+          });
+        } else if (
+          el.tags.highway === "street_lamp" ||
+          el.tags.barrier === "bollard" ||
+          el.tags.amenity === "bench" ||
+          el.tags.traffic_sign ||
+          el.tags.highway === "stop" ||
+          el.tags.highway === "give_way" ||
+          el.tags.highway === "traffic_signals"
+        ) {
+          rawFeatures.push({
+            id: el.id.toString(),
+            type: "street_furniture",
+            geometry: [{ lat: el.lat, lng: el.lon }],
+            tags: el.tags,
+          });
+        }
       }
     } else if (el.type === "way") {
       const geometry = convertGeom(el.geometry);
