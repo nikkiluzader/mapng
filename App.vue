@@ -844,14 +844,11 @@ const handleFetchOSM = async () => {
   }
 };
 
-const handleUpdateTextures = ({ osmTextureUrl, hybridTextureUrl, osmTextureCanvas, hybridTextureCanvas }) => {
+const handleUpdateTextures = (updates) => {
   if (terrainData.value) {
     terrainData.value = {
       ...terrainData.value,
-      osmTextureUrl,
-      hybridTextureUrl,
-      osmTextureCanvas,
-      hybridTextureCanvas
+      ...updates,
     };
   }
 };

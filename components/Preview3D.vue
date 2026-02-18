@@ -199,6 +199,42 @@
           </button>
         </div>
 
+        <!-- Second row: Segmented modes -->
+        <div
+          class="flex bg-gray-100 dark:bg-gray-800 rounded-md p-1 border border-gray-200 dark:border-gray-700 mb-2"
+        >
+          <button
+            @click="textureType = 'segmented'"
+            :disabled="!mergedTerrainData.segmentedTextureUrl"
+            :title="!mergedTerrainData.segmentedTextureUrl ? 'No segmented data available' : 'Segmented satellite (flat color blobs)'"
+            :class="[
+              'flex-1 text-xs py-1.5 rounded transition-colors',
+              textureType === 'segmented'
+                ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+                : !mergedTerrainData.segmentedTextureUrl
+                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
+            ]"
+          >
+            Segmented
+          </button>
+          <button
+            @click="textureType = 'segmentedHybrid'"
+            :disabled="!mergedTerrainData.segmentedHybridTextureUrl"
+            :title="!mergedTerrainData.segmentedHybridTextureUrl ? 'No segmented hybrid data available' : 'Segmented satellite + roads overlay'"
+            :class="[
+              'flex-1 text-xs py-1.5 rounded transition-colors',
+              textureType === 'segmentedHybrid'
+                ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+                : !mergedTerrainData.segmentedHybridTextureUrl
+                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
+            ]"
+          >
+            Seg. Hybrid
+          </button>
+        </div>
+
         <!-- wireframe and 3D features -->
         <div class="space-y-3 pt-2">
           <label class="flex items-center gap-2 cursor-pointer group/check">
@@ -419,6 +455,10 @@ const mergedTerrainData = computed(() => {
     osmTextureCanvas: customOsmCanvas.value || props.terrainData?.osmTextureCanvas,
     hybridTextureCanvas: customHybridCanvas.value || props.terrainData?.hybridTextureCanvas,
     satelliteTextureUrl: props.terrainData?.satelliteTextureUrl,
+    segmentedTextureUrl: props.terrainData?.segmentedTextureUrl,
+    segmentedTextureCanvas: props.terrainData?.segmentedTextureCanvas,
+    segmentedHybridTextureUrl: props.terrainData?.segmentedHybridTextureUrl,
+    segmentedHybridTextureCanvas: props.terrainData?.segmentedHybridTextureCanvas,
   };
 });
 

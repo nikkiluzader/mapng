@@ -266,6 +266,16 @@
               class="accent-[#FF6600] w-3.5 h-3.5" />
             Hybrid Texture (16K PNG)
           </label>
+          <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
+            <input type="checkbox" v-model="exports.segmentedSatellite" class="accent-[#FF6600] w-3.5 h-3.5" />
+            Segmented Satellite (PNG)
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"
+            :class="{ 'opacity-50': !includeOSM }">
+            <input type="checkbox" v-model="exports.segmentedHybrid" :disabled="!includeOSM"
+              class="accent-[#FF6600] w-3.5 h-3.5" />
+            Segmented Hybrid (PNG)
+          </label>
           <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300"
             :class="{ 'opacity-50': !includeOSM }">
             <input type="checkbox" v-model="exports.roadMask" :disabled="!includeOSM"
@@ -396,6 +406,8 @@ const exports = ref({
   satellite: true,
   osmTexture: true,
   hybridTexture: true,
+  segmentedSatellite: false,
+  segmentedHybrid: false,
   roadMask: false,
   glb: false,
   dae: false,

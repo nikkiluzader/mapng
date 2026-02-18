@@ -14,6 +14,8 @@ import {
   generateSatelliteBlob,
   generateOSMTextureBlob,
   generateHybridTextureBlob,
+  generateSegmentedSatelliteBlob,
+  generateSegmentedHybridBlob,
   generateRoadMaskBlob,
   generateGeoTIFFBlob,
   generateGeoJSONBlob,
@@ -322,6 +324,20 @@ export async function runBatchJob(state, onProgress, onTileComplete, onError, si
         onProgress({ tileIndex: i, step: 'Generating hybrid texture...', tile });
         const blob = await generateHybridTextureBlob(terrainData);
         if (blob) zip.file('hybrid_texture.png', blob);
+      }
+
+      // Segmented Satellite
+      if (state.exports.segmentedSatellite) {
+        onProgress({ tileIndex: i, step: 'Generating segmented satellite texture...', tile });
+        const blob = await generateSegmentedSatelliteBlob(terrainData);
+        if (blob) zip.file('segmented_satellite.png', blob);
+      }
+
+      // Segmented Hybrid (segmented base + roads)
+      if (state.exports.segmentedHybrid && terrainData.osmFeatures?.length > 0) {
+        onProgress({ tileIndex: i, step: 'Generating segmented hybrid texture...', tile });
+        const blob = await generateSegmentedHybridBlob(terrainData);
+        if (blob) zip.file('segmented_hybrid.png', blob);
       }
 
       // Road Mask

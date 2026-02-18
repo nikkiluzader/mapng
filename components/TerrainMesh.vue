@@ -78,7 +78,9 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
 const textureCache = reactive({
   satellite: null,
   osm: null,
-  hybrid: null
+  hybrid: null,
+  segmented: null,
+  segmentedHybrid: null
 });
 
 // Track canvas refs for direct CanvasTexture usage
@@ -147,6 +149,26 @@ watch(() => props.terrainData?.hybridTextureUrl, (url) => {
   } else {
     canvasCache.hybrid = null;
     textureCache.hybrid = loadTexture(url);
+  }
+}, { immediate: true });
+
+watch(() => props.terrainData?.segmentedTextureUrl, (url) => {
+  if (textureCache.segmented) textureCache.segmented.dispose();
+  const canvas = props.terrainData?.segmentedTextureCanvas;
+  if (canvas) {
+    textureCache.segmented = loadCanvasTexture(canvas);
+  } else {
+    textureCache.segmented = loadTexture(url);
+  }
+}, { immediate: true });
+
+watch(() => props.terrainData?.segmentedHybridTextureUrl, (url) => {
+  if (textureCache.segmentedHybrid) textureCache.segmentedHybrid.dispose();
+  const canvas = props.terrainData?.segmentedHybridTextureCanvas;
+  if (canvas) {
+    textureCache.segmentedHybrid = loadCanvasTexture(canvas);
+  } else {
+    textureCache.segmentedHybrid = loadTexture(url);
   }
 }, { immediate: true });
 

@@ -1249,3 +1249,66 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
   );
   return { url, canvas };
 };
+
+/**
+ * Generate a "segmented hybrid" texture — segmented satellite as background
+ * with OSM road network rendered on top. Ideal for PBR base color maps that
+ * need visible road geometry without photographic noise.
+ */
+export const generateSegmentedHybridTexture = async (terrainData, options = {}) => {
+  const onProgress = options.onProgress;
+  onProgress?.("Blending segmented satellite with road overlays...");
+  const MAX_TEX_SIZE = 8192;
+  const TARGET_RESOLUTION = MAX_TEX_SIZE;
+  let SCALE_FACTOR = Math.max(
+    2,
+    Math.ceil(TARGET_RESOLUTION / terrainData.width),
+  );
+  if (terrainData.width * SCALE_FACTOR > MAX_TEX_SIZE) {
+    SCALE_FACTOR = Math.max(1, Math.floor(MAX_TEX_SIZE / terrainData.width));
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = terrainData.width * SCALE_FACTOR;
+  canvas.height = terrainData.height * SCALE_FACTOR;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not get 2D context");
+
+  // Background: Segmented satellite image
+  const segCanvas = terrainData.segmentedTextureCanvas;
+  const segUrl = terrainData.segmentedTextureUrl;
+  if (segCanvas) {
+    ctx.drawImage(segCanvas, 0, 0, canvas.width, canvas.height);
+  } else if (segUrl) {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = segUrl;
+    await new Promise((r) => { img.onload = r; img.onerror = r; });
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  const centerLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
+  const centerLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
+  const toMetric = createWGS84ToLocal(centerLat, centerLng);
+  const halfW = terrainData.width / 2,
+    halfH = terrainData.height / 2;
+
+  const toPixel = (lat, lng) => {
+    const [lx, ly] = toMetric.forward([lng, lat]);
+    return { x: (lx + halfW) * SCALE_FACTOR, y: (halfH - ly) * SCALE_FACTOR };
+  };
+
+  // Render road features on top
+  const segRoadFeatures = terrainData.osmFeatures.filter((f) => f.type === "road");
+  renderFeaturesToCanvas(ctx, segRoadFeatures, toPixel, SCALE_FACTOR, {
+    ...options,
+    alpha: 1.0,
+  });
+
+  const url = await new Promise((r) =>
+    canvas.toBlob((b) => r(b ? URL.createObjectURL(b) : ""), "image/png"),
+  );
+  return { url, canvas };
+};

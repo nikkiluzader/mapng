@@ -1,5 +1,6 @@
 import { fetchOSMData } from "./osm";
-import { generateOSMTexture, generateHybridTexture } from "./osmTexture";
+import { generateOSMTexture, generateHybridTexture, generateSegmentedHybridTexture } from "./osmTexture";
+import { segmentSatelliteTexture } from "./segmentation";
 import * as GeoTIFF from "geotiff";
 import {
   resampleToMeterGrid,
@@ -864,6 +865,16 @@ export const fetchTerrainData = async (
     sourceGeoTiffs,
   };
 
+  // Generate segmented satellite texture (runs in worker, fast)
+  onProgress?.("Generating segmented satellite texture...");
+  try {
+    const segResult = await segmentSatelliteTexture(satelliteTextureUrl, { onProgress });
+    terrainData.segmentedTextureUrl = segResult.url;
+    terrainData.segmentedTextureCanvas = segResult.canvas;
+  } catch (e) {
+    console.warn("Segmentation failed, skipping:", e);
+  }
+
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, baseColor, onProgress };
     onProgress?.("Generating OSM texture...");
@@ -877,6 +888,14 @@ export const fetchTerrainData = async (
     );
     terrainData.hybridTextureUrl = hybridResult.url;
     terrainData.hybridTextureCanvas = hybridResult.canvas;
+
+    // Generate segmented hybrid (segmented base + roads)
+    if (terrainData.segmentedTextureUrl) {
+      onProgress?.("Generating Segmented Hybrid texture...");
+      const segHybridResult = await generateSegmentedHybridTexture(terrainData, options);
+      terrainData.segmentedHybridTextureUrl = segHybridResult.url;
+      terrainData.segmentedHybridTextureCanvas = segHybridResult.canvas;
+    }
   }
 
   return terrainData;
@@ -924,6 +943,14 @@ export const addOSMToTerrain = async (
     );
     newTerrainData.hybridTextureUrl = hybridResult.url;
     newTerrainData.hybridTextureCanvas = hybridResult.canvas;
+
+    // Generate segmented hybrid if segmented base exists
+    if (newTerrainData.segmentedTextureUrl) {
+      onProgress?.("Generating Segmented Hybrid texture...");
+      const segHybridResult = await generateSegmentedHybridTexture(newTerrainData, options);
+      newTerrainData.segmentedHybridTextureUrl = segHybridResult.url;
+      newTerrainData.segmentedHybridTextureCanvas = segHybridResult.canvas;
+    }
   }
 
   return newTerrainData;

@@ -118,6 +118,31 @@ export function generateRoadMaskBlob(terrainData, center) {
 }
 
 /**
+ * Generate a segmented satellite texture Blob via mean-shift segmentation.
+ */
+export async function generateSegmentedSatelliteBlob(terrainData) {
+  if (!terrainData.satelliteTextureUrl) return null;
+  const { segmentSatelliteTexture } = await import('./segmentation.js');
+  const result = await segmentSatelliteTexture(terrainData.satelliteTextureUrl);
+  // Store on terrainData so the hybrid generator can use it
+  terrainData.segmentedTextureUrl = result.url;
+  terrainData.segmentedTextureCanvas = result.canvas;
+  const response = await fetch(result.url);
+  return response.blob();
+}
+
+/**
+ * Generate a segmented hybrid texture Blob (segmented base + roads overlay).
+ */
+export async function generateSegmentedHybridBlob(terrainData) {
+  if (!terrainData.segmentedTextureUrl || !terrainData.osmFeatures?.length) return null;
+  const { generateSegmentedHybridTexture } = await import('./osmTexture.js');
+  const result = await generateSegmentedHybridTexture(terrainData);
+  const response = await fetch(result.url);
+  return response.blob();
+}
+
+/**
  * Generate GeoTIFF Blob.
  */
 export async function generateGeoTIFFBlob(terrainData, center) {
