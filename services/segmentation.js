@@ -1,13 +1,14 @@
 /**
- * segmentation.js — Fast mean-shift-like segmentation for satellite imagery.
+ * segmentation.js — K-means color segmentation for satellite imagery.
  *
  * Produces a simplified "flat color blobs" version of the satellite texture,
  * ideal as a PBR base color map in game engines where land cover should be
- * represented as large uniform-color regions rather than noisy photo detail.
+ * represented by a small number of uniform-color regions.
  *
- * Algorithm: aggressive downscale → iterative separable box blur (O(n) per
- * pass) → color quantization → flood-fill region labelling → small-region
- * merging → nearest-neighbor upscale. Runs in a Web Worker when available.
+ * Algorithm: aggressive downscale → iterative separable box blur (noise
+ * reduction) → k-means clustering with k-means++ init (exactly k colors)
+ * → flood-fill region labelling → small-region merging → nearest-neighbor
+ * upscale. Runs in a Web Worker when available.
  */
 
 // ─── Web Worker (inline) ─────────────────────────────────────────────
@@ -16,14 +17,14 @@
 const WORKER_CODE = `
 "use strict";
 
-// Horizontal box blur pass — O(n), constant per pixel regardless of radius
+// ── Box blur (separable, O(n) per pass) ──────────────────────────────
+
 function blurH(r, g, b, w, h, rad) {
   const diam = rad * 2 + 1;
   const invDiam = 1 / diam;
   for (let y = 0; y < h; y++) {
     const row = y * w;
     let sr = 0, sg = 0, sb = 0;
-    // seed the accumulator with the leftmost (rad+1) pixels, mirrored
     for (let k = -rad; k <= rad; k++) {
       const idx = row + Math.min(Math.max(k, 0), w - 1);
       sr += r[idx]; sg += g[idx]; sb += b[idx];
@@ -32,7 +33,6 @@ function blurH(r, g, b, w, h, rad) {
       r[row + x] = sr * invDiam;
       g[row + x] = sg * invDiam;
       b[row + x] = sb * invDiam;
-      // slide window
       const addIdx = row + Math.min(x + rad + 1, w - 1);
       const subIdx = row + Math.max(x - rad, 0);
       sr += r[addIdx] - r[subIdx];
@@ -42,7 +42,6 @@ function blurH(r, g, b, w, h, rad) {
   }
 }
 
-// Vertical box blur pass — O(n)
 function blurV(r, g, b, w, h, rad) {
   const diam = rad * 2 + 1;
   const invDiam = 1 / diam;
@@ -66,11 +65,115 @@ function blurV(r, g, b, w, h, rad) {
   }
 }
 
-self.onmessage = function(e) {
-  const { pixels, w, h, blurRadius, blurPasses, quantLevels, minRegionSize } = e.data;
-  const n = w * h;
+// ── K-means++ initialization ─────────────────────────────────────────
+// Picks k diverse seed centroids: first one random, each subsequent one
+// chosen with probability proportional to squared distance from the
+// nearest already-chosen centroid.
 
-  // Unpack to typed arrays
+function kmeansppInit(r, g, b, n, k) {
+  const centroids = new Float32Array(k * 3);
+  const dist = new Float32Array(n);
+
+  // First centroid: pick pixel closest to the mean (most representative)
+  let mr = 0, mg = 0, mb = 0;
+  for (let i = 0; i < n; i++) { mr += r[i]; mg += g[i]; mb += b[i]; }
+  mr /= n; mg /= n; mb /= n;
+  let bestIdx = 0, bestD = Infinity;
+  for (let i = 0; i < n; i++) {
+    const d = (r[i] - mr) ** 2 + (g[i] - mg) ** 2 + (b[i] - mb) ** 2;
+    if (d < bestD) { bestD = d; bestIdx = i; }
+  }
+  centroids[0] = r[bestIdx]; centroids[1] = g[bestIdx]; centroids[2] = b[bestIdx];
+
+  // Initialize distances to first centroid
+  let totalDist = 0;
+  for (let i = 0; i < n; i++) {
+    const d = (r[i] - centroids[0]) ** 2 + (g[i] - centroids[1]) ** 2 + (b[i] - centroids[2]) ** 2;
+    dist[i] = d;
+    totalDist += d;
+  }
+
+  // Pick remaining centroids
+  for (let c = 1; c < k; c++) {
+    // Weighted random selection proportional to dist²
+    let target = Math.random() * totalDist;
+    let chosen = 0;
+    for (let i = 0; i < n; i++) {
+      target -= dist[i];
+      if (target <= 0) { chosen = i; break; }
+    }
+    centroids[c * 3]     = r[chosen];
+    centroids[c * 3 + 1] = g[chosen];
+    centroids[c * 3 + 2] = b[chosen];
+
+    // Update distances (min with new centroid)
+    totalDist = 0;
+    for (let i = 0; i < n; i++) {
+      const d = (r[i] - centroids[c * 3]) ** 2 +
+                (g[i] - centroids[c * 3 + 1]) ** 2 +
+                (b[i] - centroids[c * 3 + 2]) ** 2;
+      if (d < dist[i]) dist[i] = d;
+      totalDist += dist[i];
+    }
+  }
+
+  return centroids;
+}
+
+// ── K-means clustering ───────────────────────────────────────────────
+
+function kmeans(r, g, b, n, k, maxIter) {
+  const centroids = kmeansppInit(r, g, b, n, k);
+  const assignments = new Uint8Array(n);
+  const sumR = new Float64Array(k);
+  const sumG = new Float64Array(k);
+  const sumB = new Float64Array(k);
+  const counts = new Uint32Array(k);
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    // Assign each pixel to nearest centroid
+    let changed = 0;
+    for (let i = 0; i < n; i++) {
+      const pr = r[i], pg = g[i], pb = b[i];
+      let bestC = 0, bestDist = Infinity;
+      for (let c = 0; c < k; c++) {
+        const dr = pr - centroids[c * 3];
+        const dg = pg - centroids[c * 3 + 1];
+        const db = pb - centroids[c * 3 + 2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bestDist) { bestDist = d; bestC = c; }
+      }
+      if (assignments[i] !== bestC) { changed++; assignments[i] = bestC; }
+    }
+
+    // Recompute centroids
+    sumR.fill(0); sumG.fill(0); sumB.fill(0); counts.fill(0);
+    for (let i = 0; i < n; i++) {
+      const c = assignments[i];
+      sumR[c] += r[i]; sumG[c] += g[i]; sumB[c] += b[i]; counts[c]++;
+    }
+    for (let c = 0; c < k; c++) {
+      if (counts[c] === 0) continue;
+      centroids[c * 3]     = sumR[c] / counts[c];
+      centroids[c * 3 + 1] = sumG[c] / counts[c];
+      centroids[c * 3 + 2] = sumB[c] / counts[c];
+    }
+
+    // Converged when < 0.1% of pixels changed
+    if (changed < n * 0.001) break;
+  }
+
+  return { centroids, assignments };
+}
+
+// ── Main worker entry ────────────────────────────────────────────────
+
+self.onmessage = function(e) {
+  const { pixels, w, h, blurRadius, blurPasses, numColors, minRegionSize } = e.data;
+  const n = w * h;
+  const k = Math.max(2, Math.min(numColors, 256));
+
+  // Unpack to float channels
   const r = new Float32Array(n);
   const g = new Float32Array(n);
   const b = new Float32Array(n);
@@ -80,25 +183,34 @@ self.onmessage = function(e) {
     b[i] = pixels[i * 4 + 2];
   }
 
-  // Iterative box blur (3 passes of box blur ≈ Gaussian)
+  // Iterative box blur (noise reduction before clustering)
   for (let p = 0; p < blurPasses; p++) {
     blurH(r, g, b, w, h, blurRadius);
     blurV(r, g, b, w, h, blurRadius);
   }
 
-  // Color quantization — snap each channel to nearest level
-  const step = 256 / quantLevels;
-  const halfStep = step * 0.5;
+  // K-means clustering to exactly k colors
+  const { centroids, assignments } = kmeans(r, g, b, n, k, 30);
+
+  // Snap every pixel to its centroid color (integer values)
+  const finalR = new Uint8Array(k);
+  const finalG = new Uint8Array(k);
+  const finalB = new Uint8Array(k);
+  for (let c = 0; c < k; c++) {
+    finalR[c] = Math.round(Math.min(255, Math.max(0, centroids[c * 3])));
+    finalG[c] = Math.round(Math.min(255, Math.max(0, centroids[c * 3 + 1])));
+    finalB[c] = Math.round(Math.min(255, Math.max(0, centroids[c * 3 + 2])));
+  }
   for (let i = 0; i < n; i++) {
-    r[i] = Math.min(255, Math.floor(r[i] / step) * step + halfStep);
-    g[i] = Math.min(255, Math.floor(g[i] / step) * step + halfStep);
-    b[i] = Math.min(255, Math.floor(b[i] / step) * step + halfStep);
+    r[i] = finalR[assignments[i]];
+    g[i] = finalG[assignments[i]];
+    b[i] = finalB[assignments[i]];
   }
 
   // Flood-fill labelling of connected same-color regions
   const labels = new Int32Array(n).fill(-1);
   let regionCount = 0;
-  const regionColors = []; // [{r,g,b,count}]
+  const regionColors = [];
 
   for (let i = 0; i < n; i++) {
     if (labels[i] >= 0) continue;
@@ -122,13 +234,9 @@ self.onmessage = function(e) {
     regionColors.push({ r: seedR, g: seedG, b: seedB, count });
   }
 
-  // Build per-region pixel lists for small-region merging (indexed once)
+  // Small-region merging
   if (minRegionSize > 1) {
-    // Build adjacency: for each small region, find best large neighbor
     const regionNeighborBest = new Int32Array(regionCount).fill(-1);
-    const regionNeighborScore = new Int32Array(regionCount);
-
-    // Scan border pixels once
     for (let i = 0; i < n; i++) {
       const rid = labels[i];
       if (regionColors[rid].count >= minRegionSize) continue;
@@ -137,7 +245,6 @@ self.onmessage = function(e) {
       const check = (ni) => {
         const nrid = labels[ni];
         if (nrid !== rid && nrid >= 0) {
-          // Prefer larger neighbor
           if (regionNeighborBest[rid] < 0 ||
               regionColors[nrid].count > regionColors[regionNeighborBest[rid]].count) {
             regionNeighborBest[rid] = nrid;
@@ -149,8 +256,6 @@ self.onmessage = function(e) {
       if (y > 0)     check(i - w);
       if (y < h - 1) check(i + w);
     }
-
-    // Reassign small regions
     for (let rid = 0; rid < regionCount; rid++) {
       if (regionColors[rid].count >= minRegionSize || regionNeighborBest[rid] < 0) continue;
       const target = regionNeighborBest[rid];
@@ -185,14 +290,14 @@ function getWorkerUrl() {
 }
 
 /**
- * Apply fast segmentation to satellite imagery.
+ * Apply k-means color segmentation to satellite imagery.
  * @param {string} satelliteTextureUrl - URL/dataURL of the satellite image
  * @param {object} [options]
- * @param {number} [options.blurRadius=6]      - Box blur kernel radius
+ * @param {number} [options.blurRadius=6]      - Box blur kernel radius (noise reduction)
  * @param {number} [options.blurPasses=3]      - Number of blur iterations (3 ≈ Gaussian)
- * @param {number} [options.quantLevels=12]    - Color quantization levels per channel
+ * @param {number} [options.numColors=10]      - Exact number of output colors (k-means k)
  * @param {number} [options.minRegionSize=100] - Merge regions smaller than this
- * @param {number} [options.maxSize=512]       - Max processing dimension (flat blobs don't need detail)
+ * @param {number} [options.maxSize=512]       - Max processing dimension
  * @param {Function} [options.onProgress]      - Progress callback
  * @returns {Promise<{url: string, canvas: HTMLCanvasElement}>}
  */
@@ -200,7 +305,7 @@ export async function segmentSatelliteTexture(satelliteTextureUrl, options = {})
   const {
     blurRadius = 6,
     blurPasses = 3,
-    quantLevels = 12,
+    numColors = 10,
     minRegionSize = 100,
     maxSize = 512,
     onProgress,
@@ -226,7 +331,7 @@ export async function segmentSatelliteTexture(satelliteTextureUrl, options = {})
 
   const imageData = procCtx.getImageData(0, 0, procW, procH);
 
-  onProgress?.('Segmenting (worker)...');
+  onProgress?.('Segmenting (k-means, k=' + numColors + ')...');
 
   // Run heavy work in a Web Worker
   const resultPixels = await new Promise((resolve, reject) => {
@@ -240,15 +345,14 @@ export async function segmentSatelliteTexture(satelliteTextureUrl, options = {})
         worker.terminate();
         reject(err);
       };
-      // Transfer the pixel buffer to avoid copy
       const pixelsCopy = new Uint8ClampedArray(imageData.data);
       worker.postMessage(
-        { pixels: pixelsCopy, w: procW, h: procH, blurRadius, blurPasses, quantLevels, minRegionSize },
+        { pixels: pixelsCopy, w: procW, h: procH, blurRadius, blurPasses, numColors, minRegionSize },
         [pixelsCopy.buffer],
       );
     } catch {
       // Fallback: run inline (e.g. if Workers are blocked)
-      resolve(runSegmentationSync(imageData.data, procW, procH, blurRadius, blurPasses, quantLevels, minRegionSize));
+      resolve(runSegmentationSync(imageData.data, procW, procH, blurRadius, blurPasses, numColors, minRegionSize));
     }
   });
 
@@ -275,27 +379,30 @@ export async function segmentSatelliteTexture(satelliteTextureUrl, options = {})
   return { url, canvas: outCanvas };
 }
 
-// ─── Synchronous fallback (same logic as worker) ─────────────────────
-function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, quantLevels, minRegionSize) {
+// ─── Synchronous fallback (mirrors worker logic) ─────────────────────
+
+function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, numColors, minRegionSize) {
   const n = w * h;
+  const k = Math.max(2, Math.min(numColors, 256));
+
   const r = new Float32Array(n);
   const g = new Float32Array(n);
   const b = new Float32Array(n);
-
   for (let i = 0; i < n; i++) {
     r[i] = pixels[i * 4];
     g[i] = pixels[i * 4 + 1];
     b[i] = pixels[i * 4 + 2];
   }
 
+  // Box blur
   const blurH = (rad) => {
     const diam = rad * 2 + 1;
     const inv = 1 / diam;
     for (let y = 0; y < h; y++) {
       const row = y * w;
       let sr = 0, sg = 0, sb = 0;
-      for (let k = -rad; k <= rad; k++) {
-        const idx = row + Math.min(Math.max(k, 0), w - 1);
+      for (let kk = -rad; kk <= rad; kk++) {
+        const idx = row + Math.min(Math.max(kk, 0), w - 1);
         sr += r[idx]; sg += g[idx]; sb += b[idx];
       }
       for (let x = 0; x < w; x++) {
@@ -308,14 +415,13 @@ function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, quantLevels, 
       }
     }
   };
-
   const blurV = (rad) => {
     const diam = rad * 2 + 1;
     const inv = 1 / diam;
     for (let x = 0; x < w; x++) {
       let sr = 0, sg = 0, sb = 0;
-      for (let k = -rad; k <= rad; k++) {
-        const idx = Math.min(Math.max(k, 0), h - 1) * w + x;
+      for (let kk = -rad; kk <= rad; kk++) {
+        const idx = Math.min(Math.max(kk, 0), h - 1) * w + x;
         sr += r[idx]; sg += g[idx]; sb += b[idx];
       }
       for (let y = 0; y < h; y++) {
@@ -327,25 +433,98 @@ function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, quantLevels, 
       }
     }
   };
+  for (let p = 0; p < blurPasses; p++) { blurH(blurRadius); blurV(blurRadius); }
 
-  for (let p = 0; p < blurPasses; p++) {
-    blurH(blurRadius);
-    blurV(blurRadius);
+  // K-means++ init
+  const centroids = new Float32Array(k * 3);
+  const dist = new Float32Array(n);
+
+  let mr = 0, mg = 0, mb = 0;
+  for (let i = 0; i < n; i++) { mr += r[i]; mg += g[i]; mb += b[i]; }
+  mr /= n; mg /= n; mb /= n;
+  let bestIdx = 0, bestD = Infinity;
+  for (let i = 0; i < n; i++) {
+    const d = (r[i] - mr) ** 2 + (g[i] - mg) ** 2 + (b[i] - mb) ** 2;
+    if (d < bestD) { bestD = d; bestIdx = i; }
+  }
+  centroids[0] = r[bestIdx]; centroids[1] = g[bestIdx]; centroids[2] = b[bestIdx];
+
+  let totalDist = 0;
+  for (let i = 0; i < n; i++) {
+    const d = (r[i] - centroids[0]) ** 2 + (g[i] - centroids[1]) ** 2 + (b[i] - centroids[2]) ** 2;
+    dist[i] = d;
+    totalDist += d;
+  }
+  for (let c = 1; c < k; c++) {
+    let target = Math.random() * totalDist;
+    let chosen = 0;
+    for (let i = 0; i < n; i++) {
+      target -= dist[i];
+      if (target <= 0) { chosen = i; break; }
+    }
+    centroids[c * 3] = r[chosen]; centroids[c * 3 + 1] = g[chosen]; centroids[c * 3 + 2] = b[chosen];
+    totalDist = 0;
+    for (let i = 0; i < n; i++) {
+      const d = (r[i] - centroids[c * 3]) ** 2 + (g[i] - centroids[c * 3 + 1]) ** 2 + (b[i] - centroids[c * 3 + 2]) ** 2;
+      if (d < dist[i]) dist[i] = d;
+      totalDist += dist[i];
+    }
   }
 
-  const step = 256 / quantLevels;
-  const half = step * 0.5;
+  // K-means iterations
+  const assignments = new Uint8Array(n);
+  const sumR = new Float64Array(k);
+  const sumG = new Float64Array(k);
+  const sumB = new Float64Array(k);
+  const counts = new Uint32Array(k);
+
+  for (let iter = 0; iter < 30; iter++) {
+    let changed = 0;
+    for (let i = 0; i < n; i++) {
+      const pr = r[i], pg = g[i], pb = b[i];
+      let bestC = 0, bestDist2 = Infinity;
+      for (let c = 0; c < k; c++) {
+        const dr = pr - centroids[c * 3];
+        const dg = pg - centroids[c * 3 + 1];
+        const db = pb - centroids[c * 3 + 2];
+        const d = dr * dr + dg * dg + db * db;
+        if (d < bestDist2) { bestDist2 = d; bestC = c; }
+      }
+      if (assignments[i] !== bestC) { changed++; assignments[i] = bestC; }
+    }
+    sumR.fill(0); sumG.fill(0); sumB.fill(0); counts.fill(0);
+    for (let i = 0; i < n; i++) {
+      const c = assignments[i];
+      sumR[c] += r[i]; sumG[c] += g[i]; sumB[c] += b[i]; counts[c]++;
+    }
+    for (let c = 0; c < k; c++) {
+      if (counts[c] === 0) continue;
+      centroids[c * 3] = sumR[c] / counts[c];
+      centroids[c * 3 + 1] = sumG[c] / counts[c];
+      centroids[c * 3 + 2] = sumB[c] / counts[c];
+    }
+    if (changed < n * 0.001) break;
+  }
+
+  // Snap pixels to centroid colors
+  const finalR = new Uint8Array(k);
+  const finalG = new Uint8Array(k);
+  const finalB = new Uint8Array(k);
+  for (let c = 0; c < k; c++) {
+    finalR[c] = Math.round(Math.min(255, Math.max(0, centroids[c * 3])));
+    finalG[c] = Math.round(Math.min(255, Math.max(0, centroids[c * 3 + 1])));
+    finalB[c] = Math.round(Math.min(255, Math.max(0, centroids[c * 3 + 2])));
+  }
   for (let i = 0; i < n; i++) {
-    r[i] = Math.min(255, Math.floor(r[i] / step) * step + half);
-    g[i] = Math.min(255, Math.floor(g[i] / step) * step + half);
-    b[i] = Math.min(255, Math.floor(b[i] / step) * step + half);
+    r[i] = finalR[assignments[i]];
+    g[i] = finalG[assignments[i]];
+    b[i] = finalB[assignments[i]];
   }
 
   // Flood fill
   const labels = new Int32Array(n).fill(-1);
   let regionCount = 0;
   const regionColors = [];
-
   for (let i = 0; i < n; i++) {
     if (labels[i] >= 0) continue;
     const rid = regionCount++;
@@ -368,6 +547,7 @@ function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, quantLevels, 
     regionColors.push({ r: sr2, g: sg2, b: sb2, count });
   }
 
+  // Small-region merging
   if (minRegionSize > 1) {
     const best = new Int32Array(regionCount).fill(-1);
     for (let i = 0; i < n; i++) {
