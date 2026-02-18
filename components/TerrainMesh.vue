@@ -173,11 +173,11 @@ onUnmounted(() => {
     :geometry="geometry"
   >
     <TresMeshStandardMaterial 
-      :key="texture ? 'tex' : 'solid'"
+      :key="texture ? 'tex' : 'clay'"
       :map="texture"
-      :color="texture ? 0xffffff : 0xad8d60"
-      :roughness="1"
-      :metalness="0"
+      :color="texture ? 0xffffff : 0xb0a898"
+      :roughness="texture ? 1 : 0.5"
+      :metalness="texture ? 0 : 0.5"
       :side="2"
       :wireframe="wireframe"
     />

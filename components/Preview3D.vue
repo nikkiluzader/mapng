@@ -1,6 +1,6 @@
 <template>
   <div class="w-full h-full bg-black relative overflow-hidden">
-    <TresCanvas window-size :clear-color="textureType === 'none' ? '#ad8d60' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="1.0" :renderer="{ logarithmicDepthBuffer: true }">
+    <TresCanvas window-size :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="0.8" :renderer="{ logarithmicDepthBuffer: true }">
       <Suspense>
         <template #default>
           <TresGroup>
@@ -19,7 +19,7 @@
               :light-margin="50"
             />
 
-            <Environment :files="currentHdrFile" :background="true" :environment-intensity="0.05" />
+            <Environment :files="currentHdrFile" :background="true" :environment-intensity="0.02" />
 
             <TerrainMesh
               :terrain-data="mergedTerrainData"
