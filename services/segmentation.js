@@ -1,14 +1,18 @@
 /**
- * segmentation.js — K-means color segmentation for satellite imagery.
+ * segmentation.js — Two-phase color segmentation for satellite imagery.
  *
  * Produces a simplified "flat color blobs" version of the satellite texture,
  * ideal as a PBR base color map in game engines where land cover should be
  * represented by a small number of uniform-color regions.
  *
- * Algorithm: aggressive downscale → iterative separable box blur (noise
- * reduction) → k-means clustering with k-means++ init (exactly k colors)
- * → flood-fill region labelling → small-region merging → nearest-neighbor
- * upscale. Runs in a Web Worker when available.
+ * Phase 1 — Posterize: downscale → box blur (noise reduction) → k-means
+ *   clustering with k-means++ init (reduce to exactly k colors).
+ * Phase 2 — Edge sharpen: iterative mode filter (majority vote in a local
+ *   window) snaps wavy gradient-following contour boundaries into blocky,
+ *   crisp edges, eliminating the "topographical" look.
+ *
+ * Then: flood-fill region labelling → small-region merging →
+ * nearest-neighbor upscale.  Runs in a Web Worker when available.
  */
 
 // ─── Web Worker (inline) ─────────────────────────────────────────────
@@ -166,10 +170,54 @@ function kmeans(r, g, b, n, k, maxIter) {
   return { centroids, assignments };
 }
 
+// ── Mode filter (majority vote) — sharpens cluster boundaries ────────
+// Replaces each pixel's cluster assignment with the most common cluster
+// in a (2*rad+1)² window.  Multiple passes progressively straighten wavy
+// gradient-following contour edges into blocky, crisp boundaries.
+
+function modeFilter(assignments, w, h, k, rad, passes) {
+  const n = w * h;
+  let src = assignments;
+  let dst = new Uint8Array(n);
+  const votes = new Uint16Array(k);
+
+  for (let pass = 0; pass < passes; pass++) {
+    for (let y = 0; y < h; y++) {
+      const y0 = Math.max(0, y - rad);
+      const y1 = Math.min(h - 1, y + rad);
+      for (let x = 0; x < w; x++) {
+        const x0 = Math.max(0, x - rad);
+        const x1 = Math.min(w - 1, x + rad);
+
+        // Tally cluster votes in the window
+        votes.fill(0);
+        for (let yy = y0; yy <= y1; yy++) {
+          const rowOff = yy * w;
+          for (let xx = x0; xx <= x1; xx++) {
+            votes[src[rowOff + xx]]++;
+          }
+        }
+
+        // Pick the cluster with the most votes
+        let bestC = src[y * w + x], bestV = 0;
+        for (let c = 0; c < k; c++) {
+          if (votes[c] > bestV) { bestV = votes[c]; bestC = c; }
+        }
+        dst[y * w + x] = bestC;
+      }
+    }
+    // Swap buffers
+    const tmp = src; src = dst; dst = tmp;
+  }
+  // If odd number of passes, result is in 'src' (which was the last dst)
+  return src;
+}
+
 // ── Main worker entry ────────────────────────────────────────────────
 
 self.onmessage = function(e) {
-  const { pixels, w, h, blurRadius, blurPasses, numColors, minRegionSize } = e.data;
+  const { pixels, w, h, blurRadius, blurPasses, numColors, minRegionSize,
+          modeRadius, modePasses } = e.data;
   const n = w * h;
   const k = Math.max(2, Math.min(numColors, 256));
 
@@ -183,14 +231,17 @@ self.onmessage = function(e) {
     b[i] = pixels[i * 4 + 2];
   }
 
-  // Iterative box blur (noise reduction before clustering)
+  // ── Phase 1: Posterize ──────────────────────────────────────────────
+  // Box blur (noise reduction) then k-means to exactly k colors
   for (let p = 0; p < blurPasses; p++) {
     blurH(r, g, b, w, h, blurRadius);
     blurV(r, g, b, w, h, blurRadius);
   }
-
-  // K-means clustering to exactly k colors
   const { centroids, assignments } = kmeans(r, g, b, n, k, 30);
+
+  // ── Phase 2: Edge sharpen ───────────────────────────────────────────
+  // Mode filter (majority vote) eliminates wavy contour boundaries
+  const cleaned = modeFilter(assignments, w, h, k, modeRadius, modePasses);
 
   // Snap every pixel to its centroid color (integer values)
   const finalR = new Uint8Array(k);
@@ -202,9 +253,9 @@ self.onmessage = function(e) {
     finalB[c] = Math.round(Math.min(255, Math.max(0, centroids[c * 3 + 2])));
   }
   for (let i = 0; i < n; i++) {
-    r[i] = finalR[assignments[i]];
-    g[i] = finalG[assignments[i]];
-    b[i] = finalB[assignments[i]];
+    r[i] = finalR[cleaned[i]];
+    g[i] = finalG[cleaned[i]];
+    b[i] = finalB[cleaned[i]];
   }
 
   // Flood-fill labelling of connected same-color regions
@@ -296,6 +347,8 @@ function getWorkerUrl() {
  * @param {number} [options.blurRadius=6]      - Box blur kernel radius (noise reduction)
  * @param {number} [options.blurPasses=3]      - Number of blur iterations (3 ≈ Gaussian)
  * @param {number} [options.numColors=10]      - Exact number of output colors (k-means k)
+ * @param {number} [options.modeRadius=3]      - Mode filter window radius (edge sharpening)
+ * @param {number} [options.modePasses=3]      - Mode filter iterations (more = blockier edges)
  * @param {number} [options.minRegionSize=100] - Merge regions smaller than this
  * @param {number} [options.maxSize=512]       - Max processing dimension
  * @param {Function} [options.onProgress]      - Progress callback
@@ -306,6 +359,8 @@ export async function segmentSatelliteTexture(satelliteTextureUrl, options = {})
     blurRadius = 6,
     blurPasses = 3,
     numColors = 10,
+    modeRadius = 3,
+    modePasses = 3,
     minRegionSize = 100,
     maxSize = 512,
     onProgress,
@@ -347,12 +402,14 @@ export async function segmentSatelliteTexture(satelliteTextureUrl, options = {})
       };
       const pixelsCopy = new Uint8ClampedArray(imageData.data);
       worker.postMessage(
-        { pixels: pixelsCopy, w: procW, h: procH, blurRadius, blurPasses, numColors, minRegionSize },
+        { pixels: pixelsCopy, w: procW, h: procH, blurRadius, blurPasses, numColors,
+          modeRadius, modePasses, minRegionSize },
         [pixelsCopy.buffer],
       );
     } catch {
       // Fallback: run inline (e.g. if Workers are blocked)
-      resolve(runSegmentationSync(imageData.data, procW, procH, blurRadius, blurPasses, numColors, minRegionSize));
+      resolve(runSegmentationSync(imageData.data, procW, procH, blurRadius, blurPasses, numColors,
+        modeRadius, modePasses, minRegionSize));
     }
   });
 
@@ -381,7 +438,7 @@ export async function segmentSatelliteTexture(satelliteTextureUrl, options = {})
 
 // ─── Synchronous fallback (mirrors worker logic) ─────────────────────
 
-function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, numColors, minRegionSize) {
+function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, numColors, modeRadius, modePasses, minRegionSize) {
   const n = w * h;
   const k = Math.max(2, Math.min(numColors, 256));
 
@@ -506,6 +563,36 @@ function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, numColors, mi
     if (changed < n * 0.001) break;
   }
 
+  // ── Phase 2: Edge sharpen (mode filter) ─────────────────────────────
+  const modeFilterSync = (src, mRad, mPasses) => {
+    let a = src;
+    let b2 = new Uint8Array(n);
+    const votes = new Uint16Array(k);
+    for (let pass = 0; pass < mPasses; pass++) {
+      for (let y = 0; y < h; y++) {
+        const y0 = Math.max(0, y - mRad);
+        const y1 = Math.min(h - 1, y + mRad);
+        for (let x = 0; x < w; x++) {
+          const x0 = Math.max(0, x - mRad);
+          const x1 = Math.min(w - 1, x + mRad);
+          votes.fill(0);
+          for (let yy = y0; yy <= y1; yy++) {
+            const rowOff = yy * w;
+            for (let xx = x0; xx <= x1; xx++) votes[a[rowOff + xx]]++;
+          }
+          let bestC = a[y * w + x], bestV = 0;
+          for (let c = 0; c < k; c++) {
+            if (votes[c] > bestV) { bestV = votes[c]; bestC = c; }
+          }
+          b2[y * w + x] = bestC;
+        }
+      }
+      const tmp = a; a = b2; b2 = tmp;
+    }
+    return a;
+  };
+  const cleaned = modeFilterSync(assignments, modeRadius, modePasses);
+
   // Snap pixels to centroid colors
   const finalR = new Uint8Array(k);
   const finalG = new Uint8Array(k);
@@ -516,9 +603,9 @@ function runSegmentationSync(pixels, w, h, blurRadius, blurPasses, numColors, mi
     finalB[c] = Math.round(Math.min(255, Math.max(0, centroids[c * 3 + 2])));
   }
   for (let i = 0; i < n; i++) {
-    r[i] = finalR[assignments[i]];
-    g[i] = finalG[assignments[i]];
-    b[i] = finalB[assignments[i]];
+    r[i] = finalR[cleaned[i]];
+    g[i] = finalG[cleaned[i]];
+    b[i] = finalB[cleaned[i]];
   }
 
   // Flood fill
