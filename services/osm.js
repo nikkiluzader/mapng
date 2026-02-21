@@ -925,6 +925,10 @@ const parseOverpassResponse = (data, bounds) => {
           const inherentlyArea =
             tags.natural === "beach" ||
             tags.natural === "sand" ||
+            tags.natural === "bare_rock" ||
+            tags.natural === "rock" ||
+            tags.natural === "scree" ||
+            tags.natural === "shingle" ||
             tags.natural === "scrub" ||
             tags.natural === "wetland" ||
             tags.natural === "wood" ||

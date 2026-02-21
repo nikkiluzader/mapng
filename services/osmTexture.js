@@ -67,7 +67,7 @@ const COLORS = {
   barrier: "#C4A484",
   coastline: "#dfcf9d", // sandy shoreline highlight
   ocean: "#4a7c9b", // explicit ocean fill
-  defaultLanduse: "#a5ab9b", // muted default so missing classes are less asphalt-like
+  defaultLanduse: "#d6d8d2", // light grey fallback for areas with sparse/missing OSM landcover
 
   // Markings
   markingWhite: "rgba(255, 255, 255, 0.7)",
@@ -75,8 +75,40 @@ const COLORS = {
   markingRed: "rgba(255, 50, 50, 0.8)",
 };
 
+const hasExplicitGroundCover = (tags) => {
+  if (!tags) return false;
+  return !!(
+    tags.surface ||
+    tags.material ||
+    tags.landcover ||
+    tags.landuse ||
+    tags.natural ||
+    tags.water ||
+    tags.wetland ||
+    tags.waterway ||
+    tags.aeroway
+  );
+};
+
+const isBoundaryOnlyArea = (tags) => {
+  if (!tags || !tags.boundary) return false;
+
+  const boundaryType = String(tags.boundary).toLowerCase();
+  const isBoundaryLike = [
+    "administrative",
+    "protected_area",
+    "national_park",
+    "political",
+    "historic",
+  ].includes(boundaryType);
+  if (!isBoundaryLike) return false;
+
+  return !hasExplicitGroundCover(tags);
+};
+
 const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
   if (!tags) return baseColor;
+  if (isBoundaryOnlyArea(tags)) return baseColor;
 
   // --- OSM2World inspired surface mapping ---
   // Priority 1: Water
@@ -169,7 +201,6 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
       "garden",
       "recreation_ground",
       "common",
-      "nature_reserve",
       "dog_park",
       "greenfield",
       "miniature_golf", // leisure=miniature_golf → grassy
@@ -258,6 +289,7 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
     return COLORS.sport;
   if (["recreation", "recreation_ground"].includes(surface))
     return COLORS.recreation;
+  if (["camp_site"].includes(surface)) return COLORS.park;
   if (["attraction", "zoo", "camp_site", "theme_park"].includes(surface))
     return COLORS.tourism;
 
@@ -941,8 +973,10 @@ const renderFeaturesToCanvas = (
   const baseColor = options.baseColor || COLORS.defaultLanduse;
 
   // 1. Draw Landcover & Landuse (Sorted by area, with Grass/Water priority layers)
-  const landcover = features.filter((f) =>
-    ["vegetation", "water", "landuse"].includes(f.type),
+  const landcover = features.filter(
+    (f) =>
+      ["vegetation", "water", "landuse"].includes(f.type) &&
+      !isBoundaryOnlyArea(f.tags),
   );
 
   const isGrass = (tags) => {
@@ -967,7 +1001,6 @@ const renderFeaturesToCanvas = (
       "garden",
       "recreation_ground",
       "common",
-      "nature_reserve",
       "greenfield",
       "dog_park",
       "fairway",
@@ -993,6 +1026,7 @@ const renderFeaturesToCanvas = (
 
   const waterFeatures = [];
   const beachFeatures = [];
+  const bareFeatures = [];
   const grassFeatures = [];
   const otherFeatures = [];
 
@@ -1011,12 +1045,38 @@ const renderFeaturesToCanvas = (
     return ["beach", "sand", "shoal", "dune", "coastline"].includes(surface);
   };
 
+  const isBare = (tags) => {
+    if (!tags) return false;
+    const surface =
+      tags.surface ||
+      tags.material ||
+      tags.landcover ||
+      tags.landuse ||
+      tags.natural ||
+      tags.leisure ||
+      tags.golf ||
+      tags.recreation ||
+      tags.tourism;
+    return [
+      "bare_rock",
+      "rock",
+      "scree",
+      "shingle",
+      "shells",
+      "marble",
+      "stone",
+      "blockfield",
+    ].includes(surface);
+  };
+
   landcover.forEach((f) => {
     const item = { f, area: getFeatureArea(f) };
     if (isWater(f.tags)) {
       waterFeatures.push(item);
     } else if (isBeach(f.tags)) {
       beachFeatures.push(item);
+    } else if (isBare(f.tags)) {
+      bareFeatures.push(item);
     } else if (isGrass(f.tags)) {
       grassFeatures.push(item);
     } else {
@@ -1028,11 +1088,19 @@ const renderFeaturesToCanvas = (
   const byArea = (a, b) => b.area - a.area;
   otherFeatures.sort(byArea);
   grassFeatures.sort(byArea);
+  bareFeatures.sort(byArea);
   waterFeatures.sort(byArea);
   beachFeatures.sort(byArea);
 
-  // Combine in draw order: Others -> Grass -> Water -> Beach (beach on top for coastline readability)
-  const sortedLC = [...otherFeatures, ...grassFeatures, ...waterFeatures, ...beachFeatures];
+  // Combine in draw order: Others -> Grass -> Bare -> Water -> Beach
+  // Bare terrain should sit above generic vegetation but below explicit shoreline/water overlays.
+  const sortedLC = [
+    ...otherFeatures,
+    ...grassFeatures,
+    ...bareFeatures,
+    ...waterFeatures,
+    ...beachFeatures,
+  ];
 
   if (options.alpha) ctx.globalAlpha = options.alpha;
   for (const { f } of sortedLC) {
