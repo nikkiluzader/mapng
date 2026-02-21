@@ -177,6 +177,9 @@ const texture = computed(() => {
   return textureCache[props.textureType] || null;
 });
 
+const useUnlitOsmMaterial = computed(() => props.textureType === 'osm' && !!texture.value);
+const OSM_SHADOW_OPACITY = 0.58;
+
 onUnmounted(() => {
   if (geometry.value) geometry.value.dispose();
   Object.values(textureCache).forEach(tex => {
@@ -186,22 +189,48 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <TresMesh 
-    v-if="geometry"
-    :rotation="[-Math.PI / 2, 0, 0]" 
-    :position="[0, 0, 0]"
-    cast-shadow
-    receive-shadow
-    :geometry="geometry"
-  >
-    <TresMeshStandardMaterial 
-      :key="texture ? 'tex' : 'clay'"
-      :map="texture"
-      :color="texture ? 0xffffff : 0xb0a898"
-      :roughness="texture ? 1 : 0.5"
-      :metalness="texture ? 0 : 0.5"
-      :side="2"
-      :wireframe="wireframe"
-    />
-  </TresMesh>
+  <TresGroup v-if="geometry">
+    <TresMesh
+      :rotation="[-Math.PI / 2, 0, 0]"
+      :position="[0, 0, 0]"
+      receive-shadow
+      :geometry="geometry"
+    >
+      <TresMeshBasicMaterial
+        v-if="useUnlitOsmMaterial"
+        :key="'osm-unlit'"
+        :map="texture"
+        :color="0xffffff"
+        :side="2"
+        :wireframe="wireframe"
+        :tone-mapped="false"
+      />
+      <TresMeshStandardMaterial
+        v-else
+        :key="texture ? 'tex' : 'clay'"
+        :map="texture"
+        :color="texture ? 0xffffff : 0xb0a898"
+        :roughness="texture ? 1 : 0.5"
+        :metalness="texture ? 0 : 0.5"
+        :side="2"
+        :wireframe="wireframe"
+      />
+    </TresMesh>
+
+    <TresMesh
+      v-if="useUnlitOsmMaterial && !wireframe"
+      :rotation="[-Math.PI / 2, 0, 0]"
+      :position="[0, 0.03, 0]"
+      :render-order="2"
+      receive-shadow
+      :geometry="geometry"
+    >
+      <TresShadowMaterial
+        :transparent="true"
+        :opacity="OSM_SHADOW_OPACITY"
+        :tone-mapped="false"
+        :depth-write="false"
+      />
+    </TresMesh>
+  </TresGroup>
 </template>

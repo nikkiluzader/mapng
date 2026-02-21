@@ -9,17 +9,20 @@
               :position="cameraPosition"
             />
             <CSMLight
-              :light-direction="[-1, -0.5, -0.65]"
+              :light-direction="activeSunPreset.lightDirection"
               :cascades="4"
               :shadow-map-size="4096"
               :max-far="500"
-              :light-intensity="3.5"
-              :ambient-intensity="0.02"
-              :shadow-bias="-0.0001"
+              :light-intensity="activeSunPreset.lightIntensity"
+              :ambient-intensity="activeSunPreset.ambientIntensity"
+              :light-color="activeSunPreset.lightColor"
+              :ambient-color="activeSunPreset.ambientColor"
+              :shadow-bias="0.00025"
+              :shadow-normal-bias="0.02"
               :light-margin="50"
             />
 
-            <Environment :files="currentHdrFile" :background="true" :environment-intensity="0.02" />
+            <Environment :files="currentHdrFile" :background="true" :environment-intensity="activeSunPreset.environmentIntensity" />
 
             <TerrainMesh
               :terrain-data="mergedTerrainData"
@@ -125,6 +128,18 @@
           class="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded py-2 px-3 focus:ring-1 focus:ring-[#FF6600] outline-none capitalize cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
         >
           <option v-for="p in presets" :key="p" :value="p">{{ p }}</option>
+        </select>
+      </div>
+
+      <div class="space-y-2 mb-4">
+        <label class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+          <Settings :size="12" /> Sun Positioning
+        </label>
+        <select
+          v-model="sunPosition"
+          class="w-full appearance-none bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-xs rounded py-2 px-3 focus:ring-1 focus:ring-[#FF6600] outline-none cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
+        >
+          <option v-for="s in sunPositionOptions" :key="s" :value="s">{{ s }}</option>
         </select>
       </div>
 
@@ -360,8 +375,60 @@ const hdrPresets = {
   "Kloofendal Pure Sky": "kloofendal_48d_partly_cloudy_puresky_4k.hdr",
 };
 
+const SUN_PRESETS = {
+  Morning: {
+    lightDirection: [-1, -0.2, -0.35],
+    lightIntensity: 2.0,
+    ambientIntensity: 0.08,
+    environmentIntensity: 0.03,
+    lightColor: '#ffcd94',
+    ambientColor: '#ffead1',
+  },
+  "Mid Morning": {
+    lightDirection: [-1, -0.45, -0.55],
+    lightIntensity: 2.8,
+    ambientIntensity: 0.05,
+    environmentIntensity: 0.025,
+    lightColor: '#ffe6bf',
+    ambientColor: '#fff5e6',
+  },
+  Noon: {
+    lightDirection: [0, -1, -0.08],
+    lightIntensity: 3.5,
+    ambientIntensity: 0.03,
+    environmentIntensity: 0.02,
+    lightColor: '#ffffff',
+    ambientColor: '#f5f9ff',
+  },
+  Afternoon: {
+    lightDirection: [0.9, -0.45, -0.45],
+    lightIntensity: 2.8,
+    ambientIntensity: 0.05,
+    environmentIntensity: 0.022,
+    lightColor: '#ffe3bf',
+    ambientColor: '#fff1e0',
+  },
+  Evening: {
+    lightDirection: [0.9, -0.22, -0.25],
+    lightIntensity: 1.8,
+    ambientIntensity: 0.1,
+    environmentIntensity: 0.02,
+    lightColor: '#ff8c4a',
+    ambientColor: '#ffc79c',
+  },
+  Night: {
+    lightDirection: [0.25, -0.08, -0.12],
+    lightIntensity: 0.16,
+    ambientIntensity: 0.028,
+    environmentIntensity: 0.006,
+    lightColor: '#86a9ff',
+    ambientColor: '#9cb8ff',
+  },
+};
+
 const quality = ref("high");
 const preset = ref("Kloofendal Pure Sky");
+const sunPosition = ref("Noon");
 const textureType = ref("osm");
 const showWireframe = ref(false);
 const showSurroundings = ref(false);
@@ -463,7 +530,9 @@ const mergedTerrainData = computed(() => {
 });
 
 const presets = Object.keys(hdrPresets);
+const sunPositionOptions = Object.keys(SUN_PRESETS);
 const currentHdrFile = computed(() => `/hdr/${hdrPresets[preset.value]}`);
+const activeSunPreset = computed(() => SUN_PRESETS[sunPosition.value] || SUN_PRESETS.Noon);
 
 const resetCamera = () => {
   if (controlsRef.value) {

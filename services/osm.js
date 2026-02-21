@@ -207,6 +207,14 @@ const buildQuery = (bounds) => {
     way["water"](${bbox});
     relation["water"](${bbox});
 
+    // Marine infrastructure often mapped outside natural=water
+    way["harbour"](${bbox});
+    relation["harbour"](${bbox});
+    way["seamark:type"](${bbox});
+    relation["seamark:type"](${bbox});
+    way["seamark:harbour:category"](${bbox});
+    relation["seamark:harbour:category"](${bbox});
+
     way["wetland"](${bbox});
     relation["wetland"](${bbox});
 
@@ -278,6 +286,7 @@ const isAreaLikeWay = (tags, nodes) => {
     tags.building ||
     tags.landuse ||
     tags.landcover ||
+    tags.water ||
     tags.leisure ||
     tags.golf ||
     tags.recreation ||
@@ -295,288 +304,6 @@ const isAreaLikeWay = (tags, nodes) => {
     tags.surface ||
     tags.material
   );
-};
-
-const edgeDistance = (p, bounds) => ({
-  west: Math.abs(p.lng - bounds.west),
-  east: Math.abs(p.lng - bounds.east),
-  south: Math.abs(p.lat - bounds.south),
-  north: Math.abs(p.lat - bounds.north),
-});
-
-const getBoundaryEdge = (p, bounds) => {
-  const d = edgeDistance(p, bounds);
-  let bestEdge = "west";
-  let best = d.west;
-  if (d.north < best) {
-    bestEdge = "north";
-    best = d.north;
-  }
-  if (d.east < best) {
-    bestEdge = "east";
-    best = d.east;
-  }
-  if (d.south < best) {
-    bestEdge = "south";
-  }
-  return bestEdge;
-};
-
-const isNearBoundary = (p, bounds, epsilon) => {
-  if (epsilon === undefined) {
-    // Use a relative epsilon based on tile span — handles any zoom level
-    const span = Math.max(bounds.east - bounds.west, bounds.north - bounds.south);
-    epsilon = span * 0.001; // 0.1% of tile span
-  }
-  const d = edgeDistance(p, bounds);
-  return (
-    d.west <= epsilon ||
-    d.east <= epsilon ||
-    d.south <= epsilon ||
-    d.north <= epsilon
-  );
-};
-
-const boundaryEndCornerCW = (edge, bounds) => {
-  switch (edge) {
-    case "west":
-      return { lat: bounds.north, lng: bounds.west };
-    case "north":
-      return { lat: bounds.north, lng: bounds.east };
-    case "east":
-      return { lat: bounds.south, lng: bounds.east };
-    case "south":
-      return { lat: bounds.south, lng: bounds.west };
-    default:
-      return { lat: bounds.south, lng: bounds.west };
-  }
-};
-
-const boundaryStartCornerCW = (edge, bounds) => {
-  switch (edge) {
-    case "west":
-      return { lat: bounds.south, lng: bounds.west };
-    case "north":
-      return { lat: bounds.north, lng: bounds.west };
-    case "east":
-      return { lat: bounds.north, lng: bounds.east };
-    case "south":
-      return { lat: bounds.south, lng: bounds.east };
-    default:
-      return { lat: bounds.south, lng: bounds.west };
-  }
-};
-
-const NEXT_EDGE_CW = {
-  west: "north",
-  north: "east",
-  east: "south",
-  south: "west",
-};
-
-const NEXT_EDGE_CCW = {
-  west: "south",
-  south: "east",
-  east: "north",
-  north: "west",
-};
-
-const boundaryPath = (from, to, bounds, clockwise = true) => {
-  const fromEdge = getBoundaryEdge(from, bounds);
-  const toEdge = getBoundaryEdge(to, bounds);
-  const path = [from];
-
-  if (fromEdge === toEdge) {
-    path.push(to);
-    return path;
-  }
-
-  let edge = fromEdge;
-  const nextEdge = clockwise ? NEXT_EDGE_CW : NEXT_EDGE_CCW;
-
-  for (let steps = 0; steps < 6 && edge !== toEdge; steps++) {
-    const corner = clockwise
-      ? boundaryEndCornerCW(edge, bounds)
-      : boundaryStartCornerCW(edge, bounds);
-    path.push(corner);
-    edge = nextEdge[edge];
-  }
-
-  path.push(to);
-  return path;
-};
-
-const pointInPolygon = (point, polygon) => {
-  const x = point.lng;
-  const y = point.lat;
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].lng;
-    const yi = polygon[i].lat;
-    const xj = polygon[j].lng;
-    const yj = polygon[j].lat;
-    const intersect =
-      yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
-    if (intersect) inside = !inside;
-  }
-  return inside;
-};
-
-const rightSideSamplePoint = (line, bounds) => {
-  if (!line || line.length < 2) return null;
-  const idx = Math.floor((line.length - 1) / 2);
-  const a = line[Math.max(0, idx - 1)];
-  const b = line[Math.min(line.length - 1, idx + 1)];
-  const dx = b.lng - a.lng;
-  const dy = b.lat - a.lat;
-  const len = Math.hypot(dx, dy);
-  if (len < 1e-12) return null;
-
-  const nx = dy / len;
-  const ny = -dx / len;
-  const span = Math.min(bounds.east - bounds.west, bounds.north - bounds.south);
-  const eps = Math.max(span * 0.003, 1e-7);
-  const m = line[idx];
-
-  return {
-    lat: m.lat + ny * eps,
-    lng: m.lng + nx * eps,
-  };
-};
-
-// Extend a coastline endpoint to a tile boundary.  Uses the direction of
-// travel (from `interior` toward `p`) to decide WHICH boundary the coastline
-// would naturally exit, then snaps perpendicular to that boundary.  This
-// avoids diagonal cuts across land that a full ray-cast would create.
-const extendToBoundary = (p, interior, bounds) => {
-  const dx = p.lng - interior.lng;
-  const dy = p.lat - interior.lat;
-
-  // Ray-cast to find which boundary the coastline is heading toward
-  let bestT = Infinity;
-  let hitEdge = null;
-
-  const tryEdge = (boundaryVal, isLat, edgeName) => {
-    const d = isLat ? dy : dx;
-    if (Math.abs(d) < 1e-15) return;
-    const t = (boundaryVal - (isLat ? p.lat : p.lng)) / d;
-    if (t <= 0) return;
-    const hitLat = p.lat + dy * t;
-    const hitLng = p.lng + dx * t;
-    const eps = 1e-9;
-    if (
-      hitLat >= bounds.south - eps && hitLat <= bounds.north + eps &&
-      hitLng >= bounds.west - eps && hitLng <= bounds.east + eps &&
-      t < bestT
-    ) {
-      bestT = t;
-      hitEdge = edgeName;
-    }
-  };
-
-  tryEdge(bounds.north, true, "north");
-  tryEdge(bounds.south, true, "south");
-  tryEdge(bounds.east, false, "east");
-  tryEdge(bounds.west, false, "west");
-
-  // Snap perpendicular to the chosen boundary (no diagonal)
-  switch (hitEdge) {
-    case "north": return { lat: bounds.north, lng: p.lng };
-    case "south": return { lat: bounds.south, lng: p.lng };
-    case "east":  return { lat: p.lat, lng: bounds.east };
-    case "west":  return { lat: p.lat, lng: bounds.west };
-    default: {
-      // Fallback: nearest boundary
-      const d = edgeDistance(p, bounds);
-      const minD = Math.min(d.west, d.east, d.south, d.north);
-      if (minD === d.south) return { lat: bounds.south, lng: p.lng };
-      if (minD === d.north) return { lat: bounds.north, lng: p.lng };
-      if (minD === d.west)  return { lat: p.lat, lng: bounds.west };
-      return { lat: p.lat, lng: bounds.east };
-    }
-  }
-};
-
-const buildWaterFromCoastlines = (coastSegments, bounds) => {
-  const waterPolygons = [];
-  const boundsRing = [
-    { lat: bounds.south, lng: bounds.west },
-    { lat: bounds.north, lng: bounds.west },
-    { lat: bounds.north, lng: bounds.east },
-    { lat: bounds.south, lng: bounds.east },
-    { lat: bounds.south, lng: bounds.west },
-  ];
-
-  coastSegments.forEach((segment) => {
-    const geom = segment.geometry;
-    if (!geom || geom.length < 2) return;
-
-    if (isClosedRing(geom)) {
-      const seaTestPoint = rightSideSamplePoint(geom, bounds);
-      const seaInsideRing = seaTestPoint && pointInPolygon(seaTestPoint, geom);
-
-      if (seaInsideRing) {
-        waterPolygons.push({
-          id: `coast_water_${segment.id}`,
-          type: "water",
-          geometry: geom,
-          tags: { natural: "water", source: "coastline" },
-        });
-      } else {
-        waterPolygons.push({
-          id: `coast_water_${segment.id}`,
-          type: "water",
-          geometry: boundsRing,
-          holes: [geom],
-          tags: { natural: "water", source: "coastline" },
-        });
-      }
-      return;
-    }
-
-    // For endpoints not on the boundary, compute a boundary anchor for the
-    // boundary walk but do NOT alter the coastline geometry itself.  This
-    // avoids creating artificial coastline segments that cut through land.
-    const start = geom[0];
-    const end = geom[geom.length - 1];
-    const startNear = isNearBoundary(start, bounds);
-    const endNear = isNearBoundary(end, bounds);
-
-    if (!startNear && !endNear) {
-      // Both endpoints are interior — can't form a meaningful water polygon
-      return;
-    }
-
-    // Boundary anchors: where the walk starts/ends on the tile edge
-    const startAnchor = startNear ? start : extendToBoundary(start, geom[1], bounds);
-    const endAnchor = endNear ? end : extendToBoundary(end, geom[geom.length - 2], bounds);
-
-    // Build the polygon: coastline + boundary walk from endAnchor → startAnchor
-    const cwPath = boundaryPath(endAnchor, startAnchor, bounds, true);
-    const ccwPath = boundaryPath(endAnchor, startAnchor, bounds, false);
-
-    // The polygon is: original coastline → snap to endAnchor → boundary walk → snap from startAnchor
-    const bridgeToEnd = endNear ? [] : [endAnchor];
-    const bridgeFromStart = startNear ? [] : [startAnchor];
-
-    const candidateCW = [...bridgeFromStart, ...geom, ...bridgeToEnd, ...cwPath.slice(1)];
-    const candidateCCW = [...bridgeFromStart, ...geom, ...bridgeToEnd, ...ccwPath.slice(1)];
-
-    const seaTestPoint = rightSideSamplePoint(geom, bounds);
-    const chooseCW = seaTestPoint && pointInPolygon(seaTestPoint, candidateCW);
-    const polygon = chooseCW ? candidateCW : candidateCCW;
-
-    if (polygon.length > 2) {
-      waterPolygons.push({
-        id: `coast_water_${segment.id}`,
-        type: "water",
-        geometry: polygon,
-        tags: { natural: "water", source: "coastline" },
-      });
-    }
-  });
-
-  return waterPolygons;
 };
 
 // Helper to join way segments into closed rings — O(n) via endpoint index
@@ -798,7 +525,14 @@ const parseOverpassResponse = (data, bounds) => {
       tags.natural === "water" ||
       tags.waterway ||
       tags.landuse === "reservoir" ||
-      tags.landuse === "basin"
+      tags.landuse === "basin" ||
+      tags.leisure === "marina" ||
+      tags.water === "harbour" ||
+      tags.water === "dock" ||
+      tags.harbour === "yes" ||
+      tags["seamark:type"] === "harbour" ||
+      tags["seamark:type"] === "harbour_basin" ||
+      tags["seamark:harbour:category"] === "marina"
     )
       return "water";
     if (tags.barrier) return "barrier";
@@ -1052,9 +786,7 @@ const parseOverpassResponse = (data, bounds) => {
     }
   }
 
-  const clippedCoastlines = clippedFeatures.filter((f) => f.type === "coastline");
-  const coastlineWaterAreas = buildWaterFromCoastlines(clippedCoastlines, bounds);
-  const finalClippedFeatures = [...clippedFeatures, ...coastlineWaterAreas];
+  const finalClippedFeatures = clippedFeatures;
 
   // 6. POST-PROCESS: Procedural Vegetation
   const isPointInPolygon = (point, vs) => {

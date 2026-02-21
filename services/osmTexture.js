@@ -1,57 +1,58 @@
 import { createWGS84ToLocal } from "./geoUtils.js";
 
-// Colors mixed from standard OSM Carto and OpenStreetBrowser
-// Carto: https://github.com/gravitystorm/openstreetmap-carto/blob/master/style/landcover.mss
-// OSB: https://wiki.openstreetmap.org/wiki/OpenStreetBrowser/Landuse-_and_Building_Colors
+// Colors aligned to OSM Carto style definitions
+// Source: https://github.com/gravitystorm/openstreetmap-carto (landcover.mss / water.mss)
 const COLORS = {
-  // Vegetation (Standard Carto is good for these)
-  forest: "#4a7a52", // Deep Forest Green
-  scrub: "#7c8c60", // Muted Olive
-  heath: "#9aa376", // Darker Heath
-  grass: "#4d7c38", // Deep Grass Green
-  orchard: "#7bb56e", // Rich Orchard
-  farmland: "#c5c9a3", // Muted Farmland
+  // Vegetation / greens (OSM Carto)
+  forest: "#add19e",
+  scrub: "#c8d7ab",
+  heath: "#d6d99f",
+  grass: "#cdebb0",
+  orchard: "#aedfa3",
+  farmland: "#eef0d5",
 
-  // Water (Standard Carto)
-  water: "#4a7c9b", // Deep River Blue
-  wetland: "#6b7d4c", // Dark Moss
-  swamp: "#1e2b23", // Very Dark Swamp
-  glacier: "#cce0e0", // Slightly darker ice
-  mud: "#d1c4b8", // Darker Mud
+  // Water / wetness (OSM Carto)
+  water: "#aad3df",
+  wetland: "#cdebb0",
+  swamp: "#add19e",
+  glacier: "#ddecec",
+  mud: "#e6dcd1",
 
-  // Bare (Standard Carto)
-  bare: "#d6cdc4", // bare_rock, scree, blockfield, shingle
-  sand: "#e0d3b0", // sand, beach, shoal
-  dirt: "#bfae96", // earth, dirt, brownfield, construction
-  quarry: "#a8a8a8", // quarry, mining
+  // Bare / earth (OSM Carto)
+  bare: "#eee5dc",
+  sand: "#f5e9c6",
+  dirt: "#c7c7b4",
+  quarry: "#c5c3c3",
 
-  // Developed / Landuse (Using OpenStreetBrowser for distinct zoning)
-  residential: "#ccb18b", // OSB: brownish/orange
-  commercial: "#a8a8b8", // cool grey-violet
-  industrial: "#8f8f8f", // darker neutral grey
-  retail: "#b6a68c", // light tan
-  education: "#e39ccf", // OSB: pink
-  military: "#9d9d7c", // OSB: olive green
-  cemetery: "#aacbaf", // OSB: light green
-  sport: "#8bccb3", // OSB: teal
-  recreation: "#9fcd88", // recreation-focused greens
-  park: "#c8df9f", // OSB: leisure=park
-  parking: "#a9a9a9", // light neutral grey
-  aeroway: "#e9d1ff", // Light purple for airport grounds
-  apron: "#dadae0", // Grey for aprons
-  runway: "#bbbbcc", // Darker grey for runways
-  power: "#bbbbbb", // Industrial grey
-  tourism: "#734a08", // Brownish (attractions)
-  hospital: "#ffeccf", // Light beige/red tint
+  // Developed / landuse (OSM Carto)
+  residential: "#e0dfdf",
+  commercial: "#f2dad9",
+  industrial: "#ebdbe8",
+  retail: "#ffd6d1",
+  education: "#ffffe5",
+  military: "#f3e3dd",
+  cemetery: "#aacbaf",
+  sport: "#88e0be",
+  recreation: "#def6c0",
+  park: "#c8facc",
+  parking: "#eeeeee",
+  aeroway: "#e9e7e2",
+  apron: "#dadae0",
+  runway: "#b9b9b9",
+  power: "#e0d0dd",
+  tourism: "#660033",
+  hospital: "#ffffe5",
 
   // Water / Aquatic features
-  swimming_pool: "#6db8d8", // Pool blue (lighter/brighter than ocean)
-  fountain: "#7ab8cc", // Fountain basin
+  swimming_pool: "#aad3df",
+  marina: "#d3cdc4", // Warm beige-gray marina/harbor fill
+  harbourLand: "#ebdbe8",
+  fountain: "#aad3df",
 
   // Vegetated / Garden
-  allotments: "#a8cc84", // Garden allotment plots
-  flowerbed: "#d4a0c0", // Flower beds (pinkish)
-  hedge: "#2a6b3a", // Dense hedge (dark green)
+  allotments: "#c9e1bf",
+  flowerbed: "#cdebb0",
+  hedge: "#add19e",
 
   // Hard surfaces (paving)
   cobblestone: "#8c8c8c", // Cobblestone / sett (dark grey)
@@ -65,9 +66,9 @@ const COLORS = {
   track: "#bfae96", // Light brown dirt color
   sidewalk: "#e5e5e5", // Light grey concrete color
   barrier: "#C4A484",
-  coastline: "#dfcf9d", // sandy shoreline highlight
-  ocean: "#4a7c9b", // explicit ocean fill
-  defaultLanduse: "#d6d8d2", // light grey fallback for areas with sparse/missing OSM landcover
+  coastline: "#9fc5d6",
+  ocean: "#aad3df",
+  defaultLanduse: "#dddddd",
 
   // Markings
   markingWhite: "rgba(255, 255, 255, 0.7)",
@@ -110,6 +111,17 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
   if (!tags) return baseColor;
   if (isBoundaryOnlyArea(tags)) return baseColor;
 
+  const isMarinaOrHarbor =
+    tags.leisure === "marina" ||
+    tags.water === "harbour" ||
+    tags.water === "dock" ||
+    tags.harbour === "yes" ||
+    tags["seamark:type"] === "harbour" ||
+    tags["seamark:type"] === "harbour_basin" ||
+    tags["seamark:harbour:category"] === "marina";
+  if (tags.landuse === "harbour") return COLORS.harbourLand;
+  if (isMarinaOrHarbor) return COLORS.marina;
+
   // --- OSM2World inspired surface mapping ---
   // Priority 1: Water
   if (
@@ -123,14 +135,12 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
   if (tags.natural === "coastline") return COLORS.coastline;
   if (tags.natural === "wetland" || tags.wetland) {
     const type = tags.wetland;
-    if (
-      type === "swamp" ||
-      type === "marsh" ||
-      type === "bog" ||
-      type === "fen" ||
-      type === "mangrove"
-    )
-      return COLORS.swamp;
+    if (type === "swamp") return COLORS.forest;
+    if (type === "mangrove") return COLORS.scrub;
+    if (type === "bog" || type === "fen" || type === "string_bog")
+      return COLORS.heath;
+    if (type === "marsh" || type === "reedbed" || type === "wet_meadow")
+      return COLORS.grass;
     return COLORS.wetland;
   }
   if (tags.natural === "glacier") return COLORS.glacier;
@@ -156,7 +166,16 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
   // Aquatic leisure / amenity
   if (tags.leisure === "swimming_pool") return COLORS.swimming_pool;
   if (tags.leisure === "water_park") return COLORS.swimming_pool;
-  if (tags.leisure === "marina") return COLORS.water;
+  if (
+    tags.leisure === "marina" ||
+    tags.water === "harbour" ||
+    tags.water === "dock" ||
+    tags.harbour === "yes" ||
+    tags["seamark:type"] === "harbour" ||
+    tags["seamark:type"] === "harbour_basin" ||
+    tags["seamark:harbour:category"] === "marina"
+  )
+    return COLORS.marina;
   if (tags.amenity === "fountain") return COLORS.fountain;
 
   // Cemetery variant tags
@@ -229,7 +248,7 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
     ].includes(surface)
   )
     return COLORS.swimming_pool;
-  if (["marina"].includes(surface)) return COLORS.water;
+  if (["marina"].includes(surface)) return COLORS.marina;
 
   if (["sand", "beach", "shoal", "dune", "coastline", "beach_resort", "bathing_place"].includes(surface))
     return COLORS.sand;
@@ -262,7 +281,8 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
   if (["fine_gravel", "compacted"].includes(surface)) return COLORS.quarry;
 
   if (["residential"].includes(surface)) return COLORS.residential;
-  if (["commercial", "retail"].includes(surface)) return COLORS.commercial;
+  if (["commercial"].includes(surface)) return COLORS.commercial;
+  if (["retail"].includes(surface)) return COLORS.retail;
   if (["industrial", "quarry", "railway", "garages", "depot"].includes(surface))
     return COLORS.industrial;
   if (["military"].includes(surface)) return COLORS.military;
@@ -1016,7 +1036,14 @@ const renderFeaturesToCanvas = (
       tags.waterway ||
       tags.landuse === "reservoir" ||
       tags.landuse === "basin" ||
-      tags.water
+      tags.water ||
+      tags.leisure === "marina" ||
+      tags.water === "harbour" ||
+      tags.water === "dock" ||
+      tags.harbour === "yes" ||
+      tags["seamark:type"] === "harbour" ||
+      tags["seamark:type"] === "harbour_basin" ||
+      tags["seamark:harbour:category"] === "marina"
     )
       return true;
     if (tags.natural === "wetland" || tags.wetland) return true;

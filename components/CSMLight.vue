@@ -11,7 +11,10 @@ const props = defineProps({
   maxFar: { type: Number, default: 500 },
   lightIntensity: { type: Number, default: 3.5 },
   ambientIntensity: { type: Number, default: 0.1 },
-  shadowBias: { type: Number, default: -0.0001 },
+  lightColor: { type: String, default: '#ffffff' },
+  ambientColor: { type: String, default: '#ffffff' },
+  shadowBias: { type: Number, default: 0.00025 },
+  shadowNormalBias: { type: Number, default: 0.02 },
   lightMargin: { type: Number, default: 50 },
 });
 
@@ -34,7 +37,7 @@ const setupCSM = () => {
   // PCFShadowMap follows object silhouettes properly (BasicShadowMap produces blocky pixel shadows)
   const rend = renderer.value;
   if (rend) {
-    rend.shadowMap.type = THREE.PCFShadowMap;
+    rend.shadowMap.type = THREE.PCFSoftShadowMap;
   }
 
   const instance = new CSM({
@@ -54,6 +57,17 @@ const setupCSM = () => {
 
   // Enable fade for smooth transitions between cascades
   instance.fade = true;
+
+  if (Array.isArray(instance.lights)) {
+    for (const light of instance.lights) {
+      if (!light) continue;
+      light.color.set(props.lightColor);
+      if (!light.shadow) continue;
+      light.shadow.bias = props.shadowBias;
+      light.shadow.normalBias = props.shadowNormalBias;
+      light.shadow.radius = 1;
+    }
+  }
 
   csm.value = instance;
 };
@@ -99,6 +113,29 @@ watch(
   }
 );
 
+watch(
+  () => [props.shadowBias, props.shadowNormalBias],
+  ([bias, normalBias]) => {
+    if (!csm.value || !Array.isArray(csm.value.lights)) return;
+    for (const light of csm.value.lights) {
+      if (!light?.shadow) continue;
+      light.shadow.bias = bias;
+      light.shadow.normalBias = normalBias;
+    }
+  }
+);
+
+watch(
+  () => props.lightColor,
+  (color) => {
+    if (!csm.value || !Array.isArray(csm.value.lights)) return;
+    for (const light of csm.value.lights) {
+      if (!light) continue;
+      light.color.set(color);
+    }
+  }
+);
+
 // Hook into TresJS render loop
 const { onBeforeRender } = useLoop();
 
@@ -119,5 +156,5 @@ onUnmounted(() => {
 
 <template>
   <!-- CSM manages its own DirectionalLights internally -->
-  <TresAmbientLight :intensity="ambientIntensity" />
+  <TresAmbientLight :intensity="ambientIntensity" :color="ambientColor" />
 </template>
