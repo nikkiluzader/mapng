@@ -27,21 +27,35 @@ const COLORS = {
 
   // Developed / Landuse (Using OpenStreetBrowser for distinct zoning)
   residential: "#ccb18b", // OSB: brownish/orange
-  commercial: "#999999", // Cement grey
-  industrial: "#999999", // Cement grey
-  retail: "#999999", // Cement grey
+  commercial: "#a8a8b8", // cool grey-violet
+  industrial: "#8f8f8f", // darker neutral grey
+  retail: "#b6a68c", // light tan
   education: "#e39ccf", // OSB: pink
   military: "#9d9d7c", // OSB: olive green
   cemetery: "#aacbaf", // OSB: light green
   sport: "#8bccb3", // OSB: teal
+  recreation: "#9fcd88", // recreation-focused greens
   park: "#c8df9f", // OSB: leisure=park
-  parking: "#999999", // Cement grey
+  parking: "#a9a9a9", // light neutral grey
   aeroway: "#e9d1ff", // Light purple for airport grounds
   apron: "#dadae0", // Grey for aprons
   runway: "#bbbbcc", // Darker grey for runways
   power: "#bbbbbb", // Industrial grey
   tourism: "#734a08", // Brownish (attractions)
   hospital: "#ffeccf", // Light beige/red tint
+
+  // Water / Aquatic features
+  swimming_pool: "#6db8d8", // Pool blue (lighter/brighter than ocean)
+  fountain: "#7ab8cc", // Fountain basin
+
+  // Vegetated / Garden
+  allotments: "#a8cc84", // Garden allotment plots
+  flowerbed: "#d4a0c0", // Flower beds (pinkish)
+  hedge: "#2a6b3a", // Dense hedge (dark green)
+
+  // Hard surfaces (paving)
+  cobblestone: "#8c8c8c", // Cobblestone / sett (dark grey)
+  tiles: "#b8b8b8", // Paving stones / tiles (lighter grey)
 
   // Defaults
   building: "#d9d0c9",
@@ -51,7 +65,9 @@ const COLORS = {
   track: "#bfae96", // Light brown dirt color
   sidewalk: "#e5e5e5", // Light grey concrete color
   barrier: "#C4A484",
-  defaultLanduse: "#999999", // Cement grey color
+  coastline: "#dfcf9d", // sandy shoreline highlight
+  ocean: "#4a7c9b", // explicit ocean fill
+  defaultLanduse: "#a5ab9b", // muted default so missing classes are less asphalt-like
 
   // Markings
   markingWhite: "rgba(255, 255, 255, 0.7)",
@@ -68,9 +84,11 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
     tags.natural === "water" ||
     tags.waterway ||
     tags.landuse === "reservoir" ||
-    tags.landuse === "basin"
+    tags.landuse === "basin" ||
+    tags.water
   )
-    return COLORS.water;
+    return tags.source === "coastline" ? COLORS.ocean : COLORS.water;
+  if (tags.natural === "coastline") return COLORS.coastline;
   if (tags.natural === "wetland" || tags.wetland) {
     const type = tags.wetland;
     if (
@@ -103,6 +121,19 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
   if (tags.amenity === "hospital" || tags.amenity === "clinic")
     return COLORS.hospital;
 
+  // Aquatic leisure / amenity
+  if (tags.leisure === "swimming_pool") return COLORS.swimming_pool;
+  if (tags.leisure === "water_park") return COLORS.swimming_pool;
+  if (tags.leisure === "marina") return COLORS.water;
+  if (tags.amenity === "fountain") return COLORS.fountain;
+
+  // Cemetery variant tags
+  if (tags.amenity === "grave_yard") return COLORS.cemetery;
+
+  // Barriers that cover area
+  if (tags.barrier === "hedge") return COLORS.hedge;
+  if (tags.natural === "shrubbery") return COLORS.hedge;
+
   if (tags.power === "plant" || tags.power === "substation")
     return COLORS.power;
   if (
@@ -116,13 +147,17 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
   // Priority 3: Surface / Landuse / Leisure generic mapping
   const surface =
     tags.surface ||
+    tags.material ||
     tags.landcover ||
     tags.landuse ||
     tags.natural ||
     tags.leisure ||
+    tags.golf ||
+    tags.recreation ||
     tags.tourism;
 
-  if (["forest", "wood"].includes(surface)) return COLORS.forest;
+  if (["forest", "wood", "trees", "tree_row"].includes(surface))
+    return COLORS.forest;
   if (
     [
       "grass",
@@ -134,25 +169,66 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
       "garden",
       "recreation_ground",
       "common",
+      "nature_reserve",
+      "dog_park",
+      "greenfield",
+      "miniature_golf", // leisure=miniature_golf → grassy
+      "fitness_centre",
+      "fitness_station",
     ].includes(surface)
   )
     return COLORS.grass;
-  if (["scrub", "heath", "tundra"].includes(surface)) return COLORS.scrub;
+  if (["scrub", "heath", "tundra", "shrubbery", "bushes"].includes(surface))
+    return COLORS.scrub;
   if (["orchard", "vineyard", "plant_nursery"].includes(surface))
     return COLORS.orchard;
   if (["farmland", "farmyard", "greenhouse_horticulture"].includes(surface))
     return COLORS.farmland;
+  if (["allotments"].includes(surface)) return COLORS.allotments;
+  if (["flowerbed"].includes(surface)) return COLORS.flowerbed;
 
-  if (["sand", "beach"].includes(surface)) return COLORS.sand;
-  if (["bare_rock", "rock", "scree", "shingle"].includes(surface))
+  // Water / aquatic areas
+  if (
+    [
+      "swimming_pool",
+      "water_park",
+      "salt_pond",
+      "aquaculture",
+      "harbour",
+    ].includes(surface)
+  )
+    return COLORS.swimming_pool;
+  if (["marina"].includes(surface)) return COLORS.water;
+
+  if (["sand", "beach", "shoal", "dune", "coastline", "beach_resort", "bathing_place"].includes(surface))
+    return COLORS.sand;
+  if (["bare_rock", "rock", "scree", "shingle", "shells", "marble"].includes(surface))
     return COLORS.bare;
   if (["glacier", "snow"].includes(surface)) return COLORS.glacier;
   if (
-    ["mud", "ground", "dirt", "earth", "construction", "brownfield"].includes(
-      surface,
-    )
+    [
+      "mud", "ground", "dirt", "earth", "construction", "brownfield",
+      "landfill", // landuse=landfill
+      "wood",     // surface=wood (wooden decks etc)
+      "woodchips", // surface=woodchips
+    ].includes(surface)
   )
     return COLORS.dirt;
+
+  // Hard paved surfaces
+  if (
+    [
+      "cobblestone", "sett", "unhewn_cobblestone",
+    ].includes(surface)
+  )
+    return COLORS.cobblestone;
+  if (
+    [
+      "paving_stones", "concrete:plates", "tiles",
+    ].includes(surface)
+  )
+    return COLORS.tiles;
+  if (["fine_gravel", "compacted"].includes(surface)) return COLORS.quarry;
 
   if (["residential"].includes(surface)) return COLORS.residential;
   if (["commercial", "retail"].includes(surface)) return COLORS.commercial;
@@ -166,11 +242,22 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
       "track",
       "stadium",
       "golf_course",
+      "fairway",
+      "green",
+      "tee",
+      "bunker",
       "playground",
       "sports_centre",
+      "ice_rink",
+      "horse_riding",
+      "bowling_alley",
+      "disc_golf_course",
+      "shooting_range",
     ].includes(surface)
   )
     return COLORS.sport;
+  if (["recreation", "recreation_ground"].includes(surface))
+    return COLORS.recreation;
   if (["attraction", "zoo", "camp_site", "theme_park"].includes(surface))
     return COLORS.tourism;
 
@@ -862,10 +949,13 @@ const renderFeaturesToCanvas = (
     if (!tags) return false;
     const surface =
       tags.surface ||
+      tags.material ||
       tags.landcover ||
       tags.landuse ||
       tags.natural ||
       tags.leisure ||
+      tags.golf ||
+      tags.recreation ||
       tags.tourism;
     return [
       "grass",
@@ -877,6 +967,12 @@ const renderFeaturesToCanvas = (
       "garden",
       "recreation_ground",
       "common",
+      "nature_reserve",
+      "greenfield",
+      "dog_park",
+      "fairway",
+      "green",
+      "tee",
     ].includes(surface);
   };
 
@@ -886,7 +982,8 @@ const renderFeaturesToCanvas = (
       tags.natural === "water" ||
       tags.waterway ||
       tags.landuse === "reservoir" ||
-      tags.landuse === "basin"
+      tags.landuse === "basin" ||
+      tags.water
     )
       return true;
     if (tags.natural === "wetland" || tags.wetland) return true;
@@ -895,13 +992,31 @@ const renderFeaturesToCanvas = (
   };
 
   const waterFeatures = [];
+  const beachFeatures = [];
   const grassFeatures = [];
   const otherFeatures = [];
+
+  const isBeach = (tags) => {
+    if (!tags) return false;
+    const surface =
+      tags.surface ||
+      tags.material ||
+      tags.landcover ||
+      tags.landuse ||
+      tags.natural ||
+      tags.leisure ||
+      tags.golf ||
+      tags.recreation ||
+      tags.tourism;
+    return ["beach", "sand", "shoal", "dune", "coastline"].includes(surface);
+  };
 
   landcover.forEach((f) => {
     const item = { f, area: getFeatureArea(f) };
     if (isWater(f.tags)) {
       waterFeatures.push(item);
+    } else if (isBeach(f.tags)) {
+      beachFeatures.push(item);
     } else if (isGrass(f.tags)) {
       grassFeatures.push(item);
     } else {
@@ -914,9 +1029,10 @@ const renderFeaturesToCanvas = (
   otherFeatures.sort(byArea);
   grassFeatures.sort(byArea);
   waterFeatures.sort(byArea);
+  beachFeatures.sort(byArea);
 
-  // Combine in draw order: Others -> Grass -> Water
-  const sortedLC = [...otherFeatures, ...grassFeatures, ...waterFeatures];
+  // Combine in draw order: Others -> Grass -> Water -> Beach (beach on top for coastline readability)
+  const sortedLC = [...otherFeatures, ...grassFeatures, ...waterFeatures, ...beachFeatures];
 
   if (options.alpha) ctx.globalAlpha = options.alpha;
   for (const { f } of sortedLC) {
@@ -975,6 +1091,22 @@ const renderFeaturesToCanvas = (
     }
   }
   ctx.globalAlpha = 1.0;
+
+  // 1b. Draw coastlines as sandy shoreline strokes
+  const coastlines = features.filter((f) => f.type === "coastline");
+  if (coastlines.length > 0) {
+    ctx.strokeStyle = COLORS.coastline;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.lineWidth = 2.0 * SCALE_FACTOR;
+    coastlines.forEach((f) => {
+      let pts = f.geometry.map((p) => toPixel(p.lat, p.lng));
+      pts = subdivideAndSmooth(pts, 1);
+      ctx.beginPath();
+      drawPathData(ctx, pts);
+      ctx.stroke();
+    });
+  }
 
   // 2. Draw Roads (with priority sorting)
   const roads = features.filter((f) => f.type === "road");
