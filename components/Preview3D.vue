@@ -428,7 +428,7 @@ const SUN_PRESETS = {
 
 const quality = ref("high");
 const preset = ref("Kloofendal Pure Sky");
-const sunPosition = ref("Noon");
+const sunPosition = ref("Mid Morning");
 const textureType = ref("osm");
 const showWireframe = ref(false);
 const showSurroundings = ref(false);
