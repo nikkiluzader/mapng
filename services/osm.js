@@ -242,6 +242,50 @@ const convertGeom = (geom) => {
   return geom.map((p) => ({ lat: p.lat, lng: p.lon }));
 };
 
+const isClosedRing = (nodes, epsilon = 1e-9) => {
+  if (!nodes || nodes.length < 4) return false;
+  const first = nodes[0];
+  const last = nodes[nodes.length - 1];
+  return (
+    Math.abs(first.lat - last.lat) < epsilon &&
+    Math.abs(first.lng - last.lng) < epsilon
+  );
+};
+
+const isAreaLikeWay = (tags, nodes) => {
+  if (!tags || !nodes || nodes.length < 3) return false;
+  if (tags.area === "yes") return true;
+  if (tags.area === "no") return false;
+
+  const closed = isClosedRing(nodes);
+  if (!closed) return false;
+
+  if (tags.highway || tags.railway || tags.barrier) return false;
+
+  if (tags.waterway) {
+    return ["riverbank", "dock", "boatyard", "dam"].includes(tags.waterway);
+  }
+
+  return !!(
+    tags.building ||
+    tags.landuse ||
+    tags.landcover ||
+    tags.leisure ||
+    tags.natural ||
+    tags.amenity ||
+    tags.aeroway ||
+    tags.tourism ||
+    tags.man_made ||
+    tags.public_transport ||
+    tags.power ||
+    tags.military ||
+    tags.place ||
+    tags.historic ||
+    tags.wetland ||
+    tags.surface
+  );
+};
+
 // Helper to join way segments into closed rings — O(n) via endpoint index
 const joinWays = (wayNodesList) => {
   if (wayNodesList.length === 0) return [];
@@ -570,6 +614,14 @@ const parseOverpassResponse = (data, bounds) => {
     } else if (!consumedWayIds.has(id)) {
       const type = getFeatureType(tags);
       if (type) {
+        const areaLike = isAreaLikeWay(tags, w.nodes);
+        const linearWaterway =
+          type === "water" && !!tags.waterway && !areaLike;
+
+        if (!areaLike && !linearWaterway && type !== "road" && type !== "barrier") {
+          continue;
+        }
+
         rawFeatures.push({
           id: id.toString(),
           type: type,
@@ -612,7 +664,13 @@ const parseOverpassResponse = (data, bounds) => {
       continue;
     }
 
-    if (f.type === "road" || f.type === "barrier") {
+    const isLinearWaterway =
+      f.type === "water" &&
+      !!f.tags?.waterway &&
+      f.tags?.area !== "yes" &&
+      !isClosedRing(f.geometry);
+
+    if (f.type === "road" || f.type === "barrier" || isLinearWaterway) {
       const clippedSegments = clipLineString(f.geometry, bounds);
       clippedSegments.forEach((segment, index) => {
         if (segment.length > 1) {

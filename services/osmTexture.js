@@ -828,8 +828,7 @@ const renderFeaturesToCanvas = (
 
   const drawPolygon = (feature) => {
     ctx.beginPath();
-    let pts = feature.geometry.map((p) => toPixel(p.lat, p.lng));
-    pts = subdivideAndSmooth(pts, 3);
+    const pts = feature.geometry.map((p) => toPixel(p.lat, p.lng));
     if (pts.length > 0) {
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 1; i < pts.length; i++) {
@@ -840,8 +839,7 @@ const renderFeaturesToCanvas = (
 
     if (feature.holes) {
       for (const hole of feature.holes) {
-        let holePts = hole.map((p) => toPixel(p.lat, p.lng));
-        holePts = subdivideAndSmooth(holePts, 3);
+        const holePts = hole.map((p) => toPixel(p.lat, p.lng));
         if (holePts.length > 0) {
           ctx.moveTo(holePts[0].x, holePts[0].y);
           for (let i = 1; i < holePts.length; i++) {
