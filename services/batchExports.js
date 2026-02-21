@@ -6,6 +6,8 @@
 import { encode } from 'fast-png';
 import { createWGS84ToLocal } from './geoUtils.js';
 import { exportGeoTiff } from './exportGeoTiff.js';
+import { segmentSatelliteTexture } from './segmentation.js';
+import { generateSegmentedHybridTexture } from './osmTexture.js';
 
 /**
  * Generate a 16-bit PNG heightmap as a Blob.
@@ -122,7 +124,6 @@ export function generateRoadMaskBlob(terrainData, center) {
  */
 export async function generateSegmentedSatelliteBlob(terrainData) {
   if (!terrainData.satelliteTextureUrl) return null;
-  const { segmentSatelliteTexture } = await import('./segmentation.js');
   const result = await segmentSatelliteTexture(terrainData.satelliteTextureUrl);
   // Store on terrainData so the hybrid generator can use it
   terrainData.segmentedTextureUrl = result.url;
@@ -136,7 +137,6 @@ export async function generateSegmentedSatelliteBlob(terrainData) {
  */
 export async function generateSegmentedHybridBlob(terrainData) {
   if (!terrainData.segmentedTextureUrl || !terrainData.osmFeatures?.length) return null;
-  const { generateSegmentedHybridTexture } = await import('./osmTexture.js');
   const result = await generateSegmentedHybridTexture(terrainData);
   const response = await fetch(result.url);
   return response.blob();
