@@ -496,8 +496,6 @@ const parseOverpassResponse = (data, bounds) => {
           const inheritedProps = [
             "highway",
             "name",
-            "lanes",
-            "oneway",
             "surface",
             "layer",
             "bridge",
@@ -515,6 +513,8 @@ const parseOverpassResponse = (data, bounds) => {
 
   // Helper to determine feature type
   const getFeatureType = (tags) => {
+    if (tags.man_made === "bridge" && !tags.highway) return "bridge_infra";
+
     if (
       !!tags.building ||
       ["castle", "fort", "monastery", "tower", "ruins"].includes(tags.historic)
@@ -610,9 +610,26 @@ const parseOverpassResponse = (data, bounds) => {
     const w = ways[id];
     const tags = w.tags;
 
-    if (tags.highway || tags.man_made === "bridge") {
-      // Roads / Bridges
-      const sig = `${tags.highway}|${tags.name || ""}|${tags.lanes || ""}|${tags.oneway || ""}|${tags.layer || 0}`;
+    if (tags.highway) {
+      // Drivable/linear roads only (bridge polygons are handled separately)
+      const sig = [
+        tags.highway || "",
+        tags.name || "",
+        tags.oneway || "",
+        tags.lanes || "",
+        tags["lanes:forward"] || "",
+        tags["lanes:backward"] || "",
+        tags.width || "",
+        tags.layer || "0",
+        tags.bridge || "",
+        tags.tunnel || "",
+        tags.covered || "",
+        tags.embankment || "",
+        tags.cutting || "",
+        tags.barrier || "",
+        tags.retaining_wall || "",
+        tags.man_made || "",
+      ].join("|");
       if (!roadsToMerge.has(sig)) roadsToMerge.set(sig, []);
       roadsToMerge.get(sig).push(w);
     } else if (tags.natural === "tree_row") {

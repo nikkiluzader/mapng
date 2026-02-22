@@ -309,26 +309,6 @@
           </div>
         </div>
 
-          <!-- OSM Background Color -->
-          <div v-if="terrainData.osmFeatures && terrainData.osmFeatures.length > 0" class="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-700">
-            <label class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 font-medium mb-1">
-              <Settings :size="12" /> OSM Background Color (for missing data)
-            </label>
-            <div class="flex flex-wrap gap-1.5 p-1.5 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-              <button 
-                v-for="color in baseColorOptions" 
-                :key="color.value"
-                @click="baseColor = color.value"
-                :title="color.name"
-                :class="[
-                  'w-6 h-6 rounded-full border-2 transition-all shadow-sm',
-                  baseColor === color.value ? 'border-[#FF6600] scale-110 shadow-md' : 'border-transparent hover:scale-105'
-                ]"
-                :style="{ backgroundColor: color.value }"
-              ></button>
-            </div>
-          </div>
-
         <div class="pt-4 border-t border-gray-100 dark:border-gray-700">
           <button
             @click="resetCamera"
@@ -345,7 +325,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, reactive, shallowRef, toRaw } from "vue";
+import { ref, computed, reactive } from "vue";
 import * as THREE from "three";
 import { TresCanvas } from "@tresjs/core";
 import { OrbitControls, Environment } from "@tresjs/cientos";
@@ -361,13 +341,8 @@ import TerrainMesh from "./TerrainMesh.vue";
 import OSMFeatures3D from "./OSMFeatures3D.vue";
 import CSMLight from "./CSMLight.vue";
 import SurroundingTerrain3D from "./SurroundingTerrain3D.vue";
-import {
-  generateOSMTexture,
-  generateHybridTexture,
-} from "../services/osmTexture";
 
 const props = defineProps(["terrainData"]);
-const emit = defineEmits(["update-textures"]);
 
 const controlsRef = ref(null);
 
@@ -438,95 +413,9 @@ const featureVisibility = reactive({
   vegetation: true,
   barriers: true,
 });
-const customOsmUrl = ref(null);
-const customHybridUrl = ref(null);
-const customOsmCanvas = ref(null);
-const customHybridCanvas = ref(null);
-const isRegenerating = ref(false);
-
-const baseColor = ref('#999999');
-const baseColorOptions = [
-  { name: "Cement Grey (Default)", value: "#999999" },
-  { name: "Forest Green", value: "#4a7a52" },
-  { name: "Sandy Gold", value: "#ad8d60" },
-  { name: "Rocky Grey", value: "#8a8a8a" },
-  { name: "Dirt Brown", value: "#bfae96" },
-  { name: "Deep Moss", value: "#4d5d4a" }
-];
-
-const regenerateTextures = async () => {
-  if (!props.terrainData) return;
-  isRegenerating.value = true;
-  try {
-    const options = { baseColor: baseColor.value };
-    const osmResult = await generateOSMTexture(props.terrainData, options);
-    const hybridResult = await generateHybridTexture(props.terrainData, options);
- 
-    customOsmUrl.value = osmResult.url;
-    customHybridUrl.value = hybridResult.url;
-    customOsmCanvas.value = osmResult.canvas;
-    customHybridCanvas.value = hybridResult.canvas;
-    
-    emit("update-textures", {
-      osmTextureUrl: osmResult.url,
-      hybridTextureUrl: hybridResult.url,
-      osmTextureCanvas: osmResult.canvas,
-      hybridTextureCanvas: hybridResult.canvas,
-    });
-  } catch (e) {
-    console.error("Failed to regenerate textures:", e);
-  } finally {
-    isRegenerating.value = false;
-  }
-};
-
-// Re-render when baseColor changes
-watch(baseColor, () => {
-  regenerateTextures();
-});
-
-// Initialize textures automatically when terrain data is loaded
-watch(
-  () => props.terrainData?.osmFeatures,
-  async (newFeatures) => {
-    if (newFeatures) {
-      // If terrain.js already generated textures with canvas, use them
-      // directly instead of re-rendering (avoids duplicate 16k render)
-      const td = props.terrainData;
-      if (td?.osmTextureCanvas && td?.osmTextureUrl) {
-        customOsmUrl.value = td.osmTextureUrl;
-        customOsmCanvas.value = td.osmTextureCanvas;
-        customHybridUrl.value = td.hybridTextureUrl || null;
-        customHybridCanvas.value = td.hybridTextureCanvas || null;
-      } else {
-        await regenerateTextures();
-      }
-    }
-  },
-  { immediate: true },
-);
-
-// Override prop data for rendering
-const activeOsmTexture = computed(
-  () => customOsmUrl.value || props.terrainData?.osmTextureUrl,
-);
-const activeHybridTexture = computed(
-  () => customHybridUrl.value || props.terrainData?.hybridTextureUrl,
-);
 
 const mergedTerrainData = computed(() => {
-  return {
-    ...props.terrainData,
-    osmTextureUrl: activeOsmTexture.value,
-    hybridTextureUrl: activeHybridTexture.value,
-    osmTextureCanvas: customOsmCanvas.value || props.terrainData?.osmTextureCanvas,
-    hybridTextureCanvas: customHybridCanvas.value || props.terrainData?.hybridTextureCanvas,
-    satelliteTextureUrl: props.terrainData?.satelliteTextureUrl,
-    segmentedTextureUrl: props.terrainData?.segmentedTextureUrl,
-    segmentedTextureCanvas: props.terrainData?.segmentedTextureCanvas,
-    segmentedHybridTextureUrl: props.terrainData?.segmentedHybridTextureUrl,
-    segmentedHybridTextureCanvas: props.terrainData?.segmentedHybridTextureCanvas,
-  };
+  return props.terrainData;
 });
 
 const presets = Object.keys(hdrPresets);

@@ -179,8 +179,7 @@
             <template #default>
               <Preview3D 
                 v-if="terrainData && previewMode"
-                :terrain-data="terrainData" 
-                @update-textures="handleUpdateTextures"
+                :terrain-data="terrainData"
               />
             </template>
             <template #fallback>
@@ -841,15 +840,6 @@ const handleFetchOSM = async () => {
       alert("Failed to fetch OSM data.");
   } finally {
       isLoading.value = false;
-  }
-};
-
-const handleUpdateTextures = (updates) => {
-  if (terrainData.value) {
-    terrainData.value = {
-      ...terrainData.value,
-      ...updates,
-    };
   }
 };
 

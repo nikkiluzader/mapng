@@ -66,6 +66,7 @@ const COLORS = {
   track: "#bfae96", // Light brown dirt color
   sidewalk: "#e5e5e5", // Light grey concrete color
   barrier: "#C4A484",
+  bridgeInfra: "#8f9399",
   coastline: "#9fc5d6",
   ocean: "#aad3df",
   defaultLanduse: "#dddddd",
@@ -193,7 +194,7 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
     tags.man_made === "groyne"
   )
     return COLORS.bare;
-  if (tags.man_made === "bridge") return COLORS.building; // Or generic grey
+  if (tags.man_made === "bridge") return COLORS.bridgeInfra;
 
   // Priority 3: Surface / Landuse / Leisure generic mapping
   const surface =
@@ -411,6 +412,78 @@ const drawPathData = (ctx, points) => {
   }
 };
 
+const trimPolylineByDistance = (points, trimStartPx, trimEndPx) => {
+  if (!points || points.length < 2) return points || [];
+
+  const segmentLengths = [];
+  let totalLength = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const dx = points[i + 1].x - points[i].x;
+    const dy = points[i + 1].y - points[i].y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    segmentLengths.push(len);
+    totalLength += len;
+  }
+
+  if (totalLength <= trimStartPx + trimEndPx + 1e-6) return [];
+
+  const carve = (fromStart, distancePx) => {
+    if (distancePx <= 0) {
+      return { index: fromStart ? 0 : points.length - 1, t: 0 };
+    }
+
+    let acc = 0;
+    if (fromStart) {
+      for (let i = 0; i < segmentLengths.length; i++) {
+        const len = segmentLengths[i];
+        if (acc + len >= distancePx) {
+          return { index: i, t: (distancePx - acc) / Math.max(len, 1e-9) };
+        }
+        acc += len;
+      }
+      return { index: segmentLengths.length - 1, t: 1 };
+    }
+
+    for (let i = segmentLengths.length - 1; i >= 0; i--) {
+      const len = segmentLengths[i];
+      if (acc + len >= distancePx) {
+        // From end: t=0 means point i, t=1 means point i+1
+        const tFromEnd = (distancePx - acc) / Math.max(len, 1e-9);
+        return { index: i, t: 1 - tFromEnd };
+      }
+      acc += len;
+    }
+    return { index: 0, t: 0 };
+  };
+
+  const startCut = carve(true, trimStartPx);
+  const endCut = carve(false, trimEndPx);
+
+  const makePoint = (segIndex, t) => {
+    const a = points[segIndex];
+    const b = points[segIndex + 1];
+    return {
+      x: a.x + (b.x - a.x) * t,
+      y: a.y + (b.y - a.y) * t,
+    };
+  };
+
+  const startPoint = makePoint(startCut.index, startCut.t);
+  const endPoint = makePoint(endCut.index, endCut.t);
+
+  // If cuts crossed, return empty.
+  if (startCut.index > endCut.index || (startCut.index === endCut.index && startCut.t >= endCut.t)) {
+    return [];
+  }
+
+  const trimmed = [startPoint];
+  for (let i = startCut.index + 1; i <= endCut.index; i++) {
+    trimmed.push(points[i]);
+  }
+  trimmed.push(endPoint);
+  return trimmed;
+};
+
 /**
  * Get the left and right border polylines of a road, by offsetting the
  * centerline by half the road width on each side.
@@ -452,6 +525,11 @@ const getCenterLineStyle = (tags, lanesTotal, isOneWay) => {
   if (isOneWay) return null;
 
   const highway = tags.highway;
+
+  // Link roads / ramps typically do not carry centerline markings in map textures.
+  if (typeof highway === "string" && highway.endsWith("_link")) {
+    return null;
+  }
 
   // Motorways use white markings, not yellow
   if (highway === "motorway" || highway === "trunk" ||
@@ -502,16 +580,222 @@ const getEdgeLineStyle = (tags) => {
   return null;
 };
 
+const parseNumeric = (value) => {
+  if (value == null) return null;
+  const num = Number.parseFloat(String(value).trim());
+  return Number.isFinite(num) ? num : null;
+};
+
+const parsePositiveInt = (value) => {
+  if (value == null) return null;
+  const num = Number.parseInt(String(value).trim(), 10);
+  return Number.isFinite(num) && num > 0 ? num : null;
+};
+
+const countLanesFromDelimited = (value) => {
+  if (!value) return null;
+  const tokens = String(value)
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return tokens.length > 0 ? tokens.length : null;
+};
+
+const parseWidthMeters = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim().toLowerCase();
+
+  if (raw.includes("ft")) {
+    const n = parseNumeric(raw.replace("ft", "").trim());
+    return n != null ? n * 0.3048 : null;
+  }
+
+  if (raw.includes("m")) {
+    return parseNumeric(raw.replace("m", "").trim());
+  }
+
+  const plain = parseNumeric(raw);
+  if (plain == null) return null;
+
+  // Heuristic: values > 40 are usually feet when no unit is provided.
+  return plain > 40 ? plain * 0.3048 : plain;
+};
+
+const getDefaultLaneWidth = (highway) => {
+  if (["motorway", "motorway_link", "trunk", "trunk_link"].includes(highway)) {
+    return 3.7;
+  }
+  if (["primary", "primary_link", "secondary", "secondary_link"].includes(highway)) {
+    return 3.5;
+  }
+  if (["tertiary", "tertiary_link"].includes(highway)) {
+    return 3.25;
+  }
+  if (["residential", "unclassified", "living_street"].includes(highway)) {
+    return 3.0;
+  }
+  if (["service"].includes(highway)) {
+    return 2.8;
+  }
+  return 3.0;
+};
+
+const getMaxReasonableLanes = (highway, isOneWay) => {
+  if (["motorway", "trunk"].includes(highway)) {
+    return isOneWay ? 6 : 10;
+  }
+  if (["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"].includes(highway)) {
+    return isOneWay ? 3 : 4;
+  }
+  if (["primary", "secondary"].includes(highway)) {
+    return isOneWay ? 5 : 8;
+  }
+  return isOneWay ? 4 : 6;
+};
+
+const inferLaneCounts = (tags, isOneWay, highway) => {
+  const explicitTotal = parsePositiveInt(tags.lanes);
+
+  let lanesForward =
+    parsePositiveInt(tags["lanes:forward"]) ||
+    countLanesFromDelimited(tags["turn:lanes:forward"]);
+  let lanesBackward =
+    parsePositiveInt(tags["lanes:backward"]) ||
+    countLanesFromDelimited(tags["turn:lanes:backward"]);
+
+  const maxLanes = getMaxReasonableLanes(highway, isOneWay);
+
+  if (isOneWay) {
+    if (!lanesForward) {
+      lanesForward =
+        explicitTotal ||
+        countLanesFromDelimited(tags["turn:lanes"]) ||
+        (highway === "motorway" || highway === "trunk" ? 2 : 1);
+    }
+    lanesForward = Math.min(maxLanes, Math.max(1, lanesForward));
+    return {
+      lanesTotal: Math.max(1, lanesForward),
+      lanesForward: Math.max(1, lanesForward),
+      lanesBackward: 0,
+    };
+  }
+
+  if (explicitTotal) {
+    if (!lanesForward && !lanesBackward) {
+      lanesForward = Math.ceil(explicitTotal / 2);
+      lanesBackward = explicitTotal - lanesForward;
+    } else if (!lanesForward) {
+      lanesForward = Math.max(1, explicitTotal - lanesBackward);
+    } else if (!lanesBackward) {
+      lanesBackward = Math.max(1, explicitTotal - lanesForward);
+    }
+  }
+
+  if (!lanesForward && !lanesBackward) {
+    const inferredTotal =
+      explicitTotal ||
+      (highway === "motorway" || highway === "trunk" ? 4 :
+       ["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"].includes(highway) ? 1 :
+       ["service", "track"].includes(highway) ? 1 : 2);
+    lanesForward = Math.ceil(inferredTotal / 2);
+    lanesBackward = Math.max(1, inferredTotal - lanesForward);
+  }
+
+  lanesForward = Math.max(1, lanesForward || 1);
+  lanesBackward = Math.max(1, lanesBackward || 1);
+
+  let lanesTotal = lanesForward + lanesBackward;
+  if (lanesTotal > maxLanes) {
+    const scale = maxLanes / lanesTotal;
+    lanesForward = Math.max(1, Math.round(lanesForward * scale));
+    lanesBackward = Math.max(1, maxLanes - lanesForward);
+    lanesTotal = lanesForward + lanesBackward;
+  }
+
+  lanesTotal = Math.max(2, lanesTotal);
+  return {
+    lanesTotal,
+    lanesForward,
+    lanesBackward,
+  };
+};
+
+const shouldSkipLaneDetail = (tags = {}, layout = null) => {
+  const highway = tags.highway;
+  const layer = getEffectiveRoadLayer(tags);
+
+  if (["motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"].includes(highway)) {
+    return true;
+  }
+
+  if (layer !== 0 || tags.bridge === "yes" || tags.tunnel === "yes" || tags.covered === "yes") {
+    return true;
+  }
+
+  if (layout && layout.lanesTotal >= 6) {
+    return true;
+  }
+
+  return false;
+};
+
+const getEffectiveRoadLayer = (tags = {}) => {
+  const explicitLayer = Number.parseInt(tags.layer, 10);
+  let layer = Number.isFinite(explicitLayer) ? explicitLayer : 0;
+
+  const bridgeLike =
+    tags.bridge === "yes" ||
+    tags.bridge === "viaduct" ||
+    tags.man_made === "bridge" ||
+    tags.location === "overground" ||
+    tags.location === "elevated";
+  const tunnelLike =
+    tags.tunnel === "yes" ||
+    tags.covered === "yes" ||
+    tags.location === "underground" ||
+    tags.location === "underwater";
+
+  if (!Number.isFinite(explicitLayer)) {
+    if (bridgeLike) layer += 1;
+    if (tunnelLike || tags.cutting === "yes") layer -= 1;
+  }
+
+  // Some ramps carry retaining-wall hints on the way itself.
+  if (tags.barrier === "retaining_wall" && !bridgeLike && !tunnelLike) {
+    layer += 0.5;
+  }
+  if (tags.embankment === "yes") {
+    layer += 0.5;
+  }
+
+  return layer;
+};
+
 const getLaneLayout = (tags) => {
   const highway = tags.highway;
+  const explicitNoOneway = tags.oneway === "no" || tags.oneway === "0";
+  const explicitYesOneway =
+    tags.oneway === "yes" || tags.oneway === "1" || tags.oneway === "true";
+  const impliedLinkOneway =
+    [
+      "motorway_link",
+      "trunk_link",
+      "primary_link",
+      "secondary_link",
+      "tertiary_link",
+    ].includes(highway) && !explicitNoOneway;
   const isOneWay =
-    tags.oneway === "yes" || tags.oneway === "1" || highway === "motorway" || highway === "motorway_link";
-  const lanesT = parseInt(tags.lanes) || (isOneWay ? 1 : 2);
-  const lanesF = parseInt(tags["lanes:forward"]) || Math.ceil(lanesT / 2);
-  const lanesB = parseInt(tags["lanes:backward"]) || lanesT - lanesF;
+    explicitYesOneway ||
+    impliedLinkOneway ||
+    highway === "motorway";
+  const laneCounts = inferLaneCounts(tags, isOneWay, highway);
+  const lanesT = laneCounts.lanesTotal;
+  const lanesF = laneCounts.lanesForward;
+  const lanesB = laneCounts.lanesBackward;
+  const defaultLaneWidth = getDefaultLaneWidth(highway);
 
   const layout = {
-    totalWidth: parseFloat(tags.width) || 0,
+    totalWidth: parseWidthMeters(tags.width) || 0,
     lanes: [],
     highway,
     isOneWay,
@@ -521,21 +805,19 @@ const getLaneLayout = (tags) => {
 
   // Width estimation (following OSM2World's defaults)
   if (layout.totalWidth === 0) {
-    if (highway === "motorway" || highway === "trunk")
-      layout.totalWidth = lanesT * 3.7;
-    else if (highway === "primary" || highway === "secondary")
-      layout.totalWidth = lanesT * 3.5;
-    else if (highway === "tertiary")
-      layout.totalWidth = lanesT * 3.25;
-    else if (highway === "residential" || highway === "unclassified")
-      layout.totalWidth = lanesT * 3.0;
-    else if (highway === "service")
-      layout.totalWidth = Math.max(lanesT * 2.5, 4.0);
-    else layout.totalWidth = lanesT * 2.8;
+    if (highway === "service") {
+      layout.totalWidth = Math.max(lanesT * defaultLaneWidth, 4.0);
+    } else {
+      layout.totalWidth = lanesT * defaultLaneWidth;
+    }
   }
 
   // Skip lane detail for unmarked surfaces
   if (layout.unmarked) return layout;
+
+  if (shouldSkipLaneDetail(tags, layout)) {
+    return layout;
+  }
 
   const hasLeftSidewalk = tags.sidewalk === "left" || tags.sidewalk === "both";
   const hasRightSidewalk =
@@ -565,7 +847,7 @@ const getLaneLayout = (tags) => {
           color: COLORS.markingWhite,
           dash: [3, 6],
         });
-      layout.lanes.push({ type: "vehicle", width: 3.5 });
+      layout.lanes.push({ type: "vehicle", width: defaultLaneWidth });
     }
     // Center Divider
     const centerStyle = getCenterLineStyle(tags, lanesT, isOneWay);
@@ -589,7 +871,7 @@ const getLaneLayout = (tags) => {
         color: COLORS.markingWhite,
         dash: [3, 6],
       });
-    layout.lanes.push({ type: "vehicle", width: 3.5 });
+    layout.lanes.push({ type: "vehicle", width: defaultLaneWidth });
   }
 
   if (edgeLine)
@@ -625,7 +907,6 @@ const getLaneLayout = (tags) => {
 const buildJunctionMap = (roads, toPixel) => {
   // Map from "lat,lng" key to junction info
   const junctions = new Map();
-  const tolerance = 0.0000001; // ~1cm
 
   const makeKey = (lat, lng) => `${lat.toFixed(7)},${lng.toFixed(7)}`;
 
@@ -633,33 +914,52 @@ const buildJunctionMap = (roads, toPixel) => {
     const geom = road.geometry;
     if (geom.length < 2) return;
 
+    const layer = getEffectiveRoadLayer(road.tags || {});
+
     // Check first point
     const startKey = makeKey(geom[0].lat, geom[0].lng);
     if (!junctions.has(startKey)) {
       junctions.set(startKey, {
         lat: geom[0].lat, lng: geom[0].lng,
-        roads: [], pixel: null,
+        layerGroups: new Map(),
       });
     }
-    junctions.get(startKey).roads.push({ road, isStart: true });
+    {
+      const group = junctions.get(startKey).layerGroups;
+      const layerKey = String(layer);
+      if (!group.has(layerKey)) group.set(layerKey, []);
+      group.get(layerKey).push({ road, isStart: true });
+    }
 
     // Check last point
     const endKey = makeKey(geom[geom.length - 1].lat, geom[geom.length - 1].lng);
     if (!junctions.has(endKey)) {
       junctions.set(endKey, {
         lat: geom[geom.length - 1].lat, lng: geom[geom.length - 1].lng,
-        roads: [], pixel: null,
+        layerGroups: new Map(),
       });
     }
-    junctions.get(endKey).roads.push({ road, isStart: false });
+    {
+      const group = junctions.get(endKey).layerGroups;
+      const layerKey = String(layer);
+      if (!group.has(layerKey)) group.set(layerKey, []);
+      group.get(layerKey).push({ road, isStart: false });
+    }
   });
 
-  // Only keep actual junctions (3+ roads meeting) or T-intersections
+  // Keep per-layer junction groups with 2+ connecting roads.
   const result = new Map();
   for (const [key, junction] of junctions) {
-    if (junction.roads.length >= 3) {
-      junction.pixel = toPixel(junction.lat, junction.lng);
-      result.set(key, junction);
+    const pixel = toPixel(junction.lat, junction.lng);
+    for (const [layerKey, roadsAtLayer] of junction.layerGroups) {
+      if (roadsAtLayer.length >= 2) {
+        result.set(`${key}|${layerKey}`, {
+          lat: junction.lat,
+          lng: junction.lng,
+          roads: roadsAtLayer,
+          pixel,
+        });
+      }
     }
   }
   return result;
@@ -717,6 +1017,22 @@ const renderJunctions = (ctx, junctions, toPixel, SCALE_FACTOR) => {
     });
 
     if (arms.length < 2) continue;
+
+    if (arms.length === 2) {
+      const dot = arms[0].dirX * arms[1].dirX + arms[0].dirY * arms[1].dirY;
+      const clampedDot = Math.max(-1, Math.min(1, dot));
+      const angle = Math.acos(clampedDot);
+
+      // Nearly straight continuation; keep markings as-is to avoid blotches.
+      if (angle > 2.75) continue;
+
+      // Merge/split cleanup: erase conflicting markings at the connection node.
+      ctx.beginPath();
+      ctx.arc(center.x, center.y, maxHalfW * 0.95, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS.road;
+      ctx.fill();
+      continue;
+    }
 
     // Sort arms by outward angle (ascending → goes clockwise in canvas coords)
     arms.sort((a, b) => a.outAngle - b.outAngle);
@@ -886,8 +1202,12 @@ const drawRoadWithMarkings = (ctx, feature, toPixel, SCALE_FACTOR) => {
   let centerPoints = geometry.map((p) => toPixel(p.lat, p.lng));
   centerPoints = subdivideAndSmooth(centerPoints, 3);
 
+  const trimDistPx = Math.max(1.5 * SCALE_FACTOR, layout.totalWidth * SCALE_FACTOR * 0.8);
+  centerPoints = trimPolylineByDistance(centerPoints, trimDistPx, trimDistPx);
+  if (centerPoints.length < 2) return;
+
   // If unmarked surface, skip all lane markings
-  if (layout.unmarked) return;
+  if (layout.unmarked || shouldSkipLaneDetail(feature.tags || {}, layout)) return;
 
   // Draw Individual Lane Features (markings only — base pavement drawn in Pass 2)
   layout.lanes.forEach((lane) => {
@@ -995,7 +1315,7 @@ const renderFeaturesToCanvas = (
   // 1. Draw Landcover & Landuse (Sorted by area, with Grass/Water priority layers)
   const landcover = features.filter(
     (f) =>
-      ["vegetation", "water", "landuse"].includes(f.type) &&
+      ["vegetation", "water", "landuse", "bridge_infra"].includes(f.type) &&
       !isBoundaryOnlyArea(f.tags),
   );
 
@@ -1227,8 +1547,8 @@ const renderFeaturesToCanvas = (
     steps: 10,
   };
   roads.sort((a, b) => {
-    const layerA = parseInt(a.tags.layer) || 0;
-    const layerB = parseInt(b.tags.layer) || 0;
+    const layerA = getEffectiveRoadLayer(a.tags || {});
+    const layerB = getEffectiveRoadLayer(b.tags || {});
     if (layerA !== layerB) return layerA - layerB;
     return (
       (roadPriority[a.tags.highway] || 10) -
@@ -1463,7 +1783,9 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
   };
 
   // Only render roads for Hybrid mode
-  const roadFeatures = terrainData.osmFeatures.filter((f) => f.type === "road");
+  const roadFeatures = terrainData.osmFeatures.filter(
+    (f) => f.type === "road" || f.type === "bridge_infra",
+  );
   renderFeaturesToCanvas(ctx, roadFeatures, toPixel, SCALE_FACTOR, {
     ...options,
     alpha: 1.0,
@@ -1526,7 +1848,9 @@ export const generateSegmentedHybridTexture = async (terrainData, options = {}) 
   };
 
   // Render road features on top
-  const segRoadFeatures = terrainData.osmFeatures.filter((f) => f.type === "road");
+  const segRoadFeatures = terrainData.osmFeatures.filter(
+    (f) => f.type === "road" || f.type === "bridge_infra",
+  );
   renderFeaturesToCanvas(ctx, segRoadFeatures, toPixel, SCALE_FACTOR, {
     ...options,
     alpha: 1.0,
