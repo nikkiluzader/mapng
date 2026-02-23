@@ -76,7 +76,6 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 - Maps selected tiles onto the 2D Leaflet map as bounding boxes.
 
 ### Additional Features
-- **"Mod of the Day"**: Displays the most recently updated map mod from BeamNG.com.
 - **Batch Job mode (Beta)**: Process grids of tiles (up to 20×20) with sequential processing, per-tile ZIP downloads, persistent state for pause/resume, and retry for failed tiles.
 - **Reproducibility tooling**: `Copy Configuration`, `Paste Configuration`, `Save Configuration` (JSON), and `Load Configuration` in both Single and Batch modes.
 - **Traceable exports**: Single-file exports also produce `*.metadata.json` sidecars containing build hash/time, bbox, resolution/zoom, texture availability, OSM query context, and GPXZ plan/rate-limit info.
@@ -184,6 +183,57 @@ npm run deploy
 7. **GPXZ users**: Paid plan limits are auto-detected, enabling concurrent API requests (up to 20× faster).
 8. **Reproduce or share jobs**: Use `Copy/Paste/Save/Load Configuration` in Batch mode to rerun identical grids and export selections.
 
+### Batch Performance Profiles
+
+Batch mode includes a **Batch Performance Profile** selector:
+
+- **Max Throughput**: fastest wall-clock in many cases, higher memory usage.
+- **Balanced**: default behavior for most workloads.
+- **Low Memory 8192 Safe**: lower concurrency and reduced fan-out for high-resolution stability.
+
+These profiles tune internal scheduler and fetch fan-out behavior and are saved in run configurations.
+
+### A/B Benchmark Matrix (8192-focused)
+
+Use this repeatable matrix to compare profiles on the same machine/network:
+
+1. Set a representative 2×2 grid at **8192** resolution.
+2. Keep exports fixed for the test pass (do not change between profile runs).
+3. Run three jobs with profiles: **Max Throughput**, **Balanced**, **Low Memory 8192 Safe**.
+4. After each run, open Batch Progress **Details** and click **Copy Benchmark Report**.
+5. Save each JSON report and compare:
+   - `job.totalDurationSec`
+   - `memory.peakUsedBytes`
+   - `timings.queueWaitMs`
+   - `timings.byStage.encode_zip.maxMs`
+   - `timings.byStage.fetch_total.avgMs`
+   - `comparison.compositeScore` (lower is better)
+
+#### Scoring Rule (built into benchmark report)
+
+Each benchmark report includes a weighted score:
+
+`compositeScore = durationSec × 1 + peakMemoryGiB × 120 + failureCount × 900 + queueWaitSec × 0.25`
+
+- Lower score is better.
+- Any failures dominate score heavily (stability first).
+- Memory is weighted strongly for high-resolution runs.
+
+Profile selection rule:
+
+1. Exclude reports with failed tiles.
+2. Prefer the lowest `comparison.compositeScore`.
+3. If scores are within 10%, choose the lower `memory.peakUsedBytes` profile.
+4. Use **Balanced** as tie-breaker for general usage.
+
+Recommended baseline export sets for matrix testing:
+
+- **Core**: heightmap + satellite + geotiff
+- **Core + OSM**: core + osmTexture + hybridTexture + geojson
+- **Full Stress**: all enabled exports you actually ship
+
+For decision-making, prefer the profile with the lowest peak memory that stays within acceptable total runtime for your release workflow.
+
 ## Run Configuration Schema
 
 MapNG supports reproducible reruns through JSON run configurations in both Single Tile and Batch Job modes.
@@ -260,6 +310,7 @@ MapNG supports reproducible reruns through JSON run configurations in both Singl
    "resolution": 1024,
    "gridCols": 3,
    "gridRows": 3,
+   "performanceProfile": "balanced",
    "includeOSM": true,
    "elevationSource": "default",
    "gpxzApiKey": "",

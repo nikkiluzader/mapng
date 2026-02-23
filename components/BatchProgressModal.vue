@@ -13,7 +13,7 @@
             <p class="text-xs text-gray-500 dark:text-gray-400">{{ gridCols }}×{{ gridRows }} grid · {{ state.resolution }}px per tile</p>
           </div>
         </div>
-        <button v-if="isDone" @click="$emit('close')"
+        <button v-if="!isRunning" @click="$emit('close')"
           class="text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors p-1">
           <X :size="20" />
         </button>
@@ -22,6 +22,16 @@
       <!-- Content -->
       <div class="p-5 overflow-y-auto custom-scrollbar space-y-5 flex-1">
 
+        <div class="flex items-center justify-between">
+          <span class="text-xs text-gray-500 dark:text-gray-400">Instrumentation</span>
+          <button
+            @click="showDetails = !showDetails"
+            class="text-xs font-medium text-[#FF6600] hover:underline"
+          >
+            {{ showDetails ? 'Hide Details' : 'Details' }}
+          </button>
+        </div>
+
         <!-- Grid Visualization -->
         <div class="space-y-2">
           <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -29,22 +39,25 @@
             <span>{{ completedCount }}/{{ totalTiles }} completed{{ failedCount > 0 ? ` · ${failedCount} failed` : '' }}</span>
           </div>
           <div :style="gridStyle" class="gap-1 mx-auto" style="max-width: 400px;">
-            <div v-for="tile in state.tiles" :key="tile.index" :class="tileClass(tile)"
+            <div v-for="tile in state.tiles" :key="tile.id || tile.index" :class="tileClass(tile)"
               class="aspect-square rounded-sm flex items-center justify-center text-[7px] font-medium transition-all duration-300 select-none overflow-hidden relative"
-              :title="`R${tile.row + 1} C${tile.col + 1}${tile.error ? ': ' + tile.error : ''}`">
+              :title="`R${tile.row + 1} C${tile.col + 1}${tile.lastError?.message ? ': ' + tile.lastError.message : ''}`">
               <!-- Snapshot background for completed tiles -->
-              <img v-if="tile.snapshot && tile.status === 'completed'" :src="tile.snapshot"
+              <img v-if="tile.snapshot && (tile.status === 'done' || tile.status === 'completed')" :src="tile.snapshot"
                 class="absolute inset-0 w-full h-full object-cover" />
-              <div v-if="tile.snapshot && tile.status === 'completed'"
+              <div v-if="tile.snapshot && (tile.status === 'done' || tile.status === 'completed')"
                 class="absolute inset-0 bg-emerald-500/30 flex items-center justify-center">
                 <Check :size="10" class="text-white drop-shadow" />
               </div>
               <template v-else>
                 <Loader2 v-if="tile.status === 'processing'" :size="10" class="animate-spin" />
-                <Check v-else-if="tile.status === 'completed'" :size="10" />
+                <Check v-else-if="tile.status === 'done' || tile.status === 'completed'" :size="10" />
                 <XIcon v-else-if="tile.status === 'failed'" :size="10" />
-                <span v-else class="opacity-50">{{ tile.row + 1 }},{{ tile.col + 1 }}</span>
+                <span v-else class="opacity-40">•</span>
               </template>
+              <div class="absolute bottom-0 left-0 right-0 bg-black/45 text-white text-[8px] leading-none py-0.5 text-center">
+                R{{ tile.row + 1 }}C{{ tile.col + 1 }}
+              </div>
             </div>
           </div>
         </div>
@@ -69,7 +82,7 @@
           <div class="flex items-center gap-2 text-sm font-medium text-blue-800 dark:text-blue-200">
             <Loader2 :size="14" class="animate-spin text-blue-500" />
             Processing tile R{{ currentTile?.row + 1 }}C{{ currentTile?.col + 1 }}
-            <span class="text-xs font-normal text-blue-600 dark:text-blue-400">({{ state.currentTileIndex + 1 }}/{{ totalTiles }})</span>
+            <span class="text-xs font-normal text-blue-600 dark:text-blue-400">({{ currentTileDisplayIndex }}/{{ totalTiles }})</span>
           </div>
           <p class="text-xs text-blue-600 dark:text-blue-400 animate-pulse">{{ currentStep }}</p>
         </div>
@@ -97,7 +110,70 @@
                 <XCircle :size="12" class="text-red-500 mt-0.5 flex-shrink-0" />
                 <div>
                   <span class="font-medium text-red-800 dark:text-red-200">R{{ tile.row + 1 }}C{{ tile.col + 1 }}</span>
-                  <span class="text-red-600 dark:text-red-400 ml-1">{{ tile.error || 'Unknown error' }}</span>
+                  <span class="text-red-600 dark:text-red-400 ml-1">{{ tile.lastError?.message || tile.error || 'Unknown error' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="showDetails" class="space-y-3">
+          <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Job Summary</h4>
+            <div class="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+              <p>Total queue wait: <span class="font-medium">{{ formatDuration(jobSummary?.totalWaitMs) }}</span></p>
+              <p v-if="jobSummary?.slowestTile">Slowest tile: <span class="font-medium">R{{ jobSummary.slowestTile.row + 1 }}C{{ jobSummary.slowestTile.col + 1 }}</span> ({{ formatDuration(jobSummary.slowestTile.totalMs) }})</p>
+              <p v-if="benchmarkReport?.comparison">Composite score: <span class="font-medium">{{ benchmarkReport.comparison.compositeScore }}</span> (lower is better)</p>
+              <p v-if="benchmarkReport?.comparison">Recommendation: <span class="font-medium">{{ benchmarkReport.comparison.recommendation }}</span></p>
+              <p v-if="jobSummary?.memory?.supported">Peak JS heap: <span class="font-medium">{{ formatBytes(jobSummary.memory.peakUsedBytes) }}</span> / {{ formatBytes(jobSummary.memory.peakTotalBytes) }}</p>
+              <p v-if="jobSummary?.memory?.supported">Memory samples: <span class="font-medium">{{ jobSummary.memory.sampleCount }}</span></p>
+              <p v-if="jobSummary?.memory?.peakTile">Peak tile heap: <span class="font-medium">R{{ jobSummary.memory.peakTile.row + 1 }}C{{ jobSummary.memory.peakTile.col + 1 }}</span> ({{ formatBytes(jobSummary.memory.peakTile.peakUsedBytes) }})</p>
+              <p v-if="!jobSummary?.memory?.supported" class="text-[10px]">Memory sampling unavailable in this browser; timings still captured.</p>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <button
+                @click="copyBenchmarkReport"
+                class="py-1.5 px-2 text-[10px] font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+              >
+                Copy Benchmark Report
+              </button>
+              <span v-if="benchmarkCopyStatus" class="text-[10px] text-gray-500 dark:text-gray-400">{{ benchmarkCopyStatus }}</span>
+            </div>
+            <div v-if="jobSummary?.byStage" class="max-h-36 overflow-y-auto custom-scrollbar">
+              <div v-for="(stats, stage) in jobSummary.byStage" :key="stage" class="text-[10px] text-gray-600 dark:text-gray-300 grid grid-cols-4 gap-2 py-0.5">
+                <span class="truncate" :title="stage">{{ stage }}</span>
+                <span>avg {{ formatDuration(stats.avgMs) }}</span>
+                <span>med {{ formatDuration(stats.medianMs) }}</span>
+                <span>max {{ formatDuration(stats.maxMs) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2">
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Per-tile Instrumentation</h4>
+            <div class="max-h-56 overflow-y-auto custom-scrollbar space-y-2">
+              <div v-for="tile in tilesWithInstrumentation" :key="tile.id || tile.index" class="border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
+                <div class="text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">R{{ tile.row + 1 }}C{{ tile.col + 1 }} · {{ tile.status }}</div>
+                <div v-if="tile.lifecycle?.totalMs" class="text-[10px] text-gray-600 dark:text-gray-300 mb-1">total {{ formatDuration(tile.lifecycle.totalMs) }}</div>
+                <div v-if="tile.memory" class="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-2">
+                  <div class="text-[10px] text-gray-500 dark:text-gray-400">heap start</div>
+                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.startUsedBytes) }}</div>
+                  <div class="text-[10px] text-gray-500 dark:text-gray-400">heap after fetch</div>
+                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.afterFetchUsedBytes) }}</div>
+                  <div class="text-[10px] text-gray-500 dark:text-gray-400">heap before zip</div>
+                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.beforeZipUsedBytes) }}</div>
+                  <div class="text-[10px] text-gray-500 dark:text-gray-400">heap after zip</div>
+                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.afterZipUsedBytes) }}</div>
+                  <div class="text-[10px] text-gray-500 dark:text-gray-400">heap end</div>
+                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.endUsedBytes) }}</div>
+                  <div class="text-[10px] text-gray-500 dark:text-gray-400">heap peak</div>
+                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.peakUsedBytes) }}</div>
+                </div>
+                <div class="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                  <template v-for="(ms, stage) in tile.stageTimings" :key="stage">
+                    <div class="text-[10px] text-gray-500 dark:text-gray-400 truncate" :title="stage">{{ stage }}</div>
+                    <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatDuration(ms) }}</div>
+                  </template>
                 </div>
               </div>
             </div>
@@ -156,12 +232,13 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import {
   Loader2, Check, X, XCircle, Square, Play, Pause, RotateCcw,
   CheckCircle2, AlertTriangle, Package,
 } from 'lucide-vue-next';
 import { estimateTimeRemaining, formatDuration } from '../services/batchJob';
+import { summarizeStageTimings, buildBatchBenchmarkReport } from '../services/batchRuntime';
 
 // Alias X icon to avoid conflict with the X used for close
 const XIcon = X;
@@ -174,6 +251,9 @@ const props = defineProps({
 defineEmits(['close', 'cancel', 'resume', 'retryFailed']);
 
 const now = ref(Date.now());
+const showDetails = ref(false);
+const doneAt = ref(null);
+const benchmarkCopyStatus = ref('');
 let timer = null;
 
 onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
@@ -183,18 +263,53 @@ onUnmounted(() => { clearInterval(timer); });
 const gridCols = computed(() => props.state.gridCols);
 const gridRows = computed(() => props.state.gridRows);
 const totalTiles = computed(() => props.state.tiles.length);
-const completedCount = computed(() => props.state.tiles.filter(t => t.status === 'completed').length);
+const completedCount = computed(() => props.state.tiles.filter(t => t.status === 'done' || t.status === 'completed').length);
 const failedCount = computed(() => props.state.tiles.filter(t => t.status === 'failed').length);
 const failedTiles = computed(() => props.state.tiles.filter(t => t.status === 'failed'));
-const currentTile = computed(() =>
-  props.state.currentTileIndex >= 0 ? props.state.tiles[props.state.currentTileIndex] : null
-);
+const tilesWithInstrumentation = computed(() => props.state.tiles.filter((t) => {
+  const hasTimings = t.stageTimings && Object.keys(t.stageTimings).length > 0;
+  const hasMemory = t.memory && Object.values(t.memory).some((v) => Number(v) > 0);
+  return hasTimings || hasMemory;
+}));
+const benchmarkReport = computed(() => buildBatchBenchmarkReport(props.state));
+const jobSummary = computed(() => props.state.summary || summarizeStageTimings(props.state));
+const currentTile = computed(() => {
+  if (props.state.currentTileId) {
+    const byId = props.state.tiles.find((tile) => tile.id === props.state.currentTileId);
+    if (byId) return byId;
+  }
+  return props.state.currentTileIndex >= 0 ? props.state.tiles[props.state.currentTileIndex] : null;
+});
 
-const isRunning = computed(() => props.state.status === 'running');
+const currentTileDisplayIndex = computed(() => {
+  if (!currentTile.value) return 0;
+  const i = props.state.tiles.findIndex((tile) => (tile.id || tile.index) === (currentTile.value.id || currentTile.value.index));
+  return i >= 0 ? i + 1 : Math.max(1, (props.state.currentTileIndex || 0) + 1);
+});
+
+const isTerminalByCounts = computed(() => {
+  if (!totalTiles.value) return false;
+  return completedCount.value + failedCount.value >= totalTiles.value;
+});
+
+const isRunning = computed(() => props.state.status === 'running' && !isTerminalByCounts.value);
 const isPaused = computed(() => props.state.status === 'paused');
 const isDone = computed(() =>
-  props.state.status === 'completed' || props.state.status === 'completed_with_errors'
+  props.state.status === 'completed' ||
+  props.state.status === 'failed' ||
+  props.state.status === 'canceled' ||
+  props.state.status === 'completed_with_errors' ||
+  isTerminalByCounts.value
 );
+
+watch(isDone, (done) => {
+  if (done && !doneAt.value) {
+    doneAt.value = props.state.completedAt || Date.now();
+  }
+  if (!done) {
+    doneAt.value = null;
+  }
+});
 
 const progressPercent = computed(() =>
   totalTiles.value > 0 ? (completedCount.value / totalTiles.value) * 100 : 0
@@ -214,9 +329,41 @@ const etaText = computed(() => {
 
 const elapsedText = computed(() => {
   if (!props.state.startedAt) return null;
-  const end = props.state.completedAt || now.value;
+  const end = props.state.completedAt || doneAt.value || now.value;
   return formatDuration(end - props.state.startedAt);
 });
+
+const formatBytes = (bytes) => {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '—';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  const fixed = value >= 100 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(fixed)} ${units[unit]}`;
+};
+
+const copyBenchmarkReport = async () => {
+  try {
+    const report = benchmarkReport.value;
+    if (!report) {
+      benchmarkCopyStatus.value = 'No benchmark data available.';
+      return;
+    }
+    const text = JSON.stringify(report, null, 2);
+    if (!navigator.clipboard?.writeText) {
+      benchmarkCopyStatus.value = 'Clipboard unavailable.';
+      return;
+    }
+    await navigator.clipboard.writeText(text);
+    benchmarkCopyStatus.value = 'Benchmark report copied.';
+  } catch {
+    benchmarkCopyStatus.value = 'Failed to copy benchmark report.';
+  }
+};
 
 // Grid style
 const gridStyle = computed(() => ({
@@ -229,6 +376,7 @@ const tileClass = (tile) => {
   switch (tile.status) {
     case 'processing':
       return 'bg-blue-400 dark:bg-blue-500 text-white ring-2 ring-blue-300 dark:ring-blue-400 animate-pulse';
+    case 'done':
     case 'completed':
       return 'bg-emerald-400 dark:bg-emerald-500 text-white';
     case 'failed':

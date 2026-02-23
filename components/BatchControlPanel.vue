@@ -113,6 +113,22 @@
 
     <hr class="border-gray-200 dark:border-gray-600" />
 
+    <!-- Performance Profile -->
+    <div class="space-y-2">
+      <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Batch Performance Profile</label>
+      <select v-model="performanceProfile"
+        class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-[#FF6600] focus:border-[#FF6600] outline-none">
+        <option value="throughput">Max Throughput (fastest, higher memory)</option>
+        <option value="balanced">Balanced (recommended)</option>
+        <option value="low_memory">Low Memory 8192 Safe (slower, most stable)</option>
+      </select>
+      <p class="text-[10px] text-gray-500 dark:text-gray-400">
+        Controls internal scheduler concurrency for fetch/compute/encode and high-res tile fan-out.
+      </p>
+    </div>
+
+    <hr class="border-gray-200 dark:border-gray-600" />
+
     <!-- OSM Toggle -->
     <div class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
       <label class="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2 cursor-pointer">
@@ -387,7 +403,7 @@
       </button>
 
       <!-- Resume saved job -->
-      <template v-if="savedState && !isRunning">
+      <template v-if="hasResumableSavedState">
         <button @click="$emit('resumeBatch')"
           class="w-full py-2.5 font-medium rounded-md flex items-center justify-center gap-2 transition-all bg-emerald-600 hover:bg-emerald-700 text-white text-sm">
           <RotateCcw :size="14" />
@@ -397,6 +413,11 @@
           class="w-full py-2 text-xs font-medium rounded-md flex items-center justify-center gap-2 transition-all bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400">
           <X :size="12" />
           Clear Saved Job
+        </button>
+        <button @click="$emit('clearCache')"
+          class="w-full py-2 text-xs font-medium rounded-md flex items-center justify-center gap-2 transition-all bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400">
+          <X :size="12" />
+          Clear Cache
         </button>
       </template>
     </div>
@@ -419,7 +440,7 @@ const props = defineProps({
 
 const emit = defineEmits([
   'locationChange', 'resolutionChange', 'startBatch',
-  'resumeBatch', 'clearSavedBatch', 'update:gridCols', 'update:gridRows',
+  'resumeBatch', 'clearSavedBatch', 'update:gridCols', 'update:gridRows', 'clearCache',
 ]);
 
 // Grid config
@@ -435,6 +456,7 @@ const isCheckingGPXZ = ref(false);
 const showElevationSource = ref(false);
 const showCoordinates = ref(false);
 const meshResolution = ref(parseInt(localStorage.getItem('mapng_batch_mesh')) || 256);
+const performanceProfile = ref(localStorage.getItem('mapng_batch_profile') || 'balanced');
 const runConfigFileInput = ref(null);
 const runConfigStatus = ref('');
 
@@ -497,6 +519,11 @@ const selectedExportCount = computed(() =>
   Object.values(exports.value).filter(Boolean).length
 );
 
+const hasResumableSavedState = computed(() => {
+  if (!props.savedState || props.isRunning) return false;
+  return props.savedState.status !== 'completed';
+});
+
 // Handlers
 const handleManualLocationChange = () => {
   const lat = parseFloat(latInput.value);
@@ -543,6 +570,7 @@ const handleStart = () => {
     gpxzApiKey: gpxzApiKey.value,
     gpxzStatus: gpxzStatus.value ? { ...gpxzStatus.value } : cloneRateLimitInfo(),
     glbMeshResolution: meshResolution.value,
+    performanceProfile: performanceProfile.value,
     exports: { ...exports.value },
   });
 };
@@ -560,6 +588,7 @@ const buildRunConfiguration = () => {
     gpxzApiKey: gpxzApiKey.value || '',
     gpxzStatus: gpxzStatus.value ? { ...gpxzStatus.value } : cloneRateLimitInfo(),
     glbMeshResolution: meshResolution.value,
+    performanceProfile: performanceProfile.value,
     exports: { ...exports.value },
   };
 };
@@ -635,6 +664,9 @@ const applyRunConfiguration = (config) => {
   if (Number.isFinite(src.glbMeshResolution)) {
     meshResolution.value = parseInt(src.glbMeshResolution);
   }
+  if (typeof src.performanceProfile === 'string' && ['throughput', 'balanced', 'low_memory'].includes(src.performanceProfile)) {
+    performanceProfile.value = src.performanceProfile;
+  }
   if (src.exports && typeof src.exports === 'object') {
     Object.keys(exports.value).forEach((key) => {
       if (typeof src.exports[key] === 'boolean') {
@@ -698,6 +730,7 @@ const checkGPXZStatus = async () => {
   }
 };
 watch(meshResolution, (v) => localStorage.setItem('mapng_batch_mesh', String(v)));
+watch(performanceProfile, (v) => localStorage.setItem('mapng_batch_profile', v));
 watch(exports, (v) => localStorage.setItem('mapng_batch_exports', JSON.stringify(v)), { deep: true });
 
 // Disable OSM-dependent exports when OSM is off

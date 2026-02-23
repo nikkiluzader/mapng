@@ -299,23 +299,6 @@
       @update:show-on-map="() => {}"
     />
 
-    <hr class="border-gray-200 dark:border-gray-600" />
-    
-    <!-- Mod of the Day (Collapsible) -->
-    <div class="space-y-2">
-      <button 
-        @click="showModOfTheDay = !showModOfTheDay"
-        class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
-      >
-        <span class="flex items-center gap-2">
-          <Trophy :size="16" class="text-yellow-500 group-hover:text-[#FF6600] transition-colors" />
-          Mod of the Day
-        </span>
-        <ChevronDown :size="14" :class="['transition-transform duration-200', showModOfTheDay ? 'rotate-180' : '']" />
-      </button>
-      <ModOfTheDay v-if="showModOfTheDay" :headless="true" />
-    </div>
-
     <!-- Export Panel -->
     <div ref="exportPanel" v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
         <!-- Missing OSM Warning / Action -->
@@ -607,8 +590,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, CircleCheck, ChevronDown, Trophy, Paintbrush } from 'lucide-vue-next';
-import ModOfTheDay from './ModOfTheDay.vue';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, CircleCheck, ChevronDown, Paintbrush } from 'lucide-vue-next';
 import LocationSearch from './LocationSearch.vue';
 import SurroundingTiles from './SurroundingTiles.vue';
 import { exportToGLB, exportToDAE } from '../services/export3d';
@@ -701,7 +683,6 @@ const usgsStatus = ref(null);
 // Collapsible section states (persisted via localStorage, hidden by default)
 const showElevationSource = ref(localStorage.getItem('mapng_showElevationSource') === 'true');
 const showCoordinates = ref(localStorage.getItem('mapng_showCoordinates') === 'true');
-const showModOfTheDay = ref(localStorage.getItem('mapng_showModOfTheDay') === 'true');
 const showExports = ref(localStorage.getItem('mapng_showExports') !== 'false'); // default open
 const showExport2D = ref(localStorage.getItem('mapng_showExport2D') !== 'false'); // default open
 const showExport3D = ref(localStorage.getItem('mapng_showExport3D') !== 'false'); // default open
@@ -787,7 +768,6 @@ const checkGPXZStatus = async () => {
 // Persist collapsible section states
 watch(showElevationSource, (v) => localStorage.setItem('mapng_showElevationSource', String(v)));
 watch(showCoordinates, (v) => localStorage.setItem('mapng_showCoordinates', String(v)));
-watch(showModOfTheDay, (v) => localStorage.setItem('mapng_showModOfTheDay', String(v)));
 watch(showExports, (v) => localStorage.setItem('mapng_showExports', String(v)));
 watch(showExport2D, (v) => localStorage.setItem('mapng_showExport2D', String(v)));
 watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v)));

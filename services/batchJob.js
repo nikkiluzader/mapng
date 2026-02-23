@@ -1,9 +1,8 @@
 /**
  * batchJob.js — Batch job grid computation, state management, and runner.
  *
- * Processes a grid of terrain tiles sequentially. Each tile is fetched,
- * all selected exports are generated, packaged into a ZIP, and downloaded.
- * Memory is freed after each tile. State is persisted so jobs can be resumed.
+ * Production-oriented runner with explicit state machine, staged timings,
+ * retry policy, queue scheduling, and persisted manifest checkpoints.
  */
 
 import JSZip from 'jszip';
@@ -21,13 +20,20 @@ import {
   generateGeoJSONBlob,
 } from './batchExports.js';
 import { buildCommonTraceMetadata, getBuildTrace } from './traceability.js';
+import {
+  JOB_STATES,
+  TILE_STATES,
+  computeDeterministicJobId,
+  computeTileId,
+  ensureJobAndTileStates,
+  summarizeStageTimings,
+} from './batchRuntime.js';
+import { classifyError, runWithRetry } from './retryPolicy.js';
+import { createTaskQueue, createRateLimiter } from './taskQueues.js';
+import { installBatchFetchCache, clearBatchCache } from './batchCache.js';
 
 // ─── Grid Computation ────────────────────────────────────────────────
 
-/**
- * Compute tile center coordinates for each cell in the grid.
- * Row 0 is the northernmost row, col 0 is the westernmost column.
- */
 export function computeGridTiles(center, resolution, gridCols, gridRows) {
   const tiles = [];
   const metersPerDegLat = 111320;
@@ -52,20 +58,15 @@ export function computeGridTiles(center, resolution, gridCols, gridRows) {
         bounds: {
           north: tileLat + halfLatSpan,
           south: tileLat - halfLatSpan,
-          east:  tileLng + halfLngSpan,
-          west:  tileLng - halfLngSpan,
+          east: tileLng + halfLngSpan,
+          west: tileLng - halfLngSpan,
         },
-        status: 'pending',   // pending | processing | completed | failed
-        error: null,
       });
     }
   }
   return tiles;
 }
 
-/**
- * Compute the overall bounding box of the entire grid.
- */
 export function computeGridBounds(center, resolution, gridCols, gridRows) {
   const metersPerDegLat = 111320;
   const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
@@ -76,59 +77,235 @@ export function computeGridBounds(center, resolution, gridCols, gridRows) {
   return {
     north: center.lat + totalHeight / 2 / metersPerDegLat,
     south: center.lat - totalHeight / 2 / metersPerDegLat,
-    east:  center.lng + totalWidth / 2 / metersPerDegLng,
-    west:  center.lng - totalWidth / 2 / metersPerDegLng,
+    east: center.lng + totalWidth / 2 / metersPerDegLng,
+    west: center.lng - totalWidth / 2 / metersPerDegLng,
   };
 }
 
 // ─── State Management ────────────────────────────────────────────────
 
-const STORAGE_KEY = 'mapng_batch_state';
+const STORAGE_KEY = 'mapng_batch_state_v2';
+const LEGACY_STORAGE_KEY = 'mapng_batch_state';
 
-/**
- * Create a new batch job state from configuration.
- */
-export function createBatchJobState(config) {
-  const tiles = computeGridTiles(config.center, config.resolution, config.gridCols, config.gridRows);
+const mapLegacyJobStatus = (status) => {
+  if (status === 'idle') return JOB_STATES.PENDING;
+  if (status === 'running') return JOB_STATES.RUNNING;
+  if (status === 'paused') return JOB_STATES.PAUSED;
+  if (status === 'completed' || status === 'completed_with_errors') return JOB_STATES.COMPLETED;
+  return status;
+};
+
+const mapLegacyTileStatus = (status) => {
+  if (status === 'pending') return TILE_STATES.QUEUED;
+  if (status === 'processing') return TILE_STATES.PROCESSING;
+  if (status === 'completed') return TILE_STATES.DONE;
+  return status;
+};
+
+function deriveSchedulerConfig(input) {
+  const resolution = Number(input?.resolution || 1024);
+  const exports = input?.exports || {};
+  const includeOSM = !!input?.includeOSM;
+  const requestedProfile = String(input?.performanceProfile || '').trim();
+
+  const heavy3D = !!(exports.glb || exports.dae);
+  const heavyVectorTextures = includeOSM && !!(exports.osmTexture || exports.hybridTexture || exports.segmentedHybrid);
+  const heavySegmentation = !!exports.segmentedSatellite || !!exports.segmentedHybrid;
+  const highRes = resolution >= 8192;
+  const veryHighRes = resolution >= 4096;
+
+  let profile = 'balanced';
+  let globalTileConcurrency = 20;
+  let fetchConcurrency = 4;
+  let computeConcurrency = 1;
+  let encodeConcurrency = 1;
+  let overpassMinIntervalMs = 600;
+
+  if (requestedProfile === 'throughput') {
+    profile = 'throughput';
+    globalTileConcurrency = resolution >= 8192 ? 12 : 20;
+    fetchConcurrency = resolution >= 8192 ? 3 : 4;
+    computeConcurrency = 1;
+    encodeConcurrency = 1;
+    overpassMinIntervalMs = 550;
+    return {
+      profile,
+      fetchConcurrency,
+      computeConcurrency,
+      encodeConcurrency,
+      globalTileConcurrency,
+      overpassMinIntervalMs,
+    };
+  }
+
+  if (requestedProfile === 'low_memory') {
+    profile = 'low_memory';
+    globalTileConcurrency = resolution >= 8192 ? 6 : 8;
+    fetchConcurrency = resolution >= 4096 ? 1 : 2;
+    computeConcurrency = 1;
+    encodeConcurrency = 1;
+    overpassMinIntervalMs = 900;
+    return {
+      profile,
+      fetchConcurrency,
+      computeConcurrency,
+      encodeConcurrency,
+      globalTileConcurrency,
+      overpassMinIntervalMs,
+    };
+  }
+
+  if (highRes) {
+    profile = 'highres_8192';
+    globalTileConcurrency = (heavy3D || heavySegmentation || heavyVectorTextures) ? 8 : 10;
+    fetchConcurrency = 2;
+    computeConcurrency = 1;
+    encodeConcurrency = 1;
+    overpassMinIntervalMs = 750;
+  } else if (veryHighRes) {
+    profile = 'highres_4096';
+    globalTileConcurrency = 12;
+    fetchConcurrency = 3;
+    computeConcurrency = 1;
+    encodeConcurrency = 1;
+    overpassMinIntervalMs = 650;
+  }
+
   return {
-    id: `batch_${Date.now()}`,
+    profile,
+    fetchConcurrency,
+    computeConcurrency,
+    encodeConcurrency,
+    globalTileConcurrency,
+    overpassMinIntervalMs,
+  };
+}
+
+export function createBatchJobState(config) {
+  const id = computeDeterministicJobId(config);
+  const performanceProfile = ['throughput', 'balanced', 'low_memory'].includes(config?.performanceProfile)
+    ? config.performanceProfile
+    : 'balanced';
+  const scheduler = {
+    ...deriveSchedulerConfig({ ...config, performanceProfile }),
+    ...(config.scheduler || {}),
+  };
+  const baseTiles = computeGridTiles(config.center, config.resolution, config.gridCols, config.gridRows);
+  const tiles = baseTiles.map((tile) => ({
+    ...tile,
+    id: computeTileId(id, tile),
+    status: TILE_STATES.QUEUED,
+    snapshot: null,
+    stageTimings: {},
+    memory: {
+      startUsedBytes: null,
+      afterFetchUsedBytes: null,
+      beforeZipUsedBytes: null,
+      afterZipUsedBytes: null,
+      endUsedBytes: null,
+      peakUsedBytes: 0,
+    },
+    lifecycle: {
+      startedAt: null,
+      fetchCompletedAt: null,
+      zipCompletedAt: null,
+      completedAt: null,
+      totalMs: 0,
+    },
+    attempts: 0,
+    errors: [],
+    lastError: null,
+    nextRetryAt: null,
+    retryable: false,
+  }));
+
+  return {
+    schemaVersion: 2,
+    id,
     center: { ...config.center },
     resolution: config.resolution,
     gridCols: config.gridCols,
     gridRows: config.gridRows,
-
     exports: { ...config.exports },
-
     includeOSM: config.includeOSM,
     elevationSource: config.elevationSource,
     gpxzApiKey: config.gpxzApiKey || '',
     gpxzStatus: config.gpxzStatus || null,
     glbMeshResolution: config.glbMeshResolution || 512,
+    performanceProfile,
 
-    status: 'idle',          // idle | running | paused | completed | completed_with_errors
+    scheduler,
+
+    status: JOB_STATES.PENDING,
     currentTileIndex: -1,
+    currentTileId: null,
     tiles,
     startedAt: null,
     completedAt: null,
+    canceledAt: null,
     totalCompleted: 0,
     totalFailed: 0,
-    tileCompletionTimes: [],  // ms per completed tile, for ETA calculation
+    tileCompletionTimes: [],
+    instrumentation: {
+      memory: {
+        supported: false,
+        samples: [],
+        peakUsedBytes: 0,
+        peakTotalBytes: 0,
+        sampleLimit: 120,
+        sampleIntervalMs: 1200,
+        lastSampleAt: 0,
+      },
+    },
+    summary: null,
   };
 }
+
+const migrateLoadedState = (state) => {
+  if (!state) return null;
+
+  state.status = mapLegacyJobStatus(state.status);
+  if (Array.isArray(state.tiles)) {
+    state.tiles.forEach((tile) => {
+      tile.status = mapLegacyTileStatus(tile.status);
+    });
+  }
+
+  if (!state.schemaVersion) state.schemaVersion = 2;
+  state.performanceProfile = ['throughput', 'balanced', 'low_memory'].includes(state.performanceProfile)
+    ? state.performanceProfile
+    : 'balanced';
+  const fallbackScheduler = deriveSchedulerConfig(state);
+  state.scheduler = {
+    ...fallbackScheduler,
+    ...(state.scheduler || {}),
+  };
+  ensureJobAndTileStates(state);
+  return state;
+};
 
 export function saveBatchState(state) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
-    // localStorage might be full — not critical
     console.warn('[Batch] Could not persist batch state to localStorage');
   }
 }
 
 export function loadBatchState() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : null;
+    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!saved) return null;
+    const state = migrateLoadedState(JSON.parse(saved));
+    if (!state) return null;
+
+    // Completed jobs should not remain as "saved resumable" jobs.
+    if (state.status === JOB_STATES.COMPLETED) {
+      clearBatchState();
+      return null;
+    }
+
+    return state;
   } catch {
     return null;
   }
@@ -136,24 +313,28 @@ export function loadBatchState() {
 
 export function clearBatchState() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
 
-/**
- * Reset failed tiles to 'pending' for retry.
- */
+export async function clearBatchClientCache() {
+  await clearBatchCache();
+}
+
 export function resetFailedTiles(state) {
   for (const tile of state.tiles) {
-    if (tile.status === 'failed') {
-      tile.status = 'pending';
-      tile.error = null;
+    if (tile.status === TILE_STATES.FAILED) {
+      tile.status = TILE_STATES.QUEUED;
+      tile.lastError = null;
+      tile.retryable = false;
+      tile.nextRetryAt = null;
     }
   }
-  state.status = 'idle';
+  state.status = JOB_STATES.PENDING;
   state.totalFailed = 0;
   saveBatchState(state);
 }
 
-// ─── Download Helper ─────────────────────────────────────────────────
+// ─── Utilities ───────────────────────────────────────────────────────
 
 function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -161,16 +342,31 @@ function triggerDownload(blob, filename) {
   link.href = url;
   link.download = filename;
   link.click();
-  // Small delay before revoking so the browser can start the download
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-/**
- * Generate a small thumbnail data URL from terrain data for the progress grid.
- * Uses satellite texture if available, falls back to heightmap grayscale.
- */
-function generateTileSnapshot(terrainData) {
-  const size = 64;
+function getSnapshotSize(state) {
+  const maxGridPx = 400;
+  const cols = Math.max(1, Number(state.gridCols || 1));
+  const rows = Math.max(1, Number(state.gridRows || 1));
+  const cellPx = maxGridPx / Math.max(cols, rows);
+  const ideal = Math.round(cellPx * 2);
+  return Math.max(96, Math.min(512, ideal));
+}
+
+async function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+async function generateTileSnapshot(terrainData, state) {
+  const size = getSnapshotSize(state);
+  const jpegQuality = size >= 320 ? 0.85 : 0.75;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
@@ -178,18 +374,12 @@ function generateTileSnapshot(terrainData) {
   if (!ctx) return null;
 
   try {
-    // Try satellite texture first
     if (terrainData.satelliteTextureUrl) {
-      const img = new Image();
-      img.src = terrainData.satelliteTextureUrl;
-      // If already loaded (data URL), draw synchronously
-      if (img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, 0, 0, size, size);
-        return canvas.toDataURL('image/jpeg', 0.6);
-      }
+      const img = await loadImage(terrainData.satelliteTextureUrl);
+      ctx.drawImage(img, 0, 0, size, size);
+      return canvas.toDataURL('image/jpeg', jpegQuality);
     }
 
-    // Fallback: heightmap grayscale
     if (terrainData.heightMap) {
       const imgData = ctx.createImageData(size, size);
       const range = terrainData.maxHeight - terrainData.minHeight;
@@ -209,327 +399,594 @@ function generateTileSnapshot(terrainData) {
         }
       }
       ctx.putImageData(imgData, 0, 0);
-      return canvas.toDataURL('image/jpeg', 0.6);
+      return canvas.toDataURL('image/jpeg', jpegQuality);
     }
   } catch {
-    // Snapshot generation is non-critical
   }
+
   return null;
 }
 
-// ─── Batch Job Runner ────────────────────────────────────────────────
+function releaseTerrainResources(terrainData) {
+  if (!terrainData || typeof terrainData !== 'object') return;
 
-/**
- * Run a batch job, processing tiles sequentially.
- *
- * @param {Object} state     - Mutable batch job state (will be updated in-place)
- * @param {Function} onProgress - Called with { tileIndex, step, tile } on each progress update
- * @param {Function} onTileComplete - Called with tile object when a tile finishes
- * @param {Function} onError  - Called with (tile, error) when a tile fails
- * @param {AbortSignal} signal - For cancellation
- */
-export async function runBatchJob(state, onProgress, onTileComplete, onError, signal) {
-  state.status = 'running';
-  if (!state.startedAt) state.startedAt = Date.now();
+  if (terrainData.heightMap) terrainData.heightMap = null;
+
+  if (terrainData.osmTextureCanvas) {
+    terrainData.osmTextureCanvas.width = 1;
+    terrainData.osmTextureCanvas.height = 1;
+    terrainData.osmTextureCanvas = null;
+  }
+  if (terrainData.hybridTextureCanvas) {
+    terrainData.hybridTextureCanvas.width = 1;
+    terrainData.hybridTextureCanvas.height = 1;
+    terrainData.hybridTextureCanvas = null;
+  }
+  if (terrainData.segmentedTextureCanvas) {
+    terrainData.segmentedTextureCanvas.width = 1;
+    terrainData.segmentedTextureCanvas.height = 1;
+    terrainData.segmentedTextureCanvas = null;
+  }
+  if (terrainData.segmentedHybridTextureCanvas) {
+    terrainData.segmentedHybridTextureCanvas.width = 1;
+    terrainData.segmentedHybridTextureCanvas.height = 1;
+    terrainData.segmentedHybridTextureCanvas = null;
+  }
+
+  if (terrainData.osmTextureUrl) URL.revokeObjectURL(terrainData.osmTextureUrl);
+  if (terrainData.hybridTextureUrl) URL.revokeObjectURL(terrainData.hybridTextureUrl);
+  if (terrainData.segmentedTextureUrl) URL.revokeObjectURL(terrainData.segmentedTextureUrl);
+  if (terrainData.segmentedHybridTextureUrl) URL.revokeObjectURL(terrainData.segmentedHybridTextureUrl);
+  if (terrainData.satelliteTextureUrl) URL.revokeObjectURL(terrainData.satelliteTextureUrl);
+
+  terrainData.osmTextureUrl = null;
+  terrainData.hybridTextureUrl = null;
+  terrainData.segmentedTextureUrl = null;
+  terrainData.segmentedHybridTextureUrl = null;
+  terrainData.satelliteTextureUrl = null;
+
+  terrainData.osmTextureBlob = null;
+  terrainData.hybridTextureBlob = null;
+  terrainData.segmentedTextureBlob = null;
+  terrainData.segmentedHybridTextureBlob = null;
+
+  terrainData.osmFeatures = null;
+  terrainData.sourceGeoTiffs = null;
+}
+
+const checkpoint = (state) => {
+  sampleMemory(state);
+  state.summary = summarizeStageTimings(state);
   saveBatchState(state);
+};
 
-  for (let i = 0; i < state.tiles.length; i++) {
-    const tile = state.tiles[i];
+const readPerformanceMemory = () => {
+  const mem = performance?.memory;
+  if (!mem) return null;
+  const usedBytes = Number(mem.usedJSHeapSize || 0);
+  const totalBytes = Number(mem.totalJSHeapSize || 0);
+  const limitBytes = Number(mem.jsHeapSizeLimit || 0);
+  if (!Number.isFinite(usedBytes) || !Number.isFinite(totalBytes)) return null;
+  return { usedBytes, totalBytes, limitBytes };
+};
 
-    // Skip completed tiles (supports resume)
-    if (tile.status === 'completed') continue;
+const sampleMemory = (state, { tile = null, label = 'checkpoint', force = false } = {}) => {
+  const store = state?.instrumentation?.memory;
+  if (!store) return null;
 
-    // Check for cancellation
-    if (signal?.aborted) {
-      tile.status = tile.status === 'processing' ? 'pending' : tile.status;
-      state.status = 'paused';
-      saveBatchState(state);
-      return;
-    }
+  const now = Date.now();
+  if (!force && store.lastSampleAt && (now - store.lastSampleAt) < (store.sampleIntervalMs || 1200)) {
+    return null;
+  }
 
-    state.currentTileIndex = i;
-    tile.status = 'processing';
-    tile.error = null;
-    const tileStartTime = Date.now();
+  const sample = readPerformanceMemory();
+  if (!sample) {
+    store.supported = false;
+    store.lastSampleAt = now;
+    return null;
+  }
 
-    const label = `R${tile.row + 1}C${tile.col + 1}`;
-    onProgress({ tileIndex: i, step: `Starting tile ${label}...`, tile });
+  store.supported = true;
+  store.lastSampleAt = now;
+  const sampleRow = {
+    at: now,
+    label,
+    tileId: tile?.id || null,
+    usedBytes: sample.usedBytes,
+    totalBytes: sample.totalBytes,
+    limitBytes: sample.limitBytes,
+  };
 
-    try {
-      // ── 1. Fetch terrain data ────────────────────────────
-      onProgress({ tileIndex: i, step: 'Fetching terrain data...', tile });
+  store.samples.push(sampleRow);
+  const limit = Math.max(20, Number(store.sampleLimit || 120));
+  if (store.samples.length > limit) {
+    store.samples.splice(0, store.samples.length - limit);
+  }
 
-      const terrainData = await fetchTerrainData(
-        tile.center,
-        state.resolution,
-        state.includeOSM,
-        state.elevationSource === 'usgs',
-        state.elevationSource === 'gpxz',
-        state.gpxzApiKey,
-        undefined,
-        (status) => onProgress({ tileIndex: i, step: status, tile }),
-        signal
-      );
+  store.peakUsedBytes = Math.max(Number(store.peakUsedBytes || 0), sample.usedBytes);
+  store.peakTotalBytes = Math.max(Number(store.peakTotalBytes || 0), sample.totalBytes);
 
-      // Check for abort after long fetch
-      if (signal?.aborted) {
-        tile.status = 'pending';
-        state.status = 'paused';
-        saveBatchState(state);
-        return;
+  if (tile) {
+    tile.memory = tile.memory || {};
+    tile.memory.peakUsedBytes = Math.max(Number(tile.memory.peakUsedBytes || 0), sample.usedBytes);
+  }
+
+  return sampleRow;
+};
+
+const addTiming = (tile, stage, ms) => {
+  tile.stageTimings[stage] = Math.round((tile.stageTimings[stage] || 0) + ms);
+};
+
+const runTimedStage = async (tile, stage, fn) => {
+  const start = performance.now();
+  const result = await fn();
+  addTiming(tile, stage, performance.now() - start);
+  return result;
+};
+
+const sanitizeError = (error, classification, attempt, waitMs = null) => {
+  const timestamp = new Date().toISOString();
+  return {
+    classification: classification.retryable ? 'retryable' : 'non-retryable',
+    kind: classification.kind,
+    status: classification.status,
+    message: error?.message || String(error),
+    stack: error?.stack || null,
+    timestamp,
+    attempts: attempt,
+    nextRetryAt: waitMs ? new Date(Date.now() + waitMs).toISOString() : null,
+  };
+};
+
+const updateCounts = (state) => {
+  state.totalCompleted = state.tiles.filter((t) => t.status === TILE_STATES.DONE).length;
+  state.totalFailed = state.tiles.filter((t) => t.status === TILE_STATES.FAILED).length;
+};
+
+const isPausedOrCanceled = (signal, state) => {
+  if (!signal?.aborted) return false;
+  if (state.status === JOB_STATES.CANCELED) return true;
+  state.status = JOB_STATES.PAUSED;
+  return true;
+};
+
+function buildTileMetadata(state, tile, terrainData) {
+  const runConfig = {
+    schemaVersion: 1,
+    mode: 'batch',
+    center: { ...state.center },
+    resolution: state.resolution,
+    gridCols: state.gridCols,
+    gridRows: state.gridRows,
+    includeOSM: state.includeOSM,
+    elevationSource: state.elevationSource,
+    gpxzApiKey: state.gpxzApiKey || '',
+    gpxzStatus: state.gpxzStatus || null,
+    glbMeshResolution: state.glbMeshResolution,
+    performanceProfile: state.performanceProfile || 'balanced',
+    exports: { ...state.exports },
+    scheduler: { ...(state.scheduler || {}) },
+  };
+
+  return buildCommonTraceMetadata({
+    mode: 'batch',
+    center: tile.center,
+    zoom: null,
+    resolution: state.resolution,
+    terrainData,
+    textureModes: {
+      satellite: !!terrainData.satelliteTextureUrl,
+      osm: !!terrainData.osmTextureUrl,
+      hybrid: !!terrainData.hybridTextureUrl,
+      segmentedSatellite: !!terrainData.segmentedTextureUrl,
+      segmentedHybrid: !!terrainData.segmentedHybridTextureUrl,
+      roadMask: !!terrainData.osmFeatures?.length,
+    },
+    osmQuery: terrainData.osmRequestInfo || null,
+    gpxz: state.gpxzStatus || null,
+    extra: {
+      batchId: state.id,
+      tile: {
+        id: tile.id,
+        row: tile.row,
+        col: tile.col,
+        label: `R${tile.row + 1}C${tile.col + 1}`,
+        center: tile.center,
+      },
+      build: getBuildTrace(),
+      runConfiguration: runConfig,
+      stageTimings: tile.stageTimings,
+      scheduler: { ...(state.scheduler || {}) },
+      terrain: {
+        bounds: terrainData.bounds,
+        minHeight: terrainData.minHeight,
+        maxHeight: terrainData.maxHeight,
+        width: terrainData.width,
+        height: terrainData.height,
+      },
+    },
+  });
+}
+
+function buildQueues(state, onQueueWait) {
+  const scheduler = state.scheduler || {
+    fetchConcurrency: 4,
+    computeConcurrency: 1,
+    encodeConcurrency: 1,
+    overpassMinIntervalMs: 600,
+  };
+  const fetchQueue = createTaskQueue({ concurrency: scheduler.fetchConcurrency, name: 'fetch' });
+  const computeQueue = createTaskQueue({ concurrency: scheduler.computeConcurrency, name: 'compute' });
+  const encodeQueue = createTaskQueue({ concurrency: scheduler.encodeConcurrency, name: 'encode' });
+
+  const overpassLimiter = createRateLimiter({
+    minIntervalMs: Math.max(0, Number(scheduler.overpassMinIntervalMs || 600)),
+    concurrency: 1,
+  });
+
+  const scheduleFetch = (tile, task) => {
+    return fetchQueue.enqueue(() => overpassLimiter.schedule(task), {
+      onStart: (waitMs) => onQueueWait(tile, 'queue_wait_fetch', waitMs),
+    });
+  };
+  const scheduleCompute = (tile, task) => {
+    return computeQueue.enqueue(task, {
+      onStart: (waitMs) => onQueueWait(tile, 'queue_wait_compute', waitMs),
+    });
+  };
+  const scheduleEncode = (tile, task) => {
+    return encodeQueue.enqueue(task, {
+      onStart: (waitMs) => onQueueWait(tile, 'queue_wait_encode', waitMs),
+    });
+  };
+
+  return {
+    scheduleFetch,
+    scheduleCompute,
+    scheduleEncode,
+    close: () => {
+      fetchQueue.close();
+      computeQueue.close();
+      encodeQueue.close();
+    },
+  };
+}
+
+async function processTile(state, tile, ctx, signal) {
+  const {
+    onProgress,
+    onTileComplete,
+    onError,
+    scheduleFetch,
+    scheduleCompute,
+    scheduleEncode,
+  } = ctx;
+
+  const label = `R${tile.row + 1}C${tile.col + 1}`;
+  tile.status = TILE_STATES.PROCESSING;
+  tile.lifecycle = tile.lifecycle || {};
+  tile.lifecycle.startedAt = Date.now();
+  tile.lastError = null;
+  tile.nextRetryAt = null;
+  tile.retryable = false;
+  tile.attempts = 0;
+  const tileStartSample = sampleMemory(state, { tile, label: 'tile_start', force: true });
+  if (tileStartSample) {
+    tile.memory.startUsedBytes = tileStartSample.usedBytes;
+  }
+  checkpoint(state);
+
+  const tileStart = Date.now();
+
+  await runWithRetry(
+    async (attempt) => {
+      tile.attempts = attempt;
+      const fetchStatus = { activeStage: null, startedAt: 0 };
+
+      const terrainData = await scheduleFetch(tile, () => runTimedStage(tile, 'fetch_total', async () => {
+        onProgress({ tileIndex: tile.index, step: `Fetching terrain data (${label})...`, tile });
+        const needsSegmentedBase = !!(state.exports.segmentedSatellite || state.exports.segmentedHybrid);
+        const needsOsmTexture = !!(state.includeOSM && state.exports.osmTexture);
+        const needsHybridTexture = !!(state.includeOSM && state.exports.hybridTexture);
+        const needsSegmentedHybrid = !!(state.includeOSM && state.exports.segmentedHybrid);
+        return fetchTerrainData(
+          tile.center,
+          state.resolution,
+          state.includeOSM,
+          state.elevationSource === 'usgs',
+          state.elevationSource === 'gpxz',
+          state.gpxzApiKey,
+          undefined,
+          (status) => {
+            const now = performance.now();
+            const next = /OpenStreetMap/.test(status)
+              ? 'osm_fetch'
+              : /segmented satellite/i.test(status)
+                ? 'segmentation'
+                : /Generating OSM texture/i.test(status)
+                  ? 'osm_texture_generation'
+                  : /Generating Hybrid texture/i.test(status)
+                    ? 'hybrid_texture_generation'
+                    : /Segmented Hybrid/i.test(status)
+                      ? 'segmented_hybrid_generation'
+                      : /(global tiles|Downloading .*terrain|Downloading .*satellite)/i.test(status)
+                        ? 'imagery_fetch'
+                        : /GPXZ|USGS|elevation/i.test(status)
+                          ? 'elevation_fetch'
+                          : null;
+
+            if (fetchStatus.activeStage && fetchStatus.activeStage !== next) {
+              addTiming(tile, fetchStatus.activeStage, now - fetchStatus.startedAt);
+              fetchStatus.startedAt = now;
+            }
+            if (next && fetchStatus.activeStage !== next) {
+              fetchStatus.activeStage = next;
+              if (!fetchStatus.startedAt) fetchStatus.startedAt = now;
+            }
+            onProgress({ tileIndex: tile.index, step: status, tile });
+            checkpoint(state);
+          },
+          signal,
+          {
+            keepSourceGeoTiffs: !!state.exports.geotiff,
+            generateSegmentedSatellite: needsSegmentedBase,
+            generateOSMTextureAsset: needsOsmTexture,
+            generateHybridTextureAsset: needsHybridTexture,
+            generateSegmentedHybridAsset: needsSegmentedHybrid,
+            globalTileConcurrency: Number(state.scheduler?.globalTileConcurrency || 20),
+          },
+        );
+      }));
+
+      tile.lifecycle.fetchCompletedAt = Date.now();
+      const afterFetchSample = sampleMemory(state, { tile, label: 'after_fetch', force: true });
+      if (afterFetchSample) {
+        tile.memory.afterFetchUsedBytes = afterFetchSample.usedBytes;
       }
 
-      // ── 2. Generate exports and package into ZIP ─────────
-      onProgress({ tileIndex: i, step: 'Packaging exports...', tile });
+      checkpoint(state);
+
       const zip = new JSZip();
-
-      // Tile metadata
-      const runConfig = {
-        schemaVersion: 1,
-        mode: 'batch',
-        center: { ...state.center },
-        resolution: state.resolution,
-        gridCols: state.gridCols,
-        gridRows: state.gridRows,
-        includeOSM: state.includeOSM,
-        elevationSource: state.elevationSource,
-        gpxzApiKey: state.gpxzApiKey || '',
-        gpxzStatus: state.gpxzStatus || null,
-        glbMeshResolution: state.glbMeshResolution,
-        exports: { ...state.exports },
-      };
-
-      const metadata = buildCommonTraceMetadata({
-        mode: 'batch',
-        center: tile.center,
-        zoom: null,
-        resolution: state.resolution,
-        terrainData,
-        textureModes: {
-          satellite: !!terrainData.satelliteTextureUrl,
-          osm: !!terrainData.osmTextureUrl,
-          hybrid: !!terrainData.hybridTextureUrl,
-          segmentedSatellite: !!terrainData.segmentedTextureUrl,
-          segmentedHybrid: !!terrainData.segmentedHybridTextureUrl,
-          roadMask: !!terrainData.osmFeatures?.length,
-        },
-        osmQuery: terrainData.osmRequestInfo || null,
-        gpxz: state.gpxzStatus || null,
-        extra: {
-          batchId: state.id,
-          tile: {
-            row: tile.row,
-            col: tile.col,
-            label,
-            center: tile.center,
-            gridPosition: `Row ${tile.row + 1} of ${state.gridRows}, Col ${tile.col + 1} of ${state.gridCols}`,
-          },
-          build: getBuildTrace(),
-          runConfiguration: runConfig,
-          terrain: {
-            bounds: terrainData.bounds,
-            minHeight: terrainData.minHeight,
-            maxHeight: terrainData.maxHeight,
-            width: terrainData.width,
-            height: terrainData.height,
-          },
-        },
-      });
-
+      const metadata = buildTileMetadata(state, tile, terrainData);
       zip.file('metadata.json', JSON.stringify(metadata, null, 2));
 
-      // Heightmap
       if (state.exports.heightmap) {
-        onProgress({ tileIndex: i, step: 'Generating heightmap...', tile });
-        const blob = generateHeightmapBlob(terrainData);
+        onProgress({ tileIndex: tile.index, step: 'Encoding heightmap...', tile });
+        const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_png_heightmap', async () => generateHeightmapBlob(terrainData)));
         if (blob) zip.file('heightmap_16bit.png', blob);
+        checkpoint(state);
       }
 
-      // Satellite
       if (state.exports.satellite) {
-        onProgress({ tileIndex: i, step: 'Generating satellite texture...', tile });
-        const blob = await generateSatelliteBlob(terrainData);
+        onProgress({ tileIndex: tile.index, step: 'Encoding satellite texture...', tile });
+        const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_png_satellite', async () => generateSatelliteBlob(terrainData)));
         if (blob) zip.file('satellite.png', blob);
+        checkpoint(state);
       }
 
-      // OSM Texture
       if (state.exports.osmTexture && terrainData.osmTextureUrl) {
-        onProgress({ tileIndex: i, step: 'Generating OSM texture...', tile });
-        const blob = await generateOSMTextureBlob(terrainData);
+        const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_png_osm_texture', async () => generateOSMTextureBlob(terrainData)));
         if (blob) zip.file('osm_texture.png', blob);
+        checkpoint(state);
       }
 
-      // Hybrid Texture
       if (state.exports.hybridTexture && terrainData.hybridTextureUrl) {
-        onProgress({ tileIndex: i, step: 'Generating hybrid texture...', tile });
-        const blob = await generateHybridTextureBlob(terrainData);
+        const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_png_hybrid_texture', async () => generateHybridTextureBlob(terrainData)));
         if (blob) zip.file('hybrid_texture.png', blob);
+        checkpoint(state);
       }
 
-      // Segmented Satellite
       if (state.exports.segmentedSatellite) {
-        onProgress({ tileIndex: i, step: 'Generating segmented satellite texture...', tile });
-        const blob = await generateSegmentedSatelliteBlob(terrainData);
+        const blob = await scheduleCompute(tile, () => runTimedStage(tile, 'compute_segmentation', async () => generateSegmentedSatelliteBlob(terrainData)));
         if (blob) zip.file('segmented_satellite.png', blob);
+        checkpoint(state);
       }
 
-      // Segmented Hybrid (segmented base + roads)
       if (state.exports.segmentedHybrid && terrainData.osmFeatures?.length > 0) {
-        onProgress({ tileIndex: i, step: 'Generating segmented hybrid texture...', tile });
-        const blob = await generateSegmentedHybridBlob(terrainData);
+        const blob = await scheduleCompute(tile, () => runTimedStage(tile, 'compute_segmented_hybrid', async () => generateSegmentedHybridBlob(terrainData)));
         if (blob) zip.file('segmented_hybrid.png', blob);
+        checkpoint(state);
       }
 
-      // Road Mask
       if (state.exports.roadMask && terrainData.osmFeatures?.length > 0) {
-        onProgress({ tileIndex: i, step: 'Generating road mask...', tile });
-        const blob = generateRoadMaskBlob(terrainData, tile.center);
+        const blob = await scheduleCompute(tile, () => runTimedStage(tile, 'compute_road_mask', async () => generateRoadMaskBlob(terrainData, tile.center)));
         if (blob) zip.file('road_mask_16bit.png', blob);
+        checkpoint(state);
       }
 
-      // GLB Model (no surroundings for batch — adjacent tiles ARE the surroundings)
       if (state.exports.glb) {
-        onProgress({ tileIndex: i, step: 'Generating GLB model...', tile });
-        const blob = await exportToGLB(terrainData, {
+        const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_glb', async () => exportToGLB(terrainData, {
           maxMeshResolution: state.glbMeshResolution,
           includeSurroundings: false,
           returnBlob: true,
-          onProgress: (s) => onProgress({ tileIndex: i, step: s, tile }),
-        });
+          onProgress: (s) => onProgress({ tileIndex: tile.index, step: s, tile }),
+        })));
         if (blob) zip.file('model.glb', blob);
+        checkpoint(state);
       }
 
-      // DAE Model
       if (state.exports.dae) {
-        onProgress({ tileIndex: i, step: 'Generating Collada DAE model...', tile });
-        const blob = await exportToDAE(terrainData, {
+        const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_dae', async () => exportToDAE(terrainData, {
           maxMeshResolution: state.glbMeshResolution,
           includeSurroundings: false,
           returnBlob: true,
-          onProgress: (s) => onProgress({ tileIndex: i, step: s, tile }),
-        });
+          onProgress: (s) => onProgress({ tileIndex: tile.index, step: s, tile }),
+        })));
         if (blob) zip.file('model.dae.zip', blob);
+        checkpoint(state);
       }
 
-      // GeoTIFF
       if (state.exports.geotiff) {
-        onProgress({ tileIndex: i, step: 'Generating GeoTIFF...', tile });
-        const blob = await generateGeoTIFFBlob(terrainData, tile.center);
+        const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_geotiff', async () => generateGeoTIFFBlob(terrainData, tile.center)));
         if (blob) zip.file('heightmap.tif', blob);
+        checkpoint(state);
       }
 
-      // GeoJSON
       if (state.exports.geojson && terrainData.osmFeatures?.length > 0) {
-        onProgress({ tileIndex: i, step: 'Generating GeoJSON...', tile });
-        const blob = generateGeoJSONBlob(terrainData);
+        const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_geojson', async () => generateGeoJSONBlob(terrainData)));
         if (blob) zip.file('features.geojson', blob);
+        checkpoint(state);
       }
 
-      // ── 3. Generate and download the ZIP ─────────────────
-      onProgress({ tileIndex: i, step: 'Creating ZIP archive...', tile });
-      let zipBlob;
-      try {
-        zipBlob = await zip.generateAsync({ type: 'blob' });
-      } catch (zipErr) {
-        console.error(`[Batch] ZIP generation failed for ${label}:`, zipErr);
-        // Retry with arraybuffer fallback (avoids browser Blob size limits)
+      const tileSnapshot = await runTimedStage(tile, 'snapshot_generation', async () => generateTileSnapshot(terrainData, state));
+      tile.snapshot = tileSnapshot;
+
+      const beforeZipSample = sampleMemory(state, { tile, label: 'before_zip', force: true });
+      if (beforeZipSample) {
+        tile.memory.beforeZipUsedBytes = beforeZipSample.usedBytes;
+      }
+
+      releaseTerrainResources(terrainData);
+      await new Promise(r => setTimeout(r, 0));
+
+      const zipBlob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_zip', async () => {
         try {
-          const buf = await zip.generateAsync({ type: 'arraybuffer' });
-          zipBlob = new Blob([buf], { type: 'application/zip' });
-        } catch (retryErr) {
-          throw new Error(`ZIP too large for ${label} — try a smaller tile resolution or disable 3D exports. (${retryErr.message})`);
+          return await zip.generateAsync({ type: 'blob', streamFiles: true, compression: 'STORE' });
+        } catch {
+          return await zip.generateAsync({ type: 'blob', compression: 'STORE' });
         }
+      }));
+
+      tile.lifecycle.zipCompletedAt = Date.now();
+      const afterZipSample = sampleMemory(state, { tile, label: 'after_zip', force: true });
+      if (afterZipSample) {
+        tile.memory.afterZipUsedBytes = afterZipSample.usedBytes;
       }
 
       const date = new Date().toISOString().slice(0, 10);
-      const lat = tile.center.lat.toFixed(4);
-      const lng = tile.center.lng.toFixed(4);
-      triggerDownload(zipBlob, `MapNG_Batch_${label}_${date}_${lat}_${lng}.zip`);
+      triggerDownload(zipBlob, `MapNG_Batch_${label}_${date}_${tile.center.lat.toFixed(4)}_${tile.center.lng.toFixed(4)}.zip`);
 
-      // ── 4. Generate thumbnail snapshot ───────────────────
-      tile.snapshot = generateTileSnapshot(terrainData);
-
-      // ── 5. Mark tile as completed ────────────────────────
-      tile.status = 'completed';
-      state.totalCompleted++;
-
-      const elapsed = Date.now() - tileStartTime;
-      state.tileCompletionTimes.push(elapsed);
-
+      tile.status = TILE_STATES.DONE;
+      tile.lifecycle.completedAt = Date.now();
+      tile.lifecycle.totalMs = tile.lifecycle.startedAt
+        ? Math.max(0, tile.lifecycle.completedAt - tile.lifecycle.startedAt)
+        : 0;
+      state.tileCompletionTimes.push(Date.now() - tileStart);
+      updateCounts(state);
+      checkpoint(state);
       onTileComplete(tile);
 
-      // ── 6. Aggressive memory cleanup ─────────────────────
-      // Null out all large data references
-      if (terrainData.heightMap) terrainData.heightMap = null;
-      if (terrainData.osmTextureCanvas) {
-        terrainData.osmTextureCanvas.width = 1;
-        terrainData.osmTextureCanvas.height = 1;
-        terrainData.osmTextureCanvas = null;
+      await new Promise(r => setTimeout(r, 120));
+      const endSample = sampleMemory(state, { tile, label: 'post_cleanup', force: true });
+      if (endSample) {
+        tile.memory.endUsedBytes = endSample.usedBytes;
       }
-      if (terrainData.hybridTextureCanvas) {
-        terrainData.hybridTextureCanvas.width = 1;
-        terrainData.hybridTextureCanvas.height = 1;
-        terrainData.hybridTextureCanvas = null;
-      }
-      if (terrainData.osmTextureUrl) {
-        URL.revokeObjectURL(terrainData.osmTextureUrl);
-        terrainData.osmTextureUrl = null;
-      }
-      if (terrainData.hybridTextureUrl) {
-        URL.revokeObjectURL(terrainData.hybridTextureUrl);
-        terrainData.hybridTextureUrl = null;
-      }
-      terrainData.osmFeatures = null;
-      terrainData.sourceGeoTiffs = null;
-      terrainData.satelliteTextureUrl = null;
+    },
+    {
+      maxAttempts: 3,
+      signal,
+      onRetry: ({ attempt, waitMs, classification, error }) => {
+        tile.retryable = true;
+        tile.nextRetryAt = new Date(Date.now() + waitMs).toISOString();
+        const detail = sanitizeError(error, classification, attempt, waitMs);
+        tile.lastError = detail;
+        tile.errors.push(detail);
+        checkpoint(state);
+      },
+    },
+  ).catch((error) => {
+    const classification = classifyError(error);
+    const detail = sanitizeError(error, classification, tile.attempts || 1, null);
+    tile.lastError = detail;
+    tile.errors.push(detail);
+    tile.retryable = classification.retryable;
+    tile.status = classification.kind === 'aborted' && state.status === JOB_STATES.PAUSED
+      ? TILE_STATES.QUEUED
+      : TILE_STATES.FAILED;
+    updateCounts(state);
+    checkpoint(state);
+    onError(tile, error);
+    throw error;
+  });
+}
 
-      // Allow GC before next tile
-      await new Promise(r => setTimeout(r, 300));
+export async function runBatchJob(state, onProgress, onTileComplete, onError, signal) {
+  ensureJobAndTileStates(state);
 
-      saveBatchState(state);
+  if (!state.startedAt) state.startedAt = Date.now();
+  state.status = JOB_STATES.RUNNING;
+  sampleMemory(state, { label: 'job_start', force: true });
+  checkpoint(state);
 
-    } catch (error) {
-      if (error.name === 'AbortError' || signal?.aborted) {
-        tile.status = 'pending';
-        state.status = 'paused';
-        saveBatchState(state);
+  const uninstallFetchCache = installBatchFetchCache();
+  const queues = buildQueues(state, (tile, stage, waitMs) => {
+    addTiming(tile, stage, waitMs);
+  });
+
+  const processTileList = async (tiles, passLabel) => {
+    for (const tile of tiles) {
+      if (isPausedOrCanceled(signal, state)) {
+        checkpoint(state);
         return;
       }
 
-      console.error(`[Batch] Tile ${label} failed:`, error);
-      tile.status = 'failed';
-      tile.error = error.message || 'Unknown error';
-      state.totalFailed++;
-      onError(tile, error);
+      if (tile.status === TILE_STATES.DONE || tile.status === TILE_STATES.SKIPPED) {
+        continue;
+      }
 
-      // Clean up any partial data
-      await new Promise(r => setTimeout(r, 200));
-      saveBatchState(state);
-      // Continue to next tile
+      state.currentTileIndex = tile.index;
+      state.currentTileId = tile.id || null;
+      onProgress({ tileIndex: tile.index, step: `Starting ${passLabel} tile R${tile.row + 1}C${tile.col + 1}...`, tile });
+      checkpoint(state);
+
+      try {
+        await processTile(state, tile, {
+          onProgress,
+          onTileComplete,
+          onError,
+          ...queues,
+        }, signal);
+      } catch (error) {
+        if (error?.name === 'AbortError' || signal?.aborted) {
+          if (state.status !== JOB_STATES.CANCELED) {
+            state.status = JOB_STATES.PAUSED;
+          }
+          checkpoint(state);
+          return;
+        }
+      }
     }
-  }
+  };
 
-  // ── Batch complete ───────────────────────────────────────
-  state.currentTileIndex = -1;
-  state.completedAt = Date.now();
-  state.status = state.totalFailed > 0 ? 'completed_with_errors' : 'completed';
-  saveBatchState(state);
+  try {
+    const initialTiles = state.tiles.filter((t) => t.status === TILE_STATES.QUEUED || t.status === TILE_STATES.FAILED);
+    await processTileList(initialTiles, 'primary');
+
+    if (state.status === JOB_STATES.RUNNING) {
+      const retryTiles = state.tiles.filter((t) => t.status === TILE_STATES.FAILED && t.retryable);
+      if (retryTiles.length > 0) {
+        await processTileList(retryTiles, 'retry');
+      }
+    }
+
+    if (state.status === JOB_STATES.RUNNING) {
+      updateCounts(state);
+      state.currentTileIndex = -1;
+      state.currentTileId = null;
+      state.completedAt = Date.now();
+      state.status = state.totalFailed > 0 ? JOB_STATES.FAILED : JOB_STATES.COMPLETED;
+      sampleMemory(state, { label: 'job_completed', force: true });
+      checkpoint(state);
+    }
+  } finally {
+    sampleMemory(state, { label: 'job_finally', force: true });
+    checkpoint(state);
+    queues.close();
+    uninstallFetchCache();
+  }
 }
 
-/**
- * Calculate estimated time remaining based on average tile completion times.
- */
 export function estimateTimeRemaining(state) {
-  if (!state.tileCompletionTimes.length) return null;
+  if (!state.tileCompletionTimes?.length) return null;
 
   const avg = state.tileCompletionTimes.reduce((a, b) => a + b, 0) / state.tileCompletionTimes.length;
-  const remaining = state.tiles.filter(t => t.status === 'pending' || t.status === 'processing').length;
+  const remaining = state.tiles.filter(t =>
+    t.status === TILE_STATES.QUEUED || t.status === TILE_STATES.PROCESSING,
+  ).length;
   return Math.round(avg * remaining);
 }
 
-/**
- * Format milliseconds to human-readable string.
- */
 export function formatDuration(ms) {
   if (!ms || ms < 0) return '—';
   const seconds = Math.floor(ms / 1000) % 60;

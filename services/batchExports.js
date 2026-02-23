@@ -9,6 +9,13 @@ import { exportGeoTiff } from './exportGeoTiff.js';
 import { segmentSatelliteTexture } from './segmentation.js';
 import { generateSegmentedHybridTexture } from './osmTexture.js';
 
+const canvasToBlob = (canvas, type = 'image/png', quality) => {
+  if (!canvas) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob || null), type, quality);
+  });
+};
+
 /**
  * Generate a 16-bit PNG heightmap as a Blob.
  */
@@ -54,6 +61,8 @@ export async function generateSatelliteBlob(terrainData) {
  * Fetch the OSM texture blob URL and return the Blob.
  */
 export async function generateOSMTextureBlob(terrainData) {
+  if (terrainData.osmTextureBlob) return terrainData.osmTextureBlob;
+  if (terrainData.osmTextureCanvas) return canvasToBlob(terrainData.osmTextureCanvas, 'image/png');
   if (!terrainData.osmTextureUrl) return null;
   const response = await fetch(terrainData.osmTextureUrl);
   return response.blob();
@@ -63,6 +72,8 @@ export async function generateOSMTextureBlob(terrainData) {
  * Fetch the hybrid texture blob URL and return the Blob.
  */
 export async function generateHybridTextureBlob(terrainData) {
+  if (terrainData.hybridTextureBlob) return terrainData.hybridTextureBlob;
+  if (terrainData.hybridTextureCanvas) return canvasToBlob(terrainData.hybridTextureCanvas, 'image/png');
   if (!terrainData.hybridTextureUrl) return null;
   const response = await fetch(terrainData.hybridTextureUrl);
   return response.blob();
@@ -123,11 +134,23 @@ export function generateRoadMaskBlob(terrainData, center) {
  * Generate a segmented satellite texture Blob via mean-shift segmentation.
  */
 export async function generateSegmentedSatelliteBlob(terrainData) {
+  if (terrainData.segmentedTextureBlob) return terrainData.segmentedTextureBlob;
+  if (terrainData.segmentedTextureCanvas) {
+    const blob = await canvasToBlob(terrainData.segmentedTextureCanvas, 'image/png');
+    if (blob) return blob;
+  }
+  if (terrainData.segmentedTextureUrl) {
+    const response = await fetch(terrainData.segmentedTextureUrl);
+    return response.blob();
+  }
+
   if (!terrainData.satelliteTextureUrl) return null;
   const result = await segmentSatelliteTexture(terrainData.satelliteTextureUrl);
-  // Store on terrainData so the hybrid generator can use it
   terrainData.segmentedTextureUrl = result.url;
   terrainData.segmentedTextureCanvas = result.canvas;
+  terrainData.segmentedTextureBlob = result.blob || null;
+  if (result.blob) return result.blob;
+
   const response = await fetch(result.url);
   return response.blob();
 }
@@ -136,8 +159,23 @@ export async function generateSegmentedSatelliteBlob(terrainData) {
  * Generate a segmented hybrid texture Blob (segmented base + roads overlay).
  */
 export async function generateSegmentedHybridBlob(terrainData) {
+  if (terrainData.segmentedHybridTextureBlob) return terrainData.segmentedHybridTextureBlob;
+  if (terrainData.segmentedHybridTextureCanvas) {
+    const blob = await canvasToBlob(terrainData.segmentedHybridTextureCanvas, 'image/png');
+    if (blob) return blob;
+  }
+  if (terrainData.segmentedHybridTextureUrl) {
+    const response = await fetch(terrainData.segmentedHybridTextureUrl);
+    return response.blob();
+  }
+
   if (!terrainData.segmentedTextureUrl || !terrainData.osmFeatures?.length) return null;
   const result = await generateSegmentedHybridTexture(terrainData);
+  terrainData.segmentedHybridTextureUrl = result.url;
+  terrainData.segmentedHybridTextureCanvas = result.canvas;
+  terrainData.segmentedHybridTextureBlob = result.blob || null;
+  if (result.blob) return result.blob;
+
   const response = await fetch(result.url);
   return response.blob();
 }

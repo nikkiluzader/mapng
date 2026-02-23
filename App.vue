@@ -97,6 +97,7 @@
           @start-batch="handleStartBatch"
           @resume-batch="handleResumeBatch"
           @clear-saved-batch="handleClearSavedBatch"
+          @clear-cache="handleClearBatchCache"
           @update:grid-cols="(v) => batchGridCols = v"
           @update:grid-rows="(v) => batchGridRows = v"
         />
@@ -346,7 +347,6 @@
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
               <li>Nominatim location search with 100+ categorized icons</li>
               <li>13 preset scenic locations (Grand Canyon, Mt. Fuji, Tail of the Dragon, etc.)</li>
-              <li>"Mod of the Day" – highlights the latest BeamNG map mod</li>
               <li>GPXZ plan auto-detection with concurrent request support</li>
               <li>Web Worker-based off-thread terrain processing</li>
               <li>Light &amp; dark mode with persistent preferences</li>
@@ -595,8 +595,13 @@ import {
   saveBatchState,
   loadBatchState,
   clearBatchState,
+  clearBatchClientCache,
   resetFailedTiles,
 } from './services/batchJob';
+
+if (import.meta.env.DEV) {
+  import('./services/batchDebugHarness.js');
+}
 
 const center = ref(
   JSON.parse(localStorage.getItem('mapng_center') || 'null') || { lat: 35.1983, lng: -111.6513 }
@@ -631,8 +636,17 @@ const savedBatchState = ref(loadBatchState());
 // Compute batch grid tiles for map overlay (live preview while configuring)
 const batchGridTiles = computed(() => {
   if (!batchMode.value) return [];
-  // If a batch is active (running/paused/done), use its tile data
-  if (batchState.value) return batchState.value.tiles;
+  // Use persisted batch tiles only while a job is active/paused
+  // or while the progress modal is open.
+  const status = batchState.value?.status;
+  const usePersistedTiles = !!batchState.value && (
+    showBatchProgress.value ||
+    batchRunning.value ||
+    status === 'running' ||
+    status === 'paused' ||
+    status === 'pending'
+  );
+  if (usePersistedTiles) return batchState.value.tiles;
   // Otherwise compute preview grid from config
   return computeGridTiles(center.value, resolution.value, batchGridCols.value, batchGridRows.value);
 });
@@ -888,6 +902,10 @@ const handleRetryFailed = () => {
 };
 
 const handleBatchCancel = () => {
+  if (batchState.value) {
+    batchState.value.status = 'canceled';
+    saveBatchState(batchState.value);
+  }
   if (batchAbortController) {
     batchAbortController.abort();
     batchAbortController = null;
@@ -912,6 +930,16 @@ const handleClearSavedBatch = () => {
   batchState.value = null;
 };
 
+const handleClearBatchCache = async () => {
+  try {
+    await clearBatchClientCache();
+    alert('Batch cache cleared.');
+  } catch (error) {
+    console.error('[Batch] Failed to clear cache:', error);
+    alert('Failed to clear batch cache.');
+  }
+};
+
 const executeBatchJob = async (state) => {
   batchRunning.value = true;
   batchAbortController = new AbortController();
@@ -922,6 +950,10 @@ const executeBatchJob = async (state) => {
       // onProgress
       ({ tileIndex, step, tile }) => {
         batchCurrentStep.value = step;
+        if (batchState.value) {
+          if (Number.isInteger(tileIndex)) batchState.value.currentTileIndex = tileIndex;
+          if (tile?.id) batchState.value.currentTileId = tile.id;
+        }
         // Force reactivity on tile status changes
         batchState.value = { ...batchState.value };
       },

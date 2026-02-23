@@ -425,15 +425,16 @@ export async function segmentSatelliteTexture(satelliteTextureUrl, options = {})
   outCtx.imageSmoothingEnabled = false;
   outCtx.drawImage(procCanvas, 0, 0, img.width, img.height);
 
-  const url = await new Promise((resolve) => {
+  const blob = await new Promise((resolve) => {
     outCanvas.toBlob(
-      (blob) => resolve(blob ? URL.createObjectURL(blob) : ''),
+      (b) => resolve(b || null),
       'image/png',
     );
   });
+  const url = blob ? URL.createObjectURL(blob) : '';
 
   onProgress?.('Segmentation complete.');
-  return { url, canvas: outCanvas };
+  return { url, canvas: outCanvas, blob };
 }
 
 // ─── Synchronous fallback (mirrors worker logic) ─────────────────────

@@ -1732,10 +1732,11 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
     options,
   );
 
-  const url = await new Promise((r) =>
-    canvas.toBlob((b) => r(b ? URL.createObjectURL(b) : ""), "image/png"),
+  const blob = await new Promise((r) =>
+    canvas.toBlob((b) => r(b || null), "image/png"),
   );
-  return { url, canvas };
+  const url = blob ? URL.createObjectURL(blob) : "";
+  return { url, canvas, blob };
 };
 
 export const generateHybridTexture = async (terrainData, options = {}) => {
@@ -1791,10 +1792,11 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
     alpha: 1.0,
   });
 
-  const url = await new Promise((r) =>
-    canvas.toBlob((b) => r(b ? URL.createObjectURL(b) : ""), "image/png"),
+  const blob = await new Promise((r) =>
+    canvas.toBlob((b) => r(b || null), "image/png"),
   );
-  return { url, canvas };
+  const url = blob ? URL.createObjectURL(blob) : "";
+  return { url, canvas, blob };
 };
 
 /**
@@ -1856,8 +1858,9 @@ export const generateSegmentedHybridTexture = async (terrainData, options = {}) 
     alpha: 1.0,
   });
 
-  const url = await new Promise((r) =>
-    canvas.toBlob((b) => r(b ? URL.createObjectURL(b) : ""), "image/png"),
+  const blob = await new Promise((r) =>
+    canvas.toBlob((b) => r(b || null), "image/png"),
   );
-  return { url, canvas };
+  const url = blob ? URL.createObjectURL(blob) : "";
+  return { url, canvas, blob };
 };
