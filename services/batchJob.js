@@ -345,6 +345,33 @@ function triggerDownload(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
+const isJsonMimeType = (mime = '') => {
+  const normalized = String(mime).toLowerCase();
+  return normalized.includes('application/json') || normalized.includes('text/json');
+};
+
+async function ensureExportBlobType(blob, expectedMimeType, fallbackMimeType = expectedMimeType) {
+  if (!blob) return null;
+
+  if (isJsonMimeType(blob.type)) {
+    throw new Error(`Expected ${expectedMimeType} blob but received JSON payload.`);
+  }
+
+  const currentType = String(blob.type || '').toLowerCase();
+  const expectedType = String(expectedMimeType || '').toLowerCase();
+
+  if (!expectedType || currentType === expectedType) {
+    if (!blob.type && (fallbackMimeType || expectedMimeType)) {
+      const buffer = await blob.arrayBuffer();
+      return new Blob([buffer], { type: fallbackMimeType || expectedMimeType });
+    }
+    return blob;
+  }
+
+  const buffer = await blob.arrayBuffer();
+  return new Blob([buffer], { type: fallbackMimeType || expectedMimeType || 'application/octet-stream' });
+}
+
 function getSnapshotSize(state) {
   const maxGridPx = 400;
   const cols = Math.max(1, Number(state.gridCols || 1));
@@ -754,44 +781,44 @@ async function processTile(state, tile, ctx, signal) {
       if (state.exports.heightmap) {
         onProgress({ tileIndex: tile.index, step: 'Encoding heightmap...', tile });
         const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_png_heightmap', async () => generateHeightmapBlob(terrainData)));
-        if (blob) zip.file('heightmap_16bit.png', blob);
+        if (blob) zip.file('heightmap_16bit.png', await ensureExportBlobType(blob, 'image/png'));
         checkpoint(state);
       }
 
       if (state.exports.satellite) {
         onProgress({ tileIndex: tile.index, step: 'Encoding satellite texture...', tile });
         const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_png_satellite', async () => generateSatelliteBlob(terrainData)));
-        if (blob) zip.file('satellite.png', blob);
+        if (blob) zip.file('satellite.png', await ensureExportBlobType(blob, 'image/png'));
         checkpoint(state);
       }
 
       if (state.exports.osmTexture && terrainData.osmTextureUrl) {
         const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_png_osm_texture', async () => generateOSMTextureBlob(terrainData)));
-        if (blob) zip.file('osm_texture.png', blob);
+        if (blob) zip.file('osm_texture.png', await ensureExportBlobType(blob, 'image/png'));
         checkpoint(state);
       }
 
       if (state.exports.hybridTexture && terrainData.hybridTextureUrl) {
         const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_png_hybrid_texture', async () => generateHybridTextureBlob(terrainData)));
-        if (blob) zip.file('hybrid_texture.png', blob);
+        if (blob) zip.file('hybrid_texture.png', await ensureExportBlobType(blob, 'image/png'));
         checkpoint(state);
       }
 
       if (state.exports.segmentedSatellite) {
         const blob = await scheduleCompute(tile, () => runTimedStage(tile, 'compute_segmentation', async () => generateSegmentedSatelliteBlob(terrainData)));
-        if (blob) zip.file('segmented_satellite.png', blob);
+        if (blob) zip.file('segmented_satellite.png', await ensureExportBlobType(blob, 'image/png'));
         checkpoint(state);
       }
 
       if (state.exports.segmentedHybrid && terrainData.osmFeatures?.length > 0) {
         const blob = await scheduleCompute(tile, () => runTimedStage(tile, 'compute_segmented_hybrid', async () => generateSegmentedHybridBlob(terrainData)));
-        if (blob) zip.file('segmented_hybrid.png', blob);
+        if (blob) zip.file('segmented_hybrid.png', await ensureExportBlobType(blob, 'image/png'));
         checkpoint(state);
       }
 
       if (state.exports.roadMask && terrainData.osmFeatures?.length > 0) {
         const blob = await scheduleCompute(tile, () => runTimedStage(tile, 'compute_road_mask', async () => generateRoadMaskBlob(terrainData, tile.center)));
-        if (blob) zip.file('road_mask_16bit.png', blob);
+        if (blob) zip.file('road_mask_16bit.png', await ensureExportBlobType(blob, 'image/png'));
         checkpoint(state);
       }
 
@@ -802,7 +829,7 @@ async function processTile(state, tile, ctx, signal) {
           returnBlob: true,
           onProgress: (s) => onProgress({ tileIndex: tile.index, step: s, tile }),
         })));
-        if (blob) zip.file('model.glb', blob);
+        if (blob) zip.file('model.glb', await ensureExportBlobType(blob, 'model/gltf-binary', 'application/octet-stream'));
         checkpoint(state);
       }
 
@@ -813,19 +840,19 @@ async function processTile(state, tile, ctx, signal) {
           returnBlob: true,
           onProgress: (s) => onProgress({ tileIndex: tile.index, step: s, tile }),
         })));
-        if (blob) zip.file('model.dae.zip', blob);
+        if (blob) zip.file('model.dae.zip', await ensureExportBlobType(blob, 'application/zip'));
         checkpoint(state);
       }
 
       if (state.exports.geotiff) {
         const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_geotiff', async () => generateGeoTIFFBlob(terrainData, tile.center)));
-        if (blob) zip.file('heightmap.tif', blob);
+        if (blob) zip.file('heightmap.tif', await ensureExportBlobType(blob, 'image/tiff'));
         checkpoint(state);
       }
 
       if (state.exports.geojson && terrainData.osmFeatures?.length > 0) {
         const blob = await scheduleEncode(tile, () => runTimedStage(tile, 'encode_geojson', async () => generateGeoJSONBlob(terrainData)));
-        if (blob) zip.file('features.geojson', blob);
+        if (blob) zip.file('features.geojson', await ensureExportBlobType(blob, 'application/geo+json', 'application/geo+json'));
         checkpoint(state);
       }
 

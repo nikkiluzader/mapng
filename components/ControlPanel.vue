@@ -943,6 +943,57 @@ const buildExportMetadata = (exportType, filename, extra = {}) => {
     });
 };
 
+const ENABLE_METADATA_SIDECARS = false;
+
+const isJsonMimeType = (mime = '') => {
+    const normalized = String(mime).toLowerCase();
+    return normalized.includes('application/json') || normalized.includes('text/json');
+};
+
+const ensureDownloadBlobType = async (blob, expectedMimeType, fallbackMimeType = expectedMimeType) => {
+    if (!blob) throw new Error(`Missing export blob for ${expectedMimeType}.`);
+
+    if (isJsonMimeType(blob.type)) {
+        throw new Error(`Received JSON payload instead of ${expectedMimeType} export data.`);
+    }
+
+    const currentType = String(blob.type || '').toLowerCase();
+    const expectedType = String(expectedMimeType || '').toLowerCase();
+
+    if (!expectedType || currentType === expectedType) {
+        if (!blob.type && (fallbackMimeType || expectedMimeType)) {
+            const buffer = await blob.arrayBuffer();
+            return new Blob([buffer], { type: fallbackMimeType || expectedMimeType });
+        }
+        return blob;
+    }
+
+    const buffer = await blob.arrayBuffer();
+    return new Blob([buffer], { type: fallbackMimeType || expectedMimeType || 'application/octet-stream' });
+};
+
+const downloadBlobUrlAsFile = async (url, filename, expectedMimePrefix = 'image/', fallbackMimeType = 'application/octet-stream') => {
+    const response = await fetch(url);
+    const blob = await response.blob();
+
+    if (isJsonMimeType(blob.type)) {
+        throw new Error(`Received JSON payload for ${filename} instead of binary file.`);
+    }
+
+    let outBlob = blob;
+    const hasExpectedType = expectedMimePrefix
+        ? (blob.type || '').toLowerCase().startsWith(expectedMimePrefix.toLowerCase())
+        : true;
+
+    if (!hasExpectedType || !blob.type) {
+        const buffer = await blob.arrayBuffer();
+        outBlob = new Blob([buffer], { type: fallbackMimeType });
+    }
+
+    const typedBlob = await ensureDownloadBlobType(outBlob, fallbackMimeType, fallbackMimeType);
+    triggerDownload(typedBlob, filename);
+};
+
 const triggerDownload = (blob, filename) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -953,6 +1004,7 @@ const triggerDownload = (blob, filename) => {
 };
 
 const downloadMetadataSidecar = (exportFilename, metadata) => {
+    if (!ENABLE_METADATA_SIDECARS) return;
     const baseName = exportFilename.replace(/\.[^.]+$/, '');
     downloadJsonFile(metadata, `${baseName}.metadata.json`);
 };
@@ -1080,16 +1132,9 @@ const downloadHeightmap = async () => {
   
       const blob = new Blob([new Uint8Array(pngData)], { type: 'image/png' });
     const filename = `Heightmap_16bit_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-    const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-    link.download = filename;
-      link.href = url;
-      link.click();
+        triggerDownload(blob, filename);
 
     downloadMetadataSidecar(filename, buildExportMetadata('heightmap_16bit_png', filename));
-      
-      URL.revokeObjectURL(url);
   } catch (error) {
       console.error("Failed to load PNG encoder", error);
       alert("Failed to generate PNG. Please try again.");
@@ -1117,24 +1162,20 @@ const downloadTexture = async () => {
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0);
 
-        canvas.toBlob((blob) => {
-            const filename = `Satellite_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.download = filename;
-            link.href = url;
-            link.click();
-            downloadMetadataSidecar(filename, buildExportMetadata('satellite_png', filename));
-            URL.revokeObjectURL(url);
-            isExportingTexture.value = false;
-        }, 'image/png');
-    } catch {
-        // Fallback to direct download
+        const blob = await new Promise((resolve) => {
+            canvas.toBlob((value) => resolve(value || null), 'image/png');
+        });
+        if (!blob) throw new Error('Failed to create satellite PNG blob.');
         const filename = `Satellite_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = props.terrainData.satelliteTextureUrl;
-        link.click();
+        const typedBlob = await ensureDownloadBlobType(blob, 'image/png');
+        triggerDownload(typedBlob, filename);
+        downloadMetadataSidecar(filename, buildExportMetadata('satellite_png', filename));
+        isExportingTexture.value = false;
+    } catch (error) {
+        // Fallback: fetch URL as blob and enforce PNG download semantics
+        console.warn('Satellite canvas export failed, falling back to blob fetch:', error);
+        const filename = `Satellite_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
+        await downloadBlobUrlAsFile(props.terrainData.satelliteTextureUrl, filename, 'image/', 'image/png');
         downloadMetadataSidecar(filename, buildExportMetadata('satellite_png', filename));
         isExportingTexture.value = false;
     }
@@ -1148,10 +1189,7 @@ const downloadOSMTexture = async () => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     const filename = `OSM_Texture_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = props.terrainData.osmTextureUrl;
-    link.click();
+    await downloadBlobUrlAsFile(props.terrainData.osmTextureUrl, filename, 'image/', 'image/png');
     downloadMetadataSidecar(filename, buildExportMetadata('osm_texture_png', filename));
     
     isExportingOSMTexture.value = false;
@@ -1165,10 +1203,7 @@ const downloadHybridTexture = async () => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     const filename = `Hybrid_Texture_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = props.terrainData.hybridTextureUrl;
-    link.click();
+    await downloadBlobUrlAsFile(props.terrainData.hybridTextureUrl, filename, 'image/', 'image/png');
     downloadMetadataSidecar(filename, buildExportMetadata('hybrid_texture_png', filename));
     
     isExportingHybridTexture.value = false;
@@ -1181,10 +1216,7 @@ const downloadSegmentedTexture = async () => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     const filename = `Segmented_Satellite_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = props.terrainData.segmentedTextureUrl;
-    link.click();
+    await downloadBlobUrlAsFile(props.terrainData.segmentedTextureUrl, filename, 'image/', 'image/png');
     downloadMetadataSidecar(filename, buildExportMetadata('segmented_satellite_png', filename));
 
     isExportingSegmentedTexture.value = false;
@@ -1197,10 +1229,7 @@ const downloadSegmentedHybridTexture = async () => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     const filename = `Segmented_Hybrid_${props.resolution}px_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-    const link = document.createElement('a');
-    link.download = filename;
-    link.href = props.terrainData.segmentedHybridTextureUrl;
-    link.click();
+    await downloadBlobUrlAsFile(props.terrainData.segmentedHybridTextureUrl, filename, 'image/', 'image/png');
     downloadMetadataSidecar(filename, buildExportMetadata('segmented_hybrid_png', filename));
 
     isExportingSegmentedHybridTexture.value = false;
@@ -1366,15 +1395,11 @@ const downloadGeoTIFF = async () => {
 
     try {
         const { blob, filename } = await exportGeoTiff(props.terrainData, props.center);
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = url;
-        link.click();
+        const typedBlob = await ensureDownloadBlobType(blob, 'image/tiff');
+        triggerDownload(typedBlob, filename);
                 downloadMetadataSidecar(filename, buildExportMetadata('geotiff', filename, {
                     geotiffSource: props.terrainData?.sourceGeoTiffs?.source || 'wgs84',
                 }));
-        URL.revokeObjectURL(url);
     } catch (e) {
         console.error("GeoTIFF export failed:", e);
         alert("Failed to export GeoTIFF.");
@@ -1396,7 +1421,8 @@ const handleGLBExport = async () => {
         const lat = ((props.terrainData.bounds.north + props.terrainData.bounds.south) / 2).toFixed(4);
         const lng = ((props.terrainData.bounds.east + props.terrainData.bounds.west) / 2).toFixed(4);
         const filename = `MapNG_Model_${date}_${lat}_${lng}.glb`;
-        triggerDownload(blob, filename);
+        const typedBlob = await ensureDownloadBlobType(blob, 'model/gltf-binary', 'application/octet-stream');
+        triggerDownload(typedBlob, filename);
         downloadMetadataSidecar(filename, buildExportMetadata('glb_model', filename, {
             modelOptions: {
                 meshResolution: parseInt(modelMeshResolution.value),
@@ -1425,7 +1451,10 @@ const handleDAEExport = async () => {
         const lng = ((props.terrainData.bounds.east + props.terrainData.bounds.west) / 2).toFixed(4);
         const ext = blob?.type === 'application/zip' ? '.dae.zip' : '.dae';
         const filename = `MapNG_Model_${date}_${lat}_${lng}${ext}`;
-        triggerDownload(blob, filename);
+        const typedBlob = ext === '.dae.zip'
+            ? await ensureDownloadBlobType(blob, 'application/zip')
+            : await ensureDownloadBlobType(blob, 'model/vnd.collada+xml', 'application/octet-stream');
+        triggerDownload(typedBlob, filename);
         downloadMetadataSidecar(filename, buildExportMetadata('dae_model', filename, {
             modelOptions: {
                 meshResolution: parseInt(modelMeshResolution.value),
