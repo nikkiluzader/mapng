@@ -83,6 +83,7 @@
           @generate="handleGenerate"
           @fetch-osm="handleFetchOSM"
           @surrounding-tiles-change="(v) => surroundingTilePositions = v"
+          @import-data="handleImportData"
         />
 
         <!-- Batch mode -->
@@ -294,6 +295,7 @@
               <li>GeoJSON Vector Data</li>
               <li>GLB 3D Model (+ optional surroundings)</li>
               <li>Collada DAE (+ optional surroundings)</li>
+              <li>Job Data (.mapng) - Complete compressed session package</li>
             </ul>
           </div>
           <div class="space-y-2">
@@ -347,6 +349,7 @@
         <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">Additional Features</h4>
             <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+              <li><strong>Job Import/Export:</strong> Save and restore full sessions via .mapng files</li>
               <li>Nominatim location search with type-categorized icons</li>
               <li>Preset scenic locations (Grand Canyon, Mt. Fuji, Tail of the Dragon, etc.)</li>
               <li>GPXZ plan auto-detection with concurrent request support</li>
@@ -556,7 +559,11 @@
               </div>
               <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
                 <div class="font-medium text-gray-900 dark:text-white">JSZip</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Client-side ZIP packaging for batch jobs and surrounding-tile exports</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Client-side ZIP packaging for batch jobs, surrounding-tile exports, and .mapng job files</div>
+              </div>
+              <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
+                <div class="font-medium text-gray-900 dark:text-white">Blob URL Management</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Zero-copy binary data handling for high-res heightmaps and texture rehydration</div>
               </div>
             </div>
           </section>
@@ -858,6 +865,45 @@ const handleFetchOSM = async () => {
   } finally {
       isLoading.value = false;
   }
+};
+
+const handleImportData = (data) => {
+  if (!data) return;
+
+  // 1. Update Map Central View if bounds exist
+  if (data.bounds) {
+      const lat = (data.bounds.north + data.bounds.south) / 2;
+      const lng = (data.bounds.east + data.bounds.west) / 2;
+      center.value = { lat, lng };
+      localStorage.setItem('mapng_center', JSON.stringify(center.value));
+  }
+
+  // 2. Update resolution
+  if (data.width) {
+      resolution.value = data.width;
+      localStorage.setItem('mapng_resolution', String(resolution.value));
+  }
+
+  // 3. Set the data
+  terrainData.value = data;
+
+  // 4. Restore the generation key if it was included
+  if (data.generationKey) {
+      lastGenerationKey.value = data.generationKey;
+  } else {
+      // Fallback: build a key that marks this area as "valid/cached" for the current UI state
+      lastGenerationKey.value = buildGenerationKey(
+          center.value,
+          resolution.value,
+          !!data.osmFeatures?.length,
+          data.usgsFallback === false,
+          false,
+          ''
+      );
+  }
+
+  // 5. Jump to 3D Preview
+  previewMode.value = true;
 };
 
 const cancelGeneration = () => {

@@ -88,6 +88,45 @@
         </div>
         <p v-if="runConfigStatus" class="text-[10px] text-gray-500 dark:text-gray-400">{{ runConfigStatus }}</p>
 
+        <hr class="border-gray-200 dark:border-gray-600" />
+
+        <!-- Job Data (Import/Export) -->
+        <div class="space-y-3">
+            <label class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                <Database :size="14" />
+                Single Job State
+            </label>
+            <div class="grid grid-cols-2 gap-2">
+                <button
+                    @click="jobFileInput?.click()"
+                    :disabled="isImportingJob || isGenerating"
+                    class="py-2 text-xs font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors flex items-center justify-center gap-2"
+                >
+                    <Import v-if="!isImportingJob" :size="14" />
+                    <Loader2 v-else :size="14" class="animate-spin" />
+                    Import Job
+                </button>
+                <button
+                    v-if="terrainData"
+                    @click="handleExportJob"
+                    :disabled="isExportingJob || isGenerating"
+                    class="py-2 text-xs font-medium rounded-md border border-[#FF6600]/30 bg-[#FF6600]/5 hover:bg-[#FF6600]/10 text-[#FF6600] transition-colors flex items-center justify-center gap-2 animate-in fade-in zoom-in-95"
+                >
+                    <Package v-if="!isExportingJob" :size="14" />
+                    <Loader2 v-else :size="14" class="animate-spin" />
+                    Export Job
+                </button>
+                <input
+                    ref="jobFileInput"
+                    type="file"
+                    accept=".mapng"
+                    class="hidden"
+                    @change="handleImportJobFile"
+                />
+            </div>
+            <p v-if="jobStatus" class="text-[10px] text-gray-500 dark:text-gray-400 text-center">{{ jobStatus }}</p>
+        </div>
+
     <hr class="border-gray-200 dark:border-gray-600" />
 
     <!-- Resolution & Settings -->
@@ -603,7 +642,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch, nextTick } from 'vue';
-import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, CircleCheck, ChevronDown, Paintbrush } from 'lucide-vue-next';
+import { MapPin, Mountain, Download, Box, FileDown, Loader2, Trees, FileJson, Layers, Route, FileCode, CircleCheck, ChevronDown, Paintbrush, Package, Import, Database } from 'lucide-vue-next';
 import LocationSearch from './LocationSearch.vue';
 import SurroundingTiles from './SurroundingTiles.vue';
 import { exportToGLB, exportToDAE } from '../services/export3d';
@@ -612,11 +651,12 @@ import { exportGeoTiff } from '../services/exportGeoTiff';
 import { createWGS84ToLocal } from '../services/geoUtils';
 import { encode } from 'fast-png';
 import { buildCommonTraceMetadata, cloneRateLimitInfo, downloadJsonFile } from '../services/traceability';
+import { exportJobData, importJobData } from '../services/jobData';
 
 
 const props = defineProps(['center', 'zoom', 'resolution', 'isGenerating', 'terrainData', 'generationCacheKey']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm', 'surroundingTilesChange']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData']);
 
 // Local state for formatted coordinate inputs to allow high precision typing
 const latInput = ref(props.center.lat.toString());
@@ -679,6 +719,49 @@ const isExportingOSM = ref(false);
 const isExportingRoadMask = ref(false);
 const isExportingGeoTIFF = ref(false);
 const isExportingDAE = ref(false);
+
+const isExportingJob = ref(false);
+const isImportingJob = ref(false);
+const jobStatus = ref('');
+const jobFileInput = ref(null);
+
+const handleExportJob = async () => {
+    if (!props.terrainData) return;
+    isExportingJob.value = true;
+    jobStatus.value = 'Preparing job data...';
+    try {
+        const blob = await exportJobData(props.terrainData, props.generationCacheKey);
+        const date = new Date().toISOString().slice(0, 10);
+        const lat = props.center.lat.toFixed(4);
+        const lng = props.center.lng.toFixed(4);
+        const filename = `MapNG_Job_${date}_${lat}_${lng}.mapng`;
+        triggerDownload(blob, filename);
+        jobStatus.value = 'Job exported successfully.';
+    } catch (e) {
+        console.error('Job export failed:', e);
+        jobStatus.value = 'Job export failed.';
+    } finally {
+        isExportingJob.value = false;
+    }
+};
+
+const handleImportJobFile = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    isImportingJob.value = true;
+    jobStatus.value = 'Importing job data...';
+    try {
+        const data = await importJobData(file);
+        emit('importData', data);
+        jobStatus.value = 'Job imported successfully.';
+    } catch (e) {
+        console.error('Job import failed:', e);
+        jobStatus.value = 'Job import failed: ' + e.message;
+    } finally {
+        isImportingJob.value = false;
+        if (jobFileInput.value) jobFileInput.value.value = '';
+    }
+};
 const isAnyExporting = computed(() => (
     isExportingGLB.value ||
     isExportingHeightmap.value ||

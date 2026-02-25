@@ -70,6 +70,7 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 | **GeoJSON** | Full OSM vector data with proper geometry types |
 | **GLB 3D Model** | Terrain + OSM model export with tile scope options: Center, Center + Surroundings, or Surroundings Only |
 | **Collada DAE** | DAE model (or DAE+textures ZIP) with tile scope options: Center, Center + Surroundings, or Surroundings Only |
+| **Job Data (.mapng)** | Complete compressed session package for instant import/restore (Heightmap + Textures + OSM + Meta) |
 
 ### Surrounding Tiles
 - Interactive 3×3 grid for selecting up to 8 adjacent tiles (NW, N, NE, W, E, SW, S, SE).
@@ -78,6 +79,7 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 - Maps selected tiles onto the 2D Leaflet map as bounding boxes.
 
 ### Additional Features
+- **Job Import/Export (.mapng)**: Save the entire state of a single terrain job into a compressed `.mapng` package. This includes raw heightmaps, all generated textures, OSM feature vectors, and generation metadata. Importing a `.mapng` file instantly restores the 3D scene and map state without any additional API calls—perfect for offline testing and re-viewing previous runs.
 - **Batch Job mode (Beta)**: Process grids of tiles (up to 20×20) with sequential processing, per-tile ZIP downloads, persistent state for pause/resume, and retry for failed tiles.
 - **Reproducibility tooling**: `Copy Configuration`, `Paste Configuration`, `Save Configuration` (JSON), and `Load Configuration` in both Single and Batch modes.
 - **Traceable exports**: Single-file exports also produce `*.metadata.json` sidecars containing build hash/time, bbox, resolution/zoom, texture availability, OSM query context, and GPXZ plan/rate-limit info.
