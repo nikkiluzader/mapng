@@ -389,7 +389,14 @@ const fetchUSGSRaw = async (bounds, onProgress, signal) => {
       return null;
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      const text = await response.text();
+      data = JSON.parse(text);
+    } catch (e) {
+      console.warn(`[USGS] Failed to parse API response as JSON:`, e);
+      return null;
+    }
 
     if (!data.items || data.items.length === 0) {
       console.log(`[USGS] No products found for bounds.`);
