@@ -28,7 +28,7 @@ const getWorker = () => {
             else pending.resolve(data);
         };
         worker.onerror = (e) => {
-            console.error('[ResamplerWorker] Uncaught error:', e);
+            console.error('[ResamplerClient] Uncaught error:', e);
             // Reject all pending, force recreation on next call
             for (const [, p] of pendingMessages) p.reject(new Error('Worker error'));
             pendingMessages.clear();
@@ -37,7 +37,7 @@ const getWorker = () => {
         };
         return worker;
     } catch (e) {
-        console.warn('[ResamplerWorker] Failed to create worker, falling back to main thread:', e);
+        console.warn('[ResamplerClient] Failed to create worker, falling back to main thread:', e);
         return null;
     }
 };
@@ -111,7 +111,7 @@ const prepareTiles = (sourceData) => {
  * @param {object|null} fallbackData - { pixels, width, height, zoom, minTileX, minTileY }
  */
 export const resampleHeightMapOffThread = async (
-    source, center, width, height, interpolation, smooth, fallbackData
+    source, center, width, height, interpolation, smooth, fallbackData, fillHoles = true
 ) => {
     // Attempt worker path
     if (getWorker()) {
@@ -147,6 +147,7 @@ export const resampleHeightMapOffThread = async (
                 width,
                 height,
                 smooth,
+                fillHoles,
                 tiles: tilesForWorker,
                 fallback: fallbackForWorker,
                 epsgDefs,
@@ -156,12 +157,12 @@ export const resampleHeightMapOffThread = async (
                 return { heightMap: result.heightMap, bounds: result.bounds };
             }
         } catch (e) {
-            console.warn('[ResamplerWorker] Height resampling failed, falling back:', e);
+            console.warn('[ResamplerClient] Height resampling failed, falling back:', e);
         }
     }
 
     // Fallback: main thread
-    return resampleToMeterGrid(source, center, width, height, interpolation, smooth);
+    return resampleToMeterGrid(source, center, width, height, interpolation, smooth, fillHoles);
 };
 
 /**
@@ -199,7 +200,7 @@ export const resampleImageOffThread = async (
                 return canvas;
             }
         } catch (e) {
-            console.warn('[ResamplerWorker] Image resampling failed, falling back:', e);
+            console.warn('[ResamplerClient] Image resampling failed, falling back:', e);
         }
     }
 

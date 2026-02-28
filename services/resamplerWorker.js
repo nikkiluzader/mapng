@@ -50,13 +50,15 @@ const bilinear = (raster, w, x, y, noDataVal) => {
     const h01 = raster[i01];
     const h11 = raster[i11];
 
+    if (!Number.isFinite(h00) || !Number.isFinite(h10) || !Number.isFinite(h01) || !Number.isFinite(h11)) return noDataVal;
     if (h00 === noDataVal || h10 === noDataVal || h01 === noDataVal || h11 === noDataVal) return noDataVal;
 
-    return (1 - dy) * ((1 - dx) * h00 + dx * h10) + dy * ((1 - dx) * h01 + dx * h11);
+    const interp = (1 - dy) * ((1 - dx) * h00 + dx * h10) + dy * ((1 - dx) * h01 + dx * h11);
+    return Number.isFinite(interp) ? interp : noDataVal;
 };
 
 // ─── Terrarium Sampler ───────────────────────────────────────────────────────
-const sampleTerrarium = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng) => {
+const sampleTerrarium = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng, noDataVal) => {
     const p = project(lat, lng, zoom);
     const localX = p.x - minTileX * TILE_SIZE;
     const localY = p.y - minTileY * TILE_SIZE;
@@ -73,13 +75,16 @@ const sampleTerrarium = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng)
         const r = pixels[i];
         const g = pixels[i + 1];
         const b = pixels[i + 2];
-        return r * 256 + g + b / 256 - 32768;
+        const h = r * 256 + g + b / 256 - 32768;
+        return h <= -32760 ? noDataVal : h;
     };
 
     const h00 = getH(x0, y0);
     const h10 = getH(x0 + 1, y0);
     const h01 = getH(x0, y0 + 1);
     const h11 = getH(x0 + 1, y0 + 1);
+
+    if (h00 === noDataVal || h10 === noDataVal || h01 === noDataVal || h11 === noDataVal) return noDataVal;
 
     const top = (1 - dx) * h00 + dx * h10;
     const bottom = (1 - dx) * h01 + dx * h11;
@@ -102,13 +107,212 @@ const sampleImage = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng) => 
     return { r: pixels[i], g: pixels[i + 1], b: pixels[i + 2], a: pixels[i + 3] };
 };
 
-// ─── Height Resampling ───────────────────────────────────────────────────────
-const resampleHeight = async ({ center, width, height, smooth, tiles, fallback, epsgDefs }) => {
+// ─── Height Resampling Helpers ───────────────────────────────────────────────
+const pushPullInpaint = (map, width, height, noData) => {
+    let hasHole = false;
+    let sumValid = 0;
+    let countValid = 0;
+    for (let i = 0; i < map.length; i++) {
+        const v = map[i];
+        if (v === noData || !Number.isFinite(v)) hasHole = true;
+        else { sumValid += v; countValid++; }
+    }
+    if (!hasHole) {
+        console.debug('[ResamplerWorker] No holes detected, skipping inpaint');
+        return null;
+    }
+    const fallback = countValid > 0 ? sumValid / countValid : 0;
+
+    const levels = [];
+    levels.push({ data: new Float32Array(map), w: width, h: height });
+
+    while (levels[levels.length - 1].w > 1 || levels[levels.length - 1].h > 1) {
+        const prev = levels[levels.length - 1];
+        const nw = Math.max(1, Math.floor((prev.w + 1) / 2));
+        const nh = Math.max(1, Math.floor((prev.h + 1) / 2));
+        const next = new Float32Array(nw * nh);
+        next.fill(noData);
+
+        for (let y = 0; y < nh; y++) {
+            for (let x = 0; x < nw; x++) {
+                let sum = 0;
+                let cnt = 0;
+                for (let dy = 0; dy < 2; dy++) {
+                    const py = y * 2 + dy;
+                    if (py >= prev.h) continue;
+                    for (let dx = 0; dx < 2; dx++) {
+                        const px = x * 2 + dx;
+                        if (px >= prev.w) continue;
+                        const v = prev.data[py * prev.w + px];
+                        if (v !== noData && Number.isFinite(v)) { sum += v; cnt++; }
+                    }
+                }
+                if (cnt > 0) next[y * nw + x] = sum / cnt;
+            }
+        }
+
+        levels.push({ data: next, w: nw, h: nh });
+    }
+
+    const top = levels[levels.length - 1];
+    for (let i = 0; i < top.data.length; i++) {
+        if (top.data[i] === noData) top.data[i] = fallback;
+    }
+
+    for (let li = levels.length - 2; li >= 0; li--) {
+        const coarse = levels[li + 1];
+        const fine = levels[li];
+        const mask = new Uint8Array(fine.data.length);
+
+        for (let y = 0; y < fine.h; y++) {
+            const cy = y * 0.5;
+            const y0 = Math.floor(cy);
+            const fy = cy - y0;
+            const y1 = Math.min(coarse.h - 1, y0 + 1);
+            for (let x = 0; x < fine.w; x++) {
+                const idx = y * fine.w + x;
+                if (fine.data[idx] !== noData) continue;
+                const cx = x * 0.5;
+                const x0 = Math.floor(cx);
+                const fx = cx - x0;
+                const x1 = Math.min(coarse.w - 1, x0 + 1);
+
+                const c00 = coarse.data[y0 * coarse.w + x0];
+                const c10 = coarse.data[y0 * coarse.w + x1];
+                const c01 = coarse.data[y1 * coarse.w + x0];
+                const c11 = coarse.data[y1 * coarse.w + x1];
+
+                const topVal = c00 * (1 - fx) + c10 * fx;
+                const botVal = c01 * (1 - fx) + c11 * fx;
+                const interp = topVal * (1 - fy) + botVal * fy;
+
+                fine.data[idx] = interp;
+                mask[idx] = 1;
+            }
+        }
+
+        levels[li].mask = mask;
+    }
+
+    const base = levels[0];
+    const mask = base.mask;
+    if (mask) {
+        const out = new Float32Array(base.data);
+        const rad = 1;
+        for (let y = 0; y < base.h; y++) {
+            for (let x = 0; x < base.w; x++) {
+                const idx = y * base.w + x;
+                if (!mask[idx]) continue;
+                let sum = 0;
+                let cnt = 0;
+                for (let dy = -rad; dy <= rad; dy++) {
+                    const ny = y + dy;
+                    if (ny < 0 || ny >= base.h) continue;
+                    const rowOff = ny * base.w;
+                    for (let dx = -rad; dx <= rad; dx++) {
+                        const nx = x + dx;
+                        if (nx < 0 || nx >= base.w) continue;
+                        sum += base.data[rowOff + nx];
+                        cnt++;
+                    }
+                }
+                if (cnt > 0) out[idx] = sum / cnt;
+            }
+        }
+        base.data.set(out);
+    }
+
+    map.set(levels[0].data);
+    return mask || null;
+};
+
+const expandFill = (map, width, height, noData, maxPasses = 64, radius = 3, baseMask = null) => {
+    const filledMask = baseMask ? new Uint8Array(baseMask) : new Uint8Array(map.length);
+    for (let pass = 0; pass < maxPasses; pass++) {
+        let any = false;
+        for (let y = 0; y < height; y++) {
+            const rowOff = y * width;
+            for (let x = 0; x < width; x++) {
+                const idx = rowOff + x;
+                if (map[idx] !== noData) continue;
+                let sum = 0;
+                let cnt = 0;
+                for (let dy = -radius; dy <= radius; dy++) {
+                    const ny = y + dy;
+                    if (ny < 0 || ny >= height) continue;
+                    const base = ny * width;
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        const nx = x + dx;
+                        if (nx < 0 || nx >= width) continue;
+                        const v = map[base + nx];
+                        if (v !== noData && Number.isFinite(v)) { sum += v; cnt++; }
+                    }
+                }
+                if (cnt > 0) {
+                    map[idx] = sum / cnt;
+                    filledMask[idx] = 1;
+                    any = true;
+                }
+            }
+        }
+        if (!any) break;
+    }
+    return filledMask;
+};
+
+const relaxFilled = (map, width, height, noData, filledMask, iterations = 200) => {
+    if (!filledMask) return;
+    for (let iter = 0; iter < iterations; iter++) {
+        let updated = false;
+        for (let y = 0; y < height; y++) {
+            const rowOff = y * width;
+            for (let x = 0; x < width; x++) {
+                const idx = rowOff + x;
+                if (!filledMask[idx]) continue;
+                
+                const curVal = map[idx];
+                const getV = (dx, dy) => {
+                    const nx = Math.max(0, Math.min(width - 1, x + dx));
+                    const ny = Math.max(0, Math.min(height - 1, y + dy));
+                    const val = map[ny * width + nx];
+                    if (val === noData || !Number.isFinite(val)) return curVal;
+                    return val;
+                };
+
+                let sumBi = 0;
+                // distance 1: weight 8
+                sumBi += 8 * (getV(-1, 0) + getV(1, 0) + getV(0, -1) + getV(0, 1));
+                // distance sqrt(2): weight -2
+                sumBi -= 2 * (getV(-1, -1) + getV(1, -1) + getV(-1, 1) + getV(1, 1));
+                // distance 2: weight -1
+                sumBi -= 1 * (getV(-2, 0) + getV(2, 0) + getV(0, -2) + getV(0, 2));
+                const biVal = sumBi / 20;
+
+                let sumLap = getV(-1, 0) + getV(1, 0) + getV(0, -1) + getV(0, 1);
+                const lapVal = sumLap / 4;
+
+                // 50% tension to prevent deep pits/overshoots (Gibbs phenomenon) while preserving smooth curvature
+                const tension = 0.5;
+                const newVal = biVal * (1 - tension) + lapVal * tension;
+
+                if (Math.abs(newVal - curVal) > 0.0001) {
+                    map[idx] = newVal;
+                    updated = true;
+                }
+            }
+        }
+        if (!updated) break;
+    }
+};
+
+const resampleHeight = async ({ center, width, height, smooth, fillHoles = true, tiles, fallback, epsgDefs }) => {
     const heightMap = new Float32Array(width * height);
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
     const halfWidth = width / 2;
     const halfHeight = height / 2;
 
+    const NO_DATA = -99999;
+    
     // Register any pre-fetched EPSG definitions
     if (epsgDefs) {
         for (const [code, def] of Object.entries(epsgDefs)) {
@@ -151,15 +355,12 @@ const resampleHeight = async ({ center, width, height, smooth, tiles, fallback, 
                     originY: tile.originY,
                     resX: tile.resX,
                     resY: tile.resY,
-                    noData: tile.noData,
+                    noData: Number.isFinite(tile.noData) ? tile.noData : NO_DATA,
                     converter,
                 });
             }
         }
     }
-
-    const NO_DATA = -99999;
-
     // Main resampling loop
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -191,12 +392,48 @@ const resampleHeight = async ({ center, width, height, smooth, tiles, fallback, 
                 h = sampleTerrarium(
                     fallback.pixels, fallback.width, fallback.height,
                     fallback.zoom, fallback.minTileX, fallback.minTileY,
-                    lat, lng
+                    lat, lng,
+                    NO_DATA
                 );
             }
 
+            if (!Number.isFinite(h) || h <= -200 || h === NO_DATA) h = NO_DATA;
             heightMap[y * width + x] = h;
         }
+    }
+
+    // Fill holes before smoothing to avoid visible seams from missing tiles (skip if disabled)
+    if (fillHoles) {
+        console.debug('[ResamplerWorker] Hole filling enabled: starting push/pull seed');
+        let preMin=Infinity, preMax=-Infinity, preHole=0;
+        for(let i=0; i<heightMap.length; i++) {
+            if(heightMap[i] === NO_DATA) preHole++;
+            else { if(heightMap[i] < preMin) preMin=heightMap[i]; if(heightMap[i] > preMax) preMax=heightMap[i]; }
+        }
+        console.debug('[ResamplerWorker] Before inpaint - Holes:', preHole, 'Min:', preMin, 'Max:', preMax);
+        const seededMask = pushPullInpaint(heightMap, width, height, NO_DATA);
+        console.debug('[ResamplerWorker] Push/pull seed complete');
+        let seedMin=Infinity, seedMax=-Infinity, seedHole=0;
+        for(let i=0; i<heightMap.length; i++) {
+            if(heightMap[i] === NO_DATA) seedHole++;
+            else { if(heightMap[i] < seedMin) seedMin=heightMap[i]; if(heightMap[i] > seedMax) seedMax=heightMap[i]; }
+        }
+        console.debug('[ResamplerWorker] After push/pull - Holes:', seedHole, 'Min:', seedMin, 'Max:', seedMax);
+        const expandedMask = expandFill(heightMap, width, height, NO_DATA, 64, 3, seededMask);
+        console.debug('[ResamplerWorker] Expand fill complete');
+        let expMin=Infinity, expMax=-Infinity, expHole=0;
+        for(let i=0; i<heightMap.length; i++) {
+            if(heightMap[i] === NO_DATA) expHole++;
+            else { if(heightMap[i] < expMin) expMin=heightMap[i]; if(heightMap[i] > expMax) expMax=heightMap[i]; }
+        }
+        console.debug('[ResamplerWorker] After expandFill - Holes:', expHole, 'Min:', expMin, 'Max:', expMax);
+        relaxFilled(heightMap, width, height, NO_DATA, expandedMask || seededMask, 200);
+        let relMin=Infinity, relMax=-Infinity, relHole=0;
+        for(let i=0; i<heightMap.length; i++) {
+            if(heightMap[i] === NO_DATA) relHole++;
+            else { if(heightMap[i] < relMin) relMin=heightMap[i]; if(heightMap[i] > relMax) relMax=heightMap[i]; }
+        }
+        console.debug('[ResamplerWorker] Relaxation complete - Holes:', relHole, 'Min:', relMin, 'Max:', relMax);
     }
 
     // Smoothing pass

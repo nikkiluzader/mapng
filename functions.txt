@@ -1,0 +1,82 @@
+    map.set(levels[0].data);
+    return mask || null;
+};
+
+const expandFill = (map, width, height, noData, maxPasses = 64, radius = 3, baseMask = null) => {
+    const filledMask = baseMask ? new Uint8Array(baseMask) : new Uint8Array(map.length);
+    for (let pass = 0; pass < maxPasses; pass++) {
+        let any = false;
+        for (let y = 0; y < height; y++) {
+            const rowOff = y * width;
+            for (let x = 0; x < width; x++) {
+                const idx = rowOff + x;
+                if (map[idx] !== noData) continue;
+                let sum = 0;
+                let cnt = 0;
+                for (let dy = -radius; dy <= radius; dy++) {
+                    const ny = y + dy;
+                    if (ny < 0 || ny >= height) continue;
+                    const base = ny * width;
+                    for (let dx = -radius; dx <= radius; dx++) {
+                        const nx = x + dx;
+                        if (nx < 0 || nx >= width) continue;
+                        const v = map[base + nx];
+                        if (v !== noData && Number.isFinite(v)) { sum += v; cnt++; }
+                    }
+                }
+                if (cnt > 0) {
+                    map[idx] = sum / cnt;
+                    filledMask[idx] = 1;
+                    any = true;
+                }
+            }
+        }
+        if (!any) break;
+    }
+    return filledMask;
+};
+
+const relaxFilled = (map, width, height, noData, filledMask, iterations = 200) => {
+    if (!filledMask) return;
+    for (let iter = 0; iter < iterations; iter++) {
+        let updated = false;
+        for (let y = 0; y < height; y++) {
+            const rowOff = y * width;
+            for (let x = 0; x < width; x++) {
+                const idx = rowOff + x;
+                if (!filledMask[idx]) continue;
+                
+                const curVal = map[idx];
+                const getV = (dx, dy) => {
+                    const nx = Math.max(0, Math.min(width - 1, x + dx));
+                    const ny = Math.max(0, Math.min(height - 1, y + dy));
+                    const val = map[ny * width + nx];
+                    if (val === noData || !Number.isFinite(val)) return curVal;
+                    return val;
+                };
+
+                let sumBi = 0;
+                // distance 1: weight 8
+                sumBi += 8 * (getV(-1, 0) + getV(1, 0) + getV(0, -1) + getV(0, 1));
+                // distance sqrt(2): weight -2
+                sumBi -= 2 * (getV(-1, -1) + getV(1, -1) + getV(-1, 1) + getV(1, 1));
+                // distance 2: weight -1
+                sumBi -= 1 * (getV(-2, 0) + getV(2, 0) + getV(0, -2) + getV(0, 2));
+                const biVal = sumBi / 20;
+
+                let sumLap = getV(-1, 0) + getV(1, 0) + getV(0, -1) + getV(0, 1);
+                const lapVal = sumLap / 4;
+
+                // 50% tension to prevent deep pits/overshoots (Gibbs phenomenon) while preserving smooth curvature
+                const tension = 0.5;
+                const newVal = biVal * (1 - tension) + lapVal * tension;
+
+                if (Math.abs(newVal - curVal) > 0.0001) {
+                    map[idx] = newVal;
+                    updated = true;
+                }
+            }
+        }
+        if (!updated) break;
+    }
+};

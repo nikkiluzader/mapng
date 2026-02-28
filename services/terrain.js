@@ -9,7 +9,7 @@ import {
 import {
   resampleHeightMapOffThread,
   resampleImageOffThread,
-} from "./workerResampler";
+} from "./resamplerClient";
 
 // Constants
 const TILE_SIZE = 256;
@@ -753,8 +753,9 @@ export const fetchTerrainData = async (
         const r = terrainDataImg.data[i];
         const g = terrainDataImg.data[i + 1];
         const b = terrainDataImg.data[i + 2];
-        // Mapzen encoding
-        return r * 256 + g + b / 256 - 32768;
+        // Mapzen encoding with nodata guard (0,0,0 → -32768)
+        const h = r * 256 + g + b / 256 - 32768;
+        return h <= -32760 ? NO_DATA_VALUE : h;
       };
 
       const h00 = getH(x0, y0);
@@ -807,6 +808,8 @@ export const fetchTerrainData = async (
     "bilinear",
     shouldSmooth,
     fallbackSamplerData,
+    // Skip hole-filling for GPXZ (dataset is already hole-free)
+    !(useGPXZ && rawData),
   );
 
   // 5. Resample Satellite Texture to Metric Grid
