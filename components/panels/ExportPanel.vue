@@ -326,6 +326,7 @@ const isExportingGeoTIFF = ref(false);
 const isExportingGLB = ref(false);
 const isExportingDAE = ref(false);
 const isExportingTER = ref(false);
+const isExportingOSM = ref(false);
 
 const isAnyExporting = computed(() => (
   isExportingHeightmap.value ||
@@ -338,7 +339,8 @@ const isAnyExporting = computed(() => (
   isExportingGeoTIFF.value ||
   isExportingGLB.value ||
   isExportingDAE.value ||
-  isExportingTER.value
+  isExportingTER.value ||
+  isExportingOSM.value
 ));
 
 const modelCenterTextureType = ref('none');
@@ -716,23 +718,29 @@ const downloadGeoTIFF = async () => {
   }
 };
 
-const downloadOSM = () => {
+const downloadOSM = async () => {
   if (!props.terrainData?.osmFeatures || props.terrainData.osmFeatures.length === 0) return;
-  const geojson = {
-    type: 'FeatureCollection',
-    features: props.terrainData.osmFeatures.map(f => ({
-      type: 'Feature',
-      geometry: {
-        type: 'LineString',
-        coordinates: f.geometry.map(p => [p.lng, p.lat])
-      },
-      properties: f.tags
-    }))
-  };
-  const filename = `osm_features_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.geojson`;
-  downloadJsonFile(geojson, filename);
-  const metadata = buildExportMetadata('osm_geojson', filename);
-  downloadMetadataSidecar(filename, metadata);
+  isExportingOSM.value = true;
+  try {
+    await yieldToUi();
+    const geojson = {
+      type: 'FeatureCollection',
+      features: props.terrainData.osmFeatures.map(f => ({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: f.geometry.map(p => [p.lng, p.lat])
+        },
+        properties: f.tags
+      }))
+    };
+    const filename = `osm_features_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.geojson`;
+    downloadJsonFile(geojson, filename);
+    const metadata = buildExportMetadata('osm_geojson', filename);
+    downloadMetadataSidecar(filename, metadata);
+  } finally {
+    isExportingOSM.value = false;
+  }
 };
 
 const handleGLBExport = async () => {
