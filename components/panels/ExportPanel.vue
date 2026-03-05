@@ -44,7 +44,7 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingHeightmap" :size="20" class="animate-spin text-[#FF6600]" />
               <img v-else-if="heightmapPreviewUrl" :src="heightmapPreviewUrl" class="w-full h-full object-cover" />
               <Mountain v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
@@ -60,7 +60,7 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingTexture" :size="20" class="animate-spin text-[#FF6600]" />
               <img v-else-if="terrainData.satelliteTextureUrl" :src="terrainData.satelliteTextureUrl" class="w-full h-full object-cover" />
               <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
@@ -76,7 +76,7 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingOSMTexture" :size="20" class="animate-spin text-[#FF6600]" />
               <img v-else-if="terrainData.osmTextureUrl" :src="terrainData.osmTextureUrl" class="w-full h-full object-cover" />
               <Trees v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
@@ -92,7 +92,7 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingHybridTexture" :size="20" class="animate-spin text-[#FF6600]" />
               <img v-else-if="terrainData.hybridTextureUrl" :src="terrainData.hybridTextureUrl" class="w-full h-full object-cover" />
               <Layers v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
@@ -108,7 +108,7 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingSegmentedTexture" :size="20" class="animate-spin text-[#FF6600]" />
               <img v-else-if="terrainData.segmentedTextureUrl" :src="terrainData.segmentedTextureUrl" class="w-full h-full object-cover" />
               <Paintbrush v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
@@ -124,7 +124,7 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingSegmentedHybridTexture" :size="20" class="animate-spin text-[#FF6600]" />
               <img v-else-if="terrainData.segmentedHybridTextureUrl" :src="terrainData.segmentedHybridTextureUrl" class="w-full h-full object-cover" />
               <Paintbrush v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
@@ -140,7 +140,7 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingRoadMask" :size="20" class="animate-spin text-[#FF6600]" />
               <img v-else-if="roadMaskPreviewUrl" :src="roadMaskPreviewUrl" class="w-full h-full object-cover" />
               <Route v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
@@ -200,7 +200,7 @@
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
-                <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+                <Loader2 v-if="isExportingGLB" :size="20" class="animate-spin text-[#FF6600]" />
                 <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
               <span class="text-[9px] font-medium">GLB Model</span>
@@ -215,7 +215,7 @@
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
-                <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+                <Loader2 v-if="isExportingDAE" :size="20" class="animate-spin text-[#FF6600]" />
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
               <span class="text-[9px] font-medium">Collada DAE</span>
@@ -230,7 +230,7 @@
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
-                <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+                <Loader2 v-if="isExportingTER" :size="20" class="animate-spin text-[#FF6600]" />
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
               <span class="text-[9px] font-medium">BeamNG Terrain</span>
@@ -258,7 +258,7 @@
             class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingGeoTIFF" :size="20" class="animate-spin text-[#FF6600]" />
               <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-[9px] font-medium">GeoTIFF</span>
@@ -273,7 +273,7 @@
             class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5">
-              <Loader2 v-if="isAnyExporting" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingOSM" :size="20" class="animate-spin text-[#FF6600]" />
               <FileJson v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-[9px] font-medium">GeoJSON</span>
@@ -323,6 +323,7 @@ const isExportingSegmentedTexture = ref(false);
 const isExportingSegmentedHybridTexture = ref(false);
 const isExportingRoadMask = ref(false);
 const isExportingGeoTIFF = ref(false);
+const isExportingGLB = ref(false);
 const isExportingDAE = ref(false);
 const isExportingTER = ref(false);
 
@@ -335,6 +336,7 @@ const isAnyExporting = computed(() => (
   isExportingSegmentedHybridTexture.value ||
   isExportingRoadMask.value ||
   isExportingGeoTIFF.value ||
+  isExportingGLB.value ||
   isExportingDAE.value ||
   isExportingTER.value
 ));
@@ -735,7 +737,7 @@ const downloadOSM = () => {
 
 const handleGLBExport = async () => {
   if (!props.terrainData) return;
-  isExportingDAE.value = true;
+  isExportingGLB.value = true;
   try {
     await yieldToUi();
     const blob = await exportToGLB(props.terrainData, {
@@ -743,7 +745,8 @@ const handleGLBExport = async () => {
       tileSelection: modelTileSelection.value,
       surroundingTilePositions: props.surroundingTilePositions,
       center: props.center,
-      resolution: props.resolution
+      resolution: props.resolution,
+      returnBlob: true
     });
     const typedBlob = await ensureDownloadBlobType(blob, 'model/gltf-binary', 'application/octet-stream');
     const filename = `terrain_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.glb`;
@@ -759,7 +762,7 @@ const handleGLBExport = async () => {
     console.error('Failed to export GLB:', error);
     alert('Failed to export GLB. See console for details.');
   } finally {
-    isExportingDAE.value = false;
+    isExportingGLB.value = false;
   }
 };
 
@@ -773,7 +776,8 @@ const handleDAEExport = async () => {
       tileSelection: modelTileSelection.value,
       surroundingTilePositions: props.surroundingTilePositions,
       center: props.center,
-      resolution: props.resolution
+      resolution: props.resolution,
+      returnBlob: true
     });
     const typedBlob = await ensureDownloadBlobType(zipBlob, 'application/zip');
     const filename = `terrain_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.zip`;
