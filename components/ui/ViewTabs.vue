@@ -1,5 +1,5 @@
 <template>
-  <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-[#e5f0e3]/95 dark:bg-gray-800/95 backdrop-blur rounded-2xl p-1.5 shadow-lg border border-white/80 dark:border-gray-700">
+  <div class="absolute top-4 right-4 z-20 flex items-center gap-1.5 bg-white/95 dark:bg-gray-800/95 backdrop-blur rounded-2xl p-1.5 shadow-lg border border-gray-200/80 dark:border-gray-700">
     <BaseButton
       size="sm"
       variant="ghost"

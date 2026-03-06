@@ -1,5 +1,5 @@
 <template>
-  <div ref="exportPanel" v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
+  <div v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
     <!-- Missing OSM Warning / Action -->
     <div v-if="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0" class="bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 flex items-center justify-between">
       <div class="text-[10px] text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
@@ -48,8 +48,8 @@
               <img v-else-if="heightmapPreviewUrl" :src="heightmapPreviewUrl" class="w-full h-full object-cover" />
               <Mountain v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">Heightmap</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
+            <span class="text-[11px] font-medium">Heightmap</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
@@ -64,8 +64,8 @@
               <img v-else-if="terrainData.satelliteTextureUrl" :src="terrainData.satelliteTextureUrl" class="w-full h-full object-cover" />
               <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">Satellite</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <span class="text-[11px] font-medium">Satellite</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
@@ -80,8 +80,8 @@
               <img v-else-if="terrainData.osmTextureUrl" :src="terrainData.osmTextureUrl" class="w-full h-full object-cover" />
               <Trees v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">OSM Texture</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <span class="text-[11px] font-medium">OSM Texture</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
@@ -96,8 +96,8 @@
               <img v-else-if="terrainData.hybridTextureUrl" :src="terrainData.hybridTextureUrl" class="w-full h-full object-cover" />
               <Layers v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">Hybrid</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <span class="text-[11px] font-medium">Hybrid</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
@@ -112,8 +112,8 @@
               <img v-else-if="terrainData.segmentedTextureUrl" :src="terrainData.segmentedTextureUrl" class="w-full h-full object-cover" />
               <Paintbrush v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">Segmented</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <span class="text-[11px] font-medium">Segmented</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
@@ -128,8 +128,8 @@
               <img v-else-if="terrainData.segmentedHybridTextureUrl" :src="terrainData.segmentedHybridTextureUrl" class="w-full h-full object-cover" />
               <Paintbrush v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">Seg. Hybrid</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <span class="text-[11px] font-medium">Seg. Hybrid</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
@@ -144,8 +144,8 @@
               <img v-else-if="roadMaskPreviewUrl" :src="roadMaskPreviewUrl" class="w-full h-full object-cover" />
               <Route v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">Road Mask</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
+            <span class="text-[11px] font-medium">Road Mask</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
         </div>
@@ -203,8 +203,8 @@
                 <Loader2 v-if="isExportingGLB" :size="20" class="animate-spin text-[#FF6600]" />
                 <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
-              <span class="text-[9px] font-medium">GLB Model</span>
-              <span class="text-[8px] text-gray-500 dark:text-gray-400">.glb binary</span>
+              <span class="text-[11px] font-medium">GLB Model</span>
+              <span class="text-[10px] text-gray-500 dark:text-gray-400">.glb binary</span>
               <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
 
@@ -218,8 +218,8 @@
                 <Loader2 v-if="isExportingDAE" :size="20" class="animate-spin text-[#FF6600]" />
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
-              <span class="text-[9px] font-medium">Collada DAE</span>
-              <span class="text-[8px] text-gray-500 dark:text-gray-400">.dae + textures</span>
+              <span class="text-[11px] font-medium">Collada DAE</span>
+              <span class="text-[10px] text-gray-500 dark:text-gray-400">.dae + textures</span>
               <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
             
@@ -233,8 +233,8 @@
                 <Loader2 v-if="isExportingTER" :size="20" class="animate-spin text-[#FF6600]" />
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
-              <span class="text-[9px] font-medium">BeamNG Terrain</span>
-              <span class="text-[8px] text-gray-500 dark:text-gray-400">.ter heightmap</span>
+              <span class="text-[11px] font-medium">BeamNG Terrain</span>
+              <span class="text-[10px] text-gray-500 dark:text-gray-400">.ter heightmap</span>
               <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
             </button>
           </div>
@@ -261,8 +261,8 @@
               <Loader2 v-if="isExportingGeoTIFF" :size="20" class="animate-spin text-[#FF6600]" />
               <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">GeoTIFF</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
+            <span class="text-[11px] font-medium">GeoTIFF</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
@@ -276,8 +276,8 @@
               <Loader2 v-if="isExportingOSM" :size="20" class="animate-spin text-[#FF6600]" />
               <FileJson v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[9px] font-medium">GeoJSON</span>
-            <span class="text-[8px] text-gray-500 dark:text-gray-400">OSM vectors</span>
+            <span class="text-[11px] font-medium">GeoJSON</span>
+            <span class="text-[10px] text-gray-500 dark:text-gray-400">OSM vectors</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
         </div>
@@ -288,9 +288,10 @@
 
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
-import { 
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Paintbrush, Route, FileCode, FileJson 
+import {
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Paintbrush, Route, FileCode, FileJson
 } from 'lucide-vue-next';
+import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExports';
 import { exportToGLB, exportToDAE } from '../../services/export3d';
 import { exportGeoTiff } from '../../services/exportGeoTiff';
@@ -311,8 +312,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['fetchOsm']);
-
-const exportPanel = ref(null);
 
 // Export states
 const isExportingHeightmap = ref(false);
@@ -356,13 +355,6 @@ watch(showExports, (v) => localStorage.setItem('mapng_showExports', String(v)));
 watch(showExport2D, (v) => localStorage.setItem('mapng_showExport2D', String(v)));
 watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v)));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
-
-watch(() => props.isGenerating, async (newVal) => {
-  if (!newVal && props.terrainData) {
-    await nextTick();
-    exportPanel.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-});
 
 // Generate a small grayscale heightmap preview
 const heightmapPreviewUrl = computed(() => {
@@ -432,42 +424,23 @@ const roadMaskPreviewUrl = computed(() => {
   return canvas.toDataURL('image/png');
 });
 
-const buildRunConfiguration = () => {
-  return {
-    schemaVersion: 1,
-    mode: 'single',
-    center: { ...props.center },
-    zoom: props.zoom ?? null,
+const buildRunConfiguration = () => ({
+  ...buildRunConfigurationBase({
+    center: props.center,
+    zoom: props.zoom,
     resolution: props.resolution,
     includeOSM: props.fetchOSM,
     elevationSource: props.elevationSource,
-    useUSGS: props.elevationSource === 'usgs',
-    useGPXZ: props.elevationSource === 'gpxz',
-    gpxzApiKey: props.gpxzApiKey || '',
-    gpxzStatus: props.gpxzStatus ? { ...props.gpxzStatus } : null,
-    modelOptions: {
-      centerTextureType: modelCenterTextureType.value,
-      tileSelection: modelTileSelection.value,
-      includeSurroundings: modelTileSelection.value !== 'center-only',
-    },
-    terrain: props.terrainData ? {
-      width: props.terrainData.width,
-      height: props.terrainData.height,
-      bounds: props.terrainData.bounds,
-      minHeight: props.terrainData.minHeight,
-      maxHeight: props.terrainData.maxHeight,
-    } : null,
-    textureModes: {
-      satellite: !!props.terrainData?.satelliteTextureUrl,
-      osm: !!props.terrainData?.osmTextureUrl,
-      hybrid: !!props.terrainData?.hybridTextureUrl,
-      segmentedSatellite: !!props.terrainData?.segmentedTextureUrl,
-      segmentedHybrid: !!props.terrainData?.segmentedHybridTextureUrl,
-      roadMask: !!props.terrainData?.osmFeatures?.length,
-    },
-    osmQuery: props.terrainData?.osmRequestInfo || null,
-  };
-};
+    gpxzApiKey: props.gpxzApiKey,
+    gpxzStatus: props.gpxzStatus,
+    terrainData: props.terrainData,
+  }),
+  modelOptions: {
+    centerTextureType: modelCenterTextureType.value,
+    tileSelection: modelTileSelection.value,
+    includeSurroundings: modelTileSelection.value !== 'center-only',
+  },
+});
 
 const buildExportMetadata = (exportType, filename, extra = {}) => {
   const runCfg = buildRunConfiguration();
@@ -562,6 +535,7 @@ const downloadHeightmap = async () => {
   if (!props.terrainData?.heightMap) return;
   isExportingHeightmap.value = true;
   try {
+    await yieldToUi();
     const blob = generateHeightmapBlob(props.terrainData);
     const typedBlob = await ensureDownloadBlobType(blob, 'image/png');
     const filename = `heightmap_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
@@ -580,6 +554,7 @@ const downloadTexture = async () => {
   if (!props.terrainData?.satelliteTextureUrl) return;
   isExportingTexture.value = true;
   try {
+    await yieldToUi();
     const filename = `texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
     await downloadBlobUrlAsFile(props.terrainData.satelliteTextureUrl, filename, 'image/', 'image/png');
     const metadata = buildExportMetadata('texture_satellite', filename);
@@ -596,6 +571,7 @@ const downloadOSMTexture = async () => {
   if (!props.terrainData?.osmTextureUrl) return;
   isExportingOSMTexture.value = true;
   try {
+    await yieldToUi();
     const filename = `osm_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
     await downloadBlobUrlAsFile(props.terrainData.osmTextureUrl, filename, 'image/', 'image/png');
     const metadata = buildExportMetadata('texture_osm', filename);
@@ -612,6 +588,7 @@ const downloadHybridTexture = async () => {
   if (!props.terrainData?.hybridTextureUrl) return;
   isExportingHybridTexture.value = true;
   try {
+    await yieldToUi();
     const filename = `hybrid_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
     await downloadBlobUrlAsFile(props.terrainData.hybridTextureUrl, filename, 'image/', 'image/png');
     const metadata = buildExportMetadata('texture_hybrid', filename);
@@ -628,6 +605,7 @@ const downloadSegmentedTexture = async () => {
   if (!props.terrainData?.segmentedTextureUrl) return;
   isExportingSegmentedTexture.value = true;
   try {
+    await yieldToUi();
     const filename = `segmented_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
     await downloadBlobUrlAsFile(props.terrainData.segmentedTextureUrl, filename, 'image/', 'image/png');
     const metadata = buildExportMetadata('texture_segmented', filename);
@@ -644,6 +622,7 @@ const downloadSegmentedHybridTexture = async () => {
   if (!props.terrainData?.segmentedHybridTextureUrl) return;
   isExportingSegmentedHybridTexture.value = true;
   try {
+    await yieldToUi();
     const filename = `segmented_hybrid_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
     await downloadBlobUrlAsFile(props.terrainData.segmentedHybridTextureUrl, filename, 'image/', 'image/png');
     const metadata = buildExportMetadata('texture_segmented_hybrid', filename);
@@ -660,6 +639,7 @@ const downloadRoadMask = async () => {
   if (!props.terrainData?.osmFeatures || props.terrainData.osmFeatures.length === 0) return;
   isExportingRoadMask.value = true;
   try {
+    await yieldToUi();
     const canvas = document.createElement('canvas');
     canvas.width = props.terrainData.width;
     canvas.height = props.terrainData.height;

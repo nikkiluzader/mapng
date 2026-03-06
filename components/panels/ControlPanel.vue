@@ -1,36 +1,15 @@
 <template>
   <div class="space-y-6">
+    <!-- Generate Actions -->
     <GenerateActions
       :is-generating="isGenerating"
       :is-cached="isCached"
-            :use-gpxz="useGPXZ"
-            :gpxz-api-key="gpxzApiKey"
+      :use-gpxz="useGPXZ"
+      :gpxz-api-key="gpxzApiKey"
       @generate="(preview) => $emit('generate', preview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
     />
 
-    <RunConfigControls
-      :status="runConfigStatus"
-      @copy="copyRunConfiguration"
-      @paste="pasteRunConfiguration"
-      @save="saveRunConfiguration"
-      @load="handleRunConfigFile"
-    />
-
-        <hr class="border-gray-200 dark:border-gray-600" />
-
-    <JobStateControls
-      :has-terrain-data="!!terrainData"
-      :is-generating="isGenerating"
-      :is-exporting="isExportingJob"
-      :is-importing="isImportingJob"
-      :status="jobStatus"
-      @export="handleExportJob"
-      @import-file="handleImportJobFile"
-    />
-
-    <hr class="border-gray-200 dark:border-gray-600" />
-
-    <!-- Resolution & Settings -->
+    <!-- Output Settings -->
     <div class="space-y-4">
       <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
         <Box :size="16" class="text-gray-700 dark:text-gray-300" />
@@ -49,18 +28,13 @@
       </ResolutionSelector>
 
       <!-- OSM Toggle -->
-      <div class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-          <label class="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2 cursor-pointer">
-              <Trees :size="12" class="text-emerald-600 dark:text-emerald-400" />
-              Include OSM Features
-          </label>
-          <input 
-              type="checkbox" 
-              v-model="fetchOSM"
-              class="accent-[#FF6600] w-4 h-4 cursor-pointer"
-          />
+      <div class="p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
+        <BaseToggle v-model="fetchOSM">
+          <Trees :size="12" class="text-emerald-600 dark:text-emerald-400" />
+          Include OSM Features
+        </BaseToggle>
       </div>
- 
+
       <!-- Elevation Source Selection -->
       <ElevationSourceSelector
         v-model:elevationSource="elevationSource"
@@ -74,11 +48,9 @@
       />
     </div>
 
-    <hr class="border-gray-200 dark:border-gray-600" />
-
-    <!-- Coordinates -->
+    <!-- Center Coordinates (collapsible) -->
     <div class="space-y-2">
-      <button 
+      <button
         @click="showCoordinates = !showCoordinates"
         class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
       >
@@ -88,53 +60,82 @@
         </span>
         <ChevronDown :size="14" :class="['transition-transform duration-200', showCoordinates ? 'rotate-180' : '']" />
       </button>
-      
-      <!-- Location Search -->
       <template v-if="showCoordinates">
         <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
       </template>
     </div>
 
-    <hr class="border-gray-200 dark:border-gray-600" />
-
     <!-- Surrounding Tiles -->
-    <SurroundingTiles 
+    <SurroundingTiles
       :terrain-data="terrainData"
       :center="center"
       :resolution="resolution"
-            @update:selected-positions="handleSurroundingTilesChange"
+      @update:selected-positions="handleSurroundingTilesChange"
       @update:show-on-map="() => {}"
     />
 
-        <!-- Export Panel -->
-        <div v-if="terrainData && !isGenerating" ref="exportPanelEl">
-            <ExportPanel
-                :terrain-data="terrainData"
-                :is-generating="isGenerating"
-                :center="center"
-                :zoom="zoom"
-                :resolution="resolution"
-                :elevation-source="elevationSource"
-                :gpxz-api-key="gpxzApiKey"
-                :gpxz-status="gpxzStatus"
-                :fetch-o-s-m="fetchOSM"
-                :surrounding-tile-positions="surroundingTilePositions"
-                @fetch-osm="$emit('fetchOsm')"
-            />
-        </div>
-
-        <TerrainStats
-          :terrain-data="terrainData"
-          :meters-per-pixel="metersPerPixel"
-          :area-display="areaDisplay"
+    <!-- Configuration & Session (collapsible, collapsed by default) -->
+    <div class="space-y-3">
+      <button
+        @click="showConfig = !showConfig"
+        class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
+      >
+        <span class="flex items-center gap-2">
+          <Settings :size="16" class="text-gray-500 dark:text-gray-400 group-hover:text-[#FF6600] transition-colors" />
+          Configuration & Session
+        </span>
+        <ChevronDown :size="14" :class="['transition-transform duration-200', showConfig ? 'rotate-180' : '']" />
+      </button>
+      <template v-if="showConfig">
+        <RunConfigControls
+          :status="runConfigStatus"
+          @copy="copyRunConfiguration"
+          @paste="pasteRunConfiguration"
+          @save="saveRunConfiguration"
+          @load="handleRunConfigFile"
         />
+        <JobStateControls
+          :has-terrain-data="!!terrainData"
+          :is-generating="isGenerating"
+          :is-exporting="isExportingJob"
+          :is-importing="isImportingJob"
+          :status="jobStatus"
+          @export="handleExportJob"
+          @import-file="handleImportJobFile"
+        />
+      </template>
+    </div>
 
+    <!-- Terrain Stats (shown when data is available) -->
+    <TerrainStats
+      :terrain-data="terrainData"
+      :meters-per-pixel="metersPerPixel"
+      :area-display="areaDisplay"
+    />
+
+    <!-- Export Panel (shown when data is available) -->
+    <div v-if="terrainData && !isGenerating" ref="exportPanelEl">
+      <ExportPanel
+        :terrain-data="terrainData"
+        :is-generating="isGenerating"
+        :center="center"
+        :zoom="zoom"
+        :resolution="resolution"
+        :elevation-source="elevationSource"
+        :gpxz-api-key="gpxzApiKey"
+        :gpxz-status="gpxzStatus"
+        :fetch-o-s-m="fetchOSM"
+        :surrounding-tile-positions="surroundingTilePositions"
+        @fetch-osm="$emit('fetchOsm')"
+      />
+    </div>
   </div>
 </template>
 
 <script setup>
-    import { ref, computed, onMounted, watch, nextTick } from 'vue';
-    import { MapPin, Box, Trees, ChevronDown } from 'lucide-vue-next';
+    import { ref, computed, onMounted, watch } from 'vue';
+    import { MapPin, Box, Trees, ChevronDown, Settings } from 'lucide-vue-next';
+import BaseToggle from '../base/BaseToggle.vue';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
@@ -145,8 +146,9 @@ import RunConfigControls from '../controls/RunConfigControls.vue';
 import JobStateControls from '../controls/JobStateControls.vue';
 import TerrainStats from '../controls/TerrainStats.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
-import { cloneRateLimitInfo, downloadJsonFile } from '../../services/traceability';
+import { downloadJsonFile } from '../../services/traceability';
 import { exportJobData, importJobData } from '../../services/jobData';
+import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 
 
 const props = defineProps(['center', 'zoom', 'resolution', 'isGenerating', 'terrainData', 'generationCacheKey']);
@@ -209,20 +211,13 @@ const usgsStatus = ref(null);
 
 // Collapsible section states (persisted via localStorage, hidden by default)
 const showCoordinates = ref(localStorage.getItem('mapng_showCoordinates') === 'true');
+const showConfig = ref(false);
 
 onMounted(async () => {
     // Initialize flags from persisted elevation source
     useUSGS.value = elevationSource.value === 'usgs';
     useGPXZ.value = elevationSource.value === 'gpxz';
     usgsStatus.value = await checkUSGSStatus();
-});
-
-// Watch for generation completion to scroll to export panel
-watch(() => props.isGenerating, async (newVal) => {
-    if (!newVal && props.terrainData) {
-        await nextTick();
-        exportPanelEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
 });
 
 // Sync elevation source with flags
@@ -308,37 +303,16 @@ const handleSurroundingTilesChange = (positions) => {
     emit('surroundingTilesChange', surroundingTilePositions.value);
 };
 
-const buildRunConfiguration = () => {
-    return {
-        schemaVersion: 1,
-        mode: 'single',
-        center: { ...props.center },
-        zoom: props.zoom ?? null,
-        resolution: props.resolution,
-        includeOSM: fetchOSM.value,
-        elevationSource: elevationSource.value,
-        useUSGS: useUSGS.value,
-        useGPXZ: useGPXZ.value,
-        gpxzApiKey: gpxzApiKey.value || '',
-        gpxzStatus: gpxzStatus.value ? { ...gpxzStatus.value } : cloneRateLimitInfo(),
-        terrain: props.terrainData ? {
-            width: props.terrainData.width,
-            height: props.terrainData.height,
-            bounds: props.terrainData.bounds,
-            minHeight: props.terrainData.minHeight,
-            maxHeight: props.terrainData.maxHeight,
-        } : null,
-        textureModes: {
-            satellite: !!props.terrainData?.satelliteTextureUrl,
-            osm: !!props.terrainData?.osmTextureUrl,
-            hybrid: !!props.terrainData?.hybridTextureUrl,
-            segmentedSatellite: !!props.terrainData?.segmentedTextureUrl,
-            segmentedHybrid: !!props.terrainData?.segmentedHybridTextureUrl,
-            roadMask: !!props.terrainData?.osmFeatures?.length,
-        },
-        osmQuery: props.terrainData?.osmRequestInfo || null,
-    };
-};
+const buildRunConfiguration = () => buildRunConfigurationBase({
+    center: props.center,
+    zoom: props.zoom,
+    resolution: props.resolution,
+    includeOSM: fetchOSM.value,
+    elevationSource: elevationSource.value,
+    gpxzApiKey: gpxzApiKey.value,
+    gpxzStatus: gpxzStatus.value,
+    terrainData: props.terrainData,
+});
 
 const triggerDownload = (blob, filename) => {
     const url = URL.createObjectURL(blob);

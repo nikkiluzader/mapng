@@ -2,7 +2,7 @@
   <div class="space-y-3">
     <label class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-2">
       <Database :size="14" />
-      Single Job State
+      Session Data
     </label>
     <div class="grid grid-cols-2 gap-2">
       <BaseButton size="sm" variant="secondary" :disabled="isImporting || isGenerating" @click="triggerImport">

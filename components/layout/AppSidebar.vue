@@ -32,16 +32,24 @@
       <slot />
     </div>
 
-    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-[11px] text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900 space-y-1.5">
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-3 min-w-0">
+    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-[11px] text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900 space-y-1">
+      <div class="flex items-center justify-between gap-1">
+        <div class="flex items-center gap-1">
           <BaseButton variant="ghost" size="sm" class="px-2 py-1 text-[11px] font-medium" @click="$emit('show-disclaimer')">Disclaimer</BaseButton>
-          <a href="mailto:nikkiluzader@gmail.com" class="text-[#FF6600] hover:text-[#E65C00] transition-colors truncate">Contact: nikkiluzader@gmail.com</a>
+          <a href="mailto:nikkiluzader@gmail.com" class="text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 py-1">Contact</a>
+          <BaseButton
+            variant="ghost"
+            size="sm"
+            class="text-gray-600 dark:text-gray-400 hover:text-[#FF6600] dark:hover:text-[#FF6600] transition-colors flex items-center gap-1 px-2 py-1"
+            @click="$emit('show-stack')"
+          >
+            <Code :size="12" /> Stack
+          </BaseButton>
         </div>
         <BaseButton
           variant="secondary"
           size="sm"
-          class="p-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          class="p-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
           :title="isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
           @click="$emit('toggle-dark')"
         >
@@ -49,18 +57,7 @@
           <Moon v-else :size="14" />
         </BaseButton>
       </div>
-
-      <div class="flex items-center justify-between gap-2">
-        <BaseButton
-          variant="ghost"
-          size="sm"
-          class="text-gray-600 dark:text-gray-400 hover:text-[#FF6600] dark:hover:text-[#FF6600] transition-colors flex items-center gap-1 px-2 py-1"
-          @click="$emit('show-stack')"
-        >
-          <Code :size="12" /> View Tech Stack
-        </BaseButton>
-        <span class="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">Build {{ buildHash }} · {{ buildTime }}</span>
-      </div>
+      <span class="text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Build {{ buildHash }} · {{ buildTime }}</span>
     </div>
   </aside>
 </template>
