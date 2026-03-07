@@ -361,6 +361,87 @@ async function generateTerrainBackdropDAE(terrainData, worldSize) {
   };
 }
 
+// OSM highway type → BeamNG DecalRoad material and half-width (metres).
+// Half-width because BeamNG's DecalRoad `nodes[3]` is the distance from
+// centreline to each edge (i.e. total road width = 2 × value).
+const HIGHWAY_STYLE = {
+  motorway:       { material: 'road_asphalt_2lane', width: 6,   textureLength: 12 },
+  motorway_link:  { material: 'road_asphalt_2lane', width: 4,   textureLength: 10 },
+  trunk:          { material: 'road_asphalt_2lane', width: 5.5, textureLength: 12 },
+  trunk_link:     { material: 'road_asphalt_2lane', width: 4,   textureLength: 10 },
+  primary:        { material: 'road_asphalt_2lane', width: 5,   textureLength: 10 },
+  primary_link:   { material: 'road_asphalt_2lane', width: 3.5, textureLength: 10 },
+  secondary:      { material: 'road_asphalt_2lane', width: 4.5, textureLength: 10 },
+  secondary_link: { material: 'road_asphalt_2lane', width: 3,   textureLength: 10 },
+  tertiary:       { material: 'road_asphalt_2lane', width: 4,   textureLength: 8  },
+  tertiary_link:  { material: 'road_asphalt_2lane', width: 3,   textureLength: 8  },
+  residential:    { material: 'road_asphalt_2lane', width: 3,   textureLength: 8  },
+  living_street:  { material: 'road_asphalt_2lane', width: 2.5, textureLength: 8  },
+  unclassified:   { material: 'road_asphalt_2lane', width: 3,   textureLength: 8  },
+  road:           { material: 'road_asphalt_2lane', width: 3,   textureLength: 8  },
+  service:        { material: 'road_asphalt_2lane', width: 2.5, textureLength: 6  },
+  track:          { material: 'road_gravel_dry',  width: 2,   textureLength: 6  },
+};
+
+// OSM highway types to exclude from road generation (non-vehicle ways).
+const ROAD_SKIP = new Set([
+  'footway', 'path', 'pedestrian', 'steps', 'cycleway',
+  'bridleway', 'corridor', 'proposed', 'construction',
+]);
+
+/**
+ * Convert OSM road features to BeamNG DecalRoad scene objects.
+ *
+ * Each OSM way with a driveable highway tag becomes one DecalRoad spline.
+ * Node coordinates are converted from WGS84 → BeamNG world-space using the
+ * same geoToWorld() projection as the spawn point, then clamped to 3 d.p.
+ *
+ * DecalRoad nodes format: [x, y, z, halfWidth]
+ *   halfWidth = distance from road centreline to each edge (metres).
+ *
+ * Returns an empty array when no OSM data is available.
+ */
+function generateDecalRoads(terrainData, squareSize) {
+  if (!terrainData.osmFeatures?.length) return [];
+
+  const roads = [];
+
+  for (const feature of terrainData.osmFeatures) {
+    if (feature.type !== 'road' || !feature.geometry?.length) continue;
+
+    const highway = feature.tags?.highway;
+    if (!highway || ROAD_SKIP.has(highway)) continue;
+
+    const style = HIGHWAY_STYLE[highway] ?? { material: 'road_asphalt_2lane', width: 3, textureLength: 8 };
+
+    const nodes = [];
+    for (const pt of feature.geometry) {
+      const [wx, wy, wz] = geoToWorld(pt.lat, pt.lng, terrainData, squareSize, 0.1);
+      nodes.push([
+        Math.round(wx * 1000) / 1000,
+        Math.round(wy * 1000) / 1000,
+        Math.round(wz * 1000) / 1000,
+        style.width,
+      ]);
+    }
+
+    if (nodes.length < 2) continue;
+
+    roads.push({
+      class: 'DecalRoad',
+      __parent: 'Decal_roads',
+      position: [nodes[0][0], nodes[0][1], nodes[0][2]],
+      improvedSpline: true,
+      material: style.material,
+      nodes,
+      overObjects: true,
+      textureLength: style.textureLength,
+    });
+  }
+
+  return roads;
+}
+
 /**
  * Write a newline-delimited JSON (NDJSON) string from an array of objects.
  * Each object is one line, file ends with a newline — matching BeamNG's format.
@@ -391,10 +472,12 @@ function toNDJSON(objects) {
  *               ├── items.level.json
  *               ├── PlayerDropPoints/
  *               │   └── items.level.json
- *               └── Level_objects/
- *                   ├── items.level.json   (LevelInfo, TimeOfDay, ScatterSky, Other group)
- *                   └── Other/
- *                       └── items.level.json  (TerrainBlock + optional TSStatics)
+ *               ├── Level_objects/
+ *               │   ├── items.level.json   (LevelInfo, TimeOfDay, ScatterSky, Other group)
+ *               │   └── Other/
+ *               │       └── items.level.json  (TerrainBlock + optional TSStatics)
+ *               └── Decal_roads/           (present when OSM road data is available)
+ *                   └── items.level.json   (one DecalRoad per driveable OSM way)
  *
  * @param {object} terrainData
  * @param {object} center        — { lat, lng }
@@ -415,6 +498,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const maxHeight = Math.ceil(terrainData.maxHeight - terrainData.minHeight);
 
   const spawnPosition = findSpawnPosition(terrainData, center, squareSize);
+
+  const decalRoads = generateDecalRoads(terrainData, squareSize);
 
   const [{ blob: terBlob }, previewBlob, texBlob, osmDaeBlob, backdropResult] = await Promise.all([
     exportTer(terrainData),
@@ -545,12 +630,23 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   );
 
   // ── main/MissionGroup/items.level.json ─────────────────────────────────────
-  zip.file(`${base}/main/MissionGroup/items.level.json`,
-    toNDJSON([
-      { __parent: 'MissionGroup', class: 'SimGroup', name: 'PlayerDropPoints' },
-      { __parent: 'MissionGroup', class: 'SimGroup', name: 'Level_objects' },
-    ])
-  );
+  const missionGroupItems = [
+    { __parent: 'MissionGroup', class: 'SimGroup', name: 'PlayerDropPoints' },
+    { __parent: 'MissionGroup', class: 'SimGroup', name: 'Level_objects' },
+  ];
+  if (decalRoads.length > 0) {
+    missionGroupItems.push({ __parent: 'MissionGroup', class: 'SimGroup', name: 'Decal_roads' });
+  }
+  zip.file(`${base}/main/MissionGroup/items.level.json`, toNDJSON(missionGroupItems));
+
+  // ── main/MissionGroup/Decal_roads/items.level.json ─────────────────────────
+  // One DecalRoad object per driveable OSM road way.  BeamNG projects the
+  // spline onto the TerrainBlock surface (improvedSpline) and renders it as a
+  // material decal, giving the level real driveable roads with collision.
+  if (decalRoads.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/Decal_roads`);
+    zip.file(`${base}/main/MissionGroup/Decal_roads/items.level.json`, toNDJSON(decalRoads));
+  }
 
   // ── main/MissionGroup/Level_objects/items.level.json ──────────────────────
   // LevelInfo, TimeOfDay, ScatterSky, and the Other group (which holds terrain)
