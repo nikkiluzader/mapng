@@ -2055,11 +2055,12 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
     );
     const tileOptions = { useNativeTerrainGrid: true };
     if (fetchOptions.includeSatellite !== undefined) tileOptions.includeSatellite = fetchOptions.includeSatellite;
+    const satZoom = fetchOptions.satelliteZoom !== undefined ? fetchOptions.satelliteZoom : GLB_SURROUND_SAT_ZOOM;
     const results = await fetchSurroundingTiles(
       data.bounds,
       allPositions,
       surroundResolution,
-      GLB_SURROUND_SAT_ZOOM,
+      satZoom,
       onProgress,
       undefined,
       tileOptions,

@@ -269,28 +269,28 @@ async function generateOSMObjectsDAE(terrainData, worldSize) {
 
 /**
  * Generate a Collada (.dae) Blob containing the 8 surrounding terrain tiles
- * (NW, N, NE, W, E, SW, S, SE) as a single low-resolution mesh backdrop.
+ * (NW, N, NE, W, E, SW, S, SE) textured with satellite imagery at zoom 15.
  *
- * Fetches surrounding tile elevation data, builds a Three.js mesh group using
- * the same seam-blending logic as the GLB/DAE 3D export, then applies the
- * scene-space → BeamNG world-space coordinate transform and exports as DAE.
+ * Fetches surrounding tile elevation + satellite data (zoom 15, max 1024px),
+ * builds a Three.js mesh group with per-tile satellite textures, applies the
+ * scene-space → BeamNG world-space coordinate transform, and exports as DAE.
  *
- * Each tile mesh has rotation.x = -π/2 and a positional offset applied in
- * scene-space.  We bake mesh.matrixWorld into the geometry before applying the
- * BeamNG transform, then reset the mesh transform to identity so the DAE
- * contains no redundant node-level transforms.
+ * Each tile gets its own material named `backdrop_${pos}` (e.g. backdrop_NW).
+ * The ColladaExporter packages the satellite images as `textures/backdrop_*.png`
+ * and returns them in result.textures — these are saved alongside the DAE in
+ * art/shapes/textures/ in the level zip.
  *
- * Satellite textures are stripped — the backdrop uses a flat earth-tone
- * material ("backdrop_terrain") defined in art/shapes/main.materials.json.
- *
- * Returns a Blob, or null if no surrounding data could be fetched.
+ * Returns { daeBlob, textureFiles } where textureFiles is the array from
+ * ColladaExporter (each entry: { name, ext, data: Uint8Array, directory }).
+ * Returns null if no surrounding data could be fetched.
  */
 async function generateTerrainBackdropDAE(terrainData, worldSize) {
-  // Fetch elevation-only at 512px — no satellite textures needed (we strip them
-  // anyway) and keeping resolution low avoids canvas-size failures at 8192px.
+  // Zoom 15 gives ~4m/px satellite imagery; 1024px cap avoids canvas-size
+  // failures at large resolutions while still giving usable texture quality.
   const surroundingGroup = await createSurroundingMeshes(terrainData, null, 128, {
-    fetchResolutionCap: 512,
-    includeSatellite: false,
+    fetchResolutionCap: 1024,
+    includeSatellite: true,
+    satelliteZoom: 15,
   });
   if (!surroundingGroup) return null;
 
@@ -316,6 +316,23 @@ async function generateTerrainBackdropDAE(terrainData, worldSize) {
   surroundingGroup.traverse(child => {
     if (!child.isMesh) return;
 
+    // Derive tile position name from mesh name (e.g. "terrain_NW" → "NW").
+    const pos = child.name.replace('terrain_', '') || 'tile';
+    const matName = `backdrop_${pos}`;
+
+    // Name the material and its texture map for the ColladaExporter and for
+    // BeamNG's material resolution via main.materials.json.
+    const mats = Array.isArray(child.material) ? child.material : [child.material];
+    mats.forEach(m => {
+      if (!m) return;
+      m.name = matName;
+      if (m.map) m.map.name = matName;
+      // Strip non-diffuse maps — they don't belong in the level file.
+      m.normalMap = null;
+      m.roughnessMap = null;
+      m.metalnessMap = null;
+    });
+
     // Bake world transform (rotation + tile offset) into geometry vertex data,
     // then apply the BeamNG coordinate transform on top.
     child.geometry.applyMatrix4(child.matrixWorld);
@@ -327,26 +344,21 @@ async function generateTerrainBackdropDAE(terrainData, worldSize) {
     child.scale.set(1, 1, 1);
     child.updateMatrix();
     child.matrixWorld.identity();
-
-    // Strip satellite textures (3D-preview assets) and name material for BeamNG.
-    const mats = Array.isArray(child.material) ? child.material : [child.material];
-    mats.forEach(m => {
-      if (!m) return;
-      m.map = null;
-      m.normalMap = null;
-      m.roughnessMap = null;
-      m.metalnessMap = null;
-      m.name = 'backdrop_terrain';
-    });
   });
 
   const { ColladaExporter } = await import('./ColladaExporter.js');
-  const result = new ColladaExporter().parse(scene, undefined, { version: '1.4.1' });
+  const result = new ColladaExporter().parse(scene, undefined, {
+    textureDirectory: 'textures',
+    version: '1.4.1',
+  });
   if (!result?.data) return null;
 
   const daeText = await result.data.text();
   const daePatched = daeText.replace('<up_axis>Y_UP</up_axis>', '<up_axis>Z_UP</up_axis>');
-  return new Blob([daePatched], { type: 'model/vnd.collada+xml' });
+  return {
+    daeBlob: new Blob([daePatched], { type: 'model/vnd.collada+xml' }),
+    textureFiles: result.textures ?? [],
+  };
 }
 
 /**
@@ -404,13 +416,15 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   const spawnPosition = findSpawnPosition(terrainData, center, squareSize);
 
-  const [{ blob: terBlob }, previewBlob, texBlob, osmDaeBlob, backdropDaeBlob] = await Promise.all([
+  const [{ blob: terBlob }, previewBlob, texBlob, osmDaeBlob, backdropResult] = await Promise.all([
     exportTer(terrainData),
     generatePreviewBlob(terrainData),
     getTerrainTextureBlob(terrainData, baseTexture),
     generateOSMObjectsDAE(terrainData, worldSize),
     includeBackdrop ? generateTerrainBackdropDAE(terrainData, worldSize) : Promise.resolve(null),
   ]);
+  const backdropDaeBlob = backdropResult?.daeBlob ?? null;
+  const backdropTextureFiles = backdropResult?.textureFiles ?? [];
 
   const zip = new JSZip();
   const base = `levels/${levelName}`;
@@ -475,15 +489,35 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       };
     }
     if (backdropDaeBlob) {
-      // Flat earth-tone material for the surrounding terrain backdrop mesh.
-      shapeMaterials.backdrop_terrain = {
-        class: 'Material',
-        name: 'backdrop_terrain',
-        mapTo: 'backdrop_terrain',
-        annotation: 'TERRAIN',
-        Stages: [{ diffuseColor: [0.55, 0.5, 0.45, 1] }],
-        translucentBlendOp: 'None',
-      };
+      // Save per-tile satellite textures alongside the DAE.
+      if (backdropTextureFiles.length > 0) {
+        zip.folder(`${base}/art/shapes/textures`);
+        for (const tex of backdropTextureFiles) {
+          zip.file(`${base}/art/shapes/textures/${tex.name}.${tex.ext}`, tex.data);
+          // One BeamNG Material entry per tile, referencing its satellite texture.
+          shapeMaterials[tex.name] = {
+            class: 'Material',
+            name: tex.name,
+            mapTo: tex.name,
+            annotation: 'TERRAIN',
+            Stages: [{
+              diffuseMap: `levels/${levelName}/art/shapes/textures/${tex.name}.${tex.ext}`,
+              diffuseColor: [1, 1, 1, 1],
+            }],
+            translucentBlendOp: 'None',
+          };
+        }
+      } else {
+        // No satellite textures available — use a flat earth-tone fallback.
+        shapeMaterials.backdrop_terrain = {
+          class: 'Material',
+          name: 'backdrop_terrain',
+          mapTo: 'backdrop_terrain',
+          annotation: 'TERRAIN',
+          Stages: [{ diffuseColor: [0.55, 0.5, 0.45, 1] }],
+          translucentBlendOp: 'None',
+        };
+      }
     }
     zip.file(`${base}/art/shapes/main.materials.json`, JSON.stringify(shapeMaterials, null, 2));
   }
