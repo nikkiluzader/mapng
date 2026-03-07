@@ -84,6 +84,7 @@ Unlike generic terrain tools, MapNG is purpose-built for vehicle simulation maps
 | **GLB 3D Model** | Terrain mesh export with tile scope options: Center, Center + Surroundings, or Surroundings Only |
 | **Collada DAE** | DAE + textures ZIP with the same tile scope options as GLB |
 | **BeamNG Terrain** | `.ter` binary heightmap for direct import into BeamNG.drive |
+| **BeamNG Level Package** | Complete playable `.zip` level — terrain, hybrid satellite texture, scene tree, sky, spawn point, and level config. Drop the `.zip` directly into your BeamNG `mods` folder. |
 | **Job Data (.mapng)** | Complete compressed session package — heightmap, all textures, OSM vectors, and metadata |
 
 ---
@@ -219,6 +220,7 @@ npm run deploy
 6. **Export** — the export panel appears below terrain stats once generation is complete. Expand any category to download:
    - **2D Assets**: Heightmap, Satellite, OSM Texture, Hybrid Texture, Segmented Satellite, Segmented Hybrid, Road Mask
    - **3D Models**: GLB, Collada DAE, BeamNG Terrain (.ter) — with tile scope options for 3D formats
+   - **BeamNG Level**: A complete playable level `.zip`. Drop it directly into your BeamNG `mods` folder — no additional setup required. Includes real-world terrain, hybrid satellite texture (satellite + road overlay), sky, and a spawn point placed on the nearest drivable road.
    - **Geo Data**: GeoTIFF, GeoJSON
 
 7. **Surrounding Tiles** (optional) — select adjacent tiles from the 3×3 grid, configure satellite quality, and download as a ZIP.

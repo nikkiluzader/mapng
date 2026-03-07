@@ -241,6 +241,34 @@
         </template>
       </div>
 
+      <!-- BeamNG Level -->
+      <div class="space-y-1.5">
+        <button
+          @click="showExportBeamNG = !showExportBeamNG"
+          class="w-full flex items-center justify-between group"
+        >
+          <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">BeamNG Level</h4>
+          <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExportBeamNG ? 'rotate-180' : '']" />
+        </button>
+        <div v-if="showExportBeamNG" class="grid grid-cols-1 gap-1.5">
+          <button
+            @click="handleBeamNGLevelExport"
+            :disabled="isAnyExporting"
+            class="relative flex items-center gap-3 p-2.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div class="flex items-center justify-center w-8 h-8 shrink-0">
+              <Loader2 v-if="isExportingBeamNGLevel" :size="20" class="animate-spin text-[#FF6600]" />
+              <PackageOpen v-else :size="20" class="text-gray-400 dark:text-gray-500" />
+            </div>
+            <div class="text-left">
+              <div class="text-[11px] font-medium">BeamNG Level Package</div>
+              <div class="text-[10px] text-gray-500 dark:text-gray-400">Drop .zip into BeamNG mods folder to play</div>
+            </div>
+            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+          </button>
+        </div>
+      </div>
+
       <!-- Geo Data -->
       <div class="space-y-1.5">
         <button
@@ -289,7 +317,7 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Paintbrush, Route, FileCode, FileJson
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Paintbrush, Route, FileCode, FileJson, PackageOpen
 } from 'lucide-vue-next';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExports';
@@ -297,6 +325,7 @@ import { exportToGLB, exportToDAE } from '../../services/export3d';
 import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
+import { exportBeamNGLevel } from '../../services/exportBeamNGLevel';
 
 const props = defineProps({
   terrainData: { type: Object, default: null },
@@ -326,6 +355,7 @@ const isExportingGLB = ref(false);
 const isExportingDAE = ref(false);
 const isExportingTER = ref(false);
 const isExportingOSM = ref(false);
+const isExportingBeamNGLevel = ref(false);
 
 const isAnyExporting = computed(() => (
   isExportingHeightmap.value ||
@@ -339,7 +369,8 @@ const isAnyExporting = computed(() => (
   isExportingGLB.value ||
   isExportingDAE.value ||
   isExportingTER.value ||
-  isExportingOSM.value
+  isExportingOSM.value ||
+  isExportingBeamNGLevel.value
 ));
 
 const modelCenterTextureType = ref('none');
@@ -349,11 +380,13 @@ const modelTileSelection = ref('center-only');
 const showExports = ref(localStorage.getItem('mapng_showExports') !== 'false');
 const showExport2D = ref(localStorage.getItem('mapng_showExport2D') !== 'false');
 const showExport3D = ref(localStorage.getItem('mapng_showExport3D') !== 'false');
+const showExportBeamNG = ref(localStorage.getItem('mapng_showExportBeamNG') !== 'false');
 const showExportGeo = ref(localStorage.getItem('mapng_showExportGeo') !== 'false');
 
 watch(showExports, (v) => localStorage.setItem('mapng_showExports', String(v)));
 watch(showExport2D, (v) => localStorage.setItem('mapng_showExport2D', String(v)));
 watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v)));
+watch(showExportBeamNG, (v) => localStorage.setItem('mapng_showExportBeamNG', String(v)));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
 // Generate a small grayscale heightmap preview
@@ -782,6 +815,21 @@ const handleDAEExport = async () => {
     alert('Failed to export DAE. See console for details.');
   } finally {
     isExportingDAE.value = false;
+  }
+};
+
+const handleBeamNGLevelExport = async () => {
+  if (!props.terrainData) return;
+  isExportingBeamNGLevel.value = true;
+  try {
+    await yieldToUi();
+    const { blob, filename } = await exportBeamNGLevel(props.terrainData, props.center);
+    triggerDownload(blob, filename);
+  } catch (error) {
+    console.error('Failed to export BeamNG level:', error);
+    alert('Failed to export BeamNG level. See console for details.');
+  } finally {
+    isExportingBeamNGLevel.value = false;
   }
 };
 
