@@ -1,11 +1,20 @@
 <template>
   <div class="space-y-6">
+    <!-- TIF Upload (BYOD) -->
+    <TifUploadControl
+      :uploaded-tif-file="uploadedTifFile"
+      :uploaded-tif-meta="uploadedTifMeta"
+      @file-selected="$emit('tifSelected', $event)"
+      @clear="$emit('tifClear')"
+    />
+
     <!-- Generate Actions -->
     <GenerateActions
       :is-generating="isGenerating"
       :is-cached="isCached"
       :use-gpxz="useGPXZ"
       :gpxz-api-key="gpxzApiKey"
+      :has-custom-elevation="!!uploadedTifFile"
       @generate="(preview) => $emit('generate', preview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
     />
 
@@ -142,6 +151,7 @@ import ResolutionSelector from '../map/ResolutionSelector.vue';
 import SurroundingTiles from '../map/SurroundingTiles.vue';
 import ExportPanel from './ExportPanel.vue';
 import GenerateActions from '../controls/GenerateActions.vue';
+import TifUploadControl from '../controls/TifUploadControl.vue';
 import RunConfigControls from '../controls/RunConfigControls.vue';
 import JobStateControls from '../controls/JobStateControls.vue';
 import TerrainStats from '../controls/TerrainStats.vue';
@@ -151,9 +161,9 @@ import { exportJobData, importJobData } from '../../services/jobData';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 
 
-const props = defineProps(['center', 'zoom', 'resolution', 'isGenerating', 'terrainData', 'generationCacheKey']);
+const props = defineProps(['center', 'zoom', 'resolution', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedTifFile', 'uploadedTifMeta']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'tifSelected', 'tifClear']);
 
 const handleLocationChange = (newLocation) => {
     emit('locationChange', { ...props.center, ...newLocation });
@@ -275,6 +285,7 @@ const areaSqKm = computed(() => totalAreaSqM.value / 1000000);
 
 // Check if the current parameters match the last successful generation
 const isCached = computed(() => {
+  if (props.uploadedTifFile) return false; // always re-generate when custom TIF is active
   if (!props.generationCacheKey || !props.terrainData) return false;
   const currentKey = JSON.stringify({
     lat: props.center.lat,

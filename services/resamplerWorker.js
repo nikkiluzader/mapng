@@ -10,6 +10,20 @@
  */
 import proj4 from 'proj4';
 
+// ─── Built-in proj4 strings for common CRS (avoids CORS fetch) ──────────────
+const getBuiltInProj4 = (epsgCode) => {
+    if (epsgCode === 3857) {
+        return '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs';
+    }
+    if (epsgCode >= 32601 && epsgCode <= 32660) {
+        return `+proj=utm +zone=${epsgCode - 32600} +datum=WGS84 +units=m +no_defs`;
+    }
+    if (epsgCode >= 32701 && epsgCode <= 32760) {
+        return `+proj=utm +zone=${epsgCode - 32700} +south +datum=WGS84 +units=m +no_defs`;
+    }
+    return null;
+};
+
 // ─── Web Mercator Projection (mirrors terrain.js) ───────────────────────────
 const TILE_SIZE = 256;
 const MAX_LATITUDE = 85.05112878;
@@ -329,11 +343,17 @@ const resampleHeight = async ({ center, width, height, smooth, fillHoles = true,
                 const epsg = `EPSG:${tile.epsgCode}`;
                 try {
                     if (!proj4.defs(epsg)) {
-                        // Try to fetch definition
-                        const response = await fetch(`https://epsg.io/${tile.epsgCode}.proj4`);
-                        if (response.ok) {
-                            const def = await response.text();
-                            proj4.defs(epsg, def);
+                        // Try built-in string first (no network required)
+                        const builtIn = getBuiltInProj4(tile.epsgCode);
+                        if (builtIn) {
+                            proj4.defs(epsg, builtIn);
+                        } else {
+                            // Fall back to network fetch for less common CRS
+                            const response = await fetch(`https://epsg.io/${tile.epsgCode}.proj4`);
+                            if (response.ok) {
+                                const def = await response.text();
+                                proj4.defs(epsg, def);
+                            }
                         }
                     }
                     converter = proj4('EPSG:4326', epsg);

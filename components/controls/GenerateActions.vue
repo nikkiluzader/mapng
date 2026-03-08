@@ -21,7 +21,7 @@
           <Mountain :size="16" />
           <span>Preview 3D</span>
         </div>
-        <span class="text-[10px] font-normal opacity-90">View before download</span>
+        <span class="text-[10px] font-normal opacity-90">{{ hasCustomElevation ? 'Using uploaded TIF' : 'View before download' }}</span>
       </template>
     </BaseButton>
 
@@ -61,6 +61,7 @@ defineProps({
   isCached: { type: Boolean, default: false },
   useGPXZ: { type: Boolean, default: false },
   gpxzApiKey: { type: String, default: '' },
+  hasCustomElevation: { type: Boolean, default: false },
 });
 
 defineEmits(['generate']);

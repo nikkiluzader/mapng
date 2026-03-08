@@ -16,14 +16,16 @@
       @set-batch-mode="setBatchMode"
     >
       <!-- Single mode -->
-      <ControlPanel 
+      <ControlPanel
         v-if="!batchMode"
-        :center="center" 
+        :center="center"
         :zoom="zoom"
         :resolution="resolution"
         :terrain-data="terrainData"
         :is-generating="isLoading"
         :generation-cache-key="lastGenerationKey"
+        :uploaded-tif-file="uploadedTifFile"
+        :uploaded-tif-meta="uploadedTifMeta"
         @location-change="handleLocationChange"
         @resolution-change="store.setResolution"
         @zoom-change="store.setZoom"
@@ -31,6 +33,8 @@
         @fetch-osm="handleFetchOSM"
         @surrounding-tiles-change="(v) => surroundingTilePositions = v"
         @import-data="handleImportData"
+        @tif-selected="handleTifSelected"
+        @tif-clear="handleTifClear"
       />
 
       <!-- Batch mode -->
@@ -153,7 +157,7 @@ import MapSelector from './components/map/MapSelector.vue';
 import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
-import { fetchTerrainData, addOSMToTerrain } from './services/terrain';
+import { fetchTerrainData, addOSMToTerrain, loadTerrainFromTif, parseTifFile } from './services/terrain';
 import {
   computeGridTiles,
   createBatchJobState,
@@ -196,6 +200,10 @@ const showAbout = ref(false);
 const showDisclaimer = ref(false);
 let abortController = null;
 let batchAbortController = null;
+
+// BYOD — user-uploaded TIF elevation data
+const uploadedTifFile = ref(null);   // File | null
+const uploadedTifMeta = ref(null);   // parseTifFile() result | null
 
 // Compute batch grid tiles for map overlay (live preview while configuring)
 const batchGridTiles = computed(() => {
@@ -262,7 +270,7 @@ const handleLocationChange = (newCenter) => {
 
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
-const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey) => {
+const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null) => {
   return JSON.stringify({
     lat: c.lat,
     lng: c.lng,
@@ -271,11 +279,36 @@ const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey) => {
     usgs,
     gpxz,
     gpxzKey: gpxz ? gpxzKey : '',
+    // Include file identity so a different upload invalidates the cache
+    tif: tifFile ? `${tifFile.name}|${tifFile.size}|${tifFile.lastModified}` : null,
   });
 };
 
+const handleTifSelected = async (file) => {
+  uploadedTifFile.value = file;
+  uploadedTifMeta.value = null;
+  // Clear existing terrain so generate buttons are enabled
+  terrainData.value = null;
+  lastGenerationKey.value = null;
+  try {
+    const meta = await parseTifFile(file);
+    uploadedTifMeta.value = meta;
+    // If it's a GeoTIFF, auto-populate the map centre from the file's bounds
+    if (meta.isGeoTiff && meta.center) {
+      store.setCenter(meta.center);
+    }
+  } catch (e) {
+    console.warn('[BYOD] Failed to read TIF metadata:', e);
+  }
+};
+
+const handleTifClear = () => {
+  uploadedTifFile.value = null;
+  uploadedTifMeta.value = null;
+};
+
 const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey) => {
-  const requestKey = buildGenerationKey(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, gpxzApiKey);
+  const requestKey = buildGenerationKey(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, gpxzApiKey, uploadedTifFile.value);
 
   // If we already have terrain data for the exact same parameters, reuse it
   if (terrainData.value && lastGenerationKey.value) {
@@ -343,17 +376,32 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
   }
 
   try {
-    const data = await fetchTerrainData(
-        center.value, 
-        resolution.value, 
-        fetchOSM, 
-        useUSGS, 
-        useGPXZ, 
+    let data;
+    if (uploadedTifFile.value) {
+      // BYOD path — use uploaded TIF for elevation, still fetch satellite/OSM
+      const meta = uploadedTifMeta.value ?? await parseTifFile(uploadedTifFile.value);
+      const effectiveCenter = (meta.isGeoTiff && meta.center) ? meta.center : center.value;
+      data = await loadTerrainFromTif(
+        meta,
+        effectiveCenter,
+        resolution.value,
+        fetchOSM,
+        (status) => { loadingStatus.value = status; },
+        signal,
+      );
+    } else {
+      data = await fetchTerrainData(
+        center.value,
+        resolution.value,
+        fetchOSM,
+        useUSGS,
+        useGPXZ,
         gpxzApiKey,
         undefined,
         (status) => { loadingStatus.value = status; },
-        signal
-    );
+        signal,
+      );
+    }
     terrainData.value = data;
     lastGenerationKey.value = requestKey;
     
