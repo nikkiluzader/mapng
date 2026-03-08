@@ -48,6 +48,7 @@ const lngInput = ref(props.center.lng.toString());
 const presetLocations = [
   { name: "Select a location...", lat: 0, lng: 0, disabled: true },
   { name: "Devils Tower, USA", lat: 44.59056, lng: -104.71511 },
+  { name: "Glacier View Car Launch, USA", lat: 61.79551798203474, lng: -147.86878824234012 },
   { name: "Johnson Valley OHV, USA", lat: 34.49523, lng: -116.82180 },
   { name: "Mount Panorama Bathurst NSW, Australia", lat: -33.45568593217826, lng: 149.5507173600283 },
   { name: "Mount Fuji, Japan", lat: 35.3606, lng: 138.7274 },

@@ -36,9 +36,22 @@ function geoToWorld(lat, lng, terrainData, squareSize, zOffset = 3) {
   // v=0 is north (top of heightMap), v=1 is south
   const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
 
-  const col = Math.min(width - 1, Math.floor(u * width));
-  const row = Math.min(height - 1, Math.floor(v * height));
-  const worldH = heightMap[row * width + col] - minHeight;
+  // Bilinear interpolation — matches BeamNG's own terrain height calculation,
+  // preventing spawn/road positions from landing inside terrain peaks that fall
+  // between heightmap samples.
+  const fx = u * (width - 1);
+  const fy = v * (height - 1);
+  const c0 = Math.min(width - 1, Math.floor(fx));
+  const c1 = Math.min(width - 1, c0 + 1);
+  const r0 = Math.min(height - 1, Math.floor(fy));
+  const r1 = Math.min(height - 1, r0 + 1);
+  const tx = fx - c0;
+  const ty = fy - r0;
+  const h00 = heightMap[r0 * width + c0];
+  const h10 = heightMap[r0 * width + c1];
+  const h01 = heightMap[r1 * width + c0];
+  const h11 = heightMap[r1 * width + c1];
+  const worldH = (h00 * (1 - tx) * (1 - ty) + h10 * tx * (1 - ty) + h01 * (1 - tx) * ty + h11 * tx * ty) - minHeight;
 
   // X = east, Y = north (BeamNG convention)
   const worldX = (u - 0.5) * worldSize;
