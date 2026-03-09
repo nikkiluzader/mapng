@@ -376,13 +376,22 @@ const triggerDownload = (blob, filename) => {
     URL.revokeObjectURL(url);
 };
 
+  const sanitizeConfigForClipboard = (payload) => {
+    if (!payload || typeof payload !== 'object') return payload;
+    return {
+      ...payload,
+      gpxzApiKey: payload.gpxzApiKey ? '' : payload.gpxzApiKey,
+      gpxzApiKeyMasked: !!payload.gpxzApiKey,
+    };
+  };
+
 const copyRunConfiguration = async () => {
-    const payload = buildRunConfiguration();
+    const payload = sanitizeConfigForClipboard(buildRunConfiguration());
     const text = JSON.stringify(payload, null, 2);
     try {
         if (navigator.clipboard?.writeText) {
             await navigator.clipboard.writeText(text);
-            runConfigStatus.value = 'Run configuration copied to clipboard.';
+        runConfigStatus.value = 'Run configuration copied to clipboard (GPXZ key masked).';
             return;
         }
     } catch {
@@ -416,30 +425,70 @@ const saveRunConfiguration = () => {
     runConfigStatus.value = 'Configuration downloaded as JSON.';
 };
 
+const toNumberOrNull = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const toBooleanOrNull = (value) => {
+  if (value === true || value === false) return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
+  }
+  if (value === 1) return true;
+  if (value === 0) return false;
+  return null;
+};
+
+const clampInt = (value, min, max) => Math.min(max, Math.max(min, parseInt(value, 10)));
+
 const applyRunConfiguration = (config) => {
     const src = config?.runConfiguration || config;
     if (!src || typeof src !== 'object') throw new Error('Invalid JSON schema');
 
-    const mode = src.mode || config?.mode;
-    if (src.schemaVersion !== 1 || (mode && mode !== 'single')) {
+  const schemaVersion = Number(src.schemaVersion ?? 1);
+  const modeRaw = String(src.mode || config?.mode || 'single').toLowerCase();
+  if (schemaVersion !== 1 || modeRaw !== 'single') {
         throw new Error('Unsupported configuration schema.');
     }
 
-    if (src.center && Number.isFinite(src.center.lat) && Number.isFinite(src.center.lng)) {
-        emit('locationChange', { lat: src.center.lat, lng: src.center.lng });
+  const lat = toNumberOrNull(src?.center?.lat);
+  const lng = toNumberOrNull(src?.center?.lng);
+  if (lat !== null && lng !== null) {
+    emit('locationChange', { lat, lng });
     }
-    if (Number.isFinite(src.resolution)) {
-        emit('resolutionChange', parseInt(src.resolution));
+
+  const resolutionValue = toNumberOrNull(src.resolution);
+  if (resolutionValue !== null) {
+    emit('resolutionChange', clampInt(resolutionValue, 512, 8192));
     }
-    if (Number.isFinite(src.zoom)) {
-        emit('zoomChange', parseInt(src.zoom));
+
+  const zoomValue = toNumberOrNull(src.zoom);
+  if (zoomValue !== null) {
+    emit('zoomChange', clampInt(zoomValue, 1, 20));
     }
-    if (typeof src.includeOSM === 'boolean') {
-        fetchOSM.value = src.includeOSM;
+
+  const includeOSMValue = toBooleanOrNull(src.includeOSM);
+  if (includeOSMValue !== null) {
+    fetchOSM.value = includeOSMValue;
     }
-    if (typeof src.elevationSource === 'string' && ['default', 'usgs', 'gpxz'].includes(src.elevationSource)) {
-        elevationSource.value = src.elevationSource;
+
+  const explicitSource = typeof src.elevationSource === 'string' ? src.elevationSource.toLowerCase() : null;
+  if (explicitSource && ['default', 'usgs', 'gpxz'].includes(explicitSource)) {
+    elevationSource.value = explicitSource;
+  } else {
+    // Legacy fallback for shared configs that only include useUSGS/useGPXZ.
+    const useUSGSValue = toBooleanOrNull(src.useUSGS);
+    const useGPXZValue = toBooleanOrNull(src.useGPXZ);
+    if (useGPXZValue === true) {
+      elevationSource.value = 'gpxz';
+    } else if (useUSGSValue === true) {
+      elevationSource.value = 'usgs';
     }
+    }
+
     if (typeof src.gpxzApiKey === 'string') {
         gpxzApiKey.value = src.gpxzApiKey;
     }

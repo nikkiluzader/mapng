@@ -428,13 +428,22 @@ const buildRunConfiguration = () => {
   };
 };
 
+const sanitizeConfigForClipboard = (payload) => {
+  if (!payload || typeof payload !== 'object') return payload;
+  return {
+    ...payload,
+    gpxzApiKey: payload.gpxzApiKey ? '' : payload.gpxzApiKey,
+    gpxzApiKeyMasked: !!payload.gpxzApiKey,
+  };
+};
+
 const copyRunConfiguration = async () => {
-  const payload = buildRunConfiguration();
+  const payload = sanitizeConfigForClipboard(buildRunConfiguration());
   const text = JSON.stringify(payload, null, 2);
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
-      runConfigStatus.value = 'Run configuration copied to clipboard.';
+      runConfigStatus.value = 'Run configuration copied to clipboard (GPXZ key masked).';
       return;
     }
   } catch {
@@ -468,52 +477,113 @@ const saveRunConfiguration = () => {
   runConfigStatus.value = 'Configuration downloaded as JSON.';
 };
 
+const toNumberOrNull = (value) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const toBooleanOrNull = (value) => {
+  if (value === true || value === false) return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true' || normalized === '1') return true;
+    if (normalized === 'false' || normalized === '0') return false;
+  }
+  if (value === 1) return true;
+  if (value === 0) return false;
+  return null;
+};
+
+const clampInt = (value, min, max) => Math.min(max, Math.max(min, parseInt(value, 10)));
+
+const normalizePerformanceProfile = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'throughput' || normalized === 'max_throughput' || normalized === 'max-throughput') {
+    return 'throughput';
+  }
+  if (normalized === 'low_memory' || normalized === 'low-memory' || normalized === 'low memory') {
+    return 'low_memory';
+  }
+  return normalized === 'balanced' ? 'balanced' : null;
+};
+
 const applyRunConfiguration = (config) => {
   const src = config?.runConfiguration || config;
   if (!src || typeof src !== 'object') throw new Error('Invalid JSON schema');
 
-  const mode = src.mode || config?.mode;
-  if (src.schemaVersion !== 1 || (mode && mode !== 'batch')) {
+  const schemaVersion = Number(src.schemaVersion ?? 1);
+  const modeRaw = String(src.mode || config?.mode || 'batch').toLowerCase();
+  if (schemaVersion !== 1 || modeRaw !== 'batch') {
     throw new Error('Unsupported configuration schema.');
   }
 
-  if (src.center && Number.isFinite(src.center.lat) && Number.isFinite(src.center.lng)) {
-    emit('locationChange', { lat: src.center.lat, lng: src.center.lng });
+  const lat = toNumberOrNull(src?.center?.lat);
+  const lng = toNumberOrNull(src?.center?.lng);
+  if (lat !== null && lng !== null) {
+    emit('locationChange', { lat, lng });
   }
-  if (Number.isFinite(src.resolution)) {
-    emit('resolutionChange', parseInt(src.resolution));
+
+  const resolutionValue = toNumberOrNull(src.resolution);
+  if (resolutionValue !== null) {
+    emit('resolutionChange', clampInt(resolutionValue, 512, 8192));
   }
-  if (Number.isFinite(src.gridCols)) {
-    gridCols.value = Math.max(1, Math.min(20, parseInt(src.gridCols)));
+
+  const colsValue = toNumberOrNull(src.gridCols);
+  if (colsValue !== null) {
+    gridCols.value = clampInt(colsValue, 1, 20);
   }
-  if (Number.isFinite(src.gridRows)) {
-    gridRows.value = Math.max(1, Math.min(20, parseInt(src.gridRows)));
+
+  const rowsValue = toNumberOrNull(src.gridRows);
+  if (rowsValue !== null) {
+    gridRows.value = clampInt(rowsValue, 1, 20);
   }
+
   if (Array.isArray(src.tileOffsets)) {
     tileOffsets.value = normalizeTileOffsets(src.tileOffsets, totalTiles.value);
     emitTileOffsets();
   }
+
   if (src.elevationNormalization && typeof src.elevationNormalization === 'object') {
-    sharedElevationBaseline.value = !!src.elevationNormalization.enabled;
+    const enabledValue = toBooleanOrNull(src.elevationNormalization.enabled);
+    sharedElevationBaseline.value = enabledValue === null ? sharedElevationBaseline.value : enabledValue;
   }
-  if (typeof src.includeOSM === 'boolean') {
-    includeOSM.value = src.includeOSM;
+
+  const includeOSMValue = toBooleanOrNull(src.includeOSM);
+  if (includeOSMValue !== null) {
+    includeOSM.value = includeOSMValue;
   }
-  if (typeof src.elevationSource === 'string' && ['default', 'usgs', 'gpxz'].includes(src.elevationSource)) {
-    elevationSource.value = src.elevationSource;
+
+  const explicitSource = typeof src.elevationSource === 'string' ? src.elevationSource.toLowerCase() : null;
+  if (explicitSource && ['default', 'usgs', 'gpxz'].includes(explicitSource)) {
+    elevationSource.value = explicitSource;
+  } else {
+    const useUSGSValue = toBooleanOrNull(src.useUSGS);
+    const useGPXZValue = toBooleanOrNull(src.useGPXZ);
+    if (useGPXZValue === true) {
+      elevationSource.value = 'gpxz';
+    } else if (useUSGSValue === true) {
+      elevationSource.value = 'usgs';
+    }
   }
+
   if (typeof src.gpxzApiKey === 'string') {
     gpxzApiKey.value = src.gpxzApiKey;
   }
+
   if (src.gpxzStatus && typeof src.gpxzStatus === 'object') {
     gpxzStatus.value = { ...src.gpxzStatus };
   }
-  if (Number.isFinite(src.glbMeshResolution)) {
-    meshResolution.value = parseInt(src.glbMeshResolution);
+
+  const meshResolutionValue = toNumberOrNull(src.glbMeshResolution);
+  if (meshResolutionValue !== null) {
+    meshResolution.value = clampInt(meshResolutionValue, 64, 1024);
   }
-  if (typeof src.performanceProfile === 'string' && ['throughput', 'balanced', 'low_memory'].includes(src.performanceProfile)) {
-    performanceProfile.value = src.performanceProfile;
+
+  const nextProfile = normalizePerformanceProfile(src.performanceProfile);
+  if (nextProfile) {
+    performanceProfile.value = nextProfile;
   }
+
   if (src.exports && typeof src.exports === 'object') {
     exports.value = normalizeExports(src.exports);
     localStorage.setItem('mapng_batch_exports', JSON.stringify(exports.value));
