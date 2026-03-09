@@ -19,7 +19,8 @@ export default defineConfig({
     })
   ],
   optimizeDeps: {
-    exclude: ['geotiff']
+    exclude: ['geotiff'],
+    include: ['laz-perf/lib/worker'],
   },
   css: {
     devSourcemap: false

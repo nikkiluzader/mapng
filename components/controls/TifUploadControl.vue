@@ -1,21 +1,38 @@
 <template>
-  <!-- Active: show badge with file info + clear button -->
+  <!-- Active: badge with file info + clear button -->
   <div v-if="uploadedTifFile" class="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-sm">
     <FileUp :size="14" class="shrink-0 text-blue-500 dark:text-blue-400" />
     <div class="flex-1 min-w-0">
       <p class="font-medium text-blue-800 dark:text-blue-200 truncate">{{ uploadedTifFile.name }}</p>
-      <p v-if="uploadedTifMeta?.isGeoTiff && uploadedTifMeta?.center" class="text-[11px] text-emerald-600 dark:text-emerald-400">
-        GeoTIFF — coordinates auto-detected
-      </p>
-      <p v-else-if="uploadedTifMeta?.isGeoTiff" class="text-[11px] text-amber-600 dark:text-amber-400">
-        GeoTIFF — CRS unsupported, using selected coordinates
-      </p>
-      <p v-else-if="uploadedTifMeta" class="text-[11px] text-amber-600 dark:text-amber-400">
-        No geo metadata — using selected coordinates
-      </p>
-      <p v-else class="text-[11px] text-blue-500 dark:text-blue-400 animate-pulse">
-        Reading file…
-      </p>
+
+      <!-- LAZ/LAS status -->
+      <template v-if="isLazFile">
+        <p v-if="uploadedTifMeta?.center" class="text-[11px] text-emerald-600 dark:text-emerald-400">
+          {{ ptLabel }} — coordinates auto-detected
+        </p>
+        <p v-else-if="uploadedTifMeta" class="text-[11px] text-amber-600 dark:text-amber-400">
+          {{ ptLabel }} — using selected coordinates
+        </p>
+        <p v-else class="text-[11px] text-blue-500 dark:text-blue-400 animate-pulse">
+          Reading file…
+        </p>
+      </template>
+
+      <!-- TIF/TIFF status -->
+      <template v-else>
+        <p v-if="uploadedTifMeta?.isGeoTiff && uploadedTifMeta?.center" class="text-[11px] text-emerald-600 dark:text-emerald-400">
+          GeoTIFF — coordinates auto-detected
+        </p>
+        <p v-else-if="uploadedTifMeta?.isGeoTiff" class="text-[11px] text-amber-600 dark:text-amber-400">
+          GeoTIFF — CRS unsupported, using selected coordinates
+        </p>
+        <p v-else-if="uploadedTifMeta" class="text-[11px] text-amber-600 dark:text-amber-400">
+          No geo metadata — using selected coordinates
+        </p>
+        <p v-else class="text-[11px] text-blue-500 dark:text-blue-400 animate-pulse">
+          Reading file…
+        </p>
+      </template>
     </div>
     <button
       @click="$emit('clear')"
@@ -26,17 +43,17 @@
     </button>
   </div>
 
-  <!-- Idle: compact upload trigger -->
+  <!-- Idle: upload trigger -->
   <div v-else>
     <label
       class="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 hover:border-[#FF6600] hover:text-[#FF6600] dark:hover:border-[#FF6600] dark:hover:text-[#FF6600] cursor-pointer transition-colors"
     >
       <Upload :size="14" class="shrink-0" />
-      <span>Upload elevation (.tif)</span>
+      <span>Upload elevation (.tif, .laz, .las)</span>
       <input
         ref="fileInput"
         type="file"
-        accept=".tif,.tiff"
+        accept=".tif,.tiff,.laz,.las"
         class="sr-only"
         @change="handleFileChange"
       />
@@ -45,10 +62,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { Upload, FileUp, X } from 'lucide-vue-next';
 
-defineProps({
+const props = defineProps({
   uploadedTifFile: { type: Object, default: null },
   uploadedTifMeta: { type: Object, default: null },
 });
@@ -56,10 +73,21 @@ defineProps({
 const emit = defineEmits(['file-selected', 'clear']);
 const fileInput = ref(null);
 
+const isLazFile = computed(() => {
+  const name = props.uploadedTifFile?.name?.toLowerCase() ?? '';
+  return name.endsWith('.laz') || name.endsWith('.las');
+});
+
+const ptLabel = computed(() => {
+  const count = props.uploadedTifMeta?.pointCount;
+  if (!count) return 'Point cloud';
+  const m = count / 1_000_000;
+  return m >= 1 ? `${m.toFixed(1)}M pts` : `${(count / 1000).toFixed(0)}K pts`;
+});
+
 const handleFileChange = (e) => {
   const file = e.target.files?.[0];
   if (file) emit('file-selected', file);
-  // Reset input so the same file can be re-selected after clearing
   if (fileInput.value) fileInput.value.value = '';
 };
 </script>

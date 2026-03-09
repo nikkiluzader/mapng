@@ -157,7 +157,7 @@ import MapSelector from './components/map/MapSelector.vue';
 import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
-import { fetchTerrainData, addOSMToTerrain, loadTerrainFromTif, parseTifFile } from './services/terrain';
+import { fetchTerrainData, addOSMToTerrain, loadTerrainFromTif, parseTifFile, loadTerrainFromLaz, parseLazFile } from './services/terrain';
 import {
   computeGridTiles,
   createBatchJobState,
@@ -287,18 +287,18 @@ const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null) =>
 const handleTifSelected = async (file) => {
   uploadedTifFile.value = file;
   uploadedTifMeta.value = null;
-  // Clear existing terrain so generate buttons are enabled
   terrainData.value = null;
   lastGenerationKey.value = null;
   try {
-    const meta = await parseTifFile(file);
+    const ext = file.name.toLowerCase().split('.').pop();
+    const meta = (ext === 'laz' || ext === 'las')
+      ? await parseLazFile(file)
+      : await parseTifFile(file);
     uploadedTifMeta.value = meta;
-    // If it's a GeoTIFF, auto-populate the map centre from the file's bounds
-    if (meta.isGeoTiff && meta.center) {
-      store.setCenter(meta.center);
-    }
+    // Auto-centre map if the file contains coordinate metadata
+    if (meta.center) store.setCenter(meta.center);
   } catch (e) {
-    console.warn('[BYOD] Failed to read TIF metadata:', e);
+    console.warn('[BYOD] Failed to read file metadata:', e);
   }
 };
 
@@ -378,17 +378,31 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
   try {
     let data;
     if (uploadedTifFile.value) {
-      // BYOD path — use uploaded TIF for elevation, still fetch satellite/OSM
-      const meta = uploadedTifMeta.value ?? await parseTifFile(uploadedTifFile.value);
-      const effectiveCenter = (meta.isGeoTiff && meta.center) ? meta.center : center.value;
-      data = await loadTerrainFromTif(
-        meta,
-        effectiveCenter,
-        resolution.value,
-        fetchOSM,
-        (status) => { loadingStatus.value = status; },
-        signal,
-      );
+      // BYOD path — use uploaded elevation file, still fetch satellite/OSM
+      const ext = uploadedTifFile.value.name.toLowerCase().split('.').pop();
+      const isLaz = ext === 'laz' || ext === 'las';
+      const meta = uploadedTifMeta.value
+        ?? (isLaz ? await parseLazFile(uploadedTifFile.value) : await parseTifFile(uploadedTifFile.value));
+      const effectiveCenter = meta.center ?? center.value;
+      if (isLaz) {
+        data = await loadTerrainFromLaz(
+          meta,
+          effectiveCenter,
+          resolution.value,
+          fetchOSM,
+          (status) => { loadingStatus.value = status; },
+          signal,
+        );
+      } else {
+        data = await loadTerrainFromTif(
+          meta,
+          effectiveCenter,
+          resolution.value,
+          fetchOSM,
+          (status) => { loadingStatus.value = status; },
+          signal,
+        );
+      }
     } else {
       data = await fetchTerrainData(
         center.value,
