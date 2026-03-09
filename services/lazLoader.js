@@ -171,6 +171,8 @@ export const parseLazFile = async (file) => {
   return {
     buffer,
     isLaz,
+    versionMajor: vMajor,
+    versionMinor: vMinor,
     pointFormat,
     pointDataRecordLength,
     pointDataOffset,

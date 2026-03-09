@@ -8,6 +8,12 @@
       @clear="$emit('tifClear')"
     />
 
+    <!-- LAZ Metadata Card -->
+    <LazMetaCard
+      v-if="isLazFileActive && uploadedTifMeta"
+      :meta="uploadedTifMeta"
+    />
+
     <!-- Generate Actions -->
     <GenerateActions
       :is-generating="isGenerating"
@@ -155,6 +161,7 @@ import TifUploadControl from '../controls/TifUploadControl.vue';
 import RunConfigControls from '../controls/RunConfigControls.vue';
 import JobStateControls from '../controls/JobStateControls.vue';
 import TerrainStats from '../controls/TerrainStats.vue';
+import LazMetaCard from '../controls/LazMetaCard.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { exportJobData, importJobData } from '../../services/jobData';
@@ -274,6 +281,11 @@ watch(() => props.terrainData, (newData) => {
 
 // Calculate resolution scale (Meters per Pixel)
 // With the new pipeline, we enforce 1m/px for all sources.
+const isLazFileActive = computed(() => {
+  const name = props.uploadedTifFile?.name?.toLowerCase() ?? '';
+  return name.endsWith('.laz') || name.endsWith('.las');
+});
+
 const metersPerPixel = computed(() => {
   return 1.0;
 });
