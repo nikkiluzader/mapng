@@ -4,6 +4,8 @@
     <TifUploadControl
       :uploaded-tif-file="uploadedTifFile"
       :uploaded-tif-meta="uploadedTifMeta"
+      :vertical-unit-override="elevationUnitOverride"
+      @update:verticalUnitOverride="(v) => elevationUnitOverride = v"
       @file-selected="$emit('tifSelected', $event)"
       @clear="$emit('tifClear')"
     />
@@ -14,6 +16,13 @@
       :meta="uploadedTifMeta"
     />
 
+    <!-- TIF Metadata Card -->
+    <TifMetaCard
+      v-if="uploadedTifMeta && !isLazFileActive"
+      :meta="uploadedTifMeta"
+      :vertical-unit-override="elevationUnitOverride"
+    />
+
     <!-- Generate Actions -->
     <GenerateActions
       :is-generating="isGenerating"
@@ -21,7 +30,7 @@
       :use-gpxz="useGPXZ"
       :gpxz-api-key="gpxzApiKey"
       :has-custom-elevation="!!uploadedTifFile"
-      @generate="(preview) => $emit('generate', preview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey)"
+      @generate="(preview) => $emit('generate', preview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey, elevationUnitOverride)"
     />
 
     <!-- Output Settings -->
@@ -31,20 +40,19 @@
         Output Settings
       </label>
 
-      <!-- When a LAZ file is loaded, resolution is driven by the file's native
-           coverage; show an info row instead of the dropdown. -->
-      <div v-if="lazNativeDims" class="space-y-1">
+      <!-- When an uploaded source has native dimensions, resolution is driven
+           by the file's native coverage; show an info row instead of dropdown. -->
+      <div v-if="nativeDims" class="space-y-1">
         <label class="text-xs text-gray-500 dark:text-gray-400">Resolution (Output Size)</label>
         <div class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
-          {{ lazNativeDims.width }} × {{ lazNativeDims.height }} px
-          <span class="text-[10px] ml-1">(LAZ native coverage)</span>
+          {{ nativeDims.width }} × {{ nativeDims.height }} px
+          <span class="text-[10px] ml-1">({{ nativeDims.sourceLabel }} native coverage)</span>
         </div>
         <div class="text-[10px] text-gray-500 dark:text-gray-400 pt-1 space-y-1">
-          <p class="text-[#FF6600] font-medium">
-            Export area: {{ lazNativeDims.cropSize }} × {{ lazNativeDims.cropSize }} px
-            (orange box in 3D preview)
+          <p v-if="nativeDims.note" class="text-[#FF6600] font-medium">
+            {{ nativeDims.note }}
           </p>
-          <p>Remove the LAZ file to choose a custom resolution.</p>
+          <p>Remove the uploaded file to choose a custom resolution.</p>
         </div>
       </div>
 
@@ -180,6 +188,7 @@ import RunConfigControls from '../controls/RunConfigControls.vue';
 import JobStateControls from '../controls/JobStateControls.vue';
 import TerrainStats from '../controls/TerrainStats.vue';
 import LazMetaCard from '../controls/LazMetaCard.vue';
+import TifMetaCard from '../controls/TifMetaCard.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { exportJobData, importJobData } from '../../services/jobData';
@@ -238,6 +247,7 @@ const handleImportJobFile = async (file) => {
 const fetchOSM = ref(localStorage.getItem('mapng_fetchOSM') !== 'false');
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
+const elevationUnitOverride = ref(localStorage.getItem('mapng_elevationUnitOverride') || 'auto');
 const elevationSource = ref(localStorage.getItem('mapng_elevationSource') || 'default');
 const gpxzApiKey = ref(localStorage.getItem('mapng_gpxzApiKey') || '');
 const gpxzStatus = ref(null); // { plan, used, limit, remaining, concurrency, valid }
@@ -274,6 +284,10 @@ watch(gpxzApiKey, (newVal) => {
     gpxzStatus.value = null;
 });
 
+watch(elevationUnitOverride, (newVal) => {
+  localStorage.setItem('mapng_elevationUnitOverride', newVal || 'auto');
+});
+
 // Check GPXZ account status
 const checkGPXZStatus = async () => {
     if (!gpxzApiKey.value) return;
@@ -293,7 +307,7 @@ watch(showCoordinates, (v) => localStorage.setItem('mapng_showCoordinates', Stri
 watch(() => props.terrainData, (newData) => {
     if (newData?.usgsFallback) {
         elevationSource.value = 'default';
-        alert("USGS 1m data for this area was missing or corrupt. Falling back on the Standard Terrarium dataset.\n\nMeters per pixel has been adjusted to the standard dataset resolution.");
+    alert("USGS 1m data for this area was missing or corrupt. Falling back to the Standard Terrarium dataset.\n\nOutput remains on the app's 1m/px processing grid.");
     }
 });
 
@@ -302,6 +316,11 @@ watch(() => props.terrainData, (newData) => {
 const isLazFileActive = computed(() => {
   const name = props.uploadedTifFile?.name?.toLowerCase() ?? '';
   return name.endsWith('.laz') || name.endsWith('.las');
+});
+
+const isGeoTiffActive = computed(() => {
+  if (isLazFileActive.value) return false;
+  return !!props.uploadedTifMeta?.isGeoTiff;
 });
 
 // When a LAZ file is active and has native dimension info, expose it for the template.
@@ -313,8 +332,32 @@ const lazNativeDims = computed(() => {
     width: meta.nativeWidth,
     height: meta.nativeHeight,
     cropSize: meta.suggestedResolution ?? null,
+    sourceLabel: 'LAZ',
+    note: meta.suggestedResolution
+      ? `Export area: ${meta.suggestedResolution} × ${meta.suggestedResolution} px (orange box in 3D preview)`
+      : null,
   };
 });
+
+// Apply the same native-dimension override behavior for georeferenced GeoTIFFs.
+const tifNativeDims = computed(() => {
+  if (!isGeoTiffActive.value) return null;
+  const meta = props.uploadedTifMeta;
+  if (!meta?.nativeWidth || !meta?.nativeHeight || !meta?.bounds) return null;
+  const crop = meta.suggestedResolution ?? null;
+  const hasCrop = Number.isFinite(crop);
+  return {
+    width: hasCrop ? crop : meta.nativeWidth,
+    height: hasCrop ? crop : meta.nativeHeight,
+    cropSize: null,
+    sourceLabel: hasCrop ? 'GeoTIFF crop window' : 'GeoTIFF',
+    note: hasCrop
+      ? `Processing is limited to ${crop} × ${crop} px around the center for faster generation.`
+      : null,
+  };
+});
+
+const nativeDims = computed(() => lazNativeDims.value || tifNativeDims.value);
 
 const metersPerPixel = computed(() => {
   return 1.0;

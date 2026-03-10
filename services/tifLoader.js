@@ -4,6 +4,27 @@ import proj4 from 'proj4';
 // GeoTIFF spec uses 32767 as sentinel value meaning "user-defined CRS"
 const USER_DEFINED_CRS = 32767;
 
+const UNIT_UNKNOWN = 'unknown';
+const UNIT_METERS = 'meters';
+const UNIT_FEET = 'feet';
+const UNIT_US_SURVEY_FEET = 'us_survey_feet';
+
+const mapLinearUnitCode = (code) => {
+  if (code === 9001) return UNIT_METERS;
+  if (code === 9002) return UNIT_FEET;
+  if (code === 9003) return UNIT_US_SURVEY_FEET;
+  return UNIT_UNKNOWN;
+};
+
+const detectUnitFromText = (text) => {
+  if (!text || typeof text !== 'string') return UNIT_UNKNOWN;
+  const t = text.toLowerCase();
+  if (t.includes('us survey foot') || t.includes('us_survey_foot') || t.includes('survey foot')) return UNIT_US_SURVEY_FEET;
+  if (t.includes('international foot') || t.includes('foot') || t.includes('feet') || t.includes('ft')) return UNIT_FEET;
+  if (t.includes('metre') || t.includes('meter') || t.includes('metres') || t.includes('meters')) return UNIT_METERS;
+  return UNIT_UNKNOWN;
+};
+
 /**
  * Return a proj4 string for common CRS types without requiring a network fetch.
  * Handles Web Mercator and all standard UTM zones.
@@ -49,6 +70,8 @@ export const parseTifFile = async (file) => {
 
   const sourceWidth = image.getWidth();
   const sourceHeight = image.getHeight();
+  const fileDirectory = image.getFileDirectory?.() || {};
+  const VALID_RESOLUTIONS = [512, 1024, 2048, 4096, 8192];
 
   // ── Detect GeoTIFF ──────────────────────────────────────────────────────────
   const geoKeys = image.getGeoKeys();
@@ -59,6 +82,33 @@ export const parseTifFile = async (file) => {
 
   let bounds = null;
   let center = null;
+  let nativeMetersPerPixel = null;
+  let nativeWidth = null;
+  let nativeHeight = null;
+  let suggestedResolution = null;
+  let verticalUnitDetected = UNIT_UNKNOWN;
+  let verticalUnitDetectionSource = null;
+
+  // GeoTIFF vertical unit keys (EPSG unit codes): 9001=m, 9002=ft, 9003=US survey ft
+  const verticalUnitCode = geoKeys?.VerticalUnitsGeoKey;
+  const modelLinearUnitCode = geoKeys?.ProjLinearUnitsGeoKey;
+  if (Number.isFinite(verticalUnitCode)) {
+    verticalUnitDetected = mapLinearUnitCode(verticalUnitCode);
+    verticalUnitDetectionSource = 'VerticalUnitsGeoKey';
+  } else if (Number.isFinite(modelLinearUnitCode)) {
+    // Fallback heuristic when explicit vertical unit is absent.
+    verticalUnitDetected = mapLinearUnitCode(modelLinearUnitCode);
+    verticalUnitDetectionSource = 'ProjLinearUnitsGeoKey';
+  }
+
+  if (verticalUnitDetected === UNIT_UNKNOWN) {
+    const asciiText = String(fileDirectory.GeoAsciiParamsTag || '');
+    const fromAscii = detectUnitFromText(asciiText);
+    if (fromAscii !== UNIT_UNKNOWN) {
+      verticalUnitDetected = fromAscii;
+      verticalUnitDetectionSource = 'GeoAsciiParamsTag';
+    }
+  }
 
   if (isGeoTiff) {
     const [originX, originY] = image.getOrigin();
@@ -121,6 +171,24 @@ export const parseTifFile = async (file) => {
           lat: (bounds.north + bounds.south) / 2,
           lng: (bounds.east  + bounds.west)  / 2,
         };
+
+        // Approximate source raster resolution from geographic coverage.
+        const midLat = (bounds.north + bounds.south) / 2;
+        const mPerDegLat = 111320;
+        const mPerDegLng = 111320 * Math.cos(midLat * Math.PI / 180);
+        const coverageWm = Math.abs(bounds.east - bounds.west) * mPerDegLng;
+        const coverageHm = Math.abs(bounds.north - bounds.south) * mPerDegLat;
+        const mppX = sourceWidth > 0 ? coverageWm / sourceWidth : NaN;
+        const mppY = sourceHeight > 0 ? coverageHm / sourceHeight : NaN;
+        const mppAvg = (mppX + mppY) / 2;
+        nativeMetersPerPixel = Number.isFinite(mppAvg) && mppAvg > 0 ? mppAvg : null;
+
+        // Native metric dimensions for 1m/px processing and export crop guidance.
+        nativeWidth = Math.max(1, Math.round(coverageWm));
+        nativeHeight = Math.max(1, Math.round(coverageHm));
+        const minCoverage = Math.min(coverageWm, coverageHm);
+        const raw = Math.pow(2, Math.floor(Math.log2(Math.max(1, minCoverage))));
+        suggestedResolution = VALID_RESOLUTIONS.filter((r) => r <= raw).pop() ?? VALID_RESOLUTIONS[0];
       } else {
         console.warn('[tifLoader] Computed bounds are outside WGS84 range — CRS conversion likely produced invalid results.');
       }
@@ -128,5 +196,22 @@ export const parseTifFile = async (file) => {
   }
 
   const noData = image.getGDALNoData() ?? null;
-  return { image, raster, isGeoTiff, bounds, center, sourceWidth, sourceHeight, noData };
+  return {
+    image,
+    raster,
+    isGeoTiff,
+    epsgCode: isGeoTiff ? epsgCode : null,
+    bounds,
+    center,
+    sourceWidth,
+    sourceHeight,
+    nativeWidth,
+    nativeHeight,
+    suggestedResolution,
+    nativeMetersPerPixel,
+    noData,
+    fileSize: file.size,
+    verticalUnitDetected,
+    verticalUnitDetectionSource,
+  };
 };

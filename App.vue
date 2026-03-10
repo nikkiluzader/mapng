@@ -77,6 +77,8 @@
             :zoom="zoom" 
             :resolution="resolution"
             :is-dark-mode="isDarkMode"
+            :uploaded-tif-file="uploadedTifFile"
+            :uploaded-tif-meta="uploadedTifMeta"
             :surrounding-tile-positions="surroundingTilePositions"
             :batch-grid="batchGridTiles"
             :batch-editable="batchMode && !batchRunning && !showBatchProgress"
@@ -283,9 +285,20 @@ const handleLocationChange = (newCenter) => {
   }
 };
 
+const signatureForKey = (key) => {
+  if (!key) return '';
+  // Lightweight non-cryptographic signature for cache invalidation.
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+};
+
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
-const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null) => {
+const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null, elevationUnitOverride = 'auto') => {
   return JSON.stringify({
     lat: c.lat,
     lng: c.lng,
@@ -293,7 +306,8 @@ const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null) =>
     osm,
     usgs,
     gpxz,
-    gpxzKey: gpxz ? gpxzKey : '',
+    gpxzKeySig: gpxz ? signatureForKey(gpxzKey) : '',
+    elevationUnitOverride,
     // Include file identity so a different upload invalidates the cache
     tif: tifFile ? `${tifFile.name}|${tifFile.size}|${tifFile.lastModified}` : null,
   });
@@ -322,8 +336,17 @@ const handleTifClear = () => {
   uploadedTifMeta.value = null;
 };
 
-const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey) => {
-  const requestKey = buildGenerationKey(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, gpxzApiKey, uploadedTifFile.value);
+const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey, elevationUnitOverride = 'auto') => {
+  const requestKey = buildGenerationKey(
+    center.value,
+    resolution.value,
+    fetchOSM,
+    useUSGS,
+    useGPXZ,
+    gpxzApiKey,
+    uploadedTifFile.value,
+    elevationUnitOverride,
+  );
 
   // If we already have terrain data for the exact same parameters, reuse it
   if (terrainData.value && lastGenerationKey.value) {
@@ -338,7 +361,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
       cachedParams.resolution === newParams.resolution &&
       cachedParams.usgs === newParams.usgs &&
       cachedParams.gpxz === newParams.gpxz &&
-      cachedParams.gpxzKey === newParams.gpxzKey;
+      (cachedParams.gpxzKeySig ?? cachedParams.gpxzKey ?? '') === (newParams.gpxzKeySig ?? '');
 
     if (requestKey === lastGenerationKey.value) {
       // Exact match — skip fetch entirely, just switch view if needed
@@ -407,6 +430,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
           fetchOSM,
           (status) => { loadingStatus.value = status; },
           signal,
+          { elevationUnitOverride },
         );
       } else {
         data = await loadTerrainFromTif(
@@ -416,6 +440,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
           fetchOSM,
           (status) => { loadingStatus.value = status; },
           signal,
+          { elevationUnitOverride },
         );
       }
     } else {

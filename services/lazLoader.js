@@ -1,6 +1,37 @@
 import proj4 from 'proj4';
 
 const USER_DEFINED_CRS = 32767;
+const UNIT_UNKNOWN = 'unknown';
+const UNIT_METERS = 'meters';
+const UNIT_FEET = 'feet';
+const UNIT_US_SURVEY_FEET = 'us_survey_feet';
+
+const detectUnitFromText = (text) => {
+  if (!text || typeof text !== 'string') return UNIT_UNKNOWN;
+  const t = text.toLowerCase();
+  if (t.includes('us survey foot') || t.includes('us_survey_foot') || t.includes('survey foot')) return UNIT_US_SURVEY_FEET;
+  if (t.includes('international foot') || t.includes('foot') || t.includes('feet') || t.includes('ft')) return UNIT_FEET;
+  if (t.includes('metre') || t.includes('meter') || t.includes('metres') || t.includes('meters')) return UNIT_METERS;
+  return UNIT_UNKNOWN;
+};
+
+const detectVerticalUnitFromWKT = (wkt) => {
+  if (!wkt || typeof wkt !== 'string') return { unit: UNIT_UNKNOWN, source: null };
+  const vertMatch = wkt.match(/VERT_CS\[[\s\S]*?UNIT\["([^"]+)"/i) || wkt.match(/VERTCRS\[[\s\S]*?LENGTHUNIT\["([^"]+)"/i);
+  if (vertMatch?.[1]) {
+    const detected = detectUnitFromText(vertMatch[1]);
+    if (detected !== UNIT_UNKNOWN) return { unit: detected, source: 'WKT_VERTICAL_UNIT' };
+  }
+
+  // Fallback heuristic: use the horizontal unit if no vertical unit block is present.
+  const projMatch = wkt.match(/PROJCS\[[\s\S]*?UNIT\["([^"]+)"/i) || wkt.match(/PROJCRS\[[\s\S]*?LENGTHUNIT\["([^"]+)"/i);
+  if (projMatch?.[1]) {
+    const detected = detectUnitFromText(projMatch[1]);
+    if (detected !== UNIT_UNKNOWN) return { unit: detected, source: 'WKT_PROJECTED_UNIT' };
+  }
+
+  return { unit: UNIT_UNKNOWN, source: null };
+};
 
 const getBuiltInProj4 = (code) => {
   if (code === 3857) return '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +no_defs';
@@ -99,6 +130,7 @@ export const parseLazFile = async (file) => {
   // ── Parse VLRs: EPSG + LAZ detection ─────────────────────────────────────
   let epsgCode  = null;
   let hasLazVLR = false;
+  let wktText = null;
   let vlrOffset = headerSize;
 
   for (let i = 0; i < numVLRs && vlrOffset + 54 <= pointDataOffset; i++) {
@@ -111,8 +143,10 @@ export const parseLazFile = async (file) => {
       if (recordId === 34735 && !epsgCode) {
         epsgCode = epsgFromGeoKeys(view, dataStart, recordLen);
       } else if (recordId === 2112 && !epsgCode) {
-        const wkt = new TextDecoder().decode(bytes.slice(dataStart, dataStart + recordLen));
-        epsgCode = epsgFromWKT(wkt);
+        wktText = new TextDecoder().decode(bytes.slice(dataStart, dataStart + recordLen));
+        epsgCode = epsgFromWKT(wktText);
+      } else if (recordId === 2112 && !wktText) {
+        wktText = new TextDecoder().decode(bytes.slice(dataStart, dataStart + recordLen));
       }
     }
     if (userId.toLowerCase().includes('laszip')) hasLazVLR = true;
@@ -122,6 +156,7 @@ export const parseLazFile = async (file) => {
 
   // Detect LAZ: file extension is most reliable; laszip VLR as backup
   const isLaz = file.name.toLowerCase().endsWith('.laz') || hasLazVLR;
+  const detectedVertical = detectVerticalUnitFromWKT(wktText);
 
   // ── Convert bounding box to WGS84 ────────────────────────────────────────
   let bounds = null;
@@ -173,7 +208,7 @@ export const parseLazFile = async (file) => {
   // suggestedResolution: the largest standard power-of-2 that fits entirely inside
   // the file's extent — used as the export/crop area shown as an orange box in 3D.
   const VALID_RESOLUTIONS = [512, 1024, 2048, 4096, 8192];
-  let nativeWidth = null, nativeHeight = null, suggestedResolution = null;
+  let nativeWidth = null, nativeHeight = null, suggestedResolution = null, nativeMetersPerPixel = null;
   if (bounds) {
     const midLat     = (bounds.north + bounds.south) / 2;
     const mPerDegLat = 111320;
@@ -182,6 +217,10 @@ export const parseLazFile = async (file) => {
     const coverageH  = (bounds.north - bounds.south) * mPerDegLat;
     nativeWidth  = Math.round(coverageW);
     nativeHeight = Math.round(coverageH);
+    const mppX = nativeWidth > 0 ? coverageW / nativeWidth : NaN;
+    const mppY = nativeHeight > 0 ? coverageH / nativeHeight : NaN;
+    const mppAvg = (mppX + mppY) / 2;
+    nativeMetersPerPixel = Number.isFinite(mppAvg) && mppAvg > 0 ? mppAvg : null;
     const minCoverage = Math.min(coverageW, coverageH);
     const raw = Math.pow(2, Math.floor(Math.log2(minCoverage)));
     suggestedResolution = VALID_RESOLUTIONS.filter(r => r <= raw).pop() ?? VALID_RESOLUTIONS[0];
@@ -204,7 +243,10 @@ export const parseLazFile = async (file) => {
     center,
     nativeWidth,
     nativeHeight,
+    nativeMetersPerPixel,
     suggestedResolution,
     fileSize: file.size,
+    verticalUnitDetected: detectedVertical.unit,
+    verticalUnitDetectionSource: detectedVertical.source,
   };
 };

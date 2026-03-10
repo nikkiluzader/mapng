@@ -50,6 +50,15 @@
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
 
+      <l-rectangle
+        v-if="nativeCoverageBounds && !hasBatchGrid"
+        :bounds="[[nativeCoverageBounds.south, nativeCoverageBounds.west], [nativeCoverageBounds.north, nativeCoverageBounds.east]]"
+        color="#9CA3AF"
+        :weight="1.5"
+        :fill-opacity="0.12"
+        :options="{ dashArray: '4, 8', lineCap: 'round', fillColor: '#9CA3AF' }"
+      />
+
       <!-- Batch Grid Tiles -->
       <l-rectangle
         v-for="tile in batchGrid"
@@ -155,6 +164,8 @@ const props = defineProps({
   zoom: { type: Number, required: true },
   resolution: { type: [Number, String], required: true },
   isDarkMode: { type: Boolean, default: false },
+  uploadedTifFile: { type: Object, default: null },
+  uploadedTifMeta: { type: Object, default: null },
   surroundingTilePositions: { type: Array, default: () => [] },
   batchGrid: { type: Array, default: () => [] },
   batchEditable: { type: Boolean, default: false },
@@ -223,9 +234,23 @@ const osmAttribution = computed(() => {
 });
 
 // Calculate bounds based on resolution (1m/px means resolution = meters)
+const activeSelectionSizeMeters = computed(() => {
+  const base = Number(props.resolution);
+  const meta = props.uploadedTifMeta;
+  const hasUpload = !!props.uploadedTifFile;
+
+  // When uploaded data drives a locked processing window, use that for the
+  // orange selection box on the 2D map.
+  if (hasUpload && Number.isFinite(meta?.suggestedResolution) && meta.suggestedResolution > 0) {
+    return Number(meta.suggestedResolution);
+  }
+
+  return Number.isFinite(base) && base > 0 ? base : 1024;
+});
+
 const bounds = computed(() => {
   const center = currentCenter.value;
-  const sizeMeters = props.resolution;
+  const sizeMeters = activeSelectionSizeMeters.value;
   
   const metersPerDegLat = 111320;
   const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
@@ -242,12 +267,24 @@ const bounds = computed(() => {
   return L.latLngBounds(nw, se);
 });
 
+const nativeCoverageBounds = computed(() => {
+  const b = props.uploadedTifMeta?.bounds;
+  if (!props.uploadedTifFile || !b) return null;
+  if (![b.north, b.south, b.east, b.west].every((v) => Number.isFinite(v))) return null;
+  return {
+    north: b.north,
+    south: b.south,
+    east: b.east,
+    west: b.west,
+  };
+});
+
 // Compute surrounding tile bounding boxes from current center + resolution
 const surroundingBounds = computed(() => {
   if (!props.surroundingTilePositions?.length) return [];
 
   const center = currentCenter.value;
-  const sizeMeters = Number(props.resolution);
+  const sizeMeters = activeSelectionSizeMeters.value;
   
   const metersPerDegLat = 111320;
   const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);

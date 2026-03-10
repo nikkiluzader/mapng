@@ -15,6 +15,7 @@ import {
   resampleHeightMapOffThread,
   resampleImageOffThread,
 } from "./resamplerClient";
+import { createLocalToWGS84 } from "./geoUtils";
 
 // Constants
 const TILE_SIZE = 256;
@@ -25,10 +26,76 @@ const SATELLITE_API_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile";
 const USGS_PRODUCT_API = "https://tnmaccess.nationalmap.gov/api/v1/products";
 const USGS_DATASET = "Digital Elevation Model (DEM) 1 meter";
+const FEET_TO_METERS = 0.3048;
+const US_SURVEY_FEET_TO_METERS = 1200 / 3937;
 
 // Helper to normalize longitude to -180 to 180
 const normalizeLng = (lng) => {
   return ((((lng + 180) % 360) + 360) % 360) - 180;
+};
+
+const unwrapLngNearRef = (lng, refLng) => {
+  let out = lng;
+  let delta = out - refLng;
+  while (delta > 180) {
+    out -= 360;
+    delta = out - refLng;
+  }
+  while (delta < -180) {
+    out += 360;
+    delta = out - refLng;
+  }
+  return out;
+};
+
+/**
+ * Compute fetch bounds from the same local metric projection used by resampling.
+ * This avoids meters/degree approximation drift, especially at higher latitudes.
+ */
+const computeMetricFetchBounds = (normalizedCenter, width, height, padMeters = 4) => {
+  const toWGS84 = createLocalToWGS84(normalizedCenter.lat, normalizedCenter.lng);
+  const halfWidth = width / 2 + padMeters;
+  const halfHeight = height / 2 + padMeters;
+
+  const corners = [
+    toWGS84.forward([-halfWidth, halfHeight]),
+    toWGS84.forward([halfWidth, halfHeight]),
+    toWGS84.forward([-halfWidth, -halfHeight]),
+    toWGS84.forward([halfWidth, -halfHeight]),
+  ];
+
+  const lats = corners.map(([, lat]) => lat);
+  const unwrappedLngs = corners.map(([lng]) => unwrapLngNearRef(lng, normalizedCenter.lng));
+
+  return {
+    north: Math.max(...lats),
+    south: Math.min(...lats),
+    east: normalizeLng(Math.max(...unwrappedLngs)),
+    west: normalizeLng(Math.min(...unwrappedLngs)),
+  };
+};
+
+const resolveElevationUnitScale = (meta, override = 'auto') => {
+  const selected = (override || 'auto').toLowerCase();
+  if (selected === 'meters') return { scale: 1, source: 'override' };
+  if (selected === 'feet') return { scale: FEET_TO_METERS, source: 'override' };
+  if (selected === 'us_survey_feet') return { scale: US_SURVEY_FEET_TO_METERS, source: 'override' };
+
+  const detected = String(meta?.verticalUnitDetected || 'unknown').toLowerCase();
+  if (detected === 'meters') return { scale: 1, source: 'metadata' };
+  if (detected === 'feet') return { scale: FEET_TO_METERS, source: 'metadata' };
+  if (detected === 'us_survey_feet') return { scale: US_SURVEY_FEET_TO_METERS, source: 'metadata' };
+  return { scale: 1, source: 'default' };
+};
+
+const convertHeightMapToMeters = (heightMap, scale) => {
+  if (!heightMap || !Number.isFinite(scale) || Math.abs(scale - 1) < 1e-9) return;
+  for (let i = 0; i < heightMap.length; i++) {
+    const v = heightMap[i];
+    if (Number.isFinite(v) && v !== NO_DATA_VALUE) {
+      heightMap[i] = v * scale;
+    }
+  }
 };
 
 // Math Helpers for Web Mercator Projection (Source of Truth for Fetching)
@@ -143,16 +210,26 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
     const rawDelay = Math.ceil((concurrency / rps) * 1000);
     const perWorkerDelayMs = (rateInfo?.plan === 'free') ? Math.max(rawDelay, 1200) : rawDelay;
 
-    // 2. Check Resolution via Points API
-    // We check the center point to see what dataset is being used
+    // 2. Check resolution profile via Points API.
+    // Sample center + near-corners so smoothing reflects mixed-coverage areas.
     const centerLat = (bounds.north + bounds.south) / 2;
     const centerLng = (bounds.east + bounds.west) / 2;
+    const latInset = (bounds.north - bounds.south) * 0.2;
+    const lngInset = (bounds.east - bounds.west) * 0.2;
+    const sampledLatLons = [
+      [centerLat, centerLng],
+      [bounds.north - latInset, bounds.west + lngInset],
+      [bounds.north - latInset, bounds.east - lngInset],
+      [bounds.south + latInset, bounds.west + lngInset],
+      [bounds.south + latInset, bounds.east - lngInset],
+    ];
 
     let shouldSmooth = false;
     try {
       // Wait before the points check to avoid 429 from the probe request
       await new Promise((r) => setTimeout(r, perWorkerDelayMs));
-      const pointsUrl = `/api/gpxz/v1/elevation/points?latlons=${centerLat},${centerLng}`;
+      const latlons = sampledLatLons.map(([lat, lng]) => `${lat},${lng}`).join('|');
+      const pointsUrl = `/api/gpxz/v1/elevation/points?latlons=${encodeURIComponent(latlons)}`;
       const pointsResp = await fetch(pointsUrl, {
         headers: { "x-api-key": apiKey },
         signal,
@@ -160,12 +237,23 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
       if (pointsResp.ok) {
         const pointsData = await pointsResp.json();
         if (pointsData.results && pointsData.results.length > 0) {
-          const res = pointsData.results[0].resolution;
-          console.log(`[GPXZ] Dataset Resolution: ${res}m`);
-          // If resolution is worse than 2m (e.g. 10m, 30m), enable smoothing
-          if (res > 2) {
-            shouldSmooth = true;
-            console.log("[GPXZ] Low resolution detected. Enabling smoothing.");
+          const resolutions = pointsData.results
+            .map((r) => Number(r?.resolution))
+            .filter((r) => Number.isFinite(r));
+
+          if (resolutions.length > 0) {
+            const coarseCount = resolutions.filter((r) => r > 2).length;
+            const sorted = [...resolutions].sort((a, b) => a - b);
+            const median = sorted[Math.floor(sorted.length / 2)];
+            const minRes = sorted[0];
+            const maxRes = sorted[sorted.length - 1];
+
+            // Smooth only when coarse data dominates; avoids over-smoothing mixed high-res areas.
+            shouldSmooth = coarseCount >= Math.ceil(resolutions.length / 2) && median > 2;
+
+            console.log(
+              `[GPXZ] Sampled resolution profile: min=${minRes}m median=${median}m max=${maxRes}m; coarse=${coarseCount}/${resolutions.length}; smooth=${shouldSmooth}`,
+            );
           }
         }
       }
@@ -250,7 +338,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
         await new Promise((r) => setTimeout(r, perWorkerDelayMs));
         signal?.throwIfAborted();
 
-        const url = `/api/gpxz/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=1&projection=latlon`;
+        const url = `/api/gpxz/v1/elevation/hires-raster?bbox_top=${reqBounds.north}&bbox_bottom=${reqBounds.south}&bbox_left=${reqBounds.west}&bbox_right=${reqBounds.east}&res_m=best&projection=best&tight_bounds=false`;
 
         // Retry logic for 429 Rate Limit AND network errors
         let result = null;
@@ -334,11 +422,15 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
     );
 
     const validResults = results.filter((r) => r !== null);
+    const hadChunkFailures = validResults.length < requests.length;
 
     if (validResults.length === 0) return null;
 
     const rawArrayBuffers = validResults.map((r) => r.arrayBuffer);
-    return { data: validResults, smooth: shouldSmooth, rawArrayBuffers };
+    if (hadChunkFailures) {
+      console.warn(`[GPXZ] ${requests.length - validResults.length}/${requests.length} chunks failed. Terrarium fallback will be enabled for gap recovery.`);
+    }
+    return { data: validResults, smooth: shouldSmooth, rawArrayBuffers, hadChunkFailures };
   } catch (e) {
     console.error("Failed to fetch GPXZ terrain:", e);
     return null;
@@ -532,24 +624,13 @@ export const fetchTerrainData = async (
 
   onProgress?.("Calculating metric bounds...");
 
-  // Calculate approximate Lat/Lon bounds for fetching
-  const metersPerDegLat = 111320;
-  const metersPerDegLng =
-    111320 * Math.cos((normalizedCenter.lat * Math.PI) / 180);
-  const latSpan = height / metersPerDegLat;
-  const lngSpan = width / metersPerDegLng;
-
-  const fetchBounds = {
-    north: normalizedCenter.lat + latSpan / 2,
-    south: normalizedCenter.lat - latSpan / 2,
-    east: normalizedCenter.lng + lngSpan / 2,
-    west: normalizedCenter.lng - lngSpan / 2,
-  };
+  const fetchBounds = computeMetricFetchBounds(normalizedCenter, width, height);
 
   // 2. Try GPXZ / USGS
   let rawData = null;
   let usgsFallback = false;
   let shouldSmooth = false;
+  let gpxzChunkFailures = false;
   let sourceGeoTiffs = undefined;
 
   if (useGPXZ && gpxzApiKey) {
@@ -558,6 +639,7 @@ export const fetchTerrainData = async (
     if (gpxzResult) {
       rawData = gpxzResult.data;
       shouldSmooth = gpxzResult.smooth;
+      gpxzChunkFailures = !!gpxzResult.hadChunkFailures;
       if (keepSourceGeoTiffs) {
         sourceGeoTiffs = {
           arrayBuffers: gpxzResult.rawArrayBuffers,
@@ -655,7 +737,7 @@ export const fetchTerrainData = async (
 
   // Terrain Requests
   // Always fetch global tiles to serve as fallback for holes in high-res data
-  if (!sourceGeoTiffs || sourceGeoTiffs.source !== "gpxz") {
+  if (!sourceGeoTiffs || sourceGeoTiffs.source !== "gpxz" || gpxzChunkFailures) {
     for (let tx = minTileX; tx <= maxTileX; tx++) {
       for (let ty = minTileY; ty <= maxTileY; ty++) {
         requests.push({ tx, ty, type: "terrain" });
@@ -820,8 +902,8 @@ export const fetchTerrainData = async (
     "bilinear",
     shouldSmooth,
     fallbackSamplerData,
-    // Skip hole-filling for GPXZ (dataset is already hole-free)
-    !(useGPXZ && rawData),
+    // GPXZ is generally hole-free; if GPXZ chunks failed, keep fill enabled.
+    !(useGPXZ && rawData && !gpxzChunkFailures),
   );
 
   // 5. Resample Satellite Texture to Metric Grid
@@ -978,24 +1060,40 @@ export const loadTerrainFromTif = async (
     generateHybridTextureAsset = true,
     generateSegmentedHybridAsset = true,
     globalTileConcurrency = 20,
+    elevationUnitOverride = 'auto',
   } = generationOptions || {};
 
   const normalizedCenter = { lat: center.lat, lng: normalizeLng(center.lng) };
-  const width = resolution;
-  const height = resolution;
+  let width;
+  let height;
+  let fetchBounds;
 
   onProgress?.('Calculating metric bounds...');
 
-  const metersPerDegLat = 111320;
-  const metersPerDegLng = 111320 * Math.cos((normalizedCenter.lat * Math.PI) / 180);
-  const latSpan = height / metersPerDegLat;
-  const lngSpan = width / metersPerDegLng;
-  const fetchBounds = {
-    north: normalizedCenter.lat + latSpan / 2,
-    south: normalizedCenter.lat - latSpan / 2,
-    east:  normalizedCenter.lng + lngSpan / 2,
-    west:  normalizedCenter.lng - lngSpan / 2,
-  };
+  // For georeferenced GeoTIFFs, process only the suggested centered export
+  // window (power-of-two) instead of the full native raster to keep large files
+  // tractable while matching the intended export area.
+  if (tifData.bounds && tifData.nativeWidth && tifData.nativeHeight) {
+    const crop = Number.isFinite(tifData.suggestedResolution) ? tifData.suggestedResolution : null;
+    if (crop) {
+      width = crop;
+      height = crop;
+      fetchBounds = computeMetricFetchBounds(normalizedCenter, width, height);
+    } else {
+      width = tifData.nativeWidth;
+      height = tifData.nativeHeight;
+      fetchBounds = {
+        north: tifData.bounds.north,
+        south: tifData.bounds.south,
+        east: normalizeLng(tifData.bounds.east),
+        west: normalizeLng(tifData.bounds.west),
+      };
+    }
+  } else {
+    width = resolution;
+    height = resolution;
+    fetchBounds = computeMetricFetchBounds(normalizedCenter, width, height);
+  }
 
   // ── Satellite tiles (same as fetchTerrainData, no terrain tiles needed) ────
   const satNw = project(fetchBounds.north, fetchBounds.west, SATELLITE_ZOOM);
@@ -1101,6 +1199,9 @@ export const loadTerrainFromTif = async (
     finalBounds = fetchBounds;
   }
 
+  const tifUnit = resolveElevationUnitScale(tifData, elevationUnitOverride);
+  convertHeightMapToMeters(heightMap, tifUnit.scale);
+
   // ── Resample satellite texture ───────────────────────────────────────────────
   signal?.throwIfAborted();
   onProgress?.('Resampling satellite texture...');
@@ -1164,6 +1265,15 @@ export const loadTerrainFromTif = async (
     osmFeatures, osmRequestInfo,
     usgsFallback: false,
     sourceGeoTiffs: undefined,
+    // GeoTIFF processing is already constrained to the suggested crop window.
+    exportCropSize: null,
+    elevationUnitApplied: {
+      selected: elevationUnitOverride,
+      detected: tifData.verticalUnitDetected || 'unknown',
+      detectionSource: tifData.verticalUnitDetectionSource || null,
+      scaleToMeters: tifUnit.scale,
+      source: tifUnit.source,
+    },
   };
 
   if (generateSegmentedSatellite || generateSegmentedHybridAsset) {
@@ -1220,6 +1330,7 @@ export const loadTerrainFromLaz = async (
     generateHybridTextureAsset   = true,
     generateSegmentedHybridAsset = true,
     globalTileConcurrency        = 20,
+    elevationUnitOverride        = 'auto',
   } = generationOptions || {};
 
   const normalizedCenter = { lat: center.lat, lng: normalizeLng(center.lng) };
@@ -1244,16 +1355,7 @@ export const loadTerrainFromLaz = async (
   } else {
     width  = resolution;
     height = resolution;
-    const metersPerDegLat = 111320;
-    const metersPerDegLng = 111320 * Math.cos((normalizedCenter.lat * Math.PI) / 180);
-    const latSpan = height / metersPerDegLat;
-    const lngSpan = width  / metersPerDegLng;
-    fetchBounds = {
-      north: normalizedCenter.lat + latSpan / 2,
-      south: normalizedCenter.lat - latSpan / 2,
-      east:  normalizedCenter.lng + lngSpan / 2,
-      west:  normalizedCenter.lng - lngSpan / 2,
-    };
+    fetchBounds = computeMetricFetchBounds(normalizedCenter, width, height);
   }
 
   // ── Satellite tiles ───────────────────────────────────────────────────────
@@ -1321,6 +1423,9 @@ export const loadTerrainFromLaz = async (
     },
   );
 
+  const lazUnit = resolveElevationUnitScale(lazData, elevationUnitOverride);
+  convertHeightMapToMeters(heightMap, lazUnit.scale);
+
   // ── Resample satellite texture ────────────────────────────────────────────
   signal?.throwIfAborted();
   onProgress?.('Resampling satellite texture...');
@@ -1382,6 +1487,13 @@ export const loadTerrainFromLaz = async (
     osmFeatures, osmRequestInfo,
     usgsFallback:   false,
     sourceGeoTiffs: undefined,
+    elevationUnitApplied: {
+      selected: elevationUnitOverride,
+      detected: lazData.verticalUnitDetected || 'unknown',
+      detectionSource: lazData.verticalUnitDetectionSource || null,
+      scaleToMeters: lazUnit.scale,
+      source: lazUnit.source,
+    },
     // When the terrain was rasterized at native LAZ resolution, exportCropSize
     // is the power-of-2 inner area shown as an orange box in 3D and used as the
     // output size for all exports (heightmap, textures, BeamNG level, etc.).

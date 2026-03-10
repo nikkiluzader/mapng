@@ -33,6 +33,20 @@
           Reading file…
         </p>
       </template>
+
+      <div v-if="uploadedTifMeta" class="mt-2 flex items-center gap-2">
+        <label class="text-[10px] text-blue-700 dark:text-blue-300">Elevation units</label>
+        <select
+          :value="verticalUnitOverride"
+          @change="$emit('update:verticalUnitOverride', $event.target.value)"
+          class="text-[10px] rounded border border-blue-200 dark:border-blue-700 bg-white dark:bg-blue-900/30 px-1.5 py-0.5 text-blue-800 dark:text-blue-200"
+        >
+          <option value="auto">Auto ({{ detectedUnitLabel }})</option>
+          <option value="meters">Meters</option>
+          <option value="feet">Feet (international)</option>
+          <option value="us_survey_feet">Feet (US survey)</option>
+        </select>
+      </div>
     </div>
     <button
       @click="$emit('clear')"
@@ -68,9 +82,10 @@ import { Upload, FileUp, X } from 'lucide-vue-next';
 const props = defineProps({
   uploadedTifFile: { type: Object, default: null },
   uploadedTifMeta: { type: Object, default: null },
+  verticalUnitOverride: { type: String, default: 'auto' },
 });
 
-const emit = defineEmits(['file-selected', 'clear']);
+const emit = defineEmits(['file-selected', 'clear', 'update:verticalUnitOverride']);
 const fileInput = ref(null);
 
 const isLazFile = computed(() => {
@@ -83,6 +98,14 @@ const ptLabel = computed(() => {
   if (!count) return 'Point cloud';
   const m = count / 1_000_000;
   return m >= 1 ? `${m.toFixed(1)}M pts` : `${(count / 1000).toFixed(0)}K pts`;
+});
+
+const detectedUnitLabel = computed(() => {
+  const u = props.uploadedTifMeta?.verticalUnitDetected;
+  if (u === 'meters') return 'meters detected';
+  if (u === 'feet') return 'feet detected';
+  if (u === 'us_survey_feet') return 'US survey feet detected';
+  return 'unknown, defaulting to meters';
 });
 
 const handleFileChange = (e) => {
