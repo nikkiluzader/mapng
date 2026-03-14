@@ -326,6 +326,19 @@ export async function buildTerrainMaterials(terrainData, worldSize, levelName, s
     rasterizePolygon(layerMap, size, ring, matIdx);
   }
 
+  // 1b. Paint water bodies on top of area fills.
+  // Water is painted in a separate pass so it overrides land-use fills (e.g. a pond
+  // inside a residential area painted as Grass). Index 0 = DefaultMaterial which shows
+  // the satellite base — BeamNG WaterBlock objects sit on top of this.
+  for (const feature of osmFeatures) {
+    if (feature.type === 'road' || !feature.geometry?.length) continue;
+    const t = feature.tags || {};
+    const isWater = t.natural === 'water' || t.natural === 'wetland' || t.water || t.waterway;
+    if (!isWater) continue;
+    const ring = feature.geometry.map(pt => geoToTerrainPx(pt.lat, pt.lng, bounds, size));
+    rasterizePolygon(layerMap, size, ring, 0); // 0 = DefaultMaterial
+  }
+
   // 2. Paint roads (overrides area fills)
   for (const feature of osmFeatures) {
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
@@ -385,44 +398,58 @@ export async function buildTerrainMaterials(terrainData, worldSize, levelName, s
     { path: 'shared_r_sm.png',  blob: sharedRSm },
   );
 
+  // World size in metres — used as the base texture mapping scale so each base
+  // texture covers the terrain exactly once (no tiling at world scale).
+  const ws = Math.round(worldSize);
+
   // Helper: build the 15 neutral slot fields, then override with material-specific ones.
+  // xxxBaseTexSize = world-space metres covered by that texture (same as ws = no tiling).
   function neutralSlots() {
     return {
-      // base color
+      // base color (detail/macro are neutral placeholders with strength 0)
       baseColorDetailTex:       p('shared_r_sm.png'),
       baseColorDetailStrength:  [0, 0],
       baseColorMacroTex:        p('shared_r_sm.png'),
       baseColorMacroStrength:   [0, 0],
       // normal
       normalBaseTex:            p('shared_nm.png'),
+      normalBaseTexSize:        ws,
       normalDetailTex:          p('shared_nm_sm.png'),
       normalDetailStrength:     [0, 0],
       normalMacroTex:           p('shared_nm_sm.png'),
       normalMacroStrength:      [0, 0],
       // roughness
       roughnessBaseTex:         p('shared_r.png'),
+      roughnessBaseTexSize:     ws,
       roughnessDetailTex:       p('shared_r_sm.png'),
       roughnessDetailStrength:  [0, 0],
       roughnessMacroTex:        p('shared_r_sm.png'),
       roughnessMacroStrength:   [0, 0],
       // ambient occlusion
       aoBaseTex:                p('shared_ao.png'),
+      aoBaseTexSize:            ws,
       aoDetailTex:              p('shared_ao_sm.png'),
       aoMacroTex:               p('shared_ao_sm.png'),
       // height
       heightBaseTex:            p('shared_r.png'),
+      heightBaseTexSize:        ws,
       heightDetailTex:          p('shared_r_sm.png'),
       heightMacroTex:           p('shared_r_sm.png'),
     };
   }
 
-  // DefaultMaterial: satellite as world-space base color; all other slots neutral.
-  materialDefs.DefaultMaterial = {
+  // Use "InternalName-uuid" key format (matching BeamNG's own convention) so the
+  // editor can generate material thumbnails correctly.
+  const defaultUuid = crypto.randomUUID();
+  const defaultKey  = `DefaultMaterial-${defaultUuid}`;
+  materialDefs[defaultKey] = {
+    name: defaultKey,
     class: 'TerrainMaterial',
-    persistentId: crypto.randomUUID(),
+    persistentId: defaultUuid,
     internalName: 'DefaultMaterial',
     groundmodelName: 'GROUNDMODEL_ASPHALT1',
-    baseColorBaseTex: satellitePath,
+    baseColorBaseTex:     satellitePath,
+    baseColorBaseTexSize: ws,
     ...neutralSlots(),
   };
 
@@ -439,12 +466,16 @@ export async function buildTerrainMaterials(terrainData, worldSize, levelName, s
       { path: `${slug}_n.png`, blob: normal },
       { path: `${slug}_r.png`, blob: roughness },
     );
-    materialDefs[mat.name] = {
+    const uuid = crypto.randomUUID();
+    const key  = `${mat.name}-${uuid}`;
+    materialDefs[key] = {
+      name: key,
       class: 'TerrainMaterial',
-      persistentId: crypto.randomUUID(),
+      persistentId: uuid,
       internalName: mat.name,
       groundmodelName: mat.groundmodelName,
-      baseColorBaseTex: p(`${slug}_b.png`),
+      baseColorBaseTex:     p(`${slug}_b.png`),
+      baseColorBaseTexSize: ws,
       ...neutralSlots(),
       // Override neutral normal + roughness detail with material-specific ones.
       detailSize: mat.detailTexSize,

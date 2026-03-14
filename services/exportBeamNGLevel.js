@@ -607,26 +607,27 @@ function decimateNodes(nodes) {
 }
 
 // OSM highway type → BeamNG DecalRoad properties.
-// width: half-width in metres (total road width = 2 × value, per BeamNG node format)
+// width: half-width in metres (total road width = 2 × value, per BeamNG node format).
+//   4 = 8 m total (single-lane residential), 8 = 16 m total (two-lane arterial).
 // textureLength: metres of road per texture tile — longer = fewer visible seams
 // renderPriority: higher = renders on top at intersections; major roads over minor
 const HIGHWAY_STYLE = {
-  motorway:       { material: 'road_asphalt_2lane',  width: 6,   textureLength: 24, renderPriority: 16 },
-  motorway_link:  { material: 'road_asphalt_2lane',  width: 4,   textureLength: 20, renderPriority: 15 },
-  trunk:          { material: 'road_asphalt_2lane',  width: 5.5, textureLength: 24, renderPriority: 15 },
-  trunk_link:     { material: 'road_asphalt_2lane',  width: 4,   textureLength: 20, renderPriority: 14 },
-  primary:        { material: 'road_asphalt_2lane',  width: 5,   textureLength: 20, renderPriority: 14 },
-  primary_link:   { material: 'road_asphalt_2lane',  width: 3.5, textureLength: 18, renderPriority: 13 },
-  secondary:      { material: 'road_asphalt_2lane',  width: 4.5, textureLength: 18, renderPriority: 13 },
-  secondary_link: { material: 'road_asphalt_2lane',  width: 3,   textureLength: 16, renderPriority: 12 },
-  tertiary:       { material: 'road_asphalt_2lane',  width: 4,   textureLength: 16, renderPriority: 12 },
-  tertiary_link:  { material: 'road_asphalt_2lane',  width: 3,   textureLength: 15, renderPriority: 11 },
-  residential:    { material: 'road_asphalt_2lane',  width: 3,   textureLength: 15, renderPriority: 11 },
-  living_street:  { material: 'road_asphalt_2lane',  width: 2.5, textureLength: 12, renderPriority: 10 },
-  unclassified:   { material: 'road_asphalt_2lane',  width: 3,   textureLength: 15, renderPriority: 11 },
-  road:           { material: 'road_asphalt_2lane',  width: 3,   textureLength: 15, renderPriority: 10 },
-  service:        { material: 'road_asphalt_2lane',  width: 2.5, textureLength: 12, renderPriority: 10 },
-  track:          { material: 'm_dirt_road_gravels',  width: 2,   textureLength: 12, renderPriority: 9  },
+  motorway:       { material: 'road_asphalt_2lane',  width: 8,   textureLength: 24, renderPriority: 16 },
+  motorway_link:  { material: 'road_asphalt_2lane',  width: 5,   textureLength: 20, renderPriority: 15 },
+  trunk:          { material: 'road_asphalt_2lane',  width: 8,   textureLength: 24, renderPriority: 15 },
+  trunk_link:     { material: 'road_asphalt_2lane',  width: 5,   textureLength: 20, renderPriority: 14 },
+  primary:        { material: 'road_asphalt_2lane',  width: 8,   textureLength: 20, renderPriority: 14 },
+  primary_link:   { material: 'road_asphalt_2lane',  width: 5,   textureLength: 18, renderPriority: 13 },
+  secondary:      { material: 'road_asphalt_2lane',  width: 6,   textureLength: 18, renderPriority: 13 },
+  secondary_link: { material: 'road_asphalt_2lane',  width: 5,   textureLength: 16, renderPriority: 12 },
+  tertiary:       { material: 'road_asphalt_2lane',  width: 5,   textureLength: 16, renderPriority: 12 },
+  tertiary_link:  { material: 'road_asphalt_2lane',  width: 4,   textureLength: 15, renderPriority: 11 },
+  residential:    { material: 'road_asphalt_2lane',  width: 4,   textureLength: 15, renderPriority: 11 },
+  living_street:  { material: 'road_asphalt_2lane',  width: 4,   textureLength: 12, renderPriority: 10 },
+  unclassified:   { material: 'road_asphalt_2lane',  width: 4,   textureLength: 15, renderPriority: 11 },
+  road:           { material: 'road_asphalt_2lane',  width: 4,   textureLength: 15, renderPriority: 10 },
+  service:        { material: 'road_asphalt_2lane',  width: 4,   textureLength: 12, renderPriority: 10 },
+  track:          { material: 'm_dirt_road_gravels',  width: 4,   textureLength: 12, renderPriority: 9  },
 };
 
 // OSM highway types to exclude from road generation (non-vehicle ways).
@@ -687,10 +688,12 @@ function generateDecalRoads(terrainData, squareSize) {
         __parent: 'Decal_roads',
         position: [nodes[0][0], nodes[0][1], nodes[0][2]],
         autoLanes: true,
+        breakAngle: 3,
+        decalBias: 0.001,
         detail: 0.1,
         drivability: 1,
         improvedSpline: true,
-        smoothness: 0,
+        smoothness: 0.1,
         material: style.material,
         nodes,
         overObjects: true,
