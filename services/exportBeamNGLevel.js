@@ -206,11 +206,13 @@ async function urlToPngBlob(url) {
 async function getTerrainTextureBlob(terrainData, textureType = 'hybrid') {
   try {
     if (textureType === 'hybrid') {
-      // In-memory canvas is the fastest path — no fetch needed.
+      // Prefer blob URL — the canvas may have been freed from CPU memory after
+      // the 3D preview uploaded it to GPU. urlToPngBlob re-encodes via a short-
+      // lived temporary canvas rather than holding a full-resolution one alive.
+      if (terrainData.hybridTextureUrl) return await urlToPngBlob(terrainData.hybridTextureUrl);
       if (terrainData.hybridTextureCanvas) {
         return new Promise(r => terrainData.hybridTextureCanvas.toBlob(r, 'image/png'));
       }
-      if (terrainData.hybridTextureUrl) return await urlToPngBlob(terrainData.hybridTextureUrl);
     } else if (textureType === 'satellite' && terrainData.satelliteTextureUrl) {
       return await urlToPngBlob(terrainData.satelliteTextureUrl);
     } else if (textureType === 'osm' && terrainData.osmTextureUrl) {

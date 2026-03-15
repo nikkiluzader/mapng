@@ -66,13 +66,26 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
   }
 
   geo.computeVertexNormals();
-  
+
   // Dispose old geometry if it exists
   if (geometry.value) {
     geometry.value.dispose();
   }
-  
+
   geometry.value = markRaw(geo);
+
+  // After 2 frames the WebGL renderer has uploaded the buffer to GPU.
+  // Null the CPU-side TypedArrays to free the ArrayBuffer (~50-130 MB at
+  // max mesh resolution). The GPU retains the data; dispose() on unmount
+  // still correctly deletes the WebGL buffers.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const g = toRaw(geometry.value);
+    if (g === geo) { // only if this geometry is still active
+      if (g.attributes.position) g.attributes.position.array = null;
+      if (g.attributes.normal)   g.attributes.normal.array   = null;
+      if (g.attributes.uv)       g.attributes.uv.array       = null;
+    }
+  }));
 }, { immediate: true });
 
 const textureCache = reactive({
@@ -104,8 +117,10 @@ const loadTexture = (url) => {
   return markRaw(tex);
 };
 
-// Helper to create texture directly from canvas (skips PNG encode/decode)
-const loadCanvasTexture = (canvas) => {
+// Helper to create texture directly from canvas (skips PNG encode/decode).
+// onUploaded: optional callback fired after the GPU upload completes (2 frames).
+//   Use it to free the canvas from CPU memory — the GPU retains the data.
+const loadCanvasTexture = (canvas, onUploaded) => {
   if (!canvas) return null;
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -117,6 +132,13 @@ const loadCanvasTexture = (canvas) => {
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
+  if (onUploaded) {
+    // Two rAF frames is enough for the WebGL renderer to call texImage2D.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      tex.image = null; // release canvas reference from the texture object
+      onUploaded();
+    }));
+  }
   return markRaw(tex);
 };
 
@@ -128,11 +150,13 @@ watch(() => props.terrainData?.satelliteTextureUrl, (url) => {
 
 watch(() => props.terrainData?.osmTextureUrl, (url) => {
   if (textureCache.osm) textureCache.osm.dispose();
-  // Prefer direct canvas if available (sharper, avoids PNG round-trip)
   const canvas = props.terrainData?.osmTextureCanvas;
   if (canvas) {
     canvasCache.osm = canvas;
-    textureCache.osm = loadCanvasTexture(canvas);
+    textureCache.osm = loadCanvasTexture(canvas, () => {
+      canvasCache.osm = null;
+      if (props.terrainData) props.terrainData.osmTextureCanvas = null;
+    });
   } else {
     canvasCache.osm = null;
     textureCache.osm = loadTexture(url);
@@ -141,11 +165,13 @@ watch(() => props.terrainData?.osmTextureUrl, (url) => {
 
 watch(() => props.terrainData?.hybridTextureUrl, (url) => {
   if (textureCache.hybrid) textureCache.hybrid.dispose();
-  // Prefer direct canvas if available
   const canvas = props.terrainData?.hybridTextureCanvas;
   if (canvas) {
     canvasCache.hybrid = canvas;
-    textureCache.hybrid = loadCanvasTexture(canvas);
+    textureCache.hybrid = loadCanvasTexture(canvas, () => {
+      canvasCache.hybrid = null;
+      if (props.terrainData) props.terrainData.hybridTextureCanvas = null;
+    });
   } else {
     canvasCache.hybrid = null;
     textureCache.hybrid = loadTexture(url);
@@ -156,7 +182,9 @@ watch(() => props.terrainData?.segmentedTextureUrl, (url) => {
   if (textureCache.segmented) textureCache.segmented.dispose();
   const canvas = props.terrainData?.segmentedTextureCanvas;
   if (canvas) {
-    textureCache.segmented = loadCanvasTexture(canvas);
+    textureCache.segmented = loadCanvasTexture(canvas, () => {
+      if (props.terrainData) props.terrainData.segmentedTextureCanvas = null;
+    });
   } else {
     textureCache.segmented = loadTexture(url);
   }
@@ -166,7 +194,9 @@ watch(() => props.terrainData?.segmentedHybridTextureUrl, (url) => {
   if (textureCache.segmentedHybrid) textureCache.segmentedHybrid.dispose();
   const canvas = props.terrainData?.segmentedHybridTextureCanvas;
   if (canvas) {
-    textureCache.segmentedHybrid = loadCanvasTexture(canvas);
+    textureCache.segmentedHybrid = loadCanvasTexture(canvas, () => {
+      if (props.terrainData) props.terrainData.segmentedHybridTextureCanvas = null;
+    });
   } else {
     textureCache.segmentedHybrid = loadTexture(url);
   }
