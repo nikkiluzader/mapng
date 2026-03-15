@@ -206,21 +206,28 @@ async function urlToPngBlob(url) {
 async function getTerrainTextureBlob(terrainData, textureType = 'hybrid') {
   try {
     if (textureType === 'hybrid') {
-      // Prefer blob URL — the canvas may have been freed from CPU memory after
-      // the 3D preview uploaded it to GPU. urlToPngBlob re-encodes via a short-
-      // lived temporary canvas rather than holding a full-resolution one alive.
-      if (terrainData.hybridTextureUrl) return await urlToPngBlob(terrainData.hybridTextureUrl);
+      // Priority: raw canvas (lossless, direct) → pre-encoded blob → blob URL fallback.
+      // The canvas may be null after the 3D preview frees it from terrainData, but the
+      // blob is always kept alive since it's a compressed PNG (much smaller than the canvas).
       if (terrainData.hybridTextureCanvas) {
         return new Promise(r => terrainData.hybridTextureCanvas.toBlob(r, 'image/png'));
       }
-    } else if (textureType === 'satellite' && terrainData.satelliteTextureUrl) {
-      return await urlToPngBlob(terrainData.satelliteTextureUrl);
-    } else if (textureType === 'osm' && terrainData.osmTextureUrl) {
-      return await urlToPngBlob(terrainData.osmTextureUrl);
-    } else if (textureType === 'segmented' && terrainData.segmentedTextureUrl) {
-      return await urlToPngBlob(terrainData.segmentedTextureUrl);
-    } else if (textureType === 'segmentedHybrid' && terrainData.segmentedHybridTextureUrl) {
-      return await urlToPngBlob(terrainData.segmentedHybridTextureUrl);
+      if (terrainData.hybridTextureBlob) return terrainData.hybridTextureBlob;
+      if (terrainData.hybridTextureUrl) return await urlToPngBlob(terrainData.hybridTextureUrl);
+    } else if (textureType === 'satellite') {
+      if (terrainData.satelliteTextureUrl) return await urlToPngBlob(terrainData.satelliteTextureUrl);
+    } else if (textureType === 'osm') {
+      if (terrainData.osmTextureCanvas) return new Promise(r => terrainData.osmTextureCanvas.toBlob(r, 'image/png'));
+      if (terrainData.osmTextureBlob) return terrainData.osmTextureBlob;
+      if (terrainData.osmTextureUrl) return await urlToPngBlob(terrainData.osmTextureUrl);
+    } else if (textureType === 'segmented') {
+      if (terrainData.segmentedTextureCanvas) return new Promise(r => terrainData.segmentedTextureCanvas.toBlob(r, 'image/png'));
+      if (terrainData.segmentedTextureBlob) return terrainData.segmentedTextureBlob;
+      if (terrainData.segmentedTextureUrl) return await urlToPngBlob(terrainData.segmentedTextureUrl);
+    } else if (textureType === 'segmentedHybrid') {
+      if (terrainData.segmentedHybridTextureCanvas) return new Promise(r => terrainData.segmentedHybridTextureCanvas.toBlob(r, 'image/png'));
+      if (terrainData.segmentedHybridTextureBlob) return terrainData.segmentedHybridTextureBlob;
+      if (terrainData.segmentedHybridTextureUrl) return await urlToPngBlob(terrainData.segmentedHybridTextureUrl);
     }
   } catch (_) {}
 
