@@ -412,15 +412,11 @@ async function generateOSMObjectsDAE(terrainData, worldSize) {
   scene.add(osmGroup);
   scene.updateMatrixWorld(true);
 
-  const result = new ColladaExporter().parse(scene, undefined, { version: '1.4.1' });
+  // Pass upAxis directly — avoids reading the blob as text (which can truncate
+  // large DAE files and cause TinyXML parse failures in BeamNG).
+  const result = new ColladaExporter().parse(scene, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
   if (!result?.data) return null;
-
-  // result.data is a Blob — read it as text so we can patch the asset header.
-  // The geometry is already in Z-up space; declare Z_UP so BeamNG does not
-  // apply an additional Y→Z axis rotation on top.
-  const daeText = await result.data.text();
-  const daePatched = daeText.replace('<up_axis>Y_UP</up_axis>', '<up_axis>Z_UP</up_axis>');
-  return new Blob([daePatched], { type: 'model/vnd.collada+xml' });
+  return result.data;
 }
 
 /**
@@ -505,13 +501,11 @@ async function generateTerrainBackdropDAE(terrainData, worldSize) {
   const result = new ColladaExporter().parse(scene, undefined, {
     textureDirectory: 'textures',
     version: '1.4.1',
+    upAxis: 'Z_UP',
   });
   if (!result?.data) return null;
-
-  const daeText = await result.data.text();
-  const daePatched = daeText.replace('<up_axis>Y_UP</up_axis>', '<up_axis>Z_UP</up_axis>');
   return {
-    daeBlob: new Blob([daePatched], { type: 'model/vnd.collada+xml' }),
+    daeBlob: result.data,
     textureFiles: result.textures ?? [],
   };
 }
