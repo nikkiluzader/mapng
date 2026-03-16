@@ -425,14 +425,16 @@ export async function buildTerrainMaterials(terrainData, worldSize, levelName, s
   const p = (f) => `/levels/${levelName}/art/terrains/${f}`;
 
   // ── Shared neutral base textures (size×size, must match baseTexSize) ─────
-  // ── Shared neutral small textures (DETAIL_SIZE, for detail + macro slots) ─
-  const [sharedAo, sharedNm, sharedR, sharedAoSm, sharedNmSm, sharedRSm] = await Promise.all([
-    makeAoBlob(baseSize),                     // white AO  — base slot
-    makeNormalBlob(0, baseSize),              // flat normal — base slot
-    makeRoughnessBlob(180, 0, baseSize),      // neutral roughness/height — base slot
-    makeAoBlob(DETAIL_SIZE),             // white AO  — detail/macro slots
-    makeNormalBlob(0, DETAIL_SIZE),      // flat normal — detail/macro slots
-    makeRoughnessBlob(180, 0, DETAIL_SIZE), // neutral — detail/macro slots
+  // Generated sequentially to avoid holding multiple large canvases (up to 256 MB each)
+  // in memory at the same time. Each canvas is freed by the browser after toBlob() resolves.
+  const sharedAo  = await makeAoBlob(baseSize);
+  const sharedNm  = await makeNormalBlob(0, baseSize);
+  const sharedR   = await makeRoughnessBlob(180, 0, baseSize);
+  // Detail/macro textures are tiny (DETAIL_SIZE=256) so parallel is fine.
+  const [sharedAoSm, sharedNmSm, sharedRSm] = await Promise.all([
+    makeAoBlob(DETAIL_SIZE),
+    makeNormalBlob(0, DETAIL_SIZE),
+    makeRoughnessBlob(180, 0, DETAIL_SIZE),
   ]);
   textureFiles.push(
     { path: 'shared_ao.png',    blob: sharedAo },
@@ -498,11 +500,13 @@ export async function buildTerrainMaterials(terrainData, worldSize, levelName, s
     ...neutralSlots(),
   };
 
-  await Promise.all(MATERIALS.map(async mat => {
+  // Generate material textures sequentially — each diffuse blob is baseSize×baseSize
+  // (potentially 256 MB canvas). Parallel generation would OOM at high resolutions.
+  for (const mat of MATERIALS) {
     const [r, g, b] = mat.rgb;
     const slug = mat.name.toLowerCase();
-    const [base, normal, roughness] = await Promise.all([
-      makeDiffuseBlob(r, g, b, mat.noise, baseSize), // baseSize×baseSize — goes in baseColorBaseTex
+    const base = await makeDiffuseBlob(r, g, b, mat.noise, baseSize);
+    const [normal, roughness] = await Promise.all([
       makeNormalBlob(mat.bumpiness, DETAIL_SIZE),
       makeRoughnessBlob(mat.roughness, 15, DETAIL_SIZE),
     ]);
@@ -529,7 +533,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, levelName, s
       roughnessDetailTex:       p(`${slug}_r.png`),
       roughnessDetailStrength:  [0.5, 0.1],
     };
-  }));
+  }
 
   return { layerMap, materialNames: MATERIAL_NAMES, materialDefs, textureFiles, textureSetName };
 }

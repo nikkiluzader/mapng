@@ -191,6 +191,25 @@ async function urlToPngBlob(url) {
 }
 
 /**
+ * Resize a PNG blob to an exact square pixel size.
+ * Required so terrain.png always matches baseTexSize in the TerrainMaterialTextureSet.
+ */
+async function resizePngBlob(blob, targetSize) {
+  if (!blob) return blob;
+  const bmp = await createImageBitmap(blob);
+  if (bmp.width === targetSize && bmp.height === targetSize) {
+    bmp.close();
+    return blob;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = targetSize;
+  canvas.height = targetSize;
+  canvas.getContext('2d').drawImage(bmp, 0, 0, targetSize, targetSize);
+  bmp.close();
+  return new Promise(r => canvas.toBlob(r, 'image/png'));
+}
+
+/**
  * Return the terrain texture as a PNG Blob for the given textureType.
  *
  * textureType options:
@@ -813,12 +832,17 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   report('Painting OSM terrain materials…', 5);
   await yield_();
-  const satelliteTexSize = Math.min(
+  // Determine the output resolution of the terrain texture.
+  // All canvas types (hybrid, osm, segmented) are rendered at the same output resolution.
+  // Check any alive canvas first; hybridTexWidth is saved before the canvas is freed by
+  // the 3D preview. Falls back to the terrain heightmap grid size as a last resort.
+  const satelliteTexSize =
     exportTerrainData.hybridTextureCanvas?.width ??
+    exportTerrainData.osmTextureCanvas?.width ??
+    exportTerrainData.segmentedTextureCanvas?.width ??
+    exportTerrainData.segmentedHybridTextureCanvas?.width ??
     exportTerrainData.hybridTexWidth ??
-    exportTerrainData.width,
-    4096  // cap to avoid OOM allocating >256 MB neutral PBR textures
-  );
+    exportTerrainData.width;
   const pbrResult = generatePbrMaterials
     ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, satelliteTexSize)
     : null;
@@ -833,6 +857,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   report('Generating satellite texture…', 35);
   await yield_();
   let texBlob = await getTerrainTextureBlob(exportTerrainData, baseTexture);
+  // terrain.png must be exactly baseTexSize pixels — BeamNG's TerrainMaterialTextureSet
+  // enforces that all base textures share the same pixel dimensions.
+  if (generatePbrMaterials && texBlob) {
+    texBlob = await resizePngBlob(texBlob, satelliteTexSize);
+  }
 
   report('Generating heightmap preview…', 50);
   await yield_();

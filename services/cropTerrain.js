@@ -207,5 +207,12 @@ export async function prepareCroppedTerrainData(terrainData) {
     hybridTextureCanvas: null,
     segmentedTextureCanvas: null,
     segmentedHybridTextureCanvas: null,
+    // Pre-crop blobs are at the wrong size; clear so URL fallbacks (croppedUrls) are used
+    hybridTextureBlob: null,
+    osmTextureBlob: null,
+    segmentedTextureBlob: null,
+    segmentedHybridTextureBlob: null,
+    // After crop, all textures are cropSize×cropSize
+    hybridTexWidth: cropSize,
   };
 }

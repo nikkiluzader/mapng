@@ -156,7 +156,11 @@ watch(() => props.terrainData?.osmTextureUrl, (url) => {
     canvasCache.osm = canvas;
     textureCache.osm = loadCanvasTexture(canvas, () => {
       canvasCache.osm = null;
-      if (props.terrainData) props.terrainData.osmTextureCanvas = null;
+      if (props.terrainData) {
+        // Save width so exportBeamNGLevel can determine satelliteTexSize after canvas is freed
+        if (!props.terrainData.hybridTexWidth) props.terrainData.hybridTexWidth = canvas.width;
+        props.terrainData.osmTextureCanvas = null;
+      }
     });
   } else {
     canvasCache.osm = null;
