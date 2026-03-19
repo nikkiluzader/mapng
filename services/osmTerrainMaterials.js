@@ -361,6 +361,8 @@ const WATERWAY_STYLE = {
   ditch:  { halfWidthM:  1.5 },
 };
 
+const CONCRETE_LANDUSES = new Set(['commercial', 'industrial', 'retail']);
+
 // ── Coordinate conversion ──────────────────────────────────────────────────
 
 /**
@@ -465,8 +467,7 @@ function areaMatIndex(feature) {
   if (lu === 'farmland' || lu === 'farmyard' || lu === 'greenhouse_horticulture') return 2;
   if (lu === 'brownfield' || lu === 'construction' || lu === 'landfill') return 2;
   if (lu === 'military') return 2;
-  if (lu === 'industrial') return 7;
-  if (lu === 'commercial' || lu === 'retail') return 7;
+  if (CONCRETE_LANDUSES.has(lu)) return 7;
   if (lu === 'garages') return 5;
   if (lu === 'residential') return 1;
   if (lu === 'quarry') return 4;
@@ -480,7 +481,8 @@ function areaMatIndex(feature) {
   if (lei === 'beach_resort') return 3;
   if (lei === 'track') return 5;
 
-  if (am === 'parking' || am === 'fuel') return 5;
+  if (am === 'parking') return 7;
+  if (am === 'fuel') return 5;
 
   if (sur === 'asphalt' || sur === 'paved') return 5;
   if (sur === 'concrete') return 7;
