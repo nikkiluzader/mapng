@@ -292,6 +292,7 @@ export function createBatchJobState(config) {
     id: computeTileId(id, tile),
     status: TILE_STATES.QUEUED,
     snapshot: null,
+    elevationStats: null,
     stageTimings: {},
     memory: {
       startUsedBytes: null,
@@ -451,6 +452,144 @@ function triggerDownload(blob, filename) {
   link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+const formatReportNumber = (value, digits = 3) => {
+  if (!Number.isFinite(value)) return 'n/a';
+  return Number(value).toFixed(digits);
+};
+
+const formatReportCoordinate = (value) => formatReportNumber(value, 6);
+
+function buildBatchElevationReportText(state) {
+  const tiles = Array.isArray(state?.tiles) ? state.tiles : [];
+  const completedTiles = tiles.filter((tile) => tile.status === TILE_STATES.DONE);
+  const tilesWithStats = completedTiles.filter((tile) => tile.elevationStats);
+  const failedTiles = tiles.filter((tile) => tile.status === TILE_STATES.FAILED);
+
+  const sharedMin = Number.isFinite(state?.elevationNormalization?.globalMinHeight)
+    ? state.elevationNormalization.globalMinHeight
+    : null;
+  const sharedMax = Number.isFinite(state?.elevationNormalization?.globalMaxHeight)
+    ? state.elevationNormalization.globalMaxHeight
+    : null;
+  const sharedRange = Number.isFinite(sharedMin) && Number.isFinite(sharedMax)
+    ? sharedMax - sharedMin
+    : null;
+
+  const aggregate = tilesWithStats.reduce((acc, tile) => {
+    const stats = tile.elevationStats;
+    if (!stats) return acc;
+
+    if (!acc.lowestLocalMin || stats.localMinHeight < acc.lowestLocalMin.value) {
+      acc.lowestLocalMin = { value: stats.localMinHeight, tile };
+    }
+    if (!acc.highestLocalMax || stats.localMaxHeight > acc.highestLocalMax.value) {
+      acc.highestLocalMax = { value: stats.localMaxHeight, tile };
+    }
+    if (!acc.narrowestRange || stats.localRange < acc.narrowestRange.value) {
+      acc.narrowestRange = { value: stats.localRange, tile };
+    }
+    if (!acc.widestRange || stats.localRange > acc.widestRange.value) {
+      acc.widestRange = { value: stats.localRange, tile };
+    }
+    return acc;
+  }, {
+    lowestLocalMin: null,
+    highestLocalMax: null,
+    narrowestRange: null,
+    widestRange: null,
+  });
+
+  const lines = [
+    'MapNG Batch Elevation Report',
+    '===========================',
+    '',
+    `Generated: ${new Date().toISOString()}`,
+    `Job ID: ${state?.id || 'n/a'}`,
+    `Status: ${state?.status || 'n/a'}`,
+    `Elevation source: ${state?.elevationSource || 'n/a'}`,
+    `Grid: ${Number(state?.gridCols || 0)} cols x ${Number(state?.gridRows || 0)} rows`,
+    `Total tiles: ${tiles.length}`,
+    `Completed tiles: ${completedTiles.length}`,
+    `Failed tiles: ${failedTiles.length}`,
+    `Resolution per tile: ${Number(state?.resolution || 0)} px`,
+    `Job center: lat ${formatReportCoordinate(state?.center?.lat)}, lng ${formatReportCoordinate(state?.center?.lng)}`,
+    `Shared elevation baseline: ${state?.elevationNormalization?.enabled ? 'enabled' : 'disabled'}`,
+    `Shared baseline min height: ${formatReportNumber(sharedMin)}`,
+    `Shared baseline max height: ${formatReportNumber(sharedMax)}`,
+    `Shared baseline height difference: ${formatReportNumber(sharedRange)}`,
+    '',
+    'Aggregate Local Tile Stats',
+    '--------------------------',
+    `Tiles with captured stats: ${tilesWithStats.length}/${tiles.length}`,
+    `Lowest local min: ${aggregate.lowestLocalMin ? `${formatReportNumber(aggregate.lowestLocalMin.value)} (${`R${aggregate.lowestLocalMin.tile.row + 1}C${aggregate.lowestLocalMin.tile.col + 1}`})` : 'n/a'}`,
+    `Highest local max: ${aggregate.highestLocalMax ? `${formatReportNumber(aggregate.highestLocalMax.value)} (${`R${aggregate.highestLocalMax.tile.row + 1}C${aggregate.highestLocalMax.tile.col + 1}`})` : 'n/a'}`,
+    `Narrowest local height difference: ${aggregate.narrowestRange ? `${formatReportNumber(aggregate.narrowestRange.value)} (${`R${aggregate.narrowestRange.tile.row + 1}C${aggregate.narrowestRange.tile.col + 1}`})` : 'n/a'}`,
+    `Widest local height difference: ${aggregate.widestRange ? `${formatReportNumber(aggregate.widestRange.value)} (${`R${aggregate.widestRange.tile.row + 1}C${aggregate.widestRange.tile.col + 1}`})` : 'n/a'}`,
+    '',
+    'Per-Tile Calculations',
+    '---------------------',
+  ];
+
+  if (!tilesWithStats.length) {
+    lines.push('No completed tile elevation stats were captured.');
+  } else {
+    for (const tile of tilesWithStats) {
+      const stats = tile.elevationStats;
+      const label = `R${tile.row + 1}C${tile.col + 1}`;
+      lines.push(
+        `${label} | center=(${formatReportCoordinate(tile.center?.lat)}, ${formatReportCoordinate(tile.center?.lng)}) | offset_m=(${formatReportNumber(tile.offsetX || 0)}, ${formatReportNumber(tile.offsetY || 0)})`,
+      );
+      lines.push(
+        `  local_min=${formatReportNumber(stats.localMinHeight)} | local_max=${formatReportNumber(stats.localMaxHeight)} | local_height_difference=${formatReportNumber(stats.localRange)}`,
+      );
+      lines.push(
+        `  encoded_min=${formatReportNumber(stats.encodedMinHeight)} | encoded_max=${formatReportNumber(stats.encodedMaxHeight)} | encoded_height_difference=${formatReportNumber(stats.encodedRange)}`,
+      );
+      lines.push(
+        `  min_delta_vs_encoded=${formatReportNumber(stats.deltaMinToEncoded)} | max_delta_vs_encoded=${formatReportNumber(stats.deltaMaxToEncoded)} | extra_encoded_range=${formatReportNumber(stats.extraEncodedRange)}`,
+      );
+      lines.push('');
+    }
+  }
+
+  if (failedTiles.length) {
+    lines.push('Failed Tiles');
+    lines.push('------------');
+    for (const tile of failedTiles) {
+      const label = `R${tile.row + 1}C${tile.col + 1}`;
+      lines.push(`${label} | ${tile.lastError?.message || 'Unknown error'}`);
+    }
+    lines.push('');
+  }
+
+  lines.push('Definitions');
+  lines.push('-----------');
+  lines.push('R#C# = row and column index of the tile inside the batch grid.');
+  lines.push('center = center coordinates of the current tile in latitude and longitude.');
+  lines.push('offset_m = how far the tile was moved from its default grid position, in meters. X is east/west and Y is north/south. This is mostly diagnostic metadata.');
+  lines.push('local_min = lowest elevation found inside this tile, in meters above sea level.');
+  lines.push('local_max = highest elevation found inside this tile, in meters above sea level.');
+  lines.push('local_height_difference = the tile\'s actual local elevation range. Formula: local_max - local_min.');
+  lines.push('encoded_min = minimum elevation value used when encoding this tile\'s heightmap. With shared baseline enabled, this is the batch-wide minimum.');
+  lines.push('encoded_max = maximum elevation value used when encoding this tile\'s heightmap. With shared baseline enabled, this is the batch-wide maximum.');
+  lines.push('encoded_height_difference = total elevation range used for encoding. Formula: encoded_max - encoded_min.');
+  lines.push('min_delta_vs_encoded = how much higher the tile\'s real minimum is than the encoded minimum. Formula: local_min - encoded_min.');
+  lines.push('max_delta_vs_encoded = how much lower the tile\'s real maximum is than the encoded maximum. Formula: encoded_max - local_max.');
+  lines.push('extra_encoded_range = how much larger the encoded range is than the tile\'s actual local range. Formula: encoded_height_difference - local_height_difference.');
+  lines.push('');
+
+  return `${lines.join('\n').trimEnd()}\n`;
+}
+
+function downloadBatchElevationReport(state) {
+  const text = buildBatchElevationReportText(state);
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const date = new Date().toISOString().slice(0, 10);
+  const lat = Number(state?.center?.lat || 0).toFixed(4);
+  const lng = Number(state?.center?.lng || 0).toFixed(4);
+  triggerDownload(blob, `MapNG_Batch_Elevation_Report_${date}_${lat}_${lng}.txt`);
 }
 
 const isJsonMimeType = (mime = '') => {
@@ -1063,6 +1202,27 @@ async function processTile(state, tile, ctx, signal) {
       }));
 
       tile.lifecycle.fetchCompletedAt = Date.now();
+      const sharedMin = state.elevationNormalization?.enabled
+        && Number.isFinite(state.elevationNormalization.globalMinHeight)
+          ? state.elevationNormalization.globalMinHeight
+          : terrainData.minHeight;
+      const sharedMax = state.elevationNormalization?.enabled
+        && Number.isFinite(state.elevationNormalization.globalMaxHeight)
+          ? state.elevationNormalization.globalMaxHeight
+          : terrainData.maxHeight;
+      const localRange = Number(terrainData.maxHeight) - Number(terrainData.minHeight);
+      const encodedRange = Number(sharedMax) - Number(sharedMin);
+      tile.elevationStats = {
+        localMinHeight: Number(terrainData.minHeight),
+        localMaxHeight: Number(terrainData.maxHeight),
+        localRange,
+        encodedMinHeight: Number(sharedMin),
+        encodedMaxHeight: Number(sharedMax),
+        encodedRange,
+        deltaMinToEncoded: Number(terrainData.minHeight) - Number(sharedMin),
+        deltaMaxToEncoded: Number(sharedMax) - Number(terrainData.maxHeight),
+        extraEncodedRange: encodedRange - localRange,
+      };
       const afterFetchSample = sampleMemory(state, { tile, label: 'after_fetch', force: true });
       if (afterFetchSample) {
         tile.memory.afterFetchUsedBytes = afterFetchSample.usedBytes;
@@ -1313,6 +1473,10 @@ export async function runBatchJob(state, onProgress, onTileComplete, onError, si
       if (state.status === JOB_STATES.COMPLETED && compositeHeightmap?.writtenTiles?.size === state.tiles.length) {
         onProgress({ tileIndex: -1, step: 'Generating stitched grid heightmap...', tile: null });
         downloadCompositeHeightmap(state, compositeHeightmap);
+      }
+      if (state.totalCompleted > 0) {
+        onProgress({ tileIndex: -1, step: 'Generating elevation report...', tile: null });
+        downloadBatchElevationReport(state);
       }
       sampleMemory(state, { label: 'job_completed', force: true });
       checkpoint(state);
