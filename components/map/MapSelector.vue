@@ -200,6 +200,12 @@ const selectedLayer = ref('osm');
 const showLabels = ref(true);
 const isMovingProgrammatically = ref(false);
 
+const normalizeDatelineLongitude = (lng) => {
+  if (lng > 180) return -180;
+  if (lng < -180) return 180;
+  return lng;
+};
+
 const batchHandleIcon = L.divIcon({
   className: 'mapng-batch-handle',
   html: '<div style="width:14px;height:14px;border-radius:9999px;background:#FF6600;border:2px solid white;box-shadow:0 0 0 1px rgba(0,0,0,0.25);"></div>',
@@ -312,7 +318,13 @@ const handleMove = () => {
   if (!mapRef.value?.leafletObject) return;
   const map = mapRef.value.leafletObject;
   const c = map.getCenter();
-  currentCenter.value = { lat: c.lat, lng: c.lng };
+
+  const normalizedLng = normalizeDatelineLongitude(c.lng);
+  if (normalizedLng !== c.lng) {
+    map.setView([c.lat, normalizedLng], map.getZoom(), { animate: false });
+  }
+
+  currentCenter.value = { lat: c.lat, lng: normalizedLng };
   emit('move', currentCenter.value);
 };
 
@@ -330,7 +342,7 @@ const onMoveEnd = () => {
     if (mapRef.value?.leafletObject) {
         const map = mapRef.value.leafletObject;
         const c = map.getCenter();
-        currentCenter.value = { lat: c.lat, lng: c.lng };
+        currentCenter.value = { lat: c.lat, lng: normalizeDatelineLongitude(c.lng) };
         emit('move', currentCenter.value);
     }
 };
