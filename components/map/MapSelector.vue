@@ -81,7 +81,7 @@
         @dragend="(event) => handleBatchTileDrag(tile, event)"
       >
         <l-tooltip :permanent="false" direction="top" :offset="[0, -8]">
-          Move R{{ tile.row + 1 }}C{{ tile.col + 1 }}
+          Move {{ tile.label || `R${tile.row + 1}C${tile.col + 1}` }}
         </l-tooltip>
       </l-marker>
 

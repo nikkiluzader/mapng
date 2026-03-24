@@ -64,6 +64,30 @@
       </div>
     </div>
 
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <p class="text-xs font-medium text-gray-700 dark:text-gray-300">Tile Names</p>
+        <BaseButton size="sm" variant="secondary" @click="resetTileNames">Reset All</BaseButton>
+      </div>
+      <p class="text-[10px] text-gray-500 dark:text-gray-400">Defaults use row/column labels. Rename any tile to change its export ZIP filename and batch labels.</p>
+      <div class="max-h-44 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 p-2 space-y-1">
+        <div
+          v-for="entry in tileNameEntries"
+          :key="entry.index"
+          class="grid grid-cols-[54px_1fr] gap-1 items-center"
+        >
+          <span class="text-[10px] text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
+          <input
+            type="text"
+            class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-[10px] text-gray-900 dark:text-white"
+            :value="entry.name"
+            :placeholder="entry.defaultName"
+            @input="updateTileName(entry.index, $event.target.value)"
+          />
+        </div>
+      </div>
+    </div>
+
     <hr class="border-gray-200 dark:border-gray-600" />
 
     <!-- Resolution -->
@@ -219,12 +243,13 @@ const props = defineProps({
   isRunning: { type: Boolean, default: false },
   savedState: { type: Object, default: null },
   tileOffsets: { type: Array, default: () => [] },
+  tileNames: { type: Array, default: () => [] },
   tileFollowCenter: { type: Boolean, default: true },
 });
 
 const emit = defineEmits([
   'locationChange', 'resolutionChange', 'startBatch',
-  'resumeBatch', 'clearSavedBatch', 'update:gridCols', 'update:gridRows', 'update:tileOffsets', 'update:tileFollowCenter', 'clearCache',
+  'resumeBatch', 'clearSavedBatch', 'update:gridCols', 'update:gridRows', 'update:tileOffsets', 'update:tileNames', 'update:tileFollowCenter', 'clearCache',
 ]);
 
 const handleLocationChange = (newLocation) => {
@@ -259,6 +284,31 @@ const normalizeTileOffsets = (offsets, tileCount) => {
 };
 
 const tileOffsets = ref([]);
+const tileNames = ref([]);
+
+const defaultTileName = (index, cols = gridCols.value) => {
+  const safeCols = Math.max(1, cols);
+  return `R${Math.floor(index / safeCols) + 1}C${(index % safeCols) + 1}`;
+};
+
+const normalizeTileNames = (names, tileCount, cols = gridCols.value) => {
+  const map = new Map();
+  if (Array.isArray(names)) {
+    names.forEach((entry) => {
+      const index = Number(entry?.index);
+      if (!Number.isInteger(index) || index < 0 || index >= tileCount) return;
+      const value = String(entry?.name || '').trim();
+      if (!value || value === defaultTileName(index, cols)) return;
+      map.set(index, { index, name: value });
+    });
+  }
+
+  const normalized = [];
+  for (let index = 0; index < tileCount; index++) {
+    normalized.push(map.get(index) || { index, name: '' });
+  }
+  return normalized;
+};
 
 // Settings
 const includeOSM = ref(localStorage.getItem('mapng_batch_osm') !== 'false');
@@ -350,11 +400,31 @@ const tileOffsetEntries = computed(() =>
   }))
 );
 
+const tileNameEntries = computed(() =>
+  tileNames.value.map((entry) => ({
+    ...entry,
+    row: Math.floor(entry.index / Math.max(1, gridCols.value)),
+    col: entry.index % Math.max(1, gridCols.value),
+    defaultName: defaultTileName(entry.index),
+  }))
+);
+
 const emitTileOffsets = () => {
   const nonZero = tileOffsets.value
     .filter((entry) => Math.abs(entry.offsetX) > 0 || Math.abs(entry.offsetY) > 0)
     .map((entry) => ({ ...entry }));
   emit('update:tileOffsets', nonZero);
+};
+
+const emitTileNames = () => {
+  const customNames = tileNames.value
+    .map((entry) => ({
+      index: entry.index,
+      name: String(entry.name || '').trim(),
+    }))
+    .filter((entry) => entry.name && entry.name !== defaultTileName(entry.index))
+    .map((entry) => ({ ...entry }));
+  emit('update:tileNames', customNames);
 };
 
 const updateTileOffset = (index, axis, value) => {
@@ -379,6 +449,18 @@ const resetTileOffsets = () => {
   emitTileOffsets();
 };
 
+const updateTileName = (index, value) => {
+  const row = tileNames.value[index];
+  if (!row) return;
+  row.name = String(value || '');
+  emitTileNames();
+};
+
+const resetTileNames = () => {
+  tileNames.value = normalizeTileNames([], totalTiles.value);
+  emitTileNames();
+};
+
 // Handlers
 const handleStart = () => {
   emit('startBatch', {
@@ -386,6 +468,9 @@ const handleStart = () => {
     resolution: props.resolution,
     gridCols: gridCols.value,
     gridRows: gridRows.value,
+    tileNames: tileNames.value
+      .map((entry) => ({ index: entry.index, name: String(entry.name || '').trim() }))
+      .filter((entry) => entry.name && entry.name !== defaultTileName(entry.index)),
     tileOffsets: tileOffsets.value
       .filter((entry) => Math.abs(entry.offsetX) > 0 || Math.abs(entry.offsetY) > 0)
       .map((entry) => ({ ...entry })),
@@ -411,6 +496,9 @@ const buildRunConfiguration = () => {
     resolution: props.resolution,
     gridCols: gridCols.value,
     gridRows: gridRows.value,
+    tileNames: tileNames.value
+      .map((entry) => ({ index: entry.index, name: String(entry.name || '').trim() }))
+      .filter((entry) => entry.name && entry.name !== defaultTileName(entry.index)),
     tileOffsets: tileOffsets.value
       .filter((entry) => Math.abs(entry.offsetX) > 0 || Math.abs(entry.offsetY) > 0)
       .map((entry) => ({ ...entry })),
@@ -543,6 +631,11 @@ const applyRunConfiguration = (config) => {
     emitTileOffsets();
   }
 
+  if (Array.isArray(src.tileNames)) {
+    tileNames.value = normalizeTileNames(src.tileNames, totalTiles.value);
+    emitTileNames();
+  }
+
   if (src.elevationNormalization && typeof src.elevationNormalization === 'object') {
     const enabledValue = toBooleanOrNull(src.elevationNormalization.enabled);
     sharedElevationBaseline.value = enabledValue === null ? sharedElevationBaseline.value : enabledValue;
@@ -616,11 +709,16 @@ watch(gridRows, (v) => {
 
 watch([gridCols, gridRows], () => {
   tileOffsets.value = normalizeTileOffsets(tileOffsets.value, totalTiles.value);
+  tileNames.value = normalizeTileNames(tileNames.value, totalTiles.value);
   emitTileOffsets();
+  emitTileNames();
 }, { immediate: true });
 
 watch(() => props.tileOffsets, (value) => {
   tileOffsets.value = normalizeTileOffsets(value, totalTiles.value);
+}, { immediate: true, deep: true });
+watch(() => props.tileNames, (value) => {
+  tileNames.value = normalizeTileNames(value, totalTiles.value);
 }, { immediate: true, deep: true });
 watch(() => props.tileFollowCenter, (value) => {
   tileFollowCenterLocal.value = !!value;

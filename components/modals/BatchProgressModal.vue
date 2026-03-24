@@ -41,7 +41,7 @@
           <div :style="gridStyle" class="gap-1 mx-auto" style="max-width: 400px;">
             <div v-for="tile in state.tiles" :key="tile.id || tile.index" :class="tileClass(tile)"
               class="aspect-square rounded-sm flex items-center justify-center text-[7px] font-medium transition-all duration-300 select-none overflow-hidden relative"
-              :title="`R${tile.row + 1} C${tile.col + 1}${tile.lastError?.message ? ': ' + tile.lastError.message : ''}`">
+              :title="`${tileLabel(tile)}${tile.lastError?.message ? ': ' + tile.lastError.message : ''}`">
               <!-- Snapshot background for completed tiles -->
               <img v-if="tile.snapshot && (tile.status === 'done' || tile.status === 'completed')" :src="tile.snapshot"
                 class="absolute inset-0 w-full h-full object-cover" />
@@ -56,7 +56,7 @@
                 <span v-else class="opacity-40">•</span>
               </template>
               <div class="absolute bottom-0 left-0 right-0 bg-black/45 text-white text-[8px] leading-none py-0.5 text-center">
-                R{{ tile.row + 1 }}C{{ tile.col + 1 }}
+                {{ tileLabel(tile) }}
               </div>
             </div>
           </div>
@@ -81,7 +81,7 @@
           class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-lg p-3 space-y-1">
           <div class="flex items-center gap-2 text-sm font-medium text-blue-800 dark:text-blue-200">
             <Loader2 :size="14" class="animate-spin text-blue-500" />
-            Processing tile R{{ currentTile?.row + 1 }}C{{ currentTile?.col + 1 }}
+            Processing tile {{ tileLabel(currentTile) }}
             <span class="text-xs font-normal text-blue-600 dark:text-blue-400">({{ currentTileDisplayIndex }}/{{ totalTiles }})</span>
           </div>
           <p class="text-xs text-blue-600 dark:text-blue-400 animate-pulse">{{ currentStep }}</p>
@@ -109,7 +109,7 @@
                 class="flex items-start gap-2 text-xs bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded p-2">
                 <XCircle :size="12" class="text-red-500 mt-0.5 flex-shrink-0" />
                 <div>
-                  <span class="font-medium text-red-800 dark:text-red-200">R{{ tile.row + 1 }}C{{ tile.col + 1 }}</span>
+                  <span class="font-medium text-red-800 dark:text-red-200">{{ tileLabel(tile) }}</span>
                   <span class="text-red-600 dark:text-red-400 ml-1">{{ tile.lastError?.message || tile.error || 'Unknown error' }}</span>
                 </div>
               </div>
@@ -122,12 +122,12 @@
             <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Job Summary</h4>
             <div class="text-xs text-gray-600 dark:text-gray-300 space-y-1">
               <p>Total queue wait: <span class="font-medium">{{ formatDuration(jobSummary?.totalWaitMs) }}</span></p>
-              <p v-if="jobSummary?.slowestTile">Slowest tile: <span class="font-medium">R{{ jobSummary.slowestTile.row + 1 }}C{{ jobSummary.slowestTile.col + 1 }}</span> ({{ formatDuration(jobSummary.slowestTile.totalMs) }})</p>
+              <p v-if="jobSummary?.slowestTile">Slowest tile: <span class="font-medium">{{ jobSummary.slowestTile.label || `R${jobSummary.slowestTile.row + 1}C${jobSummary.slowestTile.col + 1}` }}</span> ({{ formatDuration(jobSummary.slowestTile.totalMs) }})</p>
               <p v-if="benchmarkReport?.comparison">Composite score: <span class="font-medium">{{ benchmarkReport.comparison.compositeScore }}</span> (lower is better)</p>
               <p v-if="benchmarkReport?.comparison">Recommendation: <span class="font-medium">{{ benchmarkReport.comparison.recommendation }}</span></p>
               <p v-if="jobSummary?.memory?.supported">Peak JS heap: <span class="font-medium">{{ formatBytes(jobSummary.memory.peakUsedBytes) }}</span> / {{ formatBytes(jobSummary.memory.peakTotalBytes) }}</p>
               <p v-if="jobSummary?.memory?.supported">Memory samples: <span class="font-medium">{{ jobSummary.memory.sampleCount }}</span></p>
-              <p v-if="jobSummary?.memory?.peakTile">Peak tile heap: <span class="font-medium">R{{ jobSummary.memory.peakTile.row + 1 }}C{{ jobSummary.memory.peakTile.col + 1 }}</span> ({{ formatBytes(jobSummary.memory.peakTile.peakUsedBytes) }})</p>
+              <p v-if="jobSummary?.memory?.peakTile">Peak tile heap: <span class="font-medium">{{ jobSummary.memory.peakTile.label || `R${jobSummary.memory.peakTile.row + 1}C${jobSummary.memory.peakTile.col + 1}` }}</span> ({{ formatBytes(jobSummary.memory.peakTile.peakUsedBytes) }})</p>
               <p v-if="!jobSummary?.memory?.supported" class="text-[10px]">Memory sampling unavailable in this browser; timings still captured.</p>
             </div>
             <div class="flex items-center justify-between gap-2">
@@ -153,7 +153,7 @@
             <h4 class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Per-tile Instrumentation</h4>
             <div class="max-h-56 overflow-y-auto custom-scrollbar space-y-2">
               <div v-for="tile in tilesWithInstrumentation" :key="tile.id || tile.index" class="border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
-                <div class="text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">R{{ tile.row + 1 }}C{{ tile.col + 1 }} · {{ tile.status }}</div>
+                <div class="text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">{{ tileLabel(tile) }} · {{ tile.status }}</div>
                 <div v-if="tile.lifecycle?.totalMs" class="text-[10px] text-gray-600 dark:text-gray-300 mb-1">total {{ formatDuration(tile.lifecycle.totalMs) }}</div>
                 <div v-if="tile.memory" class="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-2">
                   <div class="text-[10px] text-gray-500 dark:text-gray-400">heap start</div>
@@ -255,6 +255,11 @@ const showDetails = ref(false);
 const doneAt = ref(null);
 const benchmarkCopyStatus = ref('');
 let timer = null;
+
+const tileLabel = (tile) => {
+  if (!tile) return '';
+  return tile.label || `R${Number(tile.row || 0) + 1}C${Number(tile.col || 0) + 1}`;
+};
 
 onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
 onUnmounted(() => { clearInterval(timer); });

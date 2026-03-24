@@ -33,6 +33,15 @@ export const useMainStore = defineStore('main', () => {
       return [];
     }
   })());
+  const batchTileNames = ref((() => {
+    try {
+      const saved = localStorage.getItem('mapng_batch_tile_names');
+      const parsed = saved ? JSON.parse(saved) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  })());
   const batchState = ref(null);
   const batchRunning = ref(false);
   const batchCurrentStep = ref('');
@@ -91,6 +100,11 @@ export const useMainStore = defineStore('main', () => {
     localStorage.setItem('mapng_batch_tile_offsets', JSON.stringify(batchTileOffsets.value));
   }
 
+  function setBatchTileNames(names) {
+    batchTileNames.value = Array.isArray(names) ? names : [];
+    localStorage.setItem('mapng_batch_tile_names', JSON.stringify(batchTileNames.value));
+  }
+
   return {
     // State
     center,
@@ -108,6 +122,7 @@ export const useMainStore = defineStore('main', () => {
     batchGridRows,
     batchTileFollowCenter,
     batchTileOffsets,
+    batchTileNames,
     batchState,
     batchRunning,
     batchCurrentStep,
@@ -122,6 +137,7 @@ export const useMainStore = defineStore('main', () => {
     setBatchGridCols,
     setBatchGridRows,
     setBatchTileFollowCenter,
-    setBatchTileOffsets
+    setBatchTileOffsets,
+    setBatchTileNames
   };
 });

@@ -140,6 +140,40 @@ export function computeGridBounds(center, resolution, gridCols, gridRows) {
   };
 }
 
+export function getDefaultTileLabel(tileOrIndex, gridCols = 1) {
+  if (typeof tileOrIndex === 'number') {
+    const safeCols = Math.max(1, Number(gridCols || 1));
+    return `R${Math.floor(tileOrIndex / safeCols) + 1}C${(tileOrIndex % safeCols) + 1}`;
+  }
+  const row = Number(tileOrIndex?.row || 0);
+  const col = Number(tileOrIndex?.col || 0);
+  return `R${row + 1}C${col + 1}`;
+}
+
+export function normalizeTileNames(rawNames = [], maxTiles = Infinity, gridCols = 1) {
+  if (!Array.isArray(rawNames)) return [];
+  return rawNames
+    .map((entry) => ({
+      index: Number(entry?.index),
+      name: String(entry?.name || '').trim(),
+    }))
+    .filter((entry) => Number.isInteger(entry.index) && entry.index >= 0 && entry.index < maxTiles && entry.name)
+    .filter((entry) => entry.name !== getDefaultTileLabel(entry.index, gridCols))
+    .sort((a, b) => a.index - b.index);
+}
+
+function getTileLabel(tile, gridCols = 1) {
+  return String(tile?.label || tile?.name || tile?.customName || '').trim() || getDefaultTileLabel(tile, gridCols);
+}
+
+function sanitizeFilenamePart(name) {
+  return String(name || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'tile';
+}
+
 // ─── State Management ────────────────────────────────────────────────
 
 const STORAGE_KEY = 'mapng_batch_state_v2';
@@ -280,6 +314,11 @@ export function createBatchJobState(config) {
     config.tileOffsets,
     Number(config.gridCols || 1) * Number(config.gridRows || 1),
   );
+  const normalizedTileNames = normalizeTileNames(
+    config.tileNames,
+    Number(config.gridCols || 1) * Number(config.gridRows || 1),
+    Number(config.gridCols || 1),
+  );
   const baseTiles = computeGridTilesWithOffsets(
     config.center,
     config.resolution,
@@ -287,9 +326,12 @@ export function createBatchJobState(config) {
     config.gridRows,
     normalizedTileOffsets,
   );
+  const tileNamesByIndex = new Map(normalizedTileNames.map((entry) => [entry.index, entry.name]));
   const tiles = baseTiles.map((tile) => ({
     ...tile,
     id: computeTileId(id, tile),
+    customName: tileNamesByIndex.get(tile.index) || '',
+    label: tileNamesByIndex.get(tile.index) || getDefaultTileLabel(tile),
     status: TILE_STATES.QUEUED,
     snapshot: null,
     elevationStats: null,
@@ -323,6 +365,7 @@ export function createBatchJobState(config) {
     resolution: config.resolution,
     gridCols: config.gridCols,
     gridRows: config.gridRows,
+    tileNames: normalizedTileNames,
     tileOffsets: normalizedTileOffsets,
     exports: normalizedExports,
     includeOSM,
@@ -381,6 +424,11 @@ const migrateLoadedState = (state) => {
   if (!state.schemaVersion) state.schemaVersion = 2;
   state.includeOSM = toStrictBool(state.includeOSM);
   state.exports = normalizeExportFlags(state.exports);
+  state.tileNames = normalizeTileNames(
+    state.tileNames,
+    Number(state.gridCols || 1) * Number(state.gridRows || 1),
+    Number(state.gridCols || 1),
+  );
   state.performanceProfile = ['throughput', 'balanced', 'low_memory'].includes(state.performanceProfile)
     ? state.performanceProfile
     : 'balanced';
@@ -390,6 +438,13 @@ const migrateLoadedState = (state) => {
     ...(state.scheduler || {}),
   };
   ensureJobAndTileStates(state);
+  const tileNamesByIndex = new Map((state.tileNames || []).map((entry) => [entry.index, entry.name]));
+  if (Array.isArray(state.tiles)) {
+    state.tiles.forEach((tile) => {
+      tile.customName = String(tile.customName || tile.name || tileNamesByIndex.get(tile.index) || '').trim();
+      tile.label = tile.customName || getDefaultTileLabel(tile, state.gridCols);
+    });
+  }
   return state;
 };
 
@@ -523,10 +578,10 @@ function buildBatchElevationReportText(state) {
     'Aggregate Local Tile Stats',
     '--------------------------',
     `Tiles with captured stats: ${tilesWithStats.length}/${tiles.length}`,
-    `Lowest local min: ${aggregate.lowestLocalMin ? `${formatReportNumber(aggregate.lowestLocalMin.value)} (${`R${aggregate.lowestLocalMin.tile.row + 1}C${aggregate.lowestLocalMin.tile.col + 1}`})` : 'n/a'}`,
-    `Highest local max: ${aggregate.highestLocalMax ? `${formatReportNumber(aggregate.highestLocalMax.value)} (${`R${aggregate.highestLocalMax.tile.row + 1}C${aggregate.highestLocalMax.tile.col + 1}`})` : 'n/a'}`,
-    `Narrowest local height difference: ${aggregate.narrowestRange ? `${formatReportNumber(aggregate.narrowestRange.value)} (${`R${aggregate.narrowestRange.tile.row + 1}C${aggregate.narrowestRange.tile.col + 1}`})` : 'n/a'}`,
-    `Widest local height difference: ${aggregate.widestRange ? `${formatReportNumber(aggregate.widestRange.value)} (${`R${aggregate.widestRange.tile.row + 1}C${aggregate.widestRange.tile.col + 1}`})` : 'n/a'}`,
+    `Lowest local min: ${aggregate.lowestLocalMin ? `${formatReportNumber(aggregate.lowestLocalMin.value)} (${getTileLabel(aggregate.lowestLocalMin.tile, state.gridCols)})` : 'n/a'}`,
+    `Highest local max: ${aggregate.highestLocalMax ? `${formatReportNumber(aggregate.highestLocalMax.value)} (${getTileLabel(aggregate.highestLocalMax.tile, state.gridCols)})` : 'n/a'}`,
+    `Narrowest local height difference: ${aggregate.narrowestRange ? `${formatReportNumber(aggregate.narrowestRange.value)} (${getTileLabel(aggregate.narrowestRange.tile, state.gridCols)})` : 'n/a'}`,
+    `Widest local height difference: ${aggregate.widestRange ? `${formatReportNumber(aggregate.widestRange.value)} (${getTileLabel(aggregate.widestRange.tile, state.gridCols)})` : 'n/a'}`,
     '',
     'Per-Tile Calculations',
     '---------------------',
@@ -537,7 +592,7 @@ function buildBatchElevationReportText(state) {
   } else {
     for (const tile of tilesWithStats) {
       const stats = tile.elevationStats;
-      const label = `R${tile.row + 1}C${tile.col + 1}`;
+      const label = getTileLabel(tile, state.gridCols);
       lines.push(
         `${label} | center=(${formatReportCoordinate(tile.center?.lat)}, ${formatReportCoordinate(tile.center?.lng)}) | offset_m=(${formatReportNumber(tile.offsetX || 0)}, ${formatReportNumber(tile.offsetY || 0)})`,
       );
@@ -558,7 +613,7 @@ function buildBatchElevationReportText(state) {
     lines.push('Failed Tiles');
     lines.push('------------');
     for (const tile of failedTiles) {
-      const label = `R${tile.row + 1}C${tile.col + 1}`;
+      const label = getTileLabel(tile, state.gridCols);
       lines.push(`${label} | ${tile.lastError?.message || 'Unknown error'}`);
     }
     lines.push('');
@@ -566,7 +621,7 @@ function buildBatchElevationReportText(state) {
 
   lines.push('Definitions');
   lines.push('-----------');
-  lines.push('R#C# = row and column index of the tile inside the batch grid.');
+  lines.push('Tile label = custom name when provided, otherwise the default row/column ID (R#C#).');
   lines.push('center = center coordinates of the current tile in latitude and longitude.');
   lines.push('offset_m = how far the tile was moved from its default grid position, in meters. X is east/west and Y is north/south. This is mostly diagnostic metadata.');
   lines.push('local_min = lowest elevation found inside this tile, in meters above sea level.');
@@ -872,7 +927,9 @@ function buildTileMetadata(state, tile, terrainData) {
         id: tile.id,
         row: tile.row,
         col: tile.col,
-        label: `R${tile.row + 1}C${tile.col + 1}`,
+        label: getTileLabel(tile, state.gridCols),
+        defaultLabel: getDefaultTileLabel(tile, state.gridCols),
+        customName: tile.customName || '',
         center: tile.center,
       },
       build: getBuildTrace(),
@@ -1119,7 +1176,7 @@ async function processTile(state, tile, ctx, signal) {
 
   const shouldFetchOSM = shouldFetchOSMForBatch(state);
 
-  const label = `R${tile.row + 1}C${tile.col + 1}`;
+  const label = getTileLabel(tile, state.gridCols);
   tile.status = TILE_STATES.PROCESSING;
   tile.lifecycle = tile.lifecycle || {};
   tile.lifecycle.startedAt = Date.now();
@@ -1353,7 +1410,7 @@ async function processTile(state, tile, ctx, signal) {
       }
 
       const date = new Date().toISOString().slice(0, 10);
-      triggerDownload(zipBlob, `MapNG_Batch_${label}_${date}_${tile.center.lat.toFixed(4)}_${tile.center.lng.toFixed(4)}.zip`);
+      triggerDownload(zipBlob, `MapNG_Batch_${sanitizeFilenamePart(label)}_${date}_${tile.center.lat.toFixed(4)}_${tile.center.lng.toFixed(4)}.zip`);
 
       tile.status = TILE_STATES.DONE;
       tile.lifecycle.completedAt = Date.now();
@@ -1426,7 +1483,7 @@ export async function runBatchJob(state, onProgress, onTileComplete, onError, si
 
       state.currentTileIndex = tile.index;
       state.currentTileId = tile.id || null;
-      onProgress({ tileIndex: tile.index, step: `Starting ${passLabel} tile R${tile.row + 1}C${tile.col + 1}...`, tile });
+      onProgress({ tileIndex: tile.index, step: `Starting ${passLabel} tile ${getTileLabel(tile, state.gridCols)}...`, tile });
       checkpoint(state);
 
       try {

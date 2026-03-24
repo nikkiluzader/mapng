@@ -30,6 +30,8 @@ const fnv1a = (input) => {
 };
 
 export const normalizeBatchConfig = (config) => {
+  const gridCols = Number(config.gridCols || 1);
+  const defaultTileName = (index) => `R${Math.floor(index / Math.max(1, gridCols)) + 1}C${(index % Math.max(1, gridCols)) + 1}`;
   const tileOffsets = Array.isArray(config?.tileOffsets)
     ? config.tileOffsets
       .map((entry) => ({
@@ -38,6 +40,15 @@ export const normalizeBatchConfig = (config) => {
         offsetY: round(Number(entry?.offsetY || 0), 3),
       }))
       .filter((entry) => Number.isInteger(entry.index) && entry.index >= 0)
+      .sort((a, b) => a.index - b.index)
+    : [];
+  const tileNames = Array.isArray(config?.tileNames)
+    ? config.tileNames
+      .map((entry) => ({
+        index: Number(entry?.index),
+        name: String(entry?.name || '').trim(),
+      }))
+      .filter((entry) => Number.isInteger(entry.index) && entry.index >= 0 && entry.name && entry.name !== defaultTileName(entry.index))
       .sort((a, b) => a.index - b.index)
     : [];
 
@@ -53,8 +64,9 @@ export const normalizeBatchConfig = (config) => {
       lng: round(Number(config.center?.lng || 0), 6),
     },
     resolution: Number(config.resolution || 1024),
-    gridCols: Number(config.gridCols || 1),
+    gridCols,
     gridRows: Number(config.gridRows || 1),
+    tileNames,
     tileOffsets,
     includeOSM: !!config.includeOSM,
     elevationSource: config.elevationSource || 'default',
@@ -207,6 +219,7 @@ export const summarizeStageTimings = (state) => {
     if (!peakTileMemory || peak > peakTileMemory.peakUsedBytes) {
       peakTileMemory = {
         tileId: tile.id,
+        label: tile.label || null,
         row: tile.row,
         col: tile.col,
         peakUsedBytes: peak,
@@ -219,6 +232,7 @@ export const summarizeStageTimings = (state) => {
     totalWaitMs: Math.round(totalWaitMs),
     slowestTile: slowestTile ? {
       tileId: slowestTile.id,
+      label: slowestTile.label || null,
       row: slowestTile.row,
       col: slowestTile.col,
       totalMs: Math.round(slowestMs),

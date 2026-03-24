@@ -50,6 +50,7 @@
         :is-running="batchRunning"
         :saved-state="savedBatchState"
         :tile-offsets="batchTileOffsets"
+        :tile-names="batchTileNames"
         :tile-follow-center="batchTileFollowCenter"
         @location-change="handleLocationChange"
         @resolution-change="store.setResolution"
@@ -60,6 +61,7 @@
         @update:grid-cols="store.setBatchGridCols"
         @update:grid-rows="store.setBatchGridRows"
         @update:tile-offsets="store.setBatchTileOffsets"
+        @update:tile-names="store.setBatchTileNames"
         @update:tile-follow-center="store.setBatchTileFollowCenter"
       />
     </AppSidebar>
@@ -176,6 +178,7 @@ import {
   computeGridTiles,
   computeGridTilesWithOffsets,
   createBatchJobState,
+  getDefaultTileLabel,
   runBatchJob,
   saveBatchState,
   loadBatchState,
@@ -205,6 +208,7 @@ const {
   batchGridRows,
   batchTileFollowCenter,
   batchTileOffsets,
+  batchTileNames,
   batchState,
   batchRunning,
   batchCurrentStep,
@@ -243,7 +247,14 @@ const batchGridTiles = computed(() => {
     batchGridCols.value,
     batchGridRows.value,
     batchTileOffsets.value,
-  );
+  ).map((tile) => {
+    const customName = (batchTileNames.value || []).find((entry) => Number(entry.index) === tile.index)?.name || '';
+    return {
+      ...tile,
+      customName,
+      label: customName || getDefaultTileLabel(tile, batchGridCols.value),
+    };
+  });
 });
 
 // Build info (injected by Vite at build time)
@@ -644,7 +655,7 @@ const executeBatchJob = async (state) => {
       },
       // onError
       (tile, error) => {
-        console.error(`[Batch] Tile R${tile.row + 1}C${tile.col + 1} failed:`, error);
+        console.error(`[Batch] Tile ${tile.label || `R${tile.row + 1}C${tile.col + 1}`} failed:`, error);
         batchState.value = { ...batchState.value };
       },
       batchAbortController.signal
