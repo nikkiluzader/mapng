@@ -1006,6 +1006,8 @@ function buildBeamNGExportReport({
     '',
     'Selected Export Options',
     `- Base texture: ${options?.baseTexture ?? 'n/a'}`,
+    `- Include buildings: ${formatBool(options?.includeBuildings)}`,
+    `- Apply foundations: ${formatBool(options?.applyFoundations)}`,
     `- Include backdrop: ${formatBool(options?.includeBackdrop)}`,
     `- PBR materials: ${effectivePbrSource === 'none' ? 'No' : 'Yes'}`,
     `- PBR source requested: ${options?.requestedPbrSource ?? 'n/a'}`,
@@ -1670,6 +1672,8 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {object} center        — { lat, lng }
  * @param {object} [options]
  * @param {string}  [options.baseTexture='hybrid']         — 'hybrid' | 'satellite' | 'osm' | 'segmented' | 'segmentedHybrid'
+ * @param {boolean} [options.includeBuildings=true]         — include generated OSM 3D objects (.dae)
+ * @param {boolean} [options.applyFoundations=true]         — apply terrain foundation pass under buildings
  * @param {boolean} [options.includeBackdrop=false]         — fetch and include surrounding terrain backdrop DAE
  * @param {boolean} [options.includeWater=true]             — emit native BeamNG inland water objects
  * @param {boolean} [options.includeTrees=true]             — emit native BeamNG tree and bush forest instances
@@ -1683,6 +1687,8 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
 export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const {
     baseTexture = 'hybrid',
+    includeBuildings = true,
+    applyFoundations = true,
     includeBackdrop = false,
     includeWater = true,
     includeTrees = true,
@@ -1738,10 +1744,33 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     td = await prepareCroppedTerrainData({ ...td, exportCropSize: cropSize });
   }
 
-  const exportTerrainData = applyBuildingFoundations({
+  const foundationInput = {
     ...td,
     osmFeatures: filterOSMFeaturesToBounds(td.osmFeatures, td.bounds),
-  });
+  };
+
+  let exportTerrainData = foundationInput;
+  if (applyFoundations) {
+    beginStep('Preparing building foundations…', 2);
+    await yield_();
+    exportTerrainData = await applyBuildingFoundations(
+      foundationInput,
+      {
+        yieldFn: yield_,
+        onProgress: ({ completed, total, applied, skipped }) => {
+          if (!total) return;
+          const pct = 2 + Math.round((completed / total) * 2);
+          const counts = Number.isFinite(applied) && Number.isFinite(skipped)
+            ? ` | Applied: ${applied}, Skipped: ${skipped}`
+            : '';
+          report(`Foundations ${completed}/${total}${counts}`, Math.min(4, pct));
+        },
+      }
+    );
+  } else {
+    beginStep('Skipping building foundations (disabled)…', 4);
+    await yield_();
+  }
 
   const lat = center.lat.toFixed(4);
   const lng = center.lng.toFixed(4);
@@ -1754,6 +1783,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }
 
   const size = exportTerrainData.width;
+  const osmFeatureCount = Array.isArray(exportTerrainData.osmFeatures) ? exportTerrainData.osmFeatures.length : 0;
   const squareSize = computeSquareSize(exportTerrainData);
   const halfExtent = (size / 2) * squareSize;
   const worldSize = size * squareSize;
@@ -1787,7 +1817,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const imageCanvas = exportTerrainData.segmentedHybridTextureCanvas ?? null;
   const effectivePbrSource = (pbrSource === 'image' && !imageCanvas) ? 'osm' : pbrSource;
 
-  beginStep('Painting terrain materials…', 5);
+  beginStep(`Painting terrain materials (${effectivePbrSource.toUpperCase()})…`, 5);
   const pbrResult = effectivePbrSource !== 'none'
     ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, flavor, satelliteTexSize, {
         pbrSource: effectivePbrSource,
@@ -1795,14 +1825,14 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       })
     : null;
 
-  beginStep('Exporting terrain binary (.ter)…', 20);
+  beginStep(`Exporting terrain binary (.ter, ${size}x${size})…`, 20);
   await yield_();
   const { blob: terBlob } = await exportTer(exportTerrainData, {
     layerMap: pbrResult?.layerMap ?? null,
     materialNames: pbrResult?.materialNames ?? null,
   });
 
-  beginStep('Generating satellite texture…', 35);
+  beginStep(`Generating base texture (${baseTexture}, ${satelliteTexSize}px)…`, 35);
   await yield_();
   let texBlob = await getTerrainTextureBlob(exportTerrainData, baseTexture);
   // terrain.png must be exactly baseTexSize pixels — BeamNG's TerrainMaterialTextureSet
@@ -1811,19 +1841,25 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     texBlob = await resizePngBlob(texBlob, satelliteTexSize);
   }
 
-  beginStep('Generating heightmap preview…', 50);
+  beginStep(`Generating heightmap preview (${size}x${size})…`, 50);
   await yield_();
   let heightmapBlob = await generateHeightmapPng(exportTerrainData);
 
-  beginStep('Generating level preview image…', 58);
+  beginStep('Generating level thumbnail image…', 58);
   await yield_();
   let previewBlob = await generatePreviewBlob(exportTerrainData);
 
-  beginStep('Building 3D OSM objects…', 65);
-  await yield_();
-  let osmDaeBlob = await generateOSMObjectsDAE(exportTerrainData, worldSize);
+  let osmDaeBlob = null;
+  if (includeBuildings) {
+    beginStep(`Building 3D OSM objects (${osmFeatureCount} features)…`, 65);
+    await yield_();
+    osmDaeBlob = await generateOSMObjectsDAE(exportTerrainData, worldSize);
+  } else {
+    beginStep('Skipping 3D OSM object export (disabled)…', 65);
+    await yield_();
+  }
 
-  beginStep('Building water objects…', 71);
+  beginStep(`Building water objects (${includeWater ? 'enabled' : 'disabled'})…`, 71);
   await yield_();
   const waterObjects = includeWater
     ? [
@@ -1832,7 +1868,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       ]
     : [];
 
-  beginStep('Building vegetation objects…', 77);
+  beginStep(`Building vegetation objects (trees: ${includeTrees ? 'on' : 'off'}, rocks: ${includeRocks ? 'on' : 'off'})…`, 77);
   await yield_();
   const forestPlacements = (includeTrees || includeRocks)
     ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, flavor)
@@ -1847,14 +1883,14 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   let backdropDaeBlob = null;
   let backdropTextureFiles = [];
   if (includeBackdrop) {
-    beginStep('Fetching terrain backdrop…', 82);
+    beginStep('Fetching terrain backdrop mesh…', 82);
     await yield_();
     const backdropResult = await generateTerrainBackdropDAE(exportTerrainData, worldSize);
     backdropDaeBlob = backdropResult?.daeBlob ?? null;
     backdropTextureFiles = backdropResult?.textureFiles ?? [];
   }
 
-  beginStep('Loading map flag asset…', 85);
+  beginStep('Loading MapNG flag asset…', 85);
   await yield_();
   let mapngFlagFiles = [];
   try {
@@ -1864,7 +1900,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }
   const mapngFlagPosition = findHighestTerrainPoint(exportTerrainData, squareSize);
 
-  beginStep('Assembling ZIP archive…', 88);
+  beginStep(`Assembling ZIP archive (${levelName})…`, 88);
   await yield_();
 
   const zip = new JSZip();
@@ -1945,6 +1981,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     options: {
       ...options,
       baseTexture,
+      includeBuildings,
+      applyFoundations,
       includeBackdrop,
       includeWater,
       includeTrees,
@@ -2294,7 +2332,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     }])
   );
 
-  beginStep('Compressing ZIP…', 94);
+  beginStep('Compressing ZIP archive (DEFLATE)…', 94);
   await yield_();
   const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
   beginStep('Done', 100);

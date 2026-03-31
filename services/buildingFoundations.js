@@ -42,9 +42,8 @@ function smoothstep01(t) {
   return x * x * (3 - 2 * x);
 }
 
-function percentile(values, p) {
-  if (!values.length) return NaN;
-  const sorted = [...values].sort((a, b) => a - b);
+function percentileFromSorted(sorted, p) {
+  if (!sorted.length) return NaN;
   const pos = clamp01(p) * (sorted.length - 1);
   const lo = Math.floor(pos);
   const hi = Math.min(sorted.length - 1, lo + 1);
@@ -52,15 +51,48 @@ function percentile(values, p) {
   return sorted[lo] * (1 - frac) + sorted[hi] * frac;
 }
 
-function blurTransitionZone(heightMap, sourceHeightMap, size, fixedSet, regionSet, iterations = 1) {
+function estimateMetersPerPixel(terrainData) {
+  if (Number.isFinite(terrainData?.metersPerPixel) && terrainData.metersPerPixel > 0) {
+    return terrainData.metersPerPixel;
+  }
+
+  const { bounds, width } = terrainData;
+  if (!bounds || !width) return 1;
+
+  const centerLat = (bounds.north + bounds.south) / 2;
+  const latRad = (centerLat * Math.PI) / 180;
+  const metersPerDegreeLng = 111320 * Math.cos(latRad);
+  const metersPerDegreeLat = 110574;
+  const widthMeters = Math.abs(bounds.east - bounds.west) * metersPerDegreeLng;
+  const heightMeters = Math.abs(bounds.north - bounds.south) * metersPerDegreeLat;
+  const avgMeters = (widthMeters + heightMeters) / 2;
+  return Math.max(0.01, avgMeters / width);
+}
+
+async function blurTransitionZone(
+  heightMap,
+  sourceHeightMap,
+  size,
+  fixedSet,
+  regionSet,
+  iterations = 1,
+  options = {}
+) {
   if (iterations <= 0 || !regionSet.size) return;
 
+  const {
+    yieldFn = null,
+    yieldEveryPixels = 200000,
+  } = options;
+
   const regionMask = new Uint8Array(size * size);
-  for (const idx of regionSet) regionMask[idx] = 1;
+  const regionIndices = Array.from(regionSet);
+  for (const idx of regionIndices) regionMask[idx] = 1;
 
   for (let iter = 0; iter < iterations; iter++) {
     const next = new Float32Array(heightMap);
-    for (const idx of regionSet) {
+    let processed = 0;
+    for (const idx of regionIndices) {
       if (fixedSet.has(idx)) continue;
 
       const row = Math.floor(idx / size);
@@ -85,11 +117,22 @@ function blurTransitionZone(heightMap, sourceHeightMap, size, fixedSet, regionSe
       const naturalH = sourceHeightMap[idx];
       const smoothed = Math.max(naturalH, sum / count);
       next[idx] = smoothed;
+
+      processed++;
+      if (yieldFn && processed % yieldEveryPixels === 0) {
+        await yieldFn();
+      }
     }
 
-    for (const idx of regionSet) {
+    processed = 0;
+    for (const idx of regionIndices) {
       if (fixedSet.has(idx)) continue;
       heightMap[idx] = next[idx];
+
+      processed++;
+      if (yieldFn && processed % yieldEveryPixels === 0) {
+        await yieldFn();
+      }
     }
   }
 }
@@ -155,15 +198,23 @@ function rasterizePolygonIndices(ring, size, margin = 1) {
  * @param {number} [options.marginPx=1] — extra pixels to include around each footprint
  * @returns {object} — new terrainData with updated heightMap and maxHeight
  */
-export function applyBuildingFoundations(terrainData, options = {}) {
+export async function applyBuildingFoundations(terrainData, options = {}) {
   const {
     foundationRaise = 0.3,
     marginPx = 1,
     transitionPx = 6,
     foundationPercentile = 0.85,
+    reliefLowPercentile = 0.15,
+    reliefHighPercentile = 0.85,
+    minReliefMeters = 2.5,
+    minSlope = 0.22,
     blurIterations = 2,
+    yieldFn = null,
+    yieldEveryBuildings = 8,
+    yieldEveryPixels = 200000,
+    onProgress = null,
   } = options;
-  const { width, bounds, osmFeatures = [], minHeight, maxHeight } = terrainData;
+  const { width, bounds, osmFeatures = [], maxHeight } = terrainData;
   const size = width; // terrain is square by export time
 
   const buildings = osmFeatures.filter(f => f.type === 'building' && f.geometry?.length >= 3);
@@ -173,9 +224,13 @@ export function applyBuildingFoundations(terrainData, options = {}) {
   const heightMap = new Float32Array(terrainData.heightMap);
   // Preserve the source terrain so feathering blends back into natural slopes.
   const sourceHeightMap = terrainData.heightMap;
+  const metersPerPixel = estimateMetersPerPixel(terrainData);
   let newMaxHeight = maxHeight;
+  let foundationApplied = 0;
+  let foundationSkipped = 0;
 
-  for (const building of buildings) {
+  for (let i = 0; i < buildings.length; i++) {
+    const building = buildings[i];
     const ring = building.geometry.map(pt => geoToHeightMapPx(pt.lat, pt.lng, bounds, size));
     const indices = uniqueIndices(rasterizePolygonIndices(ring, size, marginPx));
     if (!indices.length) continue;
@@ -184,15 +239,38 @@ export function applyBuildingFoundations(terrainData, options = {}) {
     // footprint distribution so one noisy high pixel does not create a cliff.
     const footprintHeights = [];
     for (const idx of indices) {
-      const h = heightMap[idx];
+      const h = sourceHeightMap[idx];
       if (isFinite(h)) footprintHeights.push(h);
     }
     if (!footprintHeights.length) continue;
 
+    const sortedHeights = [...footprintHeights].sort((a, b) => a - b);
+    const reliefLow = percentileFromSorted(sortedHeights, reliefLowPercentile);
+    const reliefHigh = percentileFromSorted(sortedHeights, reliefHighPercentile);
+    const terrainRelief = Math.max(0, reliefHigh - reliefLow);
+    const footprintRunMeters = Math.max(1, Math.sqrt(indices.length) * metersPerPixel);
+    const slopeEstimate = terrainRelief / footprintRunMeters;
+
+    if (terrainRelief < minReliefMeters && slopeEstimate < minSlope) {
+      foundationSkipped++;
+      if (onProgress && (i % 25 === 0 || i === buildings.length - 1)) {
+        onProgress({
+          completed: i + 1,
+          total: buildings.length,
+          applied: foundationApplied,
+          skipped: foundationSkipped,
+        });
+      }
+      if (yieldFn && (i + 1) % yieldEveryBuildings === 0) {
+        await yieldFn();
+      }
+      continue;
+    }
+
     // Level the entire footprint to percentile + foundation raise.
     // Pixels that were already above this value are left untouched (e.g. a ridge
     // through a building) — only lower pixels are raised to form the flat pad.
-    const foundationBase = percentile(footprintHeights, foundationPercentile);
+    const foundationBase = percentileFromSorted(sortedHeights, foundationPercentile);
     const foundationH = foundationBase + foundationRaise;
     const coreSet = new Set(indices);
     const touchedSet = new Set(indices);
@@ -232,10 +310,32 @@ export function applyBuildingFoundations(terrainData, options = {}) {
         prevRing = expanded;
       }
 
-      blurTransitionZone(heightMap, sourceHeightMap, size, coreSet, touchedSet, blurIterations);
+      await blurTransitionZone(heightMap, sourceHeightMap, size, coreSet, touchedSet, blurIterations, {
+        yieldFn,
+        yieldEveryPixels,
+      });
     }
 
     if (foundationH > newMaxHeight) newMaxHeight = foundationH;
+    foundationApplied++;
+
+    if (onProgress && (i % 25 === 0 || i === buildings.length - 1)) {
+      onProgress({
+        completed: i + 1,
+        total: buildings.length,
+        applied: foundationApplied,
+        skipped: foundationSkipped,
+      });
+    }
+    if (yieldFn && (i + 1) % yieldEveryBuildings === 0) {
+      await yieldFn();
+    }
+  }
+
+  if (foundationSkipped > 0) {
+    console.info(
+      `[BeamNG] Building foundations: applied ${foundationApplied}/${buildings.length}, skipped ${foundationSkipped} flat/low-slope footprints`
+    );
   }
 
   return { ...terrainData, heightMap, maxHeight: newMaxHeight };

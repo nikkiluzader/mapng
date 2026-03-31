@@ -27,6 +27,134 @@
     </button>
     
     <template v-if="showExports">
+      <!-- BeamNG Level -->
+      <div class="space-y-1.5">
+        <button
+          @click="showExportBeamNG = !showExportBeamNG"
+          class="w-full flex items-center justify-between group"
+        >
+          <div class="flex items-center gap-1.5">
+            <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">BeamNG Level</h4>
+            <span class="text-[8px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold">Experimental</span>
+          </div>
+          <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExportBeamNG ? 'rotate-180' : '']" />
+        </button>
+        <div v-if="showExportBeamNG" class="space-y-1.5">
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Level Name</span>
+            <input
+              v-model="beamNGLevelName"
+              @input="handleBeamNGLevelNameInput"
+              type="text"
+              maxlength="64"
+              placeholder="Suggested from map center"
+              class="min-w-0 flex-1 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300"
+            />
+          </div>
+
+          <!-- Base texture selector -->
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Base Texture</span>
+            <select v-model="beamNGBaseTexture" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+              <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">Hybrid</option>
+              <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">Satellite</option>
+              <option value="osm" :disabled="!terrainData?.osmTextureUrl">OSM</option>
+              <option value="segmented" :disabled="!terrainData?.segmentedTextureUrl">Segmented</option>
+              <option value="segmentedHybrid" :disabled="!terrainData?.segmentedHybridTextureUrl">Seg. Hybrid</option>
+            </select>
+          </div>
+
+          <!-- PBR terrain materials source selector -->
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">PBR Materials</span>
+            <select v-model="beamNGPbrSource" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+              <option value="none">Off</option>
+              <option value="osm">OSM data</option>
+              <option value="image" :disabled="!terrainData?.segmentedHybridTextureUrl && !terrainData?.segmentedHybridTextureCanvas">Segmented hybrid</option>
+            </select>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Flavor</span>
+            <select v-model="beamNGFlavorId" class="min-w-0 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+              <option value="">Select level</option>
+              <option v-for="flavor in beamNGFlavorOptions" :key="flavor.id" :value="flavor.id">
+                {{ flavor.label }}
+              </option>
+            </select>
+          </div>
+          <div v-if="!beamNGFlavorId" class="px-0.5 text-[9px] text-amber-600 dark:text-amber-400">
+            Choose a BeamNG level flavor before exporting.
+          </div>
+
+          <!-- Surrounding terrain backdrop toggle -->
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Include Backdrop</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" v-model="beamNGIncludeBackdrop" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">Surrounding terrain</span>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Include Buildings</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" v-model="beamNGIncludeBuildings" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">Export 3D OSM buildings</span>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Apply Foundations</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" v-model="beamNGApplyFoundations" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">Raise terrain under steep buildings</span>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Water</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" v-model="beamNGIncludeWater" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">Lakes and rivers</span>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Trees/Bushes</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" v-model="beamNGIncludeTrees" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">Native forest items</span>
+            </label>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Rocks</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" v-model="beamNGIncludeRocks" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">Quarry/rock cover</span>
+            </label>
+          </div>
+
+          <!-- Export button -->
+          <button
+            @click="handleBeamNGLevelExport"
+            :disabled="isAnyExporting || !beamNGFlavorId"
+            class="relative w-full flex items-center gap-3 p-3 bg-[#FF6600] hover:bg-[#e85d00] border border-[#d65500] rounded text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div class="flex items-center justify-center w-8 h-8 shrink-0">
+              <Loader2 v-if="isExportingBeamNGLevel" :size="20" class="animate-spin text-white" />
+              <PackageOpen v-else :size="20" class="text-white/90" />
+            </div>
+            <div class="text-left">
+              <div class="text-[12px] font-semibold">BeamNG Level Export</div>
+              <div class="text-[10px] text-white/90">Generate playable .zip package</div>
+            </div>
+            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity text-white" />
+          </button>
+        </div>
+      </div>
+
       <!-- 2D Assets -->
       <div class="space-y-1.5">
         <button
@@ -241,118 +369,6 @@
         </template>
       </div>
 
-      <!-- BeamNG Level -->
-      <div class="space-y-1.5">
-        <button
-          @click="showExportBeamNG = !showExportBeamNG"
-          class="w-full flex items-center justify-between group"
-        >
-          <div class="flex items-center gap-1.5">
-            <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">BeamNG Level</h4>
-            <span class="text-[8px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold">Experimental</span>
-          </div>
-          <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExportBeamNG ? 'rotate-180' : '']" />
-        </button>
-        <div v-if="showExportBeamNG" class="space-y-1.5">
-          <!-- Base texture selector -->
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Base Texture</span>
-            <select v-model="beamNGBaseTexture" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
-              <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">Hybrid</option>
-              <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">Satellite</option>
-              <option value="osm" :disabled="!terrainData?.osmTextureUrl">OSM</option>
-              <option value="segmented" :disabled="!terrainData?.segmentedTextureUrl">Segmented</option>
-              <option value="segmentedHybrid" :disabled="!terrainData?.segmentedHybridTextureUrl">Seg. Hybrid</option>
-            </select>
-          </div>
-
-          <!-- Surrounding terrain backdrop toggle -->
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Include Backdrop</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeBackdrop" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">Surrounding terrain</span>
-            </label>
-          </div>
-
-          <!-- PBR terrain materials source selector -->
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">PBR Materials</span>
-            <select v-model="beamNGPbrSource" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
-              <option value="none">Off</option>
-              <option value="osm">OSM data</option>
-              <option value="image" :disabled="!terrainData?.segmentedHybridTextureUrl && !terrainData?.segmentedHybridTextureCanvas">Segmented hybrid</option>
-            </select>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Flavor</span>
-            <select v-model="beamNGFlavorId" class="min-w-0 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
-              <option value="">Select level</option>
-              <option v-for="flavor in beamNGFlavorOptions" :key="flavor.id" :value="flavor.id">
-                {{ flavor.label }}
-              </option>
-            </select>
-          </div>
-          <div v-if="!beamNGFlavorId" class="px-0.5 text-[9px] text-amber-600 dark:text-amber-400">
-            Choose a BeamNG level flavor before exporting.
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Level Name</span>
-            <input
-              v-model="beamNGLevelName"
-              @input="handleBeamNGLevelNameInput"
-              type="text"
-              maxlength="64"
-              placeholder="Suggested from map center"
-              class="min-w-0 flex-1 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300"
-            />
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Water</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeWater" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">Lakes and rivers</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Trees/Bushes</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeTrees" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">Native forest items</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Rocks</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeRocks" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">Quarry/rock cover</span>
-            </label>
-          </div>
-
-          <!-- Export button -->
-          <button
-            @click="handleBeamNGLevelExport"
-            :disabled="isAnyExporting || !beamNGFlavorId"
-            class="relative w-full flex items-center gap-3 p-2.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div class="flex items-center justify-center w-8 h-8 shrink-0">
-              <Loader2 v-if="isExportingBeamNGLevel" :size="20" class="animate-spin text-[#FF6600]" />
-              <PackageOpen v-else :size="20" class="text-gray-400 dark:text-gray-500" />
-            </div>
-            <div class="text-left">
-              <div class="text-[11px] font-medium">BeamNG Level Package</div>
-              <div class="text-[10px] text-gray-500 dark:text-gray-400">Experimental playable .zip export</div>
-            </div>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-          </button>
-        </div>
-      </div>
-
       <!-- Geo Data -->
       <div class="space-y-1.5">
         <button
@@ -404,7 +420,7 @@
         v-if="isExportingBeamNGLevel"
         class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       >
-        <div class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-80 flex flex-col gap-4">
+        <div class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[calc(100vw-2rem)] max-w-md flex flex-col gap-4">
           <!-- Header -->
           <div class="flex items-center gap-3">
             <Loader2 :size="20" class="animate-spin text-[#FF6600] shrink-0" />
@@ -423,8 +439,8 @@
           </div>
 
           <!-- Step label -->
-          <div class="flex justify-between items-center">
-            <span class="text-[11px] text-gray-600 dark:text-gray-400 truncate">{{ beamNGProgressStep }}</span>
+          <div class="flex justify-between items-start gap-2">
+            <span class="min-w-0 flex-1 text-[11px] leading-snug text-gray-600 dark:text-gray-400 break-words">{{ beamNGProgressStep }}</span>
             <span class="text-[11px] font-mono text-[#FF6600] ml-2 shrink-0">{{ beamNGProgressPct }}%</span>
           </div>
         </div>
@@ -506,6 +522,8 @@ const resolveBeamNGBaseTexture = (terrainData, preferred = 'osm') => {
 
 const beamNGBaseTexture = ref(resolveBeamNGBaseTexture(props.terrainData));
 const beamNGIncludeBackdrop = ref(false);
+const beamNGIncludeBuildings = ref(localStorage.getItem('mapng_beamNGIncludeBuildings') !== 'false');
+const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFoundations') !== 'false');
 const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') === 'true');
@@ -553,6 +571,8 @@ watch(showExport2D, (v) => localStorage.setItem('mapng_showExport2D', String(v))
 watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v)));
 watch(showExportBeamNG, (v) => localStorage.setItem('mapng_showExportBeamNG', String(v)));
 watch(beamNGPbrSource, (v) => localStorage.setItem('mapng_beamNGPbrSource', v));
+watch(beamNGIncludeBuildings, (v) => localStorage.setItem('mapng_beamNGIncludeBuildings', String(v)));
+watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoundations', String(v)));
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
 watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
@@ -1068,6 +1088,8 @@ const handleBeamNGLevelExport = async () => {
     const { blob, filename } = await exportBeamNGLevel(td, props.center, {
       baseTexture: beamNGBaseTexture.value,
       includeBackdrop: beamNGIncludeBackdrop.value,
+      includeBuildings: beamNGIncludeBuildings.value,
+      applyFoundations: beamNGApplyFoundations.value,
       pbrSource: beamNGPbrSource.value,
       includeWater: beamNGIncludeWater.value,
       includeTrees: beamNGIncludeTrees.value,
