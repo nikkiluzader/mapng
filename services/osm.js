@@ -309,10 +309,13 @@ const parseOverpassResponse = (data, bounds) => {
   for (const el of data.elements) {
     if (el.type === "node") {
       if (el.tags) {
-        if (el.tags.natural === "tree") {
+        if (el.tags.natural === "tree" || el.tags.natural === "tree_row") {
+          const tags = el.tags.natural === "tree_row"
+            ? { ...el.tags, tree_row: "yes", source_feature: "tree_row" }
+            : el.tags;
           rawFeatures.push({
             id: el.id.toString(), type: "vegetation",
-            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+            geometry: [{ lat: el.lat, lng: el.lon }], tags,
           });
         } else if (
           el.tags.highway === "street_lamp" ||
@@ -436,7 +439,7 @@ const parseOverpassResponse = (data, bounds) => {
           rawFeatures.push({
             id: `${id}_tree_${i}_${j}`, type: "vegetation",
             geometry: [{ lat: p1.lat + (p2.lat - p1.lat) * t, lng: p1.lng + (p2.lng - p1.lng) * t }],
-            tags: { natural: "tree" },
+            tags: { natural: "tree", tree_row: "yes", source_feature: "tree_row" },
           });
         }
       }

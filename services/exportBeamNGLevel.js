@@ -1014,6 +1014,7 @@ function buildBeamNGExportReport({
     `- PBR source used: ${effectivePbrSource}`,
     `- Include water: ${formatBool(options?.includeWater)}`,
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
+    `- Tree density scale: ${formatNumber(options?.treeDensity, 2)}x`,
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     '',
     'Generated Content',
@@ -1406,7 +1407,7 @@ function jitterLatLngByMeters(point, meters, seed) {
 }
 
 function sampleAreaPlacements(feature, terrainData, squareSize, itemType, densityPerSqM, maxCount, scaleMin, scaleMax, baseSeed) {
-  if (!Array.isArray(feature.geometry) || feature.geometry.length < 4) return [];
+  if (!Array.isArray(feature.geometry) || feature.geometry.length < 3) return [];
   const ring = isClosedRing(feature.geometry) ? feature.geometry.slice(0, -1) : feature.geometry;
   if (ring.length < 3) return [];
   let minLat = Infinity;
@@ -1444,12 +1445,16 @@ function sampleAreaPlacements(feature, terrainData, squareSize, itemType, densit
   return placements;
 }
 
-function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, flavor) {
-  const placementsByType = new Map();
-  const pushPlacement = (placement) => {
+function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeDensity = 1 }, flavor) {
+  const regularPlacementsByType = new Map();
+  const priorityPlacementsByType = new Map();
+  const treeDensityMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER * Math.max(0.5, Math.min(10, Number(treeDensity) || 1));
+  const bushDensityMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER;
+  const pushPlacement = (placement, { priority = false } = {}) => {
     if (!getManagedForestTemplate(flavor, placement.type)) return;
-    if (!placementsByType.has(placement.type)) placementsByType.set(placement.type, []);
-    const list = placementsByType.get(placement.type);
+    const target = priority ? priorityPlacementsByType : regularPlacementsByType;
+    if (!target.has(placement.type)) target.set(placement.type, []);
+    const list = target.get(placement.type);
     if (list.length >= BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE) return;
     list.push(placement);
   };
@@ -1461,12 +1466,17 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
         const point = feature.geometry[0];
         const itemType = resolveTreeTypeForTags(flavor, feature.tags || {});
         const isBush = feature.tags?.natural === 'shrub';
-        const isTreeRow = feature.tags?.natural === 'tree_row';
+        const isTreeRow =
+          feature.tags?.natural === 'tree_row' ||
+          feature.tags?.tree_row === 'yes' ||
+          feature.tags?.source_feature === 'tree_row';
         const resolvedType = isBush ? resolveBushType(flavor) : itemType;
         if (!resolvedType) continue;
         const pointCopies = isTreeRow
           ? 1
-          : Math.max(1, Math.round(BEAMNG_TREE_DENSITY_MULTIPLIER));
+          : isBush
+            ? Math.max(1, Math.round(bushDensityMultiplier))
+            : Math.max(1, Math.round(treeDensityMultiplier));
         const jitterMeters = isBush ? 2.2 : 5.5;
         for (let i = 0; i < pointCopies; i++) {
           const cloneSeed = seed + i * 97.13;
@@ -1479,11 +1489,37 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
             cloneSeed,
             isBush ? 0.7 : 0.85,
             isBush ? 1.2 : 1.2,
-          ));
+          ), { priority: isTreeRow });
         }
       }
       if (feature.type === 'landuse') {
         const tags = feature.tags || {};
+        const isTreeArea =
+          tags.natural === 'wood' ||
+          tags.natural === 'forest' ||
+          tags.landuse === 'forest' ||
+          tags.landuse === 'orchard' ||
+          tags.landcover === 'trees';
+        if (isTreeArea) {
+          const itemType = resolveTreeTypeForTags(flavor, tags);
+          if (!itemType) continue;
+          // Use polygon-driven sampling for BeamNG export so tree coverage
+          // reflects full OSM vegetation areas, independent of 3D preview caps.
+          const isOrchard = tags.landuse === 'orchard';
+          const placements = sampleAreaPlacements(
+            feature,
+            terrainData,
+            squareSize,
+            itemType,
+            (isOrchard ? 0.0028 : 0.0036) * treeDensityMultiplier,
+            (isOrchard ? 1800 : 3600) * treeDensityMultiplier,
+            isOrchard ? 0.9 : 0.85,
+            isOrchard ? 1.1 : 1.25,
+            hashString(`${feature.id}:tree_area`),
+          );
+          placements.forEach(pushPlacement);
+        }
+
         const isBushArea =
           tags.natural === 'scrub' ||
           tags.natural === 'heath' ||
@@ -1497,8 +1533,8 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
             terrainData,
             squareSize,
             itemType,
-            0.004 * BEAMNG_TREE_DENSITY_MULTIPLIER,
-            400 * BEAMNG_TREE_DENSITY_MULTIPLIER,
+            0.004 * bushDensityMultiplier,
+            400 * bushDensityMultiplier,
             0.75,
             1.2,
             hashString(feature.id),
@@ -1538,6 +1574,19 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
         pushPlacement(placement);
       });
     }
+  }
+
+  const placementsByType = new Map();
+  const allTypes = new Set([
+    ...priorityPlacementsByType.keys(),
+    ...regularPlacementsByType.keys(),
+  ]);
+
+  for (const type of allTypes) {
+    const priority = priorityPlacementsByType.get(type) || [];
+    const regular = regularPlacementsByType.get(type) || [];
+    const merged = [...priority, ...regular].slice(0, BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE);
+    if (merged.length > 0) placementsByType.set(type, merged);
   }
 
   return placementsByType;
@@ -1678,6 +1727,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {boolean} [options.includeWater=true]             — emit native BeamNG inland water objects
  * @param {boolean} [options.includeTrees=true]             — emit native BeamNG tree and bush forest instances
  * @param {boolean} [options.includeRocks=false]            — emit native BeamNG rock forest instances
+ * @param {number}  [options.treeDensity=1]                 — tree density scale for BeamNG forest placement
  * @param {string}  [options.flavorId]                      — BeamNG official level flavor id
  * @param {string}  [options.levelName]                     — custom user-facing/generated level name
  * @param {'osm'|'image'|'none'} [options.pbrSource='osm'] — layer map source: 'osm' uses OSM polygon data,
@@ -1693,6 +1743,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     includeWater = true,
     includeTrees = true,
     includeRocks = false,
+    treeDensity = 1,
     flavorId,
     levelName: requestedLevelName = '',
     onProgress,
@@ -1702,6 +1753,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (pbrSource === undefined) {
     pbrSource = options.generatePbrMaterials === false ? 'none' : 'osm';
   }
+  const normalizedTreeDensity = Math.max(0.5, Math.min(10, Number(treeDensity) || 1));
 
   // Report progress and yield to the browser so UI updates and GC can run.
   const report = (step, pct) => onProgress?.({ step, pct });
@@ -1868,10 +1920,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       ]
     : [];
 
-  beginStep(`Building vegetation objects (trees: ${includeTrees ? 'on' : 'off'}, rocks: ${includeRocks ? 'on' : 'off'})…`, 77);
+  beginStep(`Building vegetation objects (trees: ${includeTrees ? 'on' : 'off'} @ ${normalizedTreeDensity.toFixed(1)}x, rocks: ${includeRocks ? 'on' : 'off'})…`, 77);
   await yield_();
   const forestPlacements = (includeTrees || includeRocks)
-    ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, flavor)
+    ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks, treeDensity: normalizedTreeDensity }, flavor)
     : new Map();
   const forestFiles = serializeForestFiles(forestPlacements);
   const groundCoverObjects = buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, flavor);
@@ -1987,6 +2039,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       includeWater,
       includeTrees,
       includeRocks,
+      treeDensity: normalizedTreeDensity,
       requestedPbrSource: pbrSource,
       terrainMaterialNames: pbrResult?.materialNames ?? ['DefaultMaterial'],
     },

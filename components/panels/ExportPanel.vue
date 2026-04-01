@@ -128,6 +128,25 @@
             </label>
           </div>
 
+          <div class="px-0.5 space-y-1" :class="beamNGIncludeTrees ? '' : 'opacity-50'">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Tree Density</span>
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ beamNGTreeDensity.toFixed(1) }}x</span>
+            </div>
+            <input
+              v-model.number="beamNGTreeDensity"
+              :disabled="!beamNGIncludeTrees"
+              type="range"
+              min="0.5"
+              max="10"
+              step="0.1"
+              class="w-full h-1.5 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed"
+            />
+            <p v-if="beamNGIncludeTrees && beamNGTreeDensity >= 5" class="text-[9px] text-amber-600 dark:text-amber-400">
+              Experimental above 5x: very dense forests can increase export time and memory usage.
+            </p>
+          </div>
+
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">Rocks</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
@@ -527,6 +546,7 @@ const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFounda
 const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') === 'true');
+const beamNGTreeDensity = ref(Math.max(0.5, Math.min(10, Number(localStorage.getItem('mapng_beamNGTreeDensity') || '1') || 1)));
 const beamNGFlavorOptions = getBeamNGFlavorOptions();
 const persistedBeamNGFlavor = localStorage.getItem('mapng_beamNGFlavorId') || '';
 const beamNGFlavorId = ref(beamNGFlavorOptions.some((flavor) => flavor.id === persistedBeamNGFlavor) ? persistedBeamNGFlavor : '');
@@ -576,6 +596,7 @@ watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoun
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
 watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
+watch(beamNGTreeDensity, (v) => localStorage.setItem('mapng_beamNGTreeDensity', String(v)));
 watch(beamNGFlavorId, (v) => localStorage.setItem('mapng_beamNGFlavorId', v));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
@@ -992,16 +1013,64 @@ const downloadOSM = async () => {
   isExportingOSM.value = true;
   try {
     await yieldToUi();
+    const toRingCoordinates = (geometry = []) => {
+      const coords = geometry.map((p) => [p.lng, p.lat]);
+      if (coords.length > 2) {
+        const [fx, fy] = coords[0];
+        const [lx, ly] = coords[coords.length - 1];
+        if (fx !== lx || fy !== ly) coords.push([fx, fy]);
+      }
+      return coords;
+    };
+
+    const isClosedGeometry = (geometry = []) => {
+      if (!geometry || geometry.length < 4) return false;
+      const first = geometry[0];
+      const last = geometry[geometry.length - 1];
+      return first?.lat === last?.lat && first?.lng === last?.lng;
+    };
+
+    const toGeoJsonGeometry = (feature) => {
+      const geometry = feature?.geometry || [];
+      if (!geometry.length) return null;
+      if (geometry.length === 1) {
+        return { type: 'Point', coordinates: [geometry[0].lng, geometry[0].lat] };
+      }
+
+      const hasHoles = Array.isArray(feature?.holes) && feature.holes.length > 0;
+      const forcePolygon = feature?.type === 'building' || feature?.type === 'landuse' || feature?.type === 'water';
+      const isPolygon = hasHoles || forcePolygon || isClosedGeometry(geometry);
+      if (isPolygon) {
+        const rings = [toRingCoordinates(geometry)];
+        for (const hole of feature.holes || []) {
+          rings.push(toRingCoordinates(hole));
+        }
+        return { type: 'Polygon', coordinates: rings };
+      }
+
+      return {
+        type: 'LineString',
+        coordinates: geometry.map((p) => [p.lng, p.lat]),
+      };
+    };
+
     const geojson = {
       type: 'FeatureCollection',
-      features: props.terrainData.osmFeatures.map(f => ({
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: f.geometry.map(p => [p.lng, p.lat])
-        },
-        properties: f.tags
-      }))
+      features: props.terrainData.osmFeatures
+        .map((f) => {
+          const geometry = toGeoJsonGeometry(f);
+          if (!geometry) return null;
+          return {
+            type: 'Feature',
+            geometry,
+            properties: {
+              ...(f.tags || {}),
+              _mapngType: f.type,
+              _mapngId: f.id,
+            },
+          };
+        })
+        .filter(Boolean)
     };
     const filename = `osm_features_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.geojson`;
     downloadJsonFile(geojson, filename);
@@ -1094,6 +1163,7 @@ const handleBeamNGLevelExport = async () => {
       includeWater: beamNGIncludeWater.value,
       includeTrees: beamNGIncludeTrees.value,
       includeRocks: beamNGIncludeRocks.value,
+      treeDensity: beamNGTreeDensity.value,
       flavorId: beamNGFlavorId.value,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
