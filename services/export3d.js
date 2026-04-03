@@ -1680,6 +1680,14 @@ export const exportToDAE = async (data, options = {}) => {
       }
     }
 
+    let meshCount = 0;
+    scene.traverse((node) => {
+      if (node?.isMesh) meshCount += 1;
+    });
+    if (meshCount === 0) {
+      throw new Error('No mesh data available for DAE export.');
+    }
+
     // Ensure all matrix values are up to date throughout hierarchy
     scene.updateMatrixWorld(true);
 
@@ -1692,23 +1700,23 @@ export const exportToDAE = async (data, options = {}) => {
 
     // We MUST process the result BEFORE disposing the scene,
     // just in case any textures need to be re-read (though parse is usually sync).
-    const daeBlob = result.data;
-    let finalBlob;
+    const daeBlob = result?.data;
+    if (!daeBlob) {
+      throw new Error('Collada exporter returned no model data.');
+    }
+
+    onProgress?.('Packaging DAE archive...');
+    const zip = new JSZip();
+    zip.file('model.dae', daeBlob);
 
     if (result.textures && result.textures.length > 0) {
-      onProgress?.('Packaging textures...');
-      const zip = new JSZip();
-      zip.file('model.dae', daeBlob);
-
       for (const tex of result.textures) {
         // Ensure path alignment
         const relDir = tex.directory ? (tex.directory.endsWith('/') ? tex.directory : tex.directory + '/') : '';
         zip.file(`${relDir}${tex.name}.${tex.ext}`, tex.data);
       }
-      finalBlob = await zip.generateAsync({ type: 'blob' });
-    } else {
-      finalBlob = daeBlob;
     }
+    const finalBlob = await zip.generateAsync({ type: 'blob' });
 
     disposeScene(scene);
 
@@ -1722,7 +1730,7 @@ export const exportToDAE = async (data, options = {}) => {
     const date = new Date().toISOString().slice(0, 10);
     const lat = ((data.bounds.north + data.bounds.south) / 2).toFixed(4);
     const lng = ((data.bounds.east + data.bounds.west) / 2).toFixed(4);
-    const ext = result.textures?.length > 0 ? '.dae.zip' : '.dae';
+    const ext = '.dae.zip';
     link.download = `MapNG_Model_${date}_${lat}_${lng}${ext}`;
     link.click();
     URL.revokeObjectURL(link.href);

@@ -1128,7 +1128,7 @@ const handleDAEExport = async () => {
       returnBlob: true
     });
     const typedBlob = await ensureDownloadBlobType(zipBlob, 'application/zip');
-    const filename = `terrain_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.zip`;
+    const filename = `terrain_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.dae.zip`;
     triggerDownload(typedBlob, filename);
     const metadata = buildExportMetadata('dae_zip', filename, {
       modelOptions: {
