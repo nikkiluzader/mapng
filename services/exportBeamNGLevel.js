@@ -1024,7 +1024,7 @@ function generateMeshRoads(terrainData, squareSize) {
         rawNodes.push([
           Math.round(wx * 1000) / 1000,
           Math.round(wy * 1000) / 1000,
-          Math.round((wz + 1) * 1000) / 1000,
+          Math.round((wz + 0.5) * 1000) / 1000,
           fullWidth,
           4,
           0, 0, 1,
