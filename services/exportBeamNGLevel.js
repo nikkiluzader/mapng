@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import JSZip from 'jszip';
+import { encode } from 'fast-png';
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
@@ -363,6 +364,38 @@ async function generateHeightmapPng(terrainData, maxSize = 2048) {
 
   ctx.putImageData(imgData, 0, 0);
   return new Promise(r => canvas.toBlob(r, 'image/png'));
+}
+
+/**
+ * Generate Road Architect-compatible terrain bitmap (16-bit grayscale PNG).
+ *
+ * Road Architect writes this as GFXFormatR16 and later reads it with
+ * bmp:getTexel(x, y), then maps texel values back to terrain heights with:
+ *   height = texel * ((zMax - zMin) / 65535) + zMin
+ *
+ * For generated levels, TerrainBlock zMin is 0 and zMax is maxHeight.
+ */
+function generateRoadArchitectHeightmapPng(terrainData, terrainBlockMaxHeight) {
+  const { width, height, heightMap, minHeight } = terrainData;
+  const zMin = 0;
+  const zMax = Math.max(1, Number(terrainBlockMaxHeight) || 1);
+  const scale = 65535 / Math.max(1e-9, (zMax - zMin));
+
+  const data = new Uint16Array(width * height);
+  for (let y = 0; y < height; y++) {
+    // Terrain data uses north-origin rows; TerrainBlock grid is south-origin.
+    const srcY = height - 1 - y;
+    const srcRow = srcY * width;
+    const dstRow = y * width;
+    for (let x = 0; x < width; x++) {
+      const worldRelativeH = Math.max(0, (heightMap[srcRow + x] - minHeight));
+      const texel = Math.max(0, Math.min(65535, Math.round(worldRelativeH * scale)));
+      data[dstRow + x] = texel;
+    }
+  }
+
+  const pngData = encode({ width, height, data, depth: 16, channels: 1 });
+  return new Blob([new Uint8Array(pngData)], { type: 'image/png' });
 }
 
 /**
@@ -991,6 +1024,279 @@ function generateDecalRoads(terrainData, squareSize) {
   return decals;
 }
 
+function createRoadArchitectDefaultProfile() {
+  const persistentBaseLayer = {
+    boxXLeft: 1,
+    boxXRight: 1,
+    boxYLeft: 1,
+    boxYRight: 1,
+    boxZLeft: 1,
+    boxZRight: 1,
+    doNotDelete: true,
+    extentsH: 1,
+    extentsL: 1,
+    extentsW: 1,
+    fadeE: 0,
+    fadeS: 0,
+    frame: 0,
+    isDisplay: false,
+    isHidden: false,
+    isSpanLong: true,
+    jitter: 0,
+    laneMax: 1,
+    laneMin: 1,
+    latOffset: 0,
+    matDisplay: '[None]',
+    nMax: 1,
+    nMin: 1,
+    numCols: 1,
+    numRows: 1,
+    pos: 0,
+    rot: 0,
+    size: 3,
+    spacing: 5,
+    type: 1,
+    useWorldZ: false,
+    vertOffset: 0,
+  };
+
+  const layers = [
+    {
+      ...persistentBaseLayer,
+      isLeft: true,
+      isPaint: true,
+      isReverse: false,
+      lane: -1,
+      mat: 'm_line_white',
+      name: 'Edge Line L',
+      off: 0.25,
+      texLen: 5,
+      width: 0.25,
+    },
+    {
+      ...persistentBaseLayer,
+      isLeft: false,
+      isPaint: true,
+      isReverse: false,
+      lane: 1,
+      mat: 'm_line_white',
+      name: 'Edge Line R',
+      off: -0.25,
+      texLen: 5,
+      width: 0.25,
+    },
+    {
+      ...persistentBaseLayer,
+      isDisplay: true,
+      isLeft: true,
+      isPaint: false,
+      isReverse: true,
+      lane: -1,
+      mat: 'm_road_asphalt_edge',
+      name: 'Edge Blend L',
+      off: -0.5,
+      texLen: 18,
+      width: 2.000000238,
+    },
+    {
+      ...persistentBaseLayer,
+      isDisplay: true,
+      isLeft: false,
+      isPaint: false,
+      isReverse: false,
+      lane: 1,
+      mat: 'm_road_asphalt_edge',
+      name: 'Edge Blend R',
+      off: 0.5,
+      texLen: 18.00003433,
+      width: 2.000000238,
+    },
+    {
+      ...persistentBaseLayer,
+      isLeft: true,
+      isPaint: true,
+      isReverse: false,
+      lane: 1,
+      mat: 'm_line_yellow_double_discontinue',
+      name: 'Centerline',
+      off: 0,
+      texLen: 5,
+      width: 0.400000006,
+    },
+  ];
+
+  return {
+    '-1': {
+      cornerDrop: 0,
+      cornerLatOff: 0,
+      heightL: 0.01,
+      heightR: 0.01,
+      isLeftSide: true,
+      kerbWidth: 0.12,
+      type: 'road_lane',
+      vStart: 0,
+      width: 3.5,
+    },
+    '1': {
+      cornerDrop: 0,
+      cornerLatOff: 0,
+      heightL: 0.01,
+      heightR: 0.01,
+      isLeftSide: true,
+      kerbWidth: 0.12,
+      type: 'road_lane',
+      vStart: 0,
+      width: 3.5,
+    },
+    autoBankingFactor: 1,
+    blendLeftMat: 'm_road_asphalt_edge',
+    blendLeftWidth: 1,
+    blendRightMat: 'm_road_asphalt_edge',
+    blendRightWidth: 1,
+    centerlineMat: 'm_line_yellow_double_discontinue',
+    class: 'urban',
+    condition: 0.3,
+    conditionCenterline: true,
+    conditionEdgesL: true,
+    conditionEdgesR: true,
+    conditionEndStopE: true,
+    conditionEndStopS: true,
+    conditionLaneMarkings: true,
+    conditionSeed: 41235,
+    continueLinesToEnd: false,
+    dirtMat: 'm_dirt_variation_04',
+    edgeLineGapL: 0.25,
+    edgeLineGapR: 0.25,
+    edgeMatL: 'm_line_white',
+    edgeMatR: 'm_line_white',
+    endStopMatE: 'm_line_white',
+    endStopMatS: 'm_line_white',
+    fadeE: 0,
+    fadeS: 0,
+    gutterMargin: 0.02,
+    gutterMat: 'gutter1',
+    gutterWidth: 0.2,
+    isAutoBanking: false,
+    isDeletable: true,
+    isEdgeBlendL: true,
+    isEdgeBlendR: true,
+    isExtraWidth: false,
+    isGutter: false,
+    isGutterShow: false,
+    isShowEdgeBlend: true,
+    isStopDecalE: false,
+    isStopDecalS: false,
+    laneMarkingsMat: 'm_line_yellow_discontinue',
+    layers,
+  };
+}
+
+function makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount) {
+  const [x, y, z] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
+  const laneWidth = Math.max(2.6, Math.min(4.5, (halfWidth * 2) / Math.max(1, laneCount)));
+  return {
+    heightsL: {
+      '1': 0.01,
+      '-1': 0.01,
+    },
+    heightsR: {
+      '1': 0.01,
+      '-1': 0.01,
+    },
+    incircleRad: 1,
+    isAutoBanked: false,
+    isLocked: false,
+    offset: 0,
+    posX: roundTo(x, 6),
+    posY: roundTo(y, 6),
+    posZ: roundTo(z, 6),
+    rot: 0,
+    widths: {
+      '1': laneWidth,
+      '-1': laneWidth,
+    },
+  };
+}
+
+function generateRoadArchitectSession(terrainData, squareSize, levelName) {
+  if (!terrainData?.osmFeatures?.length) return null;
+
+  const roads = [];
+
+  for (const feature of terrainData.osmFeatures) {
+    if (feature.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) continue;
+    const tags = feature.tags || {};
+    const highway = tags.highway;
+    if (!highway || ROAD_SKIP.has(highway)) continue;
+
+    const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
+    const isOneWay = isOneWayRoad(tags);
+    const halfWidth = estimateRoadHalfWidth(tags, highway, isOneWay, style.width);
+    const laneCount = Math.max(1, getDefaultLaneCount(highway, isOneWay));
+    const clippedSegments = clipGeometryToMargin(feature.geometry, terrainData.bounds)
+      .flatMap((segment) => chunkPolyline(segment, 80));
+
+    for (const segment of clippedSegments) {
+      const nodes = segment.map((pt) => makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount));
+      if (nodes.length < 2) continue;
+
+      roads.push({
+        bridgeArch: 0,
+        bridgeDepth: 8,
+        bridgeWidth: 8,
+        displayName: String(tags.name || `${highway}_${roads.length + 1}`),
+        extraE: 0,
+        extraS: 0,
+        forceField: 1.0,
+        granFactor: 1,
+        groupIdx: [],
+        isAllowTunnels: false,
+        isArc: false,
+        isBridge: false,
+        isCivilEngRoads: false,
+        isConformRoadToTerrain: true,
+        isDisplayLaneInfo: true,
+        isDisplayNodeNumbers: false,
+        isDisplayNodeSpheres: true,
+        isDisplayRefLine: true,
+        isDisplayRoadOutline: true,
+        isDisplayRoadSurface: true,
+        isDrivable: true,
+        isHidden: false,
+        isJctRoad: false,
+        isOverObject: true,
+        isOverlay: false,
+        isRigidTranslation: false,
+        isVis: true,
+        name: generatePersistentId(),
+        nodes,
+        overlayMat: 'm_tread_marks_clean',
+        profile: createRoadArchitectDefaultProfile(),
+        protrudeE: 0,
+        protrudeS: 0,
+        radGran: 15,
+        radOffset: 0,
+        thickness: 1.0,
+        treatAsInvisibleInEdit: false,
+        zOffsetFromRoad: 0,
+      });
+    }
+  }
+
+  if (roads.length === 0) return null;
+
+  return {
+    data: {
+      groups: [],
+      junctions: [],
+      mapName: String(levelName || 'mapng').toLowerCase(),
+      placedGroups: [],
+      profiles: [createRoadArchitectDefaultProfile()],
+      roads,
+    },
+  };
+}
+
 /**
  * Write a newline-delimited JSON (NDJSON) string from an array of objects.
  * Each object is one line, file ends with a newline — matching BeamNG's format.
@@ -1222,7 +1528,8 @@ function buildBeamNGExportReport({
   effectivePbrSource,
   waterObjects,
   barrierObjects,
-  decalRoads,
+  barrierMeshSplineGroups,
+  roadArchitectRoadCount,
   forestPlacements,
   forestFiles,
   groundCoverObjects,
@@ -1293,8 +1600,9 @@ function buildBeamNGExportReport({
     '',
     'Generated Content',
     `- Terrain materials written: ${terrainMaterialCount}`,
-    `- Decal roads generated: ${decalRoads.length}`,
-    `- Native barrier TSStatic objects: ${barrierObjects.length}`,
+    `- Road Architect roads generated: ${roadArchitectRoadCount}`,
+    `- Barrier mesh spline groups: ${barrierMeshSplineGroups.length}`,
+    `- Barrier TSStatic objects: ${barrierObjects.length}`,
     `- Water objects generated: ${waterObjects.length}`,
     `- Forest placement groups: ${forestPlacements.size}`,
     `- Forest placement files: ${forestFiles.length}`,
@@ -1668,6 +1976,31 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
   }
 
   return objects;
+}
+
+function groupBarrierObjectsAsMeshSplines(barrierObjects) {
+  if (!Array.isArray(barrierObjects) || barrierObjects.length === 0) return [];
+
+  const grouped = new Map();
+  for (const obj of barrierObjects) {
+    const name = String(obj?.name || '');
+    const match = name.match(/^barrier_(\d+)/);
+    const key = match ? Number(match[1]) : -1;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(obj);
+  }
+
+  const keys = Array.from(grouped.keys()).sort((a, b) => a - b);
+  return keys.map((key, idx) => {
+    const groupName = `Mesh Spline ${idx + 1} - ${generatePersistentId()}`;
+    const items = grouped.get(key).map((obj, itemIdx) => ({
+      ...obj,
+      __parent: groupName,
+      name: `${groupName}_Main_${itemIdx + 1}`,
+      isRenderEnabled: false,
+    }));
+    return { groupName, items };
+  });
 }
 
 function pointInPolygonLatLng(point, ring) {
@@ -2256,7 +2589,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {boolean} [options.applyFoundations=true]         — apply terrain foundation pass under buildings
  * @param {boolean} [options.includeBackdrop=false]         — fetch and include surrounding terrain backdrop DAE
  * @param {boolean} [options.includeWater=true]             — emit native BeamNG inland water objects
- * @param {boolean} [options.includeNativeBarriers=true]    — emit native BeamNG TSStatic barrier objects from OSM barriers
+ * @param {boolean} [options.includeNativeBarriers=true]    — emit native BeamNG TSStatic barrier objects from OSM barriers as MissionGroup Mesh Spline groups
  * @param {boolean} [options.includeTrees=true]             — emit native BeamNG tree and bush forest instances
  * @param {boolean} [options.includeRocks=false]            — emit native BeamNG rock forest instances
  * @param {number}  [options.treeDensity=1]                 — tree density scale for BeamNG forest placement
@@ -2378,8 +2711,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   const { position: spawnPosition, rotationMatrix: spawnRotationMatrix } =
     findSpawnPosition(exportTerrainData, center, squareSize);
-
-  const decalRoads = generateDecalRoads(exportTerrainData, squareSize);
+  const roadArchitectSession = generateRoadArchitectSession(exportTerrainData, squareSize, levelName);
+  const roadArchitectRoadCount = Array.isArray(roadArchitectSession?.data?.roads)
+    ? roadArchitectSession.data.roads.length
+    : 0;
+  const roadArchitectHeightmapBlob = roadArchitectSession
+    ? generateRoadArchitectHeightmapPng(exportTerrainData, maxHeight)
+    : null;
 
   // ── Sequential pipeline — one heavy operation at a time ────────────────────
   // Running everything in parallel (Promise.all) keeps multiple large buffers
@@ -2460,6 +2798,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const barrierObjects = includeNativeBarriers
     ? buildNativeBarrierObjects(exportTerrainData, squareSize)
     : [];
+  const barrierMeshSplineGroups = groupBarrierObjectsAsMeshSplines(barrierObjects);
 
   beginStep(`Building vegetation objects (trees: ${includeTrees ? 'on' : 'off'} @ ${normalizedTreeDensity.toFixed(1)}x, rocks: ${includeRocks ? 'on' : 'off'})…`, 77);
   await yield_();
@@ -2505,6 +2844,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   zip.folder('levels');
   zip.folder(base);
   zip.folder(`${base}/art`);
+  zip.folder(`${base}/bat`);
   zip.folder(`${base}/art/terrains`);
   zip.folder(`${base}/main`);
   zip.folder(`${base}/main/MissionGroup`);
@@ -2512,7 +2852,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   zip.folder(`${base}/main/MissionGroup/Level_objects/Other`);
   zip.folder(`${base}/main/MissionGroup/PlayerDropPoints`);
   if (waterObjects.length > 0) zip.folder(`${base}/main/MissionGroup/Level_objects/Water`);
-  if (barrierObjects.length > 0) zip.folder(`${base}/main/MissionGroup/Level_objects/Barriers`);
+  if (barrierMeshSplineGroups.length > 0) {
+    for (const group of barrierMeshSplineGroups) {
+      zip.folder(`${base}/main/MissionGroup/${group.groupName}`);
+    }
+  }
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/Level_objects/vegetation`);
     zip.folder(`${base}/art/forest`);
@@ -2542,7 +2886,86 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     '-- Auto-generated by mapng',
     'local M = {}',
     '',
+    'local raAutoLoadPending = false',
+    'local raAutoLoadDone = false',
+    'local raAutoLoadWait = 0',
+    'local raAutoLoadMaxWait = 15',
+    '',
+    'local function getRoadArchitectSessionPath()',
+    '  if not core_levels or not getMissionFilename then return nil end',
+    '  local levelName = core_levels.getLevelName(getMissionFilename())',
+    '  if not levelName or levelName == "" then return nil end',
+    '  return "/levels/" .. tostring(levelName) .. "/bat/roadatchitectsession.json"',
+    'end',
+    '',
+    'local function loadRoadArchitectSessionIfAvailable()',
+    '  if raAutoLoadDone then return true end',
+    '  local sessionPath = getRoadArchitectSessionPath()',
+    '  if not sessionPath then return false end',
+    '  if not FS or not FS.fileExists or not FS:fileExists(sessionPath) then',
+    '    raAutoLoadDone = true',
+    '    return true',
+    '  end',
+    '',
+    '  local sessionData = jsonReadFile(sessionPath)',
+    '  if not sessionData or not sessionData.data then',
+    '    log("E", "mapng", "Road Architect session exists but could not be read: " .. tostring(sessionPath))',
+    '    raAutoLoadDone = true',
+    '    return true',
+    '  end',
+    '',
+    '  if not extensions or not extensions.editor_roadArchitect or not extensions.editor_roadArchitect.onDeserialized then',
+    '    return false',
+    '  end',
+    '',
+    '  if FS and FS.directoryCreate then FS:directoryCreate("temp/") end',
+    '  jsonWriteFile("temp/roadArchitect.json", sessionData, true)',
+    '',
+    '  local ok, err = pcall(extensions.editor_roadArchitect.onDeserialized)',
+    '  if not ok then',
+    '    log("E", "mapng", "Road Architect auto-load failed: " .. tostring(err))',
+    '    return false',
+    '  end',
+    '',
+    '  local okRoadMgr, roadMgr = pcall(require, "editor/tech/roadArchitect/roads")',
+    '  if okRoadMgr and roadMgr and roadMgr.roads then',
+    '    for i = 1, #roadMgr.roads do',
+    '      local road = roadMgr.roads[i]',
+    '      if road and road.isConformRoadToTerrain then',
+    '        road.isConformRoadToTerrain[0] = true',
+    '      end',
+    '      if roadMgr.setDirty and road then',
+    '        roadMgr.setDirty(road)',
+    '      end',
+    '    end',
+    '    if roadMgr.computeAllRoadRenderData then',
+    '      roadMgr.computeAllRoadRenderData()',
+    '    end',
+    '    if roadMgr.finalise and #roadMgr.roads > 0 then',
+    '      pcall(roadMgr.finalise)',
+    '    end',
+    '  end',
+    '',
+    '  raAutoLoadDone = true',
+    '  return true',
+    'end',
+    '',
     'function M.onClientStartMission()',
+    '  raAutoLoadPending = true',
+    '  raAutoLoadWait = 0',
+    '  loadRoadArchitectSessionIfAvailable()',
+    'end',
+    '',
+    'function M.onUpdate(dtReal)',
+    '  if not raAutoLoadPending or raAutoLoadDone then return end',
+    '  raAutoLoadWait = raAutoLoadWait + (tonumber(dtReal) or 0)',
+    '  if loadRoadArchitectSessionIfAvailable() then',
+    '    raAutoLoadPending = false',
+    '    return',
+    '  end',
+    '  if raAutoLoadWait >= raAutoLoadMaxWait then',
+    '    raAutoLoadPending = false',
+    '  end',
     'end',
     '',
     'function M.onSerialize()',
@@ -2600,7 +3023,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     effectivePbrSource,
     waterObjects,
     barrierObjects,
-    decalRoads,
+    barrierMeshSplineGroups,
+    roadArchitectRoadCount,
     forestPlacements,
     forestFiles,
     groundCoverObjects,
@@ -2612,6 +3036,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     didCropToSquare,
   });
   zip.file(`${base}/export_report.txt`, reportContents);
+
+  if (roadArchitectSession) {
+    zip.file(`${base}/bat/roadatchitectsession.json`, JSON.stringify(roadArchitectSession, null, 2));
+    if (roadArchitectHeightmapBlob) {
+      zip.file(`${base}/bat/roadatchitectsession.png`, roadArchitectHeightmapBlob);
+    }
+  }
 
   // ── theTerrain.ter ─────────────────────────────────────────────────────────
   zip.file(`${base}/theTerrain.ter`, terBlob);
@@ -2748,16 +3179,20 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const missionGroupItems = [
     { __parent: 'MissionGroup', class: 'SimGroup', name: 'PlayerDropPoints', persistentId: generatePersistentId() },
     { __parent: 'MissionGroup', class: 'SimGroup', name: 'Level_objects', persistentId: generatePersistentId() },
+    ...barrierMeshSplineGroups.map((group) => ({
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: group.groupName,
+      persistentId: generatePersistentId(),
+    })),
   ];
-  if (decalRoads.length > 0) {
-    missionGroupItems.push({ __parent: 'MissionGroup', class: 'SimGroup', name: 'Decal_roads', persistentId: generatePersistentId() });
-  }
   zip.file(`${base}/main/MissionGroup/items.level.json`, toNDJSON(missionGroupItems));
 
-  // ── main/MissionGroup/Decal_roads/items.level.json ─────────────────────────
-  if (decalRoads.length > 0) {
-    zip.folder(`${base}/main/MissionGroup/Decal_roads`);
-    zip.file(`${base}/main/MissionGroup/Decal_roads/items.level.json`, toNDJSON(decalRoads));
+  // ── main/MissionGroup/Mesh Spline */items.level.json ──────────────────────
+  if (barrierMeshSplineGroups.length > 0) {
+    for (const group of barrierMeshSplineGroups) {
+      zip.file(`${base}/main/MissionGroup/${group.groupName}/items.level.json`, toNDJSON(group.items));
+    }
   }
 
   // ── main/MissionGroup/Level_objects/items.level.json ──────────────────────
@@ -2810,12 +3245,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
         __parent: 'Level_objects',
         class: 'SimGroup',
         name: 'Water',
-        persistentId: generatePersistentId(),
-      }] : []),
-      ...(barrierObjects.length > 0 ? [{
-        __parent: 'Level_objects',
-        class: 'SimGroup',
-        name: 'Barriers',
         persistentId: generatePersistentId(),
       }] : []),
       ...((forestFiles.length > 0 || groundCoverObjects.length > 0) ? [{
@@ -2896,12 +3325,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (waterObjects.length > 0) {
     zip.file(`${base}/main/MissionGroup/Level_objects/Water/items.level.json`,
       toNDJSON(waterObjects)
-    );
-  }
-
-  if (barrierObjects.length > 0) {
-    zip.file(`${base}/main/MissionGroup/Level_objects/Barriers/items.level.json`,
-      toNDJSON(barrierObjects)
     );
   }
 
