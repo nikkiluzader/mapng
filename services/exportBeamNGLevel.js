@@ -1298,6 +1298,77 @@ function generateRoadArchitectSession(terrainData, squareSize, levelName) {
 }
 
 /**
+ * Convert OSM road features to BeamNG MeshRoad 3D geometry objects.
+ *
+ * Each road segment becomes a MeshRoad with m_asphalt_new_01 on the top, side,
+ * and bottom surfaces. Node format is [x, y, z, fullWidth, depth, nx, ny, nz].
+ * Roads that were split by clipping or chunking share an incremented counter
+ * so each object gets a unique name.
+ *
+ * Returns an empty array when no OSM data is available or useMeshRoads is false.
+ */
+function generateMeshRoads(terrainData, squareSize) {
+  if (!terrainData.osmFeatures?.length) return [];
+
+  const meshRoads = [];
+  let roadIndex = 0;
+
+  for (const feature of terrainData.osmFeatures) {
+    if (feature.type !== 'road' || !feature.geometry?.length) continue;
+
+    const highway = feature.tags?.highway;
+    if (!highway || ROAD_SKIP.has(highway)) continue;
+
+    const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
+    const isOneWay = isOneWayRoad(feature.tags || {});
+    const halfWidth = estimateRoadHalfWidth(feature.tags || {}, highway, isOneWay, style.width);
+    const fullWidth = halfWidth * 2;
+
+    const clippedSegments = clipGeometryToMargin(feature.geometry, terrainData.bounds)
+      .flatMap(s => chunkPolyline(s));
+
+    for (const segment of clippedSegments) {
+      const rawNodes = [];
+      for (const pt of segment) {
+        const [wx, wy, wz] = geoToWorld(pt.lat, pt.lng, terrainData, squareSize, 0.1);
+        // MeshRoad node: [x, y, z, fullWidth, depth, normalX, normalY, normalZ]
+        rawNodes.push([
+          Math.round(wx * 1000) / 1000,
+          Math.round(wy * 1000) / 1000,
+          Math.round((wz + 0.5) * 1000) / 1000,
+          fullWidth,
+          4,
+          0, 0, 1,
+        ]);
+      }
+
+      // Reuse decimation but strip/re-add the extra fields (decimateNodes works on [x,y,z,w])
+      const stripped = rawNodes.map(n => [n[0], n[1], n[2], n[3]]);
+      const decimated = decimateNodes(stripped);
+      if (decimated.length < 2) continue;
+
+      // Reattach depth and normal after decimation
+      const nodes = decimated.map(n => [n[0], n[1], n[2], n[3], 0.5, 0, 0, 1]);
+
+      meshRoads.push({
+        class: 'MeshRoad',
+        name: `MeshRoad_${roadIndex++}`,
+        persistentId: generatePersistentId(),
+        __parent: 'Mesh_roads',
+        position: [nodes[0][0], nodes[0][1], nodes[0][2]],
+        topMaterial: 'm_asphalt_new_01',
+        sideMaterial: 'm_asphalt_new_01',
+        bottomMaterial: 'm_asphalt_new_01',
+        textureLength: 16,
+        nodes,
+      });
+    }
+  }
+
+  return meshRoads;
+}
+
+/**
  * Write a newline-delimited JSON (NDJSON) string from an array of objects.
  * Each object is one line, file ends with a newline — matching BeamNG's format.
  */
@@ -2598,6 +2669,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {'osm'|'image'|'none'} [options.pbrSource='osm'] — layer map source: 'osm' uses OSM polygon data,
  *   'image' infers materials from the segmented hybrid satellite image, 'none' disables PBR materials.
  *   Legacy boolean option `generatePbrMaterials` is still accepted for backward compatibility.
+ * @param {boolean} [options.useMeshRoads=false]            — export roads as 3D MeshRoad geometry instead of flat DecalRoad decals
  */
 export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const {
@@ -2610,6 +2682,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     includeTrees = true,
     includeRocks = false,
     treeDensity = 1,
+    useMeshRoads = false,
     flavorId,
     levelName: requestedLevelName = '',
     onProgress,
@@ -2711,6 +2784,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   const { position: spawnPosition, rotationMatrix: spawnRotationMatrix } =
     findSpawnPosition(exportTerrainData, center, squareSize);
+<<<<<<< HEAD
   const roadArchitectSession = generateRoadArchitectSession(exportTerrainData, squareSize, levelName);
   const roadArchitectRoadCount = Array.isArray(roadArchitectSession?.data?.roads)
     ? roadArchitectSession.data.roads.length
@@ -2718,6 +2792,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const roadArchitectHeightmapBlob = roadArchitectSession
     ? generateRoadArchitectHeightmapPng(exportTerrainData, maxHeight)
     : null;
+=======
+
+  const decalRoads = useMeshRoads ? [] : generateDecalRoads(exportTerrainData, squareSize);
+  const meshRoads = useMeshRoads ? generateMeshRoads(exportTerrainData, squareSize) : [];
+>>>>>>> 03d60578704cbe98adc2ab8b2e0dd6d23f363730
 
   // ── Sequential pipeline — one heavy operation at a time ────────────────────
   // Running everything in parallel (Promise.all) keeps multiple large buffers
@@ -3186,6 +3265,15 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       persistentId: generatePersistentId(),
     })),
   ];
+<<<<<<< HEAD
+=======
+  if (decalRoads.length > 0) {
+    missionGroupItems.push({ __parent: 'MissionGroup', class: 'SimGroup', name: 'Decal_roads', persistentId: generatePersistentId() });
+  }
+  if (meshRoads.length > 0) {
+    missionGroupItems.push({ __parent: 'MissionGroup', class: 'SimGroup', name: 'Mesh_roads', persistentId: generatePersistentId() });
+  }
+>>>>>>> 03d60578704cbe98adc2ab8b2e0dd6d23f363730
   zip.file(`${base}/main/MissionGroup/items.level.json`, toNDJSON(missionGroupItems));
 
   // ── main/MissionGroup/Mesh Spline */items.level.json ──────────────────────
@@ -3193,6 +3281,12 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     for (const group of barrierMeshSplineGroups) {
       zip.file(`${base}/main/MissionGroup/${group.groupName}/items.level.json`, toNDJSON(group.items));
     }
+  }
+
+  // ── main/MissionGroup/Mesh_roads/items.level.json ──────────────────────────
+  if (meshRoads.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/Mesh_roads`);
+    zip.file(`${base}/main/MissionGroup/Mesh_roads/items.level.json`, toNDJSON(meshRoads));
   }
 
   // ── main/MissionGroup/Level_objects/items.level.json ──────────────────────

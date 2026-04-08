@@ -252,6 +252,8 @@
     "experimentalTreeDensity": "Экспериментально выше 5x: очень плотные леса могут увеличить время экспорта и расход памяти.",
     "rocks": "Камни",
     "quarryRock": "Покрытие карьера/камней",
+    "roads": "Дороги",
+    "meshRoads": "3D-геометрия меша",
     "beamngLevelExport": "Экспорт уровня BeamNG",
     "generatePlayableZip": "Сгенерировать играбельный .zip",
     "assets2d": "2D ассеты",

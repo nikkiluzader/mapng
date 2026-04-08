@@ -252,6 +252,8 @@
     "experimentalTreeDensity": "Experimentell über 5x: sehr dichte Wälder können Exportzeit und Speicherverbrauch erhöhen.",
     "rocks": "Felsen",
     "quarryRock": "Steinbruch-/Felsdeckung",
+    "roads": "Straßen",
+    "meshRoads": "3D-Netzgeometrie",
     "beamngLevelExport": "BeamNG-Level-Export",
     "generatePlayableZip": "Spielbares .zip-Paket erzeugen",
     "assets2d": "2D-Assets",

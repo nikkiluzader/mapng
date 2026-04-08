@@ -252,6 +252,8 @@
     "experimentalTreeDensity": "Sperimentale sopra 5x: le foreste molto dense possono aumentare il tempo di esportazione e l'uso della memoria.",
     "rocks": "Rocce",
     "quarryRock": "Copertura cava/roccia",
+    "roads": "Strade",
+    "meshRoads": "Geometria mesh 3D",
     "beamngLevelExport": "Esportazione Livello BeamNG",
     "generatePlayableZip": "Genera pacchetto .zip giocabile",
     "assets2d": "Asset 2D",

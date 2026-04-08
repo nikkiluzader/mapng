@@ -252,6 +252,8 @@
     "experimentalTreeDensity": "Experimental above 5x: very dense forests can increase export time and memory usage.",
     "rocks": "Rocks",
     "quarryRock": "Quarry/rock cover",
+    "roads": "Roads",
+    "meshRoads": "3D mesh geometry",
     "beamngLevelExport": "BeamNG Level Export",
     "generatePlayableZip": "Generate playable .zip package",
     "assets2d": "2D Assets",

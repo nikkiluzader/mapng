@@ -252,6 +252,8 @@
     "experimentalTreeDensity": "Experimental por encima de 5x: bosques muy densos pueden aumentar tiempo y memoria.",
     "rocks": "Rocas",
     "quarryRock": "Cobertura de cantera/roca",
+    "roads": "Calles",
+    "meshRoads": "Geometría malla 3D",
     "beamngLevelExport": "Exportacion de nivel BeamNG",
     "generatePlayableZip": "Generar paquete .zip jugable",
     "assets2d": "Assets 2D",

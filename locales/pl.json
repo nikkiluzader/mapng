@@ -252,6 +252,8 @@
     "experimentalTreeDensity": "Eksperymentalne powyżej 5x: bardzo gęste lasy mogą zwiększyć czas eksportu i użycie pamięci.",
     "rocks": "Skały",
     "quarryRock": "Kwatera/pokrycie skalne",
+    "roads": "Drogi",
+    "meshRoads": "Geometria siatki 3D",
     "beamngLevelExport": "Eksport poziomu BeamNG",
     "generatePlayableZip": "Wygeneruj pakiet .zip do gry",
     "assets2d": "Zasoby 2D",

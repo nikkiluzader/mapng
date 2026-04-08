@@ -155,6 +155,14 @@
             </label>
           </div>
 
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
+            <label class="flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" v-model="beamNGUseMeshRoads" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.meshRoads') }}</span>
+            </label>
+          </div>
+
           <!-- Export button -->
           <button
             @click="handleBeamNGLevelExport"
@@ -549,6 +557,7 @@ const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFounda
 const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') === 'true');
+const beamNGUseMeshRoads = ref(localStorage.getItem('mapng_beamNGUseMeshRoads') === 'true');
 const beamNGTreeDensity = ref(Math.max(0.5, Math.min(10, Number(localStorage.getItem('mapng_beamNGTreeDensity') || '1') || 1)));
 const beamNGFlavorOptions = getBeamNGFlavorOptions();
 const persistedBeamNGFlavor = localStorage.getItem('mapng_beamNGFlavorId') || '';
@@ -599,6 +608,7 @@ watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoun
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
 watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
+watch(beamNGUseMeshRoads, (v) => localStorage.setItem('mapng_beamNGUseMeshRoads', String(v)));
 watch(beamNGTreeDensity, (v) => localStorage.setItem('mapng_beamNGTreeDensity', String(v)));
 watch(beamNGFlavorId, (v) => localStorage.setItem('mapng_beamNGFlavorId', v));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
@@ -1187,6 +1197,7 @@ const handleBeamNGLevelExport = async () => {
       includeWater: beamNGIncludeWater.value,
       includeTrees: beamNGIncludeTrees.value,
       includeRocks: beamNGIncludeRocks.value,
+      useMeshRoads: beamNGUseMeshRoads.value,
       treeDensity: beamNGTreeDensity.value,
       flavorId: beamNGFlavorId.value,
       levelName: beamNGLevelName.value.trim(),
