@@ -163,6 +163,12 @@
             </label>
           </div>
 
+          <div class="px-2 py-1.5 rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+            <p class="text-[9px] text-amber-800 dark:text-amber-300 leading-snug">
+              {{ t('exportPanel.communityQualityNotice') }}
+            </p>
+          </div>
+
           <!-- Export button -->
           <button
             @click="handleBeamNGLevelExport"

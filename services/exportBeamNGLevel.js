@@ -1218,9 +1218,179 @@ function makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount
   };
 }
 
+function makeLatLngKey(pt, decimals = 7) {
+  return `${Number(pt.lat).toFixed(decimals)}:${Number(pt.lng).toFixed(decimals)}`;
+}
+
+function splitPolylineAtNodeKeys(points, splitKeys) {
+  if (!Array.isArray(points) || points.length < 2 || !splitKeys || splitKeys.size === 0) {
+    return [points];
+  }
+
+  const out = [];
+  let current = [points[0]];
+
+  for (let i = 1; i < points.length; i++) {
+    const pt = points[i];
+    current.push(pt);
+
+    // Split at interior nodes that are shared across roads.
+    if (i < points.length - 1 && splitKeys.has(makeLatLngKey(pt))) {
+      if (current.length >= 2) out.push(current);
+      current = [pt];
+    }
+  }
+
+  if (current.length >= 2) out.push(current);
+  return out;
+}
+
+function buildRoadIntersectionNodeKeySet(osmFeatures = []) {
+  const counts = new Map();
+  for (const feature of osmFeatures) {
+    if (feature?.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) continue;
+    const highway = feature.tags?.highway;
+    if (!highway || ROAD_SKIP.has(highway)) continue;
+
+    for (const pt of feature.geometry) {
+      const key = makeLatLngKey(pt);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+
+  const intersectionKeys = new Set();
+  for (const [key, count] of counts.entries()) {
+    if (count >= 2) intersectionKeys.add(key);
+  }
+  return intersectionKeys;
+}
+
+function makeRoadArchitectSerializedJunction({
+  type,
+  roads,
+  name,
+  laneWidth,
+}) {
+  const isCrossroads = type === 'crossroads';
+  const laneWidthSafe = clamp(Number(laneWidth) || 3.5, 2.6, 5.0);
+
+  return {
+    name,
+    type,
+    roads,
+    condition: 0.2,
+    conditionSeed: 41226,
+    numPatches: 10,
+    numPotholes: 0,
+    capLength: 4.0,
+    numLanesX: 1,
+    numLanesY: 1,
+    numRBLanes: 2,
+    laneWidthX: laneWidthSafe,
+    laneWidthY: laneWidthSafe,
+    laneWidthRB: laneWidthSafe,
+    extraRadRB: 0.0,
+    isYOneWay: false,
+    isY1Outwards: !isCrossroads,
+    isY2Outwards: false,
+    s2Length: 1.0,
+    s3Length: 1.0,
+    cResWidth: 1.0,
+    sepWidthI: 1.0,
+    sepWidthO: 1.0,
+    sepMat: 'italy_road_markings_zebra_diagonal',
+    hardWidth: 1.0,
+    isBarriersI: false,
+    isBarriersO: false,
+    isSigns: true,
+    isPedX1: true,
+    isPedX2: true,
+    isPedX3: true,
+    isPedX4: isCrossroads,
+    pedXDist: 1.0,
+    pedXWidth: 2.0,
+    isSidewalk: false,
+    bevel: 2.5,
+    theta: 0.0,
+    sidewalkWidth: 2.0,
+    sidewalkHeight: 0.12,
+    isLowerSWAtPedX: true,
+    isTLights: isCrossroads,
+    trafficLatOff: -2.6,
+    isCrossings: true,
+    displayCrossings: false,
+    edgeBlendMat: 'm_road_asphalt_edge',
+    isArrow: true,
+    isDoubleArrows: true,
+    arrowSize: 1.5,
+    arrowFrontDistFromEnd: 2.5,
+    arrowBackDistFromEnd: 12.0,
+    arrowMat: 'm_decal_roadmarkings_01',
+    numCrossings: isCrossroads ? 4 : 3,
+    seed: 41230,
+  };
+}
+
+function deriveRoadArchitectJunctionsFromRoads(roads) {
+  if (!Array.isArray(roads) || roads.length < 2) return [];
+
+  const endpointBuckets = new Map();
+
+  const addEndpoint = (road, endName) => {
+    const nodes = road.nodes;
+    if (!Array.isArray(nodes) || nodes.length < 2) return;
+    const idx = endName === 'start' ? 0 : nodes.length - 1;
+    const node = nodes[idx];
+    const x = Number(node?.posX);
+    const y = Number(node?.posY);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    // Bucket nearby endpoints so small floating precision differences still match.
+    const key = `${Math.round(x * 10)}:${Math.round(y * 10)}`;
+    const list = endpointBuckets.get(key) || [];
+    list.push({ roadName: road.name, laneWidth: Number(node?.widths?.['1']) || 3.5 });
+    endpointBuckets.set(key, list);
+  };
+
+  for (const road of roads) {
+    addEndpoint(road, 'start');
+    addEndpoint(road, 'end');
+  }
+
+  const junctions = [];
+  let junctionIdx = 1;
+
+  for (const endpoints of endpointBuckets.values()) {
+    const uniqueRoads = [];
+    const seenRoadNames = new Set();
+    for (const endpoint of endpoints) {
+      if (seenRoadNames.has(endpoint.roadName)) continue;
+      seenRoadNames.add(endpoint.roadName);
+      uniqueRoads.push(endpoint);
+    }
+
+    if (uniqueRoads.length < 3) continue;
+    const supportedRoads = uniqueRoads.slice(0, 4);
+    const roadRefs = supportedRoads.map((entry) => entry.roadName);
+    const laneWidthAvg = supportedRoads.reduce((sum, entry) => sum + entry.laneWidth, 0) / supportedRoads.length;
+    const type = supportedRoads.length >= 4 ? 'crossroads' : 't-junction';
+
+    junctions.push(makeRoadArchitectSerializedJunction({
+      type,
+      roads: roadRefs,
+      name: `OSM ${type === 'crossroads' ? 'Crossroads' : 'T Junction'} ${junctionIdx}`,
+      laneWidth: laneWidthAvg,
+    }));
+    junctionIdx += 1;
+  }
+
+  return junctions;
+}
+
 function generateRoadArchitectSession(terrainData, squareSize, levelName) {
   if (!terrainData?.osmFeatures?.length) return null;
 
+  const intersectionNodeKeys = buildRoadIntersectionNodeKeySet(terrainData.osmFeatures);
   const roads = [];
 
   for (const feature of terrainData.osmFeatures) {
@@ -1234,6 +1404,7 @@ function generateRoadArchitectSession(terrainData, squareSize, levelName) {
     const halfWidth = estimateRoadHalfWidth(tags, highway, isOneWay, style.width);
     const laneCount = Math.max(1, getDefaultLaneCount(highway, isOneWay));
     const clippedSegments = clipGeometryToMargin(feature.geometry, terrainData.bounds)
+      .flatMap((segment) => splitPolylineAtNodeKeys(segment, intersectionNodeKeys))
       .flatMap((segment) => chunkPolyline(segment, 80));
 
     for (const segment of clippedSegments) {
@@ -1285,10 +1456,12 @@ function generateRoadArchitectSession(terrainData, squareSize, levelName) {
 
   if (roads.length === 0) return null;
 
+  const junctions = deriveRoadArchitectJunctionsFromRoads(roads);
+
   return {
     data: {
       groups: [],
-      junctions: [],
+      junctions,
       mapName: String(levelName || 'mapng').toLowerCase(),
       placedGroups: [],
       profiles: [createRoadArchitectDefaultProfile()],
@@ -1601,6 +1774,7 @@ function buildBeamNGExportReport({
   barrierObjects,
   barrierMeshSplineGroups,
   roadArchitectRoadCount,
+  roadArchitectJunctionCount,
   forestPlacements,
   forestFiles,
   groundCoverObjects,
@@ -1672,6 +1846,7 @@ function buildBeamNGExportReport({
     'Generated Content',
     `- Terrain materials written: ${terrainMaterialCount}`,
     `- Road Architect roads generated: ${roadArchitectRoadCount}`,
+    `- Road Architect junctions generated: ${roadArchitectJunctionCount}`,
     `- Barrier mesh spline groups: ${barrierMeshSplineGroups.length}`,
     `- Barrier TSStatic objects: ${barrierObjects.length}`,
     `- Water objects generated: ${waterObjects.length}`,
@@ -2788,6 +2963,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const roadArchitectRoadCount = Array.isArray(roadArchitectSession?.data?.roads)
     ? roadArchitectSession.data.roads.length
     : 0;
+  const roadArchitectJunctionCount = Array.isArray(roadArchitectSession?.data?.junctions)
+    ? roadArchitectSession.data.junctions.length
+    : 0;
   const meshRoads = useMeshRoads
     ? generateMeshRoads(exportTerrainData, squareSize)
     : [];
@@ -3101,6 +3279,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     barrierObjects,
     barrierMeshSplineGroups,
     roadArchitectRoadCount,
+    roadArchitectJunctionCount,
     forestPlacements,
     forestFiles,
     groundCoverObjects,

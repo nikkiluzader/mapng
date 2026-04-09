@@ -254,6 +254,7 @@
     "quarryRock": "Cobertura de cantera/roca",
     "roads": "Calles",
     "meshRoads": "Geometría malla 3D",
+    "communityQualityNotice": "Las exportaciones de MapNG se disfrutan mejor como punto de partida. Para lanzamientos publicos, recomendamos dedicar trabajo adicional de world-building y pulido antes de publicarlas en hubs de mods.",
     "beamngLevelExport": "Exportacion de nivel BeamNG",
     "generatePlayableZip": "Generar paquete .zip jugable",
     "assets2d": "Assets 2D",

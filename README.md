@@ -33,6 +33,17 @@ It is built for modding workflows, not survey-grade terrain reconstruction. The 
 - OSM-based textures and road overlays are useful for layout reference, but they are not final-quality road art.
 - The generated BeamNG level package uses heuristics and official game asset references. Some combinations still need more validation in-game.
 - Large exports, especially `4096` and `8192`, can be heavy on browser memory.
+- MapNG outputs are intended as a starting point for modding workflows. If you plan to publish to community mod forums, please do additional editing, world-building, optimization, and QA first.
+
+## Community Publishing Guidance
+
+MapNG is designed to help you bootstrap a terrain and quickly explore real places, not to replace full map production.
+
+- For modders: treat MapNG output like a first pass, then continue in your normal level-building workflow.
+- For casual users: exporting a local area to drive around is a great use case.
+- For public releases: please avoid posting raw, unedited MapNG exports as finished maps.
+
+This helps keep community resource hubs focused on curated, polished releases while still making MapNG useful for prototyping and personal projects.
 
 ## Export Types
 

@@ -254,6 +254,7 @@
     "quarryRock": "Quarry/rock cover",
     "roads": "Roads",
     "meshRoads": "3D mesh geometry",
+    "communityQualityNotice": "MapNG exports are best used as a starting point. For public releases, we strongly recommend additional world-building and polish before publishing to community mod hubs.",
     "beamngLevelExport": "BeamNG Level Export",
     "generatePlayableZip": "Generate playable .zip package",
     "assets2d": "2D Assets",
