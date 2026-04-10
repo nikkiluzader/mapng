@@ -1,5 +1,4 @@
 const OVERPASS_ENDPOINTS = [
-  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
   "https://lz4.overpass-api.de/api/interpreter",
   "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
@@ -572,17 +571,13 @@ const parseOverpassResponse = (data, bounds) => {
   return [...clippedFeatures, ...proceduralTrees];
 };
 
-// --- Parallel Race Fetcher ---
-// Fires all endpoints simultaneously. First successful response wins;
-// all others are aborted. Falls back to sequential if AbortController
-// is unavailable (shouldn't happen in any modern browser).
+// --- Endpoint Fetcher ---
 
-const fetchWithAbort = (endpoint, query, signal) => {
+const fetchFromEndpoint = (endpoint, query) => {
   return fetch(endpoint, {
     method: "POST",
     body: `data=${encodeURIComponent(query)}`,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    signal,
   }).then(async (response) => {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
@@ -598,33 +593,16 @@ const fetchWithAbort = (endpoint, query, signal) => {
   });
 };
 
-const raceEndpoints = (endpoints, query) => {
-  return new Promise((resolve, reject) => {
-    const controllers = endpoints.map(() => new AbortController());
-    let settled = false;
-    let failCount = 0;
-    const errors = [];
-
-    endpoints.forEach((endpoint, i) => {
-      fetchWithAbort(endpoint, query, controllers[i].signal)
-        .then((result) => {
-          if (settled) return;
-          settled = true;
-          // Abort all other in-flight requests
-          controllers.forEach((c, j) => { if (j !== i) c.abort(); });
-          resolve(result);
-        })
-        .catch((err) => {
-          if (err.name === "AbortError") return; // Expected — we won elsewhere
-          errors.push(`${endpoint}: ${err.message}`);
-          failCount++;
-          if (failCount === endpoints.length && !settled) {
-            settled = true;
-            reject(new Error(`All endpoints failed:\n${errors.join("\n")}`));
-          }
-        });
-    });
-  });
+const fetchSequentially = async (endpoints, query) => {
+  const errors = [];
+  for (const endpoint of endpoints) {
+    try {
+      return await fetchFromEndpoint(endpoint, query);
+    } catch (err) {
+      errors.push(`${endpoint}: ${err.message}`);
+    }
+  }
+  throw new Error(`All endpoints failed:\n${errors.join("\n")}`);
 };
 
 export const fetchOSMData = async (bounds) => {
@@ -638,7 +616,7 @@ export const fetchOSMData = async (bounds) => {
   const shuffled = [...OVERPASS_ENDPOINTS].sort(() => Math.random() - 0.5);
 
   try {
-    const { endpoint, data } = await raceEndpoints(shuffled, query);
+    const { endpoint, data } = await fetchSequentially(shuffled, query);
 
     console.log(`[OSM] Winner: ${endpoint} — ${data.elements?.length || 0} elements`);
 

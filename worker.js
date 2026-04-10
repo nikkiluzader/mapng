@@ -9,6 +9,8 @@
  */
 
 const GPXZ_ORIGIN = 'https://api.gpxz.io';
+const NOMINATIM_OSM_ORIGIN = 'https://nominatim.openstreetmap.org';
+const NOMINATIM_GEOCODE_ORIGIN = 'https://nominatim.geocoding.ai';
 
 const EXPOSED_HEADERS = [
   'x-ratelimit-used',
@@ -23,6 +25,49 @@ const EXPOSED_HEADERS = [
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    const proxySimple = async (origin, stripPrefix) => {
+      if (request.method === 'OPTIONS') {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, OPTIONS',
+            'Access-Control-Allow-Headers': 'content-type, accept',
+            'Access-Control-Max-Age': '86400',
+          },
+        });
+      }
+
+      if (request.method !== 'GET') {
+        return new Response('Method Not Allowed', { status: 405 });
+      }
+
+      const upstreamPath = url.pathname.slice(stripPrefix.length);
+      const upstreamUrl = `${origin}${upstreamPath}${url.search}`;
+      const upstream = await fetch(upstreamUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': request.headers.get('Accept') || 'application/json',
+        },
+      });
+
+      const responseHeaders = new Headers(upstream.headers);
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      return new Response(upstream.body, {
+        status: upstream.status,
+        statusText: upstream.statusText,
+        headers: responseHeaders,
+      });
+    };
+
+    if (url.pathname.startsWith('/api/nominatim-osm/')) {
+      return proxySimple(NOMINATIM_OSM_ORIGIN, '/api/nominatim-osm');
+    }
+
+    if (url.pathname.startsWith('/api/nominatim-geocode/')) {
+      return proxySimple(NOMINATIM_GEOCODE_ORIGIN, '/api/nominatim-geocode');
+    }
 
     // Only proxy /api/gpxz/* paths
     if (!url.pathname.startsWith('/api/gpxz/')) {

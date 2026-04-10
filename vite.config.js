@@ -51,6 +51,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/gpxz/, ''),
       },
+      '/api/nominatim-osm': {
+        target: 'https://nominatim.openstreetmap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/nominatim-osm/, ''),
+      },
+      '/api/nominatim-geocode': {
+        target: 'https://nominatim.geocoding.ai',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/nominatim-geocode/, ''),
+      },
     },
   },
 });

@@ -1,12 +1,10 @@
 
 const NOMINATIM_ENDPOINTS = [
-    "https://nominatim.openstreetmap.org/search",
-    "https://nominatim.geocoding.ai/search"
+    "/api/nominatim-geocode/search"
 ];
 
 const NOMINATIM_REVERSE_ENDPOINTS = [
-    "https://nominatim.openstreetmap.org/reverse",
-    "https://nominatim.geocoding.ai/reverse"
+    "/api/nominatim-geocode/reverse"
 ];
 
 // Rate limiting: Nominatim requires max 1 request per second
@@ -45,7 +43,6 @@ export const searchLocation = async (query) => {
         try {
             const response = await fetch(`${endpoint}?${params}`, {
                 headers: {
-                    'User-Agent': 'MapNG-BeamNG-Terrain-Generator/1.0',
                     'Accept': 'application/json'
                 }
             });
@@ -90,7 +87,7 @@ export const searchLocation = async (query) => {
         }
     }
 
-    console.error("[Nominatim] All endpoints failed");
+    console.warn("[Nominatim] All endpoints failed");
     return [];
 };
 
@@ -129,7 +126,6 @@ export const reverseLocationName = async (lat, lng) => {
         try {
             const response = await fetch(`${endpoint}?${params}`, {
                 headers: {
-                    'User-Agent': 'MapNG-BeamNG-Terrain-Generator/1.0',
                     'Accept': 'application/json'
                 }
             });
