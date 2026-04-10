@@ -17,8 +17,8 @@
               :ambient-intensity="activeSunPreset.ambientIntensity"
               :light-color="activeSunPreset.lightColor"
               :ambient-color="activeSunPreset.ambientColor"
-              :shadow-bias="0.00025"
-              :shadow-normal-bias="0.02"
+              :shadow-bias="0.00045"
+              :shadow-normal-bias="0.035"
               :light-margin="50"
             />
 

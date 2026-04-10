@@ -979,9 +979,10 @@ export const createOSMGroup = (data, options = {}) => {
     const roofGeos = [];
     const windowGeos = [];
 
-    // Small offset scaled to real-world units to prevent z-fighting
-    const roofZOffset = 0.005 * unitsPerMeter; // 5mm
-    const winNormalOffset = 0.03 * unitsPerMeter; // 3cm from wall surface
+    // Small offset scaled to real-world units to prevent z-fighting.
+    // 5mm can still flicker at large scene extents due to depth precision.
+    const roofZOffset = 0.02 * unitsPerMeter; // 2cm
+    const winNormalOffset = 0.06 * unitsPerMeter; // 6cm from wall surface
 
     buildingsList.forEach((b) => {
       // 1. Create Wall Geometry (Sides only)
@@ -1107,6 +1108,7 @@ export const createOSMGroup = (data, options = {}) => {
       // 2. Create Roof Geometry
       let roofGeo;
       const roofY = b.y + b.height;
+      const roofBaseY = roofY + roofZOffset;
       if (b.roofShape === "pyramidal" || b.roofShape === "gabled") {
         const vertices = [];
         const indices = [];
@@ -1123,11 +1125,11 @@ export const createOSMGroup = (data, options = {}) => {
         centroidZ /= b.points.length;
 
         b.points.forEach((p) => {
-          vertices.push(p.x, roofY, p.z);
+          vertices.push(p.x, roofBaseY, p.z);
           roofColorArr.push(rc.r, rc.g, rc.b);
         });
         const apexIdx = b.points.length;
-        vertices.push(centroidX, roofY + b.roofHeight, centroidZ);
+        vertices.push(centroidX, roofBaseY + b.roofHeight, centroidZ);
         roofColorArr.push(rc.r * 1.1, rc.g * 1.1, rc.b * 1.1);
 
         for (let i = 0; i < b.points.length; i++) {
@@ -1197,13 +1199,30 @@ export const createOSMGroup = (data, options = {}) => {
 
       // 3. Procedural Windows — stamp vertices directly into arrays to avoid
       // thousands of PlaneGeometry allocations (major GC pressure reduction)
-      if (b.levels > 1 && b.height > 2 * unitsPerMeter) {
+      const inferredLevels = Math.max(
+        1,
+        Math.round(b.height / (3.0 * unitsPerMeter)),
+      );
+      const taggedLevels = Number.isFinite(b.levels)
+        ? Math.max(0, Math.round(b.levels))
+        : 0;
+      const windowLevels = Math.max(taggedLevels, inferredLevels);
+
+      if (windowLevels >= 1 && b.height > 1.8 * unitsPerMeter) {
         const winWidth = 1.0 * unitsPerMeter;
         const winHeight = 1.2 * unitsPerMeter;
         const winPadding = 2.0 * unitsPerMeter;
         const halfW = winWidth / 2;
         const halfH = winHeight / 2;
         const wc = new THREE.Color(0x1e293b);
+        let centerX = 0;
+        let centerZ = 0;
+        b.points.forEach((p) => {
+          centerX += p.x;
+          centerZ += p.z;
+        });
+        centerX /= b.points.length;
+        centerZ /= b.points.length;
 
         for (let i = 0; i < b.points.length; i++) {
           const p1 = b.points[i];
@@ -1214,8 +1233,18 @@ export const createOSMGroup = (data, options = {}) => {
           const numWindows = Math.floor(len / winPadding);
 
           if (numWindows > 0) {
-            const normalX = -dz / len;
-            const normalZ = dx / len;
+            let normalX = -dz / len;
+            let normalZ = dx / len;
+            // Keep the window offset pointing away from the building center.
+            // Depending on polygon winding, the raw normal can point inward.
+            const midX = (p1.x + p2.x) * 0.5;
+            const midZ = (p1.z + p2.z) * 0.5;
+            const toCenterX = centerX - midX;
+            const toCenterZ = centerZ - midZ;
+            if (normalX * toCenterX + normalZ * toCenterZ > 0) {
+              normalX = -normalX;
+              normalZ = -normalZ;
+            }
             // Plane tangent vectors: right = along wall, up = Y axis
             // Use wall tangent (dx, dz) for rotation so windows are flat against the wall
             const angle = Math.atan2(dx, dz);
@@ -1227,8 +1256,8 @@ export const createOSMGroup = (data, options = {}) => {
               const cx = p1.x + dx * t + normalX * winNormalOffset;
               const cz = p1.z + dz * t + normalZ * winNormalOffset;
 
-              for (let l = 0; l < b.levels; l++) {
-                const cy = b.y + (l + 0.5) * (b.height / b.levels);
+                for (let l = 0; l < windowLevels; l++) {
+                  const cy = b.y + (l + 0.5) * (b.height / windowLevels);
                 // 4 corners of window plane rotated around Y
                 // PlaneGeometry default: vertices at (-halfW,-halfH,0), (halfW,-halfH,0), (-halfW,halfH,0), (halfW,halfH,0)
                 // After rotateY(angle): x' = x*cos + z*sin, z' = -x*sin + z*cos (z=0 for plane)
@@ -1316,11 +1345,19 @@ export const createOSMGroup = (data, options = {}) => {
             vertexColors: true,
             roughness: 0.8,
             map: textures.roof,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1,
           }),
-          new THREE.MeshStandardMaterial({
+          new THREE.MeshBasicMaterial({
             vertexColors: true,
-            roughness: 0.1,
-            metalness: 0.5,
+            toneMapped: false,
+            side: THREE.DoubleSide,
+            depthTest: true,
+            depthWrite: false,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2,
           }),
         ]);
         buildingMesh.castShadow = true;
