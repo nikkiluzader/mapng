@@ -7,8 +7,6 @@ import { exportTer } from './exportTer.js';
 import { encode } from 'fast-png';
 import { createWGS84ToLocal } from './geoUtils.js';
 import { exportGeoTiff } from './exportGeoTiff.js';
-import { segmentSatelliteTexture } from './segmentation.js';
-import { generateSegmentedHybridTexture } from './osmTexture.js';
 
 const isJsonMimeType = (mime = '') => {
   const normalized = String(mime).toLowerCase();
@@ -172,52 +170,6 @@ export function generateRoadMaskBlob(terrainData, center) {
 
   const pngData = encode({ width, height, data, depth: 16, channels: 1 });
   return new Blob([new Uint8Array(pngData)], { type: 'image/png' });
-}
-
-/**
- * Generate a segmented satellite texture Blob via mean-shift segmentation.
- */
-export async function generateSegmentedSatelliteBlob(terrainData) {
-  if (terrainData.segmentedTextureBlob) return normalizeBlobType(terrainData.segmentedTextureBlob, 'image/png');
-  if (terrainData.segmentedTextureCanvas) {
-    const blob = await canvasToBlob(terrainData.segmentedTextureCanvas, 'image/png');
-    if (blob) return normalizeBlobType(blob, 'image/png');
-  }
-  if (terrainData.segmentedTextureUrl) {
-    return fetchTypedBlob(terrainData.segmentedTextureUrl, 'image/png');
-  }
-
-  if (!terrainData.satelliteTextureUrl) return null;
-  const result = await segmentSatelliteTexture(terrainData.satelliteTextureUrl);
-  terrainData.segmentedTextureUrl = result.url;
-  terrainData.segmentedTextureCanvas = result.canvas;
-  terrainData.segmentedTextureBlob = result.blob || null;
-  if (result.blob) return normalizeBlobType(result.blob, 'image/png');
-
-  return fetchTypedBlob(result.url, 'image/png');
-}
-
-/**
- * Generate a segmented hybrid texture Blob (segmented base + roads overlay).
- */
-export async function generateSegmentedHybridBlob(terrainData) {
-  if (terrainData.segmentedHybridTextureBlob) return normalizeBlobType(terrainData.segmentedHybridTextureBlob, 'image/png');
-  if (terrainData.segmentedHybridTextureCanvas) {
-    const blob = await canvasToBlob(terrainData.segmentedHybridTextureCanvas, 'image/png');
-    if (blob) return normalizeBlobType(blob, 'image/png');
-  }
-  if (terrainData.segmentedHybridTextureUrl) {
-    return fetchTypedBlob(terrainData.segmentedHybridTextureUrl, 'image/png');
-  }
-
-  if (!terrainData.segmentedTextureUrl || !terrainData.osmFeatures?.length) return null;
-  const result = await generateSegmentedHybridTexture(terrainData);
-  terrainData.segmentedHybridTextureUrl = result.url;
-  terrainData.segmentedHybridTextureCanvas = result.canvas;
-  terrainData.segmentedHybridTextureBlob = result.blob || null;
-  if (result.blob) return normalizeBlobType(result.blob, 'image/png');
-
-  return fetchTypedBlob(result.url, 'image/png');
 }
 
 /**

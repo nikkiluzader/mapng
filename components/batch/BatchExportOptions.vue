@@ -24,14 +24,6 @@
           <input type="checkbox" class="accent-[#FF6600] w-3.5 h-3.5" :checked="exports.hybridTexture" :disabled="!includeOSM" @change="updateExport('hybridTexture', $event.target.checked)" />
           {{ t('batchExport.hybridTexture') }}
         </label>
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
-          <input type="checkbox" class="accent-[#FF6600] w-3.5 h-3.5" :checked="exports.segmentedSatellite" @change="updateExport('segmentedSatellite', $event.target.checked)" />
-          {{ t('batchExport.segmentedSatellite') }}
-        </label>
-        <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300" :class="{ 'opacity-50': !includeOSM }">
-          <input type="checkbox" class="accent-[#FF6600] w-3.5 h-3.5" :checked="exports.segmentedHybrid" :disabled="!includeOSM" @change="updateExport('segmentedHybrid', $event.target.checked)" />
-          {{ t('batchExport.segmentedHybrid') }}
-        </label>
         <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300" :class="{ 'opacity-50': !includeOSM }">
           <input type="checkbox" class="accent-[#FF6600] w-3.5 h-3.5" :checked="exports.roadMask" :disabled="!includeOSM" @change="updateExport('roadMask', $event.target.checked)" />
           {{ t('batchExport.roadMask') }}

@@ -59,8 +59,6 @@
               <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">{{ t('exportPanel.satelliteHybrid') }}</option>
               <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">{{ t('exportPanel.satellite') }}</option>
               <option value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
-              <option value="segmented" :disabled="!terrainData?.segmentedTextureUrl">{{ t('exportPanel.segmented') }}</option>
-              <option value="segmentedHybrid" :disabled="!terrainData?.segmentedHybridTextureUrl">{{ t('exportPanel.segmentedHybridShort') }}</option>
             </select>
           </div>
 
@@ -70,7 +68,6 @@
             <select v-model="beamNGPbrSource" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
               <option value="none">{{ t('exportPanel.off') }}</option>
               <option value="osm">{{ t('exportPanel.osmData') }}</option>
-              <option value="image" :disabled="!terrainData?.segmentedHybridTextureUrl && !terrainData?.segmentedHybridTextureCanvas">{{ t('exportPanel.segmentedHybrid') }}</option>
             </select>
           </div>
 
@@ -262,38 +259,6 @@
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
-          <!-- Segmented Satellite Texture -->
-          <button 
-            @click="downloadSegmentedTexture"
-            :disabled="!terrainData.segmentedTextureUrl || isAnyExporting"
-            class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
-          >
-            <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isExportingSegmentedTexture" :size="20" class="animate-spin text-[#FF6600]" />
-              <img v-else-if="terrainData.segmentedTextureUrl" :src="terrainData.segmentedTextureUrl" class="w-full h-full object-cover" />
-              <Paintbrush v-else :size="24" class="text-gray-400 dark:text-gray-500" />
-            </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.segmented') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-          </button>
-
-          <!-- Segmented Hybrid Texture -->
-          <button 
-            @click="downloadSegmentedHybridTexture"
-            :disabled="!terrainData.segmentedHybridTextureUrl || isAnyExporting"
-            class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
-          >
-            <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isExportingSegmentedHybridTexture" :size="20" class="animate-spin text-[#FF6600]" />
-              <img v-else-if="terrainData.segmentedHybridTextureUrl" :src="terrainData.segmentedHybridTextureUrl" class="w-full h-full object-cover" />
-              <Paintbrush v-else :size="24" class="text-gray-400 dark:text-gray-500" />
-            </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.segmentedHybridShort') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-          </button>
-
           <!-- Road Mask -->
           <button 
             @click="downloadRoadMask"
@@ -331,8 +296,6 @@
                 <option value="satellite">{{ t('exportPanel.satellite') }}</option>
                 <option value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
                 <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl">{{ t('exportPanel.hybrid') }}</option>
-                <option value="segmented" :disabled="!terrainData?.segmentedTextureUrl">{{ t('exportPanel.segmented') }}</option>
-                <option value="segmentedHybrid" :disabled="!terrainData?.segmentedHybridTextureUrl">{{ t('exportPanel.segmentedHybridShort') }}</option>
                 <option value="none">{{ t('exportPanel.none') }}</option>
               </select>
             </div>
@@ -497,7 +460,7 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Paintbrush, Route, FileCode, FileJson, PackageOpen
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen
 } from 'lucide-vue-next';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExports';
@@ -532,8 +495,6 @@ const isExportingHeightmap = ref(false);
 const isExportingTexture = ref(false);
 const isExportingOSMTexture = ref(false);
 const isExportingHybridTexture = ref(false);
-const isExportingSegmentedTexture = ref(false);
-const isExportingSegmentedHybridTexture = ref(false);
 const isExportingRoadMask = ref(false);
 const isExportingGeoTIFF = ref(false);
 const isExportingGLB = ref(false);
@@ -548,8 +509,6 @@ const resolveBeamNGBaseTexture = (terrainData, preferred = 'osm') => {
     osm: !!terrainData?.osmTextureUrl,
     hybrid: !!terrainData?.hybridTextureUrl || !!terrainData?.hybridTextureCanvas,
     satellite: !!terrainData?.satelliteTextureUrl,
-    segmented: !!terrainData?.segmentedTextureUrl,
-    segmentedHybrid: !!terrainData?.segmentedHybridTextureUrl,
   };
 
   if (availableTextures[preferred]) return preferred;
@@ -578,8 +537,6 @@ const isAnyExporting = computed(() => (
   isExportingTexture.value ||
   isExportingOSMTexture.value ||
   isExportingHybridTexture.value ||
-  isExportingSegmentedTexture.value ||
-  isExportingSegmentedHybridTexture.value ||
   isExportingRoadMask.value ||
   isExportingGeoTIFF.value ||
   isExportingGLB.value ||
@@ -938,44 +895,6 @@ const downloadHybridTexture = async () => {
     alert(t('export.errorHybridTexture'));
   } finally {
     isExportingHybridTexture.value = false;
-  }
-};
-
-const downloadSegmentedTexture = async () => {
-  if (!props.terrainData?.segmentedTextureUrl) return;
-  isExportingSegmentedTexture.value = true;
-  try {
-    await yieldToUi();
-    const td = await getExportTerrainData();
-    const filename = `segmented_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-    await downloadBlobUrlAsFile(td.segmentedTextureUrl ?? props.terrainData.segmentedTextureUrl, filename, 'image/', 'image/png');
-    notifyExportSuccess('texture_segmented', filename);
-    const metadata = buildExportMetadata('texture_segmented', filename);
-    downloadMetadataSidecar(filename, metadata);
-  } catch (error) {
-    console.error('Failed to export segmented texture:', error);
-    alert(t('export.errorSegmentedTexture'));
-  } finally {
-    isExportingSegmentedTexture.value = false;
-  }
-};
-
-const downloadSegmentedHybridTexture = async () => {
-  if (!props.terrainData?.segmentedHybridTextureUrl) return;
-  isExportingSegmentedHybridTexture.value = true;
-  try {
-    await yieldToUi();
-    const td = await getExportTerrainData();
-    const filename = `segmented_hybrid_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
-    await downloadBlobUrlAsFile(td.segmentedHybridTextureUrl ?? props.terrainData.segmentedHybridTextureUrl, filename, 'image/', 'image/png');
-    notifyExportSuccess('texture_segmented_hybrid', filename);
-    const metadata = buildExportMetadata('texture_segmented_hybrid', filename);
-    downloadMetadataSidecar(filename, metadata);
-  } catch (error) {
-    console.error('Failed to export segmented hybrid texture:', error);
-    alert(t('export.errorSegmentedHybridTexture'));
-  } finally {
-    isExportingSegmentedHybridTexture.value = false;
   }
 };
 

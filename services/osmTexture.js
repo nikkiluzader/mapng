@@ -1814,52 +1814,6 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
   return { url, canvas, blob };
 };
 
-/**
- * Generate a "segmented hybrid" texture — segmented satellite as background
- * with OSM road network rendered on top. Ideal for PBR base color maps that
- * need visible road geometry without photographic noise.
- */
-export const generateSegmentedHybridTexture = async (terrainData, options = {}) => {
-  const onProgress = options.onProgress;
-  onProgress?.("Blending segmented satellite with road overlays...");
-  const MAX_TEX_SIZE = 8192;
-  const requestedSize = Number(options.outputSize || terrainData.width || 1024);
-  const targetSize = Math.max(1, Math.min(MAX_TEX_SIZE, Math.floor(requestedSize)));
-  const SCALE_FACTOR = targetSize / Math.max(1, terrainData.width);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(terrainData.width * SCALE_FACTOR));
-  canvas.height = Math.max(1, Math.round(terrainData.height * SCALE_FACTOR));
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not get 2D context");
-
-  // Background: Segmented satellite image
-  const segCanvas = terrainData.segmentedTextureCanvas;
-  const segUrl = terrainData.segmentedTextureUrl;
-  if (segCanvas) {
-    ctx.drawImage(segCanvas, 0, 0, canvas.width, canvas.height);
-  } else if (segUrl) {
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    img.src = segUrl;
-    await new Promise((r) => { img.onload = r; img.onerror = r; });
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  } else {
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  renderRoadOverlayOnCanvas(canvas, terrainData, {
-    ...options,
-    alpha: 1.0,
-  });
-
-  const blob = await new Promise((r) =>
-    canvas.toBlob((b) => r(b || null), "image/png"),
-  );
-  const url = blob ? URL.createObjectURL(blob) : "";
-  return { url, canvas, blob };
-};
-
 export function renderRoadOverlayOnCanvas(canvas, terrainData, options = {}) {
   if (!canvas || !terrainData?.bounds || !terrainData?.osmFeatures?.length) return canvas;
 

@@ -4,8 +4,7 @@ export { parseTifFile };
 import { parseLazFile } from "./lazLoader";
 export { parseLazFile };
 import { rasterizeLazOffThread } from "./lazClient";
-import { generateOSMTexture, generateHybridTexture, generateSegmentedHybridTexture } from "./osmTexture";
-import { segmentSatelliteTexture } from "./segmentation";
+import { generateOSMTexture, generateHybridTexture } from "./osmTexture";
 import * as GeoTIFF from "geotiff";
 import {
   resampleToMeterGrid,
@@ -605,10 +604,8 @@ export const fetchTerrainData = async (
 ) => {
   const {
     keepSourceGeoTiffs = true,
-    generateSegmentedSatellite = true,
     generateOSMTextureAsset = true,
     generateHybridTextureAsset = true,
-    generateSegmentedHybridAsset = true,
     globalTileConcurrency = 20,
   } = generationOptions || {};
   // Normalize longitude to handle world wrapping
@@ -997,18 +994,6 @@ export const fetchTerrainData = async (
     sourceGeoTiffs,
   };
 
-  if (generateSegmentedSatellite || generateSegmentedHybridAsset) {
-    onProgress?.("Generating segmented satellite texture...");
-    try {
-      const segResult = await segmentSatelliteTexture(satelliteTextureUrl, { onProgress });
-      terrainData.segmentedTextureUrl = segResult.url;
-      terrainData.segmentedTextureCanvas = segResult.canvas;
-      terrainData.segmentedTextureBlob = segResult.blob || null;
-    } catch (e) {
-      console.warn("Segmentation failed, skipping:", e);
-    }
-  }
-
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, baseColor, onProgress };
     if (generateOSMTextureAsset) {
@@ -1030,14 +1015,6 @@ export const fetchTerrainData = async (
       terrainData.hybridTextureBlob = hybridResult.blob || null;
     }
 
-    // Generate segmented hybrid (segmented base + roads)
-    if (generateSegmentedHybridAsset && terrainData.segmentedTextureUrl) {
-      onProgress?.("Generating Segmented Hybrid texture...");
-      const segHybridResult = await generateSegmentedHybridTexture(terrainData, options);
-      terrainData.segmentedHybridTextureUrl = segHybridResult.url;
-      terrainData.segmentedHybridTextureCanvas = segHybridResult.canvas;
-      terrainData.segmentedHybridTextureBlob = segHybridResult.blob || null;
-    }
   }
 
   return terrainData;
@@ -1068,10 +1045,8 @@ export const loadTerrainFromTif = async (
   generationOptions = {},
 ) => {
   const {
-    generateSegmentedSatellite = true,
     generateOSMTextureAsset = true,
     generateHybridTextureAsset = true,
-    generateSegmentedHybridAsset = true,
     globalTileConcurrency = 20,
     elevationUnitOverride = 'auto',
   } = generationOptions || {};
@@ -1289,16 +1264,6 @@ export const loadTerrainFromTif = async (
     },
   };
 
-  if (generateSegmentedSatellite || generateSegmentedHybridAsset) {
-    onProgress?.('Generating segmented satellite texture...');
-    try {
-      const segResult = await segmentSatelliteTexture(satelliteTextureUrl, { onProgress });
-      terrainData.segmentedTextureUrl    = segResult.url;
-      terrainData.segmentedTextureCanvas = segResult.canvas;
-      terrainData.segmentedTextureBlob   = segResult.blob || null;
-    } catch (e) { console.warn('Segmentation failed, skipping:', e); }
-  }
-
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, onProgress };
     if (generateOSMTextureAsset) {
@@ -1314,13 +1279,6 @@ export const loadTerrainFromTif = async (
       terrainData.hybridTextureUrl    = hybridResult.url;
       terrainData.hybridTextureCanvas = hybridResult.canvas;
       terrainData.hybridTextureBlob   = hybridResult.blob || null;
-    }
-    if (generateSegmentedHybridAsset && terrainData.segmentedTextureUrl) {
-      onProgress?.('Generating Segmented Hybrid texture...');
-      const segHybridResult = await generateSegmentedHybridTexture(terrainData, options);
-      terrainData.segmentedHybridTextureUrl    = segHybridResult.url;
-      terrainData.segmentedHybridTextureCanvas = segHybridResult.canvas;
-      terrainData.segmentedHybridTextureBlob   = segHybridResult.blob || null;
     }
   }
 
@@ -1338,10 +1296,8 @@ export const loadTerrainFromLaz = async (
   generationOptions = {},
 ) => {
   const {
-    generateSegmentedSatellite   = true,
     generateOSMTextureAsset      = true,
     generateHybridTextureAsset   = true,
-    generateSegmentedHybridAsset = true,
     globalTileConcurrency        = 20,
     elevationUnitOverride        = 'auto',
   } = generationOptions || {};
@@ -1513,16 +1469,6 @@ export const loadTerrainFromLaz = async (
     exportCropSize: lazData.suggestedResolution ?? null,
   };
 
-  if (generateSegmentedSatellite || generateSegmentedHybridAsset) {
-    onProgress?.('Generating segmented satellite texture...');
-    try {
-      const segResult = await segmentSatelliteTexture(satelliteTextureUrl, { onProgress });
-      terrainData.segmentedTextureUrl    = segResult.url;
-      terrainData.segmentedTextureCanvas = segResult.canvas;
-      terrainData.segmentedTextureBlob   = segResult.blob || null;
-    } catch (e) { console.warn('Segmentation failed, skipping:', e); }
-  }
-
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, onProgress };
     if (generateOSMTextureAsset) {
@@ -1538,13 +1484,6 @@ export const loadTerrainFromLaz = async (
       terrainData.hybridTextureUrl    = hybridResult.url;
       terrainData.hybridTextureCanvas = hybridResult.canvas;
       terrainData.hybridTextureBlob   = hybridResult.blob || null;
-    }
-    if (generateSegmentedHybridAsset && terrainData.segmentedTextureUrl) {
-      onProgress?.('Generating Segmented Hybrid texture...');
-      const segHybridResult = await generateSegmentedHybridTexture(terrainData, options);
-      terrainData.segmentedHybridTextureUrl    = segHybridResult.url;
-      terrainData.segmentedHybridTextureCanvas = segHybridResult.canvas;
-      terrainData.segmentedHybridTextureBlob   = segHybridResult.blob || null;
     }
   }
 
@@ -1603,14 +1542,6 @@ export const addOSMToTerrain = async (
     newTerrainData.hybridTextureCanvas = hybridResult.canvas;
     newTerrainData.hybridTextureBlob = hybridResult.blob || null;
 
-    // Generate segmented hybrid if segmented base exists
-    if (newTerrainData.segmentedTextureUrl) {
-      onProgress?.("Generating Segmented Hybrid texture...");
-      const segHybridResult = await generateSegmentedHybridTexture(newTerrainData, options);
-      newTerrainData.segmentedHybridTextureUrl = segHybridResult.url;
-      newTerrainData.segmentedHybridTextureCanvas = segHybridResult.canvas;
-      newTerrainData.segmentedHybridTextureBlob = segHybridResult.blob || null;
-    }
   }
 
   return newTerrainData;

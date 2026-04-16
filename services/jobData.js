@@ -48,9 +48,7 @@ export async function exportJobData(terrainData, generationKey = null) {
     const textures = {
         "satellite.jpg": terrainData.satelliteTextureUrl,
         "osm.png": terrainData.osmTextureUrl,
-        "hybrid.jpg": terrainData.hybridTextureUrl,
-        "segmented.png": terrainData.segmentedTextureUrl,
-        "segmented_hybrid.png": terrainData.segmentedHybridTextureUrl
+        "hybrid.jpg": terrainData.hybridTextureUrl
     };
 
     for (const [name, url] of Object.entries(textures)) {

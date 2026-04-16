@@ -35,8 +35,6 @@ export const buildRunConfiguration = ({
     satellite: !!terrainData?.satelliteTextureUrl,
     osm: !!terrainData?.osmTextureUrl,
     hybrid: !!terrainData?.hybridTextureUrl,
-    segmentedSatellite: !!terrainData?.segmentedTextureUrl,
-    segmentedHybrid: !!terrainData?.segmentedHybridTextureUrl,
     roadMask: !!terrainData?.osmFeatures?.length,
   },
   osmQuery: terrainData?.osmRequestInfo || null,

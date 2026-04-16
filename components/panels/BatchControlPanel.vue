@@ -345,8 +345,6 @@ const DEFAULT_EXPORTS = {
   satellite: true,
   osmTexture: false,
   hybridTexture: false,
-  segmentedSatellite: false,
-  segmentedHybrid: false,
   roadMask: false,
   glb: false,
   dae: false,
@@ -796,7 +794,6 @@ watch(includeOSM, (v) => {
   if (!v) {
     exports.value.osmTexture = false;
     exports.value.hybridTexture = false;
-    exports.value.segmentedHybrid = false;
     exports.value.roadMask = false;
     exports.value.geojson = false;
   }

@@ -464,8 +464,6 @@ const resolveTerrainTextureUrl = (data, centerTextureType = 'osm') => {
     satellite: data?.satelliteTextureUrl || null,
     osm: data?.osmTextureUrl || null,
     hybrid: data?.hybridTextureUrl || null,
-    segmented: data?.segmentedTextureUrl || null,
-    segmentedHybrid: data?.segmentedHybridTextureUrl || null,
     none: null,
   };
 
@@ -475,8 +473,6 @@ const resolveTerrainTextureUrl = (data, centerTextureType = 'osm') => {
   return (
     textureByType.osm ||
     textureByType.hybrid ||
-    textureByType.segmented ||
-    textureByType.segmentedHybrid ||
     textureByType.satellite ||
     null
   );

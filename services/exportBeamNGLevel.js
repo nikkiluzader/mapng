@@ -234,8 +234,6 @@ async function resizePngBlob(blob, targetSize) {
  *   'hybrid'          — satellite + road overlay (default)
  *   'satellite'       — plain satellite imagery
  *   'osm'             — procedural OSM texture
- *   'segmented'       — segmented satellite
- *   'segmentedHybrid' — segmented satellite + OSM roads overlay
  *
  * Falls back to the grey 64×64 placeholder if the requested texture is
  * unavailable. Always re-encodes as PNG.
@@ -257,14 +255,6 @@ async function getTerrainTextureBlob(terrainData, textureType = 'hybrid') {
       if (terrainData.osmTextureCanvas) return new Promise(r => terrainData.osmTextureCanvas.toBlob(r, 'image/png'));
       if (terrainData.osmTextureBlob) return terrainData.osmTextureBlob;
       if (terrainData.osmTextureUrl) return await urlToPngBlob(terrainData.osmTextureUrl);
-    } else if (textureType === 'segmented') {
-      if (terrainData.segmentedTextureCanvas) return new Promise(r => terrainData.segmentedTextureCanvas.toBlob(r, 'image/png'));
-      if (terrainData.segmentedTextureBlob) return terrainData.segmentedTextureBlob;
-      if (terrainData.segmentedTextureUrl) return await urlToPngBlob(terrainData.segmentedTextureUrl);
-    } else if (textureType === 'segmentedHybrid') {
-      if (terrainData.segmentedHybridTextureCanvas) return new Promise(r => terrainData.segmentedHybridTextureCanvas.toBlob(r, 'image/png'));
-      if (terrainData.segmentedHybridTextureBlob) return terrainData.segmentedHybridTextureBlob;
-      if (terrainData.segmentedHybridTextureUrl) return await urlToPngBlob(terrainData.segmentedHybridTextureUrl);
     }
   } catch (_) {}
 
@@ -3119,7 +3109,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {object} terrainData
  * @param {object} center        — { lat, lng }
  * @param {object} [options]
- * @param {string}  [options.baseTexture='hybrid']         — 'hybrid' | 'satellite' | 'osm' | 'segmented' | 'segmentedHybrid'
+ * @param {string}  [options.baseTexture='hybrid']         — 'hybrid' | 'satellite' | 'osm'
  * @param {boolean} [options.includeBuildings=true]         — include generated OSM 3D objects (.dae)
  * @param {boolean} [options.applyFoundations=true]         — apply terrain foundation pass under buildings
  * @param {boolean} [options.includeBackdrop=false]         — fetch and include surrounding terrain backdrop DAE
@@ -3131,7 +3121,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {string}  [options.flavorId]                      — BeamNG official level flavor id
  * @param {string}  [options.levelName]                     — custom user-facing/generated level name
  * @param {'osm'|'image'|'none'} [options.pbrSource='osm'] — layer map source: 'osm' uses OSM polygon data,
- *   'image' infers materials from the segmented hybrid satellite image, 'none' disables PBR materials.
+ *   'image' is accepted for backward compatibility and falls back to OSM inference, 'none' disables PBR materials.
  *   Legacy boolean option `generatePbrMaterials` is still accepted for backward compatibility.
  * @param {boolean} [options.useMeshRoads=false]            — export roads as 3D MeshRoad geometry instead of flat DecalRoad decals
  */
@@ -3269,20 +3259,17 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   await yield_();
   // Determine the output resolution of the terrain texture.
-  // All canvas types (hybrid, osm, segmented) are rendered at the same output resolution.
+  // All canvas types (hybrid, osm) are rendered at the same output resolution.
   // Check any alive canvas first; hybridTexWidth is saved before the canvas is freed by
   // the 3D preview. Falls back to the terrain heightmap grid size as a last resort.
   const satelliteTexSize =
     exportTerrainData.hybridTextureCanvas?.width ??
     exportTerrainData.osmTextureCanvas?.width ??
-    exportTerrainData.segmentedTextureCanvas?.width ??
-    exportTerrainData.segmentedHybridTextureCanvas?.width ??
     exportTerrainData.hybridTexWidth ??
     exportTerrainData.width;
 
-  // For image-based inference, use the segmented hybrid canvas as the color source.
-  // Fall back to OSM mode if the canvas isn't available yet.
-  const imageCanvas = exportTerrainData.segmentedHybridTextureCanvas ?? null;
+  // Legacy image-based inference is no longer generated and now falls back to OSM.
+  const imageCanvas = null;
   const effectivePbrSource = (pbrSource === 'image' && !imageCanvas) ? 'osm' : pbrSource;
 
   beginStep(`Painting terrain materials (${effectivePbrSource.toUpperCase()})…`, 5);
