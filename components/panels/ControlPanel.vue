@@ -40,6 +40,15 @@
         {{ t('controlPanel.outputSettings') }}
       </label>
 
+      <div
+        v-if="devMode"
+        class="rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2"
+      >
+        <p class="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
+          Developer mode enabled (press ~ to toggle)
+        </p>
+      </div>
+
       <!-- When an uploaded source has native dimensions, resolution is driven
            by the file's native coverage; show an info row instead of dropdown. -->
       <div v-if="nativeDims" class="space-y-1">
@@ -61,6 +70,7 @@
         :modelValue="resolution"
         @update:modelValue="$emit('resolutionChange', $event)"
         :label="t('controlPanel.resolutionOutputSize')"
+        :allow-experimental16384="devMode"
       >
         <p>{{ t('controlPanel.downloadsMatch') }}</p>
         <p>{{ t('controlPanel.fetchesMaxDetail') }}</p>
@@ -215,7 +225,7 @@ import { buildRunConfiguration as buildRunConfigurationBase } from '../../servic
 const { t } = useI18n({ useScope: 'global' });
 
 
-const props = defineProps(['center', 'zoom', 'resolution', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedTifFile', 'uploadedTifMeta']);
+const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedTifFile', 'uploadedTifMeta']);
 
 const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'tifSelected', 'tifClear', 'showSupport', 'exportSuccess']);
 
@@ -525,7 +535,7 @@ const applyRunConfiguration = (config) => {
 
   const resolutionValue = toNumberOrNull(src.resolution);
   if (resolutionValue !== null) {
-    emit('resolutionChange', clampInt(resolutionValue, 512, 8192));
+    emit('resolutionChange', clampInt(resolutionValue, 512, 16384));
     }
 
   const zoomValue = toNumberOrNull(src.zoom);

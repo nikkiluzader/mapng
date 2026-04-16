@@ -11,7 +11,7 @@ import {
   resampleImageToMeterGrid,
 } from "./terrainResampler";
 import {
-  resampleHeightMapOffThread,
+  resampleHeightAndImageOffThread,
   resampleImageOffThread,
 } from "./resamplerClient";
 import { createLocalToWGS84 } from "./geoUtils";
@@ -900,27 +900,6 @@ export const fetchTerrainData = async (
     minTileY,
   } : null;
 
-  const { heightMap, bounds: finalBounds } = await resampleHeightMapOffThread(
-    {
-      type: rawData ? "geotiff" : "sampler",
-      data: rawData || undefined,
-      sampler: heightSampler || undefined,
-    },
-    normalizedCenter,
-    width,
-    height,
-    "bilinear",
-    shouldSmooth,
-    fallbackSamplerData,
-    // GPXZ is generally hole-free; if GPXZ chunks failed, keep fill enabled.
-    !(useGPXZ && rawData && !gpxzChunkFailures),
-  );
-
-  // 5. Resample Satellite Texture to Metric Grid
-  signal?.throwIfAborted();
-  onProgress?.("Resampling satellite texture...");
-
-  // Prepare serializable satellite data for the web worker
   const imageSamplerData = {
     pixels: satDataImg.data,
     width: satDataImg.width,
@@ -930,11 +909,22 @@ export const fetchTerrainData = async (
     minTileY: satMinTileY,
   };
 
-  const finalSatCanvas = await resampleImageOffThread(
-    { sampler: colorSampler },
+  const { heightMap, bounds: finalBounds, canvas: finalSatCanvas } = await resampleHeightAndImageOffThread(
+    {
+      type: rawData ? "geotiff" : "sampler",
+      data: rawData || undefined,
+      sampler: heightSampler || undefined,
+      transferRasters: !!rawData,
+    },
+    colorSampler,
     normalizedCenter,
     width,
     height,
+    "bilinear",
+    shouldSmooth,
+    fallbackSamplerData,
+    // GPXZ is generally hole-free; if GPXZ chunks failed, keep fill enabled.
+    !(useGPXZ && rawData && !gpxzChunkFailures),
     imageSamplerData,
   );
 
@@ -1138,21 +1128,33 @@ export const loadTerrainFromTif = async (
   onProgress?.('Resampling uploaded TIF to 1m/px...');
 
   let heightMap, finalBounds;
+  let finalSatCanvas = null;
 
   if (tifData.bounds) {
     // Known CRS — use geographic coordinate mapping through the worker
-    const result = await resampleHeightMapOffThread(
+    const imageSamplerData = {
+      pixels: satDataImg.data,
+      width: satDataImg.width,
+      height: satDataImg.height,
+      zoom: SATELLITE_ZOOM,
+      minTileX: satMinTileX,
+      minTileY: satMinTileY,
+    };
+    const result = await resampleHeightAndImageOffThread(
       { type: 'geotiff', data: [{ image: tifData.image, raster: tifData.raster }] },
+      colorSampler,
       normalizedCenter,
       width,
       height,
       'bilinear',
       false,
-      null,  // no Terrarium fallback
-      true,  // fillHoles
+      null,
+      true,
+      imageSamplerData,
     );
     heightMap = result.heightMap;
     finalBounds = result.bounds;
+    finalSatCanvas = result.canvas;
   } else {
     // Unknown/user-defined CRS — stretch TIF directly to output grid via bilinear scaling.
     // The user has positioned the map on the correct location, so we fill the selected area
@@ -1191,23 +1193,25 @@ export const loadTerrainFromTif = async (
   convertHeightMapToMeters(heightMap, tifUnit.scale);
 
   // ── Resample satellite texture ───────────────────────────────────────────────
-  signal?.throwIfAborted();
-  onProgress?.('Resampling satellite texture...');
-  const imageSamplerData = {
-    pixels: satDataImg.data,
-    width: satDataImg.width,
-    height: satDataImg.height,
-    zoom: SATELLITE_ZOOM,
-    minTileX: satMinTileX,
-    minTileY: satMinTileY,
-  };
-  const finalSatCanvas = await resampleImageOffThread(
-    { sampler: colorSampler },
-    normalizedCenter,
-    width,
-    height,
-    imageSamplerData,
-  );
+  if (!finalSatCanvas) {
+    signal?.throwIfAborted();
+    onProgress?.('Resampling satellite texture...');
+    const imageSamplerData = {
+      pixels: satDataImg.data,
+      width: satDataImg.width,
+      height: satDataImg.height,
+      zoom: SATELLITE_ZOOM,
+      minTileX: satMinTileX,
+      minTileY: satMinTileY,
+    };
+    finalSatCanvas = await resampleImageOffThread(
+      { sampler: colorSampler },
+      normalizedCenter,
+      width,
+      height,
+      imageSamplerData,
+    );
+  }
 
   // ── Min/Max ──────────────────────────────────────────────────────────────────
   let minHeight = Infinity;

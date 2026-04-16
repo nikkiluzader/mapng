@@ -924,6 +924,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
     groundmodelName: 'GROUNDMODEL_ASPHALT1',
     baseColorBaseTex: satellitePath,
     baseColorBaseTexSize: baseSize,
+    diffuseSize: baseSize,
     ...neutralSlots(),
   };
 
@@ -938,6 +939,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
     materialDef.internalName = refMaterial.internalName;
     materialDef.baseColorBaseTex = satellitePath;
     materialDef.baseColorBaseTexSize = baseSize;
+    materialDef.diffuseSize = baseSize;
     materialDef.aoBaseTex = p('shared_ao.png');
     materialDef.aoBaseTexSize = baseSize;
     materialDef.normalBaseTex = p('shared_nm.png');

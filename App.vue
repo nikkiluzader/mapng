@@ -26,6 +26,7 @@
         :center="center"
         :zoom="zoom"
         :resolution="resolution"
+        :dev-mode="devMode"
         :terrain-data="terrainData"
         :is-generating="isLoading"
         :generation-cache-key="lastGenerationKey"
@@ -168,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from './stores/mainStore';
@@ -234,6 +235,7 @@ const showStackInfo = ref(false);
 const showAbout = ref(false);
 const showDisclaimer = ref(false);
 const showSupportTip = ref(false);
+const devMode = ref(false);
 const supportPromptContext = ref('manual');
 let abortController = null;
 let batchAbortController = null;
@@ -322,7 +324,28 @@ const batchGridTiles = computed(() => {
 const buildHash = __BUILD_HASH__;
 const buildTime = new Date(__BUILD_TIME__).toLocaleString();
 
-const { toggleDarkMode, setCenter, setZoom, setResolution, setBatchMode } = store;
+const { toggleDarkMode, setCenter, setZoom, setResolution, setBatchMode: setStoreBatchMode } = store;
+
+const handleGlobalDevToggleKey = (event) => {
+  if (event.defaultPrevented) return;
+  const tag = String(event.target?.tagName || '').toLowerCase();
+  const isTypingTarget = tag === 'input' || tag === 'textarea' || tag === 'select' || event.target?.isContentEditable;
+  if (isTypingTarget) return;
+
+  if (event.code === 'Backquote' || event.key === '`' || event.key === '~') {
+    devMode.value = !devMode.value;
+    if (!devMode.value && Number(resolution.value) > 8192) {
+      setResolution(8192);
+    }
+  }
+};
+
+const setBatchMode = (value) => {
+  setStoreBatchMode(value);
+  if (value && Number(resolution.value) > 8192) {
+    setResolution(8192);
+  }
+};
 
 // Attempt to get user location on load
 onMounted(() => {
@@ -351,6 +374,12 @@ onMounted(() => {
     );
   }
 
+  window.addEventListener('keydown', handleGlobalDevToggleKey);
+
+});
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalDevToggleKey);
 });
 
 const handleLocationChange = (newCenter) => {

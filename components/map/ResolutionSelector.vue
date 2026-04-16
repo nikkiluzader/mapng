@@ -17,6 +17,7 @@
       <option :value="2048">2048 x 2048 px ({{ t('map.resolutionHighDetail') }})</option>
       <option :value="4096">4096 x 4096 px ({{ t('map.resolutionVeryHigh') }})</option>
       <option :value="8192">8192 x 8192 px ({{ t('map.resolutionUltra') }})</option>
+      <option v-if="allowExperimental16384" :value="16384">16384 x 16384 px (Experimental)</option>
     </select>
     <div class="text-[10px] text-gray-500 dark:text-gray-400 pt-1 space-y-1">
       <slot></slot>
@@ -33,6 +34,7 @@ defineProps({
   modelValue: { type: Number, required: true },
   label:      { type: String,  default: '' },
   disabled:   { type: Boolean, default: false },
+  allowExperimental16384: { type: Boolean, default: false },
 });
 defineEmits(['update:modelValue']);
 </script>

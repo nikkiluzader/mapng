@@ -56,6 +56,17 @@ const postToWorker = (message, transferables = []) => {
     });
 };
 
+const canvasFromRgbaBuffer = (width, height, rgbaBuffer) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(width, height);
+    imgData.data.set(new Uint8ClampedArray(rgbaBuffer.buffer || rgbaBuffer));
+    ctx.putImageData(imgData, 0, 0);
+    return canvas;
+};
+
 /**
  * Prepare serializable tile metadata from GeoTIFF image objects.
  * Called on main thread to extract data the worker needs.
@@ -127,18 +138,22 @@ export const resampleHeightMapOffThread = async (
 
             const transferables = [];
             // Collect raster buffers for transfer (clone first to avoid neutering originals)
+            const transferSourceRasters = source?.transferRasters === true;
             const tilesForWorker = tiles.map(t => {
-                const rasterCopy = new Float32Array(t.raster);
-                transferables.push(rasterCopy.buffer);
-                return { ...t, raster: rasterCopy };
+                const raster = transferSourceRasters ? t.raster : new Float32Array(t.raster);
+                transferables.push(raster.buffer);
+                return { ...t, raster };
             });
 
             // Clone fallback pixels for transfer
             let fallbackForWorker = null;
             if (fallbackData) {
-                const pixelsCopy = new Uint8Array(fallbackData.pixels);
-                transferables.push(pixelsCopy.buffer);
-                fallbackForWorker = { ...fallbackData, pixels: pixelsCopy };
+                const shouldTransferOriginalPixels = source.type === 'sampler' && fallbackData.pixels?.buffer;
+                const pixels = shouldTransferOriginalPixels
+                    ? fallbackData.pixels
+                    : new Uint8Array(fallbackData.pixels);
+                transferables.push(pixels.buffer);
+                fallbackForWorker = { ...fallbackData, pixels };
             }
 
             const result = await postToWorker({
@@ -165,6 +180,92 @@ export const resampleHeightMapOffThread = async (
     return resampleToMeterGrid(source, center, width, height, interpolation, smooth, fillHoles);
 };
 
+export const resampleHeightAndImageOffThread = async (
+    source,
+    imageSampler,
+    center,
+    width,
+    height,
+    interpolation,
+    smooth,
+    fallbackData,
+    fillHoles,
+    imageSourceData,
+) => {
+    if (getWorker() && imageSourceData) {
+        try {
+            let tiles = [];
+            let epsgDefs = {};
+
+            if (source.type === 'geotiff' && source.data) {
+                const prepared = prepareTiles(source.data);
+                tiles = prepared.tiles;
+                epsgDefs = prepared.epsgDefs;
+            }
+
+            const transferables = [];
+            const transferSourceRasters = source?.transferRasters === true;
+            const tilesForWorker = tiles.map((tile) => {
+                const raster = transferSourceRasters ? tile.raster : new Float32Array(tile.raster);
+                transferables.push(raster.buffer);
+                return { ...tile, raster };
+            });
+
+            let fallbackForWorker = null;
+            if (fallbackData) {
+                const shouldTransferOriginalPixels = source.type === 'sampler' && fallbackData.pixels?.buffer;
+                const pixels = shouldTransferOriginalPixels
+                    ? fallbackData.pixels
+                    : new Uint8Array(fallbackData.pixels);
+                transferables.push(pixels.buffer);
+                fallbackForWorker = { ...fallbackData, pixels };
+            }
+
+            const imagePixels = imageSourceData.pixels;
+            transferables.push(imagePixels.buffer);
+
+            const result = await postToWorker({
+                type: 'resampleHeightAndImage',
+                center,
+                width,
+                height,
+                smooth,
+                fillHoles,
+                tiles: tilesForWorker,
+                fallback: fallbackForWorker,
+                epsgDefs,
+                imageSource: { ...imageSourceData, pixels: imagePixels },
+            }, transferables);
+
+            if (result) {
+                return {
+                    heightMap: result.heightMap,
+                    bounds: result.bounds,
+                    canvas: canvasFromRgbaBuffer(width, height, result.rgbaBuffer),
+                };
+            }
+        } catch (e) {
+            console.warn('[ResamplerClient] Bundled resampling failed, falling back:', e);
+        }
+    }
+
+    const [{ heightMap, bounds }, canvas] = await Promise.all([
+        resampleHeightMapOffThread(
+            source,
+            center,
+            width,
+            height,
+            interpolation,
+            smooth,
+            fallbackData,
+            fillHoles,
+        ),
+        Promise.resolve(resampleImageToMeterGrid({ sampler: imageSampler }, center, width, height)),
+    ]);
+
+    return { heightMap, bounds, canvas };
+};
+
 /**
  * Resample satellite image using Web Worker, with main-thread fallback.
  *
@@ -179,25 +280,16 @@ export const resampleImageOffThread = async (
 ) => {
     if (getWorker() && imageSourceData) {
         try {
-            const pixelsCopy = new Uint8Array(imageSourceData.pixels);
             const result = await postToWorker({
                 type: 'resampleImage',
                 center,
                 width,
                 height,
-                imageSource: { ...imageSourceData, pixels: pixelsCopy },
-            }, [pixelsCopy.buffer]);
+                imageSource: imageSourceData,
+            }, [imageSourceData.pixels.buffer]);
 
             if (result && result.rgbaBuffer) {
-                // Convert RGBA buffer back to a canvas
-                const canvas = document.createElement('canvas');
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                const imgData = ctx.createImageData(width, height);
-                imgData.data.set(new Uint8ClampedArray(result.rgbaBuffer.buffer));
-                ctx.putImageData(imgData, 0, 0);
-                return canvas;
+                return canvasFromRgbaBuffer(width, height, result.rgbaBuffer);
             }
         } catch (e) {
             console.warn('[ResamplerClient] Image resampling failed, falling back:', e);

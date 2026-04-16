@@ -12,6 +12,11 @@ export const useMainStore = defineStore('main', () => {
   const isDarkMode = ref(localStorage.getItem('theme') === 'dark');
   const batchMode = ref(localStorage.getItem('mapng_batch_mode') === 'true');
 
+  if (batchMode.value && Number(resolution.value) > 8192) {
+    resolution.value = 8192;
+    localStorage.setItem('mapng_resolution', String(8192));
+  }
+
   // --- Single Tile State ---
   const terrainData = ref(null);
   const lastGenerationKey = ref(null);

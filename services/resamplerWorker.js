@@ -10,6 +10,11 @@
  */
 import proj4 from 'proj4';
 
+const DEBUG_RESAMPLER = false;
+const debugLog = (...args) => {
+    if (DEBUG_RESAMPLER) console.debug(...args);
+};
+
 // ─── Built-in proj4 strings for common CRS (avoids CORS fetch) ──────────────
 const getBuiltInProj4 = (epsgCode) => {
     if (epsgCode === 3857) {
@@ -106,7 +111,7 @@ const sampleTerrarium = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng,
 };
 
 // ─── Satellite Pixel Sampler ─────────────────────────────────────────────────
-const sampleImage = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng) => {
+const writeSampledImagePixel = (out, outIndex, pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng) => {
     const p = project(lat, lng, zoom);
     const localX = p.x - minTileX * TILE_SIZE;
     const localY = p.y - minTileY * TILE_SIZE;
@@ -114,11 +119,139 @@ const sampleImage = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng) => 
     const x = Math.floor(localX);
     const y = Math.floor(localY);
 
-    if (x < 0 || x >= imgW || y < 0 || y >= imgH)
-        return { r: 0, g: 0, b: 0, a: 255 };
+    if (x < 0 || x >= imgW || y < 0 || y >= imgH) {
+        out[outIndex] = 0;
+        out[outIndex + 1] = 0;
+        out[outIndex + 2] = 0;
+        out[outIndex + 3] = 255;
+        return;
+    }
 
     const i = (y * imgW + x) * 4;
-    return { r: pixels[i], g: pixels[i + 1], b: pixels[i + 2], a: pixels[i + 3] };
+    out[outIndex] = pixels[i];
+    out[outIndex + 1] = pixels[i + 1];
+    out[outIndex + 2] = pixels[i + 2];
+    out[outIndex + 3] = pixels[i + 3];
+};
+
+const buildPreparedTileGroups = async (tiles, epsgDefs, noDataValue) => {
+    if (epsgDefs) {
+        for (const [code, def] of Object.entries(epsgDefs)) {
+            if (def && !proj4.defs(code)) proj4.defs(code, def);
+        }
+    }
+
+    const groups = new Map();
+
+    if (!tiles || tiles.length === 0) return [];
+
+    for (const tile of tiles) {
+        const epsgKey = tile.epsgCode ? `EPSG:${tile.epsgCode}` : 'EPSG:4326';
+        let group = groups.get(epsgKey);
+
+        if (!group) {
+            let converter = null;
+            const identity = !tile.epsgCode || tile.epsgCode === 4326;
+            if (!identity) {
+                try {
+                    if (!proj4.defs(epsgKey)) {
+                        const builtIn = getBuiltInProj4(tile.epsgCode);
+                        if (builtIn) {
+                            proj4.defs(epsgKey, builtIn);
+                        } else {
+                            const response = await fetch(`https://epsg.io/${tile.epsgCode}.proj4`);
+                            if (response.ok) {
+                                const def = await response.text();
+                                proj4.defs(epsgKey, def);
+                            }
+                        }
+                    }
+                    converter = proj4('EPSG:4326', epsgKey);
+                } catch (e) {
+                    if (tile.epsgCode === 4326) {
+                        converter = { forward: (p) => p };
+                    } else {
+                        continue;
+                    }
+                }
+            }
+
+            group = {
+                identity,
+                converter,
+                tiles: [],
+                lastTile: null,
+            };
+            groups.set(epsgKey, group);
+        }
+
+        group.tiles.push({
+            raster: tile.raster,
+            width: tile.width,
+            height: tile.height,
+            originX: tile.originX,
+            originY: tile.originY,
+            resX: tile.resX,
+            resY: tile.resY,
+            noData: Number.isFinite(tile.noData) ? tile.noData : noDataValue,
+        });
+    }
+
+    return [...groups.values()];
+};
+
+const samplePreparedTile = (tile, projectedX, projectedY) => {
+    const px = (projectedX - tile.originX) / tile.resX;
+    const py = (projectedY - tile.originY) / tile.resY;
+    if (px < 0 || px >= tile.width - 1 || py < 0 || py >= tile.height - 1) {
+        return tile.noData;
+    }
+    return bilinear(tile.raster, tile.width, px, py, tile.noData);
+};
+
+const sampleHeightAt = (lng, lat, preparedGroups, fallback, noData) => {
+    for (const group of preparedGroups) {
+        let projectedX;
+        let projectedY;
+        if (group.identity) {
+            projectedX = lng;
+            projectedY = lat;
+        } else {
+            const projected = group.converter.forward([lng, lat]);
+            projectedX = projected[0];
+            projectedY = projected[1];
+        }
+
+        if (group.lastTile) {
+            const cachedVal = samplePreparedTile(group.lastTile, projectedX, projectedY);
+            if (cachedVal !== group.lastTile.noData) return cachedVal;
+        }
+
+        for (const tile of group.tiles) {
+            if (tile === group.lastTile) continue;
+            const value = samplePreparedTile(tile, projectedX, projectedY);
+            if (value !== tile.noData) {
+                group.lastTile = tile;
+                return value;
+            }
+        }
+    }
+
+    if (fallback) {
+        return sampleTerrarium(
+            fallback.pixels,
+            fallback.width,
+            fallback.height,
+            fallback.zoom,
+            fallback.minTileX,
+            fallback.minTileY,
+            lat,
+            lng,
+            noData,
+        );
+    }
+
+    return noData;
 };
 
 // ─── Height Resampling Helpers ───────────────────────────────────────────────
@@ -132,7 +265,7 @@ const pushPullInpaint = (map, width, height, noData) => {
         else { sumValid += v; countValid++; }
     }
     if (!hasHole) {
-        console.debug('[ResamplerWorker] No holes detected, skipping inpaint');
+        debugLog('[ResamplerWorker] No holes detected, skipping inpaint');
         return null;
     }
     const fallback = countValid > 0 ? sumValid / countValid : 0;
@@ -276,14 +409,18 @@ const expandFill = (map, width, height, noData, maxPasses = 64, radius = 3, base
 
 const relaxFilled = (map, width, height, noData, filledMask, iterations = 200) => {
     if (!filledMask) return;
+    const filledIndices = [];
+    for (let i = 0; i < filledMask.length; i++) {
+        if (filledMask[i]) filledIndices.push(i);
+    }
+    if (filledIndices.length === 0) return;
+
     for (let iter = 0; iter < iterations; iter++) {
         let updated = false;
-        for (let y = 0; y < height; y++) {
-            const rowOff = y * width;
-            for (let x = 0; x < width; x++) {
-                const idx = rowOff + x;
-                if (!filledMask[idx]) continue;
-                
+        for (let i = 0; i < filledIndices.length; i++) {
+                const idx = filledIndices[i];
+                const y = (idx / width) | 0;
+                const x = idx - y * width;
                 const curVal = map[idx];
                 const getV = (dx, dy) => {
                     const nx = Math.max(0, Math.min(width - 1, x + dx));
@@ -313,9 +450,105 @@ const relaxFilled = (map, width, height, noData, filledMask, iterations = 200) =
                     map[idx] = newVal;
                     updated = true;
                 }
-            }
         }
         if (!updated) break;
+    }
+};
+
+const boxBlurHorizontal = (src, dst, width, height, radius, noData) => {
+    for (let y = 0; y < height; y++) {
+        const rowOff = y * width;
+        let sum = 0;
+        let count = 0;
+
+        for (let k = 0; k <= Math.min(width - 1, radius); k++) {
+            const val = src[rowOff + k];
+            if (val !== noData) {
+                sum += val;
+                count++;
+            }
+        }
+
+        for (let x = 0; x < width; x++) {
+            dst[rowOff + x] = count > 0 ? sum / count : noData;
+
+            const removeX = x - radius;
+            if (removeX >= 0) {
+                const removeVal = src[rowOff + removeX];
+                if (removeVal !== noData) {
+                    sum -= removeVal;
+                    count--;
+                }
+            }
+
+            const addX = x + radius + 1;
+            if (addX < width) {
+                const addVal = src[rowOff + addX];
+                if (addVal !== noData) {
+                    sum += addVal;
+                    count++;
+                }
+            }
+        }
+    }
+};
+
+const boxBlurVertical = (src, dst, width, height, radius, noData) => {
+    for (let x = 0; x < width; x++) {
+        let sum = 0;
+        let count = 0;
+
+        for (let k = 0; k <= Math.min(height - 1, radius); k++) {
+            const val = src[k * width + x];
+            if (val !== noData) {
+                sum += val;
+                count++;
+            }
+        }
+
+        for (let y = 0; y < height; y++) {
+            dst[y * width + x] = count > 0 ? sum / count : noData;
+
+            const removeY = y - radius;
+            if (removeY >= 0) {
+                const removeVal = src[removeY * width + x];
+                if (removeVal !== noData) {
+                    sum -= removeVal;
+                    count--;
+                }
+            }
+
+            const addY = y + radius + 1;
+            if (addY < height) {
+                const addVal = src[addY * width + x];
+                if (addVal !== noData) {
+                    sum += addVal;
+                    count++;
+                }
+            }
+        }
+    }
+};
+
+const smoothHeightMap = (heightMap, width, height, noData) => {
+    const radius = 8;
+    const tempMap = new Float32Array(heightMap.length);
+    boxBlurHorizontal(heightMap, tempMap, width, height, radius, noData);
+    boxBlurVertical(tempMap, heightMap, width, height, radius, noData);
+    boxBlurHorizontal(heightMap, tempMap, width, height, radius, noData);
+    boxBlurVertical(tempMap, heightMap, width, height, radius, noData);
+};
+
+const finalizeHeightMap = (heightMap, width, height, noData, smooth, fillHoles) => {
+    if (fillHoles) {
+        debugLog('[ResamplerWorker] Hole filling enabled: starting push/pull seed');
+        const seededMask = pushPullInpaint(heightMap, width, height, noData);
+        const expandedMask = expandFill(heightMap, width, height, noData, 64, 3, seededMask);
+        relaxFilled(heightMap, width, height, noData, expandedMask || seededMask, 200);
+    }
+
+    if (smooth) {
+        smoothHeightMap(heightMap, width, height, noData);
     }
 };
 
@@ -326,61 +559,8 @@ const resampleHeight = async ({ center, width, height, smooth, fillHoles = true,
     const halfHeight = height / 2;
 
     const NO_DATA = -99999;
-    
-    // Register any pre-fetched EPSG definitions
-    if (epsgDefs) {
-        for (const [code, def] of Object.entries(epsgDefs)) {
-            if (!proj4.defs(code)) proj4.defs(code, def);
-        }
-    }
+    const preparedGroups = await buildPreparedTileGroups(tiles, epsgDefs, NO_DATA);
 
-    // Build tile converters (recreate proj4 instances from EPSG codes)
-    const preparedTiles = [];
-    if (tiles && tiles.length > 0) {
-        for (const tile of tiles) {
-            let converter = null;
-            if (tile.epsgCode) {
-                const epsg = `EPSG:${tile.epsgCode}`;
-                try {
-                    if (!proj4.defs(epsg)) {
-                        // Try built-in string first (no network required)
-                        const builtIn = getBuiltInProj4(tile.epsgCode);
-                        if (builtIn) {
-                            proj4.defs(epsg, builtIn);
-                        } else {
-                            // Fall back to network fetch for less common CRS
-                            const response = await fetch(`https://epsg.io/${tile.epsgCode}.proj4`);
-                            if (response.ok) {
-                                const def = await response.text();
-                                proj4.defs(epsg, def);
-                            }
-                        }
-                    }
-                    converter = proj4('EPSG:4326', epsg);
-                } catch (e) {
-                    if (tile.epsgCode === 4326) {
-                        converter = { forward: (p) => p };
-                    }
-                }
-            } else {
-                converter = { forward: (p) => p };
-            }
-
-            if (converter) {
-                preparedTiles.push({
-                    raster: tile.raster,
-                    width: tile.width,
-                    height: tile.height,
-                    originX: tile.originX,
-                    originY: tile.originY,
-                    resX: tile.resX,
-                    resY: tile.resY,
-                    noData: Number.isFinite(tile.noData) ? tile.noData : NO_DATA,
-                    converter,
-                });
-            }
-        }
-    }
     // Main resampling loop
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -388,114 +568,14 @@ const resampleHeight = async ({ center, width, height, smooth, fillHoles = true,
             const localY = halfHeight - y;
             const [lng, lat] = toWGS84.forward([localX, localY]);
 
-            let h = NO_DATA;
-
-            // Try GeoTIFF tiles first
-            if (preparedTiles.length > 0) {
-                for (const tile of preparedTiles) {
-                    const [tx, ty] = tile.converter.forward([lng, lat]);
-                    const px = (tx - tile.originX) / tile.resX;
-                    const py = (ty - tile.originY) / tile.resY;
-
-                    if (px >= 0 && px < tile.width - 1 && py >= 0 && py < tile.height - 1) {
-                        const val = bilinear(tile.raster, tile.width, px, py, tile.noData);
-                        if (val !== tile.noData) {
-                            h = val;
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Fallback to Terrarium sampler
-            if (h === NO_DATA && fallback) {
-                h = sampleTerrarium(
-                    fallback.pixels, fallback.width, fallback.height,
-                    fallback.zoom, fallback.minTileX, fallback.minTileY,
-                    lat, lng,
-                    NO_DATA
-                );
-            }
+            let h = sampleHeightAt(lng, lat, preparedGroups, fallback, NO_DATA);
 
             if (!Number.isFinite(h) || h <= -200 || h === NO_DATA) h = NO_DATA;
             heightMap[y * width + x] = h;
         }
     }
 
-    // Fill holes before smoothing to avoid visible seams from missing tiles (skip if disabled)
-    if (fillHoles) {
-        console.debug('[ResamplerWorker] Hole filling enabled: starting push/pull seed');
-        let preMin=Infinity, preMax=-Infinity, preHole=0;
-        for(let i=0; i<heightMap.length; i++) {
-            if(heightMap[i] === NO_DATA) preHole++;
-            else { if(heightMap[i] < preMin) preMin=heightMap[i]; if(heightMap[i] > preMax) preMax=heightMap[i]; }
-        }
-        console.debug('[ResamplerWorker] Before inpaint - Holes:', preHole, 'Min:', preMin, 'Max:', preMax);
-        const seededMask = pushPullInpaint(heightMap, width, height, NO_DATA);
-        console.debug('[ResamplerWorker] Push/pull seed complete');
-        let seedMin=Infinity, seedMax=-Infinity, seedHole=0;
-        for(let i=0; i<heightMap.length; i++) {
-            if(heightMap[i] === NO_DATA) seedHole++;
-            else { if(heightMap[i] < seedMin) seedMin=heightMap[i]; if(heightMap[i] > seedMax) seedMax=heightMap[i]; }
-        }
-        console.debug('[ResamplerWorker] After push/pull - Holes:', seedHole, 'Min:', seedMin, 'Max:', seedMax);
-        const expandedMask = expandFill(heightMap, width, height, NO_DATA, 64, 3, seededMask);
-        console.debug('[ResamplerWorker] Expand fill complete');
-        let expMin=Infinity, expMax=-Infinity, expHole=0;
-        for(let i=0; i<heightMap.length; i++) {
-            if(heightMap[i] === NO_DATA) expHole++;
-            else { if(heightMap[i] < expMin) expMin=heightMap[i]; if(heightMap[i] > expMax) expMax=heightMap[i]; }
-        }
-        console.debug('[ResamplerWorker] After expandFill - Holes:', expHole, 'Min:', expMin, 'Max:', expMax);
-        relaxFilled(heightMap, width, height, NO_DATA, expandedMask || seededMask, 200);
-        let relMin=Infinity, relMax=-Infinity, relHole=0;
-        for(let i=0; i<heightMap.length; i++) {
-            if(heightMap[i] === NO_DATA) relHole++;
-            else { if(heightMap[i] < relMin) relMin=heightMap[i]; if(heightMap[i] > relMax) relMax=heightMap[i]; }
-        }
-        console.debug('[ResamplerWorker] Relaxation complete - Holes:', relHole, 'Min:', relMin, 'Max:', relMax);
-    }
-
-    // Smoothing pass
-    if (smooth) {
-        const radius = 8;
-        const tempMap = new Float32Array(heightMap.length);
-
-        const blurH = (src, dst) => {
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    let sum = 0, count = 0;
-                    const start = Math.max(0, x - radius);
-                    const end = Math.min(width - 1, x + radius);
-                    for (let k = start; k <= end; k++) {
-                        const val = src[y * width + k];
-                        if (val !== NO_DATA) { sum += val; count++; }
-                    }
-                    dst[y * width + x] = count > 0 ? sum / count : NO_DATA;
-                }
-            }
-        };
-
-        const blurV = (src, dst) => {
-            for (let x = 0; x < width; x++) {
-                for (let y = 0; y < height; y++) {
-                    let sum = 0, count = 0;
-                    const start = Math.max(0, y - radius);
-                    const end = Math.min(height - 1, y + radius);
-                    for (let k = start; k <= end; k++) {
-                        const val = src[k * width + x];
-                        if (val !== NO_DATA) { sum += val; count++; }
-                    }
-                    dst[y * width + x] = count > 0 ? sum / count : NO_DATA;
-                }
-            }
-        };
-
-        blurH(heightMap, tempMap);
-        blurV(tempMap, heightMap);
-        blurH(heightMap, tempMap);
-        blurV(tempMap, heightMap);
-    }
+    finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles);
 
     // Compute output bounds
     const nw = toWGS84.forward([-halfWidth, halfHeight]);
@@ -503,6 +583,54 @@ const resampleHeight = async ({ center, width, height, smooth, fillHoles = true,
 
     return {
         heightMap,
+        bounds: { north: nw[1], west: nw[0], south: se[1], east: se[0] },
+    };
+};
+
+const resampleHeightAndImage = async ({ center, width, height, smooth, fillHoles = true, tiles, fallback, epsgDefs, imageSource }) => {
+    const heightMap = new Float32Array(width * height);
+    const rgbaBuffer = new Uint8ClampedArray(width * height * 4);
+    const toWGS84 = createLocalToWGS84(center.lat, center.lng);
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+    const NO_DATA = -99999;
+    const preparedGroups = await buildPreparedTileGroups(tiles, epsgDefs, NO_DATA);
+
+    for (let y = 0; y < height; y++) {
+        const rowOffset = y * width;
+        const rowPixelOffset = rowOffset * 4;
+        for (let x = 0; x < width; x++) {
+            const localX = x - halfWidth;
+            const localY = halfHeight - y;
+            const [lng, lat] = toWGS84.forward([localX, localY]);
+
+            let h = sampleHeightAt(lng, lat, preparedGroups, fallback, NO_DATA);
+            if (!Number.isFinite(h) || h <= -200 || h === NO_DATA) h = NO_DATA;
+            heightMap[rowOffset + x] = h;
+
+            writeSampledImagePixel(
+                rgbaBuffer,
+                rowPixelOffset + x * 4,
+                imageSource.pixels,
+                imageSource.width,
+                imageSource.height,
+                imageSource.zoom,
+                imageSource.minTileX,
+                imageSource.minTileY,
+                lat,
+                lng,
+            );
+        }
+    }
+
+    finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles);
+
+    const nw = toWGS84.forward([-halfWidth, halfHeight]);
+    const se = toWGS84.forward([halfWidth, -halfHeight]);
+
+    return {
+        heightMap,
+        rgbaBuffer,
         bounds: { north: nw[1], west: nw[0], south: se[1], east: se[0] },
     };
 };
@@ -519,18 +647,19 @@ const resampleImageData = ({ center, width, height, imageSource }) => {
             const localX = x - halfWidth;
             const localY = halfHeight - y;
             const [lng, lat] = toWGS84.forward([localX, localY]);
-
-            const color = sampleImage(
-                imageSource.pixels, imageSource.width, imageSource.height,
-                imageSource.zoom, imageSource.minTileX, imageSource.minTileY,
-                lat, lng
-            );
-
             const idx = (y * width + x) * 4;
-            rgbaBuffer[idx] = color.r;
-            rgbaBuffer[idx + 1] = color.g;
-            rgbaBuffer[idx + 2] = color.b;
-            rgbaBuffer[idx + 3] = color.a;
+            writeSampledImagePixel(
+                rgbaBuffer,
+                idx,
+                imageSource.pixels,
+                imageSource.width,
+                imageSource.height,
+                imageSource.zoom,
+                imageSource.minTileX,
+                imageSource.minTileY,
+                lat,
+                lng,
+            );
         }
     }
 
@@ -547,6 +676,18 @@ self.onmessage = async (e) => {
             self.postMessage(
                 { id, type: 'result', heightMap: result.heightMap, bounds: result.bounds },
                 [result.heightMap.buffer]
+            );
+        } else if (type === 'resampleHeightAndImage') {
+            const result = await resampleHeightAndImage(params);
+            self.postMessage(
+                {
+                    id,
+                    type: 'result',
+                    heightMap: result.heightMap,
+                    rgbaBuffer: result.rgbaBuffer,
+                    bounds: result.bounds,
+                },
+                [result.heightMap.buffer, result.rgbaBuffer.buffer]
             );
         } else if (type === 'resampleImage') {
             const result = resampleImageData(params);

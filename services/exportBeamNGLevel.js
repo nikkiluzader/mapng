@@ -3260,15 +3260,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // next one is allocated, which is critical for 4096+ terrain grids.
 
   await yield_();
-  // Determine the output resolution of the terrain texture.
-  // All canvas types (hybrid, osm) are rendered at the same output resolution.
-  // Check any alive canvas first; hybridTexWidth is saved before the canvas is freed by
-  // the 3D preview. Falls back to the terrain heightmap grid size as a last resort.
-  const satelliteTexSize =
-    exportTerrainData.hybridTextureCanvas?.width ??
-    exportTerrainData.osmTextureCanvas?.width ??
-    exportTerrainData.hybridTexWidth ??
-    exportTerrainData.width;
+  // BeamNG terrain material libraries must match the selected terrain resolution.
+  // Source textures may be generated/cached at lower sizes (e.g. 8192), so we
+  // always target the current export grid size here.
+  const terrainBaseTexSize = size;
 
   // Legacy image-based inference is no longer generated and now falls back to OSM.
   const imageCanvas = null;
@@ -3276,7 +3271,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   beginStep(`Painting terrain materials (${effectivePbrSource.toUpperCase()})…`, 5);
   const pbrResult = effectivePbrSource !== 'none'
-    ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, flavor, satelliteTexSize, {
+    ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, flavor, terrainBaseTexSize, {
         pbrSource: effectivePbrSource,
         imageCanvas,
       })
@@ -3289,13 +3284,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     materialNames: pbrResult?.materialNames ?? null,
   });
 
-  beginStep(`Generating base texture (${baseTexture}, ${satelliteTexSize}px)…`, 35);
+  beginStep(`Generating base texture (${baseTexture}, ${terrainBaseTexSize}px)…`, 35);
   await yield_();
   let texBlob = await getTerrainTextureBlob(exportTerrainData, baseTexture);
-  // terrain.png must be exactly baseTexSize pixels — BeamNG's TerrainMaterialTextureSet
-  // enforces that all base textures share the same pixel dimensions.
-  if (pbrResult && texBlob) {
-    texBlob = await resizePngBlob(texBlob, satelliteTexSize);
+  // terrain.png must be exactly baseTexSize pixels — TerrainBlock +
+  // TerrainMaterialTextureSet expect a consistent base texture size.
+  if (texBlob) {
+    texBlob = await resizePngBlob(texBlob, terrainBaseTexSize);
   }
 
   beginStep(`Generating heightmap preview (${size}x${size})…`, 50);
@@ -3551,7 +3546,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     levelDisplayName,
     flavor,
     squareSize,
-    satelliteTexSize,
+    satelliteTexSize: terrainBaseTexSize,
     worldSize,
     exportStartedAt,
     reportGeneratedAt,
@@ -3685,7 +3680,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       class: 'TerrainMaterial',
       internalName: 'DefaultMaterial',
       diffuseMap: `levels/${levelName}/art/terrains/terrain.png`,
-      diffuseSize: Math.round(worldSize),
+      diffuseSize: size,
       groundmodelName: 'GROUNDMODEL_ASPHALT1',
     },
   };
