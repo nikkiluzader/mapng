@@ -1674,15 +1674,27 @@ function generateRoadArchitectSession(terrainData, squareSize, levelName) {
 
   if (roads.length === 0) return null;
 
-  const { sidewalkRoads } = enrichRoadArchitectCrossroads(roads, intersectionEntries, 1);
-  if (sidewalkRoads.length > 0) roads.push(...sidewalkRoads);
+  const usedGroupNames = new Map();
+  const placedGroups = roads.map((road, index) => {
+    const baseName = sanitizeRoadFolderName(road?.displayName, `road_${index + 1}`);
+    const used = usedGroupNames.get(baseName) || 0;
+    usedGroupNames.set(baseName, used + 1);
+    const groupName = used > 0 ? `${baseName}_${used + 1}` : baseName;
+    const groupIndex = index + 1;
+    road.groupIdx = [groupIndex];
+
+    return {
+      name: groupName,
+      list: road.nodes.map((_, nodeIndex) => ({ r: road.name, n: nodeIndex + 1 })),
+    };
+  });
 
   return {
     data: {
-      groups: {},
-      junctions: {},
+      groups: [],
+      junctions: [],
       mapName: String(levelName || 'mapng').toLowerCase(),
-      placedGroups: {},
+      placedGroups,
       profiles: [createRoadArchitectDefaultProfile()],
       roads,
     },
@@ -2109,7 +2121,7 @@ function buildBeamNGExportReport({
     `- Terrain materials written: ${terrainMaterialCount}`,
     `- Road Architect roads generated: ${roadArchitectRoadCount}`,
     `- Road Architect junctions generated: ${roadArchitectJunctionCount}`,
-    `- Barrier mesh spline groups: ${barrierMeshSplineGroups.length}`,
+    `- Barrier folders: ${barrierMeshSplineGroups.length}`,
     `- Barrier TSStatic objects: ${barrierObjects.length}`,
     `- Water objects generated: ${waterObjects.length}`,
     `- Forest placement groups: ${forestPlacements.size}`,
@@ -2273,12 +2285,10 @@ const NATIVE_BARRIER_ASSETS = {
     yawOffset: Math.PI * 0.5,
   },
   fence: {
-    shapeName: '/levels/west_coast_usa/art/shapes/objects/fence_metal1.dae',
-    segmentLength: 4,
-    // In official mesh data, min Z is about -2.38.
-    // Lift by ~2.4m so fence feet sit at terrain level.
-    zOffset: 2.4,
-    yawOffset: Math.PI * 0.5,
+    shapeName: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_fence_a.DAE',
+    segmentLength: 2,
+    zOffset: 0.05,
+    yawOffset: 0,
   },
   chainLinkFence: {
     shapeName: '/levels/west_coast_usa/art/shapes/objects/screenfence1.dae',
@@ -2286,6 +2296,48 @@ const NATIVE_BARRIER_ASSETS = {
     // In official mesh data, min Z is about -1.52.
     zOffset: 1.55,
     yawOffset: Math.PI * 0.5,
+  },
+};
+
+const EAST_COAST_FENCE_MATERIAL_DEFS = {
+  eca_bld_trim_wood: {
+    class: 'Material',
+    name: 'eca_bld_trim_wood',
+    mapTo: 'eca_bld_trim_wood',
+    annotation: 'BUILDINGS',
+    Stages: [{
+      colorMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_trim_wood_d.dds',
+      normalMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_trim_wood_n.dds',
+      specularMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_trim_wood_s.dds',
+      diffuseColor: [1, 1, 1, 1],
+    }],
+    translucentBlendOp: 'None',
+  },
+  eca_bld_wood: {
+    class: 'Material',
+    name: 'eca_bld_wood',
+    mapTo: 'eca_bld_wood',
+    annotation: 'BUILDINGS',
+    Stages: [{
+      colorMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds',
+      normalMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds',
+      specularMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds',
+      diffuseColor: [1, 1, 1, 1],
+    }],
+    translucentBlendOp: 'None',
+  },
+  lumber_raw: {
+    class: 'Material',
+    name: 'lumber_raw',
+    mapTo: 'lumber_raw',
+    annotation: 'BUILDINGS',
+    Stages: [{
+      colorMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_d.dds',
+      normalMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_n.dds',
+      specularMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_s.dds',
+      diffuseColor: [1, 1, 1, 1],
+    }],
+    translucentBlendOp: 'None',
   },
 };
 
@@ -2358,53 +2410,109 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
     });
   };
 
-  const pushSegmentInstances = (startPt, endPt, asset, namePrefix) => {
-    const start = geoToWorldPoint(startPt.lat, startPt.lng, terrainData, squareSize, asset.zOffset);
-    const end = geoToWorldPoint(endPt.lat, endPt.lng, terrainData, squareSize, asset.zOffset);
-    const dx = end[0] - start[0];
-    const dy = end[1] - start[1];
-    const segmentLen = Math.hypot(dx, dy);
-    if (!Number.isFinite(segmentLen) || segmentLen < 0.5) return;
+  const pushFeatureInstances = (feature, asset, namePrefix) => {
+    const geometry = Array.isArray(feature?.geometry) ? feature.geometry : [];
+    if (geometry.length < 2) return;
 
-    const yaw = Math.atan2(dy, dx);
-    const rotationYaw = yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
-    const rotationMatrix = rotationMatrixFromYaw(rotationYaw);
-    const count = Math.max(1, Math.floor(segmentLen / Math.max(1, asset.segmentLength)));
+    const segmentStarts = [];
+    const segmentLengths = [];
+    const cumulative = [0];
+    let totalLen = 0;
 
-    for (let i = 0; i < count; i++) {
-      if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
-      const t = (i + 0.5) / count;
-      const geoPt = {
-        lat: startPt.lat + (endPt.lat - startPt.lat) * t,
-        lng: startPt.lng + (endPt.lng - startPt.lng) * t,
+    for (let i = 0; i < geometry.length - 1; i++) {
+      const a = geometry[i];
+      const b = geometry[i + 1];
+      const wa = geoToWorldPoint(a.lat, a.lng, terrainData, squareSize, 0);
+      const wb = geoToWorldPoint(b.lat, b.lng, terrainData, squareSize, 0);
+      const dx = wb[0] - wa[0];
+      const dy = wb[1] - wa[1];
+      const len = Math.hypot(dx, dy);
+      if (!Number.isFinite(len) || len < 0.01) continue;
+      segmentStarts.push(i);
+      segmentLengths.push(len);
+      totalLen += len;
+      cumulative.push(totalLen);
+    }
+
+    if (!Number.isFinite(totalLen) || totalLen < 0.5 || segmentStarts.length < 1) return;
+
+    const isFenceAsset = String(asset?.shapeName || '').toLowerCase().includes('wood_fence');
+    const nominalSpacing = Math.max(0.75, Number(asset.segmentLength) || 2);
+    const panelCount = Math.max(1, Math.round(totalLen / nominalSpacing));
+    const panelSpacing = totalLen / panelCount;
+
+    const sampleAtDistance = (distance) => {
+      const d = Math.max(0, Math.min(totalLen, distance));
+      let segIdx = segmentLengths.length - 1;
+      for (let i = 0; i < segmentLengths.length; i++) {
+        if (d <= cumulative[i + 1]) {
+          segIdx = i;
+          break;
+        }
+      }
+      const baseIdx = segmentStarts[segIdx];
+      const a = geometry[baseIdx];
+      const b = geometry[baseIdx + 1];
+      const segStartDist = cumulative[segIdx];
+      const segLen = segmentLengths[segIdx];
+      const t = segLen > 1e-6 ? (d - segStartDist) / segLen : 0;
+      const lat = a.lat + (b.lat - a.lat) * t;
+      const lng = a.lng + (b.lng - a.lng) * t;
+      const world = geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
+      const yaw = Math.atan2(b.lat - a.lat, b.lng - a.lng);
+      return {
+        lat,
+        lng,
+        x: world[0],
+        y: world[1],
+        terrainZ: getTerrainHeightWorld(lat, lng, terrainData),
+        yaw,
       };
-      pushInstanceAtGeo(geoPt, yaw, asset, `${namePrefix}_${objects.length}`);
+    };
+
+    for (let i = 0; i < panelCount; i++) {
+      if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
+      const startSample = sampleAtDistance(i * panelSpacing);
+      const endSample = sampleAtDistance((i + 1) * panelSpacing);
+      const centerSample = sampleAtDistance((i + 0.5) * panelSpacing);
+      const rotationYaw = centerSample.yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
+      const panelTerrainZ = isFenceAsset
+        ? Math.max(startSample.terrainZ, endSample.terrainZ, centerSample.terrainZ)
+        : centerSample.terrainZ;
+      objects.push({
+        __parent: 'Barriers',
+        class: 'TSStatic',
+        name: `${namePrefix}_${i + 1}`,
+        persistentId: generatePersistentId(),
+        position: [
+          roundTo(centerSample.x, 3),
+          roundTo(centerSample.y, 3),
+          roundTo(panelTerrainZ + (Number.isFinite(asset.zOffset) ? asset.zOffset : 0), 3),
+        ],
+        rotationMatrix: rotationMatrixFromYaw(rotationYaw),
+        shapeName: asset.shapeName,
+        useInstanceRenderData: true,
+      });
     }
 
     if (asset.postShapeName) {
-      const postSpacing = Math.max(1.5, asset.segmentLength);
-      const postCount = Math.max(2, Math.floor(segmentLen / postSpacing) + 1);
+      const isClosed = isClosedRing(geometry);
+      const postCount = isClosed ? panelCount : panelCount + 1;
       for (let i = 0; i < postCount; i++) {
         if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
-        const t = postCount <= 1 ? 0 : i / (postCount - 1);
-        const geoPt = {
-          lat: startPt.lat + (endPt.lat - startPt.lat) * t,
-          lng: startPt.lng + (endPt.lng - startPt.lng) * t,
-        };
-        const world = geoToWorldPoint(
-          geoPt.lat,
-          geoPt.lng,
-          terrainData,
-          squareSize,
-          Number.isFinite(asset.postZOffset) ? asset.postZOffset : asset.zOffset,
-        );
+        const sample = sampleAtDistance(i * panelSpacing);
+        const rotationYaw = sample.yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
         objects.push({
           __parent: 'Barriers',
           class: 'TSStatic',
-          name: `${namePrefix}_post_${objects.length}`,
+          name: `${namePrefix}_post_${i + 1}`,
           persistentId: generatePersistentId(),
-          position: [roundTo(world[0], 3), roundTo(world[1], 3), roundTo(world[2], 3)],
-          rotationMatrix,
+          position: [
+            roundTo(sample.x, 3),
+            roundTo(sample.y, 3),
+            roundTo(sample.terrainZ + (Number.isFinite(asset.postZOffset) ? asset.postZOffset : asset.zOffset), 3),
+          ],
+          rotationMatrix: rotationMatrixFromYaw(rotationYaw),
           shapeName: asset.postShapeName,
           useInstanceRenderData: true,
         });
@@ -2471,12 +2579,7 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
     const asset = resolveNativeBarrierAsset(feature.tags || {});
     if (!asset) continue;
 
-    for (let i = 0; i < feature.geometry.length - 1; i++) {
-      if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) break;
-      const a = feature.geometry[i];
-      const b = feature.geometry[i + 1];
-      pushSegmentInstances(a, b, asset, `barrier_${featureIndex}`);
-    }
+    pushFeatureInstances(feature, asset, `barrier_${featureIndex}`);
 
     if (asset.endShapeName && objects.length < MAX_NATIVE_BARRIER_OBJECTS) {
       pushGuardrailEndcaps(feature, asset, featureIndex);
@@ -2486,29 +2589,56 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
   return objects;
 }
 
-function groupBarrierObjectsAsMeshSplines(barrierObjects) {
+function buildBarrierFolderItems(barrierObjects) {
   if (!Array.isArray(barrierObjects) || barrierObjects.length === 0) return [];
+  return barrierObjects.map((obj, index) => ({
+    ...obj,
+    __parent: 'barriers',
+    name: String(obj?.name || `barrier_${index + 1}`),
+    isRenderEnabled: false,
+  }));
+}
 
-  const grouped = new Map();
-  for (const obj of barrierObjects) {
-    const name = String(obj?.name || '');
-    const match = name.match(/^barrier_(\d+)/);
-    const key = match ? Number(match[1]) : -1;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(obj);
+function sanitizeRoadFolderName(value, fallback) {
+  const ascii = String(value || '')
+    .normalize('NFKD')
+    .replace(/[^\x00-\x7F]/g, '');
+  const cleaned = ascii
+    .replace(/[^A-Za-z0-9 _.-]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 96);
+  return cleaned || fallback;
+}
+
+function buildRoadFolderGroups(roadArchitectSession) {
+  const placedGroups = Array.isArray(roadArchitectSession?.data?.placedGroups)
+    ? roadArchitectSession.data.placedGroups
+    : [];
+  if (placedGroups.length > 0) {
+    return placedGroups.map((group, index) => ({
+      groupName: sanitizeRoadFolderName(group?.name, `road_${index + 1}`),
+    }));
   }
 
-  const keys = Array.from(grouped.keys()).sort((a, b) => a - b);
-  return keys.map((key, idx) => {
-    const groupName = `Mesh Spline ${idx + 1} - ${generatePersistentId()}`;
-    const items = grouped.get(key).map((obj, itemIdx) => ({
-      ...obj,
-      __parent: groupName,
-      name: `${groupName}_Main_${itemIdx + 1}`,
-      isRenderEnabled: false,
-    }));
-    return { groupName, items };
-  });
+  const roads = Array.isArray(roadArchitectSession?.data?.roads)
+    ? roadArchitectSession.data.roads
+    : [];
+  if (roads.length === 0) return [];
+
+  const usedNames = new Map();
+  const groups = [];
+
+  for (let i = 0; i < roads.length; i++) {
+    const road = roads[i];
+    const displayName = sanitizeRoadFolderName(road?.displayName, `road_${i + 1}`);
+    const used = usedNames.get(displayName) || 0;
+    usedNames.set(displayName, used + 1);
+    const groupName = used > 0 ? `${displayName}_${used + 1}` : displayName;
+    groups.push({ groupName });
+  }
+
+  return groups;
 }
 
 function pointInPolygonLatLng(point, ring) {
@@ -3116,7 +3246,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {boolean} [options.applyFoundations=true]         — apply terrain foundation pass under buildings
  * @param {boolean} [options.includeBackdrop=false]         — fetch and include surrounding terrain backdrop DAE
  * @param {boolean} [options.includeWater=true]             — emit native BeamNG inland water objects
- * @param {boolean} [options.includeNativeBarriers=true]    — emit native BeamNG TSStatic barrier objects from OSM barriers as MissionGroup Mesh Spline groups
+ * @param {boolean} [options.includeNativeBarriers=true]    — emit native BeamNG TSStatic barrier objects from OSM barriers into MissionGroup/barriers
  * @param {boolean} [options.includeTrees=true]             — emit native BeamNG tree and bush forest instances
  * @param {boolean} [options.includeRocks=false]            — emit native BeamNG rock forest instances
  * @param {number}  [options.treeDensity=1]                 — tree density scale for BeamNG forest placement
@@ -3329,7 +3459,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const barrierObjects = includeNativeBarriers
     ? buildNativeBarrierObjects(exportTerrainData, squareSize)
     : [];
-  const barrierMeshSplineGroups = groupBarrierObjectsAsMeshSplines(barrierObjects);
+  const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
+  const roadFolderGroups = buildRoadFolderGroups(roadArchitectSession);
+  const usesEastCoastFenceMaterials = barrierFolderItems.some((obj) => (
+    String(obj?.shapeName || '').toLowerCase().includes('eca_bld_wood_fence_a.dae')
+  ));
 
   beginStep(`Building vegetation objects (trees: ${includeTrees ? 'on' : 'off'} @ ${normalizedTreeDensity.toFixed(1)}x, rocks: ${includeRocks ? 'on' : 'off'})…`, 77);
   await yield_();
@@ -3383,10 +3517,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   zip.folder(`${base}/main/MissionGroup/Level_objects/Other`);
   zip.folder(`${base}/main/MissionGroup/PlayerDropPoints`);
   zip.folder(`${base}/main/MissionGroup/Water`);
-  if (barrierMeshSplineGroups.length > 0) {
-    for (const group of barrierMeshSplineGroups) {
-      zip.folder(`${base}/main/MissionGroup/${group.groupName}`);
-    }
+  if (barrierFolderItems.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/barriers`);
+  }
+  if (roadFolderGroups.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/roads`);
   }
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/Level_objects/vegetation`);
@@ -3429,6 +3564,24 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     '  return "/levels/" .. tostring(levelName) .. "/bat/roadatchitectsession.json"',
     'end',
     '',
+    'local function moveRoadArchitectFolders(sessionData)',
+    '  if not scenetree or not scenetree.MissionGroup then return end',
+    '  local missionGroup = scenetree.MissionGroup',
+    '  local roadsRoot = scenetree.findObject("roads")',
+    '  if not roadsRoot then',
+    '    roadsRoot = createObject("SimGroup")',
+    '    roadsRoot:registerObject("roads")',
+    '    missionGroup:addObject(roadsRoot)',
+    '  end',
+    '  local roads = (sessionData and sessionData.data and sessionData.data.roads) or {}',
+    '  for i = 1, #roads do',
+    '    local folder = scenetree.findObject("Road Architect - Road " .. tostring(i))',
+    '    if folder then',
+    '      roadsRoot:addObject(folder)',
+    '    end',
+    '  end',
+    'end',
+    '',
     'local function loadRoadArchitectSessionIfAvailable()',
     '  if raAutoLoadDone then return true end',
     '  local sessionPath = getRoadArchitectSessionPath()',
@@ -3460,6 +3613,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     '',
     '  local okRoadMgr, roadMgr = pcall(require, "editor/tech/roadArchitect/roads")',
     '  if okRoadMgr and roadMgr and roadMgr.roads then',
+    '    if scenetree and scenetree.findObject and scenetree.findObject("Road Architect - Road 1") then',
+    '      raAutoLoadDone = true',
+    '      return true',
+    '    end',
     '    for i = 1, #roadMgr.roads do',
     '      local road = roadMgr.roads[i]',
     '      if road and road.isConformRoadToTerrain then',
@@ -3474,6 +3631,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     '    end',
     '    if roadMgr.finalise and #roadMgr.roads > 0 then',
     '      pcall(roadMgr.finalise)',
+    '      moveRoadArchitectFolders(sessionData)',
     '    end',
     '  end',
     '',
@@ -3554,7 +3712,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     effectivePbrSource,
     waterObjects,
     barrierObjects,
-    barrierMeshSplineGroups,
+    barrierMeshSplineGroups: barrierFolderItems.length > 0
+      ? [{ groupName: 'barriers' }]
+      : [],
     roadArchitectRoadCount,
     roadArchitectJunctionCount,
     forestPlacements,
@@ -3610,6 +3770,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     // Build a single materials JSON covering all DAEs in this directory.
     const shapeMaterials = {
       ...shapeMaterialDefsForFlavor,
+      ...(usesEastCoastFenceMaterials ? EAST_COAST_FENCE_MATERIAL_DEFS : {}),
       ...(groundCoverObjects.length > 0 ? {
         [getGroundCoverProfile(flavor).materialName]: structuredClone(getGroundCoverProfile(flavor).materialDef),
       } : {}),
@@ -3718,20 +3879,29 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       name: 'Mesh_roads',
       persistentId: generatePersistentId(),
     }] : []),
-    ...barrierMeshSplineGroups.map((group) => ({
+    ...(barrierFolderItems.length > 0 ? [{
       __parent: 'MissionGroup',
       class: 'SimGroup',
-      name: group.groupName,
+      name: 'barriers',
       persistentId: generatePersistentId(),
-    })),
+    }] : []),
+    ...(roadFolderGroups.length > 0 ? [{
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: 'roads',
+      persistentId: generatePersistentId(),
+    }] : []),
   ];
   zip.file(`${base}/main/MissionGroup/items.level.json`, toNDJSON(missionGroupItems));
 
-  // ── main/MissionGroup/Mesh Spline */items.level.json ──────────────────────
-  if (barrierMeshSplineGroups.length > 0) {
-    for (const group of barrierMeshSplineGroups) {
-      zip.file(`${base}/main/MissionGroup/${group.groupName}/items.level.json`, toNDJSON(group.items));
-    }
+  // ── main/MissionGroup/barriers/items.level.json ────────────────────────────
+  if (barrierFolderItems.length > 0) {
+    zip.file(`${base}/main/MissionGroup/barriers/items.level.json`, toNDJSON(barrierFolderItems));
+  }
+
+  // ── main/MissionGroup/roads/items.level.json ───────────────────────────────
+  if (roadFolderGroups.length > 0) {
+    zip.file(`${base}/main/MissionGroup/roads/items.level.json`, '');
   }
 
   // ── main/MissionGroup/Mesh_roads/items.level.json ──────────────────────────
