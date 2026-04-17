@@ -238,7 +238,7 @@ class ColladaExporter {
       transMat = transMat || new Matrix4();
       transMat.copy(o.matrix);
       transMat.transpose();
-      return `<matrix>${transMat.toArray().join(" ")}</matrix>`;
+      return `<matrix sid="transform">${transMat.toArray().join(" ")}</matrix>`;
     }
 
     // Process the given piece of geometry into the geometry library
@@ -247,7 +247,14 @@ class ColladaExporter {
       let info = geometryInfo.get(bufferGeometry);
 
       if (!info) {
-        const meshid = `Mesh${libraryGeometries.length + 1}`;
+        const geoBaseName = bufferGeometry.name
+          ? toColladaIdToken(bufferGeometry.name, null)
+          : null;
+        const meshidCandidate = geoBaseName ? `${geoBaseName}-mesh` : `Mesh${libraryGeometries.length + 1}`;
+        const meshid = usedGeomIds.has(meshidCandidate)
+          ? `${meshidCandidate}_${libraryGeometries.length + 1}`
+          : meshidCandidate;
+        usedGeomIds.add(meshid);
 
         const indexCount = bufferGeometry.index
           ? bufferGeometry.index.count * bufferGeometry.index.itemSize
@@ -539,8 +546,24 @@ class ColladaExporter {
     }
 
     // Recursively process the object into a scene
+    const COLLADA_ID_SANITIZE = /[^A-Za-z0-9_\-.]/g;
+    const toColladaIdToken = (value, fallback) => {
+      const raw = String(value || '').trim().replace(COLLADA_ID_SANITIZE, '_');
+      // Collada IDs should start with a letter or underscore.
+      if (!raw) return fallback;
+      return /^[A-Za-z_]/.test(raw) ? raw : `_${raw}`;
+    };
+
     function processObject(o) {
-      let node = `<node name="${o.name}">`;
+      const nodeName = String(o.name || 'node');
+      const nodeBaseId = toColladaIdToken(o.name, 'object');
+      let nodeId = nodeBaseId;
+      if (usedNodeIds.has(nodeId)) {
+        nodeId = `${nodeBaseId}_${nodeCounter}`;
+      }
+      nodeCounter++;
+      usedNodeIds.add(nodeId);
+      let node = `<node id="${nodeId}" name="${nodeName}" type="NODE">`;
 
       node += getTransform(o);
 
@@ -572,7 +595,7 @@ class ColladaExporter {
           .map((v, i) => processMaterial(materials[i % materials.length]));
 
         node +=
-          `<instance_geometry url="#${meshid}">` +
+          `<instance_geometry name="${nodeName}" url="#${meshid}">` +
           (matids.length > 0
             ? "<bind_material><technique_common>" +
               matids
@@ -604,6 +627,9 @@ class ColladaExporter {
     const libraryGeometries = [];
     const libraryEffects = [];
     const libraryMaterials = [];
+    let nodeCounter = 1;
+    const usedNodeIds = new Set();
+    const usedGeomIds = new Set();
     const libraryVisualScenes = processObject(object);
 
     const specLink =

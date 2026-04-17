@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import JSZip from 'jszip';
 import { encode } from 'fast-png';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
@@ -443,10 +444,12 @@ async function generateOSMObjectsDAE(terrainData, worldSize) {
     0,  0,  0,  1,
   );
 
+  let buildingCollisionMesh = null;
+
   osmGroup.traverse(child => {
     if (!child.isMesh) return;
 
-    // Bake the coordinate transform into each geometry's vertex data.
+    // Bake the coordinate transform into each geometry's vertex data first.
     // applyMatrix4 handles positions and derives the correct normal matrix.
     child.geometry.applyMatrix4(transformMatrix);
 
@@ -460,15 +463,172 @@ async function generateOSMObjectsDAE(terrainData, worldSize) {
       m.metalnessMap = null;
       m.name = 'osm_object';
     });
+
+    // Clone the already-transformed building geometry as the collision mesh.
+    // Must be cloned AFTER applyMatrix4 so it is in BeamNG world coordinates.
+    // BeamNG identifies collision geometry by the <geometry id> starting with "Col".
+    const isBuildingMesh = String(child.name || '').toLowerCase() === 'buildings';
+    if (isBuildingMesh && !buildingCollisionMesh) {
+      const collisionGeom = child.geometry.clone();
+      collisionGeom.name = 'Colmesh-1';
+      buildingCollisionMesh = new THREE.Mesh(
+        collisionGeom,
+        new THREE.MeshBasicMaterial({ name: 'osm_object', color: 0xffffff }),
+      );
+      buildingCollisionMesh.name = 'Colmesh-1';
+    }
   });
 
-  // Export to Collada
+  // Always wrap in the BeamNG scene hierarchy:
+  // Working BeamNG structure (matches flag reference asset):
+  //   base00 > start01 > [visual meshes] + Colmesh-1
+  // base00 must be the TOP-LEVEL node directly inside <visual_scene>.
+  // Passing a THREE.Scene to the exporter would wrap base00 in an extra
+  // unnamed node, breaking BeamNG's strict node-depth requirements.
+  const base00 = new THREE.Group();
+  base00.name = 'base00';
+  const start01 = new THREE.Group();
+  start01.name = 'start01';
+  start01.add(osmGroup);
+  if (buildingCollisionMesh) start01.add(buildingCollisionMesh);
+  base00.add(start01);
+
+  // Compute world matrices with base00 as the root (not a Scene).
+  base00.updateMatrixWorld(true);
+
+  // Pass base00 directly so it becomes the top-level node in <visual_scene>,
+  // matching the reference flag asset structure.
+  const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
+  if (!result?.data) return null;
+  return result.data;
+}
+
+/**
+ * Generate a collision-only Collada (.dae) for OSM buildings.
+ *
+ * BeamNG can be picky when visual + collision meshes are mixed in a single
+ * object graph. This emits a dedicated Colmesh-only DAE and is referenced by a
+ * hidden TSStatic collision object in the level scene.
+ */
+async function generateOSMBuildingsCollisionDAE(terrainData, worldSize) {
+  if (!terrainData?.osmFeatures?.length) return null;
+
+  const buildings = terrainData.osmFeatures.filter((feature) => (
+    feature?.type === 'building' && Array.isArray(feature.geometry) && feature.geometry.length >= 3
+  ));
+  if (buildings.length === 0) return null;
+
+  const parseHeightMeters = (tags = {}) => {
+    const parseNum = (value) => {
+      if (value === undefined || value === null) return NaN;
+      const raw = String(value).trim().toLowerCase();
+      if (!raw) return NaN;
+      if (raw.includes('ft')) {
+        const ft = Number.parseFloat(raw.replace('ft', '').trim());
+        return Number.isFinite(ft) && ft > 0 ? ft * 0.3048 : NaN;
+      }
+      const m = Number.parseFloat(raw.replace('m', '').trim());
+      return Number.isFinite(m) && m > 0 ? m : NaN;
+    };
+
+    const explicitHeight = parseNum(tags.height);
+    if (Number.isFinite(explicitHeight)) return Math.min(220, Math.max(2.5, explicitHeight));
+
+    const levels = Number.parseFloat(tags['building:levels'] ?? tags.levels);
+    if (Number.isFinite(levels) && levels > 0) {
+      const roof = Number.parseFloat(tags['roof:levels'] ?? tags['building:roof:levels'] ?? 0);
+      return Math.min(220, Math.max(2.5, (levels + Math.max(0, roof)) * 3.1));
+    }
+
+    const type = String(tags.building || '').toLowerCase();
+    if (['industrial', 'warehouse', 'retail', 'commercial'].includes(type)) return 10;
+    if (['garage', 'hut', 'shed'].includes(type)) return 4;
+    return 7.5;
+  };
+
+  const proxyGeometries = [];
+  const maxCollisionProxies = 12000;
+  const squareSize = worldSize / terrainData.width;
+
+  for (let i = 0; i < buildings.length && proxyGeometries.length < maxCollisionProxies; i++) {
+    const feature = buildings[i];
+    const geometry = Array.isArray(feature.geometry) ? feature.geometry : [];
+    if (geometry.length < 3) continue;
+
+    let ring = geometry;
+    if (geometry.length > 3) {
+      const first = geometry[0];
+      const last = geometry[geometry.length - 1];
+      if (first?.lat === last?.lat && first?.lng === last?.lng) {
+        ring = geometry.slice(0, -1);
+      }
+    }
+    if (ring.length < 3) continue;
+
+    const worldPoints = ring.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0));
+
+    let minX = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+    let minTerrainZ = Number.POSITIVE_INFINITY;
+
+    for (let p = 0; p < worldPoints.length; p++) {
+      const [x, y, z] = worldPoints[p];
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      minTerrainZ = Math.min(minTerrainZ, z);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(minTerrainZ)) continue;
+
+    const spanX = Math.max(0.8, maxX - minX);
+    const spanY = Math.max(0.8, maxY - minY);
+    const heightZ = parseHeightMeters(feature.tags || {});
+    const centerX = (minX + maxX) * 0.5;
+    const centerY = (minY + maxY) * 0.5;
+    const centerZ = minTerrainZ + (heightZ * 0.5);
+
+    // BoxGeometry axes are X/Y/Z; we map directly to BeamNG world X/Y/Z.
+    const box = new THREE.BoxGeometry(spanX, spanY, heightZ);
+    box.translate(centerX, centerY, centerZ);
+    proxyGeometries.push(box.index ? box.toNonIndexed() : box);
+  }
+
+  if (proxyGeometries.length === 0) return null;
+
+  const mergedCollisionGeometry = mergeGeometries(proxyGeometries, false);
+  proxyGeometries.forEach((g) => g.dispose());
+  if (!mergedCollisionGeometry) return null;
+
+  // Name the geometry so ColladaExporter generates id="Colmesh-1-mesh" —
+  // BeamNG identifies collision geometry by the <geometry> element's id
+  // starting with "Col" (matches the same convention as the node name).
+  mergedCollisionGeometry.name = 'Colmesh-1';
+
+  const collisionMesh = new THREE.Mesh(
+    mergedCollisionGeometry,
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  );
+  collisionMesh.name = 'Colmesh-1';
+  collisionMesh.material.name = 'osm_object';
+
+  const base00 = new THREE.Group();
+  base00.name = 'base00';
+  const collisionMarker = new THREE.Group();
+  collisionMarker.name = 'collision-1';
+  const start01 = new THREE.Group();
+  start01.name = 'start01';
+  start01.add(collisionMesh);
+  base00.add(collisionMarker);
+  base00.add(start01);
+
   const scene = new THREE.Scene();
-  scene.add(osmGroup);
+  scene.add(base00);
   scene.updateMatrixWorld(true);
 
-  // Pass upAxis directly — avoids reading the blob as text (which can truncate
-  // large DAE files and cause TinyXML parse failures in BeamNG).
   const result = new ColladaExporter().parse(scene, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
   if (!result?.data) return null;
   return result.data;
@@ -4269,9 +4429,14 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       persistentId: generatePersistentId(),
       position: [0, 0, 0],
       shapeName: `levels/${levelName}/art/shapes/osm_objects.dae`,
+      collisionType: 'Collision Mesh',
+      decalType: 'Collision Mesh',
+      prebuildCollisionData: 0,
       useInstanceRenderData: true,
     });
   }
+
+
 
   if (backdropDaeBlob) {
     otherItems.push({
