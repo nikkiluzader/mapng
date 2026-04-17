@@ -41,6 +41,9 @@ function generatePersistentId() {
   });
 }
 
+/**
+ * Check whether a {lat,lng} point lies inside inclusive geographic bounds.
+ */
 function pointInBounds(pt, bounds) {
   return (
     pt &&
@@ -51,6 +54,11 @@ function pointInBounds(pt, bounds) {
   );
 }
 
+/**
+ * Keep only OSM features whose geometry intersects the provided bounds.
+ *
+ * A feature is retained when at least one geometry point is in bounds.
+ */
 function filterOSMFeaturesToBounds(features, bounds) {
   if (!Array.isArray(features)) return [];
   return features.filter((feature) => {
@@ -774,6 +782,12 @@ const UNPAVED_SURFACES = new Set([
   'snow', 'ice',
 ]);
 
+/**
+ * Infer that a road should not receive lane paint from OSM tags.
+ *
+ * Explicit lane_markings=no always disables paint. Unpaved surfaces are also
+ * treated as unmarked unless tags explicitly force lane markings on.
+ */
 function isLikelyUnmarkedRoad(tags = {}) {
   const laneMarkings = String(tags.lane_markings ?? '').trim().toLowerCase();
   if (laneMarkings === 'yes') return false;
@@ -784,11 +798,17 @@ function isLikelyUnmarkedRoad(tags = {}) {
   return UNPAVED_SURFACES.has(surface);
 }
 
+/**
+ * Decide if this highway class should get white/yellow lane line decals.
+ */
 function shouldUseLaneMarkings(highway, tags = {}) {
   if (!MAJOR_ROAD_MARKINGS.has(highway)) return false;
   return !isLikelyUnmarkedRoad(tags);
 }
 
+/**
+ * Decide if this road should get asphalt-to-grass blend edge decals.
+ */
 function shouldUseGrassEdgeBlend(highway, tags = {}) {
   if (!GRASS_EDGE_BLEND_HIGHWAYS.has(highway)) return false;
   const surface = String(tags.surface ?? '').trim().toLowerCase();
@@ -797,6 +817,9 @@ function shouldUseGrassEdgeBlend(highway, tags = {}) {
   return true;
 }
 
+/**
+ * Infer one-way traffic from common OSM tags and implied highway types.
+ */
 function isOneWayRoad(tags = {}) {
   const value = String(tags.oneway ?? '').trim().toLowerCase();
   if (value === 'yes' || value === '1' || value === 'true') return true;
@@ -806,11 +829,20 @@ function isOneWayRoad(tags = {}) {
   return false;
 }
 
+/**
+ * Parse a strictly positive integer, returning 0 when invalid.
+ */
 function parsePositiveInt(value) {
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
+/**
+ * Parse OSM width-style values to meters.
+ *
+ * Supports values like "12", "12 m", and "40 ft". Unit-less large values
+ * above 40 are interpreted as feet, matching common OSM tagging practice.
+ */
 function parseRoadWidthMeters(value) {
   if (!value) return null;
   const raw = String(value).trim().toLowerCase();
@@ -832,6 +864,9 @@ function parseRoadWidthMeters(value) {
   return parsed > 40 ? parsed * 0.3048 : parsed;
 }
 
+/**
+ * Return a class-based default lane width in meters.
+ */
 function getDefaultLaneWidthMeters(highway) {
   if (['motorway', 'motorway_link', 'trunk', 'trunk_link'].includes(highway)) return 3.7;
   if (['primary', 'primary_link', 'secondary', 'secondary_link'].includes(highway)) return 3.5;
@@ -840,6 +875,9 @@ function getDefaultLaneWidthMeters(highway) {
   return 3.0;
 }
 
+/**
+ * Return a class-based default lane count, adjusted for one-way roads.
+ */
 function getDefaultLaneCount(highway, isOneWay) {
   if (['motorway', 'trunk'].includes(highway)) return isOneWay ? 2 : 4;
   if (['motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link'].includes(highway)) {
@@ -849,6 +887,9 @@ function getDefaultLaneCount(highway, isOneWay) {
   return isOneWay ? 1 : 2;
 }
 
+/**
+ * Return min/max half-width bounds for a given highway class.
+ */
 function getRoadHalfWidthClamp(highway) {
   if (['motorway', 'motorway_link', 'trunk', 'trunk_link'].includes(highway)) {
     return { min: 3.5, max: 9.0 };
@@ -862,6 +903,12 @@ function getRoadHalfWidthClamp(highway) {
   return { min: 2.2, max: 5.0 };
 }
 
+/**
+ * Estimate road half-width in meters from OSM tags and roadway class.
+ *
+ * Priority: explicit `width` tag -> lane-based estimate -> style fallback,
+ * always clamped to class-specific practical limits.
+ */
 function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fallbackHalfWidth = 3.5) {
   const explicitWidth = parseRoadWidthMeters(tags.width);
   const limits = getRoadHalfWidthClamp(highway);
@@ -880,6 +927,11 @@ function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fallbackHal
   return clamp(estimatedHalf || fallbackHalfWidth, limits.min, limits.max);
 }
 
+/**
+ * Create a parallel offset of road nodes in world-space.
+ *
+ * Input and output node format: [x, y, z, halfWidth].
+ */
 function offsetNodes(nodes, offset, halfWidth) {
   if (nodes.length < 2) return [];
   const out = [];
@@ -901,6 +953,9 @@ function offsetNodes(nodes, offset, halfWidth) {
   return decimateNodes(out);
 }
 
+/**
+ * Build one BeamNG DecalRoad object from prepared spline nodes and style props.
+ */
 function makeRoadDecal(nodes, props, materialOverride) {
   if (nodes.length < 2) return null;
   const decal = {
@@ -1016,6 +1071,12 @@ function generateDecalRoads(terrainData, squareSize) {
   return decals;
 }
 
+/**
+ * Create the default Road Architect profile object used by generated roads.
+ *
+ * The profile embeds lane, edge, centerline, and blend-layer defaults expected
+ * by BeamNG's roadarchitect plugin session format.
+ */
 function createRoadArchitectDefaultProfile() {
   const persistentBaseLayer = {
     boxXLeft: 1,
@@ -1183,6 +1244,9 @@ function createRoadArchitectDefaultProfile() {
   };
 }
 
+/**
+ * Convert a geographic node into one Road Architect node entry.
+ */
 function makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount) {
   const [x, y, z] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
   const laneWidth = Math.max(2.6, Math.min(4.5, (halfWidth * 2) / Math.max(1, laneCount)));
@@ -1210,10 +1274,19 @@ function makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount
   };
 }
 
+/**
+ * Build a stable key for a lat/lng point to support node identity matching.
+ */
 function makeLatLngKey(pt, decimals = 7) {
   return `${Number(pt.lat).toFixed(decimals)}:${Number(pt.lng).toFixed(decimals)}`;
 }
 
+/**
+ * Split a polyline at interior nodes whose key is in splitKeys.
+ *
+ * Used to break long OSM roads at shared intersections so each generated road
+ * segment can be independently edited in Road Architect.
+ */
 function splitPolylineAtNodeKeys(points, splitKeys) {
   if (!Array.isArray(points) || points.length < 2 || !splitKeys || splitKeys.size === 0) {
     return [points];
@@ -1237,6 +1310,9 @@ function splitPolylineAtNodeKeys(points, splitKeys) {
   return out;
 }
 
+/**
+ * Build a set of node keys that appear in two or more drivable road features.
+ */
 function buildRoadIntersectionNodeKeySet(osmFeatures = []) {
   const counts = new Map();
   for (const feature of osmFeatures) {
@@ -1257,6 +1333,9 @@ function buildRoadIntersectionNodeKeySet(osmFeatures = []) {
   return intersectionKeys;
 }
 
+/**
+ * Count occurrences of every road node key across OSM road features.
+ */
 function buildRoadNodeCountMap(osmFeatures = []) {
   const counts = new Map();
   for (const feature of osmFeatures) {
@@ -1271,6 +1350,9 @@ function buildRoadNodeCountMap(osmFeatures = []) {
   return counts;
 }
 
+/**
+ * Create a Road Architect profile layer representing a pedestrian crossing.
+ */
 function createRoadArchitectPedCrossingLayer(name = 'Ped X - R1') {
   return {
     boxXLeft: 1,
@@ -1317,6 +1399,9 @@ function createRoadArchitectPedCrossingLayer(name = 'Ped X - R1') {
   };
 }
 
+/**
+ * Create a Road Architect profile layer that places a traffic boom object.
+ */
 function createRoadArchitectTrafficBoomLayer(name = 'traffic boom A') {
   return {
     boxXLeft: 1,
@@ -1363,6 +1448,9 @@ function createRoadArchitectTrafficBoomLayer(name = 'traffic boom A') {
   };
 }
 
+/**
+ * Build a reduced-marking profile for road approaches at 4-way intersections.
+ */
 function createRoadArchitectCrossroadsApproachProfile(pedName) {
   const profile = createRoadArchitectDefaultProfile();
   profile.condition = 0.2;
@@ -1383,6 +1471,9 @@ function createRoadArchitectCrossroadsApproachProfile(pedName) {
   return profile;
 }
 
+/**
+ * Build a profile that emits only sidewalk geometry for intersection corners.
+ */
 function createRoadArchitectSidewalkOnlyProfile() {
   return {
     '1': {
@@ -1445,6 +1536,9 @@ function createRoadArchitectSidewalkOnlyProfile() {
   };
 }
 
+/**
+ * Create one locked Road Architect node for generated sidewalk arcs.
+ */
 function makeRoadArchitectSidewalkNode(worldX, worldY, worldZ) {
   return {
     heightsL: { '1': 0.01 },
@@ -1461,12 +1555,20 @@ function makeRoadArchitectSidewalkNode(worldX, worldY, worldZ) {
   };
 }
 
+/**
+ * Normalize a 2D vector, falling back to +X when magnitude is near zero.
+ */
 function normalize2D(dx, dy) {
   const len = Math.hypot(dx, dy);
   if (len < 1e-6) return { x: 1, y: 0 };
   return { x: dx / len, y: dy / len };
 }
 
+/**
+ * Decorate four-way intersections with approach profiles and sidewalk arcs.
+ *
+ * Returns extra sidewalk roads and the next available sidewalk index counter.
+ */
 function enrichRoadArchitectCrossroads(roads, intersectionEntries, startSidewalkIndex = 1) {
   if (!Array.isArray(roads) || !intersectionEntries || intersectionEntries.size === 0) {
     return { sidewalkRoads: [], nextSidewalkIndex: startSidewalkIndex };
@@ -1567,6 +1669,13 @@ function enrichRoadArchitectCrossroads(roads, intersectionEntries, startSidewalk
   return { sidewalkRoads, nextSidewalkIndex: sidewalkIndex };
 }
 
+/**
+ * Build a Road Architect session JSON object from clipped OSM roads.
+ *
+ * The output matches the plugin session schema under `data.{roads,profiles,...}`
+ * and is written into the exported level so users can edit generated roads in
+ * BeamNG's Road Architect tools.
+ */
 function generateRoadArchitectSession(terrainData, squareSize, levelName) {
   if (!terrainData?.osmFeatures?.length) return null;
 
@@ -1644,6 +1753,9 @@ function generateRoadArchitectSession(terrainData, squareSize, levelName) {
         zOffsetFromRoad: 0,
       });
 
+      /**
+       * Register one road endpoint as a candidate 4-way intersection approach.
+       */
       const addIntersectionEntry = (nodeKey, endpoint) => {
         if (!fourWayNodeKeys.has(nodeKey)) return;
         const road = roads[roadIndex];
@@ -1917,40 +2029,64 @@ const RIVER_TEMPLATE = {
   wetDepth: 0.35,
 };
 
+/**
+ * Round a number to a fixed number of decimal places.
+ */
 function roundTo(value, places = 3) {
   const f = 10 ** places;
   return Math.round(value * f) / f;
 }
 
+/**
+ * Format a finite number with fixed decimals, otherwise return "n/a".
+ */
 function formatNumber(value, places = 3) {
   if (!Number.isFinite(value)) return 'n/a';
   return Number(value).toFixed(places);
 }
 
+/**
+ * Format truthy/falsey values as Yes/No for report output.
+ */
 function formatBool(value) {
   return value ? 'Yes' : 'No';
 }
 
+/**
+ * Format a Date instance as ISO-8601, otherwise return "n/a".
+ */
 function formatIsoTimestamp(value) {
   if (!(value instanceof Date) || Number.isNaN(value.getTime())) return 'n/a';
   return value.toISOString();
 }
 
+/**
+ * Format a duration in ms with human-readable units.
+ */
 function formatDurationMs(value) {
   if (!Number.isFinite(value)) return 'n/a';
   if (value >= 1000) return `${(value / 1000).toFixed(2)} s`;
   return `${Math.round(value)} ms`;
 }
 
+/**
+ * Convert square meters to square kilometers for report display.
+ */
 function metersToKm2(value) {
   if (!Number.isFinite(value)) return 'n/a';
   return (value / 1_000_000).toFixed(3);
 }
 
+/**
+ * Clamp a numeric value to the inclusive [min, max] range.
+ */
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+/**
+ * Summarize OSM feature counts by feature type and basic geometry shape.
+ */
 function summarizeOsmFeatures(features = []) {
   const summary = {
     total: 0,
@@ -1981,6 +2117,9 @@ function summarizeOsmFeatures(features = []) {
   return summary;
 }
 
+/**
+ * Build a human-readable elevation source label for export reports.
+ */
 function resolveElevationSourceLabel(terrainData, selectedElevationSource) {
   const explicit = typeof selectedElevationSource === 'string' ? selectedElevationSource.trim() : '';
   const normalized = explicit.toLowerCase();
@@ -1998,6 +2137,9 @@ function resolveElevationSourceLabel(terrainData, selectedElevationSource) {
   return 'Default/WGS84';
 }
 
+/**
+ * Count valid vs no-data elevation samples from terrainData.heightMap.
+ */
 function summarizeTerrainSamples(terrainData) {
   const heightMap = terrainData?.heightMap;
   if (!heightMap || typeof heightMap.length !== 'number') {
@@ -2029,6 +2171,9 @@ function summarizeTerrainSamples(terrainData) {
   };
 }
 
+/**
+ * Build the plaintext export diagnostics report bundled in the level zip.
+ */
 function buildBeamNGExportReport({
   terrainData,
   originalTerrainData,
@@ -2185,6 +2330,11 @@ function buildBeamNGExportReport({
   return reportLines.join('\n') + '\n';
 }
 
+/**
+ * Load bundled MapNG flag assets from the static zip served at runtime.
+ *
+ * Returns an array of { path, data } entries ready to write into JSZip.
+ */
 async function loadMapngFlagAsset() {
   const response = await fetch('/mapng_flag_static.zip');
   if (!response.ok) throw new Error(`Failed to load mapng flag asset: ${response.status}`);
@@ -2200,6 +2350,9 @@ async function loadMapngFlagAsset() {
   return files;
 }
 
+/**
+ * Find the highest sampled terrain point and return world-space [x,y,z].
+ */
 function findHighestTerrainPoint(terrainData, squareSize) {
   const { width, height, heightMap, minHeight } = terrainData;
   let bestIndex = 0;
@@ -2222,6 +2375,9 @@ function findHighestTerrainPoint(terrainData, squareSize) {
   ];
 }
 
+/**
+ * Check whether a point array forms a closed lat/lng ring.
+ */
 function isClosedRing(points) {
   if (!Array.isArray(points) || points.length < 4) return false;
   const a = points[0];
@@ -2229,6 +2385,11 @@ function isClosedRing(points) {
   return a.lat === b.lat && a.lng === b.lng;
 }
 
+/**
+ * Sample terrain height at a lat/lng using bilinear interpolation.
+ *
+ * Returned value is world-space Z relative to terrain minHeight.
+ */
 function getTerrainHeightWorld(lat, lng, terrainData) {
   const { bounds, width, height, heightMap, minHeight } = terrainData;
   const sanitizeHeight = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
@@ -2249,6 +2410,9 @@ function getTerrainHeightWorld(lat, lng, terrainData) {
   return (h00 * (1 - tx) * (1 - ty) + h10 * tx * (1 - ty) + h01 * (1 - tx) * ty + h11 * tx * ty) - minHeight;
 }
 
+/**
+ * Convert a geographic point to BeamNG world-space coordinates.
+ */
 function geoToWorldPoint(lat, lng, terrainData, squareSize, zOffset = 0) {
   const { bounds, width } = terrainData;
   const worldSize = width * squareSize;
@@ -2261,6 +2425,9 @@ function geoToWorldPoint(lat, lng, terrainData, squareSize, zOffset = 0) {
   ];
 }
 
+/**
+ * Build a 3x3 Z-up rotation matrix from yaw radians.
+ */
 function rotationMatrixFromYaw(yaw) {
   const c = roundTo(Math.cos(yaw), 6);
   const s = roundTo(Math.sin(yaw), 6);
@@ -2343,6 +2510,9 @@ const EAST_COAST_FENCE_MATERIAL_DEFS = {
 
 const MAX_NATIVE_BARRIER_OBJECTS = 8000;
 
+/**
+ * Resolve OSM barrier tags to one of the native BeamNG barrier asset presets.
+ */
 function resolveNativeBarrierAsset(tags = {}) {
   const barrierType = String(tags.barrier ?? '').trim().toLowerCase();
   const material = String(tags.material ?? '').trim().toLowerCase();
@@ -2381,6 +2551,12 @@ function resolveNativeBarrierAsset(tags = {}) {
   return NATIVE_BARRIER_ASSETS.guardrail;
 }
 
+/**
+ * Convert OSM barrier features into BeamNG TSStatic barrier objects.
+ *
+ * Includes repeated segment placement and optional post/endcap meshes where
+ * the selected barrier asset defines them.
+ */
 function buildNativeBarrierObjects(terrainData, squareSize) {
   const features = terrainData.osmFeatures?.filter((feature) => (
     feature.type === 'barrier' && Array.isArray(feature.geometry) && feature.geometry.length >= 2
@@ -2388,6 +2564,9 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
 
   const objects = [];
 
+  /**
+   * Add one TSStatic barrier instance at a geographic point with yaw.
+   */
   const pushInstanceAtGeo = (pt, yaw, asset, name, zOffsetOverride) => {
     if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
     const rotationYaw = yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
@@ -2410,6 +2589,9 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
     });
   };
 
+  /**
+   * Place repeated barrier panels along one OSM barrier polyline.
+   */
   const pushFeatureInstances = (feature, asset, namePrefix) => {
     const geometry = Array.isArray(feature?.geometry) ? feature.geometry : [];
     if (geometry.length < 2) return;
@@ -2441,6 +2623,9 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
     const panelCount = Math.max(1, Math.round(totalLen / nominalSpacing));
     const panelSpacing = totalLen / panelCount;
 
+    /**
+     * Sample interpolated geo/world coordinates and tangent at path distance.
+     */
     const sampleAtDistance = (distance) => {
       const d = Math.max(0, Math.min(totalLen, distance));
       let segIdx = segmentLengths.length - 1;
@@ -2520,6 +2705,9 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
     }
   };
 
+  /**
+   * Place optional guardrail endcap meshes at both barrier endpoints.
+   */
   const pushGuardrailEndcaps = (feature, asset, featureIndex) => {
     if (!asset.endShapeName || !Array.isArray(feature.geometry) || feature.geometry.length < 2) return;
     const startPt = feature.geometry[0];
@@ -2589,6 +2777,9 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
   return objects;
 }
 
+/**
+ * Clone barrier TSStatic objects for folder-level JSON items output.
+ */
 function buildBarrierFolderItems(barrierObjects) {
   if (!Array.isArray(barrierObjects) || barrierObjects.length === 0) return [];
   return barrierObjects.map((obj, index) => ({
@@ -2599,6 +2790,9 @@ function buildBarrierFolderItems(barrierObjects) {
   }));
 }
 
+/**
+ * Sanitize user-facing road folder names for BeamNG file-safe usage.
+ */
 function sanitizeRoadFolderName(value, fallback) {
   const ascii = String(value || '')
     .normalize('NFKD')
@@ -2611,6 +2805,9 @@ function sanitizeRoadFolderName(value, fallback) {
   return cleaned || fallback;
 }
 
+/**
+ * Build road group folder metadata from a Road Architect session.
+ */
 function buildRoadFolderGroups(roadArchitectSession) {
   const placedGroups = Array.isArray(roadArchitectSession?.data?.placedGroups)
     ? roadArchitectSession.data.placedGroups
@@ -2641,6 +2838,9 @@ function buildRoadFolderGroups(roadArchitectSession) {
   return groups;
 }
 
+/**
+ * Point-in-polygon test in geographic coordinates using ray casting.
+ */
 function pointInPolygonLatLng(point, ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -2655,6 +2855,9 @@ function pointInPolygonLatLng(point, ring) {
   return inside;
 }
 
+/**
+ * Point-in-polygon test in world XY coordinates using ray casting.
+ */
 function pointInPolygonWorld(x, y, ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -2669,6 +2872,9 @@ function pointInPolygonWorld(x, y, ring) {
   return inside;
 }
 
+/**
+ * Deterministic string hash (FNV-1a style) used for pseudo-random seeding.
+ */
 function hashString(value) {
   let hash = 2166136261;
   const input = String(value);
@@ -2679,11 +2885,17 @@ function hashString(value) {
   return hash >>> 0;
 }
 
+/**
+ * Fast deterministic pseudo-random scalar in [0,1) from numeric seed.
+ */
 function seededRandom(seed) {
   const x = Math.sin(seed * 12.9898) * 43758.5453123;
   return x - Math.floor(x);
 }
 
+/**
+ * Downsample a polyline to at most maxPoints while preserving endpoints.
+ */
 function simplifyPolyline(points, maxPoints = 80) {
   if (!Array.isArray(points) || points.length <= maxPoints) return points;
   const out = [points[0]];
@@ -2697,6 +2909,9 @@ function simplifyPolyline(points, maxPoints = 80) {
   return out;
 }
 
+/**
+ * Exclude ocean/marina-like water features from inland water generation.
+ */
 function isExcludedWaterFeature(tags = {}) {
   return (
     tags.place === 'sea' ||
@@ -2709,12 +2924,20 @@ function isExcludedWaterFeature(tags = {}) {
   );
 }
 
+/**
+ * Return percentile value from an ascending-sorted numeric array.
+ */
 function percentileValue(sortedValues, fraction) {
   if (!sortedValues.length) return 0;
   const idx = clamp(Math.floor((sortedValues.length - 1) * fraction), 0, sortedValues.length - 1);
   return sortedValues[idx];
 }
 
+/**
+ * Compute a minimum-area oriented rectangle fit for polygon world points.
+ *
+ * Used to place WaterBlock primitives that best match OSM polygon footprint.
+ */
 function computeBestFitWaterBlock(worldPoints) {
   let cx = 0;
   let cy = 0;
@@ -2765,6 +2988,9 @@ function computeBestFitWaterBlock(worldPoints) {
   return { cx, cy, yaw: 0, width: 4, length: 4, area: 16 };
 }
 
+/**
+ * Build WaterBlock objects for closed inland water polygons.
+ */
 function buildWaterBlockObjects(terrainData, squareSize, flavor) {
   const waterProfile = getWaterProfile(flavor);
   const features = terrainData.osmFeatures?.filter((feature) => {
@@ -2805,6 +3031,9 @@ function buildWaterBlockObjects(terrainData, squareSize, flavor) {
   });
 }
 
+/**
+ * Build one sea-level WaterPlane spanning the exported level.
+ */
 function buildSeaLevelWaterPlane(terrainData, flavor) {
   const waterProfile = getWaterProfile(flavor);
   const minHeight = Number(terrainData?.minHeight);
@@ -2824,6 +3053,9 @@ function buildSeaLevelWaterPlane(terrainData, flavor) {
   };
 }
 
+/**
+ * Apply a simple 3-point moving average to a height sequence.
+ */
 function smoothHeights(heights) {
   if (heights.length < 3) return heights;
   const out = heights.slice();
@@ -2833,6 +3065,9 @@ function smoothHeights(heights) {
   return out;
 }
 
+/**
+ * Parse a numeric width token (with optional units) or return fallback.
+ */
 function parseNumericWidth(value, fallback) {
   if (value == null) return fallback;
   const match = String(value).match(/[\d.]+/);
@@ -2840,6 +3075,9 @@ function parseNumericWidth(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/**
+ * Build River objects for linear waterway OSM features.
+ */
 function buildRiverObjects(terrainData, squareSize, flavor) {
   const waterProfile = getWaterProfile(flavor);
   const features = terrainData.osmFeatures?.filter((feature) => {
@@ -2881,6 +3119,9 @@ function buildRiverObjects(terrainData, squareSize, flavor) {
   }).filter((river) => river.nodes.length >= 2);
 }
 
+/**
+ * Clone managed forest templates by item name and assign fresh persistentIds.
+ */
 function cloneManagedItemData(itemNames, flavor) {
   const out = {};
   for (const itemName of itemNames) {
@@ -2894,6 +3135,9 @@ function cloneManagedItemData(itemNames, flavor) {
   return out;
 }
 
+/**
+ * Build one managed-forest placement record at a geographic point.
+ */
 function makeForestPlacement(type, point, terrainData, squareSize, seed, scaleMin, scaleMax) {
   const [x, y, z] = geoToWorldPoint(point.lat, point.lng, terrainData, squareSize, 0);
   const yaw = seededRandom(seed + 17) * Math.PI * 2;
@@ -2912,6 +3156,9 @@ const BEAMNG_GRASS_DENSITY_MULTIPLIER = 2.0;
 const BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE = 12000;
 const BEAMNG_MAX_GROUNDCOVER_ELEMENTS = 320000;
 
+/**
+ * Randomly jitter a lat/lng point by up to N meters using deterministic seed.
+ */
 function jitterLatLngByMeters(point, meters, seed) {
   if (!meters || meters <= 0) return point;
   const metersPerDegLat = 111320;
@@ -2927,6 +3174,9 @@ function jitterLatLngByMeters(point, meters, seed) {
   };
 }
 
+/**
+ * Sample pseudo-random placements inside a polygon feature with hole support.
+ */
 function sampleAreaPlacements(feature, terrainData, squareSize, itemType, densityPerSqM, maxCount, scaleMin, scaleMax, baseSeed) {
   if (!Array.isArray(feature.geometry) || feature.geometry.length < 3) return [];
   const ring = isClosedRing(feature.geometry) ? feature.geometry.slice(0, -1) : feature.geometry;
@@ -2966,11 +3216,19 @@ function sampleAreaPlacements(feature, terrainData, squareSize, itemType, densit
   return placements;
 }
 
+/**
+ * Build grouped BeamNG forest placements for trees, bushes, and optional rocks.
+ *
+ * Returns Map<managedForestType, placement[]>.
+ */
 function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeDensity = 1 }, flavor) {
   const regularPlacementsByType = new Map();
   const priorityPlacementsByType = new Map();
   const treeDensityMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER * Math.max(0.5, Math.min(10, Number(treeDensity) || 1));
   const bushDensityMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER;
+  /**
+   * Add a forest placement to priority or regular buckets with hard caps.
+   */
   const pushPlacement = (placement, { priority = false } = {}) => {
     if (!getManagedForestTemplate(flavor, placement.type)) return;
     const target = priority ? priorityPlacementsByType : regularPlacementsByType;
@@ -3113,6 +3371,9 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
   return placementsByType;
 }
 
+/**
+ * Serialize forest placement maps into export file descriptors.
+ */
 function serializeForestFiles(placementsByType) {
   const files = [];
   for (const [type, placements] of placementsByType.entries()) {
@@ -3125,6 +3386,9 @@ function serializeForestFiles(placementsByType) {
   return files;
 }
 
+/**
+ * Build GroundCover objects used to render broad grass coverage in BeamNG.
+ */
 function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) {
   if (!includeTrees) return [];
   const groundCover = getGroundCoverProfile(flavor);
@@ -3281,12 +3545,21 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const normalizedTreeDensity = Math.max(0.5, Math.min(10, Number(treeDensity) || 1));
 
   // Report progress and yield to the browser so UI updates and GC can run.
+  /**
+   * Emit progress callbacks consumed by the export UI.
+   */
   const report = (step, pct) => onProgress?.({ step, pct });
+  /**
+   * Yield one event-loop tick so UI paint and GC can run during long exports.
+   */
   const yield_ = () => new Promise(r => setTimeout(r, 0));
   const exportStartedAt = new Date();
   const processingLog = [];
   let currentStep = null;
   let currentStepStartedAt = performance.now();
+  /**
+   * Start a timed processing step and close the previous one in the log.
+   */
   const beginStep = (step, pct) => {
     const now = performance.now();
     if (currentStep !== null) {
@@ -3300,6 +3573,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     currentStepStartedAt = now;
     report(step, pct);
   };
+  /**
+   * Finalize and flush the active timed step into the processing log.
+   */
   const finishProcessingLog = () => {
     if (currentStep !== null) {
       processingLog.push({
