@@ -71,6 +71,17 @@
             </select>
           </div>
 
+          <!-- Road export mode selector -->
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
+            <select v-model="beamNGRoadType" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+              <option value="architect">{{ t('exportPanel.roadTypeArchitect') }}</option>
+              <option value="mesh">{{ t('exportPanel.roadTypeMesh') }}</option>
+              <option value="decal">{{ t('exportPanel.roadTypeSpline') }}</option>
+              <option value="none">{{ t('exportPanel.roadTypeNone') }}</option>
+            </select>
+          </div>
+
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.flavor') }}</span>
             <select v-model="beamNGFlavorId" class="min-w-0 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
@@ -127,14 +138,6 @@
             <label class="flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" v-model="beamNGIncludeRocks" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.quarryRock') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGUseMeshRoads" class="rounded border-gray-300 dark:border-gray-600 text-[#FF6600] cursor-pointer" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.meshRoads') }}</span>
             </label>
           </div>
 
@@ -504,7 +507,11 @@ const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFounda
 const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') === 'true');
-const beamNGUseMeshRoads = ref(localStorage.getItem('mapng_beamNGUseMeshRoads') === 'true');
+// Migrate legacy boolean mesh road setting if it exists
+const _legacyMesh = localStorage.getItem('mapng_beamNGUseMeshRoads');
+let initialRoadType = localStorage.getItem('mapng_beamNGRoadType') || (_legacyMesh === 'true' ? 'mesh' : 'decal');
+if (initialRoadType === 'spline') initialRoadType = 'decal'; // Migrate from old spline naming
+const beamNGRoadType = ref(initialRoadType);
 const beamNGFlavorOptions = getBeamNGFlavorOptions();
 const persistedBeamNGFlavor = localStorage.getItem('mapng_beamNGFlavorId') || '';
 const beamNGFlavorId = ref(beamNGFlavorOptions.some((flavor) => flavor.id === persistedBeamNGFlavor) ? persistedBeamNGFlavor : '');
@@ -552,7 +559,7 @@ watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoun
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
 watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
-watch(beamNGUseMeshRoads, (v) => localStorage.setItem('mapng_beamNGUseMeshRoads', String(v)));
+watch(beamNGRoadType, (v) => localStorage.setItem('mapng_beamNGRoadType', v));
 watch(beamNGFlavorId, (v) => localStorage.setItem('mapng_beamNGFlavorId', v));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
@@ -1102,7 +1109,7 @@ const handleBeamNGLevelExport = async () => {
       includeWater: beamNGIncludeWater.value,
       includeTrees: beamNGIncludeTrees.value,
       includeRocks: beamNGIncludeRocks.value,
-      useMeshRoads: beamNGUseMeshRoads.value,
+      roadType: beamNGRoadType.value,
       flavorId: beamNGFlavorId.value,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,

@@ -853,10 +853,43 @@ function decimateNodes(nodes) {
 }
 
 const GLOBAL_DECAL_MATERIALS = {
+  invisible: 'road_invisible',
   lineWhite: 'm_line_white',
   lineYellowDouble: 'm_line_yellow_double',
+  lineYellowSingle: 'm_line_yellow',
+  lineWhiteDashed: 'm_line_white_discontinue',
   edgeAsphaltGrass: 'm_road_asphalt_edge_grass',
+  edgeAsphaltDirt: 'm_road_edge_dirt_grass',
   edgeDirt: 'm_road_edge_dirt',
+  asphaltItaly: 'road_asphalt_2lane', // Using generic asphalt matching the screenshots
+  asphaltECA: 'road_asphalt_2lane',
+};
+
+// Decal Road Layer Templates
+// Logic derived from BeamNG.drive's internal roadSpline tool (Italy/ECA).
+const ROAD_TEMPLATES = {
+  default: [
+    { name: 'asphalt', material: GLOBAL_DECAL_MATERIALS.invisible, widthScale: 1.0, offset: 0, priority: 10 },
+    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: -1.0, priority: 11, isEdge: true },
+    { name: 'edge_right', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: 1.0, priority: 11, isEdge: true },
+  ],
+  major: [
+    { name: 'asphalt', material: GLOBAL_DECAL_MATERIALS.invisible, widthScale: 1.0, offset: 0, priority: 10 },
+    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.5, offset: -1.0, priority: 11, isEdge: true },
+    { name: 'edge_right', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.5, offset: 1.0, priority: 11, isEdge: true },
+    { name: 'line_center', material: GLOBAL_DECAL_MATERIALS.lineYellowDouble, width: 0.4, offset: 0, priority: 20 },
+    { name: 'line_left', material: GLOBAL_DECAL_MATERIALS.lineWhite, width: 0.2, offset: -0.9, priority: 20, isEdgeRelative: true },
+    { name: 'line_right', material: GLOBAL_DECAL_MATERIALS.lineWhite, width: 0.2, offset: 0.9, priority: 20, isEdgeRelative: true },
+  ],
+  minor: [
+    { name: 'asphalt', material: GLOBAL_DECAL_MATERIALS.invisible, widthScale: 1.0, offset: 0, priority: 10 },
+    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: -1.0, priority: 11, isEdge: true },
+    { name: 'edge_right', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: 1.0, priority: 11, isEdge: true },
+    { name: 'line_center', material: GLOBAL_DECAL_MATERIALS.lineWhiteDashed, width: 0.2, offset: 0, priority: 20 },
+  ],
+  unpaved: [
+    { name: 'dirt', material: GLOBAL_DECAL_MATERIALS.edgeDirt, widthScale: 1.1, offset: 0, priority: 10 },
+  ],
 };
 
 // OSM highway type → generated decal styling.
@@ -1100,6 +1133,7 @@ function offsetNodes(nodes, offset, halfWidth) {
     const next = nodes[Math.min(nodes.length - 1, i + 1)];
     const dx = next[0] - prev[0];
     const dy = next[1] - prev[1];
+
     const len = Math.hypot(dx, dy);
     const nx = len > 1e-6 ? -dy / len : 0;
     const ny = len > 1e-6 ? dx / len : 0;
@@ -1116,12 +1150,13 @@ function offsetNodes(nodes, offset, halfWidth) {
 /**
  * Build one BeamNG DecalRoad object from prepared spline nodes and style props.
  */
-function makeRoadDecal(nodes, props, materialOverride) {
+function makeRoadDecal(nodes, name, parentName, props, materialOverride) {
   if (nodes.length < 2) return null;
   const decal = {
+    name,
     class: 'DecalRoad',
     persistentId: generatePersistentId(),
-    __parent: 'Decal_roads',
+    __parent: parentName || 'Decal_roads',
     position: [nodes[0][0], nodes[0][1], nodes[0][2]],
     improvedSpline: true,
     material: materialOverride || props.material,
@@ -1133,6 +1168,59 @@ function makeRoadDecal(nodes, props, materialOverride) {
   };
   if (Number.isFinite(props.detail)) decal.detail = props.detail;
   return decal;
+}
+
+function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parentName) {
+  const isUnpaved = UNPAVED_SURFACES.has(tags.surface) || highway === 'track';
+  const majorRoad = MAJOR_ROAD_MARKINGS.has(highway);
+  const laneMarkingsEnabled = !tags['lane_markings'] || tags['lane_markings'] !== 'no';
+
+  let templateKey = 'default';
+  if (isUnpaved) templateKey = 'unpaved';
+  else if (majorRoad && laneMarkingsEnabled) templateKey = 'major';
+  else if (laneMarkingsEnabled) templateKey = 'minor';
+
+  const layers = ROAD_TEMPLATES[templateKey] || ROAD_TEMPLATES.default;
+  const decals = [];
+
+  for (const layer of layers) {
+    let offset = layer.offset;
+    let width = layer.width || (styleHalfWidth * (layer.widthScale || 1.0));
+
+    // Handle offsets relative to the road edge (typical for line markings)
+    if (layer.isEdgeRelative) {
+      // Offset is multiplier of styleHalfWidth
+      offset = layer.offset * styleHalfWidth;
+    } else if (layer.isEdge) {
+      // Offset from center to edge center
+      offset = layer.offset * (styleHalfWidth - (layer.width / 2));
+    }
+
+    const layeredNodes = offsetNodes(centerNodes, offset, width);
+    if (layeredNodes.length < 2) continue;
+
+    // Use names that the BeamNG Road Spline Tool recognizes.
+    let levelName = 'Layer';
+    if (layer.name === 'asphalt' || layer.name === 'dirt') levelName = 'Base';
+    else if (layer.name === 'line_center') levelName = 'Center Line';
+    else if (layer.name === 'line_left') levelName = 'Edge Line - Left';
+    else if (layer.name === 'line_right') levelName = 'Edge Line - Right';
+    else if (layer.name === 'edge_left') levelName = 'Edge Blend - Left';
+    else if (layer.name === 'edge_right') levelName = 'Edge Blend - Right';
+
+    const decal = makeRoadDecal(layeredNodes, levelName, parentName, {
+      material: layer.material,
+      renderPriority: layer.priority,
+      breakAngle: 1.0,
+      textureLength: 5,
+      startEndFade: [1, 1],
+      detail: 0.1,
+    });
+
+    if (decal) decals.push(decal);
+  }
+
+  return decals;
 }
 
 /**
@@ -1150,7 +1238,21 @@ function makeRoadDecal(nodes, props, materialOverride) {
 function generateDecalRoads(terrainData, squareSize) {
   if (!terrainData.osmFeatures?.length) return [];
 
-  const decals = [];
+  const roadSplinesByName = new Map();
+  const segmentCounterByName = new Map();
+
+  const getOrCreateSplineGroup = (groupName) => {
+    if (roadSplinesByName.has(groupName)) return roadSplinesByName.get(groupName);
+    const group = {
+      class: 'SimGroup',
+      name: groupName,
+      persistentId: generatePersistentId(),
+      __parent: 'Decal_Roads',
+      __items: [],
+    };
+    roadSplinesByName.set(groupName, group);
+    return group;
+  };
 
   for (const feature of terrainData.osmFeatures) {
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
@@ -1158,11 +1260,11 @@ function generateDecalRoads(terrainData, squareSize) {
     const highway = feature.tags?.highway;
     if (!highway || ROAD_SKIP.has(highway)) continue;
 
+    const rawName = feature.tags?.name || feature.tags?.ref || `Road_${feature.id}`;
+    const cleanName = rawName.replace(/[^\w\s-]/g, '').trim() || `Road_${feature.id}`;
+    
     const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
-    const edgeBlendMaterial = ROAD_MARKING_STYLE.edgeBlend.material;
     const isOneWay = isOneWayRoad(feature.tags || {});
-    const useLaneMarkings = shouldUseLaneMarkings(highway, feature.tags || {});
-    const useEdgeBlend = shouldUseGrassEdgeBlend(highway, feature.tags || {});
     const styleHalfWidth = estimateRoadHalfWidth(feature.tags || {}, highway, isOneWay, style.width);
 
     // Clip to the terrain's safe inner boundary, splitting at crossings.
@@ -1170,7 +1272,12 @@ function generateDecalRoads(terrainData, squareSize) {
     const clippedSegments = clipGeometryToMargin(feature.geometry, terrainData.bounds)
       .flatMap(s => chunkPolyline(s));
 
-    for (const segment of clippedSegments) {
+    if (clippedSegments.length === 0) continue;
+
+    const splineGroup = getOrCreateSplineGroup(cleanName);
+
+    for (let i = 0; i < clippedSegments.length; i++) {
+      const segment = clippedSegments[i];
       const rawNodes = [];
       for (const pt of segment) {
         const [wx, wy, wz] = geoToWorld(pt.lat, pt.lng, terrainData, squareSize, 0.1);
@@ -1185,50 +1292,29 @@ function generateDecalRoads(terrainData, squareSize) {
       const centerNodes = decimateNodes(rawNodes);
       if (centerNodes.length < 2) continue;
 
-      const leftEdgeBlend = offsetNodes(
+      const layeredDecals = getLayeredRoadDecals(
         centerNodes,
-        styleHalfWidth - ROAD_MARKING_STYLE.edgeBlend.offsetInsideEdge,
-        ROAD_MARKING_STYLE.edgeBlend.halfWidth,
-      );
-      const rightEdgeBlend = offsetNodes(
-        centerNodes,
-        -(styleHalfWidth - ROAD_MARKING_STYLE.edgeBlend.offsetInsideEdge),
-        ROAD_MARKING_STYLE.edgeBlend.halfWidth,
-      );
-      const leftWhite = offsetNodes(
-        centerNodes,
-        styleHalfWidth - ROAD_MARKING_STYLE.edgeWhite.offsetInsideEdge,
-        ROAD_MARKING_STYLE.edgeWhite.halfWidth,
-      );
-      const rightWhite = offsetNodes(
-        centerNodes,
-        -(styleHalfWidth - ROAD_MARKING_STYLE.edgeWhite.offsetInsideEdge),
-        ROAD_MARKING_STYLE.edgeWhite.halfWidth,
+        highway,
+        feature.tags || {},
+        styleHalfWidth,
+        cleanName
       );
 
-      const leftEdgeBlendDecal = useEdgeBlend
-        ? makeRoadDecal(leftEdgeBlend, ROAD_MARKING_STYLE.edgeBlend, edgeBlendMaterial)
-        : null;
-      const rightEdgeBlendDecal = useEdgeBlend
-        ? makeRoadDecal(rightEdgeBlend, ROAD_MARKING_STYLE.edgeBlend, edgeBlendMaterial)
-        : null;
-      const leftWhiteDecal = useLaneMarkings ? makeRoadDecal(leftWhite, ROAD_MARKING_STYLE.edgeWhite) : null;
-      const rightWhiteDecal = useLaneMarkings ? makeRoadDecal(rightWhite, ROAD_MARKING_STYLE.edgeWhite) : null;
-
-      if (leftEdgeBlendDecal) decals.push(leftEdgeBlendDecal);
-      if (rightEdgeBlendDecal) decals.push(rightEdgeBlendDecal);
-      if (leftWhiteDecal) decals.push(leftWhiteDecal);
-      if (rightWhiteDecal) decals.push(rightWhiteDecal);
-
-      if (useLaneMarkings && !isOneWay) {
-        const centerYellow = offsetNodes(centerNodes, 0, ROAD_MARKING_STYLE.centerDoubleYellow.halfWidth);
-        const centerYellowDecal = makeRoadDecal(centerYellow, ROAD_MARKING_STYLE.centerDoubleYellow);
-        if (centerYellowDecal) decals.push(centerYellowDecal);
+      if (layeredDecals.length > 0) {
+        const segCount = (segmentCounterByName.get(cleanName) || 0) + 1;
+        segmentCounterByName.set(cleanName, segCount);
+        const nameSuffix = `S${segCount}`;
+        const roadNamePrefix = cleanName.replace(/\s+/g, '_');
+        for (let d = 0; d < layeredDecals.length; d++) {
+          const decal = layeredDecals[d];
+          decal.name = `${roadNamePrefix}__${decal.name}__${nameSuffix}__L${d + 1}`;
+          splineGroup.__items.push(decal);
+        }
       }
     }
   }
 
-  return decals;
+  return Array.from(roadSplinesByName.values()).filter((g) => g.__items.length > 0);
 }
 
 /**
@@ -2049,7 +2135,31 @@ function generateMeshRoads(terrainData, squareSize) {
  * Each object is one line, file ends with a newline — matching BeamNG's format.
  */
 function toNDJSON(objects) {
-  return objects.map(o => JSON.stringify(o)).join('\n') + '\n';
+  return objects
+    .map((o) => {
+      const { __items, ...rest } = o;
+      return JSON.stringify(rest);
+    })
+    .join('\n') + '\n';
+}
+
+function writeSimGroupTree(zip, folderPath, items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    zip.file(`${folderPath}/items.level.json`, '');
+    return;
+  }
+
+  zip.file(`${folderPath}/items.level.json`, toNDJSON(items));
+
+  for (const item of items) {
+    if (item.class !== 'SimGroup') continue;
+    if (!item.name) continue;
+    if (!Array.isArray(item.__items)) continue;
+
+    const childFolderPath = `${folderPath}/${item.name}`;
+    zip.folder(childFolderPath);
+    writeSimGroupTree(zip, childFolderPath, item.__items);
+  }
 }
 
 const WATERWAY_WIDTHS = {
@@ -3313,7 +3423,7 @@ function makeForestPlacement(type, point, terrainData, squareSize, seed, scaleMi
 const BEAMNG_TREE_DENSITY_MULTIPLIER = 2.5;
 const BEAMNG_GRASS_DENSITY_MULTIPLIER = 2.0;
 const BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE = 12000;
-const BEAMNG_MAX_GROUNDCOVER_ELEMENTS = 320000;
+const BEAMNG_MAX_GROUNDCOVER_ELEMENTS = 150000;
 
 /**
  * Randomly jitter a lat/lng point by up to N meters using deterministic seed.
@@ -3689,7 +3799,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     includeNativeBarriers = true,
     includeTrees = true,
     includeRocks = false,
-    useMeshRoads = false,
+    roadType = 'architect',
     flavorId,
     levelName: requestedLevelName = '',
     onProgress,
@@ -3801,16 +3911,25 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   const { position: spawnPosition, rotationMatrix: spawnRotationMatrix } =
     findSpawnPosition(exportTerrainData, center, squareSize);
-  const roadArchitectSession = generateRoadArchitectSession(exportTerrainData, squareSize, levelName);
+
+  const roadArchitectSession = roadType === 'architect'
+    ? generateRoadArchitectSession(exportTerrainData, squareSize, levelName)
+    : null;
   const roadArchitectRoadCount = Array.isArray(roadArchitectSession?.data?.roads)
     ? roadArchitectSession.data.roads.length
     : 0;
   const roadArchitectJunctionCount = Array.isArray(roadArchitectSession?.data?.junctions)
     ? roadArchitectSession.data.junctions.length
     : 0;
-  const meshRoads = useMeshRoads
+
+  const meshRoads = roadType === 'mesh'
     ? generateMeshRoads(exportTerrainData, squareSize)
     : [];
+
+  const decalRoads = roadType === 'decal'
+    ? generateDecalRoads(exportTerrainData, squareSize)
+    : [];
+
   const roadArchitectHeightmapBlob = roadArchitectSession
     ? generateRoadArchitectHeightmapPng(exportTerrainData, maxHeight)
     : null;
@@ -3953,6 +4072,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }
   if (roadFolderGroups.length > 0) {
     zip.folder(`${base}/main/MissionGroup/roads`);
+  }
+  if (meshRoads.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/Mesh_roads`);
   }
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/Level_objects/vegetation`);
@@ -4321,23 +4443,48 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       name: 'roads',
       persistentId: generatePersistentId(),
     }] : []),
+    ...(decalRoads.length > 0 ? [{
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: 'Decal_Roads',
+      persistentId: generatePersistentId(),
+    }] : []),
   ];
   zip.file(`${base}/main/MissionGroup/items.level.json`, toNDJSON(missionGroupItems));
 
-  // ── main/MissionGroup/barriers/items.level.json ────────────────────────────
+  // ── main/MissionGroup/Mesh_roads/items.level.json ─────────────────────────
+  if (meshRoads.length > 0) {
+    zip.file(`${base}/main/MissionGroup/Mesh_roads/items.level.json`, toNDJSON(meshRoads));
+  }
+
+  // ── main/MissionGroup/barriers/items.level.json ─────────────────────────
   if (barrierFolderItems.length > 0) {
     zip.file(`${base}/main/MissionGroup/barriers/items.level.json`, toNDJSON(barrierFolderItems));
   }
 
-  // ── main/MissionGroup/roads/items.level.json ───────────────────────────────
+  // ── main/MissionGroup/roads/items.level.json ──────────────────────────────
   if (roadFolderGroups.length > 0) {
-    zip.file(`${base}/main/MissionGroup/roads/items.level.json`, '');
+    // Generate SimGroup objects for each Road Architect road group
+    const roadGroups = roadFolderGroups.map(g => ({
+      __parent: 'roads',
+      class: 'SimGroup',
+      name: g.groupName,
+      persistentId: generatePersistentId(),
+    }));
+
+    zip.file(`${base}/main/MissionGroup/roads/items.level.json`, toNDJSON(roadGroups));
+
+    // BeamNG requires sub-folders and an empty items.level.json for each nested SimGroup
+    for (const g of roadGroups) {
+      zip.folder(`${base}/main/MissionGroup/roads/${g.name}`);
+      // An empty string or empty items list will parse without crashing.
+      zip.file(`${base}/main/MissionGroup/roads/${g.name}/items.level.json`, '');
+    }
   }
 
-  // ── main/MissionGroup/Mesh_roads/items.level.json ──────────────────────────
-  if (meshRoads.length > 0) {
-    zip.folder(`${base}/main/MissionGroup/Mesh_roads`);
-    zip.file(`${base}/main/MissionGroup/Mesh_roads/items.level.json`, toNDJSON(meshRoads));
+  // ── main/MissionGroup/Decal_Roads/items.level.json ────────────────────────
+  if (decalRoads.length > 0) {
+    writeSimGroupTree(zip, `${base}/main/MissionGroup/Decal_Roads`, decalRoads);
   }
 
   // ── main/MissionGroup/Level_objects/items.level.json ──────────────────────
@@ -4354,7 +4501,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
         fogAtmosphereHeight: 1000,
         fogDensity: 0.0001,
         fogDensityOffset: 0,
-        globalEnviromentMap: getGlobalEnvironmentMap(flavor),
+        globalEnviromentMap: 'BNG_Sky_02_cubemap',
         gravity: -9.81,
         nearClip: 0.1,
         visibleDistance: 4000,

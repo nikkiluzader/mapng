@@ -406,7 +406,6 @@ const parseOverpassResponse = (data, bounds) => {
     }
   }
 
-  const roadsToMerge = new Map();
   const coastlineWaysToJoin = [];
 
   for (const idStr in ways) {
@@ -415,16 +414,9 @@ const parseOverpassResponse = (data, bounds) => {
     const tags = w.tags;
 
     if (tags.highway) {
-      const sig = [
-        tags.highway || "", tags.name || "", tags.oneway || "",
-        tags.lanes || "", tags["lanes:forward"] || "", tags["lanes:backward"] || "",
-        tags.width || "", tags.layer || "0", tags.bridge || "",
-        tags.tunnel || "", tags.covered || "", tags.embankment || "",
-        tags.cutting || "", tags.barrier || "", tags.retaining_wall || "",
-        tags.man_made || "",
-      ].join("|");
-      if (!roadsToMerge.has(sig)) roadsToMerge.set(sig, []);
-      roadsToMerge.get(sig).push(w);
+      // Keep original way geometry. Aggressive signature-based joining can produce
+      // long discontinuous polylines across intersections/branches.
+      rawFeatures.push({ id: id.toString(), type: "road", geometry: w.nodes, tags });
     } else if (tags.natural === "tree_row") {
       const nodes = w.nodes;
       for (let i = 0; i < nodes.length - 1; i++) {
@@ -467,15 +459,6 @@ const parseOverpassResponse = (data, bounds) => {
         rawFeatures.push({ id: id.toString(), type, geometry: nodes, tags });
       }
     }
-  }
-
-  for (const [sig, segmentList] of roadsToMerge) {
-    const joined = joinWays(segmentList.map((s) => s.nodes));
-    joined.forEach((geometry, index) => {
-      if (geometry.length > 1) {
-        rawFeatures.push({ id: `merged_${sig}_${index}`, type: "road", geometry, tags: segmentList[0].tags });
-      }
-    });
   }
 
   if (coastlineWaysToJoin.length > 0) {
