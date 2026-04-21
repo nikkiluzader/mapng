@@ -58,26 +58,26 @@
             <select v-model="beamNGBaseTexture" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
               <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">{{ t('exportPanel.satelliteHybrid') }}</option>
               <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">{{ t('exportPanel.satellite') }}</option>
-              <option value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
+              <option v-if="hasOsmData" value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
             </select>
           </div>
 
           <!-- PBR terrain materials source selector -->
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.pbrMaterials') }}</span>
-            <select v-model="beamNGPbrSource" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+            <select v-model="beamNGPbrSource" :disabled="!hasOsmData" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
               <option value="none">{{ t('exportPanel.off') }}</option>
-              <option value="osm">{{ t('exportPanel.osmData') }}</option>
+              <option v-if="hasOsmData" value="osm">{{ t('exportPanel.osmData') }}</option>
             </select>
           </div>
 
           <!-- Road export mode selector -->
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
-            <select v-model="beamNGRoadType" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
-              <option value="architect">{{ t('exportPanel.roadTypeArchitect') }}</option>
-              <option value="mesh">{{ t('exportPanel.roadTypeMesh') }}</option>
-              <option value="decal">{{ t('exportPanel.roadTypeSpline') }}</option>
+            <select v-model="beamNGRoadType" :disabled="!hasOsmData" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60">
+              <option v-if="hasOsmData" value="architect">{{ t('exportPanel.roadTypeArchitect') }}</option>
+              <option v-if="hasOsmData" value="mesh">{{ t('exportPanel.roadTypeMesh') }}</option>
+              <option v-if="hasOsmData" value="decal">{{ t('exportPanel.roadTypeSpline') }}</option>
               <option value="none">{{ t('exportPanel.roadTypeNone') }}</option>
             </select>
           </div>
@@ -96,7 +96,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBackdrop') }}</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeBackdrop" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer" />
+              <input type="checkbox" v-model="beamNGIncludeBackdrop" :disabled="isCustomUploadTerrain" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.surroundingTerrain') }}</span>
             </label>
           </div>
@@ -104,7 +104,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBuildings') }}</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeBuildings" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer" />
+              <input type="checkbox" v-model="beamNGIncludeBuildings" :disabled="!hasOsmData" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.exportBuildings') }}</span>
             </label>
           </div>
@@ -112,7 +112,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.applyFoundations') }}</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGApplyFoundations" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer" />
+              <input type="checkbox" v-model="beamNGApplyFoundations" :disabled="!hasOsmData" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.raiseUnderBuildings') }}</span>
             </label>
           </div>
@@ -120,7 +120,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.water') }}</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeWater" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer" />
+              <input type="checkbox" v-model="beamNGIncludeWater" :disabled="!hasOsmData" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.lakesRivers') }}</span>
             </label>
           </div>
@@ -128,7 +128,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.treesBushes') }}</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeTrees" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer" />
+              <input type="checkbox" v-model="beamNGIncludeTrees" :disabled="!hasOsmData" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.nativeForest') }}</span>
             </label>
           </div>
@@ -136,7 +136,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.rocks') }}</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeRocks" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer" />
+              <input type="checkbox" v-model="beamNGIncludeRocks" :disabled="!hasOsmData" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.quarryRock') }}</span>
             </label>
           </div>
@@ -147,14 +147,14 @@
             </p>
           </div>
 
-          <div v-if="!beamNGFlavorId" class="px-0.5 text-[9px] text-amber-600 dark:text-amber-400">
+          <div v-if="beamNGFlavorRequired && !beamNGFlavorId" class="px-0.5 text-[9px] text-amber-600 dark:text-amber-400">
             {{ t('exportPanel.chooseFlavor') }}
           </div>
 
           <!-- Export button -->
           <button
             @click="handleBeamNGLevelExport"
-            :disabled="isAnyExporting || !beamNGFlavorId"
+            :disabled="isAnyExporting || (beamNGFlavorRequired && !beamNGFlavorId)"
             class="relative w-full flex items-center gap-3 p-3 bg-[#FF6600] hover:bg-[#e85d00] border border-[#d65500] rounded text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div class="flex items-center justify-center w-8 h-8 shrink-0">
@@ -167,6 +167,17 @@
             </div>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity text-white" />
           </button>
+
+          <a
+            v-if="beamNGPendingDownloadUrl"
+            :href="beamNGPendingDownloadUrl"
+            :download="beamNGPendingDownloadName || 'beamng_level.zip'"
+            @click="handleBeamNGPendingDownloadClick"
+            class="w-full flex items-center justify-center gap-2 p-2 bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 rounded text-white text-[11px] font-medium transition-colors"
+          >
+            <Download :size="14" />
+            Download Ready: {{ beamNGPendingDownloadName || 'beamng_level.zip' }}
+          </a>
         </div>
       </div>
 
@@ -474,6 +485,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['fetchOsm', 'exportSuccess']);
+const BEAMNG_EXPORT_UI_LOG = '[BeamNG Export UI]';
 
 // Export states
 const isExportingHeightmap = ref(false);
@@ -519,6 +531,20 @@ const beamNGLevelName = ref('');
 const beamNGSuggestedLevelName = ref('');
 const beamNGLevelNameTouched = ref(false);
 let beamNGLevelNameRequestId = 0;
+const hasOsmData = computed(() => Array.isArray(props.terrainData?.osmFeatures) && props.terrainData.osmFeatures.length > 0);
+const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
+const beamNGFlavorRequired = computed(() => hasOsmData.value);
+const beamNGPendingDownloadUrl = ref('');
+const beamNGPendingDownloadName = ref('');
+
+const clearPendingBeamNGDownload = () => {
+  if (beamNGPendingDownloadUrl.value) {
+    const urlToRevoke = beamNGPendingDownloadUrl.value;
+    setTimeout(() => URL.revokeObjectURL(urlToRevoke), 120_000);
+  }
+  beamNGPendingDownloadUrl.value = '';
+  beamNGPendingDownloadName.value = '';
+};
 
 const isAnyExporting = computed(() => (
   isExportingHeightmap.value ||
@@ -615,6 +641,28 @@ watch(
   () => props.terrainData,
   (terrainData) => {
     beamNGBaseTexture.value = resolveBeamNGBaseTexture(terrainData, beamNGBaseTexture.value);
+  },
+  { immediate: true }
+);
+
+watch(
+  [hasOsmData, isCustomUploadTerrain],
+  ([hasOsm, isCustom]) => {
+    if (!hasOsm) {
+      if (beamNGBaseTexture.value === 'osm') {
+        beamNGBaseTexture.value = resolveBeamNGBaseTexture(props.terrainData, 'hybrid');
+      }
+      beamNGPbrSource.value = 'none';
+      beamNGRoadType.value = 'none';
+      beamNGIncludeBuildings.value = false;
+      beamNGApplyFoundations.value = false;
+      beamNGIncludeWater.value = false;
+      beamNGIncludeTrees.value = false;
+      beamNGIncludeRocks.value = false;
+    }
+    if (isCustom) {
+      beamNGIncludeBackdrop.value = false;
+    }
   },
   { immediate: true }
 );
@@ -775,8 +823,14 @@ const triggerDownload = (blob, filename) => {
   const link = document.createElement('a');
   link.download = filename;
   link.href = url;
+  link.rel = 'noopener';
+  link.style.display = 'none';
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(link);
+  // Delay revocation so larger blobs (e.g. BeamNG zip exports) are not
+  // invalidated before the browser begins consuming the object URL.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 };
 
 const notifyExportSuccess = (type, filename) => {
@@ -1092,43 +1146,192 @@ const handleDAEExport = async () => {
 };
 
 const handleBeamNGLevelExport = async () => {
-  if (!props.terrainData) return;
-  if (!beamNGFlavorId.value) return;
+  const startedAt = performance.now();
+  console.log(`${BEAMNG_EXPORT_UI_LOG} Export requested`);
+  console.log(`${BEAMNG_EXPORT_UI_LOG} Input terrainData:`, {
+    hasTerrainData: !!props.terrainData,
+    width: props.terrainData?.width,
+    height: props.terrainData?.height,
+    hasOsmData: hasOsmData.value,
+    isCustomUploadTerrain: isCustomUploadTerrain.value,
+  });
+
+  if (!props.terrainData) {
+    console.warn(`${BEAMNG_EXPORT_UI_LOG} Aborting: missing terrainData.`);
+    return;
+  }
+  if (beamNGFlavorRequired.value && !beamNGFlavorId.value) {
+    console.warn(`${BEAMNG_EXPORT_UI_LOG} Aborting: flavor is required but missing.`);
+    return;
+  }
+
+  // Clear any stale pending bundle from a previous run.
+  clearPendingBeamNGDownload();
+
+  // Keep users in-app: pre-acquire a save handle while click activation is
+  // still present, then write the generated ZIP after export completes.
+  let beamNGSaveHandle = null;
+  const supportsSavePicker = typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
+  if (supportsSavePicker) {
+    const fallbackName = `mapng_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}`
+      .replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const suggestedBase = String(beamNGLevelName.value || fallbackName).trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || fallbackName;
+    const suggestedName = `${suggestedBase}.zip`;
+    try {
+      beamNGSaveHandle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{
+          description: 'ZIP archive',
+          accept: { 'application/zip': ['.zip'] },
+        }],
+      });
+      console.log(`${BEAMNG_EXPORT_UI_LOG} Save picker acquired handle.`, { suggestedName });
+    } catch (e) {
+      console.warn(`${BEAMNG_EXPORT_UI_LOG} Save picker unavailable/cancelled, will use anchor fallback.`, e);
+    }
+  } else {
+    console.log(`${BEAMNG_EXPORT_UI_LOG} File System Access API unavailable, using anchor fallback.`);
+  }
+
   isExportingBeamNGLevel.value = true;
   beamNGProgressStep.value = 'Preparing…';
   beamNGProgressPct.value  = 0;
   try {
+    console.log(`${BEAMNG_EXPORT_UI_LOG} Starting export pipeline...`);
     await yieldToUi();
     const td = await getExportTerrainData();
+    console.log(`${BEAMNG_EXPORT_UI_LOG} Export terrain prepared:`, {
+      width: td?.width,
+      height: td?.height,
+      minHeight: td?.minHeight,
+      maxHeight: td?.maxHeight,
+      hasBounds: !!td?.bounds,
+      osmFeatureCount: Array.isArray(td?.osmFeatures) ? td.osmFeatures.length : null,
+    });
+
+    const effectiveBaseTexture = hasOsmData.value
+      ? beamNGBaseTexture.value
+      : resolveBeamNGBaseTexture(td, 'hybrid');
+    const effectivePbrSource = hasOsmData.value ? beamNGPbrSource.value : 'none';
+    const effectiveRoadType = hasOsmData.value ? beamNGRoadType.value : 'none';
+    const effectiveIncludeBackdrop = isCustomUploadTerrain.value ? false : beamNGIncludeBackdrop.value;
+    const effectiveIncludeBuildings = hasOsmData.value ? beamNGIncludeBuildings.value : false;
+    const effectiveApplyFoundations = hasOsmData.value ? beamNGApplyFoundations.value : false;
+    const effectiveIncludeWater = hasOsmData.value ? beamNGIncludeWater.value : false;
+    const effectiveIncludeTrees = hasOsmData.value ? beamNGIncludeTrees.value : false;
+    const effectiveIncludeRocks = hasOsmData.value ? beamNGIncludeRocks.value : false;
+
+    const effectiveFlavorId = beamNGFlavorId.value || beamNGFlavorOptions[0]?.id;
+
+    console.log(`${BEAMNG_EXPORT_UI_LOG} Effective export options:`, {
+      baseTexture: effectiveBaseTexture,
+      pbrSource: effectivePbrSource,
+      roadType: effectiveRoadType,
+      includeBackdrop: effectiveIncludeBackdrop,
+      includeBuildings: effectiveIncludeBuildings,
+      applyFoundations: effectiveApplyFoundations,
+      includeWater: effectiveIncludeWater,
+      includeTrees: effectiveIncludeTrees,
+      includeRocks: effectiveIncludeRocks,
+      flavorId: effectiveFlavorId,
+      levelName: beamNGLevelName.value.trim(),
+      elevationSource: props.elevationSource,
+      requestedResolution: props.resolution,
+    });
+
     const { blob, filename } = await exportBeamNGLevel(td, props.center, {
-      baseTexture: beamNGBaseTexture.value,
-      includeBackdrop: beamNGIncludeBackdrop.value,
-      includeBuildings: beamNGIncludeBuildings.value,
-      applyFoundations: beamNGApplyFoundations.value,
-      pbrSource: beamNGPbrSource.value,
-      includeWater: beamNGIncludeWater.value,
-      includeTrees: beamNGIncludeTrees.value,
-      includeRocks: beamNGIncludeRocks.value,
-      roadType: beamNGRoadType.value,
-      flavorId: beamNGFlavorId.value,
+      baseTexture: effectiveBaseTexture,
+      includeBackdrop: effectiveIncludeBackdrop,
+      includeBuildings: effectiveIncludeBuildings,
+      applyFoundations: effectiveApplyFoundations,
+      pbrSource: effectivePbrSource,
+      includeWater: effectiveIncludeWater,
+      includeTrees: effectiveIncludeTrees,
+      includeRocks: effectiveIncludeRocks,
+      roadType: effectiveRoadType,
+      flavorId: effectiveFlavorId,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
       requestedResolution: props.resolution,
       onProgress: ({ step, pct }) => {
         beamNGProgressStep.value = step;
         beamNGProgressPct.value  = pct;
+        console.log(`${BEAMNG_EXPORT_UI_LOG} Progress:`, { step, pct });
       },
     });
-    triggerDownload(blob, filename);
-    notifyExportSuccess('beamng_level_zip', filename);
+
+    console.log(`${BEAMNG_EXPORT_UI_LOG} Export returned payload:`, {
+      filename,
+      blobType: blob?.type,
+      blobSize: blob?.size,
+      isBlob: blob instanceof Blob,
+    });
+
+    if (!(blob instanceof Blob)) {
+      throw new Error('BeamNG export did not return a Blob payload.');
+    }
+    if (!filename || typeof filename !== 'string') {
+      throw new Error('BeamNG export did not return a valid filename.');
+    }
+
+    console.log(`${BEAMNG_EXPORT_UI_LOG} Triggering browser download...`, {
+      filename,
+      blobType: blob.type,
+      blobSize: blob.size,
+    });
+
+    if (beamNGSaveHandle) {
+      const writable = await beamNGSaveHandle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      console.log(`${BEAMNG_EXPORT_UI_LOG} Download written via File System Access API.`);
+      notifyExportSuccess('beamng_level_zip', filename);
+      console.log(`${BEAMNG_EXPORT_UI_LOG} Export success notification emitted.`);
+    } else {
+      // Stage a blob URL and expose a real user-clicked anchor download link.
+      beamNGPendingDownloadUrl.value = URL.createObjectURL(blob);
+      beamNGPendingDownloadName.value = filename;
+      console.warn(`${BEAMNG_EXPORT_UI_LOG} Auto-download fallback blocked risk detected; awaiting explicit anchor click.`);
+    }
   } catch (error) {
-    console.error('Failed to export BeamNG level:', error);
+    console.error(`${BEAMNG_EXPORT_UI_LOG} Failed to export BeamNG level:`, {
+      message: error?.message,
+      name: error?.name,
+      stack: error?.stack,
+      error,
+    });
     alert(t('export.errorBeamngLevel'));
   } finally {
     isExportingBeamNGLevel.value = false;
     beamNGProgressStep.value = '';
     beamNGProgressPct.value  = 0;
+    console.log(`${BEAMNG_EXPORT_UI_LOG} Export flow completed in ms:`, Math.round(performance.now() - startedAt));
   }
+};
+
+const handleBeamNGPendingDownloadClick = () => {
+  const filename = beamNGPendingDownloadName.value || 'beamng_level.zip';
+  if (!beamNGPendingDownloadUrl.value) {
+    console.warn(`${BEAMNG_EXPORT_UI_LOG} Pending download requested but URL is missing.`);
+    return;
+  }
+  console.log(`${BEAMNG_EXPORT_UI_LOG} Dispatching pending download via explicit anchor click.`, {
+    filename,
+    urlLength: beamNGPendingDownloadUrl.value.length,
+  });
+
+  // Do not clear immediately; allow browser to fully consume the blob URL.
+  const urlToRevoke = beamNGPendingDownloadUrl.value;
+  setTimeout(() => {
+    URL.revokeObjectURL(urlToRevoke);
+    if (beamNGPendingDownloadUrl.value === urlToRevoke) {
+      beamNGPendingDownloadUrl.value = '';
+      beamNGPendingDownloadName.value = '';
+    }
+  }, 120_000);
+
+  notifyExportSuccess('beamng_level_zip', filename);
+  console.log(`${BEAMNG_EXPORT_UI_LOG} Export success notification emitted after explicit anchor click.`);
 };
 
 const handleTERExport = async () => {

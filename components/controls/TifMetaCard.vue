@@ -86,7 +86,7 @@ const rows = computed(() => {
   }
 
   if (m.suggestedResolution) {
-    list.push({ label: 'Suggested export crop', value: `${m.suggestedResolution} × ${m.suggestedResolution} px` });
+    list.push({ label: 'Suggested square export (optional)', value: `${m.suggestedResolution} × ${m.suggestedResolution} px` });
   }
 
   if (Number.isFinite(m.nativeMetersPerPixel)) {

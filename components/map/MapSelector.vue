@@ -42,21 +42,12 @@
       />
       
       <l-rectangle 
-        v-if="bounds && !hasBatchGrid"
-        :bounds="[[bounds.getSouthWest().lat, bounds.getSouthWest().lng], [bounds.getNorthEast().lat, bounds.getNorthEast().lng]]" 
+        v-if="selectionBounds && !hasBatchGrid"
+        :bounds="[[selectionBounds.south, selectionBounds.west], [selectionBounds.north, selectionBounds.east]]" 
         color="#FF6600"
         :weight="2"
         :fill-opacity="0.1"
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
-      />
-
-      <l-rectangle
-        v-if="nativeCoverageBounds && !hasBatchGrid"
-        :bounds="[[nativeCoverageBounds.south, nativeCoverageBounds.west], [nativeCoverageBounds.north, nativeCoverageBounds.east]]"
-        color="#9CA3AF"
-        :weight="1.5"
-        :fill-opacity="0.12"
-        :options="{ dashArray: '4, 8', lineCap: 'round', fillColor: '#9CA3AF' }"
       />
 
       <!-- Batch Grid Tiles -->
@@ -244,14 +235,6 @@ const osmAttribution = computed(() => {
 // Calculate bounds based on resolution (1m/px means resolution = meters)
 const activeSelectionSizeMeters = computed(() => {
   const base = Number(props.resolution);
-  const meta = props.uploadedTifMeta;
-  const hasUpload = !!props.uploadedTifFile;
-
-  // When uploaded data drives a locked processing window, use that for the
-  // orange selection box on the 2D map.
-  if (hasUpload && Number.isFinite(meta?.suggestedResolution) && meta.suggestedResolution > 0) {
-    return Number(meta.suggestedResolution);
-  }
 
   return Number.isFinite(base) && base > 0 ? base : 1024;
 });
@@ -273,6 +256,19 @@ const bounds = computed(() => {
   const se = L.latLng(center.lat - halfLat, center.lng + halfLng);
   
   return L.latLngBounds(nw, se);
+});
+
+const selectionBounds = computed(() => {
+  if (nativeCoverageBounds.value) {
+    return nativeCoverageBounds.value;
+  }
+  if (!bounds.value) return null;
+  return {
+    north: bounds.value.getNorthEast().lat,
+    south: bounds.value.getSouthWest().lat,
+    east: bounds.value.getNorthEast().lng,
+    west: bounds.value.getSouthWest().lng,
+  };
 });
 
 const nativeCoverageBounds = computed(() => {

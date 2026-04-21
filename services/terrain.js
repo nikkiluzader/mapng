@@ -1117,25 +1117,17 @@ export const loadTerrainFromTif = async (
 
   onProgress?.('Calculating metric bounds...');
 
-  // For georeferenced GeoTIFFs, process only the suggested centered export
-  // window (power-of-two) instead of the full native raster to keep large files
-  // tractable while matching the intended export area.
+  // For georeferenced GeoTIFFs with known native bounds, process the full
+  // native coverage so user uploads retain their complete resolution.
   if (tifData.bounds && tifData.nativeWidth && tifData.nativeHeight) {
-    const crop = Number.isFinite(tifData.suggestedResolution) ? tifData.suggestedResolution : null;
-    if (crop) {
-      width = crop;
-      height = crop;
-      fetchBounds = computeMetricFetchBounds(normalizedCenter, width, height);
-    } else {
-      width = tifData.nativeWidth;
-      height = tifData.nativeHeight;
-      fetchBounds = {
-        north: tifData.bounds.north,
-        south: tifData.bounds.south,
-        east: normalizeLng(tifData.bounds.east),
-        west: normalizeLng(tifData.bounds.west),
-      };
-    }
+    width = tifData.nativeWidth;
+    height = tifData.nativeHeight;
+    fetchBounds = {
+      north: tifData.bounds.north,
+      south: tifData.bounds.south,
+      east: normalizeLng(tifData.bounds.east),
+      west: normalizeLng(tifData.bounds.west),
+    };
   } else {
     width = resolution;
     height = resolution;
@@ -1326,7 +1318,7 @@ export const loadTerrainFromTif = async (
     osmFeatures, osmRequestInfo,
     usgsFallback: false,
     sourceGeoTiffs: undefined,
-    // GeoTIFF processing is already constrained to the suggested crop window.
+    // Custom upload exports default to full processed dimensions.
     exportCropSize: null,
     elevationUnitApplied: {
       selected: elevationUnitOverride,
@@ -1536,10 +1528,8 @@ export const loadTerrainFromLaz = async (
       scaleToMeters: lazUnit.scale,
       source: lazUnit.source,
     },
-    // When the terrain was rasterized at native LAZ resolution, exportCropSize
-    // is the power-of-2 inner area shown as an orange box in 3D and used as the
-    // output size for all exports (heightmap, textures, BeamNG level, etc.).
-    exportCropSize: lazData.suggestedResolution ?? null,
+    // Custom upload exports default to full processed dimensions.
+    exportCropSize: null,
   };
 
   if (includeOSM && osmFeatures.length > 0) {

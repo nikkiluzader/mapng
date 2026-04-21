@@ -364,11 +364,9 @@ const lazNativeDims = computed(() => {
   return {
     width: meta.nativeWidth,
     height: meta.nativeHeight,
-    cropSize: meta.suggestedResolution ?? null,
+    cropSize: null,
     sourceLabel: 'LAZ',
-    note: meta.suggestedResolution
-      ? `Export area: ${meta.suggestedResolution} × ${meta.suggestedResolution} px (orange box in 3D preview)`
-      : null,
+    note: null,
   };
 });
 
@@ -377,16 +375,12 @@ const tifNativeDims = computed(() => {
   if (!isGeoTiffActive.value) return null;
   const meta = props.uploadedTifMeta;
   if (!meta?.nativeWidth || !meta?.nativeHeight || !meta?.bounds) return null;
-  const crop = meta.suggestedResolution ?? null;
-  const hasCrop = Number.isFinite(crop);
   return {
-    width: hasCrop ? crop : meta.nativeWidth,
-    height: hasCrop ? crop : meta.nativeHeight,
+    width: meta.nativeWidth,
+    height: meta.nativeHeight,
     cropSize: null,
-    sourceLabel: hasCrop ? 'GeoTIFF crop window' : 'GeoTIFF',
-    note: hasCrop
-      ? `Processing is limited to ${crop} × ${crop} px around the center for faster generation.`
-      : null,
+    sourceLabel: 'GeoTIFF',
+    note: null,
   };
 });
 

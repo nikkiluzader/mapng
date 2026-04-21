@@ -20,6 +20,8 @@ import {
   resolveTreeTypeForTags,
 } from './beamngFlavorCatalog.js';
 
+const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
+
 /**
  * Sanitize a string for use as a BeamNG level folder name.
  */
@@ -3809,11 +3811,37 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (pbrSource === undefined) {
     pbrSource = options.generatePbrMaterials === false ? 'none' : 'osm';
   }
+
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Start exportBeamNGLevel`);
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Input summary:`, {
+    center,
+    terrainWidth: terrainData?.width,
+    terrainHeight: terrainData?.height,
+    hasBounds: !!terrainData?.bounds,
+    osmFeatureCount: Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures.length : null,
+    options: {
+      baseTexture,
+      includeBuildings,
+      applyFoundations,
+      includeBackdrop,
+      includeWater,
+      includeNativeBarriers,
+      includeTrees,
+      includeRocks,
+      roadType,
+      flavorId,
+      levelName: requestedLevelName,
+      pbrSource,
+    },
+  });
   // Report progress and yield to the browser so UI updates and GC can run.
   /**
    * Emit progress callbacks consumed by the export UI.
    */
-  const report = (step, pct) => onProgress?.({ step, pct });
+  const report = (step, pct) => {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Step`, { step, pct });
+    onProgress?.({ step, pct });
+  };
   /**
    * Yield one event-loop tick so UI paint and GC can run during long exports.
    */
@@ -3897,6 +3925,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const levelName = sanitizeLevelName(levelDisplayName) || sanitizeLevelName(fallbackLevelName) || 'mapng_level';
   const flavor = getBeamNGFlavorById(flavorId);
   if (!flavor) {
+    console.error(`${BEAMNG_EXPORT_SERVICE_LOG} Invalid or missing flavorId.`, { flavorId });
     throw new Error(`Missing or invalid BeamNG flavor: ${flavorId || '(none)'}`);
   }
 
@@ -4659,7 +4688,14 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   beginStep('Compressing ZIP archive (DEFLATE)…', 94);
   await yield_();
   const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} ZIP generated:`, {
+    filename: `${levelName}.zip`,
+    blobType: zipBlob?.type,
+    blobSize: zipBlob?.size,
+    levelName,
+  });
   beginStep('Done', 100);
   finishProcessingLog();
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
   return { blob: zipBlob, filename: `${levelName}.zip` };
 }
