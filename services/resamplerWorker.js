@@ -50,6 +50,47 @@ const createLocalToWGS84 = (centerLat, centerLng) => {
     return proj4(def, 'EPSG:4326');
 };
 
+const normalizeLng = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
+
+const getPixelLatLng = (x, y, width, height, toWGS84, targetBounds) => {
+    if (targetBounds && Number.isFinite(targetBounds.north) && Number.isFinite(targetBounds.south)
+        && Number.isFinite(targetBounds.east) && Number.isFinite(targetBounds.west)) {
+        const u = width > 1 ? x / (width - 1) : 0.5;
+        const v = height > 1 ? y / (height - 1) : 0.5;
+        const lat = targetBounds.north - v * (targetBounds.north - targetBounds.south);
+
+        let lngSpan = targetBounds.east - targetBounds.west;
+        if (lngSpan > 180) lngSpan -= 360;
+        if (lngSpan < -180) lngSpan += 360;
+        const lng = normalizeLng(targetBounds.west + u * lngSpan);
+        return [lng, lat];
+    }
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+    const localX = x - halfWidth;
+    const localY = halfHeight - y;
+    return toWGS84.forward([localX, localY]);
+};
+
+const getOutputBounds = (toWGS84, width, height, targetBounds) => {
+    if (targetBounds && Number.isFinite(targetBounds.north) && Number.isFinite(targetBounds.south)
+        && Number.isFinite(targetBounds.east) && Number.isFinite(targetBounds.west)) {
+        return {
+            north: targetBounds.north,
+            south: targetBounds.south,
+            east: normalizeLng(targetBounds.east),
+            west: normalizeLng(targetBounds.west),
+        };
+    }
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+    const nw = toWGS84.forward([-halfWidth, halfHeight]);
+    const se = toWGS84.forward([halfWidth, -halfHeight]);
+    return { north: nw[1], west: nw[0], south: se[1], east: se[0] };
+};
+
 // ─── Bilinear Interpolation ──────────────────────────────────────────────────
 const bilinear = (raster, w, x, y, noDataVal) => {
     const x0 = Math.floor(x);
@@ -611,11 +652,9 @@ const finalizeHeightMap = (heightMap, width, height, noData, smooth, fillHoles) 
     }
 };
 
-const resampleHeight = async ({ center, width, height, smooth, fillHoles = true, tiles, fallback, epsgDefs }) => {
+const resampleHeight = async ({ center, width, height, targetBounds = null, smooth, fillHoles = true, tiles, fallback, epsgDefs }) => {
     const heightMap = new Float32Array(width * height);
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
 
     const NO_DATA = -99999;
     const preparedGroups = await buildPreparedTileGroups(tiles, epsgDefs, NO_DATA);
@@ -623,9 +662,7 @@ const resampleHeight = async ({ center, width, height, smooth, fillHoles = true,
     // Main resampling loop
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            const localX = x - halfWidth;
-            const localY = halfHeight - y;
-            const [lng, lat] = toWGS84.forward([localX, localY]);
+            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
 
             let h = sampleHeightAt(lng, lat, preparedGroups, fallback, NO_DATA);
 
@@ -636,22 +673,16 @@ const resampleHeight = async ({ center, width, height, smooth, fillHoles = true,
 
     finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles);
 
-    // Compute output bounds
-    const nw = toWGS84.forward([-halfWidth, halfHeight]);
-    const se = toWGS84.forward([halfWidth, -halfHeight]);
-
     return {
         heightMap,
-        bounds: { north: nw[1], west: nw[0], south: se[1], east: se[0] },
+        bounds: getOutputBounds(toWGS84, width, height, targetBounds),
     };
 };
 
-const resampleHeightAndImage = async ({ center, width, height, smooth, fillHoles = true, tiles, fallback, epsgDefs, imageSource }) => {
+const resampleHeightAndImage = async ({ center, width, height, targetBounds = null, smooth, fillHoles = true, tiles, fallback, epsgDefs, imageSource }) => {
     const heightMap = new Float32Array(width * height);
     const rgbaBuffer = new Uint8ClampedArray(width * height * 4);
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
     const NO_DATA = -99999;
     const preparedGroups = await buildPreparedTileGroups(tiles, epsgDefs, NO_DATA);
 
@@ -659,9 +690,7 @@ const resampleHeightAndImage = async ({ center, width, height, smooth, fillHoles
         const rowOffset = y * width;
         const rowPixelOffset = rowOffset * 4;
         for (let x = 0; x < width; x++) {
-            const localX = x - halfWidth;
-            const localY = halfHeight - y;
-            const [lng, lat] = toWGS84.forward([localX, localY]);
+            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
 
             let h = sampleHeightAt(lng, lat, preparedGroups, fallback, NO_DATA);
             if (!Number.isFinite(h) || h <= -200 || h === NO_DATA) h = NO_DATA;
@@ -684,28 +713,21 @@ const resampleHeightAndImage = async ({ center, width, height, smooth, fillHoles
 
     finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles);
 
-    const nw = toWGS84.forward([-halfWidth, halfHeight]);
-    const se = toWGS84.forward([halfWidth, -halfHeight]);
-
     return {
         heightMap,
         rgbaBuffer,
-        bounds: { north: nw[1], west: nw[0], south: se[1], east: se[0] },
+        bounds: getOutputBounds(toWGS84, width, height, targetBounds),
     };
 };
 
 // ─── Image Resampling ────────────────────────────────────────────────────────
-const resampleImageData = ({ center, width, height, imageSource }) => {
+const resampleImageData = ({ center, width, height, targetBounds = null, imageSource }) => {
     const rgbaBuffer = new Uint8ClampedArray(width * height * 4);
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            const localX = x - halfWidth;
-            const localY = halfHeight - y;
-            const [lng, lat] = toWGS84.forward([localX, localY]);
+            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
             const idx = (y * width + x) * 4;
             writeSampledImagePixel(
                 rgbaBuffer,

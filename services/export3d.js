@@ -592,8 +592,16 @@ const createTerrainMesh = async (data, maxMeshResolution = 1024, centerTextureTy
         const col = i % (segmentsX + 1);
         const row = Math.floor(i / (segmentsX + 1));
 
-        const mapCol = Math.min(col * stride, data.width - 1);
-        const mapRow = Math.min(row * stride, data.height - 1);
+        // Use normalized mapping so outer vertices always land on the exact
+        // source-grid boundary even when (size-1) is not divisible by stride.
+        const mapCol = Math.min(
+          data.width - 1,
+          Math.round((col / Math.max(1, segmentsX)) * (data.width - 1)),
+        );
+        const mapRow = Math.min(
+          data.height - 1,
+          Math.round((row / Math.max(1, segmentsY)) * (data.height - 1)),
+        );
 
         const dataIndex = mapRow * data.width + mapCol;
 
@@ -1704,10 +1712,13 @@ const sampleSurroundingHeight = (tileData, u, v) => {
   neighbors.sort((a, b) => a - b);
   const median = neighbors[Math.floor(neighbors.length / 2)];
 
-  // Conservative threshold that preserves real relief while removing needles.
-  const localRange = Math.max(1, (tileData.maxHeight ?? median) - (tileData.minHeight ?? median));
-  const spikeDelta = Math.max(35, localRange * 0.35);
-  if (Math.abs(center - median) > spikeDelta) {
+  // Robust local spread estimate (median absolute deviation) so a single
+  // extreme sample cannot relax the threshold for the whole tile.
+  const deviations = neighbors.map((n) => Math.abs(n - median)).sort((a, b) => a - b);
+  const mad = deviations[Math.floor(deviations.length / 2)] || 0;
+  const spikeDelta = Math.max(8, mad * 6);
+  const isAbsurd = center > 12000 || center < -12000;
+  if (isAbsurd || Math.abs(center - median) > spikeDelta) {
     tileData._meshSpikeSuppressions = (tileData._meshSpikeSuppressions || 0) + 1;
     return median;
   }
@@ -1742,6 +1753,11 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
     const realWidthMeters = (data.bounds.east - data.bounds.west) * metersPerDegree;
     const unitsPerMeter = SCENE_SIZE / realWidthMeters;
     const EXAGGERATION = 1.0;
+
+    // Match center-tile edge tessellation to avoid T-junction cracks along seams.
+    const centerStride = Math.max(1, Math.ceil(Math.max(data.width, data.height) / Math.max(1, maxMeshResolution)));
+    const centerSegsX = Math.max(4, Math.floor((data.width - 1) / centerStride));
+    const centerSegsY = Math.max(4, Math.floor((data.height - 1) / centerStride));
 
     const group = new THREE.Group();
     group.name = 'surrounding_terrain';
@@ -1802,14 +1818,17 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
       let segsY;
 
       if (isCornerTile) {
-        segsX = Math.min(maxSegX, EXPORT_SURROUND_PROFILE.cornerResolution);
-        segsY = Math.min(maxSegY, EXPORT_SURROUND_PROFILE.cornerResolution);
+        // Corner edges must match adjacent side tiles on both axes.
+        segsX = Math.min(maxSegX, EXPORT_SURROUND_PROFILE.depthResolution);
+        segsY = Math.min(maxSegY, EXPORT_SURROUND_PROFILE.depthResolution);
       } else if (seamRunsAlongX) {
-        segsX = Math.min(maxSegX, EXPORT_SURROUND_PROFILE.seamEdgeResolution);
+        // N/S tiles share X-edge with center; match center X segmentation.
+        segsX = Math.min(maxSegX, centerSegsX);
         segsY = Math.min(maxSegY, EXPORT_SURROUND_PROFILE.depthResolution);
       } else if (seamRunsAlongY) {
         segsX = Math.min(maxSegX, EXPORT_SURROUND_PROFILE.depthResolution);
-        segsY = Math.min(maxSegY, EXPORT_SURROUND_PROFILE.seamEdgeResolution);
+        // E/W tiles share Y-edge with center; match center Y segmentation.
+        segsY = Math.min(maxSegY, centerSegsY);
       } else {
         segsX = Math.min(maxSegX, EXPORT_SURROUND_PROFILE.depthResolution);
         segsY = Math.min(maxSegY, EXPORT_SURROUND_PROFILE.depthResolution);
@@ -1873,7 +1892,8 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
               tileData.satelliteDataUrl,
               (t) => {
                 t.colorSpace = THREE.SRGBColorSpace;
-                t.minFilter = THREE.LinearMipmapLinearFilter;
+                t.generateMipmaps = false;
+                t.minFilter = THREE.LinearFilter;
                 t.magFilter = THREE.LinearFilter;
                 t.anisotropy = EXPORT_SURROUND_PROFILE.anisotropy;
                 resolve(t);

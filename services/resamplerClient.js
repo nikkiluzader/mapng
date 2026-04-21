@@ -122,7 +122,7 @@ const prepareTiles = (sourceData) => {
  * @param {object|null} fallbackData - { pixels, width, height, zoom, minTileX, minTileY }
  */
 export const resampleHeightMapOffThread = async (
-    source, center, width, height, interpolation, smooth, fallbackData, fillHoles = true
+    source, center, width, height, interpolation, smooth, fallbackData, fillHoles = true, targetBounds = null
 ) => {
     // Attempt worker path
     if (getWorker()) {
@@ -161,6 +161,7 @@ export const resampleHeightMapOffThread = async (
                 center,
                 width,
                 height,
+                targetBounds,
                 smooth,
                 fillHoles,
                 tiles: tilesForWorker,
@@ -177,7 +178,7 @@ export const resampleHeightMapOffThread = async (
     }
 
     // Fallback: main thread
-    return resampleToMeterGrid(source, center, width, height, interpolation, smooth, fillHoles);
+    return resampleToMeterGrid(source, center, width, height, interpolation, smooth, fillHoles, targetBounds);
 };
 
 export const resampleHeightAndImageOffThread = async (
@@ -191,6 +192,7 @@ export const resampleHeightAndImageOffThread = async (
     fallbackData,
     fillHoles,
     imageSourceData,
+    targetBounds = null,
 ) => {
     if (getWorker() && imageSourceData) {
         try {
@@ -229,6 +231,7 @@ export const resampleHeightAndImageOffThread = async (
                 center,
                 width,
                 height,
+                targetBounds,
                 smooth,
                 fillHoles,
                 tiles: tilesForWorker,
@@ -259,8 +262,9 @@ export const resampleHeightAndImageOffThread = async (
             smooth,
             fallbackData,
             fillHoles,
+            targetBounds,
         ),
-        Promise.resolve(resampleImageToMeterGrid({ sampler: imageSampler }, center, width, height)),
+        Promise.resolve(resampleImageToMeterGrid({ sampler: imageSampler }, center, width, height, targetBounds)),
     ]);
 
     return { heightMap, bounds, canvas };
@@ -276,7 +280,7 @@ export const resampleHeightAndImageOffThread = async (
  * @param {object|null} imageSourceData - { pixels, width, height, zoom, minTileX, minTileY }
  */
 export const resampleImageOffThread = async (
-    source, center, width, height, imageSourceData
+    source, center, width, height, imageSourceData, targetBounds = null
 ) => {
     if (getWorker() && imageSourceData) {
         try {
@@ -285,6 +289,7 @@ export const resampleImageOffThread = async (
                 center,
                 width,
                 height,
+                targetBounds,
                 imageSource: imageSourceData,
             }, [imageSourceData.pixels.buffer]);
 
@@ -297,5 +302,5 @@ export const resampleImageOffThread = async (
     }
 
     // Fallback: main thread
-    return resampleImageToMeterGrid(source, center, width, height);
+    return resampleImageToMeterGrid(source, center, width, height, targetBounds);
 };

@@ -2,6 +2,52 @@ import proj4 from 'proj4';
 import * as GeoTIFF from 'geotiff';
 import { createLocalToWGS84 } from './geoUtils';
 
+const normalizeLng = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
+
+const getPixelLatLng = (x, y, width, height, toWGS84, targetBounds) => {
+    if (targetBounds && Number.isFinite(targetBounds.north) && Number.isFinite(targetBounds.south)
+        && Number.isFinite(targetBounds.east) && Number.isFinite(targetBounds.west)) {
+        const u = width > 1 ? x / (width - 1) : 0.5;
+        const v = height > 1 ? y / (height - 1) : 0.5;
+        const lat = targetBounds.north - v * (targetBounds.north - targetBounds.south);
+
+        let lngSpan = targetBounds.east - targetBounds.west;
+        if (lngSpan > 180) lngSpan -= 360;
+        if (lngSpan < -180) lngSpan += 360;
+        const lng = normalizeLng(targetBounds.west + u * lngSpan);
+        return [lng, lat];
+    }
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+    const localX = x - halfWidth;
+    const localY = halfHeight - y;
+    return toWGS84.forward([localX, localY]);
+};
+
+const getOutputBounds = (toWGS84, width, height, targetBounds) => {
+    if (targetBounds && Number.isFinite(targetBounds.north) && Number.isFinite(targetBounds.south)
+        && Number.isFinite(targetBounds.east) && Number.isFinite(targetBounds.west)) {
+        return {
+            north: targetBounds.north,
+            south: targetBounds.south,
+            east: normalizeLng(targetBounds.east),
+            west: normalizeLng(targetBounds.west),
+        };
+    }
+
+    const halfWidth = width / 2;
+    const halfHeight = height / 2;
+    const nw = toWGS84.forward([-halfWidth, halfHeight]);
+    const se = toWGS84.forward([halfWidth, -halfHeight]);
+    return {
+        north: nw[1],
+        west: nw[0],
+        south: se[1],
+        east: se[0],
+    };
+};
+
 /**
  * Resamples a source raster (GeoTIFF or generic sampler) to a 1 meter/pixel grid
  * centered at the given location.
@@ -209,17 +255,14 @@ export const resampleToMeterGrid = async (
     height,
     _interpolation = 'bilinear',
     smooth = false,
-    fillHoles = true
+    fillHoles = true,
+    targetBounds = null
 ) => {
     
     const heightMap = new Float32Array(width * height);
     
     // Use shared local Transverse Mercator projection
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
-
-    // Calculate the extent in meters (centered at 0,0 in local proj)
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
 
     const tiles = [];
 
@@ -314,14 +357,7 @@ export const resampleToMeterGrid = async (
     // Iterate over the target grid (1m per pixel)
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            // Coordinates in local meter grid (Y goes up in math, but down in image usually. 
-            // Let's assume standard image coordinates: (0,0) is top-left.
-            // So y=0 is North-most.
-            const localX = x - halfWidth;
-            const localY = halfHeight - y; // Invert Y so 0 is top (North)
-
-            // Convert to Lat/Lon
-            const [lng, lat] = toWGS84.forward([localX, localY]);
+            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
 
             let h = -99999; // Match terrain.ts NO_DATA_VALUE
 
@@ -436,18 +472,9 @@ export const resampleToMeterGrid = async (
         blurV(tempMap, heightMap);
     }
 
-    // Calculate actual bounds of the generated grid
-    const nw = toWGS84.forward([-halfWidth, halfHeight]);
-    const se = toWGS84.forward([halfWidth, -halfHeight]);
-
     return {
         heightMap,
-        bounds: {
-            north: nw[1],
-            west: nw[0],
-            south: se[1],
-            east: se[0]
-        }
+        bounds: getOutputBounds(toWGS84, width, height, targetBounds),
     };
 };
 
@@ -459,7 +486,8 @@ export const resampleImageToMeterGrid = async (
     source,
     center,
     width,
-    height
+    height,
+    targetBounds = null
 ) => {
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -473,15 +501,9 @@ export const resampleImageToMeterGrid = async (
     // Use shared local Transverse Mercator projection
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
 
-    const halfWidth = width / 2;
-    const halfHeight = height / 2;
-
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            const localX = x - halfWidth;
-            const localY = halfHeight - y;
-
-            const [lng, lat] = toWGS84.forward([localX, localY]);
+            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
             
             const color = source.sampler(lat, lng);
             

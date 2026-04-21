@@ -100,12 +100,8 @@ const terrariumHeight = (r, g, b) => {
  * Strategy: compare each sample to the median of its 8-neighbour hood and
  * replace only when the deviation is implausibly large.
  */
-const suppressHeightSpikes = (heightMap, width, height, minHeight, maxHeight) => {
+const suppressHeightSpikes = (heightMap, width, height) => {
   if (!heightMap || width < 3 || height < 3) return 0;
-
-  // Keep this conservative so real cliffs/ridges are preserved.
-  const range = Math.max(1, maxHeight - minHeight);
-  const spikeDelta = Math.max(180, range * 0.6);
 
   const out = new Float32Array(heightMap);
   const neighbors = new Float32Array(8);
@@ -131,7 +127,17 @@ const suppressHeightSpikes = (heightMap, width, height, minHeight, maxHeight) =>
 
       const sorted = Array.from(neighbors.subarray(0, count)).sort((a, b) => a - b);
       const median = sorted[Math.floor(count / 2)];
-      if (Math.abs(value - median) > spikeDelta) {
+
+      // Robust local spread estimate (median absolute deviation).
+      const deviations = sorted.map((n) => Math.abs(n - median)).sort((a, b) => a - b);
+      const mad = deviations[Math.floor(deviations.length / 2)] || 0;
+      // Aggressive enough for single-pixel Terrarium speckles while still
+      // preserving meaningful local relief in backdrop tiles.
+      const robustDelta = Math.max(8, mad * 6);
+
+      // Hard sanity limits for obvious decode artifacts.
+      const isAbsurd = value > 12000 || value < -12000;
+      if (isAbsurd || Math.abs(value - median) > robustDelta) {
         out[idx] = median;
         replaced++;
       }
@@ -142,6 +148,20 @@ const suppressHeightSpikes = (heightMap, width, height, minHeight, maxHeight) =>
     heightMap.set(out);
   }
   return replaced;
+};
+
+const recomputeMinMax = (heightMap) => {
+  let minH = Infinity;
+  let maxH = -Infinity;
+  for (let i = 0; i < heightMap.length; i++) {
+    const v = heightMap[i];
+    if (!Number.isFinite(v) || v === NO_DATA_VALUE) continue;
+    if (v < minH) minH = v;
+    if (v > maxH) maxH = v;
+  }
+  if (minH === Infinity) minH = 0;
+  if (maxH === -Infinity) maxH = minH;
+  return { minH, maxH };
 };
 
 // --- Main Pipeline ---
@@ -234,6 +254,7 @@ export const fetchSurroundingTiles = async (
           generateOSMTextureAsset: false,
           generateHybridTextureAsset: false,
           globalTileConcurrency: 10,
+          targetBounds: b,
         },
       );
 
@@ -503,7 +524,12 @@ export const fetchSurroundingTiles = async (
       }
     }
 
-    const spikeReplacements = suppressHeightSpikes(heightMap, outputWidth, outputHeight, minH, maxH);
+    const spikeReplacements = suppressHeightSpikes(heightMap, outputWidth, outputHeight);
+    // Recompute min/max after cleanup so downstream consumers don't use stale
+    // extrema caused by removed outliers.
+    const cleaned = recomputeMinMax(heightMap);
+    minH = cleaned.minH;
+    maxH = cleaned.maxH;
 
     let satelliteDataUrl = null;
     if (includeSatellite && sCanvas) {

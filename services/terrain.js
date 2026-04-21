@@ -676,6 +676,7 @@ export const fetchTerrainData = async (
     generateOSMTextureAsset = true,
     generateHybridTextureAsset = true,
     globalTileConcurrency = 20,
+    targetBounds = null,
   } = generationOptions || {};
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
@@ -690,7 +691,14 @@ export const fetchTerrainData = async (
 
   onProgress?.("Calculating metric bounds...");
 
-  const fetchBounds = computeMetricFetchBounds(normalizedCenter, width, height);
+  const fetchBounds = targetBounds
+    ? {
+        north: Number(targetBounds.north),
+        south: Number(targetBounds.south),
+        east: normalizeLng(Number(targetBounds.east)),
+        west: normalizeLng(Number(targetBounds.west)),
+      }
+    : computeMetricFetchBounds(normalizedCenter, width, height);
 
   // 2. Try GPXZ / USGS
   let rawData = null;
@@ -995,6 +1003,7 @@ export const fetchTerrainData = async (
     // GPXZ is generally hole-free; if GPXZ chunks failed, keep fill enabled.
     !(useGPXZ && rawData && !gpxzChunkFailures),
     imageSamplerData,
+    targetBounds,
   );
 
   // 6. Calculate Min/Max
