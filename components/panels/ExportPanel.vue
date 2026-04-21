@@ -92,13 +92,25 @@
             </select>
           </div>
 
-          <!-- Surrounding terrain backdrop toggle -->
+          <!-- Surrounding terrain backdrop source -->
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBackdrop') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeBackdrop" :disabled="isCustomUploadTerrain" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.surroundingTerrain') }}</span>
-            </label>
+            <select
+              v-model="beamNGBackdropSource"
+              :disabled="isCustomUploadTerrain"
+              class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="off">Off</option>
+              <option value="global30m">30m Global</option>
+              <option value="usgs1m">USGS 1m</option>
+              <option value="gpxz" :disabled="!canUseGpxzBackdrop">GPXZ</option>
+            </select>
+          </div>
+          <div class="px-0.5 text-[9px] text-gray-500 dark:text-gray-400">
+            <span v-if="beamNGBackdropSource === 'global30m'">Uses global terrain tiles for surrounding backdrop.</span>
+            <span v-else-if="beamNGBackdropSource === 'usgs1m'">Uses USGS 1m elevation where available.</span>
+            <span v-else-if="beamNGBackdropSource === 'gpxz'">Uses GPXZ elevation tiles for surrounding backdrop.</span>
+            <span v-else>Surrounding backdrop disabled.</span>
           </div>
 
           <div class="flex items-center justify-between gap-2 px-0.5">
@@ -513,7 +525,11 @@ const resolveBeamNGBaseTexture = (terrainData, preferred = 'osm') => {
 };
 
 const beamNGBaseTexture = ref(resolveBeamNGBaseTexture(props.terrainData));
-const beamNGIncludeBackdrop = ref(false);
+const legacyIncludeBackdrop = localStorage.getItem('mapng_beamNGIncludeBackdrop');
+const beamNGBackdropSource = ref(
+  localStorage.getItem('mapng_beamNGBackdropSource')
+  || (legacyIncludeBackdrop === 'true' ? 'global30m' : 'off')
+);
 const beamNGIncludeBuildings = ref(localStorage.getItem('mapng_beamNGIncludeBuildings') !== 'false');
 const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFoundations') !== 'false');
 const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
@@ -534,6 +550,7 @@ let beamNGLevelNameRequestId = 0;
 const hasOsmData = computed(() => Array.isArray(props.terrainData?.osmFeatures) && props.terrainData.osmFeatures.length > 0);
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
 const beamNGFlavorRequired = computed(() => hasOsmData.value);
+const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
 const beamNGPendingDownloadUrl = ref('');
 const beamNGPendingDownloadName = ref('');
 
@@ -580,6 +597,7 @@ watch(showExport2D, (v) => localStorage.setItem('mapng_showExport2D', String(v))
 watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v)));
 watch(showExportBeamNG, (v) => localStorage.setItem('mapng_showExportBeamNG', String(v)));
 watch(beamNGPbrSource, (v) => localStorage.setItem('mapng_beamNGPbrSource', v));
+watch(beamNGBackdropSource, (v) => localStorage.setItem('mapng_beamNGBackdropSource', v));
 watch(beamNGIncludeBuildings, (v) => localStorage.setItem('mapng_beamNGIncludeBuildings', String(v)));
 watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoundations', String(v)));
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
@@ -646,8 +664,8 @@ watch(
 );
 
 watch(
-  [hasOsmData, isCustomUploadTerrain],
-  ([hasOsm, isCustom]) => {
+  [hasOsmData, isCustomUploadTerrain, canUseGpxzBackdrop],
+  ([hasOsm, isCustom, gpxzAllowed]) => {
     if (!hasOsm) {
       if (beamNGBaseTexture.value === 'osm') {
         beamNGBaseTexture.value = resolveBeamNGBaseTexture(props.terrainData, 'hybrid');
@@ -661,7 +679,10 @@ watch(
       beamNGIncludeRocks.value = false;
     }
     if (isCustom) {
-      beamNGIncludeBackdrop.value = false;
+      beamNGBackdropSource.value = 'off';
+    }
+    if (beamNGBackdropSource.value === 'gpxz' && !gpxzAllowed) {
+      beamNGBackdropSource.value = 'global30m';
     }
   },
   { immediate: true }
@@ -1214,12 +1235,18 @@ const handleBeamNGLevelExport = async () => {
       : resolveBeamNGBaseTexture(td, 'hybrid');
     const effectivePbrSource = hasOsmData.value ? beamNGPbrSource.value : 'none';
     const effectiveRoadType = hasOsmData.value ? beamNGRoadType.value : 'none';
-    const effectiveIncludeBackdrop = isCustomUploadTerrain.value ? false : beamNGIncludeBackdrop.value;
+    const effectiveBackdropSource = isCustomUploadTerrain.value
+      ? 'off'
+      : (beamNGBackdropSource.value === 'gpxz' && !canUseGpxzBackdrop.value
+        ? 'global30m'
+        : beamNGBackdropSource.value);
+    const effectiveIncludeBackdrop = effectiveBackdropSource !== 'off';
     const effectiveIncludeBuildings = hasOsmData.value ? beamNGIncludeBuildings.value : false;
     const effectiveApplyFoundations = hasOsmData.value ? beamNGApplyFoundations.value : false;
     const effectiveIncludeWater = hasOsmData.value ? beamNGIncludeWater.value : false;
     const effectiveIncludeTrees = hasOsmData.value ? beamNGIncludeTrees.value : false;
     const effectiveIncludeRocks = hasOsmData.value ? beamNGIncludeRocks.value : false;
+    const effectiveBackdropGpxzApiKey = effectiveBackdropSource === 'gpxz' ? String(props.gpxzApiKey || '') : '';
 
     const effectiveFlavorId = beamNGFlavorId.value || beamNGFlavorOptions[0]?.id;
 
@@ -1228,6 +1255,8 @@ const handleBeamNGLevelExport = async () => {
       pbrSource: effectivePbrSource,
       roadType: effectiveRoadType,
       includeBackdrop: effectiveIncludeBackdrop,
+      backdropElevationSource: effectiveBackdropSource,
+      backdropGpxzApiKey: effectiveBackdropGpxzApiKey,
       includeBuildings: effectiveIncludeBuildings,
       applyFoundations: effectiveApplyFoundations,
       includeWater: effectiveIncludeWater,
@@ -1242,6 +1271,8 @@ const handleBeamNGLevelExport = async () => {
     const { blob, filename } = await exportBeamNGLevel(td, props.center, {
       baseTexture: effectiveBaseTexture,
       includeBackdrop: effectiveIncludeBackdrop,
+      backdropElevationSource: effectiveBackdropSource,
+      backdropGpxzApiKey: effectiveBackdropGpxzApiKey,
       includeBuildings: effectiveIncludeBuildings,
       applyFoundations: effectiveApplyFoundations,
       pbrSource: effectivePbrSource,
@@ -1259,6 +1290,10 @@ const handleBeamNGLevelExport = async () => {
         console.log(`${BEAMNG_EXPORT_UI_LOG} Progress:`, { step, pct });
       },
     });
+
+    if (effectiveBackdropSource === 'gpxz' && !effectiveBackdropGpxzApiKey) {
+      console.warn(`${BEAMNG_EXPORT_UI_LOG} GPXZ backdrop selected but no GPXZ key was passed to export.`);
+    }
 
     console.log(`${BEAMNG_EXPORT_UI_LOG} Export returned payload:`, {
       filename,

@@ -1652,7 +1652,7 @@ const buildFlatSeamedFallbackHeight = (data, globalX, globalZ, flatHeight = 0) =
   return seam.centerEdgeH * (1 - fade) + flatHeight * fade;
 };
 
-const sampleSurroundingHeight = (tileData, u, v) => {
+const sampleSurroundingHeightRaw = (tileData, u, v) => {
   const w = tileData.width;
   const h = tileData.height;
   const x = clamp(u * (w - 1), 0, Math.max(0, w - 1));
@@ -1680,6 +1680,40 @@ const sampleSurroundingHeight = (tileData, u, v) => {
   return (1 - dy) * top + dy * bottom;
 };
 
+const sampleSurroundingHeight = (tileData, u, v) => {
+  const center = sampleSurroundingHeightRaw(tileData, u, v);
+  if (!Number.isFinite(center)) return tileData.minHeight;
+
+  // Second-stage outlier suppression at mesh-sample time.
+  // This catches isolated Terrarium spikes that can slip through tile decoding.
+  const du = 1 / Math.max(8, tileData.width - 1);
+  const dv = 1 / Math.max(8, tileData.height - 1);
+  const neighbors = [];
+
+  for (let oy = -1; oy <= 1; oy++) {
+    for (let ox = -1; ox <= 1; ox++) {
+      if (ox === 0 && oy === 0) continue;
+      const nu = clamp(u + ox * du, 0, 1);
+      const nv = clamp(v + oy * dv, 0, 1);
+      const n = sampleSurroundingHeightRaw(tileData, nu, nv);
+      if (Number.isFinite(n)) neighbors.push(n);
+    }
+  }
+
+  if (neighbors.length < 5) return center;
+  neighbors.sort((a, b) => a - b);
+  const median = neighbors[Math.floor(neighbors.length / 2)];
+
+  // Conservative threshold that preserves real relief while removing needles.
+  const localRange = Math.max(1, (tileData.maxHeight ?? median) - (tileData.minHeight ?? median));
+  const spikeDelta = Math.max(35, localRange * 0.35);
+  if (Math.abs(center - median) > spikeDelta) {
+    tileData._meshSpikeSuppressions = (tileData._meshSpikeSuppressions || 0) + 1;
+    return median;
+  }
+  return center;
+};
+
 export const createSurroundingMeshes = async (data, onProgress, maxMeshResolution = 128, fetchOptions = {}) => {
   try {
     const allPositions = POSITIONS.map(p => p.key);
@@ -1690,6 +1724,8 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
     );
     const tileOptions = { useNativeTerrainGrid: true };
     if (fetchOptions.includeSatellite !== undefined) tileOptions.includeSatellite = fetchOptions.includeSatellite;
+    if (fetchOptions.elevationSource) tileOptions.elevationSource = fetchOptions.elevationSource;
+    if (fetchOptions.gpxzApiKey) tileOptions.gpxzApiKey = fetchOptions.gpxzApiKey;
     const satZoom = fetchOptions.satelliteZoom !== undefined ? fetchOptions.satelliteZoom : GLB_SURROUND_SAT_ZOOM;
     const results = await fetchSurroundingTiles(
       data.bounds,
@@ -1739,6 +1775,8 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
         noDataSamples: diagnostics?.noDataSamples ?? null,
         totalSamples: diagnostics?.totalSamples ?? null,
         noDataRatio: Number.isFinite(noDataRatio) ? noDataRatio : null,
+        spikeReplacements: Number.isFinite(diagnostics?.spikeReplacements) ? diagnostics.spikeReplacements : 0,
+        meshSpikeSuppressions: 0,
       };
 
       if (useFlatFallback) {
@@ -1857,6 +1895,8 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
       mesh.name = `terrain_${pos}`;
       mesh.receiveShadow = true;
       group.add(mesh);
+
+      diagnosticsSummary.tiles[pos].meshSpikeSuppressions = Number(tileData._meshSpikeSuppressions || 0);
       diagnosticsSummary.builtTiles++;
     }
 

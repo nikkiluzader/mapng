@@ -9,7 +9,7 @@
  * positions in one pass, then extracts per-position data from shared canvases.
  */
 
-import { project, TERRAIN_ZOOM } from './terrain';
+import { project, TERRAIN_ZOOM, fetchTerrainData } from './terrain';
 import { encode } from 'fast-png';
 import JSZip from 'jszip';
 
@@ -93,6 +93,57 @@ const terrariumHeight = (r, g, b) => {
   return h <= -32760 ? NO_DATA_VALUE : h;
 };
 
+/**
+ * Suppress isolated elevation outliers that can appear in global Terrarium data
+ * and produce extreme spikes in low-detail backdrop meshes.
+ *
+ * Strategy: compare each sample to the median of its 8-neighbour hood and
+ * replace only when the deviation is implausibly large.
+ */
+const suppressHeightSpikes = (heightMap, width, height, minHeight, maxHeight) => {
+  if (!heightMap || width < 3 || height < 3) return 0;
+
+  // Keep this conservative so real cliffs/ridges are preserved.
+  const range = Math.max(1, maxHeight - minHeight);
+  const spikeDelta = Math.max(180, range * 0.6);
+
+  const out = new Float32Array(heightMap);
+  const neighbors = new Float32Array(8);
+  let replaced = 0;
+
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const idx = y * width + x;
+      const value = heightMap[idx];
+      if (!Number.isFinite(value) || value === NO_DATA_VALUE) continue;
+
+      let count = 0;
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (ox === 0 && oy === 0) continue;
+          const n = heightMap[(y + oy) * width + (x + ox)];
+          if (!Number.isFinite(n) || n === NO_DATA_VALUE) continue;
+          neighbors[count++] = n;
+        }
+      }
+
+      if (count < 5) continue;
+
+      const sorted = Array.from(neighbors.subarray(0, count)).sort((a, b) => a - b);
+      const median = sorted[Math.floor(count / 2)];
+      if (Math.abs(value - median) > spikeDelta) {
+        out[idx] = median;
+        replaced++;
+      }
+    }
+  }
+
+  if (replaced > 0) {
+    heightMap.set(out);
+  }
+  return replaced;
+};
+
 // --- Main Pipeline ---
 
 /**
@@ -123,6 +174,8 @@ export const fetchSurroundingTiles = async (
   const outputSize = resolution;
   const includeSatellite = options?.includeSatellite !== false;
   const useNativeTerrainGrid = options?.useNativeTerrainGrid === true;
+  const elevationSource = options?.elevationSource || 'global30m'; // global30m | usgs1m | gpxz
+  const gpxzApiKey = options?.gpxzApiKey || '';
   const onDownloadProgress = typeof options?.onDownloadProgress === 'function'
     ? options.onDownloadProgress
     : null;
@@ -142,6 +195,78 @@ export const fetchSurroundingTiles = async (
       combined.east  = Math.max(combined.east, b.east);
       combined.west  = Math.min(combined.west, b.west);
     }
+  }
+
+  // Non-global sources reuse the existing terrain pipeline per surrounding tile.
+  // This is slower than the stitched Terrarium pass, but gives users access to
+  // higher-quality elevation sources for backdrop generation.
+  if (elevationSource !== 'global30m') {
+    if (elevationSource === 'gpxz' && !gpxzApiKey) {
+      throw new Error('GPXZ key is required for GPXZ surrounding tile source.');
+    }
+
+    const results = {};
+    let posIdx = 0;
+
+    for (const pos of selectedPositions) {
+      signal?.throwIfAborted();
+      posIdx++;
+      onProgress?.(`Fetching ${elevationSource.toUpperCase()} data for tile ${pos} (${posIdx}/${selectedPositions.length})...`);
+
+      const b = allBounds[pos];
+      const tileCenter = {
+        lat: (b.north + b.south) / 2,
+        lng: (b.east + b.west) / 2,
+      };
+
+      const td = await fetchTerrainData(
+        tileCenter,
+        outputSize,
+        false,
+        elevationSource === 'usgs1m',
+        elevationSource === 'gpxz',
+        elevationSource === 'gpxz' ? gpxzApiKey : '',
+        undefined,
+        undefined,
+        signal,
+        {
+          keepSourceGeoTiffs: false,
+          generateOSMTextureAsset: false,
+          generateHybridTextureAsset: false,
+          globalTileConcurrency: 10,
+        },
+      );
+
+      let validSamples = 0;
+      let noDataSamples = 0;
+      for (let i = 0; i < td.heightMap.length; i++) {
+        const h = td.heightMap[i];
+        if (Number.isFinite(h) && h !== NO_DATA_VALUE) validSamples++;
+        else noDataSamples++;
+      }
+      const totalSamples = validSamples + noDataSamples;
+      const noDataRatio = totalSamples > 0 ? noDataSamples / totalSamples : 1;
+
+      results[pos] = {
+        heightMap: td.heightMap,
+        bounds: b,
+        width: td.width,
+        height: td.height,
+        minHeight: td.minHeight,
+        maxHeight: td.maxHeight,
+        satelliteDataUrl: includeSatellite ? td.satelliteTextureUrl : null,
+        diagnostics: {
+          validSamples,
+          noDataSamples,
+          totalSamples,
+          noDataRatio,
+          allInvalid: validSamples === 0,
+          source: elevationSource,
+        },
+      };
+    }
+
+    return results;
   }
 
   // 2. Calculate terrain tile range (Z15) for combined area
@@ -378,6 +503,8 @@ export const fetchSurroundingTiles = async (
       }
     }
 
+    const spikeReplacements = suppressHeightSpikes(heightMap, outputWidth, outputHeight, minH, maxH);
+
     let satelliteDataUrl = null;
     if (includeSatellite && sCanvas) {
       const outSat = document.createElement('canvas');
@@ -410,6 +537,7 @@ export const fetchSurroundingTiles = async (
         totalSamples,
         noDataRatio,
         allInvalid: validSamples === 0,
+        spikeReplacements,
       },
     };
   }

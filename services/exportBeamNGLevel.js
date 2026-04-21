@@ -653,13 +653,15 @@ async function generateOSMBuildingsCollisionDAE(terrainData, worldSize) {
  * ColladaExporter (each entry: { name, ext, data: Uint8Array, directory }).
  * Returns null if no surrounding data could be fetched.
  */
-async function generateTerrainBackdropDAE(terrainData, worldSize) {
+async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) {
   // Zoom 15 gives ~4m/px satellite imagery; 1024px cap avoids canvas-size
   // failures at large resolutions while still giving usable texture quality.
   const surroundingGroup = await createSurroundingMeshes(terrainData, null, 128, {
     fetchResolutionCap: 1024,
     includeSatellite: true,
     satelliteZoom: 15,
+    elevationSource: options.elevationSource || 'global30m',
+    gpxzApiKey: options.gpxzApiKey || '',
   });
   if (!surroundingGroup) return null;
 
@@ -3801,6 +3803,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     includeNativeBarriers = true,
     includeTrees = true,
     includeRocks = false,
+    backdropElevationSource = 'global30m',
+    backdropGpxzApiKey = '',
     roadType = 'architect',
     flavorId,
     levelName: requestedLevelName = '',
@@ -3828,6 +3832,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       includeNativeBarriers,
       includeTrees,
       includeRocks,
+      backdropElevationSource,
       roadType,
       flavorId,
       levelName: requestedLevelName,
@@ -4062,7 +4067,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (includeBackdrop) {
     beginStep('Fetching terrain backdrop mesh…', 82);
     await yield_();
-    const backdropResult = await generateTerrainBackdropDAE(exportTerrainData, worldSize);
+    const backdropResult = await generateTerrainBackdropDAE(exportTerrainData, worldSize, {
+      elevationSource: backdropElevationSource,
+      gpxzApiKey: backdropGpxzApiKey,
+    });
     backdropDaeBlob = backdropResult?.daeBlob ?? null;
     backdropTextureFiles = backdropResult?.textureFiles ?? [];
     backdropDiagnostics = backdropResult?.diagnostics ?? null;
