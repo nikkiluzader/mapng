@@ -1,6 +1,16 @@
 <template>
   <div class="w-full h-full bg-black relative overflow-hidden">
-    <TresCanvas window-size :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="0.8" :renderer="{ logarithmicDepthBuffer: true }">
+
+    <!-- WebGL unavailable fallback -->
+    <div v-if="!webGLAvailable" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-900 text-center px-6">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <p class="text-sm font-semibold text-gray-300">3D preview unavailable</p>
+      <p class="text-xs text-gray-500 max-w-xs">Your browser could not create a WebGL context. Try enabling GPU acceleration or opening the app in a different browser.</p>
+    </div>
+
+    <TresCanvas v-else window-size :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="0.8" :renderer="{ logarithmicDepthBuffer: true }">
       <Suspense>
         <template #default>
           <TresGroup>
@@ -304,6 +314,18 @@ import SurroundingTerrain3D from "./SurroundingTerrain3D.vue";
 const props = defineProps(["terrainData"]);
 
 const controlsRef = ref(null);
+
+const webGLAvailable = (() => {
+  try {
+    const canvas = document.createElement("canvas");
+    return !!(
+      window.WebGLRenderingContext &&
+      (canvas.getContext("webgl") || canvas.getContext("experimental-webgl"))
+    );
+  } catch {
+    return false;
+  }
+})();
 
 const hdrPresets = {
   "Kloofendal Pure Sky": "kloofendal_48d_partly_cloudy_puresky_4k.hdr",

@@ -556,11 +556,14 @@ const parseOverpassResponse = (data, bounds) => {
 
 // --- Endpoint Fetcher ---
 
-const fetchFromEndpoint = (endpoint, query) => {
+// Fires all endpoints simultaneously; first successful response wins and
+// all others are aborted.
+const fetchWithAbort = async (endpoint, query, signal) => {
   return fetch(endpoint, {
     method: "POST",
     body: `data=${encodeURIComponent(query)}`,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    signal,
   }).then(async (response) => {
     if (!response.ok) {
       throw new Error(`HTTP ${response.status} ${response.statusText}`);
@@ -576,16 +579,32 @@ const fetchFromEndpoint = (endpoint, query) => {
   });
 };
 
-const fetchSequentially = async (endpoints, query) => {
-  const errors = [];
-  for (const endpoint of endpoints) {
-    try {
-      return await fetchFromEndpoint(endpoint, query);
-    } catch (err) {
-      errors.push(`${endpoint}: ${err.message}`);
-    }
-  }
-  throw new Error(`All endpoints failed:\n${errors.join("\n")}`);
+const raceEndpoints = (endpoints, query) => {
+  return new Promise((resolve, reject) => {
+    const controllers = endpoints.map(() => new AbortController());
+    let settled = false;
+    let failCount = 0;
+    const errors = [];
+
+    endpoints.forEach((endpoint, i) => {
+      fetchWithAbort(endpoint, query, controllers[i].signal)
+        .then((result) => {
+          if (settled) return;
+          settled = true;
+          controllers.forEach((c, j) => { if (j !== i) c.abort(); });
+          resolve(result);
+        })
+        .catch((err) => {
+          if (err.name === "AbortError") return;
+          errors.push(`${endpoint}: ${err.message}`);
+          failCount++;
+          if (failCount === endpoints.length && !settled) {
+            settled = true;
+            reject(new Error(`All endpoints failed:\n${errors.join("\n")}`));
+          }
+        });
+    });
+  });
 };
 
 export const fetchOSMData = async (bounds) => {
@@ -599,7 +618,7 @@ export const fetchOSMData = async (bounds) => {
   const shuffled = [...OVERPASS_ENDPOINTS].sort(() => Math.random() - 0.5);
 
   try {
-    const { endpoint, data } = await fetchSequentially(shuffled, query);
+    const { endpoint, data } = await raceEndpoints(shuffled, query);
 
     console.log(`[OSM] Winner: ${endpoint} — ${data.elements?.length || 0} elements`);
 
