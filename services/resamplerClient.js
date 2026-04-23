@@ -61,9 +61,12 @@ const canvasFromRgbaBuffer = (width, height, rgbaBuffer) => {
     canvas.width = width;
     canvas.height = height;
     const ctx = canvas.getContext('2d');
-    const imgData = ctx.createImageData(width, height);
-    imgData.data.set(new Uint8ClampedArray(rgbaBuffer.buffer || rgbaBuffer));
-    ctx.putImageData(imgData, 0, 0);
+    // new ImageData(array, w, h) wraps the existing Uint8ClampedArray directly
+    // (no copy), saving ~1 GB at 16k vs ctx.createImageData() + .set().
+    const pixels = rgbaBuffer instanceof Uint8ClampedArray
+        ? rgbaBuffer
+        : new Uint8ClampedArray(rgbaBuffer);
+    ctx.putImageData(new ImageData(pixels, width, height), 0, 0);
     return canvas;
 };
 
@@ -241,6 +244,9 @@ export const resampleHeightAndImageOffThread = async (
             }, transferables);
 
             if (result) {
+                const rgba = new Uint8ClampedArray(result.rgbaBuffer.buffer || result.rgbaBuffer);
+                const midIdx = ((height >> 1) * width + (width >> 1)) * 4;
+                console.log(`[ResamplerClient] worker rgbaBuffer ${width}x${height} center: r=${rgba[midIdx]} g=${rgba[midIdx+1]} b=${rgba[midIdx+2]} a=${rgba[midIdx+3]}`);
                 return {
                     heightMap: result.heightMap,
                     bounds: result.bounds,
@@ -248,10 +254,19 @@ export const resampleHeightAndImageOffThread = async (
                 };
             }
         } catch (e) {
-            console.warn('[ResamplerClient] Bundled resampling failed, falling back:', e);
+            console.warn('[ResamplerClient] Bundled resampling failed, falling back to main-thread (imageSourceData.pixels may be detached):', e);
         }
     }
 
+    console.log('[ResamplerClient] Using main-thread fallback path for image resampling — worker unavailable or failed above');
+    // imageSourceData.pixels may be detached if the worker path was attempted
+    // (buffers are transferred zero-copy). Use a null sampler rather than reading
+    // garbage from a detached TypedArray.
+    const pixelsDetached = imageSourceData && imageSourceData.pixels?.buffer?.byteLength === 0;
+    if (pixelsDetached) {
+        console.warn('[ResamplerClient] imageSourceData.pixels is detached — falling back to black satellite texture');
+    }
+    const safeImageSampler = (!pixelsDetached && imageSampler) ? imageSampler : null;
     const [{ heightMap, bounds }, canvas] = await Promise.all([
         resampleHeightMapOffThread(
             source,
@@ -264,7 +279,9 @@ export const resampleHeightAndImageOffThread = async (
             fillHoles,
             targetBounds,
         ),
-        Promise.resolve(resampleImageToMeterGrid({ sampler: imageSampler }, center, width, height, targetBounds)),
+        Promise.resolve(safeImageSampler
+            ? resampleImageToMeterGrid({ sampler: safeImageSampler }, center, width, height, targetBounds)
+            : null),
     ]);
 
     return { heightMap, bounds, canvas };

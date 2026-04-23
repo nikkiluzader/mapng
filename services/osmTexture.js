@@ -1736,6 +1736,7 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(terrainData.width * SCALE_FACTOR));
   canvas.height = Math.max(1, Math.round(terrainData.height * SCALE_FACTOR));
+  console.log(`[OSM Texture] Generating OSM texture ${canvas.width}x${canvas.height} (${terrainData.osmFeatures?.length ?? 0} features)`);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Could not get 2D context");
 
@@ -1770,7 +1771,9 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
   const blob = await new Promise((r) =>
     canvas.toBlob((b) => r(b || null), "image/png"),
   );
+  if (!blob) console.warn("[OSM Texture] canvas.toBlob() returned null — canvas may be tainted or too large");
   const url = blob ? URL.createObjectURL(blob) : "";
+  console.log(`[OSM Texture] Done — blob=${blob ? `${(blob.size / 1024).toFixed(0)} KB` : "null"}, url=${url ? "ok" : "empty"}`);
   return { url, canvas, blob };
 };
 
@@ -1784,20 +1787,30 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(terrainData.width * SCALE_FACTOR));
   canvas.height = Math.max(1, Math.round(terrainData.height * SCALE_FACTOR));
+  console.log(`[Hybrid Texture] Generating hybrid texture ${canvas.width}x${canvas.height}`);
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Could not get 2D context");
 
   // Background: Satellite Image
   if (terrainData.satelliteTextureUrl) {
     const img = new Image();
-    img.crossOrigin = "Anonymous";
     img.src = terrainData.satelliteTextureUrl;
-    await new Promise((r) => {
-      img.onload = r;
-      img.onerror = r;
-    }); // robust load
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const loaded = await new Promise((resolve) => {
+      img.onload = () => resolve(true);
+      img.onerror = (e) => {
+        console.warn("[Hybrid Texture] Failed to load satellite image:", e?.message || e);
+        resolve(false);
+      };
+    });
+    if (loaded && img.naturalWidth > 0) {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } else {
+      console.warn("[Hybrid Texture] Satellite image not drawable — falling back to black background");
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
   } else {
+    console.warn("[Hybrid Texture] No satelliteTextureUrl — using black background");
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
@@ -1810,7 +1823,9 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
   const blob = await new Promise((r) =>
     canvas.toBlob((b) => r(b || null), "image/png"),
   );
+  if (!blob) console.warn("[Hybrid Texture] canvas.toBlob() returned null — canvas may be tainted or too large");
   const url = blob ? URL.createObjectURL(blob) : "";
+  console.log(`[Hybrid Texture] Done — blob=${blob ? `${(blob.size / 1024).toFixed(0)} KB` : "null"}, url=${url ? "ok" : "empty"}`);
   return { url, canvas, blob };
 };
 

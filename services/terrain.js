@@ -633,6 +633,83 @@ const loadImage = (url, signal) => {
   });
 };
 
+const SAT_TEX_MAX_SIZE = 8192;
+
+// Converts a satellite canvas to a blob URL, capping at SAT_TEX_MAX_SIZE to
+// avoid GPU upload failures at extreme resolutions (e.g. 16k dev mode).
+// Uses OffscreenCanvas.convertToBlob() when available so JPEG encoding runs
+// off the main thread, preventing the visible freeze that canvas.toBlob()
+// causes in Chrome right after a progress status update.
+const canvasToSatelliteBlobUrl = async (srcCanvas) => {
+  console.log(`[Sat URL] srcCanvas: ${srcCanvas.width}x${srcCanvas.height}`);
+
+  // Sample the center pixel of the source canvas to detect a blank/black canvas
+  // early — a GPU-backed canvas can silently lose its data under memory pressure.
+  try {
+    const sCtx = srcCanvas.getContext('2d');
+    if (sCtx) {
+      const cx = srcCanvas.width >> 1, cy = srcCanvas.height >> 1;
+      const px = sCtx.getImageData(cx, cy, 1, 1).data;
+      console.log(`[Sat URL] srcCanvas center pixel: r=${px[0]} g=${px[1]} b=${px[2]} a=${px[3]}`);
+    } else {
+      console.warn('[Sat URL] srcCanvas.getContext("2d") returned null');
+    }
+  } catch (e) {
+    console.warn('[Sat URL] could not sample srcCanvas:', e.message);
+  }
+
+  // Yield so Vue can flush the preceding onProgress status update before the
+  // encode starts, preventing a perceived freeze/flicker in the loading modal.
+  await new Promise(r => setTimeout(r, 0));
+
+  const needsDownscale = srcCanvas.width > SAT_TEX_MAX_SIZE || srcCanvas.height > SAT_TEX_MAX_SIZE;
+  const targetW = needsDownscale ? Math.round(srcCanvas.width  * Math.min(SAT_TEX_MAX_SIZE / srcCanvas.width,  SAT_TEX_MAX_SIZE / srcCanvas.height)) : srcCanvas.width;
+  const targetH = needsDownscale ? Math.round(srcCanvas.height * Math.min(SAT_TEX_MAX_SIZE / srcCanvas.width,  SAT_TEX_MAX_SIZE / srcCanvas.height)) : srcCanvas.height;
+
+  let blob = null;
+  // Prefer OffscreenCanvas path: encoding + optional downscale run off the main
+  // thread. When downscaling, use createImageBitmap with resize options to avoid
+  // creating a second GPU-backed canvas (saves ~256 MB at 16k).
+  if (typeof OffscreenCanvas !== 'undefined') {
+    try {
+      let source = srcCanvas;
+      if (needsDownscale) {
+        source = await createImageBitmap(srcCanvas, { resizeWidth: targetW, resizeHeight: targetH, resizeQuality: 'high' });
+        console.log(`[Sat URL] capped ${srcCanvas.width}x${srcCanvas.height} → ${targetW}x${targetH} via ImageBitmap`);
+      }
+      const offscreen = new OffscreenCanvas(targetW, targetH);
+      offscreen.getContext('2d').drawImage(source, 0, 0);
+      if (source !== srcCanvas && 'close' in source) source.close();
+      blob = await offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.9 });
+      console.log(`[Sat URL] OffscreenCanvas encode — blob=${blob ? `${(blob.size/1024).toFixed(0)} KB` : 'null'}`);
+    } catch (e) {
+      console.warn('[Sat URL] OffscreenCanvas path failed, falling back:', e.message);
+    }
+  }
+  if (!blob) {
+    // Fallback: draw to a regular canvas (creates second backing store if downscaling)
+    let canvas = srcCanvas;
+    if (needsDownscale) {
+      const scaled = document.createElement('canvas');
+      scaled.width  = targetW;
+      scaled.height = targetH;
+      const scaledCtx = scaled.getContext('2d');
+      if (scaledCtx) scaledCtx.drawImage(srcCanvas, 0, 0, targetW, targetH);
+      canvas = scaled;
+    }
+    blob = await new Promise(r => canvas.toBlob(b => r(b), 'image/jpeg', 0.9));
+    console.log(`[Sat URL] canvas.toBlob fallback — blob=${blob ? `${(blob.size/1024).toFixed(0)} KB` : 'null'}`);
+    if (canvas !== srcCanvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+  }
+
+  const url = blob ? URL.createObjectURL(blob) : '';
+  console.log(`[Sat URL] result: ${url ? 'ok' : 'empty'}`);
+  return url;
+};
+
 /**
  * Fetch and assemble a complete TerrainData object for the given centre point.
  *
@@ -798,12 +875,27 @@ export const fetchTerrainData = async (
   terrainCanvas.height = canvasHeight;
   const tCtx = terrainCanvas.getContext("2d", { willReadFrequently: true });
 
-  const satCanvas = document.createElement("canvas");
-  satCanvas.width = satCanvasWidth;
-  satCanvas.height = satCanvasHeight;
-  const sCtx = satCanvas.getContext("2d", { willReadFrequently: true });
+  if (!tCtx) throw new Error("Failed to create terrain canvas context");
 
-  if (!tCtx || !sCtx) throw new Error("Failed to create canvas contexts");
+  // Build satellite pixel data into a CPU-side buffer rather than a GPU-backed
+  // canvas. A large canvas (e.g. 18432x18176 at 16k) can have its GPU backing
+  // store silently zeroed under memory pressure, causing getImageData to return
+  // all-transparent pixels even when every tile loaded successfully.
+  // Using a plain Uint8ClampedArray eliminates the GPU round-trip entirely and
+  // halves peak memory (no separate getImageData copy needed).
+  const satBuffer = new Uint8ClampedArray(satCanvasWidth * satCanvasHeight * 4);
+  // Default alpha=255 so any gap (missed tile) reads as opaque rather than transparent
+  const satBuffer32 = new Uint32Array(satBuffer.buffer);
+  satBuffer32.fill(0xFF000000); // little-endian RGBA: (0,0,0,255) opaque black
+
+  // Reuse a single 256×256 scratch canvas to extract each satellite tile's pixels.
+  // JS is single-threaded so concurrent pMap callbacks never actually overlap;
+  // clearing+drawing+reading is always atomic within one event-loop turn.
+  const tempSatCanvas = document.createElement("canvas");
+  tempSatCanvas.width = TILE_SIZE;
+  tempSatCanvas.height = TILE_SIZE;
+  const tempSatCtx = tempSatCanvas.getContext("2d", { willReadFrequently: true });
+  if (!tempSatCtx) throw new Error("Failed to create satellite scratch canvas context");
 
   // Fetch tiles
 
@@ -834,6 +926,8 @@ export const fetchTerrainData = async (
   let terrainTilesRequested = 0;
   let terrainTilesSucceeded = 0;
   let terrainTilesFailed = 0;
+  let satTilesSucceeded = 0;
+  let satTilesFailed = 0;
   await pMap(
     requests,
     async ({ tx, ty, type }) => {
@@ -870,16 +964,35 @@ export const fetchTerrainData = async (
 
         const satUrl = `${SATELLITE_API_URL}/${SATELLITE_ZOOM}/${ty}/${wrappedTx}`;
         const sImg = await loadImage(satUrl, signal);
-        if (sImg) sCtx.drawImage(sImg, drawX, drawY);
-        else {
-          sCtx.fillStyle = "#1a1a1a";
-          sCtx.fillRect(drawX, drawY, TILE_SIZE, TILE_SIZE);
+        if (sImg) {
+          satTilesSucceeded++;
+          tempSatCtx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
+          tempSatCtx.drawImage(sImg, 0, 0);
+          const tilePixels = tempSatCtx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
+          for (let row = 0; row < TILE_SIZE; row++) {
+            const srcOff = row * TILE_SIZE * 4;
+            const dstOff = ((drawY + row) * satCanvasWidth + drawX) * 4;
+            satBuffer.set(tilePixels.subarray(srcOff, srcOff + TILE_SIZE * 4), dstOff);
+          }
+        } else {
+          satTilesFailed++;
+          // Fallback: already initialized to opaque black; write dark gray for visibility
+          for (let row = 0; row < TILE_SIZE; row++) {
+            const dstOff = ((drawY + row) * satCanvasWidth + drawX) * 4;
+            for (let col = 0; col < TILE_SIZE; col++) {
+              satBuffer[dstOff + col * 4]     = 0x1a;
+              satBuffer[dstOff + col * 4 + 1] = 0x1a;
+              satBuffer[dstOff + col * 4 + 2] = 0x1a;
+              // alpha already 255 from initialization
+            }
+          }
         }
       }
     },
     Math.max(1, Number(globalTileConcurrency || 20)),
     signal,
   );
+  console.log(`[Sat Tiles] ${satTilesSucceeded} ok / ${satTilesFailed} failed — canvas ${satCanvasWidth}x${satCanvasHeight}`);
 
   if (!rawData && terrainTilesRequested > 0 && terrainTilesSucceeded === 0) {
     throw new Error(
@@ -890,7 +1003,17 @@ export const fetchTerrainData = async (
   // Create Samplers from Canvases
   // Always create the terrain data image so we have a fallback sampler
   const terrainDataImg = tCtx.getImageData(0, 0, canvasWidth, canvasHeight);
-  const satDataImg = sCtx.getImageData(0, 0, satCanvasWidth, satCanvasHeight);
+  // satDataImg uses the CPU-side buffer directly — no GPU readback needed.
+  const satDataImg = { data: satBuffer, width: satCanvasWidth, height: satCanvasHeight };
+  {
+    const d = satDataImg.data;
+    const sample = (px, py) => {
+      const idx = (py * satCanvasWidth + px) * 4;
+      return `(${d[idx]},${d[idx+1]},${d[idx+2]},${d[idx+3]})`;
+    };
+    const cx = satCanvasWidth >> 1, cy = satCanvasHeight >> 1;
+    console.log(`[Sat Canvas] ${satCanvasWidth}x${satCanvasHeight} — center:${sample(cx,cy)} TL:${sample(0,0)} TR:${sample(satCanvasWidth-1,0)} BL:${sample(0,satCanvasHeight-1)} BR:${sample(satCanvasWidth-1,satCanvasHeight-1)}`);
+  }
 
   // Helper to get pixel from Mercator Canvas
   const getMercatorPixel = (lat, lng, data, zoom, minTx, minTy) => {
@@ -1036,17 +1159,11 @@ export const fetchTerrainData = async (
   }
 
   onProgress?.("Finalizing terrain data...");
-
-  // Use toBlob + createObjectURL instead of toDataURL for satellite texture.
-  // toDataURL creates a massive base64 string (~33% larger than binary) and blocks the main thread.
-  // toBlob is async and createObjectURL is a zero-copy reference to the blob.
-  const satelliteTextureUrl = await new Promise((resolve) => {
-    finalSatCanvas.toBlob(
-      (blob) => resolve(blob ? URL.createObjectURL(blob) : ""),
-      "image/jpeg",
-      0.9,
-    );
-  });
+  const satelliteTextureUrl = await canvasToSatelliteBlobUrl(finalSatCanvas);
+  // Free the (potentially huge) source canvas immediately — it's no longer needed
+  // and holding onto it during OSM/hybrid texture generation exhausts memory at 16k.
+  finalSatCanvas.width = 0;
+  finalSatCanvas.height = 0;
 
   const terrainData = {
     heightMap,
@@ -1313,12 +1430,9 @@ export const loadTerrainFromTif = async (
   }
 
   onProgress?.('Finalizing terrain data...');
-  const satelliteTextureUrl = await new Promise((resolve) => {
-    finalSatCanvas.toBlob(
-      (blob) => resolve(blob ? URL.createObjectURL(blob) : ''),
-      'image/jpeg', 0.9,
-    );
-  });
+  const satelliteTextureUrl = await canvasToSatelliteBlobUrl(finalSatCanvas);
+  finalSatCanvas.width = 0;
+  finalSatCanvas.height = 0;
 
   const terrainData = {
     heightMap, width, height, minHeight, maxHeight,
@@ -1516,12 +1630,9 @@ export const loadTerrainFromLaz = async (
   }
 
   onProgress?.('Finalizing terrain data...');
-  const satelliteTextureUrl = await new Promise((resolve) => {
-    finalSatCanvas.toBlob(
-      (blob) => resolve(blob ? URL.createObjectURL(blob) : ''),
-      'image/jpeg', 0.9,
-    );
-  });
+  const satelliteTextureUrl = await canvasToSatelliteBlobUrl(finalSatCanvas);
+  finalSatCanvas.width = 0;
+  finalSatCanvas.height = 0;
 
   const terrainData = {
     heightMap, width, height, minHeight, maxHeight,

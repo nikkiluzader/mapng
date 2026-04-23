@@ -220,7 +220,12 @@ const canvasCache = reactive({
 // Helper to load and configure a texture from URL
 const loadTexture = (url) => {
   if (!url) return null;
-  const tex = new THREE.TextureLoader().load(url);
+  const tex = new THREE.TextureLoader().load(
+    url,
+    (t) => console.log(`[TerrainMesh] texture loaded — ${t.image?.width}x${t.image?.height}`),
+    undefined,
+    (err) => console.error('[TerrainMesh] texture load error:', err),
+  );
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.generateMipmaps = true;
   tex.minFilter = THREE.LinearMipmapLinearFilter;
@@ -261,12 +266,14 @@ const loadCanvasTexture = (canvas, onUploaded) => {
 // Watch individual URLs and update the cache
 watch(() => props.terrainData?.satelliteTextureUrl, (url) => {
   if (textureCache.satellite) textureCache.satellite.dispose();
+  console.log(`[TerrainMesh] satellite texture watch — url=${url ? 'ok' : 'empty/null'}`);
   textureCache.satellite = loadTexture(url);
 }, { immediate: true });
 
 watch(() => props.terrainData?.osmTextureUrl, (url) => {
   if (textureCache.osm) textureCache.osm.dispose();
   const canvas = props.terrainData?.osmTextureCanvas;
+  console.log(`[TerrainMesh] osm texture watch — url=${url ? "ok" : "empty/null"}, canvas=${canvas ? `${canvas.width}x${canvas.height}` : "null"}`);
   if (canvas) {
     canvasCache.osm = canvas;
     textureCache.osm = loadCanvasTexture(canvas, () => {
@@ -280,12 +287,14 @@ watch(() => props.terrainData?.osmTextureUrl, (url) => {
   } else {
     canvasCache.osm = null;
     textureCache.osm = loadTexture(url);
+    if (!url) console.warn("[TerrainMesh] osm texture: no canvas and no url — texture will be null");
   }
 }, { immediate: true });
 
 watch(() => props.terrainData?.hybridTextureUrl, (url) => {
   if (textureCache.hybrid) textureCache.hybrid.dispose();
   const canvas = props.terrainData?.hybridTextureCanvas;
+  console.log(`[TerrainMesh] hybrid texture watch — url=${url ? "ok" : "empty/null"}, canvas=${canvas ? `${canvas.width}x${canvas.height}` : "null"}`);
   if (canvas) {
     canvasCache.hybrid = canvas;
     textureCache.hybrid = loadCanvasTexture(canvas, () => {
@@ -300,6 +309,7 @@ watch(() => props.terrainData?.hybridTextureUrl, (url) => {
   } else {
     canvasCache.hybrid = null;
     textureCache.hybrid = loadTexture(url);
+    if (!url) console.warn("[TerrainMesh] hybrid texture: no canvas and no url — texture will be null");
   }
 }, { immediate: true });
 
