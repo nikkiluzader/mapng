@@ -242,6 +242,7 @@ async function resizePngBlob(blob, targetSize) {
  * Return the terrain texture as a PNG Blob for the given textureType.
  *
  * textureType options:
+ *   'none'            — flat neutral color
  *   'hybrid'          — satellite + road overlay (default)
  *   'satellite'       — plain satellite imagery
  *   'osm'             — procedural OSM texture
@@ -251,6 +252,15 @@ async function resizePngBlob(blob, targetSize) {
  */
 async function getTerrainTextureBlob(terrainData, textureType = 'hybrid') {
   try {
+    if (textureType === 'none') {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#808080';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      return new Promise(r => canvas.toBlob(r, 'image/png'));
+    }
     if (textureType === 'hybrid') {
       // Priority: raw canvas (lossless, direct) → pre-encoded blob → blob URL fallback.
       // The canvas may be null after the 3D preview frees it from terrainData, but the
@@ -3778,7 +3788,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {object} terrainData
  * @param {object} center        — { lat, lng }
  * @param {object} [options]
- * @param {string}  [options.baseTexture='hybrid']         — 'hybrid' | 'satellite' | 'osm'
+ * @param {string}  [options.baseTexture='hybrid']         — 'none' | 'hybrid' | 'satellite' | 'osm'
  * @param {boolean} [options.includeBuildings=true]         — include generated OSM 3D objects (.dae)
  * @param {boolean} [options.applyFoundations=true]         — apply terrain foundation pass under buildings
  * @param {boolean} [options.includeBackdrop=false]         — fetch and include surrounding terrain backdrop DAE

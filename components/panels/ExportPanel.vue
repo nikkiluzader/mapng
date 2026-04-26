@@ -56,6 +56,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.baseTexture') }}</span>
             <select v-model="beamNGBaseTexture" class="text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 cursor-pointer">
+              <option value="none">{{ t('exportPanel.none') }}</option>
               <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">{{ t('exportPanel.satelliteHybrid') }}</option>
               <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">{{ t('exportPanel.satellite') }}</option>
               <option v-if="hasOsmData" value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
@@ -515,6 +516,7 @@ const beamNGProgressStep = ref('');
 const beamNGProgressPct  = ref(0);
 const resolveBeamNGBaseTexture = (terrainData, preferred = 'osm') => {
   const availableTextures = {
+    none: true,
     osm: !!terrainData?.osmTextureUrl,
     hybrid: !!terrainData?.hybridTextureUrl || !!terrainData?.hybridTextureCanvas,
     satellite: !!terrainData?.satelliteTextureUrl,
@@ -1230,9 +1232,11 @@ const handleBeamNGLevelExport = async () => {
       osmFeatureCount: Array.isArray(td?.osmFeatures) ? td.osmFeatures.length : null,
     });
 
-    const effectiveBaseTexture = hasOsmData.value
-      ? beamNGBaseTexture.value
-      : resolveBeamNGBaseTexture(td, 'hybrid');
+    const effectiveBaseTexture = beamNGBaseTexture.value === 'none'
+      ? 'none'
+      : (hasOsmData.value
+        ? beamNGBaseTexture.value
+        : resolveBeamNGBaseTexture(td, 'hybrid'));
     const effectivePbrSource = hasOsmData.value ? beamNGPbrSource.value : 'none';
     const effectiveRoadType = hasOsmData.value ? beamNGRoadType.value : 'none';
     const effectiveBackdropSource = isCustomUploadTerrain.value
