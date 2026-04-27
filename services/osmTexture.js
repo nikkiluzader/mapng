@@ -1,4 +1,5 @@
 import { createWGS84ToLocal } from "./geoUtils.js";
+import { buildRoadNetwork, getEffectiveRoadLayer, mergeLinearRoadSegments } from "./roadNetwork.js";
 
 // Colors aligned to OSM Carto style definitions
 // Source: https://github.com/gravitystorm/openstreetmap-carto (landcover.mss / water.mss)
@@ -740,38 +741,6 @@ const shouldSkipLaneDetail = (tags = {}, layout = null) => {
   return false;
 };
 
-const getEffectiveRoadLayer = (tags = {}) => {
-  const explicitLayer = Number.parseInt(tags.layer, 10);
-  let layer = Number.isFinite(explicitLayer) ? explicitLayer : 0;
-
-  const bridgeLike =
-    tags.bridge === "yes" ||
-    tags.bridge === "viaduct" ||
-    tags.man_made === "bridge" ||
-    tags.location === "overground" ||
-    tags.location === "elevated";
-  const tunnelLike =
-    tags.tunnel === "yes" ||
-    tags.covered === "yes" ||
-    tags.location === "underground" ||
-    tags.location === "underwater";
-
-  if (!Number.isFinite(explicitLayer)) {
-    if (bridgeLike) layer += 1;
-    if (tunnelLike || tags.cutting === "yes") layer -= 1;
-  }
-
-  // Some ramps carry retaining-wall hints on the way itself.
-  if (tags.barrier === "retaining_wall" && !bridgeLike && !tunnelLike) {
-    layer += 0.5;
-  }
-  if (tags.embankment === "yes") {
-    layer += 0.5;
-  }
-
-  return layer;
-};
-
 const getLaneLayout = (tags) => {
   const highway = tags.highway;
   const explicitNoOneway = tags.oneway === "no" || tags.oneway === "0";
@@ -899,6 +868,90 @@ const getLaneLayout = (tags) => {
   return layout;
 };
 
+const getTextureCorridorStyleKey = (segment) => {
+  const tags = segment?.tags || {};
+  return JSON.stringify([
+    segment?.highway || '',
+    segment?.layer ?? '',
+    tags.name || '',
+    tags.ref || '',
+    tags.surface || '',
+    tags.oneway || '',
+  ]);
+};
+
+const STABLE_TEXTURE_WIDTH_HIGHWAYS = new Set([
+  'motorway',
+  'motorway_link',
+  'trunk',
+  'trunk_link',
+  'primary',
+  'primary_link',
+  'secondary',
+  'secondary_link',
+]);
+
+const getTextureWidthCorridorKey = (road) => {
+  const tags = road?.tags || {};
+  return JSON.stringify([
+    road?.highway || tags.highway || '',
+    road?.layer ?? getEffectiveRoadLayer(tags),
+    tags.name || '',
+    tags.ref || '',
+    tags.oneway || '',
+  ]);
+};
+
+const buildStableTextureWidthMap = (roads) => {
+  const widthGroups = new Map();
+
+  roads.forEach((road) => {
+    const highway = road?.tags?.highway;
+    if (!STABLE_TEXTURE_WIDTH_HIGHWAYS.has(highway)) return;
+
+    const members = Array.isArray(road.members) && road.members.length > 0 ? road.members : [road];
+    const key = getTextureWidthCorridorKey(road);
+    const widths = widthGroups.get(key) || [];
+    for (const member of members) {
+      const width = getLaneLayout(member.tags || {}).totalWidth;
+      if (Number.isFinite(width) && width > 0) widths.push(width);
+    }
+    widthGroups.set(key, widths);
+  });
+
+  const stableWidths = new Map();
+  for (const [key, widths] of widthGroups.entries()) {
+    if (widths.length === 0) continue;
+    const highway = JSON.parse(key)[0];
+    const laneWidth = getDefaultLaneWidth(highway);
+    const minWidth = Math.min(...widths);
+    const maxWidth = Math.max(...widths);
+    // Major-road texture rendering should not visibly pinch when OSM encodes
+    // short turn-lane transitions or inconsistent shoulder/cycle-lane tagging.
+    if ((maxWidth - minWidth) <= (laneWidth * 2 + 0.75)) {
+      stableWidths.set(key, maxWidth);
+    }
+  }
+
+  return stableWidths;
+};
+
+const getStableTextureRoadWidth = (road, stableWidthMap = null) => {
+  const layout = getLaneLayout(road.tags || {});
+  const baseWidth = layout.totalWidth;
+  const highway = road.tags?.highway;
+  if (!STABLE_TEXTURE_WIDTH_HIGHWAYS.has(highway)) {
+    return baseWidth;
+  }
+
+  const stableWidth = stableWidthMap?.get(getTextureWidthCorridorKey(road));
+  if (Number.isFinite(stableWidth) && stableWidth > 0) {
+    return stableWidth;
+  }
+
+  return baseWidth;
+};
+
 // --- Junction / Intersection Rendering ---
 
 /**
@@ -906,64 +959,120 @@ const getLaneLayout = (tags) => {
  * Groups nearby endpoints (within tolerance) at shared OSM nodes.
  */
 const buildJunctionMap = (roads, toPixel) => {
-  // Map from "lat,lng" key to junction info
-  const junctions = new Map();
+  const network = buildRoadNetwork(roads, { layerResolver: getEffectiveRoadLayer });
+  const result = new Map();
+  for (const [key, roadsAtLayer] of network.intersections.entries()) {
+    const sample = roadsAtLayer[0];
+    const pt = sample?.isStart ? sample.road.geometry[0] : sample.road.geometry[sample.road.geometry.length - 1];
+    if (!pt) continue;
+    result.set(key, {
+      lat: pt.lat,
+      lng: pt.lng,
+      roads: roadsAtLayer,
+      pixel: toPixel(pt.lat, pt.lng),
+    });
+  }
 
-  const makeKey = (lat, lng) => `${lat.toFixed(7)},${lng.toFixed(7)}`;
+  // Keep per-layer junction groups with 2+ connecting roads.
+  for (const [key, junction] of Array.from(result.entries())) {
+    if (!junction.roads || junction.roads.length < 2) {
+      result.delete(key);
+    }
+  }
 
-  roads.forEach((road) => {
+  return result;
+};
+
+const buildJunctionCap = (junction, toPixel, SCALE_FACTOR, stableWidthMap) => {
+  const center = junction.pixel;
+  const arms = [];
+  let maxHalfW = 0;
+
+  junction.roads.forEach(({ road, isStart }) => {
+    const halfW = (getStableTextureRoadWidth(road, stableWidthMap) / 2) * SCALE_FACTOR;
+    maxHalfW = Math.max(maxHalfW, halfW);
     const geom = road.geometry;
     if (geom.length < 2) return;
 
-    const layer = getEffectiveRoadLayer(road.tags || {});
-
-    // Check first point
-    const startKey = makeKey(geom[0].lat, geom[0].lng);
-    if (!junctions.has(startKey)) {
-      junctions.set(startKey, {
-        lat: geom[0].lat, lng: geom[0].lng,
-        layerGroups: new Map(),
-      });
-    }
-    {
-      const group = junctions.get(startKey).layerGroups;
-      const layerKey = String(layer);
-      if (!group.has(layerKey)) group.set(layerKey, []);
-      group.get(layerKey).push({ road, isStart: true });
+    let p0;
+    let p1;
+    if (isStart) {
+      p0 = toPixel(geom[0].lat, geom[0].lng);
+      p1 = toPixel(geom[1].lat, geom[1].lng);
+    } else {
+      p0 = toPixel(geom[geom.length - 1].lat, geom[geom.length - 1].lng);
+      p1 = toPixel(geom[geom.length - 2].lat, geom[geom.length - 2].lng);
     }
 
-    // Check last point
-    const endKey = makeKey(geom[geom.length - 1].lat, geom[geom.length - 1].lng);
-    if (!junctions.has(endKey)) {
-      junctions.set(endKey, {
-        lat: geom[geom.length - 1].lat, lng: geom[geom.length - 1].lng,
-        layerGroups: new Map(),
-      });
-    }
-    {
-      const group = junctions.get(endKey).layerGroups;
-      const layerKey = String(layer);
-      if (!group.has(layerKey)) group.set(layerKey, []);
-      group.get(layerKey).push({ road, isStart: false });
-    }
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    if (len < 0.001) return;
+
+    const dirX = dx / len;
+    const dirY = dy / len;
+    const nx = -dirY;
+    const ny = dirX;
+    const outAngle = Math.atan2(dy, dx);
+
+    arms.push({
+      halfW,
+      dirX,
+      dirY,
+      outAngle,
+      cw: { x: p0.x + nx * halfW, y: p0.y + ny * halfW },
+      ccw: { x: p0.x - nx * halfW, y: p0.y - ny * halfW },
+    });
   });
 
-  // Keep per-layer junction groups with 2+ connecting roads.
-  const result = new Map();
-  for (const [key, junction] of junctions) {
-    const pixel = toPixel(junction.lat, junction.lng);
-    for (const [layerKey, roadsAtLayer] of junction.layerGroups) {
-      if (roadsAtLayer.length >= 2) {
-        result.set(`${key}|${layerKey}`, {
-          lat: junction.lat,
-          lng: junction.lng,
-          roads: roadsAtLayer,
-          pixel,
-        });
-      }
+  if (arms.length < 3) return null;
+  arms.sort((a, b) => a.outAngle - b.outAngle);
+
+  const commands = [];
+  for (let i = 0; i < arms.length; i++) {
+    const curr = arms[i];
+    const next = arms[(i + 1) % arms.length];
+
+    if (i === 0) commands.push({ type: 'move', x: curr.ccw.x, y: curr.ccw.y });
+    commands.push({ type: 'line', x: curr.cw.x, y: curr.cw.y });
+
+    const det = curr.dirX * (-next.dirY) - curr.dirY * (-next.dirX);
+    if (Math.abs(det) < 0.001) {
+      commands.push({ type: 'line', x: next.ccw.x, y: next.ccw.y });
+      continue;
     }
+
+    const dX = next.ccw.x - curr.cw.x;
+    const dY = next.ccw.y - curr.cw.y;
+    const t = (-dX * next.dirY + dY * next.dirX) / det;
+
+    let cpX = curr.cw.x + t * curr.dirX;
+    let cpY = curr.cw.y + t * curr.dirY;
+    const cornerDist = Math.sqrt((cpX - center.x) ** 2 + (cpY - center.y) ** 2);
+    if (cornerDist > maxHalfW * 4) {
+      const midX = (curr.cw.x + next.ccw.x) / 2;
+      const midY = (curr.cw.y + next.ccw.y) / 2;
+      cpX = midX * 0.4 + center.x * 0.6;
+      cpY = midY * 0.4 + center.y * 0.6;
+    }
+
+    commands.push({ type: 'quad', cx: cpX, cy: cpY, x: next.ccw.x, y: next.ccw.y });
   }
-  return result;
+
+  return {
+    center,
+    centerRadius: maxHalfW * 0.28,
+    commands,
+  };
+};
+
+const buildJunctionCaps = (junctions, toPixel, SCALE_FACTOR, stableWidthMap) => {
+  const caps = [];
+  for (const [, junction] of junctions) {
+    const cap = buildJunctionCap(junction, toPixel, SCALE_FACTOR, stableWidthMap);
+    if (cap) caps.push(cap);
+  }
+  return caps;
 };
 
 /**
@@ -974,113 +1083,20 @@ const buildJunctionMap = (roads, toPixel) => {
  * Also covers the center area so that any lane markings drawn through the
  * junction are cleanly erased.
  */
-const renderJunctions = (ctx, junctions, toPixel, SCALE_FACTOR) => {
-  for (const [, junction] of junctions) {
-    const center = junction.pixel;
-    const arms = [];
-    let maxHalfW = 0;
-
-    junction.roads.forEach(({ road, isStart }) => {
-      const layout = getLaneLayout(road.tags || {});
-      const halfW = (layout.totalWidth / 2) * SCALE_FACTOR;
-      maxHalfW = Math.max(maxHalfW, halfW);
-      const geom = road.geometry;
-      if (geom.length < 2) return;
-
-      let p0, p1;
-      if (isStart) {
-        p0 = toPixel(geom[0].lat, geom[0].lng);
-        p1 = toPixel(geom[1].lat, geom[1].lng);
-      } else {
-        p0 = toPixel(geom[geom.length - 1].lat, geom[geom.length - 1].lng);
-        p1 = toPixel(geom[geom.length - 2].lat, geom[geom.length - 2].lng);
-      }
-
-      // Direction pointing AWAY from junction (into the road body)
-      const dx = p1.x - p0.x;
-      const dy = p1.y - p0.y;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      if (len < 0.001) return;
-
-      const dirX = dx / len;
-      const dirY = dy / len;
-      // Perpendicular (90° of direction)
-      const nx = -dirY;
-      const ny = dirX;
-      const outAngle = Math.atan2(dy, dx);
-
-      arms.push({
-        halfW, dirX, dirY, nx, ny, outAngle,
-        // CW / CCW border points (as seen from above, looking outward)
-        cw:  { x: p0.x + nx * halfW, y: p0.y + ny * halfW },
-        ccw: { x: p0.x - nx * halfW, y: p0.y - ny * halfW },
-      });
-    });
-
-    if (arms.length < 2) continue;
-
-    if (arms.length === 2) {
-      const dot = arms[0].dirX * arms[1].dirX + arms[0].dirY * arms[1].dirY;
-      const clampedDot = Math.max(-1, Math.min(1, dot));
-      const angle = Math.acos(clampedDot);
-
-      // Nearly straight continuation; keep markings as-is to avoid blotches.
-      if (angle > 2.75) continue;
-
-      // For 2-arm joins, avoid circular cleanup fills; they create visible
-      // "bubble" artifacts on segmented trunk/primary roads.
-      continue;
-    }
-
-    // Sort arms by outward angle (ascending → goes clockwise in canvas coords)
-    arms.sort((a, b) => a.outAngle - b.outAngle);
-
-    // Build junction polygon: CCW → CW across each arm, curve to next arm
+const renderJunctions = (ctx, junctionCaps) => {
+  for (const cap of junctionCaps) {
     ctx.beginPath();
-    for (let i = 0; i < arms.length; i++) {
-      const curr = arms[i];
-      const next = arms[(i + 1) % arms.length];
-
-      if (i === 0) ctx.moveTo(curr.ccw.x, curr.ccw.y);
-      // Across the road width
-      ctx.lineTo(curr.cw.x, curr.cw.y);
-
-      // Curved connection from curr.cw → next.ccw (the corner between arms)
-      // Control point = intersection of the two road‐edge lines extended
-      // back toward the junction.
-      const det = curr.dirX * (-next.dirY) - curr.dirY * (-next.dirX);
-
-      if (Math.abs(det) < 0.001) {
-        // Nearly parallel arms – straight line
-        ctx.lineTo(next.ccw.x, next.ccw.y);
-      } else {
-        const dX = next.ccw.x - curr.cw.x;
-        const dY = next.ccw.y - curr.cw.y;
-        const t = (-dX * next.dirY + dY * next.dirX) / det;
-
-        let cpX = curr.cw.x + t * curr.dirX;
-        let cpY = curr.cw.y + t * curr.dirY;
-
-        // Clamp if the corner point flies too far from center
-        const cornerDist = Math.sqrt(
-          (cpX - center.x) ** 2 + (cpY - center.y) ** 2,
-        );
-        if (cornerDist > maxHalfW * 4) {
-          const midX = (curr.cw.x + next.ccw.x) / 2;
-          const midY = (curr.cw.y + next.ccw.y) / 2;
-          cpX = midX * 0.4 + center.x * 0.6;
-          cpY = midY * 0.4 + center.y * 0.6;
-        }
-        ctx.quadraticCurveTo(cpX, cpY, next.ccw.x, next.ccw.y);
-      }
+    for (const command of cap.commands) {
+      if (command.type === 'move') ctx.moveTo(command.x, command.y);
+      else if (command.type === 'line') ctx.lineTo(command.x, command.y);
+      else if (command.type === 'quad') ctx.quadraticCurveTo(command.cx, command.cy, command.x, command.y);
     }
     ctx.closePath();
     ctx.fillStyle = COLORS.road;
     ctx.fill();
 
-    // Small center stitch to hide tiny seams without producing bulbous nodes.
     ctx.beginPath();
-    ctx.arc(center.x, center.y, maxHalfW * 0.28, 0, Math.PI * 2);
+    ctx.arc(cap.center.x, cap.center.y, cap.centerRadius, 0, Math.PI * 2);
     ctx.fill();
   }
 };
@@ -1607,13 +1623,24 @@ const renderFeaturesToCanvas = (
     );
   });
 
-  // Separate vehicle roads from footways/paths for junction detection
+  // Separate vehicle roads from footways/paths for junction detection.
   const vehicleRoads = roads.filter(
     (f) => !["footway", "path", "pedestrian", "cycleway", "steps", "track"].includes(f.tags?.highway)
   );
+  const vehicleRoadNetwork = buildRoadNetwork(vehicleRoads, {
+    layerResolver: getEffectiveRoadLayer,
+  });
+  const vehicleRoadSegments = mergeLinearRoadSegments(
+    vehicleRoadNetwork.segments,
+    vehicleRoadNetwork.intersections,
+    { styleKeyResolver: getTextureCorridorStyleKey },
+  );
+  const drivableRoads = vehicleRoadSegments.length > 0 ? vehicleRoadSegments : vehicleRoads;
+  const stableWidthMap = buildStableTextureWidthMap(drivableRoads);
 
   // Build junction map for vehicle roads
   const junctions = buildJunctionMap(vehicleRoads, (lat, lng) => toPixel(lat, lng));
+  const junctionCaps = buildJunctionCaps(junctions, (lat, lng) => toPixel(lat, lng), SCALE_FACTOR, stableWidthMap);
 
   // Pass 1: Draw footways/paths (BEFORE roads so pavement paints over crossings)
   ctx.lineCap = "butt";
@@ -1641,8 +1668,7 @@ const renderFeaturesToCanvas = (
   });
 
   // Pass 2: Draw vehicle road base pavement (no markings yet)
-  vehicleRoads.forEach((f) => {
-    const layout = getLaneLayout(f.tags || {});
+  drivableRoads.forEach((f) => {
     const geometry = f.geometry;
     let centerPoints = geometry.map((p) => toPixel(p.lat, p.lng));
     centerPoints = subdivideAndSmooth(centerPoints, 3);
@@ -1650,14 +1676,14 @@ const renderFeaturesToCanvas = (
     ctx.beginPath();
     drawPathData(ctx, centerPoints);
     ctx.strokeStyle = COLORS.road;
-    ctx.lineWidth = layout.totalWidth * SCALE_FACTOR;
+    ctx.lineWidth = getStableTextureRoadWidth(f, stableWidthMap) * SCALE_FACTOR;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.stroke();
   });
 
   // Pass 3: Keep junction pavement fill behavior for cleaner intersections.
-  renderJunctions(ctx, junctions, (lat, lng) => toPixel(lat, lng), SCALE_FACTOR);
+  renderJunctions(ctx, junctionCaps);
 
   // 3. Draw Buildings
   const buildings = features.filter((f) => f.type === "building");

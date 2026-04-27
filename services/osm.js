@@ -120,7 +120,7 @@ const buildQuery = (bounds) => {
   // vegetation, crop, orchard, vineyard, material) that overlap with natural/landuse
   // and add significant response weight with minimal 3D rendering value.
   return `
-[out:json][timeout:30][maxsize:134217728];
+[out:json][timeout:15][maxsize:134217728];
 (
   way["highway"](${bbox});
   way["building"](${bbox});

@@ -8,6 +8,7 @@ import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.
 import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
+import { buildRoadNetwork } from './roadNetwork.js';
 import {
   getBeamNGFlavorById,
   getGlobalEnvironmentMap,
@@ -1252,6 +1253,12 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
 function generateDecalRoads(terrainData, squareSize) {
   if (!terrainData.osmFeatures?.length) return [];
 
+  const roadNetwork = buildRoadNetwork(terrainData.osmFeatures.filter((feature) => {
+    if (feature?.type !== 'road' || !feature.geometry?.length) return false;
+    const highway = feature.tags?.highway;
+    return !!highway && !ROAD_SKIP.has(highway);
+  }));
+
   const roadSplinesByName = new Map();
   const segmentCounterByName = new Map();
 
@@ -1268,12 +1275,9 @@ function generateDecalRoads(terrainData, squareSize) {
     return group;
   };
 
-  for (const feature of terrainData.osmFeatures) {
-    if (feature.type !== 'road' || !feature.geometry?.length) continue;
-
-    const highway = feature.tags?.highway;
-    if (!highway || ROAD_SKIP.has(highway)) continue;
-
+  for (const segmentFeature of roadNetwork.segments) {
+    const feature = segmentFeature.sourceFeature;
+    const highway = segmentFeature.highway;
     const rawName = feature.tags?.name || feature.tags?.ref || `Road_${feature.id}`;
     const cleanName = rawName.replace(/[^\w\s-]/g, '').trim() || `Road_${feature.id}`;
     
@@ -1283,7 +1287,7 @@ function generateDecalRoads(terrainData, squareSize) {
 
     // Clip to the terrain's safe inner boundary, splitting at crossings.
     // Then further chunk each segment so no single DecalRoad is too long.
-    const clippedSegments = clipGeometryToMargin(feature.geometry, terrainData.bounds)
+    const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
       .flatMap(s => chunkPolyline(s));
 
     if (clippedSegments.length === 0) continue;
@@ -1537,79 +1541,6 @@ function makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount
 /**
  * Build a stable key for a lat/lng point to support node identity matching.
  */
-function makeLatLngKey(pt, decimals = 7) {
-  return `${Number(pt.lat).toFixed(decimals)}:${Number(pt.lng).toFixed(decimals)}`;
-}
-
-/**
- * Split a polyline at interior nodes whose key is in splitKeys.
- *
- * Used to break long OSM roads at shared intersections so each generated road
- * segment can be independently edited in Road Architect.
- */
-function splitPolylineAtNodeKeys(points, splitKeys) {
-  if (!Array.isArray(points) || points.length < 2 || !splitKeys || splitKeys.size === 0) {
-    return [points];
-  }
-
-  const out = [];
-  let current = [points[0]];
-
-  for (let i = 1; i < points.length; i++) {
-    const pt = points[i];
-    current.push(pt);
-
-    // Split at interior nodes that are shared across roads.
-    if (i < points.length - 1 && splitKeys.has(makeLatLngKey(pt))) {
-      if (current.length >= 2) out.push(current);
-      current = [pt];
-    }
-  }
-
-  if (current.length >= 2) out.push(current);
-  return out;
-}
-
-/**
- * Build a set of node keys that appear in two or more drivable road features.
- */
-function buildRoadIntersectionNodeKeySet(osmFeatures = []) {
-  const counts = new Map();
-  for (const feature of osmFeatures) {
-    if (feature?.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) continue;
-    const highway = feature.tags?.highway;
-    if (!highway || ROAD_SKIP.has(highway)) continue;
-
-    for (const pt of feature.geometry) {
-      const key = makeLatLngKey(pt);
-      counts.set(key, (counts.get(key) || 0) + 1);
-    }
-  }
-
-  const intersectionKeys = new Set();
-  for (const [key, count] of counts.entries()) {
-    if (count >= 2) intersectionKeys.add(key);
-  }
-  return intersectionKeys;
-}
-
-/**
- * Count occurrences of every road node key across OSM road features.
- */
-function buildRoadNodeCountMap(osmFeatures = []) {
-  const counts = new Map();
-  for (const feature of osmFeatures) {
-    if (feature?.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) continue;
-    const highway = feature.tags?.highway;
-    if (!highway || ROAD_SKIP.has(highway)) continue;
-    for (const pt of feature.geometry) {
-      const key = makeLatLngKey(pt);
-      counts.set(key, (counts.get(key) || 0) + 1);
-    }
-  }
-  return counts;
-}
-
 /**
  * Create a Road Architect profile layer representing a pedestrian crossing.
  */
@@ -1939,37 +1870,38 @@ function enrichRoadArchitectCrossroads(roads, intersectionEntries, startSidewalk
 function generateRoadArchitectSession(terrainData, squareSize, levelName) {
   if (!terrainData?.osmFeatures?.length) return null;
 
-  const roadNodeCounts = buildRoadNodeCountMap(terrainData.osmFeatures);
-  const intersectionNodeKeys = new Set();
+  const roadNetwork = buildRoadNetwork(terrainData.osmFeatures.filter((feature) => {
+    if (feature?.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) return false;
+    const highway = feature.tags?.highway;
+    return !!highway && !ROAD_SKIP.has(highway);
+  }));
+
   const fourWayNodeKeys = new Set();
-  for (const [key, count] of roadNodeCounts.entries()) {
-    if (count >= 2) intersectionNodeKeys.add(key);
-    if (count >= 4) fourWayNodeKeys.add(key);
+  for (const [nodeKey, entries] of roadNetwork.intersections.entries()) {
+    const uniqueSegments = new Set(entries.map((entry) => entry.road.id));
+    if (uniqueSegments.size >= 4) fourWayNodeKeys.add(nodeKey);
   }
 
   const roads = [];
   const intersectionEntries = new Map();
 
-  for (const feature of terrainData.osmFeatures) {
-    if (feature.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) continue;
+  for (const segmentFeature of roadNetwork.segments) {
+    const feature = segmentFeature.sourceFeature;
     const tags = feature.tags || {};
-    const highway = tags.highway;
-    if (!highway || ROAD_SKIP.has(highway)) continue;
+    const highway = segmentFeature.highway;
 
     const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
     const isOneWay = isOneWayRoad(tags);
     const halfWidth = estimateRoadHalfWidth(tags, highway, isOneWay, style.width);
     const laneCount = Math.max(1, getDefaultLaneCount(highway, isOneWay));
-    const clippedSegments = clipGeometryToMargin(feature.geometry, terrainData.bounds)
-      .flatMap((segment) => splitPolylineAtNodeKeys(segment, intersectionNodeKeys))
+    const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
       .flatMap((segment) => chunkPolyline(segment, 80));
 
-    for (const segment of clippedSegments) {
+    for (let segmentIndex = 0; segmentIndex < clippedSegments.length; segmentIndex++) {
+      const segment = clippedSegments[segmentIndex];
       const nodes = segment.map((pt) => makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount));
       if (nodes.length < 2) continue;
 
-      const startKey = makeLatLngKey(segment[0]);
-      const endKey = makeLatLngKey(segment[segment.length - 1]);
       const roadIndex = roads.length;
 
       roads.push({
@@ -2016,7 +1948,7 @@ function generateRoadArchitectSession(terrainData, squareSize, levelName) {
       /**
        * Register one road endpoint as a candidate 4-way intersection approach.
        */
-      const addIntersectionEntry = (nodeKey, endpoint) => {
+        const addIntersectionEntry = (nodeKey, endpoint) => {
         if (!fourWayNodeKeys.has(nodeKey)) return;
         const road = roads[roadIndex];
         if (!road || !Array.isArray(road.nodes) || road.nodes.length < 2) return;
@@ -2039,8 +1971,8 @@ function generateRoadArchitectSession(terrainData, squareSize, levelName) {
         intersectionEntries.set(nodeKey, list);
       };
 
-      addIntersectionEntry(startKey, 'start');
-      addIntersectionEntry(endKey, 'end');
+      if (segmentIndex === 0) addIntersectionEntry(segmentFeature.startKey, 'start');
+      if (segmentIndex === clippedSegments.length - 1) addIntersectionEntry(segmentFeature.endKey, 'end');
     }
   }
 
