@@ -275,6 +275,9 @@
     "geoTiff": "GeoTIFF",
     "geoJson": "GeoJSON",
     "osmVectors": "OSM vectors",
+    "cleanupToolNotice": "For a higher-detail workflow, export the GeoTIFF here and use it with ",
+    "cleanupToolLinkLabel": "BeamNG Level Cleanup",
+    "cleanupToolCredit": " to generate a much more detailed map. Tool by AlexKidd.",
     "exportingBeamng": "Exporting BeamNG Level",
     "mayTakeWhile": "This may take a while for large maps"
   },

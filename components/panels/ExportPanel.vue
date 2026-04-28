@@ -383,36 +383,53 @@
           <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">{{ t('exportPanel.geoData') }}</h4>
           <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExportGeo ? 'rotate-180' : '']" />
         </button>
-        <div v-if="showExportGeo" class="grid grid-cols-2 gap-1.5">
-          <!-- GeoTIFF -->
-          <button 
-            @click="downloadGeoTIFF"
-            :disabled="isAnyExporting"
-            class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
-          >
-            <div class="w-full h-full flex items-center justify-center mb-0.5">
-              <Loader2 v-if="isExportingGeoTIFF" :size="20" class="animate-spin text-[#FF6600]" />
-              <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
-            </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.geoTiff') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-          </button>
+        <div v-if="showExportGeo" class="space-y-2">
+          <div class="grid grid-cols-2 gap-1.5">
+            <!-- GeoTIFF -->
+            <button 
+              @click="downloadGeoTIFF"
+              :disabled="isAnyExporting"
+              class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
+            >
+              <div class="w-full h-full flex items-center justify-center mb-0.5">
+                <Loader2 v-if="isExportingGeoTIFF" :size="20" class="animate-spin text-[#FF6600]" />
+                <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+              </div>
+              <span class="text-[11px] font-medium">{{ t('exportPanel.geoTiff') }}</span>
+              <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
+              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            </button>
 
-          <!-- OSM GeoJSON -->
-          <button 
-            @click="downloadOSM"
-            :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isAnyExporting"
-            class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
-          >
-            <div class="w-full h-full flex items-center justify-center mb-0.5">
-              <Loader2 v-if="isExportingOSM" :size="20" class="animate-spin text-[#FF6600]" />
-              <FileJson v-else :size="24" class="text-gray-400 dark:text-gray-500" />
-            </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.geoJson') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.osmVectors') }}</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
-          </button>
+            <!-- OSM GeoJSON -->
+            <button 
+              @click="downloadOSM"
+              :disabled="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0 || isAnyExporting"
+              class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
+            >
+              <div class="w-full h-full flex items-center justify-center mb-0.5">
+                <Loader2 v-if="isExportingOSM" :size="20" class="animate-spin text-[#FF6600]" />
+                <FileJson v-else :size="24" class="text-gray-400 dark:text-gray-500" />
+              </div>
+              <span class="text-[11px] font-medium">{{ t('exportPanel.geoJson') }}</span>
+              <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.osmVectors') }}</span>
+              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            </button>
+          </div>
+
+          <div class="rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-2 text-[10px] text-amber-800 dark:text-amber-300 leading-snug">
+            <p>
+              {{ t('exportPanel.cleanupToolNotice') }}
+              <a
+                href="https://github.com/alexkleinwaechter/BeamNG_LevelCleanUp/releases/tag/1.5.5"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-semibold text-[#FF6600] underline underline-offset-2 hover:text-[#e85d00] transition-colors"
+              >
+                {{ t('exportPanel.cleanupToolLinkLabel') }}
+              </a>
+              {{ t('exportPanel.cleanupToolCredit') }}
+            </p>
+          </div>
         </div>
       </div>
     </template>
