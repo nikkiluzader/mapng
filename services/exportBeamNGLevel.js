@@ -885,12 +885,12 @@ const GLOBAL_DECAL_MATERIALS = {
 const ROAD_TEMPLATES = {
   default: [
     { name: 'asphalt', material: GLOBAL_DECAL_MATERIALS.invisible, widthScale: 1.0, offset: 0, priority: 10 },
-    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: -1.0, priority: 11, isEdge: true },
+    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: -1.0, priority: 11, isEdge: true, mirrorByReversingNodes: true },
     { name: 'edge_right', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: 1.0, priority: 11, isEdge: true },
   ],
   major: [
     { name: 'asphalt', material: GLOBAL_DECAL_MATERIALS.invisible, widthScale: 1.0, offset: 0, priority: 10 },
-    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.5, offset: -1.0, priority: 11, isEdge: true },
+    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.5, offset: -1.0, priority: 11, isEdge: true, mirrorByReversingNodes: true },
     { name: 'edge_right', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.5, offset: 1.0, priority: 11, isEdge: true },
     { name: 'line_center', material: GLOBAL_DECAL_MATERIALS.lineYellowDouble, width: 0.4, offset: 0, priority: 20 },
     { name: 'line_left', material: GLOBAL_DECAL_MATERIALS.lineWhite, width: 0.2, offset: -0.9, priority: 20, isEdgeRelative: true },
@@ -898,7 +898,7 @@ const ROAD_TEMPLATES = {
   ],
   minor: [
     { name: 'asphalt', material: GLOBAL_DECAL_MATERIALS.invisible, widthScale: 1.0, offset: 0, priority: 10 },
-    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: -1.0, priority: 11, isEdge: true },
+    { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: -1.0, priority: 11, isEdge: true, mirrorByReversingNodes: true },
     { name: 'edge_right', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width: 2.0, offset: 1.0, priority: 11, isEdge: true },
     { name: 'line_center', material: GLOBAL_DECAL_MATERIALS.lineWhiteDashed, width: 0.2, offset: 0, priority: 20 },
   ],
@@ -1022,6 +1022,20 @@ function shouldUseGrassEdgeBlend(highway, tags = {}) {
   const surface = String(tags.surface ?? '').trim().toLowerCase();
   // If explicitly unpaved, skip asphalt-grass edge blend.
   if (surface && UNPAVED_SURFACES.has(surface)) return false;
+  return true;
+}
+
+function shouldGenerateDecalRoads(highway, tags = {}) {
+  if (!highway || ROAD_SKIP.has(highway)) return false;
+  if (tags.area === 'yes') return false;
+
+  if (highway === 'service') return false;
+
+  const service = String(tags.service ?? '').trim().toLowerCase();
+  if (['parking_aisle', 'driveway', 'alley', 'emergency_access'].includes(service)) {
+    return false;
+  }
+
   return true;
 }
 
@@ -1185,17 +1199,28 @@ function makeRoadDecal(nodes, name, parentName, props, materialOverride) {
   return decal;
 }
 
+function maybeReverseDecalNodes(nodes, layer) {
+  if (!Array.isArray(nodes) || nodes.length < 2) return nodes;
+  if (!layer?.mirrorByReversingNodes) return nodes;
+  return [...nodes].reverse();
+}
+
 function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parentName) {
   const isUnpaved = UNPAVED_SURFACES.has(tags.surface) || highway === 'track';
+  const laneMarkingsEnabled = shouldUseLaneMarkings(highway, tags);
+  const grassEdgeBlendEnabled = shouldUseGrassEdgeBlend(highway, tags);
   const majorRoad = MAJOR_ROAD_MARKINGS.has(highway);
-  const laneMarkingsEnabled = !tags['lane_markings'] || tags['lane_markings'] !== 'no';
 
   let templateKey = 'default';
   if (isUnpaved) templateKey = 'unpaved';
   else if (majorRoad && laneMarkingsEnabled) templateKey = 'major';
   else if (laneMarkingsEnabled) templateKey = 'minor';
 
-  const layers = ROAD_TEMPLATES[templateKey] || ROAD_TEMPLATES.default;
+  const layers = (ROAD_TEMPLATES[templateKey] || ROAD_TEMPLATES.default).filter((layer) => {
+    if (layer.name.startsWith('edge_')) return grassEdgeBlendEnabled;
+    if (layer.name.startsWith('line_')) return laneMarkingsEnabled;
+    return true;
+  });
   const decals = [];
 
   for (const layer of layers) {
@@ -1207,11 +1232,11 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
       // Offset is multiplier of styleHalfWidth
       offset = layer.offset * styleHalfWidth;
     } else if (layer.isEdge) {
-      // Offset from center to edge center
-      offset = layer.offset * (styleHalfWidth - (layer.width / 2));
+      // Keep the hard edge close to the pavement and let the soft fade run outward.
+      offset = layer.offset * (styleHalfWidth + (width / 2) - 0.15);
     }
 
-    const layeredNodes = offsetNodes(centerNodes, offset, width);
+    const layeredNodes = maybeReverseDecalNodes(offsetNodes(centerNodes, offset, width), layer);
     if (layeredNodes.length < 2) continue;
 
     // Use names that the BeamNG Road Spline Tool recognizes.
@@ -1278,6 +1303,7 @@ function generateDecalRoads(terrainData, squareSize) {
   for (const segmentFeature of roadNetwork.segments) {
     const feature = segmentFeature.sourceFeature;
     const highway = segmentFeature.highway;
+    if (!shouldGenerateDecalRoads(highway, feature.tags || {})) continue;
     const rawName = feature.tags?.name || feature.tags?.ref || `Road_${feature.id}`;
     const cleanName = rawName.replace(/[^\w\s-]/g, '').trim() || `Road_${feature.id}`;
     
