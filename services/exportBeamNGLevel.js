@@ -1029,6 +1029,8 @@ function shouldGenerateDecalRoads(highway, tags = {}) {
   if (!highway || ROAD_SKIP.has(highway)) return false;
   if (tags.area === 'yes') return false;
 
+  if (highway === 'trunk_link') return false;
+
   if (highway === 'service') return false;
 
   const service = String(tags.service ?? '').trim().toLowerCase();
