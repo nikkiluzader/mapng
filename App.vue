@@ -32,8 +32,10 @@
         :generation-cache-key="lastGenerationKey"
         :uploaded-tif-file="uploadedTifFile"
         :uploaded-tif-meta="uploadedTifMeta"
+        :uploaded-area-mode="uploadedAreaMode"
         @location-change="handleLocationChange"
         @resolution-change="store.setResolution"
+        @update:uploaded-area-mode="handleUploadedAreaModeChange"
         @zoom-change="store.setZoom"
         @generate="handleGenerate"
         @fetch-osm="handleFetchOSM"
@@ -90,6 +92,7 @@
             :is-dark-mode="isDarkMode"
             :uploaded-tif-file="uploadedTifFile"
             :uploaded-tif-meta="uploadedTifMeta"
+            :uploaded-area-mode="uploadedAreaMode"
             :surrounding-tile-positions="surroundingTilePositions"
             :batch-grid="batchGridTiles"
             :batch-editable="batchMode && !batchRunning && !showBatchProgress"
@@ -123,6 +126,15 @@
             <Loader2 :size="48" class="text-[#FF6600] animate-spin mx-auto mb-4" />
             <h3 class="text-xl text-gray-900 dark:text-white font-bold mb-2">{{ t('app.processingTerrain') }}</h3>
             <p class="text-gray-600 dark:text-gray-400 text-sm font-medium mb-4 animate-pulse">{{ loadingStatus }}</p>
+            <div v-if="loadingProgressPercent !== null" class="mb-4 w-full max-w-xs mx-auto space-y-1">
+              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                <div class="h-full rounded-full bg-[#FF6600] transition-all duration-300 ease-out" :style="{ width: loadingProgressPercent + '%' }"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                <span>{{ loadingProgressPercent.toFixed(0) }}%</span>
+                <span v-if="loadingProgressDetail">{{ loadingProgressDetail }}</span>
+              </div>
+            </div>
             <div class="text-xs text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
                 <span v-if="resolution >= 2048">{{ t('app.highResolutionWait') }}</span>
                 <span v-if="resolution >= 4096" class="block text-amber-500 mt-1">{{ t('app.veryLargeAreaWait') }}</span>
@@ -188,6 +200,7 @@ import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import { fetchTerrainData, addOSMToTerrain, loadTerrainFromTif, parseTifFile, loadTerrainFromLaz, parseLazFile } from './services/terrain';
+import { computeUploadedCropBounds } from './services/uploadBounds';
 import {
   computeGridTiles,
   computeGridTilesWithOffsets,
@@ -237,6 +250,10 @@ const showDisclaimer = ref(false);
 const showSupportTip = ref(false);
 const devMode = ref(false);
 const supportPromptContext = ref('manual');
+const loadingProgressPercent = ref(null);
+const loadingProgressDetail = ref('');
+const lastLoggedLoadingStatus = ref('');
+const lastLoggedLoadingPercent = ref(-1);
 let abortController = null;
 let batchAbortController = null;
 
@@ -288,6 +305,7 @@ const handleSingleExportSuccess = () => {
 // BYOD — user-uploaded TIF elevation data
 const uploadedTifFile = ref(null);   // File | null
 const uploadedTifMeta = ref(null);   // parseTifFile() result | null
+const uploadedAreaMode = ref(localStorage.getItem('mapng_uploaded_area_mode') || 'native');
 
 // Compute batch grid tiles for map overlay (live preview while configuring)
 const batchGridTiles = computed(() => {
@@ -416,6 +434,7 @@ const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null, el
     gpxz,
     gpxzKeySig: gpxz ? signatureForKey(gpxzKey) : '',
     elevationUnitOverride,
+    uploadedAreaMode: uploadedAreaMode.value,
     // Include file identity so a different upload invalidates the cache
     tif: tifFile ? `${tifFile.name}|${tifFile.size}|${tifFile.lastModified}` : null,
   });
@@ -424,6 +443,8 @@ const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null, el
 const handleTifSelected = async (file) => {
   uploadedTifFile.value = file;
   uploadedTifMeta.value = null;
+  uploadedAreaMode.value = 'native';
+  localStorage.setItem('mapng_uploaded_area_mode', 'native');
   terrainData.value = null;
   lastGenerationKey.value = null;
   try {
@@ -442,6 +463,38 @@ const handleTifSelected = async (file) => {
 const handleTifClear = () => {
   uploadedTifFile.value = null;
   uploadedTifMeta.value = null;
+  uploadedAreaMode.value = 'native';
+  localStorage.setItem('mapng_uploaded_area_mode', 'native');
+};
+
+const handleUploadedAreaModeChange = (value) => {
+  uploadedAreaMode.value = value;
+  localStorage.setItem('mapng_uploaded_area_mode', value);
+};
+
+const applyLoadingUpdate = (update) => {
+  if (typeof update === 'string') {
+    loadingStatus.value = update;
+    loadingProgressPercent.value = null;
+    loadingProgressDetail.value = '';
+  } else if (update && typeof update === 'object') {
+    loadingStatus.value = update.status || loadingStatus.value;
+    loadingProgressPercent.value = Number.isFinite(update.percent) ? update.percent : null;
+    loadingProgressDetail.value = update.detail || '';
+  }
+
+  if (loadingStatus.value && loadingStatus.value !== lastLoggedLoadingStatus.value) {
+    console.info(`[Terrain] ${loadingStatus.value}`);
+    lastLoggedLoadingStatus.value = loadingStatus.value;
+  }
+
+  if (loadingProgressPercent.value !== null) {
+    const rounded = Math.floor(loadingProgressPercent.value / 10) * 10;
+    if (rounded > lastLoggedLoadingPercent.value) {
+      console.info(`[Terrain] ${rounded}% complete${loadingProgressDetail.value ? ` (${loadingProgressDetail.value})` : ''}`);
+      lastLoggedLoadingPercent.value = rounded;
+    }
+  }
 };
 
 const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey, elevationUnitOverride = 'auto') => {
@@ -511,7 +564,11 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
   const { signal } = abortController;
 
   isLoading.value = true;
-  loadingStatus.value = t('app.status.startingGeneration');
+  lastLoggedLoadingStatus.value = '';
+  lastLoggedLoadingPercent.value = -1;
+  loadingProgressPercent.value = null;
+  loadingProgressDetail.value = '';
+  applyLoadingUpdate(t('app.status.startingGeneration'));
   
   // Flush old data to free memory before loading new large datasets
   if (terrainData.value) {
@@ -529,6 +586,9 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
       const isLaz = ext === 'laz' || ext === 'las';
       const meta = uploadedTifMeta.value
         ?? (isLaz ? await parseLazFile(uploadedTifFile.value) : await parseTifFile(uploadedTifFile.value));
+      const targetBounds = uploadedAreaMode.value === 'crop' && meta?.bounds
+        ? computeUploadedCropBounds(center.value, resolution.value, meta.bounds)
+        : null;
       const effectiveCenter = meta.center ?? center.value;
       if (isLaz) {
         data = await loadTerrainFromLaz(
@@ -536,9 +596,13 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
           effectiveCenter,
           resolution.value,
           fetchOSM,
-          (status) => { loadingStatus.value = status; },
+          applyLoadingUpdate,
           signal,
-          { elevationUnitOverride },
+          {
+            elevationUnitOverride,
+            targetBounds,
+            preferNativeCoverage: uploadedAreaMode.value !== 'crop',
+          },
         );
       } else {
         data = await loadTerrainFromTif(
@@ -546,9 +610,13 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
           effectiveCenter,
           resolution.value,
           fetchOSM,
-          (status) => { loadingStatus.value = status; },
+          applyLoadingUpdate,
           signal,
-          { elevationUnitOverride },
+          {
+            elevationUnitOverride,
+            targetBounds,
+            preferNativeCoverage: uploadedAreaMode.value !== 'crop',
+          },
         );
       }
     } else {
@@ -560,7 +628,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
         useGPXZ,
         gpxzApiKey,
         undefined,
-        (status) => { loadingStatus.value = status; },
+        applyLoadingUpdate,
         signal,
       );
     }
@@ -568,19 +636,21 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
     lastGenerationKey.value = requestKey;
     
     if (showPreview) {
-        loadingStatus.value = t('app.status.rendering3d');
+      applyLoadingUpdate(t('app.status.rendering3d'));
         previewMode.value = true;
     }
   } catch (error) {
     if (error.name === 'AbortError') {
       console.log("Terrain generation cancelled.");
-      loadingStatus.value = t('app.status.cancelled');
+      applyLoadingUpdate(t('app.status.cancelled'));
       return;
     }
     console.error("Failed to generate terrain:", error);
     alert(t('app.error.fetchTerrain'));
   } finally {
     isLoading.value = false;
+    loadingProgressPercent.value = null;
+    loadingProgressDetail.value = '';
     abortController = null;
   }
 };

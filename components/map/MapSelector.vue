@@ -42,8 +42,26 @@
       />
       
       <l-rectangle 
-        v-if="selectionBounds && !hasBatchGrid"
+        v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds"
         :bounds="[[selectionBounds.south, selectionBounds.west], [selectionBounds.north, selectionBounds.east]]" 
+        color="#FF6600"
+        :weight="2"
+        :fill-opacity="0.1"
+        :options="{ dashArray: '2, 8', lineCap: 'round' }"
+      />
+
+      <l-rectangle
+        v-if="showUploadedCoverageBounds && !hasBatchGrid"
+        :bounds="[[nativeCoverageBounds.south, nativeCoverageBounds.west], [nativeCoverageBounds.north, nativeCoverageBounds.east]]"
+        color="#3B82F6"
+        :weight="1.5"
+        :fill-opacity="0.04"
+        :options="{ dashArray: '5, 7', lineCap: 'round' }"
+      />
+
+      <l-rectangle
+        v-if="uploadedCropBounds && !hasBatchGrid"
+        :bounds="[[uploadedCropBounds.south, uploadedCropBounds.west], [uploadedCropBounds.north, uploadedCropBounds.east]]"
         color="#FF6600"
         :weight="2"
         :fill-opacity="0.1"
@@ -137,6 +155,7 @@ import { Layers } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getAdjacentBounds, POSITION_LABELS } from '../../services/surroundingTiles';
+import { computeMetricSelectionBounds, computeUploadedCropBounds } from '../../services/uploadBounds';
 
 // Fix Leaflet icon assets
 // @ts-ignore
@@ -159,6 +178,7 @@ const props = defineProps({
   isDarkMode: { type: Boolean, default: false },
   uploadedTifFile: { type: Object, default: null },
   uploadedTifMeta: { type: Object, default: null },
+  uploadedAreaMode: { type: String, default: 'native' },
   surroundingTilePositions: { type: Array, default: () => [] },
   batchGrid: { type: Array, default: () => [] },
   batchEditable: { type: Boolean, default: false },
@@ -240,28 +260,14 @@ const activeSelectionSizeMeters = computed(() => {
 });
 
 const bounds = computed(() => {
-  const center = currentCenter.value;
-  const sizeMeters = activeSelectionSizeMeters.value;
-  
-  const metersPerDegLat = 111320;
-  const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
-  
-  const latSpan = sizeMeters / metersPerDegLat;
-  const lngSpan = sizeMeters / metersPerDegLng;
-  
-  const halfLat = latSpan / 2;
-  const halfLng = lngSpan / 2;
-  
-  const nw = L.latLng(center.lat + halfLat, center.lng - halfLng);
-  const se = L.latLng(center.lat - halfLat, center.lng + halfLng);
-  
+  const metricBounds = computeMetricSelectionBounds(currentCenter.value, activeSelectionSizeMeters.value);
+  if (!metricBounds) return null;
+  const nw = L.latLng(metricBounds.north, metricBounds.west);
+  const se = L.latLng(metricBounds.south, metricBounds.east);
   return L.latLngBounds(nw, se);
 });
 
 const selectionBounds = computed(() => {
-  if (nativeCoverageBounds.value) {
-    return nativeCoverageBounds.value;
-  }
   if (!bounds.value) return null;
   return {
     north: bounds.value.getNorthEast().lat,
@@ -281,6 +287,13 @@ const nativeCoverageBounds = computed(() => {
     east: b.east,
     west: b.west,
   };
+});
+
+const showUploadedCoverageBounds = computed(() => !!nativeCoverageBounds.value);
+
+const uploadedCropBounds = computed(() => {
+  if (!nativeCoverageBounds.value || props.uploadedAreaMode !== 'crop') return null;
+  return computeUploadedCropBounds(currentCenter.value, activeSelectionSizeMeters.value, nativeCoverageBounds.value);
 });
 
 // Compute surrounding tile bounding boxes from current center + resolution

@@ -178,7 +178,7 @@
     "feetIntl": "Stopy (międzynarodowe)",
     "feetUs": "Stopy (US Survey)",
     "removeUploaded": "Usuń przesłany plik",
-    "uploadElevation": "Prześlij wysokość (.tif, .laz, .las)",
+    "uploadElevation": "Prześlij wysokość (.tif, .gml, .xml, .zip, .laz, .las)",
     "pointCloud": "Chmura punktów",
     "metersDetected": "metry wykryte",
     "feetDetected": "stopy wykryte",

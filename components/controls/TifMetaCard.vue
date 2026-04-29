@@ -75,7 +75,7 @@ const rows = computed(() => {
   const m = props.meta || {};
   const list = [];
 
-  list.push({ label: 'Format', value: m.isGeoTiff ? 'GeoTIFF' : 'TIFF (no geo metadata)' });
+  list.push({ label: 'Format', value: m.formatLabel || (m.isGeoTiff ? 'GeoTIFF' : 'TIFF (no geo metadata)') });
 
   if (m.sourceWidth && m.sourceHeight) {
     list.push({ label: 'Source grid', value: `${m.sourceWidth} × ${m.sourceHeight} px` });
@@ -91,7 +91,7 @@ const rows = computed(() => {
 
   if (Number.isFinite(m.nativeMetersPerPixel)) {
     list.push({ label: 'Source resolution', value: fmtMpp(m.nativeMetersPerPixel) });
-    list.push({ label: 'Processing resolution', value: fmtMpp(Math.min(1, Math.max(0.05, m.nativeMetersPerPixel))) });
+    list.push({ label: 'Target grid resolution', value: '1.000 m/px' });
   }
 
   list.push({ label: 'CRS', value: m.epsgCode ? `EPSG:${m.epsgCode}` : 'Unknown / user-defined' });

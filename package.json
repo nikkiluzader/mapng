@@ -16,6 +16,7 @@
     "@vue-leaflet/vue-leaflet": "^0.10.0",
     "@vueuse/core": "^11.0.0",
     "fast-png": "^6.1.0",
+    "fast-xml-parser": "^5.7.2",
     "geotiff": "^2.1.4-beta.1",
     "jszip": "^3.10.1",
     "laz-perf": "^0.0.7",

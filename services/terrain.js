@@ -1234,18 +1234,29 @@ export const loadTerrainFromTif = async (
     generateHybridTextureAsset = true,
     globalTileConcurrency = 20,
     elevationUnitOverride = 'auto',
+    targetBounds = null,
+    preferNativeCoverage = true,
   } = generationOptions || {};
 
   const normalizedCenter = { lat: center.lat, lng: normalizeLng(center.lng) };
+  const emitProgress = (update) => onProgress?.(update);
   let width;
   let height;
   let fetchBounds;
+  const hasTargetBounds = targetBounds && ['north', 'south', 'east', 'west'].every((key) => Number.isFinite(Number(targetBounds[key])));
 
-  onProgress?.('Calculating metric bounds...');
+  emitProgress('Calculating metric bounds...');
 
-  // For georeferenced GeoTIFFs with known native bounds, process the full
-  // native coverage so user uploads retain their complete resolution.
-  if (tifData.bounds && tifData.nativeWidth && tifData.nativeHeight) {
+  if (hasTargetBounds) {
+    width = resolution;
+    height = resolution;
+    fetchBounds = {
+      north: Number(targetBounds.north),
+      south: Number(targetBounds.south),
+      east: normalizeLng(Number(targetBounds.east)),
+      west: normalizeLng(Number(targetBounds.west)),
+    };
+  } else if (preferNativeCoverage && tifData.bounds && tifData.nativeWidth && tifData.nativeHeight) {
     width = tifData.nativeWidth;
     height = tifData.nativeHeight;
     fetchBounds = {
@@ -1281,12 +1292,21 @@ export const loadTerrainFromTif = async (
     for (let ty = satMinTileY; ty <= satMaxTileY; ty++)
       satRequests.push({ tx, ty });
 
-  onProgress?.(`Downloading ${satRequests.length} satellite tiles...`);
+  emitProgress({
+    status: `Downloading ${satRequests.length} satellite tiles...`,
+    percent: 0,
+    detail: `0/${satRequests.length} tiles`,
+  });
   let completed = 0;
   await pMap(satRequests, async ({ tx, ty }) => {
     completed++;
-    if (completed % 10 === 0 || completed === satRequests.length)
-      onProgress?.(`Downloaded ${completed}/${satRequests.length} satellite tiles...`);
+    if (completed % 10 === 0 || completed === satRequests.length) {
+      emitProgress({
+        status: `Downloading ${satRequests.length} satellite tiles...`,
+        percent: (completed / Math.max(1, satRequests.length)) * 100,
+        detail: `${completed}/${satRequests.length} tiles`,
+      });
+    }
     const numTiles = Math.pow(2, SATELLITE_ZOOM);
     const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
     const satUrl = `${SATELLITE_API_URL}/${SATELLITE_ZOOM}/${ty}/${wrappedTx}`;
@@ -1312,7 +1332,8 @@ export const loadTerrainFromTif = async (
 
   // ── Resample TIF heightmap to metric grid ───────────────────────────────────
   signal?.throwIfAborted();
-  onProgress?.('Resampling uploaded TIF to 1m/px...');
+  console.info(`[BYOD] Resampling ${tifData.gridTiles?.length || 1} uploaded tile(s) to ${width}x${height}.`);
+  emitProgress({ status: 'Mapping uploaded elevation to the output grid...', percent: 0 });
 
   let heightMap, finalBounds;
   let finalSatCanvas = null;
@@ -1327,8 +1348,11 @@ export const loadTerrainFromTif = async (
       minTileX: satMinTileX,
       minTileY: satMinTileY,
     };
+    const source = tifData.sourceType === 'grid'
+      ? { type: 'grid', data: { tiles: tifData.gridTiles || [] } }
+      : { type: 'geotiff', data: [{ image: tifData.image, raster: tifData.raster }] };
     const result = await resampleHeightAndImageOffThread(
-      { type: 'geotiff', data: [{ image: tifData.image, raster: tifData.raster }] },
+      source,
       colorSampler,
       normalizedCenter,
       width,
@@ -1338,6 +1362,15 @@ export const loadTerrainFromTif = async (
       null,
       true,
       imageSamplerData,
+      hasTargetBounds ? fetchBounds : null,
+      (progress) => emitProgress({
+        status: progress.message || 'Mapping uploaded elevation to the output grid...',
+        percent: Number.isFinite(progress.percent) ? progress.percent : null,
+        detail: Number.isFinite(progress.current) && Number.isFinite(progress.total)
+          ? `${progress.current}/${progress.total}`
+          : null,
+        stage: progress.stage || null,
+      }),
     );
     heightMap = result.heightMap;
     finalBounds = result.bounds;
@@ -1382,7 +1415,7 @@ export const loadTerrainFromTif = async (
   // ── Resample satellite texture ───────────────────────────────────────────────
   if (!finalSatCanvas) {
     signal?.throwIfAborted();
-    onProgress?.('Resampling satellite texture...');
+    emitProgress({ status: 'Resampling satellite texture...', percent: null, detail: null });
     const imageSamplerData = {
       pixels: satDataImg.data,
       width: satDataImg.width,
@@ -1397,6 +1430,7 @@ export const loadTerrainFromTif = async (
       width,
       height,
       imageSamplerData,
+      hasTargetBounds ? fetchBounds : null,
     );
   }
 
@@ -1418,7 +1452,7 @@ export const loadTerrainFromTif = async (
   let osmRequestInfo = null;
   if (includeOSM) {
     signal?.throwIfAborted();
-    onProgress?.('Fetching OpenStreetMap data...');
+    emitProgress('Fetching OpenStreetMap data...');
     osmFeatures = await fetchOSMData(finalBounds);
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
@@ -1429,7 +1463,7 @@ export const loadTerrainFromTif = async (
     };
   }
 
-  onProgress?.('Finalizing terrain data...');
+  emitProgress('Finalizing terrain data...');
   const satelliteTextureUrl = await canvasToSatelliteBlobUrl(finalSatCanvas);
   finalSatCanvas.width = 0;
   finalSatCanvas.height = 0;
@@ -1488,6 +1522,8 @@ export const loadTerrainFromLaz = async (
     generateHybridTextureAsset   = true,
     globalTileConcurrency        = 20,
     elevationUnitOverride        = 'auto',
+    targetBounds                 = null,
+    preferNativeCoverage         = true,
   } = generationOptions || {};
 
   const normalizedCenter = { lat: center.lat, lng: normalizeLng(center.lng) };
@@ -1500,7 +1536,17 @@ export const loadTerrainFromLaz = async (
   // error that caused terrain/OSM misalignment for non-metric CRS files.
   // Fall back to the user-selected resolution when precise bounds are missing.
   let width, height, fetchBounds;
-  if (lazData.bounds && lazData.nativeWidth && lazData.nativeHeight) {
+  const hasTargetBounds = targetBounds && ['north', 'south', 'east', 'west'].every((key) => Number.isFinite(Number(targetBounds[key])));
+  if (hasTargetBounds) {
+    width = resolution;
+    height = resolution;
+    fetchBounds = {
+      north: Number(targetBounds.north),
+      south: Number(targetBounds.south),
+      east: normalizeLng(Number(targetBounds.east)),
+      west: normalizeLng(Number(targetBounds.west)),
+    };
+  } else if (preferNativeCoverage && lazData.bounds && lazData.nativeWidth && lazData.nativeHeight) {
     width       = lazData.nativeWidth;
     height      = lazData.nativeHeight;
     fetchBounds = {
@@ -1568,10 +1614,16 @@ export const loadTerrainFromLaz = async (
   // ── Rasterize point cloud ─────────────────────────────────────────────────
   signal?.throwIfAborted();
   onProgress?.('Processing point cloud...');
+  const rasterCenter = hasTargetBounds
+    ? {
+        lat: (fetchBounds.north + fetchBounds.south) / 2,
+        lng: (fetchBounds.east + fetchBounds.west) / 2,
+      }
+    : normalizedCenter;
 
   const { heightMap } = await rasterizeLazOffThread(
     lazData,
-    normalizedCenter,
+    rasterCenter,
     width,
     height,
     (current, total, status) => {
@@ -1596,10 +1648,11 @@ export const loadTerrainFromLaz = async (
   };
   const finalSatCanvas = await resampleImageOffThread(
     { sampler: colorSampler },
-    normalizedCenter,
+    rasterCenter,
     width,
     height,
     imageSamplerData,
+    hasTargetBounds ? fetchBounds : null,
   );
 
   // ── Min / Max ─────────────────────────────────────────────────────────────

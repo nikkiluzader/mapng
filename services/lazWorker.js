@@ -14,16 +14,9 @@ import proj4 from 'proj4';
 // Import the worker-specific build (ENVIRONMENT_IS_WORKER=true).
 // WASM is resolved via locateFile → /laz-perf.wasm in public/.
 import { createLazPerf } from 'laz-perf/lib/worker';
+import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
 const NO_DATA = -99999;
-
-// ─── Built-in proj4 strings (no CORS fetch in worker) ────────────────────────
-const getBuiltInProj4 = (code) => {
-  if (code === 3857) return '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +no_defs';
-  if (code >= 32601 && code <= 32660) return `+proj=utm +zone=${code - 32600} +datum=WGS84 +units=m +no_defs`;
-  if (code >= 32701 && code <= 32760) return `+proj=utm +zone=${code - 32700} +south +datum=WGS84 +units=m +no_defs`;
-  return null;
-};
 
 // ─── Classification byte offset by point format ───────────────────────────────
 // Formats 0–5 (LAS 1.0–1.3): classification at byte 15

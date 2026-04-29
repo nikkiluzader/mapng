@@ -49,19 +49,62 @@
         </p>
       </div>
 
-      <!-- When an uploaded source has native dimensions, resolution is driven
-           by the file's native coverage; show an info row instead of dropdown. -->
+      <!-- Uploaded georeferenced sources can use either full native coverage
+           or a user-selected square crop inside that coverage. -->
       <div v-if="nativeDims" class="space-y-1">
+        <div v-if="supportsUploadAreaMode" class="space-y-2">
+          <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.uploadAreaMode') }}</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              @click="$emit('update:uploadedAreaMode', 'native')"
+              :class="[
+                'rounded border px-3 py-2 text-sm font-medium transition-colors',
+                uploadedAreaMode === 'native'
+                  ? 'border-[#FF6600] bg-orange-50 dark:bg-orange-900/20 text-[#FF6600]'
+                  : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
+              ]"
+            >
+              {{ t('controlPanel.fullCoverage') }}
+            </button>
+            <button
+              type="button"
+              @click="$emit('update:uploadedAreaMode', 'crop')"
+              :class="[
+                'rounded border px-3 py-2 text-sm font-medium transition-colors',
+                uploadedAreaMode === 'crop'
+                  ? 'border-[#FF6600] bg-orange-50 dark:bg-orange-900/20 text-[#FF6600]'
+                  : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
+              ]"
+            >
+              {{ t('controlPanel.squareCrop') }}
+            </button>
+          </div>
+        </div>
+
         <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.resolutionOutputSize') }}</label>
-        <div class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
+        <div v-if="uploadedAreaMode !== 'crop'" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
           {{ nativeDims.width }} × {{ nativeDims.height }} px
           <span class="text-[10px] ml-1">({{ t('controlPanel.nativeCoverage', { source: nativeDims.sourceLabel }) }})</span>
         </div>
+        <ResolutionSelector
+          v-else
+          :modelValue="resolution"
+          @update:modelValue="$emit('resolutionChange', $event)"
+          :label="t('controlPanel.resolutionOutputSize')"
+          :allow-experimental16384="devMode"
+          :max-resolution="maxSquareCropResolution"
+        >
+          <p>{{ t('controlPanel.squareCropWithinCoverage') }}</p>
+          <p v-if="uploadedTifMeta?.suggestedResolution">{{ t('controlPanel.suggestedSquareExport', { size: uploadedTifMeta.suggestedResolution }) }}</p>
+        </ResolutionSelector>
         <div class="text-[10px] text-gray-500 dark:text-gray-400 pt-1 space-y-1">
           <p v-if="nativeDims.note" class="text-[#FF6600] font-medium">
             {{ nativeDims.note }}
           </p>
-          <p>{{ t('controlPanel.removeUploadedForCustomResolution') }}</p>
+          <p v-if="supportsUploadAreaMode && uploadedAreaMode !== 'crop'">{{ t('controlPanel.switchToSquareCrop') }}</p>
+          <p v-else-if="supportsUploadAreaMode">{{ t('controlPanel.dragMapToPositionCrop') }}</p>
+          <p v-else>{{ t('controlPanel.removeUploadedForCustomResolution') }}</p>
         </div>
       </div>
 
@@ -221,12 +264,13 @@ import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { exportJobData, importJobData } from '../../services/jobData';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
+import { getMaxSquareCropResolution } from '../../services/uploadBounds';
 
 const { t } = useI18n({ useScope: 'global' });
 
-const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedTifFile', 'uploadedTifMeta']);
+const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedTifFile', 'uploadedTifMeta', 'uploadedAreaMode']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'tifSelected', 'tifClear', 'showSupport', 'exportSuccess']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'tifSelected', 'tifClear', 'showSupport', 'exportSuccess', 'update:uploadedAreaMode']);
 
 const handleLocationChange = (newLocation) => {
   emit('locationChange', { ...props.center, ...newLocation });
@@ -350,9 +394,9 @@ const isLazFileActive = computed(() => {
   return name.endsWith('.laz') || name.endsWith('.las');
 });
 
-const isGeoTiffActive = computed(() => {
+const isGeoReferencedRasterActive = computed(() => {
   if (isLazFileActive.value) return false;
-  return !!props.uploadedTifMeta?.isGeoTiff;
+  return !!props.uploadedTifMeta?.bounds;
 });
 
 // When a LAZ file is active with native dimensions, lock the resolution display
@@ -372,19 +416,28 @@ const lazNativeDims = computed(() => {
 
 // Same native-dimension lock for georeferenced GeoTIFFs.
 const tifNativeDims = computed(() => {
-  if (!isGeoTiffActive.value) return null;
+  if (!isGeoReferencedRasterActive.value) return null;
   const meta = props.uploadedTifMeta;
   if (!meta?.nativeWidth || !meta?.nativeHeight || !meta?.bounds) return null;
   return {
     width: meta.nativeWidth,
     height: meta.nativeHeight,
     cropSize: null,
-    sourceLabel: 'GeoTIFF',
+    sourceLabel: meta?.formatLabel || 'Raster',
     note: null,
   };
 });
 
 const nativeDims = computed(() => lazNativeDims.value || tifNativeDims.value);
+const supportsUploadAreaMode = computed(() => isGeoReferencedRasterActive.value);
+const maxSquareCropResolution = computed(() => getMaxSquareCropResolution(props.uploadedTifMeta, !!props.devMode));
+
+watch([() => props.uploadedAreaMode, maxSquareCropResolution], ([mode, maxResolution]) => {
+  if (mode !== 'crop' || !Number.isFinite(maxResolution) || maxResolution <= 0) return;
+  if (Number(props.resolution) > maxResolution) {
+    emit('resolutionChange', props.uploadedTifMeta?.suggestedResolution || maxResolution);
+  }
+}, { immediate: true });
 
 // Area calculations (resolution is in metres because metersPerPixel = 1)
 const totalWidthMeters = computed(() => props.resolution * metersPerPixel.value);

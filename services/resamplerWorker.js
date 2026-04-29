@@ -9,24 +9,26 @@
  * All data is passed as transferable ArrayBuffers where possible.
  */
 import proj4 from 'proj4';
+import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
 const DEBUG_RESAMPLER = false;
 const debugLog = (...args) => {
     if (DEBUG_RESAMPLER) console.debug(...args);
 };
 
-// ─── Built-in proj4 strings for common CRS (avoids CORS fetch) ──────────────
-const getBuiltInProj4 = (epsgCode) => {
-    if (epsgCode === 3857) {
-        return '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs';
-    }
-    if (epsgCode >= 32601 && epsgCode <= 32660) {
-        return `+proj=utm +zone=${epsgCode - 32600} +datum=WGS84 +units=m +no_defs`;
-    }
-    if (epsgCode >= 32701 && epsgCode <= 32760) {
-        return `+proj=utm +zone=${epsgCode - 32700} +south +datum=WGS84 +units=m +no_defs`;
-    }
-    return null;
+const LARGE_HOLE_SKIP_RATIO = 0.35;
+
+const createProgressReporter = (id) => {
+    const lastPercentByStage = new Map();
+    return ({ stage, message, current = 0, total = 1, force = false }) => {
+        const safeTotal = Math.max(1, total);
+        const percent = Math.max(0, Math.min(100, (current / safeTotal) * 100));
+        const rounded = Math.floor(percent);
+        const previous = lastPercentByStage.get(stage) ?? -1;
+        if (!force && rounded <= previous) return;
+        lastPercentByStage.set(stage, rounded);
+        self.postMessage({ id, type: 'progress', stage, message, current, total: safeTotal, percent });
+    };
 };
 
 // ─── Web Mercator Projection (mirrors terrain.js) ───────────────────────────
@@ -550,6 +552,19 @@ const relaxFilled = (map, width, height, noData, filledMask, iterations = 200) =
     }
 };
 
+const measureNoDataCoverage = (map, noData) => {
+    let missing = 0;
+    for (let index = 0; index < map.length; index++) {
+        const value = map[index];
+        if (value === noData || !Number.isFinite(value)) missing++;
+    }
+    return {
+        missing,
+        total: map.length,
+        ratio: map.length > 0 ? missing / map.length : 0,
+    };
+};
+
 const boxBlurHorizontal = (src, dst, width, height, radius, noData) => {
     for (let y = 0; y < height; y++) {
         const rowOff = y * width;
@@ -639,25 +654,58 @@ const smoothHeightMap = (heightMap, width, height, noData) => {
  *  1. Hole filling  — pushPull seed → expandFill propagation → Laplacian relax
  *  2. Smoothing     — separable box blur (GPXZ coarse-data mode only)
  */
-const finalizeHeightMap = (heightMap, width, height, noData, smooth, fillHoles) => {
+const finalizeHeightMap = (heightMap, width, height, noData, smooth, fillHoles, reportProgress = null) => {
     if (fillHoles) {
+        const noDataCoverage = measureNoDataCoverage(heightMap, noData);
+        if (noDataCoverage.ratio >= LARGE_HOLE_SKIP_RATIO) {
+            reportProgress?.({
+                stage: 'finalize',
+                message: 'Large unmapped regions detected; preserving gaps instead of synthesizing terrain.',
+                current: 3,
+                total: 3,
+                force: true,
+            });
+            console.warn(
+                `[ResamplerWorker] Skipping hole filling for sparse output (${(noDataCoverage.ratio * 100).toFixed(1)}% no-data).`,
+            );
+            return;
+        }
+
+        reportProgress?.({ stage: 'finalize', message: 'Filling gaps in uploaded elevation...', current: 1, total: 3, force: true });
         debugLog('[ResamplerWorker] Hole filling enabled: starting push/pull seed');
         const seededMask = pushPullInpaint(heightMap, width, height, noData);
+        if (!seededMask) {
+            reportProgress?.({
+                stage: 'finalize',
+                message: 'No gaps detected in uploaded elevation.',
+                current: 3,
+                total: 3,
+                force: true,
+            });
+            return;
+        }
+        reportProgress?.({ stage: 'finalize', message: 'Expanding filled gaps...', current: 2, total: 3, force: true });
         const expandedMask = expandFill(heightMap, width, height, noData, 64, 3, seededMask);
         relaxFilled(heightMap, width, height, noData, expandedMask || seededMask, 200);
     }
 
     if (smooth) {
+        reportProgress?.({ stage: 'finalize', message: 'Smoothing uploaded elevation...', current: 3, total: 3, force: true });
         smoothHeightMap(heightMap, width, height, noData);
+    } else if (fillHoles) {
+        reportProgress?.({ stage: 'finalize', message: 'Uploaded elevation cleanup complete.', current: 3, total: 3, force: true });
     }
 };
 
-const resampleHeight = async ({ center, width, height, targetBounds = null, smooth, fillHoles = true, tiles, fallback, epsgDefs }) => {
+const resampleHeight = async ({ id, center, width, height, targetBounds = null, smooth, fillHoles = true, tiles, fallback, epsgDefs }) => {
     const heightMap = new Float32Array(width * height);
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
 
     const NO_DATA = -99999;
+    const reportProgress = createProgressReporter(id);
+    reportProgress({ stage: 'prepare', message: 'Preparing uploaded elevation tiles...', current: 0, total: 1, force: true });
     const preparedGroups = await buildPreparedTileGroups(tiles, epsgDefs, NO_DATA);
+    reportProgress({ stage: 'prepare', message: 'Uploaded elevation tiles ready.', current: 1, total: 1, force: true });
 
     // Main resampling loop
     for (let y = 0; y < height; y++) {
@@ -669,9 +717,17 @@ const resampleHeight = async ({ center, width, height, targetBounds = null, smoo
             if (!Number.isFinite(h) || h <= -200 || h === NO_DATA) h = NO_DATA;
             heightMap[y * width + x] = h;
         }
+        if ((y & 31) === 31 || y === height - 1) {
+            reportProgress({
+                stage: 'sample-height',
+                message: 'Mapping uploaded elevation to the output grid...',
+                current: y + 1,
+                total: height,
+            });
+        }
     }
 
-    finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles);
+    finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles, reportProgress);
 
     return {
         heightMap,
@@ -679,12 +735,15 @@ const resampleHeight = async ({ center, width, height, targetBounds = null, smoo
     };
 };
 
-const resampleHeightAndImage = async ({ center, width, height, targetBounds = null, smooth, fillHoles = true, tiles, fallback, epsgDefs, imageSource }) => {
+const resampleHeightAndImage = async ({ id, center, width, height, targetBounds = null, smooth, fillHoles = true, tiles, fallback, epsgDefs, imageSource }) => {
     const heightMap = new Float32Array(width * height);
     const rgbaBuffer = new Uint8ClampedArray(width * height * 4);
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
     const NO_DATA = -99999;
+    const reportProgress = createProgressReporter(id);
+    reportProgress({ stage: 'prepare', message: 'Preparing uploaded elevation tiles...', current: 0, total: 1, force: true });
     const preparedGroups = await buildPreparedTileGroups(tiles, epsgDefs, NO_DATA);
+    reportProgress({ stage: 'prepare', message: 'Uploaded elevation tiles ready.', current: 1, total: 1, force: true });
 
     for (let y = 0; y < height; y++) {
         const rowOffset = y * width;
@@ -709,9 +768,17 @@ const resampleHeightAndImage = async ({ center, width, height, targetBounds = nu
                 lng,
             );
         }
+        if ((y & 31) === 31 || y === height - 1) {
+            reportProgress({
+                stage: 'sample-height-image',
+                message: 'Mapping uploaded elevation to the output grid...',
+                current: y + 1,
+                total: height,
+            });
+        }
     }
 
-    finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles);
+    finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles, reportProgress);
 
     return {
         heightMap,
@@ -753,13 +820,13 @@ self.onmessage = async (e) => {
 
     try {
         if (type === 'resampleHeight') {
-            const result = await resampleHeight(params);
+            const result = await resampleHeight({ id, ...params });
             self.postMessage(
                 { id, type: 'result', heightMap: result.heightMap, bounds: result.bounds },
                 [result.heightMap.buffer]
             );
         } else if (type === 'resampleHeightAndImage') {
-            const result = await resampleHeightAndImage(params);
+            const result = await resampleHeightAndImage({ id, ...params });
             self.postMessage(
                 {
                     id,

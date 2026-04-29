@@ -266,7 +266,45 @@ export const resampleToMeterGrid = async (
 
     const tiles = [];
 
-    if (source.type === 'geotiff' && source.data) {
+    if ((source.type === 'geotiff' || source.type === 'grid') && source.data) {
+        if (source.type === 'grid') {
+            for (const item of source.data.tiles || []) {
+                let converter = null;
+                if (item.epsgCode) {
+                    const epsg = `EPSG:${item.epsgCode}`;
+                    try {
+                        if (!proj4.defs(epsg)) {
+                            const response = await fetch(`https://epsg.io/${item.epsgCode}.proj4`);
+                            if (response.ok) {
+                                const def = await response.text();
+                                proj4.defs(epsg, def);
+                            }
+                        }
+                        converter = proj4('EPSG:4326', epsg);
+                    } catch (e) {
+                        if (item.epsgCode === 4326) {
+                            converter = { forward: (p) => p };
+                        }
+                    }
+                } else {
+                    converter = { forward: (p) => p };
+                }
+
+                if (converter) {
+                    tiles.push({
+                        raster: item.raster,
+                        width: item.width,
+                        height: item.height,
+                        originX: item.originX,
+                        originY: item.originY,
+                        resX: item.resX,
+                        resY: item.resY,
+                        noData: Number.isFinite(item.noData) ? item.noData : -99999,
+                        converter,
+                    });
+                }
+            }
+        } else {
         for (const item of source.data) {
             const image = item.image;
             const raster = item.raster;
@@ -325,6 +363,7 @@ export const resampleToMeterGrid = async (
                 });
             }
         }
+        }
     }
 
     // Helper for bilinear interpolation
@@ -361,7 +400,7 @@ export const resampleToMeterGrid = async (
 
             let h = -99999; // Match terrain.ts NO_DATA_VALUE
 
-            if (source.type === 'geotiff' && tiles.length > 0) {
+            if ((source.type === 'geotiff' || source.type === 'grid') && tiles.length > 0) {
                 // Try to find a tile that covers this point
                 for (const tile of tiles) {
                     // Convert Lat/Lon to TIFF CRS

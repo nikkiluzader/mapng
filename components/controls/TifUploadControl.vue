@@ -20,11 +20,11 @@
 
       <!-- TIF/TIFF status -->
       <template v-else>
-        <p v-if="uploadedTifMeta?.isGeoTiff && uploadedTifMeta?.center" class="text-[11px] text-emerald-600 dark:text-emerald-400">
-          {{ t('upload.geotiffDetected') }}
+        <p v-if="uploadedTifMeta?.center" class="text-[11px] text-emerald-600 dark:text-emerald-400">
+          {{ detectedStatusLabel }}
         </p>
-        <p v-else-if="uploadedTifMeta?.isGeoTiff" class="text-[11px] text-amber-600 dark:text-amber-400">
-          {{ t('upload.geotiffUnsupported') }}
+        <p v-else-if="uploadedTifMeta?.isGeoReferenced" class="text-[11px] text-amber-600 dark:text-amber-400">
+          {{ unsupportedStatusLabel }}
         </p>
         <p v-else-if="uploadedTifMeta" class="text-[11px] text-amber-600 dark:text-amber-400">
           {{ t('upload.noGeoMetadata') }}
@@ -67,7 +67,7 @@
       <input
         ref="fileInput"
         type="file"
-        accept=".tif,.tiff,.laz,.las"
+        accept=".tif,.tiff,.gml,.xml,.zip,.laz,.las"
         class="sr-only"
         @change="handleFileChange"
       />
@@ -95,6 +95,12 @@ const isLazFile = computed(() => {
   const name = props.uploadedTifFile?.name?.toLowerCase() ?? '';
   return name.endsWith('.laz') || name.endsWith('.las');
 });
+
+const rasterFormatLabel = computed(() => props.uploadedTifMeta?.formatLabel || 'Raster');
+
+const detectedStatusLabel = computed(() => `${rasterFormatLabel.value} - ${t('upload.autoDetected')}`);
+
+const unsupportedStatusLabel = computed(() => `${rasterFormatLabel.value} - ${t('upload.unsupportedCrsUsingSelected')}`);
 
 const ptLabel = computed(() => {
   const count = props.uploadedTifMeta?.pointCount;

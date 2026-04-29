@@ -178,7 +178,7 @@
     "feetIntl": "Fuß (international)",
     "feetUs": "Fuß (US survey)",
     "removeUploaded": "Hochgeladene Datei entfernen",
-    "uploadElevation": "Höhendaten hochladen (.tif, .laz, .las)",
+    "uploadElevation": "Höhendaten hochladen (.tif, .gml, .xml, .zip, .laz, .las)",
     "pointCloud": "Punktwolke",
     "metersDetected": "Meter erkannt",
     "feetDetected": "Fuß erkannt",

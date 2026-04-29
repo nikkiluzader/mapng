@@ -1,19 +1,11 @@
 import proj4 from 'proj4';
-
-const USER_DEFINED_CRS = 32767;
-const UNIT_UNKNOWN = 'unknown';
-const UNIT_METERS = 'meters';
-const UNIT_FEET = 'feet';
-const UNIT_US_SURVEY_FEET = 'us_survey_feet';
-
-const detectUnitFromText = (text) => {
-  if (!text || typeof text !== 'string') return UNIT_UNKNOWN;
-  const t = text.toLowerCase();
-  if (t.includes('us survey foot') || t.includes('us_survey_foot') || t.includes('survey foot')) return UNIT_US_SURVEY_FEET;
-  if (t.includes('international foot') || t.includes('foot') || t.includes('feet') || t.includes('ft')) return UNIT_FEET;
-  if (t.includes('metre') || t.includes('meter') || t.includes('metres') || t.includes('meters')) return UNIT_METERS;
-  return UNIT_UNKNOWN;
-};
+import {
+  detectUnitFromText,
+  getBuiltInProj4,
+  summarizeCoverageBounds,
+  UNIT_UNKNOWN,
+  USER_DEFINED_CRS,
+} from './uploadGeoMetadata.js';
 
 const detectVerticalUnitFromWKT = (wkt) => {
   if (!wkt || typeof wkt !== 'string') return { unit: UNIT_UNKNOWN, source: null };
@@ -32,14 +24,6 @@ const detectVerticalUnitFromWKT = (wkt) => {
 
   return { unit: UNIT_UNKNOWN, source: null };
 };
-
-const getBuiltInProj4 = (code) => {
-  if (code === 3857) return '+proj=merc +a=6378137 +b=6378137 +lat_ts=0 +lon_0=0 +x_0=0 +y_0=0 +k=1 +units=m +nadgrids=@null +no_defs';
-  if (code >= 32601 && code <= 32660) return `+proj=utm +zone=${code - 32600} +datum=WGS84 +units=m +no_defs`;
-  if (code >= 32701 && code <= 32760) return `+proj=utm +zone=${code - 32700} +south +datum=WGS84 +units=m +no_defs`;
-  return null;
-};
-
 /**
  * Return true if an EPSG code is in the CRS (coordinate reference system) range.
  * Codes 7000–7999 are datums/ellipsoids/prime meridians, NOT CRS definitions.
@@ -207,24 +191,7 @@ export const parseLazFile = async (file) => {
   // nativeWidth/Height: rasterize the full file at 1 m/px so no coverage is lost.
   // suggestedResolution: the largest standard power-of-2 that fits entirely inside
   // the file's extent — used as the export/crop area shown as an orange box in 3D.
-  const VALID_RESOLUTIONS = [512, 1024, 2048, 4096, 8192];
-  let nativeWidth = null, nativeHeight = null, suggestedResolution = null, nativeMetersPerPixel = null;
-  if (bounds) {
-    const midLat     = (bounds.north + bounds.south) / 2;
-    const mPerDegLat = 111320;
-    const mPerDegLng = 111320 * Math.cos(midLat * Math.PI / 180);
-    const coverageW  = (bounds.east  - bounds.west)  * mPerDegLng;
-    const coverageH  = (bounds.north - bounds.south) * mPerDegLat;
-    nativeWidth  = Math.round(coverageW);
-    nativeHeight = Math.round(coverageH);
-    const mppX = nativeWidth > 0 ? coverageW / nativeWidth : NaN;
-    const mppY = nativeHeight > 0 ? coverageH / nativeHeight : NaN;
-    const mppAvg = (mppX + mppY) / 2;
-    nativeMetersPerPixel = Number.isFinite(mppAvg) && mppAvg > 0 ? mppAvg : null;
-    const minCoverage = Math.min(coverageW, coverageH);
-    const raw = Math.pow(2, Math.floor(Math.log2(minCoverage)));
-    suggestedResolution = VALID_RESOLUTIONS.filter(r => r <= raw).pop() ?? VALID_RESOLUTIONS[0];
-  }
+  const coverageSummary = summarizeCoverageBounds(bounds);
 
   return {
     buffer,
@@ -241,10 +208,10 @@ export const parseLazFile = async (file) => {
     epsgCode,
     bounds,
     center,
-    nativeWidth,
-    nativeHeight,
-    nativeMetersPerPixel,
-    suggestedResolution,
+    nativeWidth: coverageSummary.nativeWidth,
+    nativeHeight: coverageSummary.nativeHeight,
+    nativeMetersPerPixel: coverageSummary.nativeMetersPerPixel,
+    suggestedResolution: coverageSummary.suggestedResolution,
     fileSize: file.size,
     verticalUnitDetected: detectedVertical.unit,
     verticalUnitDetectionSource: detectedVertical.source,

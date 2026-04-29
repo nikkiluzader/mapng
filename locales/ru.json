@@ -178,7 +178,7 @@
     "feetIntl": "Футы (международные)",
     "feetUs": "Футы (US survey)",
     "removeUploaded": "Удалить загруженный файл",
-    "uploadElevation": "Загрузить высоты (.tif, .laz, .las)",
+    "uploadElevation": "Загрузить высоты (.tif, .gml, .xml, .zip, .laz, .las)",
     "pointCloud": "Облако точек",
     "metersDetected": "обнаружены метры",
     "feetDetected": "обнаружены футы",

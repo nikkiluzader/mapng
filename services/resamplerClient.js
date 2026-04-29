@@ -23,6 +23,10 @@ const getWorker = () => {
             const { id, type, error, ...data } = e.data;
             const pending = pendingMessages.get(id);
             if (!pending) return;
+            if (type === 'progress') {
+                pending.onProgress?.(data);
+                return;
+            }
             pendingMessages.delete(id);
             if (type === 'error') pending.reject(new Error(error));
             else pending.resolve(data);
@@ -45,13 +49,13 @@ const getWorker = () => {
 /**
  * Post a message to the worker and return a promise for the response.
  */
-const postToWorker = (message, transferables = []) => {
+const postToWorker = (message, transferables = [], options = {}) => {
     const w = getWorker();
     if (!w) return null; // signal caller to use fallback
 
     const id = ++messageId;
     return new Promise((resolve, reject) => {
-        pendingMessages.set(id, { resolve, reject });
+        pendingMessages.set(id, { resolve, reject, onProgress: options.onProgress });
         w.postMessage({ ...message, id }, transferables);
     });
 };
@@ -113,6 +117,14 @@ const prepareTiles = (sourceData) => {
     return { tiles, epsgDefs };
 };
 
+const prepareGridTiles = (sourceData) => {
+    if (!sourceData?.tiles) return { tiles: [], epsgDefs: sourceData?.epsgDefs || {} };
+    return {
+        tiles: sourceData.tiles,
+        epsgDefs: sourceData.epsgDefs || {},
+    };
+};
+
 /**
  * Resample heightmap using Web Worker, with main-thread fallback.
  *
@@ -125,7 +137,7 @@ const prepareTiles = (sourceData) => {
  * @param {object|null} fallbackData - { pixels, width, height, zoom, minTileX, minTileY }
  */
 export const resampleHeightMapOffThread = async (
-    source, center, width, height, interpolation, smooth, fallbackData, fillHoles = true, targetBounds = null
+    source, center, width, height, interpolation, smooth, fallbackData, fillHoles = true, targetBounds = null, onProgress = null
 ) => {
     // Attempt worker path
     if (getWorker()) {
@@ -135,6 +147,10 @@ export const resampleHeightMapOffThread = async (
 
             if (source.type === 'geotiff' && source.data) {
                 const prepared = prepareTiles(source.data);
+                tiles = prepared.tiles;
+                epsgDefs = prepared.epsgDefs;
+            } else if (source.type === 'grid' && source.data) {
+                const prepared = prepareGridTiles(source.data);
                 tiles = prepared.tiles;
                 epsgDefs = prepared.epsgDefs;
             }
@@ -170,7 +186,7 @@ export const resampleHeightMapOffThread = async (
                 tiles: tilesForWorker,
                 fallback: fallbackForWorker,
                 epsgDefs,
-            }, transferables);
+            }, transferables, { onProgress });
 
             if (result) {
                 return { heightMap: result.heightMap, bounds: result.bounds };
@@ -196,6 +212,7 @@ export const resampleHeightAndImageOffThread = async (
     fillHoles,
     imageSourceData,
     targetBounds = null,
+    onProgress = null,
 ) => {
     if (getWorker() && imageSourceData) {
         try {
@@ -204,6 +221,10 @@ export const resampleHeightAndImageOffThread = async (
 
             if (source.type === 'geotiff' && source.data) {
                 const prepared = prepareTiles(source.data);
+                tiles = prepared.tiles;
+                epsgDefs = prepared.epsgDefs;
+            } else if (source.type === 'grid' && source.data) {
+                const prepared = prepareGridTiles(source.data);
                 tiles = prepared.tiles;
                 epsgDefs = prepared.epsgDefs;
             }
@@ -241,7 +262,7 @@ export const resampleHeightAndImageOffThread = async (
                 fallback: fallbackForWorker,
                 epsgDefs,
                 imageSource: { ...imageSourceData, pixels: imagePixels },
-            }, transferables);
+            }, transferables, { onProgress });
 
             if (result) {
                 const rgba = new Uint8ClampedArray(result.rgbaBuffer.buffer || result.rgbaBuffer);
@@ -278,6 +299,7 @@ export const resampleHeightAndImageOffThread = async (
             fallbackData,
             fillHoles,
             targetBounds,
+            onProgress,
         ),
         Promise.resolve(safeImageSampler
             ? resampleImageToMeterGrid({ sampler: safeImageSampler }, center, width, height, targetBounds)

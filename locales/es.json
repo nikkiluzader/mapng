@@ -178,7 +178,7 @@
     "feetIntl": "Pies (internacional)",
     "feetUs": "Pies (US survey)",
     "removeUploaded": "Eliminar archivo cargado",
-    "uploadElevation": "Subir elevacion (.tif, .laz, .las)",
+    "uploadElevation": "Subir elevacion (.tif, .gml, .xml, .zip, .laz, .las)",
     "pointCloud": "Nube de puntos",
     "metersDetected": "metros detectados",
     "feetDetected": "pies detectados",
