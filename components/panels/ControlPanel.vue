@@ -5,7 +5,9 @@
       :uploaded-tif-file="uploadedTifFile"
       :uploaded-tif-meta="uploadedTifMeta"
       :vertical-unit-override="elevationUnitOverride"
+      :asc-coordinate-system="uploadedAscCoordinateSystem"
       @update:verticalUnitOverride="(v) => elevationUnitOverride = v"
+      @update:ascCoordinateSystem="(v) => $emit('update:uploadedAscCoordinateSystem', v)"
       @file-selected="$emit('tifSelected', $event)"
       @clear="$emit('tifClear')"
     />
@@ -268,9 +270,9 @@ import { getMaxSquareCropResolution } from '../../services/uploadBounds';
 
 const { t } = useI18n({ useScope: 'global' });
 
-const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedTifFile', 'uploadedTifMeta', 'uploadedAreaMode']);
+const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedTifFile', 'uploadedTifMeta', 'uploadedAscCoordinateSystem', 'uploadedAreaMode']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'tifSelected', 'tifClear', 'showSupport', 'exportSuccess', 'update:uploadedAreaMode']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'tifSelected', 'tifClear', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedAreaMode']);
 
 const handleLocationChange = (newLocation) => {
   emit('locationChange', { ...props.center, ...newLocation });

@@ -32,9 +32,11 @@
         :generation-cache-key="lastGenerationKey"
         :uploaded-tif-file="uploadedTifFile"
         :uploaded-tif-meta="uploadedTifMeta"
+        :uploaded-asc-coordinate-system="uploadedAscCoordinateSystem"
         :uploaded-area-mode="uploadedAreaMode"
         @location-change="handleLocationChange"
         @resolution-change="store.setResolution"
+        @update:uploaded-asc-coordinate-system="handleUploadedAscCoordinateSystemChange"
         @update:uploaded-area-mode="handleUploadedAreaModeChange"
         @zoom-change="store.setZoom"
         @generate="handleGenerate"
@@ -200,6 +202,7 @@ import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import { fetchTerrainData, addOSMToTerrain, loadTerrainFromTif, parseTifFile, loadTerrainFromLaz, parseLazFile } from './services/terrain';
+import { applyAscCoordinateSystem } from './services/ascLoader.js';
 import { computeUploadedCropBounds } from './services/uploadBounds';
 import {
   computeGridTiles,
@@ -306,6 +309,19 @@ const handleSingleExportSuccess = () => {
 const uploadedTifFile = ref(null);   // File | null
 const uploadedTifMeta = ref(null);   // parseTifFile() result | null
 const uploadedAreaMode = ref(localStorage.getItem('mapng_uploaded_area_mode') || 'native');
+const uploadedAscCoordinateSystem = ref(localStorage.getItem('mapng_uploaded_asc_crs') || 'auto');
+
+const applyAscCoordinateSelection = async (meta) => {
+  if (!meta || meta.sourceFormat !== 'asc') return meta;
+
+  const selected = String(uploadedAscCoordinateSystem.value || 'auto').toLowerCase();
+  if (selected === 'auto') return meta;
+
+  const epsgCode = Number(selected);
+  if (!Number.isFinite(epsgCode)) return meta;
+
+  return applyAscCoordinateSystem(meta, epsgCode);
+};
 
 // Compute batch grid tiles for map overlay (live preview while configuring)
 const batchGridTiles = computed(() => {
@@ -434,6 +450,7 @@ const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null, el
     gpxz,
     gpxzKeySig: gpxz ? signatureForKey(gpxzKey) : '',
     elevationUnitOverride,
+    uploadedAscCoordinateSystem: uploadedAscCoordinateSystem.value,
     uploadedAreaMode: uploadedAreaMode.value,
     // Include file identity so a different upload invalidates the cache
     tif: tifFile ? `${tifFile.name}|${tifFile.size}|${tifFile.lastModified}` : null,
@@ -445,6 +462,8 @@ const handleTifSelected = async (file) => {
   uploadedTifMeta.value = null;
   uploadedAreaMode.value = 'native';
   localStorage.setItem('mapng_uploaded_area_mode', 'native');
+  uploadedAscCoordinateSystem.value = 'auto';
+  localStorage.setItem('mapng_uploaded_asc_crs', 'auto');
   terrainData.value = null;
   lastGenerationKey.value = null;
   try {
@@ -452,9 +471,10 @@ const handleTifSelected = async (file) => {
     const meta = (ext === 'laz' || ext === 'las')
       ? await parseLazFile(file)
       : await parseTifFile(file);
-    uploadedTifMeta.value = meta;
+    const resolvedMeta = await applyAscCoordinateSelection(meta);
+    uploadedTifMeta.value = resolvedMeta;
     // Auto-centre map if the file contains coordinate metadata
-    if (meta.center) store.setCenter(meta.center);
+    if (resolvedMeta.center) store.setCenter(resolvedMeta.center);
   } catch (e) {
     console.warn('[BYOD] Failed to read file metadata:', e);
   }
@@ -465,6 +485,31 @@ const handleTifClear = () => {
   uploadedTifMeta.value = null;
   uploadedAreaMode.value = 'native';
   localStorage.setItem('mapng_uploaded_area_mode', 'native');
+  uploadedAscCoordinateSystem.value = 'auto';
+  localStorage.setItem('mapng_uploaded_asc_crs', 'auto');
+};
+
+const handleUploadedAscCoordinateSystemChange = async (value) => {
+  uploadedAscCoordinateSystem.value = value;
+  localStorage.setItem('mapng_uploaded_asc_crs', value);
+
+  const file = uploadedTifFile.value;
+  if (!file) return;
+  const ext = file.name.toLowerCase().split('.').pop();
+  if (ext !== 'asc') return;
+
+  try {
+    const baseMeta = await parseTifFile(file);
+    const resolvedMeta = await applyAscCoordinateSelection(baseMeta);
+    uploadedTifMeta.value = resolvedMeta;
+    if (resolvedMeta.center) {
+      store.setCenter(resolvedMeta.center);
+    }
+    terrainData.value = null;
+    lastGenerationKey.value = null;
+  } catch (error) {
+    console.warn('[BYOD] Failed to re-parse ASC metadata after CRS change:', error);
+  }
 };
 
 const handleUploadedAreaModeChange = (value) => {

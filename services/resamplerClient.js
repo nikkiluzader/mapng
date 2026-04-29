@@ -119,8 +119,64 @@ const prepareTiles = (sourceData) => {
 
 const prepareGridTiles = (sourceData) => {
     if (!sourceData?.tiles) return { tiles: [], epsgDefs: sourceData?.epsgDefs || {} };
+    const tiles = sourceData.tiles
+        .map((tile) => {
+            const width = Number(tile?.width);
+            const height = Number(tile?.height);
+            if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 1 || height <= 1) {
+                return null;
+            }
+
+            let originX = Number(tile?.originX);
+            let originY = Number(tile?.originY);
+            let resX = Number(tile?.resX);
+            let resY = Number(tile?.resY);
+            const bounds = tile?.bounds;
+
+            // Backward compatibility: derive affine grid params from geographic bounds
+            // when tile metadata predates origin/res fields.
+            if (
+                (!Number.isFinite(originX) || !Number.isFinite(originY) || !Number.isFinite(resX) || !Number.isFinite(resY))
+                && bounds
+            ) {
+                const west = Number(bounds.west);
+                const east = Number(bounds.east);
+                const south = Number(bounds.south);
+                const north = Number(bounds.north);
+                if ([west, east, south, north].every(Number.isFinite)) {
+                    originX = west;
+                    originY = north;
+                    resX = (east - west) / width;
+                    resY = (south - north) / height;
+                }
+            }
+
+            if (!Number.isFinite(originX) || !Number.isFinite(originY) || !Number.isFinite(resX) || !Number.isFinite(resY)) {
+                return null;
+            }
+
+            const noData = Number.isFinite(tile?.noData) ? Number(tile.noData) : -99999;
+            const epsgCode = Number.isFinite(tile?.epsgCode) ? Number(tile.epsgCode) : null;
+            const raster = tile?.raster instanceof Float32Array
+                ? new Float32Array(tile.raster)
+                : new Float32Array(tile?.raster || []);
+
+            return {
+                raster,
+                width,
+                height,
+                originX,
+                originY,
+                resX,
+                resY,
+                noData,
+                epsgCode,
+            };
+        })
+        .filter(Boolean);
+
     return {
-        tiles: sourceData.tiles,
+        tiles,
         epsgDefs: sourceData.epsgDefs || {},
     };
 };

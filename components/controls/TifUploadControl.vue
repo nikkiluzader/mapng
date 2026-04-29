@@ -34,18 +34,32 @@
         </p>
       </template>
 
-      <div v-if="uploadedTifMeta" class="mt-2 flex items-center gap-2">
-        <label class="text-[10px] text-blue-700 dark:text-blue-300">{{ t('upload.elevationUnits') }}</label>
-        <select
-          :value="verticalUnitOverride"
-          @change="$emit('update:verticalUnitOverride', $event.target.value)"
-          class="text-[10px] rounded border border-blue-200 dark:border-blue-700 bg-white dark:bg-blue-900/30 px-1.5 py-0.5 text-blue-800 dark:text-blue-200"
-        >
-          <option value="auto">{{ t('upload.auto') }} ({{ detectedUnitLabel }})</option>
-          <option value="meters">{{ t('upload.meters') }}</option>
-          <option value="feet">{{ t('upload.feetIntl') }}</option>
-          <option value="us_survey_feet">{{ t('upload.feetUs') }}</option>
-        </select>
+      <div v-if="uploadedTifMeta" class="mt-2 space-y-1.5">
+        <div class="flex items-center gap-2">
+          <label class="w-24 shrink-0 text-[11px] font-medium text-blue-700 dark:text-blue-300">{{ t('upload.elevationUnits') }}</label>
+          <select
+            :value="verticalUnitOverride"
+            @change="$emit('update:verticalUnitOverride', $event.target.value)"
+            class="flex-1 min-w-0 text-[11px] rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+          >
+            <option value="auto">{{ t('upload.auto') }} ({{ detectedUnitLabel }})</option>
+            <option value="meters">{{ t('upload.meters') }}</option>
+            <option value="feet">{{ t('upload.feetIntl') }}</option>
+            <option value="us_survey_feet">{{ t('upload.feetUs') }}</option>
+          </select>
+        </div>
+
+        <div v-if="showAscCoordinateSelector" class="flex items-center gap-2">
+          <label class="w-24 shrink-0 text-[11px] font-medium text-blue-700 dark:text-blue-300">{{ t('upload.coordinateSystem') }}</label>
+          <select
+            :value="ascCoordinateSystem"
+            @change="$emit('update:ascCoordinateSystem', $event.target.value)"
+            class="flex-1 min-w-0 text-[11px] rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+          >
+            <option value="auto">{{ t('upload.auto') }}</option>
+            <option value="2180">{{ t('upload.crsPl1992') }}</option>
+          </select>
+        </div>
       </div>
     </div>
     <button
@@ -67,7 +81,7 @@
       <input
         ref="fileInput"
         type="file"
-        accept=".tif,.tiff,.gml,.xml,.zip,.laz,.las"
+        accept=".tif,.tiff,.asc,.gml,.xml,.zip,.laz,.las"
         class="sr-only"
         @change="handleFileChange"
       />
@@ -86,9 +100,10 @@ const props = defineProps({
   uploadedTifFile: { type: Object, default: null },
   uploadedTifMeta: { type: Object, default: null },
   verticalUnitOverride: { type: String, default: 'auto' },
+  ascCoordinateSystem: { type: String, default: 'auto' },
 });
 
-const emit = defineEmits(['file-selected', 'clear', 'update:verticalUnitOverride']);
+const emit = defineEmits(['file-selected', 'clear', 'update:verticalUnitOverride', 'update:ascCoordinateSystem']);
 const fileInput = ref(null);
 
 const isLazFile = computed(() => {
@@ -116,6 +131,8 @@ const detectedUnitLabel = computed(() => {
   if (u === 'us_survey_feet') return t('upload.usFeetDetected');
   return t('upload.unknownDefaultMeters');
 });
+
+const showAscCoordinateSelector = computed(() => props.uploadedTifMeta?.sourceFormat === 'asc');
 
 const handleFileChange = (e) => {
   const file = e.target.files?.[0];

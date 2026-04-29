@@ -1,5 +1,6 @@
 import * as GeoTIFF from 'geotiff';
 import { isLikelyGmlText, parseGmlFile, parseGmlText, parseGmlZipFile } from './gmlLoader.js';
+import { parseAscFile, parseAscText } from './ascLoader.js';
 import {
   computeGeoMetadata,
   detectUnitFromText,
@@ -10,7 +11,7 @@ import {
   USER_DEFINED_CRS,
 } from './uploadGeoMetadata.js';
 
-export { parseGmlText };
+export { parseGmlText, parseAscText };
 
 const mapLinearUnitCode = (code) => {
   if (code === 9001) return UNIT_METERS;
@@ -33,6 +34,9 @@ const mapLinearUnitCode = (code) => {
  */
 export const parseTifFile = async (file) => {
   const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith('.asc')) {
+    return parseAscFile(file);
+  }
   if (lowerName.endsWith('.zip')) {
     return parseGmlZipFile(file);
   }
