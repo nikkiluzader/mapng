@@ -24,5 +24,6 @@ dist-ssr
 *.sw?
 references/
 refs/
+tests/
 .codex
 BASE_LEVEL.zip
