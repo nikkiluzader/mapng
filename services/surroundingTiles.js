@@ -245,6 +245,7 @@ export const fetchSurroundingTiles = async (
         false,
         elevationSource === 'usgs1m',
         elevationSource === 'gpxz',
+        false,
         elevationSource === 'gpxz' ? gpxzApiKey : '',
         undefined,
         undefined,

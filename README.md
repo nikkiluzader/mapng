@@ -20,7 +20,7 @@ It is built for modding workflows, not survey-grade terrain reconstruction. The 
 ## Current Highlights
 
 - 1 meter per pixel terrain grids from `512` to `8192`
-- Multiple elevation sources: global standard DEM, USGS 1 m in the US, and GPXZ
+- Multiple elevation sources: global standard DEM, NMT EVRF2007 in Poland, USGS 1 m in the US, and GPXZ
 - Satellite, OSM, hybrid, segmented, and road mask texture exports
 - 3D preview with buildings, vegetation, barriers, and surrounding terrain
 - GLB, DAE, GeoTIFF, GeoJSON, BeamNG `.ter`, and `.mapng` session exports
@@ -67,6 +67,7 @@ This helps keep community resource hubs focused on curated, polished releases wh
 | Source | Purpose |
 |---|---|
 | AWS Terrarium / SRTM | Default global elevation |
+| GUGiK NMT EVRF2007 (Poland) | High-resolution Poland elevation tiles |
 | USGS TNM Access API | 1 m US elevation where available |
 | GPXZ | Optional premium higher-resolution elevation |
 | Esri World Imagery | Satellite textures |

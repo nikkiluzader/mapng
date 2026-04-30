@@ -55,6 +55,8 @@
     "online": "EN LIGNE",
     "offline": "HORS LIGNE",
     "usgsDescription": "Données haute precision pour les USA. Bascule vers Standard si les données sont absentes/corrompues.",
+    "kron86Poland": "NMT EVRF2007 (Pologne uniquement)",
+    "kron86Description": "Source d'index NMT EVRF2007 de GUGiK. Bascule vers Standard si les tuiles sont indisponibles ou non prises en charge.",
     "gpxzPremium": "GPXZ (Premium mondial)",
     "gpxzDescription": "Données mondiales de la meilleure qualite. Cle API requise.",
     "checkCoverage": "Vérifier la couverture",
@@ -638,7 +640,8 @@
       "fetchTerrain": "Échec de la recuperation des données de terrain. La zone demandee est peut-etre trop grande ou le service est indisponible.",
       "batchCacheCleared": "Cache du lot vide.",
       "batchCacheClearFailed": "Échec du nettoyage du cache du lot.",
-      "usgsFallback": "Les données USGS 1m pour cette zone etaient absentes ou corrompues. Bascule vers le jeu de données Terrarium Standard.\n\nLa sortie reste sur la grille de traitement 1m/px de l'application."
+      "usgsFallback": "Les données USGS 1m pour cette zone etaient absentes ou corrompues. Bascule vers le jeu de données Terrarium Standard.\n\nLa sortie reste sur la grille de traitement 1m/px de l'application.",
+      "kron86Fallback": "Les données NMT EVRF2007 ne sont disponibles que pour les tuiles prises en charge en Pologne. Bascule vers le jeu de données Terrarium Standard."
     }
   },
   "support": {

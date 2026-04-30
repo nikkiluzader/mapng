@@ -32,7 +32,7 @@
       :use-gpxz="useGPXZ"
       :gpxz-api-key="gpxzApiKey"
       :has-custom-elevation="!!uploadedTifFile"
-      @generate="(preview) => $emit('generate', preview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey, elevationUnitOverride)"
+      @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride)"
     />
 
     <!-- Output Settings -->
@@ -384,6 +384,9 @@ watch(() => props.terrainData, (newData) => {
   if (newData?.usgsFallback) {
     elevationSource.value = 'default';
     alert(t('app.error.usgsFallback'));
+  } else if (newData?.kron86Fallback) {
+    elevationSource.value = 'default';
+    alert(t('app.error.kron86Fallback'));
   }
 });
 
@@ -446,6 +449,16 @@ const totalWidthMeters = computed(() => props.resolution * metersPerPixel.value)
 const totalAreaSqM = computed(() => totalWidthMeters.value * totalWidthMeters.value);
 const areaSqKm = computed(() => totalAreaSqM.value / 1000000);
 
+const signatureForKey = (key) => {
+  if (!key) return '';
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+};
+
 // True when the current UI params exactly match the last successful generation,
 // so the user can skip re-fetching and go straight to export.
 const isCached = computed(() => {
@@ -456,9 +469,8 @@ const isCached = computed(() => {
     lng: props.center.lng,
     resolution: props.resolution,
     osm: fetchOSM.value,
-    usgs: useUSGS.value,
-    gpxz: useGPXZ.value,
-    gpxzKey: useGPXZ.value ? gpxzApiKey.value : '',
+    elevationSource: elevationSource.value,
+    gpxzKeySig: elevationSource.value === 'gpxz' ? signatureForKey(gpxzApiKey.value) : '',
   });
   return currentKey === props.generationCacheKey;
 });
@@ -600,14 +612,17 @@ const applyRunConfiguration = (config) => {
   }
 
   const explicitSource = typeof src.elevationSource === 'string' ? src.elevationSource.toLowerCase() : null;
-  if (explicitSource && ['default', 'usgs', 'gpxz'].includes(explicitSource)) {
+  if (explicitSource && ['default', 'usgs', 'gpxz', 'kron86'].includes(explicitSource)) {
     elevationSource.value = explicitSource;
   } else {
     // Legacy fallback for shared configs that only include useUSGS/useGPXZ booleans.
     const useUSGSValue = toBooleanOrNull(src.useUSGS);
     const useGPXZValue = toBooleanOrNull(src.useGPXZ);
+    const useKRON86Value = toBooleanOrNull(src.useKRON86 ?? src.useKron86);
     if (useGPXZValue === true) {
       elevationSource.value = 'gpxz';
+    } else if (useKRON86Value === true) {
+      elevationSource.value = 'kron86';
     } else if (useUSGSValue === true) {
       elevationSource.value = 'usgs';
     }

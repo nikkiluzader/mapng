@@ -2373,6 +2373,9 @@ function resolveElevationSourceLabel(terrainData, selectedElevationSource) {
     return terrainData?.usgsFallback ? 'USGS requested, fell back to default/WGS84 source' : 'USGS';
   }
   if (normalized === 'gpxz') return 'GPXZ';
+  if (normalized === 'kron86') {
+    return terrainData?.kron86Fallback ? 'NMT EVRF2007 requested, fell back to default/WGS84 source' : 'NMT EVRF2007 (Poland)';
+  }
   if (normalized === 'default') {
     return sourceGeoTiffsSource ? `Default (${String(sourceGeoTiffsSource).toUpperCase()})` : 'Default/WGS84';
   }

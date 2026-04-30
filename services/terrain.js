@@ -11,6 +11,7 @@ import {
   resampleImageOffThread,
 } from "./resamplerClient";
 import { createLocalToWGS84 } from "./geoUtils";
+import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
 
 // Constants
 const TILE_SIZE = 256;
@@ -729,6 +730,7 @@ const canvasToSatelliteBlobUrl = async (srcCanvas) => {
  * @param {boolean}  includeOSM         - Fetch OSM features and generate textures
  * @param {boolean}  useUSGS            - Attempt USGS 1 m DEM first
  * @param {boolean}  useGPXZ            - Attempt GPXZ hires elevation first
+ * @param {boolean}  useKRON86          - Attempt KRON86 (Poland only) first
  * @param {string}   gpxzApiKey         - GPXZ API key (required when useGPXZ)
  * @param {string}   [baseColor]        - Tint for OSM texture generation
  * @param {Function} [onProgress]       - Callback(statusString) for UI progress updates
@@ -742,6 +744,7 @@ export const fetchTerrainData = async (
   includeOSM = false,
   useUSGS = false,
   useGPXZ = false,
+  useKRON86 = false,
   gpxzApiKey = "",
   baseColor = undefined,
   onProgress,
@@ -779,7 +782,10 @@ export const fetchTerrainData = async (
 
   // 2. Try GPXZ / USGS
   let rawData = null;
+  let rawDataSourceType = null;
   let usgsFallback = false;
+  let kron86Fallback = false;
+  let kron86FallbackReason = null;
   let shouldSmooth = false;
   let gpxzChunkFailures = false;
   let sourceGeoTiffs = undefined;
@@ -789,6 +795,7 @@ export const fetchTerrainData = async (
     const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress, signal);
     if (gpxzResult) {
       rawData = gpxzResult.data;
+      rawDataSourceType = "geotiff";
       shouldSmooth = gpxzResult.smooth;
       gpxzChunkFailures = !!gpxzResult.hadChunkFailures;
       if (keepSourceGeoTiffs) {
@@ -796,6 +803,34 @@ export const fetchTerrainData = async (
           arrayBuffers: gpxzResult.rawArrayBuffers,
           source: "gpxz",
         };
+      }
+    }
+  }
+
+  if (!rawData && useKRON86) {
+    if (!isWithinKron86Coverage(fetchBounds)) {
+      kron86Fallback = true;
+      kron86FallbackReason = 'outside_poland';
+      onProgress?.('NMT EVRF2007 covers Poland only. Falling back to global elevation tiles...');
+    } else {
+      onProgress?.('Fetching NMT EVRF2007 elevation index (Poland)...');
+      try {
+        const kron86Result = await fetchKron86GridForBounds(fetchBounds, { onProgress, signal });
+        if (kron86Result?.gridMeta?.gridTiles?.length) {
+          rawData = {
+            tiles: kron86Result.gridMeta.gridTiles,
+          };
+          rawDataSourceType = 'grid';
+        } else {
+          kron86Fallback = true;
+          kron86FallbackReason = kron86Result?.fallbackReason || 'unavailable';
+          onProgress?.('NMT EVRF2007 data was unavailable for this area. Falling back to global elevation tiles...');
+        }
+      } catch (error) {
+        console.warn('[NMT-EVRF2007] Failed to load NMT EVRF2007 elevation data:', error);
+        kron86Fallback = true;
+        kron86FallbackReason = 'request_failed';
+        onProgress?.('NMT EVRF2007 request failed. Falling back to global elevation tiles...');
       }
     }
   }
@@ -1111,10 +1146,10 @@ export const fetchTerrainData = async (
 
   const { heightMap, bounds: finalBounds, canvas: finalSatCanvas } = await resampleHeightAndImageOffThread(
     {
-      type: rawData ? "geotiff" : "sampler",
+      type: rawData ? (rawDataSourceType || "geotiff") : "sampler",
       data: rawData || undefined,
       sampler: heightSampler || undefined,
-      transferRasters: !!rawData,
+      transferRasters: !!rawData && (rawDataSourceType === "geotiff"),
     },
     colorSampler,
     normalizedCenter,
@@ -1176,6 +1211,8 @@ export const fetchTerrainData = async (
     osmFeatures,
     osmRequestInfo,
     usgsFallback,
+    kron86Fallback,
+    kron86FallbackReason,
     sourceGeoTiffs,
   };
 

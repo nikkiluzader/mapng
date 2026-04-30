@@ -55,6 +55,8 @@
     "online": "EN LINEA",
     "offline": "FUERA DE LINEA",
     "usgsDescription": "Datos de alta precision para USA. Vuelve a Estandar si faltan datos o estan corruptos.",
+    "kron86Poland": "NMT EVRF2007 (solo Polonia)",
+    "kron86Description": "Fuente de indice NMT EVRF2007 de GUGiK. Vuelve a Estandar si los mosaicos no estan disponibles o no son compatibles.",
     "gpxzPremium": "GPXZ (Global Premium)",
     "gpxzDescription": "Datos globales de mayor calidad. Requiere API Key.",
     "checkCoverage": "Ver cobertura",
@@ -639,7 +641,8 @@
       "fetchTerrain": "No se pudieron obtener datos del terreno. El area solicitada puede ser demasiado grande o el servicio no esta disponible.",
       "batchCacheCleared": "Cache de lote limpiada.",
       "batchCacheClearFailed": "No se pudo limpiar la cache de lote.",
-      "usgsFallback": "Los datos USGS 1m para esta zona faltan o estan corruptos. Se usara el dataset Terrarium Estandar.\n\nLa salida se mantiene en la malla de procesamiento de 1m/px de la app."
+      "usgsFallback": "Los datos USGS 1m para esta zona faltan o estan corruptos. Se usara el dataset Terrarium Estandar.\n\nLa salida se mantiene en la malla de procesamiento de 1m/px de la app.",
+      "kron86Fallback": "Los datos NMT EVRF2007 solo estan disponibles para mosaicos compatibles de Polonia. Se usara el dataset Terrarium Estandar."
     }
   },
   "support": {

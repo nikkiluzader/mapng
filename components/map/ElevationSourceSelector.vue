@@ -23,6 +23,17 @@
             </div>
         </label>
 
+        <!-- NMT EVRF2007 -->
+        <label class="flex items-start gap-2 cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors">
+          <input type="radio" v-model="localElevationSource" value="kron86" class="mt-0.5 accent-[#FF6600]" />
+          <div class="space-y-0.5">
+            <span class="block text-xs font-medium text-gray-900 dark:text-white">{{ t('map.kron86Poland') }}</span>
+            <span class="block text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+            {{ t('map.kron86Description') }}
+            </span>
+          </div>
+        </label>
+
         <!-- USGS -->
         <label class="flex items-start gap-2 cursor-pointer p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors">
             <input type="radio" v-model="localElevationSource" value="usgs" class="mt-0.5 accent-[#FF6600]" />

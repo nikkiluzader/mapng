@@ -55,6 +55,8 @@
     "online": "ONLINE",
     "offline": "OFFLINE",
     "usgsDescription": "Hochpräzise Daten für die USA. Fallback auf Standard, wenn Daten fehlen/beschädigt sind.",
+    "kron86Poland": "NMT EVRF2007 (nur Polen)",
+    "kron86Description": "GUGiK NMT EVRF2007-Indexquelle. Fallback auf Standard, wenn Kacheln nicht verfügbar oder nicht unterstützt sind.",
     "gpxzPremium": "GPXZ (Premium global)",
     "gpxzDescription": "Höchste globale Datenqualität. API-Schlüssel erforderlich.",
     "checkCoverage": "Abdeckung prüfen",
@@ -638,7 +640,8 @@
       "fetchTerrain": "Terrain-Daten konnten nicht geladen werden. Die angeforderte Fläche ist möglicherweise zu groß oder der Dienst ist nicht verfügbar.",
       "batchCacheCleared": "Batch-Cache gelöscht.",
       "batchCacheClearFailed": "Batch-Cache konnte nicht gelöscht werden.",
-      "usgsFallback": "USGS-1m-Daten für diesen Bereich fehlten oder waren beschädigt. Fallback auf den Standard-Terrarium-Datensatz.\n\nDie Ausgabe bleibt auf dem 1m/px-Verarbeitungsraster der App."
+      "usgsFallback": "USGS-1m-Daten für diesen Bereich fehlten oder waren beschädigt. Fallback auf den Standard-Terrarium-Datensatz.\n\nDie Ausgabe bleibt auf dem 1m/px-Verarbeitungsraster der App.",
+      "kron86Fallback": "NMT EVRF2007-Daten sind nur für unterstützte Kacheln in Polen verfügbar. Fallback auf den Standard-Terrarium-Datensatz."
     }
   },
   "support": {

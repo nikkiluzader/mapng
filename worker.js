@@ -11,6 +11,8 @@
 const GPXZ_ORIGIN = 'https://api.gpxz.io';
 const NOMINATIM_OSM_ORIGIN = 'https://nominatim.openstreetmap.org';
 const NOMINATIM_GEOCODE_ORIGIN = 'https://nominatim.geocoding.ai';
+const KRON86_ORIGIN = 'https://mapy.geoportal.gov.pl';
+const KRON86_OPENDATA_ORIGIN = 'https://opendata.geoportal.gov.pl';
 
 const EXPOSED_HEADERS = [
   'x-ratelimit-used',
@@ -67,6 +69,14 @@ export default {
 
     if (url.pathname.startsWith('/api/nominatim-geocode/')) {
       return proxySimple(NOMINATIM_GEOCODE_ORIGIN, '/api/nominatim-geocode');
+    }
+
+    if (url.pathname.startsWith('/api/kron86/')) {
+      return proxySimple(KRON86_ORIGIN, '/api/kron86');
+    }
+
+    if (url.pathname.startsWith('/api/kron86-opendata/')) {
+      return proxySimple(KRON86_OPENDATA_ORIGIN, '/api/kron86-opendata');
     }
 
     // Only proxy /api/gpxz/* paths

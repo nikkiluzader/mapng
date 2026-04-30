@@ -55,6 +55,8 @@
     "online": "ONLINE",
     "offline": "OFFLINE",
     "usgsDescription": "Wysokiej precyzji dane dla USA. Powrót do standardu, jeśli dane brakują/są uszkodzone.",
+    "kron86Poland": "NMT EVRF2007 (tylko Polska)",
+    "kron86Description": "Źródło indeksu NMT EVRF2007 GUGiK. Powrót do standardu, gdy kafle są niedostępne lub nieobsługiwane.",
     "gpxzPremium": "GPXZ (Premium globalny)",
     "gpxzDescription": "Dane globalne najwyższej jakości. Wymaga klucza API.",
     "checkCoverage": "Sprawdź zasięg",
@@ -638,7 +640,8 @@
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
       "batchCacheCleared": "Pamięć podręczna zadania wsadowego wyczyszczona.",
       "batchCacheClearFailed": "Nie udało się wyczyścić pamięci podręcznej zadania wsadowego.",
-      "usgsFallback": "Dane USGS 1m dla tego obszaru były brakujące lub uszkodzone. Powrót do standardowego zestawu danych Terrarium.\n\nWyjście pozostaje na siatce przetwarzania aplikacji 1m/px."
+      "usgsFallback": "Dane USGS 1m dla tego obszaru były brakujące lub uszkodzone. Powrót do standardowego zestawu danych Terrarium.\n\nWyjście pozostaje na siatce przetwarzania aplikacji 1m/px.",
+      "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do standardowego zestawu danych Terrarium."
     }
   },
   "support": {

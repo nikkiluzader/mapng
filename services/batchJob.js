@@ -1137,6 +1137,7 @@ async function computeBatchElevationNormalization(state, scheduleFetch, onProgre
       false,
       state.elevationSource === 'usgs',
       state.elevationSource === 'gpxz',
+      state.elevationSource === 'kron86',
       state.gpxzApiKey,
       undefined,
       undefined,
@@ -1224,6 +1225,7 @@ async function processTile(state, tile, ctx, signal) {
           shouldFetchOSM,
           state.elevationSource === 'usgs',
           state.elevationSource === 'gpxz',
+          state.elevationSource === 'kron86',
           state.gpxzApiKey,
           undefined,
           (status) => {

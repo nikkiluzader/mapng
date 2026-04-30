@@ -440,15 +440,14 @@ const signatureForKey = (key) => {
 
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
-const buildGenerationKey = (c, res, osm, usgs, gpxz, gpxzKey, tifFile = null, elevationUnitOverride = 'auto') => {
+const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, tifFile = null, elevationUnitOverride = 'auto') => {
   return JSON.stringify({
     lat: c.lat,
     lng: c.lng,
     resolution: res,
     osm,
-    usgs,
-    gpxz,
-    gpxzKeySig: gpxz ? signatureForKey(gpxzKey) : '',
+    elevationSource,
+    gpxzKeySig: elevationSource === 'gpxz' ? signatureForKey(gpxzKey) : '',
     elevationUnitOverride,
     uploadedAscCoordinateSystem: uploadedAscCoordinateSystem.value,
     uploadedAreaMode: uploadedAreaMode.value,
@@ -542,13 +541,17 @@ const applyLoadingUpdate = (update) => {
   }
 };
 
-const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKey, elevationUnitOverride = 'auto') => {
+const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default', gpxzApiKey = '', elevationUnitOverride = 'auto') => {
+  const normalizedSource = String(elevationSource || 'default').toLowerCase();
+  const useUSGS = normalizedSource === 'usgs';
+  const useGPXZ = normalizedSource === 'gpxz';
+  const useKRON86 = normalizedSource === 'kron86';
+
   const requestKey = buildGenerationKey(
     center.value,
     resolution.value,
     fetchOSM,
-    useUSGS,
-    useGPXZ,
+    normalizedSource,
     gpxzApiKey,
     uploadedTifFile.value,
     elevationUnitOverride,
@@ -565,9 +568,8 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
       cachedParams.lat === newParams.lat &&
       cachedParams.lng === newParams.lng &&
       cachedParams.resolution === newParams.resolution &&
-      cachedParams.usgs === newParams.usgs &&
-      cachedParams.gpxz === newParams.gpxz &&
-      (cachedParams.gpxzKeySig ?? cachedParams.gpxzKey ?? '') === (newParams.gpxzKeySig ?? '');
+      cachedParams.elevationSource === newParams.elevationSource &&
+      (cachedParams.gpxzKeySig ?? '') === (newParams.gpxzKeySig ?? '');
 
     if (requestKey === lastGenerationKey.value) {
       // Exact match — skip fetch entirely, just switch view if needed
@@ -671,6 +673,7 @@ const handleGenerate = async (showPreview, fetchOSM, useUSGS, useGPXZ, gpxzApiKe
         fetchOSM,
         useUSGS,
         useGPXZ,
+        useKRON86,
         gpxzApiKey,
         undefined,
         applyLoadingUpdate,
@@ -746,8 +749,7 @@ const handleImportData = (data) => {
           center.value,
           resolution.value,
           !!data.osmFeatures?.length,
-          data.usgsFallback === false,
-          false,
+          'default',
           ''
       );
   }

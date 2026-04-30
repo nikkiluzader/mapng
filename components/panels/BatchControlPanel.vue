@@ -682,13 +682,16 @@ const applyRunConfiguration = (config) => {
   }
 
   const explicitSource = typeof src.elevationSource === 'string' ? src.elevationSource.toLowerCase() : null;
-  if (explicitSource && ['default', 'usgs', 'gpxz'].includes(explicitSource)) {
+  if (explicitSource && ['default', 'usgs', 'gpxz', 'kron86'].includes(explicitSource)) {
     elevationSource.value = explicitSource;
   } else {
     const useUSGSValue = toBooleanOrNull(src.useUSGS);
     const useGPXZValue = toBooleanOrNull(src.useGPXZ);
+    const useKRON86Value = toBooleanOrNull(src.useKRON86 ?? src.useKron86);
     if (useGPXZValue === true) {
       elevationSource.value = 'gpxz';
+    } else if (useKRON86Value === true) {
+      elevationSource.value = 'kron86';
     } else if (useUSGSValue === true) {
       elevationSource.value = 'usgs';
     }

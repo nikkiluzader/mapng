@@ -61,6 +61,18 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/nominatim-geocode/, ''),
       },
+      '/api/kron86/': {
+        target: 'https://mapy.geoportal.gov.pl',
+        changeOrigin: true,
+        followRedirects: true,
+        rewrite: (path) => path.replace(/^\/api\/kron86/, ''),
+      },
+      '/api/kron86-opendata': {
+        target: 'https://opendata.geoportal.gov.pl',
+        changeOrigin: true,
+        followRedirects: true,
+        rewrite: (path) => path.replace(/^\/api\/kron86-opendata/, ''),
+      },
     },
   },
 });

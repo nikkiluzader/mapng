@@ -22,6 +22,7 @@ export const buildRunConfiguration = ({
   elevationSource,
   useUSGS: elevationSource === 'usgs',
   useGPXZ: elevationSource === 'gpxz',
+  useKRON86: elevationSource === 'kron86',
   gpxzApiKey: gpxzApiKey || '',
   gpxzStatus: gpxzStatus ? { ...gpxzStatus } : null,
   terrain: terrainData ? {

@@ -55,6 +55,8 @@
     "online": "ONLINE",
     "offline": "OFFLINE",
     "usgsDescription": "High-precision data for USA. Falls back to Standard if data is missing/corrupt.",
+    "kron86Poland": "NMT EVRF2007 (Poland Only)",
+    "kron86Description": "GUGiK NMT EVRF2007 index source. Falls back to Standard when tiles are unavailable or unsupported.",
     "gpxzPremium": "GPXZ (Premium Global)",
     "gpxzDescription": "Highest quality global data. Requires API Key.",
     "checkCoverage": "Check Coverage",
@@ -651,7 +653,8 @@
       "fetchTerrain": "Failed to fetch terrain data. The requested area might be too large or service is down.",
       "batchCacheCleared": "Batch cache cleared.",
       "batchCacheClearFailed": "Failed to clear batch cache.",
-      "usgsFallback": "USGS 1m data for this area was missing or corrupt. Falling back to the Standard Terrarium dataset.\n\nOutput remains on the app's 1m/px processing grid."
+      "usgsFallback": "USGS 1m data for this area was missing or corrupt. Falling back to the Standard Terrarium dataset.\n\nOutput remains on the app's 1m/px processing grid.",
+      "kron86Fallback": "NMT EVRF2007 data is only available for supported Poland tiles. Falling back to the Standard Terrarium dataset."
     }
   },
   "support": {

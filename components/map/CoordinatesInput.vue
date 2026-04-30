@@ -53,10 +53,11 @@ const presetLocations = [
   { name: "Devils Tower, USA", lat: 44.59056, lng: -104.71511 },
   { name: "Glacier View Car Launch, USA", lat: 61.79551798203474, lng: -147.86878824234012 },
   { name: "Johnson Valley OHV, USA", lat: 34.49523, lng: -116.82180 },
-  {name: "Kim Jong Un's Mansion", lat: 39.116331473160436, lng: 125.80600069245881 },
+  { name: "Kim Jong Un's Mansion", lat: 39.116331473160436, lng: 125.80600069245881 },
   { name: "Mount Panorama Bathurst NSW, Australia", lat: -33.45568593217826, lng: 149.5507173600283 },
   { name: "Mount Fuji, Japan", lat: 35.3606, lng: 138.7274 },
   { name: "Matterhorn, Switzerland", lat: 45.9763, lng: 7.6586 },
+  { name: "Niedzwiedz, Poland", lat: 49.62110908759179, lng: 20.079467296600345 },
   { name: "Rossfeld Panoramastraße, Germany", lat: 47.6087, lng: 13.0234 },
   { name: "Tail of the Dragon, USA", lat: 35.50323405090838, lng: -83.94679069519044 },
 ];
