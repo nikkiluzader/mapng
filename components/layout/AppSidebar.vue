@@ -32,12 +32,12 @@
       <slot />
     </div>
 
-    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-[11px] text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900 space-y-1">
+    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-[11px] text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900 space-y-1.5">
       <div class="flex items-center justify-between gap-2 px-2">
         <label class="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">{{ t('language.label') }}</label>
         <select
           :value="locale"
-          class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-[11px] text-gray-700 dark:text-gray-200"
+          class="h-7 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 text-[11px] text-gray-700 dark:text-gray-200"
           @change="handleLocaleChange"
         >
           <option v-for="code in locales" :key="code" :value="code">
@@ -45,14 +45,15 @@
           </option>
         </select>
       </div>
-      <div class="flex items-center justify-between gap-1">
-        <div class="flex items-center gap-1">
-          <BaseButton variant="ghost" size="sm" class="px-2 py-1 text-[11px] font-medium" @click="$emit('show-disclaimer')">{{ t('sidebar.disclaimer') }}</BaseButton>
-          <a href="mailto:nikkiluzader@gmail.com" class="text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 py-1">{{ t('sidebar.contact') }}</a>
+      <div class="flex items-start justify-between gap-2 px-2">
+        <div class="flex flex-wrap items-center gap-x-1 gap-y-1 min-w-0">
+          <BaseButton variant="ghost" size="sm" class="h-6 px-2 text-[11px] font-medium leading-none" @click="$emit('show-disclaimer')">{{ t('sidebar.disclaimer') }}</BaseButton>
+          <a href="mailto:nikkiluzader@gmail.com" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.contact') }}</a>
+          <a href="https://discord.gg/pQjn7Z79" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.discord') }}</a>
           <BaseButton
             variant="ghost"
             size="sm"
-            class="text-gray-600 dark:text-gray-400 hover:text-[#FF6600] dark:hover:text-[#FF6600] transition-colors flex items-center gap-1 px-2 py-1"
+            class="h-6 text-gray-600 dark:text-gray-400 hover:text-[#FF6600] dark:hover:text-[#FF6600] transition-colors inline-flex items-center gap-1 px-2 leading-none"
             @click="$emit('show-stack')"
           >
             <Code :size="12" /> {{ t('sidebar.stack') }}
@@ -61,7 +62,7 @@
         <BaseButton
           variant="secondary"
           size="sm"
-          class="p-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+          class="h-7 w-7 p-0 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
           :title="isDarkMode ? t('sidebar.switchToLightMode') : t('sidebar.switchToDarkMode')"
           @click="$emit('toggle-dark')"
         >
@@ -69,7 +70,7 @@
           <Moon v-else :size="14" />
         </BaseButton>
       </div>
-      <span class="text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.build', { hash: buildHash, time: buildTime }) }}</span>
+      <span class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.build', { hash: buildHash, time: buildTime }) }}</span>
     </div>
   </aside>
 </template>
