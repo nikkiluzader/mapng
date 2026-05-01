@@ -50,6 +50,7 @@
           <BaseButton variant="ghost" size="sm" class="h-6 px-2 text-[11px] font-medium leading-none" @click="$emit('show-disclaimer')">{{ t('sidebar.disclaimer') }}</BaseButton>
           <a href="mailto:nikkiluzader@gmail.com" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.contact') }}</a>
           <a href="https://discord.gg/j6ZvcF8rgk" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.discord') }}</a>
+          <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.github') }}</a>
           <BaseButton
             variant="ghost"
             size="sm"
