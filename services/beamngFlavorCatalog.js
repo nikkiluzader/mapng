@@ -34,15 +34,17 @@ const ITALY_GROUNDCOVER_MATERIAL = {
 
 const UTAH_GROUNDCOVER_MATERIAL = {
   name: 'dry_grass',
-  mapTo: 'unmapped_mat',
+  mapTo: 'dry_grass',
   class: 'Material',
   persistentId: 'a269c30f-2863-4077-907b-5bfba1dc1f2f',
   Stages: [{
-    colorMap: 'levels/Utah/art/shapes/groundcover/dry_grass_d.dds',
-    diffuseColor: [0.905882418, 0.905882418, 0.905882418, 1],
-    normalMap: 'levels/Utah/art/shapes/groundcover/dry_grass_n.dds',
+    ambientOcclusionMap: '/assets/materials/foliage/grass/t_utah_dry_grass/t_utah_dry_grass_ao.data.png',
+    baseColorFactor: [0.905882418, 0.905882418, 0.905882418, 1],
+    baseColorMap: '/assets/materials/foliage/grass/t_utah_dry_grass/t_utah_dry_grass_b.color.png',
+    normalMap: '/assets/materials/foliage/grass/t_utah_dry_grass/t_utah_dry_grass_nm.normal.png',
+    opacityMap: '/assets/materials/foliage/grass/t_utah_dry_grass/t_utah_dry_grass_o.data.png',
+    roughnessMap: '/assets/materials/foliage/grass/t_utah_dry_grass/t_utah_dry_grass_r.data.png',
     specular: [0.988235354, 0.988235354, 0.988235354, 1],
-    specularMap: 'levels/Utah/art/shapes/groundcover/dry_grass_s.dds',
     useAnisotropic: true,
   }, {}, {}, {}],
   alphaRef: 60,
@@ -529,14 +531,30 @@ const ASSET_SETS = {
   },
   jungle: {
     managedItemTemplates: {
-      deadpalm_01: {
-        name: 'deadpalm_01',
-        internalName: 'deadpalm_01',
+      palm_medium: {
+        name: 'palm_medium',
+        internalName: 'palm_medium',
         class: 'TSForestItemData',
         annotation: 'NATURE',
         order_simset: '524',
         radius: 0.200000003,
-        shapeFile: '/levels/jungle_rock_island/art/shapes/trees/trees_palm/deadpalm_01.dae',
+        shapeFile: '/levels/jungle_rock_island/art/shapes/trees/trees_palm/palm_medium.dae',
+      },
+      tro_tree_1_huge: {
+        name: 'tro_tree_1_huge',
+        internalName: 'tro_tree_1_huge',
+        class: 'TSForestItemData',
+        annotation: 'NATURE',
+        radius: 0.5,
+        shapeFile: '/levels/jungle_rock_island/art/shapes/trees/trees_tropical_1/tro_tree_1_huge.dae',
+      },
+      tro_tree_2_medium: {
+        name: 'tro_tree_2_medium',
+        internalName: 'tro_tree_2_medium',
+        class: 'TSForestItemData',
+        annotation: 'NATURE',
+        radius: 0.5,
+        shapeFile: '/levels/jungle_rock_island/art/shapes/trees/trees_tropical_2/tro_tree_2_medium.dae',
       },
       grass_field_sml: {
         name: 'grass_field_sml',
@@ -562,10 +580,11 @@ const ASSET_SETS = {
       },
     },
     vegetationSelectors: {
-      default: 'deadpalm_01',
-      palm: 'deadpalm_01',
-      bush: 'grass_field_sml',
-      hedgeBush: 'grass_field_sml',
+      default: 'tro_tree_1_huge',
+      needle: 'tro_tree_2_medium',
+      palm: 'palm_medium',
+      bush: 'tro_tree_2_medium',
+      hedgeBush: 'tro_tree_2_medium',
     },
     rockCandidates: ['pac_rock_small_1'],
     groundCover: {
@@ -587,23 +606,25 @@ const ASSET_SETS = {
         mass: 4,
         radius: 0.5,
         rigidity: 20,
-        shapeFile: 'levels/industrial/art/shapes/trees/trees_italy/cork_oak_bush_large.dae',
+        shapeFile: '/levels/Industrial/art/shapes/trees/trees_italy/cork_oak_bush_large.dae',
         tightnessCoefficient: 1,
         trunkBendScale: 0.0500000007,
         windScale: 0.5,
       },
-      DRI_rock_a: {
-        name: 'DRI_rock_a',
-        internalName: 'DRI_rock_a',
+      eca_rock_small: {
+        name: 'eca_rock_small',
+        internalName: 'eca_rock_small',
         class: 'TSForestItemData',
-        shapeFile: 'levels/industrial/art/shapes/rocks/DRI_rock_a.dae',
+        annotation: 'ROCK',
+        radius: 0.100000001,
+        shapeFile: '/levels/Industrial/art/shapes/rocks/eca_rock_small.dae',
       },
     },
     vegetationSelectors: {
       bush: 'cork_oak_bush_large',
       hedgeBush: 'cork_oak_bush_large',
     },
-    rockCandidates: ['DRI_rock_a'],
+    rockCandidates: ['eca_rock_small'],
   },
   automation_test_track: {
     managedItemTemplates: {
@@ -681,12 +702,12 @@ const ASSET_SETS = {
 const WATER_PROFILES = {
   italy: {
     waterCubemap: 'cubemap_italy_reflection',
-    waterDepthGradientTex: '/levels/italy/art/water/depthcolor_ramp_italy_muddy.png',
-    waterFoamTex: 'levels/italy/art/water/foam2.dds',
-    waterRippleTex: '/levels/italy/art/water/ripple.dds',
+    waterDepthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_italy_muddy_b.png',
+    waterFoamTex: '/assets/materials/tileable/water/water_effects/foam2_b.color.dds',
+    waterRippleTex: '/assets/materials/tileable/water/water_effects/ripple_nm.normal.dds',
     riverCubemap: 'cubemap_ocean_reflection',
-    riverDepthGradientTex: 'levels/italy/art/water/depthcolor_ramp_italy_rivers.png',
-    riverRippleTex: 'levels/italy/art/water/ripple3.dds',
+    riverDepthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_italy_rivers_b.png',
+    riverRippleTex: '/assets/materials/tileable/water/water_effects/ripple3_nm.normal.dds',
   },
   utah: {
     waterCubemap: 'cubemap_utah_reflection',
@@ -769,24 +790,6 @@ const WATER_PROFILES = {
     riverDepthGradientTex: 'levels/east_coast_usa/art/water/depthcolor_ramp.png',
     riverRippleTex: 'levels/east_coast_usa/art/water/ripple3.dds',
   },
-  driver_training: {
-    waterCubemap: 'cubemap_driver_training_reflection',
-    waterDepthGradientTex: '/levels/east_coast_usa/art/water/depthcolor_ramp_mud1.png',
-    waterFoamTex: 'levels/east_coast_usa/art/water/foam.dds',
-    waterRippleTex: '/levels/east_coast_usa/art/water/ripple.dds',
-    riverCubemap: 'cubemap_ocean_reflection',
-    riverDepthGradientTex: 'levels/east_coast_usa/art/water/depthcolor_ramp.png',
-    riverRippleTex: 'levels/east_coast_usa/art/water/ripple3.dds',
-  },
-  gridmap_v2: {
-    waterCubemap: 'cubemap_ocean_reflection',
-    waterDepthGradientTex: '/levels/east_coast_usa/art/water/depthcolor_ramp_ocean.png',
-    waterFoamTex: 'levels/east_coast_usa/art/water/foam.dds',
-    waterRippleTex: '/levels/east_coast_usa/art/water/ripple.dds',
-    riverCubemap: 'cubemap_ocean_reflection',
-    riverDepthGradientTex: 'levels/east_coast_usa/art/water/depthcolor_ramp.png',
-    riverRippleTex: 'levels/east_coast_usa/art/water/ripple3.dds',
-  },
 };
 
 export const BEAMNG_FLAVORS = [
@@ -818,15 +821,6 @@ export const BEAMNG_FLAVORS = [
     terrainLevelFallbacks: ['automation_test_track', 'italy', 'east_coast_usa'],
   },
   {
-    id: 'driver_training',
-    label: 'Driver Training',
-    levelName: 'driver_training',
-    environmentProfile: { globalEnvironmentMap: 'cubemap_driver_training_reflection' },
-    waterProfile: WATER_PROFILES.driver_training,
-    assetSetIds: ['east_coast', 'automation_test_track', 'italy'],
-    terrainLevelFallbacks: ['driver_training', 'east_coast_usa', 'automation_test_track', 'italy'],
-  },
-  {
     id: 'east_coast_usa',
     label: 'East Coast USA',
     levelName: 'east_coast_usa',
@@ -834,15 +828,6 @@ export const BEAMNG_FLAVORS = [
     waterProfile: WATER_PROFILES.east_coast_usa,
     assetSetIds: ['east_coast', 'west_coast', 'italy'],
     terrainLevelFallbacks: ['east_coast_usa', 'west_coast_usa', 'italy', 'Utah'],
-  },
-  {
-    id: 'gridmap_v2',
-    label: 'Gridmap V2',
-    levelName: 'gridmap_v2',
-    environmentProfile: { globalEnvironmentMap: 'cubemap_ocean_reflection' },
-    waterProfile: WATER_PROFILES.gridmap_v2,
-    assetSetIds: ['east_coast', 'utah'],
-    terrainLevelFallbacks: ['gridmap_v2', 'east_coast_usa', 'Utah', 'italy'],
   },
   {
     id: 'hirochi_raceway',

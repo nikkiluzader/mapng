@@ -9,13 +9,14 @@ import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { buildRoadNetwork } from './roadNetwork.js';
+import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
+import { getFlavorRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
 import {
   getBeamNGFlavorById,
   getGlobalEnvironmentMap,
   getGroundCoverProfile,
   getManagedForestTemplate,
   getRockCandidates,
-  getShapeMaterialDefsForFlavor,
   getWaterProfile,
   resolveBushType,
   resolveTreeTypeForTags,
@@ -2712,56 +2713,37 @@ const NATIVE_BARRIER_ASSETS = {
   },
 };
 
-const EAST_COAST_FENCE_MATERIAL_DEFS = {
-  eca_bld_trim_wood: {
-    class: 'Material',
-    name: 'eca_bld_trim_wood',
-    mapTo: 'eca_bld_trim_wood',
-    annotation: 'BUILDINGS',
-    Stages: [{
-      colorMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_trim_wood_d.dds',
-      normalMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_trim_wood_n.dds',
-      specularMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_trim_wood_s.dds',
-      diffuseColor: [1, 1, 1, 1],
-    }],
-    translucentBlendOp: 'None',
-  },
-  eca_bld_wood: {
-    class: 'Material',
-    name: 'eca_bld_wood',
-    mapTo: 'eca_bld_wood',
-    annotation: 'BUILDINGS',
-    Stages: [{
-      colorMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds',
-      normalMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds',
-      specularMap: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds',
-      diffuseColor: [1, 1, 1, 1],
-    }],
-    translucentBlendOp: 'None',
-  },
-  lumber_raw: {
-    class: 'Material',
-    name: 'lumber_raw',
-    mapTo: 'lumber_raw',
-    annotation: 'BUILDINGS',
-    Stages: [{
-      colorMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_d.dds',
-      normalMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_n.dds',
-      specularMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_s.dds',
-      diffuseColor: [1, 1, 1, 1],
-    }],
-    translucentBlendOp: 'None',
-  },
-};
+function buildCloudObjects(flavor) {
+  if (flavor?.levelName !== 'east_coast_usa') return [];
+  return [{
+    __parent: 'cloud',
+    name: 'clouds',
+    class: 'CloudLayer',
+    persistentId: generatePersistentId(),
+    position: [547.21698, -452.971985, 609.744995],
+    Textures: [
+      { texDirection: null, texScale: 1.5, texSpeed: 0.00200000009 },
+      { texDirection: [0.800000012, 0.200000003], texScale: 3, texSpeed: 0.0250000004 },
+      { texDirection: [0.200000003, 0.5], texScale: 4, texSpeed: 0.0350000001 },
+    ],
+    baseColor: [0.996078014, 0.996078014, 0.996078014, 0.996078014],
+    coverage: 1.20000005,
+    exposure: 1.29999995,
+    height: 3,
+    texture: 'levels/east_coast_usa/art/skies/SkyNormals_05.dds',
+    windSpeed: 0.200000003,
+  }];
+}
 
 const MAX_NATIVE_BARRIER_OBJECTS = 8000;
 
 /**
  * Resolve OSM barrier tags to one of the native BeamNG barrier asset presets.
  */
-function resolveNativeBarrierAsset(tags = {}) {
+function resolveNativeBarrierAsset(tags = {}, flavor = null) {
   const barrierType = String(tags.barrier ?? '').trim().toLowerCase();
   const material = String(tags.material ?? '').trim().toLowerCase();
+  const levelName = String(flavor?.levelName ?? '').toLowerCase();
 
   if (!barrierType || barrierType === 'hedge') return null;
 
@@ -2787,6 +2769,9 @@ function resolveNativeBarrierAsset(tags = {}) {
     || barrierType === 'wire_fence'
     || barrierType === 'gate'
   ) {
+    if (levelName && levelName !== 'east_coast_usa') {
+      return NATIVE_BARRIER_ASSETS.chainLinkFence;
+    }
     return NATIVE_BARRIER_ASSETS.fence;
   }
 
@@ -2803,7 +2788,7 @@ function resolveNativeBarrierAsset(tags = {}) {
  * Includes repeated segment placement and optional post/endcap meshes where
  * the selected barrier asset defines them.
  */
-function buildNativeBarrierObjects(terrainData, squareSize) {
+function buildNativeBarrierObjects(terrainData, squareSize, flavor = null) {
   const features = terrainData.osmFeatures?.filter((feature) => (
     feature.type === 'barrier' && Array.isArray(feature.geometry) && feature.geometry.length >= 2
   )) ?? [];
@@ -3010,7 +2995,7 @@ function buildNativeBarrierObjects(terrainData, squareSize) {
   for (let featureIndex = 0; featureIndex < features.length; featureIndex++) {
     if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) break;
     const feature = features[featureIndex];
-    const asset = resolveNativeBarrierAsset(feature.tags || {});
+    const asset = resolveNativeBarrierAsset(feature.tags || {}, flavor);
     if (!asset) continue;
 
     pushFeatureInstances(feature, asset, `barrier_${featureIndex}`);
@@ -3906,6 +3891,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     console.error(`${BEAMNG_EXPORT_SERVICE_LOG} Invalid or missing flavorId.`, { flavorId });
     throw new Error(`Missing or invalid BeamNG flavor: ${flavorId || '(none)'}`);
   }
+  const linkRegistry = createBeamNGLinkFileRegistry(levelName);
 
   const size = exportTerrainData.width;
   const osmFeatureCount = Array.isArray(exportTerrainData.osmFeatures) ? exportTerrainData.osmFeatures.length : 0;
@@ -4010,11 +3996,12 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
         ]
       : []),
   ];
+  const cloudObjects = buildCloudObjects(flavor);
 
   beginStep(`Building native barrier objects (${includeNativeBarriers ? 'enabled' : 'disabled'})…`, 74);
   await yield_();
   const barrierObjects = includeNativeBarriers
-    ? buildNativeBarrierObjects(exportTerrainData, squareSize)
+    ? buildNativeBarrierObjects(exportTerrainData, squareSize, flavor)
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
   const roadFolderGroups = buildRoadFolderGroups(roadArchitectSession);
@@ -4030,9 +4017,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const forestFiles = serializeForestFiles(forestPlacements);
   const groundCoverObjects = buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, flavor);
   const managedForestItemData = cloneManagedItemData(Array.from(forestPlacements.keys()), flavor);
-  const shapeMaterialDefsForFlavor = (forestFiles.length > 0 || includeRocks)
-    ? await getShapeMaterialDefsForFlavor(flavor)
-    : {};
 
   let backdropDaeBlob = null;
   let backdropTextureFiles = [];
@@ -4075,6 +4059,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   zip.folder(`${base}/main/MissionGroup`);
   zip.folder(`${base}/main/MissionGroup/Level_objects`);
   zip.folder(`${base}/main/MissionGroup/Level_objects/Other`);
+  if (cloudObjects.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/Level_objects/cloud`);
+  }
   zip.folder(`${base}/main/MissionGroup/PlayerDropPoints`);
   zip.folder(`${base}/main/MissionGroup/Water`);
   if (barrierFolderItems.length > 0) {
@@ -4331,11 +4318,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
     // Build a single materials JSON covering all DAEs in this directory.
     const shapeMaterials = {
-      ...shapeMaterialDefsForFlavor,
-      ...(usesEastCoastFenceMaterials ? EAST_COAST_FENCE_MATERIAL_DEFS : {}),
-      ...(groundCoverObjects.length > 0 ? {
-        [getGroundCoverProfile(flavor).materialName]: structuredClone(getGroundCoverProfile(flavor).materialDef),
-      } : {}),
+      ...getFlavorRuntimeMaterialDefs(flavor),
     };
     if (osmDaeBlob) {
       // Vertex-colour Material: BeamNG multiplies diffuseColor × vertex colour.
@@ -4543,6 +4526,12 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
         name: 'Other',
         persistentId: generatePersistentId(),
       },
+      ...(cloudObjects.length > 0 ? [{
+        __parent: 'Level_objects',
+        class: 'SimGroup',
+        name: 'cloud',
+        persistentId: generatePersistentId(),
+      }] : []),
       ...((forestFiles.length > 0 || groundCoverObjects.length > 0) ? [{
         __parent: 'Level_objects',
         class: 'SimGroup',
@@ -4627,6 +4616,12 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     toNDJSON(waterObjects)
   );
 
+  if (cloudObjects.length > 0) {
+    zip.file(`${base}/main/MissionGroup/Level_objects/cloud/items.level.json`,
+      toNDJSON(cloudObjects)
+    );
+  }
+
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
     zip.file(`${base}/main/MissionGroup/Level_objects/vegetation/items.level.json`,
       toNDJSON([
@@ -4645,6 +4640,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       for (const forestFile of forestFiles) {
         zip.file(`${base}/${forestFile.path}`, forestFile.contents);
       }
+    }
+  }
+
+  const linkFiles = linkRegistry.getLinkFiles();
+  if (linkFiles.length > 0) {
+    for (const linkFile of linkFiles) {
+      zip.file(linkFile.path, linkFile.contents);
     }
   }
 
