@@ -4,6 +4,16 @@ import { templateCompilerOptions } from '@tresjs/core';
 import { execSync } from 'child_process';
 
 const nowIso = new Date().toISOString();
+const buildBranch = String(
+  process.env.CF_PAGES_BRANCH
+  || process.env.GITHUB_REF_NAME
+  || process.env.CI_COMMIT_REF_NAME
+  || process.env.VERCEL_GIT_COMMIT_REF
+  || ''
+).trim().toLowerCase();
+
+const isMainBranch = buildBranch === 'main' || buildBranch === 'master';
+const isDevBranch = buildBranch === 'dev' || buildBranch === 'develop' || buildBranch === 'development';
 
 const git = (command) => {
   try {
@@ -26,16 +36,49 @@ const resolveRefInfo = (candidates) => {
 const commitHash = (() => {
   const headHash = git('git rev-parse --short HEAD');
   if (headHash) return headHash;
-  return process.env.CF_PAGES_COMMIT_SHA?.slice(0, 7) || 'dev';
+  return (
+    process.env.CF_PAGES_COMMIT_SHA?.slice(0, 7)
+    || process.env.GITHUB_SHA?.slice(0, 7)
+    || process.env.CI_COMMIT_SHA?.slice(0, 7)
+    || process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7)
+    || 'dev'
+  );
 })();
+
+const commitTime = (
+  process.env.CF_PAGES_COMMIT_TIMESTAMP
+  || process.env.CI_COMMIT_TIMESTAMP
+  || process.env.VERCEL_GIT_COMMIT_DATE
+  || nowIso
+);
 
 const mainRefInfo = resolveRefInfo(['origin/main', 'main', 'origin/master', 'master']);
 const devRefInfo = resolveRefInfo(['origin/dev', 'dev', 'origin/develop', 'develop', 'origin/development', 'development']);
 
-const mainBuildHash = process.env.MAPNG_MAIN_BUILD_HASH || mainRefInfo.hash;
-const mainBuildTime = process.env.MAPNG_MAIN_BUILD_TIME || mainRefInfo.time;
-const devBuildHash = process.env.MAPNG_DEV_BUILD_HASH || devRefInfo.hash;
-const devBuildTime = process.env.MAPNG_DEV_BUILD_TIME || devRefInfo.time;
+const withBranchFallback = (refInfo, branchFlag, fallbackToCurrentBuild = false) => {
+  if (refInfo.hash !== 'n/a') return refInfo;
+  if (branchFlag || fallbackToCurrentBuild) {
+    return {
+      hash: commitHash,
+      time: commitTime,
+    };
+  }
+  return refInfo;
+};
+
+const bothRefsMissing = mainRefInfo.hash === 'n/a' && devRefInfo.hash === 'n/a';
+const resolvedMainRefInfo = withBranchFallback(mainRefInfo, isMainBranch, false);
+const resolvedDevRefInfo = withBranchFallback(
+  devRefInfo,
+  isDevBranch,
+  // If branch name is unavailable and no refs are present, show at least the current build on Dev line.
+  bothRefsMissing && !isMainBranch && !isDevBranch
+);
+
+const mainBuildHash = process.env.MAPNG_MAIN_BUILD_HASH || resolvedMainRefInfo.hash;
+const mainBuildTime = process.env.MAPNG_MAIN_BUILD_TIME || resolvedMainRefInfo.time;
+const devBuildHash = process.env.MAPNG_DEV_BUILD_HASH || resolvedDevRefInfo.hash;
+const devBuildTime = process.env.MAPNG_DEV_BUILD_TIME || resolvedDevRefInfo.time;
 
 // https://vitejs.dev/config/
 export default defineConfig({
