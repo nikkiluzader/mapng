@@ -3,13 +3,39 @@ import vue from '@vitejs/plugin-vue';
 import { templateCompilerOptions } from '@tresjs/core';
 import { execSync } from 'child_process';
 
-const commitHash = (() => {
+const nowIso = new Date().toISOString();
+
+const git = (command) => {
   try {
-    return execSync('git rev-parse --short HEAD').toString().trim();
+    return execSync(command, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
   } catch {
-    return process.env.CF_PAGES_COMMIT_SHA?.slice(0, 7) || 'dev';
+    return '';
   }
+};
+
+const resolveRefInfo = (candidates) => {
+  for (const ref of candidates) {
+    const hash = git(`git rev-parse --short ${ref}`);
+    if (!hash) continue;
+    const time = git(`git show -s --format=%cI ${ref}`) || '';
+    return { hash, time };
+  }
+  return { hash: 'n/a', time: '' };
+};
+
+const commitHash = (() => {
+  const headHash = git('git rev-parse --short HEAD');
+  if (headHash) return headHash;
+  return process.env.CF_PAGES_COMMIT_SHA?.slice(0, 7) || 'dev';
 })();
+
+const mainRefInfo = resolveRefInfo(['origin/main', 'main', 'origin/master', 'master']);
+const devRefInfo = resolveRefInfo(['origin/dev', 'dev', 'origin/develop', 'develop', 'origin/development', 'development']);
+
+const mainBuildHash = process.env.MAPNG_MAIN_BUILD_HASH || mainRefInfo.hash;
+const mainBuildTime = process.env.MAPNG_MAIN_BUILD_TIME || mainRefInfo.time;
+const devBuildHash = process.env.MAPNG_DEV_BUILD_HASH || devRefInfo.hash;
+const devBuildTime = process.env.MAPNG_DEV_BUILD_TIME || devRefInfo.time;
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -42,7 +68,11 @@ export default defineConfig({
   define: {
     'process.env': {},
     '__BUILD_HASH__': JSON.stringify(commitHash),
-    '__BUILD_TIME__': JSON.stringify(new Date().toISOString()),
+    '__BUILD_TIME__': JSON.stringify(nowIso),
+    '__BUILD_MAIN_HASH__': JSON.stringify(mainBuildHash),
+    '__BUILD_MAIN_TIME__': JSON.stringify(mainBuildTime),
+    '__BUILD_DEV_HASH__': JSON.stringify(devBuildHash),
+    '__BUILD_DEV_TIME__': JSON.stringify(devBuildTime),
   },
   server: {
     proxy: {

@@ -70,7 +70,8 @@
           <Moon v-else :size="14" />
         </BaseButton>
       </div>
-      <span class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.build', { hash: buildHash, time: buildTime }) }}</span>
+      <span class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Main: {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</span>
+      <span class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Dev: {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</span>
     </div>
   </aside>
 </template>
@@ -89,8 +90,10 @@ const locales = computed(() => getSupportedLocales());
 defineProps({
   batchMode: { type: Boolean, default: false },
   isDarkMode: { type: Boolean, default: false },
-  buildHash: { type: String, default: '' },
-  buildTime: { type: String, default: '' },
+  buildMainHash: { type: String, default: 'n/a' },
+  buildMainTime: { type: String, default: 'n/a' },
+  buildDevHash: { type: String, default: 'n/a' },
+  buildDevTime: { type: String, default: 'n/a' },
 });
 
 defineEmits(['show-about', 'show-disclaimer', 'show-stack', 'toggle-dark', 'set-batch-mode']);

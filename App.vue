@@ -12,8 +12,10 @@
     <AppSidebar
       :batch-mode="batchMode"
       :is-dark-mode="isDarkMode"
-      :build-hash="buildHash"
-      :build-time="buildTime"
+      :build-main-hash="buildMainHash"
+      :build-main-time="buildMainTime"
+      :build-dev-hash="buildDevHash"
+      :build-dev-time="buildDevTime"
       @show-about="showAbout = true"
       @show-disclaimer="showDisclaimer = true"
       @show-stack="showStackInfo = true"
@@ -355,8 +357,18 @@ const batchGridTiles = computed(() => {
 });
 
 // Build info (injected by Vite at build time)
-const buildHash = __BUILD_HASH__;
-const buildTime = new Date(__BUILD_TIME__).toLocaleString();
+const formatBuildTime = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return 'n/a';
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toLocaleString();
+};
+
+const buildMainHash = String(__BUILD_MAIN_HASH__ || 'n/a');
+const buildMainTime = formatBuildTime(__BUILD_MAIN_TIME__);
+const buildDevHash = String(__BUILD_DEV_HASH__ || 'n/a');
+const buildDevTime = formatBuildTime(__BUILD_DEV_TIME__);
 
 const { setCenter, setResolution, setBatchMode: setStoreBatchMode } = store;
 
