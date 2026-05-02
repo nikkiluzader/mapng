@@ -346,12 +346,11 @@ async function generatePreviewBlob(terrainData) {
  * Referenced by terrain.terrain.json as "heightmapImage" — used by BeamNG's
  * terrain system internally (minimap display, editor visualization).
  */
-async function generateHeightmapPng(terrainData, maxSize = 2048) {
+async function generateHeightmapPng(terrainData, maxSize = Number.POSITIVE_INFINITY) {
   const { width, height, heightMap, minHeight, maxHeight } = terrainData;
-  // Cap output to maxSize — this is a visual reference only (World Editor minimap).
-  // Full-resolution for large terrains would waste hundreds of MB of canvas RAM.
-  const outW = Math.min(width,  maxSize);
-  const outH = Math.min(height, maxSize);
+  const safeMaxSize = Number.isFinite(maxSize) && maxSize > 0 ? maxSize : Number.POSITIVE_INFINITY;
+  const outW = Math.min(width, safeMaxSize);
+  const outH = Math.min(height, safeMaxSize);
   const scaleX = width  / outW;
   const scaleY = height / outH;
   const range  = maxHeight - minHeight;
@@ -3972,7 +3971,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   beginStep(`Generating heightmap preview (${size}x${size})…`, 50);
   await yield_();
-  let heightmapBlob = await generateHeightmapPng(exportTerrainData);
+  let heightmapBlob = await generateHeightmapPng(exportTerrainData, size);
 
   beginStep('Generating level thumbnail image…', 58);
   await yield_();
@@ -4294,8 +4293,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   zip.file(`${base}/theTerrain.ter`, terBlob);
 
   // ── theTerrain.terrainheightmap.png ────────────────────────────────────────
-  // Grayscale heightmap preview used by BeamNG's terrain system and World Editor.
-  // Capped at 2048px — the .ter binary holds the full-res data; this is display only.
+  // Grayscale heightmap used by BeamNG's terrain system and World Editor.
+  // Export at full terrain resolution so packaged heightmap dimensions match .ter.
   zip.file(`${base}/theTerrain.terrainheightmap.png`, heightmapBlob);
   heightmapBlob = null;
 
