@@ -674,6 +674,7 @@ const applySuggestedBeamNGLevelName = (suggestedName) => {
 };
 
 const updateSuggestedBeamNGLevelName = async () => {
+  if (!showExportBeamNG.value) return;
   const requestId = ++beamNGLevelNameRequestId;
   const fallbackName = buildBeamNGFallbackLevelName();
   if (!Number.isFinite(props.center?.lat) || !Number.isFinite(props.center?.lng)) {
@@ -696,8 +697,9 @@ const handleBeamNGLevelNameInput = () => {
 };
 
 watch(
-  () => [props.center.lat, props.center.lng],
-  () => {
+  () => [props.center.lat, props.center.lng, showExportBeamNG.value],
+  ([, , isBeamNgSectionOpen]) => {
+    if (!isBeamNgSectionOpen) return;
     updateSuggestedBeamNGLevelName();
   },
   { immediate: true }

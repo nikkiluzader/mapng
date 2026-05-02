@@ -47,10 +47,22 @@ export default {
 
       const upstreamPath = url.pathname.slice(stripPrefix.length);
       const upstreamUrl = `${origin}${upstreamPath}${url.search}`;
+      const isNominatimOrigin = origin.includes('nominatim');
+      const requestOrigin = `${url.protocol}//${url.host}`;
       const upstream = await fetch(upstreamUrl, {
         method: 'GET',
         headers: {
           'Accept': request.headers.get('Accept') || 'application/json',
+          ...(request.headers.get('Accept-Language')
+            ? { 'Accept-Language': request.headers.get('Accept-Language') }
+            : {}),
+          ...(isNominatimOrigin
+            ? {
+                // Identify the app to align with Nominatim usage policy and reduce 403 blocks.
+                'User-Agent': 'mapng/1.0 (+https://mapng.dev; contact: nikkiluzader@gmail.com)',
+                'Referer': requestOrigin,
+              }
+            : {}),
         },
       });
 

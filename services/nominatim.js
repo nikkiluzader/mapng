@@ -1,10 +1,12 @@
 
 const NOMINATIM_ENDPOINTS = [
-    "/api/nominatim-geocode/search"
+    "/api/nominatim-geocode/search",
+    "/api/nominatim-osm/search"
 ];
 
 const NOMINATIM_REVERSE_ENDPOINTS = [
-    "/api/nominatim-geocode/reverse"
+    "/api/nominatim-geocode/reverse",
+    "/api/nominatim-osm/reverse"
 ];
 
 // Rate limiting: Nominatim requires max 1 request per second
@@ -131,7 +133,7 @@ export const reverseLocationName = async (lat, lng) => {
             });
 
             if (!response.ok) {
-                console.warn(`[Nominatim] Reverse endpoint ${endpoint} returned ${response.status}`);
+                console.warn(`[Nominatim] Reverse endpoint ${endpoint} returned ${response.status}; trying fallback endpoint if available.`);
                 continue;
             }
 
