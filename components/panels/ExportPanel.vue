@@ -139,6 +139,21 @@
           </div>
 
           <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.seaLevelOffset') }}</span>
+            <div class="flex items-center gap-1">
+              <input
+                v-model.number="beamNGSeaLevelOffset"
+                type="number"
+                step="1"
+                min="-2000"
+                max="2000"
+                class="w-20 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300"
+              />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400">m</span>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.treesBushes') }}</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" v-model="beamNGIncludeTrees" :disabled="!hasOsmData" class="rounded border-gray-300 dark:border-gray-600 accent-[#FF6600] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
@@ -531,6 +546,11 @@ const isExportingOSM = ref(false);
 const isExportingBeamNGLevel = ref(false);
 const beamNGProgressStep = ref('');
 const beamNGProgressPct  = ref(0);
+const normalizeBeamNGSeaLevelOffset = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(-2000, Math.min(2000, numeric));
+};
 const resolveBeamNGBaseTexture = (terrainData, preferred = 'osm') => {
   const availableTextures = {
     none: true,
@@ -552,6 +572,7 @@ const beamNGBackdropSource = ref(
 const beamNGIncludeBuildings = ref(localStorage.getItem('mapng_beamNGIncludeBuildings') !== 'false');
 const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFoundations') !== 'false');
 const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
+const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') === 'true');
 // Migrate legacy boolean mesh road setting if it exists
@@ -620,6 +641,14 @@ watch(beamNGBackdropSource, (v) => localStorage.setItem('mapng_beamNGBackdropSou
 watch(beamNGIncludeBuildings, (v) => localStorage.setItem('mapng_beamNGIncludeBuildings', String(v)));
 watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoundations', String(v)));
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
+watch(beamNGSeaLevelOffset, (v) => {
+  const normalized = normalizeBeamNGSeaLevelOffset(v);
+  if (normalized !== v) {
+    beamNGSeaLevelOffset.value = normalized;
+    return;
+  }
+  localStorage.setItem('mapng_beamNGSeaLevelOffset', String(normalized));
+});
 watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
 watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
 watch(beamNGRoadType, (v) => localStorage.setItem('mapng_beamNGRoadType', v));
@@ -1265,6 +1294,7 @@ const handleBeamNGLevelExport = async () => {
     const effectiveIncludeBuildings = hasOsmData.value ? beamNGIncludeBuildings.value : false;
     const effectiveApplyFoundations = hasOsmData.value ? beamNGApplyFoundations.value : false;
     const effectiveIncludeWater = hasOsmData.value ? beamNGIncludeWater.value : false;
+    const effectiveSeaLevelOffset = normalizeBeamNGSeaLevelOffset(beamNGSeaLevelOffset.value);
     const effectiveIncludeTrees = hasOsmData.value ? beamNGIncludeTrees.value : false;
     const effectiveIncludeRocks = hasOsmData.value ? beamNGIncludeRocks.value : false;
     const effectiveBackdropGpxzApiKey = effectiveBackdropSource === 'gpxz' ? String(props.gpxzApiKey || '') : '';
@@ -1281,6 +1311,7 @@ const handleBeamNGLevelExport = async () => {
       includeBuildings: effectiveIncludeBuildings,
       applyFoundations: effectiveApplyFoundations,
       includeWater: effectiveIncludeWater,
+      seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       includeRocks: effectiveIncludeRocks,
       flavorId: effectiveFlavorId,
@@ -1298,6 +1329,7 @@ const handleBeamNGLevelExport = async () => {
       applyFoundations: effectiveApplyFoundations,
       pbrSource: effectivePbrSource,
       includeWater: effectiveIncludeWater,
+      seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       includeRocks: effectiveIncludeRocks,
       roadType: effectiveRoadType,

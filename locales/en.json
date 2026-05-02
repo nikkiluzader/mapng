@@ -221,6 +221,8 @@
     "surroundingDesc": "Adaptive adjacent tiles with seam blending and preview-optimized satellite detail for faster loading.",
     "wireframeMode": "Wireframe Mode",
     "features3d": "3D Features",
+    "water": "Water",
+    "seaLevelOffset": "Sea Level Offset",
     "resetCamera": "Reset Camera"
   },
   "exportPanel": {
@@ -249,6 +251,7 @@
     "raiseUnderBuildings": "Raise terrain under steep buildings",
     "water": "Water",
     "lakesRivers": "Lakes and rivers",
+    "seaLevelOffset": "Sea Level Offset",
     "treesBushes": "Trees/Bushes",
     "nativeForest": "Native forest items",
     "rocks": "Rocks",

@@ -7,6 +7,8 @@ const props = defineProps({
   terrainData: { required: true },
   quality: { required: true },
   textureType: { default: 'satellite' },
+  showWater: { default: true, type: Boolean },
+  waterLevelOffsetMeters: { default: 0, type: Number },
   wireframe: { default: false, type: Boolean }
 });
 
@@ -46,9 +48,12 @@ const seaLevelSceneZ = computed(() => {
   const minHeight = Number(data?.minHeight);
   const upm = unitsPerMeter.value;
   if (!Number.isFinite(minHeight) || !Number.isFinite(upm) || upm <= 0) return 0;
+  const offsetMeters = Number.isFinite(Number(props.waterLevelOffsetMeters))
+    ? Number(props.waterLevelOffsetMeters)
+    : 0;
   // Exported terrain uses minHeight as local Z origin, so sea level (0 m)
   // sits at -minHeight in terrain space.
-  return -minHeight * upm;
+  return (-minHeight + offsetMeters) * upm;
 });
 
 const waterPlaneSize = computed(() => SCENE_SIZE * 3);
@@ -98,6 +103,7 @@ watch(() => props.quality, () => {
 });
 
 onBeforeRender(() => {
+  if (!props.showWater) return;
   const sceneObj = scene.value;
   const rendererObj = renderer.value;
   const activeCamera = camera.value;
@@ -330,6 +336,7 @@ onUnmounted(() => {
 <template>
   <TresGroup v-if="geometry">
     <TresMesh
+      v-if="showWater"
       ref="waterMeshRef"
       :rotation="[-Math.PI / 2, 0, 0]"
       :position="[0, seaLevelSceneZ, 0]"

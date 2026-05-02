@@ -38,6 +38,8 @@
               :terrain-data="mergedTerrainData"
               :quality="meshQuality"
               :texture-type="textureType"
+              :show-water="showWater"
+              :water-level-offset-meters="waterLevelOffsetMeters"
               :wireframe="showWireframe"
             />
 
@@ -256,6 +258,36 @@
               <Layers :size="12" /> {{ t('preview.features3d') }}
             </label>
             <div class="grid grid-cols-2 gap-2">
+              <label class="flex items-center gap-2 cursor-pointer group/check">
+                <div class="relative">
+                  <input
+                    type="checkbox"
+                    v-model="showWater"
+                    class="peer sr-only"
+                  />
+                  <div
+                    class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#FF6600]"
+                  ></div>
+                </div>
+                <span class="text-[10px] capitalize text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
+                  {{ t('preview.water') }}
+                </span>
+              </label>
+              <div class="col-span-2 flex items-center justify-between gap-2 px-0.5">
+                <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('preview.seaLevelOffset') }}</span>
+                <div class="flex items-center gap-1">
+                  <input
+                    v-model.number="waterLevelOffsetMeters"
+                    type="number"
+                    step="1"
+                    min="-2000"
+                    max="2000"
+                    :disabled="!showWater"
+                    class="w-20 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 disabled:opacity-60"
+                  />
+                  <span class="text-[9px] text-gray-500 dark:text-gray-400">m</span>
+                </div>
+              </div>
               <label v-for="(val, key) in featureVisibility" :key="key" class="flex items-center gap-2 cursor-pointer group/check">
                 <div class="relative">
                   <input
@@ -401,6 +433,8 @@ const sunPosition = ref("Mid Morning");
 const textureType = ref("hybrid");
 const surroundingTextureType = ref("none");
 const showWireframe = ref(false);
+const showWater = ref(true);
+const waterLevelOffsetMeters = ref(0);
 const showSurroundings = ref(false);
 const showSceneSettings = ref(false);
 const isSurroundingsLoading = ref(false);

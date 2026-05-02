@@ -3265,12 +3265,13 @@ function buildWaterBlockObjects(terrainData, squareSize, flavor) {
 /**
  * Build one sea-level WaterPlane spanning the exported level.
  */
-function buildSeaLevelWaterPlane(terrainData, flavor) {
+function buildSeaLevelWaterPlane(terrainData, flavor, seaLevelOffset = 0) {
   const waterProfile = getWaterProfile(flavor);
   const minHeight = Number(terrainData?.minHeight);
+  const safeSeaLevelOffset = Number.isFinite(Number(seaLevelOffset)) ? Number(seaLevelOffset) : 0;
   // Terrain world-space Z is stored relative to min elevation, so sea level (0m)
   // sits at -minHeight in exported level coordinates.
-  const seaLevelZ = Number.isFinite(minHeight) ? -minHeight : 0;
+  const seaLevelZ = (Number.isFinite(minHeight) ? -minHeight : 0) + safeSeaLevelOffset;
   return {
     ...structuredClone(WATER_PLANE_TEMPLATE),
     cubemap: waterProfile.waterCubemap,
@@ -3749,6 +3750,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {'osm'|'image'|'none'} [options.pbrSource='osm'] — layer map source: 'osm' uses OSM polygon data,
  *   'image' is accepted for backward compatibility and falls back to OSM inference, 'none' disables PBR materials.
  *   Legacy boolean option `generatePbrMaterials` is still accepted for backward compatibility.
+ * @param {number}  [options.seaLevelOffset=0]              — offset in meters applied to exported sea-level WaterPlane Z
  * @param {boolean} [options.useMeshRoads=false]            — export roads as 3D MeshRoad geometry instead of flat DecalRoad decals
  */
 export async function exportBeamNGLevel(terrainData, center, options = {}) {
@@ -3758,6 +3760,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     applyFoundations = true,
     includeBackdrop = false,
     includeWater = true,
+    seaLevelOffset = 0,
     includeNativeBarriers = true,
     includeTrees = true,
     includeRocks = false,
@@ -3787,6 +3790,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       applyFoundations,
       includeBackdrop,
       includeWater,
+      seaLevelOffset,
       includeNativeBarriers,
       includeTrees,
       includeRocks,
@@ -3988,7 +3992,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   await yield_();
   // Always emit a sea-level WaterPlane; includeWater toggles only inland OSM-derived water.
   const waterObjects = [
-    buildSeaLevelWaterPlane(exportTerrainData, flavor),
+    buildSeaLevelWaterPlane(exportTerrainData, flavor, seaLevelOffset),
     ...(includeWater
       ? [
           ...buildWaterBlockObjects(exportTerrainData, squareSize, flavor),
@@ -4243,6 +4247,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       applyFoundations,
       includeBackdrop,
       includeWater,
+      seaLevelOffset,
       includeNativeBarriers,
       includeTrees,
       includeRocks,
