@@ -706,7 +706,12 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       return;
     }
     console.error("Failed to generate terrain:", error);
-    alert(t('app.error.fetchTerrain'));
+    const byodMessage = String(error?.message || '');
+    if (byodMessage) {
+      alert(byodMessage);
+    } else {
+      alert(t('app.error.fetchTerrain'));
+    }
   } finally {
     isLoading.value = false;
     loadingProgressPercent.value = null;

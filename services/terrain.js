@@ -1266,6 +1266,10 @@ export const loadTerrainFromTif = async (
   signal,
   generationOptions = {},
 ) => {
+  if (tifData?.isLikelyElevation === false) {
+    throw new Error(tifData.elevationValidationMessage || '[BYOD] Uploaded GeoTIFF is not a valid elevation raster.');
+  }
+
   const {
     generateOSMTextureAsset = true,
     generateHybridTextureAsset = true,

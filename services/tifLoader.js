@@ -64,6 +64,11 @@ export const parseTifFile = async (file) => {
   const sourceWidth = image.getWidth();
   const sourceHeight = image.getHeight();
   const fileDirectory = image.getFileDirectory?.() || {};
+  const bitsPerSample = Array.isArray(fileDirectory.BitsPerSample)
+    ? fileDirectory.BitsPerSample
+    : (fileDirectory.BitsPerSample != null ? [fileDirectory.BitsPerSample] : []);
+  const samplesPerPixel = Number(fileDirectory.SamplesPerPixel || bitsPerSample.length || 1);
+  const photometric = Number(fileDirectory.PhotometricInterpretation);
 
   // ── Detect GeoTIFF ──────────────────────────────────────────────────────────
   const geoKeys = image.getGeoKeys();
@@ -80,6 +85,15 @@ export const parseTifFile = async (file) => {
   let suggestedResolution = null;
   let verticalUnitDetected = UNIT_UNKNOWN;
   let verticalUnitDetectionSource = null;
+  let isLikelyElevation = true;
+  let elevationValidationMessage = '';
+
+  const isColorPhotometric = [2, 5, 6, 8].includes(photometric); // RGB, CMYK, YCbCr, CIELab
+  const is8BitRaster = bitsPerSample.length > 0 && bitsPerSample.every((v) => Number(v) <= 8);
+  if (samplesPerPixel >= 3 && (isColorPhotometric || is8BitRaster)) {
+    isLikelyElevation = false;
+    elevationValidationMessage = 'Uploaded GeoTIFF appears to be color imagery (RGB/CIR), not an elevation raster (DEM/DTM). Please upload a single-band elevation GeoTIFF.';
+  }
 
   // GeoTIFF vertical unit keys (EPSG unit codes): 9001=m, 9002=ft, 9003=US survey ft
   const verticalUnitCode = geoKeys?.VerticalUnitsGeoKey;
@@ -143,6 +157,8 @@ export const parseTifFile = async (file) => {
     suggestedResolution,
     nativeMetersPerPixel,
     noData,
+    isLikelyElevation,
+    elevationValidationMessage,
     fileSize: file.size,
     verticalUnitDetected,
     verticalUnitDetectionSource,
