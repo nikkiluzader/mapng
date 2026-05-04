@@ -108,7 +108,7 @@
     </l-map>
 
     <!-- Custom Layer Control -->
-    <div class="absolute bottom-6 right-4 z-[400] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 overflow-hidden text-gray-800 dark:text-gray-200 text-xs">
+    <div class="absolute bottom-20 right-4 z-[400] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 overflow-hidden text-gray-800 dark:text-gray-200 text-xs">
         <div class="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b border-gray-200 dark:border-gray-600 font-medium flex items-center gap-2">
             <Layers :size="14" class="text-[#FF6600]" />
           {{ t('mapSelector.mapLayers') }}
@@ -132,6 +132,21 @@
             <span>{{ t('mapSelector.showLabels') }}</span>
             </label>
         </div>
+    </div>
+
+    <!-- Edit in OSM CTA -->
+    <div class="absolute bottom-6 right-4 z-[400] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 overflow-hidden text-gray-800 dark:text-gray-200 text-xs">
+      <div class="p-2">
+        <button
+          @click="openInOsm"
+          type="button"
+          :title="t('map.editInOsm')"
+          aria-label="Edit in OpenStreetMap"
+          class="w-full text-left text-[12px] font-medium text-[#0f766e] hover:text-[#065f55] transition-colors px-2 py-1.5"
+        >
+          {{ t('map.editInOsm') }}
+        </button>
+      </div>
     </div>
 
     <!-- Center Crosshair -->
@@ -360,6 +375,30 @@ const onMoveEnd = () => {
 
 const onDragStart = () => {
     isMovingProgrammatically.value = false;
+};
+
+// Open current view in OpenStreetMap iD editor (new tab)
+const openInOsm = () => {
+  try {
+    let center = props.center;
+    let zoom = props.zoom;
+    if (mapRef.value?.leafletObject) {
+      const map = mapRef.value.leafletObject;
+      const c = map.getCenter();
+      center = { lat: c.lat, lng: c.lng };
+      zoom = map.getZoom();
+    } else {
+      center = currentCenter.value || props.center;
+      zoom = currentZoom.value || props.zoom;
+    }
+
+    const url = `https://www.openstreetmap.org/edit?editor=id#map=${zoom}/${center.lat}/${center.lng}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  } catch (err) {
+    console.warn('openInOsm failed', err);
+    const url = `https://www.openstreetmap.org/?mlat=${props.center.lat}&mlon=${props.center.lng}#map=${props.zoom}/${props.center.lat}/${props.center.lng}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
 };
 
 // Watch for external center changes (e.g., from AI search)

@@ -35,6 +35,7 @@
   "mobile": {
     "desktopRequired": "Wymagany komputer stacjonarny",
     "description": "MapNG to wysokowydajne narzędzie do generowania terenu przeznaczone dla modyfikacji BeamNG.",
+        "editInOsm": "Edytuj w OpenStreetMap",
     "details": "Aby zapewnić najlepsze doświadczenie z renderowaniem 3D, dokładnym wyborem mapy i zarządzaniem plikami, proszę uzyskać dostęp do tej aplikacji na komputerze stacjonarnym lub laptopie.",
     "inputHint": "Zalecane: mysz i klawiatura"
   },

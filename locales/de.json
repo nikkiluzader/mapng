@@ -39,6 +39,7 @@
     "inputHint": "Maus und Tastatur empfohlen"
   },
   "map": {
+    "editInOsm": "In OpenStreetMap bearbeiten",
     "latitude": "Breitengrad",
     "longitude": "Längengrad",
     "selectLocation": "Ort auswählen...",

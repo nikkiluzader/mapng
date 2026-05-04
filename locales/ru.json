@@ -39,6 +39,7 @@
     "inputHint": "Рекомендуются мышь и клавиатура"
   },
   "map": {
+    "editInOsm": "Редактировать в OpenStreetMap",
     "latitude": "Широта",
     "longitude": "Долгота",
     "selectLocation": "Выберите локацию...",
