@@ -2,11 +2,25 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { loadBatchState } from '../services/batchJob';
 
+const DEFAULT_CENTER = { lat: 35.1983, lng: -111.6513 };
+
+const sanitizeCenter = (candidate) => {
+  const lat = Number(candidate?.lat);
+  const lng = Number(candidate?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ...DEFAULT_CENTER };
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return { ...DEFAULT_CENTER };
+  return { lat, lng };
+};
+
 export const useMainStore = defineStore('main', () => {
   // --- Global State ---
-  const center = ref(
-    JSON.parse(localStorage.getItem('mapng_center') || 'null') || { lat: 35.1983, lng: -111.6513 }
-  );
+  let persistedCenter = null;
+  try {
+    persistedCenter = JSON.parse(localStorage.getItem('mapng_center') || 'null');
+  } catch {
+    persistedCenter = null;
+  }
+  const center = ref(sanitizeCenter(persistedCenter));
   const zoom = ref(parseInt(localStorage.getItem('mapng_zoom')) || 13);
   const resolution = ref(parseInt(localStorage.getItem('mapng_resolution')) || 1024);
   const isDarkMode = ref(localStorage.getItem('theme') === 'dark');
@@ -55,8 +69,9 @@ export const useMainStore = defineStore('main', () => {
 
   // --- Actions ---
   function setCenter(newCenter) {
-    center.value = newCenter;
-    localStorage.setItem('mapng_center', JSON.stringify(newCenter));
+    const safeCenter = sanitizeCenter(newCenter);
+    center.value = safeCenter;
+    localStorage.setItem('mapng_center', JSON.stringify(safeCenter));
   }
 
   function setZoom(newZoom) {

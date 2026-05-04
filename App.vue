@@ -372,6 +372,14 @@ const buildDevTime = formatBuildTime(__BUILD_DEV_TIME__);
 
 const { setCenter, setResolution, setBatchMode: setStoreBatchMode } = store;
 
+const isValidCenter = (point) => {
+  const lat = Number(point?.lat);
+  const lng = Number(point?.lng);
+  return Number.isFinite(lat) && Number.isFinite(lng)
+    && lat >= -90 && lat <= 90
+    && lng >= -180 && lng <= 180;
+};
+
 const handleGlobalDevToggleKey = (event) => {
   if (event.defaultPrevented) return;
   const tag = String(event.target?.tagName || '').toLowerCase();
@@ -485,7 +493,7 @@ const handleTifSelected = async (file) => {
     const resolvedMeta = await applyAscCoordinateSelection(meta);
     uploadedTifMeta.value = resolvedMeta;
     // Auto-centre map if the file contains coordinate metadata
-    if (resolvedMeta.center) store.setCenter(resolvedMeta.center);
+    if (isValidCenter(resolvedMeta.center)) store.setCenter(resolvedMeta.center);
   } catch (e) {
     console.warn('[BYOD] Failed to read file metadata:', e);
   }
@@ -513,7 +521,7 @@ const handleUploadedAscCoordinateSystemChange = async (value) => {
     const baseMeta = await parseTifFile(file);
     const resolvedMeta = await applyAscCoordinateSelection(baseMeta);
     uploadedTifMeta.value = resolvedMeta;
-    if (resolvedMeta.center) {
+    if (isValidCenter(resolvedMeta.center)) {
       store.setCenter(resolvedMeta.center);
     }
     terrainData.value = null;
@@ -746,7 +754,9 @@ const handleImportData = (data) => {
   if (data.bounds) {
       const lat = (data.bounds.north + data.bounds.south) / 2;
       const lng = (data.bounds.east + data.bounds.west) / 2;
-      setCenter({ lat, lng });
+      if (isValidCenter({ lat, lng })) {
+        setCenter({ lat, lng });
+      }
   }
 
   // 2. Update resolution

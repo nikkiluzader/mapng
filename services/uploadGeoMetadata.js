@@ -27,6 +27,11 @@ export const getBuiltInProj4 = (epsgCode) => {
   if (epsgCode === 3857) {
     return '+proj=merc +a=6378137 +b=6378137 +lat_ts=0.0 +lon_0=0.0 +x_0=0.0 +y_0=0 +k=1.0 +units=m +nadgrids=@null +wktext +no_defs';
   }
+  if (epsgCode === 27700) {
+    // Browser-safe fallback for British National Grid without OSTN15 NTv2 file.
+    // Accuracy is typically lower than grid-shift based transforms but avoids NaN results.
+    return '+proj=tmerc +lat_0=49 +lon_0=-2 +k=0.9996012717 +x_0=400000 +y_0=-100000 +ellps=airy +towgs84=446.448,-125.157,542.06,0.1502,0.247,0.8421,-20.4894 +units=m +no_defs';
+  }
   if (epsgCode === 2180) {
     return '+proj=tmerc +lat_0=0 +lon_0=19 +k=0.9993 +x_0=500000 +y_0=-5300000 +ellps=GRS80 +units=m +no_defs';
   }
@@ -147,6 +152,33 @@ export const computeGeoMetadata = async ({
     };
   }
 
+  const numericInputs = [sourceWidth, sourceHeight, originX, originY, resX, resY].map(Number);
+  if (!numericInputs.every(Number.isFinite)) {
+    console.warn(`[${logPrefix}] Geo metadata inputs contain non-finite values.`);
+    return {
+      isGeoReferenced: true,
+      bounds: null,
+      center: null,
+      nativeMetersPerPixel: null,
+      nativeWidth: null,
+      nativeHeight: null,
+      suggestedResolution: null,
+    };
+  }
+
+  if (Number(sourceWidth) <= 0 || Number(sourceHeight) <= 0 || Number(resX) === 0 || Number(resY) === 0) {
+    console.warn(`[${logPrefix}] Geo metadata inputs contain invalid dimensions or pixel resolution.`);
+    return {
+      isGeoReferenced: true,
+      bounds: null,
+      center: null,
+      nativeMetersPerPixel: null,
+      nativeWidth: null,
+      nativeHeight: null,
+      suggestedResolution: null,
+    };
+  }
+
   const xExtent = useSampleSpacing ? resX * Math.max(0, sourceWidth - 1) : resX * sourceWidth;
   const yExtent = useSampleSpacing ? resY * Math.max(0, sourceHeight - 1) : resY * sourceHeight;
   const x1 = originX + xExtent;
@@ -154,6 +186,19 @@ export const computeGeoMetadata = async ({
 
   const [west, north] = toWGS84(originX, originY);
   const [east, south] = toWGS84(x1, y1);
+
+  if (![west, north, east, south].every(Number.isFinite)) {
+    console.warn(`[${logPrefix}] CRS conversion produced non-finite bounds (likely missing datum grid shift data).`);
+    return {
+      isGeoReferenced: true,
+      bounds: null,
+      center: null,
+      nativeMetersPerPixel: null,
+      nativeWidth: null,
+      nativeHeight: null,
+      suggestedResolution: null,
+    };
+  }
 
   const bounds = {
     north: Math.max(north, south),
@@ -189,6 +234,20 @@ export const computeGeoMetadata = async ({
   const mPerDegLng = 111320 * Math.cos(midLat * Math.PI / 180);
   const coverageWm = Math.abs(bounds.east - bounds.west) * mPerDegLng;
   const coverageHm = Math.abs(bounds.north - bounds.south) * mPerDegLat;
+
+  if (![coverageWm, coverageHm].every((v) => Number.isFinite(v) && v > 0)) {
+    console.warn(`[${logPrefix}] Coverage dimensions are non-finite after CRS conversion.`);
+    return {
+      isGeoReferenced: true,
+      bounds: null,
+      center: null,
+      nativeMetersPerPixel: null,
+      nativeWidth: null,
+      nativeHeight: null,
+      suggestedResolution: null,
+    };
+  }
+
   const divisorX = useSampleSpacing ? Math.max(1, sourceWidth - 1) : Math.max(1, sourceWidth);
   const divisorY = useSampleSpacing ? Math.max(1, sourceHeight - 1) : Math.max(1, sourceHeight);
   const mppX = coverageWm / divisorX;
