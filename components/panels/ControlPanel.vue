@@ -1,27 +1,27 @@
 <template>
   <div class="space-y-6">
-    <!-- TIF Upload (BYOD) -->
-    <TifUploadControl
-      :uploaded-tif-file="uploadedTifFile"
-      :uploaded-tif-meta="uploadedTifMeta"
+    <!-- Elevation Upload (BYOD: tif/tiff/asc/gml/xml/zip/laz/las) -->
+    <ElevationUploadControl
+      :uploaded-elevation-file="uploadedElevationFile"
+      :uploaded-elevation-meta="uploadedElevationMeta"
       :vertical-unit-override="elevationUnitOverride"
       :asc-coordinate-system="uploadedAscCoordinateSystem"
       @update:verticalUnitOverride="(v) => elevationUnitOverride = v"
       @update:ascCoordinateSystem="(v) => $emit('update:uploadedAscCoordinateSystem', v)"
-      @file-selected="$emit('tifSelected', $event)"
-      @clear="$emit('tifClear')"
+      @file-selected="$emit('elevationFileSelected', $event)"
+      @clear="$emit('elevationFileClear')"
     />
 
     <!-- LAZ Metadata Card -->
     <LazMetaCard
-      v-if="isLazFileActive && uploadedTifMeta"
-      :meta="uploadedTifMeta"
+      v-if="isLazFileActive && uploadedElevationMeta"
+      :meta="uploadedElevationMeta"
     />
 
-    <!-- TIF Metadata Card -->
-    <TifMetaCard
-      v-if="uploadedTifMeta && !isLazFileActive"
-      :meta="uploadedTifMeta"
+    <!-- Raster Metadata Card -->
+    <RasterMetaCard
+      v-if="uploadedElevationMeta && !isLazFileActive"
+      :meta="uploadedElevationMeta"
       :vertical-unit-override="elevationUnitOverride"
     />
 
@@ -31,7 +31,7 @@
       :is-cached="isCached"
       :use-gpxz="useGPXZ"
       :gpxz-api-key="gpxzApiKey"
-      :has-custom-elevation="!!uploadedTifFile"
+      :has-custom-elevation="!!uploadedElevationFile"
       @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride)"
     />
 
@@ -98,7 +98,7 @@
           :max-resolution="maxSquareCropResolution"
         >
           <p>{{ t('controlPanel.squareCropWithinCoverage') }}</p>
-          <p v-if="uploadedTifMeta?.suggestedResolution">{{ t('controlPanel.suggestedSquareExport', { size: uploadedTifMeta.suggestedResolution }) }}</p>
+          <p v-if="uploadedElevationMeta?.suggestedResolution">{{ t('controlPanel.suggestedSquareExport', { size: uploadedElevationMeta.suggestedResolution }) }}</p>
         </ResolutionSelector>
         <div class="text-[10px] text-gray-500 dark:text-gray-400 pt-1 space-y-1">
           <p v-if="nativeDims.note" class="text-[#FF6600] font-medium">
@@ -256,12 +256,12 @@ import ResolutionSelector from '../map/ResolutionSelector.vue';
 import SurroundingTiles from '../map/SurroundingTiles.vue';
 import ExportPanel from './ExportPanel.vue';
 import GenerateActions from '../controls/GenerateActions.vue';
-import TifUploadControl from '../controls/TifUploadControl.vue';
+import ElevationUploadControl from '../controls/ElevationUploadControl.vue';
 import RunConfigControls from '../controls/RunConfigControls.vue';
 import JobStateControls from '../controls/JobStateControls.vue';
 import TerrainStats from '../controls/TerrainStats.vue';
 import LazMetaCard from '../controls/LazMetaCard.vue';
-import TifMetaCard from '../controls/TifMetaCard.vue';
+import RasterMetaCard from '../controls/RasterMetaCard.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { exportJobData, importJobData } from '../../services/jobData';
@@ -270,9 +270,9 @@ import { getMaxSquareCropResolution } from '../../services/uploadBounds';
 
 const { t } = useI18n({ useScope: 'global' });
 
-const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedTifFile', 'uploadedTifMeta', 'uploadedAscCoordinateSystem', 'uploadedAreaMode']);
+const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedAreaMode']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'tifSelected', 'tifClear', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedAreaMode']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'elevationFileSelected', 'elevationFileClear', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedAreaMode']);
 
 const handleLocationChange = (newLocation) => {
   emit('locationChange', { ...props.center, ...newLocation });
@@ -395,20 +395,20 @@ const metersPerPixel = computed(() => 1.0);
 
 // Detect active file type for metadata card routing
 const isLazFileActive = computed(() => {
-  const name = props.uploadedTifFile?.name?.toLowerCase() ?? '';
+  const name = props.uploadedElevationFile?.name?.toLowerCase() ?? '';
   return name.endsWith('.laz') || name.endsWith('.las');
 });
 
 const isGeoReferencedRasterActive = computed(() => {
   if (isLazFileActive.value) return false;
-  return !!props.uploadedTifMeta?.bounds;
+  return !!props.uploadedElevationMeta?.bounds;
 });
 
 // When a LAZ file is active with native dimensions, lock the resolution display
 // to show the file's native coverage rather than the resolution dropdown.
 const lazNativeDims = computed(() => {
   if (!isLazFileActive.value) return null;
-  const meta = props.uploadedTifMeta;
+  const meta = props.uploadedElevationMeta;
   if (!meta?.nativeWidth || !meta?.nativeHeight) return null;
   return {
     width: meta.nativeWidth,
@@ -419,10 +419,10 @@ const lazNativeDims = computed(() => {
   };
 });
 
-// Same native-dimension lock for georeferenced GeoTIFFs.
-const tifNativeDims = computed(() => {
+// Same native-dimension lock for georeferenced raster uploads.
+const georeferencedRasterNativeDims = computed(() => {
   if (!isGeoReferencedRasterActive.value) return null;
-  const meta = props.uploadedTifMeta;
+  const meta = props.uploadedElevationMeta;
   if (!meta?.nativeWidth || !meta?.nativeHeight || !meta?.bounds) return null;
   return {
     width: meta.nativeWidth,
@@ -433,14 +433,14 @@ const tifNativeDims = computed(() => {
   };
 });
 
-const nativeDims = computed(() => lazNativeDims.value || tifNativeDims.value);
+const nativeDims = computed(() => lazNativeDims.value || georeferencedRasterNativeDims.value);
 const supportsUploadAreaMode = computed(() => isGeoReferencedRasterActive.value);
-const maxSquareCropResolution = computed(() => getMaxSquareCropResolution(props.uploadedTifMeta, !!props.devMode));
+const maxSquareCropResolution = computed(() => getMaxSquareCropResolution(props.uploadedElevationMeta, !!props.devMode));
 
 watch([() => props.uploadedAreaMode, maxSquareCropResolution], ([mode, maxResolution]) => {
   if (mode !== 'crop' || !Number.isFinite(maxResolution) || maxResolution <= 0) return;
   if (Number(props.resolution) > maxResolution) {
-    emit('resolutionChange', props.uploadedTifMeta?.suggestedResolution || maxResolution);
+    emit('resolutionChange', props.uploadedElevationMeta?.suggestedResolution || maxResolution);
   }
 }, { immediate: true });
 
@@ -462,7 +462,7 @@ const signatureForKey = (key) => {
 // True when the current UI params exactly match the last successful generation,
 // so the user can skip re-fetching and go straight to export.
 const isCached = computed(() => {
-  if (props.uploadedTifFile) return false; // always re-generate when custom file is active
+  if (props.uploadedElevationFile) return false; // always re-generate when custom file is active
   if (!props.generationCacheKey || !props.terrainData) return false;
   const currentKey = JSON.stringify({
     lat: props.center.lat,

@@ -21,18 +21,15 @@ const mapLinearUnitCode = (code) => {
 };
 
 /**
- * Parse a .tif/.tiff File from the user's filesystem.
+ * Parse supported raster/grid-based elevation uploads into a normalized
+ * metadata shape consumed by the terrain pipeline.
  *
- * Returns the GeoTIFF image object + raster data in the same format that
- * resamplerClient.prepareTiles() / resampleHeightMapOffThread() expect, so
- * the existing pipeline can consume it directly.
- *
- * Also extracts WGS84 bounds and centre point from GeoTIFF geo-metadata when
- * present (projected or geographic CRS).  Plain TIFFs without GeoKeys, or
- * GeoTIFFs with unsupported/user-defined CRS, return null for bounds/center;
- * the caller must supply coordinates.
+ * Supported inputs:
+ * - GeoTIFF / TIFF: .tif, .tiff
+ * - ASCII Grid: .asc
+ * - GML/XML (single tile) and ZIP archives containing GML tiles
  */
-export const parseTifFile = async (file) => {
+export const parseRasterOrGridElevationFile = async (file) => {
   const lowerName = file.name.toLowerCase();
   if (lowerName.endsWith('.asc')) {
     return parseAscFile(file);
@@ -164,3 +161,6 @@ export const parseTifFile = async (file) => {
     verticalUnitDetectionSource,
   };
 };
+
+// Backward-compatible alias; prefer parseRasterOrGridElevationFile() in new code.
+export const parseTifFile = async (file) => parseRasterOrGridElevationFile(file);

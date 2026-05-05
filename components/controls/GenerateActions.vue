@@ -21,7 +21,7 @@
           <Mountain :size="16" />
           <span>{{ t('generateActions.preview3d') }}</span>
         </div>
-        <span class="text-[10px] font-normal opacity-90">{{ hasCustomElevation ? t('generateActions.usingUploadedTif') : t('generateActions.viewBeforeDownload') }}</span>
+        <span class="text-[10px] font-normal opacity-90">{{ hasCustomElevation ? t('generateActions.usingUploadedElevation') : t('generateActions.viewBeforeDownload') }}</span>
       </template>
     </BaseButton>
 

@@ -327,7 +327,7 @@
     "processing": "Обработка...",
     "preview3d": "3D предпросмотр",
     "usingCachedData": "Используются кэшированные данные",
-    "usingUploadedTif": "Используется загруженный TIF",
+    "usingUploadedElevation": "Используется загруженный TIF",
     "viewBeforeDownload": "Просмотр перед скачиванием",
     "dataReady": "Данные готовы",
     "downloadBelow": "Скачать ниже",

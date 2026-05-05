@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import JSZip from 'jszip';
 
 import { parseGmlText } from '../services/tifLoader.js';
-import { parseTifFile } from '../services/tifLoader.js';
+import { parseRasterOrGridElevationFile } from '../services/tifLoader.js';
 
 test('parseGmlText parses a rectified grid coverage into raster metadata', async () => {
   const gml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -158,7 +158,7 @@ test('parseGmlText pads leading noData cells when a grid function startPoint ski
   assert.deepEqual(Array.from(parsed.raster), [parsed.noData, 10, 20, 30]);
 });
 
-test('parseTifFile parses ZIP archives containing multiple GML tiles', async () => {
+test('parseRasterOrGridElevationFile parses ZIP archives containing multiple GML tiles', async () => {
   const makeTile = ({ west, east, south, north, values }) => `<?xml version="1.0" encoding="UTF-8"?>
   <Dataset xmlns:gml="http://www.opengis.net/gml/3.2">
     <DEM>
@@ -209,7 +209,7 @@ test('parseTifFile parses ZIP archives containing multiple GML tiles', async () 
 
   const content = await zip.generateAsync({ type: 'uint8array' });
   const file = new File([content], 'tiles.zip', { type: 'application/zip' });
-  const parsed = await parseTifFile(file);
+  const parsed = await parseRasterOrGridElevationFile(file);
 
   assert.equal(parsed.sourceFormat, 'gml-zip');
   assert.equal(parsed.formatLabel, 'GML ZIP');

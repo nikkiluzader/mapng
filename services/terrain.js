@@ -1,5 +1,7 @@
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm";
-import { parseTifFile } from "./tifLoader";
+import { parseRasterOrGridElevationFile, parseTifFile } from "./tifLoader";
+export { parseRasterOrGridElevationFile };
+// Backward-compatible export; prefer parseElevationFile() in new call sites.
 export { parseTifFile };
 import { parseLazFile } from "./lazLoader";
 export { parseLazFile };
@@ -112,6 +114,166 @@ const convertHeightMapToMeters = (heightMap, scale) => {
   }
 };
 
+const decodeTerrariumHeight = (r, g, b) => {
+  const h = r * 256 + g + b / 256 - 32768;
+  return h <= -32760 ? NO_DATA_VALUE : h;
+};
+
+const createTerrariumHeightSampler = async (
+  bounds,
+  signal,
+  onProgress,
+  globalTileConcurrency = 20,
+) => {
+  const nw = project(bounds.north, bounds.west, TERRAIN_ZOOM);
+  const se = project(bounds.south, bounds.east, TERRAIN_ZOOM);
+
+  const minTileX = Math.floor(nw.x / TILE_SIZE);
+  const minTileY = Math.floor(nw.y / TILE_SIZE);
+  const maxTileX = Math.floor(se.x / TILE_SIZE);
+  const maxTileY = Math.floor(se.y / TILE_SIZE);
+
+  const tileCountX = maxTileX - minTileX + 1;
+  const tileCountY = maxTileY - minTileY + 1;
+  const canvasWidth = tileCountX * TILE_SIZE;
+  const canvasHeight = tileCountY * TILE_SIZE;
+
+  const terrainCanvas = document.createElement('canvas');
+  terrainCanvas.width = canvasWidth;
+  terrainCanvas.height = canvasHeight;
+  const tCtx = terrainCanvas.getContext('2d', { willReadFrequently: true });
+  if (!tCtx) throw new Error('Failed to create terrarium canvas context');
+
+  const requests = [];
+  for (let tx = minTileX; tx <= maxTileX; tx++) {
+    for (let ty = minTileY; ty <= maxTileY; ty++) {
+      requests.push({ tx, ty });
+    }
+  }
+
+  let completed = 0;
+  await pMap(
+    requests,
+    async ({ tx, ty }) => {
+      completed++;
+      if (completed % 10 === 0 || completed === requests.length) {
+        onProgress?.(`Downloading fallback terrain tiles... ${completed}/${requests.length}`);
+      }
+
+      const drawX = (tx - minTileX) * TILE_SIZE;
+      const drawY = (ty - minTileY) * TILE_SIZE;
+      const numTiles = Math.pow(2, TERRAIN_ZOOM);
+      const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
+      const terrainUrl = `${TILE_API_URL}/${TERRAIN_ZOOM}/${wrappedTx}/${ty}.png`;
+
+      const img = await loadImage(terrainUrl, signal);
+      if (img) {
+        tCtx.drawImage(img, drawX, drawY);
+      } else {
+        // Keep a nodata value in failed cells instead of arbitrary flat fill.
+        tCtx.fillStyle = 'rgb(0,0,0)';
+        tCtx.fillRect(drawX, drawY, TILE_SIZE, TILE_SIZE);
+      }
+    },
+    Math.max(1, Number(globalTileConcurrency || 20)),
+    signal,
+  );
+
+  const terrainDataImg = tCtx.getImageData(0, 0, canvasWidth, canvasHeight);
+  terrainCanvas.width = 0;
+  terrainCanvas.height = 0;
+
+  return (lat, lng) => {
+    const p = project(lat, lng, TERRAIN_ZOOM);
+    const localX = p.x - minTileX * TILE_SIZE;
+    const localY = p.y - minTileY * TILE_SIZE;
+
+    const x = Math.floor(localX);
+    const y = Math.floor(localY);
+    if (x < 0 || x >= terrainDataImg.width || y < 0 || y >= terrainDataImg.height) {
+      return NO_DATA_VALUE;
+    }
+
+    const i = (y * terrainDataImg.width + x) * 4;
+    return decodeTerrariumHeight(
+      terrainDataImg.data[i],
+      terrainDataImg.data[i + 1],
+      terrainDataImg.data[i + 2],
+    );
+  };
+};
+
+const fillLazNoDataWithGlobalTerrain = async (
+  heightMap,
+  width,
+  height,
+  bounds,
+  signal,
+  onProgress,
+  globalTileConcurrency = 20,
+) => {
+  const missingIndices = [];
+  for (let i = 0; i < heightMap.length; i++) {
+    if (heightMap[i] === NO_DATA_VALUE || !Number.isFinite(heightMap[i])) {
+      missingIndices.push(i);
+    }
+  }
+  if (missingIndices.length === 0) return;
+
+  onProgress?.('Filling LAZ edge gaps with global DEM...');
+  const sampleHeight = await createTerrariumHeightSampler(bounds, signal, onProgress, globalTileConcurrency);
+
+  const filledMask = new Uint8Array(heightMap.length);
+  const latSpan = bounds.north - bounds.south;
+  const lngSpan = bounds.east - bounds.west;
+
+  for (let m = 0; m < missingIndices.length; m++) {
+    const idx = missingIndices[m];
+    const row = Math.floor(idx / width);
+    const col = idx - row * width;
+
+    const u = width > 1 ? (col / (width - 1)) : 0;
+    const v = height > 1 ? (row / (height - 1)) : 0;
+
+    const lat = bounds.north - v * latSpan;
+    const lng = bounds.west + u * lngSpan;
+    const sampled = sampleHeight(lat, lng);
+
+    if (sampled !== NO_DATA_VALUE && Number.isFinite(sampled)) {
+      heightMap[idx] = sampled;
+      filledMask[idx] = 1;
+    }
+  }
+
+  // Gentle seam blending on newly filled cells only.
+  const scratch = new Float32Array(heightMap.length);
+  for (let pass = 0; pass < 2; pass++) {
+    scratch.set(heightMap);
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x;
+        if (!filledMask[idx]) continue;
+
+        let sum = 0;
+        let cnt = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            if (dx === 0 && dy === 0) continue;
+            const v = scratch[(y + dy) * width + (x + dx)];
+            if (v !== NO_DATA_VALUE && Number.isFinite(v)) {
+              sum += v;
+              cnt++;
+            }
+          }
+        }
+        if (cnt > 0) {
+          heightMap[idx] = scratch[idx] * 0.6 + (sum / cnt) * 0.4;
+        }
+      }
+    }
+  }
+};
+
 // Math Helpers for Web Mercator Projection (Source of Truth for Fetching)
 const MAX_LATITUDE = 85.05112878;
 
@@ -205,6 +367,22 @@ export function getGPXZRateLimitInfo() {
 }
 
 const NO_DATA_VALUE = -99999;
+
+/**
+ * Parse any supported BYOD elevation upload format into a metadata object
+ * consumable by the terrain generation pipeline.
+ *
+ * Supported extensions:
+ * - Point cloud: .laz, .las
+ * - Raster/text: .tif, .tiff, .asc, .gml, .xml, .zip
+ */
+export const parseElevationFile = async (file) => {
+  const ext = String(file?.name || '').toLowerCase().split('.').pop();
+  if (ext === 'laz' || ext === 'las') {
+    return parseLazFile(file);
+  }
+  return parseRasterOrGridElevationFile(file);
+};
 
 /**
  * Fetch high-resolution elevation data from the GPXZ hires-raster API.
@@ -1243,14 +1421,17 @@ export const fetchTerrainData = async (
 };
 
 /**
- * Generate terrain data from a user-uploaded TIF file instead of fetching
+ * Generate terrain data from a user-uploaded raster/grid elevation file instead of fetching
  * elevation from GPXZ/USGS/Terrarium.
+ *
+ * Legacy compatibility API: prefer loadTerrainFromUploadedElevation() for new
+ * code so callers do not need format-specific naming.
  *
  * Satellite tiles are still fetched normally from the network using the
  * coordinates, so OSM overlays and textures work exactly as in the normal flow.
  *
- * @param {object} tifData     - Parsed result from parseTifFile()
- * @param {object} center      - { lat, lng } — from GeoTIFF metadata or user input
+ * @param {object} uploadedRasterData - Parsed result from parseRasterOrGridElevationFile()
+ * @param {object} center      - { lat, lng } — from file metadata or user input
  * @param {number} resolution  - Output size in pixels (= metres at 1m/px)
  * @param {boolean} includeOSM
  * @param {Function} onProgress
@@ -1258,7 +1439,7 @@ export const fetchTerrainData = async (
  * @param {object} generationOptions
  */
 export const loadTerrainFromTif = async (
-  tifData,
+  uploadedRasterData,
   center,
   resolution,
   includeOSM = false,
@@ -1266,8 +1447,8 @@ export const loadTerrainFromTif = async (
   signal,
   generationOptions = {},
 ) => {
-  if (tifData?.isLikelyElevation === false) {
-    throw new Error(tifData.elevationValidationMessage || '[BYOD] Uploaded GeoTIFF is not a valid elevation raster.');
+  if (uploadedRasterData?.isLikelyElevation === false) {
+    throw new Error(uploadedRasterData.elevationValidationMessage || '[BYOD] Uploaded GeoTIFF is not a valid elevation raster.');
   }
 
   const {
@@ -1297,14 +1478,14 @@ export const loadTerrainFromTif = async (
       east: normalizeLng(Number(targetBounds.east)),
       west: normalizeLng(Number(targetBounds.west)),
     };
-  } else if (preferNativeCoverage && tifData.bounds && tifData.nativeWidth && tifData.nativeHeight) {
-    width = tifData.nativeWidth;
-    height = tifData.nativeHeight;
+  } else if (preferNativeCoverage && uploadedRasterData.bounds && uploadedRasterData.nativeWidth && uploadedRasterData.nativeHeight) {
+    width = uploadedRasterData.nativeWidth;
+    height = uploadedRasterData.nativeHeight;
     fetchBounds = {
-      north: tifData.bounds.north,
-      south: tifData.bounds.south,
-      east: normalizeLng(tifData.bounds.east),
-      west: normalizeLng(tifData.bounds.west),
+      north: uploadedRasterData.bounds.north,
+      south: uploadedRasterData.bounds.south,
+      east: normalizeLng(uploadedRasterData.bounds.east),
+      west: normalizeLng(uploadedRasterData.bounds.west),
     };
   } else {
     width = resolution;
@@ -1373,13 +1554,13 @@ export const loadTerrainFromTif = async (
 
   // ── Resample TIF heightmap to metric grid ───────────────────────────────────
   signal?.throwIfAborted();
-  console.info(`[BYOD] Resampling ${tifData.gridTiles?.length || 1} uploaded tile(s) to ${width}x${height}.`);
+  console.info(`[BYOD] Resampling ${uploadedRasterData.gridTiles?.length || 1} uploaded tile(s) to ${width}x${height}.`);
   emitProgress({ status: 'Mapping uploaded elevation to the output grid...', percent: 0 });
 
   let heightMap, finalBounds;
   let finalSatCanvas = null;
 
-  if (tifData.bounds) {
+  if (uploadedRasterData.bounds) {
     // Known CRS — use geographic coordinate mapping through the worker
     const imageSamplerData = {
       pixels: satDataImg.data,
@@ -1389,9 +1570,9 @@ export const loadTerrainFromTif = async (
       minTileX: satMinTileX,
       minTileY: satMinTileY,
     };
-    const source = tifData.sourceType === 'grid'
-      ? { type: 'grid', data: { tiles: tifData.gridTiles || [] } }
-      : { type: 'geotiff', data: [{ image: tifData.image, raster: tifData.raster }] };
+    const source = uploadedRasterData.sourceType === 'grid'
+      ? { type: 'grid', data: { tiles: uploadedRasterData.gridTiles || [] } }
+      : { type: 'geotiff', data: [{ image: uploadedRasterData.image, raster: uploadedRasterData.raster }] };
     const result = await resampleHeightAndImageOffThread(
       source,
       colorSampler,
@@ -1420,9 +1601,9 @@ export const loadTerrainFromTif = async (
     // Unknown/user-defined CRS — stretch TIF directly to output grid via bilinear scaling.
     // The user has positioned the map on the correct location, so we fill the selected area
     // with the TIF data regardless of coordinate metadata.
-    const srcW = tifData.sourceWidth;
-    const srcH = tifData.sourceHeight;
-    const noDataVal = tifData.noData ?? -99999;
+    const srcW = uploadedRasterData.sourceWidth;
+    const srcH = uploadedRasterData.sourceHeight;
+    const noDataVal = uploadedRasterData.noData ?? -99999;
     heightMap = new Float32Array(width * height);
 
     for (let oy = 0; oy < height; oy++) {
@@ -1435,10 +1616,10 @@ export const loadTerrainFromTif = async (
         const y1 = Math.min(srcH - 1, y0 + 1);
         const tx = sx - x0;
         const ty = sy - y0;
-        const h00 = tifData.raster[y0 * srcW + x0];
-        const h10 = tifData.raster[y0 * srcW + x1];
-        const h01 = tifData.raster[y1 * srcW + x0];
-        const h11 = tifData.raster[y1 * srcW + x1];
+        const h00 = uploadedRasterData.raster[y0 * srcW + x0];
+        const h10 = uploadedRasterData.raster[y0 * srcW + x1];
+        const h01 = uploadedRasterData.raster[y1 * srcW + x0];
+        const h11 = uploadedRasterData.raster[y1 * srcW + x1];
         const anyNoData = [h00, h10, h01, h11].some(
           h => h === noDataVal || !Number.isFinite(h)
         );
@@ -1450,8 +1631,8 @@ export const loadTerrainFromTif = async (
     finalBounds = fetchBounds;
   }
 
-  const tifUnit = resolveElevationUnitScale(tifData, elevationUnitOverride);
-  convertHeightMapToMeters(heightMap, tifUnit.scale);
+  const elevationUnit = resolveElevationUnitScale(uploadedRasterData, elevationUnitOverride);
+  convertHeightMapToMeters(heightMap, elevationUnit.scale);
 
   // ── Resample satellite texture ───────────────────────────────────────────────
   if (!finalSatCanvas) {
@@ -1520,10 +1701,10 @@ export const loadTerrainFromTif = async (
     exportCropSize: null,
     elevationUnitApplied: {
       selected: elevationUnitOverride,
-      detected: tifData.verticalUnitDetected || 'unknown',
-      detectionSource: tifData.verticalUnitDetectionSource || null,
-      scaleToMeters: tifUnit.scale,
-      source: tifUnit.source,
+      detected: uploadedRasterData.verticalUnitDetected || 'unknown',
+      detectionSource: uploadedRasterData.verticalUnitDetectionSource || null,
+      scaleToMeters: elevationUnit.scale,
+      source: elevationUnit.source,
     },
   };
 
@@ -1565,6 +1746,7 @@ export const loadTerrainFromLaz = async (
     elevationUnitOverride        = 'auto',
     targetBounds                 = null,
     preferNativeCoverage         = true,
+    fillLazEdgeGapsWithGlobalDem = true,
   } = generationOptions || {};
 
   const normalizedCenter = { lat: center.lat, lng: normalizeLng(center.lng) };
@@ -1667,6 +1849,7 @@ export const loadTerrainFromLaz = async (
     rasterCenter,
     width,
     height,
+    hasTargetBounds ? fetchBounds : null,
     (current, total, status) => {
       const pct = total > 0 ? Math.round(current / total * 100) : 0;
       onProgress?.(status || `Processing point cloud… ${pct}%`);
@@ -1675,6 +1858,18 @@ export const loadTerrainFromLaz = async (
 
   const lazUnit = resolveElevationUnitScale(lazData, elevationUnitOverride);
   convertHeightMapToMeters(heightMap, lazUnit.scale);
+
+  if (fillLazEdgeGapsWithGlobalDem) {
+    await fillLazNoDataWithGlobalTerrain(
+      heightMap,
+      width,
+      height,
+      fetchBounds,
+      signal,
+      onProgress,
+      globalTileConcurrency,
+    );
+  }
 
   // ── Resample satellite texture ────────────────────────────────────────────
   signal?.throwIfAborted();
@@ -1765,6 +1960,56 @@ export const loadTerrainFromLaz = async (
   }
 
   return terrainData;
+};
+
+/**
+ * Format-neutral BYOD terrain loader.
+ *
+ * Routes parsed upload metadata to the appropriate terrain loader while
+ * preserving the same call signature used by format-specific loaders.
+ */
+export const loadTerrainFromUploadedElevation = async (
+  uploadedElevationData,
+  center,
+  resolution,
+  includeOSM = false,
+  onProgress,
+  signal,
+  generationOptions = {},
+) => {
+  const format = String(uploadedElevationData?.sourceFormat || '').toLowerCase();
+  const sourceType = String(uploadedElevationData?.sourceType || '').toLowerCase();
+  // Prefer explicit format tags, but keep fallbacks for older metadata objects.
+  const hasLazHeaderShape = Number.isFinite(Number(uploadedElevationData?.pointFormat))
+    && Number.isFinite(Number(uploadedElevationData?.pointDataRecordLength));
+  const isPointCloud = format === 'laz'
+    || format === 'las'
+    || sourceType === 'laz'
+    || sourceType === 'las'
+    || uploadedElevationData?.isLaz === true
+    || hasLazHeaderShape;
+
+  if (isPointCloud) {
+    return loadTerrainFromLaz(
+      uploadedElevationData,
+      center,
+      resolution,
+      includeOSM,
+      onProgress,
+      signal,
+      generationOptions,
+    );
+  }
+
+  return loadTerrainFromTif(
+    uploadedElevationData,
+    center,
+    resolution,
+    includeOSM,
+    onProgress,
+    signal,
+    generationOptions,
+  );
 };
 
 /**

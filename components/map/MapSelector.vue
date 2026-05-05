@@ -176,8 +176,8 @@ const props = defineProps({
   zoom: { type: Number, required: true },
   resolution: { type: [Number, String], required: true },
   isDarkMode: { type: Boolean, default: false },
-  uploadedTifFile: { type: Object, default: null },
-  uploadedTifMeta: { type: Object, default: null },
+  uploadedElevationFile: { type: Object, default: null },
+  uploadedElevationMeta: { type: Object, default: null },
   uploadedAreaMode: { type: String, default: 'native' },
   surroundingTilePositions: { type: Array, default: () => [] },
   batchGrid: { type: Array, default: () => [] },
@@ -278,8 +278,8 @@ const selectionBounds = computed(() => {
 });
 
 const nativeCoverageBounds = computed(() => {
-  const b = props.uploadedTifMeta?.bounds;
-  if (!props.uploadedTifFile || !b) return null;
+  const b = props.uploadedElevationMeta?.bounds;
+  if (!props.uploadedElevationFile || !b) return null;
   if (![b.north, b.south, b.east, b.west].every((v) => Number.isFinite(v))) return null;
   return {
     north: b.north,

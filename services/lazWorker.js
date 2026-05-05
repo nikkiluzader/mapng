@@ -64,7 +64,7 @@ const removeSpikes = (heightMap, width, height) => {
 };
 
 // ─── Build a point→grid-index mapper ─────────────────────────────────────────
-const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, maxY, epsgDefs }) => {
+const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, maxY, targetBounds, epsgDefs }) => {
   if (epsgDefs) {
     for (const [key, def] of Object.entries(epsgDefs)) {
       if (def && !proj4.defs(key)) proj4.defs(key, def);
@@ -83,38 +83,103 @@ const buildGridMapper = ({ epsgCode, center, width, height, minX, maxX, minY, ma
         if (builtIn) proj4.defs(epsg, builtIn);
         // Workers can't async-fetch — CRS must arrive via epsgDefs
       }
+      if (!proj4.defs(epsg)) {
+        console.info(`[lazWorker] No proj4 definition for ${epsg}; using extent-stretch fallback.`);
+        throw new Error(`Missing proj4 definition for ${epsg}`);
+      }
       const toFileCRS = proj4('EPSG:4326', epsg);
+
+      // Prefer explicit WGS84 bounds from the pipeline so point rasterization
+      // shares the exact same geographic envelope as satellite/OSM sampling.
+      if (targetBounds && ['north', 'south', 'east', 'west'].every((key) => Number.isFinite(Number(targetBounds[key])))) {
+        const corners = [
+          toFileCRS.forward([Number(targetBounds.west), Number(targetBounds.north)]),
+          toFileCRS.forward([Number(targetBounds.east), Number(targetBounds.north)]),
+          toFileCRS.forward([Number(targetBounds.west), Number(targetBounds.south)]),
+          toFileCRS.forward([Number(targetBounds.east), Number(targetBounds.south)]),
+        ];
+        const xs = corners.map(([x]) => x).filter(Number.isFinite);
+        const ys = corners.map(([, y]) => y).filter(Number.isFinite);
+        if (xs.length === 4 && ys.length === 4) {
+          const bx0 = Math.min(...xs);
+          const bx1 = Math.max(...xs);
+          const by0 = Math.min(...ys);
+          const by1 = Math.max(...ys);
+          const spanX = bx1 - bx0;
+          const spanY = by1 - by0;
+          if (spanX > 0 && spanY > 0) {
+            return (px, py) => {
+              if (px < bx0 || px > bx1 || py < by0 || py > by1) return -1;
+              const col = Math.min(width - 1, Math.max(0, Math.floor((px - bx0) / spanX * width)));
+              const row = Math.min(height - 1, Math.max(0, Math.floor((by1 - py) / spanY * height)));
+              return row * width + col;
+            };
+          }
+        }
+      }
+
       const [cx, cy]  = toFileCRS.forward([center.lng, center.lat]);
 
-      // Determine how many CRS units equal 1 metre in each axis.
-      // This handles non-metric CRS (e.g. EPSG:6438 uses US survey feet, not metres).
-      // Without this, halfW/halfH (in metres) would be compared against dx/dy (in feet),
-      // causing the terrain to be stretched by ~3.28× and misaligned with OSM overlays.
+      // Build a local 2D basis in file CRS for +1m east and +1m north.
+      // This handles:
+      // 1) non-metric CRS units (e.g. US survey feet), and
+      // 2) local axis rotation/shear between geographic EN and projected XY.
+      // Using only independent X/Y scales can introduce directional offsets.
       const mPerDegLat = 111320;
       const mPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
-      const [ex]    = toFileCRS.forward([center.lng + 1 / mPerDegLng, center.lat]);
-      const [, ny]  = toFileCRS.forward([center.lng, center.lat + 1 / mPerDegLat]);
-      const crsPerMX = Math.abs(ex - cx);  // CRS units per metre (easting)
-      const crsPerMY = Math.abs(ny - cy);  // CRS units per metre (northing)
+      const [ex, ey] = toFileCRS.forward([center.lng + 1 / mPerDegLng, center.lat]);
+      const [nx, ny] = toFileCRS.forward([center.lng, center.lat + 1 / mPerDegLat]);
 
-      const halfW_crs = halfW * crsPerMX;
-      const halfH_crs = halfH * crsPerMY;
+      const ux = ex - cx;
+      const uy = ey - cy;
+      const vx = nx - cx;
+      const vy = ny - cy;
+
+      const det = ux * vy - uy * vx;
+      if (!Number.isFinite(det) || Math.abs(det) < 1e-12) {
+        throw new Error(`Degenerate local CRS basis for ${epsg}`);
+      }
 
       return (px, py) => {
         const dx = px - cx;
         const dy = py - cy;
-        if (dx < -halfW_crs || dx > halfW_crs || dy < -halfH_crs || dy > halfH_crs) return -1;
-        const col = Math.min(width  - 1, Math.floor((dx + halfW_crs) / (2 * halfW_crs) * width));
-        const row = Math.min(height - 1, Math.floor((halfH_crs - dy) / (2 * halfH_crs) * height));
+
+        // Solve [u v] * [east north]^T = d for local metre offsets.
+        const eastMeters = (dx * vy - dy * vx) / det;
+        const northMeters = (ux * dy - uy * dx) / det;
+
+        if (eastMeters < -halfW || eastMeters > halfW || northMeters < -halfH || northMeters > halfH) return -1;
+
+        const col = Math.min(width  - 1, Math.max(0, Math.floor((eastMeters + halfW) / (2 * halfW) * width)));
+        const row = Math.min(height - 1, Math.max(0, Math.floor((halfH - northMeters) / (2 * halfH) * height)));
         return row * width + col;
       };
     } catch (e) {
-      console.warn('[lazWorker] CRS mapping failed, falling back to extent stretch:', e);
+      if (!String(e?.message || '').includes('Missing proj4 definition')) {
+        console.warn('[lazWorker] CRS mapping failed, falling back to extent stretch:', e);
+      }
     }
   }
 
   // Geographic CRS (EPSG:4326) — degree→metre approximation
   if (epsgCode === 4326) {
+    if (targetBounds && ['north', 'south', 'east', 'west'].every((key) => Number.isFinite(Number(targetBounds[key])))) {
+      const north = Number(targetBounds.north);
+      const south = Number(targetBounds.south);
+      const east = Number(targetBounds.east);
+      const west = Number(targetBounds.west);
+      const spanX = east - west;
+      const spanY = north - south;
+      if (spanX > 0 && spanY > 0) {
+        return (px, py) => {
+          if (px < west || px > east || py < south || py > north) return -1;
+          const col = Math.min(width - 1, Math.max(0, Math.floor((px - west) / spanX * width)));
+          const row = Math.min(height - 1, Math.max(0, Math.floor((north - py) / spanY * height)));
+          return row * width + col;
+        };
+      }
+    }
+
     const mPerDegLat = 111320;
     const mPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
     return (px, py) => {
@@ -201,6 +266,47 @@ const fillHoles = (heightMap, width, height) => {
   heightMap.set(levels[0].data);
 };
 
+// Mark NO_DATA cells connected to the grid border so we can preserve them after
+// interpolation. This prevents the hole-filler from extrapolating terrain into
+// exterior empty regions around the point cloud footprint.
+const markExteriorNoData = (heightMap, width, height) => {
+  const total = width * height;
+  const marked = new Uint8Array(total);
+  const queue = new Uint32Array(total);
+  let head = 0;
+  let tail = 0;
+
+  const enqueue = (idx) => {
+    if (marked[idx]) return;
+    if (heightMap[idx] !== NO_DATA || !Number.isFinite(heightMap[idx])) return;
+    marked[idx] = 1;
+    queue[tail++] = idx;
+  };
+
+  // Seed flood-fill from all four borders.
+  for (let x = 0; x < width; x++) {
+    enqueue(x);
+    enqueue((height - 1) * width + x);
+  }
+  for (let y = 1; y < height - 1; y++) {
+    enqueue(y * width);
+    enqueue(y * width + (width - 1));
+  }
+
+  while (head < tail) {
+    const idx = queue[head++];
+    const y = Math.floor(idx / width);
+    const x = idx - y * width;
+
+    if (x > 0) enqueue(idx - 1);
+    if (x < width - 1) enqueue(idx + 1);
+    if (y > 0) enqueue(idx - width);
+    if (y < height - 1) enqueue(idx + width);
+  }
+
+  return marked;
+};
+
 // ─── Lazy laz-perf WASM instance (created once per worker) ───────────────────
 let lazPerfInstance = null;
 const getLazPerf = async () => {
@@ -219,10 +325,10 @@ const rasterize = async (params, id) => {
     pointFormat, pointDataRecordLength, pointDataOffset, pointCount,
     scaleX, scaleY, scaleZ, offsetX, offsetY, offsetZ,
     minX, maxX, minY, maxY,
-    epsgCode, center, width, height, epsgDefs,
+    epsgCode, center, width, height, targetBounds, epsgDefs,
   } = params;
 
-  const gridMapper = buildGridMapper({ epsgCode, center, width, height, minX, maxX, minY, maxY, epsgDefs });
+  const gridMapper = buildGridMapper({ epsgCode, center, width, height, minX, maxX, minY, maxY, targetBounds, epsgDefs });
   const clsOff     = classificationOffset(pointFormat);
   const totalCells = width * height;
 
@@ -334,8 +440,16 @@ const rasterize = async (params, id) => {
     );
   }
 
+  const exteriorNoDataMask = markExteriorNoData(heightMap, width, height);
+
   self.postMessage({ id, type: 'progress', current: processed, total: processed, status: 'Filling holes…' });
   fillHoles(heightMap, width, height);
+
+  // Restore border-connected no-data after filling so only interior gaps are
+  // interpolated; this avoids warped edges around sparse footprints.
+  for (let i = 0; i < heightMap.length; i++) {
+    if (exteriorNoDataMask[i]) heightMap[i] = NO_DATA;
+  }
 
   return heightMap;
 };

@@ -194,6 +194,9 @@ export const parseLazFile = async (file) => {
   const coverageSummary = summarizeCoverageBounds(bounds);
 
   return {
+    sourceType: 'laz',
+    sourceFormat: isLaz ? 'laz' : 'las',
+    formatLabel: isLaz ? 'LAZ' : 'LAS',
     buffer,
     isLaz,
     versionMajor: vMajor,

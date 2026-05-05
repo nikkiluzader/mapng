@@ -32,8 +32,8 @@
         :terrain-data="terrainData"
         :is-generating="isLoading"
         :generation-cache-key="lastGenerationKey"
-        :uploaded-tif-file="uploadedTifFile"
-        :uploaded-tif-meta="uploadedTifMeta"
+        :uploaded-elevation-file="uploadedElevationFile"
+        :uploaded-elevation-meta="uploadedElevationMeta"
         :uploaded-asc-coordinate-system="uploadedAscCoordinateSystem"
         :uploaded-area-mode="uploadedAreaMode"
         @location-change="handleLocationChange"
@@ -45,8 +45,8 @@
         @fetch-osm="handleFetchOSM"
         @surrounding-tiles-change="(v) => surroundingTilePositions = v"
         @import-data="handleImportData"
-        @tif-selected="handleTifSelected"
-        @tif-clear="handleTifClear"
+        @elevation-file-selected="handleElevationFileSelected"
+        @elevation-file-clear="handleElevationFileClear"
         @show-support="openSupportTip('manual')"
         @export-success="handleSingleExportSuccess"
       />
@@ -94,8 +94,8 @@
             :zoom="zoom" 
             :resolution="resolution"
             :is-dark-mode="isDarkMode"
-            :uploaded-tif-file="uploadedTifFile"
-            :uploaded-tif-meta="uploadedTifMeta"
+            :uploaded-elevation-file="uploadedElevationFile"
+            :uploaded-elevation-meta="uploadedElevationMeta"
             :uploaded-area-mode="uploadedAreaMode"
             :surrounding-tile-positions="surroundingTilePositions"
             :batch-grid="batchGridTiles"
@@ -203,7 +203,7 @@ import MapSelector from './components/map/MapSelector.vue';
 import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
-import { fetchTerrainData, addOSMToTerrain, loadTerrainFromTif, parseTifFile, loadTerrainFromLaz, parseLazFile } from './services/terrain';
+import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
 import { applyAscCoordinateSystem } from './services/ascLoader.js';
 import { computeUploadedCropBounds } from './services/uploadBounds';
 import {
@@ -307,9 +307,9 @@ const handleSingleExportSuccess = () => {
   maybePromptSupportAfterSingleExport();
 };
 
-// BYOD — user-uploaded TIF elevation data
-const uploadedTifFile = ref(null);   // File | null
-const uploadedTifMeta = ref(null);   // parseTifFile() result | null
+// BYOD upload state shared across upload, map overlay, and generation pipeline.
+const uploadedElevationFile = ref(null);   // File | null
+const uploadedElevationMeta = ref(null);   // parseElevationFile() result | null
 const uploadedAreaMode = ref(localStorage.getItem('mapng_uploaded_area_mode') || 'native');
 const uploadedAscCoordinateSystem = ref(localStorage.getItem('mapng_uploaded_asc_crs') || 'auto');
 
@@ -460,7 +460,7 @@ const signatureForKey = (key) => {
 
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
-const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, tifFile = null, elevationUnitOverride = 'auto') => {
+const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedElevationFile = null, elevationUnitOverride = 'auto') => {
   return JSON.stringify({
     lat: c.lat,
     lng: c.lng,
@@ -471,14 +471,17 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, tifFile = nul
     elevationUnitOverride,
     uploadedAscCoordinateSystem: uploadedAscCoordinateSystem.value,
     uploadedAreaMode: uploadedAreaMode.value,
-    // Include file identity so a different upload invalidates the cache
-    tif: tifFile ? `${tifFile.name}|${tifFile.size}|${tifFile.lastModified}` : null,
+    // Include file identity so changing uploads always invalidates cached terrain.
+    uploadedElevation: uploadedElevationFile
+      ? `${uploadedElevationFile.name}|${uploadedElevationFile.size}|${uploadedElevationFile.lastModified}`
+      : null,
   });
 };
 
-const handleTifSelected = async (file) => {
-  uploadedTifFile.value = file;
-  uploadedTifMeta.value = null;
+const handleElevationFileSelected = async (file) => {
+  // New upload always resets generation state because bounds/resolution may change.
+  uploadedElevationFile.value = file;
+  uploadedElevationMeta.value = null;
   uploadedAreaMode.value = 'native';
   localStorage.setItem('mapng_uploaded_area_mode', 'native');
   uploadedAscCoordinateSystem.value = 'auto';
@@ -486,12 +489,10 @@ const handleTifSelected = async (file) => {
   terrainData.value = null;
   lastGenerationKey.value = null;
   try {
-    const ext = file.name.toLowerCase().split('.').pop();
-    const meta = (ext === 'laz' || ext === 'las')
-      ? await parseLazFile(file)
-      : await parseTifFile(file);
+    // Parse every supported upload format via a format-neutral service API.
+    const meta = await parseElevationFile(file);
     const resolvedMeta = await applyAscCoordinateSelection(meta);
-    uploadedTifMeta.value = resolvedMeta;
+    uploadedElevationMeta.value = resolvedMeta;
     // Auto-centre map if the file contains coordinate metadata
     if (isValidCenter(resolvedMeta.center)) store.setCenter(resolvedMeta.center);
   } catch (e) {
@@ -499,9 +500,9 @@ const handleTifSelected = async (file) => {
   }
 };
 
-const handleTifClear = () => {
-  uploadedTifFile.value = null;
-  uploadedTifMeta.value = null;
+const handleElevationFileClear = () => {
+  uploadedElevationFile.value = null;
+  uploadedElevationMeta.value = null;
   uploadedAreaMode.value = 'native';
   localStorage.setItem('mapng_uploaded_area_mode', 'native');
   uploadedAscCoordinateSystem.value = 'auto';
@@ -512,15 +513,15 @@ const handleUploadedAscCoordinateSystemChange = async (value) => {
   uploadedAscCoordinateSystem.value = value;
   localStorage.setItem('mapng_uploaded_asc_crs', value);
 
-  const file = uploadedTifFile.value;
+  const file = uploadedElevationFile.value;
   if (!file) return;
   const ext = file.name.toLowerCase().split('.').pop();
   if (ext !== 'asc') return;
 
   try {
-    const baseMeta = await parseTifFile(file);
+    const baseMeta = await parseElevationFile(file);
     const resolvedMeta = await applyAscCoordinateSelection(baseMeta);
-    uploadedTifMeta.value = resolvedMeta;
+    uploadedElevationMeta.value = resolvedMeta;
     if (isValidCenter(resolvedMeta.center)) {
       store.setCenter(resolvedMeta.center);
     }
@@ -573,7 +574,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     fetchOSM,
     normalizedSource,
     gpxzApiKey,
-    uploadedTifFile.value,
+    uploadedElevationFile.value,
     elevationUnitOverride,
   );
 
@@ -647,45 +648,28 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
 
   try {
     let data;
-    if (uploadedTifFile.value) {
-      // BYOD path — use uploaded elevation file, still fetch satellite/OSM
-      const ext = uploadedTifFile.value.name.toLowerCase().split('.').pop();
-      const isLaz = ext === 'laz' || ext === 'las';
-      const meta = uploadedTifMeta.value
-        ?? (isLaz ? await parseLazFile(uploadedTifFile.value) : await parseTifFile(uploadedTifFile.value));
+    if (uploadedElevationFile.value) {
+      // BYOD path: local upload defines terrain heights while texture/OSM
+      // overlays still come from the normal network tile flow.
+      const meta = uploadedElevationMeta.value
+        ?? await parseElevationFile(uploadedElevationFile.value);
       const targetBounds = uploadedAreaMode.value === 'crop' && meta?.bounds
         ? computeUploadedCropBounds(center.value, resolution.value, meta.bounds)
         : null;
       const effectiveCenter = meta.center ?? center.value;
-      if (isLaz) {
-        data = await loadTerrainFromLaz(
-          meta,
-          effectiveCenter,
-          resolution.value,
-          fetchOSM,
-          applyLoadingUpdate,
-          signal,
-          {
-            elevationUnitOverride,
-            targetBounds,
-            preferNativeCoverage: uploadedAreaMode.value !== 'crop',
-          },
-        );
-      } else {
-        data = await loadTerrainFromTif(
-          meta,
-          effectiveCenter,
-          resolution.value,
-          fetchOSM,
-          applyLoadingUpdate,
-          signal,
-          {
-            elevationUnitOverride,
-            targetBounds,
-            preferNativeCoverage: uploadedAreaMode.value !== 'crop',
-          },
-        );
-      }
+      data = await loadTerrainFromUploadedElevation(
+        meta,
+        effectiveCenter,
+        resolution.value,
+        fetchOSM,
+        applyLoadingUpdate,
+        signal,
+        {
+          elevationUnitOverride,
+          targetBounds,
+          preferNativeCoverage: uploadedAreaMode.value !== 'crop',
+        },
+      );
     } else {
       data = await fetchTerrainData(
         center.value,

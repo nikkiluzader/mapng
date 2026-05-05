@@ -343,7 +343,7 @@
     "processing": "Processing...",
     "preview3d": "Preview 3D",
     "usingCachedData": "Using cached data",
-    "usingUploadedTif": "Using uploaded TIF",
+    "usingUploadedElevation": "Using uploaded elevation data",
     "viewBeforeDownload": "View before download",
     "dataReady": "Data Ready",
     "downloadBelow": "Download below",
