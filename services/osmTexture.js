@@ -1759,6 +1759,11 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
   const requestedSize = Number(options.outputSize || terrainData.width || 1024);
   const targetSize = Math.max(1, Math.min(MAX_TEX_SIZE, Math.floor(requestedSize)));
   const SCALE_FACTOR = targetSize / Math.max(1, terrainData.width);
+  const processingMetersPerPixel = Number.isFinite(Number(terrainData?.processingMetersPerPixel))
+    && Number(terrainData.processingMetersPerPixel) > 0
+    ? Number(terrainData.processingMetersPerPixel)
+    : 1;
+  const METERS_TO_PX = SCALE_FACTOR / processingMetersPerPixel;
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(terrainData.width * SCALE_FACTOR));
   canvas.height = Math.max(1, Math.round(terrainData.height * SCALE_FACTOR));
@@ -1774,7 +1779,10 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
 
   const toPixel = (lat, lng) => {
     const [lx, ly] = toMetric.forward([lng, lat]);
-    return { x: (lx + halfW) * SCALE_FACTOR, y: (halfH - ly) * SCALE_FACTOR };
+    return {
+      x: lx * METERS_TO_PX + halfW * SCALE_FACTOR,
+      y: halfH * SCALE_FACTOR - ly * METERS_TO_PX,
+    };
   };
 
   // Use noise pattern for background instead of solid color
@@ -1790,7 +1798,7 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
     ctx,
     terrainData.osmFeatures,
     toPixel,
-    SCALE_FACTOR,
+    METERS_TO_PX,
     options,
   );
 
@@ -1862,6 +1870,11 @@ export function renderRoadOverlayOnCanvas(canvas, terrainData, options = {}) {
   if (!ctx) return canvas;
 
   const scaleFactor = canvas.width / Math.max(1, terrainData.width);
+  const processingMetersPerPixel = Number.isFinite(Number(terrainData?.processingMetersPerPixel))
+    && Number(terrainData.processingMetersPerPixel) > 0
+    ? Number(terrainData.processingMetersPerPixel)
+    : 1;
+  const metersToPx = scaleFactor / processingMetersPerPixel;
   const centerLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
   const centerLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
   const toMetric = createWGS84ToLocal(centerLat, centerLng);
@@ -1870,14 +1883,17 @@ export function renderRoadOverlayOnCanvas(canvas, terrainData, options = {}) {
 
   const toPixel = (lat, lng) => {
     const [lx, ly] = toMetric.forward([lng, lat]);
-    return { x: (lx + halfW) * scaleFactor, y: (halfH - ly) * scaleFactor };
+    return {
+      x: lx * metersToPx + halfW * scaleFactor,
+      y: halfH * scaleFactor - ly * metersToPx,
+    };
   };
 
   const roadFeatures = terrainData.osmFeatures.filter(
     (f) => f.type === "road" || f.type === "bridge_infra",
   );
 
-  renderFeaturesToCanvas(ctx, roadFeatures, toPixel, scaleFactor, {
+  renderFeaturesToCanvas(ctx, roadFeatures, toPixel, metersToPx, {
     ...options,
     alpha: options.alpha ?? 1.0,
   });

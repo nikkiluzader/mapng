@@ -243,7 +243,7 @@
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
               <Loader2 v-if="isExportingTexture" :size="20" class="animate-spin text-[#FF6600]" />
-              <img v-else-if="terrainData.satelliteTextureUrl" :src="terrainData.satelliteTextureUrl" class="w-full h-full object-cover" />
+              <img v-else-if="satellitePreviewUrl" :src="satellitePreviewUrl" class="w-full h-full object-cover" />
               <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-[11px] font-medium">{{ t('exportPanel.satellite') }}</span>
@@ -259,7 +259,7 @@
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
               <Loader2 v-if="isExportingOSMTexture" :size="20" class="animate-spin text-[#FF6600]" />
-              <img v-else-if="terrainData.osmTextureUrl" :src="terrainData.osmTextureUrl" class="w-full h-full object-cover" />
+              <img v-else-if="osmPreviewUrl" :src="osmPreviewUrl" class="w-full h-full object-cover" />
               <Trees v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-[11px] font-medium">{{ t('exportPanel.osmTexture') }}</span>
@@ -275,7 +275,7 @@
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
               <Loader2 v-if="isExportingHybridTexture" :size="20" class="animate-spin text-[#FF6600]" />
-              <img v-else-if="terrainData.hybridTextureUrl" :src="terrainData.hybridTextureUrl" class="w-full h-full object-cover" />
+              <img v-else-if="hybridPreviewUrl" :src="hybridPreviewUrl" class="w-full h-full object-cover" />
               <Layers v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
             <span class="text-[11px] font-medium">{{ t('exportPanel.satelliteHybrid') }}</span>
@@ -498,7 +498,7 @@
 </style>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen
@@ -632,6 +632,63 @@ const _defaultPbrSource = localStorage.getItem('mapng_beamNGPbrSource')
 const beamNGPbrSource = ref(_defaultPbrSource);
 const showExportGeo = ref(localStorage.getItem('mapng_showExportGeo') !== 'false');
 
+const THUMB_SIZE = 256;
+const satellitePreviewUrl = ref('');
+const osmPreviewUrl = ref('');
+const hybridPreviewUrl = ref('');
+let satellitePreviewToken = 0;
+let osmPreviewToken = 0;
+let hybridPreviewToken = 0;
+
+const revokeObjectUrl = (url) => {
+  if (!url || typeof url !== 'string') return;
+  if (!url.startsWith('blob:')) return;
+  URL.revokeObjectURL(url);
+};
+
+const clearPreviewUrl = (targetRef) => {
+  revokeObjectUrl(targetRef.value);
+  targetRef.value = '';
+};
+
+const createThumbnailUrlFromSource = async (sourceUrl, size = THUMB_SIZE) => {
+  if (!sourceUrl) return '';
+  const image = new Image();
+  image.decoding = 'async';
+  image.src = sourceUrl;
+
+  await new Promise((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('Failed to load texture preview source.'));
+  });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  ctx.drawImage(image, 0, 0, size, size);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) return '';
+  return URL.createObjectURL(blob);
+};
+
+const updatePreviewUrl = async (sourceUrl, targetRef, nextToken) => {
+  clearPreviewUrl(targetRef);
+  if (!sourceUrl) return;
+  try {
+    const previewUrl = await createThumbnailUrlFromSource(sourceUrl);
+    if (nextToken() === false) {
+      revokeObjectUrl(previewUrl);
+      return;
+    }
+    targetRef.value = previewUrl;
+  } catch {
+    // Keep preview empty on decode errors.
+  }
+};
+
 watch(showExports, (v) => localStorage.setItem('mapng_showExports', String(v)));
 watch(showExport2D, (v) => localStorage.setItem('mapng_showExport2D', String(v)));
 watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v)));
@@ -654,6 +711,39 @@ watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks'
 watch(beamNGRoadType, (v) => localStorage.setItem('mapng_beamNGRoadType', v));
 watch(beamNGFlavorId, (v) => localStorage.setItem('mapng_beamNGFlavorId', v));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
+
+watch(
+  () => props.terrainData?.satelliteTextureUrl,
+  (url) => {
+    const token = ++satellitePreviewToken;
+    updatePreviewUrl(url, satellitePreviewUrl, () => token === satellitePreviewToken);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.terrainData?.osmTextureUrl,
+  (url) => {
+    const token = ++osmPreviewToken;
+    updatePreviewUrl(url, osmPreviewUrl, () => token === osmPreviewToken);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.terrainData?.hybridTextureUrl,
+  (url) => {
+    const token = ++hybridPreviewToken;
+    updatePreviewUrl(url, hybridPreviewUrl, () => token === hybridPreviewToken);
+  },
+  { immediate: true },
+);
+
+onUnmounted(() => {
+  clearPreviewUrl(satellitePreviewUrl);
+  clearPreviewUrl(osmPreviewUrl);
+  clearPreviewUrl(hybridPreviewUrl);
+});
 
 const buildBeamNGFallbackLevelName = () => (
   `mapng_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}`
@@ -779,13 +869,12 @@ const roadMaskPreviewUrl = computed(() => {
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   const src = props.terrainData;
-  const scaleX = size / src.width;
-  const scaleY = size / src.height;
+  const projection = createRoadMaskProjection(src, size, size, props.center);
+  if (!projection) return null;
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, size, size);
-  const toLocal = createWGS84ToLocal(props.center.lat, props.center.lng);
   ctx.strokeStyle = 'white';
-  ctx.lineWidth = Math.max(2, 8 * scaleX);
+  ctx.lineWidth = Math.max(2, 8 * projection.metersToPx);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   src.osmFeatures.forEach(feature => {
@@ -795,9 +884,7 @@ const roadMaskPreviewUrl = computed(() => {
     if (highway && exclude.includes(highway)) return;
     ctx.beginPath();
     feature.geometry.forEach((pt, index) => {
-      const [x, y] = toLocal.forward([pt.lng, pt.lat]);
-      const u = (x + src.width / 2) * scaleX;
-      const v = (src.height / 2 - y) * scaleY;
+      const { x: u, y: v } = projection.toPixel(pt.lat, pt.lng);
       if (index === 0) ctx.moveTo(u, v);
       else ctx.lineTo(u, v);
     });
@@ -925,6 +1012,42 @@ const yieldToUi = async () => {
 // Returns terrainData cropped to exportCropSize if a LAZ file drove the native size
 const getExportTerrainData = () => prepareCroppedTerrainData(props.terrainData);
 
+const resolveProcessingMetersPerPixel = (terrainData) => {
+  const parsed = Number(terrainData?.processingMetersPerPixel);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+};
+
+const createRoadMaskProjection = (terrainData, targetWidth, targetHeight, fallbackCenter = null) => {
+  if (!terrainData) return null;
+  const centerLat = Number.isFinite(Number(terrainData.bounds?.north)) && Number.isFinite(Number(terrainData.bounds?.south))
+    ? (terrainData.bounds.north + terrainData.bounds.south) / 2
+    : fallbackCenter?.lat;
+  const centerLng = Number.isFinite(Number(terrainData.bounds?.east)) && Number.isFinite(Number(terrainData.bounds?.west))
+    ? (terrainData.bounds.east + terrainData.bounds.west) / 2
+    : fallbackCenter?.lng;
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLng)) return null;
+
+  const sourceWidth = Math.max(1, Number(terrainData.width) || 1);
+  const sourceHeight = Math.max(1, Number(terrainData.height) || 1);
+  const scaleX = targetWidth / sourceWidth;
+  const scaleY = targetHeight / sourceHeight;
+  const processingMetersPerPixel = resolveProcessingMetersPerPixel(terrainData);
+  const metersToPxX = scaleX / processingMetersPerPixel;
+  const metersToPxY = scaleY / processingMetersPerPixel;
+  const toLocal = createWGS84ToLocal(centerLat, centerLng);
+
+  return {
+    metersToPx: Math.min(metersToPxX, metersToPxY),
+    toPixel: (lat, lng) => {
+      const [localX, localY] = toLocal.forward([lng, lat]);
+      return {
+        x: localX * metersToPxX + (sourceWidth / 2) * scaleX,
+        y: (sourceHeight / 2) * scaleY - localY * metersToPxY,
+      };
+    },
+  };
+};
+
 const downloadMetadataSidecar = (exportFilename, metadata) => {
   if (!ENABLE_METADATA_SIDECARS) return;
   const baseName = exportFilename.replace(/\.[^.]+$/, '');
@@ -1015,27 +1138,27 @@ const downloadRoadMask = async () => {
   isExportingRoadMask.value = true;
   try {
     await yieldToUi();
+    const td = await getExportTerrainData();
     const canvas = document.createElement('canvas');
-    canvas.width = props.terrainData.width;
-    canvas.height = props.terrainData.height;
+    canvas.width = td.width;
+    canvas.height = td.height;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const toLocal = createWGS84ToLocal(props.center.lat, props.center.lng);
+    const projection = createRoadMaskProjection(td, canvas.width, canvas.height, props.center);
+    if (!projection) throw new Error('Unable to create road mask projection.');
     ctx.strokeStyle = 'white';
-    ctx.lineWidth = Math.max(2, 8 * (canvas.width / props.terrainData.width));
+    ctx.lineWidth = Math.max(2, 8 * projection.metersToPx);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    props.terrainData.osmFeatures.forEach(feature => {
+    td.osmFeatures.forEach(feature => {
       if (feature.type !== 'road') return;
       const highway = feature.tags?.highway;
       const exclude = ['footway', 'path', 'pedestrian', 'steps', 'cycleway', 'bridleway', 'corridor'];
       if (highway && exclude.includes(highway)) return;
       ctx.beginPath();
       feature.geometry.forEach((pt, index) => {
-        const [x, y] = toLocal.forward([pt.lng, pt.lat]);
-        const u = x + props.terrainData.width / 2;
-        const v = props.terrainData.height / 2 - y;
+        const { x: u, y: v } = projection.toPixel(pt.lat, pt.lng);
         if (index === 0) ctx.moveTo(u, v);
         else ctx.lineTo(u, v);
       });

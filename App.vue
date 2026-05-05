@@ -36,10 +36,12 @@
         :uploaded-elevation-meta="uploadedElevationMeta"
         :uploaded-asc-coordinate-system="uploadedAscCoordinateSystem"
         :uploaded-area-mode="uploadedAreaMode"
+        :processing-meters-per-pixel="processingMetersPerPixel"
         @location-change="handleLocationChange"
         @resolution-change="store.setResolution"
         @update:uploaded-asc-coordinate-system="handleUploadedAscCoordinateSystemChange"
         @update:uploaded-area-mode="handleUploadedAreaModeChange"
+        @update:processingMetersPerPixel="handleProcessingMetersPerPixelChange"
         @zoom-change="store.setZoom"
         @generate="handleGenerate"
         @fetch-osm="handleFetchOSM"
@@ -93,6 +95,7 @@
             :center="center" 
             :zoom="zoom" 
             :resolution="resolution"
+            :processing-meters-per-pixel="processingMetersPerPixel"
             :is-dark-mode="isDarkMode"
             :uploaded-elevation-file="uploadedElevationFile"
             :uploaded-elevation-meta="uploadedElevationMeta"
@@ -312,6 +315,19 @@ const uploadedElevationFile = ref(null);   // File | null
 const uploadedElevationMeta = ref(null);   // parseElevationFile() result | null
 const uploadedAreaMode = ref(localStorage.getItem('mapng_uploaded_area_mode') || 'native');
 const uploadedAscCoordinateSystem = ref(localStorage.getItem('mapng_uploaded_asc_crs') || 'auto');
+const storedProcessingMpp = Number(localStorage.getItem('mapng_processing_mpp') || 1);
+const processingMetersPerPixel = ref(
+  Number.isFinite(storedProcessingMpp) && storedProcessingMpp > 0
+    ? storedProcessingMpp
+    : 1,
+);
+
+const handleProcessingMetersPerPixelChange = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return;
+  processingMetersPerPixel.value = parsed;
+  localStorage.setItem('mapng_processing_mpp', String(parsed));
+};
 
 const applyAscCoordinateSelection = async (meta) => {
   if (!meta || meta.sourceFormat !== 'asc') return meta;
@@ -460,11 +476,12 @@ const signatureForKey = (key) => {
 
 // Build a cache key from the parameters that affect terrain generation.
 // If this key matches the last generation, we can skip re-fetching.
-const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedElevationFile = null, elevationUnitOverride = 'auto') => {
+const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedElevationFile = null, elevationUnitOverride = 'auto', processingMpp = 1) => {
   return JSON.stringify({
     lat: c.lat,
     lng: c.lng,
     resolution: res,
+    processingMetersPerPixel: processingMpp,
     osm,
     elevationSource,
     gpxzKeySig: elevationSource === 'gpxz' ? signatureForKey(gpxzKey) : '',
@@ -562,7 +579,7 @@ const applyLoadingUpdate = (update) => {
   }
 };
 
-const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default', gpxzApiKey = '', elevationUnitOverride = 'auto') => {
+const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default', gpxzApiKey = '', elevationUnitOverride = 'auto', processingMpp = 1) => {
   const normalizedSource = String(elevationSource || 'default').toLowerCase();
   const useUSGS = normalizedSource === 'usgs';
   const useGPXZ = normalizedSource === 'gpxz';
@@ -576,6 +593,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     gpxzApiKey,
     uploadedElevationFile.value,
     elevationUnitOverride,
+    processingMpp,
   );
 
   // If we already have terrain data for the exact same parameters, reuse it
@@ -589,6 +607,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       cachedParams.lat === newParams.lat &&
       cachedParams.lng === newParams.lng &&
       cachedParams.resolution === newParams.resolution &&
+      Number(cachedParams.processingMetersPerPixel || 1) === Number(newParams.processingMetersPerPixel || 1) &&
       cachedParams.elevationSource === newParams.elevationSource &&
       (cachedParams.gpxzKeySig ?? '') === (newParams.gpxzKeySig ?? '');
 
@@ -654,7 +673,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       const meta = uploadedElevationMeta.value
         ?? await parseElevationFile(uploadedElevationFile.value);
       const targetBounds = uploadedAreaMode.value === 'crop' && meta?.bounds
-        ? computeUploadedCropBounds(center.value, resolution.value, meta.bounds)
+        ? computeUploadedCropBounds(center.value, Number(resolution.value) * Number(processingMpp || 1), meta.bounds)
         : null;
       const effectiveCenter = meta.center ?? center.value;
       data = await loadTerrainFromUploadedElevation(
@@ -666,6 +685,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         signal,
         {
           elevationUnitOverride,
+          processingMetersPerPixel: Number(processingMpp || 1),
           targetBounds,
           preferNativeCoverage: uploadedAreaMode.value !== 'crop',
         },
@@ -682,6 +702,9 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         undefined,
         applyLoadingUpdate,
         signal,
+        {
+          processingMetersPerPixel: Number(processingMpp || 1),
+        },
       );
     }
     terrainData.value = data;
@@ -761,7 +784,10 @@ const handleImportData = (data) => {
           resolution.value,
           !!data.osmFeatures?.length,
           'default',
-          ''
+          '',
+          null,
+          'auto',
+          processingMetersPerPixel.value,
       );
   }
 

@@ -175,6 +175,7 @@ const props = defineProps({
   center: { type: Object, required: true },
   zoom: { type: Number, required: true },
   resolution: { type: [Number, String], required: true },
+  processingMetersPerPixel: { type: [Number, String], default: 1 },
   isDarkMode: { type: Boolean, default: false },
   uploadedElevationFile: { type: Object, default: null },
   uploadedElevationMeta: { type: Object, default: null },
@@ -252,11 +253,14 @@ const osmAttribution = computed(() => {
     : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 });
 
-// Calculate bounds based on resolution (1m/px means resolution = meters)
+// Calculate bounds from output size and processing meters-per-pixel.
 const activeSelectionSizeMeters = computed(() => {
   const base = Number(props.resolution);
+  const mpp = Number(props.processingMetersPerPixel);
 
-  return Number.isFinite(base) && base > 0 ? base : 1024;
+  if (!Number.isFinite(base) || base <= 0) return 1024;
+  if (!Number.isFinite(mpp) || mpp <= 0) return base;
+  return base * mpp;
 });
 
 const bounds = computed(() => {

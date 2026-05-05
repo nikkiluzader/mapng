@@ -934,6 +934,7 @@ export const fetchTerrainData = async (
     generateOSMTextureAsset = true,
     generateHybridTextureAsset = true,
     globalTileConcurrency = 20,
+    processingMetersPerPixel = 1,
     targetBounds = null,
   } = generationOptions || {};
   // Normalize longitude to handle world wrapping
@@ -941,9 +942,12 @@ export const fetchTerrainData = async (
     lat: center.lat,
     lng: normalizeLng(center.lng),
   };
+  const effectiveMetersPerPixel = Number.isFinite(Number(processingMetersPerPixel)) && Number(processingMetersPerPixel) > 0
+    ? Number(processingMetersPerPixel)
+    : 1;
 
   // 1. Define Target Metric Grid
-  // Resolution is treated as "Output Size in Pixels" AND "Extent in Meters" (1m/px)
+  // Resolution is output pixels; meters-per-pixel controls world coverage.
   const width = resolution;
   const height = resolution;
 
@@ -956,7 +960,11 @@ export const fetchTerrainData = async (
         east: normalizeLng(Number(targetBounds.east)),
         west: normalizeLng(Number(targetBounds.west)),
       }
-    : computeMetricFetchBounds(normalizedCenter, width, height);
+    : computeMetricFetchBounds(
+        normalizedCenter,
+        width * effectiveMetersPerPixel,
+        height * effectiveMetersPerPixel,
+      );
 
   // 2. Try GPXZ / USGS
   let rawData = null;
@@ -1301,7 +1309,7 @@ export const fetchTerrainData = async (
 
   // 4. Resample Heightmap to Metric Grid
   signal?.throwIfAborted();
-  onProgress?.("Resampling heightmap to 1m/px...");
+  onProgress?.(`Resampling heightmap to ${effectiveMetersPerPixel}m/px...`);
 
   // Prepare serializable fallback sampler data for the web worker
   const fallbackSamplerData = terrainDataImg ? {
@@ -1339,7 +1347,7 @@ export const fetchTerrainData = async (
     // GPXZ is generally hole-free; if GPXZ chunks failed, keep fill enabled.
     !(useGPXZ && rawData && !gpxzChunkFailures),
     imageSamplerData,
-    targetBounds,
+    fetchBounds,
   );
 
   // 6. Calculate Min/Max
@@ -1392,6 +1400,7 @@ export const fetchTerrainData = async (
     kron86Fallback,
     kron86FallbackReason,
     sourceGeoTiffs,
+    processingMetersPerPixel: effectiveMetersPerPixel,
   };
 
   if (includeOSM && osmFeatures.length > 0) {
@@ -1456,9 +1465,14 @@ export const loadTerrainFromTif = async (
     generateHybridTextureAsset = true,
     globalTileConcurrency = 20,
     elevationUnitOverride = 'auto',
+    processingMetersPerPixel = 1,
     targetBounds = null,
     preferNativeCoverage = true,
   } = generationOptions || {};
+
+  const effectiveMetersPerPixel = Number.isFinite(Number(processingMetersPerPixel)) && Number(processingMetersPerPixel) > 0
+    ? Number(processingMetersPerPixel)
+    : 1;
 
   const normalizedCenter = { lat: center.lat, lng: normalizeLng(center.lng) };
   const emitProgress = (update) => onProgress?.(update);
@@ -1490,7 +1504,11 @@ export const loadTerrainFromTif = async (
   } else {
     width = resolution;
     height = resolution;
-    fetchBounds = computeMetricFetchBounds(normalizedCenter, width, height);
+    fetchBounds = computeMetricFetchBounds(
+      normalizedCenter,
+      width * effectiveMetersPerPixel,
+      height * effectiveMetersPerPixel,
+    );
   }
 
   // ── Satellite tiles (same as fetchTerrainData, no terrain tiles needed) ────
@@ -1584,7 +1602,7 @@ export const loadTerrainFromTif = async (
       null,
       true,
       imageSamplerData,
-      hasTargetBounds ? fetchBounds : null,
+      fetchBounds,
       (progress) => emitProgress({
         status: progress.message || 'Mapping uploaded elevation to the output grid...',
         percent: Number.isFinite(progress.percent) ? progress.percent : null,
@@ -1652,7 +1670,7 @@ export const loadTerrainFromTif = async (
       width,
       height,
       imageSamplerData,
-      hasTargetBounds ? fetchBounds : null,
+      fetchBounds,
     );
   }
 
@@ -1706,6 +1724,7 @@ export const loadTerrainFromTif = async (
       scaleToMeters: elevationUnit.scale,
       source: elevationUnit.source,
     },
+    processingMetersPerPixel: effectiveMetersPerPixel,
   };
 
   if (includeOSM && osmFeatures.length > 0) {
@@ -1744,10 +1763,15 @@ export const loadTerrainFromLaz = async (
     generateHybridTextureAsset   = true,
     globalTileConcurrency        = 20,
     elevationUnitOverride        = 'auto',
+    processingMetersPerPixel     = 1,
     targetBounds                 = null,
     preferNativeCoverage         = true,
     fillLazEdgeGapsWithGlobalDem = true,
   } = generationOptions || {};
+
+  const effectiveMetersPerPixel = Number.isFinite(Number(processingMetersPerPixel)) && Number(processingMetersPerPixel) > 0
+    ? Number(processingMetersPerPixel)
+    : 1;
 
   const normalizedCenter = { lat: center.lat, lng: normalizeLng(center.lng) };
 
@@ -1781,7 +1805,11 @@ export const loadTerrainFromLaz = async (
   } else {
     width  = resolution;
     height = resolution;
-    fetchBounds = computeMetricFetchBounds(normalizedCenter, width, height);
+    fetchBounds = computeMetricFetchBounds(
+      normalizedCenter,
+      width * effectiveMetersPerPixel,
+      height * effectiveMetersPerPixel,
+    );
   }
 
   // ── Satellite tiles ───────────────────────────────────────────────────────
@@ -1849,7 +1877,7 @@ export const loadTerrainFromLaz = async (
     rasterCenter,
     width,
     height,
-    hasTargetBounds ? fetchBounds : null,
+    fetchBounds,
     (current, total, status) => {
       const pct = total > 0 ? Math.round(current / total * 100) : 0;
       onProgress?.(status || `Processing point cloud… ${pct}%`);
@@ -1888,7 +1916,7 @@ export const loadTerrainFromLaz = async (
     width,
     height,
     imageSamplerData,
-    hasTargetBounds ? fetchBounds : null,
+    fetchBounds,
   );
 
   // ── Min / Max ─────────────────────────────────────────────────────────────
@@ -1937,6 +1965,7 @@ export const loadTerrainFromLaz = async (
       scaleToMeters: lazUnit.scale,
       source: lazUnit.source,
     },
+    processingMetersPerPixel: effectiveMetersPerPixel,
     // Custom upload exports default to full processed dimensions.
     exportCropSize: null,
   };

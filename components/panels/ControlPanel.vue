@@ -32,7 +32,7 @@
       :use-gpxz="useGPXZ"
       :gpxz-api-key="gpxzApiKey"
       :has-custom-elevation="!!uploadedElevationFile"
-      @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride)"
+      @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel)"
     />
 
     <!-- Output Settings -->
@@ -84,7 +84,7 @@
           </div>
         </div>
 
-        <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.resolutionOutputSize') }}</label>
+        <label v-if="uploadedAreaMode !== 'crop'" class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.resolutionOutputSize') }}</label>
         <div v-if="uploadedAreaMode !== 'crop'" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
           {{ nativeDims.width }} × {{ nativeDims.height }} px
           <span class="text-[10px] ml-1">({{ t('controlPanel.nativeCoverage', { source: nativeDims.sourceLabel }) }})</span>
@@ -122,6 +122,18 @@
         <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium">{{ t('controlPanel.largeAreaRamWarning') }}</p>
         <p>{{ t('controlPanel.currentScale') }}: <span class="text-[#FF6600]">{{ metersPerPixel.toFixed(2) }}m/px</span></p>
       </ResolutionSelector>
+
+      <div class="space-y-1">
+        <label class="text-xs text-gray-500 dark:text-gray-400">Processing resolution (meters per pixel)</label>
+        <select
+          :value="processingMetersPerPixelNumber"
+          @change="$emit('update:processingMetersPerPixel', Number($event.target.value))"
+          class="w-full border rounded px-2 py-2 text-sm outline-none bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#FF6600] focus:border-[#FF6600]"
+        >
+          <option v-for="option in processingResolutionOptions" :key="option" :value="option">{{ formatProcessingResolutionOption(option) }}</option>
+        </select>
+        <p class="text-[10px] text-gray-500 dark:text-gray-400">Lower m/px means finer detail over a smaller area for the same output size.</p>
+      </div>
 
       <!-- OSM Toggle -->
       <div class="p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
@@ -270,9 +282,9 @@ import { getMaxSquareCropResolution } from '../../services/uploadBounds';
 
 const { t } = useI18n({ useScope: 'global' });
 
-const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedAreaMode']);
+const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedAreaMode', 'processingMetersPerPixel']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'elevationFileSelected', 'elevationFileClear', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedAreaMode']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'elevationFileSelected', 'elevationFileClear', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedAreaMode', 'update:processingMetersPerPixel']);
 
 const handleLocationChange = (newLocation) => {
   emit('locationChange', { ...props.center, ...newLocation });
@@ -390,8 +402,21 @@ watch(() => props.terrainData, (newData) => {
   }
 });
 
-// The pipeline enforces 1 m/px for all sources.
-const metersPerPixel = computed(() => 1.0);
+const processingResolutionOptions = [0.25, 0.5, 1, 2];
+
+const processingMetersPerPixelNumber = computed(() => {
+  const parsed = Number(props.processingMetersPerPixel);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+});
+
+const formatProcessingResolutionOption = (value) => {
+  if (value === 0.25) return '0.25 m/px (Ultra detail)';
+  if (value === 0.5) return '0.5 m/px (High detail)';
+  if (value === 1) return '1.0 m/px (Standard)';
+  return `${value.toFixed(1)} m/px`;
+};
+
+const metersPerPixel = computed(() => processingMetersPerPixelNumber.value);
 
 // Detect active file type for metadata card routing
 const isLazFileActive = computed(() => {
@@ -498,6 +523,9 @@ const buildRunConfiguration = () => buildRunConfigurationBase({
   gpxzApiKey: gpxzApiKey.value,
   gpxzStatus: gpxzStatus.value,
   terrainData: props.terrainData,
+  extra: {
+    processingMetersPerPixel: metersPerPixel.value,
+  },
 });
 
 const triggerDownload = (blob, filename) => {
@@ -599,6 +627,11 @@ const applyRunConfiguration = (config) => {
   const resolutionValue = toNumberOrNull(src.resolution);
   if (resolutionValue !== null) {
     emit('resolutionChange', clampInt(resolutionValue, 512, 16384));
+  }
+
+  const processingMetersPerPixelValue = toNumberOrNull(src.processingMetersPerPixel);
+  if (processingMetersPerPixelValue !== null && processingMetersPerPixelValue > 0) {
+    emit('update:processingMetersPerPixel', Math.max(0.05, Math.min(10, processingMetersPerPixelValue)));
   }
 
   const zoomValue = toNumberOrNull(src.zoom);
