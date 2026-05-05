@@ -16,8 +16,17 @@ export async function exportTer(terrainData, {
 } = {}) {
   const { width, height, heightMap, minHeight, maxHeight } = terrainData;
 
-  // BeamNG terrains must be square — clip to the minimum dimension.
-  const size = Math.min(width, height);
+  // BeamNG terrains must be square power-of-two — clip down to fit.
+  const squareSize = Math.min(width, height);
+  const size = squareSize >= 2 ? 2 ** Math.floor(Math.log2(squareSize)) : squareSize;
+
+  if (size !== width || size !== height) {
+    console.warn('[exportTer] Terrain size normalized for BeamNG compatibility', {
+      sourceWidth: width,
+      sourceHeight: height,
+      exportedSize: size,
+    });
+  }
 
   const materialNames = customMaterialNames ?? ['DefaultMaterial'];
 

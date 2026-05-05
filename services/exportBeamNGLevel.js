@@ -89,6 +89,16 @@ function computeSquareSize(terrainData) {
 }
 
 /**
+ * BeamNG TerrainBlock expects square power-of-two terrain dimensions.
+ * Pick the largest power-of-two that fits within the source dimensions.
+ */
+function computeBeamNGTerrainSize(width, height) {
+  const minDim = Math.floor(Math.min(width, height));
+  if (!Number.isFinite(minDim) || minDim < 2) return minDim;
+  return 2 ** Math.floor(Math.log2(minDim));
+}
+
+/**
  * Convert a WGS84 coordinate to BeamNG world-space [x, y, z].
  * Z is meters above the terrain's minimum elevation (+ offset).
  */
@@ -2490,7 +2500,7 @@ function buildBeamNGExportReport({
     `- Bounds north/south/east/west: ${formatNumber(bounds.north, 6)}, ${formatNumber(bounds.south, 6)}, ${formatNumber(bounds.east, 6)}, ${formatNumber(bounds.west, 6)}`,
     `- Elevation source used: ${resolveElevationSourceLabel(originalTerrainData, options?.elevationSource)}`,
     `- Source GeoTIFF source: ${originalTerrainData?.sourceGeoTiffs?.source ? String(originalTerrainData.sourceGeoTiffs.source).toUpperCase() : 'n/a'}`,
-    `- Cropped to square for BeamNG: ${formatBool(didCropToSquare)}`,
+    `- Normalized terrain size for BeamNG (square power-of-two): ${formatBool(didCropToSquare)}`,
     `- Terrain samples (valid/no-data/total): ${terrainSampleSummary.valid}/${terrainSampleSummary.noData}/${terrainSampleSummary.total}`,
     `- Terrain no-data ratio: ${Number.isFinite(terrainSampleSummary.noDataRatio) ? `${formatNumber(terrainSampleSummary.noDataRatio * 100, 2)}%` : 'n/a'}`,
     `- Terrain sample warning: ${terrainSampleSummary.allInvalid ? 'ALL_ELEVATION_SAMPLES_INVALID (export likely unreliable)' : 'none'}`,
@@ -3846,13 +3856,14 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     }
   };
 
-  // BeamNG TerrainBlock is square. If source data is rectangular, center-crop
-  // everything (heightmap, bounds, textures) so terrain, texture, and OSM
-  // objects share the same footprint.
+  // BeamNG TerrainBlock expects square power-of-two terrain dimensions.
+  // Center-crop everything (heightmap, bounds, textures) so terrain, texture,
+  // and OSM objects share the same footprint.
   let td = terrainData;
-  const didCropToSquare = td.width !== td.height;
-  if (td.width !== td.height) {
-    const cropSize = Math.min(td.width, td.height);
+  const targetBeamNGSize = computeBeamNGTerrainSize(td.width, td.height);
+  const didCropToSquare = td.width !== targetBeamNGSize || td.height !== targetBeamNGSize;
+  if (didCropToSquare) {
+    const cropSize = targetBeamNGSize;
     td = await prepareCroppedTerrainData({ ...td, exportCropSize: cropSize });
   }
 
