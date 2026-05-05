@@ -153,7 +153,7 @@
     "tileNames": "Tile-Namen",
     "tileNamesHint": "Standardmaßig werden Zeilen-/Spaltenlabels genutzt. Benenne ein Tile um, um ZIP-Dateiname und Batch-Beschriftungen anzupassen.",
     "tileResolution": "Tile-Auflösung",
-    "tileEach": "Jedes Tile: {resolution}m x {resolution}m bei 1m/px",
+    "tileEach": "Jedes Tile: {resolution}m x {resolution}m bei {mpp}m/px",
     "gridCoverage": "Grid-Abdeckung: {w} x {h}",
     "highResolutionWarning": "Hochauflösende Tiles benötigen viel RAM pro Tile.",
     "sharedBaseline": "Gemeinsame Höhen-Baseline (alle Heightmaps nutzen ein Min/Max)",
@@ -290,6 +290,11 @@
     "fetchesMaxDetail": "- Lädt maximale Details (Terrain Z15, Sat Z17).",
     "largeAreaRamWarning": "Warnung: Große Fläche. Kann viel RAM benötigen.",
     "currentScale": "- Aktueller Maßstab",
+    "processingResolutionLabel": "Verarbeitungsauflösung (Meter pro Pixel)",
+    "processingResolutionHint": "Niedrigeres m/px bedeutet feinere Details über eine kleinere Fläche bei gleicher Ausgabegröße.",
+    "processingResolutionOptionUltra": "0.25 m/px (Ultra-Detail)",
+    "processingResolutionOptionHigh": "0.5 m/px (Hohe Details)",
+    "processingResolutionOptionStandard": "1.0 m/px (Standard)",
     "includeOsmFeatures": "OSM-Features einbeziehen",
     "centerCoordinates": "Zentrumskoordinaten",
     "configurationSession": "Konfiguration & Sitzung"
@@ -352,7 +357,7 @@
     "title": "Hinweis zur Datengenauigkeit",
     "lead": "Bitte beachte, dass alle von MapNG erzeugten Geländedaten, Heightmaps und 3D-Modelle Schätzungen auf Basis verfügbarer Satelliten- und Höhendaten sind.",
     "resolutionTitle": "Auflösung und Maßstab",
-    "resolutionBody": "Alle Heightmaps werden mit 1 Meter pro Pixel exportiert, um einen konsistenten Maßstab in Game-Engines sicherzustellen. Beim Standard-Datensatz (30m) wird das Terrain jedoch hochskaliert. Dadurch ist es glatt, aber weniger detailreich als echte 1m-Datensätze wie USGS oder GPXZ.",
+    "resolutionBody": "Heightmaps werden mit der gewahlten Verarbeitungsauflosung exportiert, damit der Maßstab in Game-Engines konsistent bleibt. Beim Standard-Datensatz (30m) wird das Terrain weiterhin hochskaliert und bleibt daher glatter und weniger detailreich als native hochauflosende Quellen wie USGS oder GPXZ.",
     "usage": "Dieses Tool ist für Modding und kreative Nutzung gedacht. Es sollte nicht für Navigation, Ingenieurwesen oder kritische reale Planung verwendet werden.",
     "confirm": "Verstanden"
   },
@@ -402,7 +407,7 @@
     "surroundingTitle": "Umliegende Tiles",
     "surroundingBody": "Lade bis zu 8 angrenzende Terrain-Tiles als ZIP mit Heightmaps, Satellitentexturen und Metadaten herunter - ideal fur Multi-Tile-BeamNG-Welten.",
     "resolutionTitle": "Hinweis zur Auflösung",
-    "resolutionStrong": "Alle Heightmaps werden mit 1 Meter pro Pixel exportiert.",
+    "resolutionStrong": "Heightmaps werden mit der gewahlten Verarbeitungsauflosung exportiert.",
     "resolutionBody": "Ausgabegrößen reichen von 512px bis 8192px (0.26 km2 bis 67 km2). Standard-30m-Daten werden bilinear hochskaliert, um glatte Oberflächen zu erhalten.",
     "batchTitle": "Batch-Job-Modus",
     "batchIntro": "Verarbeite große Bereiche uber ein Tile-Grid (bis 20x20). Jedes Tile wird nacheinander generiert; gewahlte Exporte werden in ein individuelles ZIP gepackt. Das umfasst:",
@@ -509,7 +514,7 @@
         },
         {
           "name": "Local Transverse Mercator",
-          "desc": "Benutzerdefinierte metrische Projektion für pixelgenaue 1m/px-Grids"
+          "desc": "Benutzerdefinierte metrische Projektion fur pixelgenaue Verarbeitungsraster"
         },
         {
           "name": "Nominatim Geocoding",
@@ -640,7 +645,7 @@
       "fetchTerrain": "Terrain-Daten konnten nicht geladen werden. Die angeforderte Fläche ist möglicherweise zu groß oder der Dienst ist nicht verfügbar.",
       "batchCacheCleared": "Batch-Cache gelöscht.",
       "batchCacheClearFailed": "Batch-Cache konnte nicht gelöscht werden.",
-      "usgsFallback": "USGS-1m-Daten für diesen Bereich fehlten oder waren beschädigt. Fallback auf den Standard-Terrarium-Datensatz.\n\nDie Ausgabe bleibt auf dem 1m/px-Verarbeitungsraster der App.",
+      "usgsFallback": "USGS-1m-Daten für diesen Bereich fehlten oder waren beschädigt. Fallback auf den Standard-Terrarium-Datensatz.\n\nDie Ausgabe bleibt auf dem aktuellen Verarbeitungsraster der App.",
       "kron86Fallback": "NMT EVRF2007-Daten sind nur für unterstützte Kacheln in Polen verfügbar. Fallback auf den Standard-Terrarium-Datensatz."
     }
   },

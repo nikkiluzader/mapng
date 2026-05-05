@@ -153,7 +153,7 @@
     "tileNames": "Nomi Tessere",
     "tileNamesHint": "I valori predefiniti usano etichette riga/colonna. Rinomina una tessera per modificare il nome file ZIP e le etichette batch.",
     "tileResolution": "Risoluzione Tessera",
-    "tileEach": "Ogni tessera: {resolution}m x {resolution}m a 1m/px",
+    "tileEach": "Ogni tessera: {resolution}m x {resolution}m a {mpp}m/px",
     "gridCoverage": "Copertura griglia: {w} x {h}",
     "highResolutionWarning": "Le tessere ad alta risoluzione richiedono RAM significativa per tessera.",
     "sharedBaseline": "Linea di Base Altitudine Condivisa (tutte le mappe di altezza usano un min/max)",
@@ -290,6 +290,11 @@
     "fetchesMaxDetail": "- Scarica il massimo dettaglio (Terrain Z15, Sat Z17).",
     "largeAreaRamWarning": "Avvertenza: Area grande. Potrebbe richiedere RAM elevata.",
     "currentScale": "- Scala Attuale",
+    "processingResolutionLabel": "Risoluzione di elaborazione (metri per pixel)",
+    "processingResolutionHint": "Un valore m/px piu basso significa piu dettaglio su un'area piu piccola a parita di dimensione di output.",
+    "processingResolutionOptionUltra": "0.25 m/px (Ultra dettaglio)",
+    "processingResolutionOptionHigh": "0.5 m/px (Alto dettaglio)",
+    "processingResolutionOptionStandard": "1.0 m/px (Standard)",
     "includeOsmFeatures": "Includi Funzionalità OSM",
     "centerCoordinates": "Coordinate Centrale",
     "configurationSession": "Configurazione & Sessione"
@@ -352,7 +357,7 @@
     "title": "Disclaimer Precisione Dati",
     "lead": "Sii consapevole che tutti i dati di terreno, mappe di altezza e modelli 3D generati da MapNG sono stime basate su dati satellite ed elevazione disponibili.",
     "resolutionTitle": "Risoluzione e Scala",
-    "resolutionBody": "Tutte le mappe di altezza vengono esportate a risoluzione di 1 metro per pixel per garantire un scaling coerente nei motori di gioco. Tuttavia, quando si utilizza il dataset Standard (30m), il terreno viene sovracampionato. Ciò significa che sarà liscio ma privo dei dettagli fini trovati in veri dataset 1m come USGS o GPXZ.",
+    "resolutionBody": "Tutte le mappe di altezza vengono esportate con la risoluzione di elaborazione selezionata per mantenere una scala coerente nei motori di gioco. Con il dataset Standard (30m), il terreno resta sovracampionato e quindi piu liscio e meno dettagliato rispetto a sorgenti native ad alta risoluzione come USGS o GPXZ.",
     "usage": "Questo strumento è destinato all'uso di modding e creativo. Non deve essere utilizzato per navigazione, ingegneria o pianificazione critica nel mondo reale.",
     "confirm": "Capisco"
   },
@@ -402,7 +407,7 @@
     "surroundingTitle": "Tessere Circostanti",
     "surroundingBody": "Scarica fino a 8 tessere di terreno adiacenti come pacchetto ZIP con mappe di altezza, texture satellite e metadati - perfetto per costruire mondi BeamNG multi-tessera.",
     "resolutionTitle": "Nota Risoluzione",
-    "resolutionStrong": "Tutte le mappe di altezza vengono esportate a 1 metro per pixel.",
+    "resolutionStrong": "Tutte le mappe di altezza vengono esportate con la risoluzione di elaborazione selezionata.",
     "resolutionBody": "Le dimensioni di output vanno da 512px a 8192px (0,26 km2 a 67 km2). I dati Standard 30m vengono sovracampionati bilinearmente per superfici lisce.",
     "batchTitle": "Modalità Job Batch",
     "batchIntro": "Elabora aree grandi definendo una griglia di tessere (fino a 20x20). Ogni tessera viene generata in sequenza con gli export selezionati confezionati in un ZIP individuale. Le funzionalità includono:",
@@ -509,7 +514,7 @@
         },
         {
           "name": "Local Transverse Mercator",
-          "desc": "Proiezione metrica personalizzata per griglie 1m/px pixel-perfect"
+          "desc": "Proiezione metrica personalizzata per griglie di elaborazione allineate ai pixel"
         },
         {
           "name": "Geocodifica Nominatim",
@@ -640,7 +645,7 @@
       "fetchTerrain": "Impossibile scaricare dati terreno. L'area richiesta potrebbe essere troppo grande o il servizio è inattivo.",
       "batchCacheCleared": "Cache batch cancellata.",
       "batchCacheClearFailed": "Impossibile cancellare cache batch.",
-      "usgsFallback": "I dati USGS 1m per questa area erano mancanti o corrotti. Ritorno al dataset Terrarium Standard.\n\nL'output rimane sulla griglia di elaborazione 1m/px dell'app.",
+      "usgsFallback": "I dati USGS 1m per questa area erano mancanti o corrotti. Ritorno al dataset Terrarium Standard.\n\nL'output rimane sulla griglia di elaborazione attuale dell'app.",
       "kron86Fallback": "I dati NMT EVRF2007 sono disponibili solo per tile supportate in Polonia. Ritorno al dataset Terrarium Standard."
     }
   },

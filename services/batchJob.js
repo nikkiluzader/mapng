@@ -34,21 +34,24 @@ import { installBatchFetchCache, clearBatchCache } from './batchCache.js';
 
 // ─── Grid Computation ────────────────────────────────────────────────
 
-export function computeGridTiles(center, resolution, gridCols, gridRows) {
+export function computeGridTiles(center, resolution, gridCols, gridRows, tileSpanMeters = resolution) {
   const tiles = [];
   const metersPerDegLat = 111320;
   const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+  const spanMeters = Number.isFinite(Number(tileSpanMeters)) && Number(tileSpanMeters) > 0
+    ? Number(tileSpanMeters)
+    : Number(resolution);
 
   for (let row = 0; row < gridRows; row++) {
     for (let col = 0; col < gridCols; col++) {
-      const offsetX = (col - (gridCols - 1) / 2) * resolution;
-      const offsetY = ((gridRows - 1) / 2 - row) * resolution;
+      const offsetX = (col - (gridCols - 1) / 2) * spanMeters;
+      const offsetY = ((gridRows - 1) / 2 - row) * spanMeters;
 
       const tileLat = center.lat + offsetY / metersPerDegLat;
       const tileLng = center.lng + offsetX / metersPerDegLng;
 
-      const halfLatSpan = resolution / 2 / metersPerDegLat;
-      const halfLngSpan = resolution / 2 / metersPerDegLng;
+      const halfLatSpan = spanMeters / 2 / metersPerDegLat;
+      const halfLngSpan = spanMeters / 2 / metersPerDegLng;
 
       tiles.push({
         row,
@@ -84,8 +87,8 @@ export function normalizeTileOffsets(rawOffsets = [], maxTiles = Infinity) {
     .sort((a, b) => a.index - b.index);
 }
 
-export function computeGridTilesWithOffsets(center, resolution, gridCols, gridRows, tileOffsets = []) {
-  const baseTiles = computeGridTiles(center, resolution, gridCols, gridRows);
+export function computeGridTilesWithOffsets(center, resolution, gridCols, gridRows, tileOffsets = [], tileSpanMeters = resolution) {
+  const baseTiles = computeGridTiles(center, resolution, gridCols, gridRows, tileSpanMeters);
   if (!tileOffsets?.length) return baseTiles;
 
   const offsets = normalizeTileOffsets(tileOffsets, baseTiles.length);
@@ -105,8 +108,11 @@ export function computeGridTilesWithOffsets(center, resolution, gridCols, gridRo
       lng: tile.center.lng + lngDelta,
     };
 
-    const halfLatSpan = resolution / 2 / metersPerDegLat;
-    const halfLngSpan = resolution / 2 / metersPerDegLng;
+    const spanMeters = Number.isFinite(Number(tileSpanMeters)) && Number(tileSpanMeters) > 0
+      ? Number(tileSpanMeters)
+      : Number(resolution);
+    const halfLatSpan = spanMeters / 2 / metersPerDegLat;
+    const halfLngSpan = spanMeters / 2 / metersPerDegLng;
 
     return {
       ...tile,
@@ -123,12 +129,15 @@ export function computeGridTilesWithOffsets(center, resolution, gridCols, gridRo
   });
 }
 
-export function computeGridBounds(center, resolution, gridCols, gridRows) {
+export function computeGridBounds(center, resolution, gridCols, gridRows, tileSpanMeters = resolution) {
   const metersPerDegLat = 111320;
   const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+  const spanMeters = Number.isFinite(Number(tileSpanMeters)) && Number(tileSpanMeters) > 0
+    ? Number(tileSpanMeters)
+    : Number(resolution);
 
-  const totalWidth = gridCols * resolution;
-  const totalHeight = gridRows * resolution;
+  const totalWidth = gridCols * spanMeters;
+  const totalHeight = gridRows * spanMeters;
 
   return {
     north: center.lat + totalHeight / 2 / metersPerDegLat,
@@ -333,12 +342,18 @@ export function createBatchJobState(config) {
     Number(config.gridCols || 1) * Number(config.gridRows || 1),
     Number(config.gridCols || 1),
   );
+  const processingMetersPerPixel = Number.isFinite(Number(config.processingMetersPerPixel))
+    && Number(config.processingMetersPerPixel) > 0
+    ? Number(config.processingMetersPerPixel)
+    : 1;
+  const tileSpanMeters = Number(config.resolution) * processingMetersPerPixel;
   const baseTiles = computeGridTilesWithOffsets(
     config.center,
     config.resolution,
     config.gridCols,
     config.gridRows,
     normalizedTileOffsets,
+    tileSpanMeters,
   );
   const tileNamesByIndex = new Map(normalizedTileNames.map((entry) => [entry.index, entry.name]));
   const tiles = baseTiles.map((tile) => ({
@@ -377,6 +392,7 @@ export function createBatchJobState(config) {
     id,
     center: { ...config.center },
     resolution: config.resolution,
+    processingMetersPerPixel,
     gridCols: config.gridCols,
     gridRows: config.gridRows,
     tileNames: normalizedTileNames,
@@ -437,6 +453,10 @@ const migrateLoadedState = (state) => {
 
   if (!state.schemaVersion) state.schemaVersion = 2;
   state.includeOSM = toStrictBool(state.includeOSM);
+  state.processingMetersPerPixel = Number.isFinite(Number(state.processingMetersPerPixel))
+    && Number(state.processingMetersPerPixel) > 0
+    ? Number(state.processingMetersPerPixel)
+    : 1;
   state.exports = normalizeExportFlags(state.exports);
   state.tileNames = normalizeTileNames(
     state.tileNames,
@@ -1149,6 +1169,7 @@ async function computeBatchElevationNormalization(state, scheduleFetch, onProgre
         generateHybridTextureAsset: false,
         generateSegmentedHybridAsset: false,
         globalTileConcurrency: Number(state.scheduler?.globalTileConcurrency || 20),
+        processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
       },
     ));
 
@@ -1259,6 +1280,7 @@ async function processTile(state, tile, ctx, signal) {
             generateOSMTextureAsset: needsOsmTexture,
             generateHybridTextureAsset: needsHybridTexture,
             globalTileConcurrency: Number(state.scheduler?.globalTileConcurrency || 20),
+            processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
           },
         );
       }));

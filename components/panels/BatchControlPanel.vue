@@ -100,7 +100,7 @@
         :modelValue="resolution"
         @update:modelValue="$emit('resolutionChange', $event)"
       >
-        <p>{{ t('batch.tileEach', { resolution }) }}</p>
+        <p>{{ t('batch.tileEach', { resolution, mpp: processingMetersPerPixelNumber.toFixed(2) }) }}</p>
         <p>{{ t('batch.gridCoverage', { w: gridWidthDisplay, h: gridHeightDisplay }) }}</p>
         <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium">⚠️ {{ t('batch.highResolutionWarning') }}</p>
       </ResolutionSelector>
@@ -259,6 +259,7 @@ const { t } = useI18n({ useScope: 'global' });
 const props = defineProps({
   center: { type: Object, required: true },
   resolution: { type: Number, required: true },
+  processingMetersPerPixel: { type: [Number, String], default: 1 },
   isRunning: { type: Boolean, default: false },
   savedState: { type: Object, default: null },
   tileOffsets: { type: Array, default: () => [] },
@@ -268,8 +269,13 @@ const props = defineProps({
 
 const emit = defineEmits([
   'locationChange', 'resolutionChange', 'startBatch',
-  'resumeBatch', 'clearSavedBatch', 'update:gridCols', 'update:gridRows', 'update:tileOffsets', 'update:tileNames', 'update:tileFollowCenter', 'clearCache', 'showSupport',
+  'resumeBatch', 'clearSavedBatch', 'update:gridCols', 'update:gridRows', 'update:tileOffsets', 'update:tileNames', 'update:tileFollowCenter', 'update:processingMetersPerPixel', 'clearCache', 'showSupport',
 ]);
+
+const processingMetersPerPixelNumber = computed(() => {
+  const parsed = Number(props.processingMetersPerPixel);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+});
 
 const handleLocationChange = (newLocation) => {
   emit('locationChange', { ...props.center, ...newLocation });
@@ -501,6 +507,7 @@ const handleStart = () => {
   emit('startBatch', {
     center: { ...props.center },
     resolution: props.resolution,
+    processingMetersPerPixel: processingMetersPerPixelNumber.value,
     gridCols: gridCols.value,
     gridRows: gridRows.value,
     tileNames: tileNames.value
@@ -529,6 +536,7 @@ const buildRunConfiguration = () => {
     mode: 'batch',
     center: { ...props.center },
     resolution: props.resolution,
+    processingMetersPerPixel: processingMetersPerPixelNumber.value,
     gridCols: gridCols.value,
     gridRows: gridRows.value,
     tileNames: tileNames.value
@@ -654,6 +662,11 @@ const applyRunConfiguration = (config) => {
   const colsValue = toNumberOrNull(src.gridCols);
   if (colsValue !== null) {
     gridCols.value = clampInt(colsValue, 1, 20);
+  }
+
+  const processingMetersPerPixelValue = toNumberOrNull(src.processingMetersPerPixel);
+  if (processingMetersPerPixelValue !== null && processingMetersPerPixelValue > 0) {
+    emit('update:processingMetersPerPixel', Math.max(0.05, Math.min(10, processingMetersPerPixelValue)));
   }
 
   const rowsValue = toNumberOrNull(src.gridRows);

@@ -2467,6 +2467,8 @@ function buildBeamNGExportReport({
   const totalAreaM2 = worldSize * worldSize;
   const bounds = terrainData?.bounds ?? {};
   const selectedResolution = Number(options?.requestedResolution);
+  const requestedProcessingMpp = Number(options?.requestedProcessingMetersPerPixel);
+  const sourceProcessingMpp = Number(originalTerrainData?.processingMetersPerPixel);
   const terrainSampleSummary = summarizeTerrainSamples(terrainData);
   const osmSummary = summarizeOsmFeatures(terrainData?.osmFeatures);
   const originalOsmSummary = summarizeOsmFeatures(originalTerrainData?.osmFeatures);
@@ -2489,6 +2491,8 @@ function buildBeamNGExportReport({
     '',
     'Terrain',
     `- Requested resolution: ${Number.isFinite(selectedResolution) ? `${selectedResolution} px` : 'n/a'}`,
+    `- Requested processing resolution: ${Number.isFinite(requestedProcessingMpp) ? `${formatNumber(requestedProcessingMpp, 3)} m/px` : 'n/a'}`,
+    `- Source processing resolution used: ${Number.isFinite(sourceProcessingMpp) ? `${formatNumber(sourceProcessingMpp, 3)} m/px` : 'n/a'}`,
     `- Exported terrain size: ${terrainData?.width ?? 'n/a'} x ${terrainData?.height ?? 'n/a'} px`,
     `- Terrain texture size: ${satelliteTexSize} x ${satelliteTexSize} px`,
     `- Height range min/max: ${formatNumber(minHeight, 2)} m / ${formatNumber(maxHeight, 2)} m`,

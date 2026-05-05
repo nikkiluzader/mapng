@@ -903,6 +903,9 @@ const buildRunConfiguration = () => ({
     gpxzApiKey: props.gpxzApiKey,
     gpxzStatus: props.gpxzStatus,
     terrainData: props.terrainData,
+    extra: {
+      processingMetersPerPixel: resolveProcessingMetersPerPixel(props.terrainData),
+    },
   }),
   modelOptions: {
     centerTextureType: modelCenterTextureType.value,
@@ -1462,6 +1465,7 @@ const handleBeamNGLevelExport = async () => {
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
       requestedResolution: props.resolution,
+      requestedProcessingMetersPerPixel: resolveProcessingMetersPerPixel(td),
       onProgress: ({ step, pct }) => {
         beamNGProgressStep.value = step;
         beamNGProgressPct.value  = pct;

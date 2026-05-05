@@ -153,7 +153,7 @@
     "tileNames": "Nazwy kafelków",
     "tileNamesHint": "Domyślnie używają etykiet wierszy/kolumn. Zmień nazwę dowolnego kafelka, aby zmienić nazwę jego pliku ZIP i etykiety wsadowe.",
     "tileResolution": "Rozdzielczość kafelka",
-    "tileEach": "Każdy kafelek: {resolution}m x {resolution}m na 1m/px",
+    "tileEach": "Każdy kafelek: {resolution}m x {resolution}m przy {mpp}m/px",
     "gridCoverage": "Pokrycie siatki: {w} x {h}",
     "highResolutionWarning": "Kafelki o wysokiej rozdzielczości wymagają znacznej ilości pamięci RAM na kafelek.",
     "sharedBaseline": "Wspólne wzniesienie (wszystkie mapy wysokości używają jednej wartości min/max)",
@@ -290,6 +290,11 @@
     "fetchesMaxDetail": "- Pobiera maksymalny szczegół (Teren Z15, Sat Z17).",
     "largeAreaRamWarning": "Ostrzeżenie: Duży obszar. Może wymagać wysokiej ilości pamięci RAM.",
     "currentScale": "- Bieżąca skala",
+    "processingResolutionLabel": "Rozdzielczosc przetwarzania (metry na piksel)",
+    "processingResolutionHint": "Nizsze m/px oznacza wiecej detali na mniejszym obszarze przy tym samym rozmiarze wyjscia.",
+    "processingResolutionOptionUltra": "0.25 m/px (Ultra detale)",
+    "processingResolutionOptionHigh": "0.5 m/px (Wysokie detale)",
+    "processingResolutionOptionStandard": "1.0 m/px (Standard)",
     "includeOsmFeatures": "Dołącz funkcje OSM",
     "centerCoordinates": "Współrzędne środka",
     "configurationSession": "Konfiguracja i sesja"
@@ -352,7 +357,7 @@
     "title": "Zastrzeżenie dotyczące dokładności danych",
     "lead": "Prosimy mieć świadomość, że wszystkie dane terenu, mapy wysokości i modele 3D wygenerowane przez MapNG są szacunkami na podstawie dostępnych satelitarnych i wysokościowych zestawów danych.",
     "resolutionTitle": "Rozdzielczość i skala",
-    "resolutionBody": "Wszystkie mapy wysokości są eksportowane w rozdzielczości 1 metra na piksel, aby zapewnić spójną skalę w silnikach gier. Jednak przy użyciu zestawu danych Standard (30m) teren jest powiększony. Oznacza to, że będzie gładki, ale będzie brakować szczegółów, które można znaleźć w prawdziwych zestawach danych 1m, takich jak USGS lub GPXZ.",
+    "resolutionBody": "Wszystkie mapy wysokosci sa eksportowane z wybrana rozdzielczoscia przetwarzania, aby zachowac spojna skale w silnikach gier. Przy zestawie Standard (30m) teren nadal jest powiekszany, wiec pozostaje gladszy i mniej szczegolowy niz natywne zrodla wysokiej rozdzielczosci, takie jak USGS lub GPXZ.",
     "usage": "To narzędzie jest przeznaczone do użytku w modowaniu i kreatywnym. Nie powinno być używane do nawigacji, inżynierii lub krytycznego planowania w świecie rzeczywistym.",
     "confirm": "Rozumiem"
   },
@@ -402,7 +407,7 @@
     "surroundingTitle": "Kafelki otaczające",
     "surroundingBody": "Pobierz do 8 sąsiednich płytek terenu jako pakiet ZIP z mapami wysokości, teksturami satelity i metadanymi - idealne do budowania wielokafelkowych światów BeamNG.",
     "resolutionTitle": "Uwaga dotycząca rozdzielczości",
-    "resolutionStrong": "Wszystkie mapy wysokości są eksportowane w rozdzielczości 1 metra na piksel.",
+    "resolutionStrong": "Wszystkie mapy wysokosci sa eksportowane z wybrana rozdzielczoscia przetwarzania.",
     "resolutionBody": "Rozmiary wyjścia wahają się od 512px do 8192px (0,26 km2 do 67 km2). Dane standardowe 30m są dwuliniowo powiększane dla gładkich powierzchni.",
     "batchTitle": "Tryb zadania wsadowego",
     "batchIntro": "Przetwarzaj duże obszary, definiując siatkę kafelków (do 20x20). Każdy kafelek jest generowany sekwencyjnie, a wybrane eksporty są pakowane do osobnego ZIP-a. Funkcje obejmują:",
@@ -509,7 +514,7 @@
         },
         {
           "name": "Lokalny poprzeczny Mercator",
-          "desc": "Niestandardowa projekcja metryczna dla siatek 1m/px idealnych dla pikseli"
+          "desc": "Niestandardowa projekcja metryczna dla siatek przetwarzania idealnie dopasowanych do pikseli"
         },
         {
           "name": "Geokodowanie Nominatim",
@@ -640,7 +645,7 @@
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
       "batchCacheCleared": "Pamięć podręczna zadania wsadowego wyczyszczona.",
       "batchCacheClearFailed": "Nie udało się wyczyścić pamięci podręcznej zadania wsadowego.",
-      "usgsFallback": "Dane USGS 1m dla tego obszaru były brakujące lub uszkodzone. Powrót do standardowego zestawu danych Terrarium.\n\nWyjście pozostaje na siatce przetwarzania aplikacji 1m/px.",
+      "usgsFallback": "Dane USGS 1m dla tego obszaru były brakujące lub uszkodzone. Powrót do standardowego zestawu danych Terrarium.\n\nWyjście pozostaje na aktualnej siatce przetwarzania aplikacji.",
       "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do standardowego zestawu danych Terrarium."
     }
   },

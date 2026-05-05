@@ -153,7 +153,7 @@
     "tileNames": "Nombres de mosaicos",
     "tileNamesHint": "Por defecto usa etiquetas fila/columna. Renombra cualquier mosaico para cambiar el nombre del ZIP y etiquetas del lote.",
     "tileResolution": "Resolucion por mosaico",
-    "tileEach": "Cada mosaico: {resolution}m x {resolution}m a 1m/px",
+    "tileEach": "Cada mosaico: {resolution}m x {resolution}m a {mpp}m/px",
     "gridCoverage": "Cobertura de grilla: {w} x {h}",
     "highResolutionWarning": "Los mosaicos de alta resolucion requieren RAM significativa por mosaico.",
     "sharedBaseline": "Linea base de elevacion compartida (todos los mapas usan un min/max)",
@@ -291,6 +291,11 @@
     "fetchesMaxDetail": "- Obtiene maximo detalle (Terrain Z15, Sat Z17).",
     "largeAreaRamWarning": "Aviso: Area grande. Puede requerir mucha RAM.",
     "currentScale": "- Escala actual",
+    "processingResolutionLabel": "Resolucion de procesamiento (metros por pixel)",
+    "processingResolutionHint": "Un m/px mas bajo significa mas detalle en un area mas pequena para el mismo tamano de salida.",
+    "processingResolutionOptionUltra": "0.25 m/px (Ultra detalle)",
+    "processingResolutionOptionHigh": "0.5 m/px (Alto detalle)",
+    "processingResolutionOptionStandard": "1.0 m/px (Estandar)",
     "includeOsmFeatures": "Incluir funciones OSM",
     "centerCoordinates": "Coordenadas del centro",
     "configurationSession": "Configuracion y sesion"
@@ -353,7 +358,7 @@
     "title": "Aviso de precision de datos",
     "lead": "Ten en cuenta que todos los datos de terreno, mapas de altura y modelos 3D generados por MapNG son estimaciones basadas en conjuntos de datos satelitales y de elevacion disponibles.",
     "resolutionTitle": "Resolucion y escala",
-    "resolutionBody": "Todos los mapas de altura se exportan a 1 metro por pixel para mantener una escala consistente en motores de juego. Sin embargo, al usar el conjunto estandar (30m), el terreno se re-muestrea. Esto produce superficies suaves, pero sin el detalle fino de conjuntos reales de 1m como USGS o GPXZ.",
+    "resolutionBody": "Todos los mapas de altura se exportan con la resolucion de procesamiento seleccionada para mantener una escala consistente en motores de juego. Al usar el conjunto estandar (30m), el terreno sigue re-muestreado, por lo que queda mas suave y con menos detalle que fuentes nativas de alta resolucion como USGS o GPXZ.",
     "usage": "Esta herramienta esta pensada para modding y uso creativo. No debe usarse para navegacion, ingenieria ni planificacion critica del mundo real.",
     "confirm": "Entiendo"
   },
@@ -403,7 +408,7 @@
     "surroundingTitle": "Mosaicos circundantes",
     "surroundingBody": "Descarga hasta 8 mosaicos de terreno adyacentes en un ZIP con mapas de altura, texturas satelitales y metadatos - ideal para construir mundos BeamNG de multiples mosaicos.",
     "resolutionTitle": "Nota de resolucion",
-    "resolutionStrong": "Todos los mapas de altura se exportan a 1 metro por pixel.",
+    "resolutionStrong": "Todos los mapas de altura se exportan con la resolucion de procesamiento seleccionada.",
     "resolutionBody": "Los tamanos de salida van de 512px a 8192px (0.26 km2 a 67 km2). Los datos estandar 30m se re-muestrean bilinealmente para superficies suaves.",
     "batchTitle": "Modo Batch Job",
     "batchIntro": "Procesa areas grandes definiendo una grilla de mosaicos (hasta 20x20). Cada mosaico se genera secuencialmente y las exportaciones seleccionadas se empaquetan en un ZIP individual. Incluye:",
@@ -510,7 +515,7 @@
         },
         {
           "name": "Transversa de Mercator local",
-          "desc": "Proyeccion metrica personalizada para grillas exactas de 1m/px"
+          "desc": "Proyeccion metrica personalizada para grillas de procesamiento alineadas a pixeles"
         },
         {
           "name": "Geocodificacion Nominatim",
@@ -641,7 +646,7 @@
       "fetchTerrain": "No se pudieron obtener datos del terreno. El area solicitada puede ser demasiado grande o el servicio no esta disponible.",
       "batchCacheCleared": "Cache de lote limpiada.",
       "batchCacheClearFailed": "No se pudo limpiar la cache de lote.",
-      "usgsFallback": "Los datos USGS 1m para esta zona faltan o estan corruptos. Se usara el dataset Terrarium Estandar.\n\nLa salida se mantiene en la malla de procesamiento de 1m/px de la app.",
+      "usgsFallback": "Los datos USGS 1m para esta zona faltan o estan corruptos. Se usara el dataset Terrarium Estandar.\n\nLa salida se mantiene en la malla de procesamiento actual de la app.",
       "kron86Fallback": "Los datos NMT EVRF2007 solo estan disponibles para mosaicos compatibles de Polonia. Se usara el dataset Terrarium Estandar."
     }
   },

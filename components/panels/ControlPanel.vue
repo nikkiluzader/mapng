@@ -117,14 +117,11 @@
         :label="t('controlPanel.resolutionOutputSize')"
         :allow-experimental16384="devMode"
       >
-        <p>{{ t('controlPanel.downloadsMatch') }}</p>
-        <p>{{ t('controlPanel.fetchesMaxDetail') }}</p>
         <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium">{{ t('controlPanel.largeAreaRamWarning') }}</p>
-        <p>{{ t('controlPanel.currentScale') }}: <span class="text-[#FF6600]">{{ metersPerPixel.toFixed(2) }}m/px</span></p>
       </ResolutionSelector>
 
       <div class="space-y-1">
-        <label class="text-xs text-gray-500 dark:text-gray-400">Processing resolution (meters per pixel)</label>
+        <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.processingResolutionLabel') }}</label>
         <select
           :value="processingMetersPerPixelNumber"
           @change="$emit('update:processingMetersPerPixel', Number($event.target.value))"
@@ -132,7 +129,7 @@
         >
           <option v-for="option in processingResolutionOptions" :key="option" :value="option">{{ formatProcessingResolutionOption(option) }}</option>
         </select>
-        <p class="text-[10px] text-gray-500 dark:text-gray-400">Lower m/px means finer detail over a smaller area for the same output size.</p>
+        <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('controlPanel.processingResolutionHint') }}</p>
       </div>
 
       <!-- OSM Toggle -->
@@ -410,9 +407,9 @@ const processingMetersPerPixelNumber = computed(() => {
 });
 
 const formatProcessingResolutionOption = (value) => {
-  if (value === 0.25) return '0.25 m/px (Ultra detail)';
-  if (value === 0.5) return '0.5 m/px (High detail)';
-  if (value === 1) return '1.0 m/px (Standard)';
+  if (value === 0.25) return t('controlPanel.processingResolutionOptionUltra');
+  if (value === 0.5) return t('controlPanel.processingResolutionOptionHigh');
+  if (value === 1) return t('controlPanel.processingResolutionOptionStandard');
   return `${value.toFixed(1)} m/px`;
 };
 

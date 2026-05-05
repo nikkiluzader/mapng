@@ -58,6 +58,7 @@
         v-if="batchMode"
         :center="center"
         :resolution="resolution"
+        :processing-meters-per-pixel="processingMetersPerPixel"
         :is-running="batchRunning"
         :saved-state="savedBatchState"
         :tile-offsets="batchTileOffsets"
@@ -74,6 +75,7 @@
         @update:tile-offsets="store.setBatchTileOffsets"
         @update:tile-names="store.setBatchTileNames"
         @update:tile-follow-center="store.setBatchTileFollowCenter"
+        @update:processingMetersPerPixel="handleProcessingMetersPerPixelChange"
         @show-support="openSupportTip('manual')"
       />
     </AppSidebar>
@@ -322,6 +324,11 @@ const processingMetersPerPixel = ref(
     : 1,
 );
 
+const getEffectiveProcessingMpp = (value = processingMetersPerPixel.value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+};
+
 const handleProcessingMetersPerPixelChange = (value) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return;
@@ -362,6 +369,7 @@ const batchGridTiles = computed(() => {
     batchGridCols.value,
     batchGridRows.value,
     batchTileOffsets.value,
+    Number(resolution.value) * getEffectiveProcessingMpp(),
   ).map((tile) => {
     const customName = (batchTileNames.value || []).find((entry) => Number(entry.index) === tile.index)?.name || '';
     return {
@@ -811,7 +819,10 @@ const switchTo2D = () => {
 // ─── Batch Job Handlers ─────────────────────────────────────────────
 
 const handleStartBatch = (config) => {
-  const state = createBatchJobState(config);
+  const state = createBatchJobState({
+    ...config,
+    processingMetersPerPixel: getEffectiveProcessingMpp(config.processingMetersPerPixel),
+  });
   batchState.value = state;
   showBatchProgress.value = true;
   executeBatchJob(state);
@@ -929,6 +940,7 @@ const handleBatchTileDrag = ({ index, lat, lng }) => {
     resolution.value,
     batchGridCols.value,
     batchGridRows.value,
+    Number(resolution.value) * getEffectiveProcessingMpp(),
   );
   const baseTile = baseTiles.find((tile) => tile.index === index);
   if (!baseTile) return;
@@ -972,12 +984,14 @@ const handleMapMove = (newCenter) => {
     batchGridCols.value,
     batchGridRows.value,
     batchTileOffsets.value,
+    Number(resolution.value) * getEffectiveProcessingMpp(),
   );
   const newBaseTiles = computeGridTiles(
     newCenter,
     resolution.value,
     batchGridCols.value,
     batchGridRows.value,
+    Number(resolution.value) * getEffectiveProcessingMpp(),
   );
 
   const nextOffsets = oldTiles.map((tile) => {

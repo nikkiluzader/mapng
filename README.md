@@ -19,19 +19,34 @@ It is built for modding workflows, not survey-grade terrain reconstruction. The 
 
 ## Current Highlights
 
-- 1 meter per pixel terrain grids from `512` to `8192`
+- Configurable processing resolution from `0.25` to `2.0` meters per pixel (sub-meter supported)
+- Output grids from `512` to `8192` with consistent world coverage based on selected processing scale
 - Multiple elevation sources: global standard DEM, NMT EVRF2007 in Poland, USGS 1 m in the US, and GPXZ
-- Satellite, OSM, hybrid, segmented, and road mask texture exports
+- Satellite, OSM, hybrid, segmented, and road mask texture exports with sub-meter aware overlay scaling
 - 3D preview with buildings, vegetation, barriers, and surrounding terrain
 - GLB, DAE, GeoTIFF, GeoJSON, BeamNG `.ter`, and `.mapng` session exports
+- Run configuration copy/paste/save/load for both single and batch workflows
 - Batch jobs for tile grids with offsets, shared elevation baseline, resume support, and stitched verification heightmaps
-- Experimental BeamNG level ZIP export with flavor-based official asset selection, terrain materials, water, vegetation, and custom level naming
+- Experimental BeamNG level ZIP export with flavor-based official asset selection, terrain materials, water, vegetation, custom level naming, and export diagnostics reports
+
+## What's New (Sub-Meter Update)
+
+- Added processing-resolution control (`0.25`, `0.5`, `1.0`, `2.0` m/px) and persisted app state
+- Updated map selection/crop sizing so terrain footprint matches the selected processing scale
+- Propagated processing resolution through generation cache keys and terrain pipelines (default, GeoTIFF, LAZ)
+- Fixed OSM/hybrid overlay scaling for sub-meter exports
+- Fixed road mask preview/export scaling for sub-meter exports
+- Updated status/progress messaging to show the active processing resolution
+- Improved 2D export cards by using lightweight thumbnail previews while keeping exported files full-resolution
+- Added processing-resolution context to BeamNG export diagnostics (`export_report.txt`)
+- Added batch configuration/session parity for processing resolution
 
 ## Important Notes
 
 - The BeamNG level package export is still experimental.
 - OSM-based textures and road overlays are useful for layout reference, but they are not final-quality road art.
 - The generated BeamNG level package uses heuristics and official game asset references. Some combinations still need more validation in-game.
+- At very small processing scales (for example `0.25 m/px`), tiny geospatial alignment differences can become more visible near tile edges.
 - Large exports, especially `4096` and `8192`, can be heavy on browser memory.
 - MapNG outputs are intended as a starting point for modding workflows. If you plan to publish to community mod forums, please do additional editing, world-building, optimization, and QA first.
 
@@ -101,11 +116,12 @@ npm run build
 ## Typical Workflow
 
 1. Pick a location on the map or search by name.
-2. Choose a resolution and elevation source.
+2. Choose an output resolution, processing resolution (m/px), and elevation source.
 3. Enable OSM features if you want roads, land-use, buildings, or vegetation-driven outputs.
 4. Generate terrain and inspect it in 3D.
-5. Export the assets you need.
-6. For larger areas, switch to Batch Job mode and process a tile grid.
+5. Save or copy run configuration if you want reproducible reruns.
+6. Export the assets you need.
+7. For larger areas, switch to Batch Job mode and process a tile grid.
 
 ## BeamNG Export Status
 
@@ -120,6 +136,7 @@ The BeamNG level package can now:
 - infer terrain materials from OSM or segmented imagery
 - place water, vegetation, rocks, and ground cover using official assets
 - generate a suggested level name from the selected location
+- emit an `export_report.txt` diagnostics summary including terrain dimensions, selected options, and processing-resolution context
 
 That export path is still under active iteration and should be treated as a starting point, not a finished one-click world builder.
 

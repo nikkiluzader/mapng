@@ -153,7 +153,7 @@
     "tileNames": "Noms des tuiles",
     "tileNamesHint": "Les valeurs par defaut utilisent des etiquettes ligne/colonne. Renommez une tuile pour modifier son nom de fichier ZIP exporte et les etiquettes du lot.",
     "tileRésolution": "Résolution de tuile",
-    "tileEach": "Chaque tuile : {resolution}m x {resolution}m a 1m/px",
+    "tileEach": "Chaque tuile : {resolution}m x {resolution}m a {mpp}m/px",
     "gridCoverage": "Couverture de grille : {w} x {h}",
     "highRésolutionWarning": "Les tuiles haute resolution nécessitent beaucoup de RAM par tuile.",
     "sharedBaseline": "Reference d'élévation partagee (toutes les heightmaps utilisent un min/max unique)",
@@ -290,6 +290,11 @@
     "fetchesMaxDetail": "- Recupere le detail maximal (Terrain Z15, Sat Z17).",
     "largeAreaRamWarning": "Attention : grande zone. Peut necessiter beaucoup de RAM.",
     "currentScale": "- Echelle actuelle",
+    "processingResolutionLabel": "Resolution de traitement (metres par pixel)",
+    "processingResolutionHint": "Un m/px plus faible donne plus de details sur une surface plus petite pour la meme taille de sortie.",
+    "processingResolutionOptionUltra": "0.25 m/px (Ultra detail)",
+    "processingResolutionOptionHigh": "0.5 m/px (Haut detail)",
+    "processingResolutionOptionStandard": "1.0 m/px (Standard)",
     "includeOsmFeatures": "Inclure les elements OSM",
     "centerCoordinates": "Coordonnées du centre",
     "configurationSession": "Configuration et session"
@@ -352,7 +357,7 @@
     "title": "Avertissement sur la precision des données",
     "lead": "Veuillez noter que toutes les données de terrain, heightmaps et modeles 3D generes par MapNG sont des estimations basees sur les jeux de données satellite et d'élévation disponibles.",
     "resolutionTitle": "Résolution et echelle",
-    "resolutionBody": "Toutes les heightmaps sont exportees a une resolution de 1 metre par pixel pour garantir une echelle coherente dans les moteurs de jeu. Cependant, lors de l'utilisation du jeu de données Standard (30m), le terrain est sur-echantillonne. Il sera donc lisse mais sans les details fins des vrais jeux de données 1m comme USGS ou GPXZ.",
+    "resolutionBody": "Les heightmaps sont exportees avec la resolution de traitement selectionnee afin de conserver une echelle coherente dans les moteurs de jeu. Avec le jeu de donnees Standard (30m), le terrain reste sur-echantillonne, donc plus lisse et moins detaille que des sources natives haute resolution comme USGS ou GPXZ.",
     "usage": "Cet outil est destine au modding et a un usage creatif. Il ne doit pas etre utilise pour la navigation, l'ingenierie ou la planification critique du monde reel.",
     "confirm": "J'ai compris"
   },
@@ -402,7 +407,7 @@
     "surroundingTitle": "Tuiles environnantes",
     "surroundingBody": "Téléchargez jusqu'a 8 tuiles de terrain adjacentes dans un package ZIP avec heightmaps, textures satellite et metadonnées - ideal pour construire des mondes BeamNG multi-tuiles.",
     "resolutionTitle": "Note sur la resolution",
-    "resolutionStrong": "Toutes les heightmaps sont exportees a 1 metre par pixel.",
+    "resolutionStrong": "Les heightmaps sont exportees avec la resolution de traitement selectionnee.",
     "resolutionBody": "Les tailles de sortie vont de 512px a 8192px (0.26 km2 a 67 km2). Les données Standard 30m sont sur-echantillonnees bilineairement pour des surfaces lisses.",
     "batchTitle": "Mode traitement par lot",
     "batchIntro": "Traitez de grandes zones en definissant une grille de tuiles (jusqu'a 20x20). Chaque tuile est générée sequentiellement avec les exports selectionnes empaquetes dans un ZIP individuel. Fonctionnalites :",
@@ -509,7 +514,7 @@
         },
         {
           "name": "Mercator transverse local",
-          "desc": "Projection metrique personnalisee pour des grilles 1m/px parfaites"
+          "desc": "Projection metrique personnalisee pour des grilles de traitement alignees sur les pixels"
         },
         {
           "name": "Geocodage Nominatim",
@@ -640,7 +645,7 @@
       "fetchTerrain": "Échec de la recuperation des données de terrain. La zone demandee est peut-etre trop grande ou le service est indisponible.",
       "batchCacheCleared": "Cache du lot vide.",
       "batchCacheClearFailed": "Échec du nettoyage du cache du lot.",
-      "usgsFallback": "Les données USGS 1m pour cette zone etaient absentes ou corrompues. Bascule vers le jeu de données Terrarium Standard.\n\nLa sortie reste sur la grille de traitement 1m/px de l'application.",
+      "usgsFallback": "Les données USGS 1m pour cette zone etaient absentes ou corrompues. Bascule vers le jeu de données Terrarium Standard.\n\nLa sortie reste sur la grille de traitement actuelle de l'application.",
       "kron86Fallback": "Les données NMT EVRF2007 ne sont disponibles que pour les tuiles prises en charge en Pologne. Bascule vers le jeu de données Terrarium Standard."
     }
   },
