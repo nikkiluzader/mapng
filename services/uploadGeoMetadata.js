@@ -24,6 +24,11 @@ export const detectUnitFromText = (text) => {
 };
 
 export const getBuiltInProj4 = (epsgCode) => {
+  if (epsgCode === 28992) {
+    // Amersfoort / RD New.
+    // Uses the same TOWGS84 parameters commonly embedded in Dutch AHN GeoTIFFs.
+    return '+proj=sterea +lat_0=52.1561605555556 +lon_0=5.38763888888889 +k=0.9999079 +x_0=155000 +y_0=463000 +ellps=bessel +towgs84=565.417,50.3319,465.552,-0.398957,0.343988,-1.8774,4.0725 +units=m +no_defs';
+  }
   if (epsgCode === 6350) {
     // NAD83(2011) / Conus Albers
     return '+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs';

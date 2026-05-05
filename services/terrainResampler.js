@@ -1,6 +1,7 @@
 import proj4 from 'proj4';
 import * as GeoTIFF from 'geotiff';
 import { createLocalToWGS84 } from './geoUtils';
+import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
 const normalizeLng = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
@@ -325,14 +326,20 @@ export const resampleToMeterGrid = async (
                 // Check if definition exists, if not fetch it
                 try {
                     if (!proj4.defs(epsg)) {
-                        console.log(`[Resampler] Fetching Proj4 definition for ${epsg}...`);
-                        const response = await fetch(`https://epsg.io/${epsgCode}.proj4`);
-                        if (response.ok) {
-                            const def = await response.text();
-                            proj4.defs(epsg, def);
-                            console.log(`[Resampler] Loaded definition for ${epsg}`);
+                        const builtIn = getBuiltInProj4(epsgCode);
+                        if (builtIn) {
+                            proj4.defs(epsg, builtIn);
+                            console.log(`[Resampler] Loaded built-in definition for ${epsg}`);
                         } else {
-                            console.warn(`[Resampler] Failed to fetch definition for ${epsg}`);
+                            console.log(`[Resampler] Fetching Proj4 definition for ${epsg}...`);
+                            const response = await fetch(`https://epsg.io/${epsgCode}.proj4`);
+                            if (response.ok) {
+                                const def = await response.text();
+                                proj4.defs(epsg, def);
+                                console.log(`[Resampler] Loaded definition for ${epsg}`);
+                            } else {
+                                console.warn(`[Resampler] Failed to fetch definition for ${epsg}`);
+                            }
                         }
                     }
                     
