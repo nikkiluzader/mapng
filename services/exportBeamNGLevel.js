@@ -25,14 +25,45 @@ import {
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
 
 /**
- * Sanitize a string for use as a BeamNG level folder name.
+ * Sanitize user input to a deterministic BeamNG level id.
+ * Rules: lowercase snake_case, no leading digit, max 64 chars.
  */
-function sanitizeLevelName(name) {
-  return String(name || '')
+function sanitizeLevelId(name) {
+  let sanitized = String(name || '')
+    .toLowerCase()
     .trim()
-    .replace(/[^a-zA-Z0-9_]/g, '_')
+    .replace(/[^a-z0-9_]/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_+|_+$/g, '');
+
+  if (!sanitized) return 'mapng_level';
+  if (/^[0-9]/.test(sanitized)) sanitized = `mapng_${sanitized}`;
+  if (sanitized.length > 64) sanitized = sanitized.slice(0, 64).replace(/_+$/g, '');
+
+  return sanitized || 'mapng_level';
+}
+
+function validateGeneratedBeamNGStructure(zip, base) {
+  const requiredFiles = [
+    `${base}/info.json`,
+    `${base}/map.json`,
+    `${base}/theTerrain.ter`,
+    `${base}/theTerrain.terrain.json`,
+    `${base}/main.decals.json`,
+    `${base}/main.forestbrushes4.json`,
+    `${base}/main.level.json`,
+    `${base}/main/items.level.json`,
+    `${base}/main/MissionGroup/items.level.json`,
+    `${base}/main/MissionGroup/PlayerDropPoints/items.level.json`,
+    `${base}/main/MissionGroup/sky_and_sun/items.level.json`,
+    `${base}/main/MissionGroup/level_objects/items.level.json`,
+  ];
+
+  for (const filePath of requiredFiles) {
+    if (!zip.file(filePath)) {
+      throw new Error(`BeamNG export validation failed: missing required file ${filePath}`);
+    }
+  }
 }
 
 /**
@@ -2729,7 +2760,7 @@ const NATIVE_BARRIER_ASSETS = {
 function buildCloudObjects(biome) {
   if (biome?.levelName !== 'east_coast_usa') return [];
   return [{
-    __parent: 'cloud',
+    __parent: 'sky_and_sun',
     name: 'clouds',
     class: 'CloudLayer',
     persistentId: generatePersistentId(),
@@ -3725,6 +3756,9 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
  *   {levelName}.zip/
  *   └── levels/{levelName}/
  *       ├── info.json
+ *       ├── map.json
+ *       ├── main.decals.json
+ *       ├── main.forestbrushes4.json
  *       ├── mainLevel.lua
  *       ├── preview.png
  *       ├── theTerrain.ter
@@ -3740,12 +3774,14 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
  *       └── main/
  *           └── MissionGroup/
  *               ├── items.level.json
+ *               ├── sky_and_sun/items.level.json
+ *               ├── level_objects/items.level.json
  *               ├── PlayerDropPoints/
  *               │   └── items.level.json
- *               ├── Level_objects/
- *               │   ├── items.level.json   (LevelInfo, TimeOfDay, ScatterSky, Other group)
- *               │   └── Other/
- *               │       └── items.level.json  (TerrainBlock + optional TSStatics)
+ *               ├── AIWaypointsGroup/items.level.json
+ *               ├── AIDecalWaypointsGroup/items.level.json
+ *               ├── Water/items.level.json
+ *               └── vegetation/items.level.json (optional)
  *
  * @param {object} terrainData
  * @param {object} center        — { lat, lng }
@@ -3903,7 +3939,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const lng = center.lng.toFixed(4);
   const fallbackLevelName = `mapng_${lat}_${lng}`.replace(/-/g, '_').replace(/\./g, '_');
   const levelDisplayName = String(requestedLevelName || '').trim() || fallbackLevelName;
-  const levelName = sanitizeLevelName(levelDisplayName) || sanitizeLevelName(fallbackLevelName) || 'mapng_level';
+  const levelName = sanitizeLevelId(levelDisplayName || fallbackLevelName);
+  if (!/^[a-z_][a-z0-9_]{0,63}$/.test(levelName)) {
+    throw new Error(`Generated invalid BeamNG level id: ${levelName}`);
+  }
   const biome = getBeamNGBiomeById(biomeId);
   if (!biome) {
     console.error(`${BEAMNG_EXPORT_SERVICE_LOG} Invalid or missing biomeId.`, { biomeId });
@@ -4075,11 +4114,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   zip.folder(`${base}/art/terrains`);
   zip.folder(`${base}/main`);
   zip.folder(`${base}/main/MissionGroup`);
-  zip.folder(`${base}/main/MissionGroup/Level_objects`);
-  zip.folder(`${base}/main/MissionGroup/Level_objects/Other`);
-  if (cloudObjects.length > 0) {
-    zip.folder(`${base}/main/MissionGroup/Level_objects/cloud`);
-  }
+  zip.folder(`${base}/main/MissionGroup/sky_and_sun`);
+  zip.folder(`${base}/main/MissionGroup/level_objects`);
+  zip.folder(`${base}/main/MissionGroup/AIWaypointsGroup`);
+  zip.folder(`${base}/main/MissionGroup/AIDecalWaypointsGroup`);
   zip.folder(`${base}/main/MissionGroup/PlayerDropPoints`);
   zip.folder(`${base}/main/MissionGroup/Water`);
   if (barrierFolderItems.length > 0) {
@@ -4092,7 +4130,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     zip.folder(`${base}/main/MissionGroup/Mesh_roads`);
   }
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
-    zip.folder(`${base}/main/MissionGroup/Level_objects/vegetation`);
+    zip.folder(`${base}/main/MissionGroup/vegetation`);
     zip.folder(`${base}/art/forest`);
     zip.folder(`${base}/forest`);
   }
@@ -4100,9 +4138,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // ── info.json ──────────────────────────────────────────────────────────────
   zip.file(`${base}/info.json`, JSON.stringify({
     authors: 'mapng',
+    biome: biome?.label || biome?.id || 'mapng',
     defaultSpawnPointName: 'spawn_default',
     description: `Generated by mapng at ${lat}, ${lng}`,
+    features: 'Procedural OSM-driven roads, vegetation, water, and terrain.',
     previews: ['preview.png'],
+    roads: roadType === 'architect' ? 'Road Architect roads from OSM' : 'OSM-derived roads',
+    suitablefor: 'Freeroam, testing, and world-building',
     size: [size, size],
     spawnPoints: [{
       name: 'Default',
@@ -4111,7 +4153,30 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       translationId: 'Default Spawnpoint',
     }],
     title: levelDisplayName,
+    supportsTraffic: false,
+    supportsTimeOfDay: true,
   }, null, 2));
+
+  // ── map.json ───────────────────────────────────────────────────────────────
+  zip.file(`${base}/map.json`, JSON.stringify({ segments: {} }, null, 2));
+
+  // ── editor helper files ───────────────────────────────────────────────────
+  zip.file(`${base}/main.decals.json`, JSON.stringify({
+    header: {
+      name: 'DecalData File',
+      comments: '// Instances format: rectIdx, size, renderPriority, position.x, position.y, position.z, normal.x, normal.y, normal.z, tangent.x, tangent.y, tangent.z, uid',
+      version: 2,
+    },
+    instances: {},
+  }, null, 2));
+
+  zip.file(`${base}/main.forestbrushes4.json`, toNDJSON([
+    {
+      class: 'SimGroup',
+      name: 'ForestBrushGroup',
+      persistentId: generatePersistentId(),
+    },
+  ]));
 
   // ── mainLevel.lua ──────────────────────────────────────────────────────────
   // Lua initialization script executed on level load. Expected by BeamNG's
@@ -4434,9 +4499,18 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   // ── main/MissionGroup/items.level.json ─────────────────────────────────────
   const missionGroupItems = [
+    { __parent: 'MissionGroup', class: 'SimGroup', name: 'sky_and_sun', persistentId: generatePersistentId() },
+    { __parent: 'MissionGroup', class: 'SimGroup', name: 'level_objects', persistentId: generatePersistentId() },
     { __parent: 'MissionGroup', class: 'SimGroup', name: 'PlayerDropPoints', persistentId: generatePersistentId() },
-    { __parent: 'MissionGroup', class: 'SimGroup', name: 'Level_objects', persistentId: generatePersistentId() },
+    { __parent: 'MissionGroup', class: 'SimGroup', name: 'AIWaypointsGroup', persistentId: generatePersistentId() },
+    { __parent: 'MissionGroup', class: 'SimGroup', name: 'AIDecalWaypointsGroup', persistentId: generatePersistentId() },
     { __parent: 'MissionGroup', class: 'SimGroup', name: 'Water', persistentId: generatePersistentId() },
+    ...((forestFiles.length > 0 || groundCoverObjects.length > 0) ? [{
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: 'vegetation',
+      persistentId: generatePersistentId(),
+    }] : []),
     ...(meshRoads.length > 0 ? [{
       __parent: 'MissionGroup',
       class: 'SimGroup',
@@ -4499,13 +4573,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     writeSimGroupTree(zip, `${base}/main/MissionGroup/Decal_Roads`, decalRoads);
   }
 
-  // ── main/MissionGroup/Level_objects/items.level.json ──────────────────────
-  // LevelInfo, TimeOfDay, ScatterSky, and the Other group (which holds terrain)
-  // are all defined here, matching the Cliff level's structure.
-  zip.file(`${base}/main/MissionGroup/Level_objects/items.level.json`,
-    toNDJSON([
+  // Base maps include these groups even when empty.
+  zip.file(`${base}/main/MissionGroup/AIWaypointsGroup/items.level.json`, '');
+  zip.file(`${base}/main/MissionGroup/AIDecalWaypointsGroup/items.level.json`, '');
+
+  const skyAndSunItems = [
       {
-        __parent: 'Level_objects',
+        __parent: 'sky_and_sun',
         class: 'LevelInfo',
         name: 'theLevelInfo',
         persistentId: generatePersistentId(),
@@ -4513,20 +4587,20 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
         fogAtmosphereHeight: 1000,
         fogDensity: 0.0001,
         fogDensityOffset: 0,
-        globalEnviromentMap: 'BNG_Sky_02_cubemap',
+        globalEnviromentMap: getGlobalEnvironmentMap(biome),
         gravity: -9.81,
         nearClip: 0.1,
         visibleDistance: 4000,
       },
       {
-        __parent: 'Level_objects',
+        __parent: 'sky_and_sun',
         class: 'TimeOfDay',
         name: 'tod',
         persistentId: generatePersistentId(),
         startTime: 0.15,
       },
       {
-        __parent: 'Level_objects',
+        __parent: 'sky_and_sun',
         class: 'ScatterSky',
         name: 'sunsky',
         persistentId: generatePersistentId(),
@@ -4539,28 +4613,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
         sunScaleGradientFile: 'art/sky_gradients/default/gradient_sunscale.png',
         texSize: 2048,
       },
-      {
-        __parent: 'Level_objects',
-        class: 'SimGroup',
-        name: 'Other',
-        persistentId: generatePersistentId(),
-      },
-      ...(cloudObjects.length > 0 ? [{
-        __parent: 'Level_objects',
-        class: 'SimGroup',
-        name: 'cloud',
-        persistentId: generatePersistentId(),
-      }] : []),
-      ...((forestFiles.length > 0 || groundCoverObjects.length > 0) ? [{
-        __parent: 'Level_objects',
-        class: 'SimGroup',
-        name: 'vegetation',
-        persistentId: generatePersistentId(),
-      }] : []),
-    ])
-  );
+      ...cloudObjects,
+  ];
 
-  // ── main/MissionGroup/Level_objects/Other/items.level.json ────────────────
+  // ── main/MissionGroup/sky_and_sun/items.level.json ───────────────────────
+  zip.file(`${base}/main/MissionGroup/sky_and_sun/items.level.json`, toNDJSON(skyAndSunItems));
+
+  // ── main/MissionGroup/level_objects/items.level.json ──────────────────────
   // TerrainBlock referencing the .ter file and the PBR material texture set.
   // - squareSize:        real-world meters per terrain grid square
   // - maxHeight:         elevation range in meters (maps ter 0→65535 to 0→maxHeight)
@@ -4572,8 +4631,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // TSStatic (optional): OSM 3D objects DAE, placed at world origin.
   // The DAE geometry is already in BeamNG world-space — no rotation or scale
   // needed on the TSStatic. Collada up_axis is declared Z_UP in the file.
-  const otherItems = [{
-    __parent: 'Other',
+  const levelObjectItems = [{
+    __parent: 'level_objects',
     class: 'TerrainBlock',
     name: 'theTerrain',
     persistentId: generatePersistentId(),
@@ -4587,13 +4646,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }];
 
   if (osmDaeBlob) {
-    otherItems.push({
-      __parent: 'Other',
+    levelObjectItems.push({
+      __parent: 'level_objects',
       class: 'TSStatic',
       name: 'osm_objects',
       persistentId: generatePersistentId(),
       position: [0, 0, 0],
-      shapeName: `levels/${levelName}/art/shapes/osm_objects.dae`,
+      shapeName: `/levels/${levelName}/art/shapes/osm_objects.dae`,
       collisionType: 'Collision Mesh',
       decalType: 'Collision Mesh',
       prebuildCollisionData: 0,
@@ -4604,56 +4663,50 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
 
   if (backdropDaeBlob) {
-    otherItems.push({
-      __parent: 'Other',
+    levelObjectItems.push({
+      __parent: 'level_objects',
       class: 'TSStatic',
       name: 'terrain_backdrop',
       persistentId: generatePersistentId(),
       position: [0, 0, 0],
-      shapeName: `levels/${levelName}/art/shapes/terrain_backdrop.dae`,
+      shapeName: `/levels/${levelName}/art/shapes/terrain_backdrop.dae`,
       useInstanceRenderData: true,
     });
   }
 
   if (mapngFlagFiles.length > 0) {
-    otherItems.push({
-      __parent: 'Other',
+    levelObjectItems.push({
+      __parent: 'level_objects',
       class: 'TSStatic',
       name: 'mapng_flag_marker',
       persistentId: generatePersistentId(),
       position: mapngFlagPosition,
-      shapeName: `levels/${levelName}/art/shapes/mapng/flagng.dae`,
+      shapeName: `/levels/${levelName}/art/shapes/mapng/flagng.dae`,
       useInstanceRenderData: true,
     });
   }
 
-  zip.file(`${base}/main/MissionGroup/Level_objects/Other/items.level.json`,
-    toNDJSON(otherItems)
+  zip.file(`${base}/main/MissionGroup/level_objects/items.level.json`,
+    toNDJSON(levelObjectItems)
   );
 
   zip.file(`${base}/main/MissionGroup/Water/items.level.json`,
     toNDJSON(waterObjects)
   );
 
-  if (cloudObjects.length > 0) {
-    zip.file(`${base}/main/MissionGroup/Level_objects/cloud/items.level.json`,
-      toNDJSON(cloudObjects)
-    );
-  }
+  const vegetationItems = [
+    ...(forestFiles.length > 0 ? [{
+      __parent: 'vegetation',
+      class: 'Forest',
+      name: 'theForest',
+      persistentId: generatePersistentId(),
+      lodReflectScalar: 0,
+    }] : []),
+    ...groundCoverObjects,
+  ];
 
-  if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
-    zip.file(`${base}/main/MissionGroup/Level_objects/vegetation/items.level.json`,
-      toNDJSON([
-        ...(forestFiles.length > 0 ? [{
-          __parent: 'vegetation',
-          class: 'Forest',
-          name: 'theForest',
-          persistentId: generatePersistentId(),
-          lodReflectScalar: 0,
-        }] : []),
-        ...groundCoverObjects,
-      ])
-    );
+  if (vegetationItems.length > 0) {
+    zip.file(`${base}/main/MissionGroup/vegetation/items.level.json`, toNDJSON(vegetationItems));
     if (forestFiles.length > 0) {
       zip.file(`${base}/art/forest/managedItemData.json`, JSON.stringify(managedForestItemData, null, 2));
       for (const forestFile of forestFiles) {
@@ -4674,8 +4727,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // fallback), 3 m above the terrain surface at that point.
   // rotationMatrix: 9-element flat row-major matrix aligning the vehicle with
   // the road tangent direction at the spawn point.
-  zip.file(`${base}/main/MissionGroup/PlayerDropPoints/items.level.json`,
-    toNDJSON([{
+  const playerDropPointItems = [{
       __parent: 'PlayerDropPoints',
       class: 'SpawnSphere',
       dataBlock: 'SpawnSphereMarker',
@@ -4684,8 +4736,67 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       position: spawnPosition,
       rotationMatrix: spawnRotationMatrix,
       radius: 5,
-    }])
-  );
+    }];
+
+  zip.file(`${base}/main/MissionGroup/PlayerDropPoints/items.level.json`, toNDJSON(playerDropPointItems));
+
+  // Fallback monolithic entrypoint for loaders that expect /levels/<id>/main.level.json.
+  const toMainLevelObject = (obj) => {
+    const { __parent, ...rest } = obj;
+    return rest;
+  };
+  const mainLevelChilds = [
+    {
+      class: 'SimGroup',
+      name: 'sky_and_sun',
+      childs: skyAndSunItems.map(toMainLevelObject),
+    },
+    {
+      class: 'SimGroup',
+      name: 'level_objects',
+      childs: levelObjectItems.map(toMainLevelObject),
+    },
+    {
+      class: 'SimGroup',
+      name: 'PlayerDropPoints',
+      childs: playerDropPointItems.map(toMainLevelObject),
+    },
+    {
+      class: 'SimGroup',
+      name: 'Water',
+      childs: waterObjects.map(toMainLevelObject),
+    },
+    ...(vegetationItems.length > 0
+      ? [{
+          class: 'SimGroup',
+          name: 'vegetation',
+          childs: vegetationItems.map(toMainLevelObject),
+        }]
+      : []),
+    ...(meshRoads.length > 0
+      ? [{
+          class: 'SimGroup',
+          name: 'Mesh_roads',
+          childs: meshRoads.map(toMainLevelObject),
+        }]
+      : []),
+    ...(barrierFolderItems.length > 0
+      ? [{
+          class: 'SimGroup',
+          name: 'barriers',
+          childs: barrierFolderItems.map(toMainLevelObject),
+        }]
+      : []),
+  ];
+
+  zip.file(`${base}/main.level.json`, JSON.stringify({
+    class: 'SimGroup',
+    name: 'MissionGroup',
+    enabled: '1',
+    childs: mainLevelChilds,
+  }, null, 2));
+
+  validateGeneratedBeamNGStructure(zip, base);
 
   beginStep('Compressing ZIP archive (DEFLATE)…', 94);
   await yield_();
