@@ -237,9 +237,9 @@
     "pbrMaterials": "PBR-Materialien",
     "off": "Aus",
     "osmData": "OSM-Daten",
-    "flavor": "Variante",
+    "biome": "Biom",
     "selectLevel": "Level auswählen",
-    "chooseFlavor": "Wahle vor dem Export eine BeamNG-Level-Variante.",
+    "chooseBiome": "Wahle vor dem Export ein BeamNG-Level-Biom.",
     "includeBackdrop": "Hintergrund einbeziehen",
     "surroundingTerrain": "Umgebendes Terrain",
     "includeBuildings": "Gebäude einbeziehen",
@@ -424,7 +424,7 @@
       "Koordinatenbasierte Dateinamen pro Tile für einfache Organisation"
     ],
     "beamngTitle": "BeamNG-Level-Export",
-    "beamngBody": "Der BeamNG-Level-Paketexport ist noch experimentell. Er kann ein spielbares Level-ZIP mit flavor-basierten offiziellen Assets, abgeleiteten Terrain-Materialien, Wasser, Vegetation und vorgeschlagenem Levelnamen erstellen, benotigt aber noch weitere Validierung und Feinschliff.",
+    "beamngBody": "Der BeamNG-Level-Paketexport ist noch experimentell. Er kann ein spielbares Level-ZIP mit biom-basierten offiziellen Assets, abgeleiteten Terrain-Materialien, Wasser, Vegetation und vorgeschlagenem Levelnamen erstellen, benotigt aber noch weitere Validierung und Feinschliff.",
     "additionalTitle": "Weitere Features",
     "additionalItems": [
       "Job-Import/Export: Ganze Sitzungen via .mapng speichern und wiederherstellen",

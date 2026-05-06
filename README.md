@@ -27,7 +27,7 @@ It is built for modding workflows, not survey-grade terrain reconstruction. The 
 - GLB, DAE, GeoTIFF, GeoJSON, BeamNG `.ter`, and `.mapng` session exports
 - Run configuration copy/paste/save/load for both single and batch workflows
 - Batch jobs for tile grids with offsets, shared elevation baseline, resume support, and stitched verification heightmaps
-- Experimental BeamNG level ZIP export with flavor-based official asset selection, terrain materials, water, vegetation, custom level naming, and export diagnostics reports
+- Experimental BeamNG level ZIP export with biome-based official asset selection, terrain materials, water, vegetation, custom level naming, and export diagnostics reports
 
 ## What's New (Sub-Meter Update)
 
@@ -132,7 +132,7 @@ MapNG currently supports two BeamNG-focused outputs:
 
 The BeamNG level package can now:
 
-- choose a flavor based on an official game level
+- choose a biome based on an official game level
 - infer terrain materials from OSM or segmented imagery
 - place water, vegetation, rocks, and ground cover using official assets
 - generate a suggested level name from the selected location

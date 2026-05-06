@@ -792,7 +792,7 @@ const WATER_PROFILES = {
   },
 };
 
-export const BEAMNG_FLAVORS = [
+export const BEAMNG_BIOMES = [
   {
     id: 'italy',
     label: 'Italy',
@@ -885,87 +885,87 @@ export const BEAMNG_FLAVORS = [
   },
 ];
 
-const FLAVOR_BY_ID = new Map(BEAMNG_FLAVORS.map((flavor) => [flavor.id, flavor]));
+const BIOME_BY_ID = new Map(BEAMNG_BIOMES.map((biome) => [biome.id, biome]));
 let shapeMaterialLibraryPromise = null;
 
 const normalizeLevelName = (value) => String(value || '').toLowerCase();
 
-export function getBeamNGFlavorById(flavorId) {
-  return FLAVOR_BY_ID.get(flavorId) ?? null;
+export function getBeamNGBiomeById(biomeId) {
+  return BIOME_BY_ID.get(biomeId) ?? null;
 }
 
-export function getBeamNGFlavorOptions() {
-  return BEAMNG_FLAVORS.map(({ id, label }) => ({ id, label }));
+export function getBeamNGBiomeOptions() {
+  return BEAMNG_BIOMES.map(({ id, label }) => ({ id, label }));
 }
 
 export function getTerrainSemanticCandidates(semanticName) {
   return DEFAULT_TERRAIN_CANDIDATES[semanticName] ?? [semanticName];
 }
 
-export function getTerrainLevelFallbacks(flavor) {
+export function getTerrainLevelFallbacks(biome) {
   return Array.from(new Set([
-    flavor?.levelName,
-    ...(flavor?.terrainLevelFallbacks ?? []),
+    biome?.levelName,
+    ...(biome?.terrainLevelFallbacks ?? []),
   ].filter(Boolean)));
 }
 
-export function getGroundCoverProfile(flavor) {
-  for (const assetSetId of flavor?.assetSetIds ?? []) {
+export function getGroundCoverProfile(biome) {
+  for (const assetSetId of biome?.assetSetIds ?? []) {
     const groundCover = ASSET_SETS[assetSetId]?.groundCover;
     if (groundCover) return groundCover;
   }
   return ASSET_SETS.italy.groundCover;
 }
 
-export function getManagedForestTemplate(flavor, itemName) {
-  for (const assetSetId of flavor?.assetSetIds ?? []) {
+export function getManagedForestTemplate(biome, itemName) {
+  for (const assetSetId of biome?.assetSetIds ?? []) {
     const template = ASSET_SETS[assetSetId]?.managedItemTemplates?.[itemName];
     if (template) return template;
   }
   return null;
 }
 
-function getVegetationSelector(flavor, selectorName) {
-  for (const assetSetId of flavor?.assetSetIds ?? []) {
+function getVegetationSelector(biome, selectorName) {
+  for (const assetSetId of biome?.assetSetIds ?? []) {
     const selectors = ASSET_SETS[assetSetId]?.vegetationSelectors;
     if (selectors?.[selectorName]) return selectors[selectorName];
   }
   return null;
 }
 
-export function resolveTreeTypeForTags(flavor, tags = {}) {
+export function resolveTreeTypeForTags(biome, tags = {}) {
   const species = `${tags.species || ''} ${tags['species:en'] || ''}`.toLowerCase();
-  if (species.includes('olive')) return getVegetationSelector(flavor, 'olive') ?? getVegetationSelector(flavor, 'default');
-  if (species.includes('cypress')) return getVegetationSelector(flavor, 'cypress') ?? getVegetationSelector(flavor, 'default');
-  if (species.includes('palm') || tags.leaf_type === 'palm') return getVegetationSelector(flavor, 'palm') ?? getVegetationSelector(flavor, 'default');
-  if (tags.leaf_type === 'needleleaved' || tags.wood === 'coniferous') return getVegetationSelector(flavor, 'needle') ?? getVegetationSelector(flavor, 'default');
-  return getVegetationSelector(flavor, 'default') ?? getVegetationSelector(flavor, 'bush');
+  if (species.includes('olive')) return getVegetationSelector(biome, 'olive') ?? getVegetationSelector(biome, 'default');
+  if (species.includes('cypress')) return getVegetationSelector(biome, 'cypress') ?? getVegetationSelector(biome, 'default');
+  if (species.includes('palm') || tags.leaf_type === 'palm') return getVegetationSelector(biome, 'palm') ?? getVegetationSelector(biome, 'default');
+  if (tags.leaf_type === 'needleleaved' || tags.wood === 'coniferous') return getVegetationSelector(biome, 'needle') ?? getVegetationSelector(biome, 'default');
+  return getVegetationSelector(biome, 'default') ?? getVegetationSelector(biome, 'bush');
 }
 
-export function resolveBushType(flavor, { hedge = false } = {}) {
-  return getVegetationSelector(flavor, hedge ? 'hedgeBush' : 'bush')
-    ?? getVegetationSelector(flavor, 'default')
+export function resolveBushType(biome, { hedge = false } = {}) {
+  return getVegetationSelector(biome, hedge ? 'hedgeBush' : 'bush')
+    ?? getVegetationSelector(biome, 'default')
     ?? 'generibush';
 }
 
-export function getRockCandidates(flavor) {
-  for (const assetSetId of flavor?.assetSetIds ?? []) {
+export function getRockCandidates(biome) {
+  for (const assetSetId of biome?.assetSetIds ?? []) {
     const candidates = ASSET_SETS[assetSetId]?.rockCandidates;
     if (Array.isArray(candidates) && candidates.length > 0) return candidates;
   }
   return ASSET_SETS.italy.rockCandidates;
 }
 
-export function getWaterProfile(flavor) {
-  return flavor?.waterProfile ?? WATER_PROFILES.italy;
+export function getWaterProfile(biome) {
+  return biome?.waterProfile ?? WATER_PROFILES.italy;
 }
 
-export function getGlobalEnvironmentMap(flavor) {
-  return flavor?.environmentProfile?.globalEnvironmentMap ?? 'cubemap_italy_reflection';
+export function getGlobalEnvironmentMap(biome) {
+  return biome?.environmentProfile?.globalEnvironmentMap ?? 'cubemap_italy_reflection';
 }
 
-export function doesFlavorMatchLevel(flavor, levelName) {
-  return normalizeLevelName(flavor?.levelName) === normalizeLevelName(levelName);
+export function doesBiomeMatchLevel(biome, levelName) {
+  return normalizeLevelName(biome?.levelName) === normalizeLevelName(levelName);
 }
 
 async function loadShapeMaterialLibrary() {
@@ -983,10 +983,10 @@ async function loadShapeMaterialLibrary() {
   return shapeMaterialLibraryPromise;
 }
 
-export async function getShapeMaterialDefsForFlavor(flavor) {
+export async function getShapeMaterialDefsForBiome(biome) {
   const library = await loadShapeMaterialLibrary();
   const merged = {};
-  for (const assetSetId of flavor?.assetSetIds ?? []) {
+  for (const assetSetId of biome?.assetSetIds ?? []) {
     Object.assign(merged, library?.[assetSetId] ?? {});
   }
   return merged;

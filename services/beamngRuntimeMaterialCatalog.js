@@ -992,7 +992,7 @@ const INDUSTRIAL_RUNTIME_MATERIAL_DEFS = {
   catchfence: UTAH_RUNTIME_MATERIAL_DEFS.catchfence,
 };
 
-const FLAVOR_RUNTIME_MATERIAL_DEFS = {
+const BIOME_RUNTIME_MATERIAL_DEFS = {
   east_coast_usa: EAST_COAST_RUNTIME_MATERIAL_DEFS,
   hirochi_raceway: EAST_COAST_RUNTIME_MATERIAL_DEFS,
   Industrial: INDUSTRIAL_RUNTIME_MATERIAL_DEFS,
@@ -1005,7 +1005,7 @@ const FLAVOR_RUNTIME_MATERIAL_DEFS = {
   automation_test_track: AUTOMATION_TEST_TRACK_RUNTIME_MATERIAL_DEFS,
 };
 
-export function getFlavorRuntimeMaterialDefs(flavor) {
-  const levelName = typeof flavor === 'string' ? flavor : flavor?.levelName;
-  return FLAVOR_RUNTIME_MATERIAL_DEFS[levelName] ?? {};
+export function getBiomeRuntimeMaterialDefs(biome) {
+  const levelName = typeof biome === 'string' ? biome : biome?.levelName;
+  return BIOME_RUNTIME_MATERIAL_DEFS[levelName] ?? {};
 }

@@ -240,9 +240,9 @@
     "pbrMaterials": "PBR Materials",
     "off": "Off",
     "osmData": "OSM data",
-    "flavor": "Flavor",
+    "biome": "Biome",
     "selectLevel": "Select level",
-    "chooseFlavor": "Choose a BeamNG level flavor before exporting.",
+    "chooseBiome": "Choose a BeamNG level biome before exporting.",
     "includeBackdrop": "Include Backdrop",
     "surroundingTerrain": "Surrounding terrain",
     "includeBuildings": "Include Buildings",
@@ -440,7 +440,7 @@
       "Per-tile coordinate-stamped filenames for easy organization"
     ],
     "beamngTitle": "BeamNG Level Export",
-    "beamngBody": "The BeamNG level package export is still experimental. It can build a playable level ZIP with flavor-based official assets, inferred terrain materials, water, vegetation, and a suggested level name, but it still needs more validation and polish.",
+    "beamngBody": "The BeamNG level package export is still experimental. It can build a playable level ZIP with biome-based official assets, inferred terrain materials, water, vegetation, and a suggested level name, but it still needs more validation and polish.",
     "additionalTitle": "Additional Features",
     "additionalItems": [
       "Job Import/Export: Save and restore full sessions via .mapng files",

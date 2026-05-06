@@ -237,9 +237,9 @@
     "pbrMaterials": "Materiales PBR",
     "off": "Apagado",
     "osmData": "Datos OSM",
-    "flavor": "Flavor",
+    "biome": "Bioma",
     "selectLevel": "Seleccionar nivel",
-    "chooseFlavor": "Elige un flavor de nivel BeamNG antes de exportar.",
+    "chooseBiome": "Elige un bioma de nivel BeamNG antes de exportar.",
     "includeBackdrop": "Incluir fondo",
     "surroundingTerrain": "Terreno circundante",
     "includeBuildings": "Incluir edificios",
@@ -425,7 +425,7 @@
       "Nombres de archivo por mosaico con coordenadas para organizar"
     ],
     "beamngTitle": "Exportacion de nivel BeamNG",
-    "beamngBody": "La exportacion de paquete de nivel BeamNG sigue siendo experimental. Puede crear un ZIP jugable con assets oficiales por flavor, materiales de terreno inferidos, agua, vegetacion y nombre sugerido, pero aun requiere mas validacion y pulido.",
+    "beamngBody": "La exportacion de paquete de nivel BeamNG sigue siendo experimental. Puede crear un ZIP jugable con assets oficiales por bioma, materiales de terreno inferidos, agua, vegetacion y nombre sugerido, pero aun requiere mas validacion y pulido.",
     "additionalTitle": "Funciones adicionales",
     "additionalItems": [
       "Import/Export de trabajos: guarda y restaura sesiones completas con archivos .mapng",

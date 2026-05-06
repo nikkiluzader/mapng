@@ -12,7 +12,7 @@
 import {
   getTerrainLevelFallbacks,
   getTerrainSemanticCandidates,
-} from './beamngFlavorCatalog.js';
+} from './beamngBiomeCatalog.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–7 = BeamNG-referenced materials.
@@ -409,9 +409,9 @@ function findFallbackReferenceMaterial(semanticName) {
   return ref ? cloneMaterialTemplate(ref.template) : null;
 }
 
-async function resolveReferenceMaterialsForFlavor(flavor) {
+async function resolveReferenceMaterialsForBiome(biome) {
   const library = await loadTerrainMaterialLibrary();
-  const levelFallbacks = getTerrainLevelFallbacks(flavor);
+  const levelFallbacks = getTerrainLevelFallbacks(biome);
   return MATERIAL_NAMES_LIST.slice(1).map((semanticName) => {
     const candidates = getTerrainSemanticCandidates(semanticName);
     for (const levelName of levelFallbacks) {
@@ -825,7 +825,7 @@ function cloneMaterialTemplate(template) {
  * @param {object} terrainData  — { width, bounds, osmFeatures }
  * @param {number} worldSize    — terrain width in metres
  * @param {string} exportLevelName — generated BeamNG level folder name
- * @param {object} flavor          — BeamNG flavor profile
+ * @param {object} biome          — BeamNG biome profile
  * @param {number} [satelliteTexSize] — base texture pixel size (defaults to terrainData.width)
  * @param {object} [options]
  * @param {'osm'|'image'} [options.pbrSource='osm'] — layer map source
@@ -838,7 +838,7 @@ function cloneMaterialTemplate(template) {
  *   textureSetName: string,
  * }>}
  */
-export async function buildTerrainMaterials(terrainData, worldSize, exportLevelName, flavor, satelliteTexSize, options = {}) {
+export async function buildTerrainMaterials(terrainData, worldSize, exportLevelName, biome, satelliteTexSize, options = {}) {
   const { pbrSource = 'osm', imageCanvas = null } = options;
   const { width: size } = terrainData;
   const baseSize = satelliteTexSize ?? size;
@@ -856,7 +856,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
   const DETAIL_SIZE = 1024;
   const textureFiles = [];
   const materialDefs = {};
-  const referenceMaterials = await resolveReferenceMaterialsForFlavor(flavor);
+  const referenceMaterials = await resolveReferenceMaterialsForBiome(biome);
 
   // TerrainMaterialTextureSet: switches BeamNG to PBR mode. baseTexSize must
   // match the pixel dimensions of the base-slot textures we generate below.

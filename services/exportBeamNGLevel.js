@@ -10,9 +10,9 @@ import { applyBuildingFoundations } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { buildRoadNetwork } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
-import { getFlavorRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
+import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
 import {
-  getBeamNGFlavorById,
+  getBeamNGBiomeById,
   getGlobalEnvironmentMap,
   getGroundCoverProfile,
   getManagedForestTemplate,
@@ -20,7 +20,7 @@ import {
   getWaterProfile,
   resolveBushType,
   resolveTreeTypeForTags,
-} from './beamngFlavorCatalog.js';
+} from './beamngBiomeCatalog.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
 
@@ -2438,7 +2438,7 @@ function buildBeamNGExportReport({
   options,
   levelName,
   levelDisplayName,
-  flavor,
+  biome,
   squareSize,
   satelliteTexSize,
   worldSize,
@@ -2484,7 +2484,7 @@ function buildBeamNGExportReport({
     'Summary',
     `- Level display name: ${levelDisplayName}`,
     `- Level folder name: ${levelName}`,
-    `- Flavor: ${flavor?.label || flavor?.name || flavor?.id || 'n/a'}`,
+    `- Biome: ${biome?.label || biome?.name || biome?.id || 'n/a'}`,
     `- Export started (UTC): ${formatIsoTimestamp(exportStartedAt)}`,
     `- Report generated (UTC): ${formatIsoTimestamp(reportGeneratedAt)}`,
     `- Processing time before ZIP compression: ${formatDurationMs(totalDurationMs)}`,
@@ -2726,8 +2726,8 @@ const NATIVE_BARRIER_ASSETS = {
   },
 };
 
-function buildCloudObjects(flavor) {
-  if (flavor?.levelName !== 'east_coast_usa') return [];
+function buildCloudObjects(biome) {
+  if (biome?.levelName !== 'east_coast_usa') return [];
   return [{
     __parent: 'cloud',
     name: 'clouds',
@@ -2753,10 +2753,10 @@ const MAX_NATIVE_BARRIER_OBJECTS = 8000;
 /**
  * Resolve OSM barrier tags to one of the native BeamNG barrier asset presets.
  */
-function resolveNativeBarrierAsset(tags = {}, flavor = null) {
+function resolveNativeBarrierAsset(tags = {}, biome = null) {
   const barrierType = String(tags.barrier ?? '').trim().toLowerCase();
   const material = String(tags.material ?? '').trim().toLowerCase();
-  const levelName = String(flavor?.levelName ?? '').toLowerCase();
+  const levelName = String(biome?.levelName ?? '').toLowerCase();
 
   if (!barrierType || barrierType === 'hedge') return null;
 
@@ -2801,7 +2801,7 @@ function resolveNativeBarrierAsset(tags = {}, flavor = null) {
  * Includes repeated segment placement and optional post/endcap meshes where
  * the selected barrier asset defines them.
  */
-function buildNativeBarrierObjects(terrainData, squareSize, flavor = null) {
+function buildNativeBarrierObjects(terrainData, squareSize, biome = null) {
   const features = terrainData.osmFeatures?.filter((feature) => (
     feature.type === 'barrier' && Array.isArray(feature.geometry) && feature.geometry.length >= 2
   )) ?? [];
@@ -3008,7 +3008,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, flavor = null) {
   for (let featureIndex = 0; featureIndex < features.length; featureIndex++) {
     if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) break;
     const feature = features[featureIndex];
-    const asset = resolveNativeBarrierAsset(feature.tags || {}, flavor);
+    const asset = resolveNativeBarrierAsset(feature.tags || {}, biome);
     if (!asset) continue;
 
     pushFeatureInstances(feature, asset, `barrier_${featureIndex}`);
@@ -3235,8 +3235,8 @@ function computeBestFitWaterBlock(worldPoints) {
 /**
  * Build WaterBlock objects for closed inland water polygons.
  */
-function buildWaterBlockObjects(terrainData, squareSize, flavor) {
-  const waterProfile = getWaterProfile(flavor);
+function buildWaterBlockObjects(terrainData, squareSize, biome) {
+  const waterProfile = getWaterProfile(biome);
   const features = terrainData.osmFeatures?.filter((feature) => {
     if (feature.type !== 'water') return false;
     if (!Array.isArray(feature.geometry) || feature.geometry.length < 4) return false;
@@ -3278,8 +3278,8 @@ function buildWaterBlockObjects(terrainData, squareSize, flavor) {
 /**
  * Build one sea-level WaterPlane spanning the exported level.
  */
-function buildSeaLevelWaterPlane(terrainData, flavor, seaLevelOffset = 0) {
-  const waterProfile = getWaterProfile(flavor);
+function buildSeaLevelWaterPlane(terrainData, biome, seaLevelOffset = 0) {
+  const waterProfile = getWaterProfile(biome);
   const minHeight = Number(terrainData?.minHeight);
   const safeSeaLevelOffset = Number.isFinite(Number(seaLevelOffset)) ? Number(seaLevelOffset) : 0;
   // Terrain world-space Z is stored relative to min elevation, so sea level (0m)
@@ -3323,8 +3323,8 @@ function parseNumericWidth(value, fallback) {
 /**
  * Build River objects for linear waterway OSM features.
  */
-function buildRiverObjects(terrainData, squareSize, flavor) {
-  const waterProfile = getWaterProfile(flavor);
+function buildRiverObjects(terrainData, squareSize, biome) {
+  const waterProfile = getWaterProfile(biome);
   const features = terrainData.osmFeatures?.filter((feature) => {
     if (feature.type !== 'water') return false;
     if (!Array.isArray(feature.geometry) || feature.geometry.length < 2) return false;
@@ -3367,10 +3367,10 @@ function buildRiverObjects(terrainData, squareSize, flavor) {
 /**
  * Clone managed forest templates by item name and assign fresh persistentIds.
  */
-function cloneManagedItemData(itemNames, flavor) {
+function cloneManagedItemData(itemNames, biome) {
   const out = {};
   for (const itemName of itemNames) {
-    const template = getManagedForestTemplate(flavor, itemName);
+    const template = getManagedForestTemplate(biome, itemName);
     if (!template) continue;
     out[itemName] = {
       ...structuredClone(template),
@@ -3466,7 +3466,7 @@ function sampleAreaPlacements(feature, terrainData, squareSize, itemType, densit
  *
  * Returns Map<managedForestType, placement[]>.
  */
-function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, flavor) {
+function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, biome) {
   const regularPlacementsByType = new Map();
   const priorityPlacementsByType = new Map();
   const treeDensityMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER;
@@ -3475,7 +3475,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
    * Add a forest placement to priority or regular buckets with hard caps.
    */
   const pushPlacement = (placement, { priority = false } = {}) => {
-    if (!getManagedForestTemplate(flavor, placement.type)) return;
+    if (!getManagedForestTemplate(biome, placement.type)) return;
     const target = priority ? priorityPlacementsByType : regularPlacementsByType;
     if (!target.has(placement.type)) target.set(placement.type, []);
     const list = target.get(placement.type);
@@ -3488,13 +3488,13 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
       if (feature.type === 'vegetation' && feature.geometry?.length === 1) {
         const seed = hashString(`${feature.id}:${feature.geometry[0].lat}:${feature.geometry[0].lng}`);
         const point = feature.geometry[0];
-        const itemType = resolveTreeTypeForTags(flavor, feature.tags || {});
+        const itemType = resolveTreeTypeForTags(biome, feature.tags || {});
         const isBush = feature.tags?.natural === 'shrub';
         const isTreeRow =
           feature.tags?.natural === 'tree_row' ||
           feature.tags?.tree_row === 'yes' ||
           feature.tags?.source_feature === 'tree_row';
-        const resolvedType = isBush ? resolveBushType(flavor) : itemType;
+        const resolvedType = isBush ? resolveBushType(biome) : itemType;
         if (!resolvedType) continue;
         const pointCopies = isTreeRow
           ? 1
@@ -3525,7 +3525,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
           tags.landuse === 'orchard' ||
           tags.landcover === 'trees';
         if (isTreeArea) {
-          const itemType = resolveTreeTypeForTags(flavor, tags);
+          const itemType = resolveTreeTypeForTags(biome, tags);
           if (!itemType) continue;
           // Use polygon-driven sampling for BeamNG export so tree coverage
           // reflects full OSM vegetation areas, independent of 3D preview caps.
@@ -3550,7 +3550,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
           tags.natural === 'shrubbery' ||
           tags.landcover === 'scrub';
         if (isBushArea) {
-          const itemType = resolveBushType(flavor, { hedge: tags.barrier === 'hedge' });
+          const itemType = resolveBushType(biome, { hedge: tags.barrier === 'hedge' });
           if (!itemType) continue;
           const placements = sampleAreaPlacements(
             feature,
@@ -3570,7 +3570,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
   }
 
   if (includeRocks) {
-    const rockTypes = getRockCandidates(flavor);
+    const rockTypes = getRockCandidates(biome);
     for (const feature of terrainData.osmFeatures || []) {
       if (feature.type !== 'landuse') continue;
       const tags = feature.tags || {};
@@ -3634,9 +3634,9 @@ function serializeForestFiles(placementsByType) {
 /**
  * Build GroundCover objects used to render broad grass coverage in BeamNG.
  */
-function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) {
+function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
   if (!includeTrees) return [];
-  const groundCover = getGroundCoverProfile(flavor);
+  const groundCover = getGroundCoverProfile(biome);
   const grassClumpScale = Math.max(1, Math.sqrt(BEAMNG_GRASS_DENSITY_MULTIPLIER));
   const widthMeters = terrainData.width * squareSize;
   const heightMeters = terrainData.height * squareSize;
@@ -3758,7 +3758,7 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, flavor) 
  * @param {boolean} [options.includeNativeBarriers=true]    — emit native BeamNG TSStatic barrier objects from OSM barriers into MissionGroup/barriers
  * @param {boolean} [options.includeTrees=true]             — emit native BeamNG tree and bush forest instances
  * @param {boolean} [options.includeRocks=false]            — emit native BeamNG rock forest instances
- * @param {string}  [options.flavorId]                      — BeamNG official level flavor id
+ * @param {string}  [options.biomeId]                      — BeamNG official level biome id
  * @param {string}  [options.levelName]                     — custom user-facing/generated level name
  * @param {'osm'|'image'|'none'} [options.pbrSource='osm'] — layer map source: 'osm' uses OSM polygon data,
  *   'image' is accepted for backward compatibility and falls back to OSM inference, 'none' disables PBR materials.
@@ -3780,7 +3780,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     backdropElevationSource = 'global30m',
     backdropGpxzApiKey = '',
     roadType = 'architect',
-    flavorId,
+    biomeId,
     levelName: requestedLevelName = '',
     onProgress,
   } = options;
@@ -3809,7 +3809,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       includeRocks,
       backdropElevationSource,
       roadType,
-      flavorId,
+      biomeId,
       levelName: requestedLevelName,
       pbrSource,
     },
@@ -3904,10 +3904,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const fallbackLevelName = `mapng_${lat}_${lng}`.replace(/-/g, '_').replace(/\./g, '_');
   const levelDisplayName = String(requestedLevelName || '').trim() || fallbackLevelName;
   const levelName = sanitizeLevelName(levelDisplayName) || sanitizeLevelName(fallbackLevelName) || 'mapng_level';
-  const flavor = getBeamNGFlavorById(flavorId);
-  if (!flavor) {
-    console.error(`${BEAMNG_EXPORT_SERVICE_LOG} Invalid or missing flavorId.`, { flavorId });
-    throw new Error(`Missing or invalid BeamNG flavor: ${flavorId || '(none)'}`);
+  const biome = getBeamNGBiomeById(biomeId);
+  if (!biome) {
+    console.error(`${BEAMNG_EXPORT_SERVICE_LOG} Invalid or missing biomeId.`, { biomeId });
+    throw new Error(`Missing or invalid BeamNG biome: ${biomeId || '(none)'}`);
   }
   const linkRegistry = createBeamNGLinkFileRegistry(levelName);
 
@@ -3962,7 +3962,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   beginStep(`Painting terrain materials (${effectivePbrSource.toUpperCase()})…`, 5);
   const pbrResult = effectivePbrSource !== 'none'
-    ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, flavor, terrainBaseTexSize, {
+    ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, biome, terrainBaseTexSize, {
         pbrSource: effectivePbrSource,
         imageCanvas,
       })
@@ -4006,20 +4006,20 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   await yield_();
   // Always emit a sea-level WaterPlane; includeWater toggles only inland OSM-derived water.
   const waterObjects = [
-    buildSeaLevelWaterPlane(exportTerrainData, flavor, seaLevelOffset),
+    buildSeaLevelWaterPlane(exportTerrainData, biome, seaLevelOffset),
     ...(includeWater
       ? [
-          ...buildWaterBlockObjects(exportTerrainData, squareSize, flavor),
-          ...buildRiverObjects(exportTerrainData, squareSize, flavor),
+          ...buildWaterBlockObjects(exportTerrainData, squareSize, biome),
+          ...buildRiverObjects(exportTerrainData, squareSize, biome),
         ]
       : []),
   ];
-  const cloudObjects = buildCloudObjects(flavor);
+  const cloudObjects = buildCloudObjects(biome);
 
   beginStep(`Building native barrier objects (${includeNativeBarriers ? 'enabled' : 'disabled'})…`, 74);
   await yield_();
   const barrierObjects = includeNativeBarriers
-    ? buildNativeBarrierObjects(exportTerrainData, squareSize, flavor)
+    ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome)
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
   const roadFolderGroups = buildRoadFolderGroups(roadArchitectSession);
@@ -4030,11 +4030,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   beginStep(`Building vegetation objects (trees: ${includeTrees ? 'on' : 'off'}, rocks: ${includeRocks ? 'on' : 'off'})…`, 77);
   await yield_();
   const forestPlacements = (includeTrees || includeRocks)
-    ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, flavor)
+    ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome)
     : new Map();
   const forestFiles = serializeForestFiles(forestPlacements);
-  const groundCoverObjects = buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, flavor);
-  const managedForestItemData = cloneManagedItemData(Array.from(forestPlacements.keys()), flavor);
+  const groundCoverObjects = buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, biome);
+  const managedForestItemData = cloneManagedItemData(Array.from(forestPlacements.keys()), biome);
 
   let backdropDaeBlob = null;
   let backdropTextureFiles = [];
@@ -4270,7 +4270,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     },
     levelName,
     levelDisplayName,
-    flavor,
+    biome,
     squareSize,
     satelliteTexSize: terrainBaseTexSize,
     worldSize,
@@ -4337,7 +4337,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
     // Build a single materials JSON covering all DAEs in this directory.
     const shapeMaterials = {
-      ...getFlavorRuntimeMaterialDefs(flavor),
+      ...getBiomeRuntimeMaterialDefs(biome),
     };
     if (osmDaeBlob) {
       // Vertex-colour Material: BeamNG multiplies diffuseColor × vertex colour.
