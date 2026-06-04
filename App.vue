@@ -26,6 +26,7 @@
       <ControlPanel
         v-if="!batchMode"
         :center="center"
+        :center-stable="centerStable"
         :zoom="zoom"
         :resolution="resolution"
         :dev-mode="devMode"
@@ -58,6 +59,7 @@
       <BatchControlPanel
         v-if="batchMode"
         :center="center"
+        :center-stable="centerStable"
         :resolution="resolution"
         :processing-meters-per-pixel="processingMetersPerPixel"
         :is-running="batchRunning"
@@ -106,7 +108,7 @@
             :surrounding-tile-positions="surroundingTilePositions"
             :batch-grid="batchGridTiles"
             :batch-editable="batchMode && !batchRunning && !showBatchProgress"
-            @move="handleMapMove" 
+            @moveend="handleMapMoveEnd"
             @zoom="store.setZoom"
             @batch-tile-drag="handleBatchTileDrag"
           />
@@ -240,6 +242,7 @@ const store = useMainStore();
 const { t } = useI18n({ useScope: 'global' });
 const {
   center,
+  centerStable,
   zoom,
   resolution,
   isDarkMode,
@@ -407,7 +410,7 @@ const buildMainTime = formatBuildTime(__BUILD_MAIN_TIME__);
 const buildDevHash = String(__BUILD_DEV_HASH__ || 'n/a');
 const buildDevTime = formatBuildTime(__BUILD_DEV_TIME__);
 
-const { setCenter, setResolution, setBatchMode: setStoreBatchMode } = store;
+const { setCenter, setCenterStable, setResolution, setBatchMode: setStoreBatchMode } = store;
 
 const isValidCenter = (point) => {
   const lat = Number(point?.lat);
@@ -456,6 +459,7 @@ onUnmounted(() => {
 
 const handleLocationChange = (newCenter) => {
   setCenter(newCenter);
+  setCenterStable(newCenter);
   terrainData.value = null;
   lastGenerationKey.value = null;
   // Cancel any in-flight generation when location changes
@@ -986,9 +990,10 @@ const handleBatchTileDrag = ({ index, lat, lng }) => {
   store.setBatchTileOffsets(next);
 };
 
-const handleMapMove = (newCenter) => {
+const handleMapMoveEnd = (newCenter) => {
   const oldCenter = center.value;
   store.setCenter(newCenter);
+  setCenterStable(newCenter);
 
   // "World-fixed" mode: when the user pans the map, keep the batch tiles
   // anchored at their geographic positions instead of moving with the grid

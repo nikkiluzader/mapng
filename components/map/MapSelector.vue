@@ -7,6 +7,7 @@
         :options="mapOptions"
         style="height: 100%; width: 100%"
         @move="handleMove"
+        @moveend="handleMoveEnd"
         @zoom="handleZoom"
      >
       <!-- Base Layers -->
@@ -236,7 +237,7 @@ const batchTileFillOpacity = (tile) => {
   }
 };
 
-const emit = defineEmits(['move', 'zoom', 'batchTileDrag']);
+const emit = defineEmits(['move', 'moveend', 'zoom', 'batchTileDrag']);
 
 const mapRef = ref(null);
 const currentCenter = ref(props.center);
@@ -396,6 +397,16 @@ const handleMove = () => {
 
   currentCenter.value = { lat: c.lat, lng: normalizedLng };
   emit('move', currentCenter.value);
+};
+
+const handleMoveEnd = () => {
+  if (isMovingProgrammatically.value) return;
+  if (!mapRef.value?.leafletObject) return;
+  const map = mapRef.value.leafletObject;
+  const c = map.getCenter();
+  const normalizedLng = normalizeDatelineLongitude(c.lng);
+  currentCenter.value = { lat: c.lat, lng: normalizedLng };
+  emit('moveend', currentCenter.value);
 };
 
 // Handle map zoom

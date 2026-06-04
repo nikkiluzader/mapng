@@ -165,6 +165,7 @@
         :isCheckingGPXZ="isCheckingGPXZ"
         :isAreaLargeForGPXZ="isAreaLargeForGPXZ"
         :areaSqKm="areaSqKm"
+        :center="centerStable"
         @verifyGpxzKey="checkGPXZStatus"
       />
     </div>
@@ -293,10 +294,11 @@ import { downloadJsonFile } from '../../services/traceability';
 import { exportJobData, importJobData } from '../../services/jobData';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
+import { ELEVATION_SOURCES } from '../../services/elevationSources.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
-const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedAreaMode', 'processingMetersPerPixel']);
+const props = defineProps(['center', 'centerStable', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedAreaMode', 'processingMetersPerPixel']);
 
 const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'elevationFileSelected', 'elevationFileClear', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedAreaMode', 'update:processingMetersPerPixel', 'update:previewStale']);
 
@@ -423,6 +425,16 @@ const checkGPXZStatus = async () => {
     isCheckingGPXZ.value = false;
   }
 };
+
+watch(() => props.centerStable, (newCenter) => {
+  if (!newCenter) return;
+  const currentSource = ELEVATION_SOURCES.find(s => s.id === elevationSource.value);
+  if (currentSource && !currentSource.isGlobal && currentSource.checkCoverage) {
+    if (!currentSource.checkCoverage(newCenter)) {
+      elevationSource.value = 'default';
+    }
+  }
+}, { immediate: true, deep: true });
 
 // Persist collapsible section states
 watch(showCoordinates, (v) => localStorage.setItem('mapng_showCoordinates', String(v)));

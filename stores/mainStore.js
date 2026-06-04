@@ -21,6 +21,7 @@ export const useMainStore = defineStore('main', () => {
     persistedCenter = null;
   }
   const center = ref(sanitizeCenter(persistedCenter));
+  const centerStable = ref(sanitizeCenter(persistedCenter));
   const zoom = ref(parseInt(localStorage.getItem('mapng_zoom')) || 13);
   const resolution = ref(parseInt(localStorage.getItem('mapng_resolution')) || 1024);
   const isDarkMode = ref(localStorage.getItem('theme') === 'dark');
@@ -69,8 +70,12 @@ export const useMainStore = defineStore('main', () => {
 
   // --- Actions ---
   function setCenter(newCenter) {
+    center.value = sanitizeCenter(newCenter);
+  }
+
+  function setCenterStable(newCenter) {
     const safeCenter = sanitizeCenter(newCenter);
-    center.value = safeCenter;
+    centerStable.value = safeCenter;
     localStorage.setItem('mapng_center', JSON.stringify(safeCenter));
   }
 
@@ -148,8 +153,10 @@ export const useMainStore = defineStore('main', () => {
     batchCurrentStep,
     showBatchProgress,
     savedBatchState,
+    centerStable,
     // Actions
     setCenter,
+    setCenterStable,
     setZoom,
     setResolution,
     toggleDarkMode,

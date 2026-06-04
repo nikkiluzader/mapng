@@ -198,6 +198,7 @@
       :isCheckingGPXZ="isCheckingGPXZ"
       :isBatchMode="true"
       :totalTiles="totalTiles"
+      :center="centerStable"
       @verifyGpxzKey="checkGPXZStatus"
     />
 
@@ -326,11 +327,13 @@ import ProcessingResolutionInput from '../controls/ProcessingResolutionInput.vue
 import BaseButton from '../base/BaseButton.vue';
 import { probeGPXZLimits } from '../../services/terrain';
 import { cloneRateLimitInfo, downloadJsonFile } from '../../services/traceability';
+import { ELEVATION_SOURCES } from '../../services/elevationSources.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
 const props = defineProps({
   center: { type: Object, required: true },
+  centerStable: { type: Object, required: true },
   resolution: { type: Number, required: true },
   processingMetersPerPixel: { type: [Number, String], default: 1 },
   isRunning: { type: Boolean, default: false },
@@ -995,6 +998,16 @@ const checkGPXZStatus = async () => {
     isCheckingGPXZ.value = false;
   }
 };
+
+watch(() => props.centerStable, (newCenter) => {
+  if (!newCenter) return;
+  const currentSource = ELEVATION_SOURCES.find(s => s.id === elevationSource.value);
+  if (currentSource && !currentSource.isGlobal && currentSource.checkCoverage) {
+    if (!currentSource.checkCoverage(newCenter)) {
+      elevationSource.value = 'default';
+    }
+  }
+}, { immediate: true, deep: true });
 watch(meshResolution, (v) => localStorage.setItem('mapng_batch_mesh', String(v)));
 watch(performanceProfile, (v) => localStorage.setItem('mapng_batch_profile', v));
 watch(exports, (v) => localStorage.setItem('mapng_batch_exports', JSON.stringify(normalizeExports(v))), {
