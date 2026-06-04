@@ -108,6 +108,7 @@
             :surrounding-tile-positions="surroundingTilePositions"
             :batch-grid="batchGridTiles"
             :batch-editable="batchMode && !batchRunning && !showBatchProgress"
+            @move="handleMapMove"
             @moveend="handleMapMoveEnd"
             @zoom="store.setZoom"
             @batch-tile-drag="handleBatchTileDrag"
@@ -988,6 +989,10 @@ const handleBatchTileDrag = ({ index, lat, lng }) => {
     .sort((a, b) => a.index - b.index);
 
   store.setBatchTileOffsets(next);
+};
+
+const handleMapMove = (newCenter) => {
+  store.setLiveCenter(newCenter);
 };
 
 const handleMapMoveEnd = (newCenter) => {

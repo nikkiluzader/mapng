@@ -34,6 +34,9 @@ import { ref, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import LocationSearch from './LocationSearch.vue';
 import { SELECT_SM } from '../base/controlStyles.js';
+import { useMainStore } from '../../stores/mainStore';
+
+const store = useMainStore();
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -135,6 +138,16 @@ const handleLocationSelect = (event) => {
 };
 
 watch(() => props.center, (newVal) => {
+  if (parseFloat(latInput.value) !== newVal.lat) {
+    latInput.value = newVal.lat.toString();
+  }
+  if (parseFloat(lngInput.value) !== newVal.lng) {
+    lngInput.value = newVal.lng.toString();
+  }
+}, { deep: true });
+
+watch(() => store.liveCenter, (newVal) => {
+  if (!newVal) return;
   if (parseFloat(latInput.value) !== newVal.lat) {
     latInput.value = newVal.lat.toString();
   }

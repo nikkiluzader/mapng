@@ -21,6 +21,7 @@ export const useMainStore = defineStore('main', () => {
     persistedCenter = null;
   }
   const center = ref(sanitizeCenter(persistedCenter));
+  const liveCenter = ref(sanitizeCenter(persistedCenter));
   const centerStable = ref(sanitizeCenter(persistedCenter));
   const zoom = ref(parseInt(localStorage.getItem('mapng_zoom')) || 13);
   const resolution = ref(parseInt(localStorage.getItem('mapng_resolution')) || 1024);
@@ -71,6 +72,10 @@ export const useMainStore = defineStore('main', () => {
   // --- Actions ---
   function setCenter(newCenter) {
     center.value = sanitizeCenter(newCenter);
+  }
+
+  function setLiveCenter(newCenter) {
+    liveCenter.value = sanitizeCenter(newCenter);
   }
 
   function setCenterStable(newCenter) {
@@ -154,8 +159,10 @@ export const useMainStore = defineStore('main', () => {
     showBatchProgress,
     savedBatchState,
     centerStable,
+    liveCenter,
     // Actions
     setCenter,
+    setLiveCenter,
     setCenterStable,
     setZoom,
     setResolution,
