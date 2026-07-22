@@ -3,7 +3,15 @@ import { getGeoTiffCoordsWGS84 } from './geoUtils.js';
 
 const buildWgs84GeoTiffExport = async (terrainData, center, timestamp) => {
     const { width, height, heightMap } = terrainData;
-    const coords = getGeoTiffCoordsWGS84(center.lat, center.lng, width, height);
+    const bounds = terrainData?.bounds;
+    const hasBounds = [bounds?.west, bounds?.south, bounds?.east, bounds?.north]
+        .every((value) => Number.isFinite(Number(value)));
+    const coords = hasBounds ? {
+        pixelSizeLng: (Number(bounds.east) - Number(bounds.west)) / width,
+        pixelSizeLat: (Number(bounds.north) - Number(bounds.south)) / height,
+        topLeftLng: Number(bounds.west),
+        topLeftLat: Number(bounds.north),
+    } : getGeoTiffCoordsWGS84(center.lat, center.lng, width, height);
 
     const metadata = {
         height,
@@ -21,6 +29,11 @@ const buildWgs84GeoTiffExport = async (terrainData, center, timestamp) => {
         blob: new Blob([arrayBuffer], { type: 'image/tiff' }),
         filename: `Heightmap_WGS84_${timestamp}.tif`
     };
+};
+
+export const exportProcessedGeoTiff = async (terrainData, center) => {
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    return buildWgs84GeoTiffExport(terrainData, center, timestamp);
 };
 
 

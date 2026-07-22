@@ -78,15 +78,17 @@
     <main class="flex-1 relative flex flex-col h-full bg-gray-100 dark:bg-gray-950">
       <ViewTabs
         :preview-mode="previewMode"
+        :cesium-mode="cesiumMode"
         :can-preview="!!terrainData"
         @switch-2d="switchTo2D"
-        @switch-3d="previewMode = true"
+        @switch-3d="switchToLegacy3D"
+        @switch-cesium="switchToCesium"
       />
 
       <!-- Views -->
       <div class="flex-1 relative w-full h-full">
         <!-- Map View -->
-        <div :class="['absolute inset-0 transition-all duration-500', previewMode ? 'opacity-0 invisible' : 'opacity-100 visible']">
+        <div :class="['absolute inset-0 transition-all duration-500', previewMode || cesiumMode ? 'opacity-0 invisible pointer-events-none' : 'opacity-100 visible']">
           <MapSelector 
             :center="center" 
             :zoom="zoom" 
@@ -102,6 +104,31 @@
             @zoom="store.setZoom"
             @batch-tile-drag="handleBatchTileDrag"
           />
+        </div>
+
+        <!-- Cesium Preview View — mounted only after first explicit selection -->
+        <div :class="['absolute inset-0 transition-all duration-500 bg-[#08131f]', cesiumMode ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
+          <Suspense>
+            <template #default>
+              <CesiumPreview
+                v-if="cesiumWasOpened"
+                :center="center"
+                :project-bounds="cesiumProjectBounds"
+                :project-name="cesiumProjectName"
+                :osm-features="terrainData?.osmFeatures || []"
+                :compiler-job-id="compilerReadyJobId"
+                :compiler-status="compilerStatus"
+                :compiler-error="compilerError"
+                :active="cesiumMode"
+              />
+            </template>
+            <template #fallback>
+              <div class="flex h-full w-full flex-col items-center justify-center gap-4 bg-[#08131f] text-white">
+                <Loader2 class="animate-spin text-[#FF6600]" :size="48" />
+                <div class="text-sm font-semibold">{{ t('view.cesiumLoading') }}</div>
+              </div>
+            </template>
+          </Suspense>
         </div>
         
         <!-- 3D Preview View -->
@@ -183,7 +210,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from './stores/mainStore';
@@ -203,7 +230,8 @@ import AppSidebar from './components/layout/AppSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import { fetchTerrainData, addOSMToTerrain, loadTerrainFromTif, parseTifFile, loadTerrainFromLaz, parseLazFile } from './services/terrain';
 import { applyAscCoordinateSystem } from './services/ascLoader.js';
-import { computeUploadedCropBounds } from './services/uploadBounds';
+import { compileTerrainData } from './services/geocrashCompiler.js';
+import { computeMetricSelectionBounds, computeUploadedCropBounds } from './services/uploadBounds';
 import {
   computeGridTiles,
   computeGridTilesWithOffsets,
@@ -216,6 +244,10 @@ import {
   clearBatchClientCache,
   resetFailedTiles,
 } from './services/batchJob';
+
+const CesiumPreview = defineAsyncComponent(
+  () => import('./components/cesium/CesiumPreview.vue'),
+);
 
 if (import.meta.env.DEV) {
   import('./services/batchDebugHarness.js');
@@ -255,16 +287,69 @@ const devMode = ref(false);
 const supportPromptContext = ref('manual');
 const loadingProgressPercent = ref(null);
 const loadingProgressDetail = ref('');
+const cesiumMode = ref(false);
+const cesiumWasOpened = ref(false);
+// Compile road surfaces automatically, while Cesium deliberately ignores the
+// compiler's experimental deformed-terrain preview.
+const COMPILER_INTEGRATION_ENABLED = true;
+const compilerReadyJobId = ref('');
+const compilerStatus = ref('idle');
+const compilerError = ref('');
 const lastLoggedLoadingStatus = ref('');
 const lastLoggedLoadingPercent = ref(-1);
 let abortController = null;
+let compilerAbortController = null;
 let batchAbortController = null;
+
+const cancelCompilerRun = () => {
+  compilerAbortController?.abort();
+  compilerAbortController = null;
+};
+
+const launchCompilerForTerrain = (data) => {
+  cancelCompilerRun();
+  compilerReadyJobId.value = '';
+  compilerError.value = '';
+  if (!COMPILER_INTEGRATION_ENABLED) {
+    compilerStatus.value = 'disabled';
+    return;
+  }
+  if (!data?.heightMap || !Array.isArray(data?.osmFeatures) || !data.osmFeatures.length) {
+    compilerStatus.value = 'inputs-missing';
+    return;
+  }
+
+  const controller = new AbortController();
+  compilerAbortController = controller;
+  compilerStatus.value = 'preparing';
+  void compileTerrainData(data, center.value, {
+    signal: controller.signal,
+    onProgress: (progress) => {
+      compilerStatus.value = progress.status || progress.stage || 'working';
+    },
+  }).then(({ jobId }) => {
+    if (controller.signal.aborted) return;
+    data.compilerJobId = jobId;
+    compilerReadyJobId.value = jobId;
+    compilerStatus.value = 'SUCCEEDED';
+  }).catch((error) => {
+    if (error?.name === 'AbortError') return;
+    compilerError.value = error?.message || 'COMPILER_FAILED';
+    compilerStatus.value = 'FAILED';
+  }).finally(() => {
+    if (compilerAbortController === controller) compilerAbortController = null;
+  });
+};
 
 const KOFI_URL = 'https://ko-fi.com/nikluz';
 const TIP_LAST_SHOWN_KEY = 'mapng_tip_last_shown_at';
 const TIP_SINGLE_COUNT_KEY = 'mapng_tip_single_export_count';
 const TIP_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const TIP_SINGLE_EXPORT_INTERVAL = 3;
+
+watch(previewMode, (enabled) => {
+  if (enabled) cesiumMode.value = false;
+});
 
 const markTipShownNow = () => {
   localStorage.setItem(TIP_LAST_SHOWN_KEY, String(Date.now()));
@@ -310,6 +395,51 @@ const uploadedTifFile = ref(null);   // File | null
 const uploadedTifMeta = ref(null);   // parseTifFile() result | null
 const uploadedAreaMode = ref(localStorage.getItem('mapng_uploaded_area_mode') || 'native');
 const uploadedAscCoordinateSystem = ref(localStorage.getItem('mapng_uploaded_asc_crs') || 'auto');
+
+const hasValidProjectBounds = (bounds) => {
+  if (!bounds) return false;
+  const values = [bounds.north, bounds.south, bounds.east, bounds.west].map(Number);
+  return values.every(Number.isFinite) && values[0] > values[1] && values[2] > values[3];
+};
+
+const copyProjectBounds = (bounds) => ({
+  north: Number(bounds.north),
+  south: Number(bounds.south),
+  east: Number(bounds.east),
+  west: Number(bounds.west),
+});
+
+const cesiumProjectBounds = computed(() => {
+  if (hasValidProjectBounds(terrainData.value?.bounds)) {
+    return copyProjectBounds(terrainData.value.bounds);
+  }
+
+  const uploadedBounds = uploadedTifMeta.value?.bounds;
+  if (uploadedTifFile.value && hasValidProjectBounds(uploadedBounds)) {
+    if (uploadedAreaMode.value === 'crop') {
+      return computeUploadedCropBounds(center.value, Number(resolution.value), uploadedBounds);
+    }
+    return copyProjectBounds(uploadedBounds);
+  }
+
+  return computeMetricSelectionBounds(center.value, Number(resolution.value));
+});
+
+const cesiumProjectName = computed(() => {
+  const explicitName = String(
+    terrainData.value?.name
+      || terrainData.value?.metadata?.name
+      || '',
+  ).trim();
+  if (explicitName) return explicitName;
+
+  const lat = Number(center.value?.lat);
+  const lng = Number(center.value?.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    return `MapNG ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  }
+  return 'MapNG Project';
+});
 
 const applyAscCoordinateSelection = async (meta) => {
   if (!meta || meta.sourceFormat !== 'asc') return meta;
@@ -414,9 +544,14 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalDevToggleKey);
+  cancelCompilerRun();
 });
 
 const handleLocationChange = (newCenter) => {
+  cancelCompilerRun();
+  compilerReadyJobId.value = '';
+  compilerStatus.value = 'idle';
+  compilerError.value = '';
   setCenter(newCenter);
   terrainData.value = null;
   lastGenerationKey.value = null;
@@ -573,7 +708,10 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
 
     if (requestKey === lastGenerationKey.value) {
       // Exact match — skip fetch entirely, just switch view if needed
-      if (showPreview) previewMode.value = true;
+      if (fetchOSM && !terrainData.value?.compilerJobId && !compilerAbortController) {
+        launchCompilerForTerrain(terrainData.value);
+      }
+      if (showPreview) switchToLegacy3D();
       return;
     }
 
@@ -587,9 +725,10 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         });
         terrainData.value = updatedData;
         lastGenerationKey.value = requestKey;
+        launchCompilerForTerrain(updatedData);
         if (showPreview) {
           loadingStatus.value = t('app.status.rendering3d');
-          previewMode.value = true;
+          switchToLegacy3D();
         }
       } catch (error) {
         console.error("Failed to add OSM data:", error);
@@ -682,10 +821,11 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     }
     terrainData.value = data;
     lastGenerationKey.value = requestKey;
+    if (fetchOSM) launchCompilerForTerrain(data);
     
     if (showPreview) {
       applyLoadingUpdate(t('app.status.rendering3d'));
-        previewMode.value = true;
+        switchToLegacy3D();
     }
   } catch (error) {
     if (error.name === 'AbortError') {
@@ -714,6 +854,7 @@ const handleFetchOSM = async () => {
           loadingStatus.value = status;
       });
       terrainData.value = updatedData;
+      launchCompilerForTerrain(updatedData);
   } catch (error) {
       console.error("Failed to fetch OSM data:", error);
       alert(t('app.error.fetchOsm'));
@@ -739,6 +880,7 @@ const handleImportData = (data) => {
 
   // 3. Set the data
   terrainData.value = data;
+  if (data?.osmFeatures?.length) launchCompilerForTerrain(data);
 
   // 4. Restore the generation key if it was included
   if (data.generationKey) {
@@ -755,7 +897,7 @@ const handleImportData = (data) => {
   }
 
   // 5. Jump to 3D Preview
-  previewMode.value = true;
+  switchToLegacy3D();
 };
 
 const cancelGeneration = () => {
@@ -766,9 +908,21 @@ const cancelGeneration = () => {
 };
 
 const switchTo2D = () => {
+  cesiumMode.value = false;
   previewMode.value = false;
   // Do not clear terrainData here, so users can switch back and forth
   // without losing their generated exports.
+};
+
+const switchToLegacy3D = () => {
+  cesiumMode.value = false;
+  previewMode.value = true;
+};
+
+const switchToCesium = () => {
+  previewMode.value = false;
+  cesiumWasOpened.value = true;
+  cesiumMode.value = true;
 };
 
 // ─── Batch Job Handlers ─────────────────────────────────────────────

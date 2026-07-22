@@ -8,13 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy",
-    "test:geotiff": "node --test tests/exportGeoTiff.test.mjs"
+    "test:geotiff": "node --test tests/exportGeoTiff.test.mjs",
+    "test:cesium-osm": "node --test services/cesiumOsmAdapter.test.mjs services/cesiumOsmBuildingsAdapter.test.mjs services/cesiumRoadDiagnosticsAdapter.test.mjs services/cesiumFpvControls.test.mjs services/cesiumCompilerPreview.test.mjs services/geocrashCompiler.test.mjs"
   },
   "dependencies": {
     "@tresjs/cientos": "^4.3.1",
     "@tresjs/core": "^4.0.0",
     "@vue-leaflet/vue-leaflet": "^0.10.0",
     "@vueuse/core": "^11.0.0",
+    "cesium": "^1.143.0",
     "fast-png": "^6.1.0",
     "fast-xml-parser": "^5.7.2",
     "geotiff": "^2.1.4-beta.1",
@@ -35,6 +37,7 @@
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "vite": "^5.2.0",
+    "vite-plugin-static-copy": "^3.4.0",
     "wrangler": "^4.95.0"
   }
 }

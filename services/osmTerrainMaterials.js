@@ -870,8 +870,8 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
     macroTexSize:  [DETAIL_SIZE, DETAIL_SIZE],
   };
 
-  const satellitePath = `/levels/${levelName}/art/terrains/terrain.png`;
-  const p = (f) => `/levels/${levelName}/art/terrains/${f}`;
+  const satellitePath = `levels/${levelName}/art/terrains/terrain.png`;
+  const p = (f) => `levels/${levelName}/art/terrains/${f}`;
 
   // Shared neutral base textures (AO = white, normal = flat, roughness = neutral).
   // Generated at baseSize to match TextureSet.baseTexSize. Only one set shared

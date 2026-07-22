@@ -1,7 +1,12 @@
-import { defineConfig } from 'vite';
+import { defineConfig, normalizePath } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import { templateCompilerOptions } from '@tresjs/core';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { execSync } from 'child_process';
+import { resolve } from 'path';
+
+const cesiumSource = normalizePath(resolve('node_modules/cesium/Build/Cesium'));
+const cesiumBaseUrl = 'cesium';
 
 const commitHash = (() => {
   try {
@@ -16,7 +21,15 @@ export default defineConfig({
   plugins: [
     vue({
       ...templateCompilerOptions
-    })
+    }),
+    viteStaticCopy({
+      targets: [
+        { src: `${cesiumSource}/Workers`, dest: cesiumBaseUrl },
+        { src: `${cesiumSource}/ThirdParty`, dest: cesiumBaseUrl },
+        { src: `${cesiumSource}/Assets`, dest: cesiumBaseUrl },
+        { src: `${cesiumSource}/Widgets`, dest: cesiumBaseUrl },
+      ],
+    }),
   ],
   optimizeDeps: {
     exclude: ['geotiff'],
@@ -41,6 +54,7 @@ export default defineConfig({
   },
   define: {
     'process.env': {},
+    CESIUM_BASE_URL: JSON.stringify(`/${cesiumBaseUrl}/`),
     '__BUILD_HASH__': JSON.stringify(commitHash),
     '__BUILD_TIME__': JSON.stringify(new Date().toISOString()),
   },

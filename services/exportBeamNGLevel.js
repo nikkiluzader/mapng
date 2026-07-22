@@ -1198,6 +1198,11 @@ function makeRoadDecal(nodes, name, parentName, props, materialOverride) {
     startEndFade: props.startEndFade,
   };
   if (Number.isFinite(props.detail)) decal.detail = props.detail;
+  if (Number.isFinite(props.drivability)) decal.drivability = props.drivability;
+  if (props.oneWay === true) {
+    decal.oneWay = true;
+    decal.lanesLeft = 0;
+  }
   return decal;
 }
 
@@ -1212,6 +1217,8 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
   const laneMarkingsEnabled = shouldUseLaneMarkings(highway, tags);
   const grassEdgeBlendEnabled = shouldUseGrassEdgeBlend(highway, tags);
   const majorRoad = MAJOR_ROAD_MARKINGS.has(highway);
+  const isOneWay = isOneWayRoad(tags);
+  const isReverseOneWay = ['-1', 'reverse'].includes(String(tags.oneway ?? '').trim().toLowerCase());
 
   let templateKey = 'default';
   if (isUnpaved) templateKey = 'unpaved';
@@ -1238,7 +1245,12 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
       offset = layer.offset * (styleHalfWidth + (width / 2) - 0.15);
     }
 
-    const layeredNodes = maybeReverseDecalNodes(offsetNodes(centerNodes, offset, width), layer);
+    let layeredNodes = maybeReverseDecalNodes(offsetNodes(centerNodes, offset, width), layer);
+    // The invisible asphalt/base spline is also BeamNG's authoritative AI path.
+    // OSM oneway=-1 runs opposite to the way's stored node order.
+    if (layer.name === 'asphalt' && isReverseOneWay) {
+      layeredNodes = [...layeredNodes].reverse();
+    }
     if (layeredNodes.length < 2) continue;
 
     // Use names that the BeamNG Road Spline Tool recognizes.
@@ -1257,6 +1269,10 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
       textureLength: 5,
       startEndFade: [1, 1],
       detail: 0.1,
+      // Only the center/base spline participates in the navgraph. Marking and
+      // edge decals remain visual-only so BeamNG does not create parallel paths.
+      drivability: layer.name === 'asphalt' ? 1 : undefined,
+      oneWay: layer.name === 'asphalt' ? isOneWay : false,
     });
 
     if (decal) decals.push(decal);
@@ -1541,28 +1557,52 @@ function createRoadArchitectDefaultProfile() {
  */
 function makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount) {
   const [x, y, z] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
-  const laneWidth = Math.max(2.6, Math.min(4.5, (halfWidth * 2) / Math.max(1, laneCount)));
+
+  let lanesPerSide = Math.floor(laneCount / 2);
+  if (lanesPerSide < 1) lanesPerSide = 1;
+  const actualLaneWidth = (halfWidth * 2) / (lanesPerSide * 2);
+
+  const widths = {};
+  const heightsL = {};
+  const heightsR = {};
+  for (let i = 1; i <= lanesPerSide; i++) {
+    widths[i.toString()] = actualLaneWidth;
+    widths[(-i).toString()] = actualLaneWidth;
+    heightsL[i.toString()] = 0.01;
+    heightsL[(-i).toString()] = 0.01;
+    heightsR[i.toString()] = 0.01;
+    heightsR[(-i).toString()] = 0.01;
+  }
+
   return {
-    heightsL: {
-      '1': 0.01,
-      '-1': 0.01,
-    },
-    heightsR: {
-      '1': 0.01,
-      '-1': 0.01,
-    },
+    arcLength: 0,
+    banking: 0,
+    centerPos: 0.5,
+    customData: '',
+    heightsL,
+    heightsR,
     incircleRad: 1,
     isAutoBanked: false,
+    isBridgePoint: false,
     isLocked: false,
+    isOverridden: false,
+    isSplit: false,
+    leftWallHeight: 0,
+    leftWallWidth: 0.2,
     offset: 0,
+    offsetZ: 0,
     posX: roundTo(x, 6),
     posY: roundTo(y, 6),
     posZ: roundTo(z, 6),
+    radius: 0,
+    rightWallHeight: 0,
+    rightWallWidth: 0.2,
     rot: 0,
-    widths: {
-      '1': laneWidth,
-      '-1': laneWidth,
-    },
+    rotX: 0,
+    rotY: 0,
+    rotZ: 0,
+    superelevation: 0,
+    widths,
   };
 }
 
@@ -1922,8 +1962,7 @@ function generateRoadArchitectSession(terrainData, squareSize, levelName) {
     const isOneWay = isOneWayRoad(tags);
     const halfWidth = estimateRoadHalfWidth(tags, highway, isOneWay, style.width);
     const laneCount = Math.max(1, getDefaultLaneCount(highway, isOneWay));
-    const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
-      .flatMap((segment) => chunkPolyline(segment, 80));
+    const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds);
 
     for (let segmentIndex = 0; segmentIndex < clippedSegments.length; segmentIndex++) {
       const segment = clippedSegments[segmentIndex];
@@ -3858,13 +3897,18 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     }
   };
 
-  // BeamNG TerrainBlock is square. If source data is rectangular, center-crop
-  // everything (heightmap, bounds, textures) so terrain, texture, and OSM
-  // objects share the same footprint.
+  // BeamNG TerrainBlock must be square AND a power of 2 in dimension.
+  // If the source data does not match, we center-crop everything (heightmap,
+  // bounds, textures) so terrain, textures, and OSM objects share the same footprint.
   let td = terrainData;
-  const didCropToSquare = td.width !== td.height;
-  if (td.width !== td.height) {
-    const cropSize = Math.min(td.width, td.height);
+
+  const isPowerOf2 = (n) => (n & (n - 1)) === 0 && n > 0;
+  const needsCrop = td.width !== td.height || !isPowerOf2(td.width);
+  const didCropToSquare = needsCrop;
+
+  if (needsCrop) {
+    const minDim = Math.min(td.width, td.height);
+    const cropSize = Math.pow(2, Math.floor(Math.log2(minDim)));
     td = await prepareCroppedTerrainData({ ...td, exportCropSize: cropSize });
   }
 
@@ -4413,7 +4457,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const terrainMaterialNames = pbrResult?.materialNames ?? ['DefaultMaterial'];
   const heightMapSize = size * size;
   zip.file(`${base}/theTerrain.terrain.json`, JSON.stringify({
-    binaryFormat: 'version(char), size(unsigned int), heightMap(heightMapSize * heightMapItemSize), layerMap(layerMapSize * layerMapItemSize), layerTextureMap(layerMapSize * layerMapItemSize), materialNames',
+    binaryFormat: 'version(char), size(unsigned int), heightMap(heightMapSize * heightMapItemSize), layerMap(layerMapSize * layerMapItemSize), materialNames',
     datafile: `/levels/${levelName}/theTerrain.ter`,
     heightMapItemSize: 2,
     heightMapSize,
@@ -4573,9 +4617,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     squareSize,
     maxHeight,
     baseTexSize: size,
-    terrainFile: `/levels/${levelName}/theTerrain.ter`,
+    terrainFile: `levels/${levelName}/theTerrain.ter`,
     materialTextureSet: pbrResult?.textureSetName ?? '',
     minimapImage: '',
+    castShadows: true,
   }];
 
   if (osmDaeBlob) {
@@ -4585,7 +4630,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       name: 'osm_objects',
       persistentId: generatePersistentId(),
       position: [0, 0, 0],
-      shapeName: `levels/${levelName}/art/shapes/osm_objects.dae`,
+      shapeName: `/levels/${levelName}/art/shapes/osm_objects.dae`,
       collisionType: 'Collision Mesh',
       decalType: 'Collision Mesh',
       prebuildCollisionData: 0,
@@ -4602,7 +4647,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       name: 'terrain_backdrop',
       persistentId: generatePersistentId(),
       position: [0, 0, 0],
-      shapeName: `levels/${levelName}/art/shapes/terrain_backdrop.dae`,
+      shapeName: `/levels/${levelName}/art/shapes/terrain_backdrop.dae`,
       useInstanceRenderData: true,
     });
   }
@@ -4614,7 +4659,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       name: 'mapng_flag_marker',
       persistentId: generatePersistentId(),
       position: mapngFlagPosition,
-      shapeName: `levels/${levelName}/art/shapes/mapng/flagng.dae`,
+      shapeName: `/levels/${levelName}/art/shapes/mapng/flagng.dae`,
       useInstanceRenderData: true,
     });
   }

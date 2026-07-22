@@ -1211,7 +1211,7 @@ const handleBeamNGLevelExport = async () => {
   // Keep users in-app: pre-acquire a save handle while click activation is
   // still present, then write the generated ZIP after export completes.
   let beamNGSaveHandle = null;
-  const supportsSavePicker = typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
+  const supportsSavePicker = false; // Forced to false for debugging 0KB issue
   if (supportsSavePicker) {
     const fallbackName = `mapng_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}`
       .replace(/[^a-zA-Z0-9_-]+/g, '_');
@@ -1356,7 +1356,7 @@ const handleBeamNGLevelExport = async () => {
       stack: error?.stack,
       error,
     });
-    alert(t('export.errorBeamngLevel'));
+    alert(t('export.errorBeamngLevel') + '\\n\\n' + (error?.message || String(error)));
   } finally {
     isExportingBeamNGLevel.value = false;
     beamNGProgressStep.value = '';
