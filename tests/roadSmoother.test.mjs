@@ -254,3 +254,75 @@ test('levelRoads flattens the full width the export draws the road at', () => {
     );
   }
 });
+
+test('a neighbouring road embankment does not tilt an adjacent road core', () => {
+  const mpp = 1;
+  const bounds = makeBounds(W, H, mpp);
+  // Flat ground with a step: the two roads sit on shelves 4 m apart in height,
+  // close enough (10 m centre to centre) that each one's feather reaches into
+  // the other's surface — a divided highway or a frontage road beside a highway.
+  const hm = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) hm[y * W + x] = y < 128 ? 0 : 4;
+  }
+
+  const road = (py, name) => ({
+    type: 'road',
+    id: name,
+    tags: { highway: 'primary', name },
+    geometry: [
+      { lat: latAtPy(bounds, py), lng: lngAtPx(bounds, 20) },
+      { lat: latAtPy(bounds, py), lng: lngAtPx(bounds, 235) },
+    ],
+  });
+
+  smoothRoadsInHeightmap(hm, W, H, bounds, [road(123, 'upper'), road(133, 'lower')], mpp, false, true);
+
+  // primary → 3.5 m half-width; sample just inside each road's own surface.
+  for (const centre of [123, 133]) {
+    for (let x = 40; x <= 215; x += 25) {
+      const drop = Math.abs(hm[(centre - 2) * W + x] - hm[(centre + 2) * W + x]);
+      assert.ok(
+        drop < 0.05,
+        `road at y=${centre} should stay flat across its own core at x=${x} (drop ${drop.toFixed(3)} m)`,
+      );
+    }
+  }
+});
+
+test('does not carve terrain for paths the export never draws as roads', () => {
+  const mpp = 1;
+  const bounds = makeBounds(W, H, mpp);
+  const slope = () => {
+    const hm = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) hm[y * W + x] = y * 0.5;
+    }
+    return hm;
+  };
+
+  const trail = (highway) => ({
+    type: 'road',
+    id: highway,
+    tags: { highway },
+    geometry: [
+      { lat: latAtPy(bounds, 128), lng: lngAtPx(bounds, 20) },
+      { lat: latAtPy(bounds, 128), lng: lngAtPx(bounds, 235) },
+    ],
+  });
+
+  for (const highway of ['path', 'footway', 'steps', 'cycleway', 'bridleway', 'proposed']) {
+    const hm = slope();
+    const before = Float32Array.from(hm);
+    smoothRoadsInHeightmap(hm, W, H, bounds, [trail(highway)], mpp, true, true);
+    let changed = 0;
+    for (let i = 0; i < hm.length; i++) if (Math.abs(hm[i] - before[i]) > 1e-4) changed++;
+    assert.equal(changed, 0, `${highway} should leave the terrain untouched (${changed} px changed)`);
+  }
+
+  // A track is driveable and still gets levelled.
+  const hm = slope();
+  smoothRoadsInHeightmap(hm, W, H, bounds, [trail('track')], mpp, false, true);
+  const drop = Math.abs(hm[127 * W + 128] - hm[129 * W + 128]);
+  assert.ok(drop < 0.05, `track should still be levelled (drop ${drop.toFixed(3)} m)`);
+});

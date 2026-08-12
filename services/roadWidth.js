@@ -10,6 +10,18 @@
  */
 
 /**
+ * Highway classes that never become a driveable road in the export.
+ *
+ * Shared so the terrain side agrees with the drawing side: carving a flat
+ * bench along a hiking trail leaves a terrace in the hillside with no road on
+ * it, which is worse than leaving the trail on natural ground.
+ */
+export const NON_DRIVEABLE_HIGHWAYS = new Set([
+  'footway', 'path', 'pedestrian', 'steps', 'cycleway',
+  'bridleway', 'corridor', 'proposed', 'construction',
+]);
+
+/**
  * Parse a strictly positive integer, returning 0 when invalid.
  */
 function parsePositiveInt(value) {

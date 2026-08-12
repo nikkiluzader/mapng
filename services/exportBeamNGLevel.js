@@ -20,6 +20,7 @@ import {
   getDefaultLaneCount,
   getDefaultLaneWidthMeters,
   isOneWayRoad,
+  NON_DRIVEABLE_HIGHWAYS,
 } from './roadWidth.js';
 import {
   getBeamNGBiomeById,
@@ -1493,10 +1494,7 @@ function getEndpointTrimProfile(segmentFeature, nodeKey, isStart, intersections)
 }
 
 // OSM highway types to exclude from road generation (non-vehicle ways).
-const ROAD_SKIP = new Set([
-  'footway', 'path', 'pedestrian', 'steps', 'cycleway',
-  'bridleway', 'corridor', 'proposed', 'construction',
-]);
+const ROAD_SKIP = NON_DRIVEABLE_HIGHWAYS;
 
 // Major roads receive full markings (double-yellow centre + white edge lines).
 const MAJOR_ROAD_MARKINGS = new Set([

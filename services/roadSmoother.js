@@ -1,6 +1,6 @@
 import { createMetricProjector } from './geoUtils.js';
 import { buildRoadNetwork, mergeLinearRoadSegments } from './roadNetwork.js';
-import { estimateRoadHalfWidth, isOneWayRoad } from './roadWidth.js';
+import { estimateRoadHalfWidth, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
 
 const NO_DATA_VALUE = -99999;
 
@@ -18,6 +18,11 @@ const SMOOTH_PASSES = 3;
 const JUNCTION_RAMP_M = 60;
 // Embankment feather width outside the flat road core (metres).
 const FEATHER_M = 6.0;
+// How close two corridors' claims on a pixel must be (in quantized weight, so
+// 13/255 ≈ 0.05) to count as the same claim and be averaged rather than one
+// winning outright. Wide enough for junction overlaps and touching embankments,
+// far below the gap between a road core (1.0) and a neighbour's feather.
+const TIE_WEIGHT = 13;
 
 /**
  * Computes distance and projection parameter t of point (x,y) onto line segment (x1,y1)-(x2,y2)
@@ -150,6 +155,11 @@ function smooth1DArray(arr, windowSize) {
 function isGroundLevelRoad(feature) {
     if (feature?.type !== 'road') return false;
     const tags = feature.tags || {};
+    // Only carve terrain for something that will actually be a road. Footpaths
+    // and trails are never drawn, so flattening them just terraces hillsides —
+    // and they are the roughest corridors in the data, since they climb where
+    // no vehicle road would.
+    if (NON_DRIVEABLE_HIGHWAYS.has(tags.highway)) return false;
     const layer = Number.parseInt(tags.layer, 10) || 0;
     // Skip bridges, overpasses, tunnels, and elevated roads
     if (layer > 0 || tags.bridge === 'yes' || tags.tunnel === 'yes' || tags.covered === 'yes' || tags.location === 'elevated') {
@@ -314,12 +324,13 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
 
     pinJunctionElevations(profiles);
 
-    // Global accumulators. roadZ holds the running weighted-average target
-    // height; roadW the (clamped) accumulated blend weight. Averaging across
-    // corridors — instead of the old strongest-weight-wins rule — removes the
-    // crease where two crossing corridors disagree slightly off-junction.
+    // Global accumulators. roadZ is the target height, roadW the strongest
+    // claim any corridor has on the pixel (quantized to 1/255 — the weight only
+    // scales a blend, and a byte here keeps an 8192² map under 400 MB), and
+    // roadCount how many near-tied claims were averaged into roadZ.
     const roadZ = new Float32Array(width * height);
-    const roadW = new Float32Array(width * height);
+    const roadW = new Uint8Array(width * height);
+    const roadCount = new Uint8Array(width * height);
     let hasRoads = false;
 
     for (const profile of profiles) {
@@ -397,13 +408,26 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
 
         for (const [idx, w] of wMap) {
             const z = zMap.get(idx);
-            const gw = roadW[idx];
-            if (gw > 0) {
-                roadZ[idx] = (roadZ[idx] * gw + z * w) / (gw + w);
-                roadW[idx] = Math.min(1, gw + w);
-            } else {
+            const wq = Math.max(1, Math.round(w * 255));
+            const best = roadW[idx];
+
+            if (wq > best + TIE_WEIGHT) {
+                // Stronger claim: this corridor's surface covers the pixel, so it
+                // replaces the weaker one outright. Averaging here is what let a
+                // neighbouring road's embankment drag the core of the road that
+                // actually owns the pixel — the highway lane next to a parallel
+                // service road came out tilted by a fraction of their height gap.
                 roadZ[idx] = z;
-                roadW[idx] = w;
+                roadW[idx] = wq;
+                roadCount[idx] = 1;
+            } else if (wq + TIE_WEIGHT >= best) {
+                // Comparable claims — two corridors meeting at a junction, or two
+                // embankments overlapping. Averaging them is what keeps crossing
+                // corridors from creasing, so it stays for near-ties only.
+                const n = roadCount[idx];
+                roadZ[idx] = (roadZ[idx] * n + z) / (n + 1);
+                if (n < 255) roadCount[idx] = n + 1;
+                if (wq > best) roadW[idx] = wq;
             }
         }
     }
@@ -412,7 +436,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
 
     // Blend the leveled roads back into the heightmap
     for (let i = 0; i < heightMap.length; i++) {
-        const w = roadW[i];
+        const w = roadW[i] / 255;
         if (w > 0 && heightMap[i] !== NO_DATA_VALUE) {
             heightMap[i] = heightMap[i] * (1 - w) + roadZ[i] * w;
         }
