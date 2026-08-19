@@ -570,3 +570,52 @@ test('exportBeamNGLevel ties TerrainBlock squareSize to processingMetersPerPixel
     restorePolyfills();
   }
 });
+
+test('exportBeamNGLevel scales terrain base slots in grid squares, not world meters', async () => {
+  const restorePolyfills = installCanvasPolyfill();
+
+  try {
+    // PBR *BaseTexSize is measured in terrain grid squares (= base texture
+    // texels), not meters: every official level with squareSize ≠ 1 sets it to
+    // the .ter grid size (automation_test_track 0.5 m/px, grid 4096, world
+    // 2048 m → 4096). Writing world meters tiled the satellite 1/squareSize
+    // times per axis in game. The legacy v0 `diffuseSize` field is the
+    // exception — it really is world meters.
+    const zip = await runExportForRoadType('decal', {
+      pbrSource: 'osm',
+      terrainOverrides: { processingMetersPerPixel: 0.5 },
+    });
+
+    const itemsPath = 'levels/mapng_demo/main/MissionGroup/level_objects/items.level.json';
+    const items = parseNDJSON(await zip.file(itemsPath).async('string'));
+    const terrain = items.find((i) => i?.class === 'TerrainBlock');
+    assert.equal(terrain.squareSize, 0.5);
+
+    const gridSize = terrain.baseTexSize;
+    const worldSize = gridSize * terrain.squareSize;
+    assert.notEqual(gridSize, worldSize, 'test needs squareSize ≠ 1 to be meaningful');
+
+    const defs = JSON.parse(await zip.file('levels/mapng_demo/art/terrains/main.materials.json').async('string'));
+    const textureSet = Object.values(defs).find((d) => d?.class === 'TerrainMaterialTextureSet');
+    assert.deepEqual(textureSet.baseTexSize, [gridSize, gridSize]);
+
+    for (const def of Object.values(defs)) {
+      if (def?.class !== 'TerrainMaterial') continue;
+      for (const field of [
+        'baseColorBaseTexSize', 'normalBaseTexSize', 'roughnessBaseTexSize',
+        'aoBaseTexSize', 'heightBaseTexSize',
+      ]) {
+        assert.equal(
+          def[field], gridSize,
+          `${def.internalName}.${field} should be the grid size (${gridSize}), got ${def[field]}`,
+        );
+      }
+      assert.equal(
+        def.diffuseSize, worldSize,
+        `${def.internalName}.diffuseSize (legacy) should be world meters (${worldSize}), got ${def.diffuseSize}`,
+      );
+    }
+  } finally {
+    restorePolyfills();
+  }
+});

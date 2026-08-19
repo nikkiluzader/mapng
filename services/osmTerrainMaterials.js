@@ -841,14 +841,20 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
   const { pbrSource = 'osm', imageCanvas = null } = options;
   const { width: size } = terrainData;
   const baseSize = satelliteTexSize ?? size;
-  // TerrainMaterial *BaseTexSize fields (and legacy diffuseSize) are WORLD
-  // METERS the base texture spans — not pixels (Terrain-Files.md: "World size
-  // used to scale the base color base texture"; vanilla small_island ships
-  // 2048px base textures with baseColorBaseTexSize=1024 = its 1024 m world).
-  // Writing the pixel size here breaks any map whose squareSize ≠ 1: at
-  // 0.84 m/px the game mapped the satellite base over 16384 m of a 13762 m
-  // terrain, so only the first 84% of the image covered the map (reported as
-  // "satellite image cropped and stretched" / terrain not matching imagery).
+  // PBR *BaseTexSize fields are measured in TERRAIN GRID SQUARES (= base
+  // texture texels), not world meters, even though the material editor labels
+  // them "size in meters". Every official level with squareSize ≠ 1 sets them
+  // to the .ter grid size, and its base texture covers the map exactly once:
+  //   automation_test_track  squareSize 0.5   grid 4096  world 2048 m  → 4096
+  //   johnson_valley         squareSize 0.75  grid 4096  world 3069 m  → 4096
+  //   hirochi_raceway        squareSize 0.75  grid 2048  world 1535 m  → 2048
+  //   derby                  squareSize 0.3   grid 2048  world  614 m  → 2048
+  // Writing world meters here tiles the base texture by 1/squareSize per axis:
+  // at 0.5 m/px an 8192 grid got 4096, so the satellite repeated 2×2 in game
+  // ("4 copies of it tiling in the main area"). The legacy v0 `diffuseSize`
+  // field is the odd one out — that one really is world meters (confirmed
+  // in-game on the PBR-off path), so it keeps `baseWorldSize` below.
+  const baseTexSpan = baseSize;
   const baseWorldSize = Number.isFinite(worldSize) && worldSize > 0 ? worldSize : baseSize;
   const levelName = exportLevelName;
 
@@ -906,16 +912,16 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
     return {
       baseColorDetailTex:      p('shared_r_sm.png'), baseColorDetailStrength: [0, 0],
       baseColorMacroTex:       p('shared_r_sm.png'), baseColorMacroStrength:  [0, 0],
-      normalBaseTex:           p('shared_nm.png'),   normalBaseTexSize:        baseWorldSize,
+      normalBaseTex:           p('shared_nm.png'),   normalBaseTexSize:        baseTexSpan,
       normalDetailTex:         p('shared_nm_sm.png'), normalDetailStrength:    [0, 0],
       normalMacroTex:          p('shared_nm_sm.png'), normalMacroStrength:     [0, 0],
-      roughnessBaseTex:        p('shared_r.png'),    roughnessBaseTexSize:     baseWorldSize,
+      roughnessBaseTex:        p('shared_r.png'),    roughnessBaseTexSize:     baseTexSpan,
       roughnessDetailTex:      p('shared_r_sm.png'), roughnessDetailStrength: [0, 0],
       roughnessMacroTex:       p('shared_r_sm.png'), roughnessMacroStrength:  [0, 0],
-      aoBaseTex:               p('shared_ao.png'),   aoBaseTexSize:            baseWorldSize,
+      aoBaseTex:               p('shared_ao.png'),   aoBaseTexSize:            baseTexSpan,
       aoDetailTex:             p('shared_ao_sm.png'),
       aoMacroTex:              p('shared_ao_sm.png'),
-      heightBaseTex:           p('shared_r.png'),    heightBaseTexSize:        baseWorldSize,
+      heightBaseTex:           p('shared_r.png'),    heightBaseTexSize:        baseTexSpan,
       heightDetailTex:         p('shared_r_sm.png'),
       heightMacroTex:          p('shared_r_sm.png'),
     };
@@ -932,16 +938,16 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
     materialDef.persistentId = uuid;
     materialDef.internalName = refMaterial.internalName;
     materialDef.baseColorBaseTex = satellitePath;
-    materialDef.baseColorBaseTexSize = baseWorldSize;
+    materialDef.baseColorBaseTexSize = baseTexSpan;
     materialDef.diffuseSize = baseWorldSize;
     materialDef.aoBaseTex = p('shared_ao.png');
-    materialDef.aoBaseTexSize = baseWorldSize;
+    materialDef.aoBaseTexSize = baseTexSpan;
     materialDef.normalBaseTex = p('shared_nm.png');
-    materialDef.normalBaseTexSize = baseWorldSize;
+    materialDef.normalBaseTexSize = baseTexSpan;
     materialDef.roughnessBaseTex = p('shared_r.png');
-    materialDef.roughnessBaseTexSize = baseWorldSize;
+    materialDef.roughnessBaseTexSize = baseTexSpan;
     materialDef.heightBaseTex = p('shared_r.png');
-    materialDef.heightBaseTexSize = baseWorldSize;
+    materialDef.heightBaseTexSize = baseTexSpan;
     materialDefs[key] = materialDef;
     // First reference material is the biome's dominant ground cover (semantic
     // "Grass"); DefaultMaterial inherits its surface below.
@@ -975,7 +981,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
         internalName: 'DefaultMaterial',
         groundmodelName: 'GROUNDMODEL_ASPHALT1',
         baseColorBaseTex: satellitePath,
-        baseColorBaseTexSize: baseWorldSize,
+        baseColorBaseTexSize: baseTexSpan,
         diffuseSize: baseWorldSize,
         ...neutralSlots(),
       };
