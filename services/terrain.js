@@ -129,6 +129,121 @@ const decodeTerrariumHeight = (r, g, b) => {
   return h <= -32760 ? NO_DATA_VALUE : h;
 };
 
+/**
+ * Repair Terrarium tiles that arrived as solid no-data.
+ *
+ * AWS's global tile pyramid has holes at high zoom: around the prime meridian
+ * off Altea (ES) every z14 and z15 tile in columns x 16382–16385 is a 270-byte
+ * black PNG that decodes to −32768, while the same ground has real samples from
+ * z13 down. Nothing downstream can tell that apart from genuine sea-floor
+ * no-data, so the band ends up flattened to the tile baseline and reads as a
+ * chunk of terrain (or backdrop) cut away.
+ *
+ * Called once on an assembled mosaic canvas: each fully-blank tile is redrawn
+ * from the nearest ancestor tile that carries data, nearest-neighbour so the
+ * RGB height encoding survives the upscale.
+ *
+ * @returns {Promise<{repaired: number, blank: number}>}
+ */
+export const repairTerrariumNoDataTiles = async ({
+  ctx,
+  zoom,
+  minTileX,
+  minTileY,
+  tileCountX,
+  tileCountY,
+  signal,
+  onProgress,
+  maxZoomOut = 6,
+  concurrency = 8,
+}) => {
+  if (!ctx || tileCountX < 1 || tileCountY < 1) return { repaired: 0, blank: 0 };
+
+  // A tile is blank when no sampled pixel decodes to a real height. Sampling
+  // every 8th pixel still catches a single valid pixel in any 8×8 block, and
+  // placeholder tiles are uniformly black anyway. Read one tile-row at a time:
+  // canvas readbacks are the expensive part, and a full-mosaic one would double
+  // peak memory right before the caller reads the whole canvas itself.
+  const rowWidth = tileCountX * TILE_SIZE;
+  const blanks = [];
+  for (let ty = 0; ty < tileCountY; ty++) {
+    const { data } = ctx.getImageData(0, ty * TILE_SIZE, rowWidth, TILE_SIZE);
+    for (let tx = 0; tx < tileCountX; tx++) {
+      const originX = tx * TILE_SIZE;
+      let blank = true;
+      for (let y = 0; y < TILE_SIZE && blank; y += 8) {
+        for (let x = 0; x < TILE_SIZE; x += 8) {
+          const i = (y * rowWidth + originX + x) * 4;
+          if (decodeTerrariumHeight(data[i], data[i + 1], data[i + 2]) !== NO_DATA_VALUE) { blank = false; break; }
+        }
+      }
+      if (blank) blanks.push({ tx: minTileX + tx, ty: minTileY + ty, drawX: originX, drawY: ty * TILE_SIZE });
+    }
+  }
+  if (blanks.length === 0) return { repaired: 0, blank: 0 };
+
+  onProgress?.(`Refilling ${blanks.length} empty elevation tile(s) from lower zoom...`);
+
+  // Ancestors are shared by neighbouring blanks — fetch each one once.
+  const ancestorCache = new Map();
+  const loadAncestor = (z, x, y) => {
+    const key = `${z}/${x}/${y}`;
+    if (!ancestorCache.has(key)) {
+      const numTiles = 2 ** z;
+      const wrappedX = ((x % numTiles) + numTiles) % numTiles;
+      ancestorCache.set(key, loadImage(`${TILE_API_URL}/${z}/${wrappedX}/${y}.png`, signal).catch(() => null));
+    }
+    return ancestorCache.get(key);
+  };
+
+  // Scratch canvas to test an ancestor's sub-rect before committing it.
+  const probe = document.createElement('canvas');
+  probe.width = TILE_SIZE;
+  probe.height = TILE_SIZE;
+  const probeCtx = probe.getContext('2d', { willReadFrequently: true });
+
+  const previousSmoothing = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;   // averaging Terrarium RGB invents heights
+  if (probeCtx) probeCtx.imageSmoothingEnabled = false;
+
+  let repaired = 0;
+  await pMap(blanks, async ({ tx, ty, drawX, drawY }) => {
+    for (let step = 1; step <= maxZoomOut && zoom - step >= 0; step++) {
+      signal?.throwIfAborted();
+      const img = await loadAncestor(zoom - step, tx >> step, ty >> step);
+      if (!img) continue;
+
+      // The slice of the ancestor covering this tile, blown back up to full size.
+      const span = TILE_SIZE >> step;
+      if (span < 1) break;
+      const srcX = (tx & ((1 << step) - 1)) * span;
+      const srcY = (ty & ((1 << step) - 1)) * span;
+
+      if (probeCtx) {
+        probeCtx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
+        probeCtx.drawImage(img, srcX, srcY, span, span, 0, 0, TILE_SIZE, TILE_SIZE);
+        const { data } = probeCtx.getImageData(0, 0, TILE_SIZE, TILE_SIZE);
+        let hasData = false;
+        for (let i = 0; i < data.length && !hasData; i += 4 * 8) {
+          if (decodeTerrariumHeight(data[i], data[i + 1], data[i + 2]) !== NO_DATA_VALUE) hasData = true;
+        }
+        if (!hasData) continue;
+      }
+
+      ctx.drawImage(img, srcX, srcY, span, span, drawX, drawY, TILE_SIZE, TILE_SIZE);
+      repaired++;
+      return;
+    }
+  }, concurrency, signal);
+
+  ctx.imageSmoothingEnabled = previousSmoothing;
+  probe.width = 0;
+  probe.height = 0;
+
+  console.info(`[Terrarium] Repaired ${repaired}/${blanks.length} empty z${zoom} elevation tile(s) from lower-zoom data.`);
+  return { repaired, blank: blanks.length };
+};
+
 const getSatelliteZoomForProcessingMpp = (processingMetersPerPixel = 1) => {
   const mpp = Number(processingMetersPerPixel);
   const normalizedMpp = Number.isFinite(mpp) && mpp > 0 ? mpp : 1;
@@ -326,6 +441,17 @@ export const fetchTerrariumMosaic = async (
     Math.max(1, Number(globalTileConcurrency || 20)),
     signal,
   );
+
+  await repairTerrariumNoDataTiles({
+    ctx: tCtx,
+    zoom: TERRAIN_ZOOM,
+    minTileX,
+    minTileY,
+    tileCountX,
+    tileCountY,
+    signal,
+    onProgress,
+  });
 
   const terrainDataImg = tCtx.getImageData(0, 0, canvasWidth, canvasHeight);
   terrainCanvas.width = 0;
@@ -1552,6 +1678,17 @@ export const fetchTerrainData = async (
       `Failed to download elevation terrain tiles (${terrainTilesFailed}/${terrainTilesRequested} failed). Please retry or switch elevation source.`
     );
   }
+
+  await repairTerrariumNoDataTiles({
+    ctx: tCtx,
+    zoom: TERRAIN_ZOOM,
+    minTileX,
+    minTileY,
+    tileCountX,
+    tileCountY,
+    signal,
+    onProgress,
+  });
 
   // Create Samplers from Canvases
   // Always create the terrain data image so we have a fallback sampler

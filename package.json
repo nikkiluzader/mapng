@@ -10,7 +10,7 @@
     "deploy": "npm run deploy:prod",
     "deploy:prod": "npm run build && npx wrangler deploy",
     "deploy:dev": "npm run build && npx wrangler deploy --env dev",
-    "test:beamng": "node --test tests/nodataDetect.test.mjs tests/gapFillBlend.test.mjs tests/exportTer.test.mjs tests/beamngLinkFiles.test.mjs tests/beamngRuntimeMaterials.test.mjs tests/beamngExportConformance.test.mjs tests/beamngExportGuideConformance.test.mjs tests/beamngMapNavigation.test.mjs tests/beamngSignals.test.mjs tests/roadNetwork.test.mjs tests/roadSmoother.test.mjs tests/roadMarkings.test.mjs tests/junctionMarkings.test.mjs tests/backdropMaterials.test.mjs tests/exportBeamNGLevel.integration.test.mjs"
+    "test:beamng": "node --test tests/nodataDetect.test.mjs tests/terrariumRepair.test.mjs tests/gapFillBlend.test.mjs tests/exportTer.test.mjs tests/beamngLinkFiles.test.mjs tests/beamngRuntimeMaterials.test.mjs tests/beamngExportConformance.test.mjs tests/beamngExportGuideConformance.test.mjs tests/beamngMapNavigation.test.mjs tests/beamngSignals.test.mjs tests/roadNetwork.test.mjs tests/roadSmoother.test.mjs tests/roadMarkings.test.mjs tests/junctionMarkings.test.mjs tests/backdropMaterials.test.mjs tests/exportBeamNGLevel.integration.test.mjs"
   },
   "dependencies": {
     "@tresjs/cientos": "^4.3.1",
