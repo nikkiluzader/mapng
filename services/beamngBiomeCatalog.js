@@ -1,3 +1,5 @@
+import { TREE_ITEMS } from './beamngTreeLibrary.js';
+
 const DEFAULT_TERRAIN_CANDIDATES = {
   Grass: ['Grass', 'Grass2', 'Grass3', 'Grass4', 'dirt_grass'],
   // Scrub/heath paint: dry patchy grass-over-soil, NOT lawn.
@@ -1308,7 +1310,8 @@ export function getManagedForestTemplate(biome, itemName) {
     const template = ASSET_SETS[assetSetId]?.managedItemTemplates?.[itemName];
     if (template) return template;
   }
-  return null;
+  // The regional tree palette (services/beamngTrees.js) works for every biome.
+  return TREE_ITEMS[itemName] ?? null;
 }
 
 function getVegetationSelector(biome, selectorName) {
@@ -1317,6 +1320,17 @@ function getVegetationSelector(biome, selectorName) {
     if (selectors?.[selectorName]) return selectors[selectorName];
   }
   return null;
+}
+
+/**
+ * A selector from the biome's OWN asset set only (its first), not one it
+ * borrows from a fallback set: the biome's signature trees (Italy's olives,
+ * the jungle's tropical trees) join the regional palette, but West Coast USA
+ * must not pull East Coast's aspen into every tree slot.
+ */
+export function getOwnVegetationSelector(biome, selectorName) {
+  const own = biome?.assetSetIds?.[0];
+  return (own && ASSET_SETS[own]?.vegetationSelectors?.[selectorName]) || null;
 }
 
 export function resolveTreeTypeForTags(biome, tags = {}) {
@@ -1406,7 +1420,8 @@ async function loadShapeMaterialLibrary() {
 
 export async function getShapeMaterialDefsForBiome(biome) {
   const library = await loadShapeMaterialLibrary();
-  const merged = {};
+  // The regional tree palette first, so the biome's own sets win name clashes.
+  const merged = { ...(library?.tree_library ?? {}) };
   for (const assetSetId of biome?.assetSetIds ?? []) {
     Object.assign(merged, library?.[assetSetId] ?? {});
   }

@@ -34,6 +34,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONTENT = os.path.join(REPO, "refs/beamng/content")
 OUT = os.path.join(REPO, "public/beamng_shape_materials.json")
 CATALOG = os.path.join(REPO, "services/beamngBiomeCatalog.js")
+TREE_LIBRARY = os.path.join(REPO, "services/beamngTreeLibrary.js")
 
 
 def lenient_json(b):
@@ -150,6 +151,11 @@ def main():
                 all_defs.setdefault(name.lower(), (name, v, folder_cased))
 
     sets = parse_asset_set_daes()
+    # The regional tree palette (scripts/build-tree-library.py) is its own set,
+    # emitted for every biome alongside the biome's asset sets.
+    if os.path.exists(TREE_LIBRARY):
+        tree_src = open(TREE_LIBRARY, encoding="utf-8").read()
+        sets["tree_library"] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", tree_src)))
     out = {}
     problems = []
     for set_id, daes in sets.items():

@@ -6,6 +6,7 @@ import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
+import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight } from './beamngTrees.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
@@ -30,13 +31,12 @@ import {
   getGlobalEnvironmentMap,
   getGroundCoverProfile,
   getManagedForestTemplate,
+  getOwnVegetationSelector,
   getRockCandidates,
   getShapeMaterialDefsForBiome,
   getStreetFurnitureProfile,
   getTrafficProfile,
   getWaterProfile,
-  resolveBushType,
-  resolveTreeTypeForTags,
 } from './beamngBiomeCatalog.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
@@ -5438,18 +5438,46 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
   };
 
   if (includeTrees) {
+    // Regional trees (services/beamngTrees.js): every tree picks its group from
+    // its tags, the climate at its position and whether it stands in town, then
+    // a model of that group (nearest its OSM height when mapped).
+    const isUrbanPlace = buildUrbanRoadClassifier(terrainData.osmFeatures || []);
+    // The biome's own signature models join the candidates (not borrowed ones).
+    const SIGNATURE_SELECTORS = {
+      deciduous: 'default', oak_west: 'default', tropical: 'default', conifer: 'needle', pine_west: 'needle',
+      palm: 'palm', shrub: 'bush', desert_shrub: 'bush',
+    };
+    const signature = (group) => {
+      const type = getOwnVegetationSelector(biome, SIGNATURE_SELECTORS[group]);
+      return type ? [{ type, height: treeItemHeight(type) ?? (group.includes('shrub') ? 2.5 : 10) }] : [];
+    };
+    const pickTree = ({ kind, tags, point, urban, area, seed }) => {
+      const hint = treeHintFromTags(tags);
+      // exact species the biome ships (Italy: olive, cypress)
+      if (kind === 'tree' && (hint === 'olive' || hint === 'cypress')) {
+        const type = getOwnVegetationSelector(biome, hint);
+        if (type) return { type, scale: 0.85 + 0.3 * seededRandom(hashString(`${seed}:s`)) };
+      }
+      const group = chooseTreeGroup({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed });
+      return chooseTreeItem(group, { tags, lat: point.lat, lon: point.lng, seed, extra: signature(group) });
+    };
+    const centroidOf = (feature) => {
+      const g = feature.geometry || [];
+      const n = Math.max(1, g.length);
+      return { lat: g.reduce((a, p) => a + p.lat, 0) / n, lng: g.reduce((a, p) => a + p.lng, 0) / n };
+    };
+
     for (const feature of terrainData.osmFeatures || []) {
       if (feature.type === 'vegetation' && feature.geometry?.length === 1) {
         const seed = hashString(`${feature.id}:${feature.geometry[0].lat}:${feature.geometry[0].lng}`);
         const point = feature.geometry[0];
-        const itemType = resolveTreeTypeForTags(biome, feature.tags || {});
-        const isBush = feature.tags?.natural === 'shrub';
+        const tags = feature.tags || {};
+        const isBush = tags.natural === 'shrub';
         const isTreeRow =
-          feature.tags?.natural === 'tree_row' ||
-          feature.tags?.tree_row === 'yes' ||
-          feature.tags?.source_feature === 'tree_row';
-        const resolvedType = isBush ? resolveBushType(biome) : itemType;
-        if (!resolvedType) continue;
+          tags.natural === 'tree_row' ||
+          tags.tree_row === 'yes' ||
+          tags.source_feature === 'tree_row';
+        const urban = isUrbanPlace({ id: `veg:${feature.id}`, geometry: [point] });
         const pointCopies = isTreeRow
           ? 1
           : isBush
@@ -5459,15 +5487,16 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
         for (let i = 0; i < pointCopies; i++) {
           const cloneSeed = seed + i * 97.13;
           const sampledPoint = i === 0 ? point : jitterLatLngByMeters(point, jitterMeters, cloneSeed);
-          pushPlacement(makeForestPlacement(
-            resolvedType,
-            sampledPoint,
-            terrainData,
-            squareSize,
-            cloneSeed,
-            isBush ? 0.7 : 0.85,
-            isBush ? 1.2 : 1.2,
-          ), { priority: isTreeRow });
+          const choice = pickTree({
+            kind: isBush ? 'shrub' : 'tree',
+            // copies are neighbours, not the same tree: only the original keeps the mapped height
+            tags: i === 0 ? tags : { ...tags, height: undefined, est_height: undefined },
+            point: sampledPoint, urban, area: false, seed: `${feature.id}:${i}`,
+          });
+          if (!choice) continue;
+          const placement = makeForestPlacement(choice.type, sampledPoint, terrainData, squareSize, cloneSeed, 1, 1);
+          placement.scale = roundTo(choice.scale, 6);
+          pushPlacement(placement, { priority: isTreeRow });
         }
       }
       if (feature.type === 'landuse') {
@@ -5478,9 +5507,15 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
           tags.landuse === 'forest' ||
           tags.landuse === 'orchard' ||
           tags.landcover === 'trees';
+        const isBushArea =
+          tags.natural === 'scrub' ||
+          tags.natural === 'heath' ||
+          tags.natural === 'shrubbery' ||
+          tags.landcover === 'scrub';
+        if (!isTreeArea && !isBushArea) continue;
+        const centre = centroidOf(feature);
+        const urban = isUrbanPlace({ id: `area:${feature.id}`, geometry: [centre] });
         if (isTreeArea) {
-          const itemType = resolveTreeTypeForTags(biome, tags);
-          if (!itemType) continue;
           // Use polygon-driven sampling for BeamNG export so tree coverage
           // reflects full OSM vegetation areas, independent of 3D preview caps.
           const isOrchard = tags.landuse === 'orchard';
@@ -5488,36 +5523,40 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
             feature,
             terrainData,
             squareSize,
-            itemType,
+            'area_tree',
             (isOrchard ? 0.0028 : 0.0036) * treeDensityMultiplier,
             (isOrchard ? 1800 : 3600) * treeDensityMultiplier,
-            isOrchard ? 0.9 : 0.85,
-            isOrchard ? 1.1 : 1.25,
+            1,
+            1,
             hashString(`${feature.id}:tree_area`),
           );
-          placements.forEach(pushPlacement);
+          placements.forEach((placement, idx) => {
+            const choice = pickTree({ kind: 'tree', tags, point: centre, urban, area: true, seed: `${feature.id}:a${idx}` });
+            if (!choice) return;
+            placement.type = choice.type;
+            placement.scale = roundTo(choice.scale, 6);
+            pushPlacement(placement);
+          });
         }
-
-        const isBushArea =
-          tags.natural === 'scrub' ||
-          tags.natural === 'heath' ||
-          tags.natural === 'shrubbery' ||
-          tags.landcover === 'scrub';
         if (isBushArea) {
-          const itemType = resolveBushType(biome, { hedge: tags.barrier === 'hedge' });
-          if (!itemType) continue;
           const placements = sampleAreaPlacements(
             feature,
             terrainData,
             squareSize,
-            itemType,
+            'area_bush',
             0.004 * bushDensityMultiplier,
             400 * bushDensityMultiplier,
-            0.75,
-            1.2,
+            1,
+            1,
             hashString(feature.id),
           );
-          placements.forEach(pushPlacement);
+          placements.forEach((placement, idx) => {
+            const choice = pickTree({ kind: 'shrub', tags, point: centre, urban, area: true, seed: `${feature.id}:b${idx}` });
+            if (!choice) return;
+            placement.type = choice.type;
+            placement.scale = roundTo(choice.scale * (0.75 + 0.45 * seededRandom(hashString(`${feature.id}:bs${idx}`))), 6);
+            pushPlacement(placement);
+          });
         }
       }
     }
