@@ -138,7 +138,21 @@ function makeTerrainData() {
         },
         geometry: [
           { lat: 0.8, lng: 0.2 },
+          { lat: 0.5, lng: 0.5 },
           { lat: 0.2, lng: 0.8 },
+        ],
+      },
+      {
+        // Side street meeting road_1; its stop sign is mapped ~15 m before.
+        id: 'road_2',
+        type: 'road',
+        tags: {
+          highway: 'residential',
+        },
+        geometry: [
+          { lat: 0.5, lng: 0.9 },
+          { lat: 0.5, lng: 0.50014 },
+          { lat: 0.5, lng: 0.5 },
         ],
       },
       {
@@ -169,7 +183,7 @@ function makeTerrainData() {
           highway: 'stop',
         },
         geometry: [
-          { lat: 0.45, lng: 0.55 },
+          { lat: 0.5, lng: 0.50014 },
         ],
       },
       {
@@ -332,11 +346,10 @@ test('exportBeamNGLevel rewrites barrier shape paths and emits .link files acros
         'sign must have a 3D position');
       const rot = signStatic.rotationMatrix;
       assert.ok(Array.isArray(rot) && rot.length === 9, 'sign must have a rotation matrix');
-      // A sign near a road should be yawed to face it (non-identity rotation).
-      assert.ok(
-        Math.abs(rot[0] - 1) > 1e-6 || Math.abs(rot[1]) > 1e-6,
-        `Sign near a road should be rotated to face traffic for roadType=${roadType}`,
-      );
+      // The side street runs east → west into the junction (d = (−1, 0)): the
+      // sign's face (local −Y) turns east toward its traffic, yaw = atan2(−dx, dy) = +90°.
+      assert.ok(Math.abs(rot[0]) < 1e-6 && Math.abs(rot[1] - 1) < 1e-6,
+        `Stop sign should face westbound traffic for roadType=${roadType}: ${rot.slice(0, 2)}`);
     }
   } finally {
     restorePolyfills();

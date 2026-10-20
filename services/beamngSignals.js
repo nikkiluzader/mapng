@@ -58,7 +58,7 @@ function collectSignalCandidates(osmFeatures = []) {
   return out;
 }
 
-function geoToWorld(lat, lng, terrainData, squareSize, zOffset = 2.5) {
+export function geoToWorld(lat, lng, terrainData, squareSize, zOffset = 2.5) {
   const { bounds, width, height, heightMap, minHeight } = terrainData;
   const worldSize = width * squareSize;
 
@@ -753,18 +753,19 @@ function collectCrossingPoints(osmFeatures) {
 export function collectJunctionApproaches(terrainData) {
   const osmFeatures = Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures : [];
   const bounds = terrainData?.bounds;
+  if (!bounds) return null;
   const candidates = collectSignalCandidates(osmFeatures);
-  if (candidates.length === 0 || !bounds) return null;
   const roadFeatures = osmFeatures.filter(shouldUseRoadForSignals);
   const projector = makeProjector((bounds.north + bounds.south) / 2, (bounds.east + bounds.west) / 2);
-  const { intersections, stopApproaches } = findSignalApproaches({
+  const result = findSignalApproaches({
     roads: roadFeatures,
     signalPoints: candidates.filter((c) => c.kind === 'traffic_light'),
     stopPoints: candidates.filter((c) => c.kind === 'stop'),
+    yieldPoints: candidates.filter((c) => c.kind === 'yield'),
     crossingPoints: collectCrossingPoints(osmFeatures),
     projector,
   });
-  return { intersections, stopApproaches, projector, roadFeatures };
+  return { ...result, projector, roadFeatures };
 }
 
 function buildSignalArtifacts(terrainData, squareSize) {
@@ -772,7 +773,7 @@ function buildSignalArtifacts(terrainData, squareSize) {
   const empty = { signalData: emptySignalData, controllerDefinitions: null, placements: [] };
 
   const junctions = collectJunctionApproaches(terrainData);
-  if (!junctions) return empty;
+  if (!junctions || (junctions.intersections.length === 0 && junctions.stopApproaches.length === 0)) return empty;
   const { intersections, stopApproaches, projector, roadFeatures } = junctions;
   const entryFor = (approach) => makeSignalEntry(approach, projector, terrainData, squareSize, roadFeatures);
 
@@ -894,12 +895,11 @@ const POLE_CLEARANCE_M = 0.6;
 const POLE_SHIFT_STEP_M = 0.5;
 const POLE_SHIFT_MAX_M = 4;
 const FAR_SIDE_REACH_M = 2.5;
-const STOP_SIGN_KERB_GAP_M = 1.5;
 // North America hangs signals on the far side of the junction; elsewhere
 // they stand at the stop line.
 const FAR_SIDE_COUNTRIES = new Set(['US', 'CA', 'MX']);
 
-function makeRoadClearance(roadFeatures, projector) {
+export function makeRoadClearance(roadFeatures, projector) {
   const CELL = 25;
   const grid = new Map();
   const segments = [];
@@ -937,9 +937,8 @@ function makeRoadClearance(roadFeatures, projector) {
 }
 
 /**
- * Posts + linked heads for traffic-light approaches, and stop signs for stop
- * approaches derived without a mapped sign (stop=all, junction-node stops).
- * Returns world-space props: { kind, position, yaw, signalInstance? }.
+ * Posts + linked heads for traffic-light approaches (signs: roadSigns.js).
+ * Returns world-space props: { kind, position, yaw, signalInstance }.
  */
 function buildSignalProps({ placements = [], projector, roadFeatures = [] }, terrainData, squareSize) {
   if (!placements.length || !projector) return [];
@@ -970,17 +969,7 @@ function buildSignalProps({ placements = [], projector, roadFeatures = [] }, ter
     const kerb = leftHandTraffic ? [-right[0], -right[1]] : right;
     const faceTraffic = Math.atan2(-d[1], -d[0]);
 
-    if (placement.kind === 'stop') {
-      if (a.hintTags) continue; // the mapped stop sign is placed by the sign builder
-      const off = a.halfWidth + STOP_SIGN_KERB_GAP_M;
-      const spot = findClearSpot(a.x + kerb[0] * off, a.y + kerb[1] * off, kerb[0], kerb[1]);
-      if (!spot) {
-        dropped++;
-        continue;
-      }
-      props.push({ kind: 'stop_sign', position: toWorld(spot[0], spot[1]), yaw: Math.atan2(-kerb[1], -kerb[0]) });
-      continue;
-    }
+    if (placement.kind !== 'traffic_light') continue; // signs: roadSigns.js
 
     let baseX = a.x + d[0] * 0.5;
     let baseY = a.y + d[1] * 0.5;
@@ -1015,7 +1004,7 @@ function buildSignalProps({ placements = [], projector, roadFeatures = [] }, ter
     }
   }
   if (props.length || dropped) {
-    console.log(`[BeamNG Signals] ${props.filter((p) => p.kind === 'signal_head').length} signal heads, ${props.filter((p) => p.kind === 'stop_sign').length} derived stop signs, ${dropped} placements dropped (no clear spot off the road).`);
+    console.log(`[BeamNG Signals] ${props.filter((p) => p.kind === 'signal_head').length} signal heads, ${dropped} placements dropped (no clear spot off the road).`);
   }
   return props;
 }

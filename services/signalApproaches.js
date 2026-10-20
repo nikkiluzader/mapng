@@ -131,19 +131,19 @@ export function buildRoadGraph(roads, projector) {
   return { nodes, edges };
 }
 
-const isJunction = (node) => node.edges.length >= 3;
-const otherEnd = (edge, node) => (edge.from === node ? edge.to : edge.from);
+export const isJunction = (node) => node.edges.length >= 3;
+export const otherEnd = (edge, node) => (edge.from === node ? edge.to : edge.from);
 // Travel allowed from `node` along `edge` (leaving node).
-const canLeave = (edge, node) => (edge.from === node ? edge.fwd : edge.back);
+export const canLeave = (edge, node) => (edge.from === node ? edge.fwd : edge.back);
 // Travel allowed along `edge` arriving at `node`.
-const canArrive = (edge, node) => (edge.to === node ? edge.fwd : edge.back);
+export const canArrive = (edge, node) => (edge.to === node ? edge.fwd : edge.back);
 
 /**
  * Follow a road outward from `start` along `edge` through plain (degree-2)
  * vertices until a junction / dead end / `maxM`. Returns the path as oriented
  * steps {edge, from, to, startM}.
  */
-function walk(start, edge, maxM, stopAt = isJunction) {
+export function walk(start, edge, maxM, stopAt = isJunction) {
   const steps = [];
   let node = start;
   let current = edge;
@@ -160,7 +160,7 @@ function walk(start, edge, maxM, stopAt = isJunction) {
 }
 
 // Point and travel direction `distM` outward along a walked path.
-function pointAlong(path, distM) {
+export function pointAlong(path, distM) {
   for (const step of path.steps) {
     if (distM <= step.startM + step.edge.length || step === path.steps[path.steps.length - 1]) {
       const t = step.edge.length > 0 ? Math.min(1, Math.max(0, (distM - step.startM) / step.edge.length)) : 0;
@@ -219,7 +219,7 @@ function junctionAhead(node, maxM, dirTag) {
 }
 
 /** Inbound arms of one junction node, excluding arms inside `clusterKeys`. */
-function junctionArms(junction, clusterKeys) {
+export function junctionArms(junction, clusterKeys) {
   const arms = [];
   for (const edge of junction.edges) {
     const path = walk(junction, edge, 200, (n) => isJunction(n) || clusterKeys.has(n.key));
@@ -232,7 +232,7 @@ function junctionArms(junction, clusterKeys) {
 
 // Stop distance from the junction node for one arm: the default, pushed out
 // past the widest other road meeting there and behind a crosswalk on the arm.
-function armStopDistance(arm, arms, crossingKeys) {
+export function armStopDistance(arm, arms, crossingKeys) {
   let dist = STOP_POINT_DEFAULT_M;
   const widestOther = Math.max(0, ...arms.filter((other) => other !== arm).map((other) => other.edge.halfWidth));
   dist = Math.max(dist, widestOther + STOP_CLEAR_OF_CROSS_ROAD_M);
@@ -248,7 +248,7 @@ function armStopDistance(arm, arms, crossingKeys) {
   return dist;
 }
 
-function approachFromArm(arm, stopDistM, hint = null) {
+export function approachFromArm(arm, stopDistM, hint = null) {
   const at = hint
     ? { x: hint.node.x, y: hint.node.y, outward: pointAlong(arm.path, Math.max(0.5, hint.distance - 0.5))?.outward }
     : pointAlong(arm.path, Math.min(stopDistM, Math.max(1, arm.path.length * 0.8)));
@@ -299,7 +299,9 @@ function clusterJunctions(junctions) {
  * Returns { intersections: [{ center:[x,y], midblock, approaches }], stopApproaches }
  * where each approach is { x, y, dir, halfWidth, lanesIn, oneWay, highway, ... }.
  */
-export function findSignalApproaches({ roads, signalPoints = [], stopPoints = [], crossingPoints = [], projector }) {
+export function findSignalApproaches({
+  roads, signalPoints = [], stopPoints = [], yieldPoints = [], crossingPoints = [], projector,
+}) {
   const graph = buildRoadGraph(roads, projector);
   const crossingKeys = new Set(crossingPoints.map((pt) => makeRoadNodeKey(pt)).filter((key) => graph.nodes.has(key)));
   const intersections = [];
@@ -382,49 +384,63 @@ export function findSignalApproaches({ roads, signalPoints = [], stopPoints = []
     if (approaches.length > 0) intersections.push({ center: [group.x, group.y], midblock: true, approaches });
   }
 
-  // ── Stop signs ─────────────────────────────────────────────────────────
-  const stopByArm = new Map();
-  const addStop = (approach) => {
-    if (approach && !stopByArm.has(approach.armId)) stopByArm.set(approach.armId, approach);
-  };
-  for (const stop of stopPoints) {
-    const tags = stop.tags || {};
-    const node = snapToGraph(graph, stop.point, projector);
-    if (!node) continue;
-    const allWay = norm(tags.stop) === 'all';
-    let junction = isJunction(node) ? node : null;
-    let ahead = null;
-    if (!junction) {
-      ahead = junctionAhead(node, SIGNAL_TO_JUNCTION_MAX_M, nodeDirectionTag(tags));
-      junction = ahead?.junction ?? null;
-    }
-    if (!junction) continue;
-    const arms = junctionArms(junction, new Set([junction.key]));
-    const stopAt = (arm) => approachFromArm(arm, armStopDistance(arm, arms, crossingKeys));
-    if (allWay) {
-      // stop=all: every approach stops (BeamNG's 4-way-stop logic).
-      for (const arm of arms) addStop(stopAt(arm));
-      continue;
-    }
-    if (node === junction) {
-      // Stop mapped on the junction node: the minor approaches stop.
-      const minRank = Math.min(...arms.map((arm) => roadRank(arm.edge.road.tags?.highway)));
-      for (const arm of arms) {
-        if (roadRank(arm.edge.road.tags?.highway) === minRank) addStop(stopAt(arm));
+  // ── Stop and give-way signs ────────────────────────────────────────────
+  // Same placement rules for both; only stops get AI instances (BeamNG's AI
+  // ignores yield signals), give-way approaches are for the visible sign.
+  const controlledApproaches = (points, allowAllWay) => {
+    const byArm = new Map();
+    const add = (approach) => {
+      if (approach && !byArm.has(approach.armId)) byArm.set(approach.armId, approach);
+    };
+    for (const sign of points) {
+      const tags = sign.tags || {};
+      const node = snapToGraph(graph, sign.point, projector);
+      if (!node) continue;
+      const allWay = allowAllWay && norm(tags.stop) === 'all';
+      let junction = isJunction(node) ? node : null;
+      let ahead = null;
+      if (!junction) {
+        ahead = junctionAhead(node, SIGNAL_TO_JUNCTION_MAX_M, nodeDirectionTag(tags));
+        junction = ahead?.junction ?? null;
       }
-      continue;
+      if (!junction) continue;
+      const arms = junctionArms(junction, new Set([junction.key]));
+      const at = (arm) => approachFromArm(arm, armStopDistance(arm, arms, crossingKeys));
+      if (allWay) {
+        // stop=all: every approach stops (BeamNG's 4-way-stop logic).
+        for (const arm of arms) add(at(arm));
+        continue;
+      }
+      if (node === junction) {
+        // Mapped on the junction node: the minor approaches are controlled.
+        const minRank = Math.min(...arms.map((arm) => roadRank(arm.edge.road.tags?.highway)));
+        for (const arm of arms) {
+          if (roadRank(arm.edge.road.tags?.highway) === minRank) add(at(arm));
+        }
+        continue;
+      }
+      // Mapped on its approach: keep the mapped spot unless it is too far
+      // from the junction for the AI to link it to the intersection.
+      const armPath = walk(node, ahead.firstEdge, SIGNAL_TO_JUNCTION_MAX_M);
+      const lastStep = armPath.steps[armPath.steps.length - 1];
+      const arm = arms.find((x) => x.armId === `${junction.key}|${lastStep.from.key}`);
+      if (!arm) continue;
+      const hint = ahead.distance <= STOP_TO_JUNCTION_MAX_M ? { node, distance: ahead.distance, tags } : null;
+      add(approachFromArm(arm, armStopDistance(arm, arms, crossingKeys), hint));
     }
-    // Stop mapped on its approach: keep the mapped spot unless it is too far
-    // from the junction for the AI to link it to the intersection.
-    const armPath = walk(node, ahead.firstEdge, SIGNAL_TO_JUNCTION_MAX_M);
-    const lastStep = armPath.steps[armPath.steps.length - 1];
-    const arm = arms.find((a) => a.armId === `${junction.key}|${lastStep.from.key}`);
-    if (!arm) continue;
-    const hint = ahead.distance <= STOP_TO_JUNCTION_MAX_M ? { node, distance: ahead.distance, tags } : null;
-    addStop(approachFromArm(arm, armStopDistance(arm, arms, crossingKeys), hint));
-  }
+    return byArm;
+  };
+  const stopByArm = controlledApproaches(stopPoints, true);
+  const yieldByArm = controlledApproaches(yieldPoints, false);
+  for (const armId of stopByArm.keys()) yieldByArm.delete(armId); // a stop wins
 
-  return { intersections, stopApproaches: [...stopByArm.values()] };
+  return {
+    intersections,
+    stopApproaches: [...stopByArm.values()],
+    yieldApproaches: [...yieldByArm.values()],
+    graph,
+    crossingKeys,
+  };
 }
 
 /**

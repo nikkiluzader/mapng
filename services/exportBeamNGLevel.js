@@ -25,6 +25,7 @@ import {
   parseMaxspeedMps,
 } from './beamngMapNavigation.js';
 import { resolveRoadRulesAt } from './countryRules.js';
+import { buildRoadSignProps } from './roadSigns.js';
 import {
   buildCarriagewayIndex,
   cutNodes,
@@ -593,7 +594,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize) {
     includeBuildings: false,
     includeVegetation: false,
     includeBarriers: false,
-    // Signs are placed as native BeamNG sign assets (see buildNativeSignObjects),
+    // Signs are placed as native BeamNG sign assets (see roadSigns.js),
     // so don't bake the procedural sign boxes into the generic OSM mesh.
     includeSigns: false,
     // Street furniture (lamps, benches, bollards) is 3D-preview-only geometry;
@@ -2131,6 +2132,13 @@ function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, z
   console.log(`[BeamNG Export] Paint cut at crossing roads: ${paintDecals.length} lines/blends → ${pieces} pieces (${removed} removed entirely).`);
 }
 
+// Road paint and sign style by location: 'americas' (yellow centre lines,
+// US signs; also BeamNG's US default when the location is unknown) or
+// 'white' (white centre lines, Vienna-convention signs) everywhere else.
+function getMarkingStyle(roadRules) {
+  return !roadRules?.countryCode || roadRules.region === 'Americas' ? 'americas' : 'white';
+}
+
 export function generateDecalRoads(terrainData, squareSize) {
   if (!terrainData.osmFeatures?.length) return [];
 
@@ -2150,10 +2158,7 @@ export function generateDecalRoads(terrainData, squareSize) {
   const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures);
   const giveWayKeys = collectGiveWayNodeKeys(terrainData.osmFeatures);
   const leftHandTraffic = !!terrainData.roadRules?.leftHandTraffic;
-  // Yellow centre lines in the Americas (and BeamNG's US default when the
-  // location is unknown), white elsewhere.
-  const rules = terrainData.roadRules;
-  const markingStyle = !rules?.countryCode || rules.region === 'Americas' ? 'americas' : 'white';
+  const markingStyle = getMarkingStyle(terrainData.roadRules);
 
   const roadSplinesByName = new Map();
   const segmentCounterByName = new Map();
@@ -3780,15 +3785,6 @@ function buildBarrierFolderItems(barrierObjects) {
   }));
 }
 
-// Native BeamNG sign meshes, referenced from official level art via .link files
-// (no mesh bundled). The east_coast_usa signs_usa set is a clean, generic
-// traffic-sign library suitable for any biome.
-const NATIVE_SIGN_ASSETS = {
-  stop: { shapeName: '/levels/east_coast_usa/art/shapes/signs_usa/sign_stop.dae' },
-  give_way: { shapeName: '/levels/east_coast_usa/art/shapes/signs_usa/sign_yield.dae' },
-};
-
-const MAX_NATIVE_SIGN_OBJECTS = 4000;
 
 // Material definitions used by the signs_usa meshes. Linking only the .dae gets
 // the geometry but leaves the sign faces bare metal because the `signs_usa`
@@ -3848,20 +3844,6 @@ function getSignRuntimeMaterialDefs() {
       translucentBlendOp: 'None',
     },
   };
-}
-
-/**
- * Resolve an OSM point feature's tags to a native BeamNG sign asset.
- *
- * Only well-defined sign types map to a mesh; ambiguous `traffic_sign` nodes
- * return null (a wrong-meaning sign is worse than none). `traffic_signals`
- * nodes are handled by the signals system, not here.
- */
-function resolveNativeSignAsset(tags = {}) {
-  const highway = String(tags.highway ?? '').trim().toLowerCase();
-  if (highway === 'stop') return NATIVE_SIGN_ASSETS.stop;
-  if (highway === 'give_way') return NATIVE_SIGN_ASSETS.give_way;
-  return null;
 }
 
 /**
@@ -3928,67 +3910,6 @@ function projectDrivableRoads(terrainData, squareSize) {
   return roads;
 }
 
-function buildNativeSignObjects(terrainData, squareSize, rightHandDrive = false) {
-  const features = terrainData.osmFeatures?.filter((feature) => (
-    feature.type === 'street_furniture'
-    && Array.isArray(feature.geometry)
-    && feature.geometry.length === 1
-  )) ?? [];
-
-  const roads = projectDrivableRoads(terrainData, squareSize);
-
-  // Shoulder clearance beyond the road edge so the post sits off the asphalt.
-  const SHOULDER_M = 1.5;
-  // Cap the search so a sign far from any road isn't yanked across the map.
-  const MAX_ROAD_SEARCH_M = 25;
-
-  const objects = [];
-  for (let i = 0; i < features.length; i++) {
-    if (objects.length >= MAX_NATIVE_SIGN_OBJECTS) break;
-    const feature = features[i];
-    const asset = resolveNativeSignAsset(feature.tags || {});
-    if (!asset) continue;
-    const pt = feature.geometry[0];
-    if (!Number.isFinite(pt?.lat) || !Number.isFinite(pt?.lng)) continue;
-    const world = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0);
-
-    let posX = world[0];
-    let posY = world[1];
-    let yaw = 0;
-
-    const near = findNearestRoad(world[0], world[1], roads, MAX_ROAD_SEARCH_M);
-    if (near) {
-      // Perpendicular to the road tangent. Two candidates; pick the traffic side.
-      // Right-hand-drive → signs face traffic from the right of travel direction.
-      const side = rightHandDrive ? -1 : 1;
-      const perpX = -near.ty * side;
-      const perpY = near.tx * side;
-      const offset = near.halfWidth + SHOULDER_M;
-      // Offset from the road centerline point (not the original node) so signs
-      // sit a consistent distance from the edge even if OSM placed them off-center.
-      posX = near.cx + perpX * offset;
-      posY = near.cy + perpY * offset;
-      // Face the sign back toward oncoming traffic: look along -tangent for the
-      // approach. Yaw measured so the sign's forward axis points at the road.
-      yaw = Math.atan2(-perpY, -perpX);
-    }
-
-    const z = getTerrainHeightAtWorldXY(posX, posY, terrainData, squareSize);
-
-    objects.push({
-      __parent: 'signs',
-      class: 'TSStatic',
-      name: `sign_${i}`,
-      persistentId: generatePersistentId(),
-      position: [roundTo(posX, 3), roundTo(posY, 3), roundTo(z, 3)],
-      rotationMatrix: rotationMatrixFromYaw(yaw),
-      shapeName: asset.shapeName,
-      useInstanceRenderData: true,
-    });
-  }
-  return objects;
-}
-
 /**
  * TSStatics for the signal props built in beamngSignals.js: pole_traffic1
  * posts and trafficlight_overhead1 heads. Heads are dynamic and carry
@@ -4033,23 +3954,6 @@ function buildTrafficSignalObjects(props = []) {
     }
   });
   return objects;
-}
-
-// Stop signs for stop approaches derived without a mapped sign (stop=all,
-// stops mapped on the junction node). Mapped ones come from buildNativeSignObjects.
-function buildDerivedStopSignObjects(props = []) {
-  return props
-    .filter((prop) => prop.kind === 'stop_sign')
-    .map((prop, i) => ({
-      __parent: 'signs',
-      class: 'TSStatic',
-      name: `sign_stop_derived_${i}`,
-      persistentId: generatePersistentId(),
-      position: prop.position,
-      rotationMatrix: rotationMatrixFromYaw(prop.yaw),
-      shapeName: NATIVE_SIGN_ASSETS.stop.shapeName,
-      useInstanceRenderData: true,
-    }));
 }
 
 // Street furniture caps. BeamNG QA (Wonly): 25k+ lights per level are fine
@@ -5930,10 +5834,18 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome)
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
-  const signObjects = [
-    ...buildNativeSignObjects(exportTerrainData, squareSize, resolvedRightHandDrive),
-    ...buildDerivedStopSignObjects(signalProps),
-  ];
+  const signObjects = buildRoadSignProps(exportTerrainData, squareSize, {
+    style: getMarkingStyle(exportTerrainData.roadRules),
+  }).props.map((sign, i) => ({
+    __parent: 'signs',
+    class: 'TSStatic',
+    name: `sign_${sign.kind}_${i}`,
+    persistentId: generatePersistentId(),
+    position: sign.position,
+    rotationMatrix: rotationMatrixFromYaw(sign.yaw),
+    shapeName: sign.shape,
+    useInstanceRenderData: true,
+  }));
   const trafficSignalObjects = buildTrafficSignalObjects(signalProps);
   const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome);
   const { objects: fuelStationObjects, facilities: fuelStationFacilities } =

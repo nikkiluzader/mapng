@@ -250,18 +250,3 @@ test('signal props: far side in North America, stop line elsewhere; kerb follows
   // Lenses (+X) face oncoming traffic: south for a northbound approach.
   assert.ok(Math.abs(us.yaw - (-Math.PI / 2)) < 1e-6);
 });
-
-test('derived stop=all approaches get stop signs; mapped stop signs are left to the sign builder', () => {
-  const allWay = buildBeamNGSignalExportBundle(makeTerrainData([
-    ...crossroads({ highway: 'residential' }, { highway: 'residential' }),
-    node('stop', { highway: 'stop', stop: 'all' }, J, J),
-  ]), SQ);
-  assert.equal(allWay.props.filter((p) => p.kind === 'stop_sign').length, 4);
-
-  const mapped = buildBeamNGSignalExportBundle(makeTerrainData([
-    road('main', { highway: 'secondary' }, [[J, 0.001], [J, J], [J, 0.009]]),
-    road('side', { highway: 'residential' }, [[0.009, J], [J + 10 * M, J], [J, J]]),
-    node('stop', { highway: 'stop' }, J + 10 * M, J),
-  ]), SQ);
-  assert.equal(mapped.props.length, 0);
-});
