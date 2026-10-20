@@ -632,70 +632,218 @@ const parseOverpassResponse = (data, bounds) => {
 };
 
 // --- Endpoint Fetcher ---
+//
+// Overpass mirrors are volunteer servers that go down or rate-limit without
+// warning (2026-10-19: overpass-api.de refusing connections, three others
+// timing out, only kumi answering). Instead of firing the full query at every
+// mirror on every generate:
+//   - mirrors are tried healthiest first, from a small health record kept in
+//     localStorage (last success, latency, cool-down after a failure), so a
+//     mirror that just failed is skipped next time instead of timing out again;
+//   - the next mirror starts as soon as one fails, or after HEDGE_DELAY_MS
+//     with no answer (at most MAX_IN_FLIGHT at once), and the first good
+//     response aborts the rest;
+//   - each attempt and the whole fetch have a deadline, and an all-failed
+//     round caused by rate limits / gateway timeouts is retried once.
 
-// Fires all endpoints simultaneously; first successful response wins and
-// all others are aborted.
+const MIRROR_HEALTH_KEY = "mapng_overpass_health_v1";
+const HEDGE_DELAY_MS = 6000;
+const MAX_IN_FLIGHT = 3;
+const ATTEMPT_TIMEOUT_MS = 60000;   // server-side [timeout:30] + transfer
+const OVERALL_DEADLINE_MS = 150000;
+const COOLDOWN_MS = { network: 10 * 60000, timeout: 10 * 60000, rate_limit: 2 * 60000, http: 5 * 60000 };
+const RETRY_DELAY_MS = 5000;
+
+const readMirrorHealth = () => {
+  try {
+    const raw = globalThis.localStorage?.getItem(MIRROR_HEALTH_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeMirrorHealth = (health) => {
+  try {
+    globalThis.localStorage?.setItem(MIRROR_HEALTH_KEY, JSON.stringify(health));
+  } catch {
+    // Private mode / blocked storage: health just isn't remembered.
+  }
+};
+
+const recordMirrorResult = (endpoint, result) => {
+  const health = readMirrorHealth();
+  const prev = health[endpoint] || {};
+  health[endpoint] = result.ok
+    ? { okAt: Date.now(), latencyMs: result.latencyMs }
+    : { ...prev, failAt: Date.now(), failKind: result.kind, coolUntil: Date.now() + (COOLDOWN_MS[result.kind] ?? COOLDOWN_MS.http) };
+  writeMirrorHealth(health);
+};
+
+/**
+ * Endpoints in the order to try them: healthy mirrors by recent success and
+ * latency, unknown ones shuffled (spreads load), cooling-down ones last.
+ */
+export const orderOverpassEndpoints = (endpoints, health = readMirrorHealth(), now = Date.now()) => {
+  const rank = (e) => {
+    const h = health[e] || {};
+    if (h.coolUntil && h.coolUntil > now) return [2, h.coolUntil];
+    if (h.okAt && (!h.failAt || h.okAt > h.failAt)) return [0, h.latencyMs ?? 0];
+    return [1, Math.random()];
+  };
+  return endpoints
+    .map((e) => ({ e, r: rank(e) }))
+    .sort((a, b) => a.r[0] - b.r[0] || a.r[1] - b.r[1])
+    .map(({ e }) => e);
+};
+
+const classifyMirrorError = (err, timedOut) => {
+  if (timedOut) return "timeout";
+  if (err?.status === 429) return "rate_limit";
+  if (err?.status) return "http";
+  return "network";
+};
+
 const fetchWithAbort = async (endpoint, query, signal) => {
-  return fetch(endpoint, {
+  const response = await fetch(endpoint, {
     method: "POST",
     body: `data=${encodeURIComponent(query)}`,
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     signal,
-  }).then(async (response) => {
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText}`);
-    }
-    const rawText = await response.text();
-    let data;
+  });
+  if (!response.ok) {
+    const error = new Error(`HTTP ${response.status} ${response.statusText}`);
+    error.status = response.status;
+    throw error;
+  }
+  const rawText = await response.text();
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    // Overpass reports server-side timeouts / memory limits as HTML or an
+    // XML remark with a 200; treat those like a gateway timeout.
+    const error = new Error(`Non-JSON response from ${endpoint}: ${rawText.slice(0, 200)}`);
+    error.status = 504;
+    throw error;
+  }
+  return { endpoint, data };
+};
+
+const mirrorName = (endpoint) => {
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    return endpoint;
+  }
+};
+
+/**
+ * Try mirrors in order with hedging; resolves with the first good response.
+ * Rejects with { errors, retryable } when every mirror failed.
+ */
+const hedgedFetch = (endpoints, query, { onStatus, signal, deadlineAt }) => new Promise((resolve, reject) => {
+  const attempts = [];
+  const errors = [];
+  let next = 0;
+  let settled = false;
+  let inFlight = 0;
+  let hedgeTimer = null;
+  let deadlineTimer = null;
+
+  const finish = (fn, value) => {
+    if (settled) return;
+    settled = true;
+    clearTimeout(hedgeTimer);
+    clearTimeout(deadlineTimer);
+    signal?.removeEventListener?.("abort", onAbort);
+    for (const a of attempts) { clearTimeout(a.timer); a.controller.abort(); }
+    fn(value);
+  };
+  const onAbort = () => finish(reject, signal.reason ?? new DOMException("Aborted", "AbortError"));
+  if (signal?.aborted) { onAbort(); return; }
+  signal?.addEventListener?.("abort", onAbort, { once: true });
+
+  const scheduleHedge = () => {
+    clearTimeout(hedgeTimer);
+    if (next < endpoints.length) hedgeTimer = setTimeout(launch, HEDGE_DELAY_MS);
+  };
+
+  const launch = () => {
+    if (settled || next >= endpoints.length || inFlight >= MAX_IN_FLIGHT) return;
+    const endpoint = endpoints[next++];
+    const controller = new AbortController();
+    const startedAt = Date.now();
+    const attempt = { controller, timedOut: false, timer: null };
+    attempt.timer = setTimeout(() => { attempt.timedOut = true; controller.abort(); }, ATTEMPT_TIMEOUT_MS);
+    attempts.push(attempt);
+    inFlight++;
+    onStatus?.(`Fetching OpenStreetMap data from ${mirrorName(endpoint)} (mirror ${next}/${endpoints.length})...`);
+
+    fetchWithAbort(endpoint, query, controller.signal)
+      .then((result) => {
+        clearTimeout(attempt.timer);
+        recordMirrorResult(endpoint, { ok: true, latencyMs: Date.now() - startedAt });
+        finish(resolve, result);
+      })
+      .catch((err) => {
+        clearTimeout(attempt.timer);
+        inFlight--;
+        if (settled) return;                          // aborted because another mirror won
+        const kind = classifyMirrorError(err, attempt.timedOut);
+        recordMirrorResult(endpoint, { ok: false, kind });
+        errors.push({ endpoint, kind, message: attempt.timedOut ? `no response in ${ATTEMPT_TIMEOUT_MS / 1000}s` : err.message });
+        console.warn(`[OSM] ${mirrorName(endpoint)} failed (${kind}); trying the next mirror.`);
+        if (next < endpoints.length) {
+          launch();                                   // a failure frees a slot right away
+          scheduleHedge();
+        } else if (inFlight === 0) {
+          finish(reject, { errors, retryable: errors.some((e) => e.kind === "rate_limit" || e.kind === "timeout" || e.kind === "http") });
+        }
+      });
+  };
+
+  deadlineTimer = setTimeout(() => {
+    errors.push({ endpoint: "*", kind: "timeout", message: "overall deadline reached" });
+    finish(reject, { errors, retryable: false });
+  }, Math.max(0, deadlineAt - Date.now()));
+
+  launch();
+  scheduleHedge();
+});
+
+const fetchFromOverpass = async (query, { onStatus, signal } = {}) => {
+  const deadlineAt = Date.now() + OVERALL_DEADLINE_MS;
+  let lastFailure = null;
+  for (let round = 0; round < 2; round++) {
+    // A retry round ignores cool-downs: every mirror just failed anyway.
+    const ordered = round === 0
+      ? orderOverpassEndpoints(OVERPASS_ENDPOINTS)
+      : [...OVERPASS_ENDPOINTS].sort(() => Math.random() - 0.5);
     try {
-      data = JSON.parse(rawText);
-    } catch (e) {
-      throw new Error(`Non-JSON response from ${endpoint}: ${rawText.slice(0, 200)}`);
+      return await hedgedFetch(ordered, query, { onStatus, signal, deadlineAt });
+    } catch (failure) {
+      if (failure?.name === "AbortError" || signal?.aborted) throw failure;
+      lastFailure = failure;
+      if (!failure?.retryable || Date.now() + RETRY_DELAY_MS >= deadlineAt) break;
+      onStatus?.("OpenStreetMap mirrors are busy; retrying shortly...");
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
     }
-    return { endpoint, data };
-  });
+  }
+  const detail = (lastFailure?.errors || []).map((e) => `${e.endpoint}: ${e.message}`).join("\n");
+  throw new Error(`All Overpass mirrors failed:\n${detail || String(lastFailure?.message || lastFailure)}`);
 };
 
-const raceEndpoints = (endpoints, query) => {
-  return new Promise((resolve, reject) => {
-    const controllers = endpoints.map(() => new AbortController());
-    let settled = false;
-    let failCount = 0;
-    const errors = [];
-
-    endpoints.forEach((endpoint, i) => {
-      fetchWithAbort(endpoint, query, controllers[i].signal)
-        .then((result) => {
-          if (settled) return;
-          settled = true;
-          controllers.forEach((c, j) => { if (j !== i) c.abort(); });
-          resolve(result);
-        })
-        .catch((err) => {
-          if (err.name === "AbortError") return;
-          errors.push(`${endpoint}: ${err.message}`);
-          failCount++;
-          if (failCount === endpoints.length && !settled) {
-            settled = true;
-            reject(new Error(`All endpoints failed:\n${errors.join("\n")}`));
-          }
-        });
-    });
-  });
-};
-
-export const fetchOSMData = async (bounds) => {
+export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
   console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
 
   const query = buildQuery(bounds);
   const queryParams = getOSMQueryParameters(bounds);
   const startedAt = new Date().toISOString();
 
-  // Shuffle endpoints so no single mirror always gets hammered first
-  const shuffled = [...OVERPASS_ENDPOINTS].sort(() => Math.random() - 0.5);
-
   try {
-    const { endpoint, data } = await raceEndpoints(shuffled, query);
+    const { endpoint, data } = await fetchFromOverpass(query, { onStatus, signal });
 
     console.log(`[OSM] Winner: ${endpoint} — ${data.elements?.length || 0} elements`);
 
@@ -714,6 +862,7 @@ export const fetchOSMData = async (bounds) => {
     return features;
 
   } catch (error) {
+    if (error?.name === "AbortError" || signal?.aborted) throw error;
     console.error("[OSM] All endpoints failed:", error.message);
     lastOSMRequestInfo = {
       ...queryParams,

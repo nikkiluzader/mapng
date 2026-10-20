@@ -726,6 +726,7 @@
     },
     "error": {
       "fetchOsm": "Nie udało się pobrać danych OSM.",
+      "osmUnavailable": "Serwery OpenStreetMap obecnie nie odpowiadają, więc teren wygenerowano bez dróg, budynków i innych obiektów mapy. Spróbuj ponownie za kilka minut.",
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
       "usgsFallback": "Dane USGS 1m dla tego obszaru były brakujące lub uszkodzone. Powrót do standardowego zestawu danych Terrarium.\n\nWyjście pozostaje na aktualnej siatce przetwarzania aplikacji.",
       "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do standardowego zestawu danych Terrarium."

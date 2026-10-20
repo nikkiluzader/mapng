@@ -750,6 +750,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         });
         terrainData.value = updatedData;
         lastGenerationKey.value = requestKey;
+        warnIfOsmUnavailable(updatedData);
         if (showPreview) {
           loadingStatus.value = t('app.status.rendering3d');
           previewMode.value = true;
@@ -842,6 +843,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     }
     terrainData.value = data;
     lastGenerationKey.value = requestKey;
+    warnIfOsmUnavailable(data);
     
     if (showPreview) {
       applyLoadingUpdate(t('app.status.rendering3d'));
@@ -868,6 +870,12 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
   }
 };
 
+// fetchOSMData never throws on a mirror outage (the terrain is still usable),
+// so say so instead of silently returning a map with no roads or buildings.
+const warnIfOsmUnavailable = (data) => {
+  if (data?.osmRequestInfo?.error) alert(t('app.error.osmUnavailable'));
+};
+
 const handleFetchOSM = async () => {
   if (!terrainData.value) return;
   
@@ -879,6 +887,7 @@ const handleFetchOSM = async () => {
           loadingStatus.value = status;
       });
       terrainData.value = updatedData;
+      warnIfOsmUnavailable(updatedData);
   } catch (error) {
       console.error("Failed to fetch OSM data:", error);
       alert(t('app.error.fetchOsm'));

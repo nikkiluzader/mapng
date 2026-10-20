@@ -727,6 +727,7 @@
     },
     "error": {
       "fetchOsm": "No se pudieron obtener los datos OSM.",
+      "osmUnavailable": "Los servidores de OpenStreetMap no responden en este momento, así que el terreno se generó sin carreteras, edificios ni otros elementos del mapa. Inténtalo de nuevo en unos minutos.",
       "fetchTerrain": "No se pudieron obtener datos del terreno. El area solicitada puede ser demasiado grande o el servicio no esta disponible.",
       "usgsFallback": "Los datos USGS 1m para esta zona faltan o estan corruptos. Se usara el dataset Terrarium Estandar.\n\nLa salida se mantiene en la malla de procesamiento actual de la app.",
       "kron86Fallback": "Los datos NMT EVRF2007 solo estan disponibles para mosaicos compatibles de Polonia. Se usara el dataset Terrarium Estandar."

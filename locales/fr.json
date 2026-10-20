@@ -726,6 +726,7 @@
     },
     "error": {
       "fetchOsm": "Échec de la recuperation des données OSM.",
+      "osmUnavailable": "Les serveurs OpenStreetMap ne répondent pas pour le moment : le terrain a été généré sans routes, bâtiments ni autres éléments de carte. Réessayez dans quelques minutes.",
       "fetchTerrain": "Échec de la recuperation des données de terrain. La zone demandee est peut-etre trop grande ou le service est indisponible.",
       "usgsFallback": "Les données USGS 1m pour cette zone etaient absentes ou corrompues. Bascule vers le jeu de données Terrarium Standard.\n\nLa sortie reste sur la grille de traitement actuelle de l'application.",
       "kron86Fallback": "Les données NMT EVRF2007 ne sont disponibles que pour les tuiles prises en charge en Pologne. Bascule vers le jeu de données Terrarium Standard."

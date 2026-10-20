@@ -726,6 +726,7 @@
     },
     "error": {
       "fetchOsm": "OSM-Daten konnten nicht geladen werden.",
+      "osmUnavailable": "Die OpenStreetMap-Server antworten gerade nicht, daher wurde das Gelände ohne Straßen, Gebäude und andere Kartenobjekte erstellt. Bitte versuche es in ein paar Minuten erneut.",
       "fetchTerrain": "Terrain-Daten konnten nicht geladen werden. Die angeforderte Fläche ist möglicherweise zu groß oder der Dienst ist nicht verfügbar.",
       "usgsFallback": "USGS-1m-Daten für diesen Bereich fehlten oder waren beschädigt. Fallback auf den Standard-Terrarium-Datensatz.\n\nDie Ausgabe bleibt auf dem aktuellen Verarbeitungsraster der App.",
       "kron86Fallback": "NMT EVRF2007-Daten sind nur für unterstützte Kacheln in Polen verfügbar. Fallback auf den Standard-Terrarium-Datensatz."

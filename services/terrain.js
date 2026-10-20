@@ -1832,7 +1832,7 @@ export const fetchTerrainData = async (
   if (includeOSM || enhanceRoads || levelRoads) {
     signal?.throwIfAborted();
     onProgress?.("Fetching OpenStreetMap data...");
-    osmFeatures = await fetchOSMData(finalBounds);
+    osmFeatures = await fetchOSMData(finalBounds, { onStatus: onProgress, signal });
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2185,7 +2185,7 @@ export const loadTerrainFromTif = async (
   if (includeOSM || enhanceRoads || levelRoads) {
     signal?.throwIfAborted();
     emitProgress('Fetching OpenStreetMap data...');
-    osmFeatures = await fetchOSMData(finalBounds);
+    osmFeatures = await fetchOSMData(finalBounds, { onStatus: emitProgress, signal });
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2415,7 +2415,7 @@ export const loadTerrainFromLaz = async (
   if (includeOSM || enhanceRoads || levelRoads) {
     signal?.throwIfAborted();
     onProgress?.('Fetching OpenStreetMap data...');
-    osmFeatures = await fetchOSMData(fetchBounds);
+    osmFeatures = await fetchOSMData(fetchBounds, { onStatus: onProgress, signal });
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(fetchBounds),
       endpointUsed: null,
@@ -2609,7 +2609,7 @@ export const addOSMToTerrain = async (
   onProgress,
 ) => {
   onProgress?.("Fetching OpenStreetMap data...");
-  const osmFeatures = await fetchOSMData(terrainData.bounds);
+  const osmFeatures = await fetchOSMData(terrainData.bounds, { onStatus: onProgress });
   const osmRequestInfo = getLastOSMRequestInfo() || {
     ...getOSMQueryParameters(terrainData.bounds),
     endpointUsed: null,

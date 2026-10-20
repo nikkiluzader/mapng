@@ -779,6 +779,7 @@
     },
     "error": {
       "fetchOsm": "Failed to fetch OSM data.",
+      "osmUnavailable": "OpenStreetMap servers aren't responding right now, so the terrain was generated without roads, buildings or other map features. Try again in a few minutes.",
       "fetchTerrain": "Failed to fetch terrain data. The requested area might be too large or service is down.",
       "usgsFallback": "USGS 1m data for this area was missing or corrupt. Falling back to the Standard Terrarium dataset.\n\nOutput remains on the app's current processing grid.",
       "kron86Fallback": "NMT EVRF2007 data is only available for supported Poland tiles. Falling back to the Standard Terrarium dataset."

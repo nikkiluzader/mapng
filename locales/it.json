@@ -726,6 +726,7 @@
     },
     "error": {
       "fetchOsm": "Impossibile scaricare dati OSM.",
+      "osmUnavailable": "I server di OpenStreetMap non rispondono al momento, quindi il terreno è stato generato senza strade, edifici o altri elementi della mappa. Riprova tra qualche minuto.",
       "fetchTerrain": "Impossibile scaricare dati terreno. L'area richiesta potrebbe essere troppo grande o il servizio è inattivo.",
       "usgsFallback": "I dati USGS 1m per questa area erano mancanti o corrotti. Ritorno al dataset Terrarium Standard.\n\nL'output rimane sulla griglia di elaborazione attuale dell'app.",
       "kron86Fallback": "I dati NMT EVRF2007 sono disponibili solo per tile supportate in Polonia. Ritorno al dataset Terrarium Standard."
