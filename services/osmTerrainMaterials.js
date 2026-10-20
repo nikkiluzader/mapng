@@ -14,6 +14,7 @@ import {
   getTerrainSemanticCandidates,
 } from './beamngBiomeCatalog.js';
 import { TERRAIN_MATERIAL_LIBRARY } from './beamngTerrainMaterialLibrary.js';
+import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–8 = BeamNG-referenced materials.
@@ -638,13 +639,24 @@ function buildOSMLayerMap(terrainData, worldSize) {
     }
   }
 
-  // 4. Paint roads (overrides area fills).
+  // 4. Paint roads (overrides area fills). Asphalt covers at least the whole
+  // carriageway the export paves (parking lanes / shoulders included), so the
+  // tyres feel asphalt wherever the decal shows it.
+  const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
   for (const feature of osmFeatures) {
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
-    const highway = feature.tags?.highway;
+    const tags = feature.tags || {};
+    const highway = tags.highway;
     const style = ROAD_STYLE[highway];
     if (!style) continue;
-    const halfPx = Math.max(1, style.halfWidthM / metersPerPixel);
+    let halfWidthM = style.halfWidthM;
+    if (style.mat === 5) {
+      const { carriagewayHalfWidth } = estimateRoadCrossSection(tags, highway, isOneWayRoad(tags), {
+        urban: isUrbanRoad(feature),
+      });
+      if (Number.isFinite(carriagewayHalfWidth)) halfWidthM = Math.max(halfWidthM, carriagewayHalfWidth);
+    }
+    const halfPx = Math.max(1, halfWidthM / metersPerPixel);
     const pts = feature.geometry.map(pt => toPx(pt.lat, pt.lng));
     for (let i = 0; i < pts.length - 1; i++) {
       rasterizeSegment(layerMap, size, pts[i].px, pts[i].py, pts[i + 1].px, pts[i + 1].py, halfPx, style.mat);

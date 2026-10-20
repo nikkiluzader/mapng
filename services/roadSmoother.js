@@ -1,6 +1,6 @@
 import { createMetricProjector } from './geoUtils.js';
 import { buildRoadNetwork, mergeLinearRoadSegments } from './roadNetwork.js';
-import { estimateRoadHalfWidth, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
+import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
 
 const NO_DATA_VALUE = -99999;
 
@@ -180,8 +180,10 @@ function isGroundLevelRoad(feature) {
  * Merged corridors take the widest of their member ways, mirroring the
  * export's stable-width pass: OSM segmentation splits a constant-width road
  * into differently-tagged pieces, and the road is drawn at the wider value.
+ * The width is the whole carriageway (parking lanes / shoulders included):
+ * that is what the export paves.
  */
-function corridorHalfWidthMeters(corridor) {
+function corridorHalfWidthMeters(corridor, isUrbanRoad) {
     const members = Array.isArray(corridor.members) && corridor.members.length > 0
         ? corridor.members
         : [corridor];
@@ -190,7 +192,9 @@ function corridorHalfWidthMeters(corridor) {
     for (const member of members) {
         const tags = member?.tags || {};
         const highway = member?.highway || tags.highway || corridor.highway;
-        const w = estimateRoadHalfWidth(tags, highway, isOneWayRoad(tags));
+        const w = estimateRoadCrossSection(tags, highway, isOneWayRoad(tags), {
+            urban: isUrbanRoad(corridor),
+        }).carriagewayHalfWidth;
         if (Number.isFinite(w) && w > half) half = w;
     }
     return half > 0 ? half : 3.0;
@@ -319,6 +323,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
     if (corridors.length === 0) return;
 
     const project = createMetricProjector(bounds, width, height);
+    const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
     const profiles = buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel);
     if (profiles.length === 0) return;
 
@@ -336,7 +341,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
     for (const profile of profiles) {
         const { corridor, points, zOrig, zSmooth } = profile;
 
-        const radiusMeters = corridorHalfWidthMeters(corridor);
+        const radiusMeters = corridorHalfWidthMeters(corridor, isUrbanRoad);
         // The core is flat. We add an extra margin for feathering back to the terrain.
         const radiusPx = Math.max(1, (radiusMeters + FEATHER_M) / metersPerPixel);
         const coreRadiusPx = Math.max(1, radiusMeters / metersPerPixel);

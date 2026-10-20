@@ -630,3 +630,61 @@ test('road nodes: sanitizeRoadNodes removes ~180-degree hairpin spikes', async (
   assert.deepEqual(clean[0], [0, 0, 1, 2]);
   assert.deepEqual(clean[clean.length - 1], [8, 0, 1, 2]);
 });
+
+// ── Carriageway vs driving width (roadWidth.estimateRoadCrossSection) ──
+test('decal roads: asphalt covers the carriageway, AI path + paint the driving lanes', async () => {
+  const restore = installCanvasPolyfill();
+  try {
+    const td = makeTerrainData();
+    td.osmFeatures = [
+      // Rural primary (no buildings): 7 m of lanes + a 1 m edge strip each side.
+      { id: 'rural_1', type: 'road', tags: { highway: 'primary', name: 'rural_rd' },
+        geometry: [{ lat: 0.5, lng: 0.15 }, { lat: 0.5, lng: 0.85 }] },
+      // Tagged kerbside parking both sides: 6 m of lanes + 2 × 2.3 m.
+      { id: 'parked_1', type: 'road', tags: { highway: 'residential', name: 'parked_st', 'parking:both': 'lane' },
+        geometry: [{ lat: 0.3, lng: 0.15 }, { lat: 0.3, lng: 0.85 }] },
+    ];
+    const result = await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
+      roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
+      baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
+      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeTrees: false, includeRocks: false, includeNativeBarriers: false,
+    });
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const decals = [];
+    for (const path of Object.keys(zip.files)) {
+      if (!/Decal_Roads\/[^/]+\/items\.level\.json$/.test(path)) continue;
+      const text = await zip.file(path).async('string');
+      if (text.trim()) decals.push(...parseNDJSON(text));
+    }
+    const of = (group, suffix) => decals.filter((d) => d.class === 'DecalRoad' && d.name.startsWith(`dr_${group}`) && d.name.endsWith(suffix));
+    const widthOf = (d) => d.nodes[Math.floor(d.nodes.length / 2)][3];
+    const yOf = (d) => d.nodes[Math.floor(d.nodes.length / 2)][1];
+
+    for (const [group, carriageway, driving] of [['rural_rd', 9, 7], ['parked_st', 6 + 2 * 2.3, 6]]) {
+      const base = of(group, '_b');
+      const ai = of(group, '_ai');
+      assert.ok(base.length > 0 && ai.length > 0, `${group}: base + AI path decals`);
+      for (const d of base) {
+        assert.ok(Math.abs(widthOf(d) - carriageway) < 1e-6, `${group}: asphalt ${widthOf(d)} m, want ${carriageway}`);
+        assert.ok(!(d.drivability > 0), `${group}: asphalt must not be the AI road when wider than the lanes`);
+      }
+      for (const d of ai) {
+        assert.equal(d.material, 'road_invisible');
+        assert.ok(d.drivability > 0, `${group}: AI path is drivable`);
+        assert.ok(Math.abs(widthOf(d) - driving) < 1e-6, `${group}: AI path ${widthOf(d)} m, want ${driving}`);
+      }
+    }
+
+    // Rural primary edge lines sit inside the 7 m of lanes, not at the asphalt edge.
+    const centreY = yOf(of('rural_rd', '_b')[0]);
+    const edgeLines = [...of('rural_rd', '_ell'), ...of('rural_rd', '_elr')];
+    assert.ok(edgeLines.length >= 2, 'rural primary has both edge lines');
+    for (const d of edgeLines) {
+      const off = Math.abs(yOf(d) - centreY);
+      assert.ok(Math.abs(off - 0.9 * 3.5) < 0.05, `edge line ${off.toFixed(2)} m from centre, want 3.15`);
+    }
+  } finally {
+    restore();
+  }
+});

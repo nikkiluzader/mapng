@@ -16,6 +16,8 @@ import { validateBeamNGZipStructure } from './beamngExportConformance.js';
 import { buildManualMapNavigationData, inferManualLaneData } from './beamngMapNavigation.js';
 import { buildBeamNGSignalExportBundle } from './beamngSignals.js';
 import {
+  buildUrbanRoadClassifier,
+  estimateRoadCrossSection,
   estimateRoadHalfWidth,
   getDefaultLaneCount,
   getDefaultLaneWidthMeters,
@@ -1220,6 +1222,12 @@ const ASPHALT_BASE = {
   renderPriority: 14, textureLength: 10, breakAngle: 2,
   startEndFadeMag: 4, distanceFade: [250, 150], drivability: 1,
 };
+// Invisible drivable path at the driving width, used when the asphalt is wider
+// (parking lanes / shoulders). Carries the nav metadata instead of the asphalt.
+const AI_PATH_LAYER = {
+  name: 'ai_path', material: GLOBAL_DECAL_MATERIALS.invisible,
+  renderPriority: 20, textureLength: 10, breakAngle: 2, drivability: 1,
+};
 const EDGE_BLEND = (width) => ([
   { name: 'edge_left', material: GLOBAL_DECAL_MATERIALS.edgeAsphaltGrass, width, offset: -1.0, isEdge: true, mirrorByReversingNodes: true,
     renderPriority: 9, textureLength: 8, breakAngle: 1, startEndFadeMag: 1 },
@@ -1875,12 +1883,29 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
   else if (majorRoad && laneMarkingsEnabled) templateKey = 'major';
   else if (laneMarkingsEnabled) templateKey = 'minor';
 
-  const layers = (ROAD_TEMPLATES[templateKey] || ROAD_TEMPLATES.default).filter((layer) => {
+  // styleHalfWidth is the whole carriageway (parking / shoulders included);
+  // lanes, paint and the AI path use the driving width inside it.
+  const drivingHalfWidth = Number.isFinite(options.drivingHalfWidth) && options.drivingHalfWidth > 0
+    ? Math.min(options.drivingHalfWidth, styleHalfWidth)
+    : styleHalfWidth;
+  const laneShift = Number.isFinite(options.laneShift) ? options.laneShift : 0;
+  const separateAiPath = !isUnpaved && styleHalfWidth - drivingHalfWidth > 0.1;
+
+  let layers = (ROAD_TEMPLATES[templateKey] || ROAD_TEMPLATES.default).filter((layer) => {
     if (layer.name.startsWith('edge_')) return grassEdgeBlendEnabled;
     return true;
   });
+  if (separateAiPath) {
+    // Like the official maps' road_invisible: the AI drives the lanes, not the
+    // parking lane or shoulder the asphalt also covers.
+    layers = layers.map((layer) => (layer.drivability ? { ...layer, drivability: undefined } : layer));
+    layers.push({
+      ...AI_PATH_LAYER, width: 2 * drivingHalfWidth, offset: laneShift,
+    });
+  }
   if (!isUnpaved && laneMarkingsEnabled) {
-    layers.push(...buildLineMarkingLayers(highway, tags, styleHalfWidth));
+    layers.push(...buildLineMarkingLayers(highway, tags, drivingHalfWidth)
+      .map((layer) => ({ ...layer, offset: layer.offset + laneShift })));
   }
   const decals = [];
 
@@ -1936,6 +1961,7 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
     else if (layer.name === 'line_right') levelName = 'Edge Line - Right';
     else if (layer.name === 'edge_left') levelName = 'Edge Blend - Left';
     else if (layer.name === 'edge_right') levelName = 'Edge Blend - Right';
+    else if (layer.name === 'ai_path') levelName = 'AI Path';
 
     // Fade only at a road's true termini — never at internal chunk joins, or
     // every ~chunk boundary would show a gap. mirrored layers swap start/end.
@@ -1998,6 +2024,7 @@ function generateDecalRoads(terrainData, squareSize) {
   );
   const drivableRoads = mergedRoadSegments.length > 0 ? mergedRoadSegments : roadNetwork.segments;
   const stableHalfWidthMap = buildStableDecalHalfWidthMap(drivableRoads);
+  const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures);
 
   const roadSplinesByName = new Map();
   const segmentCounterByName = new Map();
@@ -2009,6 +2036,7 @@ function generateDecalRoads(terrainData, squareSize) {
     'Edge Line - Right': 'elr',
     'Edge Blend - Left': 'ebl',
     'Edge Blend - Right': 'ebr',
+    'AI Path': 'ai',
   };
 
   const getOrCreateSplineGroup = (groupName) => {
@@ -2038,11 +2066,17 @@ function generateDecalRoads(terrainData, squareSize) {
     const isOneWay = isOneWayRoad(feature.tags || {});
     const renderTags = getMergedRoadRenderTags(segmentFeature);
     const corridorKey = getDecalWidthCorridorKey(segmentFeature);
-    const estimatedHalfWidth = estimateRoadHalfWidth(feature.tags || {}, highway, isOneWay, style.width);
+    const crossSection = estimateRoadCrossSection(feature.tags || {}, highway, isOneWay, {
+      urban: isUrbanRoad(segmentFeature),
+      fallbackHalfWidth: style.width,
+    });
     const stableHalfWidth = stableHalfWidthMap.get(corridorKey);
-    const styleHalfWidth = Number.isFinite(stableHalfWidth) && stableHalfWidth > 0
+    // The stable pass evens out the DRIVING width along a corridor; parking /
+    // shoulders sit on top of it.
+    const drivingHalfWidth = Number.isFinite(stableHalfWidth) && stableHalfWidth > 0
       ? stableHalfWidth
-      : estimatedHalfWidth;
+      : crossSection.drivingHalfWidth;
+    const styleHalfWidth = drivingHalfWidth + (crossSection.leftExtra + crossSection.rightExtra) / 2;
     const startTrimProfile = getEndpointTrimProfile(
       segmentFeature,
       segmentFeature.startKey,
@@ -2104,6 +2138,8 @@ function generateDecalRoads(terrainData, squareSize) {
           isRoadStart: i === 0,
           isRoadEnd: i === clippedSegments.length - 1,
           navMetadata: getDecalRoadNavMetadata(highway, renderTags),
+          drivingHalfWidth,
+          laneShift: crossSection.laneShift,
         },
       );
 
@@ -3249,6 +3285,7 @@ function generateMeshRoads(terrainData, squareSize) {
 
   const meshRoads = [];
   let roadIndex = 0;
+  const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures);
 
   for (const feature of terrainData.osmFeatures) {
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
@@ -3258,7 +3295,10 @@ function generateMeshRoads(terrainData, squareSize) {
 
     const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
     const isOneWay = isOneWayRoad(feature.tags || {});
-    const halfWidth = estimateRoadHalfWidth(feature.tags || {}, highway, isOneWay, style.width);
+    const halfWidth = estimateRoadCrossSection(feature.tags || {}, highway, isOneWay, {
+      urban: isUrbanRoad(feature),
+      fallbackHalfWidth: style.width,
+    }).carriagewayHalfWidth;
     const fullWidth = halfWidth * 2;
 
     const clippedSegments = clipGeometryToMargin(feature.geometry, terrainData.bounds)
@@ -4430,12 +4470,16 @@ function findNearestRoad(px, py, roads, maxSearch) {
 // (shared by sign and street-furniture placement).
 function projectDrivableRoads(terrainData, squareSize) {
   const roads = [];
+  const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures ?? []);
   for (const feature of terrainData.osmFeatures ?? []) {
     if (feature.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) continue;
     const highway = feature.tags?.highway;
     if (!highway || ['footway', 'path', 'pedestrian', 'steps', 'cycleway', 'bridleway', 'corridor'].includes(highway)) continue;
     const isOneWay = isOneWayRoad(feature.tags || {});
-    const halfWidth = estimateRoadHalfWidth(feature.tags || {}, highway, isOneWay);
+    // Whole carriageway: signs and furniture stand beyond any parking lane.
+    const halfWidth = estimateRoadCrossSection(feature.tags || {}, highway, isOneWay, {
+      urban: isUrbanRoad(feature),
+    }).carriagewayHalfWidth;
     const pts = feature.geometry
       .filter((p) => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
       .map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
@@ -4728,12 +4772,15 @@ function buildFuelStations(terrainData, squareSize) {
 
   // Pre-project drivable roads for offsetting synthesized pumps toward the road.
   const roads = [];
+  const isUrbanRoad = buildUrbanRoadClassifier(features);
   for (const feature of features) {
     if (feature.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) continue;
     const highway = feature.tags?.highway;
     if (!highway || ['footway', 'path', 'pedestrian', 'steps', 'cycleway', 'bridleway', 'corridor'].includes(highway)) continue;
     const isOneWay = isOneWayRoad(feature.tags || {});
-    const halfWidth = estimateRoadHalfWidth(feature.tags || {}, highway, isOneWay);
+    const halfWidth = estimateRoadCrossSection(feature.tags || {}, highway, isOneWay, {
+      urban: isUrbanRoad(feature),
+    }).carriagewayHalfWidth;
     const pts = feature.geometry
       .filter((p) => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
       .map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
