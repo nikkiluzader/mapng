@@ -268,8 +268,15 @@ const emit = defineEmits(['move', 'zoom', 'batchTileDrag']);
 const mapRef = ref(null);
 const currentCenter = ref(props.center);
 const currentZoom = ref(props.zoom);
-const selectedLayer = ref('osm');
-const showLabels = ref(true);
+// Remembered across reloads; labels default off.
+const MAP_LAYERS = ['osm', 'satellite', 'topo'];
+const readStored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+const writeStored = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
+const storedLayer = readStored('mapng_mapLayer');
+const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'osm');
+const showLabels = ref(readStored('mapng_showLabels') === 'true');
+watch(selectedLayer, (v) => writeStored('mapng_mapLayer', v));
+watch(showLabels, (v) => writeStored('mapng_showLabels', String(v)));
 const isMovingProgrammatically = ref(false);
 
 const normalizeDatelineLongitude = (lng) => {

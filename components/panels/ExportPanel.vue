@@ -56,7 +56,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.baseTexture') }}</span>
             <div class="flex items-center gap-1 min-w-0">
-              <select v-model="beamNGBaseTexture" :class="SELECT_XS">
+              <select v-model="beamNGBaseTexture" :class="SELECT_XS" @change="handleBeamNGBaseTextureChange">
                 <option value="none">{{ t('exportPanel.none') }}</option>
                 <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">{{ t('exportPanel.satelliteHybrid') }}</option>
                 <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">{{ t('exportPanel.satellite') }}</option>
@@ -84,7 +84,7 @@
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.pbrMaterials') }}</span>
             <select v-model="beamNGPbrSource" :disabled="!hasOsmData" :class="SELECT_XS">
               <option value="none">{{ t('exportPanel.off') }}</option>
-              <option v-if="hasOsmData" value="osm">{{ t('exportPanel.osmData') }}</option>
+              <option value="osm" :disabled="!hasOsmData">{{ t('exportPanel.osmData') }}</option>
             </select>
           </div>
 
@@ -92,9 +92,9 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
             <select v-model="beamNGRoadType" :disabled="!hasOsmData" :class="SELECT_XS">
-              <option v-if="hasOsmData" value="architect">{{ t('exportPanel.roadTypeArchitect') }}</option>
-              <option v-if="hasOsmData" value="mesh">{{ t('exportPanel.roadTypeMesh') }}</option>
-              <option v-if="hasOsmData" value="decal">{{ t('exportPanel.roadTypeSpline') }}</option>
+              <option value="architect" :disabled="!hasOsmData">{{ t('exportPanel.roadTypeArchitect') }}</option>
+              <option value="mesh" :disabled="!hasOsmData">{{ t('exportPanel.roadTypeMesh') }}</option>
+              <option value="decal" :disabled="!hasOsmData">{{ t('exportPanel.roadTypeSpline') }}</option>
               <option value="none">{{ t('exportPanel.roadTypeNone') }}</option>
             </select>
           </div>
@@ -588,18 +588,27 @@ const normalizeBeamNGSeaLevelOffset = (value) => {
 };
 const resolveBeamNGBaseTexture = (terrainData, preferred = 'osm') => {
   const availableTextures = {
-    none: true,
-    osm: !!terrainData?.osmTextureUrl,
+    painted: !!terrainData?.paintedTextureBlob,
     hybrid: !!terrainData?.hybridTextureUrl || !!terrainData?.hybridTextureCanvas,
     satellite: !!terrainData?.satelliteTextureUrl,
-    painted: !!terrainData?.paintedTextureBlob,
+    osm: !!terrainData?.osmTextureUrl,
+    none: true,
   };
 
   if (availableTextures[preferred]) return preferred;
-  return Object.keys(availableTextures).find((key) => availableTextures[key]) || preferred;
+  // Closest available look, never "none" while an image exists.
+  return Object.keys(availableTextures).find((key) => key !== 'painted' && availableTextures[key]) || preferred;
 };
 
-const beamNGBaseTexture = ref(resolveBeamNGBaseTexture(props.terrainData));
+// The user's base texture choice is remembered across areas and reloads; the
+// selected value falls back per terrain when that texture isn't available
+// (e.g. 'painted' only exists after a touch-up).
+const beamNGBaseTexturePreference = ref(localStorage.getItem('mapng_beamNGBaseTexture') || 'osm');
+const beamNGBaseTexture = ref(resolveBeamNGBaseTexture(props.terrainData, beamNGBaseTexturePreference.value));
+const handleBeamNGBaseTextureChange = () => {
+  beamNGBaseTexturePreference.value = beamNGBaseTexture.value;
+  localStorage.setItem('mapng_beamNGBaseTexture', beamNGBaseTexture.value);
+};
 const legacyIncludeBackdrop = localStorage.getItem('mapng_beamNGIncludeBackdrop');
 const beamNGBackdropSource = ref(
   localStorage.getItem('mapng_beamNGBackdropSource')
@@ -947,7 +956,7 @@ watch(
 watch(
   () => props.terrainData,
   (terrainData) => {
-    beamNGBaseTexture.value = resolveBeamNGBaseTexture(terrainData, beamNGBaseTexture.value);
+    beamNGBaseTexture.value = resolveBeamNGBaseTexture(terrainData, beamNGBaseTexturePreference.value);
   },
   { immediate: true }
 );
@@ -955,17 +964,12 @@ watch(
 watch(
   [hasOsmData, isCustomUploadTerrain, canUseGpxzBackdrop],
   ([hasOsm, isCustom, gpxzAllowed]) => {
-    if (!hasOsm) {
-      if (beamNGBaseTexture.value === 'osm') {
-        beamNGBaseTexture.value = resolveBeamNGBaseTexture(props.terrainData, 'hybrid');
-      }
-      beamNGPbrSource.value = 'none';
-      beamNGRoadType.value = 'none';
-      beamNGIncludeBuildings.value = false;
-      beamNGApplyFoundations.value = false;
-      beamNGIncludeWater.value = false;
-      beamNGIncludeTrees.value = false;
-      beamNGIncludeRocks.value = false;
+    // Without OSM data the OSM-driven controls are disabled and the export
+    // uses "off" for them (effective* in handleBeamNGLevelExport). Don't write
+    // "off" into the settings themselves: that ran on every page load (no
+    // terrain yet) and saved over the user's choices.
+    if (!hasOsm && beamNGBaseTexture.value === 'osm') {
+      beamNGBaseTexture.value = resolveBeamNGBaseTexture(props.terrainData, 'hybrid');
     }
     // Custom elevation uploads default to the global 30 m backdrop rather than
     // 'off', so an uploaded map gets surrounding terrain out of the box. Users
