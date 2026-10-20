@@ -8,6 +8,10 @@
  * /api/osm?bbox=s,w,n,e answers MapNG's own Overpass query from Cloudflare's
  * edge cache, fetching from the public mirrors on a miss (see handleOsm).
  *
+ * /api/osm-tiles/manifest and /api/osm-tiles/osm/<name>.pmtiles serve MapNG's
+ * own OSM tile archives from the R2 bucket bound as OSM_TILES (see
+ * handleOsmTiles; built by scripts/build-osm-tiles.py).
+ *
  * All other requests fall through to the static assets (dist/).
  */
 
@@ -104,6 +108,67 @@ async function handleOsm(request, url, ctx) {
   return jsonResponse({ error: 'All Overpass mirrors failed', attempts }, 502);
 }
 
+// /api/osm-tiles: archives are immutable (a rebuild uploads a new name and
+// updates the manifest), so their byte ranges are cached for a long time;
+// the manifest only briefly so a new build goes live within minutes.
+const OSM_TILES_PREFIX = '/api/osm-tiles/';
+const OSM_TILES_MANIFEST_KEY = 'osm/manifest.json';
+const OSM_TILES_KEY_RE = /^osm\/[A-Za-z0-9._-]+\.pmtiles$/;
+const OSM_TILES_RANGE_TTL_S = 30 * 24 * 3600;
+const OSM_TILES_MANIFEST_TTL_S = 300;
+
+async function handleOsmTiles(request, url, env, ctx) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Method Not Allowed', { status: 405 });
+  }
+  if (!env.OSM_TILES) return jsonResponse({ error: 'OSM tiles bucket not bound' }, 503);
+
+  const path = url.pathname.slice(OSM_TILES_PREFIX.length);
+  if (path === 'manifest') {
+    const object = await env.OSM_TILES.get(OSM_TILES_MANIFEST_KEY);
+    if (!object) return jsonResponse({ archives: [] }, 200, { 'Cache-Control': `public, max-age=${OSM_TILES_MANIFEST_TTL_S}` });
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `public, max-age=${OSM_TILES_MANIFEST_TTL_S}`,
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
+  if (!OSM_TILES_KEY_RE.test(path)) return new Response('Not Found', { status: 404 });
+
+  // PMTiles readers only ever ask for byte ranges; whole-archive downloads are refused.
+  const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers.get('Range') || '');
+  if (!range) return new Response('Range required', { status: 416 });
+  const offset = Number(range[1]);
+  const length = Number(range[2]) - offset + 1;
+  if (!(length > 0) || length > 16 * 1024 * 1024) return new Response('Range too large', { status: 416 });
+
+  const cache = caches.default;
+  const cacheKey = new Request(`https://mapng-osm-tiles.internal/${path}?r=${offset}-${length}`);
+  let cached = await cache.match(cacheKey);
+  if (!cached) {
+    const object = await env.OSM_TILES.get(path, { range: { offset, length } });
+    if (!object) return new Response('Not Found', { status: 404 });
+    const total = object.size;
+    cached = new Response(object.body, {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Cache-Control': `public, max-age=${OSM_TILES_RANGE_TTL_S}, immutable`,
+        'ETag': object.httpEtag,
+        'x-mapng-total-size': String(total),
+      },
+    });
+    ctx.waitUntil(cache.put(cacheKey, cached.clone()));
+  }
+  const total = cached.headers.get('x-mapng-total-size');
+  const headers = new Headers(cached.headers);
+  headers.delete('x-mapng-total-size');
+  headers.set('Content-Range', `bytes ${offset}-${offset + length - 1}/${total}`);
+  headers.set('Access-Control-Allow-Origin', '*');
+  return new Response(request.method === 'HEAD' ? null : cached.body, { status: 206, headers });
+}
+
 const EXPOSED_HEADERS = [
   'x-ratelimit-used',
   'x-ratelimit-limit',
@@ -120,6 +185,10 @@ export default {
 
     if (url.pathname === '/api/osm') {
       return handleOsm(request, url, ctx);
+    }
+
+    if (url.pathname.startsWith(OSM_TILES_PREFIX)) {
+      return handleOsmTiles(request, url, env, ctx);
     }
 
     const proxySimple = async (origin, stripPrefix) => {

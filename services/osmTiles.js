@@ -18,6 +18,64 @@ import { PMTiles } from 'pmtiles';
 
 const archives = new Map();   // url -> PMTiles
 
+// The Worker lists the published archives (worker.js handleOsmTiles, written
+// by scripts/publish-osm-tiles.py): [{ region, key, bounds: [w, s, e, n], built_at }].
+const MANIFEST_URL = '/api/osm-tiles/manifest';
+const MANIFEST_RETRY_MS = 5 * 60 * 1000;
+let manifestPromise = null;
+let manifestFailedAt = 0;
+
+const loadManifest = () => {
+  if (manifestPromise) return manifestPromise;
+  if (Date.now() - manifestFailedAt < MANIFEST_RETRY_MS) return Promise.resolve(null);
+  manifestPromise = fetch(MANIFEST_URL)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((m) => (Array.isArray(m?.archives) ? m : null))
+    .catch(() => null)
+    .then((m) => {
+      if (!m) { manifestFailedAt = Date.now(); manifestPromise = null; }
+      return m;
+    });
+  return manifestPromise;
+};
+
+const insideRing = (lon, lat, ring) => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
+    if ((yi > lat) !== (yj > lat) && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+};
+
+/**
+ * Whether an archive covers bounds: inside its bbox and, when the manifest
+ * gives one, with all four corners inside its coverage outline (an extract's
+ * bbox also spans neighbouring areas it holds no data for).
+ */
+export const archiveCovers = (archive, bounds) => {
+  const b = archive?.bounds;
+  if (!Array.isArray(b)) return false;
+  if (bounds.west < b[0] || bounds.south < b[1] || bounds.east > b[2] || bounds.north > b[3]) return false;
+  const rings = archive.coverage;
+  if (!Array.isArray(rings) || rings.length === 0) return true;
+  const corners = [[bounds.west, bounds.south], [bounds.west, bounds.north], [bounds.east, bounds.south], [bounds.east, bounds.north]];
+  return corners.every(([lon, lat]) => rings.some((ring) => insideRing(lon, lat, ring)));
+};
+
+/**
+ * URL of the newest published archive that covers bounds, or null (no
+ * manifest, e.g. local vite dev, or the area is not built yet).
+ */
+export const resolveOsmTileArchiveUrl = async (bounds) => {
+  const manifest = await loadManifest();
+  const covering = (manifest?.archives || []).filter((archive) => archiveCovers(archive, bounds));
+  if (covering.length === 0) return null;
+  covering.sort((a, b) => String(b.built_at).localeCompare(String(a.built_at)));
+  return `/api/osm-tiles/${covering[0].key}`;
+};
+
 /** The PMTiles archive for a URL (or any pmtiles Source), cached per page. */
 export const getOsmTileArchive = (source) => {
   if (source && typeof source === 'object') return new PMTiles(source);

@@ -57,3 +57,15 @@ test('fetchOSMData reads from a configured tile archive before Overpass', async 
     globalThis.fetch = origFetch;
   }
 });
+
+test('archiveCovers uses the coverage outline, not just the bbox', async () => {
+  const { archiveCovers } = await import('../services/osmTiles.js');
+  const { readFileSync } = await import('node:fs');
+  const manifest = JSON.parse(readFileSync(new URL('./helpers/osm-manifest-arizona.json', import.meta.url), 'utf8'));
+  const az = manifest.archives.find((a) => a.region === 'arizona');
+  const box = (lat, lng, d = 0.005) => ({ south: lat - d, north: lat + d, west: lng - d, east: lng + d });
+  assert.equal(archiveCovers(az, box(35.21, -111.41)), true, 'Flagstaff');
+  assert.equal(archiveCovers(az, box(31.5, -113.5)), false, 'Sonora: inside the bbox, outside Arizona');
+  assert.equal(archiveCovers(az, box(36.1, -115.15)), false, 'Las Vegas');
+  assert.equal(archiveCovers(az, box(37.0, -111.0, 0.02)), false, 'straddling the Utah line');
+});

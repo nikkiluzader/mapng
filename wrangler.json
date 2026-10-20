@@ -9,14 +9,32 @@
     "binding": "ASSETS"
   },
   "routes": [
-    { "pattern": "mapng.com", "custom_domain": true }
+    {
+      "pattern": "mapng.com",
+      "custom_domain": true
+    }
   ],
   "env": {
     "dev": {
       "name": "dev-mapng",
       "routes": [
-        { "pattern": "dev.mapng.com", "custom_domain": true }
+        {
+          "pattern": "dev.mapng.com",
+          "custom_domain": true
+        }
+      ],
+      "r2_buckets": [
+        {
+          "binding": "OSM_TILES",
+          "bucket_name": "mapng-osm"
+        }
       ]
     }
-  }
+  },
+  "r2_buckets": [
+    {
+      "binding": "OSM_TILES",
+      "bucket_name": "mapng-osm"
+    }
+  ]
 }
