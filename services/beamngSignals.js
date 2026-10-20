@@ -732,23 +732,48 @@ function makeSignalEntry(approach, projector, terrainData, squareSize, roadFeatu
   };
 }
 
-function buildSignalArtifacts(terrainData, squareSize) {
-  const emptySignalData = { instances: [], controllers: [], sequences: [] };
-  const empty = { signalData: emptySignalData, controllerDefinitions: null, placements: [] };
+// Pedestrian crossings on the road: crossing nodes and the vertices that
+// crossing ways (footway/cycleway/path=crossing) share with the road.
+function collectCrossingPoints(osmFeatures) {
+  const points = [];
+  for (const feature of osmFeatures) {
+    const tags = feature?.tags || {};
+    if (!Array.isArray(feature?.geometry)) continue;
+    if (feature.geometry.length === 1 && tags.highway === 'crossing') points.push(feature.geometry[0]);
+    else if (tags.footway === 'crossing' || tags.cycleway === 'crossing' || tags.path === 'crossing') points.push(...feature.geometry);
+  }
+  return points.filter((pt) => Number.isFinite(pt?.lat) && Number.isFinite(pt?.lng));
+}
 
+/**
+ * Signalled intersections and stop approaches for an export, in a local
+ * metric frame (signalApproaches.js). Shared by the signal export and the
+ * stop-bar paint, so the AI stops where the bar is painted.
+ */
+export function collectJunctionApproaches(terrainData) {
   const osmFeatures = Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures : [];
-  const candidates = collectSignalCandidates(osmFeatures);
   const bounds = terrainData?.bounds;
-  if (candidates.length === 0 || !bounds) return empty;
-
+  const candidates = collectSignalCandidates(osmFeatures);
+  if (candidates.length === 0 || !bounds) return null;
   const roadFeatures = osmFeatures.filter(shouldUseRoadForSignals);
   const projector = makeProjector((bounds.north + bounds.south) / 2, (bounds.east + bounds.west) / 2);
   const { intersections, stopApproaches } = findSignalApproaches({
     roads: roadFeatures,
     signalPoints: candidates.filter((c) => c.kind === 'traffic_light'),
     stopPoints: candidates.filter((c) => c.kind === 'stop'),
+    crossingPoints: collectCrossingPoints(osmFeatures),
     projector,
   });
+  return { intersections, stopApproaches, projector, roadFeatures };
+}
+
+function buildSignalArtifacts(terrainData, squareSize) {
+  const emptySignalData = { instances: [], controllers: [], sequences: [] };
+  const empty = { signalData: emptySignalData, controllerDefinitions: null, placements: [] };
+
+  const junctions = collectJunctionApproaches(terrainData);
+  if (!junctions) return empty;
+  const { intersections, stopApproaches, projector, roadFeatures } = junctions;
   const entryFor = (approach) => makeSignalEntry(approach, projector, terrainData, squareSize, roadFeatures);
 
   const controllers = [];

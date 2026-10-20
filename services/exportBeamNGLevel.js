@@ -25,7 +25,21 @@ import {
   parseMaxspeedMps,
 } from './beamngMapNavigation.js';
 import { resolveRoadRulesAt } from './countryRules.js';
-import { buildBeamNGSignalExportBundle, SIGNAL_HEAD_SHAPE, SIGNAL_POLE_SHAPE } from './beamngSignals.js';
+import {
+  buildCarriagewayIndex,
+  cutNodes,
+  isInZone,
+  isOnCrossingCarriageway,
+  isOnOtherCarriageway,
+  parallelHalfWidthAt,
+  parallelRoadAt,
+} from './roadMarkingCuts.js';
+import {
+  buildBeamNGSignalExportBundle,
+  collectJunctionApproaches,
+  SIGNAL_HEAD_SHAPE,
+  SIGNAL_POLE_SHAPE,
+} from './beamngSignals.js';
 import {
   buildUrbanRoadClassifier,
   estimateRoadCrossSection,
@@ -2012,7 +2026,11 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
       Object.assign(decal, options.navMetadata);
     }
 
-    if (decal) decals.push(decal);
+    if (decal) {
+      // Internal tags for the paint cut pass (removed before export).
+      Object.defineProperty(decal, '__layer', { value: layer.name, enumerable: false });
+      decals.push(decal);
+    }
   }
 
   return decals;
@@ -2030,7 +2048,60 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
  *
  * Returns an empty array when no OSM data is available.
  */
-function generateDecalRoads(terrainData, squareSize) {
+// Lines stop this far outside a crossing road's carriageway (BeamNG.Earth
+// roads.py: lines 2 m); edge blends stop at its asphalt.
+const PAINT_CUT_MARGIN_M = { line: 2.0, edge: 0.0 };
+const isCutPaintLayer = (layerName) => typeof layerName === 'string'
+  && (layerName.startsWith('line_') || layerName.startsWith('edge_'));
+
+/**
+ * Cut every painted line / edge blend where it runs onto another road's
+ * carriageway (see roadMarkingCuts.js). A road ignores itself and the road
+ * it simply continues into (an endpoint shared by exactly two roads).
+ */
+function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, zones = []) {
+  if (paintDecals.length === 0 || index.segments.length === 0) return;
+  const ignoredBy = new Map();
+  const ignoreSetFor = (owner) => {
+    if (ignoredBy.has(owner)) return ignoredBy.get(owner);
+    const set = new Set([owner]);
+    const seg = drivableRoads[owner];
+    for (const key of [seg?.startKey, seg?.endKey]) {
+      const owners = key ? ownersAtNode.get(key) : null;
+      if (owners && owners.size === 2) owners.forEach((o) => set.add(o));
+    }
+    ignoredBy.set(owner, set);
+    return set;
+  };
+  let removed = 0;
+  let pieces = 0;
+  for (const { decal, group, owner } of paintDecals) {
+    const ignore = ignoreSetFor(owner);
+    const isLine = decal.__layer.startsWith('line_');
+    const margin = isLine ? PAINT_CUT_MARGIN_M.line : PAINT_CUT_MARGIN_M.edge;
+    const runs = cutNodes(decal.nodes, (x, y) => (
+      isOnOtherCarriageway(index, x, y, margin, (o) => ignore.has(o))
+      || (isLine && isInZone(zones, x, y))
+    ));
+    if (runs.length === 1 && runs[0].length === decal.nodes.length) continue; // untouched
+    const at = group.__items.indexOf(decal);
+    if (at < 0) continue;
+    const replacements = runs.map((nodes, k) => ({
+      ...decal,
+      name: runs.length > 1 ? `${decal.name}_${k + 1}` : decal.name,
+      persistentId: k === 0 ? decal.persistentId : generatePersistentId(),
+      nodes,
+      // A cut end is a clean paint edge, not a faded road terminus.
+      ...(decal.startEndFade ? { startEndFade: [0, 0] } : {}),
+    }));
+    group.__items.splice(at, 1, ...replacements);
+    if (runs.length === 0) removed++;
+    pieces += runs.length;
+  }
+  console.log(`[BeamNG Export] Paint cut at crossing roads: ${paintDecals.length} lines/blends → ${pieces} pieces (${removed} removed entirely).`);
+}
+
+export function generateDecalRoads(terrainData, squareSize) {
   if (!terrainData.osmFeatures?.length) return [];
 
   const sourceRoadFeatures = terrainData.osmFeatures.filter((feature) => {
@@ -2076,10 +2147,22 @@ function generateDecalRoads(terrainData, squareSize) {
     return group;
   };
 
-  for (const segmentFeature of drivableRoads) {
+  // Paint cut pass inputs: each drawn road's carriageway, and which roads
+  // meet at each endpoint (two meeting = a plain continuation, not a junction).
+  const carriageways = [];
+  const ownersAtNode = new Map();
+  const paintDecals = [];
+
+  for (let segIndex = 0; segIndex < drivableRoads.length; segIndex++) {
+    const segmentFeature = drivableRoads[segIndex];
     const feature = segmentFeature.sourceFeature;
     const highway = segmentFeature.highway;
     if (!shouldGenerateDecalRoads(highway, feature.tags || {})) continue;
+    for (const key of [segmentFeature.startKey, segmentFeature.endKey]) {
+      if (!key) continue;
+      if (!ownersAtNode.has(key)) ownersAtNode.set(key, new Set());
+      ownersAtNode.get(key).add(segIndex);
+    }
     const rawName = feature.tags?.name || feature.tags?.ref || `road_${feature.id}`;
     const baseName = sanitizeBeamNGObjectName(rawName, `road_${feature.id || 'x'}`);
     const used = usedGroupNames.get(baseName) || 0;
@@ -2149,6 +2232,7 @@ function generateDecalRoads(terrainData, squareSize) {
       // ROAD_NODE_SPACING_M before world conversion), so no decimation here.
       const centerNodes = rawNodes;
       if (centerNodes.length < 2) continue;
+      carriageways.push({ owner: segIndex, nodes: centerNodes, half: styleHalfWidth });
 
       const layeredDecals = getLayeredRoadDecals(
         centerNodes,
@@ -2180,14 +2264,18 @@ function generateDecalRoads(terrainData, squareSize) {
           const layerCode = LAYER_CODE[decal.name] || `l${d + 1}`;
           decal.name = sanitizeBeamNGObjectName(`${roadNamePrefix}_${nameSuffix}_${layerCode}`);
           splineGroup.__items.push(decal);
+          if (isCutPaintLayer(decal.__layer)) paintDecals.push({ decal, group: splineGroup, owner: segIndex });
         }
       }
     }
   }
 
+  const carriagewayIndex = buildCarriagewayIndex(carriageways);
+  const junctionMarkings = generateJunctionMarkingDecals(terrainData, squareSize, { carriageways: carriagewayIndex });
+  cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || []);
+
   const groups = Array.from(roadSplinesByName.values()).filter((g) => g.__items.length > 0);
 
-  const junctionMarkings = generateJunctionMarkingDecals(terrainData, squareSize);
   if (junctionMarkings.length > 0) {
     groups.push({
       class: 'SimGroup',
@@ -2211,6 +2299,14 @@ const CROSSWALK_LINE_WIDTH_M = 0.3;
 const CROSSWALK_LINE_GAP_HALF_M = 1.2;    // transverse pair, 2.4 m apart
 // Painted span stays inside the edge lines (0.9 × halfWidth).
 const JUNCTION_MARK_SPAN_FACTOR = 0.88;
+// With the drawn carriageway known: paint stops this far inside its edge.
+const JUNCTION_MARK_EDGE_INSET_M = 0.3;
+const STOP_BAR_CENTRE_GAP_M = 0.25;
+// Crosswalk lines keep this far off crossing roads' carriageways, moving at
+// most CROSSWALK_MAX_SHIFT_M along their road; lines stop this far short.
+const CROSSWALK_CLEAR_M = 1.6;
+const CROSSWALK_MAX_SHIFT_M = 12;
+const CROSSWALK_LINE_CLEAR_M = 0.5;
 
 function shouldPaintCrossing(tags = {}) {
   const crossing = String(tags.crossing ?? '').trim().toLowerCase();
@@ -2224,7 +2320,7 @@ function shouldPaintCrossing(tags = {}) {
  *
  * Returns an array of DecalRoad objects (no group wrapper).
  */
-export function generateJunctionMarkingDecals(terrainData, squareSize) {
+export function generateJunctionMarkingDecals(terrainData, squareSize, { carriageways = null } = {}) {
   const features = terrainData.osmFeatures || [];
   if (!features.length) return [];
 
@@ -2299,12 +2395,33 @@ export function generateJunctionMarkingDecals(terrainData, squareSize) {
     const tangent = tangentAt(road, index);
     if (!tangent) return null;
     const oneWay = isOneWayRoad(roadTags);
-    const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
-    const halfW = JUNCTION_MARK_SPAN_FACTOR *
-      estimateRoadHalfWidth(roadTags, highway, oneWay, style.width);
     const [px, py] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0);
+    // The painted carriageway's real width where the decals exist.
+    const drawnHalf = carriageways ? parallelHalfWidthAt(carriageways, px, py, tangent) : null;
+    const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
+    const halfW = drawnHalf
+      ? Math.max(1, drawnHalf - JUNCTION_MARK_EDGE_INSET_M)
+      : JUNCTION_MARK_SPAN_FACTOR * estimateRoadHalfWidth(roadTags, highway, oneWay, style.width);
     return { roadTags, tangent, oneWay, halfW, px, py };
   };
+
+  // A crosswalk mapped inside the junction box moves out along its own road
+  // until it clears the crossing roads (BeamNG.Earth puts crosswalks just
+  // outside each corner). Null when there's no room.
+  const clearOfCrossingRoads = (m) => {
+    if (!carriageways) return [m.px, m.py];
+    const blocked = (x, y) => isOnCrossingCarriageway(carriageways, x, y, CROSSWALK_CLEAR_M, m.tangent);
+    if (!blocked(m.px, m.py)) return [m.px, m.py];
+    for (let shift = 0.5; shift <= CROSSWALK_MAX_SHIFT_M; shift += 0.5) {
+      for (const sign of [1, -1]) {
+        const x = m.px + m.tangent[0] * shift * sign;
+        const y = m.py + m.tangent[1] * shift * sign;
+        if (!blocked(x, y)) return [x, y];
+      }
+    }
+    return null;
+  };
+  const zones = [];
 
   // Transverse crosswalk: two full-width lines straddling the crossing point.
   const paintCrosswalk = (road, index, pt) => {
@@ -2313,15 +2430,29 @@ export function generateJunctionMarkingDecals(terrainData, squareSize) {
     const m = roadMetricsAt(road, index, pt);
     if (!m) return;
     paintedCrossingKeys.add(key);
-    const perp = [-m.tangent[1], m.tangent[0]];
+    const spot = clearOfCrossingRoads(m);
+    if (!spot) return;
+    const [cx, cy] = spot;
+    // Square to the drawn road where the crosswalk ends up: the tangent at a
+    // junction vertex is bent by the other road.
+    const drawn = carriageways ? parallelRoadAt(carriageways, cx, cy, m.tangent) : null;
+    const tangent = drawn?.dir ?? m.tangent;
+    const halfW = drawn ? Math.max(1, drawn.half - JUNCTION_MARK_EDGE_INSET_M) : m.halfW;
+    const perp = [-tangent[1], tangent[0]];
     for (const side of [-1, 1]) {
       pushLine(
         'jm_crosswalk',
-        m.px + m.tangent[0] * CROSSWALK_LINE_GAP_HALF_M * side,
-        m.py + m.tangent[1] * CROSSWALK_LINE_GAP_HALF_M * side,
-        perp[0], perp[1], -m.halfW, m.halfW, CROSSWALK_LINE_WIDTH_M,
+        cx + tangent[0] * CROSSWALK_LINE_GAP_HALF_M * side,
+        cy + tangent[1] * CROSSWALK_LINE_GAP_HALF_M * side,
+        perp[0], perp[1], -halfW, halfW, CROSSWALK_LINE_WIDTH_M,
       );
     }
+    // Lines along the road stop at the crosswalk.
+    zones.push({
+      x: cx, y: cy, ux: tangent[0], uy: tangent[1],
+      halfLength: CROSSWALK_LINE_GAP_HALF_M + CROSSWALK_LINE_WIDTH_M / 2 + CROSSWALK_LINE_CLEAR_M,
+      halfWidth: halfW + 1,
+    });
     crossingCount++;
   };
 
@@ -2348,8 +2479,7 @@ export function generateJunctionMarkingDecals(terrainData, squareSize) {
     if (!Array.isArray(feature?.geometry) || feature.geometry.length !== 1) continue;
     const tags = feature.tags || {};
     const kind = tags.highway;
-    if (kind !== 'stop' && kind !== 'traffic_signals' && kind !== 'crossing') continue;
-    if (kind === 'crossing' && !shouldPaintCrossing(tags)) continue;
+    if (kind !== 'crossing' || !shouldPaintCrossing(tags)) continue;
 
     const pt = feature.geometry[0];
     if (!Number.isFinite(pt?.lat) || !Number.isFinite(pt?.lng) || !insideMargin(pt)) continue;
@@ -2363,42 +2493,37 @@ export function generateJunctionMarkingDecals(terrainData, squareSize) {
     if (distinctRoads.size > 1) continue;
 
     const { road, index } = entries[0];
+    paintCrosswalk(road, index, pt);
+  }
 
-    if (kind === 'crossing') {
-      paintCrosswalk(road, index, pt);
-      continue;
-    }
-
-    const m = roadMetricsAt(road, index, pt);
-    if (!m) continue;
-    const { roadTags, tangent, oneWay, halfW, px, py } = m;
-
-    // Stop bar (highway=stop / highway=traffic_signals): spans only the
-    // approaching lanes. Travel direction comes from the way orientation,
-    // corrected by the node's direction tag; on two-way roads without one,
-    // assume the bar sits just before the junction and orient toward the
-    // nearer way end.
-    let approach = tangent;
-    const dirTag = String(tags['traffic_signals:direction'] ?? tags.direction ?? '').trim().toLowerCase();
-    if (oneWay) {
-      if (isReverseOneWayRoad(roadTags)) approach = [-tangent[0], -tangent[1]];
-    } else if (dirTag === 'backward') {
-      approach = [-tangent[0], -tangent[1]];
-    } else if (dirTag !== 'forward') {
-      const nearerStart = index < road.geometry.length - 1 - index;
-      if (nearerStart) approach = [-tangent[0], -tangent[1]];
-    }
-    const right = [approach[1], -approach[0]];
-    // One-way: bar across the full roadway. Two-way: approach half only,
-    // with a small gap at the center line.
-    const fromM = oneWay ? -halfW : 0.25;
-    pushLine('jm_stopline', px, py, right[0], right[1], fromM, halfW, STOP_BAR_THICKNESS_M);
+  // Stop bars at the same stop points the AI uses (signals + stop signs, one
+  // per approach; beamngSignals.collectJunctionApproaches), across the lanes
+  // that approach: the kerb half of a two-way road, all of a one-way.
+  const junctions = collectJunctionApproaches(terrainData);
+  const leftHandTraffic = !!terrainData.roadRules?.leftHandTraffic;
+  const approaches = junctions
+    ? [...junctions.intersections.flatMap((i) => i.approaches), ...junctions.stopApproaches]
+    : [];
+  for (const approach of approaches) {
+    const ll = junctions.projector.unproject(approach.x, approach.y);
+    if (!insideMargin(ll)) continue;
+    const [px, py] = geoToWorldPoint(ll.lat, ll.lng, terrainData, squareSize, 0);
+    const len = Math.hypot(approach.dir[0], approach.dir[1]) || 1;
+    const dir = [approach.dir[0] / len, approach.dir[1] / len];
+    const right = [dir[1], -dir[0]];
+    const kerb = leftHandTraffic ? [-right[0], -right[1]] : right;
+    const drawnHalf = carriageways ? parallelHalfWidthAt(carriageways, px, py, dir) : null;
+    const halfW = Math.max(1, (drawnHalf ?? approach.halfWidth) - JUNCTION_MARK_EDGE_INSET_M);
+    const fromM = approach.oneWay ? -halfW : STOP_BAR_CENTRE_GAP_M;
+    pushLine('jm_stopline', px, py, kerb[0], kerb[1], fromM, halfW, STOP_BAR_THICKNESS_M);
     stopCount++;
   }
 
   if (decals.length > 0) {
     console.log(`[BeamNG Export] Junction markings: ${stopCount} stop bars, ${crossingCount} crosswalks`);
   }
+  // Crosswalk bands, for cutting the road's own lines (see generateDecalRoads).
+  Object.defineProperty(decals, 'zones', { value: zones, enumerable: false });
   return decals;
 }
 

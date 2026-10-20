@@ -33,15 +33,21 @@ const point = (lat, lng, tags) => ({ id: 'n1', type: 'poi', geometry: [{ lat, ln
 test('stop node paints a bar on the approach half; crossing paints two lines', () => {
   const lat = CENTER_LAT;
   const dLng = 0.001; // ~96 m steps along x
+  // A cross street 0.2 · dLng (~19 m) past the stop: the stop applies there.
+  const junctionLng = CENTER_LNG + 1.2 * dLng;
   const road = {
     id: 'w1', type: 'road',
     tags: { highway: 'residential' },
-    geometry: [-2, -1, 0, 1, 2].map((k) => ({ lat, lng: CENTER_LNG + k * dLng })),
+    geometry: [...[-2, -1, 0, 1].map((k) => ({ lat, lng: CENTER_LNG + k * dLng })), { lat, lng: junctionLng }, { lat, lng: CENTER_LNG + 2 * dLng }],
+  };
+  const cross = {
+    id: 'w2', type: 'road', tags: { highway: 'secondary' },
+    geometry: [{ lat: lat - 0.001, lng: junctionLng }, { lat, lng: junctionLng }, { lat: lat + 0.001, lng: junctionLng }],
   };
   const stop = point(lat, CENTER_LNG + dLng, { highway: 'stop', direction: 'forward' });
   const crossing = point(lat, CENTER_LNG - dLng, { highway: 'crossing', crossing: 'marked' });
 
-  const decals = generateJunctionMarkingDecals(makeTerrainData([road, stop, crossing]), SQUARE_SIZE);
+  const decals = generateJunctionMarkingDecals(makeTerrainData([road, cross, stop, crossing]), SQUARE_SIZE);
 
   const bars = decals.filter((d) => d.name.startsWith('jm_stopline'));
   const cw = decals.filter((d) => d.name.startsWith('jm_crosswalk'));
@@ -64,7 +70,7 @@ test('stop node paints a bar on the approach half; crossing paints two lines', (
   assert.ok(Math.abs(xs[1] - xs[0] - 2.4) < 0.05, `lines 2.4 m apart (got ${(xs[1] - xs[0]).toFixed(2)})`);
 });
 
-test('markings at shared junction nodes and unmarked crossings are skipped', () => {
+test('a signal on the junction node paints a bar on every approach, outside the junction', () => {
   const lat = CENTER_LAT;
   const dLng = 0.001;
   const dLat = 0.001;
@@ -76,16 +82,22 @@ test('markings at shared junction nodes and unmarked crossings are skipped', () 
     id: 'wb', type: 'road', tags: { highway: 'residential' },
     geometry: [-1, 0, 1].map((k) => ({ lat: lat + k * dLat, lng: CENTER_LNG })),
   };
-  // Signal mapped on the junction node itself (old-style mapping) → skip.
+  // Signal mapped on the junction node itself (common older mapping).
   const junctionSignal = point(lat, CENTER_LNG, { highway: 'traffic_signals' });
-  // Unmarked crossing → skip.
+  // Unmarked crossing → no crosswalk.
   const unmarked = point(lat, CENTER_LNG + dLng, { highway: 'crossing', crossing: 'unmarked' });
 
   const decals = generateJunctionMarkingDecals(
     makeTerrainData([roadA, roadB, junctionSignal, unmarked]),
     SQUARE_SIZE,
   );
-  assert.equal(decals.length, 0);
+  const bars = decals.filter((d) => d.name.startsWith('jm_stopline'));
+  assert.equal(bars.length, 4, 'one stop bar per approach');
+  assert.equal(decals.filter((d) => d.name.startsWith('jm_crosswalk')).length, 0);
+  for (const bar of bars) {
+    const mid = [(bar.nodes[0][0] + bar.nodes[1][0]) / 2, (bar.nodes[0][1] + bar.nodes[1][1]) / 2];
+    assert.ok(Math.hypot(...mid) >= 6, 'bar stands outside the junction (world origin)');
+  }
 });
 
 test('turn:lanes places one arrow per lane, ordered left-to-right across travel', () => {

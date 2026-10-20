@@ -24,6 +24,11 @@ export const STOP_POINT_DEFAULT_M = 8;
 export const STOP_TO_JUNCTION_MAX_M = 20;
 // Mid-block (crossing) signals: stop just before the crossing.
 export const MIDBLOCK_STOP_M = 3;
+// Stop clear of the crossing roads' carriageways and of any crosswalk on the
+// approach, so the AI stops where the stop bar is painted.
+const STOP_CLEAR_OF_CROSS_ROAD_M = 1.5;
+const STOP_BEHIND_CROSSWALK_M = 2.5;
+const CROSSWALK_SEARCH_M = 25;
 const SNAP_MAX_M = 20;
 const LANE_WIDTH_M = 3.25;
 
@@ -225,10 +230,28 @@ function junctionArms(junction, clusterKeys) {
   return arms;
 }
 
+// Stop distance from the junction node for one arm: the default, pushed out
+// past the widest other road meeting there and behind a crosswalk on the arm.
+function armStopDistance(arm, arms, crossingKeys) {
+  let dist = STOP_POINT_DEFAULT_M;
+  const widestOther = Math.max(0, ...arms.filter((other) => other !== arm).map((other) => other.edge.halfWidth));
+  dist = Math.max(dist, widestOther + STOP_CLEAR_OF_CROSS_ROAD_M);
+  if (crossingKeys?.size) {
+    for (const step of arm.path.steps) {
+      if (step.startM + step.edge.length > CROSSWALK_SEARCH_M) break;
+      if (crossingKeys.has(step.to.key)) {
+        dist = Math.max(dist, step.startM + step.edge.length + STOP_BEHIND_CROSSWALK_M);
+        break;
+      }
+    }
+  }
+  return dist;
+}
+
 function approachFromArm(arm, stopDistM, hint = null) {
   const at = hint
     ? { x: hint.node.x, y: hint.node.y, outward: pointAlong(arm.path, Math.max(0.5, hint.distance - 0.5))?.outward }
-    : pointAlong(arm.path, Math.min(stopDistM, Math.max(1, arm.path.length * 0.6)));
+    : pointAlong(arm.path, Math.min(stopDistM, Math.max(1, arm.path.length * 0.8)));
   if (!at?.outward) return null;
   const road = arm.edge.road;
   const travelAlongOrder = arm.edge.to === arm.junction; // arriving along node order
@@ -276,8 +299,9 @@ function clusterJunctions(junctions) {
  * Returns { intersections: [{ center:[x,y], midblock, approaches }], stopApproaches }
  * where each approach is { x, y, dir, halfWidth, lanesIn, oneWay, highway, ... }.
  */
-export function findSignalApproaches({ roads, signalPoints = [], stopPoints = [], projector }) {
+export function findSignalApproaches({ roads, signalPoints = [], stopPoints = [], crossingPoints = [], projector }) {
   const graph = buildRoadGraph(roads, projector);
+  const crossingKeys = new Set(crossingPoints.map((pt) => makeRoadNodeKey(pt)).filter((key) => graph.nodes.has(key)));
   const intersections = [];
 
   // ── Traffic signals ────────────────────────────────────────────────────
@@ -308,8 +332,9 @@ export function findSignalApproaches({ roads, signalPoints = [], stopPoints = []
     const keys = new Set(cluster.map((j) => j.key));
     const approaches = [];
     for (const junction of cluster) {
-      for (const arm of junctionArms(junction, keys)) {
-        const approach = approachFromArm(arm, STOP_POINT_DEFAULT_M, hintsByArm.get(arm.armId));
+      const arms = junctionArms(junction, keys);
+      for (const arm of arms) {
+        const approach = approachFromArm(arm, armStopDistance(arm, arms, crossingKeys), hintsByArm.get(arm.armId));
         if (approach) approaches.push(approach);
       }
     }
@@ -375,16 +400,17 @@ export function findSignalApproaches({ roads, signalPoints = [], stopPoints = []
     }
     if (!junction) continue;
     const arms = junctionArms(junction, new Set([junction.key]));
+    const stopAt = (arm) => approachFromArm(arm, armStopDistance(arm, arms, crossingKeys));
     if (allWay) {
       // stop=all: every approach stops (BeamNG's 4-way-stop logic).
-      for (const arm of arms) addStop(approachFromArm(arm, STOP_POINT_DEFAULT_M));
+      for (const arm of arms) addStop(stopAt(arm));
       continue;
     }
     if (node === junction) {
       // Stop mapped on the junction node: the minor approaches stop.
       const minRank = Math.min(...arms.map((arm) => roadRank(arm.edge.road.tags?.highway)));
       for (const arm of arms) {
-        if (roadRank(arm.edge.road.tags?.highway) === minRank) addStop(approachFromArm(arm, STOP_POINT_DEFAULT_M));
+        if (roadRank(arm.edge.road.tags?.highway) === minRank) addStop(stopAt(arm));
       }
       continue;
     }
@@ -395,7 +421,7 @@ export function findSignalApproaches({ roads, signalPoints = [], stopPoints = []
     const arm = arms.find((a) => a.armId === `${junction.key}|${lastStep.from.key}`);
     if (!arm) continue;
     const hint = ahead.distance <= STOP_TO_JUNCTION_MAX_M ? { node, distance: ahead.distance, tags } : null;
-    addStop(approachFromArm(arm, STOP_POINT_DEFAULT_M, hint));
+    addStop(approachFromArm(arm, armStopDistance(arm, arms, crossingKeys), hint));
   }
 
   return { intersections, stopApproaches: [...stopByArm.values()] };
