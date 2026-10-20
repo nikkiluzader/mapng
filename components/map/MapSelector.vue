@@ -12,9 +12,11 @@
       <!-- Base Layers -->
       <l-tile-layer
         v-if="selectedLayer === 'osm'"
+        :key="osmUrl"
         :url="osmUrl"
         :attribution="osmAttribution"
         layer-type="base"
+        :options="{ maxNativeZoom: osmMaxNativeZoom }"
       />
 
       <l-tile-layer
@@ -32,14 +34,20 @@
         layer-type="base"
       />
 
-      <!-- Overlay -->
-      <l-tile-layer
-        v-if="showLabels"
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png"
-        attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors &copy; <a href='https://carto.com/attributions'>CARTO</a>"
-        layer-type="overlay"
-        :opacity="0.7"
-      />
+      <!-- Overlay: Esri reference layers (keyless; CARTO's labels now need an API key).
+           z-index keeps them above a base layer switched in after them. -->
+      <template v-if="showLabels">
+        <l-tile-layer
+          v-for="layer in labelLayers"
+          :key="layer.url"
+          :url="layer.url"
+          :attribution="ESRI_REFERENCE_ATTRIBUTION"
+          layer-type="overlay"
+          :opacity="layer.opacity"
+          :z-index="10"
+          :options="{ maxNativeZoom: layer.maxNativeZoom }"
+        />
+      </template>
       
       <l-rectangle 
         v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds"
@@ -291,17 +299,33 @@ const handleBatchTileDrag = (tile, event) => {
   });
 };
 
+// Keyless Esri tiles (the satellite / topo layers come from the same servers).
+// CARTO's basemaps started rendering "API KEY REQUIRED" in 2026-10.
+const ESRI_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const ESRI_REFERENCE_ATTRIBUTION = 'Labels &copy; <a href="https://www.esri.com/">Esri</a> and its data providers';
+
 const osmUrl = computed(() => {
-  return props.isDarkMode 
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+  return props.isDarkMode
+    ? `${ESRI_TILES}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`
     : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 });
 
+// Esri's Canvas basemaps stop at z16 ("Map data not yet available" tiles
+// beyond); Leaflet upscales instead. vue-leaflet only passes this via options.
+const osmMaxNativeZoom = computed(() => (props.isDarkMode ? 16 : 19));
+
 const osmAttribution = computed(() => {
   return props.isDarkMode
-    ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+    ? '&copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 });
+
+const labelLayers = computed(() => (props.isDarkMode
+  ? [{ url: `${ESRI_TILES}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 16, opacity: 1 }]
+  : [
+    { url: `${ESRI_TILES}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 19, opacity: 0.8 },
+    { url: `${ESRI_TILES}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 17, opacity: 1 },
+  ]));
 
 // Calculate bounds from output size and processing meters-per-pixel.
 const activeSelectionSizeMeters = computed(() => {
