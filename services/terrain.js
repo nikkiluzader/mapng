@@ -244,6 +244,213 @@ export const repairTerrariumNoDataTiles = async ({
   return { repaired, blank: blanks.length };
 };
 
+// ── Blended no-data repair ───────────────────────────────────────────────────
+//
+// AWS blends its -32768 no-data into real heights when it resamples some
+// tiles, so pixels arrive part-way between the two: -24,764 m around Malpelo
+// Island at z15, -2,892 m in Hong Kong's harbour (a user report, 2026-09-30:
+// a "corrupted" island and water glitches). decodeTerrariumHeight only catches
+// the fully-blank end (<= -32760). Blending can only drag a value DOWN, and the
+// same place at a lower zoom is usually intact, so a pixel far below its
+// lower-zoom ancestor is replaced by the ancestor's (bilinear) height.
+
+// Deeper than any real sea floor (Challenger Deep is about -10,994 m).
+export const TERRARIUM_IMPLAUSIBLE_DEPTH_M = -11100;
+// A below-sea-level pixel this far under its 5x5 neighbourhood median is suspect.
+const BLEND_LOCAL_DROP_M = 150;
+// Replace a pixel when it sits this far below the ancestor reference.
+const blendThreshold = (ref) => Math.max(80, 0.2 * Math.abs(ref));
+
+export const encodeTerrariumHeight = (h, out = [0, 0, 0], offset = 0) => {
+  const v = Math.max(0, Math.min(65535.996, h + 32768));
+  const r = Math.floor(v / 256);
+  const g = Math.floor(v - r * 256);
+  const b = Math.min(255, Math.round((v - r * 256 - g) * 256));
+  out[offset] = r; out[offset + 1] = g; out[offset + 2] = b;
+  return out;
+};
+
+// 5x5: blended pixels come as clusters and thin seam lines (often along tile
+// edges), which a 3x3 window misses; the window is clipped at the tile edge
+// rather than skipping edge pixels.
+const PIT_RADIUS = 2;
+const isLocalPit = (heights, size, x, y) => {
+  const h = heights[y * size + x];
+  const nb = [];
+  for (let j = -PIT_RADIUS; j <= PIT_RADIUS; j++) {
+    const yy = y + j;
+    if (yy < 0 || yy >= size) continue;
+    for (let i = -PIT_RADIUS; i <= PIT_RADIUS; i++) {
+      const xx = x + i;
+      if ((!i && !j) || xx < 0 || xx >= size) continue;
+      const v = heights[yy * size + xx];
+      if (v !== NO_DATA_VALUE) nb.push(v);
+    }
+  }
+  if (nb.length < 5) return false;
+  nb.sort((a, b) => a - b);
+  return nb[nb.length >> 1] - h > BLEND_LOCAL_DROP_M;
+};
+
+const hasImplausibleDepth = (heights) => heights.some((h) => h !== NO_DATA_VALUE && h < TERRARIUM_IMPLAUSIBLE_DEPTH_M);
+
+/** Whether a tile's heights (Float32Array, NO_DATA_VALUE for gaps) show blending. */
+export const detectBlendedTerrarium = (heights, size = TILE_SIZE) => {
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const h = heights[y * size + x];
+      if (h === NO_DATA_VALUE || h >= 0) continue;
+      if (h < TERRARIUM_IMPLAUSIBLE_DEPTH_M || isLocalPit(heights, size, x, y)) return true;
+    }
+  }
+  return false;
+};
+
+/**
+ * Replace blended pixels of `heights` (in place) with `reference` (same grid:
+ * the ancestor, bilinear-upsampled). Returns the number replaced.
+ *
+ * A tile with impossible depths is a damaged blob (Malpelo): every pixel far
+ * below the reference goes. Otherwise only isolated pits are replaced, so a
+ * real steep sea floor (Kona's) keeps its detail.
+ */
+export const patchBlendedHeights = (heights, reference, size = TILE_SIZE) => {
+  const blob = hasImplausibleDepth(heights);
+  const replace = [];
+  for (let i = 0; i < heights.length; i++) {
+    const h = heights[i];
+    const ref = reference[i];
+    if (h === NO_DATA_VALUE || h >= 0 || ref === NO_DATA_VALUE || !Number.isFinite(ref)) continue;
+    if (ref < TERRARIUM_IMPLAUSIBLE_DEPTH_M) continue;
+    if (ref - h <= blendThreshold(ref) && h >= TERRARIUM_IMPLAUSIBLE_DEPTH_M) continue;
+    if (blob || h < TERRARIUM_IMPLAUSIBLE_DEPTH_M || isLocalPit(heights, size, i % size, Math.floor(i / size))) replace.push(i);
+  }
+  // decide every pixel against the original heights, then write
+  for (const i of replace) heights[i] = reference[i];
+  return replace.length;
+};
+
+/** Bilinear upsample of an ancestor sub-square (span x span of a 256 tile) to TILE_SIZE. */
+const upsampleAncestor = (ancestorHeights, srcX, srcY, span) => {
+  const out = new Float32Array(TILE_SIZE * TILE_SIZE);
+  const at = (x, y) => ancestorHeights[Math.min(TILE_SIZE - 1, Math.max(0, y)) * TILE_SIZE + Math.min(TILE_SIZE - 1, Math.max(0, x))];
+  for (let y = 0; y < TILE_SIZE; y++) {
+    const fy = srcY + ((y + 0.5) * span) / TILE_SIZE - 0.5;
+    const y0 = Math.floor(fy); const ty = fy - y0;
+    for (let x = 0; x < TILE_SIZE; x++) {
+      const fx = srcX + ((x + 0.5) * span) / TILE_SIZE - 0.5;
+      const x0 = Math.floor(fx); const tx = fx - x0;
+      const c = [at(x0, y0), at(x0 + 1, y0), at(x0, y0 + 1), at(x0 + 1, y0 + 1)];
+      if (c.some((v) => v === NO_DATA_VALUE)) {
+        out[y * TILE_SIZE + x] = c[(tx < 0.5 ? 0 : 1) + (ty < 0.5 ? 0 : 2)];
+      } else {
+        out[y * TILE_SIZE + x] = (c[0] * (1 - tx) + c[1] * tx) * (1 - ty) + (c[2] * (1 - tx) + c[3] * tx) * ty;
+      }
+    }
+  }
+  return out;
+};
+
+const decodeTile = (data, stride, originX, originY) => {
+  const heights = new Float32Array(TILE_SIZE * TILE_SIZE);
+  for (let y = 0; y < TILE_SIZE; y++) {
+    for (let x = 0; x < TILE_SIZE; x++) {
+      const i = ((originY + y) * stride + originX + x) * 4;
+      heights[y * TILE_SIZE + x] = decodeTerrariumHeight(data[i], data[i + 1], data[i + 2]);
+    }
+  }
+  return heights;
+};
+
+/**
+ * Repair Terrarium tiles whose pixels arrived blended with no-data (see the
+ * section comment). Runs on the assembled mosaic canvas, after
+ * repairTerrariumNoDataTiles; only suspicious tiles fetch an ancestor.
+ *
+ * @returns {Promise<{tiles: number, pixels: number}>}
+ */
+export const repairTerrariumBlendedTiles = async ({
+  ctx,
+  zoom,
+  minTileX,
+  minTileY,
+  tileCountX,
+  tileCountY,
+  signal,
+  onProgress,
+  ancestorSteps = [3, 4, 5],
+  concurrency = 8,
+}) => {
+  if (!ctx || tileCountX < 1 || tileCountY < 1) return { tiles: 0, pixels: 0 };
+  const rowWidth = tileCountX * TILE_SIZE;
+  const suspects = [];
+  for (let ty = 0; ty < tileCountY; ty++) {
+    const { data } = ctx.getImageData(0, ty * TILE_SIZE, rowWidth, TILE_SIZE);
+    for (let tx = 0; tx < tileCountX; tx++) {
+      const heights = decodeTile(data, rowWidth, tx * TILE_SIZE, 0);
+      if (detectBlendedTerrarium(heights)) {
+        suspects.push({ tx: minTileX + tx, ty: minTileY + ty, drawX: tx * TILE_SIZE, drawY: ty * TILE_SIZE, heights });
+      }
+    }
+  }
+  if (suspects.length === 0) return { tiles: 0, pixels: 0 };
+  onProgress?.(`Repairing ${suspects.length} elevation tile(s) with corrupted sea-floor values...`);
+
+  const ancestorCache = new Map();
+  const loadAncestorHeights = (z, x, y) => {
+    const key = `${z}/${x}/${y}`;
+    if (!ancestorCache.has(key)) {
+      const numTiles = 2 ** z;
+      const wrappedX = ((x % numTiles) + numTiles) % numTiles;
+      ancestorCache.set(key, loadImage(`${TILE_API_URL}/${z}/${wrappedX}/${y}.png`, signal)
+        .then((img) => {
+          const c = document.createElement('canvas');
+          c.width = TILE_SIZE; c.height = TILE_SIZE;
+          const cx = c.getContext('2d', { willReadFrequently: true });
+          cx.imageSmoothingEnabled = false;
+          cx.drawImage(img, 0, 0);
+          const heights = decodeTile(cx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data, TILE_SIZE, 0, 0);
+          c.width = 0; c.height = 0;
+          return heights;
+        })
+        .catch(() => null));
+    }
+    return ancestorCache.get(key);
+  };
+
+  let tiles = 0;
+  let pixels = 0;
+  await pMap(suspects, async ({ tx, ty, drawX, drawY, heights }) => {
+    // Judge the ancestor per pixel (patchBlendedHeights skips implausible
+    // reference values): its real coastal cliffs would fail a whole-tile
+    // blend test. Go coarser only while impossible depths remain.
+    let patched = 0;
+    for (const step of ancestorSteps) {
+      signal?.throwIfAborted();
+      if (zoom - step < 0) break;
+      const ancestor = await loadAncestorHeights(zoom - step, tx >> step, ty >> step);
+      if (!ancestor) continue;
+      const span = TILE_SIZE >> step;
+      const reference = upsampleAncestor(ancestor, (tx & ((1 << step) - 1)) * span, (ty & ((1 << step) - 1)) * span, span);
+      patched += patchBlendedHeights(heights, reference);
+      if (!hasImplausibleDepth(heights)) break;
+    }
+    if (patched > 0) {
+      const img = ctx.getImageData(drawX, drawY, TILE_SIZE, TILE_SIZE);
+      for (let i = 0; i < heights.length; i++) {
+        if (heights[i] === NO_DATA_VALUE) continue;
+        encodeTerrariumHeight(heights[i], img.data, i * 4);
+      }
+      ctx.putImageData(img, drawX, drawY);
+      tiles++;
+      pixels += patched;
+    }
+  }, concurrency, signal);
+
+  console.info(`[Terrarium] Repaired ${pixels} blended pixel(s) in ${tiles}/${suspects.length} z${zoom} elevation tile(s) from lower-zoom data.`);
+  return { tiles, pixels };
+};
+
 const getSatelliteZoomForProcessingMpp = (processingMetersPerPixel = 1) => {
   const mpp = Number(processingMetersPerPixel);
   const normalizedMpp = Number.isFinite(mpp) && mpp > 0 ? mpp : 1;
@@ -443,6 +650,16 @@ export const fetchTerrariumMosaic = async (
   );
 
   await repairTerrariumNoDataTiles({
+    ctx: tCtx,
+    zoom: TERRAIN_ZOOM,
+    minTileX,
+    minTileY,
+    tileCountX,
+    tileCountY,
+    signal,
+    onProgress,
+  });
+  await repairTerrariumBlendedTiles({
     ctx: tCtx,
     zoom: TERRAIN_ZOOM,
     minTileX,
@@ -1680,6 +1897,16 @@ export const fetchTerrainData = async (
   }
 
   await repairTerrariumNoDataTiles({
+    ctx: tCtx,
+    zoom: TERRAIN_ZOOM,
+    minTileX,
+    minTileY,
+    tileCountX,
+    tileCountY,
+    signal,
+    onProgress,
+  });
+  await repairTerrariumBlendedTiles({
     ctx: tCtx,
     zoom: TERRAIN_ZOOM,
     minTileX,

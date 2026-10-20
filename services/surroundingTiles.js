@@ -9,7 +9,7 @@
  * positions in one pass, then extracts per-position data from shared canvases.
  */
 
-import { project, TERRAIN_ZOOM, fetchTerrainData, repairTerrariumNoDataTiles } from './terrain.js';
+import { project, TERRAIN_ZOOM, fetchTerrainData, repairTerrariumBlendedTiles, repairTerrariumNoDataTiles } from './terrain.js';
 import { encode } from 'fast-png';
 import JSZip from 'jszip';
 
@@ -448,6 +448,16 @@ export const fetchSurroundingTiles = async (
   // the whole band gets flattened to the tile baseline below and the backdrop
   // looks like a chunk of it was cut away.
   await repairTerrariumNoDataTiles({
+    ctx: tCtx,
+    zoom: TERRAIN_ZOOM,
+    minTileX: tMinTX,
+    minTileY: tMinTY,
+    tileCountX: tMaxTX - tMinTX + 1,
+    tileCountY: tMaxTY - tMinTY + 1,
+    signal,
+    onProgress,
+  });
+  await repairTerrariumBlendedTiles({
     ctx: tCtx,
     zoom: TERRAIN_ZOOM,
     minTileX: tMinTX,

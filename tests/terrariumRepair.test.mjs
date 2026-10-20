@@ -173,3 +173,56 @@ test('repairTerrariumNoDataTiles gives up when no ancestor has data', async () =
     stubs.restore();
   }
 });
+
+// ── Blended no-data (Malpelo Island / Hong Kong harbour report, 2026-09-30) ──
+import {
+  detectBlendedTerrarium,
+  encodeTerrariumHeight,
+  patchBlendedHeights,
+} from '../services/terrain.js';
+
+const SIZE = 256;
+const grid = (fn) => { const g = new Float32Array(SIZE * SIZE); for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) g[y * SIZE + x] = fn(x, y); return g; };
+
+test('blend repair: a seam line along a tile edge is detected and patched', () => {
+  // Hong Kong: a column of -2892 m at the tile edge in ~-20 m water
+  const h = grid((x) => (x === 0 ? -2892 : -20));
+  assert.equal(detectBlendedTerrarium(h), true);
+  const n = patchBlendedHeights(h, grid(() => -18));
+  assert.equal(n, SIZE);
+  assert.ok(Math.min(...h) > -100, `deepest ${Math.min(...h)}`);
+});
+
+test('blend repair: a damaged deep blob (impossible depths) is replaced wholesale', () => {
+  // Malpelo: a blob of -24,000 m fading into -9,000 m around it, real floor ~-3,000 m
+  const h = grid((x, y) => { const d = Math.hypot(x - 128, y - 128); return d < 30 ? -24000 : d < 60 ? -9000 : d < 100 ? -3000 : 50; });
+  assert.equal(detectBlendedTerrarium(h), true);
+  patchBlendedHeights(h, grid((x, y) => (Math.hypot(x - 128, y - 128) < 100 ? -3000 : 50)));
+  assert.ok(Math.min(...h) >= -3000, `deepest ${Math.min(...h)}`);
+  assert.equal(h[0], 50, 'land untouched');
+});
+
+test('blend repair: a real steep but smooth sea floor is left alone', () => {
+  // Kona-like: 0 m to -1,000 m across the tile, 4 m per pixel, no pits
+  const h = grid((x) => -4 * x);
+  const before = Float32Array.from(h);
+  assert.equal(detectBlendedTerrarium(h), false);
+  // even if patched against a coarse, shallower reference, only pits would change
+  assert.equal(patchBlendedHeights(h, grid((x) => -2 * x)), 0);
+  assert.deepEqual(h, before);
+});
+
+test('blend repair: land is never touched', () => {
+  const h = grid((x, y) => 100 + ((x * 7 + y * 13) % 300));
+  assert.equal(detectBlendedTerrarium(h), false);
+  assert.equal(patchBlendedHeights(h, grid(() => 0)), 0);
+});
+
+test('encodeTerrariumHeight round-trips through the Terrarium decode', () => {
+  const out = [0, 0, 0];
+  for (const v of [-10994, -2.5, 0, 0.004, 1234.567, 8848]) {
+    encodeTerrariumHeight(v, out);
+    const back = out[0] * 256 + out[1] + out[2] / 256 - 32768;
+    assert.ok(Math.abs(back - v) <= 1 / 256, `${v} -> ${back}`);
+  }
+});
