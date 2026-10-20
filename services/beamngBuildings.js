@@ -450,22 +450,30 @@ class MeshBuilder {
   }
 
   toMesh(name) {
+    // Copy into preallocated typed arrays: spreading a whole neighbourhood's
+    // vertices into push() overflows the call stack.
+    let total = 0;
+    for (const p of this.parts.values()) total += p.pos.length / 3;
+    if (total === 0) return null;
     const geo = new THREE.BufferGeometry();
-    const pos = []; const uv = []; const col = [];
+    const pos = new Float32Array(total * 3);
+    const uv = new Float32Array(total * 2);
+    const col = new Float32Array(total * 3);
     const materials = [];
     let start = 0;
     for (const [mat, p] of this.parts) {
       const count = p.pos.length / 3;
       if (count === 0) continue;
-      pos.push(...p.pos); uv.push(...p.uv); col.push(...p.col);
+      pos.set(p.pos, start * 3);
+      uv.set(p.uv, start * 2);
+      col.set(p.col, start * 3);
       geo.addGroup(start, count, materials.length);
       materials.push(new THREE.MeshStandardMaterial({ name: BUILDING_MATERIALS[mat], vertexColors: true }));
       start += count;
     }
-    if (start === 0) return null;
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, materials);
     mesh.name = name;

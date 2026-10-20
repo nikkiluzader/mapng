@@ -108,3 +108,13 @@ test('material defs: v1.5, vertex-coloured, one per material name', () => {
   }
   assert.ok(defs.mapng_bld_facade.Stages[0].emissiveMap, 'lit windows at night');
 });
+
+test('a whole neighbourhood builds (regression: spread into push() overflowed the stack)', () => {
+  const feats = [];
+  for (let i = 0; i < 600; i++) feats.push(rect(`n${i}`, (i % 30) * 25, Math.floor(i / 30) * 25, 14, 10, { building: i % 3 ? 'house' : 'apartments' }));
+  const { meshes, count } = buildTexturedBuildings(feats, project);
+  assert.equal(count, 600);
+  assert.ok(meshes.length >= 2, 'batched into several meshes');
+  const vertices = meshes.reduce((n, m) => n + m.geometry.getAttribute('position').count, 0);
+  assert.ok(vertices > 100000, `${vertices} vertices`);
+});
