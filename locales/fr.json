@@ -58,6 +58,8 @@
     "offline": "HORS LIGNE",
     "usgsDescription": "Données haute precision pour les USA. Bascule vers Standard si les données sont absentes/corrompues.",
     "kron86Poland": "NMT EVRF2007 (Pologne uniquement)",
+    "outsideCoverage": "hors couverture",
+    "selectedSourceOutsideCoverage": "Cette source ne couvre pas la zone de la carte : Standard sera utilisé à la place.",
     "kron86Description": "Source d'index NMT EVRF2007 de GUGiK. Bascule vers Standard si les tuiles sont indisponibles ou non prises en charge.",
     "gpxzPremium": "GPXZ (Premium mondial)",
     "gpxzDescription": "Données mondiales de la meilleure qualite. Cle API requise.",

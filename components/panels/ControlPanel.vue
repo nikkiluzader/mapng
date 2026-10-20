@@ -179,6 +179,7 @@
         :isCheckingGPXZ="isCheckingGPXZ"
         :isAreaLargeForGPXZ="isAreaLargeForGPXZ"
         :areaSqKm="areaSqKm"
+        :center="center"
         @verifyGpxzKey="checkGPXZStatus"
       />
     </div>

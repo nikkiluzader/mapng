@@ -18,10 +18,18 @@
         >
             <option value="default">{{ t('map.standard30m') }}</option>
             <option value="none">{{ t('map.flatNone') }}</option>
-            <option value="kron86">{{ t('map.kron86Poland') }}</option>
-            <option value="usgs">{{ t('map.usgs1m') }}</option>
+            <option value="kron86" :disabled="!coverage.kron86 && localElevationSource !== 'kron86'">
+              {{ t('map.kron86Poland') }}{{ coverage.kron86 ? '' : ` — ${t('map.outsideCoverage')}` }}
+            </option>
+            <option value="usgs" :disabled="!coverage.usgs && localElevationSource !== 'usgs'">
+              {{ t('map.usgs1m') }}{{ coverage.usgs ? '' : ` — ${t('map.outsideCoverage')}` }}
+            </option>
             <option value="gpxz">{{ t('map.gpxzPremium') }}</option>
         </select>
+
+        <p v-if="selectedOutsideCoverage" class="text-[10px] text-amber-600 dark:text-amber-500 font-medium leading-tight">
+          ⚠️ {{ t('map.selectedSourceOutsideCoverage') }}
+        </p>
 
         <!-- Default -->
         <span v-if="localElevationSource === 'default'" class="block text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
@@ -101,7 +109,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Mountain, ChevronDown } from 'lucide-vue-next';
 
@@ -143,8 +151,34 @@ const props = defineProps({
   totalTiles: {
     type: Number,
     default: 0
+  },
+  // Map centre: region-only sources are disabled outside their coverage (issue #18).
+  center: {
+    type: Object,
+    default: null
   }
 });
+
+// Coarse coverage boxes [south, west, north, east] of the region-only sources.
+const SOURCE_COVERAGE = {
+  // USGS 3DEP 1 m: conterminous US, Alaska, Hawaii, Puerto Rico
+  usgs: [[24.4, -125.0, 49.5, -66.8], [51.0, -180.0, 71.6, -129.9], [18.8, -160.4, 22.4, -154.7], [17.8, -67.4, 18.6, -65.2]],
+  // NMT EVRF2007: Poland
+  kron86: [[49.0, 14.1, 54.9, 24.2]],
+};
+
+const coverage = computed(() => {
+  const lat = Number(props.center?.lat);
+  const lng = Number(props.center?.lng);
+  const known = Number.isFinite(lat) && Number.isFinite(lng);
+  const inside = (boxes) => !known || boxes.some(([s, w, n, e]) => lat >= s && lat <= n && lng >= w && lng <= e);
+  return { usgs: inside(SOURCE_COVERAGE.usgs), kron86: inside(SOURCE_COVERAGE.kron86) };
+});
+
+const selectedOutsideCoverage = computed(() => (
+  (localElevationSource.value === 'usgs' && !coverage.value.usgs)
+  || (localElevationSource.value === 'kron86' && !coverage.value.kron86)
+));
 
 const emit = defineEmits(['update:elevationSource', 'update:gpxzApiKey', 'verifyGpxzKey']);
 

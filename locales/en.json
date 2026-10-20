@@ -60,6 +60,8 @@
     "offline": "OFFLINE",
     "usgsDescription": "High-precision data for USA. Falls back to Standard if data is missing/corrupt.",
     "kron86Poland": "NMT EVRF2007 (Poland Only)",
+    "outsideCoverage": "outside coverage",
+    "selectedSourceOutsideCoverage": "This source doesn't cover the area on the map, so it will fall back to Standard.",
     "kron86Description": "GUGiK NMT EVRF2007 index source. Falls back to Standard when tiles are unavailable or unsupported.",
     "gpxzPremium": "GPXZ (Premium Global)",
     "gpxzDescription": "Highest quality global data. Requires API Key.",

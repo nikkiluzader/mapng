@@ -198,6 +198,7 @@
       :isCheckingGPXZ="isCheckingGPXZ"
       :isBatchMode="true"
       :totalTiles="totalTiles"
+      :center="center"
       @verifyGpxzKey="checkGPXZStatus"
     />
 

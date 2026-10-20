@@ -58,6 +58,8 @@
     "offline": "OFFLINE",
     "usgsDescription": "Hochpräzise Daten für die USA. Fallback auf Standard, wenn Daten fehlen/beschädigt sind.",
     "kron86Poland": "NMT EVRF2007 (nur Polen)",
+    "outsideCoverage": "außerhalb der Abdeckung",
+    "selectedSourceOutsideCoverage": "Diese Quelle deckt den Kartenbereich nicht ab, daher wird auf Standard zurückgegriffen.",
     "kron86Description": "GUGiK NMT EVRF2007-Indexquelle. Fallback auf Standard, wenn Kacheln nicht verfügbar oder nicht unterstützt sind.",
     "gpxzPremium": "GPXZ (Premium global)",
     "gpxzDescription": "Höchste globale Datenqualität. API-Schlüssel erforderlich.",
