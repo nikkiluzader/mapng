@@ -11,7 +11,17 @@ Each shape becomes a TSForestItemData template whose wind / physics fields
 are copied from the vanilla level that owns it (any level's
 managedItemData.json entry with the same shapeFile), so trees sway like they
 do in the official maps. Item names are the shape's file name; a clash
-between levels is an error.
+between levels is an error. Items are named "mapng_tree_<shape>": a bare
+shape name can collide with a material of the same name (Italy's
+"scots_pine" material made BeamNG reject the scots_pine ForestItemData).
+
+SHAPE_IMPOSTER_FILES lists, for every tree shape an export may place (this
+library's and the biome catalog's), the shipped imposter companions
+(.dae.imposter.dds, .dae.imposter_normals.dds, .dae.asset.json). Exports
+link-mirror shapes into the level folder, where the engine finds no imposter
+and bakes its own from defaults (a 256x128 sheet whose opaque normals drew a
+black square round far palms); linking the companions next to the mirrored
+.dae makes it use the shipped ones.
 
 The materials these shapes bind are harvested by
 scripts/build-shape-material-library.py (it reads this file as the
@@ -147,7 +157,7 @@ def main():
             if rel not in entries and rel[:-4] + ".cdae" not in entries:
                 problems.append(f"{dae}: not in game")
                 continue
-            name = os.path.basename(path)
+            name = "mapng_tree_" + os.path.basename(path)
             if name in items and items[name]["shapeFile"].lower() != dae.lower():
                 problems.append(f"{name}: two shapes share the name")
                 continue
@@ -163,6 +173,17 @@ def main():
         print("PROBLEM:", p, file=sys.stderr)
     if problems:
         return 1
+
+    # Imposter companions for every tree shape an export may place.
+    catalog = open(os.path.join(REPO, "services/beamngBiomeCatalog.js"), encoding="utf-8").read()
+    shapes = {it["shapeFile"] for it in items.values()}
+    shapes |= set(re.findall(r"shapeFile:\s*'([^']+\.dae)'", catalog))
+    companions = {}
+    for dae in sorted(shapes):
+        rel = dae.lstrip("/").lower()
+        found = [sfx for sfx in (".imposter.dds", ".imposter_normals.dds", ".asset.json") if rel + sfx in entries]
+        if ".imposter.dds" in found:
+            companions[rel] = found
 
     version = "unknown"
     integrity = os.path.join(REPO, "refs/beamng/integrity.json")
@@ -187,7 +208,13 @@ def main():
             body = ",\n".join(f"    {k}: {json.dumps(v)}" if k != "shapeFile" else f"    shapeFile: '{v}'"
                               for k, v in it.items())
             f.write(f"  {json.dumps(name)}: {{\n{body},\n  }},\n")
+        f.write("};\n\n")
+        f.write("// lowercase shape path (no leading slash) -> shipped imposter files to link beside a mirrored copy\n")
+        f.write("export const SHAPE_IMPOSTER_FILES = {\n")
+        for rel, sfx in companions.items():
+            f.write(f"  {json.dumps(rel)}: {json.dumps(sfx)},\n")
         f.write("};\n")
+    print(f"imposter companions for {len(companions)} shapes", file=sys.stderr)
     print(f"Wrote {OUT}: {len(items)} items in {len(groups)} groups (game {version}); "
           f"{sum(1 for n in items if items[n].get('windScale') is not None)} with wind data")
     return 0

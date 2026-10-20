@@ -58,10 +58,10 @@ test('OSM tags win: genus, leaf type', () => {
 
 test('a mapped height picks the nearest model and scales to it', () => {
   const t = chooseTreeItem('palm', { tags: { height: '20' }, lat: 33.5, lon: -112, seed: 'h' });
-  assert.equal(t.type, 'fanpalm_slim');
+  assert.equal(t.type, 'mapng_tree_fanpalm_slim');
   assert.ok(Math.abs(t.scale - 20 / 20.8) < 1e-9);
   assert.equal(chooseTreeItem('palm', { tags: { height: '60' }, lat: 33.5, lon: -112, seed: 'h' }).scale, 1.4, 'clamped');
-  assert.equal(chooseTreeItem('palm', { tags: { height: '30 ft' }, lat: 33.5, lon: -112, seed: 'h' }).type, 'palm_small');
+  assert.equal(chooseTreeItem('palm', { tags: { height: '30 ft' }, lat: 33.5, lon: -112, seed: 'h' }).type, 'mapng_tree_palm_small');
 });
 
 test('deterministic, and every grouped model has a template', () => {
@@ -74,4 +74,27 @@ test('deterministic, and every grouped model has a template', () => {
       assert.ok(h > 0);
     }
   }
+});
+
+test('library item names never collide with material names (scots_pine was rejected in-game)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const shapeLib = JSON.parse(readFileSync(new URL('../public/beamng_shape_materials.json', import.meta.url), 'utf8'));
+  const { getBiomeRuntimeMaterialDefs } = await import('../services/beamngRuntimeMaterialCatalog.js');
+  const { BEAMNG_BIOMES } = await import('../services/beamngBiomeCatalog.js');
+  const materials = new Set();
+  for (const set of Object.values(shapeLib)) for (const [k, v] of Object.entries(set)) { materials.add(k.toLowerCase()); if (v?.mapTo) materials.add(String(v.mapTo).toLowerCase()); }
+  for (const b of BEAMNG_BIOMES) for (const k of Object.keys(getBiomeRuntimeMaterialDefs(b))) materials.add(k.toLowerCase());
+  for (const name of Object.keys(TREE_ITEMS)) assert.ok(!materials.has(name.toLowerCase()), `${name} is also a material name`);
+});
+
+test('tree shapes link their shipped imposters beside the mirrored copy', async () => {
+  const { createBeamNGLinkFileRegistry } = await import('../services/beamngLinkFiles.js');
+  const { SHAPE_IMPOSTER_FILES } = await import('../services/beamngTreeLibrary.js');
+  const reg = createBeamNGLinkFileRegistry('mylevel', { companions: SHAPE_IMPOSTER_FILES });
+  const mirrored = reg.rewriteAssetPath(TREE_ITEMS.mapng_tree_fanpalm_tall.shapeFile);
+  const links = Object.fromEntries(reg.getLinkFiles().map((f) => [f.path, JSON.parse(f.contents).path]));
+  const base = mirrored.slice(1);
+  assert.equal(links[`${base}.link`], '/levels/west_coast_usa/art/shapes/trees/trees_palm/fanpalm_tall.dae');
+  assert.equal(links[`${base}.imposter.dds.link`], '/levels/west_coast_usa/art/shapes/trees/trees_palm/fanpalm_tall.dae.imposter.dds');
+  assert.ok(links[`${base}.imposter_normals.dds.link`] && links[`${base}.asset.json.link`]);
 });

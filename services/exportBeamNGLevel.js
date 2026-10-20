@@ -7,6 +7,7 @@ import { buildTerrainMaterials } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight } from './beamngTrees.js';
+import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
@@ -6387,7 +6388,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const resolvedRightHandDrive = typeof rightHandDrive === 'boolean'
     ? rightHandDrive
     : trafficProfile.rightHandDrive;
-  const linkRegistry = createBeamNGLinkFileRegistry(levelName);
+  const linkRegistry = createBeamNGLinkFileRegistry(levelName, { companions: SHAPE_IMPOSTER_FILES });
 
   const size = exportTerrainData.width;
   const osmFeatureCount = Array.isArray(exportTerrainData.osmFeatures) ? exportTerrainData.osmFeatures.length : 0;

@@ -141,7 +141,7 @@ function candidates(group, { lat, lon, extra = [] }) {
   let list = (TREE_GROUPS[group] || TREE_GROUPS.deciduous).map(([type, height]) => ({ type, height }));
   // Redwoods only where they grow (Northern California's coast); firs stay out
   // of hot desert towns (their pines: the radiata / scots pine models).
-  if (!c.norCal) list = list.filter(({ type }) => !type.startsWith('redwood'));
+  if (!c.norCal) list = list.filter(({ type }) => !type.includes('redwood'));
   if (c.hotDesert && group === 'pine_west') list = list.filter(({ type }) => !type.includes('douglasfir'));
   return [...list, ...extra];
 }

@@ -25,7 +25,14 @@ function isLinkableLevelAssetPath(pathNoSlash) {
   return lower.endsWith('.dae') || lower.endsWith('.cdae');
 }
 
-export function createBeamNGLinkFileRegistry(exportLevelName) {
+/**
+ * companions: lowercase official .dae path (no leading slash) -> suffixes of
+ * files that ship beside it and must be linked beside its mirrored copy too
+ * (".imposter.dds", ".imposter_normals.dds", ".asset.json"). Without them the
+ * engine finds no imposter next to the mirrored shape and bakes one from
+ * defaults; the baked far billboards of palms rendered as black squares.
+ */
+export function createBeamNGLinkFileRegistry(exportLevelName, { companions = {} } = {}) {
   const linksByPath = new Map();
 
   function rewriteAssetPath(path) {
@@ -49,6 +56,9 @@ export function createBeamNGLinkFileRegistry(exportLevelName) {
       });
     } else {
       linksByPath.set(localPathNoSlash, redirectPath);
+      for (const suffix of companions[parsed.noSlash.toLowerCase()] || []) {
+        linksByPath.set(`${localPathNoSlash}${suffix}`, `${redirectPath}${suffix}`);
+      }
     }
 
     return parsed.hasLeadingSlash ? `/${localPathNoSlash}` : localPathNoSlash;
