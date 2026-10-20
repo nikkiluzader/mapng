@@ -1,18 +1,108 @@
 /**
- * Cloudflare Worker — GPXZ API Proxy
+ * Cloudflare Worker — API proxies
  *
  * Proxies requests from /api/gpxz/* to https://api.gpxz.io/*
  * so that rate-limit response headers (x-ratelimit-used, x-ratelimit-remaining, etc.)
  * are visible to the browser (same-origin requests have full header access).
  *
+ * /api/osm?bbox=s,w,n,e answers MapNG's own Overpass query from Cloudflare's
+ * edge cache, fetching from the public mirrors on a miss (see handleOsm).
+ *
  * All other requests fall through to the static assets (dist/).
  */
+
+import {
+  OVERPASS_ENDPOINTS,
+  OVERPASS_QUERY_VERSION,
+  buildOverpassQuery,
+  snapOsmBounds,
+} from './services/overpassQuery.js';
 
 const GPXZ_ORIGIN = 'https://api.gpxz.io';
 const NOMINATIM_OSM_ORIGIN = 'https://nominatim.openstreetmap.org';
 const NOMINATIM_GEOCODE_ORIGIN = 'https://nominatim.geocoding.ai';
 const KRON86_ORIGIN = 'https://mapy.geoportal.gov.pl';
 const KRON86_OPENDATA_ORIGIN = 'https://opendata.geoportal.gov.pl';
+
+// /api/osm: how long an answer is reused, how long one mirror may take, and
+// how many mirrors one miss may try (the browser falls back to the mirrors
+// itself when this endpoint fails, so the Worker keeps its own budget short).
+const OSM_CACHE_TTL_S = 7 * 24 * 3600;
+const OSM_MIRROR_TIMEOUT_MS = 30000;
+const OSM_MAX_MIRRORS = 3;
+const OSM_USER_AGENT = 'mapng/1.0 (+https://mapng.com; contact: nikkiluzader@gmail.com)';
+
+const jsonResponse = (body, status, extraHeaders = {}) => new Response(JSON.stringify(body), {
+  status,
+  headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', ...extraHeaders },
+});
+
+/**
+ * Cached Overpass for MapNG's own query only (not an open proxy): the box is
+ * snapped outward to a grid so nearby selections share a cache entry, and the
+ * client clips the answer to its exact bounds.
+ */
+async function handleOsm(request, url, ctx) {
+  if (request.method !== 'GET') return new Response('Method Not Allowed', { status: 405 });
+
+  const parts = String(url.searchParams.get('bbox') || '').split(',').map(Number);
+  const [south, west, north, east] = parts;
+  const snapped = parts.length === 4 ? snapOsmBounds({ south, west, north, east }) : null;
+  if (!snapped) return jsonResponse({ error: 'bbox must be s,w,n,e within the size limit' }, 400);
+
+  const cache = caches.default;
+  const cacheKey = new Request(
+    `https://mapng-osm-cache.internal/v${OVERPASS_QUERY_VERSION}/${snapped.south},${snapped.west},${snapped.north},${snapped.east}`,
+  );
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    const hit = new Response(cached.body, cached);
+    hit.headers.set('x-mapng-osm-cache', 'HIT');
+    return hit;
+  }
+
+  const query = buildOverpassQuery(snapped);
+  const mirrors = [...OVERPASS_ENDPOINTS].sort(() => Math.random() - 0.5).slice(0, OSM_MAX_MIRRORS);
+  const attempts = [];
+  for (const mirror of mirrors) {
+    try {
+      const upstream = await fetch(mirror, {
+        method: 'POST',
+        body: `data=${encodeURIComponent(query)}`,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+          'User-Agent': OSM_USER_AGENT,
+        },
+        signal: AbortSignal.timeout(OSM_MIRROR_TIMEOUT_MS),
+      });
+      if (!upstream.ok) {
+        attempts.push(`${new URL(mirror).host}: HTTP ${upstream.status}`);
+        continue;
+      }
+      const text = await upstream.text();
+      // Overpass reports timeouts / memory limits as a 200 with HTML or a
+      // JSON "remark" and no usable elements; never cache those.
+      let data;
+      try { data = JSON.parse(text); } catch { data = null; }
+      if (!data || !Array.isArray(data.elements) || (data.remark && /error|timeout|runtime/i.test(data.remark))) {
+        attempts.push(`${new URL(mirror).host}: unusable response`);
+        continue;
+      }
+      const headers = {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': `public, max-age=${OSM_CACHE_TTL_S}`,
+        'x-mapng-osm-mirror': new URL(mirror).host,
+      };
+      ctx.waitUntil(cache.put(cacheKey, new Response(text, { headers })));
+      return new Response(text, { headers: { ...headers, 'x-mapng-osm-cache': 'MISS' } });
+    } catch (e) {
+      attempts.push(`${new URL(mirror).host}: ${e?.name === 'TimeoutError' ? 'timeout' : String(e?.message || e)}`);
+    }
+  }
+  return jsonResponse({ error: 'All Overpass mirrors failed', attempts }, 502);
+}
 
 const EXPOSED_HEADERS = [
   'x-ratelimit-used',
@@ -25,8 +115,12 @@ const EXPOSED_HEADERS = [
 ].join(', ');
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === '/api/osm') {
+      return handleOsm(request, url, ctx);
+    }
 
     const proxySimple = async (origin, stripPrefix) => {
       if (request.method === 'OPTIONS') {

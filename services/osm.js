@@ -1,10 +1,7 @@
-const OVERPASS_ENDPOINTS = [
-  "https://lz4.overpass-api.de/api/interpreter",
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.private.coffee/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass.openstreetmap.ru/api/interpreter",
-];
+import {
+  OVERPASS_ENDPOINTS,
+  buildOverpassQuery,
+} from "./overpassQuery.js";
 
 let lastOSMRequestInfo = null;
 
@@ -111,71 +108,6 @@ const clipLineString = (points, bounds) => {
 
 // --- Main Service ---
 
-const buildQuery = (bounds) => {
-  const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
-
-  // Timeout is 30s, matching the timeoutSec that getOSMQueryParameters advertises
-  // and records into export metadata.
-  // Maxsize reduced to 128 MB — 512 MB was triggering server-side rejection.
-  // Query trimmed: removed redundant/rare keys (seamark, tidal, harbour subtypes,
-  // vegetation, crop, orchard, vineyard, material) that overlap with natural/landuse
-  // and add significant response weight with minimal 3D rendering value.
-  return `
-[out:json][timeout:30][maxsize:134217728];
-(
-  way["highway"](${bbox});
-  way["building"](${bbox});
-  way["waterway"](${bbox});
-  way["barrier"](${bbox});
-  way["aeroway"](${bbox});
-  way["man_made"](${bbox});
-  way["public_transport"](${bbox});
-  way["power"](${bbox});
-  way["military"](${bbox});
-  way["historic"](${bbox});
-  way["tourism"](${bbox});
-  way["amenity"](${bbox});
-  way["landuse"](${bbox});
-  way["natural"](${bbox});
-  way["leisure"](${bbox});
-  way["water"](${bbox});
-  way["wetland"](${bbox});
-  way["surface"](${bbox});
-  way["area"="yes"](${bbox});
-  way["landcover"](${bbox});
-
-  relation["building"](${bbox});
-  relation["waterway"](${bbox});
-  relation["aeroway"](${bbox});
-  relation["man_made"](${bbox});
-  relation["military"](${bbox});
-  relation["historic"](${bbox});
-  relation["tourism"](${bbox});
-  relation["amenity"](${bbox});
-  relation["landuse"](${bbox});
-  relation["natural"](${bbox});
-  relation["leisure"](${bbox});
-  relation["water"](${bbox});
-  relation["wetland"](${bbox});
-  relation["landcover"](${bbox});
-
-  node["natural"="tree"](${bbox});
-  node["natural"="tree_row"](${bbox});
-  way["natural"="tree_row"](${bbox});
-  node["natural"="shrub"](${bbox});
-  node["amenity"="fuel"](${bbox});
-  node["amenity"="charging_station"](${bbox});
-  node["man_made"="fuel_pump"](${bbox});
-  node["highway"="traffic_signals"](${bbox});
-  node["highway"="stop"](${bbox});
-  node["highway"="give_way"](${bbox});
-  node["highway"="street_lamp"](${bbox});
-  node["barrier"="bollard"](${bbox});
-  node["amenity"="bench"](${bbox});
-);
-out body geom;
-`;
-};
 
 const convertGeom = (geom) => {
   if (!geom) return [];
@@ -648,6 +580,13 @@ const parseOverpassResponse = (data, bounds) => {
 
 const MIRROR_HEALTH_KEY = "mapng_overpass_health_v1";
 const HEDGE_DELAY_MS = 6000;
+// Our Worker's edge cache (worker.js handleOsm) is tried first. A cache miss
+// waits on a mirror upstream, so it gets longer before direct mirrors start.
+const OSM_CACHE_PATH = "/api/osm";
+const CACHE_HEDGE_DELAY_MS = 25000;
+const isCacheEndpoint = (endpoint) => endpoint === OSM_CACHE_PATH;
+// Only on the deployed site (same-origin Worker); not in node or file://.
+const cacheEndpointAvailable = () => /^https?:$/.test(globalThis.location?.protocol || "");
 const MAX_IN_FLIGHT = 3;
 const ATTEMPT_TIMEOUT_MS = 60000;   // server-side [timeout:30] + transfer
 const OVERALL_DEADLINE_MS = 150000;
@@ -705,13 +644,15 @@ const classifyMirrorError = (err, timedOut) => {
   return "network";
 };
 
-const fetchWithAbort = async (endpoint, query, signal) => {
-  const response = await fetch(endpoint, {
-    method: "POST",
-    body: `data=${encodeURIComponent(query)}`,
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    signal,
-  });
+const fetchWithAbort = async (endpoint, { query, bounds }, signal) => {
+  const response = isCacheEndpoint(endpoint)
+    ? await fetch(`${OSM_CACHE_PATH}?bbox=${bounds.south},${bounds.west},${bounds.north},${bounds.east}`, { signal })
+    : await fetch(endpoint, {
+      method: "POST",
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      signal,
+    });
   if (!response.ok) {
     const error = new Error(`HTTP ${response.status} ${response.statusText}`);
     error.status = response.status;
@@ -732,6 +673,7 @@ const fetchWithAbort = async (endpoint, query, signal) => {
 };
 
 const mirrorName = (endpoint) => {
+  if (isCacheEndpoint(endpoint)) return "the MapNG cache";
   try {
     return new URL(endpoint).host;
   } catch {
@@ -743,7 +685,7 @@ const mirrorName = (endpoint) => {
  * Try mirrors in order with hedging; resolves with the first good response.
  * Rejects with { errors, retryable } when every mirror failed.
  */
-const hedgedFetch = (endpoints, query, { onStatus, signal, deadlineAt }) => new Promise((resolve, reject) => {
+const hedgedFetch = (endpoints, request, { onStatus, signal, deadlineAt }) => new Promise((resolve, reject) => {
   const attempts = [];
   const errors = [];
   let next = 0;
@@ -767,7 +709,8 @@ const hedgedFetch = (endpoints, query, { onStatus, signal, deadlineAt }) => new 
 
   const scheduleHedge = () => {
     clearTimeout(hedgeTimer);
-    if (next < endpoints.length) hedgeTimer = setTimeout(launch, HEDGE_DELAY_MS);
+    const delay = next > 0 && isCacheEndpoint(endpoints[next - 1]) ? CACHE_HEDGE_DELAY_MS : HEDGE_DELAY_MS;
+    if (next < endpoints.length) hedgeTimer = setTimeout(launch, delay);
   };
 
   const launch = () => {
@@ -781,7 +724,7 @@ const hedgedFetch = (endpoints, query, { onStatus, signal, deadlineAt }) => new 
     inFlight++;
     onStatus?.(`Fetching OpenStreetMap data from ${mirrorName(endpoint)} (mirror ${next}/${endpoints.length})...`);
 
-    fetchWithAbort(endpoint, query, controller.signal)
+    fetchWithAbort(endpoint, request, controller.signal)
       .then((result) => {
         clearTimeout(attempt.timer);
         recordMirrorResult(endpoint, { ok: true, latencyMs: Date.now() - startedAt });
@@ -813,16 +756,20 @@ const hedgedFetch = (endpoints, query, { onStatus, signal, deadlineAt }) => new 
   scheduleHedge();
 });
 
-const fetchFromOverpass = async (query, { onStatus, signal } = {}) => {
+const fetchFromOverpass = async (request, { onStatus, signal } = {}) => {
   const deadlineAt = Date.now() + OVERALL_DEADLINE_MS;
   let lastFailure = null;
   for (let round = 0; round < 2; round++) {
     // A retry round ignores cool-downs: every mirror just failed anyway.
-    const ordered = round === 0
+    let ordered = round === 0
       ? orderOverpassEndpoints(OVERPASS_ENDPOINTS)
       : [...OVERPASS_ENDPOINTS].sort(() => Math.random() - 0.5);
+    if (round === 0 && cacheEndpointAvailable()) {
+      const coolUntil = readMirrorHealth()[OSM_CACHE_PATH]?.coolUntil || 0;
+      if (coolUntil <= Date.now()) ordered = [OSM_CACHE_PATH, ...ordered];
+    }
     try {
-      return await hedgedFetch(ordered, query, { onStatus, signal, deadlineAt });
+      return await hedgedFetch(ordered, request, { onStatus, signal, deadlineAt });
     } catch (failure) {
       if (failure?.name === "AbortError" || signal?.aborted) throw failure;
       lastFailure = failure;
@@ -838,12 +785,12 @@ const fetchFromOverpass = async (query, { onStatus, signal } = {}) => {
 export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
   console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
 
-  const query = buildQuery(bounds);
+  const query = buildOverpassQuery(bounds);
   const queryParams = getOSMQueryParameters(bounds);
   const startedAt = new Date().toISOString();
 
   try {
-    const { endpoint, data } = await fetchFromOverpass(query, { onStatus, signal });
+    const { endpoint, data } = await fetchFromOverpass({ query, bounds }, { onStatus, signal });
 
     console.log(`[OSM] Winner: ${endpoint} — ${data.elements?.length || 0} elements`);
 
