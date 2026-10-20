@@ -773,6 +773,28 @@ const SHARED_BARRIER_MATERIAL_DEFS = {
     alphaTest: true,
     translucentBlendOp: 'None',
   },
+  // The same fence's posts and rails. Vanilla defines it only in hirochi's
+  // level materials (not loaded in our level); textures already live in /assets/.
+  hr_bld_metal_trim: {
+    name: 'hr_bld_metal_trim',
+    mapTo: 'hr_bld_metal_trim',
+    class: 'Material',
+    annotation: 'BUILDINGS',
+    Stages: [{
+      colorMap: '/assets/materials/trim/metal/hr_bld_metal_trim/hr_bld_metal_trim_d.dds',
+      detailMap: '/assets/materials/trim/metal/hr_bld_metal_trim/macro_drips.dds',
+      detailScale: [0.230000004, 0.230000004],
+      diffuseColor: [0.988235354, 0.996078491, 0.988235354, 0.00800000038],
+      normalMap: '/assets/materials/trim/metal/hr_bld_metal_trim/hr_bld_metal_trim_n.dds',
+      reflectivityMap: '/assets/materials/trim/metal/hr_bld_metal_trim/hr_bld_metal_trim_r.dds',
+      roughnessFactor: 0.812008262,
+      specularMap: '/assets/materials/trim/metal/hr_bld_metal_trim/hr_bld_metal_trim_s.dds',
+      useAnisotropic: true,
+      vertColor: true,
+    }],
+    cubemap: 'global_cubemap_metalblurred',
+    translucentBlendOp: 'None',
+  },
 };
 
 const AUTOMATION_TEST_TRACK_RUNTIME_MATERIAL_DEFS = {
