@@ -376,9 +376,9 @@ const EAST_COAST_RUNTIME_MATERIAL_DEFS = {
     mapTo: 'lumber_raw',
     annotation: 'BUILDINGS',
     Stages: [{
-      colorMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_d.dds',
-      normalMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_n.dds',
-      specularMap: '/levels/east_coast_usa/art/shapes/misc/lumber_raw_s.dds',
+      colorMap: '/assets/materials/baked_props/lumber_raw/lumber_raw_d.dds',
+      normalMap: '/assets/materials/baked_props/lumber_raw/lumber_raw_n.dds',
+      specularMap: '/assets/materials/baked_props/lumber_raw/lumber_raw_s.dds',
       diffuseColor: [1, 1, 1, 1],
     }],
     translucentBlendOp: 'None',

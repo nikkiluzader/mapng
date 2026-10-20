@@ -164,10 +164,10 @@ export function getFuelStationRuntimeMaterialDefs() {
       "class": "Material",
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_sidewalks_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_sidewalks_n.dds",
+          "colorMap": "/assets/materials/baked_props/eca_bld_sidewalks/eca_bld_sidewalks_d.dds",
+          "normalMap": "/assets/materials/baked_props/eca_bld_sidewalks/eca_bld_sidewalks_n.dds",
           "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_sidewalks_s.dds",
+          "specularMap": "/assets/materials/baked_props/eca_bld_sidewalks/eca_bld_sidewalks_s.dds",
           "specularPower": 1,
           "useAnisotropic": true,
           "vertColor": true
@@ -225,7 +225,7 @@ export function getFuelStationRuntimeMaterialDefs() {
       "class": "Material",
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_genericsigns_d.dds",
+          "colorMap": "/assets/materials/baked_props/eca_genericsigns/eca_genericsigns_d.dds",
           "specular": [
             0.9882349968,
             0.9882349968,
@@ -237,7 +237,7 @@ export function getFuelStationRuntimeMaterialDefs() {
           "vertColor": true
         },
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_genericsigns_emissive.dds",
+          "colorMap": "/assets/materials/baked_props/eca_genericsigns/eca_genericsigns_emissive.dds",
           "glow": true,
           "vertColor": true
         },

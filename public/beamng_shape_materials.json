@@ -3,21 +3,21 @@
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -135,30 +135,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -171,10 +184,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -305,23 +318,23 @@
     "m_rocks_nz_jagged": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/automation_test_track/art/shapes/rocks/rocks_nz_jagged_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/rocks/m_rocks_nz_jagged/rocks_nz_jagged_ao.data.png",
           "baseColorFactor": [
             1,
             0.948472023,
             0.896924973,
             1
           ],
-          "baseColorMap": "/levels/automation_test_track/art/shapes/rocks/rocks_nz_jagged_b.color.png",
-          "detailMap": "/levels/automation_test_track/art/shapes/rocks/t_rocks_nz_jagged_detail_b.data.png",
-          "detailNormalMap": "/levels/automation_test_track/art/shapes/rocks/t_rocks_nz_jagged_detail_nm.normal.png",
+          "baseColorMap": "/assets/materials/rocks/m_rocks_nz_jagged/rocks_nz_jagged_b.color.png",
+          "detailMap": "/assets/materials/rocks/m_rocks_nz_jagged/t_rocks_nz_jagged_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/rocks/m_rocks_nz_jagged/t_rocks_nz_jagged_detail_nm.normal.png",
           "detailNormalMapStrength": 0.300000012,
           "detailScale": [
             24,
             24
           ],
-          "normalMap": "/levels/automation_test_track/art/shapes/rocks/rocks_nz_jagged_nm.normal.png",
-          "roughnessMap": "/levels/automation_test_track/art/shapes/rocks/rocks_nz_jagged_r.data.png"
+          "normalMap": "/assets/materials/rocks/m_rocks_nz_jagged/rocks_nz_jagged_nm.normal.png",
+          "roughnessMap": "/assets/materials/rocks/m_rocks_nz_jagged/rocks_nz_jagged_r.data.png"
         },
         {
           "baseColorFactor": null,
@@ -354,28 +367,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -419,20 +432,20 @@
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {
@@ -630,21 +643,21 @@
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -681,30 +694,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -717,10 +743,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -742,23 +768,23 @@
     "eca_rocks": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/rocks/m_rocks_nz_jagged/rocks_nz_jagged_ao.data.png",
           "baseColorFactor": [
             1,
             1,
             0.999000013,
             1
           ],
-          "baseColorMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_b.color.png",
-          "detailMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_detail_b.data.png",
-          "detailNormalMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_detail_nm.normal.png",
+          "baseColorMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_b.color.png",
+          "detailMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_nm.normal.png",
           "detailNormalMapStrength": 0.300000012,
           "detailScale": [
             24,
             24
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_nm.normal.png",
-          "roughnessMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_r.data.png"
+          "normalMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_nm.normal.png",
+          "roughnessMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_r.data.png"
         },
         {},
         {},
@@ -843,28 +869,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -908,20 +934,20 @@
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {
@@ -1141,30 +1167,55 @@
     "bld_glass_transparent": {
       "Stages": [
         {
-          "colorMap": "/levels/italy/art/shapes/buildings/italy_bld_glass_d.dds",
+          "baseColorFactor": [
+            0.894117713,
+            0.960784376,
+            0.996078491,
+            0.561999977
+          ],
+          "baseColorMap": "/assets/materials/tileable/glass/bld_glass_transparent/italy_bld_glass_d.dds",
           "detailNormalMapStrength": 0.5,
           "detailScale": [
             8,
             8
           ],
-          "diffuseColor": [
-            0.894117713,
-            0.960784376,
-            0.9960784912,
-            0.561999977
-          ],
+          "metallicFactor": 0.800000012,
+          "opacityFactor": 0.600000024,
+          "roughnessFactor": 0.00999999978,
           "specular": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
-          ],
-          "specularMap": "/levels/italy/art/shapes/buildings/Italy_bld_glass_s.dds",
-          "specularPower": 19
+          ]
         },
-        {},
-        {},
-        {}
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "roughnessFactor": null,
+          "specular": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "roughnessFactor": null,
+          "specular": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "roughnessFactor": null,
+          "specular": null
+        }
       ],
       "alphaRef": 0,
       "annotation": "BUILDINGS",
@@ -1178,7 +1229,10 @@
       "name": "bld_glass_transparent",
       "persistentId": "cf12cada-35ab-42ea-ab81-eb203c464e82",
       "specularStrength0": "0.490196",
-      "translucent": true
+      "translucent": true,
+      "translucentBlendOp": "PreMulAlpha",
+      "translucentRecvShadows": true,
+      "version": 1.5
     },
     "cypress": {
       "Stages": [
@@ -1239,30 +1293,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -1275,20 +1342,38 @@
     "eca_bld_metal_01_white_annotation_pole": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_01_d_white.dds",
-          "detailMap": "/levels/east_coast_usa/art/shapes/buildings/eca_grungewood_b.dds",
+          "colorMap": "/assets/materials/tileable/metal/eca_bld_metal_01_white/eca_bld_metal_01_d_white.dds",
+          "detailMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_grungewood_b.dds",
           "detailScale": [
             0.200000003,
             0.200000003
           ],
           "pixelSpecular": true,
-          "specularPower": 26,
+          "roughnessFactor": 0.638332963,
           "useAnisotropic": true,
           "vertColor": true
         },
-        {},
-        {},
-        {}
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "POLE",
       "class": "Material",
@@ -1306,44 +1391,58 @@
     "eca_bld_metaltrim": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_trim_d.dds",
-          "detailMap": "/levels/east_coast_usa/art/shapes/buildings/eca_grungewood_b.dds",
+          "colorMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_d.dds",
+          "detailMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_grungewood_b.dds",
           "detailScale": [
             0.200000003,
             0.200000003
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_trim_n.dds",
+          "normalMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_n.dds",
           "pixelSpecular": true,
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_trim_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_trim_s.dds",
-          "specularPower": 1,
+          "reflectivityMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_r.dds",
+          "specularMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
-        {},
-        {},
-        {}
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "global_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_metaltrim",
       "materialTag0": "beamng",
       "materialTag1": "building",
       "materialTag2": "east_coast_usa",
       "name": "eca_bld_metaltrim",
-      "persistentId": "ba99d70a-41b3-4609-96b1-eb70f9893cee",
+      "persistentId": "7ef7b0b0-2102-4ebb-a86b-0f6ee1d5e54c",
       "specularStrength0": "0.588235",
       "translucentBlendOp": "None"
     },
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -1365,23 +1464,23 @@
     "eca_rocks": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/rocks/m_rocks_nz_jagged/rocks_nz_jagged_ao.data.png",
           "baseColorFactor": [
             1,
             1,
             0.999000013,
             1
           ],
-          "baseColorMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_b.color.png",
-          "detailMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_detail_b.data.png",
-          "detailNormalMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_detail_nm.normal.png",
+          "baseColorMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_b.color.png",
+          "detailMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_nm.normal.png",
           "detailNormalMapStrength": 0.300000012,
           "detailScale": [
             24,
             24
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_nm.normal.png",
-          "roughnessMap": "/levels/east_coast_usa/art/shapes/rocks/t_rocks_eca_r.data.png"
+          "normalMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_nm.normal.png",
+          "roughnessMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_r.data.png"
         },
         {},
         {},
@@ -1717,21 +1816,21 @@
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -1849,30 +1948,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -1885,10 +1997,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -1910,23 +2022,23 @@
     "eca_rocks": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/hirochi_raceway/art/shapes/rocks/t_rocks_eca_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/rocks/m_rocks_nz_jagged/rocks_nz_jagged_ao.data.png",
           "baseColorFactor": [
             1,
             0.974031985,
             0.934899986,
             1
           ],
-          "baseColorMap": "/levels/hirochi_raceway/art/shapes/rocks/t_rocks_eca_b.color.png",
-          "detailMap": "/levels/hirochi_raceway/art/shapes/rocks/t_rocks_eca_detail_b.data.png",
-          "detailNormalMap": "/levels/hirochi_raceway/art/shapes/rocks/t_rocks_eca_detail_nm.normal.png",
+          "baseColorMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_b.color.png",
+          "detailMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_nm.normal.png",
           "detailNormalMapStrength": 0.300000012,
           "detailScale": [
             8,
             8
           ],
-          "normalMap": "/levels/hirochi_raceway/art/shapes/rocks/t_rocks_eca_nm.normal.png",
-          "roughnessMap": "/levels/hirochi_raceway/art/shapes/rocks/t_rocks_eca_r.data.png"
+          "normalMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_nm.normal.png",
+          "roughnessMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_r.data.png"
         },
         {},
         {},
@@ -2055,28 +2167,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -2120,20 +2232,20 @@
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {
@@ -2180,21 +2292,21 @@
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -2312,30 +2424,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -2348,10 +2473,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -2373,23 +2498,23 @@
     "eca_rocks": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/industrial/art/shapes/rocks/t_rocks_eca_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/rocks/m_rocks_nz_jagged/rocks_nz_jagged_ao.data.png",
           "baseColorFactor": [
             1,
             1,
             0.999000013,
             1
           ],
-          "baseColorMap": "/levels/industrial/art/shapes/rocks/t_rocks_eca_b.color.png",
-          "detailMap": "/levels/industrial/art/shapes/rocks/t_rocks_eca_detail_b.data.png",
-          "detailNormalMap": "/levels/industrial/art/shapes/rocks/t_rocks_eca_detail_nm.normal.png",
+          "baseColorMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_b.color.png",
+          "detailMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_nm.normal.png",
           "detailNormalMapStrength": 0.300000012,
           "detailScale": [
             24,
             24
           ],
-          "normalMap": "/levels/industrial/art/shapes/rocks/t_rocks_eca_nm.normal.png",
-          "roughnessMap": "/levels/industrial/art/shapes/rocks/t_rocks_eca_r.data.png"
+          "normalMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_nm.normal.png",
+          "roughnessMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_r.data.png"
         },
         {},
         {},
@@ -2519,28 +2644,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -2584,20 +2709,20 @@
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {
@@ -2683,30 +2808,55 @@
     "bld_glass_transparent": {
       "Stages": [
         {
-          "colorMap": "/levels/italy/art/shapes/buildings/italy_bld_glass_d.dds",
+          "baseColorFactor": [
+            0.894117713,
+            0.960784376,
+            0.996078491,
+            0.561999977
+          ],
+          "baseColorMap": "/assets/materials/tileable/glass/bld_glass_transparent/italy_bld_glass_d.dds",
           "detailNormalMapStrength": 0.5,
           "detailScale": [
             8,
             8
           ],
-          "diffuseColor": [
-            0.894117713,
-            0.960784376,
-            0.9960784912,
-            0.561999977
-          ],
+          "metallicFactor": 0.800000012,
+          "opacityFactor": 0.600000024,
+          "roughnessFactor": 0.00999999978,
           "specular": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
-          ],
-          "specularMap": "/levels/italy/art/shapes/buildings/Italy_bld_glass_s.dds",
-          "specularPower": 19
+          ]
         },
-        {},
-        {},
-        {}
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "roughnessFactor": null,
+          "specular": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "roughnessFactor": null,
+          "specular": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "roughnessFactor": null,
+          "specular": null
+        }
       ],
       "alphaRef": 0,
       "annotation": "BUILDINGS",
@@ -2720,7 +2870,10 @@
       "name": "bld_glass_transparent",
       "persistentId": "cf12cada-35ab-42ea-ab81-eb203c464e82",
       "specularStrength0": "0.490196",
-      "translucent": true
+      "translucent": true,
+      "translucentBlendOp": "PreMulAlpha",
+      "translucentRecvShadows": true,
+      "version": 1.5
     },
     "cypress": {
       "Stages": [
@@ -2781,30 +2934,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -2817,20 +2983,38 @@
     "eca_bld_metal_01_white_annotation_pole": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_01_d_white.dds",
-          "detailMap": "/levels/east_coast_usa/art/shapes/buildings/eca_grungewood_b.dds",
+          "colorMap": "/assets/materials/tileable/metal/eca_bld_metal_01_white/eca_bld_metal_01_d_white.dds",
+          "detailMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_grungewood_b.dds",
           "detailScale": [
             0.200000003,
             0.200000003
           ],
           "pixelSpecular": true,
-          "specularPower": 26,
+          "roughnessFactor": 0.638332963,
           "useAnisotropic": true,
           "vertColor": true
         },
-        {},
-        {},
-        {}
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "POLE",
       "class": "Material",
@@ -2848,44 +3032,58 @@
     "eca_bld_metaltrim": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_trim_d.dds",
-          "detailMap": "/levels/east_coast_usa/art/shapes/buildings/eca_grungewood_b.dds",
+          "colorMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_d.dds",
+          "detailMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_grungewood_b.dds",
           "detailScale": [
             0.200000003,
             0.200000003
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_trim_n.dds",
+          "normalMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_n.dds",
           "pixelSpecular": true,
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_trim_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_metal_trim_s.dds",
-          "specularPower": 1,
+          "reflectivityMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_r.dds",
+          "specularMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_bld_metal_trim_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
-        {},
-        {},
-        {}
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "global_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_metaltrim",
       "materialTag0": "beamng",
       "materialTag1": "building",
       "materialTag2": "east_coast_usa",
       "name": "eca_bld_metaltrim",
-      "persistentId": "ba99d70a-41b3-4609-96b1-eb70f9893cee",
+      "persistentId": "7ef7b0b0-2102-4ebb-a86b-0f6ee1d5e54c",
       "specularStrength0": "0.588235",
       "translucentBlendOp": "None"
     },
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -2981,24 +3179,24 @@
     "italy_rocksface": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/italy/art/shapes/rocks/t_italy_rocksface_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/stone/m_marble_cut/t_italy_rocksface_ao.data.png",
           "baseColorFactor": [
             0.933333397,
             0.933333397,
             0.933333397,
             0.00800000038
           ],
-          "baseColorMap": "/levels/italy/art/shapes/rocks/t_italy_rocksface_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/stone/m_marble_cut/t_italy_rocksface_b.color.png",
           "detailBaseColorMapStrength": 0.25,
-          "detailMap": "/levels/italy/art/shapes/rocks/t_italy_rocksface_detail_b.data.png",
-          "detailNormalMap": "/levels/italy/art/shapes/rocks/t_italy_rocksface_detail_nm.normal.png",
+          "detailMap": "/assets/materials/baked_props/t_italy_rocksface_detail/t_italy_rocksface_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/baked_props/t_italy_rocksface_detail/t_italy_rocksface_detail_nm.normal.png",
           "detailNormalMapStrength": 1.5,
           "detailScale": [
             22,
             22
           ],
-          "normalMap": "/levels/italy/art/shapes/rocks/t_italy_rocksface_nm.normal.png",
-          "roughnessMap": "/levels/italy/art/shapes/rocks/t_italy_rocksface_r.data.png",
+          "normalMap": "/assets/materials/tileable/stone/m_marble_cut/t_italy_rocksface_nm.normal.png",
+          "roughnessMap": "/assets/materials/tileable/stone/m_marble_cut/t_italy_rocksface_r.data.png",
           "vertColor": true
         },
         {},
@@ -3698,38 +3896,24 @@
     }
   },
   "johnson_valley": {
-    "branches_strong": {
-      "Stages": [
-        {},
-        {},
-        {},
-        {}
-      ],
-      "class": "Material",
-      "groundDepth": 1,
-      "groundType": "branches_strong",
-      "mapTo": "branches_strong",
-      "name": "branches_strong",
-      "persistentId": "fd68c03b-68ae-4e0a-850e-a66f02004d54"
-    },
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -3855,30 +4039,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -3891,10 +4088,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -3928,20 +4125,6 @@
       "name": "leaves_strong",
       "persistentId": "7e8157dc-940e-4435-937b-e934d4e42892"
     },
-    "leaves_thin": {
-      "Stages": [
-        {},
-        {},
-        {},
-        {}
-      ],
-      "class": "Material",
-      "groundDepth": 1,
-      "groundType": "leaves_thin",
-      "mapTo": "leaves_thin",
-      "name": "leaves_thin",
-      "persistentId": "859cdbd4-7a36-4613-9344-b50a1d8745ea"
-    },
     "lod_vertcol": {
       "Stages": [
         {
@@ -3969,28 +4152,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -4034,23 +4217,23 @@
     "rocks_desert_ca": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/johnson_valley/art/shapes/rocks/t_rocks_desert_ca_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/decal/rock/rocks_desert_ca/t_rocks_desert_ca_ao.data.png",
           "baseColorFactor": [
             0.896924973,
             0.896915972,
             0.896915972,
             1
           ],
-          "baseColorMap": "/levels/johnson_valley/art/shapes/rocks/t_rocks_desert_ca_b.color.png",
-          "detailMap": "/levels/johnson_valley/art/shapes/rocks/t_rocks_pac_detail_b.data.png",
-          "detailNormalMap": "/levels/johnson_valley/art/shapes/rocks/t_rocks_pac_detail_n.normal.png",
+          "baseColorMap": "/assets/materials/decal/rock/rocks_desert_ca/t_rocks_desert_ca_b.color.png",
+          "detailMap": "/assets/materials/decal/rock/rocks_desert_ca/t_rocks_pac_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/decal/rock/rocks_desert_ca/t_rocks_pac_detail_n.normal.png",
           "detailNormalMapStrength": 0.699999988,
           "detailScale": [
             32,
             16
           ],
-          "normalMap": "/levels/johnson_valley/art/shapes/rocks/t_rocks_desert_ca_nm.normal.png",
-          "roughnessMap": "/levels/johnson_valley/art/shapes/rocks/t_rocks_desert_ca_r.data.png"
+          "normalMap": "/assets/materials/decal/rock/rocks_desert_ca/t_rocks_desert_ca_nm.normal.png",
+          "roughnessMap": "/assets/materials/decal/rock/rocks_desert_ca/t_rocks_desert_ca_r.data.png"
         },
         {},
         {},
@@ -4068,20 +4251,20 @@
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {
@@ -4128,21 +4311,21 @@
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -4179,30 +4362,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -4215,10 +4411,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -4237,46 +4433,19 @@
       "persistentId": "3b7d34ad-4b02-4c3f-8fb9-26ff0c34cb70",
       "translucentBlendOp": "None"
     },
-    "grass_field": {
-      "Stages": [
-        {
-          "ambientOcclusionMap": "/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_ao.data.png",
-          "baseColorMap": "/assets/materials/foliage/grass/t_grass_green_short_02/t_grass_green_short_02_b.color.png",
-          "normalMap": "/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_nm.normal.png",
-          "opacityMap": "/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_o.data.png",
-          "roughnessMap": "/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_r.data.png"
-        },
-        {},
-        {},
-        {}
-      ],
-      "alphaRef": 60,
-      "alphaTest": true,
-      "class": "Material",
-      "doubleSided": true,
-      "mapTo": "grass_field",
-      "materialTag0": "beamng",
-      "materialTag1": "vegetation",
-      "materialTag2": "vegetation",
-      "name": "grass_field",
-      "persistentId": "042e6281-839c-4e43-86d3-3993a2ccf809",
-      "subSurface": true,
-      "subSurfaceIntensity": 1,
-      "version": 1.5
-    },
     "jri_rocks": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/jungle_rock_island/art/shapes/rocks/t_rocks_pac_ao.data.png",
-          "baseColorMap": "/levels/jungle_rock_island/art/shapes/rocks/t_rocks_pac_b.color.png",
-          "detailMap": "/levels/jungle_rock_island/art/shapes/rocks/t_rocks_pac_detail_d.data.png",
-          "detailNormalMap": "/levels/jungle_rock_island/art/shapes/rocks/t_rocks_pac_detail_n.normal.png",
+          "ambientOcclusionMap": "/assets/materials/rocks/t_rocks_pac/t_rocks_pac_ao.data.png",
+          "baseColorMap": "/assets/materials/rocks/t_rocks_pac/t_rocks_pac_b.color.png",
+          "detailMap": "/assets/materials/decal/rock/rocks_desert_ca/t_rocks_pac_detail_d.data.png",
+          "detailNormalMap": "/assets/materials/decal/rock/rocks_desert_ca/t_rocks_pac_detail_n.normal.png",
           "detailScale": [
             32,
             32
           ],
-          "normalMap": "/levels/jungle_rock_island/art/shapes/rocks/t_rocks_pac_nm.normal.png",
-          "roughnessMap": "/levels/jungle_rock_island/art/shapes/rocks/t_rocks_pac_r.data.png",
+          "normalMap": "/assets/materials/rocks/t_rocks_pac/t_rocks_pac_nm.normal.png",
+          "roughnessMap": "/assets/materials/rocks/t_rocks_pac/t_rocks_pac_r.data.png",
           "vertColor": true
         },
         {},
@@ -4292,21 +4461,6 @@
       "persistentId": "6c071962-a8ff-4146-a7e0-b6185262b593",
       "translucentBlendOp": "None",
       "version": 1.5
-    },
-    "leaves_strong": {
-      "Stages": [
-        {},
-        {},
-        {},
-        {}
-      ],
-      "annotation": "NATURE",
-      "class": "Material",
-      "groundDepth": 0.600000024,
-      "groundType": "leaves_strong",
-      "mapTo": "leaves_strong",
-      "name": "leaves_strong",
-      "persistentId": "7e8157dc-940e-4435-937b-e934d4e42892"
     },
     "leaves_thin": {
       "Stages": [
@@ -4349,28 +4503,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -4645,21 +4799,21 @@
     "tro_tree_2_trunk": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/jungle_rock_island/art/shapes/trees/trees_tropical_2/t_tro_bark_02_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tree/tropical/tro_tree_2_trunk/t_tro_bark_02_ao.data.png",
           "baseColorFactor": [
             1,
             0.999994993,
             0.999989986,
             1
           ],
-          "baseColorMap": "/levels/jungle_rock_island/art/shapes/trees/trees_tropical_2/t_tro_bark_02_b.color.png",
-          "detailNormalMap": "/levels/jungle_rock_island/art/shapes/trees/trees_tropical_1/t_tro_bark_01_detail_nm.normal.png",
+          "baseColorMap": "/assets/materials/tree/tropical/tro_tree_2_trunk/t_tro_bark_02_b.color.png",
+          "detailNormalMap": "/assets/materials/tree/tropical/tro_tree_1_trunk/t_tro_bark_01_detail_nm.normal.png",
           "detailScale": [
             1,
             0.200000003
           ],
-          "normalMap": "/levels/jungle_rock_island/art/shapes/trees/trees_tropical_2/t_tro_bark_02_nm.normal.png",
-          "roughnessMap": "/levels/jungle_rock_island/art/shapes/trees/trees_tropical_2/t_tro_bark_02_r.data.png"
+          "normalMap": "/assets/materials/tree/tropical/tro_tree_2_trunk/t_tro_bark_02_nm.normal.png",
+          "roughnessMap": "/assets/materials/tree/tropical/tro_tree_2_trunk/t_tro_bark_02_r.data.png"
         },
         {},
         {},
@@ -4804,23 +4958,23 @@
     "vegetation_palm_02_single_side": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/jungle_rock_island/art/shapes/trees/trees_palm/t_palm_leaves_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tree/fan_palm/vegetation_palm_02/t_palm_leaves_ao.data.png",
           "baseColorFactor": [
             0.996078014,
             0.996078014,
             0.996078014,
             1
           ],
-          "baseColorMap": "/levels/jungle_rock_island/art/shapes/trees/trees_palm/t_palm_leaves_b.color.png",
+          "baseColorMap": "/assets/materials/tree/fan_palm/vegetation_palm_02/t_palm_leaves_b.color.png",
           "detailNormalMapStrength": 0.300000012,
           "detailScale": [
             4,
             4
           ],
-          "normalMap": "/levels/jungle_rock_island/art/shapes/trees/trees_palm/t_palm_leaves_nm.normal.png",
-          "opacityMap": "/levels/jungle_rock_island/art/shapes/trees/trees_palm/t_palm_leaves_o.data.png",
+          "normalMap": "/assets/materials/tree/fan_palm/vegetation_palm_02/t_palm_leaves_nm.normal.png",
+          "opacityMap": "/assets/materials/tree/fan_palm/vegetation_palm_02/t_palm_leaves_o.data.png",
           "roughnessFactor": 0.672736585,
-          "roughnessMap": "/levels/jungle_rock_island/art/shapes/trees/trees_palm/t_palm_leaves_r.data.png",
+          "roughnessMap": "/assets/materials/tree/fan_palm/vegetation_palm_02/t_palm_leaves_r.data.png",
           "specular": [
             0.996078014,
             0.996078014,
@@ -4896,20 +5050,20 @@
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {
@@ -4956,21 +5110,21 @@
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -5007,30 +5161,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -5043,10 +5210,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -5314,28 +5481,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -5379,20 +5546,20 @@
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {
@@ -5439,21 +5606,21 @@
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -5490,30 +5657,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -5526,10 +5706,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -5797,28 +5977,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -5859,12 +6039,31 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
-    "utah_rocks_a": {
+    "utah_rocks_b": {
       "Stages": [
         {
-          "colorMap": "/levels/GridMap/art/shapes/rocks/utah_rocks_a_d.dds",
-          "normalMap": "/levels/GridMap/art/shapes/rocks/utah_rocks_a_n.dds",
-          "specularPower": 1
+          "ambientOcclusionMap": "/assets/materials/rocks/utah_rocks_b/t_rocks_utah_ao.data.png",
+          "baseColorFactor": [
+            1,
+            0.999993026,
+            0.999989986,
+            1
+          ],
+          "baseColorMap": "/assets/materials/rocks/utah_rocks_b/t_rocks_utah_b.color.png",
+          "detailMap": "/assets/materials/rocks/utah_rocks_b/t_rocks_utah_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/rocks/utah_rocks_b/t_rocks_utah_detail_nm.normal.png",
+          "detailScale": [
+            32,
+            32
+          ],
+          "normalMap": "/assets/materials/rocks/utah_rocks_b/t_rocks_utah_nm.normal.png",
+          "roughnessMap": "/assets/materials/rocks/utah_rocks_b/t_rocks_utah_r.data.png",
+          "specular": [
+            0.396077991,
+            0.396077991,
+            0.396077991,
+            0.00800000038
+          ]
         },
         {},
         {},
@@ -5872,29 +6071,32 @@
       ],
       "class": "Material",
       "groundType": "ROCK",
-      "mapTo": "utah_rocks_a",
-      "materialTag0": "beamng",
-      "materialTag1": "Natural",
-      "name": "utah_rocks_a",
-      "persistentId": "020ff0de-c97e-4cc6-a82b-8d26c23f7016"
+      "mapTo": "utah_rocks_b",
+      "materialTag0": "Utah",
+      "materialTag1": "rock",
+      "materialTag2": "east_coast_usa",
+      "name": "utah_rocks_b",
+      "persistentId": "2dac091c-1fea-467a-808f-610c8ea8b7b0",
+      "specularStrength0": "0.490196",
+      "version": 1.5
     },
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {
@@ -5938,38 +6140,24 @@
     }
   },
   "west_coast": {
-    "branches_strong": {
-      "Stages": [
-        {},
-        {},
-        {},
-        {}
-      ],
-      "class": "Material",
-      "groundDepth": 1,
-      "groundType": "branches_strong",
-      "mapTo": "branches_strong",
-      "name": "branches_strong",
-      "persistentId": "fd68c03b-68ae-4e0a-850e-a66f02004d54"
-    },
     "concrete_plain": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
           "baseColorFactor": [
             0.881534994,
             0.881525993,
             0.881525993,
             1
           ],
-          "baseColorMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
           "detailScale": [
             4,
             0.5
           ],
-          "normalMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_nm.normal.png",
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_concrete_plain/t_concrete_plain_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
           "vertColor": true
         },
         {
@@ -6095,30 +6283,43 @@
     "eca_bld_cleanmetal": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/null.dds",
+          "colorMap": "/assets/materials/tileable/metal/italy_corrugated_metal/null.dds",
           "diffuseColor": [
-            0.9960780144,
-            0.9960780144,
-            0.9960780144,
+            0.996078014,
+            0.996078014,
+            0.996078014,
             1
           ],
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "reflectivityMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_r.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_cleanmetal_s.dds",
-          "specularPower": 11,
+          "normalMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "reflectivityMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_r.dds",
+          "roughnessFactor": 0.812008262,
+          "specularMap": "/assets/materials/tileable/metal/eca_bld_cleanmetal/eca_bld_cleanmetal_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
         {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
           "vertColor": true
         },
-        {},
-        {}
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
       ],
       "annotation": "BUILDINGS",
       "class": "Material",
-      "cubemap": "eca_cubemap_metalblurred",
+      "dynamicCubemap": true,
       "groundType": "METAL",
       "mapTo": "eca_bld_cleanmetal",
       "materialTag0": "beamng",
@@ -6131,10 +6332,10 @@
     "eca_bld_wood": {
       "Stages": [
         {
-          "colorMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_d.dds",
-          "normalMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_n.dds",
-          "overlayMap": "/levels/east_coast_usa/art/shapes/buildings/eca_breakup_texture.dds",
-          "specularMap": "/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_s.dds",
+          "colorMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_s.dds",
           "useAnisotropic": true,
           "vertColor": true
         },
@@ -6156,23 +6357,23 @@
     "eca_rocks": {
       "Stages": [
         {
-          "ambientOcclusionMap": "/levels/west_coast_usa/art/shapes/rocks/t_rocks_eca_ao.data.png",
+          "ambientOcclusionMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_ao.data.png",
           "baseColorFactor": [
             1,
             0.948472023,
             0.896924973,
             1
           ],
-          "baseColorMap": "/levels/west_coast_usa/art/shapes/rocks/t_rocks_eca_b.color.png",
-          "detailMap": "/levels/west_coast_usa/art/shapes/rocks/t_rocks_eca_detail_b.data.png",
-          "detailNormalMap": "/levels/west_coast_usa/art/shapes/rocks/t_rocks_eca_detail_nm.normal.png",
+          "baseColorMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_b.color.png",
+          "detailMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_b.data.png",
+          "detailNormalMap": "/assets/materials/rocks/t_rocks_eca_detail/t_rocks_eca_detail_nm.normal.png",
           "detailNormalMapStrength": 0.300000012,
           "detailScale": [
             24,
             24
           ],
-          "normalMap": "/levels/west_coast_usa/art/shapes/rocks/t_rocks_eca_nm.normal.png",
-          "roughnessMap": "/levels/west_coast_usa/art/shapes/rocks/t_rocks_eca_r.data.png"
+          "normalMap": "/assets/materials/rocks/t_rocks_eca/t_rocks_eca_nm.normal.png",
+          "roughnessMap": "/assets/materials/rocks/wca_t_rocks_eca/t_rocks_eca_r.data.png"
         },
         {},
         {},
@@ -6205,20 +6406,6 @@
       "name": "leaves_strong",
       "persistentId": "7e8157dc-940e-4435-937b-e934d4e42892"
     },
-    "leaves_thin": {
-      "Stages": [
-        {},
-        {},
-        {},
-        {}
-      ],
-      "class": "Material",
-      "groundDepth": 1,
-      "groundType": "leaves_thin",
-      "mapTo": "leaves_thin",
-      "name": "leaves_thin",
-      "persistentId": "859cdbd4-7a36-4613-9344-b50a1d8745ea"
-    },
     "lod_vertcol": {
       "Stages": [
         {
@@ -6246,28 +6433,28 @@
     "metal_galvanized": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/t_metal_galvanized_01_b.color.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
           "detailScale": [
             0.100000001,
             0.100000001
           ],
           "diffuseMapUseUV": null,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/t_metal_galvanized_02_m.data.png",
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
           "opacityFactor": null,
           "opacityMapUseUV": null,
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/t_metal_galvanized_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
           "roughnessMapUseUV": null,
           "vertColor": true
         },
         {
-          "baseColorMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_b.color.png",
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
           "detailScale": null,
           "diffuseMapUseUV": 1,
           "metallicFactor": null,
           "opacityFactor": 0.800000012,
-          "opacityMap": "/levels/automation_test_track/art/shapes/buildings/t_breakup_general_o.data.png",
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
           "opacityMapUseUV": 1,
           "pixelSpecular": null,
           "roughnessMapUseUV": 1,
@@ -6311,20 +6498,20 @@
     "wca_objects1": {
       "Stages": [
         {
-          "baseColorMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_b.color.png",
+          "baseColorMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_b.color.png",
           "emissiveFactor": [
             1,
             1,
             1
           ],
           "emissiveIntensityNits": 4000,
-          "emissiveMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_e.color.png",
+          "emissiveMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_e.color.png",
           "instanceEmissive": true,
           "metallicFactor": 1,
-          "metallicMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_m.data.png",
-          "normalMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_nm.normal.png",
+          "metallicMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_m.data.png",
+          "normalMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_nm.normal.png",
           "pixelSpecular": true,
-          "roughnessMap": "/art/shapes/objects/m_wca_objects1/t_wca_objects1_r.data.png",
+          "roughnessMap": "/assets/materials/baked_props/wca_objects1/t_wca_objects1_r.data.png",
           "vertColor": true
         },
         {

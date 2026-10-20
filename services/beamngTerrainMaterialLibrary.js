@@ -1,9 +1,9 @@
 // GENERATED FILE — do not edit by hand.
-// Built by scripts/build-terrain-material-library.py from BeamNG 0.39.0.0.
+// Built by scripts/build-terrain-material-library.py from BeamNG 0.40.0.0.
 // Per-level TerrainMaterial templates for MapNG's semantic slots. All
 // detail/macro textures resolve to core /assets/... paths; base slots are
 // placeholders the exporter overwrites with the generated satellite base.
-export const TERRAIN_MATERIAL_LIBRARY_VERSION = '0.39.0.0';
+export const TERRAIN_MATERIAL_LIBRARY_VERSION = '0.40.0.0';
 
 export const TERRAIN_MATERIAL_LIBRARY = {
   "automation_test_track": {

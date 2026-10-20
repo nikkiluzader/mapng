@@ -397,12 +397,14 @@ const ASSET_SETS = {
         trunkBendScale: 0.00400000019,
         windScale: 0.400000006,
       },
-      utah_rock_small_a: {
-        name: 'utah_rock_small_a',
-        internalName: 'utah_rock_small_a',
+      // 0.40 removed the GridMap level (and Utah never shipped utah_rock_small_a
+      // itself); utah_rock_flat_a is the closest small rock vanilla Utah defines.
+      utah_rock_flat_a: {
+        name: 'utah_rock_flat_a',
+        internalName: 'utah_rock_flat_a',
         class: 'TSForestItemData',
-        radius: 0.5,
-        shapeFile: 'levels/GridMap/art/shapes/rocks/utah_rock_small_a.dae',
+        radius: 0.800000012,
+        shapeFile: '/levels/Utah/art/shapes/rocks/utah_rock_flat_a.dae',
       },
     },
     vegetationSelectors: {
@@ -411,7 +413,7 @@ const ASSET_SETS = {
       bush: 'Juniper_bush_large_01',
       hedgeBush: 'Juniper_bush_large_01',
     },
-    rockCandidates: ['utah_rock_small_a'],
+    rockCandidates: ['utah_rock_flat_a'],
     groundCover: {
       materialName: 'dry_grass',
       materialDef: UTAH_GROUNDCOVER_MATERIAL,
@@ -714,19 +716,6 @@ const ASSET_SETS = {
         annotation: 'NATURE',
         radius: 0.5,
         shapeFile: '/levels/jungle_rock_island/art/shapes/trees/trees_tropical_2/tro_tree_2_medium.dae',
-      },
-      grass_field_sml: {
-        name: 'grass_field_sml',
-        internalName: 'grass_field_sml',
-        class: 'TSForestItemData',
-        collidable: false,
-        detailAmp: 0.5,
-        detailFreq: 0.5,
-        radius: 0.200000003,
-        shapeFile: 'levels/GridMap/art/shapes/groundcover/grass_field_sml.dae',
-        tightnessCoefficient: 4,
-        trunkBendScale: 0.100000001,
-        windScale: 0.5,
       },
       pac_rock_small_1: {
         name: 'pac_rock_small_1',
