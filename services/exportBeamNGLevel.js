@@ -6955,6 +6955,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // Write Biome materials (which used to be in art/shapes/) to map_assets/official_assets/biome_materials/
   // because they override official names without having specific meshes.
   const biomeRuntimeDefs = getBiomeRuntimeMaterialDefs(biome);
+  // The GroundCover material comes from the first asset set that has one, which
+  // need not be the biome's own (West Coast USA borrows East Coast's BNGGrass),
+  // so define it from the profile itself or the grass renders "not found".
+  const groundCoverProfile = getGroundCoverProfile(biome);
+  if (groundCoverProfile?.materialName && groundCoverProfile.materialDef && !biomeRuntimeDefs[groundCoverProfile.materialName]) {
+    biomeRuntimeDefs[groundCoverProfile.materialName] = groundCoverProfile.materialDef;
+  }
   zip.file(`${base}/map_assets/official_assets/biome_materials/main.materials.json`, JSON.stringify(biomeRuntimeDefs, null, 2));
 
   // Per-biome shape material defs harvested from the game install

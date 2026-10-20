@@ -658,3 +658,38 @@ test('exportBeamNGLevel ships textured buildings with every material defined', a
     restorePolyfills();
   }
 });
+
+test('every biome defines the material of every GroundCover it emits', async () => {
+  // West Coast USA borrows East Coast's BNGGrass profile; the def used to be
+  // written only for biomes whose own runtime set held it (in-game: "Material
+  // BNGGrass was not found" and untextured grass everywhere).
+  const { BEAMNG_BIOMES } = await import('../services/beamngBiomeCatalog.js');
+  const biomeIds = (Array.isArray(BEAMNG_BIOMES) ? BEAMNG_BIOMES : Object.values(BEAMNG_BIOMES || {})).map((b) => b.id);
+  assert.ok(biomeIds.length >= 10, `found ${biomeIds.length} biomes`);
+  const restorePolyfills = installCanvasPolyfill();
+  try {
+    for (const biomeId of biomeIds) {
+      const result = await exportBeamNGLevel(makeTerrainData(), { lat: 0.5, lng: 0.5 }, {
+        roadType: 'decal', levelName: 'mapng_demo', biomeId, baseTexture: 'none', pbrSource: 'none',
+        includeBuildings: false, applyFoundations: false, includeBackdrop: false, includeWater: false,
+        includeTrees: true, includeRocks: false, includeNativeBarriers: false,
+      });
+      const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+      const defined = new Set();
+      const used = new Set();
+      for (const path of Object.keys(zip.files)) {
+        const text = path.endsWith('.json') ? await zip.file(path).async('string') : null;
+        if (!text) continue;
+        if (path.endsWith('materials.json')) {
+          for (const [k, v] of Object.entries(JSON.parse(text))) { defined.add(k); if (v?.name) defined.add(v.name); }
+        } else if (path.endsWith('items.level.json')) {
+          for (const obj of parseNDJSON(text)) if (obj?.class === 'GroundCover' && obj.material) used.add(obj.material);
+        }
+      }
+      assert.ok(used.size > 0, `${biomeId}: emits GroundCover`);
+      for (const m of used) assert.ok(defined.has(m), `${biomeId}: GroundCover material ${m} is defined`);
+    }
+  } finally {
+    restorePolyfills();
+  }
+});
