@@ -23,6 +23,7 @@ import glob
 import json
 import os
 import re
+import subprocess
 import sys
 import zipfile
 
@@ -37,6 +38,7 @@ SOURCES = [
     "services/beamngRuntimeMaterialCatalog.js",
     "services/beamngFuelStationMaterials.js",
     "services/beamngSignals.js",
+    "services/beamngBuildings.js",
     "services/exportBeamNGLevel.js",
     "public/beamng_shape_materials.json",
 ]
@@ -82,11 +84,30 @@ def cdae_material_names(data):
     return names
 
 
+# Material definitions assembled at runtime (template paths the text scan
+# above cannot see): node prints their JSON and the same regex reads it.
+GENERATED_DEFS = [
+    ("services/beamngBuildings.js", "getBuildingMaterialDefs"),
+]
+
+
+def generated_defs_text():
+    out = []
+    for module, fn in GENERATED_DEFS:
+        res = subprocess.run(
+            ["node", "-e", f"import('./{module}').then((m) => console.log(JSON.stringify(m.{fn}())))"],
+            cwd=REPO, capture_output=True, text=True, check=True,
+        )
+        out.append(res.stdout)
+    return "\n".join(out)
+
+
 def collect_referenced_paths():
     refs = set()
     for src in SOURCES:
         with open(os.path.join(REPO, src), encoding="utf-8") as f:
             refs.update(m.group(1) for m in PATH_RE.finditer(f.read()))
+    refs.update(m.group(1) for m in PATH_RE.finditer(generated_defs_text()))
     return sorted(refs)
 
 

@@ -619,3 +619,36 @@ test('exportBeamNGLevel scales terrain base slots in grid squares, not world met
     restorePolyfills();
   }
 });
+
+test('exportBeamNGLevel ships textured buildings with every material defined', async () => {
+  const restorePolyfills = installCanvasPolyfill();
+  try {
+    const d = 12 / 111320;   // ~12 m in degrees near the equator
+    const building = (id, lat, lng, tags) => ({
+      id, type: 'building', tags,
+      geometry: [
+        { lat, lng }, { lat, lng: lng + d }, { lat: lat + d * 0.75, lng: lng + d }, { lat: lat + d * 0.75, lng },
+      ],
+    });
+    const base = 'levels/mapng_demo';
+    const zip = await runExportForRoadType('decal', {
+      includeBuildings: true,
+      terrainOverrides: {
+        osmFeatures: [
+          building('b1', 0.5, 0.5, { building: 'house' }),
+          building('b2', 0.4, 0.4, { building: 'retail', 'building:levels': '3' }),
+        ],
+      },
+    });
+    const dae = await zip.file(`${base}/map_assets/custom_assets/osm_objects/osm_objects.dae`)?.async('string');
+    assert.ok(dae, 'osm_objects.dae exported');
+    const used = new Set([...dae.matchAll(/<material id="[^"]+" name="([^"]+)"/g)].map((m) => m[1]));
+    assert.ok([...used].some((n) => n.startsWith('mapng_bld_')), `textured materials used: ${[...used]}`);
+    assert.match(dae, /<geometry id="Colmesh-1/, 'buildings collide');
+
+    const defs = JSON.parse(await zip.file(`${base}/map_assets/custom_assets/osm_objects/main.materials.json`).async('string'));
+    for (const name of used) assert.ok(defs[name], `material ${name} defined`);
+  } finally {
+    restorePolyfills();
+  }
+});

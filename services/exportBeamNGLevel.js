@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
+import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
@@ -577,9 +578,18 @@ function generateRoadArchitectHeightmapPng(terrainData, terrainBlockMaxHeight) {
 async function generateOSMObjectsDAE(terrainData, worldSize) {
   if (!terrainData.osmFeatures?.length) return null;
 
+  // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
+  // straight in world space (services/beamngBuildings.js).
+  const squareSize = worldSize / terrainData.width;
+  const { meshes: buildingMeshes } = buildTexturedBuildings(
+    terrainData.osmFeatures,
+    (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
+  );
+
   // Barriers are exported as native TSStatic objects in BeamNG scene JSON,
   // not baked into the generic OSM DAE mesh.
   const osmGroup = createOSMGroup(terrainData, {
+    includeBuildings: false,
     includeVegetation: false,
     includeBarriers: false,
     // Signs are placed as native BeamNG sign assets (see buildNativeSignObjects),
@@ -594,7 +604,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize) {
 
   // Verify there is at least one mesh child — an empty group means no features
   // were of a type that produces geometry (e.g. only road centrelines).
-  let hasMesh = false;
+  let hasMesh = buildingMeshes.length > 0;
   osmGroup.traverse(c => { if (c.isMesh) hasMesh = true; });
   if (!hasMesh) return null;
 
@@ -607,7 +617,26 @@ async function generateOSMObjectsDAE(terrainData, worldSize) {
     0,  0,  0,  1,
   );
 
+  // Collision: every building's walls and roofs, positions only.
+  // BeamNG identifies collision geometry by the <geometry id> starting with "Col".
   let buildingCollisionMesh = null;
+  if (buildingMeshes.length > 0) {
+    const parts = buildingMeshes.map((mesh) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', mesh.geometry.getAttribute('position').clone());
+      return g;
+    });
+    const collisionGeom = mergeGeometries(parts);
+    parts.forEach((g) => g.dispose());
+    if (collisionGeom) {
+      collisionGeom.name = 'Colmesh-1';
+      buildingCollisionMesh = new THREE.Mesh(
+        collisionGeom,
+        new THREE.MeshBasicMaterial({ name: 'osm_object', color: 0xffffff }),
+      );
+      buildingCollisionMesh.name = 'Colmesh-1';
+    }
+  }
 
   osmGroup.traverse(child => {
     if (!child.isMesh) return;
@@ -653,6 +682,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize) {
   const start01 = new THREE.Group();
   start01.name = 'start01';
   start01.add(osmGroup);
+  for (const mesh of buildingMeshes) start01.add(mesh);
   if (buildingCollisionMesh) start01.add(buildingCollisionMesh);
   base00.add(start01);
 
@@ -6881,7 +6911,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
           annotation: 'BUILDINGS',
           Stages: [{ diffuseColor: [1, 1, 1, 1], vertColor: true }],
           translucentBlendOp: 'None',
-        }
+        },
+        ...getBuildingMaterialDefs(),
       }, null, 2));
     }
     if (backdropDaeData) {
