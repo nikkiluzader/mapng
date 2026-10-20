@@ -1,3 +1,10 @@
+import {
+  findSignalApproaches,
+  makeProjector,
+  roadHalfWidth,
+  splitApproachesByAxis,
+} from './signalApproaches.js';
+
 const ROAD_SKIP = new Set([
   'footway', 'path', 'pedestrian', 'steps', 'cycleway',
   'bridleway', 'corridor', 'proposed', 'construction',
@@ -705,46 +712,59 @@ function buildSequencePhases(lightGroups, controllersById) {
     }));
 }
 
+// Stop points sit on the road surface (West Coast USA: median 0.0 m above
+// the nearest DecalRoad node), so the closest-edge search finds the approach.
+const STOP_POINT_Z = 0.1;
+
+function makeSignalEntry(approach, projector, terrainData, squareSize, roadFeatures) {
+  const point = projector.unproject(approach.x, approach.y);
+  const len = Math.hypot(approach.dir[0], approach.dir[1]) || 1;
+  const dir = [approach.dir[0] / len, approach.dir[1] / len, 0];
+  const explicitLaneRole = approach.hintTags ? inferSignalLaneRole(approach.hintTags) : 'unknown';
+  return {
+    approach,
+    point,
+    pos: geoToWorld(point.lat, point.lng, terrainData, squareSize, STOP_POINT_Z),
+    dir: dir.map((v) => Math.round(v * 1e6) / 1e6),
+    protectedTurnHint: hasProtectedTurnHintNearPoint(point, dir, roadFeatures),
+    laneRole: explicitLaneRole !== 'unknown' ? explicitLaneRole : inferRoadLaneRoleNearPoint(point, dir, roadFeatures),
+    roadPriorityScore: getRoadPriorityScore(approach.highway),
+  };
+}
+
 function buildSignalArtifacts(terrainData, squareSize) {
   const emptySignalData = { instances: [], controllers: [], sequences: [] };
+  const empty = { signalData: emptySignalData, controllerDefinitions: null, placements: [] };
 
   const osmFeatures = Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures : [];
   const candidates = collectSignalCandidates(osmFeatures);
-  if (candidates.length === 0) {
-    return { signalData: emptySignalData, controllerDefinitions: null };
-  }
+  const bounds = terrainData?.bounds;
+  if (candidates.length === 0 || !bounds) return empty;
 
   const roadFeatures = osmFeatures.filter(shouldUseRoadForSignals);
-
-  const entries = candidates.map((candidate) => {
-    const dir = findNearestRoadDirection(candidate.point, roadFeatures);
-    const roadLaneRole = inferRoadLaneRoleNearPoint(candidate.point, dir, roadFeatures);
-    const nearestRoadHighway = inferNearestRoadHighwayNearPoint(candidate.point, dir, roadFeatures);
-    const explicitLaneRole = inferSignalLaneRole(candidate.tags || {});
-    return {
-      ...candidate,
-      pos: geoToWorld(candidate.point.lat, candidate.point.lng, terrainData, squareSize, candidate.kind === 'traffic_light' ? 3.5 : 2.5),
-      dir,
-      protectedTurnHint: hasProtectedTurnHintNearPoint(candidate.point, dir, roadFeatures),
-      laneRole: explicitLaneRole !== 'unknown' ? explicitLaneRole : roadLaneRole,
-      roadPriorityScore: getRoadPriorityScore(nearestRoadHighway),
-    };
+  const projector = makeProjector((bounds.north + bounds.south) / 2, (bounds.east + bounds.west) / 2);
+  const { intersections, stopApproaches } = findSignalApproaches({
+    roads: roadFeatures,
+    signalPoints: candidates.filter((c) => c.kind === 'traffic_light'),
+    stopPoints: candidates.filter((c) => c.kind === 'stop'),
+    projector,
   });
+  const entryFor = (approach) => makeSignalEntry(approach, projector, terrainData, squareSize, roadFeatures);
 
   const controllers = [];
   const instances = [];
   const sequences = [];
+  const placements = [];
   const controllersById = new Map();
   let nextId = 1;
   const allocId = () => nextId++;
-
   const signalOptions = { euroSignals: !!terrainData?.roadRules?.euroSignals };
 
   // Give-way points get no signal instance: BeamNG's AI never acts on yield
   // (action 4), and a custom "stop" yield state left AI waiting forever.
   // They lower the way's drivability instead (beamngMapNavigation).
   let stopControllerId = null;
-  for (const entry of entries.filter((item) => item.kind === 'stop')) {
+  for (const approach of stopApproaches) {
     if (stopControllerId === null) {
       stopControllerId = allocId();
       controllers.push({
@@ -756,11 +776,12 @@ function buildSignalArtifacts(terrainData, squareSize) {
       });
       controllersById.set(stopControllerId, controllers[controllers.length - 1]);
     }
-
+    const entry = entryFor(approach);
     const instanceId = allocId();
+    const name = `stop ${instanceId}`;
     instances.push({
       id: instanceId,
-      name: `stop ${instanceId}`,
+      name,
       controllerId: stopControllerId,
       sequenceId: 0,
       pos: entry.pos,
@@ -768,18 +789,15 @@ function buildSignalArtifacts(terrainData, squareSize) {
       group: `group_stop_${stopControllerId}`,
       startDisabled: false,
     });
+    placements.push({ kind: 'stop', instanceName: name, approach });
   }
 
-  const trafficLights = entries.filter((item) => item.kind === 'traffic_light');
-  const clusters = clusterTrafficLights(trafficLights);
-
-  clusters.forEach((cluster, clusterIndex) => {
-    const { ns, ew } = splitTrafficLightClusterByAxis(cluster.members);
+  intersections.forEach((intersection, clusterIndex) => {
+    const [primary, secondary] = splitApproachesByAxis(intersection.approaches);
 
     const lightGroups = [];
-    lightGroups.push(...buildAxisLightGroups('ns', ns, clusterIndex, allocId, controllers, controllersById, signalOptions));
-    lightGroups.push(...buildAxisLightGroups('ew', ew, clusterIndex, allocId, controllers, controllersById, signalOptions));
-
+    lightGroups.push(...buildAxisLightGroups('ns', primary.map(entryFor), clusterIndex, allocId, controllers, controllersById, signalOptions));
+    lightGroups.push(...buildAxisLightGroups('ew', secondary.map(entryFor), clusterIndex, allocId, controllers, controllersById, signalOptions));
     if (lightGroups.length === 0) return;
 
     const axisCount = new Set(lightGroups.map((group) => group.axis)).size;
@@ -800,14 +818,23 @@ function buildSignalArtifacts(terrainData, squareSize) {
     for (const group of lightGroups) {
       for (const member of group.members) {
         const id = allocId();
+        const name = `trafficLight ${id}`;
         created.push({
           id,
-          name: `trafficLight ${id}`,
+          name,
           controllerId: group.controllerId,
           sequenceId,
           pos: member.pos,
           dir: member.dir,
           startDisabled: false,
+        });
+        placements.push({
+          kind: 'traffic_light',
+          instanceName: name,
+          approach: member.approach,
+          center: intersection.center,
+          midblock: intersection.midblock,
+          otherApproaches: intersection.approaches,
         });
       }
     }
@@ -822,12 +849,159 @@ function buildSignalArtifacts(terrainData, squareSize) {
   return {
     signalData: { instances, controllers, sequences },
     controllerDefinitions: null,
+    placements,
+    projector,
+    roadFeatures,
   };
 }
 
+// ── Visible signal props ─────────────────────────────────────────────────
+// West Coast USA mounts trafficlight_overhead1 heads on pole_traffic1 posts,
+// head centre 3.0 m above the post base (73 of its heads). The head's lenses
+// face its local +X. A head lights up when it carries `signalInstance` and
+// `dynamic` (core/trafficSignals.lua), so heads link to their instance.
+export const SIGNAL_HEAD_SHAPE = '/art/shapes/objects/trafficlight_overhead1.dae';
+export const SIGNAL_POLE_SHAPE = '/levels/west_coast_usa/art/shapes/objects/pole_traffic1.dae';
+const HEAD_HEIGHT_M = 3.0;
+const HEAD_FORWARD_M = 0.15;
+const POLE_KERB_GAP_M = 1.2;
+const POLE_CLEARANCE_M = 0.6;
+const POLE_SHIFT_STEP_M = 0.5;
+const POLE_SHIFT_MAX_M = 4;
+const FAR_SIDE_REACH_M = 2.5;
+const STOP_SIGN_KERB_GAP_M = 1.5;
+// North America hangs signals on the far side of the junction; elsewhere
+// they stand at the stop line.
+const FAR_SIDE_COUNTRIES = new Set(['US', 'CA', 'MX']);
+
+function makeRoadClearance(roadFeatures, projector) {
+  const CELL = 25;
+  const grid = new Map();
+  const segments = [];
+  for (const road of roadFeatures) {
+    const half = roadHalfWidth(road.tags);
+    const pts = road.geometry.map((pt) => projector.project(pt));
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const seg = { a: pts[i], b: pts[i + 1], half };
+      const idx = segments.push(seg) - 1;
+      const pad = half + POLE_CLEARANCE_M;
+      const x0 = Math.floor((Math.min(seg.a[0], seg.b[0]) - pad) / CELL);
+      const x1 = Math.floor((Math.max(seg.a[0], seg.b[0]) + pad) / CELL);
+      const y0 = Math.floor((Math.min(seg.a[1], seg.b[1]) - pad) / CELL);
+      const y1 = Math.floor((Math.max(seg.a[1], seg.b[1]) + pad) / CELL);
+      for (let gx = x0; gx <= x1; gx++) {
+        for (let gy = y0; gy <= y1; gy++) {
+          const key = `${gx},${gy}`;
+          if (!grid.has(key)) grid.set(key, []);
+          grid.get(key).push(idx);
+        }
+      }
+    }
+  }
+  return (x, y) => {
+    for (const idx of grid.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || []) {
+      const { a, b, half } = segments[idx];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const len = dx * dx + dy * dy;
+      const t = len > 0 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / len)) : 0;
+      if (Math.hypot(a[0] + t * dx - x, a[1] + t * dy - y) < half + POLE_CLEARANCE_M) return false;
+    }
+    return true;
+  };
+}
+
+/**
+ * Posts + linked heads for traffic-light approaches, and stop signs for stop
+ * approaches derived without a mapped sign (stop=all, junction-node stops).
+ * Returns world-space props: { kind, position, yaw, signalInstance? }.
+ */
+function buildSignalProps({ placements = [], projector, roadFeatures = [] }, terrainData, squareSize) {
+  if (!placements.length || !projector) return [];
+  const isClear = makeRoadClearance(roadFeatures, projector);
+  const leftHandTraffic = !!terrainData?.roadRules?.leftHandTraffic;
+  const countryCode = terrainData?.roadRules?.countryCode;
+  const farSide = !countryCode || FAR_SIDE_COUNTRIES.has(countryCode);
+  const toWorld = (x, y, zOffset = 0) => {
+    const ll = projector.unproject(x, y);
+    return geoToWorld(ll.lat, ll.lng, terrainData, squareSize, zOffset).map((v) => Math.round(v * 1000) / 1000);
+  };
+  const findClearSpot = (x, y, sideX, sideY) => {
+    for (let shift = 0; shift <= POLE_SHIFT_MAX_M; shift += POLE_SHIFT_STEP_M) {
+      const px = x + sideX * shift;
+      const py = y + sideY * shift;
+      if (isClear(px, py)) return [px, py];
+    }
+    return null;
+  };
+
+  const props = [];
+  let dropped = 0;
+  for (const placement of placements) {
+    const a = placement.approach;
+    const len = Math.hypot(a.dir[0], a.dir[1]) || 1;
+    const d = [a.dir[0] / len, a.dir[1] / len];
+    const right = [d[1], -d[0]];
+    const kerb = leftHandTraffic ? [-right[0], -right[1]] : right;
+    const faceTraffic = Math.atan2(-d[1], -d[0]);
+
+    if (placement.kind === 'stop') {
+      if (a.hintTags) continue; // the mapped stop sign is placed by the sign builder
+      const off = a.halfWidth + STOP_SIGN_KERB_GAP_M;
+      const spot = findClearSpot(a.x + kerb[0] * off, a.y + kerb[1] * off, kerb[0], kerb[1]);
+      if (!spot) {
+        dropped++;
+        continue;
+      }
+      props.push({ kind: 'stop_sign', position: toWorld(spot[0], spot[1]), yaw: Math.atan2(-kerb[1], -kerb[0]) });
+      continue;
+    }
+
+    let baseX = a.x + d[0] * 0.5;
+    let baseY = a.y + d[1] * 0.5;
+    if (farSide && !placement.midblock && placement.center) {
+      const toCenter = (placement.center[0] - a.x) * d[0] + (placement.center[1] - a.y) * d[1];
+      const reach = Math.max(0, ...placement.otherApproaches
+        .filter((other) => other.armId !== a.armId)
+        .map((other) => other.halfWidth)) + FAR_SIDE_REACH_M;
+      baseX = a.x + d[0] * (Math.max(0, toCenter) + reach);
+      baseY = a.y + d[1] * (Math.max(0, toCenter) + reach);
+    }
+    const sides = [kerb];
+    // Wide approaches get a second head on the other side (far-left corner,
+    // or the median kerb of a one-way carriageway).
+    if (a.lanesIn >= 3 || (a.oneWay && a.lanesIn >= 2)) {
+      if (farSide || a.oneWay) sides.push([-kerb[0], -kerb[1]]);
+    }
+    for (const side of sides) {
+      const off = a.halfWidth + POLE_KERB_GAP_M;
+      const spot = findClearSpot(baseX + side[0] * off, baseY + side[1] * off, side[0], side[1]);
+      if (!spot) {
+        dropped++;
+        continue;
+      }
+      props.push({ kind: 'signal_pole', position: toWorld(spot[0], spot[1]), yaw: faceTraffic });
+      props.push({
+        kind: 'signal_head',
+        position: toWorld(spot[0] - d[0] * HEAD_FORWARD_M, spot[1] - d[1] * HEAD_FORWARD_M, HEAD_HEIGHT_M),
+        yaw: faceTraffic,
+        signalInstance: placement.instanceName,
+      });
+    }
+  }
+  if (props.length || dropped) {
+    console.log(`[BeamNG Signals] ${props.filter((p) => p.kind === 'signal_head').length} signal heads, ${props.filter((p) => p.kind === 'stop_sign').length} derived stop signs, ${dropped} placements dropped (no clear spot off the road).`);
+  }
+  return props;
+}
+
 export function buildBeamNGSignalExportBundle(terrainData, squareSize) {
-  const { signalData, controllerDefinitions } = buildSignalArtifacts(terrainData, squareSize);
-  return { signalData, controllerDefinitions };
+  const artifacts = buildSignalArtifacts(terrainData, squareSize);
+  return {
+    signalData: artifacts.signalData,
+    controllerDefinitions: artifacts.controllerDefinitions,
+    props: buildSignalProps(artifacts, terrainData, squareSize),
+  };
 }
 
 export function buildBeamNGSignalData(terrainData, squareSize) {

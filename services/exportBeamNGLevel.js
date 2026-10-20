@@ -26,7 +26,7 @@ import {
   parseMaxspeedMps,
 } from './beamngMapNavigation.js';
 import { resolveRoadRulesAt } from './countryRules.js';
-import { buildBeamNGSignalExportBundle } from './beamngSignals.js';
+import { buildBeamNGSignalExportBundle, SIGNAL_HEAD_SHAPE, SIGNAL_POLE_SHAPE } from './beamngSignals.js';
 import {
   buildUrbanRoadClassifier,
   estimateRoadCrossSection,
@@ -4609,6 +4609,69 @@ function buildNativeSignObjects(terrainData, squareSize, rightHandDrive = false)
   return objects;
 }
 
+/**
+ * TSStatics for the signal props built in beamngSignals.js: pole_traffic1
+ * posts and trafficlight_overhead1 heads. Heads are dynamic and carry
+ * `signalInstance`, the field core_trafficSignals uses to light them (the
+ * same fields as West Coast USA's signal prefabs).
+ */
+function buildTrafficSignalObjects(props = []) {
+  const objects = [];
+  props.forEach((prop, i) => {
+    if (prop.kind === 'signal_pole') {
+      objects.push({
+        __parent: 'traffic_signals',
+        class: 'TSStatic',
+        name: `signal_pole_${i}`,
+        persistentId: generatePersistentId(),
+        position: prop.position,
+        rotationMatrix: rotationMatrixFromYaw(prop.yaw),
+        shapeName: SIGNAL_POLE_SHAPE,
+        annotation: 'TRAFFIC_SIGNALS',
+        useInstanceRenderData: true,
+      });
+    } else if (prop.kind === 'signal_head') {
+      objects.push({
+        __parent: 'traffic_signals',
+        class: 'TSStatic',
+        name: `signal_head_${i}`,
+        persistentId: generatePersistentId(),
+        position: prop.position,
+        rotationMatrix: rotationMatrixFromYaw(prop.yaw),
+        shapeName: SIGNAL_HEAD_SHAPE,
+        annotation: 'TRAFFIC_SIGNALS',
+        internalName: 'trafficLight',
+        dynamic: true,
+        useInstanceRenderData: false,
+        instanceColor: 'black',
+        instanceColor1: 'black',
+        instanceColor2: 'black',
+        collisionType: 'None',
+        decalType: 'None',
+        signalInstance: prop.signalInstance,
+      });
+    }
+  });
+  return objects;
+}
+
+// Stop signs for stop approaches derived without a mapped sign (stop=all,
+// stops mapped on the junction node). Mapped ones come from buildNativeSignObjects.
+function buildDerivedStopSignObjects(props = []) {
+  return props
+    .filter((prop) => prop.kind === 'stop_sign')
+    .map((prop, i) => ({
+      __parent: 'signs',
+      class: 'TSStatic',
+      name: `sign_stop_derived_${i}`,
+      persistentId: generatePersistentId(),
+      position: prop.position,
+      rotationMatrix: rotationMatrixFromYaw(prop.yaw),
+      shapeName: NATIVE_SIGN_ASSETS.stop.shapeName,
+      useInstanceRenderData: true,
+    }));
+}
+
 // Street furniture caps. BeamNG QA (Wonly): 25k+ lights per level are fine
 // even on Steam Deck; the constraints that matter are no shadow-casting point
 // lights and no heavy overlap — hence the min-spacing dedupe below.
@@ -6463,7 +6526,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   const manualMapNavigation = buildManualMapNavigationData(exportTerrainData, squareSize, roadType);
   const manualMapSegmentCount = Object.keys(manualMapNavigation.segments).length;
-  const { signalData, controllerDefinitions: signalControllerDefinitions } =
+  const { signalData, controllerDefinitions: signalControllerDefinitions, props: signalProps = [] } =
     buildBeamNGSignalExportBundle(exportTerrainData, squareSize);
 
   // Traffic support should reflect whether the export contains any road graph
@@ -6551,7 +6614,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome)
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
-  const signObjects = buildNativeSignObjects(exportTerrainData, squareSize, resolvedRightHandDrive);
+  const signObjects = [
+    ...buildNativeSignObjects(exportTerrainData, squareSize, resolvedRightHandDrive),
+    ...buildDerivedStopSignObjects(signalProps),
+  ];
+  const trafficSignalObjects = buildTrafficSignalObjects(signalProps);
   const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome);
   const { objects: fuelStationObjects, facilities: fuelStationFacilities } =
     buildFuelStations(exportTerrainData, squareSize);
@@ -7190,6 +7257,12 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       name: 'street_furniture',
       persistentId: generatePersistentId(),
     }] : []),
+    ...(trafficSignalObjects.length > 0 ? [{
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: 'traffic_signals',
+      persistentId: generatePersistentId(),
+    }] : []),
     ...(fuelStationObjects.length > 0 ? [{
       __parent: 'MissionGroup',
       class: 'SimGroup',
@@ -7238,6 +7311,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // level-scoped meshes (core /art/shapes paths pass through untouched).
   if (streetFurnitureObjects.length > 0) {
     zip.file(`${base}/main/MissionGroup/street_furniture/items.level.json`, toNDJSON(rewriteForLinks(streetFurnitureObjects)));
+  }
+
+  // ── main/MissionGroup/traffic_signals/items.level.json ──────────────────
+  // Signal posts + heads; each head names its signals.json instance
+  // (signalInstance) so core_trafficSignals lights it with the AI's phase.
+  if (trafficSignalObjects.length > 0) {
+    zip.file(`${base}/main/MissionGroup/traffic_signals/items.level.json`, toNDJSON(rewriteForLinks(trafficSignalObjects)));
   }
 
   // ── main/MissionGroup/gasStations/items.level.json + facilities ──────────

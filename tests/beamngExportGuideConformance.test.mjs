@@ -735,3 +735,47 @@ test('road rules: a London export drives on the left with matching lane sides', 
     restore();
   }
 });
+
+// ── Visible traffic signals linked to signals.json ────────────────────────────
+test('traffic signals: heads link to signals.json instances; level posts get .link files', async () => {
+  const restore = installCanvasPolyfill();
+  try {
+    const td = makeTerrainData();
+    td.osmFeatures = [
+      { id: 'ns', type: 'road', tags: { highway: 'primary', name: 'ns_ave' },
+        geometry: [{ lat: 0.8, lng: 0.5 }, { lat: 0.5, lng: 0.5 }, { lat: 0.2, lng: 0.5 }] },
+      { id: 'ew', type: 'road', tags: { highway: 'primary', name: 'ew_ave' },
+        geometry: [{ lat: 0.5, lng: 0.2 }, { lat: 0.5, lng: 0.5 }, { lat: 0.5, lng: 0.8 }] },
+      { id: 'tl', type: 'street_furniture', tags: { highway: 'traffic_signals' },
+        geometry: [{ lat: 0.5, lng: 0.5 }] },
+    ];
+    const result = await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
+      roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
+      baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
+      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeTrees: false, includeRocks: false, includeNativeBarriers: false,
+    });
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const signals = JSON.parse(await readText(zip, 'signals.json'));
+    assert.equal(signals.instances.length, 4);
+
+    const items = parseNDJSON(await readText(zip, 'main/MissionGroup/traffic_signals/items.level.json'));
+    const heads = items.filter((o) => o.signalInstance);
+    assert.equal(heads.length, 4);
+    const names = new Set(signals.instances.map((i) => i.name));
+    for (const head of heads) {
+      assert.ok(names.has(head.signalInstance));
+      assert.equal(head.dynamic, true);
+      assert.equal(head.collisionType, 'None');
+    }
+    const posts = items.filter((o) => /pole_traffic1\.dae$/.test(o.shapeName));
+    assert.equal(posts.length, 4);
+    const missionGroup = parseNDJSON(await readText(zip, 'main/MissionGroup/items.level.json'));
+    assert.ok(missionGroup.some((o) => o.name === 'traffic_signals'));
+    // The West Coast USA post is mirrored into this level through a .link file.
+    const linked = Object.keys(zip.files).some((p) => /pole_traffic1\.dae\.link$/.test(p));
+    assert.ok(linked, 'pole_traffic1 .link file');
+  } finally {
+    restore();
+  }
+});
