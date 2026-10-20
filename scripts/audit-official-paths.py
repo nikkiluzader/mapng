@@ -7,6 +7,8 @@ Collects all `/levels/...` and `/assets/...` file references from the export
 catalogs, then checks each against the zips in refs/beamng/content. A path
 counts as present when the exact file exists, a .png/.dds/.jpg sibling exists
 (the engine resolves those interchangeably), or a `.link` redirect provides it.
+Terrain detail/macro textures are stricter: TerrainCellMaterial does not follow
+.link redirects, so those must exist as real files.
 
 Run from the repo root with a game install present under refs/beamng:
 
@@ -53,6 +55,32 @@ PATH_RE = re.compile(
 )
 IMG_EXT_RE = re.compile(r"\.(png|dds|jpg)$", re.I)
 
+# Modules whose *DetailTex / *MacroTex paths feed TerrainCellMaterial (*BaseTex
+# slots are skipped: the exporter overwrites them with the generated base).
+TERRAIN_SOURCES = [
+    "services/beamngTerrainMaterialLibrary.js",
+    "services/osmTerrainMaterials.js",
+]
+TERRAIN_TEX_RE = re.compile(
+    r"['\"]?(\w+(?:Detail|Macro)Tex)['\"]?\s*:\s*['\"](/?(?:levels|assets)/[^'\"]+)['\"]"
+)
+
+# A .cdae (msgpack) stores each material name as a msgpack string followed by
+# its index and two 0xffffffff map slots. The engine loads the .cdae, so its
+# bindings are what must be defined, not just the source .dae's.
+CDAE_MATERIAL_RE = re.compile(
+    rb"(?:([\xa1-\xbf])|\xd9(.))([\x20-\x7e]+?)[\x00-\x0f].{0,2}?\xce\xff\xff\xff\xff", re.S
+)
+
+
+def cdae_material_names(data):
+    names = set()
+    for m in CDAE_MATERIAL_RE.finditer(data):
+        length = (m.group(1)[0] & 0x1F) if m.group(1) else m.group(2)[0]
+        if len(m.group(3)) == length:
+            names.add(m.group(3).decode().lower())
+    return names
+
 
 def collect_referenced_paths():
     refs = set()
@@ -89,13 +117,33 @@ def audit_dae_material_coverage(zips):
     library; the official level's own materials.json is NOT loaded in-game.
     """
     catalog = open(os.path.join(REPO, "services/beamngBiomeCatalog.js")).read()
-    daes = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", catalog)))
+    daes = set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", catalog))
+    # Shapes placed directly by the exporter (fences, fuel pumps, signs, lamps).
+    for src in ("services/exportBeamNGLevel.js", "services/beamngSignals.js"):
+        text = open(os.path.join(REPO, src)).read()
+        daes |= set(re.findall(r"'(/?levels/[^']+\.(?:dae|cdae))'", text, re.I))
+    daes = sorted(daes)
     # lowercase throughout: BeamNG material lookup is case-insensitive
     defined = set()
     for src in ("services/beamngRuntimeMaterialCatalog.js", "services/beamngSignals.js",
-                "services/beamngFuelStationMaterials.js"):
-        defined |= {m.lower() for m in re.findall(r"(?:name|mapTo):\s*'([^']+)'",
+                "services/beamngFuelStationMaterials.js", "services/exportBeamNGLevel.js"):
+        defined |= {m.lower() for m in re.findall(r"""['"]?(?:name|mapTo)['"]?:\s*['"]([^'"]+)['"]""",
                                                   open(os.path.join(REPO, src)).read())}
+    # art/ and assets/ materials load globally at startup; level ones do not.
+    for z in zips:
+        with zipfile.ZipFile(z) as zf:
+            for n in zf.namelist():
+                if not n.endswith("materials.json") or not n.lower().startswith(("art/", "assets/")):
+                    continue
+                try:
+                    defs = json.loads(zf.read(n))
+                except ValueError:
+                    continue
+                for k, v in defs.items():
+                    if isinstance(v, dict):
+                        defined.add(k.lower())
+                        if v.get("mapTo"):
+                            defined.add(str(v["mapTo"]).lower())
     shape_lib = json.load(open(os.path.join(REPO, "public/beamng_shape_materials.json")))
     for mats in shape_lib.values():
         for k, v in (mats or {}).items():
@@ -112,15 +160,22 @@ def audit_dae_material_coverage(zips):
     gaps = []
     for dae in daes:
         rel = dae.lstrip("/").lower()
+        if rel not in entries and rel.endswith(".dae") and rel[:-4] + ".cdae" in entries:
+            rel = rel[:-4] + ".cdae"
         if rel not in entries:
             gaps.append((dae, "<dae not found in game>"))
             continue
         z, n = entries[rel]
         with zipfile.ZipFile(z) as zf:
-            xml = zf.read(n).decode("utf-8", "replace")
+            xml = "" if rel.endswith(".cdae") else zf.read(n).decode("utf-8", "replace")
         used = set(re.findall(r'<instance_material\s+symbol="([^"]+)"', xml))
         used |= {m.split("#")[-1] for m in re.findall(r'<instance_material[^>]*target="([^"]+)"', xml)}
         used = {re.sub(r"-material$", "", u).lower() for u in used}
+        cdae = re.sub(r"\.dae$", ".cdae", rel)
+        if cdae in entries:
+            cz, cn = entries[cdae]
+            with zipfile.ZipFile(cz) as zf:
+                used |= cdae_material_names(zf.read(cn))
         for name in sorted(used - defined):
             gaps.append((dae, name))
     return gaps
@@ -144,6 +199,18 @@ def main():
         if p in KNOWN_VANILLA_DANGLING or "/" + p.lstrip("/") in KNOWN_VANILLA_DANGLING:
             continue
         missing.append(p)
+
+    # Terrain textures must be real files: a .link-only hit is still missing.
+    real_stems = {IMG_EXT_RE.sub("", n) for n in idx if not n.endswith(".link")}
+    terrain_refs = set()
+    for src in TERRAIN_SOURCES:
+        with open(os.path.join(REPO, src), encoding="utf-8") as f:
+            terrain_refs.update(m.group(2) for m in TERRAIN_TEX_RE.finditer(f.read()))
+    for p in sorted(terrain_refs):
+        rel = p.lstrip("/").lower()
+        if rel in idx or IMG_EXT_RE.sub("", rel) in real_stems or p in missing:
+            continue
+        missing.append(p + "  (terrain texture only reachable via .link)")
 
     version = "unknown"
     integrity = os.path.join(REPO, "refs/beamng/integrity.json")
