@@ -16,7 +16,16 @@ import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
 import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
 import { getFuelStationRuntimeMaterialDefs } from './beamngFuelStationMaterials.js';
 import { validateBeamNGZipStructure } from './beamngExportConformance.js';
-import { buildManualMapNavigationData, inferManualLaneData } from './beamngMapNavigation.js';
+import {
+  buildManualMapNavigationData,
+  collectGiveWayNodeKeys,
+  geometryHasGiveWay,
+  GIVE_WAY_DRIVABILITY_STEP,
+  inferManualLaneData,
+  inferRoadDrivability,
+  parseMaxspeedMps,
+} from './beamngMapNavigation.js';
+import { resolveRoadRulesAt } from './countryRules.js';
 import { buildBeamNGSignalExportBundle } from './beamngSignals.js';
 import {
   buildUrbanRoadClassifier,
@@ -148,7 +157,17 @@ const COUNTRY_REGION_MAP = [
   { match: /(italy|germany|france|spain|uk|united_kingdom|england|netherlands|belgium|sweden|norway|poland|austria|switzerland|europe)/, region: 'europe' },
 ];
 
-function getRegionForCountry(country) {
+// Natural Earth UN regions (country_rules.json) → info.json region ids.
+const UN_REGION_TO_LEVEL_REGION = {
+  Europe: 'europe', Asia: 'asia', Africa: 'africa', Oceania: 'oceania',
+};
+
+function getRegionForCountry(country, roadRules = null) {
+  if (roadRules?.region === 'Americas') {
+    return roadRules.countryCode === 'US' || roadRules.countryCode === 'CA' || roadRules.countryCode === 'MX'
+      ? 'northAmerica' : 'southAmerica';
+  }
+  if (UN_REGION_TO_LEVEL_REGION[roadRules?.region]) return UN_REGION_TO_LEVEL_REGION[roadRules.region];
   const key = String(country ?? '').toLowerCase();
   for (const { match, region } of COUNTRY_REGION_MAP) {
     if (match.test(key)) return region;
@@ -1632,9 +1651,14 @@ function isReverseOneWayRoad(tags = {}) {
  *   - manual lanes from lanes/lanes:forward/lanes:backward tags (autoLanes off).
  *   - private/track roads are gated and hidden from the navigation display.
  */
-function getDecalRoadNavMetadata(highway, tags = {}) {
+function getDecalRoadNavMetadata(highway, tags = {}, { leftHandTraffic = false, givesWay = false } = {}) {
   const oneWay = isOneWayRoad(tags);
-  const meta = { ...inferManualLaneData(highway, tags, oneWay) };
+  const meta = { ...inferManualLaneData(highway, tags, oneWay, leftHandTraffic) };
+  // Road hierarchy for junction priority (beamngMapNavigation.inferRoadDrivability).
+  meta.drivability = Math.round((inferRoadDrivability(highway, tags) - (givesWay ? GIVE_WAY_DRIVABILITY_STEP : 0)) * 1000) / 1000;
+  // Only a mapped maxspeed: without it BeamNG derives a speed itself.
+  const speedLimit = parseMaxspeedMps(tags);
+  if (speedLimit) meta.speedLimit = speedLimit;
 
   if (oneWay) {
     meta.oneWay = true;
@@ -2056,6 +2080,8 @@ function generateDecalRoads(terrainData, squareSize) {
   const drivableRoads = mergedRoadSegments.length > 0 ? mergedRoadSegments : roadNetwork.segments;
   const stableHalfWidthMap = buildStableDecalHalfWidthMap(drivableRoads);
   const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures);
+  const giveWayKeys = collectGiveWayNodeKeys(terrainData.osmFeatures);
+  const leftHandTraffic = !!terrainData.roadRules?.leftHandTraffic;
 
   const roadSplinesByName = new Map();
   const segmentCounterByName = new Map();
@@ -2168,7 +2194,10 @@ function generateDecalRoads(terrainData, squareSize) {
           endTrim: i === clippedSegments.length - 1 ? endTrimProfile : { center: 0, pos: 0, neg: 0 },
           isRoadStart: i === 0,
           isRoadEnd: i === clippedSegments.length - 1,
-          navMetadata: getDecalRoadNavMetadata(highway, renderTags),
+          navMetadata: getDecalRoadNavMetadata(highway, renderTags, {
+            leftHandTraffic,
+            givesWay: geometryHasGiveWay(segmentFeature.geometry, giveWayKeys),
+          }),
           drivingHalfWidth,
           laneShift: crossSection.laneShift,
         },
@@ -6381,13 +6410,25 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     console.error(`${BEAMNG_EXPORT_SERVICE_LOG} Invalid or missing biomeId.`, { biomeId });
     throw new Error(`Missing or invalid BeamNG biome: ${biomeId || '(none)'}`);
   }
+  // Road rules follow the export's location (driving side, signal cycle,
+  // turn on red); the biome only picks visuals. Explicit options still win,
+  // and the biome profile is the fallback when the location is unknown.
   const trafficProfile = getTrafficProfile(biome);
+  const roadRules = await resolveRoadRulesAt(center.lat, center.lng);
   const resolvedCountry = typeof country === 'string' && country.trim().length > 0
     ? country.trim()
-    : trafficProfile.country;
+    : roadRules?.beamngCountry ?? trafficProfile.country;
   const resolvedRightHandDrive = typeof rightHandDrive === 'boolean'
     ? rightHandDrive
-    : trafficProfile.rightHandDrive;
+    : roadRules?.leftHandTraffic ?? trafficProfile.rightHandDrive;
+  exportTerrainData.roadRules = {
+    leftHandTraffic: resolvedRightHandDrive,
+    euroSignals: !!roadRules?.euroSignals,
+    countryCode: roadRules?.countryCode ?? null,
+  };
+  if (roadRules) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road rules: ${roadRules.countryName} (${roadRules.countryCode}), ${resolvedRightHandDrive ? 'left' : 'right'}-hand traffic${roadRules.euroSignals ? ', EU signal cycle' : ''}.`);
+  }
   const linkRegistry = createBeamNGLinkFileRegistry(levelName, { companions: SHAPE_IMPOSTER_FILES });
 
   const size = exportTerrainData.width;
@@ -6638,10 +6679,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     supportsTraffic,
     supportsTimeOfDay: true,
     country: resolvedCountry,
-    region: getRegionForCountry(resolvedCountry),
+    region: getRegionForCountry(resolvedCountry, roadRules),
     roadRules: {
       rightHandDrive: resolvedRightHandDrive,
-      turnOnRed: getTurnOnRedForCountry(resolvedCountry),
+      turnOnRed: roadRules ? roadRules.turnOnRed : getTurnOnRedForCountry(resolvedCountry),
     },
     minimap: [{
       file: minimapImageRel,

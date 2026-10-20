@@ -3,8 +3,6 @@ const ROAD_SKIP = new Set([
   'bridleway', 'corridor', 'proposed', 'construction',
 ]);
 
-const MAPNG_YIELD_STATE_KEY = 'mapngYieldAsStop';
-const MAPNG_YIELD_TYPE_KEY = 'mapngYieldSign';
 const HIGH_PRIORITY_HIGHWAYS = new Set(['motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link']);
 const MEDIUM_PRIORITY_HIGHWAYS = new Set(['secondary', 'secondary_link', 'tertiary', 'tertiary_link']);
 
@@ -386,7 +384,24 @@ function splitTrafficLightClusterByAxis(clusterMembers) {
   return { ns, ew };
 }
 
-function makeLightsBasicController(id, name) {
+// Europe shows red+amber before green: BeamNG's lightsBasicEU type
+// (settings/trafficSignals.json), whose idle state is index 4.
+function makeLightsBasicController(id, name, { euroSignals = false } = {}) {
+  if (euroSignals) {
+    return {
+      id,
+      name,
+      type: 'lightsBasicEU',
+      isSimple: false,
+      defaultIndex: 4,
+      states: [
+        { state: 'redYellowTrafficLight', duration: 1.5 },
+        { state: 'greenTrafficLight', duration: 12 },
+        { state: 'yellowTrafficLight', duration: 4 },
+        { state: 'redTrafficLight', duration: 1.5 },
+      ],
+    };
+  }
   return {
     id,
     name,
@@ -425,7 +440,7 @@ function getControllerCycleDuration(controller) {
   return total > 0 ? Math.round(total * 1000) / 1000 : 17.5;
 }
 
-function buildAxisLightGroups(axisName, members, clusterIndex, allocId, controllers, controllersById) {
+function buildAxisLightGroups(axisName, members, clusterIndex, allocId, controllers, controllersById, options = {}) {
   if (!Array.isArray(members) || members.length === 0) return [];
 
   const leftMembers = [];
@@ -451,7 +466,7 @@ function buildAxisLightGroups(axisName, members, clusterIndex, allocId, controll
     const protectedTurn = leftMembers.some((member) => member.protectedTurnHint);
     const controller = protectedTurn
       ? makeLightsProtectedGreenController(controllerId, `cluster_${clusterIndex + 1}_${axisName}_left_turn`)
-      : makeLightsBasicController(controllerId, `cluster_${clusterIndex + 1}_${axisName}_left`);
+      : makeLightsBasicController(controllerId, `cluster_${clusterIndex + 1}_${axisName}_left`, options);
     controllers.push(controller);
     controllersById.set(controllerId, controller);
     groups.push({
@@ -466,7 +481,7 @@ function buildAxisLightGroups(axisName, members, clusterIndex, allocId, controll
 
   if (generalMembers.length > 0) {
     const controllerId = allocId();
-    const controller = makeLightsBasicController(controllerId, `cluster_${clusterIndex + 1}_${axisName}`);
+    const controller = makeLightsBasicController(controllerId, `cluster_${clusterIndex + 1}_${axisName}`, options);
     controllers.push(controller);
     controllersById.set(controllerId, controller);
     groups.push({
@@ -690,28 +705,6 @@ function buildSequencePhases(lightGroups, controllersById) {
     }));
 }
 
-function buildSignalControllerDefinitions(hasYieldController) {
-  if (!hasYieldController) return null;
-  return {
-    states: {
-      [MAPNG_YIELD_STATE_KEY]: {
-        name: 'MapNG Yield (Stop Fallback)',
-        action: 'stop',
-        duration: -1,
-        lights: ['red'],
-      },
-    },
-    types: {
-      [MAPNG_YIELD_TYPE_KEY]: {
-        name: 'MapNG Yield Sign',
-        states: [MAPNG_YIELD_STATE_KEY],
-        defaultIndex: 1,
-        isSimple: true,
-      },
-    },
-  };
-}
-
 function buildSignalArtifacts(terrainData, squareSize) {
   const emptySignalData = { instances: [], controllers: [], sequences: [] };
 
@@ -745,60 +738,34 @@ function buildSignalArtifacts(terrainData, squareSize) {
   let nextId = 1;
   const allocId = () => nextId++;
 
+  const signalOptions = { euroSignals: !!terrainData?.roadRules?.euroSignals };
+
+  // Give-way points get no signal instance: BeamNG's AI never acts on yield
+  // (action 4), and a custom "stop" yield state left AI waiting forever.
+  // They lower the way's drivability instead (beamngMapNavigation).
   let stopControllerId = null;
-  let yieldControllerId = null;
-  let hasYieldController = false;
-
-  for (const entry of entries.filter((item) => item.kind === 'stop' || item.kind === 'yield')) {
-    if (entry.kind === 'stop') {
-      if (stopControllerId === null) {
-        stopControllerId = allocId();
-        controllers.push({
-          id: stopControllerId,
-          name: 'stop',
-          type: 'signStop',
-          isSimple: true,
-          states: [{ state: 'basicStop', duration: -1 }],
-        });
-        controllersById.set(stopControllerId, controllers[controllers.length - 1]);
-      }
-
-      const instanceId = allocId();
-      instances.push({
-        id: instanceId,
-        name: `stop ${instanceId}`,
-        controllerId: stopControllerId,
-        sequenceId: 0,
-        pos: entry.pos,
-        dir: entry.dir,
-        group: `group_stop_${stopControllerId}`,
-        startDisabled: false,
-      });
-      continue;
-    }
-
-    if (yieldControllerId === null) {
-      yieldControllerId = allocId();
-      hasYieldController = true;
+  for (const entry of entries.filter((item) => item.kind === 'stop')) {
+    if (stopControllerId === null) {
+      stopControllerId = allocId();
       controllers.push({
-        id: yieldControllerId,
-        name: 'yield',
-        type: MAPNG_YIELD_TYPE_KEY,
+        id: stopControllerId,
+        name: 'stop',
+        type: 'signStop',
         isSimple: true,
-        states: [{ state: MAPNG_YIELD_STATE_KEY, duration: -1 }],
+        states: [{ state: 'basicStop', duration: -1 }],
       });
-      controllersById.set(yieldControllerId, controllers[controllers.length - 1]);
+      controllersById.set(stopControllerId, controllers[controllers.length - 1]);
     }
 
     const instanceId = allocId();
     instances.push({
       id: instanceId,
-      name: `yield ${instanceId}`,
-      controllerId: yieldControllerId,
+      name: `stop ${instanceId}`,
+      controllerId: stopControllerId,
       sequenceId: 0,
       pos: entry.pos,
       dir: entry.dir,
-      group: `group_yield_${yieldControllerId}`,
+      group: `group_stop_${stopControllerId}`,
       startDisabled: false,
     });
   }
@@ -810,8 +777,8 @@ function buildSignalArtifacts(terrainData, squareSize) {
     const { ns, ew } = splitTrafficLightClusterByAxis(cluster.members);
 
     const lightGroups = [];
-    lightGroups.push(...buildAxisLightGroups('ns', ns, clusterIndex, allocId, controllers, controllersById));
-    lightGroups.push(...buildAxisLightGroups('ew', ew, clusterIndex, allocId, controllers, controllersById));
+    lightGroups.push(...buildAxisLightGroups('ns', ns, clusterIndex, allocId, controllers, controllersById, signalOptions));
+    lightGroups.push(...buildAxisLightGroups('ew', ew, clusterIndex, allocId, controllers, controllersById, signalOptions));
 
     if (lightGroups.length === 0) return;
 
@@ -854,7 +821,7 @@ function buildSignalArtifacts(terrainData, squareSize) {
 
   return {
     signalData: { instances, controllers, sequences },
-    controllerDefinitions: buildSignalControllerDefinitions(hasYieldController),
+    controllerDefinitions: null,
   };
 }
 

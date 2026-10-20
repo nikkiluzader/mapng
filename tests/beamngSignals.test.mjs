@@ -138,35 +138,9 @@ test('buildBeamNGSignalData creates dual-phase sequence for orthogonal intersect
   assert.equal(sequenceControllerIds.size, 2);
 });
 
-test('buildBeamNGSignalData maps give_way to custom yield controller', () => {
-  const terrainData = makeTerrainData([
-    {
-      id: 'road_1',
-      type: 'road',
-      tags: { highway: 'residential' },
-      geometry: [
-        { lat: 0.9, lng: 0.5 },
-        { lat: 0.1, lng: 0.5 },
-      ],
-    },
-    {
-      id: 'yield_1',
-      type: 'street_furniture',
-      tags: { highway: 'give_way' },
-      geometry: [{ lat: 0.55, lng: 0.49 }],
-    },
-  ]);
-
-  const signalData = buildBeamNGSignalData(terrainData, 1);
-
-  assert.equal(signalData.controllers.length, 1);
-  assert.equal(signalData.controllers[0].type, 'mapngYieldSign');
-  assert.equal(signalData.instances.length, 1);
-  assert.match(signalData.instances[0].name, /^yield\s/);
-  assert.equal(signalData.instances[0].sequenceId, 0);
-});
-
-test('buildBeamNGSignalExportBundle includes optional controller definitions when custom yield type is used', () => {
+// BeamNG's AI never acts on yield signals, and the old custom "stop" yield
+// state made AI wait forever; give-way is expressed through drivability.
+test('buildBeamNGSignalData emits no signal for give_way', () => {
   const terrainData = makeTerrainData([
     {
       id: 'road_1',
@@ -187,9 +161,28 @@ test('buildBeamNGSignalExportBundle includes optional controller definitions whe
 
   const bundle = buildBeamNGSignalExportBundle(terrainData, 1);
 
-  assert.ok(bundle.controllerDefinitions);
-  assert.equal(bundle.controllerDefinitions.types.mapngYieldSign.name, 'MapNG Yield Sign');
-  assert.equal(bundle.controllerDefinitions.states.mapngYieldAsStop.action, 'stop');
+  assert.equal(bundle.signalData.controllers.length, 0);
+  assert.equal(bundle.signalData.instances.length, 0);
+  assert.equal(bundle.controllerDefinitions, null);
+});
+
+test('buildBeamNGSignalData uses the EU red+amber cycle when road rules ask for it', () => {
+  const lights = [
+    { id: 'road_ns', type: 'road', tags: { highway: 'primary' }, geometry: [{ lat: 0.9, lng: 0.5 }, { lat: 0.1, lng: 0.5 }] },
+    { id: 'road_ew', type: 'road', tags: { highway: 'primary' }, geometry: [{ lat: 0.5, lng: 0.1 }, { lat: 0.5, lng: 0.9 }] },
+    { id: 'tl_n', type: 'street_furniture', tags: { highway: 'traffic_signals' }, geometry: [{ lat: 0.52, lng: 0.5 }] },
+    { id: 'tl_e', type: 'street_furniture', tags: { highway: 'traffic_signals' }, geometry: [{ lat: 0.5, lng: 0.52 }] },
+  ];
+  const euro = buildBeamNGSignalData({ ...makeTerrainData(lights), roadRules: { euroSignals: true } }, 1);
+  const us = buildBeamNGSignalData(makeTerrainData(lights), 1);
+
+  assert.ok(euro.controllers.length > 0);
+  for (const controller of euro.controllers) {
+    assert.equal(controller.type, 'lightsBasicEU');
+    assert.equal(controller.states[0].state, 'redYellowTrafficLight');
+    assert.equal(controller.defaultIndex, 4);
+  }
+  assert.ok(us.controllers.every((controller) => controller.type === 'lightsBasic'));
 });
 
 test('buildBeamNGSignalData skips sequence for single-direction traffic lights', () => {

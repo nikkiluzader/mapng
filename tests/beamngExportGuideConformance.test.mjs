@@ -474,8 +474,11 @@ test('decal roads: drivable base layer carries oneWay/flipDirection/gatedRoad/la
       assert.equal(d.oneWay, true, 'oneway=yes road must set oneWay');
       assert.equal(d.flipDirection, undefined, 'forward oneway must not flip');
       assert.equal(d.autoLanes, false);
-      assert.equal(d.lanesLeft, 2, 'lanes=2 oneway carries both lanes one side');
-      assert.equal(d.lanesRight, 0);
+      // Right-hand traffic: BeamNG's map.lua reads the right side as forward
+      // lanes; lanes on the left would decode as backward and get flipped.
+      assert.equal(d.lanesLeft, 0);
+      assert.equal(d.lanesRight, 2, 'lanes=2 oneway carries both lanes on the travel side');
+      assert.equal(d.drivability, 0.98, 'primary ranks just below motorway/trunk');
       assert.equal(d.gatedRoad, undefined);
     }
 
@@ -685,6 +688,50 @@ test('decal roads: asphalt covers the carriageway, AI path + paint the driving l
       assert.ok(Math.abs(off - 0.9 * 3.5) < 0.05, `edge line ${off.toFixed(2)} m from centre, want 3.15`);
     }
   } finally {
+    restore();
+  }
+});
+
+// ── Road rules follow the export location (country_rules.json) ────────────────
+test('road rules: a London export drives on the left with matching lane sides', async () => {
+  const restore = installCanvasPolyfill();
+  const realFetch = globalThis.fetch;
+  const rulesJson = readFileSync(new URL('../public/country_rules.json', import.meta.url), 'utf8');
+  globalThis.fetch = async (url, ...rest) => (String(url) === '/country_rules.json'
+    ? new Response(rulesJson, { status: 200 })
+    : realFetch(url, ...rest));
+  try {
+    const td = makeTerrainData();
+    td.osmFeatures = [
+      { id: 'oneway_1', type: 'road', tags: { highway: 'primary', oneway: 'yes', lanes: '2', name: 'oneway_ave' },
+        geometry: [{ lat: 0.8, lng: 0.2 }, { lat: 0.2, lng: 0.8 }] },
+    ];
+    const result = await exportBeamNGLevel(td, { lat: 51.507, lng: -0.128 }, {
+      roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
+      baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
+      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeTrees: false, includeRocks: false, includeNativeBarriers: false,
+    });
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const info = JSON.parse(await readText(zip, 'info.json'));
+    assert.equal(info.roadRules.rightHandDrive, true, 'UK keeps left (BeamNG calls this rightHandDrive)');
+    assert.equal(info.roadRules.turnOnRed, false);
+    assert.equal(info.region, 'europe');
+
+    const decals = [];
+    for (const path of Object.keys(zip.files)) {
+      if (!/Decal_Roads\/[^/]+\/items\.level\.json$/.test(path)) continue;
+      const text = await zip.file(path).async('string');
+      if (text.trim()) decals.push(...parseNDJSON(text));
+    }
+    const base = decals.filter((d) => d.class === 'DecalRoad' && d.drivability > 0 && d.name.startsWith('dr_oneway_ave'));
+    assert.ok(base.length > 0);
+    for (const d of base) {
+      assert.equal(d.lanesLeft, 2, 'left-hand traffic: forward lanes on the left');
+      assert.equal(d.lanesRight, 0);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
     restore();
   }
 });

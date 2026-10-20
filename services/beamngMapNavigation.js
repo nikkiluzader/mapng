@@ -1,4 +1,4 @@
-import { buildRoadNetwork, mergeLinearRoadSegments } from './roadNetwork.js';
+import { buildRoadNetwork, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 
 const ROAD_SKIP = new Set([
   'footway', 'path', 'pedestrian', 'steps', 'cycleway',
@@ -37,13 +37,54 @@ function shouldGenerateNavigationRoad(feature) {
   return true;
 }
 
-function inferMapSegmentDrivability(highway, tags = {}) {
-  const access = String(tags.access ?? '').trim().toLowerCase();
-  if (access === 'private') return 0.6;
+// Road hierarchy as AI drivability. At a junction without signals BeamNG's AI
+// gives way when its edge has lower drivability than another edge there
+// (vehicle/ai.lua), so small steps by class make side streets yield to main
+// roads while barely changing route choice. West Coast USA grades its own
+// DecalRoads the same way. Links rank with their parent road.
+const ROAD_CLASS_DRIVABILITY = {
+  motorway: 1, trunk: 1, primary: 0.98, secondary: 0.96, tertiary: 0.94,
+  unclassified: 0.92, residential: 0.9, road: 0.9, living_street: 0.85,
+  service: 0.6, track: 0.3,
+};
+// One notch below the crossing road: a way with a give-way sign yields even
+// to a road of its own class.
+export const GIVE_WAY_DRIVABILITY_STEP = 0.01;
 
-  if (highway === 'track') return 0.7;
-  if (highway === 'service') return 0.8;
-  return 1;
+export function inferRoadDrivability(highway, tags = {}) {
+  const base = String(highway ?? '').replace(/_link$/, '');
+  let drivability = ROAD_CLASS_DRIVABILITY[base] ?? 0.9;
+  const access = String(tags.access ?? '').trim().toLowerCase();
+  if (access === 'private' || access === 'no') drivability = Math.min(drivability, 0.6);
+  return drivability;
+}
+
+function inferMapSegmentDrivability(highway, tags = {}) {
+  return inferRoadDrivability(highway, tags);
+}
+
+// BeamNG's AI ignores yield signals (it never acts on action 4), so an OSM
+// give-way point is expressed as lower drivability on the way it sits on.
+const isGiveWayTags = (tags = {}) => {
+  if (String(tags.highway ?? '').trim().toLowerCase() === 'give_way') return true;
+  const sign = String(tags.traffic_sign ?? '').trim().toLowerCase();
+  return sign.includes('give_way') || sign.includes('yield');
+};
+
+export function collectGiveWayNodeKeys(osmFeatures = []) {
+  const keys = new Set();
+  for (const feature of osmFeatures) {
+    if (!Array.isArray(feature?.geometry) || feature.geometry.length !== 1) continue;
+    if (!isGiveWayTags(feature.tags)) continue;
+    const pt = feature.geometry[0];
+    if (Number.isFinite(pt?.lat) && Number.isFinite(pt?.lng)) keys.add(makeRoadNodeKey(pt));
+  }
+  return keys;
+}
+
+export function geometryHasGiveWay(geometry, giveWayKeys) {
+  if (!giveWayKeys?.size || !Array.isArray(geometry)) return false;
+  return geometry.some((pt) => Number.isFinite(pt?.lat) && giveWayKeys.has(makeRoadNodeKey(pt)));
 }
 
 function inferMapSegmentRoadMetadata(highway, tags = {}) {
@@ -152,46 +193,60 @@ function getDefaultLaneCount(highway, isOneWay) {
 // Exported: DecalRoad nav metadata (exportBeamNGLevel) uses the same manual
 // lane inference as map.json segments so AI lane data stays consistent across
 // road modes (DecalRoad.md and Navigation-Map.md document the same fields).
-export function inferManualLaneData(highway, tags = {}, isOneWay = false) {
+// lanesLeft/lanesRight are PHYSICAL sides relative to node order. BeamNG's
+// ge/map.lua reads the left side as backward lanes under right-hand traffic
+// and as forward lanes under left-hand traffic (roadRules.rightHandDrive).
+// A one-way road whose lanes all decode as backward gets flipped, so forward
+// lanes must sit on the travel side or the AI drives one-ways the wrong way.
+export function inferManualLaneData(highway, tags = {}, isOneWay = false, leftHandTraffic = false) {
   const forward = parsePositiveInt(tags['lanes:forward']);
   const backward = parsePositiveInt(tags['lanes:backward']);
   const total = parsePositiveInt(tags.lanes);
+  const sides = (nForward, nBackward) => (leftHandTraffic
+    ? { autoLanes: false, lanesLeft: nForward, lanesRight: nBackward }
+    : { autoLanes: false, lanesLeft: nBackward, lanesRight: nForward });
 
   if (isOneWay) {
-    const laneCount = Math.max(1, forward || total || getDefaultLaneCount(highway, true));
-    return { autoLanes: false, lanesLeft: laneCount, lanesRight: 0 };
+    return sides(Math.max(1, forward || total || getDefaultLaneCount(highway, true)), 0);
   }
 
   if (forward > 0 || backward > 0) {
-    const left = Math.max(1, forward || Math.ceil((forward + backward) / 2));
-    const right = Math.max(1, backward || Math.floor((forward + backward) / 2));
-    return { autoLanes: false, lanesLeft: left, lanesRight: right };
+    return sides(
+      Math.max(1, forward || Math.ceil((forward + backward) / 2)),
+      Math.max(1, backward || Math.floor((forward + backward) / 2)),
+    );
   }
 
   if (total > 0) {
-    const left = Math.max(1, Math.ceil(total / 2));
-    const right = Math.max(1, Math.floor(total / 2));
-    return { autoLanes: false, lanesLeft: left, lanesRight: right };
+    return sides(Math.max(1, Math.ceil(total / 2)), Math.max(1, Math.floor(total / 2)));
   }
 
   const fallback = Math.max(2, getDefaultLaneCount(highway, false));
-  return {
-    autoLanes: false,
-    lanesLeft: Math.max(1, Math.ceil(fallback / 2)),
-    lanesRight: Math.max(1, Math.floor(fallback / 2)),
-  };
+  return sides(Math.max(1, Math.ceil(fallback / 2)), Math.max(1, Math.floor(fallback / 2)));
 }
 
-function parseMaxspeedMps(tags = {}) {
-  const raw = String(tags.maxspeed ?? '').trim().toLowerCase();
+// OSM maxspeed → m/s. Handles "50", "30 mph", "DE:zone30" / "DE:zone:30",
+// "walk" and "none" (motorways without a limit; capped for the AI). Implicit
+// country defaults ("DE:urban") and anything unparseable return null, which
+// lets BeamNG work the speed out itself rather than us guessing a limit.
+const NO_LIMIT_KMH = 130;
+const WALK_KMH = 7;
+
+export function parseMaxspeedMps(tags = {}) {
+  const raw = String(tags.maxspeed ?? '').trim().toLowerCase().split(';')[0].trim();
   if (!raw) return null;
-
-  const numeric = Number.parseFloat(raw);
-  if (!Number.isFinite(numeric) || numeric <= 0) return null;
-
-  // OSM maxspeed is km/h by default unless unit suffix indicates otherwise.
-  const mps = raw.includes('mph') ? numeric * 0.44704 : numeric / 3.6;
-  return Number.isFinite(mps) && mps > 0 ? Math.round(mps * 1000) / 1000 : null;
+  let kmh = null;
+  if (raw === 'none') kmh = NO_LIMIT_KMH;
+  else if (raw === 'walk') kmh = WALK_KMH;
+  else {
+    const zone = raw.match(/^[a-z]{2}:zone:?(\d+)$/);
+    const match = zone || raw.match(/^(\d+(?:\.\d+)?)\s*(mph|km\/h|kmh|kph)?$/);
+    if (!match) return null;
+    const value = Number.parseFloat(match[1]);
+    if (!Number.isFinite(value) || value <= 0) return null;
+    kmh = match[2] === 'mph' ? value * 1.609344 : value;
+  }
+  return Math.round((kmh / 3.6) * 1000) / 1000;
 }
 
 function clipGeometryToMargin(geometry, bounds) {
@@ -346,6 +401,7 @@ export function buildManualMapNavigationData(terrainData, squareSize, roadType) 
   const roadNetwork = buildRoadNetwork(sourceRoadFeatures);
   const mergedRoadSegments = mergeLinearRoadSegments(roadNetwork.segments, roadNetwork.intersections);
   const navSegmentsSource = resolveNavigationSegments(roadNetwork, mergedRoadSegments);
+  const giveWayKeys = collectGiveWayNodeKeys(terrainData.osmFeatures);
 
   const waypointNameByGeoKey = new Map();
   const waypoints = [];
@@ -375,6 +431,7 @@ export function buildManualMapNavigationData(terrainData, squareSize, roadType) 
 
   for (const segment of navSegmentsSource) {
     const tags = segment.tags || {};
+    const givesWay = geometryHasGiveWay(segment.geometry, giveWayKeys);
     const clippedSegments = clipGeometryToMargin(segment.geometry, terrainData.bounds)
       .flatMap((piece) => chunkPolyline(piece, 80));
 
@@ -392,8 +449,8 @@ export function buildManualMapNavigationData(terrainData, squareSize, roadType) 
       );
       const mapSegment = {
         nodes: dedupedNodeNames,
-        drivability: inferMapSegmentDrivability(segment.highway, tags),
-        ...inferManualLaneData(segment.highway, tags, oneWay),
+        drivability: inferMapSegmentDrivability(segment.highway, tags) - (givesWay ? GIVE_WAY_DRIVABILITY_STEP : 0),
+        ...inferManualLaneData(segment.highway, tags, oneWay, !!terrainData.roadRules?.leftHandTraffic),
         ...inferMapSegmentJunctionMetadata(segment, tags, endpointDegree),
       };
 
