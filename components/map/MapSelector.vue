@@ -45,7 +45,7 @@
           layer-type="overlay"
           :opacity="layer.opacity"
           :z-index="10"
-          :options="{ maxNativeZoom: layer.maxNativeZoom }"
+          :options="{ maxNativeZoom: layer.maxNativeZoom, minZoom: layer.minZoom ?? 0, maxZoom: layer.maxZoom ?? 22, updateWhenZooming: false, keepBuffer: 1 }"
         />
       </template>
       
@@ -302,6 +302,10 @@ const handleBatchTileDrag = (tile, event) => {
 // Keyless Esri tiles (the satellite / topo layers come from the same servers).
 // CARTO's basemaps started rendering "API KEY REQUIRED" in 2026-10.
 const ESRI_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+// Esri serves HTTP/1.1 only (6 connections per host), so the label layers come
+// from Esri's second host instead of queueing behind the satellite tiles; they
+// also skip the intermediate zoom levels while zooming (updateWhenZooming).
+const ESRI_LABEL_TILES = 'https://services.arcgisonline.com/ArcGIS/rest/services';
 const ESRI_REFERENCE_ATTRIBUTION = 'Labels &copy; <a href="https://www.esri.com/">Esri</a> and its data providers';
 
 const osmUrl = computed(() => {
@@ -321,10 +325,12 @@ const osmAttribution = computed(() => {
 });
 
 const labelLayers = computed(() => (props.isDarkMode
-  ? [{ url: `${ESRI_TILES}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 16, opacity: 1 }]
+  ? [{ url: `${ESRI_LABEL_TILES}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 16, opacity: 1 }]
   : [
-    { url: `${ESRI_TILES}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 19, opacity: 0.8 },
-    { url: `${ESRI_TILES}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 17, opacity: 1 },
+    // Each layer only where it helps (fewer tiles on Esri's 6-connection host):
+    // roads and street names from z11, place names up to z15.
+    { url: `${ESRI_LABEL_TILES}/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 19, minZoom: 11, opacity: 0.8 },
+    { url: `${ESRI_LABEL_TILES}/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 17, maxZoom: 15, opacity: 1 },
   ]));
 
 // Calculate bounds from output size and processing meters-per-pixel.
