@@ -652,6 +652,53 @@ export const OVERPASS_STATUS_EVENT = "mapng:overpass-status";
 export const publicOverpassMirrorsDown = (health = readMirrorHealth(), now = Date.now()) =>
   OVERPASS_ENDPOINTS.every((e) => (health[e]?.coolUntil || 0) > now);
 
+// Pre-flight check on page load: a trivial query to every public mirror at
+// once, stopping at the first answer. Results feed the same health record
+// the fetch path uses. Throttled so reloads don't re-probe volunteer servers.
+const PROBE_AT_KEY = "mapng_overpass_probe_at";
+const PROBE_INTERVAL_MS = 5 * 60000;
+const PROBE_TIMEOUT_MS = 10000;
+const PROBE_QUERY = "[out:json][timeout:5];node(1);out ids;";
+
+export const probePublicOverpassMirrors = async ({ force = false } = {}) => {
+  try {
+    const last = Number(globalThis.localStorage?.getItem(PROBE_AT_KEY)) || 0;
+    if (!force && Date.now() - last < PROBE_INTERVAL_MS) return;
+    globalThis.localStorage?.setItem(PROBE_AT_KEY, String(Date.now()));
+  } catch {
+    // Storage blocked: probe anyway.
+  }
+  const controllers = OVERPASS_ENDPOINTS.map(() => new AbortController());
+  let answered = false;
+  await Promise.allSettled(OVERPASS_ENDPOINTS.map(async (endpoint, i) => {
+    const startedAt = Date.now();
+    const timer = setTimeout(() => controllers[i].abort(), PROBE_TIMEOUT_MS);
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        body: `data=${encodeURIComponent(PROBE_QUERY)}`,
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        signal: controllers[i].signal,
+      });
+      if (!response.ok) {
+        const error = new Error(`HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      await response.json();
+      answered = true;
+      controllers.forEach((c, j) => { if (j !== i) c.abort(); });
+      recordMirrorResult(endpoint, { ok: true, latencyMs: Date.now() - startedAt });
+    } catch (err) {
+      if (answered) return;                    // cancelled because another mirror answered
+      const timedOut = controllers[i].signal.aborted;
+      recordMirrorResult(endpoint, { ok: false, kind: classifyMirrorError(err, timedOut) });
+    } finally {
+      clearTimeout(timer);
+    }
+  }));
+};
+
 /**
  * Endpoints in the order to try them: healthy mirrors by recent success and
  * latency, unknown ones shuffled (spreads load), cooling-down ones last.
