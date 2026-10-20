@@ -595,6 +595,19 @@ const HEDGE_DELAY_MS = 6000;
 const OSM_CACHE_PATH = "/api/osm";
 const CACHE_HEDGE_DELAY_MS = 25000;
 const isCacheEndpoint = (endpoint) => endpoint === OSM_CACHE_PATH;
+// User's own Overpass server (e.g. a paid Tracestrack/Overspan key embedded in
+// the URL). Stands in the mirror list as a sentinel so the key never reaches
+// logs, status text or export metadata.
+export const CUSTOM_OVERPASS_STORAGE_KEY = "mapng_customOverpassUrl";
+const CUSTOM_ENDPOINT = "custom-overpass";
+const readCustomOverpassUrl = () => {
+  try {
+    const url = new URL(String(globalThis.localStorage?.getItem(CUSTOM_OVERPASS_STORAGE_KEY) || "").trim());
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+};
 // Only on the deployed site (same-origin Worker); not in node or file://.
 const cacheEndpointAvailable = () => /^https?:$/.test(globalThis.location?.protocol || "");
 const MAX_IN_FLIGHT = 3;
@@ -657,7 +670,7 @@ const classifyMirrorError = (err, timedOut) => {
 const fetchWithAbort = async (endpoint, { query, bounds }, signal) => {
   const response = isCacheEndpoint(endpoint)
     ? await fetch(`${OSM_CACHE_PATH}?bbox=${bounds.south},${bounds.west},${bounds.north},${bounds.east}`, { signal })
-    : await fetch(endpoint, {
+    : await fetch(endpoint === CUSTOM_ENDPOINT ? readCustomOverpassUrl() : endpoint, {
       method: "POST",
       body: `data=${encodeURIComponent(query)}`,
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -684,6 +697,7 @@ const fetchWithAbort = async (endpoint, { query, bounds }, signal) => {
 
 const mirrorName = (endpoint) => {
   if (isCacheEndpoint(endpoint)) return "the MapNG cache";
+  if (endpoint === CUSTOM_ENDPOINT) return "your Overpass server";
   try {
     return new URL(endpoint).host;
   } catch {
@@ -719,7 +733,7 @@ const hedgedFetch = (endpoints, request, { onStatus, signal, deadlineAt }) => ne
 
   const scheduleHedge = () => {
     clearTimeout(hedgeTimer);
-    const delay = next > 0 && isCacheEndpoint(endpoints[next - 1]) ? CACHE_HEDGE_DELAY_MS : HEDGE_DELAY_MS;
+    const delay = next > 0 && (isCacheEndpoint(endpoints[next - 1]) || endpoints[next - 1] === CUSTOM_ENDPOINT) ? CACHE_HEDGE_DELAY_MS : HEDGE_DELAY_MS;
     if (next < endpoints.length) hedgeTimer = setTimeout(launch, delay);
   };
 
@@ -778,6 +792,8 @@ const fetchFromOverpass = async (request, { onStatus, signal } = {}) => {
       const coolUntil = readMirrorHealth()[OSM_CACHE_PATH]?.coolUntil || 0;
       if (coolUntil <= Date.now()) ordered = [OSM_CACHE_PATH, ...ordered];
     }
+    // A paid server goes first in every round, ignoring cool-downs.
+    if (readCustomOverpassUrl()) ordered = [CUSTOM_ENDPOINT, ...ordered];
     try {
       return await hedgedFetch(ordered, request, { onStatus, signal, deadlineAt });
     } catch (failure) {

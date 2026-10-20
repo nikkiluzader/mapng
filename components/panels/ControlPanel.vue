@@ -143,6 +143,19 @@
           <Trees :size="12" class="text-emerald-600 dark:text-emerald-400" />
           {{ t('controlPanel.includeOsmFeatures') }}
         </BaseToggle>
+        <details v-if="fetchOSM" class="mt-1 ml-6 text-[10px] text-gray-500 dark:text-gray-400" :open="!!customOverpassUrl">
+          <summary class="cursor-pointer select-none">{{ t('controlPanel.customOverpass') }}</summary>
+          <input
+            v-model.trim="customOverpassUrl"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="https://api.tracestrack.com/overpass/YOUR_KEY/interpreter"
+            class="mt-1 w-full px-1.5 py-1 rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-[10px] text-gray-900 dark:text-white"
+          />
+          <p v-if="customOverpassUrl && !customOverpassValid" class="mt-0.5 text-amber-600 dark:text-amber-400">{{ t('controlPanel.customOverpassInvalid') }}</p>
+          <p class="mt-0.5 leading-tight">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Overspan</a></p>
+        </details>
       </div>
 
       <!-- Road Enhancing Toggle -->
@@ -287,6 +300,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
+import { CUSTOM_OVERPASS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
 import { MapPin, Box, Trees, ChevronDown, Settings, Route, AlertTriangle } from 'lucide-vue-next';
 import BaseToggle from '../base/BaseToggle.vue';
@@ -413,6 +427,13 @@ watch(isFlat, (flat) => {
 }, { immediate: true });
 
 // Persist OSM toggle
+const customOverpassUrl = ref(localStorage.getItem(CUSTOM_OVERPASS_STORAGE_KEY) || '');
+const customOverpassValid = computed(() => /^https:\/\/\S+$/.test(customOverpassUrl.value));
+watch(customOverpassUrl, (newVal) => {
+  if (newVal) localStorage.setItem(CUSTOM_OVERPASS_STORAGE_KEY, newVal);
+  else localStorage.removeItem(CUSTOM_OVERPASS_STORAGE_KEY);
+});
+
 watch(fetchOSM, (newVal) => {
   localStorage.setItem('mapng_fetchOSM', String(newVal));
 });
