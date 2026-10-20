@@ -2,6 +2,14 @@ import {
   OVERPASS_ENDPOINTS,
   buildOverpassQuery,
 } from "./overpassQuery.js";
+import { fetchOsmFromTiles } from "./osmTiles.js";
+
+// MapNG's own OSM tiles (services/osmTiles.js) are read first when an archive
+// is configured; Overpass (edge cache, then mirrors) covers everything else.
+let osmTileSource = import.meta.env?.VITE_OSM_TILES_URL || null;
+
+/** Point OSM reads at a PMTiles archive URL / pmtiles Source (null: off). */
+export const setOsmTileSource = (source) => { osmTileSource = source || null; };
 
 let lastOSMRequestInfo = null;
 
@@ -790,7 +798,18 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
   const startedAt = new Date().toISOString();
 
   try {
-    const { endpoint, data } = await fetchFromOverpass({ query, bounds }, { onStatus, signal });
+    let result = null;
+    if (osmTileSource) {
+      try {
+        onStatus?.("Reading OpenStreetMap data from MapNG tiles...");
+        const data = await fetchOsmFromTiles(osmTileSource, bounds, { signal });
+        if (data) result = { endpoint: "mapng-osm-tiles", data };
+      } catch (tileError) {
+        if (tileError?.name === "AbortError" || signal?.aborted) throw tileError;
+        console.warn("[OSM] MapNG tiles unavailable, using Overpass:", tileError?.message || tileError);
+      }
+    }
+    const { endpoint, data } = result || await fetchFromOverpass({ query, bounds }, { onStatus, signal });
 
     console.log(`[OSM] Winner: ${endpoint} — ${data.elements?.length || 0} elements`);
 

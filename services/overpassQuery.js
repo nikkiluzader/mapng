@@ -48,67 +48,44 @@ export const snapOsmBounds = (bounds, step = OSM_CACHE_GRID_DEG) => {
   return area <= OSM_CACHE_MAX_AREA_DEG2 ? snapped : null;
 };
 
+// What MapNG takes from OSM. One spec drives both the live Overpass query
+// (buildOverpassQuery) and the offline tile builder
+// (scripts/build-osm-tiles.py), so tiles and Overpass return the same data.
+// Trimmed: seamark, tidal, harbour subtypes, vegetation, crop, orchard,
+// vineyard, material overlap natural/landuse and add weight for little value.
+export const OSM_FILTER = {
+  wayKeys: [
+    'highway', 'building', 'waterway', 'barrier', 'aeroway', 'man_made', 'public_transport',
+    'power', 'military', 'historic', 'tourism', 'amenity', 'landuse', 'natural', 'leisure',
+    'water', 'wetland', 'surface', 'landcover',
+  ],
+  wayTags: [['area', 'yes'], ['natural', 'tree_row']],
+  relationKeys: [
+    'building', 'waterway', 'aeroway', 'man_made', 'military', 'historic', 'tourism', 'amenity',
+    'landuse', 'natural', 'leisure', 'water', 'wetland', 'landcover',
+  ],
+  nodeTags: [
+    ['natural', 'tree'], ['natural', 'tree_row'], ['natural', 'shrub'],
+    ['amenity', 'fuel'], ['amenity', 'charging_station'], ['man_made', 'fuel_pump'],
+    ['highway', 'traffic_signals'], ['highway', 'stop'], ['highway', 'give_way'],
+    ['highway', 'street_lamp'], ['barrier', 'bollard'], ['amenity', 'bench'],
+  ],
+};
+
 export const buildOverpassQuery = (bounds) => {
   const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
-
-  // Timeout is 30s, matching the timeoutSec that getOSMQueryParameters advertises
-  // and records into export metadata.
-  // Maxsize reduced to 128 MB — 512 MB was triggering server-side rejection.
-  // Query trimmed: removed redundant/rare keys (seamark, tidal, harbour subtypes,
-  // vegetation, crop, orchard, vineyard, material) that overlap with natural/landuse
-  // and add significant response weight with minimal 3D rendering value.
+  const lines = [
+    ...OSM_FILTER.wayKeys.map((k) => `way["${k}"](${bbox});`),
+    ...OSM_FILTER.wayTags.map(([k, v]) => `way["${k}"="${v}"](${bbox});`),
+    ...OSM_FILTER.relationKeys.map((k) => `relation["${k}"](${bbox});`),
+    ...OSM_FILTER.nodeTags.map(([k, v]) => `node["${k}"="${v}"](${bbox});`),
+  ];
+  // Timeout 30 s matches the timeoutSec getOSMQueryParameters records into
+  // export metadata; 128 MB maxsize (512 MB triggered server-side rejection).
   return `
 [out:json][timeout:30][maxsize:134217728];
 (
-  way["highway"](${bbox});
-  way["building"](${bbox});
-  way["waterway"](${bbox});
-  way["barrier"](${bbox});
-  way["aeroway"](${bbox});
-  way["man_made"](${bbox});
-  way["public_transport"](${bbox});
-  way["power"](${bbox});
-  way["military"](${bbox});
-  way["historic"](${bbox});
-  way["tourism"](${bbox});
-  way["amenity"](${bbox});
-  way["landuse"](${bbox});
-  way["natural"](${bbox});
-  way["leisure"](${bbox});
-  way["water"](${bbox});
-  way["wetland"](${bbox});
-  way["surface"](${bbox});
-  way["area"="yes"](${bbox});
-  way["landcover"](${bbox});
-
-  relation["building"](${bbox});
-  relation["waterway"](${bbox});
-  relation["aeroway"](${bbox});
-  relation["man_made"](${bbox});
-  relation["military"](${bbox});
-  relation["historic"](${bbox});
-  relation["tourism"](${bbox});
-  relation["amenity"](${bbox});
-  relation["landuse"](${bbox});
-  relation["natural"](${bbox});
-  relation["leisure"](${bbox});
-  relation["water"](${bbox});
-  relation["wetland"](${bbox});
-  relation["landcover"](${bbox});
-
-  node["natural"="tree"](${bbox});
-  node["natural"="tree_row"](${bbox});
-  way["natural"="tree_row"](${bbox});
-  node["natural"="shrub"](${bbox});
-  node["amenity"="fuel"](${bbox});
-  node["amenity"="charging_station"](${bbox});
-  node["man_made"="fuel_pump"](${bbox});
-  node["highway"="traffic_signals"](${bbox});
-  node["highway"="stop"](${bbox});
-  node["highway"="give_way"](${bbox});
-  node["highway"="street_lamp"](${bbox});
-  node["barrier"="bollard"](${bbox});
-  node["amenity"="bench"](${bbox});
+  ${lines.join('\n  ')}
 );
 out body geom;
 `;

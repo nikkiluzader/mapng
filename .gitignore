@@ -28,4 +28,4 @@ scratch/
 tmp_unzip/
 .codex
 BASE_LEVEL.zip
-.claude
+.claude.wrangler/

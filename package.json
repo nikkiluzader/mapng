@@ -10,7 +10,7 @@
     "deploy": "npm run deploy:prod",
     "deploy:prod": "npm run build && npx wrangler deploy",
     "deploy:dev": "npm run build && npx wrangler deploy --env dev",
-    "test:beamng": "node --test tests/nodataDetect.test.mjs tests/terrariumRepair.test.mjs tests/gapFillBlend.test.mjs tests/exportTer.test.mjs tests/beamngLinkFiles.test.mjs tests/beamngRuntimeMaterials.test.mjs tests/beamngExportConformance.test.mjs tests/beamngExportGuideConformance.test.mjs tests/beamngMapNavigation.test.mjs tests/beamngSignals.test.mjs tests/roadNetwork.test.mjs tests/roadSmoother.test.mjs tests/roadMarkings.test.mjs tests/junctionMarkings.test.mjs tests/backdropMaterials.test.mjs tests/exportBeamNGLevel.integration.test.mjs tests/overpassMirrors.test.mjs tests/roadCrossSection.test.mjs tests/osmWorkerCache.test.mjs"
+    "test:beamng": "node --test tests/nodataDetect.test.mjs tests/terrariumRepair.test.mjs tests/gapFillBlend.test.mjs tests/exportTer.test.mjs tests/beamngLinkFiles.test.mjs tests/beamngRuntimeMaterials.test.mjs tests/beamngExportConformance.test.mjs tests/beamngExportGuideConformance.test.mjs tests/beamngMapNavigation.test.mjs tests/beamngSignals.test.mjs tests/roadNetwork.test.mjs tests/roadSmoother.test.mjs tests/roadMarkings.test.mjs tests/junctionMarkings.test.mjs tests/backdropMaterials.test.mjs tests/exportBeamNGLevel.integration.test.mjs tests/overpassMirrors.test.mjs tests/roadCrossSection.test.mjs tests/osmWorkerCache.test.mjs tests/osmTiles.test.mjs"
   },
   "dependencies": {
     "@tresjs/cientos": "^4.3.1",
@@ -25,6 +25,7 @@
     "leaflet": "^1.9.4",
     "lucide-vue-next": "^0.460.0",
     "pinia": "^3.0.4",
+    "pmtiles": "^4.5.0",
     "proj4": "^2.20.2",
     "three": "^0.162.0",
     "vue": "^3.5.0",
