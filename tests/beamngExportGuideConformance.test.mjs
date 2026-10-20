@@ -681,7 +681,7 @@ test('decal roads: asphalt covers the carriageway, AI path + paint the driving l
     assert.ok(edgeLines.length >= 2, 'rural primary has both edge lines');
     for (const d of edgeLines) {
       const off = Math.abs(yOf(d) - centreY);
-      assert.ok(Math.abs(off - 0.9 * 3.5) < 0.05, `edge line ${off.toFixed(2)} m from centre, want 3.15`);
+      assert.ok(Math.abs(off - (3.5 - 0.3)) < 0.05, `edge line ${off.toFixed(2)} m from centre, want 3.2 (0.3 m inside the lanes)`);
     }
   } finally {
     restore();

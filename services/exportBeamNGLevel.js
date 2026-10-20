@@ -1223,6 +1223,7 @@ const GLOBAL_DECAL_MATERIALS = {
   lineWhite: 'm_line_white',
   lineYellowDouble: 'm_line_yellow_double',
   lineYellowSingle: 'm_line_yellow',
+  lineYellowDashed: 'm_line_yellow_discontinue',
   lineWhiteDashed: 'm_line_white_discontinue',
   edgeAsphaltGrass: 'm_road_asphalt_edge_grass',
   dirtRoad: 'DefaultDecalRoadMaterial',  // no core dirt surface exists; use default road
@@ -1808,6 +1809,15 @@ const MAX_PAINTED_LANE_SEPARATORS = 6;
 
 const LINE_LAYER_BASE = { textureLength: 6.4, breakAngle: 1 };
 
+// Edge lines sit this far inside the carriageway edge (BeamNG.Earth: 0.3 m).
+const EDGE_LINE_INSET_M = 0.3;
+// Narrower two-way roads get no centre line (BeamNG.Earth: centre only at ≥ 6 m
+// of paved width; 5.5 m of driving width here, parking/shoulders excluded).
+const CENTRE_LINE_MIN_WIDTH_M = 5.5;
+
+const hasSidewalkTag = (tags = {}) => ['sidewalk', 'sidewalk:both', 'sidewalk:left', 'sidewalk:right']
+  .some((key) => ['both', 'left', 'right', 'yes', 'separate'].includes(String(tags[key] ?? '').trim().toLowerCase()));
+
 /**
  * Build line-marking decal layers (center line, edge lines, lane separators)
  * for one road corridor from its OSM tags.
@@ -1817,21 +1827,28 @@ const LINE_LAYER_BASE = { textureLength: 6.4, breakAngle: 1 };
  * in the travel direction (routing requires it); oneway=-1 runs against it,
  * flipping which side is travel-left.
  *
- * One-way roads get no center line: white dashed separators between lanes,
- * and on major classes a solid yellow travel-left edge + white right edge
- * (US divided-highway convention). Two-way roads get the center divider at
- * the forward/backward lane boundary (offset 0 when symmetric) — yellow
- * double on major classes, white dashed on minor — plus dashed separators
- * for any additional lanes per direction.
+ * Style by country (options.style, from the export's road rules):
+ *   'americas' — yellow centre lines: double solid by default, single dashed
+ *                where overtaking=yes; one-way main roads get a yellow
+ *                median-side edge (US divided-highway convention).
+ *   'white'    — the rest of the world: one white centre line, dashed, solid
+ *                where overtaking=no; white edges everywhere.
+ * Lane separators are white dashed in both. Two-way roads get the centre line
+ * at the forward/backward lane boundary, only when at least
+ * CENTRE_LINE_MIN_WIDTH_M wide. Major roads get edge lines unless they are
+ * urban streets with sidewalks (a kerb, not paint, marks the edge there).
  *
  * Caveat: when lanes:forward/backward are asymmetric AND the corridor merger
  * reversed the seed geometry, the painted layout mirrors. Symmetric layouts
  * (the overwhelmingly common case) are unaffected.
  */
-export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5) {
+export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5, options = {}) {
+  const style = options.style === 'white' ? 'white' : 'americas';
   const majorRoad = MAJOR_ROAD_MARKINGS.has(highway);
-  const edgeOffset = 0.9 * styleHalfWidth;
+  const edgeOffset = Math.max(0.5, styleHalfWidth - EDGE_LINE_INSET_M);
   const layers = [];
+  const drawEdgeLines = majorRoad && !(options.urban && hasSidewalkTag(tags));
+  const overtaking = String(tags.overtaking ?? '').trim().toLowerCase();
 
   const totalTag = parsePositiveInt(tags.lanes);
   const fwdTag = parsePositiveInt(tags['lanes:forward']);
@@ -1850,15 +1867,16 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5)
     const sepCount = Math.min(lanes - 1, MAX_PAINTED_LANE_SEPARATORS);
     for (let k = 1; k <= sepCount; k++) pushSeparator(k, lanes);
 
-    if (majorRoad) {
+    if (drawEdgeLines) {
       const leftSign = isReverseOneWayRoad(tags) ? -1 : 1;
       layers.push({
-        name: leftSign > 0 ? 'line_right' : 'line_left', material: GLOBAL_DECAL_MATERIALS.lineYellowSingle,
-        width: 0.2, offset: leftSign * edgeOffset, renderPriority: 1, ...LINE_LAYER_BASE,
+        name: leftSign > 0 ? 'line_right' : 'line_left',
+        material: style === 'americas' ? GLOBAL_DECAL_MATERIALS.lineYellowSingle : GLOBAL_DECAL_MATERIALS.lineWhite,
+        width: 0.15, offset: leftSign * edgeOffset, renderPriority: 1, ...LINE_LAYER_BASE,
       });
       layers.push({
         name: leftSign > 0 ? 'line_left' : 'line_right', material: GLOBAL_DECAL_MATERIALS.lineWhite,
-        width: 0.2, offset: -leftSign * edgeOffset, renderPriority: 1, ...LINE_LAYER_BASE,
+        width: 0.15, offset: -leftSign * edgeOffset, renderPriority: 1, ...LINE_LAYER_BASE,
       });
     }
     return layers;
@@ -1879,12 +1897,22 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5)
 
   // Center divider sits at the forward/backward boundary. Forward travel
   // follows node order, so its lanes occupy the negative-offset (right) side.
-  const centerOffset = -edgeOffset + (2 * edgeOffset * nF) / lanes;
-  layers.push({
-    name: 'line_center',
-    material: majorRoad ? GLOBAL_DECAL_MATERIALS.lineYellowDouble : GLOBAL_DECAL_MATERIALS.lineWhiteDashed,
-    width: majorRoad ? 0.4 : 0.2, offset: centerOffset, renderPriority: 2, ...LINE_LAYER_BASE,
-  });
+  if (2 * styleHalfWidth >= CENTRE_LINE_MIN_WIDTH_M) {
+    const centerOffset = -edgeOffset + (2 * edgeOffset * nF) / lanes;
+    let centre;
+    if (style === 'americas') {
+      centre = overtaking === 'yes'
+        ? { material: GLOBAL_DECAL_MATERIALS.lineYellowDashed, width: 0.15 }
+        : { material: GLOBAL_DECAL_MATERIALS.lineYellowDouble, width: 0.4 };
+    } else {
+      centre = overtaking === 'no'
+        ? { material: GLOBAL_DECAL_MATERIALS.lineWhite, width: 0.15 }
+        : { material: GLOBAL_DECAL_MATERIALS.lineWhiteDashed, width: 0.15 };
+    }
+    layers.push({
+      name: 'line_center', ...centre, offset: centerOffset, renderPriority: 2, ...LINE_LAYER_BASE,
+    });
+  }
 
   let seps = 0;
   for (let k = 1; k < lanes && seps < MAX_PAINTED_LANE_SEPARATORS; k++) {
@@ -1893,14 +1921,14 @@ export function buildLineMarkingLayers(highway, tags = {}, styleHalfWidth = 3.5)
     pushSeparator(k, lanes);
   }
 
-  if (majorRoad) {
+  if (drawEdgeLines) {
     layers.push({
       name: 'line_left', material: GLOBAL_DECAL_MATERIALS.lineWhite,
-      width: 0.2, offset: -edgeOffset, renderPriority: 1, ...LINE_LAYER_BASE,
+      width: 0.15, offset: -edgeOffset, renderPriority: 1, ...LINE_LAYER_BASE,
     });
     layers.push({
       name: 'line_right', material: GLOBAL_DECAL_MATERIALS.lineWhite,
-      width: 0.2, offset: edgeOffset, renderPriority: 1, ...LINE_LAYER_BASE,
+      width: 0.15, offset: edgeOffset, renderPriority: 1, ...LINE_LAYER_BASE,
     });
   }
   return layers;
@@ -1940,7 +1968,9 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
     });
   }
   if (!isUnpaved && laneMarkingsEnabled) {
-    layers.push(...buildLineMarkingLayers(highway, tags, drivingHalfWidth)
+    layers.push(...buildLineMarkingLayers(highway, tags, drivingHalfWidth, {
+      style: options.markingStyle, urban: options.urban,
+    })
       .map((layer) => ({ ...layer, offset: layer.offset + laneShift })));
   }
   const decals = [];
@@ -2120,6 +2150,10 @@ export function generateDecalRoads(terrainData, squareSize) {
   const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures);
   const giveWayKeys = collectGiveWayNodeKeys(terrainData.osmFeatures);
   const leftHandTraffic = !!terrainData.roadRules?.leftHandTraffic;
+  // Yellow centre lines in the Americas (and BeamNG's US default when the
+  // location is unknown), white elsewhere.
+  const rules = terrainData.roadRules;
+  const markingStyle = !rules?.countryCode || rules.region === 'Americas' ? 'americas' : 'white';
 
   const roadSplinesByName = new Map();
   const segmentCounterByName = new Map();
@@ -2173,8 +2207,9 @@ export function generateDecalRoads(terrainData, squareSize) {
     const isOneWay = isOneWayRoad(feature.tags || {});
     const renderTags = getMergedRoadRenderTags(segmentFeature);
     const corridorKey = getDecalWidthCorridorKey(segmentFeature);
+    const urbanRoad = isUrbanRoad(segmentFeature);
     const crossSection = estimateRoadCrossSection(feature.tags || {}, highway, isOneWay, {
-      urban: isUrbanRoad(segmentFeature),
+      urban: urbanRoad,
       fallbackHalfWidth: style.width,
     });
     const stableHalfWidth = stableHalfWidthMap.get(corridorKey);
@@ -2251,6 +2286,8 @@ export function generateDecalRoads(terrainData, squareSize) {
           }),
           drivingHalfWidth,
           laneShift: crossSection.laneShift,
+          markingStyle,
+          urban: urbanRoad,
         },
       );
 
@@ -5783,6 +5820,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     leftHandTraffic: resolvedRightHandDrive,
     euroSignals: !!roadRules?.euroSignals,
     countryCode: roadRules?.countryCode ?? null,
+    region: roadRules?.region ?? null,
   };
   if (roadRules) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road rules: ${roadRules.countryName} (${roadRules.countryCode}), ${resolvedRightHandDrive ? 'left' : 'right'}-hand traffic${roadRules.euroSignals ? ', EU signal cycle' : ''}.`);
