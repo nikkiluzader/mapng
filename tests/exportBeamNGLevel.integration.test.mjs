@@ -645,6 +645,12 @@ test('exportBeamNGLevel ships textured buildings with every material defined', a
     const used = new Set([...dae.matchAll(/<material id="[^"]+" name="([^"]+)"/g)].map((m) => m[1]));
     assert.ok([...used].some((n) => n.startsWith('mapng_bld_')), `textured materials used: ${[...used]}`);
     assert.match(dae, /<geometry id="Colmesh-1/, 'buildings collide');
+    // BeamNG reads trailing digits in node names as detail levels; only the
+    // scene roots and the collision mesh may carry them.
+    for (const [, name] of dae.matchAll(/<node [^>]*name="([^"]+)"/g)) {
+      if (['base00', 'start01', 'Colmesh-1'].includes(name)) continue;
+      assert.doesNotMatch(name, /\d$/, `node "${name}" would be read as a detail level`);
+    }
 
     const defs = JSON.parse(await zip.file(`${base}/map_assets/custom_assets/osm_objects/main.materials.json`).async('string'));
     for (const name of used) assert.ok(defs[name], `material ${name} defined`);

@@ -607,6 +607,20 @@ function pitchedRoof(m, box, z, plan, wallMat, wallUv) {
  * buildings so no single geometry grows unbounded.
  */
 const MESH_BATCH = 400;
+
+// BeamNG reads trailing digits of a Collada node name as its detail level
+// (official shapes: *_a700, *_a160, Colmesh-1), so "buildings_1" + "buildings_2"
+// made the whole shape "invalid detail levels" and nothing rendered. Batch
+// names use letters: buildings_a, buildings_b, ... buildings_aa.
+export function letterName(index) {
+  let n = index;
+  let out = '';
+  do {
+    out = String.fromCharCode(97 + (n % 26)) + out;
+    n = Math.floor(n / 26) - 1;
+  } while (n >= 0);
+  return out;
+}
 const MAX_AREA_M2 = 50000;
 
 export function buildTexturedBuildings(features, project, { maxBuildings = 20000 } = {}) {
@@ -616,7 +630,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   let count = 0;
 
   const flush = () => {
-    const mesh = builder.toMesh(`buildings_${meshes.length + 1}`);
+    const mesh = builder.toMesh(`buildings_${letterName(meshes.length)}`);
     if (mesh) meshes.push(mesh);
     builder = new MeshBuilder();
     inBatch = 0;

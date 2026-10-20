@@ -115,6 +115,10 @@ test('a whole neighbourhood builds (regression: spread into push() overflowed th
   const { meshes, count } = buildTexturedBuildings(feats, project);
   assert.equal(count, 600);
   assert.ok(meshes.length >= 2, 'batched into several meshes');
+  // BeamNG treats trailing digits in a node name as a detail level; several
+  // "buildings_1", "buildings_2" nodes made the shape invalid in-game.
+  for (const m of meshes) assert.doesNotMatch(m.name, /\d$/, `mesh name ${m.name} must not end in a digit`);
+  assert.equal(new Set(meshes.map((m) => m.name)).size, meshes.length, 'unique names');
   const vertices = meshes.reduce((n, m) => n + m.geometry.getAttribute('position').count, 0);
   assert.ok(vertices > 100000, `${vertices} vertices`);
 });

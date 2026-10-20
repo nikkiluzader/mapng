@@ -1677,7 +1677,8 @@ const handleBeamNGLevelExport = async () => {
       console.warn(`${BEAMNG_EXPORT_UI_LOG} Auto-download fallback blocked risk detected; awaiting explicit anchor click.`);
     }
   } catch (error) {
-    console.error(`${BEAMNG_EXPORT_UI_LOG} Failed to export BeamNG level:`, {
+    // Message inline: copied console logs collapse the object to "Object".
+    console.error(`${BEAMNG_EXPORT_UI_LOG} Failed to export BeamNG level: ${error?.name || 'Error'}: ${error?.message || error}`, {
       message: error?.message,
       name: error?.name,
       stack: error?.stack,
