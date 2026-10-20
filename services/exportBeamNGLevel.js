@@ -27,6 +27,7 @@ import {
 import { resolveRoadRulesAt } from './countryRules.js';
 import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
+import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS } from './beamngSidewalks.js';
 import {
   buildCarriagewayIndex,
   cutNodes,
@@ -578,6 +579,36 @@ async function generateHeightmapPng(terrainData, maxSize = Number.POSITIVE_INFIN
  *
  * Returns a Blob, or null if there are no OSM features.
  */
+/**
+ * Sidewalk meshes (beamngSidewalks.js) as one Collada shape: visual meshes
+ * plus a Colmesh-1 collision copy, in BeamNG's base00 > start01 layout.
+ */
+function generateSidewalksDAE(meshes) {
+  if (!meshes.length) return null;
+  const parts = meshes.map((mesh) => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', mesh.geometry.getAttribute('position').clone());
+    return g;
+  });
+  const collisionGeom = mergeGeometries(parts);
+  parts.forEach((g) => g.dispose());
+  const base00 = new THREE.Group();
+  base00.name = 'base00';
+  const start01 = new THREE.Group();
+  start01.name = 'start01';
+  for (const mesh of meshes) start01.add(mesh);
+  if (collisionGeom) {
+    collisionGeom.name = 'Colmesh-1';
+    const collision = new THREE.Mesh(collisionGeom, new THREE.MeshBasicMaterial({ name: SIDEWALK_MATERIALS.curb }));
+    collision.name = 'Colmesh-1';
+    start01.add(collision);
+  }
+  base00.add(start01);
+  base00.updateMatrixWorld(true);
+  const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
+  return result?.data ?? null;
+}
+
 async function generateOSMObjectsDAE(terrainData, worldSize) {
   if (!terrainData.osmFeatures?.length) return null;
 
@@ -2332,8 +2363,17 @@ export function generateDecalRoads(terrainData, squareSize) {
     });
   }
 
-  // The drawn carriageways, for furniture placed along them (street lamps).
+  // The drawn carriageways (with the roads each plainly continues into) and
+  // crosswalk bands, for things built along them (street lamps, sidewalks).
+  for (const cw of carriageways) {
+    const seg = drivableRoads[cw.owner];
+    cw.continuations = [seg?.startKey, seg?.endKey]
+      .map((key) => (key ? ownersAtNode.get(key) : null))
+      .filter((owners) => owners && owners.size === 2)
+      .flatMap((owners) => [...owners].filter((o) => o !== cw.owner));
+  }
   Object.defineProperty(groups, 'carriageways', { value: carriageways, enumerable: false });
+  Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
   return groups;
 }
 
@@ -5572,6 +5612,7 @@ async function generateZipToOPFS(zip, filename, onPercent) {
  * @param {object} [options]
  * @param {string}  [options.baseTexture='hybrid']         — 'none' | 'hybrid' | 'satellite' | 'osm' | 'painted'
  * @param {boolean} [options.includeBuildings=true]         — include generated OSM 3D objects (.dae)
+ * @param {boolean} [options.includeSidewalks=true]         — raised curbs + sidewalks along drawn roads (.dae)
  * @param {boolean} [options.applyFoundations=true]         — apply terrain foundation pass under buildings
  * @param {boolean} [options.includeBackdrop=false]         — fetch and include surrounding terrain backdrop DAE
  * @param {boolean} [options.includeWater=true]             — emit native BeamNG inland water objects
@@ -5593,6 +5634,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const {
     baseTexture = 'hybrid',
     includeBuildings = true,
+    includeSidewalks = true,
     applyFoundations = true,
     includeBackdrop = false,
     includeWater = true,
@@ -5783,6 +5825,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const decalRoads = includeRoads
     ? generateDecalRoads(exportTerrainData, squareSize)
     : [];
+  const sidewalks = includeRoads && includeSidewalks
+    ? buildSidewalkMeshes(decalRoads.carriageways || [], { zones: decalRoads.crosswalkZones || [] })
+    : { meshes: [], runs: [], triangles: 0 };
+  if (sidewalks.runs.length > 0) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
+  }
+  const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);
 
   const { signalData, controllerDefinitions: signalControllerDefinitions, props: signalProps = [] } =
     buildBeamNGSignalExportBundle(exportTerrainData, squareSize);
@@ -6217,6 +6266,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const terrainBinaryData = await toZipBinary(terBlob);
   const terrainHeightmapData = await toZipBinary(heightmapBlob);
   const osmDaeData = await toZipBinary(osmDaeBlob);
+  const sidewalksDaeData = await toZipBinary(sidewalksDae);
   const backdropDaeData = await toZipBinary(backdropDaeBlob);
   const terrainTextureData = await toZipBinary(texBlob);
 
@@ -6296,7 +6346,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   heightmapBlob = null;
 
   // ── map_assets/custom_assets/ (OSM 3D objects and/or terrain backdrop) ──────────────────
-  if (osmDaeData || backdropDaeData || mapngFlagFiles.length > 0) {
+  if (osmDaeData || sidewalksDae || backdropDaeData || mapngFlagFiles.length > 0) {
     if (osmDaeData) {
       zip.folder(`${base}/map_assets/custom_assets/osm_objects`);
       zip.file(`${base}/map_assets/custom_assets/osm_objects/osm_objects.dae`, osmDaeData);
@@ -6311,6 +6361,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
         },
         ...getBuildingMaterialDefs(),
       }, null, 2));
+    }
+    if (sidewalksDae) {
+      zip.folder(`${base}/map_assets/custom_assets/sidewalks`);
+      zip.file(`${base}/map_assets/custom_assets/sidewalks/sidewalks.dae`, sidewalksDaeData);
+      zip.file(`${base}/map_assets/custom_assets/sidewalks/main.materials.json`, JSON.stringify(getSidewalkMaterialDefs(), null, 2));
     }
     if (backdropDaeData) {
       zip.folder(`${base}/map_assets/custom_assets/terrain_backdrop`);
@@ -6675,6 +6730,22 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }
 
 
+
+  if (sidewalksDae) {
+    // Curbs collide; decals don't project onto them (edge blends stay on the ground).
+    levelObjectItems.push({
+      __parent: 'level_objects',
+      class: 'TSStatic',
+      name: 'sidewalks',
+      persistentId: generatePersistentId(),
+      position: [0, 0, 0],
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/sidewalks/sidewalks.dae`,
+      collisionType: 'Collision Mesh',
+      decalType: 'None',
+      prebuildCollisionData: 0,
+      useInstanceRenderData: true,
+    });
+  }
 
   if (backdropDaeBlob) {
     levelObjectItems.push({

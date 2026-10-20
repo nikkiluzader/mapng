@@ -802,3 +802,40 @@ test('street lamps: a lit street gets poles with night lights', async () => {
     restore();
   }
 });
+
+// ── Raised sidewalks along urban streets ──────────────────────────────────────
+test('sidewalks: tagged street gets a curb mesh with collision, materials and a level object', async () => {
+  const restore = installCanvasPolyfill();
+  try {
+    const td = makeTerrainData();
+    td.osmFeatures = [
+      { id: 'walk_1', type: 'road', tags: { highway: 'residential', sidewalk: 'both', name: 'walk_st' },
+        geometry: [{ lat: 0.5, lng: 0.15 }, { lat: 0.5, lng: 0.85 }] },
+      { id: 'none_1', type: 'road', tags: { highway: 'residential', sidewalk: 'separate', name: 'sep_st' },
+        geometry: [{ lat: 0.3, lng: 0.15 }, { lat: 0.3, lng: 0.85 }] },
+    ];
+    const run = async (opts = {}) => JSZip.loadAsync(await (await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
+      roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
+      baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
+      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeTrees: false, includeRocks: false, includeNativeBarriers: false, ...opts,
+    })).blob.arrayBuffer());
+    const zip = await run();
+    const dae = await readText(zip, 'map_assets/custom_assets/sidewalks/sidewalks.dae');
+    assert.match(dae, /Colmesh-1/, 'collision mesh');
+    assert.match(dae, /mapng_curbs/);
+    assert.match(dae, /mapng_sidewalk/);
+    assert.match(dae, /<up_axis>Z_UP<\/up_axis>/);
+    const mats = JSON.parse(await readText(zip, 'map_assets/custom_assets/sidewalks/main.materials.json'));
+    assert.match(mats.mapng_curbs.Stages[0].baseColorMap, /^\/assets\/materials\/trim\/concrete\/curbs\//);
+    const levelObjects = parseNDJSON(await readText(zip, 'main/MissionGroup/level_objects/items.level.json'));
+    const sidewalks = levelObjects.find((o) => o.name === 'sidewalks');
+    assert.ok(sidewalks);
+    assert.equal(sidewalks.collisionType, 'Collision Mesh');
+
+    const off = await run({ includeSidewalks: false });
+    assert.ok(!off.file(`${BASE}/map_assets/custom_assets/sidewalks/sidewalks.dae`));
+  } finally {
+    restore();
+  }
+});
