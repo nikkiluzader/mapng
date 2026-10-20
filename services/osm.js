@@ -641,7 +641,16 @@ const recordMirrorResult = (endpoint, result) => {
     ? { okAt: Date.now(), latencyMs: result.latencyMs }
     : { ...prev, failAt: Date.now(), failKind: result.kind, coolUntil: Date.now() + (COOLDOWN_MS[result.kind] ?? COOLDOWN_MS.http) };
   writeMirrorHealth(health);
+  if (OVERPASS_ENDPOINTS.includes(endpoint)) {
+    globalThis.dispatchEvent?.(new Event(OVERPASS_STATUS_EVENT));
+  }
 };
+
+// True while every public mirror is cooling down after a failure (the outage
+// banner in the UI listens for OVERPASS_STATUS_EVENT and re-checks this).
+export const OVERPASS_STATUS_EVENT = "mapng:overpass-status";
+export const publicOverpassMirrorsDown = (health = readMirrorHealth(), now = Date.now()) =>
+  OVERPASS_ENDPOINTS.every((e) => (health[e]?.coolUntil || 0) > now);
 
 /**
  * Endpoints in the order to try them: healthy mirrors by recent success and

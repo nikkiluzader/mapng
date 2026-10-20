@@ -8,7 +8,9 @@
   <MobileRestrictionOverlay />
 
   <!-- Main Application - Hidden on Mobile -->
-  <div class="hidden md:flex h-screen w-full flex-col md:flex-row overflow-hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+  <div class="hidden md:flex h-screen w-full flex-col overflow-hidden bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+  <OverpassStatusBanner />
+  <div class="flex flex-1 min-h-0 w-full flex-row overflow-hidden">
     <AppSidebar
       :batch-mode="batchMode"
       :is-dark-mode="isDarkMode"
@@ -175,6 +177,7 @@
       </div>
     </main>
   </div>
+  </div>
 
   <!-- Batch Progress Modal -->
     <BatchProgressModal
@@ -224,6 +227,7 @@ import MapSelector from './components/map/MapSelector.vue';
 import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
+import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
 import { releaseUploadRasterCache } from './services/resamplerClient';
 import { applyAscCoordinateSystem } from './services/ascLoader.js';

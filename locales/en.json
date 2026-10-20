@@ -1,4 +1,10 @@
 {
+  "overpassStatus": {
+    "title": "OpenStreetMap servers aren't responding.",
+    "body": "All public Overpass servers failed recently, so roads, buildings and other OSM features may not load (MapNG's own data still covers Arizona). Try again in a few minutes, or add your own Overpass server under Include OSM Features.",
+    "dismiss": "Hide this notice",
+    "reopen": "OpenStreetMap servers aren't responding. Show details"
+  },
   "common": {
     "cancel": "Cancel"
   },
