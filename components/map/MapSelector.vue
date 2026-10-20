@@ -462,11 +462,21 @@ const surroundingBounds = computed(() => {
 });
 
 // Handle map move
+// The map's own centre the last time it was reported. Leaflet also fires
+// 'move' when nothing moved (layout resizes); re-reporting its pixel-rounded
+// centre then overwrote coordinates typed with more precision (issue #3).
+let lastMapCenter = null;
+const mapCenterUnchanged = (c) => lastMapCenter
+  && Math.abs(c.lat - lastMapCenter.lat) < 1e-12
+  && Math.abs(c.lng - lastMapCenter.lng) < 1e-12;
+
 const handleMove = () => {
   if (isMovingProgrammatically.value) return;
   if (!mapRef.value?.leafletObject) return;
   const map = mapRef.value.leafletObject;
   const c = map.getCenter();
+  if (mapCenterUnchanged(c)) return;
+  lastMapCenter = { lat: c.lat, lng: c.lng };
 
   const normalizedLng = normalizeDatelineLongitude(c.lng);
   if (normalizedLng !== c.lng) {
@@ -485,19 +495,36 @@ const handleZoom = () => {
   emit('zoom', currentZoom.value);
 };
 
+// Where a programmatic move (typed coordinates, search) was sent: reported
+// back exactly when the map lands there, instead of the map's own
+// pixel-rounded centre, so manually entered coordinates keep every digit.
+let programmaticTarget = null;
+const PROGRAMMATIC_LANDING_DEG = 1e-6;
+
 const onMoveEnd = () => {
     isMovingProgrammatically.value = false;
     // Ensure we sync final position
     if (mapRef.value?.leafletObject) {
         const map = mapRef.value.leafletObject;
         const c = map.getCenter();
-        currentCenter.value = { lat: c.lat, lng: normalizeDatelineLongitude(c.lng) };
+        const target = programmaticTarget;
+        programmaticTarget = null;
+        // This listener stays registered after the first programmatic move, so
+        // it also sees no-op moveends (layout resizes): nothing to report then.
+        if (!target && mapCenterUnchanged(c)) return;
+        lastMapCenter = { lat: c.lat, lng: c.lng };
+        currentCenter.value = target
+          && Math.abs(c.lat - target.lat) < PROGRAMMATIC_LANDING_DEG
+          && Math.abs(c.lng - target.lng) < PROGRAMMATIC_LANDING_DEG
+          ? { lat: target.lat, lng: target.lng }
+          : { lat: c.lat, lng: normalizeDatelineLongitude(c.lng) };
         emit('move', currentCenter.value);
     }
 };
 
 const onDragStart = () => {
     isMovingProgrammatically.value = false;
+    programmaticTarget = null;
 };
 
 // Open current view in OpenStreetMap iD editor (new tab)
@@ -542,8 +569,13 @@ watch(() => props.center, (newCenter) => {
     map.on('moveend', onMoveEnd);
     map.on('dragstart', onDragStart);
     
+    programmaticTarget = { lat: newCenter.lat, lng: newCenter.lng };
     map.setView([newCenter.lat, newCenter.lng], props.zoom, { animate: true });
     currentCenter.value = newCenter;
+  } else {
+    // Too small to move the map (< ~11 m), but it is the new centre: keep it,
+    // or the next map event reports the old one back over the typed value.
+    currentCenter.value = { lat: newCenter.lat, lng: newCenter.lng };
   }
 }, { deep: true });
 
