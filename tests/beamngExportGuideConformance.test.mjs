@@ -775,3 +775,30 @@ test('traffic signals: heads link to signals.json instances; level posts get .li
     restore();
   }
 });
+
+// ── Generated street lamps along lit roads ────────────────────────────────────
+test('street lamps: a lit street gets poles with night lights', async () => {
+  const restore = installCanvasPolyfill();
+  try {
+    const td = makeTerrainData();
+    td.osmFeatures = [
+      { id: 'lit_1', type: 'road', tags: { highway: 'residential', lit: 'yes', name: 'lit_st' },
+        geometry: [{ lat: 0.5, lng: 0.15 }, { lat: 0.5, lng: 0.85 }] },
+    ];
+    const result = await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
+      roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
+      baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
+      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeTrees: false, includeRocks: false, includeNativeBarriers: false,
+    });
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const items = parseNDJSON(await readText(zip, 'main/MissionGroup/street_furniture/items.level.json'));
+    const poles = items.filter((o) => o.class === 'TSStatic' && /^street_lamp_gen_/.test(o.name));
+    const lights = items.filter((o) => o.class === 'PointLight' && /^street_lamp_gen_/.test(o.name));
+    assert.ok(poles.length > 0, 'generated lamp poles');
+    assert.equal(lights.length, poles.length, 'one night light per pole');
+    assert.ok(lights.every((l) => l.nightLight === '1' && l.castShadows === false));
+  } finally {
+    restore();
+  }
+});

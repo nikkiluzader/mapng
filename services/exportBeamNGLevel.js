@@ -26,6 +26,7 @@ import {
 } from './beamngMapNavigation.js';
 import { resolveRoadRulesAt } from './countryRules.js';
 import { buildRoadSignProps } from './roadSigns.js';
+import { generateRoadLamps } from './streetLamps.js';
 import {
   buildCarriagewayIndex,
   cutNodes,
@@ -2272,7 +2273,10 @@ export function generateDecalRoads(terrainData, squareSize) {
       // ROAD_NODE_SPACING_M before world conversion), so no decimation here.
       const centerNodes = rawNodes;
       if (centerNodes.length < 2) continue;
-      carriageways.push({ owner: segIndex, nodes: centerNodes, half: styleHalfWidth });
+      carriageways.push({
+        owner: segIndex, nodes: centerNodes, half: styleHalfWidth,
+        tags: renderTags, highway, urban: urbanRoad, wayId: feature.id, oneWay: isOneWay,
+      });
 
       const layeredDecals = getLayeredRoadDecals(
         centerNodes,
@@ -2328,6 +2332,8 @@ export function generateDecalRoads(terrainData, squareSize) {
     });
   }
 
+  // The drawn carriageways, for furniture placed along them (street lamps).
+  Object.defineProperty(groups, 'carriageways', { value: carriageways, enumerable: false });
   return groups;
 }
 
@@ -3993,7 +3999,7 @@ const STREET_LAMP_LIGHT_TEMPLATE = {
  * Replaces the procedural preview primitives that used to be baked into the
  * OSM objects DAE (see generateOSMObjectsDAE includeStreetFurniture: false).
  */
-function buildStreetFurnitureObjects(terrainData, squareSize, biome) {
+function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [] } = {}) {
   const profile = getStreetFurnitureProfile(biome);
   if (!profile) return [];
 
@@ -4002,7 +4008,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome) {
     && Array.isArray(feature.geometry)
     && feature.geometry.length === 1
   )) ?? [];
-  if (features.length === 0) return [];
+  if (features.length === 0 && carriageways.length === 0) return [];
 
   const roads = projectDrivableRoads(terrainData, squareSize);
   const MAX_ROAD_SEARCH_M = 30;
@@ -4011,6 +4017,37 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome) {
   let lampCount = 0;
   let benchCount = 0;
   const lampCells = new Set();
+  const LAMP_LIMIT = MAX_STREET_LAMPS;
+  const osmLampSpots = [];
+  // Pole + dusk-to-dawn PointLight at the luminaire, arm toward `facing`.
+  const addLamp = (posX, posY, facing, name) => {
+    const asset = profile.lamp;
+    if (!asset?.shapeFile || lampCount >= LAMP_LIMIT) return;
+    const z = getTerrainHeightAtWorldXY(posX, posY, terrainData, squareSize);
+    objects.push({
+      __parent: 'street_furniture',
+      class: 'TSStatic',
+      name,
+      persistentId: generatePersistentId(),
+      position: [roundTo(posX, 3), roundTo(posY, 3), roundTo(z, 3)],
+      rotationMatrix: rotationMatrixFromYaw(facing + (asset.yawOffset ?? 0)),
+      shapeName: asset.shapeFile,
+      useInstanceRenderData: true,
+    });
+    const forward = asset.lightForward ?? 0;
+    objects.push({
+      __parent: 'street_furniture',
+      name: `${name}_light`,
+      persistentId: generatePersistentId(),
+      position: [
+        roundTo(posX + Math.cos(facing) * forward, 3),
+        roundTo(posY + Math.sin(facing) * forward, 3),
+        roundTo(z + (asset.lightHeight ?? 6), 3),
+      ],
+      ...STREET_LAMP_LIGHT_TEMPLATE,
+    });
+    lampCount++;
+  };
   const cellKey = (x, y) => `${Math.round(x / LAMP_MIN_SPACING_M)},${Math.round(y / LAMP_MIN_SPACING_M)}`;
 
   for (let i = 0; i < features.length; i++) {
@@ -4049,42 +4086,38 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome) {
       const key = cellKey(posX, posY);
       if (lampCells.has(key)) continue;
       lampCells.add(key);
+      osmLampSpots.push([posX, posY]);
     }
 
+    if (isLamp) {
+      addLamp(posX, posY, facing, `street_lamp_${i}`);
+      continue;
+    }
     const z = getTerrainHeightAtWorldXY(posX, posY, terrainData, squareSize);
-    const kind = isLamp ? 'street_lamp' : 'bench';
     objects.push({
       __parent: 'street_furniture',
       class: 'TSStatic',
-      name: `${kind}_${i}`,
+      name: `bench_${i}`,
       persistentId: generatePersistentId(),
       position: [roundTo(posX, 3), roundTo(posY, 3), roundTo(z, 3)],
       rotationMatrix: rotationMatrixFromYaw(yaw),
       shapeName: asset.shapeFile,
       useInstanceRenderData: true,
     });
+    benchCount++;
+  }
 
-    if (isLamp) {
-      lampCount++;
-      const forward = asset.lightForward ?? 0;
-      objects.push({
-        __parent: 'street_furniture',
-        name: `street_lamp_light_${i}`,
-        persistentId: generatePersistentId(),
-        position: [
-          roundTo(posX + Math.cos(facing) * forward, 3),
-          roundTo(posY + Math.sin(facing) * forward, 3),
-          roundTo(z + (asset.lightHeight ?? 6), 3),
-        ],
-        ...STREET_LAMP_LIGHT_TEMPLATE,
-      });
-    } else {
-      benchCount++;
-    }
+  // Lamps along lit streets: OSM maps few street_lamp nodes, so lit roads
+  // (lit=yes, or urban main roads without a lit tag) get poles at a steady
+  // spacing (BeamNG.Earth plan B3).
+  const generatedLamps = generateRoadLamps(carriageways, osmLampSpots, LAMP_LIMIT - lampCount);
+  for (let i = 0; i < generatedLamps.length; i++) {
+    const lamp = generatedLamps[i];
+    addLamp(lamp.x, lamp.y, lamp.facing, `street_lamp_gen_${i}`);
   }
 
   if (lampCount + benchCount > 0) {
-    console.log(`[BeamNG Export] Street furniture: ${lampCount} lamps (+lights), ${benchCount} benches`);
+    console.log(`[BeamNG Export] Street furniture: ${lampCount} lamps (+lights; ${generatedLamps.length} along lit streets), ${benchCount} benches`);
   }
   return objects;
 }
@@ -5847,7 +5880,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     useInstanceRenderData: true,
   }));
   const trafficSignalObjects = buildTrafficSignalObjects(signalProps);
-  const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome);
+  const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome, {
+    carriageways: decalRoads.carriageways || [],
+  });
   const { objects: fuelStationObjects, facilities: fuelStationFacilities } =
     buildFuelStations(exportTerrainData, squareSize);
   const usesEastCoastFenceMaterials = barrierFolderItems.some((obj) => (
