@@ -43,8 +43,6 @@
       <div class="flex items-center justify-between gap-2">
         <span class="text-[11px] text-gray-600 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
         <select :value="model.roadType" @change="update('roadType', $event.target.value)" :disabled="!includeOSM" :class="SELECT_XS">
-          <option v-if="includeOSM" value="architect">{{ t('exportPanel.roadTypeArchitect') }}</option>
-          <option v-if="includeOSM" value="mesh">{{ t('exportPanel.roadTypeMesh') }}</option>
           <option v-if="includeOSM" value="decal">{{ t('exportPanel.roadTypeSpline') }}</option>
           <option value="none">{{ t('exportPanel.roadTypeNone') }}</option>
         </select>

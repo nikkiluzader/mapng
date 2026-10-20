@@ -92,8 +92,6 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
             <select v-model="beamNGRoadType" :disabled="!hasOsmData" :class="SELECT_XS">
-              <option value="architect" :disabled="!hasOsmData">{{ t('exportPanel.roadTypeArchitect') }}</option>
-              <option value="mesh" :disabled="!hasOsmData">{{ t('exportPanel.roadTypeMesh') }}</option>
               <option value="decal" :disabled="!hasOsmData">{{ t('exportPanel.roadTypeSpline') }}</option>
               <option value="none">{{ t('exportPanel.roadTypeNone') }}</option>
             </select>
@@ -621,10 +619,9 @@ const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getI
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') === 'true');
 // Migrate legacy boolean mesh road setting if it exists
-const _legacyMesh = localStorage.getItem('mapng_beamNGUseMeshRoads');
-let initialRoadType = localStorage.getItem('mapng_beamNGRoadType') || (_legacyMesh === 'true' ? 'mesh' : 'decal');
-if (initialRoadType === 'spline') initialRoadType = 'decal'; // Migrate from old spline naming
-const beamNGRoadType = ref(initialRoadType);
+// DecalRoads are the only road system; earlier choices (Road Architect, Mesh
+// Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
+const beamNGRoadType = ref(localStorage.getItem('mapng_beamNGRoadType') === 'none' ? 'none' : 'decal');
 const beamNGBiomeOptions = getBeamNGBiomeOptions();
 const persistedBeamNGBiome = localStorage.getItem('mapng_beamNGBiomeId') || '';
 const beamNGBiomeId = ref(beamNGBiomeOptions.some((biome) => biome.id === persistedBeamNGBiome) ? persistedBeamNGBiome : '');

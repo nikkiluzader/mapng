@@ -243,7 +243,7 @@ test('exportBeamNGLevel rewrites barrier shape paths and emits .link files acros
   const restorePolyfills = installCanvasPolyfill();
 
   try {
-    for (const roadType of ['decal', 'architect', 'mesh']) {
+    for (const roadType of ['decal']) {
       const zip = await runExportForRoadType(roadType);
       const base = 'levels/mapng_demo';
       const barriersPath = `${base}/main/MissionGroup/barriers/items.level.json`;
@@ -403,7 +403,7 @@ test('exportBeamNGLevel rewrites managed forest shape paths across road modes', 
   const restorePolyfills = installCanvasPolyfill();
 
   try {
-    for (const roadType of ['decal', 'architect', 'mesh']) {
+    for (const roadType of ['decal']) {
       const zip = await runExportForRoadType(roadType, { includeTrees: true });
       const vegetationPath = 'levels/mapng_demo/main/MissionGroup/vegetation/items.level.json';
       const vegetationFile = zip.file(vegetationPath);

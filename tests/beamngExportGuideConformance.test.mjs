@@ -280,7 +280,7 @@ test('guide §10.12: supportsTraffic implies a nav graph', async () => {
       const map = JSON.parse(await readText(zip, 'map.json'));
       const hasSegments = map.segments && Object.keys(map.segments).length > 0;
       assert.ok(hasDecalRoads || hasSegments,
-        'supportsTraffic=true requires decal roads or map.json segments');
+        'supportsTraffic=true requires drivable decal roads');
     }
   });
 });
@@ -306,22 +306,18 @@ test('guide §10.13: DecalRoad nodes are 4-value', async () => {
   }
 });
 
-test('guide §10.13: MeshRoad nodes are 8-value', async () => {
+// DecalRoads are the only road system; legacy saved values still export roads.
+test('road mode: legacy architect/mesh values export DecalRoads and nothing else', async () => {
   const restore = installCanvasPolyfill();
   try {
-    const zip = await exportZip({ roadType: 'mesh' });
-    const file = zip.file(`${BASE}/main/MissionGroup/Mesh_roads/items.level.json`);
-    if (!file) return; // no mesh roads in this fixture run
-    let checked = 0;
-    for (const obj of parseNDJSON(await file.async('string'))) {
-      if (obj.class !== 'MeshRoad' || !Array.isArray(obj.nodes)) continue;
-      for (const node of obj.nodes) {
-        assert.ok(Array.isArray(node) && node.length === 8 && node.every((n) => typeof n === 'number'),
-          `MeshRoad node must be [x,y,z,width,depth,nx,ny,nz]: ${JSON.stringify(node)}`);
-        checked++;
-      }
+    for (const roadType of ['mesh', 'architect']) {
+      const zip = await exportZip({ roadType });
+      assert.ok(zip.file(`${BASE}/main/MissionGroup/Decal_Roads/items.level.json`), `${roadType} → DecalRoads`);
+      assert.ok(!zip.file(`${BASE}/main/MissionGroup/Mesh_roads/items.level.json`));
+      assert.ok(!Object.keys(zip.files).some((p) => /roadatchitectsession/.test(p)));
     }
-    assert.ok(checked > 0, 'expected at least one MeshRoad node in mesh mode');
+    const none = await exportZip({ roadType: 'none' });
+    assert.ok(!none.file(`${BASE}/main/MissionGroup/Decal_Roads/items.level.json`));
   } finally {
     restore();
   }

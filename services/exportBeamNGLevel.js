@@ -17,7 +17,6 @@ import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
 import { getFuelStationRuntimeMaterialDefs } from './beamngFuelStationMaterials.js';
 import { validateBeamNGZipStructure } from './beamngExportConformance.js';
 import {
-  buildManualMapNavigationData,
   collectGiveWayNodeKeys,
   geometryHasGiveWay,
   GIVE_WAY_DRIVABILITY_STEP,
@@ -540,38 +539,6 @@ async function generateHeightmapPng(terrainData, maxSize = Number.POSITIVE_INFIN
   }
 
   const pngData = encode({ width: outW, height: outH, data, depth: 16, channels: 1 });
-  return new Blob([new Uint8Array(pngData)], { type: 'image/png' });
-}
-
-/**
- * Generate Road Architect-compatible terrain bitmap (16-bit grayscale PNG).
- *
- * Road Architect writes this as GFXFormatR16 and later reads it with
- * bmp:getTexel(x, y), then maps texel values back to terrain heights with:
- *   height = texel * ((zMax - zMin) / 65535) + zMin
- *
- * For generated levels, TerrainBlock zMin is 0 and zMax is maxHeight.
- */
-function generateRoadArchitectHeightmapPng(terrainData, terrainBlockMaxHeight) {
-  const { width, height, heightMap, minHeight } = terrainData;
-  const zMin = 0;
-  const zMax = Math.max(1, Number(terrainBlockMaxHeight) || 1);
-  const scale = 65535 / Math.max(1e-9, (zMax - zMin));
-
-  const data = new Uint16Array(width * height);
-  for (let y = 0; y < height; y++) {
-    // Terrain data uses north-origin rows; TerrainBlock grid is south-origin.
-    const srcY = height - 1 - y;
-    const srcRow = srcY * width;
-    const dstRow = y * width;
-    for (let x = 0; x < width; x++) {
-      const worldRelativeH = Math.max(0, (heightMap[srcRow + x] - minHeight));
-      const texel = Math.max(0, Math.min(65535, Math.round(worldRelativeH * scale)));
-      data[dstRow + x] = texel;
-    }
-  }
-
-  const pngData = encode({ width, height, data, depth: 16, channels: 1 });
   return new Blob([new Uint8Array(pngData)], { type: 'image/png' });
 }
 
@@ -2661,753 +2628,6 @@ export function generateTurnArrowDecals(terrainData, squareSize) {
 }
 
 /**
- * Create the default Road Architect profile object used by generated roads.
- *
- * The profile embeds lane, edge, centerline, and blend-layer defaults expected
- * by BeamNG's roadarchitect plugin session format.
- */
-function createRoadArchitectDefaultProfile() {
-  const persistentBaseLayer = {
-    boxXLeft: 1,
-    boxXRight: 1,
-    boxYLeft: 1,
-    boxYRight: 1,
-    boxZLeft: 1,
-    boxZRight: 1,
-    doNotDelete: true,
-    extentsH: 1,
-    extentsL: 1,
-    extentsW: 1,
-    fadeE: 0,
-    fadeS: 0,
-    frame: 0,
-    isDisplay: false,
-    isHidden: false,
-    isSpanLong: true,
-    jitter: 0,
-    laneMax: 1,
-    laneMin: 1,
-    latOffset: 0,
-    matDisplay: '[None]',
-    nMax: 1,
-    nMin: 1,
-    numCols: 1,
-    numRows: 1,
-    pos: 0,
-    rot: 0,
-    size: 3,
-    spacing: 5,
-    type: 1,
-    useWorldZ: false,
-    vertOffset: 0,
-  };
-
-  const layers = [
-    {
-      ...persistentBaseLayer,
-      isLeft: true,
-      isPaint: true,
-      isReverse: false,
-      lane: -1,
-      mat: 'm_line_white',
-      name: 'Edge Line L',
-      off: 0.25,
-      texLen: 5,
-      width: 0.25,
-    },
-    {
-      ...persistentBaseLayer,
-      isLeft: false,
-      isPaint: true,
-      isReverse: false,
-      lane: 1,
-      mat: 'm_line_white',
-      name: 'Edge Line R',
-      off: -0.25,
-      texLen: 5,
-      width: 0.25,
-    },
-    {
-      ...persistentBaseLayer,
-      isDisplay: true,
-      isLeft: true,
-      isPaint: false,
-      isReverse: true,
-      lane: -1,
-      mat: 'm_road_asphalt_edge',
-      name: 'Edge Blend L',
-      off: -0.5,
-      texLen: 18,
-      width: 2.000000238,
-    },
-    {
-      ...persistentBaseLayer,
-      isDisplay: true,
-      isLeft: false,
-      isPaint: false,
-      isReverse: false,
-      lane: 1,
-      mat: 'm_road_asphalt_edge',
-      name: 'Edge Blend R',
-      off: 0.5,
-      texLen: 18.00003433,
-      width: 2.000000238,
-    },
-    {
-      ...persistentBaseLayer,
-      isLeft: true,
-      isPaint: true,
-      isReverse: false,
-      lane: 1,
-      mat: 'm_line_yellow_double_discontinue',
-      name: 'Centerline',
-      off: 0,
-      texLen: 5,
-      width: 0.400000006,
-    },
-  ];
-
-  return {
-    '-1': {
-      cornerDrop: 0,
-      cornerLatOff: 0,
-      heightL: 0.01,
-      heightR: 0.01,
-      isLeftSide: true,
-      kerbWidth: 0.12,
-      type: 'road_lane',
-      vStart: 0,
-      width: 3.5,
-    },
-    '1': {
-      cornerDrop: 0,
-      cornerLatOff: 0,
-      heightL: 0.01,
-      heightR: 0.01,
-      isLeftSide: true,
-      kerbWidth: 0.12,
-      type: 'road_lane',
-      vStart: 0,
-      width: 3.5,
-    },
-    autoBankingFactor: 1,
-    blendLeftMat: 'm_road_asphalt_edge',
-    blendLeftWidth: 1,
-    blendRightMat: 'm_road_asphalt_edge',
-    blendRightWidth: 1,
-    centerlineMat: 'm_line_yellow_double_discontinue',
-    class: 'urban',
-    condition: 0.3,
-    conditionCenterline: true,
-    conditionEdgesL: true,
-    conditionEdgesR: true,
-    conditionEndStopE: true,
-    conditionEndStopS: true,
-    conditionLaneMarkings: true,
-    conditionSeed: 41235,
-    continueLinesToEnd: false,
-    dirtMat: 'm_dirt_variation_04',
-    edgeLineGapL: 0.25,
-    edgeLineGapR: 0.25,
-    edgeMatL: 'm_line_white',
-    edgeMatR: 'm_line_white',
-    endStopMatE: 'm_line_white',
-    endStopMatS: 'm_line_white',
-    fadeE: 0,
-    fadeS: 0,
-    gutterMargin: 0.02,
-    gutterMat: 'gutter1',
-    gutterWidth: 0.2,
-    isAutoBanking: false,
-    isDeletable: true,
-    isEdgeBlendL: true,
-    isEdgeBlendR: true,
-    isExtraWidth: false,
-    isGutter: false,
-    isGutterShow: false,
-    isShowEdgeBlend: true,
-    isStopDecalE: false,
-    isStopDecalS: false,
-    laneMarkingsMat: 'm_line_yellow_discontinue',
-    layers,
-  };
-}
-
-/**
- * Convert a geographic node into one Road Architect node entry.
- */
-function makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount) {
-  const [x, y, z] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
-  const laneWidth = Math.max(2.6, Math.min(4.5, (halfWidth * 2) / Math.max(1, laneCount)));
-  return {
-    heightsL: {
-      '1': 0.01,
-      '-1': 0.01,
-    },
-    heightsR: {
-      '1': 0.01,
-      '-1': 0.01,
-    },
-    incircleRad: 1,
-    isAutoBanked: false,
-    isLocked: false,
-    offset: 0,
-    posX: roundTo(x, 6),
-    posY: roundTo(y, 6),
-    posZ: roundTo(z, 6),
-    rot: 0,
-    widths: {
-      '1': laneWidth,
-      '-1': laneWidth,
-    },
-  };
-}
-
-/**
- * Build a stable key for a lat/lng point to support node identity matching.
- */
-/**
- * Create a Road Architect profile layer representing a pedestrian crossing.
- */
-function createRoadArchitectPedCrossingLayer(name = 'Ped X - R1') {
-  return {
-    boxXLeft: 1,
-    boxXRight: 1,
-    boxYLeft: 1,
-    boxYRight: 1,
-    boxZLeft: 1,
-    boxZRight: 1,
-    doNotDelete: true,
-    extentsH: 1,
-    extentsL: 1,
-    extentsW: 1,
-    fadeE: 0,
-    fadeS: 0,
-    frame: 0,
-    isDisplay: true,
-    isHidden: false,
-    isLeft: true,
-    isPaint: false,
-    isReverse: false,
-    isSpanLong: true,
-    jitter: 0,
-    lane: 1,
-    laneMax: 1,
-    laneMin: -1,
-    latOffset: 0,
-    mat: 'crossing_white',
-    matDisplay: '[None]',
-    nMax: 1,
-    nMin: 1,
-    name,
-    numCols: 0,
-    numRows: 0,
-    off: 0,
-    pos: 0,
-    rot: 0,
-    size: 0,
-    spacing: 0,
-    texLen: 5,
-    type: 2,
-    useWorldZ: false,
-    vertOffset: 0,
-    width: 2,
-  };
-}
-
-/**
- * Create a Road Architect profile layer that places a traffic boom object.
- */
-function createRoadArchitectTrafficBoomLayer(name = 'traffic boom A') {
-  return {
-    boxXLeft: 1,
-    boxXRight: 1,
-    boxYLeft: 1,
-    boxYRight: 1,
-    boxZLeft: 1,
-    boxZRight: 1,
-    doNotDelete: true,
-    extentsH: 1,
-    extentsL: 1,
-    extentsW: 1,
-    fadeE: 0,
-    fadeS: 0,
-    frame: 0,
-    isDisplay: true,
-    isHidden: false,
-    isLeft: true,
-    isPaint: false,
-    isReverse: false,
-    isSpanLong: true,
-    jitter: 0,
-    lane: -1,
-    laneMax: -1,
-    laneMin: -1,
-    latOffset: 0,
-    mat: '/art/shapes/objects/s_trafficlight_boom_sn.dae',
-    matDisplay: 's_trafficlight_boom_ns.dae',
-    nMax: 1,
-    nMin: 1,
-    name,
-    numCols: 1,
-    numRows: 1,
-    off: 0,
-    pos: 0,
-    rot: 3,
-    size: 3,
-    spacing: 0,
-    texLen: 5,
-    type: 5,
-    useWorldZ: false,
-    vertOffset: 0,
-    width: 1,
-  };
-}
-
-/**
- * Build a reduced-marking profile for road approaches at 4-way intersections.
- */
-function createRoadArchitectCrossroadsApproachProfile(pedName) {
-  const profile = createRoadArchitectDefaultProfile();
-  profile.condition = 0.2;
-  profile.conditionCenterline = false;
-  profile.conditionEdgesL = false;
-  profile.conditionEdgesR = false;
-  profile.conditionLaneMarkings = false;
-  profile.conditionEndStopE = false;
-  profile.conditionEndStopS = false;
-  profile.fadeE = 3;
-  profile.fadeS = 3;
-  profile.isEdgeBlendL = false;
-  profile.isEdgeBlendR = false;
-  profile.layers = [
-    createRoadArchitectPedCrossingLayer(pedName),
-    createRoadArchitectTrafficBoomLayer(),
-  ];
-  return profile;
-}
-
-/**
- * Build a profile that emits only sidewalk geometry for intersection corners.
- */
-function createRoadArchitectSidewalkOnlyProfile() {
-  return {
-    '1': {
-      cornerDrop: 0,
-      cornerLatOff: 0,
-      heightL: 0.01,
-      heightR: 0.12,
-      isLeftSide: false,
-      kerbWidth: 0.12,
-      type: 'sidewalk',
-      vStart: 0,
-      width: 2,
-    },
-    autoBankingFactor: 1,
-    blendLeftMat: 'm_road_asphalt_edge',
-    blendLeftWidth: 1,
-    blendRightMat: 'm_road_asphalt_edge',
-    blendRightWidth: 1,
-    centerlineMat: 'm_line_yellow_double_discontinue',
-    class: 'urban',
-    condition: 0.2,
-    conditionCenterline: true,
-    conditionEdgesL: true,
-    conditionEdgesR: true,
-    conditionEndStopE: true,
-    conditionEndStopS: true,
-    conditionLaneMarkings: true,
-    conditionSeed: 41234,
-    continueLinesToEnd: false,
-    dirtMat: 'm_dirt_variation_04',
-    edgeLineGapL: 0.25,
-    edgeLineGapR: 0.25,
-    edgeMatL: 'm_line_white',
-    edgeMatR: 'm_line_white',
-    endStopMatE: 'm_line_white',
-    endStopMatS: 'm_line_white',
-    fadeE: 3,
-    fadeS: 3,
-    gutterMargin: 0.02,
-    gutterMat: 'gutter1',
-    gutterWidth: 0.2,
-    isAutoBanking: false,
-    isDeletable: true,
-    isEdgeBlendL: false,
-    isEdgeBlendR: false,
-    isExtraWidth: false,
-    isGutter: false,
-    isGutterShow: false,
-    isShowEdgeBlend: true,
-    isStopDecalE: false,
-    isStopDecalS: false,
-    laneMarkingsMat: 'm_line_yellow_discontinue',
-    layers: {},
-    name: 'New Profile',
-    numPatches: 2,
-    numPotholes: 0,
-    stopGapE: 0.2,
-    stopGapS: 0.2,
-    styleType: 0,
-  };
-}
-
-/**
- * Create one locked Road Architect node for generated sidewalk arcs.
- */
-function makeRoadArchitectSidewalkNode(worldX, worldY, worldZ) {
-  return {
-    heightsL: { '1': 0.01 },
-    heightsR: { '1': 0.12 },
-    incircleRad: 1,
-    isAutoBanked: false,
-    isLocked: true,
-    offset: 0,
-    posX: roundTo(worldX, 6),
-    posY: roundTo(worldY, 6),
-    posZ: roundTo(worldZ, 6),
-    rot: 0,
-    widths: { '1': 2 },
-  };
-}
-
-/**
- * Normalize a 2D vector, falling back to +X when magnitude is near zero.
- */
-function normalize2D(dx, dy) {
-  const len = Math.hypot(dx, dy);
-  if (len < 1e-6) return { x: 1, y: 0 };
-  return { x: dx / len, y: dy / len };
-}
-
-/**
- * Decorate four-way intersections with approach profiles and sidewalk arcs.
- *
- * Returns extra sidewalk roads and the next available sidewalk index counter.
- */
-function enrichRoadArchitectCrossroads(roads, intersectionEntries, startSidewalkIndex = 1) {
-  if (!Array.isArray(roads) || !intersectionEntries || intersectionEntries.size === 0) {
-    return { sidewalkRoads: [], nextSidewalkIndex: startSidewalkIndex };
-  }
-
-  const sidewalkRoads = [];
-  let sidewalkIndex = startSidewalkIndex;
-
-  for (const entries of intersectionEntries.values()) {
-    const uniqueByRoad = new Map();
-    for (const entry of entries) {
-      if (!uniqueByRoad.has(entry.roadIndex)) uniqueByRoad.set(entry.roadIndex, entry);
-    }
-    const candidates = Array.from(uniqueByRoad.values());
-    if (candidates.length < 4) continue;
-
-    const selected = candidates.slice(0, 4);
-
-    for (let i = 0; i < selected.length; i++) {
-      const sel = selected[i];
-      const road = roads[sel.roadIndex];
-      if (!road) continue;
-      road.profile = createRoadArchitectCrossroadsApproachProfile(`Ped X - R${i + 1}`);
-
-      const nodes = road.nodes;
-      if (Array.isArray(nodes) && nodes.length >= 2) {
-        if (sel.endpoint === 'start') nodes[0].isLocked = true;
-        else nodes[nodes.length - 1].isLocked = true;
-      }
-    }
-
-    const centerX = selected.reduce((sum, sel) => sum + sel.endX, 0) / selected.length;
-    const centerY = selected.reduce((sum, sel) => sum + sel.endY, 0) / selected.length;
-    const centerZ = selected.reduce((sum, sel) => sum + sel.endZ, 0) / selected.length;
-    const laneHalf = selected.reduce((sum, sel) => sum + sel.laneHalfWidth, 0) / selected.length;
-    const sidewalkRadius = Math.max(4.5, laneHalf + 2.5);
-
-    selected.sort((a, b) => Math.atan2(a.dirY, a.dirX) - Math.atan2(b.dirY, b.dirX));
-
-    for (let i = 0; i < selected.length; i++) {
-      const a = selected[i];
-      const b = selected[(i + 1) % selected.length];
-      const ax = centerX + a.dirX * sidewalkRadius;
-      const ay = centerY + a.dirY * sidewalkRadius;
-      const bx = centerX + b.dirX * sidewalkRadius;
-      const by = centerY + b.dirY * sidewalkRadius;
-      const bis = normalize2D(a.dirX + b.dirX, a.dirY + b.dirY);
-      const mx = centerX + bis.x * sidewalkRadius * 1.2;
-      const my = centerY + bis.y * sidewalkRadius * 1.2;
-
-      sidewalkRoads.push({
-        bridgeArch: -6,
-        bridgeDepth: 4,
-        bridgeWidth: 5.5,
-        displayName: `Crossroads Sidewalk ${sidewalkIndex++}`,
-        extraE: 2,
-        extraS: 2,
-        forceField: 1,
-        granFactor: 2,
-        groupIdx: {},
-        isAllowTunnels: false,
-        isArc: true,
-        isBridge: false,
-        isCivilEngRoads: false,
-        isConformRoadToTerrain: false,
-        isDisplayLaneInfo: true,
-        isDisplayNodeNumbers: false,
-        isDisplayNodeSpheres: true,
-        isDisplayRefLine: true,
-        isDisplayRoadOutline: true,
-        isDisplayRoadSurface: true,
-        isDrivable: false,
-        isHidden: false,
-        isJctRoad: false,
-        isOverObject: true,
-        isOverlay: false,
-        isRigidTranslation: false,
-        isVis: true,
-        name: generatePersistentId(),
-        nodes: [
-          makeRoadArchitectSidewalkNode(ax, ay, centerZ),
-          makeRoadArchitectSidewalkNode(mx, my, centerZ),
-          makeRoadArchitectSidewalkNode(bx, by, centerZ),
-        ],
-        overlayMat: 'm_tread_marks_clean',
-        profile: createRoadArchitectSidewalkOnlyProfile(),
-        protrudeE: 0,
-        protrudeS: 0,
-        radGran: 15,
-        radOffset: 0,
-        thickness: 1,
-        treatAsInvisibleInEdit: false,
-        zOffsetFromRoad: 0,
-      });
-    }
-  }
-
-  return { sidewalkRoads, nextSidewalkIndex: sidewalkIndex };
-}
-
-/**
- * Build a Road Architect session JSON object from clipped OSM roads.
- *
- * The output matches the plugin session schema under `data.{roads,profiles,...}`
- * and is written into the exported level so users can edit generated roads in
- * BeamNG's Road Architect tools.
- */
-function generateRoadArchitectSession(terrainData, squareSize, levelName) {
-  if (!terrainData?.osmFeatures?.length) return null;
-
-  const roadNetwork = buildRoadNetwork(terrainData.osmFeatures.filter((feature) => {
-    if (feature?.type !== 'road' || !Array.isArray(feature.geometry) || feature.geometry.length < 2) return false;
-    const highway = feature.tags?.highway;
-    return !!highway && !ROAD_SKIP.has(highway);
-  }));
-
-  const fourWayNodeKeys = new Set();
-  for (const [nodeKey, entries] of roadNetwork.intersections.entries()) {
-    const uniqueSegments = new Set(entries.map((entry) => entry.road.id));
-    if (uniqueSegments.size >= 4) fourWayNodeKeys.add(nodeKey);
-  }
-
-  const roads = [];
-  const intersectionEntries = new Map();
-
-  for (const segmentFeature of roadNetwork.segments) {
-    const feature = segmentFeature.sourceFeature;
-    const tags = feature.tags || {};
-    const highway = segmentFeature.highway;
-
-    const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
-    const isOneWay = isOneWayRoad(tags);
-    const halfWidth = estimateRoadHalfWidth(tags, highway, isOneWay, style.width);
-    const laneCount = Math.max(1, getDefaultLaneCount(highway, isOneWay));
-    const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
-      .flatMap((segment) => chunkPolyline(segment, 80));
-
-    for (let segmentIndex = 0; segmentIndex < clippedSegments.length; segmentIndex++) {
-      const segment = clippedSegments[segmentIndex];
-      const nodes = segment.map((pt) => makeRoadArchitectNode(pt, terrainData, squareSize, halfWidth, laneCount));
-      if (nodes.length < 2) continue;
-
-      const roadIndex = roads.length;
-
-      roads.push({
-        bridgeArch: 0,
-        bridgeDepth: 8,
-        bridgeWidth: 8,
-        displayName: String(tags.name || `${highway}_${roads.length + 1}`),
-        extraE: 0,
-        extraS: 0,
-        forceField: 1.0,
-        granFactor: 1,
-        groupIdx: [],
-        isAllowTunnels: false,
-        isArc: false,
-        isBridge: false,
-        isCivilEngRoads: false,
-        isConformRoadToTerrain: true,
-        isDisplayLaneInfo: true,
-        isDisplayNodeNumbers: false,
-        isDisplayNodeSpheres: true,
-        isDisplayRefLine: true,
-        isDisplayRoadOutline: true,
-        isDisplayRoadSurface: true,
-        isDrivable: true,
-        isHidden: false,
-        isJctRoad: false,
-        isOverObject: true,
-        isOverlay: false,
-        isRigidTranslation: false,
-        isVis: true,
-        name: generatePersistentId(),
-        nodes,
-        overlayMat: 'm_tread_marks_clean',
-        profile: createRoadArchitectDefaultProfile(),
-        protrudeE: 0,
-        protrudeS: 0,
-        radGran: 15,
-        radOffset: 0,
-        thickness: 1.0,
-        treatAsInvisibleInEdit: false,
-        zOffsetFromRoad: 0,
-      });
-
-      /**
-       * Register one road endpoint as a candidate 4-way intersection approach.
-       */
-        const addIntersectionEntry = (nodeKey, endpoint) => {
-        if (!fourWayNodeKeys.has(nodeKey)) return;
-        const road = roads[roadIndex];
-        if (!road || !Array.isArray(road.nodes) || road.nodes.length < 2) return;
-        const endNode = endpoint === 'start' ? road.nodes[0] : road.nodes[road.nodes.length - 1];
-        const nearNode = endpoint === 'start' ? road.nodes[1] : road.nodes[road.nodes.length - 2];
-        const dir = endpoint === 'start'
-          ? normalize2D(nearNode.posX - endNode.posX, nearNode.posY - endNode.posY)
-          : normalize2D(endNode.posX - nearNode.posX, endNode.posY - nearNode.posY);
-        const list = intersectionEntries.get(nodeKey) || [];
-        list.push({
-          roadIndex,
-          endpoint,
-          dirX: dir.x,
-          dirY: dir.y,
-          endX: endNode.posX,
-          endY: endNode.posY,
-          endZ: endNode.posZ,
-          laneHalfWidth: Number(endNode?.widths?.['1']) || 3.5,
-        });
-        intersectionEntries.set(nodeKey, list);
-      };
-
-      if (segmentIndex === 0) addIntersectionEntry(segmentFeature.startKey, 'start');
-      if (segmentIndex === clippedSegments.length - 1) addIntersectionEntry(segmentFeature.endKey, 'end');
-    }
-  }
-
-  if (roads.length === 0) return null;
-
-  const usedGroupNames = new Map();
-  const placedGroups = roads.map((road, index) => {
-    const baseName = sanitizeRoadFolderName(road?.displayName, `road_${index + 1}`);
-    const used = usedGroupNames.get(baseName) || 0;
-    usedGroupNames.set(baseName, used + 1);
-    const groupName = used > 0 ? `${baseName}_${used + 1}` : baseName;
-    const groupIndex = index + 1;
-    road.groupIdx = [groupIndex];
-
-    return {
-      name: groupName,
-      list: road.nodes.map((_, nodeIndex) => ({ r: road.name, n: nodeIndex + 1 })),
-    };
-  });
-
-  return {
-    data: {
-      groups: [],
-      junctions: [],
-      mapName: String(levelName || 'mapng').toLowerCase(),
-      placedGroups,
-      profiles: [createRoadArchitectDefaultProfile()],
-      roads,
-    },
-  };
-}
-
-/**
- * Convert OSM road features to BeamNG MeshRoad 3D geometry objects.
- *
- * Each road segment becomes a MeshRoad with m_asphalt_new_01 on the top, side,
- * and bottom surfaces. Node format is [x, y, z, fullWidth, depth, nx, ny, nz].
- * Roads that were split by clipping or chunking share an incremented counter
- * so each object gets a unique name.
- *
- * Returns an empty array when no OSM data is available or useMeshRoads is false.
- */
-function generateMeshRoads(terrainData, squareSize) {
-  if (!terrainData.osmFeatures?.length) return [];
-
-  const meshRoads = [];
-  let roadIndex = 0;
-  const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures);
-
-  for (const feature of terrainData.osmFeatures) {
-    if (feature.type !== 'road' || !feature.geometry?.length) continue;
-
-    const highway = feature.tags?.highway;
-    if (!highway || ROAD_SKIP.has(highway)) continue;
-
-    const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
-    const isOneWay = isOneWayRoad(feature.tags || {});
-    const halfWidth = estimateRoadCrossSection(feature.tags || {}, highway, isOneWay, {
-      urban: isUrbanRoad(feature),
-      fallbackHalfWidth: style.width,
-    }).carriagewayHalfWidth;
-    const fullWidth = halfWidth * 2;
-
-    const clippedSegments = clipGeometryToMargin(feature.geometry, terrainData.bounds)
-      .map(s => resampleGeometryToSpacing(s, ROAD_NODE_SPACING_M))
-      .flatMap(s => chunkPolyline(s));
-
-    for (const segment of clippedSegments) {
-      const rawNodes = [];
-      for (const pt of segment) {
-        // geoToWorldPoint avoids geoToWorld's 0.1 m grid quantization (see
-        // generateDecalRoads); nodes are mm-rounded below.
-        const [wx, wy, wz] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
-        // MeshRoad node: [x, y, z, fullWidth, depth, normalX, normalY, normalZ]
-        rawNodes.push([
-          Math.round(wx * 1000) / 1000,
-          Math.round(wy * 1000) / 1000,
-          Math.round((wz + 0.5) * 1000) / 1000,
-          fullWidth,
-          4,
-          0, 0, 1,
-        ]);
-      }
-
-      // Geometry was already resampled to ROAD_NODE_SPACING_M before world
-      // conversion, but clip/chunk endpoints can still land within mm of a
-      // neighbor — collapse those like the DecalRoad path does.
-      const cleanRawNodes = sanitizeRoadNodes(rawNodes);
-      if (cleanRawNodes.length < 2) continue;
-      const nodes = cleanRawNodes.map(n => [n[0], n[1], n[2], n[3], 0.5, 0, 0, 1]);
-
-      meshRoads.push({
-        class: 'MeshRoad',
-        name: `MeshRoad_${roadIndex++}`,
-        persistentId: generatePersistentId(),
-        __parent: 'Mesh_roads',
-        position: [nodes[0][0], nodes[0][1], nodes[0][2]],
-        topMaterial: 'm_asphalt_new_01',
-        sideMaterial: 'm_asphalt_new_01',
-        bottomMaterial: 'm_asphalt_new_01',
-        textureLength: 16,
-        nodes,
-      });
-    }
-  }
-
-  return meshRoads;
-}
-
-/**
  * Write a newline-delimited JSON (NDJSON) string from an array of objects.
  * Each object is one line, file ends with a newline — matching BeamNG's format.
  */
@@ -3742,8 +2962,7 @@ function buildBeamNGExportReport({
   waterObjects,
   barrierObjects,
   barrierMeshSplineGroups,
-  roadArchitectRoadCount,
-  roadArchitectJunctionCount,
+  decalRoadCount,
   forestPlacements,
   forestFiles,
   groundCoverObjects,
@@ -3817,8 +3036,7 @@ function buildBeamNGExportReport({
     '',
     'Generated Content',
     `- Terrain materials written: ${terrainMaterialCount}`,
-    `- Road Architect roads generated: ${roadArchitectRoadCount}`,
-    `- Road Architect junctions generated: ${roadArchitectJunctionCount}`,
+    `- DecalRoads generated: ${decalRoadCount}`,
     `- Barrier folders: ${barrierMeshSplineGroups.length}`,
     `- Barrier TSStatic objects: ${barrierObjects.length}`,
     `- Water objects generated: ${waterObjects.length}`,
@@ -5028,21 +4246,6 @@ function buildFuelStations(terrainData, squareSize) {
 }
 
 /**
- * Sanitize user-facing road folder names for BeamNG file-safe usage.
- */
-function sanitizeRoadFolderName(value, fallback) {
-  const ascii = String(value || '')
-    .normalize('NFKD')
-    .replace(/[^\x00-\x7F]/g, '');
-  const cleaned = ascii
-    .replace(/[^A-Za-z0-9 _.-]/g, '_')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 96);
-  return cleaned || fallback;
-}
-
-/**
  * Sanitize a SimObject name for BeamNG/Torque constraints.
  * Name must not start with a digit and should stay compact.
  */
@@ -5059,39 +4262,6 @@ function sanitizeBeamNGObjectName(value, fallback = 'road') {
   if (!/^[A-Za-z_]/.test(cleaned)) cleaned = `r_${cleaned}`;
   if (cleaned.length > 48) cleaned = cleaned.slice(0, 48).replace(/_+$/g, '');
   return cleaned || 'road';
-}
-
-/**
- * Build road group folder metadata from a Road Architect session.
- */
-function buildRoadFolderGroups(roadArchitectSession) {
-  const placedGroups = Array.isArray(roadArchitectSession?.data?.placedGroups)
-    ? roadArchitectSession.data.placedGroups
-    : [];
-  if (placedGroups.length > 0) {
-    return placedGroups.map((group, index) => ({
-      groupName: sanitizeRoadFolderName(group?.name, `road_${index + 1}`),
-    }));
-  }
-
-  const roads = Array.isArray(roadArchitectSession?.data?.roads)
-    ? roadArchitectSession.data.roads
-    : [];
-  if (roads.length === 0) return [];
-
-  const usedNames = new Map();
-  const groups = [];
-
-  for (let i = 0; i < roads.length; i++) {
-    const road = roads[i];
-    const displayName = sanitizeRoadFolderName(road?.displayName, `road_${i + 1}`);
-    const used = usedNames.get(displayName) || 0;
-    usedNames.set(displayName, used + 1);
-    const groupName = used > 0 ? `${displayName}_${used + 1}` : displayName;
-    groups.push({ groupName });
-  }
-
-  return groups;
 }
 
 /**
@@ -6317,8 +5487,8 @@ async function generateZipToOPFS(zip, filename, onPercent) {
  *   'image' is accepted for backward compatibility and falls back to OSM inference, 'none' disables PBR materials.
  *   Legacy boolean option `generatePbrMaterials` is still accepted for backward compatibility.
  * @param {number}  [options.seaLevelOffset=0]              — offset in meters applied to exported sea-level WaterPlane Z
- * @param {'decal'|'architect'|'mesh'|'none'} [options.roadType='decal'] — road system: layered DecalRoads (recommended),
- *   a Road Architect session, 3D MeshRoad geometry, or no generated roads
+ * @param {'decal'|'none'} [options.roadType='decal'] — 'decal' writes layered DecalRoads (the
+ *   only road system); 'none' writes no roads. Legacy 'architect' / 'mesh' mean 'decal'.
  */
 export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const {
@@ -6506,36 +5676,19 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const { position: spawnPosition, rotationMatrix: spawnRotationMatrix } =
     findSpawnPosition(exportTerrainData, center, squareSize);
 
-  const roadArchitectSession = roadType === 'architect'
-    ? generateRoadArchitectSession(exportTerrainData, squareSize, levelName)
-    : null;
-  const roadArchitectRoadCount = Array.isArray(roadArchitectSession?.data?.roads)
-    ? roadArchitectSession.data.roads.length
-    : 0;
-  const roadArchitectJunctionCount = Array.isArray(roadArchitectSession?.data?.junctions)
-    ? roadArchitectSession.data.junctions.length
-    : 0;
-
-  const meshRoads = roadType === 'mesh'
-    ? generateMeshRoads(exportTerrainData, squareSize)
-    : [];
-
-  const decalRoads = roadType === 'decal'
+  // DecalRoads are the only road system (BeamNG's own levels use them, and the
+  // AI navgraph is built from them). Legacy 'architect' / 'mesh' values from
+  // saved settings or batch configs are treated as 'decal'.
+  const includeRoads = roadType !== 'none';
+  const decalRoads = includeRoads
     ? generateDecalRoads(exportTerrainData, squareSize)
     : [];
 
-  const manualMapNavigation = buildManualMapNavigationData(exportTerrainData, squareSize, roadType);
-  const manualMapSegmentCount = Object.keys(manualMapNavigation.segments).length;
   const { signalData, controllerDefinitions: signalControllerDefinitions, props: signalProps = [] } =
     buildBeamNGSignalExportBundle(exportTerrainData, squareSize);
 
-  // Traffic support should reflect whether the export contains any road graph
-  // source, either native DecalRoads or manual map.json segments.
-  const supportsTraffic = decalRoads.length > 0 || manualMapSegmentCount > 0;
-
-  const roadArchitectHeightmapBlob = roadArchitectSession
-    ? generateRoadArchitectHeightmapPng(exportTerrainData, maxHeight)
-    : null;
+  // Traffic needs a road graph; the engine builds it from drivable DecalRoads.
+  const supportsTraffic = decalRoads.length > 0;
 
   // ── Sequential pipeline — one heavy operation at a time ────────────────────
   // Running everything in parallel (Promise.all) keeps multiple large buffers
@@ -6622,7 +5775,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome);
   const { objects: fuelStationObjects, facilities: fuelStationFacilities } =
     buildFuelStations(exportTerrainData, squareSize);
-  const roadFolderGroups = buildRoadFolderGroups(roadArchitectSession);
   const usesEastCoastFenceMaterials = barrierFolderItems.some((obj) => (
     String(obj?.shapeName || '').toLowerCase().includes('eca_bld_wood_fence_a.dae')
   ));
@@ -6704,12 +5856,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (signObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/signs`);
   }
-  if (roadFolderGroups.length > 0) {
-    zip.folder(`${base}/main/MissionGroup/roads`);
-  }
-  if (meshRoads.length > 0) {
-    zip.folder(`${base}/main/MissionGroup/Mesh_roads`);
-  }
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/vegetation`);
     zip.folder(`${base}/art/forest`);
@@ -6732,7 +5878,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     description: `Generated by mapng at ${lat}, ${lng}`,
     features: 'Procedural OSM-driven roads, vegetation, water, and terrain.',
     previews: ['preview.png'],
-    roads: roadType === 'architect' ? 'Road Architect roads from OSM' : 'OSM-derived roads',
+    roads: 'OSM-derived roads',
     suitablefor: 'Freeroam, testing, and world-building',
     // BeamNG displays this as map dimensions in km; provide real-world meters.
     size: [worldSizeMeters, worldSizeMeters],
@@ -6772,7 +5918,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }, null, 2));
 
   // ── map.json ───────────────────────────────────────────────────────────────
-  zip.file(`${base}/map.json`, JSON.stringify({ segments: manualMapNavigation.segments }, null, 2));
+  // Navigation comes from the drivable DecalRoads; map.json carries no
+  // manual segments (kept as the valid empty file official levels ship).
+  zip.file(`${base}/map.json`, JSON.stringify({ segments: {} }, null, 2));
 
   // ── signals.json ───────────────────────────────────────────────────────────
   // Generate OSM-driven signals when available; fall back to a valid empty schema.
@@ -6783,7 +5931,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   // ── art/decals + main.decals.json: turn-lane arrows ───────────────────────
   // Painted from OSM turn:lanes via the core road-markings atlas.
-  const turnArrowInstances = roadType === 'decal'
+  const turnArrowInstances = includeRoads
     ? generateTurnArrowDecals(exportTerrainData, squareSize)
     : [];
   zip.file(`${base}/art/decals/managedDecalData.json`, JSON.stringify(
@@ -6956,7 +6104,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   };
 
   const previewData = await toZipBinary(previewBlob);
-  const roadArchitectHeightmapData = await toZipBinary(roadArchitectHeightmapBlob);
   const terrainBinaryData = await toZipBinary(terBlob);
   const terrainHeightmapData = await toZipBinary(heightmapBlob);
   const osmDaeData = await toZipBinary(osmDaeBlob);
@@ -7011,8 +6158,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     barrierMeshSplineGroups: barrierFolderItems.length > 0
       ? [{ groupName: 'barriers' }]
       : [],
-    roadArchitectRoadCount,
-    roadArchitectJunctionCount,
+    decalRoadCount: decalRoads.length,
     forestPlacements,
     forestFiles,
     groundCoverObjects,
@@ -7024,13 +6170,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     didCropToSquare,
   });
   zip.file(`${base}/export_report.txt`, reportContents);
-
-  if (roadArchitectSession) {
-    zip.file(`${base}/bat/roadatchitectsession.json`, JSON.stringify(roadArchitectSession, null, 2));
-    if (roadArchitectHeightmapData) {
-      zip.file(`${base}/bat/roadatchitectsession.png`, roadArchitectHeightmapData);
-    }
-  }
 
   const terrainBinaryPath = `${base}/art/terrains/terrain.ter`;
   const terrainHeightmapPath = `${base}/art/terrains/terrain.terrainheightmap.png`;
@@ -7233,12 +6372,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       name: 'vegetation',
       persistentId: generatePersistentId(),
     }] : []),
-    ...(meshRoads.length > 0 ? [{
-      __parent: 'MissionGroup',
-      class: 'SimGroup',
-      name: 'Mesh_roads',
-      persistentId: generatePersistentId(),
-    }] : []),
     ...(barrierFolderItems.length > 0 ? [{
       __parent: 'MissionGroup',
       class: 'SimGroup',
@@ -7269,12 +6402,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       name: 'gasStations',
       persistentId: generatePersistentId(),
     }] : []),
-    ...(roadFolderGroups.length > 0 ? [{
-      __parent: 'MissionGroup',
-      class: 'SimGroup',
-      name: 'roads',
-      persistentId: generatePersistentId(),
-    }] : []),
     ...(decalRoads.length > 0 ? [{
       __parent: 'MissionGroup',
       class: 'SimGroup',
@@ -7284,15 +6411,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   ];
   zip.file(`${base}/main/MissionGroup/items.level.json`, toNDJSON(missionGroupItems));
 
-  // ── main/MissionGroup/Mesh_roads/items.level.json ─────────────────────────
   const rewriteForLinks = (value) => linkRegistry.rewriteObjectPathsDeep(value);
-  const rewrittenMeshRoads = rewriteForLinks(meshRoads);
   const rewrittenBarrierFolderItems = rewriteForLinks(barrierFolderItems);
   const rewrittenSignObjects = rewriteForLinks(signObjects);
-
-  if (meshRoads.length > 0) {
-    zip.file(`${base}/main/MissionGroup/Mesh_roads/items.level.json`, toNDJSON(rewrittenMeshRoads));
-  }
 
   // ── main/MissionGroup/barriers/items.level.json ─────────────────────────
   if (barrierFolderItems.length > 0) {
@@ -7333,40 +6454,16 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     );
   }
 
-  // ── main/MissionGroup/roads/items.level.json ──────────────────────────────
-  if (roadFolderGroups.length > 0) {
-    // Generate SimGroup objects for each Road Architect road group
-    const roadGroups = roadFolderGroups.map(g => ({
-      __parent: 'roads',
-      class: 'SimGroup',
-      name: g.groupName,
-      persistentId: generatePersistentId(),
-    }));
-
-    zip.file(`${base}/main/MissionGroup/roads/items.level.json`, toNDJSON(roadGroups));
-
-    // BeamNG requires sub-folders and an empty items.level.json for each nested SimGroup
-    for (const g of roadGroups) {
-      zip.folder(`${base}/main/MissionGroup/roads/${g.name}`);
-      // An empty string or empty items list will parse without crashing.
-      zip.file(`${base}/main/MissionGroup/roads/${g.name}/items.level.json`, '');
-    }
-  }
-
   // ── main/MissionGroup/Decal_Roads/items.level.json ────────────────────────
   if (decalRoads.length > 0) {
     writeSimGroupTree(zip, `${base}/main/MissionGroup/Decal_Roads`, decalRoads);
   }
 
-  const aiWaypointItems = manualMapNavigation.waypoints.map((waypoint) => ({
-    ...waypoint,
-    persistentId: generatePersistentId(),
-  }));
 
   // Base maps include these groups even when empty.
   zip.file(
     `${base}/main/MissionGroup/AIWaypointsGroup/items.level.json`,
-    aiWaypointItems.length > 0 ? toNDJSON(aiWaypointItems) : ''
+    ''
   );
   zip.file(`${base}/main/MissionGroup/AIDecalWaypointsGroup/items.level.json`, '');
 
@@ -7619,8 +6716,6 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   validateBeamNGZipStructure(zip, base, {
     requiresVegetation: vegetationItems.length > 0,
-    requiresRoadGroups: roadFolderGroups.length > 0,
-    requiresMeshRoads: meshRoads.length > 0,
     requiresBarriers: barrierFolderItems.length > 0,
     requiresSigns: signObjects.length > 0,
     requiresDecalRoads: decalRoads.length > 0,

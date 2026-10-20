@@ -1177,6 +1177,8 @@ function normalizeCombinedLevelOptions(raw = {}) {
   const out = {};
   for (const key of Object.keys(DEFAULT_COMBINED_LEVEL_OPTIONS)) out[key] = merged[key];
   out.seaLevelOffset = Number.isFinite(Number(out.seaLevelOffset)) ? Number(out.seaLevelOffset) : 0;
+  // DecalRoads are the only road system; old 'architect' / 'mesh' jobs mean roads on.
+  out.roadType = out.roadType === 'none' ? 'none' : 'decal';
   return out;
 }
 

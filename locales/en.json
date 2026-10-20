@@ -315,8 +315,6 @@
     "quarryRock": "Quarry/rock cover",
     "roads": "Roads",
     "roadType": "Road Type",
-    "roadTypeArchitect": "Road Architect",
-    "roadTypeMesh": "Mesh Roads",
     "roadTypeSpline": "Decal Roads",
     "roadTypeNone": "None",
     "communityQualityNotice": "MapNG exports are best used as a starting point. For public releases, it is strongly recommended to do more additional world-building and polish before publishing to community mod hubs.",
