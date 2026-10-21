@@ -308,11 +308,12 @@ function pinJunctionElevations(profiles) {
  * nodes, so a profile is smoothed per continuous roadway, and all roads
  * meeting at a junction are pinned to one shared height there.
  *
- * levelRoads=true flattens the road cross-section onto the smoothed
- * centerline (terracing); otherwise only the longitudinal smoothing delta is
- * applied and the transverse micro-relief is preserved.
+ * Smoothing and leveling are one operation: the road surface is laid on the
+ * smoothed centerline profile with a flat cross-section (no side-to-side
+ * tilt), feathered back into the surrounding terrain. fetchTerrainData runs
+ * it on global 30 m terrain, whose stair-steps and lumps it exists to hide.
  */
-export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeatures, metersPerPixel, enhanceRoads, levelRoads) {
+export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeatures, metersPerPixel) {
     if (!osmFeatures || osmFeatures.length === 0) return;
 
     const groundRoads = osmFeatures.filter(isGroundLevelRoad);
@@ -339,7 +340,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
     let hasRoads = false;
 
     for (const profile of profiles) {
-        const { corridor, points, zOrig, zSmooth } = profile;
+        const { corridor, points, zSmooth } = profile;
 
         const radiusMeters = corridorHalfWidthMeters(corridor, isUrbanRoad);
         // The core is flat. We add an extra margin for feathering back to the terrain.
@@ -389,20 +390,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
                     if (w < prevW || (w === prevW && dist >= (dMap.get(idx) ?? Infinity))) continue;
 
                     // The flat target elevation is determined by the smoothed centerline
-                    let zTarget = z1 + t * (z2 - z1);
-
-                    if (!levelRoads) {
-                        // If not leveling, we only apply the longitudinal smoothing delta.
-                        // delta = smoothed_centerline - original_centerline
-                        const origZ = zOrig[i] + t * (zOrig[i + 1] - zOrig[i]);
-                        const delta = zTarget - origZ;
-
-                        // Apply this vertical shift to the pixel's original height
-                        const pxOrigZ = heightMap[idx];
-                        if (pxOrigZ !== NO_DATA_VALUE) {
-                            zTarget = pxOrigZ + delta;
-                        }
-                    }
+                    const zTarget = z1 + t * (z2 - z1);
 
                     wMap.set(idx, w);
                     zMap.set(idx, zTarget);

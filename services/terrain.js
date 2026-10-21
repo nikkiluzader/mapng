@@ -1664,8 +1664,6 @@ export const fetchTerrainData = async (
     globalTileConcurrency = 20,
     processingMetersPerPixel = 1,
     targetBounds = null,
-    enhanceRoads = false,
-    levelRoads = false,
     flat = false,
   } = generationOptions || {};
   // Normalize longitude to handle world wrapping
@@ -2114,7 +2112,7 @@ export const fetchTerrainData = async (
   // 7. Fetch OSM Data
   let osmFeatures = [];
   let osmRequestInfo = null;
-  if (includeOSM || enhanceRoads || levelRoads) {
+  if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.("Fetching OpenStreetMap data...");
     osmFeatures = await fetchOSMData(finalBounds, { onStatus: onProgress, signal });
@@ -2127,9 +2125,12 @@ export const fetchTerrainData = async (
     };
   }
 
-  if ((enhanceRoads || levelRoads) && osmFeatures.length > 0) {
+  // Global 30 m terrain (no GPXZ / USGS / KRON86 raster, also when one of
+  // those fell back) is lumpy and stair-stepped under roads: smooth and level
+  // them. Higher-accuracy sources keep their real road surfaces.
+  if (!rawData && !flat && osmFeatures.length > 0) {
     onProgress?.("Smoothing roads in heightmap...");
-    smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, enhanceRoads, levelRoads);
+    smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel);
   }
 
   // 6. Calculate Min/Max
@@ -2234,8 +2235,6 @@ export const loadTerrainFromTif = async (
     processingMetersPerPixel = 1,
     targetBounds = null,
     preferNativeCoverage = true,
-    enhanceRoads = false,
-    levelRoads = false,
     gapFillSource = GAP_FILL_STANDARD,
     gpxzApiKey = '',
     layerOrder = null,
@@ -2468,7 +2467,7 @@ export const loadTerrainFromTif = async (
   // ── OSM ──────────────────────────────────────────────────────────────────────
   let osmFeatures = [];
   let osmRequestInfo = null;
-  if (includeOSM || enhanceRoads || levelRoads) {
+  if (includeOSM) {
     signal?.throwIfAborted();
     emitProgress('Fetching OpenStreetMap data...');
     osmFeatures = await fetchOSMData(finalBounds, { onStatus: emitProgress, signal });
@@ -2479,11 +2478,6 @@ export const loadTerrainFromTif = async (
       completedAt: new Date().toISOString(),
       elementCount: 0,
     };
-  }
-
-  if ((enhanceRoads || levelRoads) && osmFeatures.length > 0) {
-    emitProgress('Smoothing roads in heightmap...');
-    smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, enhanceRoads, levelRoads);
   }
 
   // ── Min/Max ──────────────────────────────────────────────────────────────────
@@ -2564,8 +2558,6 @@ export const loadTerrainFromLaz = async (
     targetBounds                 = null,
     preferNativeCoverage         = true,
     fillLazEdgeGapsWithGlobalDem = true,
-    enhanceRoads                 = false,
-    levelRoads                   = false,
   } = generationOptions || {};
 
   const effectiveMetersPerPixel = Number.isFinite(Number(processingMetersPerPixel)) && Number(processingMetersPerPixel) > 0
@@ -2700,7 +2692,7 @@ export const loadTerrainFromLaz = async (
 
   // ── OSM ───────────────────────────────────────────────────────────────────
   let osmFeatures = [], osmRequestInfo = null;
-  if (includeOSM || enhanceRoads || levelRoads) {
+  if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.('Fetching OpenStreetMap data...');
     osmFeatures = await fetchOSMData(fetchBounds, { onStatus: onProgress, signal });
@@ -2711,11 +2703,6 @@ export const loadTerrainFromLaz = async (
       completedAt:  new Date().toISOString(),
       elementCount: 0,
     };
-  }
-
-  if ((enhanceRoads || levelRoads) && osmFeatures.length > 0) {
-    onProgress?.("Smoothing roads in heightmap...");
-    smoothRoadsInHeightmap(heightMap, width, height, fetchBounds, osmFeatures, effectiveMetersPerPixel, enhanceRoads, levelRoads);
   }
 
   // ── Min / Max ─────────────────────────────────────────────────────────────
@@ -2800,8 +2787,6 @@ export const loadTerrainFromUploadedElevation = async (
       processingMetersPerPixel = 1,
       targetBounds = null,
       preferNativeCoverage = true,
-      enhanceRoads = false,
-      levelRoads = false,
     } = generationOptions || {};
 
     const bounds = targetBounds
@@ -2823,8 +2808,6 @@ export const loadTerrainFromUploadedElevation = async (
       {
         processingMetersPerPixel,
         targetBounds: bounds,
-        enhanceRoads,
-        levelRoads,
       },
     );
   }

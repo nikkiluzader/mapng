@@ -73,7 +73,7 @@ test('removes DEM stair-steps along a straight road', () => {
     ],
   };
 
-  smoothRoadsInHeightmap(hm, W, H, bounds, [road], mpp, false, true);
+  smoothRoadsInHeightmap(hm, W, H, bounds, [road], mpp);
 
   // Center row (the road runs along y≈127.5; row 127 is inside the flat core).
   const rawMax = maxAdjacentDiffAlongRow(raw, 127, 40, 215);
@@ -119,7 +119,7 @@ test('crossing roads stay continuous through the junction', () => {
     ],
   };
 
-  smoothRoadsInHeightmap(hm, W, H, bounds, [roadA, roadB], mpp, false, true);
+  smoothRoadsInHeightmap(hm, W, H, bounds, [roadA, roadB], mpp);
 
   // Walk each road's core straight through the junction: no vertical crease.
   const alongA = maxAdjacentDiffAlongRow(hm, 127, 40, 215);
@@ -152,11 +152,11 @@ test('bridges and elevated roads leave the heightmap untouched', () => {
     ],
   };
 
-  smoothRoadsInHeightmap(hm, W, H, bounds, [bridge], mpp, false, true);
+  smoothRoadsInHeightmap(hm, W, H, bounds, [bridge], mpp);
   assert.deepEqual(hm, raw);
 });
 
-test('levelRoads flattens the cross-section; delta mode preserves it', () => {
+test('roads get a flat cross-section', () => {
   const mpp = 1;
   const bounds = makeBounds(W, H, mpp);
   // Constant transverse slope (along y); flat along the road direction (x).
@@ -177,27 +177,17 @@ test('levelRoads flattens the cross-section; delta mode preserves it', () => {
     ],
   };
 
-  // levelRoads=true: zero transverse tilt within the road core.
+  // Zero transverse tilt within the road core.
   const leveled = makeSlope();
-  smoothRoadsInHeightmap(leveled, W, H, bounds, [road], mpp, false, true);
+  smoothRoadsInHeightmap(leveled, W, H, bounds, [road], mpp);
   for (let x = 40; x <= 215; x += 5) {
     const tilt = Math.abs(leveled[126 * W + x] - leveled[129 * W + x]);
     assert.ok(tilt < 0.02, `expected flat cross-section at x=${x} (tilt ${tilt.toFixed(3)} m)`);
   }
 
-  // levelRoads=false: the longitudinal profile is already flat, so the delta
-  // is ~0 and the original transverse slope must survive.
-  const delta = makeSlope();
-  const rawSlope = makeSlope();
-  smoothRoadsInHeightmap(delta, W, H, bounds, [road], mpp, true, false);
-  let maxChange = 0;
-  for (let i = 0; i < delta.length; i++) {
-    maxChange = Math.max(maxChange, Math.abs(delta[i] - rawSlope[i]));
-  }
-  assert.ok(maxChange < 0.05, `delta mode should not reshape flat-profile terrain (max change ${maxChange.toFixed(3)} m)`);
 });
 
-test('levelRoads flattens the full width the export draws the road at', () => {
+test('roads are flattened across the full width the export draws the road at', () => {
   const mpp = 1;
   const bounds = makeBounds(W, H, mpp);
   // Constant transverse slope (along y); flat along the road direction (x).
@@ -232,7 +222,7 @@ test('levelRoads flattens the full width the export draws the road at', () => {
 
   for (const [highway, halfWidth] of cases) {
     const hm = makeSlope();
-    smoothRoadsInHeightmap(hm, W, H, bounds, [roadAtY(highway, 128)], mpp, false, true);
+    smoothRoadsInHeightmap(hm, W, H, bounds, [roadAtY(highway, 128)], mpp);
 
     // Sample just inside each edge of the road surface.
     const edge = Math.floor(halfWidth) - 1;
@@ -276,7 +266,7 @@ test('a neighbouring road embankment does not tilt an adjacent road core', () =>
     ],
   });
 
-  smoothRoadsInHeightmap(hm, W, H, bounds, [road(123, 'upper'), road(133, 'lower')], mpp, false, true);
+  smoothRoadsInHeightmap(hm, W, H, bounds, [road(123, 'upper'), road(133, 'lower')], mpp);
 
   // primary → 3.5 m half-width; sample just inside each road's own surface.
   for (const centre of [123, 133]) {
@@ -314,7 +304,7 @@ test('does not carve terrain for paths the export never draws as roads', () => {
   for (const highway of ['path', 'footway', 'steps', 'cycleway', 'bridleway', 'proposed']) {
     const hm = slope();
     const before = Float32Array.from(hm);
-    smoothRoadsInHeightmap(hm, W, H, bounds, [trail(highway)], mpp, true, true);
+    smoothRoadsInHeightmap(hm, W, H, bounds, [trail(highway)], mpp);
     let changed = 0;
     for (let i = 0; i < hm.length; i++) if (Math.abs(hm[i] - before[i]) > 1e-4) changed++;
     assert.equal(changed, 0, `${highway} should leave the terrain untouched (${changed} px changed)`);
@@ -322,7 +312,7 @@ test('does not carve terrain for paths the export never draws as roads', () => {
 
   // A track is driveable and still gets levelled.
   const hm = slope();
-  smoothRoadsInHeightmap(hm, W, H, bounds, [trail('track')], mpp, false, true);
+  smoothRoadsInHeightmap(hm, W, H, bounds, [trail('track')], mpp);
   const drop = Math.abs(hm[127 * W + 128] - hm[129 * W + 128]);
   assert.ok(drop < 0.05, `track should still be levelled (drop ${drop.toFixed(3)} m)`);
 });
