@@ -59,13 +59,7 @@
           </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="space-y-2">
-            <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">{{ t('about.surroundingTitle') }}</h4>
-            <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
-              {{ t('about.surroundingBody') }}
-            </p>
-          </div>
+        <div class="grid grid-cols-1 gap-4">
           <div class="space-y-2">
              <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">{{ t('about.resolutionTitle') }}</h4>
              <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">

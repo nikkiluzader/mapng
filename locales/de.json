@@ -76,28 +76,7 @@
     "concurrency": "Parallelität",
     "parallel": "{count}x parallel",
     "invalidApiKey": "Ungültiger API-Schlüssel",
-    "largeAreaWarning": "Große Fläche ({area} km2). Nutzt mehrere API-Aufrufe.",
-    "surrounding": {
-      "title": "Umliegende Tiles",
-      "description": "Lade angrenzende Tiles fur Terrain außerhalb des Bereichs herunter. Nutzt standardmaßige 30m-Hohendaten, keine OSM-Daten.",
-      "centerTileTitle": "Zentrales Tile (dein Hauptexport)",
-      "tileTitle": "Tile {label} ({pos})",
-      "selectAll": "Alle auswählen",
-      "clear": "Zurücksetzen",
-      "showOnMap": "Auf Karte anzeigen",
-      "satelliteQuality": "Satellitenqualität",
-      "outputSize": "Ausgabegröße",
-      "scale": "Maßstab",
-      "perTileArea": "Fläche pro Tile",
-      "upsampleNote": "Hohendaten aus einer 30m-Quelle hochskaliert. Gleiche Pixelgroße wie beim zentralen Tile.",
-      "generateTerrainFirst": "Zuerst Terrain generieren",
-      "download": "{count} Tiles herunterladen (ZIP)",
-      "cancel": "Abbrechen",
-      "statusStarting": "Starte...",
-      "statusDone": "Fertig!",
-      "statusCancelled": "Abgebrochen.",
-      "error": "Umliegende Tiles konnten nicht generiert werden. Bitte erneut versuchen."
-    }
+    "largeAreaWarning": "Große Fläche ({area} km2). Nutzt mehrere API-Aufrufe."
   },
   "status": {
     "jobPreparing": "Job-Daten werden vorbereitet...",
@@ -118,16 +97,8 @@
     "runConfigInvalidFile": "Ungültige Konfigurationsdatei (Schema stimmt nicht überein)."
   },
   "export": {
-    "errorHeightmap": "Heightmap-Export fehlgeschlagen. Details in der Konsole.",
-    "errorTexture": "Textur-Export fehlgeschlagen. Details in der Konsole.",
-    "errorOsmTexture": "OSM-Textur-Export fehlgeschlagen. Details in der Konsole.",
-    "errorHybridTexture": "Hybrid-Textur-Export fehlgeschlagen. Details in der Konsole.",
-    "errorRoadMask": "Road-Mask-Export fehlgeschlagen. Details in der Konsole.",
     "errorGeotiff": "GeoTIFF-Export fehlgeschlagen. Details in der Konsole.",
-    "errorGlb": "GLB-Export fehlgeschlagen. Details in der Konsole.",
-    "errorDae": "DAE-Export fehlgeschlagen. Details in der Konsole.",
-    "errorBeamngLevel": "BeamNG-Level-Export fehlgeschlagen. Details in der Konsole.",
-    "errorTer": "TER-Export fehlgeschlagen. Details in der Konsole."
+    "errorBeamngLevel": "BeamNG-Level-Export fehlgeschlagen. Details in der Konsole."
   },
   "batch": {
     "copyConfig": "Konfiguration kopieren",
@@ -264,7 +235,6 @@
     "levelNamePlaceholder": "Aus Kartenzentrum vorgeschlagen",
     "baseTexture": "Basetextur",
     "osm": "OSM",
-    "hybrid": "Hybrid",
     "none": "Keine",
     "pbrMaterials": "PBR-Materialien",
     "off": "Aus",
@@ -273,7 +243,6 @@
     "selectLevel": "Level auswählen",
     "chooseBiome": "Wahle vor dem Export ein BeamNG-Level-Biom.",
     "includeBackdrop": "Hintergrund einbeziehen",
-    "surroundingTerrain": "Umgebendes Terrain",
     "includeBuildings": "Gebäude einbeziehen",
     "exportBuildings": "3D-OSM-Gebäude exportieren",
     "applyFoundations": "Fundamente anwenden",
@@ -288,10 +257,7 @@
     "meshRoads": "3D-Netzgeometrie",
     "beamngLevelExport": "BeamNG-Level-Export",
     "generatePlayableZip": "Spielbares .zip-Paket erzeugen",
-    "assets2d": "2D-Assets",
-    "heightmap": "Heightmap",
     "satellite": "Satellit",
-    "osmTexture": "OSM-Textur",
     "satelliteHybrid": "Satellit Hybrid",
     "touchedUp": "Nachbearbeitet",
     "texturePaint": {
@@ -326,16 +292,6 @@
       "saveFailed": "Die bemalte Textur konnte nicht gespeichert werden.",
       "loadFailed": "Die Basistextur konnte nicht geladen werden."
     },
-    "roadMask": "Straßenmaske",
-    "models3d": "3D-Modelle",
-    "centerTexture": "Zentrum-Textur:",
-    "tiles": "Tiles:",
-    "center": "Zentrum",
-    "centerPlusSurroundings": "Zentrum + Umgebung",
-    "surroundingsOnly": "Nur Umgebung",
-    "glbModel": "GLB-Modell",
-    "colladaDae": "Collada DAE",
-    "beamngTerrain": "BeamNG-Terrain",
     "geoData": "Geodaten",
     "geoTiff": "GeoTIFF",
     "geoJson": "GeoJSON",
@@ -461,8 +417,8 @@
       "Road-Mask (16-bit PNG)",
       "GeoTIFF (WGS84 oder Quell-CRS)",
       "GeoJSON Vektordaten",
-      "GLB-3D-Modell (+ optionale Umgebung)",
-      "Collada DAE (+ optionale Umgebung)",
+      "GLB-3D-Modell",
+      "Collada DAE",
       "BeamNG-Terrain (.ter)",
       "BeamNG-Level-Paket (.zip, experimentell)",
       "Job-Daten (.mapng) - Vollstandig komprimiertes Sitzungspaket"
@@ -475,8 +431,6 @@
       "Zebrastreifen-Erkennung, wenn OSM-Daten es erlauben",
       "Anpassbare OSM-Hintergrundfarbe"
     ],
-    "surroundingTitle": "Umliegende Tiles",
-    "surroundingBody": "Lade bis zu 8 angrenzende Terrain-Tiles als ZIP mit Heightmaps, Satellitentexturen und Metadaten herunter - ideal fur Multi-Tile-BeamNG-Welten.",
     "resolutionTitle": "Hinweis zur Auflösung",
     "resolutionStrong": "Heightmaps werden mit der gewahlten Verarbeitungsauflosung exportiert.",
     "resolutionBody": "Ausgabegrößen reichen von 512px bis 8192px (0.26 km2 bis 67 km2). Standard-30m-Daten werden bilinear hochskaliert, um glatte Oberflächen zu erhalten.",

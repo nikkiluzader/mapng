@@ -76,28 +76,7 @@
     "concurrency": "Concurrence",
     "parallel": "{count}x en parallele",
     "invalidApiKey": "Cle API invalide",
-    "largeAreaWarning": "Grande zone ({area} km2). Utilise plusieurs appels API.",
-    "surrounding": {
-      "title": "Tuiles environnantes",
-      "description": "Télécharge les tuiles adjacentes pour les terrains hors limite. Utilise une elevation standard 30m, sans données OSM.",
-      "centerTileTitle": "Tuile centrale (votre export principal)",
-      "tileTitle": "Tuile {label} ({pos})",
-      "selectAll": "Tout selectionner",
-      "clear": "Effacer",
-      "showOnMap": "Afficher sur la carte",
-      "satelliteQuality": "Qualite satellite",
-      "outputSize": "Taille de sortie",
-      "scale": "Echelle",
-      "perTileArea": "Surface par tuile",
-      "upsampleNote": "Elevation sur-echantillonnee depuis des données source 30m. Meme taille en pixels que la tuile centrale.",
-      "generateTerrainFirst": "Generez d'abord le terrain",
-      "download": "Télécharger {count} tuile{suffix} (ZIP)",
-      "cancel": "Annuler",
-      "statusStarting": "Demarrage...",
-      "statusDone": "Termine !",
-      "statusCancelled": "Annule.",
-      "error": "Échec de generation des tuiles environnantes. Veuillez réessayer."
-    }
+    "largeAreaWarning": "Grande zone ({area} km2). Utilise plusieurs appels API."
   },
   "status": {
     "jobPreparing": "Préparation des données du job...",
@@ -118,16 +97,8 @@
     "runConfigInvalidFile": "Fichier de configuration invalide (schema incompatible)."
   },
   "export": {
-    "errorHeightmap": "Échec de l'export de la heightmap. Voir la console pour les details.",
-    "errorTexture": "Échec de l'export de la texture. Voir la console pour les details.",
-    "errorOsmTexture": "Échec de l'export de la texture OSM. Voir la console pour les details.",
-    "errorHybridTexture": "Échec de l'export de la texture hybride. Voir la console pour les details.",
-    "errorRoadMask": "Échec de l'export du masque routier. Voir la console pour les details.",
     "errorGeotiff": "Échec de l'export GeoTIFF. Voir la console pour les details.",
-    "errorGlb": "Échec de l'export GLB. Voir la console pour les details.",
-    "errorDae": "Échec de l'export DAE. Voir la console pour les details.",
-    "errorBeamngLevel": "Échec de l'export de niveau BeamNG. Voir la console pour les details.",
-    "errorTer": "Échec de l'export TER. Voir la console pour les details."
+    "errorBeamngLevel": "Échec de l'export de niveau BeamNG. Voir la console pour les details."
   },
   "batch": {
     "copyConfig": "Copier la configuration",
@@ -264,7 +235,6 @@
     "levelNamePlaceholder": "Suggere depuis le centre de la carte",
     "baseTexture": "Texture de base",
     "osm": "OSM",
-    "hybrid": "Hybride",
     "none": "Aucun",
     "pbrMaterials": "Materiaux PBR",
     "off": "Désactivé",
@@ -273,7 +243,6 @@
     "selectLevel": "Selectionner le niveau",
     "chooseBiome": "Choisissez un biome de niveau BeamNG avant l'export.",
     "includeBackdrop": "Inclure l'arriere-plan",
-    "surroundingTerrain": "Terrain environnant",
     "includeBuildings": "Inclure les bâtiments",
     "exportBuildings": "Exporter les bâtiments OSM 3D",
     "applyFoundations": "Appliquer les fondations",
@@ -288,10 +257,7 @@
     "meshRoads": "Géométrie maillée 3D",
     "beamngLevelExport": "Export de niveau BeamNG",
     "generatePlayableZip": "Generer un package .zip jouable",
-    "assets2d": "Ressources 2D",
-    "heightmap": "Heightmap",
     "satellite": "Satellite",
-    "osmTexture": "Texture OSM",
     "satelliteHybrid": "Hybride satellite",
     "touchedUp": "Retouchee",
     "texturePaint": {
@@ -326,16 +292,6 @@
       "saveFailed": "Echec de l'enregistrement de la texture peinte.",
       "loadFailed": "Echec du chargement de la texture de base."
     },
-    "roadMask": "Masque routier",
-    "models3d": "Modèles 3D",
-    "centerTexture": "Texture centrale :",
-    "tiles": "Tuiles :",
-    "center": "Centre",
-    "centerPlusSurroundings": "Centre + environs",
-    "surroundingsOnly": "Environs uniquement",
-    "glbModel": "Modele GLB",
-    "colladaDae": "Collada DAE",
-    "beamngTerrain": "Terrain BeamNG",
     "geoData": "Données geo",
     "geoTiff": "GeoTIFF",
     "geoJson": "GeoJSON",
@@ -461,8 +417,8 @@
       "Masque routier (PNG 16 bits)",
       "GeoTIFF (WGS84 ou CRS source)",
       "Données vectorielles GeoJSON",
-      "Modele 3D GLB (+ environs optionnels)",
-      "Collada DAE (+ environs optionnels)",
+      "Modele 3D GLB",
+      "Collada DAE",
       "Terrain BeamNG (.ter)",
       "Package de niveau BeamNG (.zip, experimental)",
       "Données de job (.mapng) - package de session compresse complet"
@@ -475,8 +431,6 @@
       "Detection de passages pietons lorsque les données OSM le permettent",
       "Couleur de fond OSM personnalisable"
     ],
-    "surroundingTitle": "Tuiles environnantes",
-    "surroundingBody": "Téléchargez jusqu'a 8 tuiles de terrain adjacentes dans un package ZIP avec heightmaps, textures satellite et metadonnées - ideal pour construire des mondes BeamNG multi-tuiles.",
     "resolutionTitle": "Note sur la resolution",
     "resolutionStrong": "Les heightmaps sont exportees avec la resolution de traitement selectionnee.",
     "resolutionBody": "Les tailles de sortie vont de 512px a 8192px (0.26 km2 a 67 km2). Les données Standard 30m sont sur-echantillonnees bilineairement pour des surfaces lisses.",

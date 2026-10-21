@@ -214,15 +214,6 @@
       </template>
     </div>
 
-    <!-- Surrounding Tiles -->
-    <SurroundingTiles
-      :terrain-data="terrainData"
-      :center="center"
-      :resolution="resolution"
-      @update:selected-positions="handleSurroundingTilesChange"
-      @update:show-on-map="() => {}"
-    />
-
     <!-- Configuration & Session (collapsible, collapsed by default) -->
     <div class="space-y-3">
       <button
@@ -290,7 +281,6 @@
         :gpxz-api-key="gpxzApiKey"
         :gpxz-status="gpxzStatus"
         :fetch-o-s-m="fetchOSM"
-        :surrounding-tile-positions="surroundingTilePositions"
         @fetch-osm="$emit('fetchOsm')"
         @export-success="$emit('exportSuccess', $event)"
       />
@@ -307,7 +297,6 @@ import BaseToggle from '../base/BaseToggle.vue';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
-import SurroundingTiles from '../map/SurroundingTiles.vue';
 import ExportPanel from './ExportPanel.vue';
 import GenerateActions from '../controls/GenerateActions.vue';
 import ElevationUploadControl from '../controls/ElevationUploadControl.vue';
@@ -328,13 +317,12 @@ const { t } = useI18n({ useScope: 'global' });
 
 const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedNoDataOverride', 'uploadedLayerOrder', 'elevationLayerSlots', 'maxElevationSlots', 'uploadedAreaMode', 'processingMetersPerPixel']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'elevationFileSelected', 'elevationFileClear', 'elevationSlotSelected', 'elevationSlotRemoved', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedNoDataOverride', 'update:uploadedLayerOrder', 'update:uploadedAreaMode', 'update:processingMetersPerPixel', 'update:previewStale']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'importData', 'elevationFileSelected', 'elevationFileClear', 'elevationSlotSelected', 'elevationSlotRemoved', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedNoDataOverride', 'update:uploadedLayerOrder', 'update:uploadedAreaMode', 'update:processingMetersPerPixel', 'update:previewStale']);
 
 const handleLocationChange = (newLocation) => {
   emit('locationChange', { ...props.center, ...newLocation });
 };
 
-const surroundingTilePositions = ref([]);
 const runConfigStatus = ref('');
 const isExportingJob = ref(false);
 const isImportingJob = ref(false);
@@ -627,11 +615,6 @@ const areaDisplay = computed(() => {
     ? `${areaSqKm.value.toFixed(2)} km²`
     : `${Math.round(totalAreaSqM.value).toLocaleString()} m²`;
 });
-
-const handleSurroundingTilesChange = (positions) => {
-  surroundingTilePositions.value = positions || [];
-  emit('surroundingTilesChange', surroundingTilePositions.value);
-};
 
 const buildRunConfiguration = () => buildRunConfigurationBase({
   center: props.center,

@@ -51,7 +51,6 @@ export const useMainStore = defineStore('main', () => {
   const isLoading = ref(false);
   const loadingStatus = ref("Initializing...");
   const previewMode = ref(false);
-  const surroundingTilePositions = ref([]);
 
   // --- Batch Job State ---
   const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
@@ -151,7 +150,6 @@ export const useMainStore = defineStore('main', () => {
     isLoading,
     loadingStatus,
     previewMode,
-    surroundingTilePositions,
     batchGridCols,
     batchGridRows,
     batchTileFollowCenter,

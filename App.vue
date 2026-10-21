@@ -54,7 +54,6 @@
         @zoom-change="store.setZoom"
         @generate="(preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, enhanceRoads, levelRoads, gapFillSource) => handleGenerate(preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, enhanceRoads, levelRoads, gapFillSource)"
         @fetch-osm="handleFetchOSM"
-        @surrounding-tiles-change="(v) => surroundingTilePositions = v"
         @import-data="handleImportData"
         @elevation-file-selected="handleElevationFileSelected"
         @elevation-file-clear="handleElevationFileClear"
@@ -113,7 +112,6 @@
             :uploaded-elevation-file="uploadedElevationFile"
             :uploaded-elevation-meta="uploadedElevationMeta"
             :uploaded-area-mode="uploadedAreaMode"
-            :surrounding-tile-positions="surroundingTilePositions"
             :batch-grid="batchGridTiles"
             :batch-editable="batchMode && !batchRunning && !showBatchProgress"
             @move="handleMapMove" 
@@ -265,7 +263,6 @@ const {
   isLoading,
   loadingStatus,
   previewMode,
-  surroundingTilePositions,
   batchGridCols,
   batchGridRows,
   batchTileFollowCenter,

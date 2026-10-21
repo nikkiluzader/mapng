@@ -76,28 +76,7 @@
     "concurrency": "Współbieżność",
     "parallel": "{count}x równoległa",
     "invalidApiKey": "Nieprawidłowy klucz API",
-    "largeAreaWarning": "Duży obszar ({area} km2). Używa wielu wywołań API.",
-    "surrounding": {
-      "title": "Sąsiednie kafelki",
-      "description": "Pobierz sąsiednie kafelki dla terenu wykraczającego poza granice. Używa standardowej wysokości 30m, bez danych OSM.",
-      "centerTileTitle": "Kafelek środkowy (twój główny eksport)",
-      "tileTitle": "Kafelek {label} ({pos})",
-      "selectAll": "Zaznacz wszystko",
-      "clear": "Wyczyść",
-      "showOnMap": "Pokaż na mapie",
-      "satelliteQuality": "Jakość satelity",
-      "outputSize": "Rozmiar wyjścia",
-      "scale": "Skala",
-      "perTileArea": "Powierzchnia na kafelek",
-      "upsampleNote": "Wysokość przeskalowana z danych źródłowych 30m. Taki sam rozmiar piksela jak kafelek środkowy.",
-      "generateTerrainFirst": "Najpierw wygeneruj teren",
-      "download": "Pobierz {count} kafelek{suffix} (ZIP)",
-      "cancel": "Anuluj",
-      "statusStarting": "Rozpoczynanie...",
-      "statusDone": "Gotowe!",
-      "statusCancelled": "Anulowany.",
-      "error": "Nie udało się wygenerować sąsiednich kafelków. Spróbuj ponownie."
-    }
+    "largeAreaWarning": "Duży obszar ({area} km2). Używa wielu wywołań API."
   },
   "status": {
     "jobPreparing": "Przygotowanie danych zadania...",
@@ -118,16 +97,8 @@
     "runConfigInvalidFile": "Nieprawidłowy plik konfiguracji (niezgodność schematu)."
   },
   "export": {
-    "errorHeightmap": "Nie udało się wyeksportować mapy wysokości. Szczegóły w konsoli.",
-    "errorTexture": "Nie udało się wyeksportować tekstury. Szczegóły w konsoli.",
-    "errorOsmTexture": "Nie udało się wyeksportować tekstury OSM. Szczegóły w konsoli.",
-    "errorHybridTexture": "Nie udało się wyeksportować tekstury hybrydowej. Szczegóły w konsoli.",
-    "errorRoadMask": "Nie udało się wyeksportować maski drogi. Szczegóły w konsoli.",
     "errorGeotiff": "Nie udało się wyeksportować GeoTIFF. Szczegóły w konsoli.",
-    "errorGlb": "Nie udało się wyeksportować GLB. Szczegóły w konsoli.",
-    "errorDae": "Nie udało się wyeksportować DAE. Szczegóły w konsoli.",
-    "errorBeamngLevel": "Nie udało się wyeksportować poziomu BeamNG. Szczegóły w konsoli.",
-    "errorTer": "Nie udało się wyeksportować TER. Szczegóły w konsoli."
+    "errorBeamngLevel": "Nie udało się wyeksportować poziomu BeamNG. Szczegóły w konsoli."
   },
   "batch": {
     "copyConfig": "Skopiuj konfigurację",
@@ -264,7 +235,6 @@
     "levelNamePlaceholder": "Zasugerowana ze środka mapy",
     "baseTexture": "Tekstura podstawowa",
     "osm": "OSM",
-    "hybrid": "Hybrydowa",
     "none": "Brak",
     "pbrMaterials": "Materiały PBR",
     "off": "Wył.",
@@ -273,7 +243,6 @@
     "selectLevel": "Wybierz poziom",
     "chooseBiome": "Wybierz biom poziomu BeamNG przed eksportem.",
     "includeBackdrop": "Dołącz tło",
-    "surroundingTerrain": "Teren otaczający",
     "includeBuildings": "Dołącz budynki",
     "exportBuildings": "Eksportuj 3D budynki OSM",
     "applyFoundations": "Stosuj fundamenty",
@@ -288,10 +257,7 @@
     "meshRoads": "Geometria siatki 3D",
     "beamngLevelExport": "Eksport poziomu BeamNG",
     "generatePlayableZip": "Wygeneruj pakiet .zip do gry",
-    "assets2d": "Zasoby 2D",
-    "heightmap": "Mapa wysokości",
     "satellite": "Satelita",
-    "osmTexture": "Tekstura OSM",
     "satelliteHybrid": "Satelita hybrydowa",
     "touchedUp": "Poprawiona",
     "texturePaint": {
@@ -326,16 +292,6 @@
       "saveFailed": "Nie udało się zapisać pomalowanej tekstury.",
       "loadFailed": "Nie udało się wczytać tekstury bazowej."
     },
-    "roadMask": "Maska drogi",
-    "models3d": "Modele 3D",
-    "centerTexture": "Tekstura środkowa:",
-    "tiles": "Kafelki:",
-    "center": "Środek",
-    "centerPlusSurroundings": "Środek + Otoczenie",
-    "surroundingsOnly": "Tylko otoczenie",
-    "glbModel": "Model GLB",
-    "colladaDae": "Collada DAE",
-    "beamngTerrain": "Teren BeamNG",
     "geoData": "Dane geo",
     "geoTiff": "GeoTIFF",
     "geoJson": "GeoJSON",
@@ -461,8 +417,8 @@
       "Maska drogi (16-bitowy PNG)",
       "GeoTIFF (WGS84 lub źródłowy CRS)",
       "Dane wektorowe GeoJSON",
-      "Model 3D GLB (+ opcjonalne otoczenie)",
-      "Collada DAE (+ opcjonalne otoczenie)",
+      "Model 3D GLB",
+      "Collada DAE",
       "Teren BeamNG (.ter)",
       "Pakiet poziomu BeamNG (.zip, eksperymentalny)",
       "Dane zadania (.mapng) - Kompletny spakowany pakiet sesji"
@@ -475,8 +431,6 @@
       "Wykrywanie przejścia dla pieszych tam, gdzie dane OSM go obsługują",
       "Kolor tła OSM do dostosowania"
     ],
-    "surroundingTitle": "Kafelki otaczające",
-    "surroundingBody": "Pobierz do 8 sąsiednich płytek terenu jako pakiet ZIP z mapami wysokości, teksturami satelity i metadanymi - idealne do budowania wielokafelkowych światów BeamNG.",
     "resolutionTitle": "Uwaga dotycząca rozdzielczości",
     "resolutionStrong": "Wszystkie mapy wysokosci sa eksportowane z wybrana rozdzielczoscia przetwarzania.",
     "resolutionBody": "Rozmiary wyjścia wahają się od 512px do 8192px (0,26 km2 do 67 km2). Dane standardowe 30m są dwuliniowo powiększane dla gładkich powierzchni.",

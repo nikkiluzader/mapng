@@ -84,28 +84,7 @@
     "concurrency": "Concurrency",
     "parallel": "{count}x parallel",
     "invalidApiKey": "Invalid API key",
-    "largeAreaWarning": "Large area ({area} km2). Uses multiple API calls.",
-    "surrounding": {
-      "title": "Surrounding Tiles",
-      "description": "Download adjacent tiles for out-of-bounds terrain. Uses standard 30m elevation, no OSM data.",
-      "centerTileTitle": "Center tile (your main export)",
-      "tileTitle": "Tile {label} ({pos})",
-      "selectAll": "Select All",
-      "clear": "Clear",
-      "showOnMap": "Show on map",
-      "satelliteQuality": "Satellite Quality",
-      "outputSize": "Output size",
-      "scale": "Scale",
-      "perTileArea": "Per-tile area",
-      "upsampleNote": "Elevation upsampled from 30m source data. Same pixel size as center tile.",
-      "generateTerrainFirst": "Generate terrain first",
-      "download": "Download {count} Tile{suffix} (ZIP)",
-      "cancel": "Cancel",
-      "statusStarting": "Starting...",
-      "statusDone": "Done!",
-      "statusCancelled": "Cancelled.",
-      "error": "Failed to generate surrounding tiles. Please try again."
-    }
+    "largeAreaWarning": "Large area ({area} km2). Uses multiple API calls."
   },
   "status": {
     "jobPreparing": "Preparing job data...",
@@ -126,16 +105,8 @@
     "runConfigInvalidFile": "Invalid configuration file (schema mismatch)."
   },
   "export": {
-    "errorHeightmap": "Failed to export heightmap. See console for details.",
-    "errorTexture": "Failed to export texture. See console for details.",
-    "errorOsmTexture": "Failed to export OSM texture. See console for details.",
-    "errorHybridTexture": "Failed to export hybrid texture. See console for details.",
-    "errorRoadMask": "Failed to export road mask. See console for details.",
     "errorGeotiff": "Failed to export GeoTIFF. See console for details.",
-    "errorGlb": "Failed to export GLB. See console for details.",
-    "errorDae": "Failed to export DAE. See console for details.",
-    "errorBeamngLevel": "Failed to export BeamNG level. See console for details.",
-    "errorTer": "Failed to export TER. See console for details."
+    "errorBeamngLevel": "Failed to export BeamNG level. See console for details."
   },
   "batch": {
     "copyConfig": "Copy Configuration",
@@ -292,7 +263,6 @@
     "levelNamePlaceholder": "Suggested from map center",
     "baseTexture": "Base Texture",
     "osm": "OSM",
-    "hybrid": "Hybrid",
     "none": "None",
     "pbrMaterials": "PBR Materials",
     "off": "Off",
@@ -301,7 +271,6 @@
     "selectLevel": "Select level",
     "chooseBiome": "Choose a BeamNG level biome before exporting.",
     "includeBackdrop": "Include Backdrop",
-    "surroundingTerrain": "Surrounding terrain",
     "includeBuildings": "Include Buildings",
     "exportBuildings": "Export 3D OSM buildings",
     "applyFoundations": "Apply Foundations",
@@ -320,10 +289,7 @@
     "communityQualityNotice": "MapNG exports are best used as a starting point. For public releases, it is strongly recommended to do more additional world-building and polish before publishing to community mod hubs.",
     "beamngLevelExport": "BeamNG Level Export",
     "generatePlayableZip": "Generate playable .zip package",
-    "assets2d": "2D Assets",
-    "heightmap": "Heightmap",
     "satellite": "Satellite",
-    "osmTexture": "OSM Texture",
     "satelliteHybrid": "Satellite Hybrid",
     "touchedUp": "Touched up",
     "texturePaint": {
@@ -358,17 +324,6 @@
       "saveFailed": "Failed to save the painted texture.",
       "loadFailed": "Failed to load the base texture for painting."
     },
-    "roadMask": "Road Mask",
-    "models3d": "3D Models",
-    "centerTexture": "Center Texture:",
-    "tiles": "Tiles:",
-    "center": "Center",
-    "centerPlusSurroundings": "Center + Surroundings",
-    "surroundingsOnly": "Surroundings Only",
-    "realWorldScale": "Real-world scale (1 unit = 1 m)",
-    "glbModel": "GLB Model",
-    "colladaDae": "Collada DAE",
-    "beamngTerrain": "BeamNG Terrain",
     "geoData": "Geo Data",
     "geoTiff": "GeoTIFF",
     "geoJson": "GeoJSON",
@@ -517,8 +472,8 @@
       "Road Mask (16-bit PNG)",
       "GeoTIFF (WGS84 or source CRS)",
       "GeoJSON Vector Data",
-      "GLB 3D Model (+ optional surroundings)",
-      "Collada DAE (+ optional surroundings)",
+      "GLB 3D Model",
+      "Collada DAE",
       "BeamNG Terrain (.ter)",
       "BeamNG Level Package (.zip, experimental)",
       "Job Data (.mapng) - Complete compressed session package"
@@ -531,8 +486,6 @@
       "Crosswalk detection where OSM data supports it",
       "Customizable OSM background color"
     ],
-    "surroundingTitle": "Surrounding Tiles",
-    "surroundingBody": "Download up to 8 adjacent terrain tiles as a ZIP package with heightmaps, satellite textures, and metadata - perfect for building multi-tile BeamNG worlds.",
     "resolutionTitle": "Resolution Note",
     "resolutionStrong": "Heightmaps are exported at the selected processing resolution.",
     "resolutionBody": "Output sizes range from 512px to 8192px (0.26 km2 to 67 km2). Standard 30m data is bilinearly upsampled for smooth surfaces.",
