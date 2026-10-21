@@ -218,10 +218,6 @@
     "segmentedTip": "Satelita segmentowana (płaskie kleksy kolorów)",
     "noSegmentedHybrid": "Brak dostępnych hybrydowych danych segmentowanych",
     "segmentedHybridTip": "Satelita segmentowana + nakładka dróg",
-    "surroundingsTexture": "Tekstura otoczenia",
-    "surroundingTerrain": "Teren otaczający",
-    "surroundingDesc": "Adaptacyjne sąsiednie kafelki ze zszywaniem szwów i optymalizowanym szczegółami satelity dla szybszego ładowania.",
-    "wireframeMode": "Tryb szkieletu",
     "features3d": "Funkcje 3D",
     "resetCamera": "Resetuj kamerę"
   },

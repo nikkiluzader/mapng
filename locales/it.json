@@ -218,10 +218,6 @@
     "segmentedTip": "Satellite segmentato (macchie di colore piatto)",
     "noSegmentedHybrid": "Nessun dato ibrido segmentato disponibile",
     "segmentedHybridTip": "Satellite segmentato + overlay strade",
-    "surroundingsTexture": "Texture Surroundings",
-    "surroundingTerrain": "Terreno Circostante",
-    "surroundingDesc": "Tessere adiacenti adattive con blending cuciture e dettaglio satellite ottimizzato per anteprima per caricamento più veloce.",
-    "wireframeMode": "Modalità Wireframe",
     "features3d": "Funzionalità 3D",
     "resetCamera": "Ripristina Telecamera"
   },

@@ -218,10 +218,6 @@
     "segmentedTip": "Satellite segmente (aplats de couleur)",
     "noSegmentedHybrid": "Aucune donnee hybride segmentee disponible",
     "segmentedHybridTip": "Satellite segmente + superposition routes",
-    "surroundingsTexture": "Texture des alentours",
-    "surroundingTerrain": "Terrain environnant",
-    "surroundingDesc": "Tuiles adjacentes adaptatives avec fusion des jonctions et detail satellite optimise pour un chargement plus rapide.",
-    "wireframeMode": "Mode fil de fer",
     "features3d": "Elements 3D",
     "resetCamera": "Reinitialiser la caméra"
   },

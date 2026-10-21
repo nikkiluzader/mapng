@@ -218,10 +218,6 @@
     "segmentedTip": "Segmentierter Satellit (flache Farbflächen)",
     "noSegmentedHybrid": "Keine segmentierten Hybrid-Daten verfügbar",
     "segmentedHybridTip": "Segmentierter Satellit + Straßen-Overlay",
-    "surroundingsTexture": "Umgebungs-Textur",
-    "surroundingTerrain": "Umgebendes Terrain",
-    "surroundingDesc": "Adaptive angrenzende Tiles mit Nahtübergängen und für Vorschau optimierten Satellitendetails für schnelleres Laden.",
-    "wireframeMode": "Drahtgittermodus",
     "features3d": "3D-Features",
     "resetCamera": "Kamera zurücksetzen"
   },
