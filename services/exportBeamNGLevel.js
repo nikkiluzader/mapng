@@ -65,6 +65,7 @@ import {
   getTrafficProfile,
   getWaterProfile,
 } from './beamngBiomeCatalog.js';
+import { resolveRegionalBiome } from './beamngRegion.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
 
@@ -3442,6 +3443,20 @@ function isClosedRing(points) {
  *
  * Returned value is world-space Z relative to terrain minHeight.
  */
+/** Mean terrain height (m) from a strided sample of the heightmap, or null. */
+function sampleMeanHeight(terrainData) {
+  const hm = terrainData?.heightMap;
+  if (!hm?.length) return null;
+  const stride = Math.max(1, Math.floor(hm.length / 65536));
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i < hm.length; i += stride) {
+    const h = hm[i];
+    if (Number.isFinite(h) && h > -32760) { sum += h; n++; }
+  }
+  return n ? sum / n : null;
+}
+
 function getTerrainHeightWorld(lat, lng, terrainData) {
   const { bounds, width, height, heightMap, minHeight } = terrainData;
   const sanitizeHeight = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
@@ -3594,6 +3609,15 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
     || barrierType === 'wire_fence'
     || barrierType === 'gate'
   ) {
+    // What OSM says about the fence first; untagged fences take the region's
+    // default (wooden in temperate places, chain-link elsewhere).
+    const fenceType = String(tags.fence_type ?? '').trim().toLowerCase();
+    if (['wood', 'picket', 'board', 'split_rail', 'paling'].includes(fenceType) || material === 'wood') {
+      return NATIVE_BARRIER_ASSETS.fence;
+    }
+    if (['chain_link', 'metal', 'wire', 'mesh'].includes(fenceType) || ['metal', 'steel', 'wire'].includes(material)) {
+      return NATIVE_BARRIER_ASSETS.chainLinkFence;
+    }
     if (levelName && levelName !== 'east_coast_usa') {
       return NATIVE_BARRIER_ASSETS.chainLinkFence;
     }
@@ -5737,11 +5761,23 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (!/^[a-z_][a-z0-9_]{0,63}$/.test(levelName)) {
     throw new Error(`Generated invalid BeamNG level id: ${levelName}`);
   }
-  const biome = getBeamNGBiomeById(biomeId);
+  // The look (ground cover, signature trees, rocks, terrain detail textures,
+  // water) follows the location (services/beamngRegion.js); an explicit
+  // biomeId still wins (tests, tools).
+  const regional = biomeId ? null : resolveRegionalBiome({
+    lat: center.lat,
+    lon: center.lng,
+    meanHeightM: sampleMeanHeight(exportTerrainData),
+    features: exportTerrainData.osmFeatures || [],
+    mapAreaM2: (exportTerrainData.width * computeSquareSize(exportTerrainData)) ** 2,
+  });
+  const resolvedBiomeId = biomeId || regional.biomeId;
+  const biome = getBeamNGBiomeById(resolvedBiomeId);
   if (!biome) {
-    console.error(`${BEAMNG_EXPORT_SERVICE_LOG} Invalid or missing biomeId.`, { biomeId });
-    throw new Error(`Missing or invalid BeamNG biome: ${biomeId || '(none)'}`);
+    console.error(`${BEAMNG_EXPORT_SERVICE_LOG} Invalid biomeId.`, { biomeId: resolvedBiomeId });
+    throw new Error(`Invalid BeamNG biome: ${resolvedBiomeId}`);
   }
+  if (regional) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Regional look: ${biome.label} (${regional.reason}).`);
   // Road rules follow the export's location (driving side, signal cycle,
   // turn on red); the biome only picks visuals. Explicit options still win,
   // and the biome profile is the fallback when the location is unknown.

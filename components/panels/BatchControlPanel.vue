@@ -493,7 +493,6 @@ const DEFAULT_LEVEL_OPTIONS = {
   baseTexture: 'hybrid',
   pbrSource: 'osm',
   roadType: 'decal',
-  biomeId: '',
   backdropSource: 'off',
   includeBuildings: true,
   applyFoundations: true,
@@ -605,8 +604,6 @@ const startDisabled = computed(() => {
   if (elevationSource.value === 'gpxz' && !gpxzApiKey.value) return true;
   if (combinedLevel.value) {
     if (combinedTier.value === 'disabled') return true;
-    // Biome is required whenever OSM-derived materials/assets are in play.
-    if (includeOSM.value && !levelOptions.value.biomeId) return true;
     return false;
   }
   return selectedExportCount.value === 0;

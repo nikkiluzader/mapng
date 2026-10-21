@@ -48,14 +48,6 @@
         </select>
       </div>
 
-      <!-- Biome -->
-      <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400 shrink-0">{{ t('exportPanel.biome') }}</span>
-        <select :value="model.biomeId" @change="update('biomeId', $event.target.value)" :class="[SELECT_XS, 'min-w-0']">
-          <option value="">{{ t('exportPanel.selectLevel') }}</option>
-          <option v-for="biome in biomeOptions" :key="biome.id" :value="biome.id">{{ biome.label }}</option>
-        </select>
-      </div>
 
       <!-- Backdrop -->
       <div class="flex items-center justify-between gap-2">
@@ -106,10 +98,6 @@
         </div>
       </div>
     </BaseCard>
-
-    <div v-if="includeOSM && !model.biomeId" class="text-[10px] text-amber-600 dark:text-amber-400">
-      {{ t('exportPanel.chooseBiome') }}
-    </div>
   </div>
 </template>
 
@@ -119,7 +107,6 @@ import { useI18n } from 'vue-i18n';
 import BaseCard from '../base/BaseCard.vue';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { PackageOpen } from 'lucide-vue-next';
-import { getBeamNGBiomeOptions } from '../../services/beamngBiomeCatalog.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -130,7 +117,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:levelOptions']);
 
-const biomeOptions = getBeamNGBiomeOptions();
 const model = computed(() => props.levelOptions);
 
 const update = (key, value) => {

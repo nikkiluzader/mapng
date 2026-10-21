@@ -770,3 +770,19 @@ test('OSM grass polygons do not multiply GroundCover layers', async () => {
     restorePolyfills();
   }
 });
+
+test('without a biome the export picks the look from the location', async () => {
+  const restorePolyfills = installCanvasPolyfill();
+  try {
+    const result = await exportBeamNGLevel(makeTerrainData(), { lat: 0.5, lng: 0.5 }, {
+      roadType: 'decal', levelName: 'mapng_demo', baseTexture: 'none', pbrSource: 'none',
+      includeBuildings: false, applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeTrees: true, includeRocks: false, includeNativeBarriers: false,
+    });
+    const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+    const info = JSON.parse(await zip.file('levels/mapng_demo/info.json').async('string'));
+    assert.equal(info.biome, 'Jungle Rock Island', 'equator → tropics');
+  } finally {
+    restorePolyfills();
+  }
+});

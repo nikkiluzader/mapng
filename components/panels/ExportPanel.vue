@@ -91,15 +91,6 @@
             <input type="checkbox" v-model="beamNGRoadType" true-value="decal" false-value="none" :disabled="!hasOsmData" :class="CHECKBOX" />
           </div>
 
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.biome') }}</span>
-            <select v-model="beamNGBiomeId" :class="[SELECT_XS, 'min-w-0']">
-              <option value="">{{ t('exportPanel.selectLevel') }}</option>
-              <option v-for="biome in beamNGBiomeOptions" :key="biome.id" :value="biome.id">
-                {{ biome.label }}
-              </option>
-            </select>
-          </div>
 
           <!-- Surrounding terrain backdrop source -->
           <div class="flex items-center justify-between gap-2 px-0.5">
@@ -144,14 +135,11 @@
             </p>
           </div>
 
-          <div v-if="beamNGBiomeRequired && !beamNGBiomeId" class="px-0.5 text-[9px] text-amber-600 dark:text-amber-400">
-            {{ t('exportPanel.chooseBiome') }}
-          </div>
 
           <!-- Export button -->
           <button
             @click="handleBeamNGLevelExport"
-            :disabled="isAnyExporting || (beamNGBiomeRequired && !beamNGBiomeId)"
+            :disabled="isAnyExporting"
             class="relative w-full flex items-center gap-3 p-3 bg-[#FF6600] hover:bg-[#e85d00] border border-[#d65500] rounded text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div class="flex items-center justify-center w-8 h-8 shrink-0">
@@ -311,7 +299,6 @@ import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/trace
 import { exportBeamNGLevel } from '../../services/exportBeamNGLevel';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
-import { getBeamNGBiomeOptions } from '../../services/beamngBiomeCatalog.js';
 import { reverseLocationName } from '../../services/nominatim';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -375,16 +362,12 @@ const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getI
 // DecalRoads are the only road system; earlier choices (Road Architect, Mesh
 // Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
 const beamNGRoadType = ref(localStorage.getItem('mapng_beamNGRoadType') === 'none' ? 'none' : 'decal');
-const beamNGBiomeOptions = getBeamNGBiomeOptions();
-const persistedBeamNGBiome = localStorage.getItem('mapng_beamNGBiomeId') || '';
-const beamNGBiomeId = ref(beamNGBiomeOptions.some((biome) => biome.id === persistedBeamNGBiome) ? persistedBeamNGBiome : '');
 const beamNGLevelName = ref('');
 const beamNGSuggestedLevelName = ref('');
 const beamNGLevelNameTouched = ref(false);
 let beamNGLevelNameRequestId = 0;
 const hasOsmData = computed(() => Array.isArray(props.terrainData?.osmFeatures) && props.terrainData.osmFeatures.length > 0);
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
-const beamNGBiomeRequired = computed(() => hasOsmData.value);
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
 const beamNGPendingDownloadUrl = ref('');
 const beamNGPendingDownloadName = ref('');
@@ -535,7 +518,6 @@ watch(beamNGSeaLevelOffset, (v) => {
   localStorage.setItem('mapng_beamNGSeaLevelOffset', String(normalized));
 });
 watch(beamNGRoadType, (v) => localStorage.setItem('mapng_beamNGRoadType', v));
-watch(beamNGBiomeId, (v) => localStorage.setItem('mapng_beamNGBiomeId', v));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
 onUnmounted(() => {
@@ -842,10 +824,6 @@ const handleBeamNGLevelExport = async () => {
     console.warn(`${BEAMNG_EXPORT_UI_LOG} Aborting: missing terrainData.`);
     return;
   }
-  if (beamNGBiomeRequired.value && !beamNGBiomeId.value) {
-    console.warn(`${BEAMNG_EXPORT_UI_LOG} Aborting: biome is required but missing.`);
-    return;
-  }
 
   // Clear any stale pending bundle from a previous run.
   clearPendingBeamNGDownload();
@@ -923,8 +901,6 @@ const handleBeamNGLevelExport = async () => {
     const effectiveIncludeRocks = hasOsmData.value;
     const effectiveBackdropGpxzApiKey = effectiveBackdropSource === 'gpxz' ? String(props.gpxzApiKey || '') : '';
 
-    const effectiveBiomeId = beamNGBiomeId.value || beamNGBiomeOptions[0]?.id;
-
     console.log(`${BEAMNG_EXPORT_UI_LOG} Effective export options:`, {
       baseTexture: effectiveBaseTexture,
       pbrSource: effectivePbrSource,
@@ -938,7 +914,6 @@ const handleBeamNGLevelExport = async () => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       includeRocks: effectiveIncludeRocks,
-      biomeId: effectiveBiomeId,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
       requestedResolution: props.resolution,
@@ -957,7 +932,6 @@ const handleBeamNGLevelExport = async () => {
       includeTrees: effectiveIncludeTrees,
       includeRocks: effectiveIncludeRocks,
       roadType: effectiveRoadType,
-      biomeId: effectiveBiomeId,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
       requestedResolution: props.resolution,
