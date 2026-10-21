@@ -31,6 +31,10 @@ import { generateRoadLamps } from './streetLamps.js';
 import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS } from './beamngSidewalks.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
+  solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck,
+  liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE,
+} from './beamngBridges.js';
+import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
 } from './beamngPropLibrary.js';
 import {
@@ -690,6 +694,78 @@ function generatePowerWireDAEs(wires) {
     const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
     if (result?.data) out.push({ key, data: result.data });
     geo.dispose();
+  }
+  return out;
+}
+
+const BRIDGE_TILE_M = 512;
+export const BRIDGE_MATERIAL = 'mapng_bridge_concrete';
+
+/** Bridge concrete material (BeamNG's shared plain concrete). */
+function getBridgeMaterialDefs() {
+  const T = '/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain';
+  return {
+    [BRIDGE_MATERIAL]: {
+      name: BRIDGE_MATERIAL,
+      mapTo: BRIDGE_MATERIAL,
+      class: 'Material',
+      version: 1.5,
+      annotation: 'CONCRETE',
+      groundType: 'CONCRETE',
+      Stages: [{
+        ambientOcclusionMap: `${T}_ao.data.png`,
+        baseColorMap: `${T}_b.color.png`,
+        normalMap: `${T}_nm.normal.png`,
+        roughnessMap: `${T}_r.data.png`,
+        pixelSpecular: true,
+      }, {}, {}, {}],
+      translucentBlendOp: 'None',
+    },
+  };
+}
+
+/**
+ * Solved bridge decks as Collada shapes per BRIDGE_TILE_M tile (one object
+ * each, culled by tile): visual mesh + a Colmesh-1 collision copy.
+ */
+function generateBridgeDAEs(decks, groundAt, roadLines) {
+  const tiles = new Map();
+  for (const deck of decks) {
+    const p0 = deck.parts[0]?.xy?.[0];
+    if (!p0) continue;
+    const key = `${Math.floor(p0[0] / BRIDGE_TILE_M)}_${Math.floor(p0[1] / BRIDGE_TILE_M)}`.replace(/-/g, 'm');
+    if (!tiles.has(key)) tiles.set(key, { positions: [], uvs: [] });
+    const g = buildDeckGeometry(deck, { groundAt, roadLines });
+    const t = tiles.get(key);
+    for (const v of g.positions) t.positions.push(v);
+    for (const v of g.uvs) t.uvs.push(v);
+  }
+  const out = [];
+  for (const [key, { positions, uvs }] of tiles) {
+    if (!positions.length) continue;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: BRIDGE_MATERIAL }));
+    mesh.name = 'bridge_decks';
+    const colGeo = new THREE.BufferGeometry();
+    colGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    colGeo.name = 'Colmesh-1';
+    const collision = new THREE.Mesh(colGeo, new THREE.MeshBasicMaterial({ name: BRIDGE_MATERIAL }));
+    collision.name = 'Colmesh-1';
+    const base00 = new THREE.Group();
+    base00.name = 'base00';
+    const start01 = new THREE.Group();
+    start01.name = 'start01';
+    start01.add(mesh);
+    start01.add(collision);
+    base00.add(start01);
+    base00.updateMatrixWorld(true);
+    const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
+    if (result?.data) out.push({ key, data: result.data, triangles: positions.length / 9 });
+    geo.dispose();
+    colGeo.dispose();
   }
   return out;
 }
@@ -2254,6 +2330,261 @@ function getMarkingStyle(roadRules) {
   return !roadRules?.countryCode || roadRules.region === 'Americas' ? 'americas' : 'white';
 }
 
+const isBridgeRoad = (tags = {}) => (
+  (!!tags.bridge && tags.bridge !== 'no')
+  || tags.man_made === 'bridge'
+  || tags.location === 'elevated'
+  || tags.location === 'overground'
+);
+
+// Half widths (m) for linear waterways when deciding what a bridge is over.
+const WATERWAY_HALF_M = { river: 10, canal: 6, stream: 2, drain: 1, ditch: 1 };
+
+/** wetAt(x, y): OSM water (areas, and rivers / streams by a typical width). */
+function buildWaterLookup(terrainData, squareSize) {
+  const CELL = 64;
+  const cells = new Map();
+  const add = (box, item) => {
+    for (let cx = Math.floor(box[0] / CELL); cx <= Math.floor(box[2] / CELL); cx++) {
+      for (let cy = Math.floor(box[1] / CELL); cy <= Math.floor(box[3] / CELL); cy++) {
+        const k = `${cx},${cy}`;
+        if (!cells.has(k)) cells.set(k, []);
+        cells.get(k).push(item);
+      }
+    }
+  };
+  for (const f of terrainData.osmFeatures || []) {
+    if (f.type !== 'water' || !Array.isArray(f.geometry) || f.geometry.length < 2) continue;
+    const xy = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
+    const waterway = f.tags?.waterway;
+    const half = WATERWAY_HALF_M[waterway];
+    const closed = xy.length > 3 && Math.hypot(xy[0][0] - xy[xy.length - 1][0], xy[0][1] - xy[xy.length - 1][1]) < 0.5;
+    const pad = half ?? 0;
+    const box = [
+      Math.min(...xy.map((p) => p[0])) - pad, Math.min(...xy.map((p) => p[1])) - pad,
+      Math.max(...xy.map((p) => p[0])) + pad, Math.max(...xy.map((p) => p[1])) + pad,
+    ];
+    if (half != null && !closed) add(box, { line: xy, half });
+    else if (closed) add(box, { ring: xy, holes: (f.holes || []).map((h) => h.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0))) });
+  }
+  const inRing = (x, y, ring) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i];
+      const [xj, yj] = ring[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  return (x, y) => {
+    for (const item of cells.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || []) {
+      if (item.ring) {
+        if (inRing(x, y, item.ring) && !item.holes.some((h) => inRing(x, y, h))) return true;
+        continue;
+      }
+      const q = item.line;
+      for (let i = 0; i + 1 < q.length; i++) {
+        const vx = q[i + 1][0] - q[i][0]; const vy = q[i + 1][1] - q[i][1];
+        const L2 = vx * vx + vy * vy || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - q[i][0]) * vx + (y - q[i][1]) * vy) / L2));
+        if (Math.hypot(q[i][0] + vx * t - x, q[i][1] + vy * t - y) < item.half) return true;
+      }
+    }
+    return false;
+  };
+}
+
+/**
+ * Bridge decks for the drawn road segments (services/beamngBridges.js):
+ * Map segIndex → solved part ({ xy, z, half }), and the decks. A deck that
+ * cannot clear what it crosses gets approach embankments raised into the
+ * terrain (terrainData.heightMap is replaced by a raised copy, never edited
+ * in place: it is shared with the app's own terrain), then all are re-solved.
+ */
+function solveExportBridges(drivableRoads, terrainData, squareSize) {
+  const toXY = (geometry) => geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
+  const groundAt = (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize);
+  const wetAt = buildWaterLookup(terrainData, squareSize);
+  // OSM is clipped to the map: a bridge running on past the edge ends there,
+  // but that end is no abutment.
+  const edge = (terrainData.width * squareSize) / 2 - 3;
+  const isFreeEnd = (x, y) => Math.abs(x) >= edge || Math.abs(y) >= edge;
+  const collect = () => {
+    const parts = [];
+    const partSeg = [];
+    const lowerRoads = [];
+    drivableRoads.forEach((seg, segIndex) => {
+      const tags = seg.sourceFeature?.tags || {};
+      if (!shouldGenerateDecalRoads(seg.highway, tags) || !Array.isArray(seg.geometry) || seg.geometry.length < 2) return;
+      const xy = toXY(seg.geometry);
+      const layer = getEffectiveRoadLayer(tags);
+      if (isBridgeRoad(tags)) {
+        parts.push({ xy: xy.map(([x, y]) => [x, y]), half: 4, layer: Math.max(1, layer) });
+        partSeg.push(segIndex);
+      } else {
+        lowerRoads.push({
+          layer: Math.min(layer, 0),
+          xy: xy.map(([x, y]) => [x, y, groundAt(x, y)]),
+          half: (HIGHWAY_STYLE[seg.highway] ?? DEFAULT_ROAD_STYLE).width ?? 4,
+        });
+      }
+    });
+    return { parts, partSeg, lowerRoads };
+  };
+  let { parts, partSeg, lowerRoads } = collect();
+  const bySeg = new Map();
+  if (!parts.length) return { bySeg, decks: [], roadLines: [] };
+  let decks = solveBridgeDecks(parts, { groundAt, wetAt, lowerRoads, isFreeEnd });
+
+  // Embankments for the decks that fall short.
+  const ramps = [];
+  for (const deck of decks) {
+    if (!(deck.shortfall > 0.3)) continue;
+    for (const [ax, ay] of deck.abutments) {
+      const near = lowerRoads.filter((r) => {
+        const a = r.xy[0];
+        const b = r.xy[r.xy.length - 1];
+        return Math.hypot(a[0] - ax, a[1] - ay) < 1.5 || Math.hypot(b[0] - ax, b[1] - ay) < 1.5;
+      });
+      if (near.length !== 1) continue;   // a junction at the abutment: no ramp
+      // The approach: this road and on through plain continuations (one road
+      // in, one out) until there is room for the highest ramp, or a junction.
+      const want = rampLength(liftFor(deck.shortfall, Infinity)) + 10;
+      const line = [];
+      let road = near[0];
+      let from = [ax, ay];
+      const used = new Set();
+      let available = 0;
+      while (road && available < want) {
+        used.add(road);
+        const piece = Math.hypot(road.xy[0][0] - from[0], road.xy[0][1] - from[1]) < 1.5 ? road.xy : [...road.xy].reverse();
+        for (let i = line.length ? 1 : 0; i < piece.length; i++) {
+          if (line.length) available += Math.hypot(piece[i][0] - line[line.length - 1][0], piece[i][1] - line[line.length - 1][1]);
+          line.push(piece[i]);
+        }
+        from = piece[piece.length - 1];
+        const next = lowerRoads.filter((r) => !used.has(r) && (
+          Math.hypot(r.xy[0][0] - from[0], r.xy[0][1] - from[1]) < 1.5
+          || Math.hypot(r.xy[r.xy.length - 1][0] - from[0], r.xy[r.xy.length - 1][1] - from[1]) < 1.5));
+        road = next.length === 1 ? next[0] : null;
+      }
+      const lift = liftFor(deck.shortfall, available);
+      if (lift < 0.5) continue;
+      // The ramp follows the real ground (OSM vertices can be far apart).
+      const dense = resample(line.map(([x, y]) => [x, y]), 4).map(([x, y]) => [x, y, groundAt(x, y)]);
+      const dl = Math.hypot(dense[1][0] - dense[0][0], dense[1][1] - dense[0][1]) || 1;
+      // Every other road keeps its ground, and so does the ground under the
+      // bridges; this deck's own only on its side of the abutment (an
+      // abutment wall), so the approach comes up to meet it.
+      const own = new Set(deck.parts.map((p) => p.index));
+      const protect = [
+        ...lowerRoads.filter((r) => !used.has(r)).map((r) => ({ xy: r.xy, half: r.half })),
+        ...parts.map((p, pi) => ({ xy: p.xy, half: p.half, own: own.has(pi) })),
+      ];
+      ramps.push({
+        line: dense, lift, length: rampLength(lift), half: near[0].half, protect,
+        abutment: [ax, ay], dir: [(dense[1][0] - dense[0][0]) / dl, (dense[1][1] - dense[0][1]) / dl],
+      });
+    }
+  }
+  const built = ramps.length > 0 ? raiseApproachEmbankments(terrainData, squareSize, ramps) : 0;
+  if (built > 0) {
+    ({ parts, partSeg, lowerRoads } = collect());
+    decks = solveBridgeDecks(parts, { groundAt, wetAt, lowerRoads, isFreeEnd });
+  }
+  for (const deck of decks) for (const part of deck.parts) bySeg.set(partSeg[part.index], part);
+  return { bySeg, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built };
+}
+
+/**
+ * Raise the terrain along approach roads into ramps up to their bridge
+ * abutments: [{ line: [[x, y, z]...] from the abutment out, lift, length, half,
+ * protect: [{ xy, half }] }]. Flat across the road and a shoulder, then 1:2
+ * side slopes down to the ground; only ever raises, and never raises another
+ * road (protect): within its width the ground stays, beyond it the embankment
+ * may rise only at the side slope. Replaces terrainData.heightMap with a copy.
+ */
+function raiseApproachEmbankments(terrainData, squareSize, ramps) {
+  const { width, height, minHeight } = terrainData;
+  const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
+  const original = terrainData.heightMap;
+  const raised = Float32Array.from(original);
+  const worldSize = width * squareSize;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  // One ramp: false (and nothing raised) when it would have to hold back for
+  // another road or bridge anywhere: all or nothing, never a ridge or a step.
+  const apply = (ramp, write) => {
+    const flat = ramp.half + RAMP_SHOULDER_M;
+    const reach = flat + ramp.lift / RAMP_SIDE_SLOPE;
+    // the line up to the ramp's length, with arc lengths
+    const pts = [ramp.line[0]];
+    const s = [0];
+    for (let i = 1; i < ramp.line.length && s[s.length - 1] < ramp.length; i++) {
+      pts.push(ramp.line[i]);
+      s.push(s[s.length - 1] + Math.hypot(ramp.line[i][0] - ramp.line[i - 1][0], ramp.line[i][1] - ramp.line[i - 1][1]));
+    }
+    if (pts.length < 2) return false;
+    const xs = pts.map((p) => p[0]); const ys = pts.map((p) => p[1]);
+    const box = [Math.min(...xs) - reach, Math.min(...ys) - reach, Math.max(...xs) + reach, Math.max(...ys) + reach];
+    const [c0, r1] = toPixel(box[0], box[1]);
+    const [c1, r0] = toPixel(box[2], box[3]);
+    const protect = (ramp.protect || []).filter(({ xy }) => xy.some(([x, y]) => x >= box[0] - 50 && x <= box[2] + 50 && y >= box[1] - 50 && y <= box[3] + 50));
+    // room (m) beyond the nearest protected road's shoulder, or Infinity
+    const roomAt = (x, y) => {
+      let room = Infinity;
+      const approachSide = (x - ramp.abutment[0]) * ramp.dir[0] + (y - ramp.abutment[1]) * ramp.dir[1] >= -0.5;
+      for (const { xy, half, own } of protect) {
+        if (own && approachSide) continue;
+        for (let i = 0; i + 1 < xy.length; i++) {
+          const vx = xy[i + 1][0] - xy[i][0]; const vy = xy[i + 1][1] - xy[i][1];
+          const L2 = vx * vx + vy * vy || 1e-9;
+          const t = Math.max(0, Math.min(1, ((x - xy[i][0]) * vx + (y - xy[i][1]) * vy) / L2));
+          room = Math.min(room, Math.hypot(xy[i][0] + vx * t - x, xy[i][1] + vy * t - y) - half - RAMP_SHOULDER_M);
+        }
+      }
+      return room;
+    };
+    for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+      for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+        const [x, y] = toWorld(c, r);
+        let best = Infinity;
+        let along = 0;
+        let roadZ = 0;
+        for (let i = 0; i + 1 < pts.length; i++) {
+          const vx = pts[i + 1][0] - pts[i][0]; const vy = pts[i + 1][1] - pts[i][1];
+          const L2 = vx * vx + vy * vy || 1e-9;
+          const t = Math.max(0, Math.min(1, ((x - pts[i][0]) * vx + (y - pts[i][1]) * vy) / L2));
+          const d = Math.hypot(pts[i][0] + vx * t - x, pts[i][1] + vy * t - y);
+          if (d < best) {
+            best = d;
+            along = s[i] + t * (s[i + 1] - s[i]);
+            roadZ = pts[i][2] + t * (pts[i + 1][2] - pts[i][2]);
+          }
+        }
+        if (best > reach || along >= ramp.length) continue;
+        const top = roadZ + rampLift(along, ramp.lift, ramp.length);
+        let target = (best <= flat ? top : top - (best - flat) * RAMP_SIDE_SLOPE) + minHeight;
+        const idx = r * width + c;
+        if (target <= raised[idx]) continue;
+        const room = roomAt(x, y);
+        if (room < 0 || original[idx] + room * RAMP_SIDE_SLOPE < target) {
+          if (target - original[idx] > 0.05) return false;
+          continue;
+        }
+        if (write) raised[idx] = Math.min(target, maxHeight);
+      }
+    }
+    return true;
+  };
+  let built = 0;
+  for (const ramp of ramps) {
+    if (apply(ramp, false)) { apply(ramp, true); built++; }
+  }
+  terrainData.heightMap = raised;
+  return built;
+}
+
 export function generateDecalRoads(terrainData, squareSize) {
   if (!terrainData.osmFeatures?.length) return [];
 
@@ -2269,6 +2600,8 @@ export function generateDecalRoads(terrainData, squareSize) {
     { styleKeyResolver: getDecalMergeStyleKey },
   );
   const drivableRoads = mergedRoadSegments.length > 0 ? mergedRoadSegments : roadNetwork.segments;
+  // Bridge decks first: the road nodes on a bridge ride on its deck.
+  const bridges = solveExportBridges(drivableRoads, terrainData, squareSize);
   const stableHalfWidthMap = buildStableDecalHalfWidthMap(drivableRoads);
   const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures);
   const giveWayKeys = collectGiveWayNodeKeys(terrainData.osmFeatures);
@@ -2369,7 +2702,9 @@ export function generateDecalRoads(terrainData, squareSize) {
         // geoToWorldPoint, not geoToWorld: the latter quantizes X/Y/Z to 0.1 m,
         // which at 2 m node spacing puts visible lateral jitter into the spline
         // (and its painted lines). Road nodes are mm-rounded below instead.
-        const [wx, wy, wz] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
+        const [wx, wy, groundZ] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
+        const deckPart = bridges.bySeg.get(segIndex);
+        const wz = deckPart ? deckHeightAt(deckPart, wx, wy) + 0.1 : groundZ;
         // Defense in depth: a non-finite node becomes an inf DecalRoad position
         // that BeamNG rejects at batch build, taking the whole road down. Source
         // geometry is already sanitized in buildRoadNetwork; skip here too so no
@@ -2387,9 +2722,12 @@ export function generateDecalRoads(terrainData, squareSize) {
       // ROAD_NODE_SPACING_M before world conversion), so no decimation here.
       const centerNodes = rawNodes;
       if (centerNodes.length < 2) continue;
+      const bridgePart = bridges.bySeg.get(segIndex);
+      if (bridgePart) bridgePart.half = styleHalfWidth;
       carriageways.push({
         owner: segIndex, nodes: centerNodes, half: styleHalfWidth,
         tags: renderTags, highway, urban: urbanRoad, wayId: feature.id, oneWay: isOneWay,
+        bridge: !!bridgePart,
       });
 
       const layeredDecals = getLayeredRoadDecals(
@@ -2456,6 +2794,7 @@ export function generateDecalRoads(terrainData, squareSize) {
       .flatMap((owners) => [...owners].filter((o) => o !== cw.owner));
   }
   Object.defineProperty(groups, 'carriageways', { value: carriageways, enumerable: false });
+  Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
   return groups;
 }
@@ -4175,7 +4514,7 @@ function collectMappedStreetProps(terrainData, squareSize) {
   return out;
 }
 
-function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], props = null } = {}) {
+function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], props = null, underDeck = () => false } = {}) {
   const profile = getStreetFurnitureProfile(biome);
   if (!profile) return [];
 
@@ -4200,6 +4539,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     const asset = profile.lamp;
     if (!asset?.shapeFile || lampCount >= LAMP_LIMIT) return;
     const z = getTerrainHeightAtWorldXY(posX, posY, terrainData, squareSize);
+    if (underDeck(posX, posY, z, z + (asset.lightHeight ?? 6) + 1)) return;
     objects.push({
       __parent: 'street_furniture',
       class: 'TSStatic',
@@ -5975,8 +6315,21 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const decalRoads = includeRoads
     ? generateDecalRoads(exportTerrainData, squareSize)
     : [];
+  // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
+  // props, lamps) is built along them, nothing tall stands up into them.
+  const bridgeDecks = decalRoads.bridges?.decks || [];
+  const groundCarriageways = (decalRoads.carriageways || []).filter((cw) => !cw.bridge);
+  const underDeck = (x, y, z, zTop) => bridgeDecks.length > 0 && hitsDeck(bridgeDecks, x, y, z, zTop);
+  const bridgeDaes = generateBridgeDAEs(
+    bridgeDecks,
+    (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+    decalRoads.bridges?.roadLines || [],
+  );
+  if (bridgeDecks.length > 0) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles in ${bridgeDaes.length} tile(s).`);
+  }
   const sidewalks = includeRoads && includeSidewalks
-    ? buildSidewalkMeshes(decalRoads.carriageways || [], { zones: decalRoads.crosswalkZones || [] })
+    ? buildSidewalkMeshes(groundCarriageways, { zones: decalRoads.crosswalkZones || [] })
     : { meshes: [], runs: [], triangles: 0 };
   if (sidewalks.runs.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
@@ -5988,13 +6341,16 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const mappedStreetProps = collectMappedStreetProps(exportTerrainData, squareSize);
   const streetProps = includeRoads
     ? placeStreetProps({
-      carriageways: decalRoads.carriageways || [],
+      carriageways: groundCarriageways,
       runs: sidewalks.runs,
       mapped: mappedStreetProps,
       heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       townPoles: center.lat > 24 && center.lng > -170 && center.lng < -50,
+      isBlocked: underDeck,
     })
     : { hydrants: [], bins: [], benches: [], poles: [], wires: [] };
+  // A wire passing just under (or through) a deck is left out.
+  streetProps.wires = streetProps.wires.filter((w) => !w.some(([x, y, z]) => underDeck(x, y, z - 1.5, z + 1.5)));
   const powerWireDaes = generatePowerWireDAEs(streetProps.wires);
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Street props: ${streetProps.hydrants.length} hydrants, ${streetProps.bins.length} bins, ${streetProps.benches.length} benches, ${streetProps.poles.length} poles, ${streetProps.wires.length} wires in ${powerWireDaes.length} tile(s).`);
 
@@ -6094,8 +6450,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }));
   const trafficSignalObjects = buildTrafficSignalObjects(signalProps);
   const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome, {
-    carriageways: decalRoads.carriageways || [],
+    carriageways: groundCarriageways,
     props: streetProps,
+    underDeck,
   });
   const { objects: fuelStationObjects, facilities: fuelStationFacilities } =
     buildFuelStations(exportTerrainData, squareSize);
@@ -6445,6 +6802,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const terrainHeightmapData = await toZipBinary(heightmapBlob);
   const osmDaeData = await toZipBinary(osmDaeBlob);
   const sidewalksDaeData = await toZipBinary(sidewalksDae);
+  if (bridgeDaes.length > 0) {
+    zip.folder(`${base}/map_assets/custom_assets/bridges`);
+    for (const { key, data } of bridgeDaes) {
+      zip.file(`${base}/map_assets/custom_assets/bridges/bridges_${key}.dae`, await toZipBinary(data));
+    }
+    zip.file(`${base}/map_assets/custom_assets/bridges/main.materials.json`, JSON.stringify(getBridgeMaterialDefs(), null, 2));
+  }
   if (powerWireDaes.length > 0) {
     zip.folder(`${base}/map_assets/custom_assets/power_lines`);
     for (const { key, data } of powerWireDaes) {
@@ -6927,6 +7291,22 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       shapeName: `/levels/${levelName}/map_assets/custom_assets/sidewalks/sidewalks.dae`,
       collisionType: 'Collision Mesh',
       decalType: 'None',
+      prebuildCollisionData: 0,
+      useInstanceRenderData: true,
+    });
+  }
+
+  // Bridge decks, one object per tile. They collide, and the road decals on
+  // them project onto their tops (no decalType: None here).
+  for (const { key } of bridgeDaes) {
+    levelObjectItems.push({
+      __parent: 'level_objects',
+      class: 'TSStatic',
+      name: `bridges_${key}`,
+      persistentId: generatePersistentId(),
+      position: [0, 0, 0],
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/bridges/bridges_${key}.dae`,
+      collisionType: 'Collision Mesh',
       prebuildCollisionData: 0,
       useInstanceRenderData: true,
     });

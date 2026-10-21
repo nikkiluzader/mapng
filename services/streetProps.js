@@ -46,6 +46,7 @@ export const POLE_LAMP_Z = 7.0;
 export const POLE_LAMP_REACH_M = 2.8;
 
 const MAX_POLES = 8000;
+const POLE_TOP_M = 9.3;
 
 const BUCKET_M = 8;
 
@@ -323,9 +324,10 @@ export function buildChains(carriageways) {
  *   mapped: { hydrants, bins, benches: [[x, y]], powerLines: [[[x, y, z]...]], poles: [[x, y, z]] }
  *   heightAt(x, y): terrain height
  *   townPoles: wooden poles with cobra-head lamps along unlit town streets (North America)
+ *   isBlocked(x, y, z, zTop): no pole there (under a bridge deck)
  * Returns { hydrants, bins, benches: [{ x, y, z, yaw }], poles: [{ x, y, z, yaw, lamp }], wires }.
  */
-export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, heightAt = () => 0, townPoles = false } = {}) {
+export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, heightAt = () => 0, townPoles = false, isBlocked = () => false } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const byOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
   const swZ = sidewalkHeightLookup(runs);
@@ -385,6 +387,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   for (const p of poles) poleTaken.add(p.x, p.y);
   for (const [x, y, z] of mapped.poles || []) {
     if (poleTaken.near(x, y, 1.5) || poles.length >= MAX_POLES) continue;
+    if (isBlocked(x, y, z ?? heightAt(x, y), (z ?? heightAt(x, y)) + POLE_TOP_M)) continue;
     poles.push({ x, y, z: z ?? heightAt(x, y), yaw: 0, lamp: false });
     poleTaken.add(x, y);
   }
@@ -417,6 +420,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
         || nearMappedLine(x, y, MAPPED_LINE_CLEAR_M)
         || poleTaken.near(x, y, spacing * 0.5)) continue;
       const z = (cw.urban ? swZ(x, y) : null) ?? heightAt(x, y);
+      if (isBlocked(x, y, z, z + POLE_TOP_M)) continue;
       // Cross-arm (local x) across the road, pointing away from it: the lamp's
       // arm (local -x) then reaches over the road.
       const pole = { x, y, z, yaw: Math.atan2(out[1], out[0]), lamp: cw.urban && st.k % 2 === 0 };

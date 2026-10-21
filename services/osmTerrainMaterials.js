@@ -15,6 +15,7 @@ import {
 } from './beamngBiomeCatalog.js';
 import { TERRAIN_MATERIAL_LIBRARY } from './beamngTerrainMaterialLibrary.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
+import { getEffectiveRoadLayer } from './roadNetwork.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–8 = BeamNG-referenced materials.
@@ -649,6 +650,10 @@ function buildOSMLayerMap(terrainData, worldSize) {
     const highway = tags.highway;
     const style = ROAD_STYLE[highway];
     if (!style) continue;
+    // Bridges and tunnels are not on the ground: no asphalt in the river
+    // under a bridge or across the hill over a tunnel.
+    const layer = getEffectiveRoadLayer(tags);
+    if (layer >= 1 || layer <= -1) continue;
     let halfWidthM = style.halfWidthM;
     if (style.mat === 5) {
       const { carriagewayHalfWidth } = estimateRoadCrossSection(tags, highway, isOneWayRoad(tags), {
