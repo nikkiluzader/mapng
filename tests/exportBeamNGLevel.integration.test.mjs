@@ -229,7 +229,7 @@ function parseNDJSON(text) {
     .map((line) => JSON.parse(line));
 }
 
-async function runExportForRoadType(roadType, { includeTrees = false, pbrSource = 'none', terrainOverrides = {}, includeBuildings = false } = {}) {
+async function runExportForRoadType(roadType, { includeTrees = false, pbrSource = 'none', terrainOverrides = {}, includeBuildings = false, baseTexture = 'none' } = {}) {
   const result = await exportBeamNGLevel(
     { ...makeTerrainData(), ...terrainOverrides },
     { lat: 0.5, lng: 0.5 },
@@ -237,7 +237,7 @@ async function runExportForRoadType(roadType, { includeTrees = false, pbrSource 
       roadType,
       levelName: 'mapng_demo',
       biomeId: 'west_coast_usa',
-      baseTexture: 'none',
+      baseTexture,
       pbrSource,
       includeBuildings,
       applyFoundations: false,
@@ -627,6 +627,39 @@ test('exportBeamNGLevel scales terrain base slots in grid squares, not world met
         def.diffuseSize, worldSize,
         `${def.internalName}.diffuseSize (legacy) should be world meters (${worldSize}), got ${def.diffuseSize}`,
       );
+    }
+  } finally {
+    restorePolyfills();
+  }
+});
+
+test('exportBeamNGLevel ships a 2× base texture with spans still in grid squares', async () => {
+  const restorePolyfills = installCanvasPolyfill();
+
+  try {
+    // west_coast_usa: 2048 grid, 4096 base texture, *BaseTexSize 2048. The
+    // texture set carries the texture's pixel size, the spans the grid size.
+    const grid = makeTerrainData().width;
+    const hybrid = document.createElement('canvas');
+    hybrid.width = grid * 2;
+    hybrid.height = grid * 2;
+    const zip = await runExportForRoadType('decal', {
+      pbrSource: 'osm',
+      baseTexture: 'hybrid',
+      terrainOverrides: { hybridTextureCanvas: hybrid },
+    });
+
+    const items = parseNDJSON(await zip.file('levels/mapng_demo/main/MissionGroup/level_objects/items.level.json').async('string'));
+    const terrain = items.find((i) => i?.class === 'TerrainBlock');
+    assert.equal(terrain.baseTexSize, grid, 'TerrainBlock.baseTexSize stays the grid size');
+
+    const defs = JSON.parse(await zip.file('levels/mapng_demo/art/terrains/main.materials.json').async('string'));
+    const textureSet = Object.values(defs).find((d) => d?.class === 'TerrainMaterialTextureSet');
+    assert.deepEqual(textureSet.baseTexSize, [grid * 2, grid * 2]);
+    for (const def of Object.values(defs)) {
+      if (def?.class !== 'TerrainMaterial') continue;
+      assert.equal(def.baseColorBaseTexSize, grid, `${def.internalName} span should be the grid size`);
+      assert.equal(def.normalBaseTexSize, grid);
     }
   } finally {
     restorePolyfills();

@@ -10,16 +10,18 @@ async function cropTextureUrl(url, origWidth, origHeight, startX, startY, cropSi
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width  = cropSize;
-      canvas.height = cropSize;
-      const ctx = canvas.getContext('2d');
-      // Scale the source rect from heightmap pixel space to image pixel space
+      // Scale the source rect from heightmap pixel space to image pixel space;
+      // the crop keeps the texture's own resolution (it may be finer than the
+      // grid, baseTextureSize.js).
       const sx = startX * (img.naturalWidth  / origWidth);
       const sy = startY * (img.naturalHeight / origHeight);
       const sw = cropSize * (img.naturalWidth  / origWidth);
       const sh = cropSize * (img.naturalHeight / origHeight);
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, cropSize, cropSize);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.max(1, Math.round(sw));
+      canvas.height = Math.max(1, Math.round(sh));
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL('image/png'));
     };
     img.onerror = () => resolve(null);

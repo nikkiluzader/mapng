@@ -32,6 +32,7 @@ import {
 import { classifyError, runWithRetry } from './retryPolicy.js';
 import { createTaskQueue, createRateLimiter } from './taskQueues.js';
 import { installBatchFetchCache, clearBatchCache } from './batchCache.js';
+import { getBaseTextureSize } from './baseTextureSize.js';
 
 // ─── Grid Computation ────────────────────────────────────────────────
 
@@ -1191,9 +1192,10 @@ function createCombinedLevelContext(state) {
   const fullSize = tileSize * cols; // UI enforces a square (cols === rows) grid.
   const baseTexture = normalizeCombinedLevelOptions(state.levelOptions).baseTexture;
 
-  // Base texture canvas downscaled to fit the 8192px cap; kept an exact multiple
-  // of the column count so tiles tile cleanly with no sub-pixel seams.
-  const texTile = Math.max(1, Math.floor(Math.min(fullSize, COMBINED_TEXTURE_MAX) / cols));
+  // Base texture canvas at the level's base texture size (2× the grid up to
+  // 4096, baseTextureSize.js) within the 8192px cap; kept an exact multiple of
+  // the column count so tiles tile cleanly with no sub-pixel seams.
+  const texTile = Math.max(1, Math.floor(Math.min(getBaseTextureSize(fullSize), COMBINED_TEXTURE_MAX) / cols));
   const texSize = texTile * cols;
 
   return {
@@ -1288,6 +1290,10 @@ async function writeTileToCombinedLevel(combined, state, tile, terrainData) {
       combined.texCanvas.width = combined.texSize;
       combined.texCanvas.height = combined.texSize;
       combined.texCtx = combined.texCanvas.getContext('2d');
+      if (combined.texCtx) {
+        combined.texCtx.imageSmoothingEnabled = true;
+        combined.texCtx.imageSmoothingQuality = 'high';
+      }
     }
     const srcImg = await resolveTileTextureSource(terrainData, combined.baseTexture);
     if (srcImg && combined.texCtx) {

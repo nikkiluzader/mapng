@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import JSZip from 'jszip';
+import { chooseBaseTextureSize } from './baseTextureSize.js';
 import { encode } from 'fast-png';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { exportTer } from './exportTer.js';
@@ -398,9 +399,9 @@ async function urlToPngBlob(url) {
  * Resize a PNG blob to an exact square pixel size.
  * Required so terrain.png always matches baseTexSize in the TerrainMaterialTextureSet.
  */
-async function resizePngBlob(blob, targetSize) {
+async function resizePngBlob(blob, targetSize, bmp = null) {
   if (!blob) return blob;
-  const bmp = await createImageBitmap(blob);
+  bmp = bmp ?? await createImageBitmap(blob);
   if (bmp.width === targetSize && bmp.height === targetSize) {
     bmp.close();
     return blob;
@@ -408,9 +409,25 @@ async function resizePngBlob(blob, targetSize) {
   const canvas = document.createElement('canvas');
   canvas.width = targetSize;
   canvas.height = targetSize;
-  canvas.getContext('2d').drawImage(bmp, 0, 0, targetSize, targetSize);
+  const ctx = canvas.getContext('2d');
+  // 'high' filters downscales instead of point-sampling them (aliasing).
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bmp, 0, 0, targetSize, targetSize);
   bmp.close();
   return new Promise(r => canvas.toBlob(r, 'image/png'));
+}
+
+/**
+ * Size the base texture for a grid (chooseBaseTextureSize) and resize the
+ * blob to exactly that square; returns { blob, size }. `allowFiner: false`
+ * keeps the grid size (flat placeholder, procedural OSM texture).
+ */
+async function fitBaseTexture(blob, gridSize, { allowFiner = true } = {}) {
+  if (!blob) return { blob, size: gridSize };
+  const bmp = await createImageBitmap(blob);
+  const size = allowFiner ? chooseBaseTextureSize(bmp.width, gridSize) : gridSize;
+  return { blob: await resizePngBlob(blob, size, bmp), size };
 }
 
 /**
@@ -5845,16 +5862,24 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // next one is allocated, which is critical for 4096+ terrain grids.
 
   await yield_();
-  // BeamNG terrain material libraries must match the selected terrain resolution.
-  // Source textures may be generated/cached at lower sizes (e.g. 8192), so we
-  // always target the current export grid size here.
-  const terrainBaseTexSize = size;
+  beginStep(`Generating base texture (${baseTexture})…`, 5);
+  await yield_();
+  // The base texture may be finer than the grid (2× up to 4096 grids, as
+  // west_coast_usa: 2048 grid, 4096 base). Use that size only when the chosen
+  // texture carries the detail; the OSM texture and older 1× textures stay at
+  // the grid size. *BaseTexSize spans stay in grid squares either way.
+  let texBlob = await getTerrainTextureBlob(exportTerrainData, baseTexture);
+  const fittedTexture = await fitBaseTexture(texBlob, size, {
+    allowFiner: baseTexture !== 'none' && baseTexture !== 'osm',
+  });
+  texBlob = fittedTexture.blob;
+  const terrainBaseTexSize = fittedTexture.size;
 
   // Legacy image-based inference is no longer generated and now falls back to OSM.
   const imageCanvas = null;
   const effectivePbrSource = (pbrSource === 'image' && !imageCanvas) ? 'osm' : pbrSource;
 
-  beginStep(`Painting terrain materials (${effectivePbrSource.toUpperCase()})…`, 5);
+  beginStep(`Painting terrain materials (${effectivePbrSource.toUpperCase()})…`, 15);
   const pbrResult = effectivePbrSource !== 'none'
     ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, biome, terrainBaseTexSize, {
         pbrSource: effectivePbrSource,
@@ -5862,21 +5887,12 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       })
     : null;
 
-  beginStep(`Exporting terrain binary (.ter, ${size}x${size})…`, 20);
+  beginStep(`Exporting terrain binary (.ter, ${size}x${size})…`, 30);
   await yield_();
   const { blob: terBlob } = await exportTer(exportTerrainData, {
     layerMap: pbrResult?.layerMap ?? null,
     materialNames: pbrResult?.materialNames ?? null,
   });
-
-  beginStep(`Generating base texture (${baseTexture}, ${terrainBaseTexSize}px)…`, 35);
-  await yield_();
-  let texBlob = await getTerrainTextureBlob(exportTerrainData, baseTexture);
-  // terrain.png must be exactly baseTexSize pixels — TerrainBlock +
-  // TerrainMaterialTextureSet expect a consistent base texture size.
-  if (texBlob) {
-    texBlob = await resizePngBlob(texBlob, terrainBaseTexSize);
-  }
 
   beginStep(`Generating heightmap preview (${size}x${size})…`, 50);
   await yield_();

@@ -10,6 +10,7 @@
  */
 import proj4 from 'proj4';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
+import { sampleSatelliteTexture } from './satelliteImageSampler.js';
 
 const DEBUG_RESAMPLER = false;
 const debugLog = (...args) => {
@@ -166,27 +167,39 @@ const sampleTerrarium = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng,
 };
 
 // ─── Satellite Pixel Sampler ─────────────────────────────────────────────────
-const writeSampledImagePixel = (out, outIndex, pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng) => {
-    const p = project(lat, lng, zoom);
-    const localX = p.x - minTileX * TILE_SIZE;
-    const localY = p.y - minTileY * TILE_SIZE;
-
-    const x = Math.floor(localX);
-    const y = Math.floor(localY);
-
-    if (x < 0 || x >= imgW || y < 0 || y >= imgH) {
-        out[outIndex] = 0;
-        out[outIndex + 1] = 0;
-        out[outIndex + 2] = 0;
-        out[outIndex + 3] = 255;
-        return;
+// Satellite texture at imageWidth × imageHeight (may be finer than the grid,
+// baseTextureSize.js). If the larger buffer cannot be allocated, fall back to
+// one texel per grid square rather than failing the whole run.
+const resampleSatelliteImage = ({ width, height, imageWidth, imageHeight, toWGS84, targetBounds, imageSource }) => {
+    let outWidth = imageWidth || width;
+    let outHeight = imageHeight || height;
+    let out;
+    try {
+        out = new Uint8ClampedArray(outWidth * outHeight * 4);
+    } catch (err) {
+        if (outWidth === width && outHeight === height) throw err;
+        console.warn(`[ResamplerWorker] ${outWidth}x${outHeight} satellite texture could not be allocated; using ${width}x${height}`);
+        outWidth = width;
+        outHeight = height;
+        out = new Uint8ClampedArray(outWidth * outHeight * 4);
     }
-
-    const i = (y * imgW + x) * 4;
-    out[outIndex] = pixels[i];
-    out[outIndex + 1] = pixels[i + 1];
-    out[outIndex + 2] = pixels[i + 2];
-    out[outIndex + 3] = pixels[i + 3];
+    const originX = imageSource.minTileX * TILE_SIZE;
+    const originY = imageSource.minTileY * TILE_SIZE;
+    const gridToMosaic = (gx, gy) => {
+        const [lng, lat] = getPixelLatLng(gx, gy, width, height, toWGS84, targetBounds);
+        const p = project(lat, lng, imageSource.zoom);
+        return [p.x - originX, p.y - originY];
+    };
+    sampleSatelliteTexture({
+        width,
+        height,
+        outWidth,
+        outHeight,
+        mosaic: { pixels: imageSource.pixels, width: imageSource.width, height: imageSource.height },
+        gridToMosaic,
+        out,
+    });
+    return { rgbaBuffer: out, imageWidth: outWidth, imageHeight: outHeight };
 };
 
 /**
@@ -1137,9 +1150,8 @@ const resampleHeight = async ({ id, center, width, height, targetBounds = null, 
     };
 };
 
-const resampleHeightAndImage = async ({ id, center, width, height, targetBounds = null, smooth, fillHoles = true, expandFilledGaps = true, tiles, fallback, epsgDefs, imageSource, flat = false, gapFillTiles = null, gapFillEpsgDefs = null }) => {
+const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, imageHeight, targetBounds = null, smooth, fillHoles = true, expandFilledGaps = true, tiles, fallback, epsgDefs, imageSource, flat = false, gapFillTiles = null, gapFillEpsgDefs = null }) => {
     const heightMap = new Float32Array(width * height);
-    const rgbaBuffer = new Uint8ClampedArray(width * height * 4);
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
     const NO_DATA = -99999;
     const reportProgress = createProgressReporter(id);
@@ -1154,42 +1166,31 @@ const resampleHeightAndImage = async ({ id, center, width, height, targetBounds 
         reportProgress({ stage: 'prepare', message: 'Uploaded elevation tiles ready.', current: 1, total: 1, force: true });
     }
 
-    for (let y = 0; y < height; y++) {
-        const rowOffset = y * width;
-        const rowPixelOffset = rowOffset * 4;
-        for (let x = 0; x < width; x++) {
-            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
-
-            if (!flat) {
+    if (!flat) {
+        for (let y = 0; y < height; y++) {
+            const rowOffset = y * width;
+            for (let x = 0; x < width; x++) {
+                const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
                 // Gap-fill is sampled and blended in afterwards, not inline, so
                 // the seam between the two sources can be joined smoothly.
                 let h = sampleHeightAt(lng, lat, preparedGroups, null, NO_DATA);
                 if (!Number.isFinite(h) || h <= -200 || h === NO_DATA) h = NO_DATA;
                 heightMap[rowOffset + x] = h;
             }
-
-            writeSampledImagePixel(
-                rgbaBuffer,
-                rowPixelOffset + x * 4,
-                imageSource.pixels,
-                imageSource.width,
-                imageSource.height,
-                imageSource.zoom,
-                imageSource.minTileX,
-                imageSource.minTileY,
-                lat,
-                lng,
-            );
-        }
-        if ((y & 31) === 31 || y === height - 1) {
-            reportProgress({
-                stage: 'sample-height-image',
-                message: flat ? 'Mapping satellite imagery to the output grid...' : 'Mapping uploaded elevation to the output grid...',
-                current: y + 1,
-                total: height,
-            });
+            if ((y & 31) === 31 || y === height - 1) {
+                reportProgress({
+                    stage: 'sample-height-image',
+                    message: 'Mapping uploaded elevation to the output grid...',
+                    current: y + 1,
+                    total: height,
+                });
+            }
         }
     }
+
+    reportProgress({ stage: 'sample-image', message: 'Mapping satellite imagery to the output grid...', current: 0, total: 1, force: true });
+    const image = resampleSatelliteImage({ width, height, imageWidth, imageHeight, toWGS84, targetBounds, imageSource });
+    reportProgress({ stage: 'sample-image', message: 'Mapping satellite imagery to the output grid...', current: 1, total: 1, force: true });
 
     if (!flat) {
         fillFromLayerStack(heightMap, width, height, NO_DATA, layerStack, toWGS84, targetBounds, reportProgress);
@@ -1199,36 +1200,17 @@ const resampleHeightAndImage = async ({ id, center, width, height, targetBounds 
 
     return {
         heightMap,
-        rgbaBuffer,
+        rgbaBuffer: image.rgbaBuffer,
+        imageWidth: image.imageWidth,
+        imageHeight: image.imageHeight,
         bounds: getOutputBounds(toWGS84, width, height, targetBounds),
     };
 };
 
 // ─── Image Resampling ────────────────────────────────────────────────────────
-const resampleImageData = ({ center, width, height, targetBounds = null, imageSource }) => {
-    const rgbaBuffer = new Uint8ClampedArray(width * height * 4);
+const resampleImageData = ({ center, width, height, imageWidth, imageHeight, targetBounds = null, imageSource }) => {
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
-
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
-            const idx = (y * width + x) * 4;
-            writeSampledImagePixel(
-                rgbaBuffer,
-                idx,
-                imageSource.pixels,
-                imageSource.width,
-                imageSource.height,
-                imageSource.zoom,
-                imageSource.minTileX,
-                imageSource.minTileY,
-                lat,
-                lng,
-            );
-        }
-    }
-
-    return rgbaBuffer;
+    return resampleSatelliteImage({ width, height, imageWidth, imageHeight, toWGS84, targetBounds, imageSource });
 };
 
 // ─── Uploaded raster cache ───────────────────────────────────────────────────
@@ -1281,6 +1263,8 @@ self.onmessage = async (e) => {
                     type: 'result',
                     heightMap: result.heightMap,
                     rgbaBuffer: result.rgbaBuffer,
+                    imageWidth: result.imageWidth,
+                    imageHeight: result.imageHeight,
                     bounds: result.bounds,
                 },
                 [result.heightMap.buffer, result.rgbaBuffer.buffer]
@@ -1288,8 +1272,8 @@ self.onmessage = async (e) => {
         } else if (type === 'resampleImage') {
             const result = resampleImageData(params);
             self.postMessage(
-                { id, type: 'result', rgbaBuffer: result },
-                [result.buffer]
+                { id, type: 'result', rgbaBuffer: result.rgbaBuffer, imageWidth: result.imageWidth, imageHeight: result.imageHeight },
+                [result.rgbaBuffer.buffer]
             );
         }
     } catch (err) {

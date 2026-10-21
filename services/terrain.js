@@ -20,12 +20,16 @@ import { createLocalToWGS84 } from "./geoUtils.js";
 import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
 import { smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { scaleNativeDimsToProcessingMpp } from "./uploadBounds.js";
+import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSize.js";
 
 // Constants
 const TILE_SIZE = 256;
 export const TERRAIN_ZOOM = 15; // Fixed high detail zoom level for Terrain
 const SATELLITE_ZOOM = 17; // Higher detail zoom level for Satellite (approx 1.2m/px)
 const MIN_SATELLITE_ZOOM = 0;
+// Esri World Imagery serves z18/z19 (~0.6/0.3 m) over most built-up areas; a
+// 2× base texture (baseTextureSize.js) asks for one zoom more than 1× would.
+const MAX_SATELLITE_ZOOM = 19;
 export const TILE_API_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium";
 const SATELLITE_API_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile";
@@ -451,11 +455,65 @@ export const repairTerrariumBlendedTiles = async ({
   return { tiles, pixels };
 };
 
-const getSatelliteZoomForProcessingMpp = (processingMetersPerPixel = 1) => {
+const getSatelliteZoomForProcessingMpp = (processingMetersPerPixel = 1, textureScale = 1) => {
   const mpp = Number(processingMetersPerPixel);
   const normalizedMpp = Number.isFinite(mpp) && mpp > 0 ? mpp : 1;
   const reduction = normalizedMpp > 1 ? Math.floor(normalizedMpp / 4) : 0;
-  return Math.max(MIN_SATELLITE_ZOOM, SATELLITE_ZOOM - reduction);
+  const extra = textureScale > 1 ? Math.round(Math.log2(textureScale)) : 0;
+  return Math.min(MAX_SATELLITE_ZOOM, Math.max(MIN_SATELLITE_ZOOM, SATELLITE_ZOOM - reduction + extra));
+};
+
+/**
+ * Satellite zoom and texture size for a grid: the texture is
+ * getBaseTextureSize(grid) pixels (2× up to 4096 grids), and the zoom is the
+ * coarsest that still carries that much detail.
+ */
+const pickSatelliteTexture = (fetchBounds, processingMetersPerPixel, gridSize) => {
+  const texturePx = getBaseTextureSize(gridSize);
+  const zoom = clampSatelliteZoomForOutput(
+    fetchBounds,
+    getSatelliteZoomForProcessingMpp(processingMetersPerPixel, texturePx / Math.max(1, gridSize)),
+    texturePx,
+  );
+  return { zoom, texturePx };
+};
+
+// blankTile=false makes Esri answer 404 where it has no imagery at a zoom,
+// instead of a grey "Map data not yet available" tile that used to end up in
+// textures. The tile is then cut from the nearest ancestor that has imagery.
+const SATELLITE_ANCESTOR_LEVELS = 4;
+
+/**
+ * RGBA pixels (256×256) for satellite tile z/tx/ty, or null when neither it nor
+ * any of its SATELLITE_ANCESTOR_LEVELS ancestors loads. `ctx` is a 256×256
+ * scratch context; drawing and reading it happen in one synchronous step, so
+ * concurrent callers sharing it never interleave. `ancestorCache` (a Map)
+ * shares ancestor downloads between sibling tiles of one mosaic.
+ */
+const loadSatelliteTilePixels = async (ctx, z, tx, ty, signal, ancestorCache) => {
+  for (let step = 0; step <= SATELLITE_ANCESTOR_LEVELS && z - step >= 0; step++) {
+    const az = z - step;
+    const n = 2 ** az;
+    const ax = Math.floor(tx / 2 ** step);
+    const ay = Math.floor(ty / 2 ** step);
+    const url = `${SATELLITE_API_URL}/${az}/${ay}/${((ax % n) + n) % n}?blankTile=false`;
+    let img;
+    if (step === 0) {
+      img = await loadImage(url, signal);
+    } else {
+      if (!ancestorCache.has(url)) ancestorCache.set(url, loadImage(url, signal));
+      img = await ancestorCache.get(url);
+    }
+    if (!img) continue;
+    const span = TILE_SIZE / 2 ** step;
+    const sx = (tx - ax * 2 ** step) * span;
+    const sy = (ty - ay * 2 ** step) * span;
+    ctx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(img, sx, sy, span, span, 0, 0, TILE_SIZE, TILE_SIZE);
+    return ctx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
+  }
+  return null;
 };
 
 // Downstream consumers cap satellite-derived textures at 8192px (see
@@ -538,20 +596,16 @@ const fetchSatelliteMosaic = async (
       satRequests.push({ tx, ty });
 
   let completed = 0;
+  const ancestorCache = new Map();
   await pMap(satRequests, async ({ tx, ty }) => {
     completed++;
     if (completed % 10 === 0 || completed === satRequests.length) {
       onTileProgress?.(completed, satRequests.length);
     }
-    const numTiles = 2 ** satelliteZoom;
-    const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
-    const sImg = await loadImage(`${SATELLITE_API_URL}/${satelliteZoom}/${ty}/${wrappedTx}`, signal);
+    const tilePixels = await loadSatelliteTilePixels(tempSatCtx, satelliteZoom, tx, ty, signal, ancestorCache);
     const drawX = (tx - satMinTileX) * TILE_SIZE;
     const drawY = (ty - satMinTileY) * TILE_SIZE;
-    if (sImg) {
-      tempSatCtx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
-      tempSatCtx.drawImage(sImg, 0, 0);
-      const tilePixels = tempSatCtx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
+    if (tilePixels) {
       for (let row = 0; row < TILE_SIZE; row++) {
         const srcOff = row * TILE_SIZE * 4;
         const dstOff = ((drawY + row) * satCanvasWidth + drawX) * 4;
@@ -1479,6 +1533,14 @@ const loadImage = (url, signal) => {
 
 const SAT_TEX_MAX_SIZE = 8192;
 
+// Grids up to 4096 hand the lossless satellite canvas to the hybrid texture
+// (one JPEG generation fewer in the export path); larger grids free it at once,
+// since holding it through OSM/hybrid generation exhausted memory at 16k.
+const keepSatelliteCanvasForHybrid = (gridWidth) => gridWidth <= BASE_TEXTURE_SCALE_MAX_GRID;
+const releaseCanvas = (canvas) => {
+  if (canvas) { canvas.width = 0; canvas.height = 0; }
+};
+
 // Converts a satellite canvas to a blob URL, capping at SAT_TEX_MAX_SIZE to
 // avoid GPU upload failures at extreme resolutions (e.g. 16k dev mode).
 // Uses OffscreenCanvas.convertToBlob() when available so JPEG encoding runs
@@ -1524,7 +1586,7 @@ const canvasToSatelliteBlobUrl = async (srcCanvas) => {
       const offscreen = new OffscreenCanvas(targetW, targetH);
       offscreen.getContext('2d').drawImage(source, 0, 0);
       if (source !== srcCanvas && 'close' in source) source.close();
-      blob = await offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.9 });
+      blob = await offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.95 });
       console.log(`[Sat URL] OffscreenCanvas encode — blob=${blob ? `${(blob.size/1024).toFixed(0)} KB` : 'null'}`);
     } catch (e) {
       console.warn('[Sat URL] OffscreenCanvas path failed, falling back:', e.message);
@@ -1541,7 +1603,7 @@ const canvasToSatelliteBlobUrl = async (srcCanvas) => {
       if (scaledCtx) scaledCtx.drawImage(srcCanvas, 0, 0, targetW, targetH);
       canvas = scaled;
     }
-    blob = await new Promise(r => canvas.toBlob(b => r(b), 'image/jpeg', 0.9));
+    blob = await new Promise(r => canvas.toBlob(b => r(b), 'image/jpeg', 0.95));
     console.log(`[Sat URL] canvas.toBlob fallback — blob=${blob ? `${(blob.size/1024).toFixed(0)} KB` : 'null'}`);
     if (canvas !== srcCanvas) {
       canvas.width = 0;
@@ -1634,9 +1696,9 @@ export const fetchTerrainData = async (
         height * effectiveMetersPerPixel,
       );
 
-  const satelliteZoom = clampSatelliteZoomForOutput(
+  const { zoom: satelliteZoom, texturePx: satelliteTexturePx } = pickSatelliteTexture(
     fetchBounds,
-    getSatelliteZoomForProcessingMpp(effectiveMetersPerPixel),
+    effectiveMetersPerPixel,
     width,
   );
 
@@ -1791,6 +1853,7 @@ export const fetchTerrainData = async (
   tempSatCanvas.height = TILE_SIZE;
   const tempSatCtx = tempSatCanvas.getContext("2d", { willReadFrequently: true });
   if (!tempSatCtx) throw new Error("Failed to create satellite scratch canvas context");
+  const satAncestorCache = new Map();
 
   // Fetch tiles
 
@@ -1855,16 +1918,9 @@ export const fetchTerrainData = async (
         const drawX = (tx - satMinTileX) * TILE_SIZE;
         const drawY = (ty - satMinTileY) * TILE_SIZE;
 
-        const numTiles = Math.pow(2, satelliteZoom);
-        const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
-
-        const satUrl = `${SATELLITE_API_URL}/${satelliteZoom}/${ty}/${wrappedTx}`;
-        const sImg = await loadImage(satUrl, signal);
-        if (sImg) {
+        const tilePixels = await loadSatelliteTilePixels(tempSatCtx, satelliteZoom, tx, ty, signal, satAncestorCache);
+        if (tilePixels) {
           satTilesSucceeded++;
-          tempSatCtx.clearRect(0, 0, TILE_SIZE, TILE_SIZE);
-          tempSatCtx.drawImage(sImg, 0, 0);
-          const tilePixels = tempSatCtx.getImageData(0, 0, TILE_SIZE, TILE_SIZE).data;
           for (let row = 0; row < TILE_SIZE; row++) {
             const srcOff = row * TILE_SIZE * 4;
             const dstOff = ((drawY + row) * satCanvasWidth + drawX) * 4;
@@ -2051,6 +2107,8 @@ export const fetchTerrainData = async (
     undefined, // onProgress
     undefined, // expandFilledGaps (defaults to true)
     flat,
+    null, // gapFillData
+    { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
   );
 
   // 7. Fetch OSM Data
@@ -2089,10 +2147,8 @@ export const fetchTerrainData = async (
 
   onProgress?.("Finalizing terrain data...");
   const satelliteTextureUrl = await canvasToSatelliteBlobUrl(finalSatCanvas);
-  // Free the (potentially huge) source canvas immediately — it's no longer needed
-  // and holding onto it during OSM/hybrid texture generation exhausts memory at 16k.
-  finalSatCanvas.width = 0;
-  finalSatCanvas.height = 0;
+  const hybridSatelliteCanvas = keepSatelliteCanvasForHybrid(width) ? finalSatCanvas : null;
+  if (!hybridSatelliteCanvas) releaseCanvas(finalSatCanvas);
 
   const terrainData = {
     heightMap,
@@ -2126,7 +2182,7 @@ export const fetchTerrainData = async (
       onProgress?.("Generating Hybrid texture...");
       const hybridResult = await generateHybridTexture(
         terrainData,
-        options,
+        { ...options, satelliteCanvas: hybridSatelliteCanvas },
       );
       terrainData.hybridTextureUrl = hybridResult.url;
       terrainData.hybridTextureCanvas = hybridResult.canvas;
@@ -2135,6 +2191,7 @@ export const fetchTerrainData = async (
 
   }
 
+  releaseCanvas(hybridSatelliteCanvas);
   return terrainData;
 };
 
@@ -2258,9 +2315,9 @@ export const loadTerrainFromTif = async (
   // ── Satellite tiles (same as fetchTerrainData, no terrain tiles needed) ────
   // CPU-side mosaic: a tileCount-sized canvas goes blank on Chromium at fine
   // processing resolutions (see fetchSatelliteMosaic).
-  const satelliteZoom = clampSatelliteZoomForOutput(
+  const { zoom: satelliteZoom, texturePx: satelliteTexturePx } = pickSatelliteTexture(
     fetchBounds,
-    getSatelliteZoomForProcessingMpp(effectiveMetersPerPixel),
+    effectiveMetersPerPixel,
     width,
   );
   emitProgress({
@@ -2343,6 +2400,7 @@ export const loadTerrainFromTif = async (
       !skipGapExpansion,
       false,
       gapFillData,
+      { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
     );
     heightMap = result.heightMap;
     finalBounds = result.bounds;
@@ -2403,6 +2461,7 @@ export const loadTerrainFromTif = async (
       height,
       imageSamplerData,
       fetchBounds,
+      { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
     );
   }
 
@@ -2442,8 +2501,8 @@ export const loadTerrainFromTif = async (
 
   emitProgress('Finalizing terrain data...');
   const satelliteTextureUrl = await canvasToSatelliteBlobUrl(finalSatCanvas);
-  finalSatCanvas.width = 0;
-  finalSatCanvas.height = 0;
+  const hybridSatelliteCanvas = keepSatelliteCanvasForHybrid(width) ? finalSatCanvas : null;
+  if (!hybridSatelliteCanvas) releaseCanvas(finalSatCanvas);
 
   const terrainData = {
     heightMap, width, height, minHeight, maxHeight,
@@ -2475,13 +2534,14 @@ export const loadTerrainFromTif = async (
     }
     if (generateHybridTextureAsset) {
       onProgress?.('Generating Hybrid texture...');
-      const hybridResult = await generateHybridTexture(terrainData, options);
+      const hybridResult = await generateHybridTexture(terrainData, { ...options, satelliteCanvas: hybridSatelliteCanvas });
       terrainData.hybridTextureUrl    = hybridResult.url;
       terrainData.hybridTextureCanvas = hybridResult.canvas;
       terrainData.hybridTextureBlob   = hybridResult.blob || null;
     }
   }
 
+  releaseCanvas(hybridSatelliteCanvas);
   return terrainData;
 };
 
@@ -2552,9 +2612,9 @@ export const loadTerrainFromLaz = async (
   // ── Satellite tiles ───────────────────────────────────────────────────────
   // CPU-side mosaic: a tileCount-sized canvas goes blank on Chromium at fine
   // processing resolutions (see fetchSatelliteMosaic).
-  const satelliteZoom = clampSatelliteZoomForOutput(
+  const { zoom: satelliteZoom, texturePx: satelliteTexturePx } = pickSatelliteTexture(
     fetchBounds,
-    getSatelliteZoomForProcessingMpp(effectiveMetersPerPixel),
+    effectiveMetersPerPixel,
     width,
   );
   onProgress?.('Downloading satellite tiles...');
@@ -2635,6 +2695,7 @@ export const loadTerrainFromLaz = async (
     height,
     imageSamplerData,
     fetchBounds,
+    { width: satelliteTexturePx, height: Math.round(satelliteTexturePx * height / width) },
   );
 
   // ── OSM ───────────────────────────────────────────────────────────────────
@@ -2671,8 +2732,8 @@ export const loadTerrainFromLaz = async (
 
   onProgress?.('Finalizing terrain data...');
   const satelliteTextureUrl = await canvasToSatelliteBlobUrl(finalSatCanvas);
-  finalSatCanvas.width = 0;
-  finalSatCanvas.height = 0;
+  const hybridSatelliteCanvas = keepSatelliteCanvasForHybrid(width) ? finalSatCanvas : null;
+  if (!hybridSatelliteCanvas) releaseCanvas(finalSatCanvas);
 
   const terrainData = {
     heightMap, width, height, minHeight, maxHeight,
@@ -2704,13 +2765,14 @@ export const loadTerrainFromLaz = async (
     }
     if (generateHybridTextureAsset) {
       onProgress?.('Generating Hybrid texture...');
-      const hybridResult = await generateHybridTexture(terrainData, options);
+      const hybridResult = await generateHybridTexture(terrainData, { ...options, satelliteCanvas: hybridSatelliteCanvas });
       terrainData.hybridTextureUrl    = hybridResult.url;
       terrainData.hybridTextureCanvas = hybridResult.canvas;
       terrainData.hybridTextureBlob   = hybridResult.blob || null;
     }
   }
 
+  releaseCanvas(hybridSatelliteCanvas);
   return terrainData;
 };
 

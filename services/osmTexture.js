@@ -1836,18 +1836,11 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
   const onProgress = options.onProgress;
   onProgress?.("Blending satellite imagery with vector overlays...");
   const MAX_TEX_SIZE = 8192;
-  const requestedSize = Number(options.outputSize || terrainData.width || 1024);
-  const targetSize = Math.max(1, Math.min(MAX_TEX_SIZE, Math.floor(requestedSize)));
-  const SCALE_FACTOR = targetSize / Math.max(1, terrainData.width);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.max(1, Math.round(terrainData.width * SCALE_FACTOR));
-  canvas.height = Math.max(1, Math.round(terrainData.height * SCALE_FACTOR));
-  console.log(`[Hybrid Texture] Generating hybrid texture ${canvas.width}x${canvas.height}`);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not get 2D context");
 
-  // Background: Satellite Image
-  if (terrainData.satelliteTextureUrl) {
+  // Background source: the lossless satellite canvas when the caller still
+  // holds it, else the satellite blob URL.
+  let satellite = options.satelliteCanvas?.width > 0 ? options.satelliteCanvas : null;
+  if (!satellite && terrainData.satelliteTextureUrl) {
     const img = new Image();
     img.src = terrainData.satelliteTextureUrl;
     const loaded = await new Promise((resolve) => {
@@ -1857,15 +1850,30 @@ export const generateHybridTexture = async (terrainData, options = {}) => {
         resolve(false);
       };
     });
-    if (loaded && img.naturalWidth > 0) {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    } else {
-      console.warn("[Hybrid Texture] Satellite image not drawable — falling back to black background");
-      ctx.fillStyle = "#000000";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-  } else {
+    if (loaded && img.naturalWidth > 0) satellite = img;
+    else console.warn("[Hybrid Texture] Satellite image not drawable — falling back to black background");
+  } else if (!satellite) {
     console.warn("[Hybrid Texture] No satelliteTextureUrl — using black background");
+  }
+
+  // Match the satellite texture's resolution (it may be finer than the grid,
+  // baseTextureSize.js) unless the caller asks for a size.
+  const satelliteWidth = satellite ? (satellite.naturalWidth || satellite.width) : 0;
+  const requestedSize = Number(options.outputSize || satelliteWidth || terrainData.width || 1024);
+  const targetSize = Math.max(1, Math.min(MAX_TEX_SIZE, Math.floor(requestedSize)));
+  const SCALE_FACTOR = targetSize / Math.max(1, terrainData.width);
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(terrainData.width * SCALE_FACTOR));
+  canvas.height = Math.max(1, Math.round(terrainData.height * SCALE_FACTOR));
+  console.log(`[Hybrid Texture] Generating hybrid texture ${canvas.width}x${canvas.height}`);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not get 2D context");
+
+  if (satellite) {
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(satellite, 0, 0, canvas.width, canvas.height);
+  } else {
     ctx.fillStyle = "#000000";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }

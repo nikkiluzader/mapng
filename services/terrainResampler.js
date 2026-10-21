@@ -556,27 +556,35 @@ export const resampleImageToMeterGrid = async (
     center,
     width,
     height,
-    targetBounds = null
+    targetBounds = null,
+    imageWidth = width,
+    imageHeight = height,
 ) => {
+    // Output pixel i sits at grid coordinate (i + 0.5) · grid / out − 0.5
+    // (satelliteImageSampler.js); at 1× that is grid point i.
+    const outW = imageWidth;
+    const outH = imageHeight;
+    const sx = width / outW;
+    const sy = height / outH;
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = outW;
+    canvas.height = outH;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error("Could not create canvas context");
     
-    const imageData = ctx.createImageData(width, height);
+    const imageData = ctx.createImageData(outW, outH);
     const data = imageData.data;
 
     // Use shared local Transverse Mercator projection
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
 
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+    for (let y = 0; y < outH; y++) {
+        for (let x = 0; x < outW; x++) {
+            const [lng, lat] = getPixelLatLng((x + 0.5) * sx - 0.5, (y + 0.5) * sy - 0.5, width, height, toWGS84, targetBounds);
             
             const color = source.sampler(lat, lng);
             
-            const idx = (y * width + x) * 4;
+            const idx = (y * outW + x) * 4;
             data[idx] = color.r;
             data[idx + 1] = color.g;
             data[idx + 2] = color.b;

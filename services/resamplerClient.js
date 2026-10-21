@@ -421,7 +421,10 @@ export const resampleHeightAndImageOffThread = async (
     expandFilledGaps = true,
     flat = false,
     gapFillData = null,
+    imageSize = null,
 ) => {
+    const imageWidth = imageSize?.width || width;
+    const imageHeight = imageSize?.height || height;
     if (getWorker() && imageSourceData) {
         try {
             let tiles = [];
@@ -460,6 +463,8 @@ export const resampleHeightAndImageOffThread = async (
                 center,
                 width,
                 height,
+                imageWidth,
+                imageHeight,
                 targetBounds,
                 smooth,
                 fillHoles,
@@ -475,12 +480,14 @@ export const resampleHeightAndImageOffThread = async (
 
             if (result) {
                 const rgba = new Uint8ClampedArray(result.rgbaBuffer.buffer || result.rgbaBuffer);
-                const midIdx = ((height >> 1) * width + (width >> 1)) * 4;
-                console.log(`[ResamplerClient] worker rgbaBuffer ${width}x${height} center: r=${rgba[midIdx]} g=${rgba[midIdx+1]} b=${rgba[midIdx+2]} a=${rgba[midIdx+3]}`);
+                const outW = result.imageWidth || width;
+                const outH = result.imageHeight || height;
+                const midIdx = ((outH >> 1) * outW + (outW >> 1)) * 4;
+                console.log(`[ResamplerClient] worker rgbaBuffer ${outW}x${outH} center: r=${rgba[midIdx]} g=${rgba[midIdx+1]} b=${rgba[midIdx+2]} a=${rgba[midIdx+3]}`);
                 return {
                     heightMap: result.heightMap,
                     bounds: result.bounds,
-                    canvas: await canvasFromRgbaBuffer(width, height, result.rgbaBuffer),
+                    canvas: await canvasFromRgbaBuffer(outW, outH, result.rgbaBuffer),
                 };
             }
         } catch (e) {
@@ -513,7 +520,7 @@ export const resampleHeightAndImageOffThread = async (
             gapFillData,
         ),
         Promise.resolve(safeImageSampler
-            ? resampleImageToMeterGrid({ sampler: safeImageSampler }, center, width, height, targetBounds)
+            ? resampleImageToMeterGrid({ sampler: safeImageSampler }, center, width, height, targetBounds, imageWidth, imageHeight)
             : null),
     ]);
 
@@ -530,8 +537,10 @@ export const resampleHeightAndImageOffThread = async (
  * @param {object|null} imageSourceData - { pixels, width, height, zoom, minTileX, minTileY }
  */
 export const resampleImageOffThread = async (
-    source, center, width, height, imageSourceData, targetBounds = null
+    source, center, width, height, imageSourceData, targetBounds = null, imageSize = null
 ) => {
+    const imageWidth = imageSize?.width || width;
+    const imageHeight = imageSize?.height || height;
     if (getWorker() && imageSourceData) {
         try {
             const result = await postToWorker({
@@ -539,12 +548,14 @@ export const resampleImageOffThread = async (
                 center,
                 width,
                 height,
+                imageWidth,
+                imageHeight,
                 targetBounds,
                 imageSource: imageSourceData,
             }, [imageSourceData.pixels.buffer]);
 
             if (result && result.rgbaBuffer) {
-                return await canvasFromRgbaBuffer(width, height, result.rgbaBuffer);
+                return await canvasFromRgbaBuffer(result.imageWidth || width, result.imageHeight || height, result.rgbaBuffer);
             }
         } catch (e) {
             console.warn('[ResamplerClient] Image resampling failed, falling back:', e);
@@ -552,5 +563,5 @@ export const resampleImageOffThread = async (
     }
 
     // Fallback: main thread
-    return resampleImageToMeterGrid(source, center, width, height, targetBounds);
+    return resampleImageToMeterGrid(source, center, width, height, targetBounds, imageWidth, imageHeight);
 };

@@ -752,7 +752,74 @@ function buildLayerMapFromImage(canvas, terrainSize) {
 // These are generated at baseSize to match the TerrainMaterialTextureSet.
 // Only 6 textures total regardless of how many materials are used.
 
+// ── Solid-colour PNG without a canvas ──────────────────────────────────────
+// The shared base slots must match the texture set's baseTexSize (up to 8192),
+// but they are one flat colour: drawing them on a canvas held a 256 MB RGBA
+// buffer each for a PNG of a few hundred KB. Rows are streamed through
+// CompressionStream instead; without it, fall back to a canvas.
+
+const CRC_TABLE = (() => {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function crc32(bytes, crc = 0xffffffff) {
+  for (let i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+  return crc;
+}
+
+function pngChunk(type, data) {
+  const out = new Uint8Array(12 + data.length);
+  const view = new DataView(out.buffer);
+  view.setUint32(0, data.length);
+  for (let i = 0; i < 4; i++) out[4 + i] = type.charCodeAt(i);
+  out.set(data, 8);
+  view.setUint32(8 + data.length, (crc32(out.subarray(4, 8 + data.length)) ^ 0xffffffff) >>> 0);
+  return out;
+}
+
+export async function solidColorPngBlob(size, [r, g, b]) {
+  if (typeof CompressionStream === 'undefined') return null;
+  const rowLength = 1 + size * 3;                  // filter byte 0 + RGB
+  const rowsPerChunk = Math.max(1, Math.min(size, Math.floor((1 << 20) / rowLength)));
+  const chunk = new Uint8Array(rowLength * rowsPerChunk);
+  for (let y = 0; y < rowsPerChunk; y++) {
+    for (let i = y * rowLength + 1; i < (y + 1) * rowLength; i += 3) {
+      chunk[i] = r; chunk[i + 1] = g; chunk[i + 2] = b;
+    }
+  }
+  const zlib = new CompressionStream('deflate');
+  const compressed = new Response(zlib.readable).arrayBuffer();
+  const writer = zlib.writable.getWriter();
+  // Every row is identical, so the one chunk buffer can be queued repeatedly.
+  for (let y = 0; y < size; y += rowsPerChunk) {
+    await writer.ready;
+    const rows = Math.min(rowsPerChunk, size - y);
+    writer.write(rows === rowsPerChunk ? chunk : chunk.subarray(0, rows * rowLength));
+  }
+  await writer.close();
+  const ihdr = new Uint8Array(13);
+  const view = new DataView(ihdr.buffer);
+  view.setUint32(0, size);
+  view.setUint32(4, size);
+  ihdr[8] = 8;   // bit depth
+  ihdr[9] = 2;   // colour type RGB
+  return new Blob([
+    new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', new Uint8Array(await compressed)),
+    pngChunk('IEND', new Uint8Array(0)),
+  ], { type: 'image/png' });
+}
+
 async function makeAoBlob(size = 256) {
+  const solid = await solidColorPngBlob(size, [255, 255, 255]);
+  if (solid) return solid;
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   canvas.getContext('2d').fillStyle = '#ffffff';
@@ -761,6 +828,10 @@ async function makeAoBlob(size = 256) {
 }
 
 async function makeNormalBlob(bumpiness = 0, size = 256) {
+  if (bumpiness === 0) {
+    const solid = await solidColorPngBlob(size, [128, 128, 255]);
+    if (solid) return solid;
+  }
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
@@ -811,6 +882,11 @@ async function makeNormalBlob(bumpiness = 0, size = 256) {
 }
 
 async function makeRoughnessBlob(roughness = 180, variance = 0, size = 256) {
+  if (variance === 0) {
+    const v = Math.max(0, Math.min(255, Math.round(roughness)));
+    const solid = await solidColorPngBlob(size, [v, v, v]);
+    if (solid) return solid;
+  }
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
@@ -866,7 +942,10 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
   // ("4 copies of it tiling in the main area"). The legacy v0 `diffuseSize`
   // field is the odd one out — that one really is world meters (confirmed
   // in-game on the PBR-off path), so it keeps `baseWorldSize` below.
-  const baseTexSpan = baseSize;
+  // The texture itself may be finer than the grid (baseTextureSize.js;
+  // west_coast_usa: 2048 grid, 4096 base texture, spans 2048), so the span is
+  // the grid size, not the texture size.
+  const baseTexSpan = size;
   const baseWorldSize = Number.isFinite(worldSize) && worldSize > 0 ? worldSize : baseSize;
   const levelName = exportLevelName;
 
