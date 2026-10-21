@@ -75,7 +75,7 @@ test('exported crossroads: no painted line enters the other road, the asphalt is
         `${d.name} node (${x.toFixed(1)}, ${y.toFixed(1)}) inside the junction`);
     }
   }
-  const asphalt = decals.filter((d) => d.material === 'DefaultDecalRoadMaterial');
+  const asphalt = decals.filter((d) => d.material === 'road_asphalt_2lane');
   assert.ok(asphalt.some((d) => d.nodes.some(([x, y]) => Math.hypot(x, y) < 2)), 'asphalt still covers the junction');
   // The paint pass's internal layer tag never reaches the level files.
   assert.ok(decals.every((d) => !JSON.stringify(d).includes('__layer')));

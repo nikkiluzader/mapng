@@ -1250,34 +1250,31 @@ function trimNodesByDistance(nodes, trimStartM = 0, trimEndM = 0) {
   return trimmed;
 }
 
-// All names below are BeamNG's GLOBAL ("m_") road material library, shipped with
-// the base game (verified against base levels: they are referenced by DecalRoads
-// but never defined inside any level zip, i.e. they live in core /art/road).
-// Using them keeps exported levels self-contained without redistributing the
-// per-level road textures (t_asphalt_variation_*, etc.).
-// IMPORTANT: only materials that exist in BeamNG's CORE install resolve in an
-// exported level — most named asphalt/dirt surfaces (m_road_variation_01,
-// m_asphalt_cracks, m_dirt_road, …) are actually defined per-level and ship
-// their own textures, so referencing them yields "NO MATERIAL" at runtime.
-//
-// Confirmed-core (resolve with no extra assets):
-//   - DefaultDecalRoadMaterial : the engine's built-in road surface (asphalt).
-//   - road_invisible           : invisible placeholder surface.
-//   - m_line_white / m_line_yellow_double / m_line_white_discontinue : lane paint.
-//   - m_road_asphalt_edge_grass : asphalt→grass edge blend.
-// The road surface uses DefaultDecalRoadMaterial so roads have a real, crisp,
-// tiling asphalt independent of the baked base-texture resolution.
+// Road surface and paint materials from BeamNG's global decal-road library
+// (art_shapes.zip art/shapes/common/decalroads/main.materials.json, loaded at
+// startup for every level; textures in content/assets/materials/decalroad.zip).
+// Exported levels reference them without shipping any textures. The surfaces
+// are the ones official maps and BeamNG.Earth use: West Coast USA's asphalt,
+// Johnson Valley's dirt road, the concrete street slabs.
 const GLOBAL_DECAL_MATERIALS = {
   invisible: 'road_invisible',
-  asphalt: 'DefaultDecalRoadMaterial',   // core built-in asphalt road surface
+  asphalt: 'road_asphalt_2lane',
+  concrete: 'road1_concrete',
   lineWhite: 'm_line_white',
   lineYellowDouble: 'm_line_yellow_double',
   lineYellowSingle: 'm_line_yellow',
   lineYellowDashed: 'm_line_yellow_discontinue',
   lineWhiteDashed: 'm_line_white_discontinue',
   edgeAsphaltGrass: 'm_road_asphalt_edge_grass',
-  dirtRoad: 'DefaultDecalRoadMaterial',  // no core dirt surface exists; use default road
+  dirtRoad: 'm_dirt_road',
 };
+
+// Paved surfaces drawn as concrete slabs instead of asphalt.
+const CONCRETE_SURFACES = new Set(['concrete', 'concrete:plates', 'concrete:lanes', 'paving_stones']);
+// Metres one texture repeat covers along the road, per surface (official
+// usage: BeamNG.Earth 11 for road_asphalt_2lane, West Coast USA 40 for
+// road1_concrete, Johnson Valley 88 for m_dirt_road).
+const SURFACE_TEXTURE_LENGTH = { asphalt: 11, concrete: 40, dirt: 88 };
 
 // Decal Road Layer Templates.
 //
@@ -1299,9 +1296,7 @@ const GLOBAL_DECAL_MATERIALS = {
 const ASPHALT_BASE = {
   name: 'asphalt', material: GLOBAL_DECAL_MATERIALS.asphalt,
   widthScale: 2.0, offset: 0,
-  // DefaultDecalRoadMaterial's texture tiles best around the engine default
-  // (~10 m); long lengths (ECA used 100 for its bespoke texture) would stretch it.
-  renderPriority: 14, textureLength: 10, breakAngle: 2,
+  renderPriority: 14, textureLength: SURFACE_TEXTURE_LENGTH.asphalt, breakAngle: 2,
   startEndFadeMag: 4, distanceFade: [250, 150], drivability: 1,
 };
 // Invisible drivable path at the driving width, used when the asphalt is wider
@@ -1335,7 +1330,7 @@ const ROAD_TEMPLATES = {
   ],
   unpaved: [
     { name: 'dirt', material: GLOBAL_DECAL_MATERIALS.dirtRoad, widthScale: 2.2, offset: 0,
-      renderPriority: 14, textureLength: 10, breakAngle: 1, startEndFadeMag: 3, drivability: 1 },
+      renderPriority: 14, textureLength: SURFACE_TEXTURE_LENGTH.dirt, breakAngle: 1, startEndFadeMag: 3, drivability: 1 },
   ],
 };
 
@@ -2005,10 +2000,13 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
   const laneShift = Number.isFinite(options.laneShift) ? options.laneShift : 0;
   const separateAiPath = !isUnpaved && styleHalfWidth - drivingHalfWidth > 0.1;
 
+  const concrete = !isUnpaved && CONCRETE_SURFACES.has(String(tags.surface ?? '').trim().toLowerCase());
   let layers = (ROAD_TEMPLATES[templateKey] || ROAD_TEMPLATES.default).filter((layer) => {
     if (layer.name.startsWith('edge_')) return grassEdgeBlendEnabled;
     return true;
-  });
+  }).map((layer) => (concrete && layer.name === 'asphalt'
+    ? { ...layer, material: GLOBAL_DECAL_MATERIALS.concrete, textureLength: SURFACE_TEXTURE_LENGTH.concrete }
+    : layer));
   if (separateAiPath) {
     // Like the official maps' road_invisible: the AI drives the lanes, not the
     // parking lane or shoulder the asphalt also covers.
