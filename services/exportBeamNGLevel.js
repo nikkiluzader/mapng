@@ -29,6 +29,10 @@ import { resolveRoadRulesAt } from './countryRules.js';
 import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
 import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS } from './beamngSidewalks.js';
+import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
+import {
+  PROP_HYDRANT, PROP_BINS, PROP_SHAPES, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
+} from './beamngPropLibrary.js';
 import {
   buildCarriagewayIndex,
   cutNodes,
@@ -625,6 +629,69 @@ function generateSidewalksDAE(meshes) {
   base00.updateMatrixWorld(true);
   const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
   return result?.data ?? null;
+}
+
+// Overhead wires as thin crossed ribbons (a double-sided material shows both
+// faces), cut into WIRE_TILE_M tiles so each is its own object the engine can
+// cull, rather than one map-wide mesh.
+const WIRE_TILE_M = 512;
+const WIRE_HALF_W = 0.015;
+
+/**
+ * Wire polylines (streetProps.js) as Collada shapes: [{ key, data }] per tile,
+ * no collision.
+ */
+function generatePowerWireDAEs(wires) {
+  if (!wires.length) return [];
+  const tiles = new Map();
+  for (const line of wires) {
+    const key = `${Math.floor(line[0][0] / WIRE_TILE_M)}_${Math.floor(line[0][1] / WIRE_TILE_M)}`.replace(/-/g, 'm');
+    if (!tiles.has(key)) tiles.set(key, []);
+    tiles.get(key).push(line);
+  }
+  const out = [];
+  for (const [key, lines] of tiles) {
+    const pos = [];
+    for (const line of lines) {
+      for (let i = 0; i + 1 < line.length; i++) {
+        const a = line[i];
+        const b = line[i + 1];
+        const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+        if (d.length() < 1e-6) continue;
+        d.normalize();
+        const side = new THREE.Vector3().crossVectors(d, new THREE.Vector3(0, 0, 1));
+        if (side.length() < 1e-6) side.set(1, 0, 0);
+        side.normalize().multiplyScalar(WIRE_HALF_W);
+        const up = new THREE.Vector3().crossVectors(side, d).normalize().multiplyScalar(WIRE_HALF_W);
+        for (const v of [side, up]) {
+          const p0 = [a[0] - v.x, a[1] - v.y, a[2] - v.z];
+          const p1 = [b[0] - v.x, b[1] - v.y, b[2] - v.z];
+          const p2 = [b[0] + v.x, b[1] + v.y, b[2] + v.z];
+          const p3 = [a[0] + v.x, a[1] + v.y, a[2] + v.z];
+          pos.push(...p0, ...p1, ...p2, ...p0, ...p2, ...p3);
+        }
+      }
+    }
+    if (!pos.length) continue;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+    geo.computeVertexNormals();
+    // No trailing digits in node names: BeamNG reads them as a detail level.
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: POWER_WIRE_MATERIAL }));
+    mesh.name = 'power_wires';
+    const base00 = new THREE.Group();
+    base00.name = 'base00';
+    const start01 = new THREE.Group();
+    start01.name = 'start01';
+    start01.add(mesh);
+    base00.add(start01);
+    base00.updateMatrixWorld(true);
+    const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
+    if (result?.data) out.push({ key, data: result.data });
+    geo.dispose();
+  }
+  return out;
 }
 
 async function generateOSMObjectsDAE(terrainData, worldSize) {
@@ -4078,7 +4145,37 @@ const STREET_LAMP_LIGHT_TEMPLATE = {
  * Replaces the procedural preview primitives that used to be baked into the
  * OSM objects DAE (see generateOSMObjectsDAE includeStreetFurniture: false).
  */
-function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [] } = {}) {
+/**
+ * Mapped street props in world space for placeStreetProps: hydrants, bins,
+ * benches ([x, y]), standalone poles ([x, y, z]) and low-voltage power lines
+ * ([[x, y, z]...]). High-voltage lines (power=line) are left out: their
+ * lattice towers have no stock model, and a wooden pole would carry them.
+ */
+function collectMappedStreetProps(terrainData, squareSize) {
+  const out = { hydrants: [], bins: [], benches: [], poles: [], powerLines: [] };
+  const toWorld = (p) => {
+    const [x, y] = geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
+    return [x, y, getTerrainHeightAtWorldXY(x, y, terrainData, squareSize)];
+  };
+  for (const f of terrainData.osmFeatures || []) {
+    const tags = f.tags || {};
+    if (f.type === 'power_line') {
+      if (tags.power === 'minor_line' && Array.isArray(f.geometry) && f.geometry.length > 1) {
+        out.powerLines.push(f.geometry.map(toWorld));
+      }
+      continue;
+    }
+    if (f.type !== 'street_furniture' || f.geometry?.length !== 1) continue;
+    const p = toWorld(f.geometry[0]);
+    if (tags.emergency === 'fire_hydrant') out.hydrants.push(p);
+    else if (tags.amenity === 'waste_basket') out.bins.push(p);
+    else if (tags.amenity === 'bench') out.benches.push(p);
+    else if (tags.power === 'pole') out.poles.push(p);
+  }
+  return out;
+}
+
+function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], props = null } = {}) {
   const profile = getStreetFurnitureProfile(biome);
   if (!profile) return [];
 
@@ -4087,7 +4184,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     && Array.isArray(feature.geometry)
     && feature.geometry.length === 1
   )) ?? [];
-  if (features.length === 0 && carriageways.length === 0) return [];
+  if (features.length === 0 && carriageways.length === 0 && !props?.poles.length) return [];
 
   const roads = projectDrivableRoads(terrainData, squareSize);
   const MAX_ROAD_SEARCH_M = 30;
@@ -4195,8 +4292,67 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     addLamp(lamp.x, lamp.y, lamp.facing, `street_lamp_gen_${i}`);
   }
 
-  if (lampCount + benchCount > 0) {
-    console.log(`[BeamNG Export] Street furniture: ${lampCount} lamps (+lights; ${generatedLamps.length} along lit streets), ${benchCount} benches`);
+  // Benches along major town streets (streetProps.js), facing the road.
+  for (let i = 0; i < (props?.benches.length ?? 0) && benchCount < MAX_BENCHES; i++) {
+    const b = props.benches[i];
+    if (!profile.bench?.shapeFile) break;
+    objects.push({
+      __parent: 'street_furniture',
+      class: 'TSStatic',
+      name: `bench_gen_${i}`,
+      persistentId: generatePersistentId(),
+      position: [roundTo(b.x, 3), roundTo(b.y, 3), roundTo(b.z, 3)],
+      rotationMatrix: rotationMatrixFromYaw(b.yaw + (profile.bench.yawOffset ?? 0)),
+      shapeName: profile.bench.shapeFile,
+      useInstanceRenderData: true,
+    });
+    benchCount++;
+  }
+
+  // Wooden utility poles (cross-arm along the pole's yaw; the wires are a
+  // separate mesh), a cobra-head lamp on every other town pole: its arm
+  // reaches along local -x, over the road, with a dusk-to-dawn light at its end.
+  let poleLamps = 0;
+  for (let i = 0; i < (props?.poles.length ?? 0); i++) {
+    const p = props.poles[i];
+    objects.push({
+      __parent: 'street_furniture',
+      class: 'TSStatic',
+      name: `utility_pole_${i}`,
+      persistentId: generatePersistentId(),
+      position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(p.z, 3)],
+      rotationMatrix: rotationMatrixFromYaw(p.yaw),
+      shapeName: PROP_SHAPES.pole.shapeFile,
+      useInstanceRenderData: true,
+    });
+    if (!p.lamp || lampCount >= LAMP_LIMIT) continue;
+    objects.push({
+      __parent: 'street_furniture',
+      class: 'TSStatic',
+      name: `pole_lamp_${i}`,
+      persistentId: generatePersistentId(),
+      position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(p.z + POLE_LAMP_Z, 3)],
+      rotationMatrix: rotationMatrixFromYaw(p.yaw),
+      shapeName: PROP_SHAPES.poleLamp.shapeFile,
+      useInstanceRenderData: true,
+    });
+    objects.push({
+      __parent: 'street_furniture',
+      name: `pole_lamp_${i}_light`,
+      persistentId: generatePersistentId(),
+      position: [
+        roundTo(p.x - Math.cos(p.yaw) * POLE_LAMP_REACH_M, 3),
+        roundTo(p.y - Math.sin(p.yaw) * POLE_LAMP_REACH_M, 3),
+        roundTo(p.z + POLE_LAMP_Z - 0.2, 3),
+      ],
+      ...STREET_LAMP_LIGHT_TEMPLATE,
+    });
+    lampCount++;
+    poleLamps++;
+  }
+
+  if (lampCount + benchCount + (props?.poles.length ?? 0) > 0) {
+    console.log(`[BeamNG Export] Street furniture: ${lampCount} lamps (+lights; ${generatedLamps.length} along lit streets, ${poleLamps} on utility poles), ${benchCount} benches, ${props?.poles.length ?? 0} utility poles`);
   }
   return objects;
 }
@@ -5827,6 +5983,21 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }
   const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);
 
+  // Street props (hydrants, bins, benches, utility poles + wires): mapped OSM
+  // ones where they exist, the rest at real-world spacings along the roads.
+  const mappedStreetProps = collectMappedStreetProps(exportTerrainData, squareSize);
+  const streetProps = includeRoads
+    ? placeStreetProps({
+      carriageways: decalRoads.carriageways || [],
+      runs: sidewalks.runs,
+      mapped: mappedStreetProps,
+      heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      townPoles: center.lat > 24 && center.lng > -170 && center.lng < -50,
+    })
+    : { hydrants: [], bins: [], benches: [], poles: [], wires: [] };
+  const powerWireDaes = generatePowerWireDAEs(streetProps.wires);
+  console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Street props: ${streetProps.hydrants.length} hydrants, ${streetProps.bins.length} bins, ${streetProps.benches.length} benches, ${streetProps.poles.length} poles, ${streetProps.wires.length} wires in ${powerWireDaes.length} tile(s).`);
+
   const { signalData, controllerDefinitions: signalControllerDefinitions, props: signalProps = [] } =
     buildBeamNGSignalExportBundle(exportTerrainData, squareSize);
 
@@ -5924,6 +6095,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const trafficSignalObjects = buildTrafficSignalObjects(signalProps);
   const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome, {
     carriageways: decalRoads.carriageways || [],
+    props: streetProps,
   });
   const { objects: fuelStationObjects, facilities: fuelStationFacilities } =
     buildFuelStations(exportTerrainData, squareSize);
@@ -5936,6 +6108,19 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const forestPlacements = (includeTrees || includeRocks)
     ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome)
     : new Map();
+  // Hydrants and bins (mapped + generated) as Forest items: instanced and
+  // cheap, and their orientation does not matter.
+  const addPropPlacement = (type, x, y, z, yaw) => {
+    if (!forestPlacements.has(type)) forestPlacements.set(type, []);
+    const list = forestPlacements.get(type);
+    if (list.length >= BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE) return;
+    list.push({ ctxid: 0, pos: [roundTo(x, 3), roundTo(y, 3), roundTo(z, 3)], rotationMatrix: rotationMatrixFromYaw(yaw), scale: 1, type });
+  };
+  for (const [x, y, z] of mappedStreetProps.hydrants) addPropPlacement(PROP_HYDRANT, x, y, z, propHash(x, y) * Math.PI * 2);
+  for (const h of streetProps.hydrants) addPropPlacement(PROP_HYDRANT, h.x, h.y, h.z, h.yaw);
+  const binType = (x, y) => PROP_BINS[Math.floor(propHash(x.toFixed(1), y.toFixed(1), 'bin') * PROP_BINS.length)];
+  for (const [x, y, z] of mappedStreetProps.bins) addPropPlacement(binType(x, y), x, y, z, propHash(x, y) * Math.PI * 2);
+  for (const b of streetProps.bins) addPropPlacement(binType(b.x, b.y), b.x, b.y, b.z, b.yaw);
   const forestFiles = serializeForestFiles(forestPlacements);
   const groundCoverObjects = buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, biome);
   const managedForestItemData = cloneManagedItemData(Array.from(forestPlacements.keys()), biome);
@@ -6260,6 +6445,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const terrainHeightmapData = await toZipBinary(heightmapBlob);
   const osmDaeData = await toZipBinary(osmDaeBlob);
   const sidewalksDaeData = await toZipBinary(sidewalksDae);
+  if (powerWireDaes.length > 0) {
+    zip.folder(`${base}/map_assets/custom_assets/power_lines`);
+    for (const { key, data } of powerWireDaes) {
+      zip.file(`${base}/map_assets/custom_assets/power_lines/wires_${key}.dae`, await toZipBinary(data));
+    }
+    zip.file(`${base}/map_assets/custom_assets/power_lines/main.materials.json`, JSON.stringify(getPowerWireMaterialDefs(), null, 2));
+  }
   const backdropDaeData = await toZipBinary(backdropDaeBlob);
   const terrainTextureData = await toZipBinary(texBlob);
 
@@ -6736,6 +6928,21 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       collisionType: 'Collision Mesh',
       decalType: 'None',
       prebuildCollisionData: 0,
+      useInstanceRenderData: true,
+    });
+  }
+
+  // Overhead wires, one object per tile so the engine culls them by tile.
+  for (const { key } of powerWireDaes) {
+    levelObjectItems.push({
+      __parent: 'level_objects',
+      class: 'TSStatic',
+      name: `power_wires_${key}`,
+      persistentId: generatePersistentId(),
+      position: [0, 0, 0],
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/power_lines/wires_${key}.dae`,
+      collisionType: 'None',
+      decalType: 'None',
       useInstanceRenderData: true,
     });
   }

@@ -1,4 +1,5 @@
 import { TREE_ITEMS } from './beamngTreeLibrary.js';
+import { PROP_ITEMS } from './beamngPropLibrary.js';
 
 const DEFAULT_TERRAIN_CANDIDATES = {
   Grass: ['Grass', 'Grass2', 'Grass3', 'Grass4', 'dirt_grass'],
@@ -1355,8 +1356,9 @@ export function getManagedForestTemplate(biome, itemName) {
     const template = ASSET_SETS[assetSetId]?.managedItemTemplates?.[itemName];
     if (template) return template;
   }
-  // The regional tree palette (services/beamngTrees.js) works for every biome.
-  return TREE_ITEMS[itemName] ?? null;
+  // The regional tree palette (services/beamngTrees.js) and the street props
+  // (services/streetProps.js) work for every biome.
+  return TREE_ITEMS[itemName] ?? PROP_ITEMS[itemName] ?? null;
 }
 
 function getVegetationSelector(biome, selectorName) {
@@ -1465,8 +1467,9 @@ async function loadShapeMaterialLibrary() {
 
 export async function getShapeMaterialDefsForBiome(biome) {
   const library = await loadShapeMaterialLibrary();
-  // The regional tree palette first, so the biome's own sets win name clashes.
-  const merged = { ...(library?.tree_library ?? {}) };
+  // The regional tree palette and the street props first, so the biome's own
+  // sets win name clashes.
+  const merged = { ...(library?.tree_library ?? {}), ...(library?.prop_library ?? {}) };
   for (const assetSetId of biome?.assetSetIds ?? []) {
     Object.assign(merged, library?.[assetSetId] ?? {});
   }

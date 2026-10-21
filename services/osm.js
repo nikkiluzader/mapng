@@ -271,6 +271,9 @@ const parseOverpassResponse = (data, bounds) => {
           el.tags.highway === "street_lamp" ||
           el.tags.barrier === "bollard" ||
           el.tags.amenity === "bench" ||
+          el.tags.emergency === "fire_hydrant" ||
+          el.tags.amenity === "waste_basket" ||
+          el.tags.power === "pole" ||
           el.tags.traffic_sign ||
           el.tags.highway === "give_way"
         ) {
@@ -395,6 +398,9 @@ const parseOverpassResponse = (data, bounds) => {
           });
         }
       }
+    } else if (!consumedWayIds.has(id) && (tags.power === "minor_line" || tags.power === "line") && !isClosedRing(w.nodes)) {
+      // Overhead power lines: a pole (or tower) at every vertex (streetProps.js).
+      rawFeatures.push({ id: id.toString(), type: "power_line", geometry: w.nodes, tags });
     } else if (!consumedWayIds.has(id)) {
       const type = getFeatureType(tags);
       if (type) {
@@ -441,7 +447,7 @@ const parseOverpassResponse = (data, bounds) => {
       continue;
     }
     const isLinearWaterway = f.type === "water" && !!f.tags?.waterway && f.tags?.area !== "yes" && !isClosedRing(f.geometry);
-    if (f.type === "road" || f.type === "barrier" || f.type === "coastline" || isLinearWaterway) {
+    if (f.type === "road" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || isLinearWaterway) {
       const clippedSegments = clipLineString(f.geometry, bounds);
       clippedSegments.forEach((segment, index) => {
         if (segment.length > 1) {

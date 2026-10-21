@@ -35,6 +35,7 @@ CONTENT = os.path.join(REPO, "refs/beamng/content")
 OUT = os.path.join(REPO, "public/beamng_shape_materials.json")
 CATALOG = os.path.join(REPO, "services/beamngBiomeCatalog.js")
 TREE_LIBRARY = os.path.join(REPO, "services/beamngTreeLibrary.js")
+PROP_LIBRARY = os.path.join(REPO, "services/beamngPropLibrary.js")
 
 
 def lenient_json(b):
@@ -156,6 +157,10 @@ def main():
     if os.path.exists(TREE_LIBRARY):
         tree_src = open(TREE_LIBRARY, encoding="utf-8").read()
         sets["tree_library"] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", tree_src)))
+    # Street props (services/streetProps.js): likewise their own set.
+    if os.path.exists(PROP_LIBRARY):
+        prop_src = open(PROP_LIBRARY, encoding="utf-8").read()
+        sets["prop_library"] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", prop_src)))
     out = {}
     problems = []
     for set_id, daes in sets.items():

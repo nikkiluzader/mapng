@@ -117,8 +117,9 @@ function offsetLine(nodes, offset) {
 }
 
 /**
- * Sidewalk runs: [{ points: [[x,y,z]...], side: ±1, width }] where side +1 is
- * left of the run's direction (the sidewalk lies on that side of the curb).
+ * Sidewalk runs: [{ points: [[x,y,z]...], side: ±1, width, owner }] where side +1
+ * is left of the run's direction (the sidewalk lies on that side of the curb)
+ * and owner is the carriageway's.
  */
 export function buildSidewalkRuns(carriageways, { zones = [] } = {}) {
   const index = buildCarriagewayIndex(carriageways);
@@ -130,7 +131,7 @@ export function buildSidewalkRuns(carriageways, { zones = [] } = {}) {
     for (const [side, width] of [[1, sides.left], [-1, sides.right]]) {
       if (!width) continue;
       for (const piece of cutNodes(offsetLine(cw.nodes, side * cw.half), blocked, { minPieceM: MIN_RUN_M })) {
-        runs.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width });
+        runs.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width, owner: cw.owner });
       }
     }
   }

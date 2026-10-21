@@ -40,6 +40,7 @@ SOURCES = [
     "services/beamngSignals.js",
     "services/beamngBuildings.js",
     "services/beamngTreeLibrary.js",
+    "services/beamngPropLibrary.js",
     "services/exportBeamNGLevel.js",
     "public/beamng_shape_materials.json",
 ]
@@ -139,7 +140,7 @@ def audit_dae_material_coverage(zips):
     library; the official level's own materials.json is NOT loaded in-game.
     """
     daes = set()
-    for src in ("services/beamngBiomeCatalog.js", "services/beamngTreeLibrary.js"):
+    for src in ("services/beamngBiomeCatalog.js", "services/beamngTreeLibrary.js", "services/beamngPropLibrary.js"):
         catalog = open(os.path.join(REPO, src)).read()
         daes |= set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", catalog))
     # Shapes placed directly by the exporter (fences, fuel pumps, signs, lamps).

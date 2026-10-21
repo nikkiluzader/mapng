@@ -69,6 +69,7 @@ export const OSM_FILTER = {
     ['amenity', 'fuel'], ['amenity', 'charging_station'], ['man_made', 'fuel_pump'],
     ['highway', 'traffic_signals'], ['highway', 'stop'], ['highway', 'give_way'],
     ['highway', 'street_lamp'], ['barrier', 'bollard'], ['amenity', 'bench'],
+    ['emergency', 'fire_hydrant'], ['amenity', 'waste_basket'], ['power', 'pole'],
   ],
 };
 
