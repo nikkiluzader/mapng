@@ -82,19 +82,13 @@
           <!-- PBR terrain materials source selector -->
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.pbrMaterials') }}</span>
-            <select v-model="beamNGPbrSource" :disabled="!hasOsmData" :class="SELECT_XS">
-              <option value="none">{{ t('exportPanel.off') }}</option>
-              <option value="osm" :disabled="!hasOsmData">{{ t('exportPanel.osmData') }}</option>
-            </select>
+            <input type="checkbox" v-model="beamNGPbrSource" true-value="osm" false-value="none" :disabled="!hasOsmData" :class="CHECKBOX" />
           </div>
 
           <!-- Road export mode selector -->
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
-            <select v-model="beamNGRoadType" :disabled="!hasOsmData" :class="SELECT_XS">
-              <option value="decal" :disabled="!hasOsmData">{{ t('exportPanel.roadTypeSpline') }}</option>
-              <option value="none">{{ t('exportPanel.roadTypeNone') }}</option>
-            </select>
+            <input type="checkbox" v-model="beamNGRoadType" true-value="decal" false-value="none" :disabled="!hasOsmData" :class="CHECKBOX" />
           </div>
 
           <div class="flex items-center justify-between gap-2 px-0.5">
