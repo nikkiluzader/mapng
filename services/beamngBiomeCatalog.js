@@ -92,6 +92,33 @@ const EAST_COAST_GROUNDCOVER_MATERIAL = {
   translucentBlendOp: 'None',
 };
 
+const WEST_COAST_GROUNDCOVER_MATERIAL = {
+  // West Coast USA's own field grass (vanilla m_grass_dry_01, its grass_dry_1 /
+  // grass_dry_2 covers): dry long blades, not East Coast's lush BNGGrass.
+  name: 'wca_grass_dry',
+  mapTo: 'wca_grass_dry',
+  class: 'Material',
+  persistentId: '3c0e6f5a-1d7b-4b8e-9a62-5f4e2c71d0a9',
+  Stages: [{
+    ambientOcclusionMap: '/assets/materials/foliage/grass/t_grass_green_long_01/t_grass_green_long_01_ao.data.png',
+    baseColorFactor: [0.980755985, 0.980755985, 0.980755985, 1],
+    baseColorMap: '/assets/materials/foliage/grass/t_grass_dry_long_01/t_grass_dry_long_01_b.color.png',
+    normalMap: '/assets/materials/foliage/grass/t_grass_green_long_01/t_grass_green_long_01_nm.normal.png',
+    opacityMap: '/assets/materials/foliage/grass/t_grass_green_long_01/t_grass_green_long_01_o.data.png',
+    pixelSpecular: true,
+    roughnessMap: '/assets/materials/foliage/grass/t_grass_green_long_01/t_grass_green_long_01_r.data.png',
+  }, {}, {}, {}],
+  alphaRef: 16,
+  alphaTest: true,
+  annotation: 'GRASS',
+  doubleSided: true,
+  groundType: 'GRASS',
+  subSurface: true,
+  subSurfaceIntensity: 1,
+  translucentZWrite: true,
+  version: 1.5,
+};
+
 const JOHNSON_VALLEY_GROUNDCOVER_MATERIAL = {
   name: 'dry_grass',
   mapTo: 'dry_grass',
@@ -429,6 +456,7 @@ const ASSET_SETS = {
         [0.671264112, 0.675679326, 0.328736931, 0.247079358],
         [0, 0.542968988, 0.753906012, 0.457031012],
       ],
+      flowers: false,
     },
   },
   small_island: {
@@ -607,6 +635,22 @@ const ASSET_SETS = {
       hedgeBush: 'deserttree_bush_medium',
     },
     rockCandidates: ['eca_rock_small'],
+    groundCover: {
+      materialName: 'wca_grass_dry',
+      materialDef: WEST_COAST_GROUNDCOVER_MATERIAL,
+      terrainLayer: 'Grass',
+      // Bottom-anchored quadrants of t_grass_green_long_01's atlas, from official
+      // WCUSA grass_dry_1 / forest_grass; see grassSprites note on the Utah profile.
+      grassSprites: [
+        [0, 0, 0.5, 0.490999997],
+        [0.5, 0, 0.5, 0.491121948],
+        [0, 0.5, 0.5, 0.5],
+        [0.5, 0.5, 0.5, 0.5],
+      ],
+      // These sprites are tall single blades; vanilla draws them 0.2–0.5 m.
+      sizeScale: 0.7,
+      flowers: false,
+    },
   },
   johnson_valley: {
     streetFurniture: {
@@ -674,6 +718,7 @@ const ASSET_SETS = {
         [0.679687023, 0.332031995, 0.320313007, 0.328125],
         [0, 0.324218988, 0.332031012, 0.332031012],
       ],
+      flowers: false,
     },
   },
   jungle: {

@@ -5286,6 +5286,13 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
         type.billboardUVs = sprites[i % sprites.length];
       });
     }
+    const sizeScale = groundCover.sizeScale ?? 1;
+    if (sizeScale !== 1) {
+      grassTypes.forEach((type) => {
+        type.sizeMin = roundTo(type.sizeMin * sizeScale, 3);
+        type.sizeMax = roundTo(type.sizeMax * sizeScale, 3);
+      });
+    }
     return [...grassTypes, {}, {}, {}, {}];
   };
 
@@ -5371,8 +5378,9 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
     ],
   });
 
+  // Daisies + buttercups are an East Coast meadow look; dry biomes opt out.
   const flowerElements = 40000;
-  groundCoverObjects.push({
+  if (groundCover.flowers !== false) groundCoverObjects.push({
     __parent: 'vegetation',
     class: 'GroundCover',
     name: 'mapng_flower_cover',
