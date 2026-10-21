@@ -128,46 +128,6 @@
           </div>
 
           <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBuildings') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeBuildings" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.exportBuildings') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.applyFoundations') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGApplyFoundations" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.raiseUnderBuildings') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.treesBushes') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeTrees" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.nativeForest') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.rocks') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeRocks" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.quarryRock') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.water') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeWater" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.lakesRivers') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.seaLevelOffset') }}</span>
             <div class="flex items-center gap-1">
               <input
@@ -416,12 +376,7 @@ const beamNGBackdropSource = ref(
   localStorage.getItem('mapng_beamNGBackdropSource')
   || (legacyIncludeBackdrop === 'true' ? 'global30m' : 'off')
 );
-const beamNGIncludeBuildings = ref(localStorage.getItem('mapng_beamNGIncludeBuildings') !== 'false');
-const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFoundations') !== 'false');
-const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
 const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
-const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
-const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') === 'true');
 // Migrate legacy boolean mesh road setting if it exists
 // DecalRoads are the only road system; earlier choices (Road Architect, Mesh
 // Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
@@ -577,9 +532,6 @@ watch(showExports, (v) => localStorage.setItem('mapng_showExports', String(v)));
 watch(showExportBeamNG, (v) => localStorage.setItem('mapng_showExportBeamNG', String(v)));
 watch(beamNGPbrSource, (v) => localStorage.setItem('mapng_beamNGPbrSource', v));
 watch(beamNGBackdropSource, (v) => localStorage.setItem('mapng_beamNGBackdropSource', v));
-watch(beamNGIncludeBuildings, (v) => localStorage.setItem('mapng_beamNGIncludeBuildings', String(v)));
-watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoundations', String(v)));
-watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGSeaLevelOffset, (v) => {
   const normalized = normalizeBeamNGSeaLevelOffset(v);
   if (normalized !== v) {
@@ -588,8 +540,6 @@ watch(beamNGSeaLevelOffset, (v) => {
   }
   localStorage.setItem('mapng_beamNGSeaLevelOffset', String(normalized));
 });
-watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
-watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
 watch(beamNGRoadType, (v) => localStorage.setItem('mapng_beamNGRoadType', v));
 watch(beamNGBiomeId, (v) => localStorage.setItem('mapng_beamNGBiomeId', v));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
@@ -965,16 +915,18 @@ const handleBeamNGLevelExport = async () => {
       ? 'global30m'
       : beamNGBackdropSource.value;
     const effectiveIncludeBackdrop = effectiveBackdropSource !== 'off';
-    const effectiveIncludeBuildings = hasOsmData.value ? beamNGIncludeBuildings.value : false;
-    const effectiveApplyFoundations = hasOsmData.value ? beamNGApplyFoundations.value : false;
-    const effectiveIncludeWater = hasOsmData.value ? beamNGIncludeWater.value : false;
+    // Buildings, trees, rocks and water always come with the level when OSM
+    // data exists. No terrain foundations: buildings carry their own.
+    const effectiveIncludeBuildings = hasOsmData.value;
+    const effectiveApplyFoundations = false;
+    const effectiveIncludeWater = hasOsmData.value;
     // Flat terrain sits at height 0; place the water plane just below ground
     // (−1 m) so it doesn't flood the whole level. Matches the 3D preview default.
     const effectiveSeaLevelOffset = props.terrainData?.flat
       ? -1
       : normalizeBeamNGSeaLevelOffset(beamNGSeaLevelOffset.value);
-    const effectiveIncludeTrees = hasOsmData.value ? beamNGIncludeTrees.value : false;
-    const effectiveIncludeRocks = hasOsmData.value ? beamNGIncludeRocks.value : false;
+    const effectiveIncludeTrees = hasOsmData.value;
+    const effectiveIncludeRocks = hasOsmData.value;
     const effectiveBackdropGpxzApiKey = effectiveBackdropSource === 'gpxz' ? String(props.gpxzApiKey || '') : '';
 
     const effectiveBiomeId = beamNGBiomeId.value || beamNGBiomeOptions[0]?.id;
