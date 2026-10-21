@@ -739,3 +739,34 @@ test('every biome defines the material of every GroundCover it emits', async () 
     restorePolyfills();
   }
 });
+
+test('OSM grass polygons do not multiply GroundCover layers', async () => {
+  // GroundCover fills around the camera and ignores its position, so a cover
+  // per grass polygon stacked full layers everywhere (GPU overdraw).
+  const fields = Array.from({ length: 30 }, (_, i) => {
+    const s = 0.05 + (i % 6) * 0.15;
+    const w = 0.05 + Math.floor(i / 6) * 0.15;
+    return {
+      id: `grass_${i}`, type: 'landuse', tags: { landuse: i % 2 ? 'meadow' : 'grass' },
+      geometry: [{ lat: s, lng: w }, { lat: s, lng: w + 0.1 }, { lat: s + 0.1, lng: w + 0.1 }, { lat: s + 0.1, lng: w }, { lat: s, lng: w }],
+    };
+  });
+  const restorePolyfills = installCanvasPolyfill();
+  try {
+    for (const biomeId of ['west_coast_usa', 'european']) {
+      const terrain = makeTerrainData();
+      terrain.osmFeatures = [...terrain.osmFeatures, ...fields];
+      const result = await exportBeamNGLevel(terrain, { lat: 0.5, lng: 0.5 }, {
+        roadType: 'decal', levelName: 'mapng_demo', biomeId, baseTexture: 'none', pbrSource: 'none',
+        includeBuildings: false, applyFoundations: false, includeBackdrop: false, includeWater: false,
+        includeTrees: true, includeRocks: false, includeNativeBarriers: false,
+      });
+      const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
+      const veg = parseNDJSON(await zip.file('levels/mapng_demo/main/MissionGroup/vegetation/items.level.json').async('string'));
+      const covers = veg.filter((o) => o?.class === 'GroundCover');
+      assert.ok(covers.length > 0 && covers.length <= 4, `${biomeId}: ${covers.length} GroundCover objects`);
+    }
+  } finally {
+    restorePolyfills();
+  }
+});

@@ -4739,7 +4739,6 @@ const BEAMNG_TREE_DENSITY_MULTIPLIER = 1.5;
 const BEAMNG_GRASS_DENSITY_MULTIPLIER = 1.0;
 const BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE = 12000;
 const BEAMNG_MAX_GROUNDCOVER_ELEMENTS = 650000;
-const BEAMNG_MAX_GROUNDCOVER_OBJECTS = 48;
 // Grass billboards are camera-relative: GroundCover generates elements out to
 // `radius` meters from the viewer. Official levels keep this around 80–160 m;
 // grass beyond that is invisible anyway and is pure overdraw.
@@ -5177,7 +5176,11 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
       });
     };
 
-    for (const feature of grassFeatures.slice(0, BEAMNG_MAX_GROUNDCOVER_OBJECTS)) {
+    // One cover per material, not per polygon: covers fill around the camera
+    // (see the note above the base path's return), so per-polygon copies
+    // stacked full layers. The largest matching area sets the density.
+    const byMaterial = new Map();
+    for (const feature of grassFeatures) {
       const ring = isClosedRing(feature.geometry) ? feature.geometry.slice(0, -1) : feature.geometry;
       if (ring.length < 3) continue;
       let centerLat = 0;
@@ -5203,16 +5206,20 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
       const radius = Math.max(24, Math.min(130, Math.sqrt(areaSqM / Math.PI) * 1.1));
       const tags = feature.tags || {};
       const isFlowerLike = tags.landuse === 'meadow' || tags.leisure === 'garden';
-      emitTemplateCover({
-        centerLat,
-        centerLng,
-        radius,
-        areaSqM,
-        material: isFlowerLike ? 'GC_Flowers_1' : (templateObjects.length % 2 === 0 ? 'GC_Grass_close' : 'GC_Grass_close_2'),
-        types: isFlowerLike ? templateTypesFlowerGrass : templateTypesLongGrass,
-        seed: 10 + templateObjects.length,
-      });
+      const material = isFlowerLike ? 'GC_Flowers_1' : (byMaterial.size % 2 === 0 ? 'GC_Grass_close' : 'GC_Grass_close_2');
+      const seen = byMaterial.get(material);
+      if (!seen || areaSqM > seen.areaSqM) {
+        byMaterial.set(material, {
+          centerLat,
+          centerLng,
+          radius,
+          areaSqM,
+          material,
+          types: isFlowerLike ? templateTypesFlowerGrass : templateTypesLongGrass,
+        });
+      }
     }
+    for (const cover of byMaterial.values()) emitTemplateCover({ ...cover, seed: 10 + templateObjects.length });
 
     if (templateObjects.length === 0) {
       emitTemplateCover({
@@ -5440,84 +5447,12 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
     ],
   });
 
-  // Add dense per-area grass cover for OSM polygons tagged as grass-like fields.
-  let areaObjectIndex = 0;
-  for (const feature of grassFeatures) {
-    if (groundCoverObjects.length >= BEAMNG_MAX_GROUNDCOVER_OBJECTS) break;
-    const ring = isClosedRing(feature.geometry) ? feature.geometry.slice(0, -1) : feature.geometry;
-    if (ring.length < 3) continue;
-
-    let centroidLat = 0;
-    let centroidLng = 0;
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    const worldPoints = [];
-
-    for (const pt of ring) {
-      centroidLat += pt.lat;
-      centroidLng += pt.lng;
-      const [x, y] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0);
-      worldPoints.push([x, y]);
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
-    }
-
-    centroidLat /= ring.length;
-    centroidLng /= ring.length;
-
-    let areaSqM = 0;
-    for (let i = 0; i < worldPoints.length; i++) {
-      const [x1, y1] = worldPoints[i];
-      const [x2, y2] = worldPoints[(i + 1) % worldPoints.length];
-      areaSqM += (x1 * y2) - (x2 * y1);
-    }
-    areaSqM = Math.abs(areaSqM) * 0.5;
-    if (!Number.isFinite(areaSqM) || areaSqM < 120) continue;
-
-    const approxRadius = Math.max(
-      14,
-      Math.min(
-        BEAMNG_GROUNDCOVER_MAX_RADIUS,
-        Math.max(
-          Math.sqrt(areaSqM / Math.PI) * 1.3,
-          Math.max(maxX - minX, maxY - minY) * 0.6,
-        ),
-      ),
-    );
-    const centerHeightWorld = getTerrainHeightWorld(centroidLat, centroidLng, terrainData);
-    const [centerX, centerY] = geoToWorldPoint(centroidLat, centroidLng, terrainData, squareSize, 0);
-
-    const fieldMaxElements = Math.min(
-      BEAMNG_MAX_GROUNDCOVER_ELEMENTS,
-      Math.max(50000, Math.round(areaSqM * 2.8 * BEAMNG_GRASS_DENSITY_MULTIPLIER)),
-    );
-    groundCoverObjects.push({
-      __parent: 'vegetation',
-      class: 'GroundCover',
-      name: `mapng_grass_field_${++areaObjectIndex}`,
-      persistentId: generatePersistentId(),
-      position: [roundTo(centerX, 3), roundTo(centerY, 3), roundTo(centerHeightWorld, 3)],
-      material: groundCover.materialName,
-      gridSize: gridSizeForElements(fieldMaxElements),
-      radius: roundTo(approxRadius, 3),
-      dissolveRadius: roundTo(Math.max(40, approxRadius * 0.92), 3),
-      shapeCullRadius: roundTo(Math.max(approxRadius, approxRadius * 1.25), 3),
-      maxBillboardTiltAngle: 40,
-      maxElements: fieldMaxElements,
-      windGustLength: 1.7,
-      windGustStrength: 0.1,
-      windGustFrequency: 0.1,
-      windTurbulenceFrequency: 0.2,
-      windTurbulenceStrength: 0.05,
-      seed: 100 + areaObjectIndex,
-      Types: buildGrassTypes(1.25),
-    });
-  }
-
+  // No per-field covers: a GroundCover fills cells around the CAMERA wherever
+  // its terrain layer matches (official GroundCover docs) and ignores its
+  // position, so one per OSM grass polygon stacked another full grass layer
+  // under the car for every field (up to 48; ~600 billboards/m² near the
+  // camera in a Mesa export vs vanilla's ≤50, a GPU overdraw sink). OSM grass
+  // areas are painted onto the Grass layer, which the base cover already fills.
   return groundCoverObjects;
 }
 
