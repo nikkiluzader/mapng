@@ -69,3 +69,25 @@ test('archiveCovers uses the coverage outline, not just the bbox', async () => {
   assert.equal(archiveCovers(az, box(36.1, -115.15)), false, 'Las Vegas');
   assert.equal(archiveCovers(az, box(37.0, -111.0, 0.02)), false, 'straddling the Utah line');
 });
+
+test('compact tiles expand to the exact Overpass JSON; old tiles pass through', async () => {
+  const { expandCompactTile } = await import('../services/osmTiles.js');
+  const compact = { v: 2, e: [
+    ['n', 5, 352100000, -1114150000, { amenity: 'fuel' }],
+    ['w', 7, { highway: 'residential' }, [352100000, -1114150000, 10000, 50000]],
+    ['r', -3, { landuse: 'forest', 'mapng:relation': '42' }, [
+      ['w', -1, 'outer', [352000001, -1114000001, 1, -2]],
+      ['n', 11, 'label', 352000000, -1114000000],
+    ]],
+  ] };
+  const overpass = { elements: [
+    { type: 'node', id: 5, lat: 35.21, lon: -111.415, tags: { amenity: 'fuel' } },
+    { type: 'way', id: 7, tags: { highway: 'residential' }, geometry: [{ lat: 35.21, lon: -111.415 }, { lat: 35.211, lon: -111.41 }] },
+    { type: 'relation', id: -3, tags: { landuse: 'forest', 'mapng:relation': '42' }, members: [
+      { type: 'way', ref: -1, role: 'outer', geometry: [{ lat: 35.2000001, lon: -111.4000001 }, { lat: 35.2000002, lon: -111.4000003 }] },
+      { type: 'node', ref: 11, role: 'label', lat: 35.2, lon: -111.4 },
+    ] },
+  ] };
+  assert.equal(JSON.stringify(expandCompactTile(compact)), JSON.stringify(overpass));
+  assert.equal(expandCompactTile(overpass), overpass);
+});

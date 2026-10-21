@@ -10,7 +10,14 @@ What goes in: services/overpassQuery.js OSM_FILTER (read through node, so the
 tiles and the live query can never disagree).
 
 Each tile (z13 by default, ~4 km at mid latitudes) is gzipped
-{"elements": [...]} in Overpass's own JSON shape:
+{"v": 2, "e": [...]}: Overpass's own elements in a compact form the browser
+expands back to the identical JSON (services/osmTiles.js expandCompactTile):
+  - node      ["n", id, lat, lon, tags]
+  - way       ["w", id, tags, coords]
+  - relation  ["r", id, tags, [["w", ref, role, coords] | ["n", ref, role, lat, lon], ...]]
+where lat / lon are integers at OSM's 1e-7 precision and coords is a flat
+[lat0, lon0, dlat1, dlon1, ...] delta list (about a third of the old size).
+Which elements go in:
   - nodes, ways and small relations are stored WHOLE in every tile their
     bounding box touches (the browser de-duplicates by type + id), so roads
     keep their real ends and junctions;
@@ -83,8 +90,23 @@ def tile_range(coords, z):
     return x0, y0, x1, y1
 
 
+def e7(value):
+    """Integer 1e-7 degrees; value / 1e7 in the browser is exactly round(value, 7)."""
+    return int(round(round(value, COORD_DIGITS) * 10 ** COORD_DIGITS))
+
+
 def geom_json(coords):
-    return [{"lat": round(lat, COORD_DIGITS), "lon": round(lon, COORD_DIGITS)} for lat, lon in coords]
+    flat = []
+    plat = plon = 0
+    for lat, lon in coords:
+        ilat, ilon = e7(lat), e7(lon)
+        flat += [ilat - plat, ilon - plon]
+        plat, plon = ilat, ilon
+    return flat
+
+
+def dumps(el):
+    return json.dumps(el, separators=(",", ":"), ensure_ascii=False)
 
 
 class Tiles:
@@ -148,9 +170,8 @@ class WayNodePass(osmium.SimpleHandler):
         if not n.location.valid():
             return
         lat, lon = n.location.lat, n.location.lon
-        el = {"type": "node", "id": n.id, "lat": round(lat, COORD_DIGITS), "lon": round(lon, COORD_DIGITS),
-              "tags": tags_dict(n.tags)}
-        self.tiles.add_whole(json.dumps(el, separators=(",", ":")), [(lat, lon)])
+        el = ["n", n.id, e7(lat), e7(lon), tags_dict(n.tags)]
+        self.tiles.add_whole(dumps(el), [(lat, lon)])
         self.counts["node"] += 1
 
     def way(self, w):
@@ -166,8 +187,8 @@ class WayNodePass(osmium.SimpleHandler):
         if is_member:
             self.way_geom[w.id] = coords
         if matches:
-            el = {"type": "way", "id": w.id, "tags": tags, "geometry": geom_json(coords)}
-            self.tiles.add_whole(json.dumps(el, separators=(",", ":")), coords)
+            el = ["w", w.id, tags, geom_json(coords)]
+            self.tiles.add_whole(dumps(el), coords)
             self.counts["way"] += 1
 
 
@@ -213,12 +234,11 @@ def emit_relations(relations, way_geom, node_loc, tiles):
         for t, ref, role in members:
             if t == "w" and ref in way_geom:
                 coords = way_geom[ref]
-                member_json.append(({"type": "way", "ref": ref, "role": role, "geometry": geom_json(coords)}, coords))
+                member_json.append((["w", ref, role, geom_json(coords)], coords))
                 all_coords.extend(coords)
             elif t == "n" and ref in node_loc:
                 lat, lon = node_loc[ref]
-                member_json.append(({"type": "node", "ref": ref, "role": role,
-                                     "lat": round(lat, COORD_DIGITS), "lon": round(lon, COORD_DIGITS)}, [(lat, lon)]))
+                member_json.append((["n", ref, role, e7(lat), e7(lon)], [(lat, lon)]))
                 all_coords.append((lat, lon))
         if not all_coords:
             continue
@@ -226,8 +246,8 @@ def emit_relations(relations, way_geom, node_loc, tiles):
         small = (x1 - x0) < MAX_SPAN and (y1 - y0) < MAX_SPAN
 
         if small:
-            el = {"type": "relation", "id": rid, "tags": tags, "members": [m for m, _ in member_json]}
-            tiles.add_whole(json.dumps(el, separators=(",", ":")), all_coords)
+            el = ["r", rid, tags, [m for m, _ in member_json]]
+            tiles.add_whole(dumps(el), all_coords)
             counts["relation_whole"] += 1
             continue
 
@@ -245,14 +265,11 @@ def emit_relations(relations, way_geom, node_loc, tiles):
                     for poly in polys:
                         if poly.is_empty:
                             continue
-                        piece_members = [{"type": "way", "ref": synthetic_id(), "role": "outer",
-                                          "geometry": geom_json(ring_coords(poly.exterior))}]
+                        piece_members = [["w", synthetic_id(), "outer", geom_json(ring_coords(poly.exterior))]]
                         for hole in poly.interiors:
-                            piece_members.append({"type": "way", "ref": synthetic_id(), "role": "inner",
-                                                  "geometry": geom_json(ring_coords(hole))})
-                        el = {"type": "relation", "id": synthetic_id(),
-                              "tags": {**tags, "mapng:relation": str(rid)}, "members": piece_members}
-                        tiles.add_to((x, y), json.dumps(el, separators=(",", ":")))
+                            piece_members.append(["w", synthetic_id(), "inner", geom_json(ring_coords(hole))])
+                        el = ["r", synthetic_id(), {**tags, "mapng:relation": str(rid)}, piece_members]
+                        tiles.add_to((x, y), dumps(el))
                         counts["relation_area_piece"] += 1
             counts["relation_area_split"] += 1
             continue
@@ -265,8 +282,8 @@ def emit_relations(relations, way_geom, node_loc, tiles):
                 for y in range(my0, my1 + 1):
                     per_tile[(x, y)].append(m)
         for xy, ms in per_tile.items():
-            el = {"type": "relation", "id": rid, "tags": tags, "members": ms}
-            tiles.add_to(xy, json.dumps(el, separators=(",", ":")))
+            el = ["r", rid, tags, ms]
+            tiles.add_to(xy, dumps(el))
         counts["relation_members_split"] += 1
     return counts
 
@@ -279,7 +296,7 @@ def write_pmtiles(tiles, out_path, source_name):
     with open(out_path, "wb") as f:
         writer = Writer(f)
         for tileid, (x, y) in entries:
-            body = '{"elements":[' + ",".join(tiles.buckets[(x, y)]) + "]}"
+            body = '{"v":2,"e":[' + ",".join(tiles.buckets[(x, y)]) + "]}"
             data = gzip.compress(body.encode("utf-8"), compresslevel=9)
             writer.write_tile(tileid, data)
             total += len(data)
@@ -301,7 +318,7 @@ def write_pmtiles(tiles, out_path, source_name):
         }
         metadata = {
             "name": "mapng-osm",
-            "format": "overpass-json",
+            "format": "overpass-json-compact-v2",
             "source": source_name,
             "zoom": z,
             "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),

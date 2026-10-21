@@ -1,7 +1,8 @@
 /**
  * MapNG's own OSM tiles (scripts/build-osm-tiles.py; option B in
  * refs/output/osm-data-sources.md): a PMTiles archive whose tiles hold the
- * same "out body geom" JSON the live Overpass query returns.
+ * same "out body geom" JSON the live Overpass query returns (in a compact
+ * form expanded here).
  *
  * fetchOsmFromTiles() reads the tiles covering a bbox and merges them into one
  * Overpass-shaped response for parseOverpassResponse:
@@ -124,9 +125,41 @@ export const mergeTileElements = (payloads) => {
   return { elements: [...byKey.values()] };
 };
 
+// Compact tiles ({v: 2, e: [...]}, scripts/build-osm-tiles.py) store
+// coordinates as 1e-7 integers, delta-encoded per way; expand them back to
+// Overpass's own element objects, key order included. Archives built before
+// the compact form hold {elements} and pass through.
+const E7 = 1e7;
+
+const expandCoords = (flat) => {
+  const geometry = new Array(flat.length / 2);
+  let lat = 0;
+  let lon = 0;
+  for (let i = 0; i < flat.length; i += 2) {
+    lat += flat[i];
+    lon += flat[i + 1];
+    geometry[i / 2] = { lat: lat / E7, lon: lon / E7 };
+  }
+  return geometry;
+};
+
+const expandMember = (m) => (m[0] === 'n'
+  ? { type: 'node', ref: m[1], role: m[2], lat: m[3] / E7, lon: m[4] / E7 }
+  : { type: 'way', ref: m[1], role: m[2], geometry: expandCoords(m[3]) });
+
+export const expandCompactElement = (el) => {
+  if (el[0] === 'n') return { type: 'node', id: el[1], lat: el[2] / E7, lon: el[3] / E7, tags: el[4] };
+  if (el[0] === 'w') return { type: 'way', id: el[1], tags: el[2], geometry: expandCoords(el[3]) };
+  return { type: 'relation', id: el[1], tags: el[2], members: el[3].map(expandMember) };
+};
+
+export const expandCompactTile = (tile) => (tile?.v === 2
+  ? { elements: tile.e.map(expandCompactElement) }
+  : tile);
+
 const decodeTile = async (bytes) => {
   const text = new TextDecoder().decode(bytes);
-  return JSON.parse(text);
+  return expandCompactTile(JSON.parse(text));
 };
 
 /**
