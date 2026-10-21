@@ -71,6 +71,12 @@ def main():
     size = os.path.getsize(args.archive)
     listing = r2("lsjson", f"r2:mapng-osm/{key}", check=False)
     existing = json.loads(listing.stdout or "[]") if listing.returncode == 0 else []
+    if existing and existing[0].get("Size") != size:
+        # A second build the same day: never overwrite a published name (the
+        # Worker edge-caches its byte ranges as immutable), add the time.
+        key = f"osm/{args.region}-{built_at[:10]}-{built_at[11:16].replace(':', '')}.pmtiles"
+        listing = r2("lsjson", f"r2:mapng-osm/{key}", check=False)
+        existing = json.loads(listing.stdout or "[]") if listing.returncode == 0 else []
     if existing and existing[0].get("Size") == size:
         print(f"{key} already uploaded ({size} bytes)", file=sys.stderr)
     else:
