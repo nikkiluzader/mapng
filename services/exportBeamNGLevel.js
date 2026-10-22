@@ -2495,6 +2495,73 @@ export function buildWaterLookup(terrainData, squareSize) {
  * terrain (terrainData.heightMap is replaced by a raised copy, never edited
  * in place: it is shared with the app's own terrain), then all are re-solved.
  */
+// Bare-earth (lidar) elevation has every bridge taken out: under it, a gap
+// down to the ground, and the approach embankment ends in a cliff. Where OSM
+// ends a bridge short of that cliff the approach road runs on in the gap and
+// then climbs the cliff; the deck is carried on along it instead, to where
+// the ground has come up (the real bridge is there).
+const BERM_SEARCH_M = 30;       // how far past a bridge's end a cliff is looked for
+const BERM_RISE_M = 2;          // a rise this steep within BERM_STEP_M is a cliff
+const BERM_STEP_M = 4;
+const BERM_MIN_M = 1.5;         // the berm top over the bridge's end
+
+/**
+ * Carry bridges on along their approach roads over a bare-earth gap, up to
+ * the berm beyond it: one more part per approach so carried (joined to the
+ * bridge at its end, a fork where two ramps leave it), listing the approach's
+ * segIndex (.landedOn); the approach road is trimmed to start on the berm.
+ * Returns the parts added, as [[part, partSegValue]].
+ */
+function landOnBerms(parts, lowerRoads, groundAt) {
+  const added = [];
+  const ends = parts.flatMap((part) => [part.xy[0], part.xy[part.xy.length - 1]].map((end) => ({ part, end })));
+  for (const { part, end } of ends) {
+    const touching = lowerRoads.filter((r) => {
+      const a = r.xy[0]; const b = r.xy[r.xy.length - 1];
+      return Math.hypot(a[0] - end[0], a[1] - end[1]) < 1.5 || Math.hypot(b[0] - end[0], b[1] - end[1]) < 1.5;
+    });
+    for (const road of touching) {
+      const fromStart = Math.hypot(road.xy[0][0] - end[0], road.xy[0][1] - end[1]) < 1.5;
+      const line = fromStart ? road.xy : [...road.xy].reverse();
+      // points along the approach every 2 m, with their arc length
+      const pts = [];
+      let s0 = 0;
+      for (let i = 0; i + 1 < line.length && s0 <= BERM_SEARCH_M + BERM_STEP_M * 2; i++) {
+        const L = Math.hypot(line[i + 1][0] - line[i][0], line[i + 1][1] - line[i][1]);
+        for (let s = Math.ceil(s0 / 2) * 2; s < s0 + L; s += 2) {
+          const t = (s - s0) / L;
+          const x = line[i][0] + (line[i + 1][0] - line[i][0]) * t;
+          const y = line[i][1] + (line[i + 1][1] - line[i][1]) * t;
+          pts.push({ s, x, y, z: groundAt(x, y), i });
+        }
+        s0 += L;
+      }
+      const step = BERM_STEP_M / 2;
+      let land = -1;
+      for (let k = 0; k + step < pts.length && pts[k].s <= BERM_SEARCH_M; k++) {
+        if (pts[k + step].z - pts[k].z < BERM_RISE_M) continue;
+        // the top of the cliff: where it has stopped rising
+        let top = k + step;
+        while (top + 1 < pts.length && pts[top + 1].z - pts[top].z > 0.3) top++;
+        if (pts[top].z - pts[0].z >= BERM_MIN_M) land = top;
+        break;
+      }
+      if (land < 1) continue;
+      const ext = { ...part, xy: [[end[0], end[1]], ...pts.slice(1, land + 1).map(({ x, y }) => [x, y])], landedOn: [road.segIndex] };
+      added.push(ext);
+      // the approach now starts on the berm
+      const rest = [[pts[land].x, pts[land].y, pts[land].z], ...line.slice(pts[land].i + 1)];
+      road.xy = fromStart ? rest : rest.reverse();
+    }
+  }
+  return added;
+}
+
+// The approach road samples an abutment's height is fitted to (m from the
+// bridge's end), and the steepest grade that fit may carry on to it.
+const APPROACH_FIT_M = [4, 40];
+const APPROACH_MAX_GRADE = 0.08;
+
 function solveExportBridges(drivableRoads, terrainData, squareSize) {
   const toXY = (geometry) => geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
   const groundAt = (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize);
@@ -2538,18 +2605,59 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
         partSeg.push(segIndex);
       } else {
         lowerRoads.push({
+          segIndex,
           layer: Math.min(layer, 0),
           xy: xy.map(([x, y]) => [x, y, groundAt(x, y)]),
           half: (HIGHWAY_STYLE[seg.highway] ?? DEFAULT_ROAD_STYLE).width ?? 4,
         });
       }
     });
+    // carried-on approaches are deck parts of no bridge segment of their own
+    for (const ext of landOnBerms(parts, lowerRoads, groundAt)) {
+      parts.push(ext);
+      partSeg.push(-1);
+    }
     return { parts, partSeg, lowerRoads };
   };
   let { parts, partSeg, lowerRoads } = collect();
   const bySeg = new Map();
-  if (!parts.length) return { bySeg, decks: [], roadLines: [] };
-  let decks = solveBridgeDecks(parts, { groundAt, wetAt, lowerRoads, isFreeEnd });
+  if (!parts.length) return { bySeg, approaches: new Map(), decks: [], roadLines: [] };
+  // An abutment meets its approach road at the height the road arrives at:
+  // the ground along the approach, fitted and carried on to the bridge's end.
+  // Never the ground at the end itself: bare-earth (lidar) elevation has the
+  // bridge taken out, so the approach embankment ends in a cliff, and the
+  // OSM end of a bridge often lands at its foot (a deck starting metres
+  // below the road coming onto it).
+  const endHeight = (x, y) => {
+    const fits = [];
+    for (const r of lowerRoads) {
+      const a = r.xy[0]; const b = r.xy[r.xy.length - 1];
+      const line = Math.hypot(a[0] - x, a[1] - y) < 1.5 ? r.xy : Math.hypot(b[0] - x, b[1] - y) < 1.5 ? [...r.xy].reverse() : null;
+      if (!line) continue;
+      const samples = [];
+      let s0 = 0;
+      for (let i = 0; i + 1 < line.length && s0 < APPROACH_FIT_M[1]; i++) {
+        const L = Math.hypot(line[i + 1][0] - line[i][0], line[i + 1][1] - line[i][1]);
+        for (let s = Math.ceil(Math.max(s0, APPROACH_FIT_M[0]) / 2) * 2; s <= Math.min(s0 + L, APPROACH_FIT_M[1]); s += 2) {
+          const t = (s - s0) / (L || 1);
+          samples.push([s, groundAt(line[i][0] + (line[i + 1][0] - line[i][0]) * t, line[i][1] + (line[i + 1][1] - line[i][1]) * t)]);
+        }
+        s0 += L;
+      }
+      if (samples.length < 4) continue;
+      // Theil-Sen: a stretch of the approach still in the bridge's gap
+      // does not drag the fit down
+      const slopes = [];
+      for (let i = 0; i < samples.length; i++) {
+        for (let j = i + 1; j < samples.length; j++) slopes.push((samples[j][1] - samples[i][1]) / (samples[j][0] - samples[i][0]));
+      }
+      const median = (v) => { const q = [...v].sort((m, n) => m - n); return q[q.length >> 1]; };
+      const slope = Math.max(-APPROACH_MAX_GRADE, Math.min(APPROACH_MAX_GRADE, median(slopes)));
+      fits.push(median(samples.map(([d, z]) => z - slope * d)));
+    }
+    return fits.length ? Math.max(...fits) : groundAt(x, y);
+  };
+  let decks = solveBridgeDecks(parts, { groundAt, endHeight, wetAt, lowerRoads, isFreeEnd });
 
   // Embankments for the decks that fall short.
   const ramps = [];
@@ -2605,11 +2713,18 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
   const built = ramps.length > 0 ? raiseApproachEmbankments(terrainData, squareSize, ramps) : 0;
   if (built > 0) {
     ({ parts, partSeg, lowerRoads } = collect());
-    decks = solveBridgeDecks(parts, { groundAt, wetAt, lowerRoads, isFreeEnd });
+    decks = solveBridgeDecks(parts, { groundAt, endHeight, wetAt, lowerRoads, isFreeEnd });
   }
   gradeAbutments(terrainData, squareSize, decks);
-  for (const deck of decks) for (const part of deck.parts) bySeg.set(partSeg[part.index], part);
-  return { bySeg, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built };
+  for (const deck of decks) for (const part of deck.parts) if (partSeg[part.index] >= 0) bySeg.set(partSeg[part.index], part);
+  // approach roads a deck was carried on over (their road is drawn on it there)
+  const approaches = new Map();
+  for (const deck of decks) {
+    for (const part of deck.parts) {
+      for (const seg of parts[part.index].landedOn || []) approaches.set(seg, part);
+    }
+  }
+  return { bySeg, approaches, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built };
 }
 
 // The ground at each abutment meets the deck: the approach is graded to the
@@ -2617,11 +2732,25 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
 // ABUT_PAD_M), and the ground under the deck's first UNDER_DECK_M is lowered
 // wherever it would show through it. Without this a bridge started with a
 // step up or down, and the ground poked through low decks near their ends.
-const ABUT_FLAT_M = 4;
-const ABUT_PAD_M = 20;
-const ABUT_SIDE_M = 6;          // lateral feather beyond the deck's edge
+const ABUT_FLAT_M = 3;
+const ABUT_PAD_M = 12;
+const ABUT_SIDE_M = 4;          // lateral feather beyond the deck's edge
+const ABUT_MAX_SHIFT_M = 1.5;   // the pad never moves the ground further than this
 const UNDER_DECK_M = 30;
 const UNDER_DECK_CLEAR_M = 0.15;
+const UNDER_DECK_MAX_CUT_M = 2;  // a deck further under the ground than this is left to it
+
+/** Distance from (x, y) to a polyline [[x, y]...]. */
+function distanceToLine(xy, x, y) {
+  let best = Infinity;
+  for (let i = 0; i + 1 < xy.length; i++) {
+    const vx = xy[i + 1][0] - xy[i][0]; const vy = xy[i + 1][1] - xy[i][1];
+    const L2 = vx * vx + vy * vy || 1e-9;
+    const t = Math.max(0, Math.min(1, ((x - xy[i][0]) * vx + (y - xy[i][1]) * vy) / L2));
+    best = Math.min(best, Math.hypot(xy[i][0] + vx * t - x, xy[i][1] + vy * t - y));
+  }
+  return best;
+}
 
 /**
  * Shape the ground at every abutment of the solved decks (replaces
@@ -2700,7 +2829,8 @@ export function gradeAbutments(terrainData, squareSize, decks) {
       const claim = t + (l <= e.slab && a <= ABUT_FLAT_M ? 1 : 0);
       if (claim <= weight[idx]) return;
       weight[idx] = claim;
-      graded[idx] = Math.min(original[idx] + (e.zEnd + minHeight - original[idx]) * t, maxHeight);
+      const shift = Math.max(-ABUT_MAX_SHIFT_M, Math.min(ABUT_MAX_SHIFT_M, e.zEnd + minHeight - original[idx]));
+      graded[idx] = Math.min(original[idx] + shift * t, maxHeight);
       touched++;
     });
   }
@@ -2711,7 +2841,7 @@ export function gradeAbutments(terrainData, squareSize, decks) {
     eachPixel(e, (idx, a, l) => {
       if (a >= 0 || -a > UNDER_DECK_M || l > e.half) return;
       const cap = e.deckZBack(-a) - UNDER_DECK_CLEAR_M * Math.min(1, 0.1 - a / 3) + minHeight;
-      if (graded[idx] > cap) { graded[idx] = cap; touched++; }
+      if (graded[idx] > cap && graded[idx] - cap <= UNDER_DECK_MAX_CUT_M) { graded[idx] = cap; touched++; }
     });
   }
   if (touched) terrainData.heightMap = graded;
@@ -2926,7 +3056,10 @@ export function generateDecalRoads(terrainData, squareSize) {
         // (and its painted lines). Road nodes are mm-rounded below instead.
         const [wx, wy, groundZ] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
         const deckPart = bridges.bySeg.get(segIndex);
-        const wz = deckPart ? deckHeightAt(deckPart, wx, wy) + 0.1 : groundZ;
+        const carried = bridges.approaches?.get(segIndex);
+        const wz = deckPart ? deckHeightAt(deckPart, wx, wy) + 0.1
+          : carried && distanceToLine(carried.xy, wx, wy) < 1 ? deckHeightAt(carried, wx, wy) + 0.1
+            : groundZ;
         // Defense in depth: a non-finite node becomes an inf DecalRoad position
         // that BeamNG rejects at batch build, taking the whole road down. Source
         // geometry is already sanitized in buildRoadNetwork; skip here too so no
@@ -2985,7 +3118,7 @@ export function generateDecalRoads(terrainData, squareSize) {
           decal.name = sanitizeBeamNGObjectName(`${roadNamePrefix}_${nameSuffix}_${layerCode}`);
           // On a bridge the road clips onto the deck: without overObjects a
           // DecalRoad is projected down onto the terrain under it.
-          if (bridges.bySeg.has(segIndex)) decal.overObjects = true;
+          if (bridges.bySeg.has(segIndex) || bridges.approaches?.has(segIndex)) decal.overObjects = true;
           splineGroup.__items.push(decal);
           if (isCutPaintLayer(decal.__layer)) paintDecals.push({ decal, group: splineGroup, owner: segIndex });
         }

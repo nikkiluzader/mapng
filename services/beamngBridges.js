@@ -166,12 +166,14 @@ export function chainBridgeParts(parts) {
  *   groundAt(x, y): ground height
  *   crossings: [{ part, s, z, clear? }]: something under the deck at arc s of
  *     part (z its height; clear its own clearance, default the road's)
+ *   endHeight(x, y): the height an abutment at (x, y) meets the road at
+ *     (default the ground there)
  *   isFreeEnd(x, y): a chain end that is not an abutment (the bridge runs on
  *     past the map's edge): neither pinned to the ground nor capping the grade
  * Returns [z array per part] with .shortfall (m the deck stays under what it
  * should clear) and .abutments ([[x, y]] of its ground ends).
  */
-export function solveChain(parts, { groundAt, crossings = [], isFreeEnd = () => false }) {
+export function solveChain(parts, { groundAt, endHeight = groundAt, crossings = [], isFreeEnd = () => false }) {
   const key = (p) => `${Math.round(p[0] / JOIN_M)},${Math.round(p[1] / JOIN_M)}`;
   const nodeIds = new Map();
   const node = (p) => {
@@ -222,7 +224,7 @@ export function solveChain(parts, { groundAt, crossings = [], isFreeEnd = () => 
     if (isFreeEnd(...endXY.get(n))) free.add(n);
     else ends.push(n);
   }
-  const endZ = ends.map((n) => groundAt(...endXY.get(n)));
+  const endZ = ends.map((n) => endHeight(...endXY.get(n)));
   const endDist = ends.map((n) => dijkstra([[n, 0]]));
 
   // Base: abutment heights weighted by 1 / distance along the chain (a
@@ -383,7 +385,9 @@ export function waterCrossings(partIndex, xy, { wetAt, groundAt, nav = 0 }) {
  * solved first and crossed like roads.
  * Returns [{ parts: [{ index, xy, z, half }] }] per chain.
  */
-export function solveBridgeDecks(parts, { groundAt, wetAt = () => false, lowerRoads = [], isFreeEnd = () => false } = {}) {
+export function solveBridgeDecks(parts, {
+  groundAt, endHeight = groundAt, wetAt = () => false, lowerRoads = [], isFreeEnd = () => false,
+} = {}) {
   const resampled = parts.map((p) => ({ ...p, xy: resample(p.xy) }));
   const bbox = (xy, pad = 0) => {
     let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
@@ -410,7 +414,7 @@ export function solveBridgeDecks(parts, { groundAt, wetAt = () => false, lowerRo
       crossings.push(...planCrossings(pi, p.xy, under, groundAt));
       crossings.push(...waterCrossings(pi, p.xy, { wetAt, groundAt, nav }));
     });
-    const zs = solveChain(chainParts, { groundAt, crossings, isFreeEnd });
+    const zs = solveChain(chainParts, { groundAt, endHeight, crossings, isFreeEnd });
     const deck = {
       layer,
       parts: chainParts.map((p, k) => ({

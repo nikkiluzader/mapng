@@ -167,11 +167,11 @@ test('water lookup: the sea by its coastline, islands of mapped land in it, ship
 test('the ground at an abutment meets the deck: a flat pad, filled under its end, never through it', async () => {
   const { gradeAbutments } = await import('../services/exportBeamNGLevel.js');
   // 400 m map at 2 m a pixel, ground sloping across the road (y); a deck along
-  // +x ending at x = 0 at 3 m, rising to 6 m by x = -100, over ground at 2..4 m
+  // +x ending at x = 0 at 3 m, rising to 6 m by x = -100, over ground 1.5 m up
   const w = 201; const sq = 2; const size = w * sq;
   const heightMap = new Float32Array(w * w);
   const toWorld = (c, r) => [((c / (w - 1)) - 0.5) * size, (0.5 - r / (w - 1)) * size];
-  for (let r = 0; r < w; r++) for (let c = 0; c < w; c++) heightMap[r * w + c] = 3 + 0.1 * toWorld(c, r)[1] + (toWorld(c, r)[0] < 0 ? 4 : 0);
+  for (let r = 0; r < w; r++) for (let c = 0; c < w; c++) heightMap[r * w + c] = 3 + 0.1 * toWorld(c, r)[1] + (toWorld(c, r)[0] < 0 ? 1.5 : 0);
   const terrainData = { width: w, height: w, heightMap, minHeight: 0, maxHeight: 100 };
   const part = { xy: [[-100, 0], [-50, 0], [0, 0]], z: [6, 4.5, 3], half: 4 };
   const graded = gradeAbutments(terrainData, sq, [{ parts: [part], abutments: [[0, 0]] }]);
