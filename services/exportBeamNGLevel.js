@@ -32,7 +32,7 @@ import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS } from
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
   solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck,
-  liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE,
+  liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M,
 } from './beamngBridges.js';
 import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
@@ -698,7 +698,6 @@ function generatePowerWireDAEs(wires) {
   return out;
 }
 
-const BRIDGE_TILE_M = 512;
 export const BRIDGE_MATERIAL = 'mapng_bridge_concrete';
 
 /** Bridge concrete material (BeamNG's shared plain concrete). */
@@ -725,32 +724,31 @@ function getBridgeMaterialDefs() {
 }
 
 /**
- * Solved bridge decks as Collada shapes per BRIDGE_TILE_M tile (one object
- * each, culled by tile): visual mesh + a Colmesh-1 collision copy.
+ * Solved bridge decks as Collada shapes, one per bridge (its own object, so it
+ * can be picked, moved or deleted, and is culled on its own), with its origin
+ * at the bridge's centre: visual mesh + a Colmesh-1 collision copy.
+ * Returns [{ key, origin: [x, y, z], data, triangles }].
  */
 function generateBridgeDAEs(decks, groundAt, roadLines) {
-  const tiles = new Map();
-  for (const deck of decks) {
-    const p0 = deck.parts[0]?.xy?.[0];
-    if (!p0) continue;
-    const key = `${Math.floor(p0[0] / BRIDGE_TILE_M)}_${Math.floor(p0[1] / BRIDGE_TILE_M)}`.replace(/-/g, 'm');
-    if (!tiles.has(key)) tiles.set(key, { positions: [], uvs: [] });
-    const g = buildDeckGeometry(deck, { groundAt, roadLines });
-    const t = tiles.get(key);
-    for (const v of g.positions) t.positions.push(v);
-    for (const v of g.uvs) t.uvs.push(v);
-  }
   const out = [];
-  for (const [key, { positions, uvs }] of tiles) {
-    if (!positions.length) continue;
+  decks.forEach((deck, i) => {
+    const g = buildDeckGeometry(deck, { groundAt, roadLines });
+    if (!g.positions.length) return;
+    const pts = deck.parts.flatMap((p) => p.xy.map(([x, y], k) => [x, y, p.z[k]]));
+    const origin = [
+      Math.round(pts.reduce((n, p) => n + p[0], 0) / pts.length * 100) / 100,
+      Math.round(pts.reduce((n, p) => n + p[1], 0) / pts.length * 100) / 100,
+      Math.round(Math.min(...pts.map((p) => p[2])) * 100) / 100,
+    ];
+    const positions = Float32Array.from(g.positions, (v, k) => v - origin[k % 3]);
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
-    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.uvs), 2));
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: BRIDGE_MATERIAL }));
-    mesh.name = 'bridge_decks';
+    mesh.name = 'bridge_deck';
     const colGeo = new THREE.BufferGeometry();
-    colGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
+    colGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
     colGeo.name = 'Colmesh-1';
     const collision = new THREE.Mesh(colGeo, new THREE.MeshBasicMaterial({ name: BRIDGE_MATERIAL }));
     collision.name = 'Colmesh-1';
@@ -763,10 +761,10 @@ function generateBridgeDAEs(decks, groundAt, roadLines) {
     base00.add(start01);
     base00.updateMatrixWorld(true);
     const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
-    if (result?.data) out.push({ key, data: result.data, triangles: positions.length / 9 });
+    if (result?.data) out.push({ key: `b${String(i + 1).padStart(3, '0')}`, origin, data: result.data, triangles: g.positions.length / 9 });
     geo.dispose();
     colGeo.dispose();
-  }
+  });
   return out;
 }
 
@@ -2530,7 +2528,13 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
       const xy = toXY(seg.geometry);
       const layer = getEffectiveRoadLayer(tags);
       if (isBridgeRoad(tags)) {
-        parts.push({ xy: xy.map(([x, y]) => [x, y]), half: 4, layer: Math.max(1, layer), structure: structureOf(tags, xy) });
+        // the drawn half width is known only later; this estimate shapes the
+        // ground at the abutments (gradeAbutments)
+        const cs = estimateRoadCrossSection(tags, seg.highway, isOneWayRoad(tags), {
+          fallbackHalfWidth: (HIGHWAY_STYLE[seg.highway] ?? DEFAULT_ROAD_STYLE).width,
+        });
+        const half = cs.drivingHalfWidth + (cs.leftExtra + cs.rightExtra) / 2;
+        parts.push({ xy: xy.map(([x, y]) => [x, y]), half, layer: Math.max(1, layer), structure: structureOf(tags, xy) });
         partSeg.push(segIndex);
       } else {
         lowerRoads.push({
@@ -2603,8 +2607,115 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
     ({ parts, partSeg, lowerRoads } = collect());
     decks = solveBridgeDecks(parts, { groundAt, wetAt, lowerRoads, isFreeEnd });
   }
+  gradeAbutments(terrainData, squareSize, decks);
   for (const deck of decks) for (const part of deck.parts) bySeg.set(partSeg[part.index], part);
   return { bySeg, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built };
+}
+
+// The ground at each abutment meets the deck: the approach is graded to the
+// deck end's height (flat for ABUT_FLAT_M, then blending back to the ground by
+// ABUT_PAD_M), and the ground under the deck's first UNDER_DECK_M is lowered
+// wherever it would show through it. Without this a bridge started with a
+// step up or down, and the ground poked through low decks near their ends.
+const ABUT_FLAT_M = 4;
+const ABUT_PAD_M = 20;
+const ABUT_SIDE_M = 6;          // lateral feather beyond the deck's edge
+const UNDER_DECK_M = 30;
+const UNDER_DECK_CLEAR_M = 0.15;
+
+/**
+ * Shape the ground at every abutment of the solved decks (replaces
+ * terrainData.heightMap with a graded copy; the app's own terrain is shared).
+ */
+export function gradeAbutments(terrainData, squareSize, decks) {
+  const { width, height, minHeight } = terrainData;
+  const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
+  const original = terrainData.heightMap;
+  const graded = Float32Array.from(original);
+  const worldSize = width * squareSize;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const smooth = (t) => t * t * (3 - 2 * t);
+  const ends = [];
+  for (const deck of decks) {
+    for (const part of deck.parts) {
+      const { xy, z } = part;
+      if (xy.length < 2) continue;
+      for (const end of [0, xy.length - 1]) {
+        const [ex, ey] = xy[end];
+        if (!deck.abutments.some(([ax, ay]) => Math.hypot(ax - ex, ay - ey) < 1)) continue;
+        const inner = xy[end === 0 ? 1 : xy.length - 2];
+        const len = Math.hypot(ex - inner[0], ey - inner[1]) || 1;
+        // deck height going back into the bridge from this end
+        const order = end === 0 ? xy.map((_, i) => i) : xy.map((_, i) => xy.length - 1 - i);
+        const s = [0];
+        for (let k = 1; k < order.length; k++) s.push(s[k - 1] + Math.hypot(xy[order[k]][0] - xy[order[k - 1]][0], xy[order[k]][1] - xy[order[k - 1]][1]));
+        const deckZBack = (d) => {
+          let k = 0;
+          while (k < s.length - 2 && s[k + 1] < d) k++;
+          const f = Math.min(1, Math.max(0, (d - s[k]) / Math.max(1e-9, s[k + 1] - s[k])));
+          return z[order[k]] + (z[order[k + 1]] - z[order[k]]) * f;
+        };
+        ends.push({
+          ex, ey, u: [(ex - inner[0]) / len, (ey - inner[1]) / len],   // out of the bridge, onto the approach
+          // graded one grid square past the slab's edge (the terrain between
+          // grid points blends to its neighbours)
+          zEnd: z[end], slab: part.half + PARAPET_W_M, half: part.half + PARAPET_W_M + squareSize, deckZBack,
+        });
+      }
+    }
+  }
+  // each end's pixels: (c, r, x, y, along (> 0 on the approach), across)
+  const eachPixel = (e, fn) => {
+    const reach = Math.max(ABUT_PAD_M, UNDER_DECK_M) + e.half + ABUT_SIDE_M;
+    const [c0, r1] = toPixel(e.ex - reach, e.ey - reach);
+    const [c1, r0] = toPixel(e.ex + reach, e.ey + reach);
+    for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+      for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+        const [x, y] = toWorld(c, r);
+        fn(r * width + c, (x - e.ex) * e.u[0] + (y - e.ey) * e.u[1], Math.abs(-(x - e.ex) * e.u[1] + (y - e.ey) * e.u[0]));
+      }
+    }
+  };
+  // 1. approach pads; where two overlap (twin decks, a ramp beside the main
+  // line) a deck's own width beats the other's margin, else the stronger claim
+  const weight = new Float32Array(width * height);
+  let touched = 0;
+  for (const e of ends) {
+    eachPixel(e, (idx, a, l) => {
+      if (a < 0 && a >= -squareSize && l <= e.half) {
+        // the abutment: the first grid square under the deck filled up to it,
+        // or the road dips on its way to the slab
+        const claim = l <= e.slab ? 2 : 1;
+        if (claim <= weight[idx]) return;
+        weight[idx] = claim;
+        graded[idx] = Math.min(e.deckZBack(-a) - 0.05 + minHeight, maxHeight);
+        touched++;
+        return;
+      }
+      if (a < 0 || a > ABUT_PAD_M || l > e.half + ABUT_SIDE_M) return;
+      const along = a <= ABUT_FLAT_M ? 1 : smooth(1 - (a - ABUT_FLAT_M) / (ABUT_PAD_M - ABUT_FLAT_M));
+      const across = l <= e.half ? 1 : smooth(1 - (l - e.half) / ABUT_SIDE_M);
+      const t = along * across;
+      const claim = t + (l <= e.slab && a <= ABUT_FLAT_M ? 1 : 0);
+      if (claim <= weight[idx]) return;
+      weight[idx] = claim;
+      graded[idx] = Math.min(original[idx] + (e.zEnd + minHeight - original[idx]) * t, maxHeight);
+      touched++;
+    });
+  }
+  // 2. under every deck's first UNDER_DECK_M, below its top: just under it at
+  // the very end (no lip where the road meets it), the full clearance a few
+  // metres in
+  for (const e of ends) {
+    eachPixel(e, (idx, a, l) => {
+      if (a >= 0 || -a > UNDER_DECK_M || l > e.half) return;
+      const cap = e.deckZBack(-a) - UNDER_DECK_CLEAR_M * Math.min(1, 0.1 - a / 3) + minHeight;
+      if (graded[idx] > cap) { graded[idx] = cap; touched++; }
+    });
+  }
+  if (touched) terrainData.heightMap = graded;
+  return touched;
 }
 
 /**
@@ -6440,7 +6551,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     decalRoads.bridges?.roadLines || [],
   );
   if (bridgeDecks.length > 0) {
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles in ${bridgeDaes.length} tile(s).`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles, one object per bridge.`);
   }
   const sidewalks = includeRoads && includeSidewalks
     ? buildSidewalkMeshes(groundCarriageways, { zones: decalRoads.crosswalkZones || [] })
@@ -6919,7 +7030,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (bridgeDaes.length > 0) {
     zip.folder(`${base}/map_assets/custom_assets/bridges`);
     for (const { key, data } of bridgeDaes) {
-      zip.file(`${base}/map_assets/custom_assets/bridges/bridges_${key}.dae`, await toZipBinary(data));
+      zip.file(`${base}/map_assets/custom_assets/bridges/bridge_${key}.dae`, await toZipBinary(data));
     }
     zip.file(`${base}/map_assets/custom_assets/bridges/main.materials.json`, JSON.stringify(getBridgeMaterialDefs(), null, 2));
   }
@@ -7410,16 +7521,16 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     });
   }
 
-  // Bridge decks, one object per tile. They collide, and the road decals on
+  // Bridge decks, one object per bridge. They collide, and the road decals on
   // them project onto their tops (no decalType: None here).
-  for (const { key } of bridgeDaes) {
+  for (const { key, origin } of bridgeDaes) {
     levelObjectItems.push({
       __parent: 'level_objects',
       class: 'TSStatic',
-      name: `bridges_${key}`,
+      name: `bridge_${key}`,
       persistentId: generatePersistentId(),
-      position: [0, 0, 0],
-      shapeName: `/levels/${levelName}/map_assets/custom_assets/bridges/bridges_${key}.dae`,
+      position: origin,
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/bridges/bridge_${key}.dae`,
       collisionType: 'Collision Mesh',
       prebuildCollisionData: 0,
       useInstanceRenderData: true,

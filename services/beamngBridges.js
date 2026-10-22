@@ -419,7 +419,6 @@ export function solveBridgeDecks(parts, { groundAt, wetAt = () => false, lowerRo
       shortfall: zs.shortfall,
       abutments: zs.abutments,
     };
-    for (const part of deck.parts) overshootAbutments(part, deck.abutments, groundAt);
     decks.push(deck);
     for (const p of deck.parts) solvedLines.push({ layer, deck: true, xy: p.xy.map(([x, y], k) => [x, y, p.z[k]]), box: bbox(p.xy) });
   }
@@ -456,30 +455,6 @@ function planCrossings(partIndex, xy, lines, groundAt) {
     }
   }
   return out;
-}
-
-const OVERSHOOT_M = 8;
-
-// The deck runs on a little past each abutment, into the approach, its top
-// coming down to just under the ground there: no step where the road meets
-// the slab (the ground at an abutment is rarely as flat as the deck end).
-function overshootAbutments(part, abutments, groundAt) {
-  const isAbutment = (p) => abutments.some(([x, y]) => Math.hypot(p[0] - x, p[1] - y) < JOIN_M * 2);
-  const extend = (end, next, zEnd) => {
-    const len = Math.hypot(end[0] - next[0], end[1] - next[1]) || 1;
-    const u = [(end[0] - next[0]) / len, (end[1] - next[1]) / len];
-    const far = [end[0] + u[0] * OVERSHOOT_M, end[1] + u[1] * OVERSHOOT_M];
-    const zFar = Math.min(zEnd, groundAt(far[0], far[1]) - 0.05);
-    return [0.5, 1].map((f) => ({ xy: [end[0] + u[0] * OVERSHOOT_M * f, end[1] + u[1] * OVERSHOOT_M * f], z: zEnd + (zFar - zEnd) * f }));
-  };
-  if (part.xy.length < 2) return;
-  const n = part.xy.length;
-  if (isAbutment(part.xy[n - 1])) {
-    for (const q of extend(part.xy[n - 1], part.xy[n - 2], part.z[n - 1])) { part.xy.push(q.xy); part.z.push(q.z); }
-  }
-  if (isAbutment(part.xy[0])) {
-    for (const q of extend(part.xy[0], part.xy[1], part.z[0])) { part.xy.unshift(q.xy); part.z.unshift(q.z); }
-  }
 }
 
 /** Deck height at (x, y) on a solved part (nearest point of its centreline). */
