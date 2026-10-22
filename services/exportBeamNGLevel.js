@@ -2753,6 +2753,27 @@ function distanceToLine(xy, x, y) {
   return best;
 }
 
+// Bridge grading edits the export's own copy of the heightmap (the app's
+// terrain is shared): one copy per export, made at the first changed pixel. A
+// 16384² grid is 1 GiB, and a copy per pass plus a full-grid weight buffer ran
+// the tab out of memory. `ground` is a pixel's height before this pass.
+const exportHeightMaps = new WeakSet();
+function heightMapEditor(terrainData) {
+  const before = new Map();
+  return {
+    at: (idx) => terrainData.heightMap[idx],
+    ground: (idx) => (before.has(idx) ? before.get(idx) : terrainData.heightMap[idx]),
+    set(idx, value) {
+      if (!exportHeightMaps.has(terrainData.heightMap)) {
+        terrainData.heightMap = terrainData.heightMap.slice();
+        exportHeightMaps.add(terrainData.heightMap);
+      }
+      if (!before.has(idx)) before.set(idx, terrainData.heightMap[idx]);
+      terrainData.heightMap[idx] = value;
+    },
+  };
+}
+
 /**
  * Shape the ground at every abutment of the solved decks (replaces
  * terrainData.heightMap with a graded copy; the app's own terrain is shared).
@@ -2760,8 +2781,7 @@ function distanceToLine(xy, x, y) {
 export function gradeAbutments(terrainData, squareSize, decks) {
   const { width, height, minHeight } = terrainData;
   const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
-  const original = terrainData.heightMap;
-  const graded = Float32Array.from(original);
+  const hm = heightMapEditor(terrainData);
   const worldSize = width * squareSize;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
   const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
@@ -2809,7 +2829,7 @@ export function gradeAbutments(terrainData, squareSize, decks) {
   };
   // 1. approach pads; where two overlap (twin decks, a ramp beside the main
   // line) a deck's own width beats the other's margin, else the stronger claim
-  const weight = new Float32Array(width * height);
+  const weight = new Map();
   let touched = 0;
   for (const e of ends) {
     eachPixel(e, (idx, a, l) => {
@@ -2817,9 +2837,9 @@ export function gradeAbutments(terrainData, squareSize, decks) {
         // the abutment: the first grid square under the deck filled up to it,
         // or the road dips on its way to the slab
         const claim = l <= e.slab ? 2 : 1;
-        if (claim <= weight[idx]) return;
-        weight[idx] = claim;
-        graded[idx] = Math.min(e.deckZBack(-a) - 0.05 + minHeight, maxHeight);
+        if (claim <= (weight.get(idx) ?? 0)) return;
+        weight.set(idx, claim);
+        hm.set(idx, Math.min(e.deckZBack(-a) - 0.05 + minHeight, maxHeight));
         touched++;
         return;
       }
@@ -2828,10 +2848,11 @@ export function gradeAbutments(terrainData, squareSize, decks) {
       const across = l <= e.half ? 1 : smooth(1 - (l - e.half) / ABUT_SIDE_M);
       const t = along * across;
       const claim = t + (l <= e.slab && a <= ABUT_FLAT_M ? 1 : 0);
-      if (claim <= weight[idx]) return;
-      weight[idx] = claim;
-      const shift = Math.max(-ABUT_MAX_SHIFT_M, Math.min(ABUT_MAX_SHIFT_M, e.zEnd + minHeight - original[idx]));
-      graded[idx] = Math.min(original[idx] + shift * t, maxHeight);
+      if (claim <= (weight.get(idx) ?? 0)) return;
+      weight.set(idx, claim);
+      const ground = hm.ground(idx);
+      const shift = Math.max(-ABUT_MAX_SHIFT_M, Math.min(ABUT_MAX_SHIFT_M, e.zEnd + minHeight - ground));
+      hm.set(idx, Math.min(ground + shift * t, maxHeight));
       touched++;
     });
   }
@@ -2842,10 +2863,10 @@ export function gradeAbutments(terrainData, squareSize, decks) {
     eachPixel(e, (idx, a, l) => {
       if (a >= 0 || -a > UNDER_DECK_M || l > e.half) return;
       const cap = e.deckZBack(-a) - UNDER_DECK_CLEAR_M * Math.min(1, 0.1 - a / 3) + minHeight;
-      if (graded[idx] > cap && graded[idx] - cap <= UNDER_DECK_MAX_CUT_M) { graded[idx] = cap; touched++; }
+      const z = hm.at(idx);
+      if (z > cap && z - cap <= UNDER_DECK_MAX_CUT_M) { hm.set(idx, cap); touched++; }
     });
   }
-  if (touched) terrainData.heightMap = graded;
   return touched;
 }
 
@@ -2860,8 +2881,7 @@ export function gradeAbutments(terrainData, squareSize, decks) {
 function raiseApproachEmbankments(terrainData, squareSize, ramps) {
   const { width, height, minHeight } = terrainData;
   const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
-  const original = terrainData.heightMap;
-  const raised = Float32Array.from(original);
+  const hm = heightMapEditor(terrainData);
   const worldSize = width * squareSize;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
   const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
@@ -2919,13 +2939,14 @@ function raiseApproachEmbankments(terrainData, squareSize, ramps) {
         const top = roadZ + rampLift(along, ramp.lift, ramp.length);
         let target = (best <= flat ? top : top - (best - flat) * RAMP_SIDE_SLOPE) + minHeight;
         const idx = r * width + c;
-        if (target <= raised[idx]) continue;
+        if (target <= hm.at(idx)) continue;
+        const ground = hm.ground(idx);
         const room = roomAt(x, y);
-        if (room < 0 || original[idx] + room * RAMP_SIDE_SLOPE < target) {
-          if (target - original[idx] > 0.05) return false;
+        if (room < 0 || ground + room * RAMP_SIDE_SLOPE < target) {
+          if (target - ground > 0.05) return false;
           continue;
         }
-        if (write) raised[idx] = Math.min(target, maxHeight);
+        if (write) hm.set(idx, Math.min(target, maxHeight));
       }
     }
     return true;
@@ -2934,7 +2955,6 @@ function raiseApproachEmbankments(terrainData, squareSize, ramps) {
   for (const ramp of ramps) {
     if (apply(ramp, false)) { apply(ramp, true); built++; }
   }
-  terrainData.heightMap = raised;
   return built;
 }
 
