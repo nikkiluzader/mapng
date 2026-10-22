@@ -252,21 +252,24 @@
             />
           </div>
 
-          <!-- Step label -->
-          <div class="flex justify-between items-start gap-2">
-            <span class="min-w-0 flex-1 text-[11px] leading-snug text-gray-600 dark:text-gray-400 break-words">{{ beamNGProgressStep }}</span>
-            <span class="text-[11px] font-mono text-[#FF6600] ml-2 shrink-0">{{ beamNGProgressPct }}%</span>
+          <!-- Step label: fixed height (the text changes many times a second;
+               long lines clamp, full text on hover) -->
+          <div class="flex justify-between items-start gap-2 h-[2.875rem]">
+            <span class="min-w-0 flex-1 text-[11px] leading-snug text-gray-600 dark:text-gray-400 break-words line-clamp-3" :title="beamNGProgressStep">{{ beamNGProgressStep }}</span>
+            <span class="w-9 text-right text-[11px] font-mono text-[#FF6600] shrink-0">{{ beamNGProgressPct }}%</span>
           </div>
 
-          <!-- Finished steps (most recent last) and elapsed time -->
-          <div v-if="beamNGProgressDone.length || beamNGElapsedMs" class="flex flex-col gap-0.5 border-t border-gray-100 dark:border-gray-800 pt-2">
-            <div
-              v-for="(done, i) in beamNGProgressDone.slice(-5)"
-              :key="i"
-              class="flex justify-between gap-2 text-[10px] leading-snug text-gray-400 dark:text-gray-500"
-            >
-              <span class="min-w-0 flex-1 truncate">✓ {{ done.step }}</span>
-              <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
+          <!-- Finished steps (most recent last, room for five) and elapsed time -->
+          <div class="border-t border-gray-100 dark:border-gray-800 pt-2">
+            <div class="h-[78px] flex flex-col gap-0.5 overflow-hidden">
+              <div
+                v-for="(done, i) in beamNGProgressDone.slice(-5)"
+                :key="i"
+                class="flex justify-between gap-2 text-[10px] leading-snug text-gray-400 dark:text-gray-500"
+              >
+                <span class="min-w-0 flex-1 truncate" :title="done.step">✓ {{ done.step }}</span>
+                <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
+              </div>
             </div>
             <div class="flex justify-end text-[10px] font-mono text-gray-500 dark:text-gray-400">
               {{ t('exportPanel.elapsed') }} {{ formatStepDuration(beamNGElapsedMs) }}

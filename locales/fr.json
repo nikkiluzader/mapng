@@ -664,7 +664,6 @@
     "loadingScene": "Chargement de la scene 3D...",
     "processingTerrain": "Traitement du terrain",
     "highRésolutionWait": "La haute resolution (2048+) peut prendre 1-2 minutes.",
-    "veryLargeAreaWait": "Zone tres grande (4k/8k). Veuillez patienter...",
     "batchCacheCleared": "Cache du lot vide.",
     "batchCacheClearFailed": "Échec du nettoyage du cache du lot.",
     "status": {

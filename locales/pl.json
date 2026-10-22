@@ -663,8 +663,6 @@
   "app": {
     "loadingScene": "Ładowanie sceny 3D...",
     "processingTerrain": "Przetwarzanie terenu",
-    "highResolutionWait": "Wysoka rozdzielczość (2048+) może trwać 1-2 minuty.",
-    "veryLargeAreaWait": "Bardzo duży obszar (4k/8k). Proszę czekać...",
     "batchCacheCleared": "Pamięć podręczna zadania wsadowego wyczyszczona.",
     "batchCacheClearFailed": "Nie udało się wyczyścić pamięci podręcznej zadania wsadowego.",
     "status": {

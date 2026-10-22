@@ -716,8 +716,6 @@
   "app": {
     "loadingScene": "Loading 3D Scene...",
     "processingTerrain": "Processing Terrain",
-    "highResolutionWait": "High resolution (2048+) may take 1-2 minutes.",
-    "veryLargeAreaWait": "Very large area (4k/8k). Please wait...",
     "batchCacheCleared": "Batch cache cleared.",
     "batchCacheClearFailed": "Failed to clear batch cache.",
     "status": {

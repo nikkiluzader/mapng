@@ -664,8 +664,6 @@
   "app": {
     "loadingScene": "Cargando escena 3D...",
     "processingTerrain": "Procesando terreno",
-    "highResolutionWait": "La resolucion alta (2048+) puede tardar 1-2 minutos.",
-    "veryLargeAreaWait": "Area muy grande (4k/8k). Espera por favor...",
     "batchCacheCleared": "Cache de lote limpiada.",
     "batchCacheClearFailed": "No se pudo limpiar la cache de lote.",
     "status": {

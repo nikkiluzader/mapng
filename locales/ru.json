@@ -663,8 +663,6 @@
   "app": {
     "loadingScene": "Загрузка 3D-сцены...",
     "processingTerrain": "Обработка рельефа",
-    "highResolutionWait": "Высокое разрешение (2048+) может занять 1-2 минуты.",
-    "veryLargeAreaWait": "Очень большая область (4k/8k). Пожалуйста, подождите...",
     "batchCacheCleared": "Кэш пакетной задачи очищен.",
     "batchCacheClearFailed": "Не удалось очистить кэш пакетной задачи.",
     "status": {

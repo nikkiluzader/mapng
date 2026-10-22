@@ -7262,7 +7262,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     String(obj?.shapeName || '').toLowerCase().includes('eca_bld_wood_fence_a.dae')
   ));
 
-  beginStep('vegetation', `Planting ${[includeTrees && 'trees and bushes', includeRocks && 'rocks'].filter(Boolean).join(' and ') || 'nothing (vegetation off)'}, ground cover and props…`);
+  const plants = [includeTrees && 'trees and bushes', includeRocks && 'rocks'].filter(Boolean).join(', ');
+  beginStep('vegetation', plants ? `Planting ${plants}, ground cover and props…` : 'Placing ground cover and props…');
   await yield_();
   const forestPlacements = (includeTrees || includeRocks)
     ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome)

@@ -147,37 +147,37 @@
         
         <!-- Loading Overlay -->
         <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm">
-          <div class="text-center p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl min-w-[300px]">
+          <!-- Fixed size: the text changes many times a second, so every area
+               keeps its height (long status lines clamp, full text on hover) -->
+          <div class="text-center p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl w-[min(26rem,calc(100vw-2rem))]">
             <Loader2 :size="48" class="text-[#FF6600] animate-spin mx-auto mb-4" />
             <h3 class="text-xl text-gray-900 dark:text-white font-bold mb-2">{{ t('app.processingTerrain') }}</h3>
             <!-- Overall progress (services/generationProgress.js), the current step,
                  the steps finished with their durations, and the time so far -->
-            <div class="mb-4 w-full max-w-sm mx-auto space-y-1.5 text-left">
+            <div class="w-full space-y-1.5 text-left">
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
                 <div class="h-full rounded-full bg-[#FF6600] transition-all duration-500 ease-out" :style="{ width: loadingOverallPct + '%' }"></div>
               </div>
-              <div class="flex items-start justify-between gap-2">
-                <span class="min-w-0 flex-1 text-[12px] leading-snug text-gray-600 dark:text-gray-400 break-words">{{ loadingStatus }}</span>
-                <span class="text-[11px] font-mono text-[#FF6600] shrink-0">{{ loadingOverallPct }}%</span>
+              <div class="flex items-start justify-between gap-2 h-[3.125rem]">
+                <span class="min-w-0 flex-1 text-[12px] leading-snug text-gray-600 dark:text-gray-400 break-words line-clamp-3" :title="loadingStatus">{{ loadingStatus }}</span>
+                <span class="w-9 text-right text-[11px] font-mono text-[#FF6600] shrink-0">{{ loadingOverallPct }}%</span>
               </div>
-              <div v-if="loadingProgressDetail" class="text-[11px] text-gray-500 dark:text-gray-400">{{ loadingProgressDetail }}</div>
-              <div v-if="loadingDone.length || loadingElapsedMs" class="flex flex-col gap-0.5 border-t border-gray-100 dark:border-gray-800 pt-2">
-                <div
-                  v-for="(done, i) in loadingDone.slice(-5)"
-                  :key="i"
-                  class="flex justify-between gap-2 text-[10px] leading-snug text-gray-400 dark:text-gray-500"
-                >
-                  <span class="min-w-0 flex-1 truncate">✓ {{ done.step }}</span>
-                  <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
+              <div class="h-4 text-[11px] leading-4 text-gray-500 dark:text-gray-400 truncate" :title="loadingProgressDetail">{{ loadingProgressDetail }}</div>
+              <div class="border-t border-gray-100 dark:border-gray-800 pt-2">
+                <div class="h-[78px] flex flex-col gap-0.5 overflow-hidden">
+                  <div
+                    v-for="(done, i) in loadingDone.slice(-5)"
+                    :key="i"
+                    class="flex justify-between gap-2 text-[10px] leading-snug text-gray-400 dark:text-gray-500"
+                  >
+                    <span class="min-w-0 flex-1 truncate" :title="done.step">✓ {{ done.step }}</span>
+                    <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
+                  </div>
                 </div>
                 <div class="flex justify-end text-[10px] font-mono text-gray-500 dark:text-gray-400">
                   {{ t('exportPanel.elapsed') }} {{ formatStepDuration(loadingElapsedMs) }}
                 </div>
               </div>
-            </div>
-            <div class="text-xs text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
-                <span v-if="resolution >= 2048">{{ t('app.highResolutionWait') }}</span>
-                <span v-if="resolution >= 4096" class="block text-amber-500 mt-1">{{ t('app.veryLargeAreaWait') }}</span>
             </div>
             <button
               @click="cancelGeneration"

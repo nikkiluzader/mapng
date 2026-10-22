@@ -663,8 +663,6 @@
   "app": {
     "loadingScene": "3D-Szene wird geladen...",
     "processingTerrain": "Terrain wird verarbeitet",
-    "highResolutionWait": "Hohe Auflösung (2048+) kann 1-2 Minuten dauern.",
-    "veryLargeAreaWait": "Sehr große Fläche (4k/8k). Bitte warten...",
     "batchCacheCleared": "Batch-Cache gelöscht.",
     "batchCacheClearFailed": "Batch-Cache konnte nicht gelöscht werden.",
     "status": {
