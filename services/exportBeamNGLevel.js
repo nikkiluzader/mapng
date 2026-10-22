@@ -2340,8 +2340,20 @@ const isBridgeRoad = (tags = {}) => (
 // Half widths (m) for linear waterways when deciding what a bridge is over.
 const WATERWAY_HALF_M = { river: 10, canal: 6, stream: 2, drain: 1, ditch: 1 };
 
-/** wetAt(x, y): OSM water (areas, and rivers / streams by a typical width). */
-function buildWaterLookup(terrainData, squareSize) {
+// Within this far of an OSM coastline its side decides land or sea (OSM draws
+// coastlines with the land on the left): river mouths and bays near the sea
+// are often mapped as sea, with no water polygon (the St. Johns at Dames Point).
+const COAST_REACH_M = 2000;
+const COAST_CELL_M = 256;
+// Water within this far of a ship-channel line (waterway tagged ship /
+// deep_draft) is a ship channel.
+const SHIP_CHANNEL_REACH_M = 150;
+
+/**
+ * wetAt(x, y): 0 on land, 1 over OSM water (areas, rivers / streams by a
+ * typical width, the sea by its coastline), 2 over a ship channel.
+ */
+export function buildWaterLookup(terrainData, squareSize) {
   const CELL = 64;
   const cells = new Map();
   const add = (box, item) => {
@@ -2364,9 +2376,89 @@ function buildWaterLookup(terrainData, squareSize) {
       Math.min(...xy.map((p) => p[0])) - pad, Math.min(...xy.map((p) => p[1])) - pad,
       Math.max(...xy.map((p) => p[0])) + pad, Math.max(...xy.map((p) => p[1])) + pad,
     ];
-    if (half != null && !closed) add(box, { line: xy, half });
-    else if (closed) add(box, { ring: xy, holes: (f.holes || []).map((h) => h.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0))) });
+    const ship = f.tags?.deep_draft === 'yes' || f.tags?.ship === 'yes';
+    // Polygons assembled from relations need not repeat their first point:
+    // anything but an open waterway line is an area.
+    if (half != null && !closed) add(box, { line: xy, half, ship });
+    else if (xy.length >= 3) add(box, { ring: xy, ship, holes: (f.holes || []).map((h) => h.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0))) });
   }
+  // ship-channel lines, coastline segments and mapped land (islands in the
+  // sea: a wood or a marsh with no coastline of its own), each in their grid
+  const shipLines = [];
+  const coast = new Map();
+  const landCells = new Map();
+  const LAND_NATURAL = new Set(['wood', 'scrub', 'grassland', 'heath', 'wetland', 'sand', 'beach', 'bare_rock', 'scree']);
+  for (const f of terrainData.osmFeatures || []) {
+    const t = f.tags || {};
+    const isLand = (f.type === 'building' || (f.type === 'landuse' && (t.landuse || t.leisure || LAND_NATURAL.has(t.natural))))
+      && !t.water && t.natural !== 'water';
+    if (!isLand || !Array.isArray(f.geometry) || f.geometry.length < 3) continue;
+    const ring = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
+    const xs = ring.map((p) => p[0]); const ys = ring.map((p) => p[1]);
+    for (let cx = Math.floor(Math.min(...xs) / COAST_CELL_M); cx <= Math.floor(Math.max(...xs) / COAST_CELL_M); cx++) {
+      for (let cy = Math.floor(Math.min(...ys) / COAST_CELL_M); cy <= Math.floor(Math.max(...ys) / COAST_CELL_M); cy++) {
+        const k = `${cx},${cy}`;
+        if (!landCells.has(k)) landCells.set(k, []);
+        landCells.get(k).push(ring);
+      }
+    }
+  }
+  for (const f of terrainData.osmFeatures || []) {
+    if (!Array.isArray(f.geometry) || f.geometry.length < 2) continue;
+    const isShip = f.type === 'water' && f.tags?.waterway && (f.tags.deep_draft === 'yes' || f.tags.ship === 'yes');
+    if (!isShip && f.type !== 'coastline') continue;
+    const xy = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
+    if (isShip) { shipLines.push(xy); continue; }
+    for (let i = 0; i + 1 < xy.length; i++) {
+      const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
+      for (let cx = Math.floor(Math.min(ax, bx) / COAST_CELL_M); cx <= Math.floor(Math.max(ax, bx) / COAST_CELL_M); cx++) {
+        for (let cy = Math.floor(Math.min(ay, by) / COAST_CELL_M); cy <= Math.floor(Math.max(ay, by) / COAST_CELL_M); cy++) {
+          const k = `${cx},${cy}`;
+          if (!coast.has(k)) coast.set(k, []);
+          coast.get(k).push([ax, ay, bx, by]);
+        }
+      }
+    }
+  }
+  const nearest = (x, y, segs) => {
+    let best = null; let bestD = Infinity;
+    for (const [ax, ay, bx, by] of segs) {
+      const vx = bx - ax; const vy = by - ay;
+      const L2 = vx * vx + vy * vy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
+      const d = Math.hypot(ax + vx * t - x, ay + vy * t - y);
+      if (d < bestD) { bestD = d; best = [ax, ay, bx, by]; }
+    }
+    return { seg: best, d: bestD };
+  };
+  const seaAt = (x, y) => {
+    if (!coast.size) return false;
+    const reach = Math.ceil(COAST_REACH_M / COAST_CELL_M);
+    const cx = Math.floor(x / COAST_CELL_M); const cy = Math.floor(y / COAST_CELL_M);
+    // the nearest coastline segment, searching outward ring by ring
+    for (let r = 0; r <= reach; r++) {
+      const segs = [];
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) segs.push(...(coast.get(`${cx + dx},${cy + dy}`) || []));
+      }
+      if (!segs.length) continue;
+      const { seg, d } = nearest(x, y, segs);
+      if (d > (r + 1) * COAST_CELL_M && r < reach) continue;   // something nearer may sit one ring out
+      if (d > COAST_REACH_M) return false;
+      const [ax, ay, bx, by] = seg;
+      return (bx - ax) * (y - ay) - (by - ay) * (x - ax) < 0;   // right of the coastline: the sea
+    }
+    return false;
+  };
+  const nearShipChannel = (x, y) => shipLines.some((line) => {
+    for (let i = 0; i + 1 < line.length; i++) {
+      const vx = line[i + 1][0] - line[i][0]; const vy = line[i + 1][1] - line[i][1];
+      const L2 = vx * vx + vy * vy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((x - line[i][0]) * vx + (y - line[i][1]) * vy) / L2));
+      if (Math.hypot(line[i][0] + vx * t - x, line[i][1] + vy * t - y) < SHIP_CHANNEL_REACH_M) return true;
+    }
+    return false;
+  });
   const inRing = (x, y, ring) => {
     let inside = false;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -2377,9 +2469,10 @@ function buildWaterLookup(terrainData, squareSize) {
     return inside;
   };
   return (x, y) => {
+    let wet = 0;
     for (const item of cells.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || []) {
       if (item.ring) {
-        if (inRing(x, y, item.ring) && !item.holes.some((h) => inRing(x, y, h))) return true;
+        if (inRing(x, y, item.ring) && !item.holes.some((h) => inRing(x, y, h))) wet = Math.max(wet, item.ship ? 2 : 1);
         continue;
       }
       const q = item.line;
@@ -2387,10 +2480,13 @@ function buildWaterLookup(terrainData, squareSize) {
         const vx = q[i + 1][0] - q[i][0]; const vy = q[i + 1][1] - q[i][1];
         const L2 = vx * vx + vy * vy || 1e-9;
         const t = Math.max(0, Math.min(1, ((x - q[i][0]) * vx + (y - q[i][1]) * vy) / L2));
-        if (Math.hypot(q[i][0] + vx * t - x, q[i][1] + vy * t - y) < item.half) return true;
+        if (Math.hypot(q[i][0] + vx * t - x, q[i][1] + vy * t - y) < item.half) { wet = Math.max(wet, item.ship ? 2 : 1); break; }
       }
     }
-    return false;
+    if (wet === 0 && seaAt(x, y)
+      && !(landCells.get(`${Math.floor(x / COAST_CELL_M)},${Math.floor(y / COAST_CELL_M)}`) || []).some((r) => inRing(x, y, r))) wet = 1;
+    if (wet === 1 && nearShipChannel(x, y)) wet = 2;
+    return wet;
   };
 }
 
@@ -2409,6 +2505,21 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
   // but that end is no abutment.
   const edge = (terrainData.width * squareSize) / 2 - 3;
   const isFreeEnd = (x, y) => Math.abs(x) >= edge || Math.abs(y) >= edge;
+  // Bridge outlines (man_made=bridge) carry the structure type more often
+  // than the roads on them do.
+  const outlines = (terrainData.osmFeatures || [])
+    .filter((f) => f.type === 'bridge_infra' && f.tags?.['bridge:structure'] && f.geometry?.length > 2)
+    .map((f) => ({ structure: f.tags['bridge:structure'], ring: toXY(f.geometry) }));
+  const inRing = (x, y, ring) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      if ((ring[i][1] > y) !== (ring[j][1] > y) && x < ((ring[j][0] - ring[i][0]) * (y - ring[i][1])) / (ring[j][1] - ring[i][1]) + ring[i][0]) inside = !inside;
+    }
+    return inside;
+  };
+  const structureOf = (tags, xy) => tags['bridge:structure']
+    || outlines.find((o) => xy.filter(([x, y]) => inRing(x, y, o.ring)).length >= 0.2 * xy.length)?.structure
+    || null;
   const collect = () => {
     const parts = [];
     const partSeg = [];
@@ -2419,7 +2530,7 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
       const xy = toXY(seg.geometry);
       const layer = getEffectiveRoadLayer(tags);
       if (isBridgeRoad(tags)) {
-        parts.push({ xy: xy.map(([x, y]) => [x, y]), half: 4, layer: Math.max(1, layer) });
+        parts.push({ xy: xy.map(([x, y]) => [x, y]), half: 4, layer: Math.max(1, layer), structure: structureOf(tags, xy) });
         partSeg.push(segIndex);
       } else {
         lowerRoads.push({
@@ -2761,6 +2872,9 @@ export function generateDecalRoads(terrainData, squareSize) {
           const decal = layeredDecals[d];
           const layerCode = LAYER_CODE[decal.name] || `l${d + 1}`;
           decal.name = sanitizeBeamNGObjectName(`${roadNamePrefix}_${nameSuffix}_${layerCode}`);
+          // On a bridge the road clips onto the deck: without overObjects a
+          // DecalRoad is projected down onto the terrain under it.
+          if (bridges.bySeg.has(segIndex)) decal.overObjects = true;
           splineGroup.__items.push(decal);
           if (isCutPaintLayer(decal.__layer)) paintDecals.push({ decal, group: splineGroup, owner: segIndex });
         }

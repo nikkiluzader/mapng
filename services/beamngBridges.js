@@ -36,10 +36,21 @@ const eased = (d, slope) => (d < VERTICAL_CURVE_M
 // wants a ship's room); a very long run is a causeway, low over the water.
 const WATER_CLEAR_SHARE = 0.15;
 const WATER_CLEAR_MIN_M = 2.5;
-const WATER_CLEAR_MAX_M = 40;
+// BeamNG.Earth allows 40 m; MapNG finds ship channels from OSM (NAV_CLEAR_M),
+// so other water (Mill Cove beside the St. Johns) is crossed lower.
+const WATER_CLEAR_MAX_M = 20;
 const WATER_CAUSEWAY_M = 1500;
 const WATER_CAUSEWAY_CLEAR_M = 5;
 const WATER_STEP_M = 16;
+// Ship channels: a long wet run that OSM marks as one (deep_draft / ship on
+// the water), or under a cable-stayed or suspension bridge, takes a
+// navigation clearance (Dames Point, Jacksonville: 53 m over the St. Johns,
+// tagged deep_draft=yes; BeamNG.Earth reads it from the National Bridge
+// Inventory).
+export const NAV_CLEAR_M = 50;
+const NAV_RUN_M = 100;
+const NAV_STRUCTURES = new Set(['cable-stayed', 'suspension']);
+export const navClearance = (structure) => (NAV_STRUCTURES.has(String(structure || '').toLowerCase()) ? NAV_CLEAR_M : 0);
 
 export function waterClear(runM) {
   if (runM > WATER_CAUSEWAY_M) return WATER_CAUSEWAY_CLEAR_M;
@@ -338,9 +349,10 @@ export function solveChain(parts, { groundAt, crossings = [], isFreeEnd = () => 
  * Wet runs along a part (wetAt(x, y) → bool) as crossings with their own
  * clearance over the water surface (the ground there).
  */
-export function waterCrossings(partIndex, xy, { wetAt, groundAt }) {
+export function waterCrossings(partIndex, xy, { wetAt, groundAt, nav = 0 }) {
   const s = arcLengths(xy);
-  const wet = xy.map(([x, y]) => !!wetAt(x, y));
+  const wetness = xy.map(([x, y]) => Number(wetAt(x, y)) || 0);   // 0 dry, 1 water, 2 ship channel
+  const wet = wetness.map((w) => w > 0);
   const out = [];
   let i = 0;
   while (i < wet.length) {
@@ -348,7 +360,9 @@ export function waterCrossings(partIndex, xy, { wetAt, groundAt }) {
     let j = i;
     while (j + 1 < wet.length && wet[j + 1]) j++;
     const run = s[j] - s[i] + (s[1] ?? 0);
-    const clear = waterClear(run);
+    // a ship channel under it (or a cable-stayed / suspension bridge over it)
+    const channel = wetness.slice(i, j + 1).some((w) => w >= 2) ? NAV_CLEAR_M : nav;
+    const clear = Math.max(waterClear(run), run >= NAV_RUN_M ? channel : 0);
     for (let sc = s[i]; sc <= s[j] + 1e-6; sc += WATER_STEP_M) {
       let k = 0;
       while (k < s.length - 2 && s[k + 1] < sc) k++;
@@ -386,6 +400,7 @@ export function solveBridgeDecks(parts, { groundAt, wetAt = () => false, lowerRo
   for (const { idx, layer } of chains) {
     const chainParts = idx.map((i) => resampled[i]);
     const crossings = [];
+    const nav = Math.max(0, ...chainParts.map((p) => navClearance(p.structure)));
     chainParts.forEach((p, pi) => {
       const box = bbox(p.xy, 1);
       const under = [
@@ -393,7 +408,7 @@ export function solveBridgeDecks(parts, { groundAt, wetAt = () => false, lowerRo
         ...solvedLines.filter((r) => r.layer < (p.layer ?? 1) && overlaps(box, r.box)),
       ];
       crossings.push(...planCrossings(pi, p.xy, under, groundAt));
-      crossings.push(...waterCrossings(pi, p.xy, { wetAt, groundAt }));
+      crossings.push(...waterCrossings(pi, p.xy, { wetAt, groundAt, nav }));
     });
     const zs = solveChain(chainParts, { groundAt, crossings, isFreeEnd });
     const deck = {
@@ -404,6 +419,7 @@ export function solveBridgeDecks(parts, { groundAt, wetAt = () => false, lowerRo
       shortfall: zs.shortfall,
       abutments: zs.abutments,
     };
+    for (const part of deck.parts) overshootAbutments(part, deck.abutments, groundAt);
     decks.push(deck);
     for (const p of deck.parts) solvedLines.push({ layer, deck: true, xy: p.xy.map(([x, y], k) => [x, y, p.z[k]]), box: bbox(p.xy) });
   }
@@ -440,6 +456,30 @@ function planCrossings(partIndex, xy, lines, groundAt) {
     }
   }
   return out;
+}
+
+const OVERSHOOT_M = 8;
+
+// The deck runs on a little past each abutment, into the approach, its top
+// coming down to just under the ground there: no step where the road meets
+// the slab (the ground at an abutment is rarely as flat as the deck end).
+function overshootAbutments(part, abutments, groundAt) {
+  const isAbutment = (p) => abutments.some(([x, y]) => Math.hypot(p[0] - x, p[1] - y) < JOIN_M * 2);
+  const extend = (end, next, zEnd) => {
+    const len = Math.hypot(end[0] - next[0], end[1] - next[1]) || 1;
+    const u = [(end[0] - next[0]) / len, (end[1] - next[1]) / len];
+    const far = [end[0] + u[0] * OVERSHOOT_M, end[1] + u[1] * OVERSHOOT_M];
+    const zFar = Math.min(zEnd, groundAt(far[0], far[1]) - 0.05);
+    return [0.5, 1].map((f) => ({ xy: [end[0] + u[0] * OVERSHOOT_M * f, end[1] + u[1] * OVERSHOOT_M * f], z: zEnd + (zFar - zEnd) * f }));
+  };
+  if (part.xy.length < 2) return;
+  const n = part.xy.length;
+  if (isAbutment(part.xy[n - 1])) {
+    for (const q of extend(part.xy[n - 1], part.xy[n - 2], part.z[n - 1])) { part.xy.push(q.xy); part.z.push(q.z); }
+  }
+  if (isAbutment(part.xy[0])) {
+    for (const q of extend(part.xy[0], part.xy[1], part.z[0])) { part.xy.unshift(q.xy); part.z.unshift(q.z); }
+  }
 }
 
 /** Deck height at (x, y) on a solved part (nearest point of its centreline). */

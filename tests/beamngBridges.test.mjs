@@ -50,7 +50,7 @@ test('a road the deck meets right by its abutment is a junction at grade, not li
 test('water: clearance grows with the wet span', () => {
   assert.equal(waterClear(10), 2.5);
   assert.equal(waterClear(100), 15);
-  assert.equal(waterClear(1000), 40);
+  assert.equal(waterClear(1000), 20, 'capped: a ship channel takes the navigation clearance instead');
   assert.equal(waterClear(2000), 5, 'a causeway');
   const wetAt = (x) => x > 300 && x < 400;
   const [deck] = solveBridgeDecks([part(0, 700)], { groundAt: () => 0, wetAt });
@@ -120,4 +120,54 @@ test('the approach road meeting a bridge at its end is no crossing (full structu
   const [deck] = solveBridgeDecks([part(0, 300)], { groundAt: (x) => valley(x), lowerRoads: [approach] });
   assert.equal(deck.parts[0].depth, 2.2, 'slab and girders');
   assert.ok(Math.abs(zAt(deck, 150) - 50) < 0.5, 'and no junction-at-grade dip');
+});
+
+test('the deck runs on past each abutment, down to just under the ground', () => {
+  const ground = (x) => (x < 0 ? -0.6 : 0);   // the land falls away right before the abutment
+  const [deck] = solveBridgeDecks([part(0, 200)], { groundAt: ground });
+  const p = deck.parts[0];
+  assert.ok(Math.abs(p.xy[0][0] + 8) < 1e-6, 'starts 8 m before the abutment');
+  assert.ok(p.z[0] <= ground(-8) - 0.05 + 1e-9, `its leading edge is under the ground (${p.z[0].toFixed(2)})`);
+});
+
+test('a cable-stayed bridge over a ship channel clears it by the navigation clearance', async () => {
+  const { NAV_CLEAR_M } = await import('../services/beamngBridges.js');
+  const wetAt = (x) => x > 1200 && x < 1700;     // a 500 m channel mid-way along a 2.9 km bridge
+  const plain = solveBridgeDecks([part(0, 2900)], { groundAt: () => 0, wetAt })[0];
+  const stayed = solveBridgeDecks([{ ...part(0, 2900), structure: 'cable-stayed' }], { groundAt: () => 0, wetAt })[0];
+  assert.ok(zAt(plain, 1450) < 21, `a plain bridge: ${zAt(plain, 1450).toFixed(1)} m (river rule)`);
+  assert.ok(zAt(stayed, 1450) >= NAV_CLEAR_M - 0.5, `cable-stayed: ${zAt(stayed, 1450).toFixed(1)} m over the channel`);
+});
+
+test('a ship channel under a plain bridge (deep_draft water) takes the navigation clearance', async () => {
+  const { NAV_CLEAR_M } = await import('../services/beamngBridges.js');
+  const wetAt = (x) => (x > 1200 && x < 1700 ? 2 : 0);
+  const [deck] = solveBridgeDecks([part(0, 2900)], { groundAt: () => 0, wetAt });
+  assert.ok(zAt(deck, 1450) >= NAV_CLEAR_M - 0.5, `${zAt(deck, 1450).toFixed(1)} m over the channel`);
+});
+
+test('water lookup: the sea by its coastline, islands of mapped land in it, ship channels', async () => {
+  const { buildWaterLookup } = await import('../services/exportBeamNGLevel.js');
+  // A 2 km map; a coastline running north along lng 0 (land on its left = west),
+  // a wood island out in the sea, and a ship-channel river line through the sea.
+  const terrainData = {
+    width: 200, height: 200, heightMap: new Float32Array(200 * 200), minHeight: 0, maxHeight: 10,
+    bounds: { north: 0.009, south: -0.009, east: 0.009, west: -0.009 },
+    osmFeatures: [
+      { type: 'coastline', tags: { natural: 'coastline' }, geometry: [{ lat: -0.009, lng: 0 }, { lat: 0.009, lng: 0 }] },
+      { type: 'landuse', tags: { natural: 'wood' }, geometry: [
+        { lat: 0.004, lng: 0.004 }, { lat: 0.004, lng: 0.006 }, { lat: 0.006, lng: 0.006 }, { lat: 0.006, lng: 0.004 }] },
+      { type: 'water', tags: { waterway: 'river', ship: 'yes' }, geometry: [{ lat: -0.009, lng: 0.007 }, { lat: 0.003, lng: 0.007 }] },
+    ],
+  };
+  const squareSize = (0.018 * 111320) / 200;
+  const at = (lat, lng) => {
+    const worldSize = 200 * squareSize;
+    return [((lng + 0.009) / 0.018 - 0.5) * worldSize, (0.5 - (0.009 - lat) / 0.018) * worldSize];
+  };
+  const wetAt = buildWaterLookup(terrainData, squareSize);
+  assert.equal(wetAt(...at(0, -0.004)), 0, 'west of the coastline: land');
+  assert.equal(wetAt(...at(-0.004, 0.003)), 1, 'east of it: the sea');
+  assert.equal(wetAt(...at(0.005, 0.005)), 0, 'the wood island in the sea: land');
+  assert.equal(wetAt(...at(-0.002, 0.0072)), 2, 'next to the ship-channel line: a ship channel');
 });

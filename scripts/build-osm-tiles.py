@@ -35,6 +35,7 @@ import gzip
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -128,6 +129,125 @@ def tags_dict(tag_list):
     return {t.k: t.v for t in tag_list}
 
 
+# ── OPL input (--opl) ──────────────────────────────────────────────────────
+# pyosmium's own reader corrupted the process's memory part way through the
+# Florida extract (segfaults, "unknown opcode", sets yielding non-pairs) on
+# Python 3.12 and 3.13 alike. Big extracts are therefore prepared by the
+# osmium command-line tool and read here as plain text, in pure Python:
+#
+#   osmium tags-filter in.osm.pbf <OSM_FILTER as osmium expressions> -o f.osm.pbf
+#   osmium add-locations-to-ways f.osm.pbf -o f-loc.osm.pbf
+#   osmium cat f-loc.osm.pbf -f "opl,add_metadata=false,locations_on_ways=true" -o f.opl
+#
+# The objects below carry just what the handlers read, under pyosmium's names.
+
+_OPL_ESC = re.compile(r"%([0-9a-fA-F]+)%")
+
+
+def _unopl(s):
+    return _OPL_ESC.sub(lambda m: chr(int(m.group(1), 16)), s) if "%" in s else s
+
+
+class _Tag:
+    __slots__ = ("k", "v")
+
+    def __init__(self, k, v):
+        self.k, self.v = k, v
+
+
+class _Tags(dict):
+    """A dict (get / in / truthiness) that iterates like pyosmium's TagList."""
+
+    def __iter__(self):
+        return (_Tag(k, v) for k, v in self.items())
+
+
+class _Location:
+    __slots__ = ("lat", "lon")
+
+    def __init__(self, lat, lon):
+        self.lat, self.lon = lat, lon
+
+    def valid(self):
+        return self.lat is not None
+
+
+class _NodeRef:
+    __slots__ = ("ref", "location")
+
+    def __init__(self, ref, location):
+        self.ref, self.location = ref, location
+
+
+class _Member:
+    __slots__ = ("type", "ref", "role")
+
+    def __init__(self, type_, ref, role):
+        self.type, self.ref, self.role = type_, ref, role
+
+
+class _Obj:
+    __slots__ = ("id", "tags", "location", "nodes", "members")
+
+
+def _opl_tags(field):
+    tags = _Tags()
+    if len(field) > 1:
+        for kv in field[1:].split(","):
+            k, _, v = kv.partition("=")
+            tags[_unopl(k)] = _unopl(v)
+    return tags
+
+
+def _opl_xy(field_x, field_y):
+    try:
+        return _Location(float(field_y), float(field_x))
+    except ValueError:
+        return _Location(None, None)
+
+
+def apply_opl(path, handler, kinds="nwr"):
+    """Feed an OPL file's objects to a handler's node / way / relation methods."""
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            kind = line[0]
+            if kind not in kinds:
+                continue
+            fields = line.rstrip("\n").split(" ")
+            o = _Obj()
+            o.id = int(fields[0][1:])
+            o.tags = _Tags()
+            x = y = ""
+            for field in fields[1:]:
+                c = field[:1]
+                if c == "T":
+                    o.tags = _opl_tags(field)
+                elif c == "x":
+                    x = field[1:]
+                elif c == "y":
+                    y = field[1:]
+                elif c == "N":
+                    refs = []
+                    for item in field[1:].split(",") if len(field) > 1 else []:
+                        ref, _, rest = item[1:].partition("x")
+                        lon, _, lat = rest.partition("y")
+                        refs.append(_NodeRef(int(ref), _opl_xy(lon, lat)))
+                    o.nodes = refs
+                elif c == "M":
+                    members = []
+                    for item in field[1:].split(",") if len(field) > 1 else []:
+                        ref, _, role = item[1:].partition("@")
+                        members.append(_Member(item[0], int(ref), _unopl(role)))
+                    o.members = members
+            if kind == "n":
+                o.location = _opl_xy(x, y)
+                handler.node(o)
+            elif kind == "w":
+                handler.way(o)
+            else:
+                handler.relation(o)
+
+
 class RelationPass(osmium.SimpleHandler):
     def __init__(self, flt):
         super().__init__()
@@ -165,7 +285,10 @@ class WayNodePass(osmium.SimpleHandler):
             self.node_loc[n.id] = (n.location.lat, n.location.lon)
         if not n.tags:
             return
-        if not any((t.k, t.v) in self.flt["node_tags"] for t in n.tags):
+        # Look the filter's keys up rather than iterating every tag of every
+        # node: pyosmium's tag iterator crashed (segfault / SystemError) part
+        # way through the Florida extract, and this is faster anyway.
+        if not any(n.tags.get(k) == v for k, v in self.flt["node_tags"]):
             return
         if not n.location.valid():
             return
@@ -333,18 +456,31 @@ def main():
     ap.add_argument("input")
     ap.add_argument("output")
     ap.add_argument("--zoom", type=int, default=13)
+    ap.add_argument("--opl", action="store_true",
+                    help="the input is OPL text with locations on its ways (see apply_opl)")
+    ap.add_argument("--index", default="flex_mem",
+                    help="osmium node location index, or none for a file with locations on its ways\n                    (osmium add-locations-to-ways; how big extracts are built: pyosmium's\n                    own reader corrupted memory part way through Florida)")
     args = ap.parse_args()
 
     t0 = time.time()
     flt = load_filter()
     rel = RelationPass(flt)
-    rel.apply_file(args.input)
+    if args.opl:
+        apply_opl(args.input, rel, kinds="r")
+    else:
+        rel.apply_file(args.input)
     print(f"relations: {len(rel.relations)} matching, {len(rel.member_ways)} member ways "
           f"({time.time() - t0:.0f}s)", file=sys.stderr)
 
     tiles = Tiles(args.zoom)
     wn = WayNodePass(flt, rel.member_ways, rel.member_nodes, tiles)
-    wn.apply_file(args.input, locations=True, idx="flex_mem")
+    if args.opl:
+        apply_opl(args.input, wn, kinds="nw")
+    elif args.index == "none":
+        # node locations embedded in the ways (osmium add-locations-to-ways)
+        wn.apply_file(args.input, locations=False)
+    else:
+        wn.apply_file(args.input, locations=True, idx=args.index)
     print(f"nodes: {wn.counts['node']}, ways: {wn.counts['way']} ({time.time() - t0:.0f}s)", file=sys.stderr)
 
     rc = emit_relations(rel.relations, wn.way_geom, wn.node_loc, tiles)
