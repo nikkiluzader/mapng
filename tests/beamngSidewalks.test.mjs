@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildSidewalkMeshes, buildSidewalkRuns, sidewalkSides } from '../services/beamngSidewalks.js';
+import { buildMedianRuns, buildSidewalkMeshes, buildSidewalkRuns, findMedians, sidewalkSides } from '../services/beamngSidewalks.js';
 
 const street = (overrides = {}) => ({
   owner: 1, half: 4, highway: 'residential', urban: true, tags: { sidewalk: 'both' }, continuations: [],
@@ -96,4 +96,41 @@ test('a driveway lowers the curb across it instead of cutting the sidewalk', () 
     if (Math.abs(pos[i] - 20) < 0.5 && pos[i + 1] > 4.1 && pos[i + 1] < 4.3) lowest = Math.min(lowest, pos[i + 2]);
   }
   assert.ok(lowest <= 5 + 1e-6, `curb top over the driveway at the road: ${lowest}`);
+});
+
+test('a divided road: a raised median island between its carriageways, no sidewalk on the median side', () => {
+  // eastbound at y = -9, westbound at y = +9 (driven along their node order),
+  // each 4 m half: 10 m of median ground; a same-direction turn lane beside
+  // the eastbound one is no median
+  const line = (y, x0, x1) => Array.from({ length: 21 }, (_, i) => [x0 + ((x1 - x0) * i) / 20, y, 5, 0]);
+  const cw = (owner, y, x0, x1, extra = {}) => ({
+    owner, half: 4, highway: 'primary', urban: true, continuations: [],
+    tags: { name: 'Central Avenue', oneway: 'yes' }, nodes: line(y, x0, x1), ...extra,
+  });
+  const east = cw(1, -9, -100, 100);
+  const west = cw(2, 9, 100, -100);
+  const lane = cw(3, -18, -100, 100);   // same direction as `east`
+  const all = [east, west, lane];
+  const medians = findMedians(all);
+  const em = medians.get(east);
+  assert.ok(em && em.side.every((v) => v === 1), 'eastbound: median on its left all along');
+  assert.ok(Array.from(em.width).every((w) => Math.abs(w - 10) < 1e-6), 'median ground 18 m - 2 × 4 m');
+  assert.ok(medians.get(west)?.side.every((v) => v === 1), 'westbound: median on its left too');
+  assert.ok(!medians.get(lane)?.side.some((v) => v !== 0), 'the turn lane pairs with nothing');
+
+  const sidewalks = buildSidewalkRuns(all, { medians });
+  for (const run of sidewalks.filter((r) => r.owner !== 3)) {
+    assert.ok(run.points.every((p) => Math.abs(p[1]) > 9), `no sidewalk on the median side (owner ${run.owner})`);
+  }
+  const islands = buildMedianRuns(all, medians);
+  assert.equal(islands.length, 2, 'one half island per carriageway');
+  for (const run of islands) {
+    assert.ok(run.points.every((p) => Math.abs(Math.abs(p[1]) - 5) < 1e-6), 'curb at the carriageway edge');
+    assert.ok(run.points.every((p) => Math.abs(p[3] - 0.6) < 1e-6), 'a 10 m median: a 0.6 m curb each side');
+  }
+  // a narrow median: each half reaches the middle
+  const narrow = [cw(1, -6, -100, 100), cw(2, 6, 100, -100)];
+  const halves = buildMedianRuns(narrow, findMedians(narrow));
+  assert.ok(halves.every((run) => run.points.every((p) => Math.abs(p[3] - 2) < 1e-6)), '4 m median: 2 m slab from each side');
+  assert.ok(buildSidewalkMeshes(narrow).medianRuns.length === 2);
 });

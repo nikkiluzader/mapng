@@ -1281,7 +1281,10 @@ function clipGeometryToMargin(geometry, bounds) {
  * Adjacent chunks overlap by one node so there is no visible gap between the
  * resulting DecalRoad objects.
  */
-function chunkPolyline(points, maxNodes = 50) {
+// 250 nodes (~500 m at ROAD_NODE_SPACING_M): official roads run to 170-429
+// nodes (West Coast USA, Italy), and at DECAL_ROAD_DETAIL a piece samples as
+// many points as the old 50-node pieces did at the engine's 0.1.
+function chunkPolyline(points, maxNodes = 250) {
   if (points.length <= maxNodes) return [points];
   const chunks = [];
   for (let i = 0; i < points.length - 1; i += maxNodes - 1) {
@@ -1455,11 +1458,13 @@ const SURFACE_TEXTURE_LENGTH = { asphalt: 11, concrete: 40, dirt: 88 };
 // Geometry: 'widthScale' makes a layer span the full corridor (2 × halfWidth);
 // literal 'width' is a full metric width (lines/edge strips). Offsets are in
 // halfWidth multiples for edge-relative layers, metres otherwise.
+// No fade on the road surface: where two OSM ways meet, both pieces faded
+// and the satellite ground showed through the gap (in-game, 2026-10-22).
 const ASPHALT_BASE = {
   name: 'asphalt', material: GLOBAL_DECAL_MATERIALS.asphalt,
   widthScale: 2.0, offset: 0,
   renderPriority: 14, textureLength: SURFACE_TEXTURE_LENGTH.asphalt, breakAngle: 2,
-  startEndFadeMag: 4, distanceFade: [250, 150], drivability: 1,
+  startEndFadeMag: 0, distanceFade: [250, 150], drivability: 1,
 };
 // Invisible drivable path at the driving width, used when the asphalt is wider
 // (parking lanes / shoulders). Carries the nav metadata instead of the asphalt.
@@ -1492,7 +1497,7 @@ const ROAD_TEMPLATES = {
   ],
   unpaved: [
     { name: 'dirt', material: GLOBAL_DECAL_MATERIALS.dirtRoad, widthScale: 2.2, offset: 0,
-      renderPriority: 14, textureLength: SURFACE_TEXTURE_LENGTH.dirt, breakAngle: 1, startEndFadeMag: 3, drivability: 1 },
+      renderPriority: 14, textureLength: SURFACE_TEXTURE_LENGTH.dirt, breakAngle: 1, startEndFadeMag: 0, drivability: 1 },
   ],
 };
 
@@ -1978,6 +1983,12 @@ export function sanitizeRoadNodes(nodes, minSpacing = MIN_ROAD_NODE_SPACING_M) {
   return out.length >= 2 ? out : [];
 }
 
+// Spline sampling step between nodes (docs: 0.1 = every 10 %). The engine's
+// 0.1 sampled our 2 m-spaced nodes every 20 cm, and many roads vanished in-game;
+// 0.5 (the midpoint only) draws them (in-game, 2026-10-22). West Coast USA's
+// own roads mostly use 0.2-1.
+const DECAL_ROAD_DETAIL = 0.5;
+
 /**
  * Build one BeamNG DecalRoad object from prepared spline nodes and style props.
  */
@@ -2000,7 +2011,7 @@ function makeRoadDecal(nodes, name, parentName, props, materialOverride) {
   if (Array.isArray(props.startEndFade)) decal.startEndFade = props.startEndFade;
   if (Array.isArray(props.distanceFade)) decal.distanceFade = props.distanceFade;
   if (Number.isFinite(props.drivability)) decal.drivability = props.drivability;
-  if (Number.isFinite(props.detail)) decal.detail = props.detail;
+  decal.detail = Number.isFinite(props.detail) ? props.detail : DECAL_ROAD_DETAIL;
   return decal;
 }
 
@@ -2242,7 +2253,9 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
     // Fade only at a road's true termini — never at internal chunk joins, or
     // every ~chunk boundary would show a gap. mirrored layers swap start/end.
     let startEndFade;
-    if (Number.isFinite(layer.startEndFadeMag) && layer.startEndFadeMag > 0) {
+    if (layer.startEndFadeMag === 0) {
+      startEndFade = [0, 0];   // written out: the engine's default is not documented
+    } else if (Number.isFinite(layer.startEndFadeMag) && layer.startEndFadeMag > 0) {
       let s = options.isRoadStart ? layer.startEndFadeMag : 0;
       let e = options.isRoadEnd ? layer.startEndFadeMag : 0;
       if (layer.mirrorByReversingNodes) { const t = s; s = e; e = t; }
@@ -4224,7 +4237,10 @@ function buildDetailedReportSections(d) {
   // ── Sidewalks and street furniture ─────────────────────────────────────────
   section('Sidewalks and Street Furniture');
   const sw = d.sidewalks || {};
-  lines.push(`- Sidewalk curb runs: ${(sw.runs || []).length}, meshes: ${(sw.meshes || []).length}, triangles: ${sw.triangles ?? 0}`);
+  lines.push(`- Sidewalk curb runs: ${(sw.runs || []).length}, meshes: ${(sw.meshes || []).length}, triangles (with medians): ${sw.triangles ?? 0}`);
+  const medianRuns = sw.medianRuns || [];
+  const medianM = medianRuns.reduce((n, r) => n + polylineLength(r.points), 0);
+  lines.push(`- Divided-road medians: ${medianRuns.length} island run(s), ${formatNumber(medianM / 1000, 2)} km of curb, on ${new Set(medianRuns.map((r) => r.owner)).size} carriageway(s)`);
   const sp = d.streetProps || {};
   const mp = d.mappedStreetProps || {};
   lines.push(`- Street props placed: ${(sp.hydrants || []).length} hydrants, ${(sp.bins || []).length} bins, ${(sp.benches || []).length} benches, ${(sp.poles || []).length} utility poles, ${(sp.wires || []).length} power line spans`);
@@ -7129,7 +7145,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     })
     : { meshes: [], runs: [], triangles: 0 };
   if (sidewalks.runs.length > 0) {
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${(sidewalks.medianRuns || []).length} median island runs, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
   }
   const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);
 

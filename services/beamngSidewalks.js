@@ -16,6 +16,7 @@
 
 import * as THREE from 'three';
 import { buildCarriagewayIndex, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
+import { isOneWayRoad } from './roadWidth.js';
 
 const CURB_H = 0.15;          // m above the road
 const SINK = 0.10;            // m the faces reach below the road
@@ -40,6 +41,24 @@ const CORNER_TRIES = [1, 0.5, 0.25];
 const CORNER_REACH_M = 15;    // how far past a run's end its corner may lie
 const CORNER_ANGLES = [30, 150];  // degrees between the two curb lines for a corner
 const RUNS_PER_MESH = 300;
+
+// Divided roads' medians (BeamNG.Earth server/roads.py dual_carriageways,
+// median_width, extras): two one-way carriageways of one street (name or
+// ref) and class, side by side DUAL_GAP_M apart (centre lines) and parallel
+// within DUAL_ANGLE_DEG. The ground between them is a median when it is
+// MEDIAN_MIN_M..MEDIAN_MAX_M wide; up to MEDIAN_SLAB_M each carriageway builds
+// a curbed slab out to the middle (one raised island between them), wider a
+// MEDIAN_CURB_W curb along each with the ground between. Decided point by
+// point, so a median starts and ends where the carriageways part and meet.
+const DUAL_CLASSES = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary']);
+const DUAL_GAP_M = [4, 45];
+const DUAL_ANGLE_COS = Math.cos((25 * Math.PI) / 180);
+const MEDIAN_MIN_M = 0.8;
+const MEDIAN_MAX_M = 16;
+const MEDIAN_SLAB_M = 6;
+const MEDIAN_CURB_W = 0.6;
+const MEDIAN_MIN_RUN_M = 20;
+const MEDIAN_SIDE_SHARE = 0.3;   // a carriageway whose side faces a median this much of its length: no sidewalk there
 
 // curbs sheet (1024 × 512, 8 bands of 64 px, v up): band 0, light rows 0–40.
 const V_BAND_TOP = 1 - 1 / 512;
@@ -167,12 +186,142 @@ export function streetSides(carriageways) {
   return sides;
 }
 
+// +1 when a one-way carriageway is driven along its node order, -1 against it
+const travelSign = (cw) => (['-1', 'reverse'].includes(String(cw.tags?.oneway ?? '').trim().toLowerCase()) ? -1 : 1);
+
+const streetKey = (cw) => {
+  const name = String(cw.tags?.name || cw.tags?.ref || '').trim();
+  const cls = String(cw.highway || '').replace(/_link$/, '');
+  return name && DUAL_CLASSES.has(cls) && isOneWayRoad(cw.tags || {}) ? `${cls}|${name}` : null;
+};
+
+/**
+ * Where each carriageway runs beside its divided road's other carriageway:
+ * Map(cw -> { side: ±1 per node (0 = none; +1 left of the node order),
+ * width: median ground width per node }).
+ */
+export function findMedians(carriageways) {
+  const groups = new Map();
+  for (const cw of carriageways) {
+    const key = cw.nodes?.length > 1 ? streetKey(cw) : null;
+    if (!key) continue;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(cw);
+  }
+  const out = new Map();
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    // segments of the group in a coarse grid
+    const CELL = DUAL_GAP_M[1];
+    const grid = new Map();
+    group.forEach((cw, ci) => {
+      for (let i = 0; i + 1 < cw.nodes.length; i++) {
+        const a = cw.nodes[i]; const b = cw.nodes[i + 1];
+        const k = `${Math.floor((a[0] + b[0]) / 2 / CELL)},${Math.floor((a[1] + b[1]) / 2 / CELL)}`;
+        if (!grid.has(k)) grid.set(k, []);
+        grid.get(k).push([ci, i]);
+      }
+    });
+    group.forEach((cw, ci) => {
+      const n = cw.nodes.length;
+      const side = new Int8Array(n);
+      const width = new Float32Array(n);
+      let any = false;
+      for (let i = 0; i < n; i++) {
+        const p = cw.nodes[i];
+        const a = cw.nodes[Math.max(0, i - 1)]; const b = cw.nodes[Math.min(n - 1, i + 1)];
+        const t = unit([b[0] - a[0], b[1] - a[1]]);
+        let best = null;
+        const gx = Math.floor(p[0] / CELL); const gy = Math.floor(p[1] / CELL);
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            for (const [cj, j] of grid.get(`${gx + dx},${gy + dy}`) || []) {
+              if (cj === ci) continue;
+              const other = group[cj];
+              const q0 = other.nodes[j]; const q1 = other.nodes[j + 1];
+              const sx = q1[0] - q0[0]; const sy = q1[1] - q0[1];
+              const L2 = sx * sx + sy * sy || 1e-9;
+              const f = Math.max(0, Math.min(1, ((p[0] - q0[0]) * sx + (p[1] - q0[1]) * sy) / L2));
+              const vx = q0[0] + sx * f - p[0]; const vy = q0[1] + sy * f - p[1];
+              const d = Math.hypot(vx, vy);
+              if (d < DUAL_GAP_M[0] || d > DUAL_GAP_M[1] || (best && d >= best.d)) continue;
+              const u = unit([sx, sy]);
+              // the other carriageway of a divided road is driven the other
+              // way (a turn lane or slip road beside it, the same way, is not)
+              if ((t[0] * u[0] + t[1] * u[1]) * travelSign(cw) * travelSign(other) > -DUAL_ANGLE_COS) continue;
+              best = { d, s: Math.sign(t[0] * vy - t[1] * vx), half: other.half };
+            }
+          }
+        }
+        if (!best) continue;
+        const mw = best.d - cw.half - best.half;
+        if (mw < MEDIAN_MIN_M || mw > MEDIAN_MAX_M) continue;
+        side[i] = best.s;
+        width[i] = mw;
+        any = true;
+      }
+      if (any) out.set(cw, { side, width });
+    });
+  }
+  return out;
+}
+
+// The share of a carriageway's nodes whose `side` (±1) faces a median.
+const medianShare = (median, side) => {
+  if (!median) return 0;
+  let k = 0;
+  for (const v of median.side) if (v === side) k++;
+  return k / median.side.length;
+};
+
+/**
+ * Median islands along each divided carriageway: runs like the sidewalks'
+ * (curb at the carriageway's edge, slab toward the median) whose points carry
+ * their slab width as a 4th value. Cut where they would cross another road
+ * or a crosswalk.
+ */
+export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
+  const index = buildCarriagewayIndex(carriageways);
+  const pieces = [];
+  for (const cw of carriageways) {
+    const median = medians.get(cw);
+    if (!median) continue;
+    for (const side of [1, -1]) {
+      // contiguous stretches facing a median on this side
+      let i = 0;
+      const n = cw.nodes.length;
+      while (i < n) {
+        if (median.side[i] !== side) { i++; continue; }
+        let j = i;
+        while (j + 1 < n && median.side[j + 1] === side) j++;
+        const widths = Array.from(median.width.slice(i, j + 1));
+        const sorted = [...widths].sort((x, y) => x - y);
+        // one island (slab to the middle) or two curbs, by the stretch's typical width
+        const slab = sorted[sorted.length >> 1] <= MEDIAN_SLAB_M;
+        const nodes = offsetLine(cw.nodes.slice(i, j + 1), side * cw.half)
+          .map((pt, k) => [pt[0], pt[1], pt[2], slab ? Math.max(0.3, widths[k] / 2) : MEDIAN_CURB_W]);
+        const ignore = new Set([cw.owner, ...(cw.continuations || [])]);
+        const blocked = (x, y) => isOnOtherCarriageway(index, x, y, CUT_MARGIN_M, (o) => ignore.has(o)) || isInZone(zones, x, y);
+        for (const piece of cutNodes(nodes, blocked, { minPieceM: 0.5 })) {
+          pieces.push({ points: piece, side, width: 0, owner: cw.owner, highway: cw.highway, median: true });
+        }
+        i = j + 1;
+      }
+    }
+  }
+  // OSM splits a carriageway into many short ways: join their pieces end to
+  // end first (each point keeps its own width), then drop the short ones
+  return mergeRuns(pieces, { matchWidth: false })
+    .filter((run) => runLength(run.points) >= MEDIAN_MIN_RUN_M)
+    .map((run) => ({ ...run, width: Math.max(...run.points.map((pt) => pt[3])) }));
+}
+
 /**
  * Sidewalk runs: [{ points: [[x,y,z]...], side: ±1, width, owner }] where side +1
  * is left of the run's direction (the sidewalk lies on that side of the curb)
  * and owner is the carriageway's.
  */
-export function buildSidewalkRuns(carriageways, { zones = [], driveways = [] } = {}) {
+export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map() } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const sidesOf = streetSides(carriageways);
   // Driveways and parking aisles (OSM service roads, not carriageways of
@@ -184,7 +333,8 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [] } =
     const ignore = new Set([cw.owner, ...(cw.continuations || [])]);
     const blocked = (x, y) => isOnOtherCarriageway(index, x, y, CUT_MARGIN_M, (o) => ignore.has(o)) || isInZone(zones, x, y);
     for (const [side, width] of [[1, sides.left], [-1, sides.right]]) {
-      if (!width) continue;
+      // a divided road's median side has the median, not a sidewalk
+      if (!width || medianShare(medians.get(cw), side) >= MEDIAN_SIDE_SHARE) continue;
       for (const piece of cutNodes(offsetLine(cw.nodes, side * cw.half), blocked, { minPieceM: 0.5 })) {
         pieces.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width, owner: cw.owner, highway: cw.highway });
       }
@@ -227,37 +377,55 @@ function buildLineIndex(lines) {
  * boundary (OSM splits streets into many ways): same side, near-straight,
  * same width. Without this every way boundary ended the sidewalk.
  */
-function mergeRuns(pieces) {
-  const runs = pieces.map((r) => ({ ...r, points: [...r.points] }));
-  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.75;
+// Join pieces end to end into runs (same side, similar width, turning less
+// than 35°). Run ends are kept in a grid, so a city's thousands of pieces
+// join in one pass (re-scanning every pair after each join took 222 s for a
+// 4 km Phoenix export).
+function mergeRuns(pieces, { matchWidth = true } = {}) {
+  const NEAR = 0.75;
+  const runs = pieces.map((r) => ({ ...r, points: [...r.points], alive: true }));
+  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < NEAR;
   const dir = (a, b) => unit([b[0] - a[0], b[1] - a[1]]);
-  let merged = true;
-  while (merged) {
-    merged = false;
-    for (let i = 0; i < runs.length && !merged; i++) {
-      for (let j = 0; j < runs.length && !merged; j++) {
-        if (i === j) continue;
-        const A = runs[i];
-        let B = runs[j];
-        if (Math.abs(A.width - B.width) > 0.3) continue;
-        const aEnd = A.points[A.points.length - 1];
-        let joinable = false;
-        if (near(aEnd, B.points[0]) && A.side === B.side) joinable = true;
-        else if (near(aEnd, B.points[B.points.length - 1]) && A.side === -B.side) {
-          B = { ...B, points: [...B.points].reverse(), side: A.side };
-          joinable = true;
-        }
-        if (!joinable || A.points.length < 2 || B.points.length < 2) continue;
-        const da = dir(A.points[A.points.length - 2], aEnd);
-        const db = dir(B.points[0], B.points[1]);
+  const cellOf = (p) => `${Math.floor(p[0] / NEAR)},${Math.floor(p[1] / NEAR)}`;
+  const grid = new Map();   // cell -> runs with an end there (checked again on use)
+  const addEnds = (run) => {
+    for (const p of [run.points[0], run.points[run.points.length - 1]]) {
+      const k = cellOf(p);
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push(run);
+    }
+  };
+  const nearby = (p) => {
+    const cx = Math.floor(p[0] / NEAR); const cy = Math.floor(p[1] / NEAR);
+    const out = [];
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const r of grid.get(`${cx + dx},${cy + dy}`) || []) out.push(r);
+    return out;
+  };
+  runs.forEach(addEnds);
+  for (const A of runs) {
+    if (!A.alive || A.points.length < 2) continue;
+    let extended = true;
+    while (extended) {
+      extended = false;
+      const aEnd = A.points[A.points.length - 1];
+      const da = dir(A.points[A.points.length - 2], aEnd);
+      for (const cand of nearby(aEnd)) {
+        if (cand === A || !cand.alive || cand.points.length < 2 || (matchWidth && Math.abs(A.width - cand.width) > 0.3)) continue;
+        let B = null;
+        if (near(aEnd, cand.points[0]) && A.side === cand.side) B = cand.points;
+        else if (near(aEnd, cand.points[cand.points.length - 1]) && A.side === -cand.side) B = [...cand.points].reverse();
+        if (!B) continue;
+        const db = dir(B[0], B[1]);
         if (da[0] * db[0] + da[1] * db[1] < Math.cos((35 * Math.PI) / 180)) continue;
-        A.points = [...A.points, ...B.points.slice(1)];
-        runs.splice(j, 1);
-        merged = true;
+        A.points = [...A.points, ...B.slice(1)];
+        cand.alive = false;
+        addEnds(A);
+        extended = true;
+        break;
       }
     }
   }
-  return runs;
+  return runs.filter((r) => r.alive).map(({ alive, ...r }) => r);
 }
 
 const DIP_STEP_M = 0.5;
@@ -386,6 +554,8 @@ function sweepRun(builder, run) {
   const { side, width } = run;
   const caps = run.caps ?? [true, true];
   const { points, share } = rampStations(run.points, run.ramps ?? [false, false], run.dips);
+  // a median island's points carry their own slab width (4th value)
+  const profiles = run.median ? points.map((p) => profileFor(p[3] || width)) : null;
   const profile = profileFor(width);
   // Outward unit normal at each station (mitred, the sidewalk's side).
   const outward = points.map((p, i) => {
@@ -394,7 +564,7 @@ function sweepRun(builder, run) {
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     return [-((b[1] - a[1]) / len) * side, ((b[0] - a[0]) / len) * side];
   });
-  const stations = points.map((p, i) => profile.points.map(([o, h]) => [p[0] + outward[i][0] * o, p[1] + outward[i][1] * o, p[2] + (h > 0 ? h * share[i] : h)]));
+  const stations = points.map((p, i) => (profiles ? profiles[i] : profile).points.map(([o, h]) => [p[0] + outward[i][0] * o, p[1] + outward[i][1] * o, p[2] + (h > 0 ? h * share[i] : h)]));
   let along = 0;
   for (let i = 0; i + 1 < points.length; i++) {
     const step = Math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
@@ -403,8 +573,8 @@ function sweepRun(builder, run) {
     along = s1;
     const out = [(outward[i][0] + outward[i + 1][0]) / 2, (outward[i][1] + outward[i + 1][1]) / 2];
     profile.segments.forEach((seg, k) => {
-      const [o0, h0] = profile.points[k];
-      const [o1, h1] = profile.points[k + 1];
+      const [o0, h0] = (profiles ? profiles[i] : profile).points[k];
+      const [o1, h1] = (profiles ? profiles[i] : profile).points[k + 1];
       // Front of this profile segment: (−dh)·outward + (do)·up.
       const want = [-(h1 - h0) * out[0], -(h1 - h0) * out[1], o1 - o0];
       const repeat = seg.mat === 'slab' ? SLAB_REPEAT_M : CURB_REPEAT_M;
@@ -611,7 +781,9 @@ function sweepCorner(builder, corner) {
  * reads trailing digits of a Collada node name as a detail level).
  */
 export function buildSidewalkMeshes(carriageways, options = {}) {
-  const runs = buildSidewalkRuns(carriageways, options);
+  const medians = findMedians(carriageways);
+  const runs = buildSidewalkRuns(carriageways, { ...options, medians });
+  const medianRuns = buildMedianRuns(carriageways, medians, options);
   const corners = joinCorners(runs, buildCarriagewayIndex(carriageways));
   const meshes = [];
   let builder = new PartBuilder();
@@ -634,6 +806,10 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
     sweepCorner(builder, corner);
     if (++inBatch >= RUNS_PER_MESH) flush();
   }
+  for (const run of medianRuns) {
+    sweepRun(builder, run);
+    if (++inBatch >= RUNS_PER_MESH) flush();
+  }
   flush();
-  return { meshes, runs, corners, triangles };
+  return { meshes, runs, corners, medianRuns, triangles };
 }
