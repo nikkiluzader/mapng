@@ -46,6 +46,7 @@
   },
   "map": {
     "editInOsm": "Edit in OpenStreetMap",
+    "osmCoverageTooltip": "MapNG OSM data: {region} (updated {date})",
     "latitude": "Latitude",
     "longitude": "Longitude",
     "selectLocation": "Select a location...",
@@ -350,9 +351,13 @@
     "processingResolutionOptionHigh": "0.5 m/px (High detail)",
     "processingResolutionOptionStandard": "1.0 m/px (Standard)",
     "includeOsmFeatures": "Include OSM Features",
+    "showOsmCoverage": "Show MapNG OSM coverage",
+    "osmCoverageHint": "Inside the green outlines, OSM data loads from MapNG's own copy: fast, and unaffected by Overpass outages. Elsewhere it comes from Overpass.",
+    "osmCoverageUnavailable": "Coverage list unavailable right now.",
+    "osmCoverageLoading": "Loading coverage…",
     "customOverpass": "Use my own Overpass server (optional)",
     "customOverpassInvalid": "Must be a full https:// address.",
-    "customOverpassHint": "Paste your full Overpass URL including your key. It's tried first and stays in this browser only; the public servers remain as backup. Paid plans with Overpass access:",
+    "customOverpassHint": "Paste your full Overpass URL including your key. Areas MapNG already hosts (Show MapNG OSM coverage) still load from MapNG's own copy, so your key is only used outside them; there it's tried first, with the public servers as backup. It stays in this browser only. Paid plans with Overpass access:",
     "centerCoordinates": "Center Coordinates",
     "configurationSession": "Configuration & Session"
   },

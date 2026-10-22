@@ -49,6 +49,23 @@
         />
       </template>
       
+      <!-- MapNG's own OSM coverage (control panel toggle): the hosted archives' outlines -->
+      <template v-if="showOsmCoverage">
+        <l-polygon
+          v-for="area in osmCoverageAreas"
+          :key="`osm-coverage-${area.region}`"
+          :lat-lngs="area.rings"
+          color="#10B981"
+          :weight="2"
+          :fill-opacity="0.06"
+          :options="{ dashArray: '6, 6', lineCap: 'round' }"
+        >
+          <l-tooltip :options="{ sticky: true }">
+            {{ t('map.osmCoverageTooltip', { region: formatCoverageRegion(area.region), date: area.builtAt.slice(0, 10) }) }}
+          </l-tooltip>
+        </l-polygon>
+      </template>
+
       <l-rectangle 
         v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds"
         :bounds="[[selectionBounds.south, selectionBounds.west], [selectionBounds.north, selectionBounds.east]]" 
@@ -195,13 +212,14 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { LMap, LTileLayer, LRectangle, LMarker, LTooltip } from '@vue-leaflet/vue-leaflet';
+import { LMap, LTileLayer, LRectangle, LMarker, LTooltip, LPolygon } from '@vue-leaflet/vue-leaflet';
 import { Layers } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import ElevationOverlay from './ElevationOverlay.vue';
 import { computeMetricSelectionBounds, computeUploadedCropBounds } from '../../services/uploadBounds';
 import { CHECKBOX } from '../base/controlStyles.js';
+import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
 
 // Fix Leaflet icon assets
 // @ts-ignore
@@ -215,6 +233,9 @@ L.Icon.Default.mergeOptions({
 // Static options to prevent reactivity issues
 const mapOptions = { scrollWheelZoom: true };
 const { t } = useI18n({ useScope: 'global' });
+const { show: showOsmCoverage, areas: osmCoverageAreas } = useOsmCoverage();
+// Archive regions are Geofabrik slugs ("utah", "new-mexico").
+const formatCoverageRegion = (region) => region.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 
 const props = defineProps({

@@ -50,6 +50,9 @@ const insideRing = (lon, lat, ring) => {
   return inside;
 };
 
+/** The published archives ({ archives: [...] }), or null (e.g. local vite dev). */
+export const getOsmTileManifest = () => loadManifest();
+
 /**
  * Whether an archive covers bounds: inside its bbox and, when the manifest
  * gives one, with all four corners inside its coverage outline (an extract's

@@ -91,3 +91,34 @@ test('compact tiles expand to the exact Overpass JSON; old tiles pass through', 
   assert.equal(JSON.stringify(expandCompactTile(compact)), JSON.stringify(overpass));
   assert.equal(expandCompactTile(overpass), overpass);
 });
+
+test('a covered area reads MapNG tiles even with the user\'s own Overpass server set', async () => {
+  // A paid Tracestrack / Overspan key is only spent where MapNG has no tiles.
+  const { setOsmTileSource, fetchOSMData, getLastOSMRequestInfo, CUSTOM_OVERPASS_STORAGE_KEY } = await import('../services/osm.js');
+  const { PMTiles } = await import('pmtiles');
+  const origGetHeader = PMTiles.prototype.getHeader;
+  const origGetZxy = PMTiles.prototype.getZxy;
+  const payload = { elements: [{ type: 'way', id: 1, tags: { highway: 'residential' },
+    geometry: [{ lat: 35.21, lon: -111.415 }, { lat: 35.211, lon: -111.41 }] }] };
+  PMTiles.prototype.getHeader = async () => ({ minLon: -115, maxLon: -109, minLat: 31, maxLat: 37, maxZoom: 13 });
+  PMTiles.prototype.getZxy = async () => ({ data: new TextEncoder().encode(JSON.stringify(payload)).buffer });
+  const origStorage = globalThis.localStorage;
+  const store = new Map([[CUSTOM_OVERPASS_STORAGE_KEY, 'https://api.tracestrack.com/overpass/SECRET/interpreter']]);
+  globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) };
+  const origFetch = globalThis.fetch;
+  const called = [];
+  globalThis.fetch = async (url) => { called.push(String(url)); throw new Error('no Overpass call expected'); };
+  try {
+    setOsmTileSource({ getKey: () => 'stub', getBytes: async () => ({ data: gzipSync(Buffer.alloc(1)).buffer }) });
+    const features = await fetchOSMData({ north: 35.2158, south: 35.2065, east: -111.4075, west: -111.4188 });
+    assert.equal(getLastOSMRequestInfo().endpointUsed, 'mapng-osm-tiles');
+    assert.ok(features.some((f) => f.type === 'road'));
+    assert.deepEqual(called, [], 'the custom server (and every mirror) stays unused');
+  } finally {
+    setOsmTileSource(null);
+    PMTiles.prototype.getHeader = origGetHeader;
+    PMTiles.prototype.getZxy = origGetZxy;
+    globalThis.fetch = origFetch;
+    globalThis.localStorage = origStorage;
+  }
+});

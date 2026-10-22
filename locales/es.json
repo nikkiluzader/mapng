@@ -40,6 +40,7 @@
   },
   "map": {
     "editInOsm": "Editar en OpenStreetMap",
+    "osmCoverageTooltip": "Datos OSM de MapNG: {region} (actualizado {date})",
     "latitude": "Latitud",
     "longitude": "Longitud",
     "selectLocation": "Selecciona una ubicacion...",
@@ -307,6 +308,10 @@
     "processingResolutionOptionHigh": "0.5 m/px (Alto detalle)",
     "processingResolutionOptionStandard": "1.0 m/px (Estandar)",
     "includeOsmFeatures": "Incluir funciones OSM",
+    "showOsmCoverage": "Mostrar cobertura OSM de MapNG",
+    "osmCoverageHint": "Dentro de los contornos verdes, los datos OSM se cargan desde la copia propia de MapNG: rápido y sin depender de las caídas de Overpass. En el resto vienen de Overpass.",
+    "osmCoverageUnavailable": "Lista de cobertura no disponible ahora.",
+    "osmCoverageLoading": "Cargando cobertura…",
     "centerCoordinates": "Coordenadas del centro",
     "configurationSession": "Configuracion y sesion"
   },

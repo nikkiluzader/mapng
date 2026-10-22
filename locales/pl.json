@@ -40,6 +40,7 @@
     "inputHint": "Zalecane: mysz i klawiatura"
   },
   "map": {
+    "osmCoverageTooltip": "Dane OSM MapNG: {region} (aktualizacja {date})",
     "latitude": "Szerokość geograficzna",
     "longitude": "Długość geograficzna",
     "selectLocation": "Wybierz lokalizację...",
@@ -306,6 +307,10 @@
     "processingResolutionOptionHigh": "0.5 m/px (Wysokie detale)",
     "processingResolutionOptionStandard": "1.0 m/px (Standard)",
     "includeOsmFeatures": "Dołącz funkcje OSM",
+    "showOsmCoverage": "Pokaż zasięg OSM MapNG",
+    "osmCoverageHint": "Wewnątrz zielonych obrysów dane OSM wczytują się z kopii MapNG: szybko i niezależnie od awarii Overpass. Poza nimi pochodzą z Overpass.",
+    "osmCoverageUnavailable": "Lista zasięgu jest teraz niedostępna.",
+    "osmCoverageLoading": "Wczytywanie zasięgu…",
     "centerCoordinates": "Współrzędne środka",
     "configurationSession": "Konfiguracja i sesja"
   },

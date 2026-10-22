@@ -40,6 +40,7 @@
   },
   "map": {
     "editInOsm": "Редактировать в OpenStreetMap",
+    "osmCoverageTooltip": "Данные OSM MapNG: {region} (обновлено {date})",
     "latitude": "Широта",
     "longitude": "Долгота",
     "selectLocation": "Выберите локацию...",
@@ -306,6 +307,10 @@
     "processingResolutionOptionHigh": "0.5 м/пкс (Высокая детализация)",
     "processingResolutionOptionStandard": "1.0 м/пкс (Стандарт)",
     "includeOsmFeatures": "Включать OSM-объекты",
+    "showOsmCoverage": "Показать покрытие OSM MapNG",
+    "osmCoverageHint": "Внутри зелёных контуров данные OSM загружаются из собственной копии MapNG: быстро и без зависимости от сбоев Overpass. В остальных местах — из Overpass.",
+    "osmCoverageUnavailable": "Список покрытия сейчас недоступен.",
+    "osmCoverageLoading": "Загрузка покрытия…",
     "centerCoordinates": "Координаты центра",
     "configurationSession": "Конфигурация и сессия"
   },

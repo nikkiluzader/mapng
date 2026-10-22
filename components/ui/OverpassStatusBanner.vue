@@ -1,8 +1,11 @@
 <template>
+  <!-- An overlay, not part of the layout: pushing the page down resized the
+       map under Leaflet and moved its centre off the selection. Centred so it
+       clears the view tabs (top right). -->
   <div
     v-if="down && !dismissed"
     role="alert"
-    class="flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/60 border-b border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 text-xs"
+    class="fixed top-2 left-1/2 -translate-x-1/2 z-[1100] w-[min(44rem,calc(100%-2rem))] flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 text-xs"
   >
     <AlertTriangle :size="16" class="shrink-0" />
     <p class="flex-1 leading-snug">

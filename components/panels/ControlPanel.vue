@@ -156,6 +156,16 @@
           <p v-if="customOverpassUrl && !customOverpassValid" class="mt-0.5 text-amber-600 dark:text-amber-400">{{ t('controlPanel.customOverpassInvalid') }}</p>
           <p class="mt-0.5 leading-tight">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Overspan</a></p>
         </details>
+        <!-- Outlines of the OSM archives MapNG hosts, on the 2D map -->
+        <div class="mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-600">
+          <BaseToggle v-model="showOsmCoverage">
+            <MapIcon :size="12" class="text-emerald-600 dark:text-emerald-400" />
+            <span class="text-xs">{{ t('controlPanel.showOsmCoverage') }}</span>
+          </BaseToggle>
+          <p v-if="showOsmCoverage" class="mt-0.5 ml-5 text-[10px] leading-tight" :class="osmCoverageStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
+            {{ osmCoverageStatus === 'unavailable' ? t('controlPanel.osmCoverageUnavailable') : osmCoverageStatus === 'loading' ? t('controlPanel.osmCoverageLoading') : t('controlPanel.osmCoverageHint') }}
+          </p>
+        </div>
       </div>
 
       <!-- Elevation Source Selection -->
@@ -267,7 +277,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { CUSTOM_OVERPASS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
-import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle } from 'lucide-vue-next';
+import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle, Map as MapIcon } from 'lucide-vue-next';
 import BaseToggle from '../base/BaseToggle.vue';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
@@ -287,6 +297,7 @@ import { exportJobData, importJobData } from '../../services/jobData';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
+import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -340,6 +351,7 @@ const handleImportJobFile = async (file) => {
 };
 
 const fetchOSM = ref(localStorage.getItem('mapng_fetchOSM') !== 'false');
+const { show: showOsmCoverage, status: osmCoverageStatus } = useOsmCoverage();
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
 const elevationUnitOverride = ref(localStorage.getItem('mapng_elevationUnitOverride') || 'auto');
