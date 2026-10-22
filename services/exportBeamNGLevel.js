@@ -6737,7 +6737,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles, one object per bridge.`);
   }
   const sidewalks = includeRoads && includeSidewalks
-    ? buildSidewalkMeshes(groundCarriageways, { zones: decalRoads.crosswalkZones || [] })
+    ? buildSidewalkMeshes(groundCarriageways, {
+      zones: decalRoads.crosswalkZones || [],
+      // driveways and parking aisles: the curb lowered where they cross
+      driveways: (exportTerrainData.osmFeatures || [])
+        .filter((f) => f.type === 'road' && f.tags?.highway === 'service' && f.geometry?.length > 1)
+        .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0))),
+    })
     : { meshes: [], runs: [], triangles: 0 };
   if (sidewalks.runs.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);

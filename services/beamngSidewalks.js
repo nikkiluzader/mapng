@@ -6,7 +6,12 @@
 //
 // Runs follow the drawn carriageway's edge (generateDecalRoads exposes the
 // carriageways) and are cut where they would cross another road or a
-// crosswalk, so curbs end cleanly at junctions. Profile numbers are
+// crosswalk. A street's sidewalks are decided along the whole street, not per
+// OSM way (an untagged piece takes them from the tagged pieces it continues).
+// Where two sidewalks meet at a junction corner they are joined by a curb
+// return (BeamNG.Earth's server/junctions.py: an arc tangent to both curb
+// lines, a slab out to where the sidewalks' outer edges meet); every other
+// end comes down to the road in a curb ramp. Profile numbers are
 // BeamNG.Earth's (server/sidewalks.py), measured on official US curbs.
 
 import * as THREE from 'three';
@@ -25,7 +30,15 @@ const SLAB_REPEAT_M = 45.0;   // m of sidewalk per texture width
 const DEFAULT_WIDTH_M = 2.0;
 const MAX_WIDTH_M = 6.0;
 const CUT_MARGIN_M = 0.5;     // runs stop this far outside other carriageways
-const MIN_RUN_M = 4;
+const MIN_RUN_M = 8;
+const RAMP_M = 1.8;           // a loose end's curb ramp: down to the road over this (1:12)
+// Curb return radius by the larger road's class (BeamNG.Earth's survey of
+// city corners), tried smaller until the corner clears every carriageway.
+const CORNER_RADII = { residential: 3, living_street: 3, unclassified: 3, service: 3, tertiary: 4.5, secondary: 6, primary: 6, trunk: 8 };
+const CORNER_RADIUS = 5;
+const CORNER_TRIES = [1, 0.5, 0.25];
+const CORNER_REACH_M = 15;    // how far past a run's end its corner may lie
+const CORNER_ANGLES = [30, 150];  // degrees between the two curb lines for a corner
 const RUNS_PER_MESH = 300;
 
 // curbs sheet (1024 × 512, 8 bands of 64 px, v up): band 0, light rows 0–40.
@@ -116,26 +129,156 @@ function offsetLine(nodes, offset) {
   return out;
 }
 
+const hasSidewalkTags = (tags = {}) => Object.keys(tags).some((k) => k === 'sidewalk' || k.startsWith('sidewalk:'));
+
+/**
+ * Each carriageway's sidewalk sides, decided along the street: a carriageway
+ * with no sidewalk tags of its own takes them from the tagged carriageways it
+ * plainly continues (same name; left and right swapped where it runs the
+ * other way), carried on along the street. OSM often tags only some ways of
+ * a street, which left sidewalks stopping mid-block and short stubs.
+ */
+export function streetSides(carriageways) {
+  const sides = new Map(carriageways.map((cw) => [cw, sidewalkSides(cw)]));
+  const known = new Set(carriageways.filter((cw) => hasSidewalkTags(cw.tags)));
+  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1;
+  const ends = (cw) => [cw.nodes[0], cw.nodes[cw.nodes.length - 1]];
+  const sameStreet = (a, b) => (a.owner === b.owner || (a.continuations || []).includes(b.owner) || (b.continuations || []).includes(a.owner))
+    && String(a.tags?.name ?? '') === String(b.tags?.name ?? '');
+  let queue = [...known];
+  while (queue.length) {
+    const next = [];
+    for (const from of queue) {
+      const [fs, fe] = ends(from);
+      for (const cw of carriageways) {
+        if (known.has(cw) || !cw.nodes?.length || !sameStreet(from, cw)) continue;
+        const [cs, ce] = ends(cw);
+        const along = near(fe, cs) || near(ce, fs);
+        const against = near(fs, cs) || near(fe, ce);
+        if (!along && !against) continue;
+        const s = sides.get(from);
+        sides.set(cw, along ? { ...s } : { left: s.right, right: s.left });
+        known.add(cw);
+        next.push(cw);
+      }
+    }
+    queue = next;
+  }
+  return sides;
+}
+
 /**
  * Sidewalk runs: [{ points: [[x,y,z]...], side: ±1, width, owner }] where side +1
  * is left of the run's direction (the sidewalk lies on that side of the curb)
  * and owner is the carriageway's.
  */
-export function buildSidewalkRuns(carriageways, { zones = [] } = {}) {
+export function buildSidewalkRuns(carriageways, { zones = [], driveways = [] } = {}) {
   const index = buildCarriagewayIndex(carriageways);
-  const runs = [];
+  const sidesOf = streetSides(carriageways);
+  // Driveways and parking aisles (OSM service roads, not carriageways of
+  // their own) cross a sidewalk with its curb lowered: a dip, not a cut.
+  const nearDriveway = buildLineIndex(driveways);
+  const pieces = [];
   for (const cw of carriageways) {
-    const sides = sidewalkSides(cw);
+    const sides = sidesOf.get(cw);
     const ignore = new Set([cw.owner, ...(cw.continuations || [])]);
     const blocked = (x, y) => isOnOtherCarriageway(index, x, y, CUT_MARGIN_M, (o) => ignore.has(o)) || isInZone(zones, x, y);
     for (const [side, width] of [[1, sides.left], [-1, sides.right]]) {
       if (!width) continue;
-      for (const piece of cutNodes(offsetLine(cw.nodes, side * cw.half), blocked, { minPieceM: MIN_RUN_M })) {
-        runs.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width, owner: cw.owner });
+      for (const piece of cutNodes(offsetLine(cw.nodes, side * cw.half), blocked, { minPieceM: 0.5 })) {
+        pieces.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width, owner: cw.owner, highway: cw.highway });
+      }
+    }
+  }
+  const runs = mergeRuns(pieces).filter((run) => runLength(run.points) >= MIN_RUN_M);
+  if (nearDriveway) for (const run of runs) run.dips = dipsAlong(run.points, (x, y) => nearDriveway(x, y, DRIVEWAY_HALF_M));
+  return runs;
+}
+
+const DRIVEWAY_HALF_M = 2.5;
+const LINE_CELL_M = 16;
+// near(x, y, r): within r of any of the polylines [[x, y]...] (null for none).
+function buildLineIndex(lines) {
+  if (!lines.length) return null;
+  const grid = new Map();
+  for (const line of lines) {
+    for (let i = 0; i + 1 < line.length; i++) {
+      const [ax, ay] = line[i];
+      const [bx, by] = line[i + 1];
+      for (let gx = Math.floor(Math.min(ax, bx) / LINE_CELL_M) - 1; gx <= Math.floor(Math.max(ax, bx) / LINE_CELL_M) + 1; gx++) {
+        for (let gy = Math.floor(Math.min(ay, by) / LINE_CELL_M) - 1; gy <= Math.floor(Math.max(ay, by) / LINE_CELL_M) + 1; gy++) {
+          const k = `${gx},${gy}`;
+          if (!grid.has(k)) grid.set(k, []);
+          grid.get(k).push([ax, ay, bx, by]);
+        }
+      }
+    }
+  }
+  return (x, y, r) => (grid.get(`${Math.floor(x / LINE_CELL_M)},${Math.floor(y / LINE_CELL_M)}`) || []).some(([ax, ay, bx, by]) => {
+    const dx = bx - ax; const dy = by - ay;
+    const len = dx * dx + dy * dy;
+    const t = len > 0 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len)) : 0;
+    return Math.hypot(ax + t * dx - x, ay + t * dy - y) < r;
+  });
+}
+
+/**
+ * Pieces joined end to end where one street's sidewalk goes on across a way
+ * boundary (OSM splits streets into many ways): same side, near-straight,
+ * same width. Without this every way boundary ended the sidewalk.
+ */
+function mergeRuns(pieces) {
+  const runs = pieces.map((r) => ({ ...r, points: [...r.points] }));
+  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 0.75;
+  const dir = (a, b) => unit([b[0] - a[0], b[1] - a[1]]);
+  let merged = true;
+  while (merged) {
+    merged = false;
+    for (let i = 0; i < runs.length && !merged; i++) {
+      for (let j = 0; j < runs.length && !merged; j++) {
+        if (i === j) continue;
+        const A = runs[i];
+        let B = runs[j];
+        if (Math.abs(A.width - B.width) > 0.3) continue;
+        const aEnd = A.points[A.points.length - 1];
+        let joinable = false;
+        if (near(aEnd, B.points[0]) && A.side === B.side) joinable = true;
+        else if (near(aEnd, B.points[B.points.length - 1]) && A.side === -B.side) {
+          B = { ...B, points: [...B.points].reverse(), side: A.side };
+          joinable = true;
+        }
+        if (!joinable || A.points.length < 2 || B.points.length < 2) continue;
+        const da = dir(A.points[A.points.length - 2], aEnd);
+        const db = dir(B.points[0], B.points[1]);
+        if (da[0] * db[0] + da[1] * db[1] < Math.cos((35 * Math.PI) / 180)) continue;
+        A.points = [...A.points, ...B.points.slice(1)];
+        runs.splice(j, 1);
+        merged = true;
       }
     }
   }
   return runs;
+}
+
+const DIP_STEP_M = 0.5;
+// Arc-length spans [s0, s1] of a run where `on(x, y)` (a driveway crossing).
+function dipsAlong(points, on) {
+  const spans = [];
+  let s = 0;
+  let open = null;
+  for (let i = 0; i + 1 < points.length; i++) {
+    const [ax, ay] = points[i];
+    const [bx, by] = points[i + 1];
+    const len = Math.hypot(bx - ax, by - ay);
+    for (let d = 0; d < len; d += DIP_STEP_M) {
+      const hit = on(ax + ((bx - ax) * d) / len, ay + ((by - ay) * d) / len);
+      if (hit && open === null) open = s + d;
+      if (!hit && open !== null) { spans.push([open, s + d]); open = null; }
+    }
+    s += len;
+  }
+  if (open !== null) spans.push([open, s]);
+  return spans;
 }
 
 // Profile across from the curb line: [outward offset, height] and material.
@@ -201,8 +344,48 @@ class PartBuilder {
   }
 }
 
+const DIP_RAMP_M = 1.0;        // the curb's slope down into a driveway dip
+
+// A run's stations (its points, with more where the curb height changes) and
+// each one's curb-height share: 0 at a ramped end and across a driveway dip,
+// back to 1 over RAMP_M / DIP_RAMP_M.
+function rampStations(points, ramps, dips = []) {
+  const s = [0];
+  for (let i = 1; i < points.length; i++) s.push(s[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
+  const total = s[s.length - 1];
+  const ramp = Math.min(RAMP_M, total / 2.5);
+  const shareAt = (d) => {
+    let f = Math.min(1, ramps[0] ? d / ramp : 1, ramps[1] ? (total - d) / ramp : 1);
+    for (const [a, b] of dips) f = Math.min(f, Math.max(0, Math.max(a - d, d - b) / DIP_RAMP_M));
+    return Math.max(0, f);
+  };
+  const cuts = [];
+  if (ramps[0]) cuts.push(ramp);
+  if (ramps[1]) cuts.push(total - ramp);
+  for (const [a, b] of dips) cuts.push(a - DIP_RAMP_M, a, b, b + DIP_RAMP_M);
+  const inner = cuts.filter((c) => c > 1e-6 && c < total - 1e-6).sort((x, y) => x - y);
+  const out = [];
+  const at = [];
+  let c = 0;
+  for (let i = 0; i < points.length; i++) {
+    while (i > 0 && c < inner.length && inner[c] < s[i] - 1e-6) {
+      if (inner[c] > s[i - 1] + 1e-6) {
+        const f = (inner[c] - s[i - 1]) / (s[i] - s[i - 1]);
+        out.push(points[i - 1].map((v, k) => v + (points[i][k] - v) * f));
+        at.push(inner[c]);
+      }
+      c++;
+    }
+    out.push(points[i]);
+    at.push(s[i]);
+  }
+  return { points: out, share: at.map(shareAt) };
+}
+
 function sweepRun(builder, run) {
-  const { points, side, width } = run;
+  const { side, width } = run;
+  const caps = run.caps ?? [true, true];
+  const { points, share } = rampStations(run.points, run.ramps ?? [false, false], run.dips);
   const profile = profileFor(width);
   // Outward unit normal at each station (mitred, the sidewalk's side).
   const outward = points.map((p, i) => {
@@ -211,7 +394,7 @@ function sweepRun(builder, run) {
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
     return [-((b[1] - a[1]) / len) * side, ((b[0] - a[0]) / len) * side];
   });
-  const stations = points.map((p, i) => profile.points.map(([o, h]) => [p[0] + outward[i][0] * o, p[1] + outward[i][1] * o, p[2] + h]));
+  const stations = points.map((p, i) => profile.points.map(([o, h]) => [p[0] + outward[i][0] * o, p[1] + outward[i][1] * o, p[2] + (h > 0 ? h * share[i] : h)]));
   let along = 0;
   for (let i = 0; i + 1 < points.length; i++) {
     const step = Math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
@@ -234,13 +417,191 @@ function sweepRun(builder, run) {
       builder.tri(seg.mat, a0, b1, b0, [u0, va], [u1, vb], [u0, vb], want);
     });
   }
-  // End caps: fan over the profile, facing away from the run.
-  for (const [i, j] of [[0, 1], [points.length - 1, points.length - 2]]) {
+  // End caps: fan over the profile, facing away from the run (not where a
+  // corner piece goes on from it).
+  for (const [i, j, cap] of [[0, 1, caps[0]], [points.length - 1, points.length - 2, caps[1]]]) {
+    if (!cap) continue;
     const dir = [points[i][0] - points[j][0], points[i][1] - points[j][1], 0];
     const ring = stations[i];
     for (let k = 1; k + 1 < ring.length; k++) {
       builder.tri('curb', ring[0], ring[k], ring[k + 1], [0, V_BAND_LOW], [0.02, V_LIGHT_LOW], [0.04, V_LIGHT_LOW], dir);
     }
+  }
+}
+
+const unit = (v) => { const l = Math.hypot(v[0], v[1]) || 1; return [v[0] / l, v[1] / l]; };
+const lineX = (p, d, q, e) => {
+  const den = d[0] * e[1] - d[1] * e[0];
+  if (Math.abs(den) < 1e-9) return null;
+  const t = ((q[0] - p[0]) * e[1] - (q[1] - p[1]) * e[0]) / den;
+  return [p[0] + t * d[0], p[1] + t * d[1]];
+};
+const runLength = (pts) => pts.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) : 0), 0);
+
+// A run's end: its point, the way on past it, the sidewalk's side (outward
+// from the road), its height.
+function runEnd(run, atStart) {
+  const pts = run.points;
+  const p = atStart ? pts[0] : pts[pts.length - 1];
+  const q = atStart ? pts[1] : pts[pts.length - 2];
+  const d = unit([p[0] - q[0], p[1] - q[1]]);
+  // outward = left normal of the run's direction times its side
+  const fwd = atStart ? [-d[0], -d[1]] : d;
+  return { run, atStart, p, d, n: [-fwd[1] * run.side, fwd[0] * run.side], z: p[2] };
+}
+
+// The run cut (t < 0) or carried on (t > 0) to t m past this end.
+function moveEnd(end, t) {
+  const { run, atStart } = end;
+  const pts = atStart ? [...run.points].reverse() : [...run.points];
+  if (t >= 0) {
+    if (t > 0.01) pts.push([end.p[0] + end.d[0] * t, end.p[1] + end.d[1] * t, end.z]);
+  } else {
+    let cut = -t;
+    while (pts.length > 1) {
+      const a = pts[pts.length - 1];
+      const b = pts[pts.length - 2];
+      const seg = Math.hypot(a[0] - b[0], a[1] - b[1]);
+      if (seg > cut + 1e-6) {
+        const f = cut / seg;
+        pts[pts.length - 1] = a.map((v, k) => v + (b[k] - v) * f);
+        break;
+      }
+      cut -= seg;
+      pts.pop();
+    }
+  }
+  run.points = atStart ? pts.reverse() : pts;
+  // driveway dips are arc lengths from the start
+  if (atStart && run.dips) run.dips = run.dips.map(([a, b]) => [a + t, b + t]).filter(([, b]) => b > 0);
+}
+
+/**
+ * Curb returns where two sidewalks meet at a junction corner: each pair of
+ * run ends whose curb lines meet just ahead of both, at a corner angle, with
+ * each sidewalk on the outside of the other. Both runs are cut (or carried
+ * on) to the arc's tangent points; returns the corner pieces
+ * [{ arc: [[x, y, z]...], centre, outer: [x, y], a: end, b: end }]. Ends
+ * left over get curb ramps.
+ */
+function joinCorners(runs, index) {
+  const ends = runs.flatMap((run) => [runEnd(run, true), runEnd(run, false)]);
+  const pairs = [];
+  for (let i = 0; i < ends.length; i++) {
+    for (let j = i + 1; j < ends.length; j++) {
+      const A = ends[i];
+      const B = ends[j];
+      if (A.run === B.run || Math.hypot(A.p[0] - B.p[0], A.p[1] - B.p[1]) > 2 * CORNER_REACH_M) continue;
+      const angle = Math.acos(Math.max(-1, Math.min(1, A.d[0] * B.d[0] + A.d[1] * B.d[1]))) * 180 / Math.PI;
+      if (angle < CORNER_ANGLES[0] || angle > CORNER_ANGLES[1]) continue;
+      // each sidewalk lies on the outside of the other's road
+      if (A.n[0] * -B.d[0] + A.n[1] * -B.d[1] < 0.3 || B.n[0] * -A.d[0] + B.n[1] * -A.d[1] < 0.3) continue;
+      const C = lineX(A.p, A.d, B.p, B.d);
+      if (!C) continue;
+      const tA = (C[0] - A.p[0]) * A.d[0] + (C[1] - A.p[1]) * A.d[1];
+      const tB = (C[0] - B.p[0]) * B.d[0] + (C[1] - B.p[1]) * B.d[1];
+      if (tA < -2 || tB < -2 || tA > CORNER_REACH_M || tB > CORNER_REACH_M) continue;
+      pairs.push({ A, B, cost: tA + tB });
+    }
+  }
+  pairs.sort((x, y) => x.cost - y.cost);
+  const used = new Set();
+  const corners = [];
+  for (const { A, B } of pairs) {
+    if (used.has(A) || used.has(B)) continue;
+    const r0 = Math.max(CORNER_RADII[A.run.highway] ?? CORNER_RADIUS, CORNER_RADII[B.run.highway] ?? CORNER_RADIUS);
+    for (const share of CORNER_TRIES) {
+      const r = r0 * share;
+      const Z = lineX([A.p[0] + A.n[0] * r, A.p[1] + A.n[1] * r], A.d, [B.p[0] + B.n[0] * r, B.p[1] + B.n[1] * r], B.d);
+      if (!Z) break;
+      const T1 = [Z[0] - A.n[0] * r, Z[1] - A.n[1] * r];
+      const T2 = [Z[0] - B.n[0] * r, Z[1] - B.n[1] * r];
+      const t1 = (T1[0] - A.p[0]) * A.d[0] + (T1[1] - A.p[1]) * A.d[1];
+      const t2 = (T2[0] - B.p[0]) * B.d[0] + (T2[1] - B.p[1]) * B.d[1];
+      // keep enough of each run, and reach no further than the corner search
+      if (t1 > CORNER_REACH_M || t2 > CORNER_REACH_M) continue;
+      if (runLength(A.run.points) + t1 < MIN_RUN_M / 2 || runLength(B.run.points) + t2 < MIN_RUN_M / 2) continue;
+      const a0 = Math.atan2(T1[1] - Z[1], T1[0] - Z[0]);
+      const a1 = Math.atan2(T2[1] - Z[1], T2[0] - Z[0]);
+      const da = ((a1 - a0 + 3 * Math.PI) % (2 * Math.PI)) - Math.PI;
+      const k = Math.max(3, Math.ceil((Math.abs(da) * r) / 0.75) + 1);
+      const arc = Array.from({ length: k }, (_, i) => {
+        const a = a0 + (da * i) / (k - 1);
+        return [Z[0] + r * Math.cos(a), Z[1] + r * Math.sin(a), A.z + ((B.z - A.z) * i) / (k - 1)];
+      });
+      // the corner (the curb and the slab behind it) clear of every carriageway
+      const outer = lineX([T1[0] + A.n[0] * A.run.width, T1[1] + A.n[1] * A.run.width], A.d,
+        [T2[0] + B.n[0] * B.run.width, T2[1] + B.n[1] * B.run.width], B.d);
+      if (!outer) break;
+      const probes = [...arc, outer, [(outer[0] + Z[0]) / 2, (outer[1] + Z[1]) / 2]];
+      if (probes.some(([x, y]) => isOnOtherCarriageway(index, x, y, -0.2, () => false))) continue;
+      moveEnd(A, t1);
+      moveEnd(B, t2);
+      corners.push({ arc, centre: Z, outer, a: A, b: B });
+      used.add(A);
+      used.add(B);
+      break;
+    }
+  }
+  for (const end of ends) {
+    const { run } = end;
+    run.caps ??= [true, true];
+    run.ramps ??= [false, false];
+    const k = end.atStart ? 0 : 1;
+    if (used.has(end)) run.caps[k] = false;
+    else run.ramps[k] = true;
+  }
+  return corners;
+}
+
+// A corner piece: the curb along the arc, the slab from the curb's top out to
+// the corner of the two sidewalks' outer edges, and the back faces along them.
+function sweepCorner(builder, corner) {
+  const { arc, centre, outer, a, b } = corner;
+  const prof = profileFor(Math.min(a.run.width, b.run.width));
+  const curbPts = prof.points.slice(0, 4);     // face, nose, top
+  const inward = arc.map(([x, y]) => unit([centre[0] - x, centre[1] - y]));   // away from the road
+  const stations = arc.map((p, i) => curbPts.map(([o, h]) => [p[0] + inward[i][0] * o, p[1] + inward[i][1] * o, p[2] + h]));
+  let along = 0;
+  for (let i = 0; i + 1 < arc.length; i++) {
+    const step = Math.hypot(arc[i + 1][0] - arc[i][0], arc[i + 1][1] - arc[i][1]);
+    const u0 = along / CURB_REPEAT_M;
+    along += step;
+    const u1 = along / CURB_REPEAT_M;
+    const out = [(inward[i][0] + inward[i + 1][0]) / 2, (inward[i][1] + inward[i + 1][1]) / 2];
+    for (let k = 0; k < 3; k++) {
+      const [o0, h0] = curbPts[k];
+      const [o1, h1] = curbPts[k + 1];
+      const want = [-(h1 - h0) * out[0], -(h1 - h0) * out[1], o1 - o0];
+      const [va, vb] = prof.segments[k].v;
+      const a0 = stations[i][k]; const b0 = stations[i][k + 1];
+      const a1 = stations[i + 1][k]; const b1 = stations[i + 1][k + 1];
+      builder.tri('curb', a0, a1, b1, [u0, va], [u1, va], [u1, vb], want);
+      builder.tri('curb', a0, b1, b0, [u0, va], [u1, vb], [u0, vb], want);
+    }
+  }
+  // slab: a fan from the outer corner over the curb top's back edge, closed
+  // by the two sidewalks' end sections
+  const zMid = (a.z + b.z) / 2;
+  const slabZ = (z, w) => z + CURB_H + w * CROSS_SLOPE;
+  const aOut = [arc[0][0] + a.n[0] * a.run.width, arc[0][1] + a.n[1] * a.run.width, slabZ(a.z, a.run.width)];
+  const bOut = [arc[arc.length - 1][0] + b.n[0] * b.run.width, arc[arc.length - 1][1] + b.n[1] * b.run.width, slabZ(b.z, b.run.width)];
+  const O = [outer[0], outer[1], slabZ(zMid, (a.run.width + b.run.width) / 2)];
+  const rim = [aOut, ...stations.map((st) => st[3]), bOut];
+  const uvOf = (p, v) => [p[0] / SLAB_REPEAT_M, v];
+  for (let i = 0; i + 1 < rim.length; i++) {
+    const vi = i === 0 ? V_SLAB_OUT : V_SLAB_IN;
+    const vj = i + 1 === rim.length - 1 ? V_SLAB_OUT : V_SLAB_IN;
+    builder.tri('slab', O, rim[i], rim[i + 1], uvOf(O, V_SLAB_OUT), uvOf(rim[i], vi), uvOf(rim[i + 1], vj), [0, 0, 1]);
+  }
+  // back faces: from the slab's outer edge down to the ground behind it
+  for (const [p, q] of [[aOut, O], [O, bOut]]) {
+    const mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    const away = unit([mid[0] - centre[0], mid[1] - centre[1]]);
+    const drop = (v) => [v[0] + away[0] * BACK_SLOPE_RUN * (v[2] - zMid + SINK), v[1] + away[1] * BACK_SLOPE_RUN * (v[2] - zMid + SINK), zMid - SINK];
+    const want = [away[0], away[1], 0.5];
+    builder.tri('curb', p, q, drop(q), [0, V_LIGHT_LOW], [0.2, V_LIGHT_LOW], [0.2, V_BAND_LOW], want);
+    builder.tri('curb', p, drop(q), drop(p), [0, V_LIGHT_LOW], [0.2, V_BAND_LOW], [0, V_BAND_LOW], want);
   }
 }
 
@@ -251,6 +612,7 @@ function sweepRun(builder, run) {
  */
 export function buildSidewalkMeshes(carriageways, options = {}) {
   const runs = buildSidewalkRuns(carriageways, options);
+  const corners = joinCorners(runs, buildCarriagewayIndex(carriageways));
   const meshes = [];
   let builder = new PartBuilder();
   let inBatch = 0;
@@ -268,6 +630,10 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
     sweepRun(builder, run);
     if (++inBatch >= RUNS_PER_MESH) flush();
   }
+  for (const corner of corners) {
+    sweepCorner(builder, corner);
+    if (++inBatch >= RUNS_PER_MESH) flush();
+  }
   flush();
-  return { meshes, runs, triangles };
+  return { meshes, runs, corners, triangles };
 }

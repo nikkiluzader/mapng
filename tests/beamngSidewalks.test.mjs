@@ -49,3 +49,51 @@ test('the swept mesh has curb and slab parts, all above-ground faces pointing up
     assert.ok(nz > 0, 'slab faces up');
   }
 });
+
+test('a street keeps its sidewalks across OSM way boundaries', async () => {
+  const { streetSides } = await import('../services/beamngSidewalks.js');
+  // three ways of one street, the middle one untagged and rural, the last drawn the other way
+  const a = street({ owner: 1, tags: { name: 'Main', sidewalk: 'right' }, nodes: [[-100, 0, 5, 8], [0, 0, 5, 8]], continuations: [2] });
+  const b = street({ owner: 2, urban: false, tags: { name: 'Main' }, nodes: [[0, 0, 5, 8], [100, 0, 5, 8]], continuations: [1, 3] });
+  const c = street({ owner: 3, urban: false, tags: { name: 'Main' }, nodes: [[200, 0, 5, 8], [100, 0, 5, 8]], continuations: [2] });
+  const sides = streetSides([a, b, c]);
+  assert.deepEqual(sides.get(b), { left: 0, right: 2 }, 'the untagged way takes the tagged one');
+  assert.deepEqual(sides.get(c), { left: 2, right: 0 }, 'swapped where the way runs the other way');
+  const runs = buildSidewalkRuns([a, b, c]);
+  assert.equal(runs.length, 1, 'one run along the whole street, not one per way');
+  const xs = runs[0].points.map((p) => p[0]);
+  assert.ok(Math.min(...xs) <= -99 && Math.max(...xs) >= 199);
+});
+
+test('sidewalks meeting at a corner are joined by a curb return; loose ends ramp down', () => {
+  const ew = street({ owner: 1, nodes: [[-100, 0, 5, 8], [0, 0, 5, 8], [100, 0, 5, 8]] });
+  const ns = street({ owner: 2, tags: { sidewalk: 'both', name: 'Cross' }, nodes: [[0, -100, 5, 8], [0, 0, 5, 8], [0, 100, 5, 8]] });
+  const { corners, runs } = buildSidewalkMeshes([ew, ns]);
+  assert.equal(corners.length, 4, 'all four corners of the crossing');
+  for (const c of corners) {
+    const r = Math.hypot(c.arc[0][0] - c.centre[0], c.arc[0][1] - c.centre[1]);
+    assert.ok(Math.abs(r - 3) < 1e-6, `a residential corner's radius: ${r}`);
+    // the curb return stays off both carriageways (half 4)
+    for (const [x, y] of c.arc) assert.ok(Math.abs(x) >= 4 - 1e-6 && Math.abs(y) >= 4 - 1e-6);
+  }
+  // the outer ends (at the map edge here) are loose: curb ramps, no corner
+  const loose = runs.filter((r) => r.ramps?.some(Boolean));
+  assert.ok(loose.length >= 4);
+});
+
+test('a driveway lowers the curb across it instead of cutting the sidewalk', () => {
+  const driveway = [[20, 0], [20, 30]];
+  const { meshes, runs } = buildSidewalkMeshes([street()], { driveways: [driveway] });
+  const left = runs.filter((r) => r.side === 1);
+  assert.equal(left.length, 1, 'not cut');
+  assert.equal(left[0].dips.length, 1);
+  const [s0, s1] = left[0].dips[0];
+  assert.ok(s1 - s0 > 4 && s1 - s0 < 6.5, `about the driveway's width: ${(s1 - s0).toFixed(1)} m`);
+  // somewhere over the driveway the top of the sidewalk is down at the road
+  const pos = meshes[0].geometry.getAttribute('position').array;
+  let lowest = Infinity;
+  for (let i = 0; i < pos.length; i += 3) {
+    if (Math.abs(pos[i] - 20) < 0.5 && pos[i + 1] > 4.1 && pos[i + 1] < 4.3) lowest = Math.min(lowest, pos[i + 2]);
+  }
+  assert.ok(lowest <= 5 + 1e-6, `curb top over the driveway at the road: ${lowest}`);
+});
