@@ -628,6 +628,16 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   let builder = new MeshBuilder();
   let inBatch = 0;
   let count = 0;
+  // For the export report: why footprints were left out, and what was built.
+  const stats = {
+    footprints: 0,
+    skipped: { badGeometry: 0, tiny: 0, oversize: 0, noGround: 0, overCap: 0 },
+    kinds: {}, classes: {}, roofs: {}, walls: {},
+    floors: { min: Infinity, max: 0, sum: 0 }, height: { min: Infinity, max: 0, sum: 0 },
+    groundSpread: { max: 0, over3m: 0 },
+    shopFronts: 0, offices: 0, withHoles: 0,
+  };
+  const bump = (map, key) => { map[key] = (map[key] || 0) + 1; };
 
   const flush = () => {
     const mesh = builder.toMesh(`buildings_${letterName(meshes.length)}`);
@@ -637,16 +647,18 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   };
 
   for (const f of features) {
-    if (count >= maxBuildings) break;
-    if (f?.type !== 'building' || !Array.isArray(f.geometry) || f.geometry.length < 3) continue;
+    if (f?.type !== 'building') continue;
+    stats.footprints++;
+    if (count >= maxBuildings) { stats.skipped.overCap++; continue; }
+    if (!Array.isArray(f.geometry) || f.geometry.length < 3) { stats.skipped.badGeometry++; continue; }
     const projected = f.geometry.map((p) => project(p.lat, p.lng));
     let ring = cleanRing(projected.map(([x, y]) => [x, y]));
-    if (ring.length < 3) continue;
+    if (ring.length < 3) { stats.skipped.badGeometry++; continue; }
     let area = signedArea(ring);
     if (area < 0) { ring = ring.reverse(); area = -area; }
-    if (area < 4) continue;
+    if (area < 4) { stats.skipped.tiny++; continue; }
     const tags = f.tags || {};
-    if (area > MAX_AREA_M2 && !INDUSTRIAL_CLASSES.has(tags.building) && !BIG_BOX_CLASSES.has(tags.building)) continue;
+    if (area > MAX_AREA_M2 && !INDUSTRIAL_CLASSES.has(tags.building) && !BIG_BOX_CLASSES.has(tags.building)) { stats.skipped.oversize++; continue; }
     const holes = (f.holes || []).map((h) => {
       let hr = cleanRing(h.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]));
       if (hr.length >= 3 && signedArea(hr) > 0) hr = hr.reverse();
@@ -654,7 +666,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     }).filter((h) => h.length >= 3);
 
     const grounds = projected.map((p) => p[2]).filter(Number.isFinite);
-    if (grounds.length === 0) continue;
+    if (grounds.length === 0) { stats.skipped.noGround++; continue; }
     const zMin = Math.min(...grounds);
     const zMax = Math.max(...grounds);
     const c = f.geometry[0];
@@ -701,8 +713,20 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     }
 
     count++;
+    bump(stats.kinds, plan.kind);
+    bump(stats.classes, plan.cls);
+    bump(stats.roofs, plan.roof === 'flat' || !box ? 'flat' : plan.roof);
+    bump(stats.walls, plan.band || plan.office ? (plan.office ? 'office' : 'facade') : plan.wall);
+    for (const [acc, v] of [[stats.floors, plan.floors], [stats.height, plan.eaveH]]) {
+      acc.min = Math.min(acc.min, v); acc.max = Math.max(acc.max, v); acc.sum += v;
+    }
+    stats.groundSpread.max = Math.max(stats.groundSpread.max, zMax - zMin);
+    if (zMax - zMin > 3) stats.groundSpread.over3m++;
+    if (plan.shopFloor) stats.shopFronts++;
+    if (plan.office) stats.offices++;
+    if (holes.length) stats.withHoles++;
     if (++inBatch >= MESH_BATCH) flush();
   }
   flush();
-  return { meshes, count };
+  return { meshes, count, stats };
 }

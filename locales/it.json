@@ -288,7 +288,8 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": " per generare una mappa molto piu dettagliata. Strumento di AlexKidd.",
     "exportingBeamng": "Esportazione Livello BeamNG",
-    "mayTakeWhile": "Questo potrebbe richiedere un po' per le mappe grandi"
+    "mayTakeWhile": "Questo potrebbe richiedere un po' per le mappe grandi",
+    "elapsed": "Trascorso"
   },
   "controlPanel": {
     "outputSettings": "Impostazioni Output",

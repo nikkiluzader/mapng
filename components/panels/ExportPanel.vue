@@ -257,6 +257,21 @@
             <span class="min-w-0 flex-1 text-[11px] leading-snug text-gray-600 dark:text-gray-400 break-words">{{ beamNGProgressStep }}</span>
             <span class="text-[11px] font-mono text-[#FF6600] ml-2 shrink-0">{{ beamNGProgressPct }}%</span>
           </div>
+
+          <!-- Finished steps (most recent last) and elapsed time -->
+          <div v-if="beamNGProgressDone.length || beamNGElapsedMs" class="flex flex-col gap-0.5 border-t border-gray-100 dark:border-gray-800 pt-2">
+            <div
+              v-for="(done, i) in beamNGProgressDone.slice(-5)"
+              :key="i"
+              class="flex justify-between gap-2 text-[10px] leading-snug text-gray-400 dark:text-gray-500"
+            >
+              <span class="min-w-0 flex-1 truncate">✓ {{ done.step }}</span>
+              <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
+            </div>
+            <div class="flex justify-end text-[10px] font-mono text-gray-500 dark:text-gray-400">
+              {{ t('exportPanel.elapsed') }} {{ formatStepDuration(beamNGElapsedMs) }}
+            </div>
+          </div>
         </div>
       </div>
     </Transition>
@@ -324,6 +339,15 @@ const isExportingOSM = ref(false);
 const isExportingBeamNGLevel = ref(false);
 const beamNGProgressStep = ref('');
 const beamNGProgressPct  = ref(0);
+// Finished export steps ({ step, durationMs }) and the time since export began.
+const beamNGProgressDone = ref([]);
+const beamNGElapsedMs = ref(0);
+const formatStepDuration = (ms) => {
+  if (!Number.isFinite(ms)) return '';
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const sec = Math.round(ms / 1000);
+  return sec < 60 ? `${sec} s` : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+};
 const normalizeBeamNGSeaLevelOffset = (value) => {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return 0;
@@ -856,6 +880,10 @@ const handleBeamNGLevelExport = async () => {
   isExportingBeamNGLevel.value = true;
   beamNGProgressStep.value = 'Preparing…';
   beamNGProgressPct.value  = 0;
+  beamNGProgressDone.value = [];
+  beamNGElapsedMs.value = 0;
+  // ticks between progress events (a long step reports only when it ends)
+  const elapsedTimer = setInterval(() => { beamNGElapsedMs.value = performance.now() - startedAt; }, 1000);
   try {
     console.log(`${BEAMNG_EXPORT_UI_LOG} Starting export pipeline...`);
     await yieldToUi();
@@ -936,9 +964,11 @@ const handleBeamNGLevelExport = async () => {
       elevationSource: props.elevationSource,
       requestedResolution: props.resolution,
       requestedProcessingMetersPerPixel: resolveProcessingMetersPerPixel(td),
-      onProgress: ({ step, pct }) => {
+      onProgress: ({ step, pct, elapsedMs, completed }) => {
         beamNGProgressStep.value = step;
         beamNGProgressPct.value  = pct;
+        if (Number.isFinite(elapsedMs)) beamNGElapsedMs.value = elapsedMs;
+        if (completed) beamNGProgressDone.value = [...beamNGProgressDone.value, completed];
         console.log(`${BEAMNG_EXPORT_UI_LOG} Progress:`, { step, pct });
       },
     });
@@ -990,9 +1020,12 @@ const handleBeamNGLevelExport = async () => {
     });
     alert(t('export.errorBeamngLevel'));
   } finally {
+    clearInterval(elapsedTimer);
     isExportingBeamNGLevel.value = false;
     beamNGProgressStep.value = '';
     beamNGProgressPct.value  = 0;
+    beamNGProgressDone.value = [];
+    beamNGElapsedMs.value = 0;
     console.log(`${BEAMNG_EXPORT_UI_LOG} Export flow completed in ms:`, Math.round(performance.now() - startedAt));
   }
 };

@@ -769,16 +769,22 @@ function generateBridgeDAEs(decks, groundAt, roadLines) {
   return out;
 }
 
-async function generateOSMObjectsDAE(terrainData, worldSize) {
+async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null) {
   if (!terrainData.osmFeatures?.length) return null;
 
   // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
   // straight in world space (services/beamngBuildings.js).
   const squareSize = worldSize / terrainData.width;
-  const { meshes: buildingMeshes } = buildTexturedBuildings(
+  const { meshes: buildingMeshes, count: buildingCount, stats: buildingStats } = buildTexturedBuildings(
     terrainData.osmFeatures,
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
   );
+  if (reportStats) {
+    reportStats.built = buildingCount;
+    reportStats.stats = buildingStats;
+    reportStats.meshes = buildingMeshes.length;
+    reportStats.triangles = buildingMeshes.reduce((n, m) => n + (m.geometry.getAttribute('position')?.count || 0) / 3, 0);
+  }
 
   // Barriers are exported as native TSStatic objects in BeamNG scene JSON,
   // not baked into the generic OSM DAE mesh.
@@ -1089,13 +1095,26 @@ export function buildBackdropMaterialDefs(levelName, textureFiles = [], material
 async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) {
   // Zoom 15 gives ~4m/px satellite imagery; 1024px cap avoids canvas-size
   // failures at large resolutions while still giving usable texture quality.
-  const surroundingGroup = await createSurroundingMeshes(terrainData, null, 128, {
+  // Progress: downloads are most of the time (0–85 % of the step), then the
+  // tiles' meshes and textures.
+  let downloaded = 0;
+  const onText = (text) => {
+    // USGS / GPXZ backdrops fetch tile by tile: "… for tile NE (3/8)..."
+    const m = /^Fetching .*\((\d+)\/(\d+)\)/.exec(String(text));
+    if (m) downloaded = Math.max(downloaded, (Number(m[1]) - 1) / Number(m[2]));
+    options.onProgress?.(text, downloaded * 0.85);
+  };
+  const surroundingGroup = await createSurroundingMeshes(terrainData, onText, 128, {
     fetchResolutionCap: 1024,
     includeSatellite: true,
     satelliteZoom: 15,
     elevationSource: options.elevationSource || 'global30m',
     gpxzApiKey: options.gpxzApiKey || '',
+    onDownloadProgress: ({ completedTotal, total }) => {
+      if (total > 0) downloaded = completedTotal / total;
+    },
   });
+  options.onProgress?.('Building the backdrop meshes and textures…', 0.9);
   if (!surroundingGroup) return null;
 
   let hasMesh = false;
@@ -2604,7 +2623,10 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
           fallbackHalfWidth: (HIGHWAY_STYLE[seg.highway] ?? DEFAULT_ROAD_STYLE).width,
         });
         const half = cs.drivingHalfWidth + (cs.leftExtra + cs.rightExtra) / 2;
-        parts.push({ xy: xy.map(([x, y]) => [x, y]), half, layer: Math.max(1, layer), structure: structureOf(tags, xy) });
+        parts.push({
+          xy: xy.map(([x, y]) => [x, y]), half, layer: Math.max(1, layer), structure: structureOf(tags, xy),
+          osm: { id: seg.sourceFeature?.id ?? null, name: tags.name || tags.ref || null, highway: seg.highway },
+        });
         partSeg.push(segIndex);
       } else {
         lowerRoads.push({
@@ -2727,7 +2749,12 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
       for (const seg of parts[part.index].landedOn || []) approaches.set(seg, part);
     }
   }
-  return { bySeg, approaches, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built };
+  return {
+    bySeg, approaches, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built,
+    // for the export report: each part's OSM way (carried-on approaches have none)
+    partInfo: parts.map((p, i) => ({ ...(p.osm || { id: null, name: null, highway: null }), structure: p.structure ?? null, landing: partSeg[i] < 0 })),
+    endHeight,
+  };
 }
 
 // The ground at each abutment meets the deck: the approach is graded to the
@@ -3853,6 +3880,18 @@ function formatDurationMs(value) {
 }
 
 /**
+ * Format a byte count as B / KB / MB / GB for progress and report output.
+ */
+function formatBytes(value) {
+  if (!Number.isFinite(value) || value < 0) return 'n/a';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let v = value;
+  let u = 0;
+  while (v >= 1024 && u < units.length - 1) { v /= 1024; u++; }
+  return `${u === 0 ? v : v.toFixed(v >= 100 ? 0 : 1)} ${units[u]}`;
+}
+
+/**
  * Convert square meters to square kilometers for report display.
  */
 function metersToKm2(value) {
@@ -3957,6 +3996,287 @@ function summarizeTerrainSamples(terrainData) {
   };
 }
 
+// Rough share of an export's run time per phase, in seconds, fitted to timed
+// exports (Salt Lake County 16k: backdrop downloads 180 s, ZIP ~80 s, heightmap
+// PNG 23 s, vegetation 18 s; Cottonwood Heights 4k: ZIP 25 s for 1,038 files,
+// sidewalks 7 s for 1,329 roads, buildings 1.3 s for 3,399 footprints). Grid
+// work scales with the pixel count, road work with the roads, the ZIP with
+// its file count (≈ the roads: one folder per named road) and the backdrop's
+// downloads with the area, so the bar follows the time actually spent.
+function exportPhaseWeights({ size, osmFeatureCount, roadCount, buildingCount, includeBackdrop, applyFoundations }) {
+  const px = (size / 4096) ** 2;
+  return {
+    prepare: 0.5,
+    foundations: applyFoundations ? 0.001 * buildingCount : 0,
+    roads: 1 + 0.001 * roadCount,
+    sidewalks: 0.005 * roadCount,
+    props: 0.5 + 0.0002 * roadCount,
+    texture: 0.5 + 1 * px,
+    materials: 0.3 * px,
+    ter: 0.1 * px,
+    heightmap: 1.4 * px,
+    thumbnail: 0.4,
+    buildings: 0.0004 * buildingCount,
+    water: 0.2,
+    furniture: 0.2 + 0.00005 * osmFeatureCount,
+    vegetation: 0.00008 * osmFeatureCount,
+    backdrop: includeBackdrop ? 4 + 15 * px : 0,
+    assets: 0.5,
+    zip: 0.5,
+    compress: 2 + 0.018 * roadCount + 2.5 * px,
+  };
+}
+
+// Compression cost of one ZIP entry (s): JSZip + the OPFS write per file, and
+// DEFLATE per MB (4k export: ~20 ms a file, ~46 ms a MB).
+const ZIP_FILE_COST_S = 0.02;
+const ZIP_MB_COST_S = 0.046;
+const byteSizeOf = (data) => {
+  if (typeof data === 'string') return data.length;
+  return Number(data?.byteLength ?? data?.size) || 0;
+};
+
+const JOB_LOG_MAX_LINES = 20000;
+const JOB_LOG_MAX_ARG_CHARS = 2000;
+
+// Mirror console output into a timestamped list while an export runs. Large
+// arrays and typed arrays are summarized, not serialized.
+function captureConsole() {
+  const startedAt = performance.now();
+  const lines = [];
+  let dropped = 0;
+  const replacer = (key, value) => {
+    if (ArrayBuffer.isView(value)) return `[${value.constructor.name} ${value.length}]`;
+    if (Array.isArray(value) && value.length > 50) return `[Array ${value.length}]`;
+    return value;
+  };
+  const format = (arg) => {
+    if (typeof arg === 'string') return arg;
+    if (arg instanceof Error) return `${arg.name}: ${arg.message}`;
+    let text;
+    try { text = JSON.stringify(arg, replacer); } catch { text = String(arg); }
+    if (text === undefined) text = String(arg);
+    return text.length > JOB_LOG_MAX_ARG_CHARS ? `${text.slice(0, JOB_LOG_MAX_ARG_CHARS)}…` : text;
+  };
+  const originals = {};
+  for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
+    const original = console[level];
+    originals[level] = original;
+    console[level] = (...args) => {
+      if (lines.length < JOB_LOG_MAX_LINES) {
+        const t = ((performance.now() - startedAt) / 1000).toFixed(2).padStart(8);
+        lines.push(`[${t}s] ${level.toUpperCase().padEnd(5)} ${args.map(format).join(' ')}`);
+      } else {
+        dropped++;
+      }
+      original.apply(console, args);
+    };
+  }
+  return {
+    lines,
+    get dropped() { return dropped; },
+    restore() { for (const [level, fn] of Object.entries(originals)) console[level] = fn; },
+  };
+}
+
+/**
+ * Detailed troubleshooting sections for export_report.txt: what the export
+ * built (roads, bridges, buildings, furniture, vegetation, water, terrain
+ * materials), the machine it ran on, and the job's console output.
+ */
+function buildDetailedReportSections(d) {
+  const lines = [];
+  const section = (title) => { lines.push('', title, '-'.repeat(title.length)); };
+  const countBy = (items, keyOf) => {
+    const m = new Map();
+    for (const it of items) { const k = keyOf(it) ?? 'n/a'; m.set(k, (m.get(k) || 0) + 1); }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  };
+  const listCounts = (entries, limit = 25) => {
+    for (const [k, n] of entries.slice(0, limit)) lines.push(`  - ${k}: ${n}`);
+    if (entries.length > limit) lines.push(`  - … ${entries.length - limit} more`);
+  };
+  const td = d.terrainData;
+  const minH = Number(td?.minHeight) || 0;
+  const toWorld = (p) => geoToWorldPoint(p.lat, p.lng, td, d.squareSize, 0);
+  const polylineLength = (pts) => {
+    let L = 0;
+    for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return L;
+  };
+  const shapeName = (o) => String(o?.shapeName || o?.class || 'n/a').split('/').pop();
+
+  // ── Environment ────────────────────────────────────────────────────────────
+  section('Environment');
+  lines.push(`- MapNG build: ${typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : 'n/a'} (${typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : 'n/a'})`);
+  const nav = typeof navigator !== 'undefined' ? navigator : null;
+  lines.push(`- Browser: ${nav?.userAgent ?? 'n/a'}`);
+  lines.push(`- CPU threads: ${nav?.hardwareConcurrency ?? 'n/a'}, device memory: ${nav?.deviceMemory ? `${nav.deviceMemory} GB` : 'n/a'}`);
+  const mem = typeof performance !== 'undefined' ? performance.memory : null;
+  lines.push(`- JS heap at report time: ${mem ? `${formatBytes(mem.usedJSHeapSize)} used of ${formatBytes(mem.jsHeapSizeLimit)} limit` : 'n/a'}`);
+  lines.push(`- Disk streaming for the ZIP (OPFS): ${typeof nav?.storage?.getDirectory === 'function' ? 'available' : 'unavailable (in-memory ZIP)'}`);
+
+  // ── Roads ──────────────────────────────────────────────────────────────────
+  section('Roads');
+  const roadFeatures = (td?.osmFeatures || []).filter((f) => f.type === 'road' && f.geometry?.length > 1);
+  const byClass = new Map();
+  for (const f of roadFeatures) {
+    const k = f.tags?.highway || 'n/a';
+    const e = byClass.get(k) || { n: 0, m: 0, bridges: 0, tunnels: 0 };
+    e.n++;
+    e.m += polylineLength(f.geometry.map(toWorld));
+    if (f.tags?.bridge && f.tags.bridge !== 'no') e.bridges++;
+    if (f.tags?.tunnel && f.tags.tunnel !== 'no') e.tunnels++;
+    byClass.set(k, e);
+  }
+  lines.push(`- OSM road ways in the map: ${roadFeatures.length}`);
+  for (const [k, e] of [...byClass.entries()].sort((a, b) => b[1].m - a[1].m)) {
+    lines.push(`  - ${k}: ${e.n} ways, ${formatNumber(e.m / 1000, 2)} km${e.bridges ? `, ${e.bridges} bridge` : ''}${e.tunnels ? `, ${e.tunnels} tunnel (drawn on the ground)` : ''}`);
+  }
+  // generateDecalRoads returns one SimGroup per road name (and one for the
+  // junction markings) with the DecalRoads inside
+  const groups = d.decalRoads || [];
+  const decals = [];
+  const collect = (items) => {
+    for (const it of items || []) {
+      if (it?.class === 'DecalRoad') decals.push(it);
+      else if (Array.isArray(it?.__items)) collect(it.__items);
+    }
+  };
+  collect(groups);
+  lines.push(`- Road groups (one per road name): ${groups.length}`);
+  lines.push(`- DecalRoad objects: ${decals.length} (drivable, in the AI road graph: ${decals.filter((r) => Number(r.drivability) > 0).length})`);
+  lines.push(`- DecalRoad nodes: ${decals.reduce((n, r) => n + (r.nodes?.length || 0), 0)}`);
+  lines.push('- DecalRoads by material:');
+  listCounts(countBy(decals, (r) => r.material));
+  lines.push(`- Carriageways (paint cut / sidewalk input): ${(groups.carriageways || []).length}`);
+  lines.push(`- Crosswalk zones: ${(groups.crosswalkZones || []).length}`);
+
+  // ── Bridges ────────────────────────────────────────────────────────────────
+  section('Bridges');
+  const bridges = d.bridges;
+  const decks = bridges?.decks || [];
+  const partInfo = bridges?.partInfo || [];
+  lines.push(`- Bridge decks: ${decks.length}, approach embankments built: ${bridges?.ramps ?? 0}`);
+  lines.push('- Heights are absolute (m above sea level); "ground" is the exported terrain under the point.');
+  lines.push('- An abutment far from its ground means the deck meets its road above/below the terrain: look there first.');
+  const daeByKey = new Map((d.bridgeDaes || []).map((b) => [b.key, b]));
+  decks.forEach((deck, i) => {
+    const key = `b${String(i + 1).padStart(3, '0')}`;
+    const infos = deck.parts.map((p) => partInfo[p.index] || {});
+    const named = infos.filter((x) => !x.landing);
+    const names = [...new Set(named.map((x) => `${x.name || 'unnamed'} [${x.highway || '?'}]`))].join(', ') || 'n/a';
+    const ways = [...new Set(named.map((x) => String(x.id ?? '?').replace(/_seg_\d+$/, '')))].join(', ');
+    const landings = infos.filter((x) => x.landing).length;
+    const length = deck.parts.reduce((n, p) => n + polylineLength(p.xy), 0);
+    let maxGap = -Infinity; let minGap = Infinity; let sumGap = 0; let nGap = 0;
+    for (const p of deck.parts) {
+      p.xy.forEach(([x, y], k) => {
+        const g = d.groundAtWorld(x, y);
+        const gap = p.z[k] - g;
+        maxGap = Math.max(maxGap, gap); minGap = Math.min(minGap, gap); sumGap += gap; nGap++;
+      });
+    }
+    const minRoadGap = Math.min(...deck.parts.map((p) => p.minGap ?? Infinity));
+    const structure = [...new Set(infos.map((x) => x.structure).filter(Boolean))].join(', ') || 'beam (default)';
+    const dae = daeByKey.get(key);
+    lines.push('');
+    lines.push(`Bridge ${key}: ${names}`);
+    lines.push(`  - OSM way(s): ${ways || 'n/a'}${landings ? `; ${landings} part(s) carried on over the approach road (lidar gap)` : ''}`);
+    lines.push(`  - Length ${formatNumber(length, 1)} m in ${deck.parts.length} part(s), width ${formatNumber(2 * Math.max(...deck.parts.map((p) => p.half)), 1)} m, structure ${structure}, depth ${formatNumber(Math.max(...deck.parts.map((p) => p.depth ?? 0)), 2)} m, layer ${deck.layer ?? 'n/a'}`);
+    lines.push(`  - Crosses: ${deck.crossed?.roads ?? 'n/a'} road(s), ${deck.crossed?.water ?? 'n/a'} water run(s)${deck.crossed?.nav ? `, ship channel clearance ${deck.crossed.nav} m` : ''}`);
+    (deck.abutments || []).forEach(([ax, ay], j) => {
+      let z = null;
+      for (const p of deck.parts) {
+        for (const k of [0, p.xy.length - 1]) if (Math.hypot(p.xy[k][0] - ax, p.xy[k][1] - ay) < 0.6) z = p.z[k];
+      }
+      const g = d.groundAtWorld(ax, ay);
+      const fit = typeof bridges.endHeight === 'function' ? bridges.endHeight(ax, ay) : null;
+      lines.push(`  - Abutment ${j + 1} at (${formatNumber(ax, 1)}, ${formatNumber(ay, 1)}): deck ${formatNumber((z ?? NaN) + minH, 2)} m, ground ${formatNumber(g + minH, 2)} m (${z == null ? 'n/a' : `${z - g >= 0 ? '+' : ''}${formatNumber(z - g, 2)} m`}), approach road fit ${fit == null ? 'n/a' : `${formatNumber(fit + minH, 2)} m`}`);
+    });
+    lines.push(`  - Deck over ground: max ${formatNumber(maxGap, 2)} m, mean ${formatNumber(sumGap / Math.max(1, nGap), 2)} m, min ${formatNumber(minGap, 2)} m`);
+    lines.push(`  - Lowest clearance over a crossed road: ${Number.isFinite(minRoadGap) ? `${formatNumber(minRoadGap, 2)} m` : 'n/a'}; clearance shortfall: ${formatNumber(deck.shortfall ?? 0, 2)} m`);
+    lines.push(`  - Object: bridge_${key}.dae${dae ? `, ${Math.round(dae.triangles)} triangles, origin (${dae.origin.map((v) => formatNumber(v, 1)).join(', ')})` : ' (not written: no geometry)'}`);
+  });
+
+  // ── Buildings ──────────────────────────────────────────────────────────────
+  section('Buildings');
+  const br = d.buildingReport || {};
+  const st = br.stats;
+  if (!st) {
+    lines.push('- No buildings exported (none in the map, or buildings off).');
+  } else {
+    lines.push(`- OSM building footprints: ${st.footprints}, built: ${br.built}`);
+    lines.push(`- Skipped: invalid geometry ${st.skipped.badGeometry}, under 4 m² ${st.skipped.tiny}, over 50,000 m² (non-industrial) ${st.skipped.oversize}, no terrain under them ${st.skipped.noGround}, over the building cap ${st.skipped.overCap}`);
+    lines.push(`- Meshes: ${br.meshes}, triangles: ${Math.round(br.triangles)}, collision: one mesh of every wall and roof`);
+    const avg = (a) => (br.built ? a.sum / br.built : NaN);
+    lines.push(`- Floors: min ${br.built ? st.floors.min : 'n/a'}, mean ${formatNumber(avg(st.floors), 1)}, max ${st.floors.max}`);
+    lines.push(`- Eave height: min ${br.built ? formatNumber(st.height.min, 1) : 'n/a'} m, mean ${formatNumber(avg(st.height), 1)} m, max ${formatNumber(st.height.max, 1)} m`);
+    lines.push(`- On sloping ground: ${st.groundSpread.over3m} footprint(s) span more than 3 m of terrain (max ${formatNumber(st.groundSpread.max, 1)} m; their plinth reaches the lowest corner)`);
+    lines.push(`- Shop fronts: ${st.shopFronts}, offices: ${st.offices}, courtyards (inner rings): ${st.withHoles}`);
+    const sorted = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]);
+    lines.push('- Kinds:'); listCounts(sorted(st.kinds));
+    lines.push('- OSM building=* classes:'); listCounts(sorted(st.classes), 30);
+    lines.push('- Roofs:'); listCounts(sorted(st.roofs));
+    lines.push('- Wall materials:'); listCounts(sorted(st.walls));
+  }
+
+  // ── Sidewalks and street furniture ─────────────────────────────────────────
+  section('Sidewalks and Street Furniture');
+  const sw = d.sidewalks || {};
+  lines.push(`- Sidewalk curb runs: ${(sw.runs || []).length}, meshes: ${(sw.meshes || []).length}, triangles: ${sw.triangles ?? 0}`);
+  const sp = d.streetProps || {};
+  const mp = d.mappedStreetProps || {};
+  lines.push(`- Street props placed: ${(sp.hydrants || []).length} hydrants, ${(sp.bins || []).length} bins, ${(sp.benches || []).length} benches, ${(sp.poles || []).length} utility poles, ${(sp.wires || []).length} power line spans`);
+  lines.push(`- Mapped in OSM: ${(mp.hydrants || []).length} hydrants, ${(mp.bins || []).length} bins`);
+  const sig = d.signalData || {};
+  lines.push(`- Traffic signals: ${(sig.instances || []).length} signal instances, ${(sig.controllers || []).length} controllers, ${(sig.sequences || []).length} sequences, ${(d.trafficSignalObjects || []).length} signal objects`);
+  lines.push(`- Road signs: ${(d.signObjects || []).length}`);
+  listCounts(countBy(d.signObjects || [], (o) => String(o.name || '').replace(/^sign_/, '').replace(/_\d+$/, '')));
+  lines.push(`- Barriers / fences: ${(d.barrierObjects || []).length}`);
+  listCounts(countBy(d.barrierObjects || [], shapeName), 15);
+  lines.push(`- Lamps, benches and other furniture: ${(d.streetFurnitureObjects || []).length}`);
+  listCounts(countBy(d.streetFurnitureObjects || [], shapeName), 15);
+  lines.push(`- Fuel / charging station objects: ${(d.fuelStationObjects || []).length}`);
+
+  // ── Vegetation ─────────────────────────────────────────────────────────────
+  section('Vegetation');
+  const forest = [...(d.forestPlacements || new Map()).entries()].map(([type, list]) => [type, list.length]).sort((a, b) => b[1] - a[1]);
+  lines.push(`- Forest item types: ${forest.length}, placements: ${forest.reduce((n, [, c]) => n + c, 0)}`);
+  listCounts(forest, 60);
+  lines.push(`- Ground cover objects: ${(d.groundCoverObjects || []).length}`);
+  for (const g of d.groundCoverObjects || []) lines.push(`  - ${g.name || 'n/a'} (material ${g.material || 'n/a'})`);
+
+  // ── Water ──────────────────────────────────────────────────────────────────
+  section('Water');
+  lines.push(`- Water objects: ${(d.waterObjects || []).length}`);
+  listCounts(countBy(d.waterObjects || [], (o) => o.class));
+
+  // ── Terrain materials ──────────────────────────────────────────────────────
+  section('Terrain Materials');
+  const names = d.pbrResult?.materialNames || ['DefaultMaterial'];
+  const layerMap = d.pbrResult?.layerMap;
+  if (layerMap?.length) {
+    const counts = new Float64Array(256);
+    for (let i = 0; i < layerMap.length; i++) counts[layerMap[i]]++;
+    names.forEach((n, i) => lines.push(`  - ${i}: ${n} — ${formatNumber((counts[i] / layerMap.length) * 100, 2)}% of the terrain`));
+  } else {
+    names.forEach((n, i) => lines.push(`  - ${i}: ${n}`));
+  }
+
+  // ── Console ────────────────────────────────────────────────────────────────
+  section('Job Console Log');
+  const log = d.jobLog;
+  if (!log) {
+    lines.push('- n/a');
+  } else {
+    lines.push(`- ${log.lines.length} line(s) from the start of the export to this report (ZIP compression follows it)${log.dropped ? `; ${log.dropped} later line(s) dropped over the ${JOB_LOG_MAX_LINES}-line cap` : ''}.`);
+    lines.push('');
+    for (const line of log.lines) lines.push(line);
+  }
+  return lines;
+}
+
 /**
  * Build the plaintext export diagnostics report bundled in the level zip.
  */
@@ -3988,6 +4308,7 @@ function buildBeamNGExportReport({
   backdropDiagnostics,
   mapngFlagFiles,
   didCropToSquare,
+  detail = null,
 }) {
   const minHeight = Number(terrainData?.minHeight);
   const maxHeight = Number(terrainData?.maxHeight);
@@ -4052,7 +4373,7 @@ function buildBeamNGExportReport({
     '',
     'Generated Content',
     `- Terrain materials written: ${terrainMaterialCount}`,
-    `- DecalRoads generated: ${decalRoadCount}`,
+    `- DecalRoad groups (one per road name; DecalRoads under Roads below): ${decalRoadCount}`,
     `- Barrier folders: ${barrierMeshSplineGroups.length}`,
     `- Barrier TSStatic objects: ${barrierObjects.length}`,
     `- Water objects generated: ${waterObjects.length}`,
@@ -4101,9 +4422,11 @@ function buildBeamNGExportReport({
   reportLines.push(`- Point/line/polygon split: ${osmSummary.points}/${osmSummary.lines}/${osmSummary.polygons}`);
   reportLines.push('');
   reportLines.push('Processing Timeline');
-
+  reportLines.push('- duration, share of the time so far, and where the progress bar stood when the step began');
+  const timelineTotalMs = processingLog.reduce((sum, entry) => sum + (entry.durationMs || 0), 0);
   for (const entry of processingLog) {
-    reportLines.push(`- ${entry.step}: ${formatDurationMs(entry.durationMs)} (${entry.pct}%)`);
+    const share = timelineTotalMs > 0 ? `${formatNumber((entry.durationMs / timelineTotalMs) * 100, 1)}%` : 'n/a';
+    reportLines.push(`- ${entry.step}: ${formatDurationMs(entry.durationMs)} (${share} of the time; bar at ${entry.pct}%)`);
   }
 
   if (originalTerrainData?.osmRequestInfo) {
@@ -4113,6 +4436,8 @@ function buildBeamNGExportReport({
       reportLines.push(`- ${key}: ${typeof value === 'object' ? JSON.stringify(value) : String(value)}`);
     }
   }
+
+  if (detail) reportLines.push(...buildDetailedReportSections({ terrainData, squareSize, worldSize, ...detail }));
 
   return reportLines.join('\n') + '\n';
 }
@@ -6424,7 +6749,7 @@ async function streamZipToWritable(zip, writable, onPercent) {
       chain = chain
         .then(() => writable.write(chunk))
         .then(() => {
-          onPercent?.(metadata?.percent);
+          onPercent?.(metadata?.percent, metadata?.currentFile);
           stream.resume();
         })
         .catch(reject);
@@ -6539,6 +6864,17 @@ async function generateZipToOPFS(zip, filename, onPercent) {
  *   only road system); 'none' writes no roads. Legacy 'architect' / 'mesh' mean 'decal'.
  */
 export async function exportBeamNGLevel(terrainData, center, options = {}) {
+  // Every module logs to the console (OSM, roads, bridges, buildings...); the
+  // export keeps its share of that for export_report.txt.
+  const jobLog = captureConsole();
+  try {
+    return await runBeamNGLevelExport(terrainData, center, options, jobLog);
+  } finally {
+    jobLog.restore();
+  }
+}
+
+async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const {
     baseTexture = 'hybrid',
     includeBuildings = true,
@@ -6594,51 +6930,69 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       pbrSource,
     },
   });
-  // Report progress and yield to the browser so UI updates and GC can run.
-  /**
-   * Emit progress callbacks consumed by the export UI.
-   */
-  const report = (step, pct) => {
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Step`, { step, pct });
-    onProgress?.({ step, pct });
-  };
   /**
    * Yield one event-loop tick so UI paint and GC can run during long exports.
    */
   const yield_ = () => new Promise(r => setTimeout(r, 0));
   const exportStartedAt = new Date();
+  const exportT0 = performance.now();
   const processingLog = [];
-  let currentStep = null;
-  let currentStepStartedAt = performance.now();
-  /**
-   * Start a timed processing step and close the previous one in the log.
-   */
-  const beginStep = (step, pct) => {
-    const now = performance.now();
-    if (currentStep !== null) {
-      processingLog.push({
-        step: currentStep.step,
-        pct: currentStep.pct,
-        durationMs: now - currentStepStartedAt,
-      });
-    }
-    currentStep = { step, pct };
-    currentStepStartedAt = now;
-    report(step, pct);
+  const featureTypeCount = (type) => (terrainData?.osmFeatures || []).reduce((n, f) => n + (f?.type === type ? 1 : 0), 0);
+  const phaseWeights = exportPhaseWeights({
+    size: computeBeamNGTerrainSize(terrainData.width, terrainData.height),
+    osmFeatureCount: Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures.length : 0,
+    roadCount: roadType === 'none' ? 0 : featureTypeCount('road'),
+    buildingCount: includeBuildings ? featureTypeCount('building') : 0,
+    includeBackdrop,
+    applyFoundations,
+  });
+  const totalWeight = Object.values(phaseWeights).reduce((sum, w) => sum + w, 0);
+  let weightDone = 0;
+  let lastPct = 0;
+  let currentStep = null;   // { phase, step, pct }
+  let currentStepStartedAt = exportT0;
+  // Overall percent: the phases finished plus the share of the current one
+  // done, never moving backwards and holding 100 for the end.
+  const percentAt = (fraction) => {
+    const w = currentStep ? (phaseWeights[currentStep.phase] ?? 0) : 0;
+    const pct = Math.floor(((weightDone + w * Math.max(0, Math.min(1, fraction))) / totalWeight) * 100);
+    lastPct = Math.max(lastPct, Math.min(99, pct));
+    return lastPct;
   };
   /**
-   * Finalize and flush the active timed step into the processing log.
+   * Emit progress to the export UI: the step's text, the overall percent and,
+   * on a new step, the one just finished with its duration.
    */
-  const finishProcessingLog = () => {
-    if (currentStep !== null) {
-      processingLog.push({
-        step: currentStep.step,
-        pct: currentStep.pct,
-        durationMs: performance.now() - currentStepStartedAt,
-      });
-      currentStep = null;
-    }
+  const report = (step, fraction = 0, completed = null) => {
+    const pct = percentAt(fraction);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Step`, { step, pct });
+    onProgress?.({ step, pct, elapsedMs: performance.now() - exportT0, completed });
   };
+  /**
+   * Close the active step into the processing log.
+   */
+  const closeStep = () => {
+    if (currentStep === null) return null;
+    const entry = { step: currentStep.step, pct: currentStep.pct, durationMs: performance.now() - currentStepStartedAt };
+    processingLog.push(entry);
+    weightDone += phaseWeights[currentStep.phase] ?? 0;
+    currentStep = null;
+    return entry;
+  };
+  /**
+   * Start a timed processing step (one of exportPhaseWeights' phases).
+   */
+  const beginStep = (phase, step) => {
+    const completed = closeStep();
+    currentStep = { phase, step, pct: 0 };
+    currentStep.pct = percentAt(0);
+    currentStepStartedAt = performance.now();
+    report(step, 0, completed);
+  };
+  const finishProcessingLog = () => { closeStep(); };
+
+  beginStep('prepare', `Preparing ${terrainData.width}×${terrainData.height} terrain and ${Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures.length : 0} OSM features…`);
+  await yield_();
 
   // BeamNG TerrainBlock expects square power-of-two terrain dimensions.
   // Center-crop everything (heightmap, bounds, textures) so terrain, texture,
@@ -6648,6 +7002,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const didCropToSquare = td.width !== targetBeamNGSize || td.height !== targetBeamNGSize;
   if (didCropToSquare) {
     const cropSize = targetBeamNGSize;
+    report(`Cropping terrain to ${cropSize}×${cropSize} (BeamNG needs a square power of two)…`);
     td = await prepareCroppedTerrainData({ ...td, exportCropSize: cropSize });
   }
 
@@ -6658,7 +7013,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
 
   let exportTerrainData = foundationInput;
   if (applyFoundations) {
-    beginStep('Preparing building foundations…', 2);
+    beginStep('foundations', 'Preparing building foundations…');
     await yield_();
     exportTerrainData = await applyBuildingFoundations(
       foundationInput,
@@ -6666,17 +7021,13 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
         yieldFn: yield_,
         onProgress: ({ completed, total, applied, skipped }) => {
           if (!total) return;
-          const pct = 2 + Math.round((completed / total) * 2);
           const counts = Number.isFinite(applied) && Number.isFinite(skipped)
             ? ` | Applied: ${applied}, Skipped: ${skipped}`
             : '';
-          report(`Foundations ${completed}/${total}${counts}`, Math.min(4, pct));
+          report(`Building foundations ${completed}/${total}${counts}`, completed / total);
         },
       }
     );
-  } else {
-    beginStep('Skipping building foundations (disabled)…', 4);
-    await yield_();
   }
 
   const lat = center.lat.toFixed(4);
@@ -6687,6 +7038,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (!/^[a-z_][a-z0-9_]{0,63}$/.test(levelName)) {
     throw new Error(`Generated invalid BeamNG level id: ${levelName}`);
   }
+  report('Choosing the regional look and road rules for this location…', 0.5);
   // The look (ground cover, signature trees, rocks, terrain detail textures,
   // water) follows the location (services/beamngRegion.js); an explicit
   // biomeId still wins (tests, tools).
@@ -6742,6 +7094,11 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // AI navgraph is built from them). Legacy 'architect' / 'mesh' values from
   // saved settings or batch configs are treated as 'decal'.
   const includeRoads = roadType !== 'none';
+  if (includeRoads) {
+    const roadFeatureCount = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'road').length;
+    beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions and bridge decks…`);
+    await yield_();
+  }
   const decalRoads = includeRoads
     ? generateDecalRoads(exportTerrainData, squareSize)
     : [];
@@ -6758,6 +7115,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   if (bridgeDecks.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles, one object per bridge.`);
   }
+  if (includeRoads && includeSidewalks) {
+    beginStep('sidewalks', `Building sidewalks, curbs and ramps along ${groundCarriageways.length} carriageways${bridgeDecks.length ? ` (${bridgeDecks.length} bridge decks built)` : ''}…`);
+    await yield_();
+  }
   const sidewalks = includeRoads && includeSidewalks
     ? buildSidewalkMeshes(groundCarriageways, {
       zones: decalRoads.crosswalkZones || [],
@@ -6772,6 +7133,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }
   const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);
 
+  beginStep('props', 'Placing street props (hydrants, bins, benches, utility poles, power lines) and traffic signals…');
+  await yield_();
   // Street props (hydrants, bins, benches, utility poles + wires): mapped OSM
   // ones where they exist, the rest at real-world spacings along the roads.
   const mappedStreetProps = collectMappedStreetProps(exportTerrainData, squareSize);
@@ -6802,13 +7165,14 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // next one is allocated, which is critical for 4096+ terrain grids.
 
   await yield_();
-  beginStep(`Generating base texture (${baseTexture})…`, 5);
+  beginStep('texture', `Generating the ${baseTexture} base texture for the ${size}×${size} terrain…`);
   await yield_();
   // The base texture may be finer than the grid (2× up to 4096 grids, as
   // west_coast_usa: 2048 grid, 4096 base). Use that size only when the chosen
   // texture carries the detail; the OSM texture and older 1× textures stay at
   // the grid size. *BaseTexSize spans stay in grid squares either way.
   let texBlob = await getTerrainTextureBlob(exportTerrainData, baseTexture);
+  report(`Fitting the base texture to the ${size}×${size} grid${texBlob ? ` (${formatBytes(texBlob.size)} source)` : ''}…`, 0.75);
   const fittedTexture = await fitBaseTexture(texBlob, size, {
     allowFiner: baseTexture !== 'none' && baseTexture !== 'osm',
   });
@@ -6819,7 +7183,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const imageCanvas = null;
   const effectivePbrSource = (pbrSource === 'image' && !imageCanvas) ? 'osm' : pbrSource;
 
-  beginStep(`Painting terrain materials (${effectivePbrSource.toUpperCase()})…`, 15);
+  beginStep('materials', effectivePbrSource !== 'none'
+    ? `Painting terrain materials from OSM land use (${size}×${size} layer map)…`
+    : 'Writing the default terrain material…');
   const pbrResult = effectivePbrSource !== 'none'
     ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, biome, terrainBaseTexSize, {
         pbrSource: effectivePbrSource,
@@ -6827,32 +7193,32 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
       })
     : null;
 
-  beginStep(`Exporting terrain binary (.ter, ${size}x${size})…`, 30);
+  beginStep('ter', `Writing the terrain binary (terrain.ter, ${size}×${size} heights + material layers)…`);
   await yield_();
   const { blob: terBlob } = await exportTer(exportTerrainData, {
     layerMap: pbrResult?.layerMap ?? null,
     materialNames: pbrResult?.materialNames ?? null,
   });
 
-  beginStep(`Generating heightmap preview (${size}x${size})…`, 50);
+  beginStep('heightmap', `Encoding the 16-bit heightmap PNG (${size}×${size})…`);
   await yield_();
   let heightmapBlob = await generateHeightmapPng(exportTerrainData, size);
 
-  beginStep('Generating level thumbnail image…', 58);
+  beginStep('thumbnail', 'Rendering the level preview thumbnail…');
   await yield_();
   let previewBlob = await generatePreviewBlob(exportTerrainData);
 
   let osmDaeBlob = null;
+  const buildingReport = {};
   if (includeBuildings) {
-    beginStep(`Building 3D OSM objects (${osmFeatureCount} features)…`, 65);
+    beginStep('buildings', `Building textured 3D buildings (${(exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building').length} OSM footprints)…`);
     await yield_();
-    osmDaeBlob = await generateOSMObjectsDAE(exportTerrainData, worldSize);
+    osmDaeBlob = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport);
   } else {
-    beginStep('Skipping 3D OSM object export (disabled)…', 65);
     await yield_();
   }
 
-  beginStep(`Building water objects (sea level + inland ${includeWater ? 'enabled' : 'disabled'})…`, 71);
+  beginStep('water', includeWater ? 'Building water: sea level plane, lakes and rivers…' : 'Building the sea level water plane…');
   await yield_();
   // Always emit a sea-level WaterPlane; includeWater toggles only inland OSM-derived water.
   const waterObjects = [
@@ -6866,7 +7232,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   ];
   const cloudObjects = buildCloudObjects(biome);
 
-  beginStep(`Building native barrier objects (${includeNativeBarriers ? 'enabled' : 'disabled'})…`, 74);
+  beginStep('furniture', 'Placing barriers, fences, road signs, traffic lights, lamps, benches and fuel stations…');
   await yield_();
   const barrierObjects = includeNativeBarriers
     ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome)
@@ -6896,7 +7262,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     String(obj?.shapeName || '').toLowerCase().includes('eca_bld_wood_fence_a.dae')
   ));
 
-  beginStep(`Building vegetation objects (trees: ${includeTrees ? 'on' : 'off'}, rocks: ${includeRocks ? 'on' : 'off'})…`, 77);
+  beginStep('vegetation', `Planting ${[includeTrees && 'trees and bushes', includeRocks && 'rocks'].filter(Boolean).join(' and ') || 'nothing (vegetation off)'}, ground cover and props…`);
   await yield_();
   const forestPlacements = (includeTrees || includeRocks)
     ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome)
@@ -6939,11 +7305,12 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   let backdropMaterialNames = [];
   let backdropDiagnostics = null;
   if (includeBackdrop) {
-    beginStep('Fetching terrain backdrop mesh…', 82);
+    beginStep('backdrop', `Fetching the surrounding backdrop (${backdropElevationSource === 'global30m' ? 'global 30 m' : backdropElevationSource.toUpperCase()} elevation + satellite imagery, 8 tiles)…`);
     await yield_();
     const backdropResult = await generateTerrainBackdropDAE(exportTerrainData, worldSize, {
       elevationSource: backdropElevationSource,
       gpxzApiKey: backdropGpxzApiKey,
+      onProgress: (text, fraction) => report(`Backdrop: ${String(text).replace(/\.\.\.$/, '…')}`, fraction),
     });
     backdropDaeBlob = backdropResult?.daeBlob ?? null;
     backdropTextureFiles = backdropResult?.textureFiles ?? [];
@@ -6951,7 +7318,7 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     backdropDiagnostics = backdropResult?.diagnostics ?? null;
   }
 
-  beginStep('Loading MapNG flag asset…', 85);
+  beginStep('assets', 'Loading bundled assets (MapNG flag, reflection cubemap)…');
   await yield_();
   let mapngFlagFiles = [];
   try {
@@ -6972,10 +7339,18 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }
   const useUniversalCubemap = cubemapFiles.length > 0;
 
-  beginStep(`Assembling ZIP archive (${levelName})…`, 88);
+  beginStep('zip', `Assembling the level files (levels/${levelName}/…)…`);
   await yield_();
 
   const zip = new JSZip();
+  // Entry sizes for the compression progress (JSZip keeps none it exposes).
+  const zipEntryBytes = new Map();
+  const addZipFile = zip.file.bind(zip);
+  // (arguments passed on as given: zip.file(name) alone reads an entry)
+  zip.file = (...args) => {
+    if (args.length > 1 && typeof args[0] === 'string') zipEntryBytes.set(args[0], byteSizeOf(args[1]));
+    return addZipFile(...args);
+  };
   const base = `levels/${levelName}`;
 
   // Explicit directory entries so BeamNG's FS:directoryExists() works correctly
@@ -7331,6 +7706,27 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     backdropDiagnostics,
     mapngFlagFiles,
     didCropToSquare,
+    detail: {
+      jobLog,
+      buildingReport,
+      bridges: decalRoads.bridges,
+      bridgeDaes,
+      groundAtWorld: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      decalRoads,
+      sidewalks,
+      streetProps,
+      mappedStreetProps,
+      signalData,
+      signObjects,
+      trafficSignalObjects,
+      streetFurnitureObjects,
+      fuelStationObjects,
+      barrierObjects,
+      forestPlacements,
+      groundCoverObjects,
+      waterObjects,
+      pbrResult,
+    },
   });
   zip.file(`${base}/export_report.txt`, reportContents);
 
@@ -7936,14 +8332,31 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     requiresDecalRoads: decalRoads.length > 0,
   });
 
-  beginStep('Compressing ZIP archive (DEFLATE)…', 94);
+  // JSZip's percent counts files, so one 1 GB terrain.ter held it at 5 %
+  // for over a minute: weigh each entry by its cost (per file + per MB).
+  const zipEntries = Object.values(zip.files).filter((f) => !f.dir);
+  const entryCost = (name) => ZIP_FILE_COST_S + ((zipEntryBytes.get(name) || 0) / 1048576) * ZIP_MB_COST_S;
+  const zipTotalBytes = zipEntries.reduce((n, f) => n + (zipEntryBytes.get(f.name) || 0), 0);
+  const zipTotalCost = zipEntries.reduce((n, f) => n + entryCost(f.name), 0);
+  beginStep('compress', `Compressing ${zipEntries.length} files (${formatBytes(zipTotalBytes)}) into the level ZIP…`);
   await yield_();
   const zipFilename = `${levelName}.zip`;
-  let lastZipPct = -10;
-  const onZipPercent = (pct) => {
-    if (!Number.isFinite(pct) || pct - lastZipPct < 5) return;
-    lastZipPct = pct;
-    report(`Compressing ZIP archive (${Math.round(pct)}%)…`, 94 + Math.min(5, Math.floor(pct / 20)));
+  let zipCostDone = 0;
+  let zipCurrentFile = null;
+  let lastZipReportAt = 0;
+  const onZipPercent = (pct, currentFile) => {
+    if (currentFile && currentFile !== zipCurrentFile) {
+      if (zipCurrentFile) zipCostDone += entryCost(zipCurrentFile);
+      zipCurrentFile = currentFile;
+    }
+    const now = performance.now();
+    if (now - lastZipReportAt < 250) return;
+    lastZipReportAt = now;
+    const fraction = zipTotalCost > 0 ? zipCostDone / zipTotalCost : (Number(pct) || 0) / 100;
+    const current = zipCurrentFile && !zipCurrentFile.endsWith('/')
+      ? ` ${zipCurrentFile.replace(`levels/${levelName}/`, '')} (${formatBytes(zipEntryBytes.get(zipCurrentFile) || 0)})`
+      : '';
+    report(`Compressing the level ZIP (${formatBytes(zipTotalBytes)}, ${zipEntries.length} files):${current}…`, fraction);
   };
   // Stream the archive to disk (OPFS) when available so the ~1 GB output never
   // has to accumulate in the JS heap; fall back to the in-memory blob elsewhere.
@@ -7960,8 +8373,9 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     delivery: zipDelivery,
     levelName,
   });
-  beginStep('Done', 100);
   finishProcessingLog();
+  lastPct = 100;
+  onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - exportT0, completed: processingLog[processingLog.length - 1] ?? null });
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
   return { blob: zipBlob, filename: `${levelName}.zip` };
 }

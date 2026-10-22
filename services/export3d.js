@@ -1786,6 +1786,7 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
     if (fetchOptions.includeSatellite !== undefined) tileOptions.includeSatellite = fetchOptions.includeSatellite;
     if (fetchOptions.elevationSource) tileOptions.elevationSource = fetchOptions.elevationSource;
     if (fetchOptions.gpxzApiKey) tileOptions.gpxzApiKey = fetchOptions.gpxzApiKey;
+    if (fetchOptions.onDownloadProgress) tileOptions.onDownloadProgress = fetchOptions.onDownloadProgress;
     const satZoom = fetchOptions.satelliteZoom !== undefined ? fetchOptions.satelliteZoom : GLB_SURROUND_SAT_ZOOM;
     const results = await fetchSurroundingTiles(
       data.bounds,

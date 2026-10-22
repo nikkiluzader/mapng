@@ -426,6 +426,8 @@ export function solveBridgeDecks(parts, {
       })),
       shortfall: zs.shortfall,
       abutments: zs.abutments,
+      // for the export report: what it was lifted over
+      crossed: { roads: crossings.filter((c) => c.clear == null).length, water: crossings.filter((c) => c.clear != null).length, nav },
     };
     decks.push(deck);
     for (const p of deck.parts) solvedLines.push({ layer, deck: true, xy: p.xy.map(([x, y], k) => [x, y, p.z[k]]), box: bbox(p.xy) });

@@ -320,7 +320,8 @@
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
     "cleanupToolCredit": " to generate a much more detailed map. Tool by AlexKidd.",
     "exportingBeamng": "Exporting BeamNG Level",
-    "mayTakeWhile": "This may take a while for large maps"
+    "mayTakeWhile": "This may take a while for large maps",
+    "elapsed": "Elapsed"
   },
   "controlPanel": {
     "sessionData": "Session Data",
