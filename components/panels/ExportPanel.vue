@@ -35,7 +35,6 @@
         >
           <div class="flex items-center gap-1.5">
             <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">{{ t('exportPanel.beamngLevel') }}</h4>
-            <span class="text-[8px] uppercase tracking-wider bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded font-bold">{{ t('exportPanel.experimental') }}</span>
           </div>
           <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExportBeamNG ? 'rotate-180' : '']" />
         </button>

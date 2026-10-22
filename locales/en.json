@@ -255,7 +255,6 @@
     "fetchNow": "Fetch Now",
     "readyToExport": "Ready to Export",
     "beamngLevel": "BeamNG Level",
-    "experimental": "Experimental",
     "levelName": "Level Name",
     "levelNamePlaceholder": "Suggested from map center",
     "baseTexture": "Base Texture",
@@ -431,79 +430,84 @@
   },
   "about": {
     "title": "About MapNG",
-    "subtitle": "BeamNG.drive Terrain Generator",
-    "hero": "MapNG is a desktop-focused web app for turning real-world locations into terrain, textures, GIS data, 3D meshes, and BeamNG-oriented exports.",
+    "subtitle": "Real-world maps for BeamNG.drive",
+    "hero": "MapNG turns any real-world location into a playable BeamNG.drive level: terrain, textures, roads with markings and traffic signals, buildings, bridges, vegetation and more, built right in your browser.",
     "whatTitle": "What does it do?",
-    "whatBody": "Select a location, choose an elevation source, generate the terrain, and export the parts of the workflow you need. MapNG can produce 16-bit heightmaps, satellite and OSM-derived textures, GIS exports, 3D meshes, BeamNG .ter files, and an experimental BeamNG level package. It also includes a live 3D preview with optional OSM-driven buildings, vegetation, barriers, and surrounding terrain context.",
+    "whatBody": "Pick a location, choose an elevation source, generate the terrain and check it in the 3D preview. Then export a complete BeamNG level ZIP built from real elevation and OpenStreetMap data, or take GeoTIFF and GeoJSON data into your own workflow. Batch mode processes whole grids of tiles and can stitch them into one large level.",
     "elevationTitle": "Elevation Sources",
     "elevationItems": [
-      "Standard 30m Global (AWS Terrarium/SRTM)",
+      "Standard 30 m global (AWS Terrarium / SRTM), with roads smoothed and levelled automatically",
+      "USGS 1 m DEM (USA: CONUS, Alaska, Hawaii)",
       "NMT EVRF2007 (Poland, high-resolution GUGiK tiles)",
-      "USGS 1m DEM (USA - CONUS, Alaska, Hawaii)",
-      "GPXZ Premium High-Res (Global, concurrent requests for paid plans)",
-      "Custom upload - LAZ/LAS point clouds, GeoTIFF, ASC, GML/XML (single or multi-tile, auto-reprojected)"
+      "GPXZ premium (global high resolution, concurrent requests on paid plans)",
+      "Flat terrain",
+      "Your own uploads: LAZ/LAS point clouds, GeoTIFF, ASC, GML/XML, layered and reprojected, with gaps filled from Standard or GPXZ and blended seams"
     ],
     "previewTitle": "3D Preview",
     "previewItems": [
-      "HDR environment lighting and CSM shadows",
-      "Satellite, OSM, Hybrid, and clay modes",
-      "3D buildings, trees, bushes and barriers",
-      "Surrounding terrain tiles (8 directions)",
-      "Quality and wireframe controls"
+      "HDR lighting and cascaded shadows",
+      "Satellite, OSM, hybrid and clay texture modes",
+      "3D buildings, trees, bushes and barriers from OSM",
+      "Mesh quality from low poly up to full native detail",
+      "Zoom-to-cursor camera"
     ],
-    "exportTitle": "Export Formats",
+    "exportTitle": "Exports",
     "exportItems": [
-      "16-bit PNG Heightmap",
-      "Satellite Texture (PNG)",
-      "OSM Blueprint Texture (up to 8192x8192 PNG)",
-      "Hybrid Satellite + Roads Texture (PNG)",
-      "Road Mask (16-bit PNG)",
-      "GeoTIFF (WGS84 or source CRS)",
-      "GeoJSON Vector Data",
-      "GLB 3D Model",
-      "Collada DAE",
-      "BeamNG Terrain (.ter)",
-      "BeamNG Level Package (.zip, experimental)",
-      "Job Data (.mapng) - Complete compressed session package"
+      "BeamNG level package (.zip), up to 16384 x 16384",
+      "GeoTIFF elevation (WGS84 or the source CRS)",
+      "GeoJSON OSM vector data",
+      "Job data (.mapng): a complete saved session",
+      "Batch mode adds per tile: 16-bit heightmaps, satellite, OSM and hybrid textures, road masks, GLB, DAE and .ter"
     ],
-    "osmTitle": "OSM Texture Features",
+    "osmTitle": "OpenStreetMap Data",
     "osmItems": [
-      "40+ land-use color categories",
-      "Procedural road overlays and surface-aware linework",
-      "Junction fills and smoothed road/path curves",
-      "Crosswalk detection where OSM data supports it",
-      "Customizable OSM background color"
+      "MapNG's own OSM copy for the regions it hosts: fast, and unaffected by Overpass outages",
+      "Show MapNG OSM coverage outlines those regions on the map",
+      "Everywhere else: health-ranked Overpass mirrors with an edge cache",
+      "Bring your own Overpass server (Tracestrack, Overspan); MapNG's copy still answers first where it can",
+      "A banner tells you when the public Overpass servers are down"
     ],
-    "resolutionTitle": "Resolution Note",
-    "resolutionStrong": "Heightmaps are exported at the selected processing resolution.",
-    "resolutionBody": "Output sizes range from 512px to 8192px (0.26 km2 to 67 km2). Standard 30m data is bilinearly upsampled for smooth surfaces.",
+    "resolutionTitle": "Resolution",
+    "resolutionStrong": "Output sizes from 512 to 16384 px at any processing scale (m/px).",
+    "resolutionBody": "At 1 m/px that covers 0.26 km² up to 268 km². Standard 30 m elevation is upsampled and its roads are smoothed automatically; USGS, GPXZ, NMT and uploads keep their real detail.",
     "batchTitle": "Batch Job Mode",
-    "batchIntro": "Process large areas by defining a grid of tiles (up to 20x20). Each tile is generated sequentially with the selected exports packaged into an individual ZIP. Features include:",
+    "batchIntro": "Process large areas as a grid of tiles (up to 20 x 20). Each tile is generated in turn and its selected exports are packaged into its own ZIP. Features include:",
     "batchItems": [
-      "Configurable grid dimensions, resolution, and export selections",
-      "Independent tile X/Y offsets and live drag editing on the map",
-      "Tiles Follow Map Center toggle for center-anchored or world-locked tile layouts",
-      "Shared Elevation Baseline option for one min/max across all tile heightmaps",
-      "Automatic stitched full-grid 16-bit verification heightmap on successful runs",
-      "Live progress tracking with color-coded tile grid and satellite thumbnails",
-      "Persistent state - pause, resume, and retry failed tiles",
-      "Automatic memory cleanup between tiles for stability",
-      "GPXZ concurrent requests for paid plans (based on account limits)",
-      "Per-tile coordinate-stamped filenames for easy organization"
+      "Combined BeamNG level: stitch a 2 x 2, 4 x 4 or 8 x 8 grid into one playable level (up to 16384 px)",
+      "Configurable grid size, resolution and export selection",
+      "Per-tile X/Y offsets with live drag editing on the map",
+      "Tiles Follow Map Center for center-anchored or world-locked layouts",
+      "Shared elevation baseline and a stitched 16-bit verification heightmap",
+      "Live progress with a color-coded tile grid and satellite thumbnails",
+      "Pause, resume and retry failed tiles; state survives a reload",
+      "GPXZ concurrent requests on paid plans",
+      "Coordinate-stamped filenames for every tile"
     ],
     "beamngTitle": "BeamNG Level Export",
-    "beamngBody": "The BeamNG level package export is still experimental. It can build a playable level ZIP with biome-based official assets, inferred terrain materials, water, vegetation, and a suggested level name, but it still needs more validation and polish.",
+    "beamngBody": "A ready-to-drive level ZIP for BeamNG.drive 0.40, built from the real place:",
+    "beamngItems": [
+      "Terrain painted with materials from OSM land use, and a 2x satellite base texture you can touch up before export",
+      "A regional look chosen from the location: grass, ground cover, rocks and water",
+      "Regional trees from BeamNG's own models, picked from OSM tags and the local climate",
+      "Textured buildings with BeamNG's facades and roofs",
+      "DecalRoads with real surfaces, lane markings by country, crosswalks, stop bars, parking lanes and shoulders",
+      "Raised sidewalks with curb returns and ramps, and median islands on divided roads",
+      "Traffic signals for every approach, road signs, and street lamps that light up at night",
+      "Hydrants, bins, benches, utility poles and power lines",
+      "Bridges with solved decks, piers and graded abutments",
+      "AI traffic on the road network, road names on the minimap, and fuel stations",
+      "A surrounding backdrop and a detailed export_report.txt for troubleshooting"
+    ],
     "additionalTitle": "Additional Features",
     "additionalItems": [
-      "Job Import/Export: Save and restore full sessions via .mapng files",
-      "Nominatim location search with type-categorized icons",
-      "Preset scenic locations (Grand Canyon, Mt. Fuji, Tail of the Dragon, etc.)",
-      "GPXZ plan auto-detection with concurrent request support",
-      "Web Worker-based off-thread terrain processing",
-      "Light and dark mode with persistent preferences",
-      "Automatic geolocation on first visit",
-      "Generation caching - skip reprocessing when switching views",
-      "Abort support for long-running generation tasks"
+      "Run configurations: copy, paste, save and load",
+      "Job import/export: save and restore full sessions as .mapng files",
+      "Location search (Nominatim), preset scenic locations and Use my location",
+      "Keyless Esri satellite and topo layers with labels; your choices are remembered",
+      "Elevation overlay minimap of the selected area",
+      "Live progress with finished steps and timings for generation and export",
+      "Generation caching and cancel for long-running tasks",
+      "Light and dark mode, in 7 languages"
     ],
     "footerPrefix": "Created by",
     "footerMiddle": "Open Source on"
@@ -548,7 +552,7 @@
       "render": [
         {
           "name": "Three.js",
-          "desc": "WebGL 3D engine - geometry, materials, textures, export"
+          "desc": "WebGL 3D engine: geometry, materials, textures, export"
         },
         {
           "name": "TresJS",
@@ -560,21 +564,21 @@
         },
         {
           "name": "Cascaded Shadow Maps",
-          "desc": "4-cascade CSM with 4096px shadow maps and PCF filtering"
+          "desc": "4-cascade CSM with 4096 px shadow maps and PCF filtering"
         },
         {
           "name": "HDR Environment",
           "desc": "4K puresky HDRI for realistic ambient and reflection lighting"
         },
         {
-          "name": "GLTFExporter",
-          "desc": "Full 3D model export with terrain, OSM features and surroundings"
+          "name": "Collada and GLTF exporters",
+          "desc": "BeamNG DAE shapes (buildings, bridges, sidewalks, power lines, backdrop) and GLB models in batch mode"
         }
       ],
       "map": [
         {
           "name": "Leaflet and Vue-Leaflet",
-          "desc": "Interactive 2D map with 3 base layers and dark mode"
+          "desc": "Interactive 2D map with keyless Esri satellite, topo and label layers, dark mode and OSM coverage outlines"
         },
         {
           "name": "proj4 and GeoTIFF",
@@ -629,12 +633,12 @@
           "desc": "High-res satellite textures at Z17 (~1.2m/px)"
         },
         {
-          "name": "Overpass API (OSM)",
-          "desc": "Roads, buildings, land-use, vegetation, barriers (3 failover endpoints)"
+          "name": "OpenStreetMap",
+          "desc": "MapNG's own OSM archive on Cloudflare R2 (PMTiles, read by range), health-ranked Overpass mirrors with an edge cache, or your own Overpass server"
         },
         {
           "name": "JSZip",
-          "desc": "Client-side ZIP packaging for BeamNG levels, surrounding tiles, batch jobs, and .mapng sessions"
+          "desc": "Client-side ZIP packaging for BeamNG levels, batch jobs and .mapng sessions, streamed to disk (OPFS) for large levels"
         },
         {
           "name": "Blob URL Management",
@@ -643,8 +647,8 @@
       ],
       "deploy": [
         {
-          "name": "Cloudflare Pages",
-          "desc": "Global edge-deployed static hosting via Wrangler CLI"
+          "name": "Cloudflare Workers",
+          "desc": "Edge-hosted site and /api routes (OSM cache, OSM tiles from R2, proxies), deployed per branch by Workers Builds"
         }
       ]
     }

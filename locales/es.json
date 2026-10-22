@@ -227,7 +227,6 @@
     "fetchNow": "Obtener ahora",
     "readyToExport": "Listo para exportar",
     "beamngLevel": "Nivel BeamNG",
-    "experimental": "Experimental",
     "levelName": "Nombre del nivel",
     "levelNamePlaceholder": "Sugerido desde el centro del mapa",
     "baseTexture": "Textura base",
@@ -385,80 +384,87 @@
   },
   "about": {
     "title": "Acerca de MapNG",
-    "subtitle": "Generador de terreno para BeamNG.drive",
-    "hero": "MapNG es una app web orientada a escritorio para convertir ubicaciones reales en terreno, texturas, datos GIS, mallas 3D y exportaciones orientadas a BeamNG.",
-    "whatTitle": "Que hace?",
-    "whatBody": "Selecciona una ubicacion, elige una fuente de elevacion, genera el terreno y exporta las partes del flujo que necesites. MapNG puede producir mapas de altura de 16 bits, texturas satelitales y derivadas de OSM, exportaciones GIS, mallas 3D, archivos .ter de BeamNG y un paquete de nivel BeamNG experimental. Tambien incluye una vista 3D en vivo con edificios, vegetacion, barreras y contexto de terreno circundante basado en OSM.",
-    "elevationTitle": "Fuentes de elevacion",
+    "subtitle": "Mapas reales para BeamNG.drive",
+    "hero": "MapNG convierte cualquier lugar real en un nivel jugable de BeamNG.drive: terreno, texturas, carreteras con marcas y semáforos, edificios, puentes, vegetación y más, creado directamente en tu navegador.",
+    "whatTitle": "¿Qué hace?",
+    "whatBody": "Elige un lugar y una fuente de elevación, genera el terreno y revísalo en la vista previa 3D. Después exporta un nivel completo de BeamNG en ZIP, creado con datos reales de elevación y de OpenStreetMap, o lleva los datos GeoTIFF y GeoJSON a tu propio flujo de trabajo. El modo por lotes procesa cuadrículas enteras de casillas y puede unirlas en un nivel grande.",
+    "elevationTitle": "Fuentes de elevación",
     "elevationItems": [
-      "Estandar 30m Global (AWS Terrarium/SRTM)",
-      "USGS 1m DEM (USA - CONUS, Alaska, Hawaii)",
-      "GPXZ Premium alta resolucion (Global, solicitudes concurrentes para planes de pago)"
+      "Estándar 30 m global (AWS Terrarium / SRTM), con carreteras suavizadas y niveladas automáticamente",
+      "MDE USGS 1 m (EE. UU.: CONUS, Alaska, Hawái)",
+      "NMT EVRF2007 (Polonia, casillas GUGiK de alta resolución)",
+      "GPXZ premium (alta resolución global, peticiones simultáneas en planes de pago)",
+      "Terreno plano",
+      "Tus propios archivos: nubes de puntos LAZ/LAS, GeoTIFF, ASC, GML/XML, en capas y reproyectados, con huecos rellenados desde Estándar o GPXZ y uniones fundidas"
     ],
-    "previewTitle": "Vista 3D",
+    "previewTitle": "Vista previa 3D",
     "previewItems": [
-      "Iluminacion HDR y sombras CSM",
-      "Modos satelite, OSM, hibrido y clay",
-      "Edificios 3D, arboles, arbustos y barreras",
-      "Mosaicos de terreno circundante (8 direcciones)",
-      "Controles de calidad y wireframe"
+      "Iluminación HDR y sombras en cascada",
+      "Modos de textura satélite, OSM, híbrido y arcilla",
+      "Edificios, árboles, arbustos y barreras 3D desde OSM",
+      "Calidad de malla desde low poly hasta todo el detalle nativo",
+      "Cámara que hace zoom hacia el cursor"
     ],
-    "exportTitle": "Formatos de exportacion",
+    "exportTitle": "Exportaciones",
     "exportItems": [
-      "Heightmap PNG de 16 bits",
-      "Textura satelital (PNG)",
-      "Textura Blueprint OSM (hasta 8192x8192 PNG)",
-      "Textura hibrida satelite + carreteras (PNG)",
-      "Mascara de carreteras (PNG 16 bits)",
-      "GeoTIFF (WGS84 o CRS de origen)",
-      "Datos vectoriales GeoJSON",
-      "Modelo 3D GLB",
-      "Collada DAE",
-      "Terreno BeamNG (.ter)",
-      "Paquete de nivel BeamNG (.zip, experimental)",
-      "Datos de trabajo (.mapng) - Paquete de sesion comprimido completo"
+      "Paquete de nivel BeamNG (.zip), hasta 16384 x 16384",
+      "Elevación GeoTIFF (WGS84 o CRS de origen)",
+      "Datos vectoriales OSM en GeoJSON",
+      "Datos de trabajo (.mapng): una sesión completa guardada",
+      "El modo por lotes añade por casilla: mapas de altura de 16 bits, texturas satélite, OSM e híbridas, máscaras de carretera, GLB, DAE y .ter"
     ],
-    "osmTitle": "Funciones de textura OSM",
+    "osmTitle": "Datos de OpenStreetMap",
     "osmItems": [
-      "Mas de 40 categorias de color de uso de suelo",
-      "Superposiciones de carreteras procedurales y lineas segun superficie",
-      "Relleno de cruces y curvas suavizadas de caminos/senderos",
-      "Deteccion de cruces peatonales cuando OSM lo permite",
-      "Color de fondo OSM configurable"
+      "La copia propia de OSM de MapNG para las regiones que aloja: rápida e inmune a las caídas de Overpass",
+      "Mostrar cobertura OSM de MapNG marca esas regiones en el mapa",
+      "En el resto: espejos de Overpass ordenados por estado, con caché en el borde",
+      "Tu propio servidor Overpass (Tracestrack, Overspan); la copia de MapNG responde primero cuando puede",
+      "Un aviso te indica cuándo los servidores públicos de Overpass están caídos"
     ],
-    "resolutionTitle": "Nota de resolucion",
-    "resolutionStrong": "Todos los mapas de altura se exportan con la resolucion de procesamiento seleccionada.",
-    "resolutionBody": "Los tamanos de salida van de 512px a 8192px (0.26 km2 a 67 km2). Los datos estandar 30m se re-muestrean bilinealmente para superficies suaves.",
-    "batchTitle": "Modo Batch Job",
-    "batchIntro": "Procesa areas grandes definiendo una grilla de mosaicos (hasta 20x20). Cada mosaico se genera secuencialmente y las exportaciones seleccionadas se empaquetan en un ZIP individual. Incluye:",
+    "resolutionTitle": "Resolución",
+    "resolutionStrong": "Tamaños de salida de 512 a 16384 px con cualquier escala de procesamiento (m/px).",
+    "resolutionBody": "A 1 m/px eso cubre de 0,26 km² a 268 km². La elevación Estándar de 30 m se sobremuestrea y sus carreteras se suavizan automáticamente; USGS, GPXZ, NMT y tus archivos conservan su detalle real.",
+    "batchTitle": "Modo por lotes",
+    "batchIntro": "Procesa áreas grandes como una cuadrícula de casillas (hasta 20 x 20). Cada casilla se genera por turno y sus exportaciones elegidas se empaquetan en su propio ZIP. Incluye:",
     "batchItems": [
-      "Dimensiones de grilla, resolucion y exportaciones configurables",
-      "Offsets X/Y por mosaico y edicion drag en vivo en el mapa",
-      "Toggle Tiles Follow Map Center para esquemas anclados o bloqueados al mundo",
-      "Opcion Shared Elevation Baseline para un min/max comun en todos los mapas de altura",
-      "Mapa de altura 16-bit de verificacion completa de la grilla al finalizar",
-      "Seguimiento en vivo con grilla por color y miniaturas satelitales",
-      "Estado persistente - pausar, reanudar y reintentar mosaicos fallidos",
-      "Limpieza automatica de memoria entre mosaicos para estabilidad",
-      "Solicitudes concurrentes GPXZ para planes de pago (segun limites de cuenta)",
-      "Nombres de archivo por mosaico con coordenadas para organizar"
+      "Nivel BeamNG combinado: une una cuadrícula de 2 x 2, 4 x 4 u 8 x 8 en un solo nivel jugable (hasta 16384 px)",
+      "Tamaño de cuadrícula, resolución y exportaciones configurables",
+      "Desplazamientos X/Y por casilla con edición arrastrando en el mapa",
+      "Casillas que siguen el centro del mapa, para diseños centrados o fijos",
+      "Base de elevación compartida y mapa de altura de 16 bits unido para verificación",
+      "Progreso en vivo con cuadrícula de casillas por colores y miniaturas satélite",
+      "Pausar, reanudar y reintentar casillas fallidas; el estado sobrevive a una recarga",
+      "Peticiones GPXZ simultáneas en planes de pago",
+      "Nombres de archivo con coordenadas para cada casilla"
     ],
-    "beamngTitle": "Exportacion de nivel BeamNG",
-    "beamngBody": "La exportacion de paquete de nivel BeamNG sigue siendo experimental. Puede crear un ZIP jugable con assets oficiales por bioma, materiales de terreno inferidos, agua, vegetacion y nombre sugerido, pero aun requiere mas validacion y pulido.",
-    "additionalTitle": "Funciones adicionales",
+    "beamngTitle": "Exportación de nivel BeamNG",
+    "beamngBody": "Un nivel ZIP listo para conducir en BeamNG.drive 0.40, creado a partir del lugar real:",
+    "beamngItems": [
+      "Terreno pintado con materiales según el uso del suelo de OSM, y una textura base satélite 2x que puedes retocar antes de exportar",
+      "Un aspecto regional elegido según el lugar: hierba, cobertura del suelo, rocas y agua",
+      "Árboles regionales con los modelos de BeamNG, elegidos por etiquetas OSM y clima",
+      "Edificios texturizados con las fachadas y tejados de BeamNG",
+      "DecalRoads con superficies reales, marcas viales por país, pasos de peatones, líneas de detención, carriles de estacionamiento y arcenes",
+      "Aceras elevadas con esquinas curvas y rampas, y medianas en carreteras de calzadas separadas",
+      "Semáforos para cada acceso, señales de tráfico y farolas que se encienden de noche",
+      "Hidrantes, papeleras, bancos, postes y tendido eléctrico",
+      "Puentes con tableros calculados, pilares y estribos ajustados",
+      "Tráfico IA en la red de carreteras, nombres de calles en el minimapa y gasolineras",
+      "Un paisaje de fondo y un export_report.txt detallado para diagnosticar problemas"
+    ],
+    "additionalTitle": "Otras funciones",
     "additionalItems": [
-      "Import/Export de trabajos: guarda y restaura sesiones completas con archivos .mapng",
-      "Busqueda Nominatim con iconos por tipo",
-      "Ubicaciones panoramicas predefinidas (Gran Canon, Monte Fuji, Tail of the Dragon, etc.)",
-      "Deteccion automatica de plan GPXZ con soporte de concurrencia",
-      "Procesamiento off-thread con Web Worker",
-      "Modo claro y oscuro con preferencias persistentes",
-      "Geolocalizacion automatica en primera visita",
-      "Cache de generacion - evita reprocesar al cambiar de vista",
-      "Soporte de cancelacion para tareas largas"
+      "Configuraciones: copiar, pegar, guardar y cargar",
+      "Importar/exportar trabajos: guarda y restaura sesiones completas como archivos .mapng",
+      "Búsqueda de lugares (Nominatim), lugares destacados predefinidos y Mi ubicación",
+      "Capas satélite y topográficas de Esri con etiquetas, sin clave; se recuerdan tus elecciones",
+      "Minimapa de elevación del área seleccionada",
+      "Progreso en vivo con pasos terminados y tiempos para generación y exportación",
+      "Caché de generación y cancelación de tareas largas",
+      "Modo claro y oscuro, en 7 idiomas"
     ],
     "footerPrefix": "Creado por",
-    "footerMiddle": "Codigo abierto en"
+    "footerMiddle": "Código abierto en"
   },
   "tech": {
     "title": "Stack tecnico de MapNG",
@@ -500,11 +506,11 @@
       "render": [
         {
           "name": "Three.js",
-          "desc": "Motor WebGL 3D - geometria, materiales, texturas, export"
+          "desc": "Motor 3D WebGL: geometría, materiales, texturas, exportación"
         },
         {
           "name": "TresJS",
-          "desc": "Renderer declarativo de Vue 3 para escenas Three.js"
+          "desc": "Renderizador declarativo de Vue 3 para escenas Three.js"
         },
         {
           "name": "Cientos",
@@ -512,33 +518,33 @@
         },
         {
           "name": "Cascaded Shadow Maps",
-          "desc": "CSM de 4 cascadas con sombras 4096px y filtro PCF"
+          "desc": "CSM de 4 cascadas con mapas de sombra de 4096 px y filtrado PCF"
         },
         {
           "name": "Entorno HDR",
-          "desc": "HDRI puresky 4K para iluminacion ambiental y reflejos"
+          "desc": "HDRI puresky 4K para luz ambiental y reflejos realistas"
         },
         {
-          "name": "GLTFExporter",
-          "desc": "Exportacion 3D completa con terreno, features OSM y alrededores"
+          "name": "Exportadores Collada y GLTF",
+          "desc": "Formas DAE de BeamNG (edificios, puentes, aceras, tendido eléctrico, fondo) y modelos GLB en modo por lotes"
         }
       ],
       "map": [
         {
           "name": "Leaflet y Vue-Leaflet",
-          "desc": "Mapa 2D interactivo con 3 capas base y dark mode"
+          "desc": "Mapa 2D interactivo con capas Esri satélite, topográfica y de etiquetas sin clave, modo oscuro y contornos de cobertura OSM"
         },
         {
           "name": "proj4 y GeoTIFF",
-          "desc": "Reproyeccion CRS, parseo DEM y export GeoTIFF"
+          "desc": "Reproyección de CRS (incl. archivos cónicos/UTM), lectura de MDE y exportación GeoTIFF"
         },
         {
-          "name": "Transversa de Mercator local",
-          "desc": "Proyeccion metrica personalizada para grillas de procesamiento alineadas a pixeles"
+          "name": "Mercator transversa local",
+          "desc": "Proyección métrica propia para cuadrículas alineadas al píxel"
         },
         {
-          "name": "Geocodificacion Nominatim",
-          "desc": "Busqueda dual y reverse lookup para sugerir nombres de nivel BeamNG"
+          "name": "Geocodificación Nominatim",
+          "desc": "Búsqueda con dos puntos de acceso y geocodificación inversa para los nombres de nivel sugeridos"
         }
       ],
       "tex": [
@@ -577,12 +583,12 @@
           "desc": "Texturas satelitales de alta resolucion en Z17 (~1.2m/px)"
         },
         {
-          "name": "Overpass API (OSM)",
-          "desc": "Carreteras, edificios, uso de suelo, vegetacion, barreras (3 endpoints de failover)"
+          "name": "OpenStreetMap",
+          "desc": "El archivo OSM propio de MapNG en Cloudflare R2 (PMTiles, leído por rangos), espejos de Overpass ordenados por estado con caché en el borde, o tu propio servidor Overpass"
         },
         {
           "name": "JSZip",
-          "desc": "Empaquetado ZIP client-side para niveles BeamNG, mosaicos circundantes, lotes y sesiones .mapng"
+          "desc": "Empaquetado ZIP en el navegador para niveles BeamNG, trabajos por lotes y sesiones .mapng, escrito directamente a disco (OPFS) en niveles grandes"
         },
         {
           "name": "Gestion de Blob URL",
@@ -591,8 +597,8 @@
       ],
       "deploy": [
         {
-          "name": "Cloudflare Pages",
-          "desc": "Hosting estatico global en edge via Wrangler CLI"
+          "name": "Cloudflare Workers",
+          "desc": "Sitio y rutas /api en el borde (caché OSM, casillas OSM desde R2, proxies), publicados por rama con Workers Builds"
         }
       ]
     }

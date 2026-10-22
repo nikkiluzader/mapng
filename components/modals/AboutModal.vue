@@ -84,9 +84,12 @@
 
         <div class="space-y-2">
           <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">{{ t('about.beamngTitle') }}</h4>
-          <p class="text-xs bg-amber-50 dark:bg-amber-900/20 p-3 rounded border border-amber-200 dark:border-amber-900/30 text-amber-800 dark:text-amber-200">
+          <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
             {{ t('about.beamngBody') }}
           </p>
+          <ul class="space-y-1 list-disc list-inside marker:text-[#FF6600] text-xs">
+            <li v-for="item in tm('about.beamngItems')" :key="item">{{ item }}</li>
+          </ul>
         </div>
 
         <div class="space-y-2">

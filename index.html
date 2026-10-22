@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- Primary SEO -->
-    <title>MapNG - Real-World Terrain Generator for BeamNG.drive</title>
-    <meta name="description" content="Create BeamNG.drive terrain from real-world locations. Generate 16-bit heightmaps, satellite and OSM textures, GeoTIFF and GeoJSON data, 3D models, BeamNG .ter files, and experimental BeamNG level packages." />
-    <meta name="keywords" content="BeamNG, BeamNG.drive, BeamNG map maker, BeamNG terrain generator, BeamNG heightmap, BeamNG modding, real-world terrain, heightmap generator, terrain generator, OSM texture, GeoTIFF, GeoJSON, GLB export, DAE export, BeamNG level" />
+    <title>MapNG - Real-World Maps for BeamNG.drive</title>
+    <meta name="description" content="Turn any real-world location into a playable BeamNG.drive level: real terrain, textured buildings, roads with lane markings, traffic signals and signs, sidewalks, bridges, regional trees and AI traffic, built in your browser. Free and open source." />
+    <meta name="keywords" content="BeamNG, BeamNG.drive, BeamNG map maker, BeamNG map generator, BeamNG level generator, real world BeamNG map, BeamNG terrain generator, BeamNG heightmap, BeamNG modding, OpenStreetMap to BeamNG, real-world terrain, heightmap generator, GeoTIFF, GeoJSON, BeamNG level" />
     <meta name="author" content="Nikki Luzader" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://mapng.com/" />
@@ -15,8 +15,8 @@
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://mapng.com/" />
-    <meta property="og:title" content="MapNG - Real-World Terrain Generator for BeamNG.drive" />
-    <meta property="og:description" content="Turn any real-world location into terrain data and BeamNG-ready exports including heightmaps, textures, 3D models, batch tile sets, and experimental level packages." />
+    <meta property="og:title" content="MapNG - Real-World Maps for BeamNG.drive" />
+    <meta property="og:description" content="Pick any place on Earth and get a playable BeamNG.drive level: real terrain, roads with markings and traffic signals, buildings, bridges, sidewalks, trees and AI traffic." />
     <meta property="og:image" content="https://mapng.com/og-image.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -24,8 +24,8 @@
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="MapNG - Real-World Terrain Generator for BeamNG.drive" />
-    <meta name="twitter:description" content="Generate BeamNG terrain from real-world data: heightmaps, textures, GIS exports, 3D models, and experimental BeamNG level packages." />
+    <meta name="twitter:title" content="MapNG - Real-World Maps for BeamNG.drive" />
+    <meta name="twitter:description" content="Real places as playable BeamNG.drive levels: terrain, roads, traffic signals, buildings, bridges, trees and AI traffic. Free and open source." />
     <meta name="twitter:image" content="https://mapng.com/og-image.png" />
 
     <!-- Favicon -->
@@ -38,9 +38,9 @@
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "MapNG",
-      "alternateName": "MapNG BeamNG Terrain Generator",
+      "alternateName": "MapNG BeamNG Map Generator",
       "url": "https://mapng.com/",
-      "description": "A free, open-source web application that converts real-world geographic data into terrain, texture, GIS, 3D, and BeamNG-oriented exports from any location on Earth.",
+      "description": "A free, open-source web application that turns any real-world location into a playable BeamNG.drive level, plus terrain, texture and GIS exports, from real elevation and OpenStreetMap data.",
       "applicationCategory": "GameApplication",
       "operatingSystem": "Web Browser (Desktop)",
       "offers": {
@@ -54,31 +54,31 @@
         "url": "https://github.com/nikkiluzader"
       },
       "license": "https://opensource.org/licenses/MIT",
-      "softwareVersion": "1.0",
+      "softwareVersion": "2.0",
       "screenshot": "https://mapng.com/og-image.png",
       "featureList": [
-        "Real-world terrain heightmap generation",
-        "3 elevation sources: 30m global, USGS 1m USA, GPXZ premium",
-        "1 meter per pixel output resolution",
-        "16-bit PNG heightmap export",
-        "Satellite texture from Esri World Imagery",
-        "8K procedural OSM texture generation",
-        "Hybrid satellite + road overlay texture",
-        "Road mask export for drivable surfaces",
-        "GeoTIFF export with proper CRS",
-        "GeoJSON OSM vector data export",
-        "GLB 3D model export with buildings and vegetation",
-        "Collada DAE and BeamNG .ter exports",
-        "Experimental BeamNG level package ZIP export",
+        "Playable BeamNG.drive level ZIP from any real-world location, up to 16384 x 16384",
+        "Elevation sources: Standard 30 m global, USGS 1 m (USA), NMT EVRF2007 (Poland), GPXZ premium, flat, and custom LAZ/LAS, GeoTIFF, ASC and GML uploads with gap filling",
+        "Any processing scale in meters per pixel",
+        "Terrain materials painted from OpenStreetMap land use and a 2x satellite base texture with a touch-up painter",
+        "A regional look and regional trees chosen from the location",
+        "Textured buildings with BeamNG's own facades and roofs",
+        "DecalRoads with real surfaces, lane markings by country, crosswalks, stop bars, parking lanes and shoulders",
+        "Traffic signals per approach, road signs and street lamps with night lights",
+        "Raised sidewalks with curb returns and ramps, and median islands on divided roads",
+        "Hydrants, bins, benches, utility poles and power lines",
+        "Bridges with solved decks, piers and graded abutments",
+        "AI traffic on the road network and road names on the minimap",
+        "Surrounding backdrop terrain and a detailed export report",
+        "MapNG's own OpenStreetMap copy for hosted regions, with Overpass failover and bring-your-own Overpass server",
+        "GeoTIFF and GeoJSON exports",
         "Interactive 3D preview with HDR lighting and shadows",
-        "Surrounding terrain tile downloads",
-        "Batch mode with tile offsets and drag-adjustable tile centers",
-        "Optional shared elevation baseline and stitched verification heightmap",
-        "Combined BeamNG Level export: stitch a square power-of-2 batch grid into one playable level",
-        "GPXZ concurrent requests for paid plans",
-        "Location search with Nominatim geocoding"
+        "Batch mode for tile grids with per-tile exports (heightmaps, textures, road masks, GLB, DAE, .ter)",
+        "Combined BeamNG level: stitch a 2x2, 4x4 or 8x8 batch grid into one playable level",
+        "Live progress with step timings for generation and export",
+        "Location search, run configurations and .mapng session files, in 7 languages"
       ],
-      "keywords": "BeamNG, BeamNG.drive, terrain generator, heightmap, map maker, modding tool, satellite to heightmap, real world map, driving simulator"
+      "keywords": "BeamNG, BeamNG.drive, map generator, level generator, real world map, terrain generator, heightmap, modding tool, OpenStreetMap, driving simulator"
     }
     </script>
 
@@ -93,7 +93,7 @@
           "name": "How do I make a real-world map in BeamNG.drive?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Use MapNG to select any location on Earth, generate a heightmap and satellite texture at 1 meter per pixel resolution, then import the files into the BeamNG.drive World Editor. MapNG supports multiple elevation sources including USGS 1m data for the USA."
+            "text": "Open MapNG, pick a location on the map or search for it, choose a size and an elevation source, and generate. Then export the BeamNG level package: unzip it into your BeamNG.drive levels folder and drive. The level comes with terrain, roads, traffic signals, buildings, bridges, trees and AI traffic built from real data."
           }
         },
         {
@@ -101,15 +101,15 @@
           "name": "Can I convert real-world locations to BeamNG terrain?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. MapNG uses high-resolution satellite imagery and elevation data to generate terrain that matches real-world locations. Select any location using the interactive map or search by name, then export heightmaps, textures, and 3D models ready for BeamNG.drive."
+            "text": "Yes. MapNG uses real elevation data (30 m global, USGS 1 m in the USA, NMT in Poland, GPXZ, or your own LAZ/GeoTIFF files) and OpenStreetMap data to build terrain and a complete level for any location on Earth."
           }
         },
         {
           "@type": "Question",
-          "name": "What file formats does MapNG export for BeamNG?",
+          "name": "What does MapNG export?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "MapNG exports multiple formats including 16-bit PNG heightmaps, satellite and OSM-based textures, road masks, GeoTIFF elevation data, GeoJSON vector data, GLB and DAE 3D models, BeamNG .ter heightmaps, and experimental BeamNG level package ZIP files. Batch mode can process tile grids automatically and package per-tile outputs into ZIP files."
+            "text": "A playable BeamNG.drive level package (.zip), GeoTIFF elevation and GeoJSON OpenStreetMap data, and .mapng session files. Batch mode processes tile grids and adds per-tile heightmaps, satellite and OSM textures, road masks, GLB, DAE and .ter files, or stitches the grid into one combined level."
           }
         },
         {
@@ -117,7 +117,7 @@
           "name": "Is MapNG free to use?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes, MapNG is completely free and open-source under the MIT license. The Standard (30m) and USGS (1m USA) elevation sources are free. The optional GPXZ premium source requires an API key with a free tier of 100 requests per day."
+            "text": "Yes, MapNG is free and open source under the MIT license. The Standard (30 m), USGS (1 m USA) and NMT (Poland) elevation sources are free. The optional GPXZ premium source requires an API key with a free tier of 100 requests per day."
           }
         }
       ]
@@ -128,25 +128,22 @@
     <!-- SEO: Noscript fallback content for crawlers that don't execute JS -->
     <noscript>
       <div style="max-width: 800px; margin: 40px auto; padding: 20px; font-family: system-ui, sans-serif; color: #333;">
-        <h1>MapNG - Real-World Terrain Generator for BeamNG.drive</h1>
-        <p>MapNG is a free, open-source web application that converts real-world geographic data into game-engine-ready terrain for BeamNG.drive modding.</p>
+        <h1>MapNG - Real-World Maps for BeamNG.drive</h1>
+        <p>MapNG is a free, open-source web application that turns any real-world location into a playable BeamNG.drive level, built from real elevation and OpenStreetMap data.</p>
         <h2>Features</h2>
         <ul>
-          <li>Generate heightmaps from any location on Earth at 1 meter per pixel</li>
-          <li>3 elevation sources: Standard 30m global, USGS 1m (USA), GPXZ premium</li>
-          <li>High-resolution satellite textures from Esri World Imagery</li>
-          <li>Procedural OSM textures with road overlays, land-use fills, and simple markings</li>
-          <li>Hybrid satellite + road overlay textures</li>
-          <li>Interactive 3D preview with HDR lighting and cascaded shadows</li>
-          <li>3D buildings, trees, and barriers from OpenStreetMap data</li>
-          <li>Multiple export formats: 16-bit heightmaps, satellite and OSM textures, road masks, GeoTIFF, GeoJSON, GLB, DAE, BeamNG .ter, and experimental BeamNG level ZIP packages</li>
-          <li>Surrounding terrain tile downloads for multi-tile worlds</li>
-          <li>Batch Job mode for processing tile grids (up to 20x20) with per-tile offsets, pause, resume, and retry</li>
-          <li>Combined BeamNG Level export from a square power-of-2 batch grid (2x2, 4x4, 8x8): stitches all tiles into one playable level with a shared elevation baseline</li>
-          <li>Optional shared elevation baseline and stitched verification heightmap for seam validation</li>
+          <li>Playable BeamNG.drive level ZIP from any place on Earth, up to 16384 x 16384</li>
+          <li>Elevation: Standard 30 m global, USGS 1 m (USA), NMT EVRF2007 (Poland), GPXZ premium, or your own LAZ/LAS, GeoTIFF, ASC and GML files</li>
+          <li>Terrain materials from OpenStreetMap land use and a 2x satellite base texture</li>
+          <li>Textured buildings, regional trees, grass and rocks chosen from the location</li>
+          <li>Roads with real surfaces and lane markings by country, crosswalks, stop bars, parking lanes, traffic signals, road signs and street lamps</li>
+          <li>Raised sidewalks with curbs and ramps, median islands, hydrants, benches, utility poles and power lines</li>
+          <li>Bridges with solved decks, piers and abutments; AI traffic and road names on the minimap</li>
+          <li>GeoTIFF and GeoJSON exports, and an interactive 3D preview</li>
+          <li>Batch mode for tile grids (up to 20x20), and a combined BeamNG level stitched from a 2x2, 4x4 or 8x8 grid</li>
         </ul>
-        <h2>How to Make a BeamNG Map from Real-World Locations</h2>
-        <p>Select a location using the interactive map or search by name, configure your resolution (512–16384 px), choose an elevation source, and generate. Preview your terrain in 3D, then export heightmaps and textures ready for the BeamNG.drive World Editor.</p>
+        <h2>How to Make a BeamNG Map from a Real-World Location</h2>
+        <p>Select a location on the map or search by name, choose an output size (512 to 16384 px) and an elevation source, and generate. Check the terrain in the 3D preview, then export the BeamNG level package and unzip it into your BeamNG.drive levels folder.</p>
         <p><strong>Please enable JavaScript to use MapNG.</strong></p>
         <p><a href="https://github.com/nikkiluzader/mapng">View on GitHub</a></p>
       </div>
