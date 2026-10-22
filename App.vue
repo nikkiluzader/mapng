@@ -150,14 +150,29 @@
           <div class="text-center p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl min-w-[300px]">
             <Loader2 :size="48" class="text-[#FF6600] animate-spin mx-auto mb-4" />
             <h3 class="text-xl text-gray-900 dark:text-white font-bold mb-2">{{ t('app.processingTerrain') }}</h3>
-            <p class="text-gray-600 dark:text-gray-400 text-sm font-medium mb-4 animate-pulse">{{ loadingStatus }}</p>
-            <div v-if="loadingProgressPercent !== null" class="mb-4 w-full max-w-xs mx-auto space-y-1">
+            <!-- Overall progress (services/generationProgress.js), the current step,
+                 the steps finished with their durations, and the time so far -->
+            <div class="mb-4 w-full max-w-sm mx-auto space-y-1.5 text-left">
               <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                <div class="h-full rounded-full bg-[#FF6600] transition-all duration-300 ease-out" :style="{ width: loadingProgressPercent + '%' }"></div>
+                <div class="h-full rounded-full bg-[#FF6600] transition-all duration-500 ease-out" :style="{ width: loadingOverallPct + '%' }"></div>
               </div>
-              <div class="flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                <span>{{ loadingProgressPercent.toFixed(0) }}%</span>
-                <span v-if="loadingProgressDetail">{{ loadingProgressDetail }}</span>
+              <div class="flex items-start justify-between gap-2">
+                <span class="min-w-0 flex-1 text-[12px] leading-snug text-gray-600 dark:text-gray-400 break-words">{{ loadingStatus }}</span>
+                <span class="text-[11px] font-mono text-[#FF6600] shrink-0">{{ loadingOverallPct }}%</span>
+              </div>
+              <div v-if="loadingProgressDetail" class="text-[11px] text-gray-500 dark:text-gray-400">{{ loadingProgressDetail }}</div>
+              <div v-if="loadingDone.length || loadingElapsedMs" class="flex flex-col gap-0.5 border-t border-gray-100 dark:border-gray-800 pt-2">
+                <div
+                  v-for="(done, i) in loadingDone.slice(-5)"
+                  :key="i"
+                  class="flex justify-between gap-2 text-[10px] leading-snug text-gray-400 dark:text-gray-500"
+                >
+                  <span class="min-w-0 flex-1 truncate">✓ {{ done.step }}</span>
+                  <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
+                </div>
+                <div class="flex justify-end text-[10px] font-mono text-gray-500 dark:text-gray-400">
+                  {{ t('exportPanel.elapsed') }} {{ formatStepDuration(loadingElapsedMs) }}
+                </div>
               </div>
             </div>
             <div class="text-xs text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
@@ -226,6 +241,7 @@ import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
+import { createGenerationProgress } from './services/generationProgress.js';
 import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
 import { releaseUploadRasterCache } from './services/resamplerClient';
 import { applyAscCoordinateSystem } from './services/ascLoader.js';
@@ -283,6 +299,42 @@ const devMode = ref(false);
 const supportPromptContext = ref('manual');
 const loadingProgressPercent = ref(null);
 const loadingProgressDetail = ref('');
+// Overall generation progress: stages weighted by their time, the steps
+// finished ({ step, durationMs }) and the time since the run began.
+const loadingOverallPct = ref(0);
+const loadingDone = ref([]);
+const loadingElapsedMs = ref(0);
+let generationProgress = null;
+let generationTimer = null;
+let generationStartedAt = 0;
+const formatStepDuration = (ms) => {
+  if (!Number.isFinite(ms)) return '';
+  if (ms < 1000) return `${Math.round(ms)} ms`;
+  const sec = Math.round(ms / 1000);
+  return sec < 60 ? `${sec} s` : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+};
+const applyGenerationProgress = ({ pct, completed }) => {
+  loadingOverallPct.value = pct;
+  if (completed) loadingDone.value = [...loadingDone.value, completed];
+};
+const startGenerationProgress = (options) => {
+  stopGenerationProgress();
+  generationProgress = createGenerationProgress(options);
+  generationStartedAt = performance.now();
+  loadingOverallPct.value = 0;
+  loadingDone.value = [];
+  loadingElapsedMs.value = 0;
+  // the creep on silent steps and the elapsed time move between messages
+  generationTimer = setInterval(() => {
+    loadingElapsedMs.value = performance.now() - generationStartedAt;
+    if (generationProgress) applyGenerationProgress(generationProgress.tick());
+  }, 500);
+};
+const stopGenerationProgress = () => {
+  if (generationTimer) clearInterval(generationTimer);
+  generationTimer = null;
+  generationProgress = null;
+};
 const lastLoggedLoadingStatus = ref('');
 const lastLoggedLoadingPercent = ref(-1);
 let abortController = null;
@@ -675,6 +727,7 @@ const applyLoadingUpdate = (update) => {
     loadingProgressPercent.value = Number.isFinite(update.percent) ? update.percent : null;
     loadingProgressDetail.value = update.detail || '';
   }
+  if (generationProgress) applyGenerationProgress(generationProgress.update(loadingStatus.value, loadingProgressPercent.value));
 
   if (loadingStatus.value && loadingStatus.value !== lastLoggedLoadingStatus.value) {
     console.info(`[Terrain] ${loadingStatus.value}`);
@@ -735,11 +788,10 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     if (onlyOsmAdded) {
       // Terrain + textures are identical, just add OSM data on top
       isLoading.value = true;
-      loadingStatus.value = t('app.status.addingOsm');
+      startGenerationProgress({ resolution: resolution.value, includeOSM: true, startAt: 'osm' });
+      applyLoadingUpdate(t('app.status.addingOsm'));
       try {
-        const updatedData = await addOSMToTerrain(terrainData.value, undefined, (status) => {
-          loadingStatus.value = status;
-        });
+        const updatedData = await addOSMToTerrain(terrainData.value, undefined, applyLoadingUpdate);
         terrainData.value = updatedData;
         lastGenerationKey.value = requestKey;
         warnIfOsmUnavailable(updatedData);
@@ -752,6 +804,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         alert(t('app.error.fetchOsm'));
       } finally {
         isLoading.value = false;
+        stopGenerationProgress();
       }
       return;
     }
@@ -771,6 +824,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
   lastLoggedLoadingPercent.value = -1;
   loadingProgressPercent.value = null;
   loadingProgressDetail.value = '';
+  startGenerationProgress({ resolution: resolution.value, includeOSM: !!fetchOSM, upload: !!uploadedElevationFile.value });
   applyLoadingUpdate(t('app.status.startingGeneration'));
   
   // Flush old data to free memory before loading new large datasets
@@ -854,6 +908,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     isLoading.value = false;
     loadingProgressPercent.value = null;
     loadingProgressDetail.value = '';
+    stopGenerationProgress();
     abortController = null;
   }
 };
@@ -868,12 +923,11 @@ const handleFetchOSM = async () => {
   if (!terrainData.value) return;
   
   isLoading.value = true;
-  loadingStatus.value = t('app.status.fetchingOsm');
+  startGenerationProgress({ resolution: resolution.value, includeOSM: true, startAt: 'osm' });
+  applyLoadingUpdate(t('app.status.fetchingOsm'));
   
   try {
-      const updatedData = await addOSMToTerrain(terrainData.value, undefined, (status) => {
-          loadingStatus.value = status;
-      });
+      const updatedData = await addOSMToTerrain(terrainData.value, undefined, applyLoadingUpdate);
       terrainData.value = updatedData;
       warnIfOsmUnavailable(updatedData);
   } catch (error) {
@@ -881,6 +935,7 @@ const handleFetchOSM = async () => {
       alert(t('app.error.fetchOsm'));
   } finally {
       isLoading.value = false;
+      stopGenerationProgress();
   }
 };
 
