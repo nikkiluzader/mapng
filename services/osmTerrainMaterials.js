@@ -16,6 +16,7 @@ import {
 import { TERRAIN_MATERIAL_LIBRARY } from './beamngTerrainMaterialLibrary.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
 import { getEffectiveRoadLayer } from './roadNetwork.js';
+import { sidewalkSides } from './beamngSidewalks.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–8 = BeamNG-referenced materials.
@@ -482,7 +483,7 @@ function geoToTerrainPx(lat, lng, bounds, size) {
 /**
  * Rasterize a thick line segment into the layer map using distance-to-segment.
  */
-function rasterizeSegment(layerMap, size, x0, y0, x1, y1, halfPx, matIdx) {
+function rasterizeSegment(layerMap, size, x0, y0, x1, y1, halfPx, matIdx, onlyOver = null) {
   const dx = x1 - x0, dy = y1 - y0;
   const segLen2 = dx * dx + dy * dy;
   const r2 = halfPx * halfPx;
@@ -502,7 +503,7 @@ function rasterizeSegment(layerMap, size, x0, y0, x1, y1, halfPx, matIdx) {
         const ex = x - (x0 + t * dx), ey = y - (y0 + t * dy);
         dist2 = ex * ex + ey * ey;
       }
-      if (dist2 <= r2) layerMap[row + x] = matIdx;
+      if (dist2 <= r2 && (!onlyOver || onlyOver.has(layerMap[row + x]))) layerMap[row + x] = matIdx;
     }
   }
 }
@@ -603,7 +604,7 @@ function buildOSMLayerMap(terrainData, worldSize) {
   // Linear projection shared with the OSM base texture + geoToWorld placement.
   const toPx = (lat, lng) => geoToTerrainPx(lat, lng, bounds, size);
 
-  // 1. Paint area polygons (painted first; roads override on top).
+  // 1. Paint area polygons (painted first; roads go on top, paintRoadFootprints).
   for (const feature of osmFeatures) {
     if (feature.type === 'road') continue;
     const matIdx = areaMatIndex(feature);
@@ -640,10 +641,28 @@ function buildOSMLayerMap(terrainData, worldSize) {
     }
   }
 
-  // 4. Paint roads (overrides area fills). Asphalt covers at least the whole
-  // carriageway the export paves (parking lanes / shoulders included), so the
-  // tyres feel asphalt wherever the decal shows it.
+  return layerMap;
+}
+
+// Grass grows (GroundCover) on these materials: Grass, Dirt, DirtGrass.
+const GRASS_GROWING = new Set([1, 2, 8]);
+// Bare gravel this far past a road's paved edge (its sidewalk, if any): the
+// road's edge blend and grass billboards leaning in stay off the road.
+const ROAD_VERGE_M = 2.0;
+
+/**
+ * Paint every ground-level road's footprint over the layer map: asphalt (or
+ * its style's surface) on the carriageway, concrete under its sidewalks (the
+ * raised sidewalk meshes, beamngSidewalks.js), and a bare verge past them
+ * where the ground would grow grass. In three passes over all roads, so no
+ * road's verge or sidewalk covers another's carriageway.
+ */
+function paintRoadFootprints(layerMap, terrainData, worldSize) {
+  const { width: size, bounds, osmFeatures = [] } = terrainData;
+  const metersPerPixel = worldSize / size;
+  const toPx = (lat, lng) => geoToTerrainPx(lat, lng, bounds, size);
   const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
+  const roads = [];
   for (const feature of osmFeatures) {
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
     const tags = feature.tags || {};
@@ -654,21 +673,30 @@ function buildOSMLayerMap(terrainData, worldSize) {
     // under a bridge or across the hill over a tunnel.
     const layer = getEffectiveRoadLayer(tags);
     if (layer >= 1 || layer <= -1) continue;
+    // Asphalt covers at least the whole carriageway the export paves
+    // (parking lanes / shoulders included), so the tyres feel asphalt
+    // wherever the decal shows it.
     let halfWidthM = style.halfWidthM;
+    let sidewalkM = 0;
     if (style.mat === 5) {
-      const { carriagewayHalfWidth } = estimateRoadCrossSection(tags, highway, isOneWayRoad(tags), {
-        urban: isUrbanRoad(feature),
-      });
+      const urban = isUrbanRoad(feature);
+      const { carriagewayHalfWidth } = estimateRoadCrossSection(tags, highway, isOneWayRoad(tags), { urban });
       if (Number.isFinite(carriagewayHalfWidth)) halfWidthM = Math.max(halfWidthM, carriagewayHalfWidth);
+      const sides = sidewalkSides({ tags, highway, urban });
+      sidewalkM = Math.max(sides.left, sides.right);
     }
-    const halfPx = Math.max(1, halfWidthM / metersPerPixel);
-    const pts = feature.geometry.map(pt => toPx(pt.lat, pt.lng));
-    for (let i = 0; i < pts.length - 1; i++) {
-      rasterizeSegment(layerMap, size, pts[i].px, pts[i].py, pts[i + 1].px, pts[i + 1].py, halfPx, style.mat);
-    }
+    roads.push({ style, halfWidthM, sidewalkM, pts: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) });
   }
-
-  return layerMap;
+  const paint = (road, halfM, mat, onlyOver = null) => {
+    const halfPx = Math.max(1, halfM / metersPerPixel);
+    const { pts } = road;
+    for (let i = 0; i < pts.length - 1; i++) {
+      rasterizeSegment(layerMap, size, pts[i].px, pts[i].py, pts[i + 1].px, pts[i + 1].py, halfPx, mat, onlyOver);
+    }
+  };
+  for (const road of roads) paint(road, road.halfWidthM + road.sidewalkM + ROAD_VERGE_M, 6, GRASS_GROWING);
+  for (const road of roads) if (road.sidewalkM > 0) paint(road, road.halfWidthM + road.sidewalkM, 7);
+  for (const road of roads) paint(road, road.halfWidthM, road.style.mat);
 }
 
 // ── Image-based layer map builder ──────────────────────────────────────────
@@ -961,6 +989,8 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
   } else {
     layerMap = buildOSMLayerMap(terrainData, worldSize);
   }
+  // roads over either: the satellite-classified map draws none of its own
+  paintRoadFootprints(layerMap, terrainData, worldSize);
 
   // ── Material definitions ───────────────────────────────────────────────────
   const DETAIL_SIZE = 1024;

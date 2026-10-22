@@ -173,7 +173,7 @@ function makeTerrainData() {
           natural: 'tree',
         },
         geometry: [
-          { lat: 0.6, lng: 0.4 },
+          { lat: 0.7, lng: 0.6 },
         ],
       },
       {

@@ -29,6 +29,7 @@ import { resolveRoadRulesAt } from './countryRules.js';
 import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
 import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS } from './beamngSidewalks.js';
+import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
   solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck,
@@ -5709,6 +5710,55 @@ function sampleAreaPlacements(feature, terrainData, squareSize, itemType, densit
   return placements;
 }
 
+// How far trunks (and bushes, rocks) stay from a road's or sidewalk's edge.
+const VEGETATION_CLEAR_TREE_M = 2;
+const VEGETATION_CLEAR_LOW_M = 0.75;
+const CLEARANCE_CELL_M = 16;
+
+/**
+ * Clearance test against strips [{ points: [[x, y, ...]...], half }]:
+ * returns clearOf(x, y, margin), true within half + margin of any strip.
+ */
+function buildClearanceIndex(strips) {
+  const segments = [];
+  const grid = new Map();
+  let maxHalf = 0;
+  for (const { points, half } of strips) {
+    maxHalf = Math.max(maxHalf, half);
+    for (let i = 0; i + 1 < points.length; i++) {
+      const [ax, ay] = points[i];
+      const [bx, by] = points[i + 1];
+      const idx = segments.push({ ax, ay, bx, by, half }) - 1;
+      for (let gx = Math.floor(Math.min(ax, bx) / CLEARANCE_CELL_M); gx <= Math.floor(Math.max(ax, bx) / CLEARANCE_CELL_M); gx++) {
+        for (let gy = Math.floor(Math.min(ay, by) / CLEARANCE_CELL_M); gy <= Math.floor(Math.max(ay, by) / CLEARANCE_CELL_M); gy++) {
+          const key = `${gx},${gy}`;
+          if (!grid.has(key)) grid.set(key, []);
+          grid.get(key).push(idx);
+        }
+      }
+    }
+  }
+  return (x, y, margin) => {
+    const r = Math.ceil((maxHalf + margin) / CLEARANCE_CELL_M);
+    const cx = Math.floor(x / CLEARANCE_CELL_M);
+    const cy = Math.floor(y / CLEARANCE_CELL_M);
+    for (let gx = cx - r; gx <= cx + r; gx++) {
+      for (let gy = cy - r; gy <= cy + r; gy++) {
+        for (const idx of grid.get(`${gx},${gy}`) || []) {
+          const s = segments[idx];
+          const dx = s.bx - s.ax;
+          const dy = s.by - s.ay;
+          const len = dx * dx + dy * dy;
+          const t = len > 0 ? Math.max(0, Math.min(1, ((x - s.ax) * dx + (y - s.ay) * dy) / len)) : 0;
+          const reach = s.half + margin;
+          if ((s.ax + t * dx - x) ** 2 + (s.ay + t * dy - y) ** 2 < reach * reach) return true;
+        }
+      }
+    }
+    return false;
+  };
+}
+
 /**
  * Build grouped BeamNG forest placements for trees, bushes, and optional rocks.
  *
@@ -6823,6 +6873,22 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   const forestPlacements = (includeTrees || includeRocks)
     ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome)
     : new Map();
+  // Trees, bushes and rocks keep off the roads and sidewalks (OSM woods and
+  // scrub are often drawn right over the roads through them) and out from
+  // under bridge decks.
+  const clearOf = buildClearanceIndex([
+    ...groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })),
+    ...sidewalks.runs.map((run) => ({ points: run.points, half: run.width })),
+  ]);
+  let vegetationCleared = 0;
+  for (const [type, list] of forestPlacements) {
+    const margin = (treeItemHeight(type) ?? 10) < 4 ? VEGETATION_CLEAR_LOW_M : VEGETATION_CLEAR_TREE_M;
+    const kept = list.filter(({ pos: [x, y, z] }) => !clearOf(x, y, margin) && !underDeck(x, y, z, z + 12));
+    vegetationCleared += list.length - kept.length;
+    if (kept.length) forestPlacements.set(type, kept);
+    else forestPlacements.delete(type);
+  }
+  if (vegetationCleared) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Vegetation: ${vegetationCleared} placement(s) kept off roads, sidewalks and bridges.`);
   // Hydrants and bins (mapped + generated) as Forest items: instanced and
   // cheap, and their orientation does not matter.
   const addPropPlacement = (type, x, y, z, yaw) => {
@@ -6957,8 +7023,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   }, null, 2));
 
   // ── city.sites.json ───────────────────────────────────────────────────────
-  // Seed a valid Sites Editor file so zones/parking can be authored without
-  // creating boilerplate manually in BeamNG World Editor.
+  // A valid Sites Editor file (zones / parking can be authored in the World
+  // Editor), with a zone along every named road: the minimap's label names
+  // the road being driven (services/roadNameZones.js).
+  const roadNameZones = buildRoadNameZones(decalRoads.carriageways || []);
   zip.file(`${base}/city.sites.json`, JSON.stringify({
     description: 'Description of these Sites. Contains Locations and Zones.',
     dir: `/levels/${levelName}/`,
@@ -6966,8 +7034,8 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
     locations: {},
     name: 'city.sites.json',
     parkingSpots: [],
-    zones: [],
-  }, null, 2));
+    zones: roadNameZones,
+  }));
 
   // ── map.json ───────────────────────────────────────────────────────────────
   // Navigation comes from the drivable DecalRoads; map.json carries no
