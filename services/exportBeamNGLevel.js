@@ -2559,9 +2559,11 @@ function landOnBerms(parts, lowerRoads, groundAt) {
 }
 
 // The approach road samples an abutment's height is fitted to (m from the
-// bridge's end), and the steepest grade that fit may carry on to it.
+// bridge's end), and the steepest grade that fit may carry on to it: about
+// the steepest streets (a hillside street climbing 23 % from a bridge, held
+// to 8 %, put the abutment 3.8 m over the road arriving at it).
 const APPROACH_FIT_M = [4, 40];
-const APPROACH_MAX_GRADE = 0.08;
+const APPROACH_MAX_GRADE = 0.25;
 
 function solveExportBridges(drivableRoads, terrainData, squareSize) {
   const toXY = (geometry) => geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));

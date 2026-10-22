@@ -228,7 +228,11 @@ export function solveChain(parts, { groundAt, endHeight = groundAt, crossings = 
   const endDist = ends.map((n) => dijkstra([[n, 0]]));
 
   // Base: abutment heights weighted by 1 / distance along the chain (a
-  // straight grade between two abutments); caps: MAX_GRADE from each.
+  // straight grade between two abutments); caps: MAX_GRADE from each, but
+  // never below the base: abutments further apart in height than MAX_GRADE
+  // allows (a bridge on a hillside road) are joined by the straight grade,
+  // never by dragging the high end down to the low one's cap, metres under
+  // the road arriving at it.
   const base = [];
   const cap = [];
   const toAbut = [];
@@ -251,7 +255,7 @@ export function solveChain(parts, { groundAt, endHeight = groundAt, crossings = 
         ta = Math.min(ta, dk);
       });
       b.push(den > 0 ? num / den : ground[i][k]);
-      c.push(cp);
+      c.push(den > 0 ? Math.max(cp, num / den) : cp);
       t.push(ta);
     }
     base.push(b);
