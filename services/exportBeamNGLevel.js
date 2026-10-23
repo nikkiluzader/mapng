@@ -8,6 +8,8 @@ import { buildTerrainMaterials } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
 import { placeTrafficCalming } from './trafficCalming.js';
+import { placeBollards } from './bollards.js';
+import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight } from './beamngTrees.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
@@ -4255,6 +4257,10 @@ function buildDetailedReportSections(d) {
   lines.push(`- Lamps, benches and other furniture: ${(d.streetFurnitureObjects || []).length}`);
   listCounts(countBy(d.streetFurnitureObjects || [], shapeName), 15);
   lines.push(`- Fuel / charging station objects: ${(d.fuelStationObjects || []).length}`);
+  const bp = d.bollardPlacement;
+  if (bp) lines.push(`- Bollards (OSM barrier=bollard): ${bp.bollards.length} placed (${bp.bollards.filter((b) => b.material === 'concrete').length} concrete), ${bp.skipped.onRoad} on drawn roads left out, ${bp.skipped.blocked} under bridges`);
+  const cv = d.curveWarnings;
+  if (cv) lines.push(`- Curve warnings from road geometry: ${cv.props.length} signs${cv.props.length ? ` (${Object.entries(cv.counts).map(([k, v]) => `${v} ${k}`).join(', ')})` : ''}`);
   const cm = d.calming || {};
   lines.push(`- Traffic calming placed: ${Object.entries(cm.counts || {}).map(([k, v]) => `${v} ${k}`).join(', ') || 'none'} (${(d.trafficCalmingObjects || []).length} objects, ${(cm.chevrons || []).length} chevron decals, ${(cm.signs || []).length} warning signs)`);
   if (cm.skipped && Object.values(cm.skipped).some(Boolean)) {
@@ -7221,6 +7227,22 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       decalRoads.push({ class: 'SimGroup', name: 'traffic_calming_markings', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: markings });
     }
   }
+  // Curve warnings and chevrons from the road geometry (services/curveWarningSigns.js).
+  const curveWarnings = includeRoads
+    ? placeCurveWarnings({
+      carriageways: groundCarriageways,
+      heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      isBlocked: (() => {
+        const index = buildCarriagewayIndex(groundCarriageways);
+        return (x, y) => isOnOtherCarriageway(index, x, y, 0.5, () => false) || underDeck(x, y, getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), 4);
+      })(),
+      style: getMarkingStyle(exportTerrainData.roadRules),
+      leftHandTraffic: !!exportTerrainData.roadRules?.leftHandTraffic,
+    })
+    : { props: [], counts: {} };
+  if (curveWarnings.props.length) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Curve warnings: ${curveWarnings.props.length} signs (${JSON.stringify(curveWarnings.counts)}).`);
+  }
   const calmingTotal = Object.values(calming.counts).reduce((n, v) => n + v, 0);
   if (calmingTotal > 0 || calming.skipped.offRoad) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Traffic calming: ${JSON.stringify(calming.counts)} placed (${trafficCalmingObjects.length} objects, ${calming.chevrons.length} chevron decals, ${calming.signs.length} warning signs); skipped ${JSON.stringify(calming.skipped)}.`);
@@ -7310,7 +7332,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
   const signObjects = [...buildRoadSignProps(exportTerrainData, squareSize, {
     style: getMarkingStyle(exportTerrainData.roadRules),
-  }).props, ...calming.signs.map((sign) => ({ ...sign, position: sign.position.map((v) => roundTo(v, 3)) }))].map((sign, i) => ({
+  }).props, ...[...calming.signs, ...curveWarnings.props].map((sign) => ({ ...sign, position: sign.position.map((v) => roundTo(v, 3)) }))].map((sign, i) => ({
     __parent: 'signs',
     class: 'TSStatic',
     name: `sign_${sign.kind}_${i}`,
@@ -7326,6 +7348,30 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     props: streetProps,
     underDeck,
   });
+  // OSM bollards as stock bollards (services/bollards.js), not on drawn roads.
+  const bollardPlacement = placeBollards({
+    features: exportTerrainData.osmFeatures || [],
+    toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
+    heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+    onDrawnRoad: (() => {
+      const index = buildCarriagewayIndex(groundCarriageways);
+      return (x, y) => isOnOtherCarriageway(index, x, y, 0, () => false);
+    })(),
+    isBlocked: (x, y, z) => underDeck(x, y, z, z + 2),
+  });
+  bollardPlacement.bollards.forEach((b, i) => streetFurnitureObjects.push({
+    __parent: 'street_furniture',
+    class: 'TSStatic',
+    name: `bollard_${i}`,
+    persistentId: generatePersistentId(),
+    position: b.position.map((v) => roundTo(v, 3)),
+    rotationMatrix: rotationMatrixFromYaw(b.yaw),
+    shapeName: b.shape,
+    useInstanceRenderData: true,
+  }));
+  if (bollardPlacement.bollards.length || bollardPlacement.skipped.onRoad) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bollards: ${bollardPlacement.bollards.length} placed, ${bollardPlacement.skipped.onRoad} on drawn roads left out.`);
+  }
   const { objects: fuelStationObjects, facilities: fuelStationFacilities } =
     buildFuelStations(exportTerrainData, squareSize);
   const usesEastCoastFenceMaterials = barrierFolderItems.some((obj) => (
@@ -7798,6 +7844,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       barrierObjects,
       calming,
       trafficCalmingObjects,
+      bollardPlacement,
+      curveWarnings,
       forestPlacements,
       groundCoverObjects,
       waterObjects,

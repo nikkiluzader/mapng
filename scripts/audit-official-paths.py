@@ -142,7 +142,7 @@ def audit_dae_material_coverage(zips):
     daes = set()
     for src in ("services/beamngBiomeCatalog.js", "services/beamngTreeLibrary.js", "services/beamngPropLibrary.js"):
         catalog = open(os.path.join(REPO, src)).read()
-        daes |= set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", catalog))
+        daes |= set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", catalog, re.I))
     # Shapes placed directly by the exporter (fences, fuel pumps, signs, lamps).
     for src in ("services/exportBeamNGLevel.js", "services/beamngSignals.js"):
         text = open(os.path.join(REPO, src)).read()

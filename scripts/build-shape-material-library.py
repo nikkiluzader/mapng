@@ -75,7 +75,7 @@ def parse_asset_set_daes():
             depth -= 1
             if depth == 0 and key is not None:
                 block = body[key_start:k]
-                sets[key] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", block)))
+                sets[key] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", block, re.I)))
                 key = None
     return sets
 
@@ -109,6 +109,8 @@ def main():
         missing-rock-texture bug from the 2026-07-23 Utah test).
         """
         d = json.loads(json.dumps(def_obj))
+        if "class" in d:
+            d["class"] = "Material"
         stages = d.get("Stages") if isinstance(d.get("Stages"), list) else [d]
         for st in stages:
             if not isinstance(st, dict):
@@ -143,7 +145,8 @@ def main():
         folder_cased = os.path.dirname(entries[lp][1])
         fd = folder_defs.setdefault(folder, {})
         for k, v in mats.items():
-            if not isinstance(v, dict) or v.get("class") not in (None, "Material"):
+            # class names are case-insensitive in BeamNG (Utah's ut_roadsigns: "material")
+            if not isinstance(v, dict) or str(v.get("class") or "Material").lower() != "material":
                 continue
             # keyed lowercase: BeamNG material lookup is case-insensitive
             # (e.g. daes bind 'Juniper_bark', the official def is 'juniper_bark')
@@ -156,11 +159,11 @@ def main():
     # emitted for every biome alongside the biome's asset sets.
     if os.path.exists(TREE_LIBRARY):
         tree_src = open(TREE_LIBRARY, encoding="utf-8").read()
-        sets["tree_library"] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", tree_src)))
+        sets["tree_library"] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", tree_src, re.I)))
     # Street props (services/streetProps.js): likewise their own set.
     if os.path.exists(PROP_LIBRARY):
         prop_src = open(PROP_LIBRARY, encoding="utf-8").read()
-        sets["prop_library"] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", prop_src)))
+        sets["prop_library"] = sorted(set(re.findall(r"shapeFile:\s*'([^']+\.(?:dae|cdae))'", prop_src, re.I)))
     out = {}
     problems = []
     for set_id, daes in sets.items():

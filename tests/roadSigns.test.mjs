@@ -80,7 +80,10 @@ test('speed limit signs where a mapped limit changes, and only with a mesh for i
   assert.equal(eu.length, 2, 'one per direction entering a new limit');
   assert.ok(eu.some((s) => /speed_80/.test(s.shape)) && eu.some((s) => /speed_50/.test(s.shape)));
   assert.equal(signs(ways('50', '50'), 'white').filter((s) => s.kind === 'speed').length, 0, 'no change, no sign');
-  assert.equal(signs(ways('30 mph', '40 mph'), 'americas').filter((s) => s.kind === 'speed').length, 1, 'only 40 mph has a US mesh');
+  const us = signs(ways('30 mph', '40 mph'), 'americas').filter((s) => s.kind === 'speed');
+  assert.equal(us.length, 2, '30 mph (Utah) and 40 mph (East Coast USA) both have a US mesh');
+  assert.ok(us.some((s) => /ut_30_speed_limit/.test(s.shape)) && us.some((s) => /sign_speedlimit_40/.test(s.shape)));
+  assert.equal(signs(ways('35 mph', '40 mph'), 'americas').filter((s) => s.kind === 'speed').length, 1, 'no stock 35 mph sign: only the 40');
 });
 
 test('one way and no entry signs (Vienna convention), not on service roads', () => {

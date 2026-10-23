@@ -59,6 +59,34 @@ export const CALMING_SHAPES = {
   table: { shapeFile: '/levels/gridmap_v2/art/shapes/grid/s_gm_suspension_sbump_4x4_c.dae' },
 };
 
+// OSM barrier=bollard: the standard steel bollard (0.26 m, 1.68 m tall),
+// East Coast USA's concrete city bollard for material=concrete.
+export const BOLLARD_SHAPES = {
+  steel: { shapeFile: '/art/shapes/objects/bollard_yellow.dae' },
+  concrete: { shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bollard_concrete.dae' },
+};
+
+// North American road signs from Utah (ut_roadsigns) and West Coast USA,
+// beside East Coast USA's in services/roadSigns.js. Their faces look along
+// local -Y, like East Coast USA's and the Vienna-convention set. (Paths
+// written out in full: the material generator reads quoted shapeFile lines.)
+export const US_SIGN_SHAPES = {
+  speed5: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/sign_speed5.dae' },
+  speed25: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/sign_speed25.dae' },
+  speed30: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_30_speed_limit.DAE' },
+  speed60: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_60_speed_limit.DAE' },
+  speed70: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_70_speed_limit.DAE' },
+  speed80: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_80_speed_limit.DAE' },
+  curveLeft: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_curve_left.DAE' },
+  curveRight: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_curve_right.DAE' },
+  reverseCurveLeft: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_reverse_curve_left.DAE' },
+  reverseCurveRight: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_reverse_curve_right.DAE' },
+  windingLeft: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_winding_road_left.DAE' },
+  windingRight: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_winding_road_right.DAE' },
+  chevronLeft: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_chevron_left.DAE' },
+  chevronRight: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_chevron_right.DAE' },
+};
+
 // The overhead wires (a generated mesh): plain dark cable, both faces drawn.
 export const POWER_WIRE_MATERIAL = 'mapng_power_wire';
 export function getPowerWireMaterialDefs() {

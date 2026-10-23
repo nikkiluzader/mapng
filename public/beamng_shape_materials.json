@@ -5226,6 +5226,36 @@
       "persistentId": "f74c972d-e96b-4e13-9f3f-524f25dc4813",
       "translucentBlendOp": "None"
     },
+    "eca_bld_concrete": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/concrete/eca_bld_concrete/eca_bld_concrete_d.dds",
+          "detailMap": "/assets/materials/tileable/concrete/eca_bld_concrete/detail_grunge_01b_low_desat.dds",
+          "detailScale": [
+            0.300000012,
+            0.300000012
+          ],
+          "normalMap": "/assets/materials/tileable/concrete/eca_bld_concrete/eca_bld_concrete_n.dds",
+          "overlayMap": "/assets/materials/tileable/road/eca_asphalt/eca_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/concrete/eca_bld_concrete/eca_bld_concrete_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "CONCRETE",
+      "mapTo": "eca_bld_concrete",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "east_coast_usa",
+      "name": "eca_bld_concrete",
+      "persistentId": "bdaa001e-5175-42bb-ab76-9ab9506712d9",
+      "translucentBlendOp": "None"
+    },
     "eca_bld_metaltrim": {
       "Stages": [
         {
@@ -5548,6 +5578,73 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "m_metal_trim_01": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/metal/m_metal_trim_01/t_garage_metal_trim_ao.data.png",
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": [
+            1,
+            0.999989986,
+            0.999989986,
+            1
+          ],
+          "baseColorMap": "/assets/materials/trim/metal/m_metal_trim_01/t_garage_metal_trim_b.color.png",
+          "diffuseMapUseUV": null,
+          "instanceDiffuse": true,
+          "metallicFactor": 0.349999994,
+          "metallicMap": "/assets/materials/trim/metal/m_metal_trim_01/t_garage_metal_trim_m.data.png",
+          "normalMap": "/assets/materials/trim/metal/m_metal_trim_01/t_garage_metal_trim_nm.normal.png",
+          "opacityMapUseUV": null,
+          "roughnessFactor": 0.800000012,
+          "roughnessMap": "/assets/materials/trim/metal/m_metal_trim_01/t_garage_metal_trim_r.data.png",
+          "roughnessMapUseUV": null,
+          "vertColor": true
+        },
+        {
+          "ambientOcclusionMapUseUV": 1,
+          "baseColorFactor": null,
+          "diffuseMapUseUV": 1,
+          "instanceDiffuse": null,
+          "metallicFactor": null,
+          "opacityMapUseUV": 1,
+          "roughnessFactor": null,
+          "roughnessMapUseUV": 1,
+          "vertColor": null
+        },
+        {
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": null,
+          "diffuseMapUseUV": null,
+          "instanceDiffuse": null,
+          "metallicFactor": null,
+          "opacityMapUseUV": null,
+          "roughnessFactor": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        },
+        {
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": null,
+          "diffuseMapUseUV": null,
+          "instanceDiffuse": null,
+          "metallicFactor": null,
+          "opacityMapUseUV": null,
+          "roughnessFactor": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "m_metal_trim_01",
+      "name": "m_metal_trim_01",
+      "persistentId": "838cee7f-7695-4a92-a040-9969977c40cd",
+      "version": 1.5
+    },
     "m_metal_wall_corrugate": {
       "Stages": [
         {
@@ -5666,6 +5763,48 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "roadsigns": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/signage/roadsigns/t_roadsigns_b.color.png",
+          "detailScale": [
+            4,
+            0.5
+          ],
+          "opacityMap": "/assets/materials/signage/roadsigns/t_roadsigns_o.data.png",
+          "retroreflectivity": 0.5,
+          "vertColor": true
+        },
+        {
+          "detailScale": null,
+          "retroreflectivity": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "retroreflectivity": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "retroreflectivity": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 128,
+      "alphaTest": true,
+      "annotation": "TRAFFIC_SIGNS",
+      "class": "Material",
+      "mapTo": "roadsigns",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "roadsigns",
+      "persistentId": "2ef69b57-0f78-4d98-a8fc-8a9c480424cd",
+      "specularColor0": "1 1 1 1",
+      "translucent": true,
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "speedbump": {
       "Stages": [
         {
@@ -5691,6 +5830,118 @@
       "materialTag1": "vehicle",
       "name": "speedbump",
       "persistentId": "5c352a12-eeeb-4e4a-a87a-21821fdc9c1b",
+      "translucentBlendOp": "None"
+    },
+    "ut_bld_metal_clean": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_ao.data.png",
+          "baseColorMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_b.color.png",
+          "metallicFactor": 0.800000012,
+          "metallicMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_m.data.png",
+          "normalMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_nm.normal.png",
+          "roughnessMap": "/assets/materials/tileable/metal/ut_bld_metal_clean/t_ut_bld_metal_clean_r.data.png",
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "ut_bld_metal_clean",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_bld_metal_clean",
+      "persistentId": "0020c3da-ab62-4a56-98c8-90774c5b6230",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "ut_metal_trim": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_b.color.png",
+          "metallicFactor": 0.800000012,
+          "metallicMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_m.data.png",
+          "normalMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_nm.normal.png",
+          "roughnessMap": "/assets/materials/trim/metal/ut_metal_trim/t_metal_trim_r.data.png",
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "GUARD_RAIL",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "ut_metal_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_metal_trim",
+      "persistentId": "23e33e13-be8b-46d7-9042-880eb6aef428",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "ut_roadsigns": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/signage/ut_roadsigns/ut_roadsigns_d.dds",
+          "diffuseColor": [
+            1,
+            1,
+            0.9990000128746033,
+            1
+          ],
+          "pixelSpecular": true,
+          "specularMap": "/assets/materials/signage/ut_roadsigns/ut_roadsigns_s.dds",
+          "specularPower": 32,
+          "subSurfaceColor": [
+            0.9960784912109375,
+            0.988235354423523,
+            0.988235354423523,
+            1
+          ],
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 64,
+      "alphaTest": true,
+      "class": "Material",
+      "groundType": "METAL",
+      "mapTo": "ut_roadsigns",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "materialTag2": "Utah",
+      "name": "ut_roadsigns",
+      "persistentId": "c1f639ea-515e-4f69-a91e-b433d6ac8f7b",
       "translucentBlendOp": "None"
     },
     "wca_objects1": {

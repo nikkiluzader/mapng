@@ -27,18 +27,30 @@ import {
   walk,
 } from './signalApproaches.js';
 import { makeRoadNodeKey } from './roadNetwork.js';
+import { US_SIGN_SHAPES } from './beamngPropLibrary.js';
 
 const ECA = '/levels/east_coast_usa/art/shapes/signs_usa/';
 const IT = '/art/shapes/garage_and_dealership/Clutter/italy_traf_sign_';
 
-// North America uses East Coast USA's signs (mph); everywhere else the
+// North America uses East Coast USA's signs (mph), with the speed limits it
+// lacks from Utah and West Coast USA (no stock 35 / 45 / 55 / 65 mph sign: those
+// roads go unsigned rather than showing a wrong number); everywhere else the
 // common Vienna-convention set (km/h), which loads in any level.
 export const SIGN_SETS = {
   americas: {
     unit: 'mph',
     stop: `${ECA}sign_stop.dae`,
     give_way: `${ECA}sign_yield.dae`,
-    speed: { 40: `${ECA}sign_speedlimit_40.dae`, 50: `${ECA}sign_speedlimit_50.dae` },
+    speed: {
+      5: US_SIGN_SHAPES.speed5.shapeFile,
+      25: US_SIGN_SHAPES.speed25.shapeFile,
+      30: US_SIGN_SHAPES.speed30.shapeFile,
+      40: `${ECA}sign_speedlimit_40.dae`,
+      50: `${ECA}sign_speedlimit_50.dae`,
+      60: US_SIGN_SHAPES.speed60.shapeFile,
+      70: US_SIGN_SHAPES.speed70.shapeFile,
+      80: US_SIGN_SHAPES.speed80.shapeFile,
+    },
   },
   white: {
     unit: 'km/h',
