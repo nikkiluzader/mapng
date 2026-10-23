@@ -87,3 +87,38 @@ test('a street lined by buildings is urban; an empty road is not', () => {
   assert.equal(isUrban(country), false);
   assert.equal(buildUrbanRoadClassifier([])(street), false, 'no buildings → rural');
 });
+
+test('one road name, mixed lane counts: tagged ways keep their own width', async () => {
+  const { generateDecalRoads } = await import('../services/exportBeamNGLevel.js');
+  // A canyon road: two 2-lane ways, a 4-lane way, an untagged way — split
+  // where they meet a side road so each stays its own decal.
+  const way = (id, lanes, a, b) => ({
+    id, type: 'road', geometry: [{ lat: 0.005, lng: a }, { lat: 0.005, lng: b }],
+    tags: { highway: 'secondary', name: 'Canyon Road', ...(lanes ? { lanes } : {}) },
+  });
+  const side = (id, lng) => ({
+    id, type: 'road', tags: { highway: 'residential', name: id },
+    geometry: [{ lat: 0.005, lng }, { lat: 0.008, lng }],
+  });
+  const size = 64;
+  const td = {
+    width: size, height: size, minHeight: 0, maxHeight: 50,
+    heightMap: new Float32Array(size * size).fill(10),
+    bounds: { north: 0.01, south: 0, west: 0, east: 0.01 },
+    metersPerPixel: (0.01 * 111320) / size,
+    osmFeatures: [
+      way('a', '2', 0.001, 0.003), way('b', '2', 0.003, 0.005), way('c', '4', 0.005, 0.007), way('d', null, 0.007, 0.009),
+      side('s1', 0.003), side('s2', 0.005), side('s3', 0.007),
+    ],
+  };
+  const decals = [];
+  const walk = (items) => items.forEach((it) => { if (it.class === 'DecalRoad') decals.push(it); if (it.__items) walk(it.__items); });
+  walk(generateDecalRoads(td, td.metersPerPixel));
+  const paths = decals.filter((d) => d.material === 'road_invisible' && /Canyon/.test(d.name));
+  const widthAt = (x) => paths.find((d) => d.nodes.some(([nx]) => Math.abs(nx - x) < 60))?.nodes[0][3];
+  const m = 111320 * 0.001;
+  // World x = 0 at lng 0.005; driving width = lanes × 3.5 m, capped at 12 m.
+  assert.equal(widthAt(-3 * m), 7, '2-lane way stays 2 lanes wide');
+  assert.equal(widthAt(1 * m), 12, '4-lane way is wide (secondary cap: 12 m)');
+  assert.equal(widthAt(3 * m), 7, 'untagged way takes the corridor\'s usual width');
+});

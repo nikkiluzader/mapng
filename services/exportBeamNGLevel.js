@@ -1622,6 +1622,17 @@ function getDecalWidthCorridorKey(segment) {
   ]);
 }
 
+function hasWidthTags(tags = {}) {
+  return ['width', 'lanes', 'lanes:forward', 'lanes:backward']
+    .some((key) => tags[key] !== undefined && String(tags[key]).trim() !== '');
+}
+
+// Corridor driving width for ways that carry no lanes / width tag: the most
+// common width among the corridor's tagged ways, so an untagged piece of a
+// four-lane road isn't drawn at the two-lane default. Tagged ways keep their
+// own width — evening those out to the widest one painted all of Big
+// Cottonwood Canyon Road (2 lanes, with 3-lane passing stretches and one
+// 4-lane block) at four-lane width, running up the cut slopes beside it.
 function buildStableDecalHalfWidthMap(roads = []) {
   const widthGroups = new Map();
 
@@ -1632,29 +1643,29 @@ function buildStableDecalHalfWidthMap(roads = []) {
 
     const members = Array.isArray(road.members) && road.members.length > 0 ? road.members : [road];
     const key = getDecalWidthCorridorKey(road);
-    const widths = widthGroups.get(key) || [];
+    const counts = widthGroups.get(key) || new Map();
     for (const member of members) {
       const memberTags = member?.tags || {};
+      if (!hasWidthTags(memberTags)) continue;
       const isOneWay = isOneWayRoad(memberTags);
       const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
       const halfWidth = estimateRoadHalfWidth(memberTags, highway, isOneWay, style.width);
-      if (Number.isFinite(halfWidth) && halfWidth > 0) widths.push(halfWidth);
+      if (Number.isFinite(halfWidth) && halfWidth > 0) counts.set(halfWidth, (counts.get(halfWidth) || 0) + 1);
     }
-    widthGroups.set(key, widths);
+    widthGroups.set(key, counts);
   }
 
   const stableMap = new Map();
-  for (const [key, widths] of widthGroups.entries()) {
-    if (widths.length === 0) continue;
-    const [highway] = JSON.parse(key);
-    const laneWidth = getDefaultLaneWidthMeters(highway);
-    const minWidth = Math.min(...widths);
-    const maxWidth = Math.max(...widths);
-    // Keep a constant width only when variation is likely from OSM segmentation,
-    // not from an actual multi-lane transition.
-    if ((maxWidth - minWidth) <= laneWidth) {
-      stableMap.set(key, maxWidth);
+  for (const [key, counts] of widthGroups.entries()) {
+    let best = 0;
+    let bestCount = 0;
+    for (const [width, count] of counts) {
+      if (count > bestCount || (count === bestCount && width > best)) {
+        best = width;
+        bestCount = count;
+      }
     }
+    if (bestCount > 0) stableMap.set(key, best);
   }
 
   return stableMap;
@@ -3123,9 +3134,9 @@ export function generateDecalRoads(terrainData, squareSize) {
       urban: urbanRoad,
       fallbackHalfWidth: style.width,
     });
-    const stableHalfWidth = stableHalfWidthMap.get(corridorKey);
-    // The stable pass evens out the DRIVING width along a corridor; parking /
-    // shoulders sit on top of it.
+    // Untagged ways take the corridor's DRIVING width; parking / shoulders
+    // sit on top of it.
+    const stableHalfWidth = hasWidthTags(feature.tags || {}) ? null : stableHalfWidthMap.get(corridorKey);
     const drivingHalfWidth = Number.isFinite(stableHalfWidth) && stableHalfWidth > 0
       ? stableHalfWidth
       : crossSection.drivingHalfWidth;
