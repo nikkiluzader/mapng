@@ -80,3 +80,9 @@ test('solid-colour PNG decodes to the full size in the given colour', async () =
     assert.deepEqual([img.data[i], img.data[i + 1], img.data[i + 2]], [128, 128, 255]);
   }
 });
+
+test('isVegetationColor: lawns and woods yes; roofs, asphalt, concrete, bare soil no', async () => {
+  const { isVegetationColor } = await import('../services/osmTerrainMaterials.js');
+  for (const c of [[72, 110, 52], [40, 70, 35], [120, 140, 70], [95, 120, 60]]) assert.equal(isVegetationColor(...c), true, `green ${c}`);
+  for (const c of [[150, 150, 150], [60, 60, 62], [180, 90, 70], [190, 170, 130], [140, 110, 80], [20, 25, 20], [90, 120, 170]]) assert.equal(isVegetationColor(...c), false, `not vegetation ${c}`);
+});

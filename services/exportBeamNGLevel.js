@@ -4,7 +4,7 @@ import { chooseBaseTextureSize } from './baseTextureSize.js';
 import { encode } from 'fast-png';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { exportTer } from './exportTer.js';
-import { buildTerrainMaterials } from './osmTerrainMaterials.js';
+import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
 import { placeTrafficCalming } from './trafficCalming.js';
@@ -442,6 +442,45 @@ async function fitBaseTexture(blob, gridSize, { allowFiner = true } = {}) {
   const bmp = await createImageBitmap(blob);
   const size = allowFiner ? chooseBaseTextureSize(bmp.width, gridSize) : gridSize;
   return { blob: await resizePngBlob(blob, size, bmp), size };
+}
+
+/**
+ * Vegetation mask (north-up, ≤ VEGETATION_MASK_MAX px a side) from a
+ * satellite-based texture blob, for the OSM material painter: unmapped ground
+ * that is green there gets Grass (osmTerrainMaterials isVegetationColor).
+ * Decoded downscaled and read in strips so a 16k export allocates no
+ * full-grid RGBA buffer. Null when the texture can't be decoded.
+ */
+const VEGETATION_MASK_MAX = 4096;
+const VEGETATION_MASK_STRIP = 256;
+async function buildVegetationMask(blob) {
+  if (!blob) return null;
+  try {
+    const probe = await createImageBitmap(blob);
+    const size = Math.min(VEGETATION_MASK_MAX, probe.width);
+    probe.close?.();
+    const bmp = await createImageBitmap(blob, { resizeWidth: size, resizeHeight: size, resizeQuality: 'medium' });
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = VEGETATION_MASK_STRIP;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx?.getImageData) { bmp.close?.(); return null; }
+    const data = new Uint8Array(size * size);
+    for (let y0 = 0; y0 < size; y0 += VEGETATION_MASK_STRIP) {
+      const rows = Math.min(VEGETATION_MASK_STRIP, size - y0);
+      ctx.clearRect(0, 0, size, VEGETATION_MASK_STRIP);
+      ctx.drawImage(bmp, 0, y0, size, rows, 0, 0, size, rows);
+      const px = ctx.getImageData(0, 0, size, rows).data;
+      for (let i = 0; i < size * rows; i++) {
+        if (isVegetationColor(px[i * 4], px[i * 4 + 1], px[i * 4 + 2])) data[y0 * size + i] = 1;
+      }
+    }
+    bmp.close?.();
+    return { data, size };
+  } catch (error) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Vegetation mask unavailable; unmapped ground keeps DefaultMaterial.`, error?.message || error);
+    return null;
+  }
 }
 
 /**
@@ -7160,6 +7199,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const imageCanvas = null;
   const effectivePbrSource = (pbrSource === 'image' && !imageCanvas) ? 'osm' : pbrSource;
 
+  // Satellite-based textures show where unmapped ground is vegetated.
+  const vegetationMask = effectivePbrSource === 'osm' && ['hybrid', 'satellite', 'painted'].includes(baseTexture)
+    ? await buildVegetationMask(texBlob)
+    : null;
+
   beginStep('materials', effectivePbrSource !== 'none'
     ? `Painting terrain materials from OSM land use (${size}×${size} layer map)…`
     : 'Writing the default terrain material…');
@@ -7167,6 +7211,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, biome, terrainBaseTexSize, {
         pbrSource: effectivePbrSource,
         imageCanvas,
+        vegetationMask,
       })
     : null;
 

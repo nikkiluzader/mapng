@@ -596,7 +596,25 @@ function areaMatIndex(feature) {
 
 // ── OSM layer map builder ──────────────────────────────────────────────────
 
-function buildOSMLayerMap(terrainData, worldSize) {
+/**
+ * Vegetation in a satellite pixel: the green and yellow-green branches of
+ * colorToMaterialIndex, without its permissive grey / fallback-to-grass ones.
+ */
+export function isVegetationColor(r, g, b) {
+  const max = Math.max(r, g, b) / 255;
+  const delta = max - Math.min(r, g, b) / 255;
+  if (max < 0.15 || delta <= 0) return false;
+  const s = delta / max;
+  const rn = r / 255, gn = g / 255, bn = b / 255;
+  let h;
+  if (max === rn) h = ((gn - bn) / delta % 6) * 60;
+  else if (max === gn) h = ((bn - rn) / delta + 2) * 60;
+  else h = ((rn - gn) / delta + 4) * 60;
+  if (h < 0) h += 360;
+  return (h >= 60 && h <= 160 && s > 0.12) || (h >= 40 && h < 60 && s > 0.1 && max > 0.35);
+}
+
+function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null) {
   const { width: size, bounds, osmFeatures = [] } = terrainData;
   const metersPerPixel = worldSize / size;
   const layerMap = new Uint8Array(size * size);
@@ -611,6 +629,22 @@ function buildOSMLayerMap(terrainData, worldSize) {
     if (matIdx < 0 || !feature.geometry?.length) continue;
     const ring = feature.geometry.map(pt => toPx(pt.lat, pt.lng));
     rasterizePolygon(layerMap, size, ring, matIdx);
+  }
+
+  // 1b. Ground no OSM area covers stays DefaultMaterial, where no grass
+  // grows. Where the satellite shows vegetation there (unmapped lawns, woods
+  // and fields: 93 % of the unmapped ground round a 16k Salt Lake County
+  // spawn), paint Grass so the GroundCover fills it. Water still overrides.
+  if (vegetationMask?.data && vegetationMask.size > 0) {
+    const { data: veg, size: ms } = vegetationMask;
+    const scale = ms / size;
+    for (let y = 0; y < size; y++) {
+      const my = Math.min(ms - 1, Math.floor((size - 1 - y) * scale)) * ms; // mask is north-up
+      const row = y * size;
+      for (let x = 0; x < size; x++) {
+        if (layerMap[row + x] === 0 && veg[my + Math.min(ms - 1, Math.floor(x * scale))]) layerMap[row + x] = 1;
+      }
+    }
   }
 
   // 2. Paint water area bodies (overrides land-use fills).
@@ -959,7 +993,7 @@ function cloneMaterialTemplate(template) {
  * }>}
  */
 export async function buildTerrainMaterials(terrainData, worldSize, exportLevelName, biome, satelliteTexSize, options = {}) {
-  const { pbrSource = 'osm', imageCanvas = null } = options;
+  const { pbrSource = 'osm', imageCanvas = null, vegetationMask = null } = options;
   const { width: size } = terrainData;
   const baseSize = satelliteTexSize ?? size;
   // PBR *BaseTexSize fields are measured in TERRAIN GRID SQUARES (= base
@@ -987,7 +1021,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
   if (pbrSource === 'image' && imageCanvas) {
     layerMap = buildLayerMapFromImage(imageCanvas, size);
   } else {
-    layerMap = buildOSMLayerMap(terrainData, worldSize);
+    layerMap = buildOSMLayerMap(terrainData, worldSize, vegetationMask);
   }
   // roads over either: the satellite-classified map draws none of its own
   paintRoadFootprints(layerMap, terrainData, worldSize);
