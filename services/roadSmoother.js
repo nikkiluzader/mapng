@@ -1,4 +1,4 @@
-import { createMetricProjector } from './geoUtils.js';
+import { createGridProjector } from './geoUtils.js';
 import { buildRoadNetwork, mergeLinearRoadSegments } from './roadNetwork.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
 
@@ -323,7 +323,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
     const corridors = mergeLinearRoadSegments(network.segments, network.intersections);
     if (corridors.length === 0) return;
 
-    const project = createMetricProjector(bounds, width, height);
+    const project = createGridProjector(bounds, width, height);
     const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
     const profiles = buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel);
     if (profiles.length === 0) return;

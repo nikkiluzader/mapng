@@ -26,36 +26,26 @@ export const createWGS84ToLocal = (centerLat, centerLng) =>
     proj4('EPSG:4326', localProjDef(centerLat, centerLng));
 
 /**
- * Create a function that maps (lat, lng) → pixel {x, y} for a given
- * terrain bounds + raster size.  Used for OSM texture rendering and 3D export.
+ * Create a function that maps (lat, lng) → pixel {x, y} on a terrain raster.
+ *
+ * Linear in lat/lng across the bounds, which is how fetchTerrainData
+ * resamples the heightmap (targetBounds) and how the BeamNG export places
+ * everything (geoToWorldPoint). Going through the local Transverse Mercator
+ * instead put roads east of their real grid position by up to 18 m on a 16 km
+ * Utah map (39 m in Alaska; it grows with the square of the map size).
  *
  * @param {{north:number, south:number, east:number, west:number}} bounds
- * @param {number} width   raster width in pixels (= meters at 1 m/px)
+ * @param {number} width   raster width in pixels
  * @param {number} height  raster height in pixels
  * @returns {(lat:number, lng:number) => {x:number, y:number}}
  */
-export const createMetricProjector = (bounds, width, height) => {
-    const centerLat = (bounds.north + bounds.south) / 2;
-    const centerLng = (bounds.east + bounds.west) / 2;
-    const toMetric = createWGS84ToLocal(centerLat, centerLng);
-
-    const [minX, minY] = toMetric.forward([bounds.west, bounds.south]);
-    const [maxX, maxY] = toMetric.forward([bounds.east, bounds.north]);
-
-    const widthM = Math.abs(maxX - minX);
-    const heightM = Math.abs(maxY - minY);
-
-    return (lat, lng) => {
-        const [localX, localY] = toMetric.forward([lng, lat]);
-
-        const u = (localX - minX) / widthM;
-        const v = (localY - minY) / heightM;
-
-        const x = u * (width - 1);
-        const y = (1 - v) * (height - 1);
-
-        return { x, y };
-    };
+export const createGridProjector = (bounds, width, height) => {
+    const lngSpan = bounds.east - bounds.west;
+    const latSpan = bounds.north - bounds.south;
+    return (lat, lng) => ({
+        x: ((lng - bounds.west) / lngSpan) * (width - 1),
+        y: ((bounds.north - lat) / latSpan) * (height - 1),
+    });
 };
 
 // ─── UTM Helpers ─────────────────────────────────────────────────────────────

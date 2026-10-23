@@ -316,3 +316,23 @@ test('does not carve terrain for paths the export never draws as roads', () => {
   const drop = Math.abs(hm[127 * W + 128] - hm[129 * W + 128]);
   assert.ok(drop < 0.05, `track should still be levelled (drop ${drop.toFixed(3)} m)`);
 });
+
+test('roads are carved where the export draws them, even on a 16 km map far north', async () => {
+  const { createGridProjector, createLocalToWGS84 } = await import('../services/geoUtils.js');
+  // fetchTerrainData's bounds for a 16384 m square at Glacier View, Alaska.
+  const toWGS84 = createLocalToWGS84(61.807, -147.70);
+  const corners = [[-8196, 8196], [8196, 8196], [-8196, -8196], [8196, -8196]].map((c) => toWGS84.forward(c));
+  const bounds = {
+    north: Math.max(...corners.map((c) => c[1])), south: Math.min(...corners.map((c) => c[1])),
+    east: Math.max(...corners.map((c) => c[0])), west: Math.min(...corners.map((c) => c[0])),
+  };
+  const N = 16384;
+  const project = createGridProjector(bounds, N, N);
+  // The export (geoToWorldPoint) and the heightmap grid are linear in lat/lng.
+  for (const [u, v] of [[0.5, 0.5], [0.02, 0.98], [0.98, 0.02], [0.98, 0.98]]) {
+    const lat = bounds.north - v * (bounds.north - bounds.south);
+    const lng = bounds.west + u * (bounds.east - bounds.west);
+    const p = project(lat, lng);
+    assert.ok(Math.abs(p.x - u * (N - 1)) < 0.01 && Math.abs(p.y - v * (N - 1)) < 0.01, `(${u}, ${v}) → ${p.x}, ${p.y}`);
+  }
+});
