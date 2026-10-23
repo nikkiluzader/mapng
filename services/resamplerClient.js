@@ -328,7 +328,7 @@ const prepareGridTiles = (sourceData) => {
  * @param {number} width
  * @param {number} height
  * @param {string} interpolation
- * @param {boolean} smooth
+ * @param {boolean|number} smooth - true = coarse-data blur (radius 8), number = box radius
  * @param {object|null} fallbackData - { pixels, width, height, zoom, minTileX, minTileY }
  */
 export const resampleHeightMapOffThread = async (

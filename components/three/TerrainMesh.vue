@@ -129,6 +129,21 @@ const seaLevelSceneZ = computed(() => {
   return (-minHeight + offsetMeters) * upm;
 });
 
+// Water only matters where sea level cuts the terrain. Inland/high-altitude
+// areas (minHeight well above 0 m) would otherwise get an opaque sea floating
+// far below the whole map, plus six-face reflection captures every other frame
+// for a plane that never touches the terrain. The margin keeps the sea on low
+// coasts (minHeight a few metres up a seawall) and flat maps (water at −1 m).
+const WATER_HIDE_MARGIN_METERS = 10;
+const waterVisible = computed(() => {
+  if (!props.showWater) return false;
+  const data = toRaw(props.terrainData);
+  const minHeight = Number(data?.minHeight);
+  if (!Number.isFinite(minHeight)) return true;
+  const offsetMeters = Number(props.waterLevelOffsetMeters) || 0;
+  return offsetMeters >= minHeight - WATER_HIDE_MARGIN_METERS;
+});
+
 const waterPlaneSize = computed(() => SCENE_SIZE * 3);
 const waterEnvMap = computed(() => waterCubeRenderTarget.value?.texture ?? null);
 const waterReflectionResolution = computed(() => {
@@ -184,7 +199,7 @@ onBeforeRender(() => {
     normalTex.offset.y = (normalTex.offset.y + WATER_NORMAL_SCROLL_Y) % 1;
   }
 
-  if (!props.showWater) return;
+  if (!waterVisible.value) return;
   const sceneObj = scene.value;
   const rendererObj = renderer.value;
   const activeCamera = camera.value;
@@ -204,8 +219,14 @@ onBeforeRender(() => {
   cubeCamera.position.set(activeCamera.position.x, seaLevelSceneZ.value + 0.15, activeCamera.position.z);
 
   // Hide water while capturing to avoid self-reflection artifacts.
+  // Reuse this frame's shadow maps: CubeCamera.update() is six render() calls,
+  // and each would otherwise re-render every CSM cascade (6 × 4 shadow passes
+  // per capture) for a 128 px reflection that can't show the difference.
   if (waterMesh) waterMesh.visible = false;
+  const shadowAutoUpdate = rendererObj.shadowMap.autoUpdate;
+  rendererObj.shadowMap.autoUpdate = false;
   cubeCamera.update(rendererObj, sceneObj);
+  rendererObj.shadowMap.autoUpdate = shadowAutoUpdate;
   if (waterMesh) waterMesh.visible = true;
 
   lastReflectionCameraPosition.copy(activeCamera.position);
@@ -554,7 +575,7 @@ onUnmounted(() => {
 <template>
   <TresGroup v-if="geometry">
     <TresMesh
-      v-if="showWater"
+      v-if="waterVisible"
       ref="waterMeshRef"
       :rotation="[-Math.PI / 2, 0, 0]"
       :position="[0, seaLevelSceneZ, 0]"

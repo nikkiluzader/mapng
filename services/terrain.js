@@ -19,6 +19,7 @@ import {
 import { createLocalToWGS84 } from "./geoUtils.js";
 import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
 import { smoothRoadsInHeightmap } from "./roadSmoother.js";
+import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights } from "./terrariumSampling.js";
 import { scaleNativeDimsToProcessingMpp } from "./uploadBounds.js";
 import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSize.js";
 
@@ -123,6 +124,19 @@ const convertHeightMapToMeters = (heightMap, scale) => {
       heightMap[i] = v * scale;
     }
   }
+};
+
+// Global 30 m terrain carries SRTM-style speckle and per-tile resampling
+// texture at a scale finer than the data's real resolution. A light blur
+// (Gaussian σ ≈ 5 m, as two box passes) removes it while keeping ridges and
+// gullies; past ~7 m/px the grid itself is coarser than that, so no blur.
+// Returns the box radius in pixels, or false.
+const GLOBAL_TERRAIN_SMOOTH_SIGMA_METERS = 5;
+const globalTerrainSmoothRadius = (metersPerPixel) => {
+  const sigmaPx = GLOBAL_TERRAIN_SMOOTH_SIGMA_METERS / Math.max(1e-6, Number(metersPerPixel) || 1);
+  // Two passes of a (2r+1) box have variance 2·((2r+1)² − 1)/12.
+  const r = Math.round((Math.sqrt(6 * sigmaPx * sigmaPx + 1) - 1) / 2);
+  return r >= 1 ? r : false;
 };
 
 const decodeTerrariumHeight = (r, g, b) => {
@@ -2011,40 +2025,23 @@ export const fetchTerrainData = async (
     // resampled grid is perfectly level. Satellite + OSM still flow normally.
     heightSampler = () => 0;
   } else if (terrainDataImg) {
+    // Same seam-blended cubic B-spline as the worker (terrariumSampling.js);
+    // only used when the worker path is unavailable.
+    let terrariumHeights = null;
     heightSampler = (lat, lng) => {
-      // Bilinear Interpolation for smoother terrain
+      if (!terrariumHeights) {
+        terrariumHeights = decodeTerrariumPixels(terrainDataImg.data, terrainDataImg.width, terrainDataImg.height, NO_DATA_VALUE);
+        blendTerrariumTileSeams(terrariumHeights, terrainDataImg.width, terrainDataImg.height, NO_DATA_VALUE);
+      }
       const p = project(lat, lng, TERRAIN_ZOOM);
-      const localX = p.x - minTileX * TILE_SIZE;
-      const localY = p.y - minTileY * TILE_SIZE;
-
-      const x0 = Math.floor(localX);
-      const y0 = Math.floor(localY);
-      const dx = localX - x0;
-      const dy = localY - y0;
-
-      const w = terrainDataImg.width;
-      const h = terrainDataImg.height;
-
-      const getH = (x, y) => {
-        const cx = Math.max(0, Math.min(w - 1, x));
-        const cy = Math.max(0, Math.min(h - 1, y));
-        const i = (cy * w + cx) * 4;
-        const r = terrainDataImg.data[i];
-        const g = terrainDataImg.data[i + 1];
-        const b = terrainDataImg.data[i + 2];
-        // Mapzen encoding with nodata guard (0,0,0 → -32768)
-        const h = r * 256 + g + b / 256 - 32768;
-        return h <= -32760 ? NO_DATA_VALUE : h;
-      };
-
-      const h00 = getH(x0, y0);
-      const h10 = getH(x0 + 1, y0);
-      const h01 = getH(x0, y0 + 1);
-      const h11 = getH(x0 + 1, y0 + 1);
-
-      const top = (1 - dx) * h00 + dx * h10;
-      const bottom = (1 - dx) * h01 + dx * h11;
-      return (1 - dy) * top + dy * bottom;
+      return sampleTerrariumHeights(
+        terrariumHeights,
+        terrainDataImg.width,
+        terrainDataImg.height,
+        p.x - minTileX * TILE_SIZE,
+        p.y - minTileY * TILE_SIZE,
+        NO_DATA_VALUE,
+      );
     };
   }
 
@@ -2096,7 +2093,7 @@ export const fetchTerrainData = async (
     width,
     height,
     "bilinear",
-    shouldSmooth,
+    shouldSmooth || (!rawData && !flat && globalTerrainSmoothRadius(effectiveMetersPerPixel)),
     fallbackSamplerData,
     // GPXZ is generally hole-free; if GPXZ chunks failed, keep fill enabled.
     !(useGPXZ && rawData && !gpxzChunkFailures),

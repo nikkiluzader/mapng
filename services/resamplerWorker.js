@@ -11,6 +11,7 @@
 import proj4 from 'proj4';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 import { sampleSatelliteTexture } from './satelliteImageSampler.js';
+import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights } from './terrariumSampling.js';
 
 const DEBUG_RESAMPLER = false;
 const debugLog = (...args) => {
@@ -127,43 +128,29 @@ const bilinear = (raster, w, x, y, noDataVal) => {
 };
 
 // ─── Terrarium Sampler ───────────────────────────────────────────────────────
-const sampleTerrarium = (pixels, imgW, imgH, zoom, minTileX, minTileY, lat, lng, noDataVal) => {
-    const p = project(lat, lng, zoom);
-    const localX = p.x - minTileX * TILE_SIZE;
-    const localY = p.y - minTileY * TILE_SIZE;
+// Decoded once per job (seam-blended, see terrariumSampling.js) instead of
+// unpacking RGB on every tap — the B-spline reads 16 source pixels per sample.
+const terrariumHeightsCache = new WeakMap();
+const getTerrariumHeights = (fallback, noDataVal) => {
+    let heights = terrariumHeightsCache.get(fallback);
+    if (!heights) {
+        heights = decodeTerrariumPixels(fallback.pixels, fallback.width, fallback.height, noDataVal);
+        blendTerrariumTileSeams(heights, fallback.width, fallback.height, noDataVal);
+        terrariumHeightsCache.set(fallback, heights);
+    }
+    return heights;
+};
 
-    const x0 = Math.floor(localX);
-    const y0 = Math.floor(localY);
-    const dx = localX - x0;
-    const dy = localY - y0;
-
-    const getH = (x, y) => {
-        const cx = Math.max(0, Math.min(imgW - 1, x));
-        const cy = Math.max(0, Math.min(imgH - 1, y));
-        const i = (cy * imgW + cx) * 4;
-        const r = pixels[i];
-        const g = pixels[i + 1];
-        const b = pixels[i + 2];
-        const h = r * 256 + g + b / 256 - 32768;
-        return h <= -32760 ? noDataVal : h;
-    };
-
-    const h00 = getH(x0, y0);
-    const h10 = getH(x0 + 1, y0);
-    const h01 = getH(x0, y0 + 1);
-    const h11 = getH(x0 + 1, y0 + 1);
-
-    let validSum = 0, validCnt = 0;
-    if (h00 !== noDataVal) { validSum += h00; validCnt++; }
-    if (h10 !== noDataVal) { validSum += h10; validCnt++; }
-    if (h01 !== noDataVal) { validSum += h01; validCnt++; }
-    if (h11 !== noDataVal) { validSum += h11; validCnt++; }
-    if (validCnt === 0) return noDataVal;
-    if (validCnt < 4) return validSum / validCnt;
-
-    const top = (1 - dx) * h00 + dx * h10;
-    const bottom = (1 - dx) * h01 + dx * h11;
-    return (1 - dy) * top + dy * bottom;
+const sampleTerrarium = (fallback, lat, lng, noDataVal) => {
+    const p = project(lat, lng, fallback.zoom);
+    return sampleTerrariumHeights(
+        getTerrariumHeights(fallback, noDataVal),
+        fallback.width,
+        fallback.height,
+        p.x - fallback.minTileX * TILE_SIZE,
+        p.y - fallback.minTileY * TILE_SIZE,
+        noDataVal,
+    );
 };
 
 // ─── Satellite Pixel Sampler ─────────────────────────────────────────────────
@@ -323,17 +310,7 @@ const sampleHeightAt = (lng, lat, preparedGroups, fallback, noData) => {
     }
 
     if (fallback) {
-        return sampleTerrarium(
-            fallback.pixels,
-            fallback.width,
-            fallback.height,
-            fallback.zoom,
-            fallback.minTileX,
-            fallback.minTileY,
-            lat,
-            lng,
-            noData,
-        );
+        return sampleTerrarium(fallback, lat, lng, noData);
     }
 
     return noData;
@@ -1025,8 +1002,7 @@ const boxBlurVertical = (src, dst, width, height, radius, noData) => {
     }
 };
 
-const smoothHeightMap = (heightMap, width, height, noData) => {
-    const radius = 8;
+const smoothHeightMap = (heightMap, width, height, noData, radius = 8) => {
     const tempMap = new Float32Array(heightMap.length);
     boxBlurHorizontal(heightMap, tempMap, width, height, radius, noData);
     boxBlurVertical(tempMap, heightMap, width, height, radius, noData);
@@ -1037,7 +1013,8 @@ const smoothHeightMap = (heightMap, width, height, noData) => {
 /**
  * Post-processing pipeline applied to a freshly resampled heightmap:
  *  1. Hole filling  — pushPull seed → expandFill propagation → Laplacian relax
- *  2. Smoothing     — separable box blur (GPXZ coarse-data mode only)
+ *  2. Smoothing     — separable box blur: `smooth` true = GPXZ coarse-data
+ *                     mode (radius 8), a number = that radius (global 30 m)
  */
 const finalizeHeightMap = (
     heightMap,
@@ -1101,7 +1078,7 @@ const finalizeHeightMap = (
 
     if (smooth) {
         reportProgress?.({ stage: 'finalize', message: 'Smoothing uploaded elevation...', current: 3, total: 3, force: true });
-        smoothHeightMap(heightMap, width, height, noData);
+        smoothHeightMap(heightMap, width, height, noData, typeof smooth === 'number' ? smooth : 8);
     } else if (fillHoles) {
         reportProgress?.({ stage: 'finalize', message: 'Uploaded elevation cleanup complete.', current: 3, total: 3, force: true });
     }

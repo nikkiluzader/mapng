@@ -477,7 +477,8 @@ export const resampleToMeterGrid = async (
         
         // O(1) per-pixel box blur using running sum (sliding window).
         // ~17x faster than naive O(radius) approach for radius=8.
-        const radius = 8; 
+        // true = GPXZ coarse-data mode; a number = explicit radius (global 30 m).
+        const radius = typeof smooth === 'number' ? smooth : 8;
         const tempMap = new Float32Array(heightMap.length);
         const NO_DATA = -99999;
         
