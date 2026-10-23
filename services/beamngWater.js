@@ -10,8 +10,8 @@
 //
 // Rivers: ways that continue one another are chained (OSM draws waterways in
 // the direction of flow), resampled, and each node's surface is the lowest
-// ground in the channel, median-smoothed and never rising downstream, a hand
-// above it; the width is measured across the riverbank outline where there
+// ground in the channel, median-smoothed, never above the lowest ground
+// across its width and never rising downstream, a hand above it; the width is measured across the riverbank outline where there
 // is one, else by kind; a River never reaches within ROAD_MARGIN_M of a road
 // and is cut where a road crosses it at grade.
 //
@@ -29,6 +29,10 @@ const WIDTH_MAX_M = 600;
 const WIDTH_STEP_M = 2;
 const WIDTH_PAD = 1.05;
 const CHANNEL_PROBE_M = 3;
+// Without a riverbank outline the OSM line often runs a few metres up the
+// slope beside the bed; nodes slide across to the lowest ground within this.
+const BED_SNAP_M = 6;
+const MID_FLOAT_M = 0.5;
 const MEDIAN_N = 5;
 const SMOOTH_N = 7;
 const SURFACE_ABOVE_M = 0.25;
@@ -197,6 +201,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
     // width across the outline, the node moved midway between its banks
     const tagged = Number.parseFloat(String(chain.tags.width ?? '').replace(',', '.'));
     let centres = pts.map((p) => [...p]);
+    const fromOutline = pts.map(() => false);
     let widths = pts.map((p, i) => {
       const n = [-tangents[i][1], tangents[i][0]];
       const poly = outlines.find((o) => o.contains(p[0], p[1]));
@@ -206,19 +211,52 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
       while (dr < WIDTH_MAX_M && poly.contains(p[0] - n[0] * (dr + WIDTH_STEP_M), p[1] - n[1] * (dr + WIDTH_STEP_M))) dr += WIDTH_STEP_M;
       centres[i] = [p[0] + (n[0] * (dl - dr)) / 2, p[1] + (n[1] * (dl - dr)) / 2];
       stats.widthFromOutline++;
+      fromOutline[i] = true;
       return Math.max(spec.width * 0.5, (dl + dr + WIDTH_STEP_M) * WIDTH_PAD);
     });
     const xs = movingAverage(centres.map((c) => c[0]), SMOOTH_N);
     const ys = movingAverage(centres.map((c) => c[1]), SMOOTH_N);
     centres = xs.map((x, i) => [x, ys[i]]);
     widths = movingAverage(widths, SMOOTH_N);
-    // surface: the lowest ground in the channel, never rising downstream
+    // onto the bed: a mountain stream drawn on the gully's side otherwise
+    // sits underground at bed level (half the Salt Lake County streams)
+    const offsets = centres.map(([x, y], i) => {
+      if (fromOutline[i]) return 0;
+      const n = [-tangents[i][1], tangents[i][0]];
+      let best = 0; let low = heightAt(x, y);
+      for (let d = -BED_SNAP_M; d <= BED_SNAP_M; d += 1) {
+        const z = heightAt(x + n[0] * d, y + n[1] * d);
+        if (z < low - 0.05) { low = z; best = d; }
+      }
+      return best;
+    });
+    const eased = movingAverage(offsets, 3);
+    centres = centres.map(([x, y], i) => [x - tangents[i][1] * eased[i], y + tangents[i][0] * eased[i]]);
+    // surface: the lowest ground across the channel (not along it: on a steep
+    // stream that sank the water by grade × probe), never rising downstream
     const ground = centres.map(([x, y], i) => {
       const t = tangents[i]; const n = [-t[1], t[0]]; const r = CHANNEL_PROBE_M;
-      return Math.min(heightAt(x, y), heightAt(x + n[0] * r, y + n[1] * r), heightAt(x - n[0] * r, y - n[1] * r),
-        heightAt(x + t[0] * r, y + t[1] * r), heightAt(x - t[0] * r, y - t[1] * r));
+      return Math.min(heightAt(x, y), heightAt(x + n[0] * r, y + n[1] * r), heightAt(x - n[0] * r, y - n[1] * r));
     });
     const med = runningMedian(ground, MEDIAN_N);
+    // The median ignores a node's own low ground, and the ±3 m probe misses
+    // the ribbon's edges: a surface kept at its neighbours' level over a dip
+    // in the bed, or across a side slope, hangs metres above the ground (the
+    // floating rivers of the 16k Salt Lake County report). Never above the
+    // lowest ground across the full width at that node; this only lowers.
+    for (let i = 0; i < med.length; i++) {
+      const [x, y] = centres[i]; const t = tangents[i]; const n = [-t[1], t[0]];
+      let across = ground[i];
+      for (let s = -1; s <= 1; s += 0.25) across = Math.min(across, heightAt(x + n[0] * s * widths[i] / 2, y + n[1] * s * widths[i] / 2));
+      med[i] = Math.min(med[i], across);
+    }
+    // the water runs straight between nodes: where the ground halfway along
+    // is far lower (a bend cutting across a bank), bring both ends down so it
+    // clears by at most MID_FLOAT_M. Lowering more buries the streams below.
+    for (let i = 1; i < med.length; i++) {
+      const cap = heightAt((centres[i][0] + centres[i - 1][0]) / 2, (centres[i][1] + centres[i - 1][1]) / 2) + MID_FLOAT_M;
+      if ((med[i] + med[i - 1]) / 2 > cap) { med[i] = Math.min(med[i], cap); med[i - 1] = Math.min(med[i - 1], cap); }
+    }
     for (let i = 1; i < med.length; i++) med[i] = Math.min(med[i], med[i - 1]);
     // keep off the roads; cut where one crosses at grade
     let piece = [];

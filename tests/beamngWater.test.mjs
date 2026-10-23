@@ -90,3 +90,23 @@ test('lakes become a few rectangles inside the outline; riverbanks and dry lakes
   const lArea = 200 * 60 + 60 * 140;
   assert.ok(area > lArea * 0.8 && area < lArea * 1.3, `tiles cover the pond: ${area.toFixed(0)} vs ${lArea}`);
 });
+
+test('a steep stream drawn on a gully side slides onto the bed and never floats over its banks', () => {
+  // V gully along y = 0 dropping 25 % downstream, with a 3 m deep dip in the
+  // bed at x = 150; the stream is drawn 4 m up the side.
+  const bed = (x) => 500 - x * 0.25 - (Math.abs(x - 150) < 6 ? 3 : 0);
+  const heightAt = (x, y) => bed(x) + Math.abs(y) * 0.8;
+  const { rivers } = planRivers({ features: [line([[0, 4], [300, 4]], { waterway: 'stream' })], toWorld, heightAt });
+  assert.equal(rivers.length, 1);
+  const { nodes } = rivers[0];
+  const inner = nodes.slice(3, -3);
+  assert.ok(inner.every(([, y]) => Math.abs(y) < 1.5), `snapped near the bed: ${inner.map(([, y]) => y.toFixed(1)).join(' ')}`);
+  for (const [x, y, z, w] of nodes) {
+    // never above the lowest ground across its width (plus the hand)
+    let low = Infinity;
+    for (let s = -1; s <= 1; s += 0.25) low = Math.min(low, heightAt(x, y + (s * w) / 2));
+    assert.ok(z <= low + 0.25 + 1e-6, `node at x=${x.toFixed(0)} floats: ${z.toFixed(2)} over ${low.toFixed(2)}`);
+    // and not sunk by the slope: within a metre of the bed it sits in
+    assert.ok(z > bed(x) - 1 - 1e-6 || Math.abs(x - 150) < 30, `node at x=${x.toFixed(0)} buried: ${z.toFixed(2)} vs bed ${bed(x).toFixed(2)}`);
+  }
+});
