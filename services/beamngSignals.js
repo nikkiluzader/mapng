@@ -4,6 +4,7 @@ import {
   roadHalfWidth,
   splitApproachesByAxis,
 } from './signalApproaches.js';
+import { SIGNAL_MAST } from './beamngPropLibrary.js';
 
 const ROAD_SKIP = new Set([
   'footway', 'path', 'pedestrian', 'steps', 'cycleway',
@@ -882,7 +883,9 @@ function buildSignalArtifacts(terrainData, squareSize) {
 }
 
 // ── Visible signal props ─────────────────────────────────────────────────
-// West Coast USA mounts trafficlight_overhead1 heads on pole_traffic1 posts,
+// North American approaches get West Coast USA's signal mast (SIGNAL_MAST)
+// with heads hung over the lanes; elsewhere, and the second head of wide
+// approaches, West Coast USA mounts trafficlight_overhead1 heads on pole_traffic1 posts,
 // head centre 3.0 m above the post base (73 of its heads). The head's lenses
 // face its local +X. A head lights up when it carries `signalInstance` and
 // `dynamic` (core/trafficSignals.lua), so heads link to their instance.
@@ -895,6 +898,7 @@ const POLE_CLEARANCE_M = 0.6;
 const POLE_SHIFT_STEP_M = 0.5;
 const POLE_SHIFT_MAX_M = 4;
 const FAR_SIDE_REACH_M = 2.5;
+const MAST_MAX_HEADS = 3;
 // North America hangs signals on the far side of the junction; elsewhere
 // they stand at the stop line.
 const FAR_SIDE_COUNTRIES = new Set(['US', 'CA', 'MX']);
@@ -992,6 +996,29 @@ function buildSignalProps({ placements = [], projector, roadFeatures = [] }, ter
       const spot = findClearSpot(baseX + side[0] * off, baseY + side[1] * off, side[0], side[1]);
       if (!spot) {
         dropped++;
+        continue;
+      }
+      if (farSide && !leftHandTraffic && side === kerb) {
+        // North America: a mast arm over the approach's lanes, a head above
+        // each (one way: the whole carriageway; else the right half), and a
+        // street light on top.
+        const left = [-d[1], d[0]];
+        const kerbGap = Math.hypot(spot[0] - (baseX + side[0] * a.halfWidth), spot[1] - (baseY + side[1] * a.halfWidth));
+        const lanes = Math.max(1, Math.min(MAST_MAX_HEADS, a.lanesIn || 1));
+        const laneW = (a.oneWay ? 2 * a.halfWidth : a.halfWidth) / Math.max(1, a.lanesIn || 1);
+        props.push({ kind: 'signal_mast', position: toWorld(spot[0], spot[1]), yaw: Math.atan2(left[1], left[0]) });
+        const reaches = new Set();
+        for (let k = 0; k < lanes; k++) {
+          const reach = Math.min(SIGNAL_MAST.armTo, Math.max(SIGNAL_MAST.armFrom, kerbGap + laneW * (k + 0.5)));
+          if ([...reaches].some((r) => Math.abs(r - reach) < 1.2)) continue;
+          reaches.add(reach);
+          props.push({
+            kind: 'signal_head',
+            position: toWorld(spot[0] + left[0] * reach - d[0] * HEAD_FORWARD_M, spot[1] + left[1] * reach - d[1] * HEAD_FORWARD_M, SIGNAL_MAST.headZ),
+            yaw: faceTraffic,
+            signalInstance: placement.instanceName,
+          });
+        }
         continue;
       }
       props.push({ kind: 'signal_pole', position: toWorld(spot[0], spot[1]), yaw: faceTraffic });

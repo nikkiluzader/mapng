@@ -44,6 +44,36 @@ export const PROP_SHAPES = {
   poleLamp: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/electrical_pole_lamp.dae' },
 };
 
+// Street lights, their arms along local +X; the night light sits at the
+// luminaire (lightForward along the arm, lightHeight up). West Coast USA's
+// 13 m cobra head lights its arterials (351 placed there); East Coast's
+// davit lamppost (common art) the town streets; the lantern post stays for
+// lamps mapped on footpaths and squares.
+export const STREET_LIGHT_SHAPES = {
+  arterial: {
+    shapeFile: '/levels/west_coast_usa/art/shapes/objects/pole_light_single.dae',
+    lightHeight: 12.5, lightForward: 5.3, radius: 24,
+  },
+  street: {
+    shapeFile: '/art/shapes/garage_and_dealership/Clutter/eca_lamppost.dae',
+    lightHeight: 7.8, lightForward: 2.7, radius: 15,
+  },
+  path: {
+    shapeFile: '/art/shapes/objects/lamp1.dae',
+    lightHeight: 6.4, lightForward: 0.8, radius: 12,
+  },
+};
+
+// West Coast USA's signal mast with a street light on top: the signal arm
+// reaches along local +X, level at ARM_Z from 3.5 m out to its 7.5 m tip;
+// the luminaire sits at the end of the upper arm. Heads (trafficlight_overhead1,
+// ~1 m tall about their origin) hang under the arm.
+export const SIGNAL_MAST = {
+  shapeFile: '/levels/west_coast_usa/art/shapes/objects/pole_light_signal1.dae',
+  armZ: 7.75, armFrom: 3.5, armTo: 7.2, headZ: 7.2,
+  lightHeight: 12.5, lightForward: 5.4, radius: 24,
+};
+
 // Traffic calming (services/trafficCalming.js). Driver Training's bolt-down
 // bump: speedbump1 is a module 1 m across the road (local y) and 0.55 m deep
 // (local x), 7.5 cm tall; speedbump2 / speedbump3 are its end caps, their

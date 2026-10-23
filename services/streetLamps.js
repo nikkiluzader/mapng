@@ -79,7 +79,7 @@ export function generateRoadLamps(carriageways, mappedLamps = [], budget = Infin
           if (isOnOtherCarriageway(index, x, y, ROAD_CLEAR_M, () => false)) continue;
           if (tooClose(x, y, spacing)) continue;
           taken.push({ x, y, spacing });
-          lamps.push({ x, y, facing: Math.atan2(-normal[1], -normal[0]) });
+          lamps.push({ x, y, facing: Math.atan2(-normal[1], -normal[0]), highway: cw.highway });
         }
         travelled += len;
       }

@@ -9,6 +9,7 @@ import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.
 import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
+import { planLakes, planRivers } from './beamngWater.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight } from './beamngTrees.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
@@ -39,7 +40,7 @@ import {
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M,
 } from './beamngBridges.js';
 import {
-  PROP_HYDRANT, PROP_BINS, PROP_SHAPES, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
+  PROP_HYDRANT, PROP_BINS, PROP_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
 } from './beamngPropLibrary.js';
 import {
   buildCarriagewayIndex,
@@ -3718,37 +3719,24 @@ function writeSimGroupTree(zip, folderPath, items) {
   }
 }
 
-const WATERWAY_WIDTHS = {
-  river: 20,
-  canal: 12,
-  stream: 3.5,
-  drain: 2.5,
-  ditch: 1.5,
-};
-
-const WATERWAY_DEPTHS = {
-  river: 6,
-  canal: 4,
-  stream: 1.2,
-  drain: 1,
-  ditch: 0.6,
-};
-
+const LAKE_BLOCK_DEPTH_M = 6;
 
 const WATER_BLOCK_TEMPLATE = {
   class: 'WaterBlock',
   Foam: [{}, {}],
   'Ripples (texture animation)': [
-    { rippleDir: [0, 1], rippleMagnitude: 0.8, rippleSpeed: 0.001, rippleTexScale: [12, 12] },
-    { rippleDir: [0, 1], rippleSpeed: 0.02, rippleTexScale: [6, 6] },
-    { rippleDir: [0.7, -0.7], rippleMagnitude: 1, rippleSpeed: 0.02, rippleTexScale: [3, 3] },
+    { rippleDir: [0, 1], rippleMagnitude: 0.8, rippleSpeed: 0.03, rippleTexScale: [12, 12] },
+    { rippleDir: [0, 1], rippleSpeed: 0.09, rippleTexScale: [6, 6] },
+    { rippleDir: [0.7, -0.7], rippleMagnitude: 1, rippleSpeed: 0.012, rippleTexScale: [3, 3] },
   ],
   'Waves (vertex undulation)': [
     { waveDir: [0, 1], waveMagnitude: 0.2, waveSpeed: 1 },
     { waveDir: [0.707, 0.707], waveMagnitude: 0.2, waveSpeed: 1 },
     { waveDir: [0.5, 0.86], waveMagnitude: 0.2, waveSpeed: 1 },
   ],
-  baseColor: [189, 253, 255, 255],
+  baseColor: [44, 74, 60, 255],
+  clarity: 0.12,
+  underwaterColor: [52, 78, 58, 240],
   cubemap: 'cubemap_italy_reflection',
   depthGradientMax: 30,
   depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_italy_muddy_b.png',
@@ -3761,7 +3749,7 @@ const WATER_BLOCK_TEMPLATE = {
   fullReflect: false,
   gridElementSize: 1,
   gridSize: 1,
-  overallRippleMagnitude: 0.2,
+  overallRippleMagnitude: 0.6,
   overallWaveMagnitude: 0,
   reflectivity: 0.8,
   rippleTex: '/assets/materials/tileable/water/water_effects/ripple_nm.normal.dds',
@@ -3815,44 +3803,49 @@ const WATER_PLANE_TEMPLATE = {
   wetDepth: 0.5,
 };
 
+// Rivers styled like the stock maps' and BeamNG.Earth's (sea.lua RIVER_LOOK):
+// no foam (white fringes at every shallow edge), small waves, fresh water
+// greener and browner than the sea; ripple tiles longer along the river than
+// across (the texture runs along the spline), their speeds set from the flow.
 const RIVER_TEMPLATE = {
   class: 'River',
   Foam: [{}, {}],
   'Ripples (texture animation)': [
-    { rippleDir: [0, 1], rippleMagnitude: 1.5, rippleSpeed: 0.1, rippleTexScale: [2, 2] },
-    { rippleDir: [0, 1], rippleMagnitude: 2, rippleSpeed: 0.2, rippleTexScale: [5, 5] },
-    { rippleDir: [0.1, 0.9], rippleMagnitude: 1, rippleSpeed: 0.01, rippleTexScale: [20, 20] },
+    { rippleDir: [0, 1], rippleMagnitude: 1, rippleSpeed: 0.3, rippleTexScale: [2, 4] },
+    { rippleDir: [0.2, 1], rippleMagnitude: 1, rippleSpeed: 0.06, rippleTexScale: [5, 10] },
+    { rippleDir: [-0.2, 1], rippleMagnitude: 0.3, rippleSpeed: 0.006, rippleTexScale: [20, 40] },
   ],
   'Waves (vertex undulation)': [
-    { waveDir: [-0.5, 0.8], waveMagnitude: 0.2, waveSpeed: 2 },
-    { waveDir: [0.1, -1.5], waveMagnitude: 0.2, waveSpeed: 2 },
-    { waveDir: [0.1, 0.5], waveMagnitude: 0.2, waveSpeed: 3 },
+    { waveDir: [0, 1], waveMagnitude: 0.1, waveSpeed: 2 },
+    { waveDir: [0.707, 0.707], waveMagnitude: 0.1, waveSpeed: 1 },
+    { waveDir: [0.5, 0.86], waveMagnitude: 0.1, waveSpeed: 2 },
   ],
-  baseColor: [254, 220, 165, 255],
+  baseColor: [44, 74, 60, 255],
+  clarity: 0.12,
   cubemap: 'cubemap_ocean_reflection',
-  depthGradientMax: 20,
+  depthGradientMax: 6,
   depthGradientTex: '/assets/materials/tileable/water/depthcolor_ramp/depthcolor_ramp_italy_rivers_b.png',
-  flowMagnitudePhysics: 4,
-  foamMaxDepth: 1,
-  foamRippleInfluence: 0.09,
-  foamTex: 'core/art/water/foam.dds',
-  fresnelBias: 0.5,
-  fresnelPower: 5,
+  flowMagnitudePhysics: 1.2,
+  foamMaxDepth: 0.1,
+  foamRippleInfluence: 0.05,
+  foamTex: '/assets/materials/tileable/water/water_effects/foam_b.color.dds',
+  fresnelBias: 0,
+  fresnelPower: 3,
   fullReflect: false,
-  lowLODDistance: 150,
-  overallFoamOpacity: 3,
+  lowLODDistance: 120,
+  overallFoamOpacity: 0,
   overallRippleMagnitude: 1.2,
-  overallWaveMagnitude: 0.5,
+  overallWaveMagnitude: 0.05,
   reflectDetailAdjust: -2,
   reflectMaxRateMs: 10,
   reflectivity: 0.3,
   rippleTex: '/assets/materials/tileable/water/water_effects/ripple3_nm.normal.dds',
-  subdivideLength: 2,
-  underwaterColor: [254, 253, 252, 250],
-  waterFogDensity: 0.8,
-  waterFogDensityOffset: 0,
+  subdivideLength: 4,
+  underwaterColor: [52, 78, 58, 240],
+  waterFogDensity: 0.4,
+  waterFogDensityOffset: 0.1,
   wetDarkening: 0.3,
-  wetDepth: 0.35,
+  wetDepth: 0.5,
 };
 
 /**
@@ -5093,7 +5086,7 @@ function findNearestRoad(px, py, roads, maxSearch) {
       const dist = Math.hypot(px - cx, py - cy);
       if (!best || dist < best.dist) {
         const len = Math.sqrt(segLen2);
-        best = { dist, cx, cy, tx: dx / len, ty: dy / len, halfWidth: road.halfWidth };
+        best = { dist, cx, cy, tx: dx / len, ty: dy / len, halfWidth: road.halfWidth, highway: road.highway };
       }
     }
   }
@@ -5130,14 +5123,15 @@ function projectDrivableRoads(terrainData, squareSize) {
     const pts = feature.geometry
       .filter((p) => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
       .map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
-    if (pts.length >= 2) roads.push({ pts, halfWidth });
+    if (pts.length >= 2) roads.push({ pts, halfWidth, highway });
   }
   return roads;
 }
 
 /**
  * TSStatics for the signal props built in beamngSignals.js: pole_traffic1
- * posts and trafficlight_overhead1 heads. Heads are dynamic and carry
+ * posts, signal masts (with a night light at their street light) and
+ * trafficlight_overhead1 heads. Heads are dynamic and carry
  * `signalInstance`, the field core_trafficSignals uses to light them (the
  * same fields as West Coast USA's signal prefabs).
  */
@@ -5155,6 +5149,30 @@ function buildTrafficSignalObjects(props = []) {
         shapeName: SIGNAL_POLE_SHAPE,
         annotation: 'TRAFFIC_SIGNALS',
         useInstanceRenderData: true,
+      });
+    } else if (prop.kind === 'signal_mast') {
+      objects.push({
+        __parent: 'traffic_signals',
+        class: 'TSStatic',
+        name: `signal_mast_${i}`,
+        persistentId: generatePersistentId(),
+        position: prop.position,
+        rotationMatrix: rotationMatrixFromYaw(prop.yaw),
+        shapeName: SIGNAL_MAST.shapeFile,
+        annotation: 'TRAFFIC_SIGNALS',
+        useInstanceRenderData: true,
+      });
+      objects.push({
+        __parent: 'traffic_signals',
+        name: `signal_mast_${i}_light`,
+        persistentId: generatePersistentId(),
+        position: [
+          roundTo(prop.position[0] + Math.cos(prop.yaw) * SIGNAL_MAST.lightForward, 3),
+          roundTo(prop.position[1] + Math.sin(prop.yaw) * SIGNAL_MAST.lightForward, 3),
+          roundTo(prop.position[2] + SIGNAL_MAST.lightHeight, 3),
+        ],
+        ...STREET_LAMP_LIGHT_TEMPLATE,
+        radius: SIGNAL_MAST.radius,
       });
     } else if (prop.kind === 'signal_head') {
       objects.push({
@@ -5187,6 +5205,9 @@ function buildTrafficSignalObjects(props = []) {
 const MAX_STREET_LAMPS = 20000;
 const MAX_BENCHES = 5000;
 const LAMP_MIN_SPACING_M = 2;
+const ARTERIAL_LIGHTING = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary']);
+// a mapped lamp this far beyond the nearest carriageway's edge lights a path or square
+const PATH_LAMP_MIN_M = 8;
 
 // Vanilla wcusa street lamp light (lightemitters_vintage sodium pairing,
 // 400+ instances) — with castShadows forced off per QA guidance. isEnabled
@@ -5269,8 +5290,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   const LAMP_LIMIT = MAX_STREET_LAMPS;
   const osmLampSpots = [];
   // Pole + dusk-to-dawn PointLight at the luminaire, arm toward `facing`.
-  const addLamp = (posX, posY, facing, name) => {
-    const asset = profile.lamp;
+  const addLamp = (posX, posY, facing, name, asset = profile.lamp) => {
     if (!asset?.shapeFile || lampCount >= LAMP_LIMIT) return;
     const z = getTerrainHeightAtWorldXY(posX, posY, terrainData, squareSize);
     if (underDeck(posX, posY, z, z + (asset.lightHeight ?? 6) + 1)) return;
@@ -5295,9 +5315,15 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
         roundTo(z + (asset.lightHeight ?? 6), 3),
       ],
       ...STREET_LAMP_LIGHT_TEMPLATE,
+      ...(asset.radius ? { radius: asset.radius } : {}),
     });
     lampCount++;
   };
+  // Which light a road gets: the tall cobra head on arterials, the davit
+  // lamppost on town streets (the region's own lamp where it has one), the
+  // lantern post where a mapped lamp stands away from any road.
+  const streetLamp = profile.lamp?.shapeFile === STREET_LIGHT_SHAPES.path.shapeFile ? STREET_LIGHT_SHAPES.street : profile.lamp;
+  const lampFor = (highway) => (ARTERIAL_LIGHTING.has(String(highway ?? '').replace(/_link$/, '')) ? STREET_LIGHT_SHAPES.arterial : streetLamp);
   const cellKey = (x, y) => `${Math.round(x / LAMP_MIN_SPACING_M)},${Math.round(y / LAMP_MIN_SPACING_M)}`;
 
   for (let i = 0; i < features.length; i++) {
@@ -5320,14 +5346,14 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
 
     // Face the nearest road; explicit OSM direction tags override.
     let facing = null;
+    const nearRoad = findNearestRoad(posX, posY, roads, MAX_ROAD_SEARCH_M);
     const dirTag = tags['light:direction'] ?? tags.direction;
     const dirDeg = Number.parseFloat(dirTag);
     if (Number.isFinite(dirDeg)) {
       // OSM: 0 = north (+Y), 90 = east (+X) → math yaw from +X axis.
       facing = ((90 - dirDeg) * Math.PI) / 180;
-    } else {
-      const near = findNearestRoad(posX, posY, roads, MAX_ROAD_SEARCH_M);
-      if (near) facing = Math.atan2(near.cy - posY, near.cx - posX);
+    } else if (nearRoad) {
+      facing = Math.atan2(nearRoad.cy - posY, nearRoad.cx - posX);
     }
     if (facing === null) facing = 0;
     const yaw = facing + (asset.yawOffset ?? 0);
@@ -5340,7 +5366,8 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     }
 
     if (isLamp) {
-      addLamp(posX, posY, facing, `street_lamp_${i}`);
+      const lampAsset = !nearRoad || nearRoad.dist - (nearRoad.halfWidth ?? 0) > PATH_LAMP_MIN_M ? STREET_LIGHT_SHAPES.path : lampFor(nearRoad.highway);
+      addLamp(posX, posY, facing, `street_lamp_${i}`, lampAsset);
       continue;
     }
     const z = getTerrainHeightAtWorldXY(posX, posY, terrainData, squareSize);
@@ -5363,7 +5390,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   const generatedLamps = generateRoadLamps(carriageways, osmLampSpots, LAMP_LIMIT - lampCount);
   for (let i = 0; i < generatedLamps.length; i++) {
     const lamp = generatedLamps[i];
-    addLamp(lamp.x, lamp.y, lamp.facing, `street_lamp_gen_${i}`);
+    addLamp(lamp.x, lamp.y, lamp.facing, `street_lamp_gen_${i}`, lampFor(lamp.highway));
   }
 
   // Benches along major town streets (streetProps.js), facing the road.
@@ -5728,141 +5755,32 @@ function seededRandom(seed) {
 }
 
 /**
- * Downsample a polyline to at most maxPoints while preserving endpoints.
+ * Lake WaterBlocks: rectangles covering each standing-water outline at the
+ * lake's level (services/beamngWater.js planLakes). A WaterBlock's surface is
+ * at its position; its volume reaches scale.z / 2 below.
  */
-function simplifyPolyline(points, maxPoints = 80) {
-  if (!Array.isArray(points) || points.length <= maxPoints) return points;
-  const out = [points[0]];
-  const interior = points.length - 2;
-  const targetInterior = Math.max(0, maxPoints - 2);
-  const step = interior / Math.max(1, targetInterior);
-  for (let i = 1; i <= targetInterior; i++) {
-    out.push(points[Math.min(points.length - 2, Math.round(i * step))]);
-  }
-  out.push(points[points.length - 1]);
-  return out;
-}
-
-/**
- * Exclude ocean/marina-like water features from inland water generation.
- */
-function isExcludedWaterFeature(tags = {}) {
-  return (
-    tags.place === 'sea' ||
-    tags.place === 'ocean' ||
-    tags.natural === 'bay' ||
-    tags.water === 'dock' ||
-    tags.water === 'harbour' ||
-    tags.harbour === 'yes' ||
-    tags.leisure === 'marina'
-  );
-}
-
-/**
- * Return percentile value from an ascending-sorted numeric array.
- */
-function percentileValue(sortedValues, fraction) {
-  if (!sortedValues.length) return 0;
-  const idx = clamp(Math.floor((sortedValues.length - 1) * fraction), 0, sortedValues.length - 1);
-  return sortedValues[idx];
-}
-
-/**
- * Compute a minimum-area oriented rectangle fit for polygon world points.
- *
- * Used to place WaterBlock primitives that best match OSM polygon footprint.
- */
-function computeBestFitWaterBlock(worldPoints) {
-  let cx = 0;
-  let cy = 0;
-  for (const pt of worldPoints) {
-    cx += pt[0];
-    cy += pt[1];
-  }
-  cx /= worldPoints.length;
-  cy /= worldPoints.length;
-
-  let best = null;
-  for (let i = 0; i < worldPoints.length; i++) {
-    const a = worldPoints[i];
-    const b = worldPoints[(i + 1) % worldPoints.length];
-    const dx = b[0] - a[0];
-    const dy = b[1] - a[1];
-    if (Math.hypot(dx, dy) < 1e-6) continue;
-
-    const yaw = Math.atan2(dy, dx);
-    const cos = Math.cos(yaw);
-    const sin = Math.sin(yaw);
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-
-    for (const pt of worldPoints) {
-      const relX = pt[0] - cx;
-      const relY = pt[1] - cy;
-      const rx = relX * cos + relY * sin;
-      const ry = -relX * sin + relY * cos;
-      minX = Math.min(minX, rx);
-      maxX = Math.max(maxX, rx);
-      minY = Math.min(minY, ry);
-      maxY = Math.max(maxY, ry);
-    }
-
-    const width = maxX - minX;
-    const length = maxY - minY;
-    const area = width * length;
-    if (!best || area < best.area) {
-      best = { yaw, width, length, area };
-    }
-  }
-
-  if (best) return { cx, cy, ...best };
-
-  return { cx, cy, yaw: 0, width: 4, length: 4, area: 16 };
-}
-
-/**
- * Build WaterBlock objects for closed inland water polygons.
- */
-function buildWaterBlockObjects(terrainData, squareSize, biome) {
+function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}) {
   const waterProfile = getWaterProfile(biome);
-  const features = terrainData.osmFeatures?.filter((feature) => {
-    if (feature.type !== 'water') return false;
-    if (!Array.isArray(feature.geometry) || feature.geometry.length < 4) return false;
-    if (!isClosedRing(feature.geometry)) return false;
-    if (feature.tags?.waterway) return false;
-    return !isExcludedWaterFeature(feature.tags);
-  }) ?? [];
-
-  return features.map((feature, index) => {
-    const ring = feature.geometry.slice(0, -1);
-    const worldPoints = ring.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0));
-    const fit = computeBestFitWaterBlock(worldPoints);
-    const rawWidth = Math.max(4, fit.width);
-    const rawLength = Math.max(4, fit.length);
-    const pad = clamp(Math.min(rawWidth, rawLength) * 0.092, 1.5, 6.9);
-    const width = rawWidth + (pad * 2);
-    const length = rawLength + (pad * 2);
-    const height = Math.max(1.5, Math.min(width, length) * 0.08);
-    const ringHeights = ring.map((pt) => getTerrainHeightWorld(pt.lat, pt.lng, terrainData));
-    ringHeights.sort((a, b) => a - b);
-    const surfaceElevation = percentileValue(ringHeights, 0.8) + 0.14;
-
-    return {
-      ...structuredClone(WATER_BLOCK_TEMPLATE),
-      cubemap: waterProfile.waterCubemap,
-      depthGradientTex: waterProfile.waterDepthGradientTex,
-      foamTex: waterProfile.waterFoamTex,
-      rippleTex: waterProfile.waterRippleTex,
-      name: `water_body_${index}`,
-      persistentId: generatePersistentId(),
-      __parent: 'Water',
-      position: [roundTo(fit.cx, 3), roundTo(fit.cy, 3), roundTo(surfaceElevation, 3)],
-      rotationMatrix: rotationMatrixFromYaw(fit.yaw),
-      scale: [roundTo(width, 3), roundTo(length, 3), roundTo(height, 3)],
-    };
+  const { tiles, stats: lakeStats } = planLakes({
+    features: terrainData.osmFeatures || [],
+    toWorld: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
+    heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
   });
+  Object.assign(stats, lakeStats);
+  return tiles.map((tile, index) => ({
+    ...structuredClone(WATER_BLOCK_TEMPLATE),
+    cubemap: waterProfile.waterCubemap,
+    depthGradientTex: waterProfile.waterDepthGradientTex,
+    foamTex: waterProfile.waterFoamTex,
+    rippleTex: waterProfile.waterRippleTex,
+    gridSize: Math.max(1, Math.floor(Math.min(100, tile.sx, tile.sy))),
+    gridElementSize: roundTo(clamp(Math.min(tile.sx, tile.sy) / 32, 0.5, 4), 2),
+    name: `lake_${tile.lake}_${index}`,
+    persistentId: generatePersistentId(),
+    __parent: 'Water',
+    position: [roundTo(tile.cx, 3), roundTo(tile.cy, 3), roundTo(tile.z, 3)],
+    scale: [roundTo(tile.sx, 3), roundTo(tile.sy, 3), LAKE_BLOCK_DEPTH_M * 2],
+  }));
 }
 
 /**
@@ -5889,69 +5807,36 @@ function buildSeaLevelWaterPlane(terrainData, biome, seaLevelOffset = 0) {
 }
 
 /**
- * Apply a simple 3-point moving average to a height sequence.
+ * Rivers along year-round waterway centrelines (services/beamngWater.js
+ * planRivers): per-node width from the riverbank outline, surface in the
+ * channel, kept off the roads; ripples drift downstream at the river's flow.
  */
-function smoothHeights(heights) {
-  if (heights.length < 3) return heights;
-  const out = heights.slice();
-  for (let i = 1; i < heights.length - 1; i++) {
-    out[i] = (heights[i - 1] + heights[i] + heights[i + 1]) / 3;
-  }
-  return out;
-}
-
-/**
- * Parse a numeric width token (with optional units) or return fallback.
- */
-function parseNumericWidth(value, fallback) {
-  if (value == null) return fallback;
-  const match = String(value).match(/[\d.]+/);
-  const parsed = match ? parseFloat(match[0]) : NaN;
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-/**
- * Build River objects for linear waterway OSM features.
- */
-function buildRiverObjects(terrainData, squareSize, biome) {
+function buildRiverObjects(terrainData, squareSize, biome, roads = [], stats = {}) {
   const waterProfile = getWaterProfile(biome);
-  const features = terrainData.osmFeatures?.filter((feature) => {
-    if (feature.type !== 'water') return false;
-    if (!Array.isArray(feature.geometry) || feature.geometry.length < 2) return false;
-    if (isClosedRing(feature.geometry)) return false;
-    if (!feature.tags?.waterway) return false;
-    return !isExcludedWaterFeature(feature.tags);
-  }) ?? [];
-
-  return features.map((feature, index) => {
-    const geom = simplifyPolyline(feature.geometry, 72);
-    const fallbackWidth = WATERWAY_WIDTHS[feature.tags.waterway] ?? 10;
-    const width = Math.max(1.5, parseNumericWidth(feature.tags.width, fallbackWidth));
-    const depth = WATERWAY_DEPTHS[feature.tags.waterway] ?? Math.max(0.6, width * 0.15);
-    const worldPts = geom.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0));
-    const heights = smoothHeights(worldPts.map((pt) => pt[2] + 0.9));
-    const nodes = worldPts.map((pt, ptIndex) => ([
-      roundTo(pt[0], 3),
-      roundTo(pt[1], 3),
-      roundTo(heights[ptIndex], 3),
-      roundTo(width, 3),
-      roundTo(depth, 3),
-      0,
-      0,
-      1,
-    ]));
+  const { rivers, stats: riverStats } = planRivers({
+    features: terrainData.osmFeatures || [],
+    toWorld: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
+    heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
+    roads,
+  });
+  Object.assign(stats, riverStats);
+  return rivers.map((river, index) => {
+    const nodes = river.nodes.map(([x, y, z, width, depth]) => [roundTo(x, 3), roundTo(y, 3), roundTo(z, 3), roundTo(width, 2), roundTo(depth, 2), 0, 0, 1]);
+    const template = structuredClone(RIVER_TEMPLATE);
+    template['Ripples (texture animation)'].forEach((layer, i) => { layer.rippleSpeed = roundTo(river.flow / [4, 20, 200][i], 4); });
     return {
-      ...structuredClone(RIVER_TEMPLATE),
+      ...template,
       cubemap: waterProfile.riverCubemap,
       depthGradientTex: waterProfile.riverDepthGradientTex,
       rippleTex: waterProfile.riverRippleTex,
-      name: `waterway_${index}`,
+      flowMagnitudePhysics: river.flow,
+      name: `${river.kind}_${index}`,
       persistentId: generatePersistentId(),
       __parent: 'Water',
-      position: nodes.length > 0 ? nodes[0].slice(0, 3) : [0, 0, 0],
+      position: nodes[0].slice(0, 3),
       nodes,
     };
-  }).filter((river) => river.nodes.length >= 2);
+  });
 }
 
 /**
@@ -7313,15 +7198,20 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   beginStep('water', includeWater ? 'Building water: sea level plane, lakes and rivers…' : 'Building the sea level water plane…');
   await yield_();
   // Always emit a sea-level WaterPlane; includeWater toggles only inland OSM-derived water.
+  const waterStats = { lakes: {}, rivers: {} };
   const waterObjects = [
     buildSeaLevelWaterPlane(exportTerrainData, biome, seaLevelOffset),
     ...(includeWater
       ? [
-          ...buildWaterBlockObjects(exportTerrainData, squareSize, biome),
-          ...buildRiverObjects(exportTerrainData, squareSize, biome),
+          ...buildWaterBlockObjects(exportTerrainData, squareSize, biome, waterStats.lakes),
+          ...buildRiverObjects(exportTerrainData, squareSize, biome,
+            groundCarriageways.map((c) => ({ points: c.nodes, half: c.half })), waterStats.rivers),
         ]
       : []),
   ];
+  if (includeWater) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water: ${waterStats.lakes.tiles ?? 0} lake tiles in ${waterStats.lakes.lakes ?? 0} lakes, ${waterStats.rivers.pieces ?? 0} rivers; left out ${waterStats.rivers.dry ?? 0} dry washes, ${waterStats.rivers.underground ?? 0} culverts, ${waterStats.rivers.otherKinds ?? 0} drains/ditches, ${waterStats.lakes.dry ?? 0} dry lakes; ${waterStats.rivers.cutAtRoads ?? 0} cut at roads.`);
+  }
   const cloudObjects = buildCloudObjects(biome);
 
   beginStep('furniture', 'Placing barriers, fences, road signs, traffic lights, lamps, benches and fuel stations…');

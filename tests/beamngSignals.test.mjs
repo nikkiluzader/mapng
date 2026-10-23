@@ -217,20 +217,36 @@ test('a higher-priority cross road gets a longer overlap after the protected axi
   assert.ok(overlapFor('primary') > overlapFor('residential'));
 });
 
-test('signal props: a linked head on a post per approach, off the road', () => {
-  const { signalData, props } = buildBeamNGSignalExportBundle(
-    makeTerrainData([...crossroads(), node('tl', { highway: 'traffic_signals' }, J, J)]), SQ);
+test('signal props: North America hangs heads from a mast arm; elsewhere a post per approach', () => {
+  const features = [...crossroads(), node('tl', { highway: 'traffic_signals' }, J, J)];
+  const { signalData, props } = buildBeamNGSignalExportBundle(makeTerrainData(features, { roadRules: { countryCode: 'US' } }), SQ);
   const heads = props.filter((p) => p.kind === 'signal_head');
-  const poles = props.filter((p) => p.kind === 'signal_pole');
-  assert.equal(heads.length, 4);
-  assert.equal(poles.length, 4);
+  const masts = props.filter((p) => p.kind === 'signal_mast');
+  assert.equal(masts.length, 4);
+  assert.equal(props.filter((p) => p.kind === 'signal_pole').length, 0);
+  assert.ok(heads.length >= 4);
   const names = new Set(signalData.instances.map((i) => i.name));
   for (const head of heads) assert.ok(names.has(head.signalInstance), 'head links to a real instance');
-  for (const pole of poles) {
-    // Clear of both primaries (2 lanes → half width 3.25 m) crossing at the origin.
-    const offRoad = Math.min(Math.abs(pole.position[0]), Math.abs(pole.position[1]));
-    assert.ok(offRoad > 3.25, `post ${offRoad.toFixed(2)} m from a road centreline`);
+  // Clear of both primaries (2 lanes → half width 3.25 m) crossing at the origin.
+  for (const mast of masts) {
+    const offRoad = Math.min(Math.abs(mast.position[0]), Math.abs(mast.position[1]));
+    assert.ok(offRoad > 3.25, `mast ${offRoad.toFixed(2)} m from a road centreline`);
   }
+  // each head hangs over the carriageway its lenses face
+  for (const head of heads) {
+    const across = Math.abs(Math.cos(head.yaw)) > 0.5 ? Math.abs(head.position[1]) : Math.abs(head.position[0]);
+    assert.ok(across < 3.25 + 0.5, `head ${across.toFixed(2)} m off its road's centreline`);
+  }
+  // the arm (local +X) reaches from the kerb over the lanes, to the driver's left
+  const instance = signalData.instances.find((i) => i.dir[1] > 0.9);
+  const head = heads.find((h) => h.signalInstance === instance.name);
+  const mast = masts.reduce((best, m) => (Math.hypot(m.position[0] - head.position[0], m.position[1] - head.position[1])
+    < Math.hypot(best.position[0] - head.position[0], best.position[1] - head.position[1]) ? m : best));
+  assert.ok(Math.cos(mast.yaw) < -0.999, 'northbound: the arm reaches west');
+
+  const de = buildBeamNGSignalExportBundle(makeTerrainData(features, { roadRules: { countryCode: 'DE' } }), SQ).props;
+  assert.equal(de.filter((p) => p.kind === 'signal_pole').length, 4);
+  assert.equal(de.filter((p) => p.kind === 'signal_mast').length, 0);
 });
 
 test('signal props: far side in North America, stop line elsewhere; kerb follows driving side', () => {

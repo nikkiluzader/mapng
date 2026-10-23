@@ -733,7 +733,7 @@ test('road rules: a London export drives on the left with matching lane sides', 
 });
 
 // ── Visible traffic signals linked to signals.json ────────────────────────────
-test('traffic signals: heads link to signals.json instances; level posts get .link files', async () => {
+test('traffic signals: heads link to signals.json instances; level masts get .link files', async () => {
   const restore = installCanvasPolyfill();
   try {
     const td = makeTerrainData();
@@ -757,20 +757,23 @@ test('traffic signals: heads link to signals.json instances; level posts get .li
 
     const items = parseNDJSON(await readText(zip, 'main/MissionGroup/traffic_signals/items.level.json'));
     const heads = items.filter((o) => o.signalInstance);
-    assert.equal(heads.length, 4);
+    assert.ok(heads.length >= 4);
     const names = new Set(signals.instances.map((i) => i.name));
+    assert.equal(new Set(heads.map((h) => h.signalInstance)).size, 4, 'every instance has a head');
     for (const head of heads) {
       assert.ok(names.has(head.signalInstance));
       assert.equal(head.dynamic, true);
       assert.equal(head.collisionType, 'None');
     }
-    const posts = items.filter((o) => /pole_traffic1\.dae$/.test(o.shapeName));
-    assert.equal(posts.length, 4);
+    // North America: a West Coast USA signal mast per approach, its street light lit at night
+    const masts = items.filter((o) => /pole_light_signal1\.dae$/.test(o.shapeName));
+    assert.equal(masts.length, 4);
+    assert.equal(items.filter((o) => o.class === 'PointLight' && o.nightLight === '1').length, 4);
     const missionGroup = parseNDJSON(await readText(zip, 'main/MissionGroup/items.level.json'));
     assert.ok(missionGroup.some((o) => o.name === 'traffic_signals'));
-    // The West Coast USA post is mirrored into this level through a .link file.
-    const linked = Object.keys(zip.files).some((p) => /pole_traffic1\.dae\.link$/.test(p));
-    assert.ok(linked, 'pole_traffic1 .link file');
+    // The West Coast USA mast is mirrored into this level through a .link file.
+    const linked = Object.keys(zip.files).some((p) => /pole_light_signal1\.dae\.link$/.test(p));
+    assert.ok(linked, 'pole_light_signal1 .link file');
   } finally {
     restore();
   }

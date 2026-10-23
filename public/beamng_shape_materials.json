@@ -5177,6 +5177,57 @@
       "translucentRecvShadows": true,
       "version": 1.5
     },
+    "concrete_plain": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_ao.data.png",
+          "baseColorFactor": [
+            0.881534994,
+            0.881525993,
+            0.881525993,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_b.color.png",
+          "detailScale": [
+            4,
+            0.5
+          ],
+          "normalMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/concrete/concrete_plain/t_concrete_plain_r.data.png",
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 64,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "mapTo": "concrete_plain",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "concrete_plain",
+      "persistentId": "0affa924-0c54-48c6-b635-e529d390a043",
+      "translucent": true,
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "eca_bld_cleanmetal": {
       "Stages": [
         {
@@ -5256,6 +5307,55 @@
       "persistentId": "bdaa001e-5175-42bb-ab76-9ab9506712d9",
       "translucentBlendOp": "None"
     },
+    "eca_bld_metal_01_white_annotation_pole": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/metal/eca_bld_metal_01_white/eca_bld_metal_01_d_white.dds",
+          "detailMap": "/assets/materials/trim/metal/eca_bld_metaltrim/eca_grungewood_b.dds",
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "pixelSpecular": true,
+          "roughnessFactor": 0.638332963,
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "POLE",
+      "class": "Material",
+      "doubleSided": true,
+      "groundType": "METAL",
+      "mapTo": "eca_bld_metal_01_white_annotation_pole",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "east_coast_usa",
+      "name": "eca_bld_metal_01_white_annotation_pole",
+      "persistentId": "3439a2f8-38c5-4919-a062-f0ad572c0bf0",
+      "specularStrength0": "0.588235",
+      "translucentBlendOp": "None"
+    },
     "eca_bld_metaltrim": {
       "Stages": [
         {
@@ -5329,6 +5429,77 @@
       "materialTag1": "garbage",
       "name": "garbage",
       "persistentId": "d9779e7d-b4ea-4d74-9148-6dc5522fda31",
+      "version": 1.5
+    },
+    "guardrail": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/baked_props/guardrail_painted/t_guardrail_ao.data.png",
+          "baseColorFactor": [
+            0.686275005,
+            0.686275005,
+            0.686275005,
+            1
+          ],
+          "baseColorMap": "/assets/materials/baked_props/guardrail_painted/t_guardrail_b.color.png",
+          "detailBaseColorMapStrength": 0.200000003,
+          "detailMap": "/assets/materials/breakup/guardrail_rust_detail/guardrail_rust_detail_d.data.png",
+          "detailNormalMap": "/assets/materials/breakup/guardrail_rust_detail/guardrail_rust_detail_n.normal.png",
+          "detailNormalMapStrength": 0.150000006,
+          "detailScale": [
+            4,
+            0.5
+          ],
+          "metallicFactor": 0.699999988,
+          "metallicMap": "/assets/materials/baked_props/guardrail_painted/t_guardrail_m.data.png",
+          "normalMap": "/assets/materials/baked_props/guardrail_painted/t_guardrail_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/baked_props/guardrail_painted/t_guardrail_r.data.png",
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailBaseColorMapStrength": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailBaseColorMapStrength": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailBaseColorMapStrength": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "GUARD_RAIL",
+      "class": "Material",
+      "cubemap": "global_cubemap_metalblurred",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "invertBackFaceNormals": true,
+      "mapTo": "guardrail",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "guardrail",
+      "persistentId": "cb95c67e-7d5f-4043-ac65-84022c3abb44",
+      "translucent": true,
+      "translucentBlendOp": "None",
       "version": 1.5
     },
     "lod_vertcol": {
@@ -5760,6 +5931,50 @@
       "materialTag0": "metal",
       "name": "metal_galvanized",
       "persistentId": "0115bd66-7eda-41a7-9541-cd91d5cc3f2e",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "metal_plates": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_ao.data.png",
+          "baseColorMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_b.color.png",
+          "metallicFactor": 0.800000012,
+          "metallicMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_m.data.png",
+          "normalMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/metal/metal_plates/t_metal_plates_r.data.png",
+          "vertColor": true
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 64,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "invertBackFaceNormals": true,
+      "mapTo": "metal_plates",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "metal_plates",
+      "persistentId": "02ca2eb3-3a34-4ccb-b894-084a27b88b8d",
       "translucentBlendOp": "None",
       "version": 1.5
     },
