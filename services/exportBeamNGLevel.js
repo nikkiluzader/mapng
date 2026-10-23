@@ -7,6 +7,7 @@ import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
+import { placeTrafficCalming } from './trafficCalming.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight } from './beamngTrees.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
@@ -4254,6 +4255,11 @@ function buildDetailedReportSections(d) {
   lines.push(`- Lamps, benches and other furniture: ${(d.streetFurnitureObjects || []).length}`);
   listCounts(countBy(d.streetFurnitureObjects || [], shapeName), 15);
   lines.push(`- Fuel / charging station objects: ${(d.fuelStationObjects || []).length}`);
+  const cm = d.calming || {};
+  lines.push(`- Traffic calming placed: ${Object.entries(cm.counts || {}).map(([k, v]) => `${v} ${k}`).join(', ') || 'none'} (${(d.trafficCalmingObjects || []).length} objects, ${(cm.chevrons || []).length} chevron decals, ${(cm.signs || []).length} warning signs)`);
+  if (cm.skipped && Object.values(cm.skipped).some(Boolean)) {
+    lines.push(`- Traffic calming skipped: ${cm.skipped.offRoad || 0} not on a drawn or service road, ${cm.skipped.unsupported || 0} of other kinds (dips, islands, chokers...)`);
+  }
 
   // ── Vegetation ─────────────────────────────────────────────────────────────
   section('Vegetation');
@@ -7172,6 +7178,54 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const { signalData, controllerDefinitions: signalControllerDefinitions, props: signalProps = [] } =
     buildBeamNGSignalExportBundle(exportTerrainData, squareSize);
 
+  // Speed bumps, humps, tables and cushions from OSM traffic_calming, all
+  // stock assets (services/trafficCalming.js), with chevron paint and a
+  // warning sign ahead of humps and tables.
+  const calming = includeRoads
+    ? placeTrafficCalming({
+      features: exportTerrainData.osmFeatures || [],
+      carriageways: groundCarriageways,
+      toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
+      heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      isBlocked: (() => {
+        const index = buildCarriagewayIndex(groundCarriageways);
+        return (x, y) => isOnOtherCarriageway(index, x, y, 0.5, () => false) || underDeck(x, y, getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), 4);
+      })(),
+      style: getMarkingStyle(exportTerrainData.roadRules),
+      leftHandTraffic: !!exportTerrainData.roadRules?.leftHandTraffic,
+    })
+    : { statics: [], chevrons: [], signs: [], counts: {}, skipped: {} };
+  const trafficCalmingObjects = calming.statics.map((item, i) => ({
+    __parent: 'traffic_calming',
+    class: 'TSStatic',
+    name: `calming_${item.kind}_${i}`,
+    persistentId: generatePersistentId(),
+    position: item.position.map((v) => roundTo(v, 3)),
+    rotationMatrix: rotationMatrixFromYaw(item.yaw),
+    ...(item.scale ? { scale: item.scale.map((v) => roundTo(v, 4)) } : {}),
+    shapeName: item.shape,
+    collisionType: 'Collision Mesh',
+    useInstanceRenderData: true,
+  }));
+  if (calming.chevrons.length > 0 && decalRoads.length > 0) {
+    // the chevrons paint onto the humps (overObjects), above the road
+    const markings = calming.chevrons.map((c, i) => {
+      const decal = makeRoadDecal(c.nodes, `Chevrons_${i}`, 'traffic_calming_markings', {
+        material: 'road_chevrons', renderPriority: 1, breakAngle: 1, textureLength: c.textureLength,
+        startEndFade: [0, 0],
+      });
+      if (decal) decal.overObjects = true;
+      return decal;
+    }).filter(Boolean);
+    if (markings.length) {
+      decalRoads.push({ class: 'SimGroup', name: 'traffic_calming_markings', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: markings });
+    }
+  }
+  const calmingTotal = Object.values(calming.counts).reduce((n, v) => n + v, 0);
+  if (calmingTotal > 0 || calming.skipped.offRoad) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Traffic calming: ${JSON.stringify(calming.counts)} placed (${trafficCalmingObjects.length} objects, ${calming.chevrons.length} chevron decals, ${calming.signs.length} warning signs); skipped ${JSON.stringify(calming.skipped)}.`);
+  }
+
   // Traffic needs a road graph; the engine builds it from drivable DecalRoads.
   const supportsTraffic = decalRoads.length > 0;
 
@@ -7254,9 +7308,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome)
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
-  const signObjects = buildRoadSignProps(exportTerrainData, squareSize, {
+  const signObjects = [...buildRoadSignProps(exportTerrainData, squareSize, {
     style: getMarkingStyle(exportTerrainData.roadRules),
-  }).props.map((sign, i) => ({
+  }).props, ...calming.signs.map((sign) => ({ ...sign, position: sign.position.map((v) => roundTo(v, 3)) }))].map((sign, i) => ({
     __parent: 'signs',
     class: 'TSStatic',
     name: `sign_${sign.kind}_${i}`,
@@ -7393,6 +7447,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   if (signObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/signs`);
+  }
+  if (trafficCalmingObjects.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/traffic_calming`);
   }
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/vegetation`);
@@ -7739,6 +7796,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       streetFurnitureObjects,
       fuelStationObjects,
       barrierObjects,
+      calming,
+      trafficCalmingObjects,
       forestPlacements,
       groundCoverObjects,
       waterObjects,
@@ -7977,6 +8036,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       name: 'traffic_signals',
       persistentId: generatePersistentId(),
     }] : []),
+    ...(trafficCalmingObjects.length > 0 ? [{
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: 'traffic_calming',
+      persistentId: generatePersistentId(),
+    }] : []),
     ...(fuelStationObjects.length > 0 ? [{
       __parent: 'MissionGroup',
       class: 'SimGroup',
@@ -8020,6 +8085,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // (signalInstance) so core_trafficSignals lights it with the AI's phase.
   if (trafficSignalObjects.length > 0) {
     zip.file(`${base}/main/MissionGroup/traffic_signals/items.level.json`, toNDJSON(rewriteForLinks(trafficSignalObjects)));
+  }
+
+  // ── main/MissionGroup/traffic_calming/items.level.json ──────────────────
+  // Speed bumps / cushions (Driver Training modules) and humps / tables
+  // (Gridmap pieces); rewriteForLinks registers their .link files.
+  if (trafficCalmingObjects.length > 0) {
+    zip.file(`${base}/main/MissionGroup/traffic_calming/items.level.json`, toNDJSON(rewriteForLinks(trafficCalmingObjects)));
   }
 
   // ── main/MissionGroup/gasStations/items.level.json + facilities ──────────

@@ -257,7 +257,13 @@ const parseOverpassResponse = (data, bounds) => {
   for (const el of data.elements) {
     if (el.type === "node") {
       if (el.tags) {
-        if (el.tags.natural === "tree" || el.tags.natural === "tree_row") {
+        if (el.tags.traffic_calming && el.tags.traffic_calming !== "no") {
+          // speed bumps, humps, tables, cushions (services/trafficCalming.js)
+          rawFeatures.push({
+            id: el.id.toString(), type: "traffic_calming",
+            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+          });
+        } else if (el.tags.natural === "tree" || el.tags.natural === "tree_row") {
           const tags = el.tags.natural === "tree_row"
             ? { ...el.tags, tree_row: "yes", source_feature: "tree_row" }
             : el.tags;

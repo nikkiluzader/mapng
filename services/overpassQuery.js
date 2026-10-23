@@ -6,7 +6,7 @@
  * Bump OVERPASS_QUERY_VERSION whenever the query changes: it is part of the
  * Worker's cache key, so stale answers to an old query are never served.
  */
-export const OVERPASS_QUERY_VERSION = 1;
+export const OVERPASS_QUERY_VERSION = 2;   // 2: traffic_calming nodes
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [
@@ -70,6 +70,7 @@ export const OSM_FILTER = {
     ['highway', 'traffic_signals'], ['highway', 'stop'], ['highway', 'give_way'],
     ['highway', 'street_lamp'], ['barrier', 'bollard'], ['amenity', 'bench'],
     ['emergency', 'fire_hydrant'], ['amenity', 'waste_basket'], ['power', 'pole'],
+    ['traffic_calming', 'bump'], ['traffic_calming', 'hump'], ['traffic_calming', 'table'], ['traffic_calming', 'cushion'],
   ],
 };
 

@@ -44,6 +44,21 @@ export const PROP_SHAPES = {
   poleLamp: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/electrical_pole_lamp.dae' },
 };
 
+// Traffic calming (services/trafficCalming.js). Driver Training's bolt-down
+// bump: speedbump1 is a module 1 m across the road (local y) and 0.55 m deep
+// (local x), 7.5 cm tall; speedbump2 / speedbump3 are its end caps, their
+// geometry at y -0.625..-0.5 / 0.5..0.625 of the module they sit on.
+// Gridmap's suspension pieces: 4.2 m across (local x) and 4.2 m along (local
+// y), their base 10 cm under the road; 4x4_b a smooth 8.3 cm hump, 4x4_c a
+// 10.7 cm table (short ramps, flat top).
+export const CALMING_SHAPES = {
+  bumpModule: { shapeFile: '/levels/driver_training/art/shapes/objects/speedbump1.dae' },
+  bumpCapStart: { shapeFile: '/levels/driver_training/art/shapes/objects/speedbump2.dae' },
+  bumpCapEnd: { shapeFile: '/levels/driver_training/art/shapes/objects/speedbump3.dae' },
+  hump: { shapeFile: '/levels/gridmap_v2/art/shapes/grid/s_gm_suspension_sbump_4x4_b.dae' },
+  table: { shapeFile: '/levels/gridmap_v2/art/shapes/grid/s_gm_suspension_sbump_4x4_c.dae' },
+};
+
 // The overhead wires (a generated mesh): plain dark cable, both faces drawn.
 export const POWER_WIRE_MATERIAL = 'mapng_power_wire';
 export function getPowerWireMaterialDefs() {

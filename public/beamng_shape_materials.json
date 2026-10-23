@@ -5325,6 +5325,155 @@
       "persistentId": "3122f280-003f-419e-ba18-ba85683d01ed",
       "translucentBlendOp": "None"
     },
+    "m_gm_concrete_edges": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/edge/m_edge_decal/t_gm_edge_decal_d.color.png",
+          "detailNormalMap": "/assets/materials/trim/edge/m_gm_concrete_edges/ind_concrete_nm.normal.png",
+          "detailScale": [
+            8,
+            8
+          ],
+          "diffuseColor": [
+            1,
+            0.999989986,
+            0.999989986,
+            1
+          ],
+          "normalMap": "/assets/materials/trim/edge/m_edge_decal/t_gm_edge_decal_nm.normal.png",
+          "pixelSpecular": true,
+          "specular": [
+            1,
+            0.999989986,
+            0.999989986,
+            1
+          ],
+          "specularMap": "/assets/materials/trim/edge/m_edge_decal/t_gm_edge_decal_s.color.png",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 185,
+      "class": "Material",
+      "groundtype": "ASPHALT_OLD",
+      "mapTo": "m_gm_concrete_edges",
+      "materialTag0": "beamng",
+      "materialTag1": "gridmap",
+      "materialTag2": "concrete",
+      "name": "m_gm_concrete_edges",
+      "order_simset": 2147352576,
+      "persistentId": "cafa7ee1-4701-4113-886e-f81518ae0716",
+      "specularStrength0": "0.490196",
+      "translucent": true,
+      "translucentRecvShadows": true,
+      "translucentZWrite": true
+    },
+    "m_gm_concrete_plain": {
+      "Stages": [
+        {
+          "baseColorFactor": [
+            1,
+            0.999989986,
+            0.999989986,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_concrete_plain_d.color.png",
+          "detailMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_concrete_plain_detail.data.png",
+          "detailNormalMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_concrete_plain_nm.normal.png",
+          "detailNormalMapStrength": 0.209999993,
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "normalMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_concrete_plain_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_concrete_plain_r.data.png",
+          "specular": [
+            0.517175972,
+            0.517170012,
+            0.517170012,
+            1
+          ],
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "baseColorMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_breakup_d.color.png",
+          "diffuseMapUV": true,
+          "opacityMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_breakup_o.data.png",
+          "opacityMapUV": true,
+          "roughnessFactor": 0.699999988
+        },
+        {},
+        {}
+      ],
+      "activeLayers": 2,
+      "class": "Material",
+      "groundtype": "ASPHALT",
+      "mapTo": "m_gm_concrete_plain",
+      "materialTag0": "beamng",
+      "materialTag1": "gridmap",
+      "materialTag2": "concrete",
+      "name": "m_gm_concrete_plain",
+      "order_simset": 2147352576,
+      "persistentId": "23209e84-1ba5-4242-b869-77bf7154b437",
+      "specularStrength0": "0.490196",
+      "version": 1.5
+    },
+    "m_gm_concrete_tiles_horizontal": {
+      "Stages": [
+        {
+          "baseColorFactor": [
+            1,
+            0.999989986,
+            0.999989986,
+            1
+          ],
+          "baseColorMap": "/assets/materials/decal/concrete/m_gm_concrete_tiles_horizontal/t_gm_concrete_tiles_horizontal_d.color.png",
+          "detailMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_concrete_plain_detail.data.png",
+          "detailNormalMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_concrete_plain_nm.normal.png",
+          "detailScale": [
+            4,
+            4
+          ],
+          "normalMap": "/assets/materials/decal/concrete/m_gm_concrete_tiles_horizontal/t_gm_concrete_tiles_horizontal_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/decal/concrete/m_gm_concrete_tiles_horizontal/t_gm_concrete_tiles_horizontal_r.data.png",
+          "specular": [
+            0.517175972,
+            0.517170012,
+            0.517170012,
+            1
+          ],
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "baseColorMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_breakup_d.color.png",
+          "diffuseMapUV": true,
+          "opacityMap": "/assets/materials/tileable/concrete/m_gm_concrete_plain/t_gm_breakup_o.data.png",
+          "opacityMapUV": true,
+          "roughnessFactor": 0.699999988
+        },
+        {},
+        {}
+      ],
+      "activeLayers": 2,
+      "class": "Material",
+      "groundtype": "ASPHALT_OLD",
+      "mapTo": "m_gm_concrete_tiles_horizontal",
+      "materialTag0": "beamng",
+      "materialTag1": "gridmap",
+      "materialTag2": "concrete",
+      "name": "m_gm_concrete_tiles_horizontal",
+      "order_simset": 2147352576,
+      "persistentId": "40cfea9a-50d4-457c-9c10-e53f7b528c75",
+      "specularStrength0": "0.490196",
+      "version": 1.5
+    },
     "m_metal_hs_ind_painted": {
       "Stages": [
         {
@@ -5451,6 +5600,98 @@
       "name": "m_metal_wall_corrugate",
       "persistentId": "11313705-08ad-4755-9b0e-5746aa5b5913",
       "version": 1.5
+    },
+    "metal_galvanized": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_01_b.color.png",
+          "detailScale": [
+            0.100000001,
+            0.100000001
+          ],
+          "diffuseMapUseUV": null,
+          "metallicFactor": 1,
+          "metallicMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_m.data.png",
+          "opacityFactor": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/metal/metal_galvanized/t_metal_galvanized_02_r.data.png",
+          "roughnessMapUseUV": null,
+          "vertColor": true
+        },
+        {
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
+          "detailScale": null,
+          "diffuseMapUseUV": 1,
+          "metallicFactor": null,
+          "opacityFactor": 0.800000012,
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
+          "opacityMapUseUV": 1,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": 1,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "metallicFactor": null,
+          "opacityFactor": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "GUARD_RAIL",
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "invertBackFaceNormals": true,
+      "mapTo": "metal_galvanized",
+      "materialTag0": "metal",
+      "name": "metal_galvanized",
+      "persistentId": "0115bd66-7eda-41a7-9541-cd91d5cc3f2e",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "speedbump": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/metal/speedbump/diamondplate_d.dds",
+          "normalMap": "/assets/materials/tileable/metal/speedbump/diamondplate_n.dds",
+          "pixelSpecular": true,
+          "reflectivityMap": "/assets/materials/tileable/metal/speedbump/diamondplate_r.dds",
+          "specularMap": "/assets/materials/tileable/metal/speedbump/diamondplate_s.dds",
+          "specularPower": 32,
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 0,
+      "class": "Material",
+      "cubemap": "global_cubemap_metalblurred",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "speedbump",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "speedbump",
+      "persistentId": "5c352a12-eeeb-4e4a-a87a-21821fdc9c1b",
+      "translucentBlendOp": "None"
     },
     "wca_objects1": {
       "Stages": [
