@@ -18,7 +18,8 @@ import {
 } from "./resamplerClient.js";
 import { createLocalToWGS84 } from "./geoUtils.js";
 import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
-import { smoothRoadsInHeightmap } from "./roadSmoother.js";
+import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
+import { snapRoadsToTerrain } from "./roadSnap.js";
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights } from "./terrariumSampling.js";
 import { scaleNativeDimsToProcessingMpp } from "./uploadBounds.js";
 import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSize.js";
@@ -2122,12 +2123,20 @@ export const fetchTerrainData = async (
     };
   }
 
-  // Global 30 m terrain (no GPXZ / USGS / KRON86 raster, also when one of
-  // those fell back) is lumpy and stair-stepped under roads: smooth and level
-  // them. Higher-accuracy sources keep their real road surfaces.
-  if (!rawData && !flat && osmFeatures.length > 0) {
+  // Roads on every source get smoothed and levelled. Global 30 m terrain (and
+  // coarse GPXZ, which is blurred like it) is lumpy and stair-stepped under
+  // roads and gets the full treatment. Fine rasters (1 m lidar) already hold
+  // the real road cut, but OSM often runs a few metres beside it: move the
+  // roads onto it first, so levelling barely has to reshape the ground, and
+  // leave unpaved tracks alone.
+  if (!flat && osmFeatures.length > 0) {
+    const fineRaster = !!rawData && !shouldSmooth;
+    if (fineRaster) {
+      onProgress?.("Aligning roads with the terrain...");
+      osmFeatures = snapRoadsToTerrain(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, isGroundLevelRoad).features;
+    }
     onProgress?.("Smoothing roads in heightmap...");
-    smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel);
+    smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, { skipTracks: fineRaster });
   }
 
   // 6. Calculate Min/Max

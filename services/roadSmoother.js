@@ -152,7 +152,7 @@ function smooth1DArray(arr, windowSize) {
     return result;
 }
 
-function isGroundLevelRoad(feature) {
+export function isGroundLevelRoad(feature) {
     if (feature?.type !== 'road') return false;
     const tags = feature.tags || {};
     // Only carve terrain for something that will actually be a road. Footpaths
@@ -311,12 +311,15 @@ function pinJunctionElevations(profiles) {
  * Smoothing and leveling are one operation: the road surface is laid on the
  * smoothed centerline profile with a flat cross-section (no side-to-side
  * tilt), feathered back into the surrounding terrain. fetchTerrainData runs
- * it on global 30 m terrain, whose stair-steps and lumps it exists to hide.
+ * it on every source: on global 30 m (and coarse GPXZ) terrain it hides the
+ * stair-steps and lumps; on 1 m lidar, after snapRoadsToTerrain has moved the
+ * roads onto their cut, it only evens out what is left. skipTracks keeps it
+ * off unpaved tracks there — flattening them on real hillsides cut terraces.
  */
-export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeatures, metersPerPixel) {
+export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeatures, metersPerPixel, { skipTracks = false } = {}) {
     if (!osmFeatures || osmFeatures.length === 0) return;
 
-    const groundRoads = osmFeatures.filter(isGroundLevelRoad);
+    const groundRoads = osmFeatures.filter((f) => isGroundLevelRoad(f) && !(skipTracks && f.tags?.highway === 'track'));
     if (groundRoads.length === 0) return;
 
     const network = buildRoadNetwork(groundRoads);

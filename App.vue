@@ -769,12 +769,13 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     const cachedParams = JSON.parse(lastGenerationKey.value);
     const newParams = JSON.parse(requestKey);
 
-    // Check if only the OSM toggle changed (was off, now on). Not for the
-    // global 30 m source: its roads are smoothed during generation, which
-    // needs the OSM data, so adding OSM regenerates.
+    // Check if only the OSM toggle changed (was off, now on). Only for
+    // uploads and flat terrain: every other source aligns and levels its
+    // roads during generation, which needs the OSM data, so adding OSM
+    // regenerates.
     const onlyOsmAdded =
       !cachedParams.osm && newParams.osm &&
-      newParams.elevationSource !== 'default' &&
+      (useFlat || !!uploadedElevationFile.value) &&
       cachedParams.lat === newParams.lat &&
       cachedParams.lng === newParams.lng &&
       cachedParams.resolution === newParams.resolution &&

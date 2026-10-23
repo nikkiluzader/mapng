@@ -34,7 +34,7 @@ export function classifyGenerationStatus(text) {
   const s = String(text || '').toLowerCase();
   if (!s) return null;
   if (/generating (osm|hybrid) texture|procedural noise|vector maps|blending satellite imagery/.test(s)) return 'textures';
-  if (/smoothing roads/.test(s)) return 'roads';
+  if (/smoothing roads|aligning roads/.test(s)) return 'roads';
   if (/finaliz/.test(s)) return 'finalize';
   if (/openstreetmap|overpass|osm data|\bmirror/.test(s)) return 'osm';
   if (/resampling heightmap|mapping uploaded elevation/.test(s)) return 'resample';
