@@ -149,6 +149,17 @@
         </l-tooltip>
       </l-marker>
 
+      <!-- Surrounding Tile Bounding Boxes (hidden during batch mode) -->
+      <l-rectangle
+        v-for="rect in surroundingBounds"
+        v-if="!hasBatchGrid"
+        :key="rect.key"
+        :bounds="[[rect.south, rect.west], [rect.north, rect.east]]"
+        color="#3B82F6"
+        :weight="1.5"
+        :fill-opacity="0.06"
+        :options="{ dashArray: '4, 6', lineCap: 'round' }"
+      />
     </l-map>
 
     <!-- Live free-dataset elevation preview, fitted to the selection area -->
@@ -217,6 +228,7 @@ import { Layers } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import ElevationOverlay from './ElevationOverlay.vue';
+import { getAdjacentBounds, POSITION_LABELS } from '../../services/surroundingTiles';
 import { computeMetricSelectionBounds, computeUploadedCropBounds } from '../../services/uploadBounds';
 import { CHECKBOX } from '../base/controlStyles.js';
 import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
@@ -247,6 +259,7 @@ const props = defineProps({
   uploadedElevationFile: { type: [Object, Array], default: null },
   uploadedElevationMeta: { type: Object, default: null },
   uploadedAreaMode: { type: String, default: 'native' },
+  surroundingTilePositions: { type: Array, default: () => [] },
   batchGrid: { type: Array, default: () => [] },
   batchEditable: { type: Boolean, default: false },
 });
@@ -440,6 +453,33 @@ const elevationOverlayBounds = computed(() => {
     }
   }
   return uploadedCropBounds.value || selectionBounds.value;
+});
+
+// Compute surrounding tile bounding boxes from current center + resolution
+const surroundingBounds = computed(() => {
+  if (!props.surroundingTilePositions?.length) return [];
+
+  const center = currentCenter.value;
+  const sizeMeters = activeSelectionSizeMeters.value;
+  
+  const metersPerDegLat = 111320;
+  const metersPerDegLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+  
+  const latSpan = sizeMeters / metersPerDegLat;
+  const lngSpan = sizeMeters / metersPerDegLng;
+  
+  const centerBounds = {
+    north: center.lat + latSpan / 2,
+    south: center.lat - latSpan / 2,
+    east:  center.lng + lngSpan / 2,
+    west:  center.lng - lngSpan / 2,
+  };
+
+  return props.surroundingTilePositions.map(pos => ({
+    key: pos,
+    label: POSITION_LABELS[pos],
+    ...getAdjacentBounds(centerBounds, pos),
+  }));
 });
 
 // Handle map move

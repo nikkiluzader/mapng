@@ -45,6 +45,7 @@
               :texture-type="textureType"
               :show-water="showWater"
               :water-level-offset-meters="waterLevelOffsetMeters"
+              :wireframe="advancedMode && showWireframe"
             />
 
             <MapngFlag3D
@@ -54,6 +55,15 @@
             <OSMFeatures3D
               :terrain-data="terrainData"
               :feature-visibility="featureVisibility"
+            />
+
+            <SurroundingTerrain3D
+              v-if="advancedMode"
+              :terrain-data="terrainData"
+              :visible="showSurroundings"
+              :quality="surroundingQuality"
+              :texture-mode="surroundingTextureType"
+              @loading-state="handleSurroundingsLoadingState"
             />
 
             <OrbitControls
@@ -213,8 +223,61 @@
           </button>
         </div>
 
-        <!-- 3D features -->
+        <!-- wireframe and 3D features -->
         <div class="space-y-3 pt-2">
+          <!-- Surroundings + wireframe: advanced mode -->
+          <template v-if="advancedMode">
+          <div>
+            <label class="text-[10px] text-gray-400 dark:text-gray-500 block mb-1">{{ t('preview.surroundingsTexture') }}</label>
+            <select
+              v-model="surroundingTextureType"
+              :class="[SELECT_XS, 'w-full max-w-[140px] appearance-none hover:bg-gray-50 dark:hover:bg-gray-700']"
+            >
+              <option value="satellite">{{ t('preview.satellite') }}</option>
+              <option value="none">{{ t('preview.none') }}</option>
+            </select>
+          </div>
+
+          <label class="flex items-center gap-2 cursor-pointer group/check">
+            <div class="relative">
+              <input
+                type="checkbox"
+                v-model="showSurroundings"
+                class="peer sr-only"
+              />
+              <div
+                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"
+              ></div>
+            </div>
+            <span class="text-xs text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white"
+              >{{ t('preview.surroundingTerrain') }}</span
+            >
+          </label>
+          <p v-if="showSurroundings" class="text-[10px] text-gray-400 dark:text-gray-500 ml-11 -mt-1">{{ t('preview.surroundingDesc') }}</p>
+          <p
+            v-if="showSurroundings && surroundingTextureType === 'satellite' && isSurroundingsLoading"
+            class="text-[10px] text-gray-400 dark:text-gray-500 ml-11 -mt-1"
+          >
+            {{ surroundingsSatelliteProgress.completed }} of {{ surroundingsSatelliteProgress.total }} satellite images downloaded
+          </p>
+
+          <label class="flex items-center gap-2 cursor-pointer group/check">
+            <div class="relative">
+              <input
+                type="checkbox"
+                v-model="showWireframe"
+                class="peer sr-only"
+              />
+              <div
+                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"
+              ></div>
+            </div>
+            <span class="text-xs text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white"
+              >{{ t('preview.wireframeMode') }}</span
+            >
+          </label>
+          </template>
+
           <div class="space-y-2">
             <label class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 font-medium mb-1">
               <Layers :size="12" /> {{ t('preview.features3d') }}
@@ -303,9 +366,13 @@ import TerrainMesh from "./TerrainMesh.vue";
 import MapngFlag3D from "./MapngFlag3D.vue";
 import OSMFeatures3D from "./OSMFeatures3D.vue";
 import CSMLight from "./CSMLight.vue";
+import SurroundingTerrain3D from "./SurroundingTerrain3D.vue";
+import { useMainStore } from "../../stores/mainStore";
 import { SELECT_SM, SELECT_XS } from "../base/controlStyles.js";
 
 const props = defineProps(["terrainData"]);
+const store = useMainStore();
+const advancedMode = computed(() => store.advancedMode);
 
 const controlsRef = ref(null);
 
@@ -398,17 +465,41 @@ const meshQualityOptions = [
   { value: 'high', labelKey: 'preview.qualityMaxSafe' },
   { value: 'full', labelKey: 'preview.qualityFull' },
 ];
+// SurroundingTerrain3D has its own low/medium/high fetch profiles; 'full'
+// center-tile detail doesn't warrant re-downloading surrounding tiles.
+const surroundingQuality = computed(() => (meshQuality.value === 'full' ? 'high' : meshQuality.value));
 const preset = ref("Kloofendal Pure Sky");
 const sunPosition = ref("Mid Morning");
 const textureType = ref("hybrid");
+const surroundingTextureType = ref("none");
+const showWireframe = ref(false);
 const showWater = ref(true);
 const waterLevelOffsetMeters = ref(0);
+const showSurroundings = ref(false);
 const showSceneSettings = ref(false);
+const isSurroundingsLoading = ref(false);
+const surroundingsSatelliteProgress = reactive({
+  completed: 0,
+  total: 0,
+});
 const featureVisibility = reactive({
   buildings: true,
   vegetation: true,
   barriers: true,
 });
+
+const handleSurroundingsLoadingState = (state) => {
+  isSurroundingsLoading.value = !!state?.isLoading;
+
+  if (state?.textureMode !== 'satellite') {
+    surroundingsSatelliteProgress.completed = 0;
+    surroundingsSatelliteProgress.total = 0;
+    return;
+  }
+
+  surroundingsSatelliteProgress.completed = Number(state?.completedSatellite || 0);
+  surroundingsSatelliteProgress.total = Number(state?.totalSatellite || 0);
+};
 
 const mergedTerrainData = computed(() => {
   return props.terrainData;

@@ -40,6 +40,11 @@ export const useMainStore = defineStore('main', () => {
 
   const batchMode = ref(localStorage.getItem('mapng_batch_mode') === 'true');
 
+  // Advanced mode brings back the map-maker tools the basic UI hides: the 2D
+  // asset / 3D model downloads, Surrounding Tiles, per-category level export
+  // toggles and the preview's surroundings + wireframe. Basic is the default.
+  const advancedMode = ref(localStorage.getItem('mapng_advanced_mode') === 'true');
+
   if (batchMode.value && Number(resolution.value) > 8192) {
     resolution.value = 8192;
     localStorage.setItem('mapng_resolution', String(8192));
@@ -51,6 +56,7 @@ export const useMainStore = defineStore('main', () => {
   const isLoading = ref(false);
   const loadingStatus = ref("Initializing...");
   const previewMode = ref(false);
+  const surroundingTilePositions = ref([]);
 
   // --- Batch Job State ---
   const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
@@ -95,6 +101,13 @@ export const useMainStore = defineStore('main', () => {
   function setResolution(newResolution) {
     resolution.value = newResolution;
     localStorage.setItem('mapng_resolution', String(newResolution));
+  }
+
+  function setAdvancedMode(value) {
+    advancedMode.value = !!value;
+    localStorage.setItem('mapng_advanced_mode', String(advancedMode.value));
+    // Hidden Surrounding Tiles must not keep drawing on the map or feeding exports.
+    if (!advancedMode.value) surroundingTilePositions.value = [];
   }
 
   function toggleDarkMode() {
@@ -150,6 +163,7 @@ export const useMainStore = defineStore('main', () => {
     isLoading,
     loadingStatus,
     previewMode,
+    surroundingTilePositions,
     batchGridCols,
     batchGridRows,
     batchTileFollowCenter,
@@ -165,6 +179,8 @@ export const useMainStore = defineStore('main', () => {
     setZoom,
     setResolution,
     toggleDarkMode,
+    advancedMode,
+    setAdvancedMode,
     setBatchMode,
     setBatchGridCols,
     setBatchGridRows,

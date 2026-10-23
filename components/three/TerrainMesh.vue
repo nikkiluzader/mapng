@@ -9,6 +9,7 @@ const props = defineProps({
   textureType: { default: 'satellite' },
   showWater: { default: true, type: Boolean },
   waterLevelOffsetMeters: { default: 0, type: Number },
+  wireframe: { default: false, type: Boolean }
 });
 
 const SCENE_SIZE = 100;
@@ -620,6 +621,7 @@ onUnmounted(() => {
         :roughness="texture ? 1 : 0.5"
         :metalness="texture ? 0 : 0.5"
         :side="2"
+        :wireframe="wireframe"
       />
     </TresMesh>
   </TresGroup>

@@ -77,7 +77,28 @@
     "concurrency": "Concorrenza",
     "parallel": "{count}x parallelo",
     "invalidApiKey": "Chiave API non valida",
-    "largeAreaWarning": "Area grande ({area} km2). Usa multiple chiamate API."
+    "largeAreaWarning": "Area grande ({area} km2). Usa multiple chiamate API.",
+    "surrounding": {
+      "title": "Tessere Adiacenti",
+      "description": "Scarica tessere adiacenti per terreno fuori dai limiti. Usa elevazione standard 30m, nessun dato OSM.",
+      "centerTileTitle": "Tessera centrale (tuo export principale)",
+      "tileTitle": "Tessera {label} ({pos})",
+      "selectAll": "Seleziona Tutto",
+      "clear": "Cancella",
+      "showOnMap": "Mostra sulla mappa",
+      "satelliteQuality": "Qualità Satellite",
+      "outputSize": "Dimensione Output",
+      "scale": "Scala",
+      "perTileArea": "Area per-tessera",
+      "upsampleNote": "Altitudine campionata da dati sorgente 30m. Stessa dimensione pixel della tessera centrale.",
+      "generateTerrainFirst": "Genera terreno prima",
+      "download": "Scarica {count} Tessera{suffix} (ZIP)",
+      "cancel": "Annulla",
+      "statusStarting": "Avvio in corso...",
+      "statusDone": "Fatto!",
+      "statusCancelled": "Cancellato.",
+      "error": "Impossibile generare tessere adiacenti. Prova di nuovo."
+    }
   },
   "status": {
     "jobPreparing": "Preparazione dati del job...",
@@ -99,7 +120,15 @@
   },
   "export": {
     "errorGeotiff": "Impossibile esportare GeoTIFF. Vedi console per dettagli.",
-    "errorBeamngLevel": "Impossibile esportare livello BeamNG. Vedi console per dettagli."
+    "errorBeamngLevel": "Impossibile esportare livello BeamNG. Vedi console per dettagli.",
+    "errorHeightmap": "Impossibile esportare mappa di altezza. Vedi console per dettagli.",
+    "errorTexture": "Impossibile esportare texture. Vedi console per dettagli.",
+    "errorOsmTexture": "Impossibile esportare texture OSM. Vedi console per dettagli.",
+    "errorHybridTexture": "Impossibile esportare texture ibrida. Vedi console per dettagli.",
+    "errorRoadMask": "Impossibile esportare maschera stradale. Vedi console per dettagli.",
+    "errorGlb": "Impossibile esportare GLB. Vedi console per dettagli.",
+    "errorDae": "Impossibile esportare DAE. Vedi console per dettagli.",
+    "errorTer": "Impossibile esportare TER. Vedi console per dettagli."
   },
   "batch": {
     "copyConfig": "Copia Configurazione",
@@ -219,6 +248,10 @@
     "segmentedTip": "Satellite segmentato (macchie di colore piatto)",
     "noSegmentedHybrid": "Nessun dato ibrido segmentato disponibile",
     "segmentedHybridTip": "Satellite segmentato + overlay strade",
+    "surroundingsTexture": "Texture Surroundings",
+    "surroundingTerrain": "Terreno Circostante",
+    "surroundingDesc": "Tessere adiacenti adattive con blending cuciture e dettaglio satellite ottimizzato per anteprima per caricamento più veloce.",
+    "wireframeMode": "Modalità Wireframe",
     "features3d": "Funzionalità 3D",
     "resetCamera": "Ripristina Telecamera"
   },
@@ -237,10 +270,15 @@
     "osmData": "Dati OSM",
     "includeBackdrop": "Includi Sfondo",
     "includeBuildings": "Includi Edifici",
+    "exportBuildings": "Esporta edifici 3D OSM",
     "applyFoundations": "Applica Fondamenta",
+    "raiseUnderBuildings": "Alza terreno sotto edifici ripidi",
     "water": "Acqua",
+    "lakesRivers": "Laghi e fiumi",
     "treesBushes": "Alberi/Cespugli",
+    "nativeForest": "Elementi foresta nativa",
     "rocks": "Rocce",
+    "quarryRock": "Copertura cava/roccia",
     "roads": "Strade",
     "meshRoads": "Geometria mesh 3D",
     "beamngLevelExport": "Esportazione Livello BeamNG",
@@ -289,7 +327,22 @@
     "cleanupToolCredit": " per generare una mappa molto piu dettagliata. Strumento di AlexKidd.",
     "exportingBeamng": "Esportazione Livello BeamNG",
     "mayTakeWhile": "Questo potrebbe richiedere un po' per le mappe grandi",
-    "elapsed": "Trascorso"
+    "elapsed": "Trascorso",
+    "hybrid": "Ibrido",
+    "surroundingTerrain": "Terreno circostante",
+    "assets2d": "Asset 2D",
+    "heightmap": "Mappa di Altezza",
+    "osmTexture": "Texture OSM",
+    "roadMask": "Maschera Stradale",
+    "models3d": "Modelli 3D",
+    "centerTexture": "Texture Centrale:",
+    "tiles": "Tessere:",
+    "center": "Centro",
+    "centerPlusSurroundings": "Centro + Surroundings",
+    "surroundingsOnly": "Solo Surroundings",
+    "glbModel": "Modello GLB",
+    "colladaDae": "Collada DAE",
+    "beamngTerrain": "Terreno BeamNG"
   },
   "controlPanel": {
     "outputSettings": "Impostazioni Output",
@@ -311,7 +364,11 @@
     "osmCoverageUnavailable": "Elenco di copertura non disponibile al momento.",
     "osmCoverageLoading": "Caricamento copertura…",
     "centerCoordinates": "Coordinate Centrale",
-    "configurationSession": "Configurazione & Sessione"
+    "configurationSession": "Configurazione & Sessione",
+    "modeBasic": "Base",
+    "modeAdvanced": "Avanzato",
+    "modeBasicHint": "Solo il livello BeamNG. Passa ad Avanzato per scaricare heightmap, texture e modelli 3D, i riquadri circostanti e altre opzioni di esportazione.",
+    "modeAdvancedHint": "Tutti gli strumenti: download 2D e 3D, riquadri circostanti, opzioni del livello per categoria ed extra dell’anteprima."
   },
   "batchExport": {
     "title": "Opzioni Esportazione",
@@ -410,7 +467,7 @@
       "Elevazione GeoTIFF (WGS84 o CRS di origine)",
       "Dati vettoriali OSM in GeoJSON",
       "Dati del job (.mapng): una sessione completa salvata",
-      "La modalità batch aggiunge per tile: heightmap a 16 bit, texture satellite, OSM e ibride, maschere stradali, GLB, DAE e .ter"
+      "La modalità avanzata e la modalità batch (per tile) aggiungono: heightmap a 16 bit, texture satellite, OSM e ibride, maschere stradali, GLB, DAE e .ter"
     ],
     "osmTitle": "Dati OpenStreetMap",
     "osmItems": [

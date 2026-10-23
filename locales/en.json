@@ -85,7 +85,28 @@
     "concurrency": "Concurrency",
     "parallel": "{count}x parallel",
     "invalidApiKey": "Invalid API key",
-    "largeAreaWarning": "Large area ({area} km2). Uses multiple API calls."
+    "largeAreaWarning": "Large area ({area} km2). Uses multiple API calls.",
+    "surrounding": {
+      "title": "Surrounding Tiles",
+      "description": "Download adjacent tiles for out-of-bounds terrain. Uses standard 30m elevation, no OSM data.",
+      "centerTileTitle": "Center tile (your main export)",
+      "tileTitle": "Tile {label} ({pos})",
+      "selectAll": "Select All",
+      "clear": "Clear",
+      "showOnMap": "Show on map",
+      "satelliteQuality": "Satellite Quality",
+      "outputSize": "Output size",
+      "scale": "Scale",
+      "perTileArea": "Per-tile area",
+      "upsampleNote": "Elevation upsampled from 30m source data. Same pixel size as center tile.",
+      "generateTerrainFirst": "Generate terrain first",
+      "download": "Download {count} Tile{suffix} (ZIP)",
+      "cancel": "Cancel",
+      "statusStarting": "Starting...",
+      "statusDone": "Done!",
+      "statusCancelled": "Cancelled.",
+      "error": "Failed to generate surrounding tiles. Please try again."
+    }
   },
   "status": {
     "jobPreparing": "Preparing job data...",
@@ -107,7 +128,15 @@
   },
   "export": {
     "errorGeotiff": "Failed to export GeoTIFF. See console for details.",
-    "errorBeamngLevel": "Failed to export BeamNG level. See console for details."
+    "errorBeamngLevel": "Failed to export BeamNG level. See console for details.",
+    "errorHeightmap": "Failed to export heightmap. See console for details.",
+    "errorTexture": "Failed to export texture. See console for details.",
+    "errorOsmTexture": "Failed to export OSM texture. See console for details.",
+    "errorHybridTexture": "Failed to export hybrid texture. See console for details.",
+    "errorRoadMask": "Failed to export road mask. See console for details.",
+    "errorGlb": "Failed to export GLB. See console for details.",
+    "errorDae": "Failed to export DAE. See console for details.",
+    "errorTer": "Failed to export TER. See console for details."
   },
   "batch": {
     "copyConfig": "Copy Configuration",
@@ -245,6 +274,10 @@
     "segmentedTip": "Segmented satellite (flat color blobs)",
     "noSegmentedHybrid": "No segmented hybrid data available",
     "segmentedHybridTip": "Segmented satellite + roads overlay",
+    "surroundingsTexture": "Surroundings Texture",
+    "surroundingTerrain": "Surrounding Terrain",
+    "surroundingDesc": "Adaptive adjacent tiles with seam blending and preview-optimized satellite detail for faster loading.",
+    "wireframeMode": "Wireframe Mode",
     "features3d": "3D Features",
     "water": "Water",
     "seaLevelOffset": "Sea Level Offset",
@@ -265,11 +298,16 @@
     "osmData": "OSM data",
     "includeBackdrop": "Include Backdrop",
     "includeBuildings": "Include Buildings",
+    "exportBuildings": "Export 3D OSM buildings",
     "applyFoundations": "Apply Foundations",
+    "raiseUnderBuildings": "Raise terrain under steep buildings",
     "water": "Water",
+    "lakesRivers": "Lakes and rivers",
     "seaLevelOffset": "Sea Level Offset",
     "treesBushes": "Trees/Bushes",
+    "nativeForest": "Native forest items",
     "rocks": "Rocks",
+    "quarryRock": "Quarry/rock cover",
     "roads": "Roads",
     "roadType": "Road Type",
     "roadTypeSpline": "Decal Roads",
@@ -321,7 +359,23 @@
     "cleanupToolCredit": " to generate a much more detailed map. Tool by AlexKidd.",
     "exportingBeamng": "Exporting BeamNG Level",
     "mayTakeWhile": "This may take a while for large maps",
-    "elapsed": "Elapsed"
+    "elapsed": "Elapsed",
+    "hybrid": "Hybrid",
+    "surroundingTerrain": "Surrounding terrain",
+    "assets2d": "2D Assets",
+    "heightmap": "Heightmap",
+    "osmTexture": "OSM Texture",
+    "roadMask": "Road Mask",
+    "models3d": "3D Models",
+    "centerTexture": "Center Texture:",
+    "tiles": "Tiles:",
+    "center": "Center",
+    "centerPlusSurroundings": "Center + Surroundings",
+    "surroundingsOnly": "Surroundings Only",
+    "realWorldScale": "Real-world scale (1 unit = 1 m)",
+    "glbModel": "GLB Model",
+    "colladaDae": "Collada DAE",
+    "beamngTerrain": "BeamNG Terrain"
   },
   "controlPanel": {
     "sessionData": "Session Data",
@@ -358,7 +412,11 @@
     "customOverpassInvalid": "Must be a full https:// address.",
     "customOverpassHint": "Paste your full Overpass URL including your key. Areas MapNG already hosts (Show MapNG OSM coverage) still load from MapNG's own copy, so your key is only used outside them; there it's tried first, with the public servers as backup. It stays in this browser only. Paid plans with Overpass access:",
     "centerCoordinates": "Center Coordinates",
-    "configurationSession": "Configuration & Session"
+    "configurationSession": "Configuration & Session",
+    "modeBasic": "Basic",
+    "modeAdvanced": "Advanced",
+    "modeBasicHint": "Just the BeamNG level. Switch to Advanced for heightmap, texture and 3D model downloads, Surrounding Tiles and more export options.",
+    "modeAdvancedHint": "All tools: 2D and 3D asset downloads, Surrounding Tiles, per-category level options and preview extras."
   },
   "batchExport": {
     "title": "Export Options",
@@ -457,7 +515,7 @@
       "GeoTIFF elevation (WGS84 or the source CRS)",
       "GeoJSON OSM vector data",
       "Job data (.mapng): a complete saved session",
-      "Batch mode adds per tile: 16-bit heightmaps, satellite, OSM and hybrid textures, road masks, GLB, DAE and .ter"
+      "Advanced mode and Batch mode (per tile) add: 16-bit heightmaps, satellite, OSM and hybrid textures, road masks, GLB, DAE and .ter"
     ],
     "osmTitle": "OpenStreetMap Data",
     "osmItems": [

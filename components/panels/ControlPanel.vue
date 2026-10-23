@@ -1,5 +1,29 @@
 <template>
   <div class="space-y-6">
+    <!-- Basic / Advanced: advanced restores the map-maker tools (2D/3D asset
+         downloads, Surrounding Tiles, per-category level export options). -->
+    <div>
+      <div class="flex bg-gray-100 dark:bg-gray-800 rounded-md p-1 border border-gray-200 dark:border-gray-700">
+        <button
+          v-for="mode in ['basic', 'advanced']"
+          :key="mode"
+          type="button"
+          @click="store.setAdvancedMode(mode === 'advanced')"
+          :class="[
+            'flex-1 text-xs py-1.5 rounded transition-colors',
+            (mode === 'advanced') === store.advancedMode
+              ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+              : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
+          ]"
+        >
+          {{ t(mode === 'advanced' ? 'controlPanel.modeAdvanced' : 'controlPanel.modeBasic') }}
+        </button>
+      </div>
+      <p class="mt-1.5 text-[10px] text-gray-500 dark:text-gray-400">
+        {{ t(store.advancedMode ? 'controlPanel.modeAdvancedHint' : 'controlPanel.modeBasicHint') }}
+      </p>
+    </div>
+
     <!-- Elevation Upload (BYOD: tif/tiff/asc/gml/xml/zip/laz/las) -->
     <ElevationUploadControl
       :uploaded-elevation-file="uploadedElevationFile"
@@ -199,6 +223,16 @@
       </template>
     </div>
 
+    <!-- Surrounding Tiles (advanced mode) -->
+    <SurroundingTiles
+      v-if="store.advancedMode"
+      :terrain-data="terrainData"
+      :center="center"
+      :resolution="resolution"
+      @update:selected-positions="handleSurroundingTilesChange"
+      @update:show-on-map="() => {}"
+    />
+
     <!-- Configuration & Session (collapsible, collapsed by default) -->
     <div class="space-y-3">
       <button
@@ -266,6 +300,7 @@
         :gpxz-api-key="gpxzApiKey"
         :gpxz-status="gpxzStatus"
         :fetch-o-s-m="fetchOSM"
+        :surrounding-tile-positions="surroundingTilePositions"
         @fetch-osm="$emit('fetchOsm')"
         @export-success="$emit('exportSuccess', $event)"
       />
@@ -282,7 +317,9 @@ import BaseToggle from '../base/BaseToggle.vue';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
+import SurroundingTiles from '../map/SurroundingTiles.vue';
 import ExportPanel from './ExportPanel.vue';
+import { useMainStore } from '../../stores/mainStore';
 import GenerateActions from '../controls/GenerateActions.vue';
 import ElevationUploadControl from '../controls/ElevationUploadControl.vue';
 import RunConfigControls from '../controls/RunConfigControls.vue';
@@ -303,12 +340,17 @@ const { t } = useI18n({ useScope: 'global' });
 
 const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedNoDataOverride', 'uploadedLayerOrder', 'elevationLayerSlots', 'maxElevationSlots', 'uploadedAreaMode', 'processingMetersPerPixel']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'importData', 'elevationFileSelected', 'elevationFileClear', 'elevationSlotSelected', 'elevationSlotRemoved', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedNoDataOverride', 'update:uploadedLayerOrder', 'update:uploadedAreaMode', 'update:processingMetersPerPixel', 'update:previewStale']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'elevationFileSelected', 'elevationFileClear', 'elevationSlotSelected', 'elevationSlotRemoved', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedNoDataOverride', 'update:uploadedLayerOrder', 'update:uploadedAreaMode', 'update:processingMetersPerPixel', 'update:previewStale']);
 
 const handleLocationChange = (newLocation) => {
   emit('locationChange', { ...props.center, ...newLocation });
 };
 
+const store = useMainStore();
+const surroundingTilePositions = ref([]);
+watch(() => store.advancedMode, (advanced) => {
+  if (!advanced) handleSurroundingTilesChange([]);
+});
 const runConfigStatus = ref('');
 const isExportingJob = ref(false);
 const isImportingJob = ref(false);
@@ -568,6 +610,11 @@ const areaDisplay = computed(() => {
     ? `${areaSqKm.value.toFixed(2)} km²`
     : `${Math.round(totalAreaSqM.value).toLocaleString()} m²`;
 });
+
+const handleSurroundingTilesChange = (positions) => {
+  surroundingTilePositions.value = positions || [];
+  emit('surroundingTilesChange', surroundingTilePositions.value);
+};
 
 const buildRunConfiguration = () => buildRunConfigurationBase({
   center: props.center,

@@ -77,7 +77,28 @@
     "concurrency": "Concurrencia",
     "parallel": "{count}x en paralelo",
     "invalidApiKey": "API Key invalida",
-    "largeAreaWarning": "Area grande ({area} km2). Usa multiples llamadas API."
+    "largeAreaWarning": "Area grande ({area} km2). Usa multiples llamadas API.",
+    "surrounding": {
+      "title": "Mosaicos circundantes",
+      "description": "Descarga mosaicos adyacentes para terreno fuera de limites. Usa elevacion estandar 30m, sin datos OSM.",
+      "centerTileTitle": "Mosaico central (tu exportacion principal)",
+      "tileTitle": "Mosaico {label} ({pos})",
+      "selectAll": "Seleccionar todo",
+      "clear": "Limpiar",
+      "showOnMap": "Mostrar en mapa",
+      "satelliteQuality": "Calidad satelital",
+      "outputSize": "Tamano de salida",
+      "scale": "Escala",
+      "perTileArea": "Area por mosaico",
+      "upsampleNote": "Elevacion re-muestreada desde fuente 30m. Mismo tamano de pixel que el mosaico central.",
+      "generateTerrainFirst": "Genera terreno primero",
+      "download": "Descargar {count} mosaico{suffix} (ZIP)",
+      "cancel": "Cancelar",
+      "statusStarting": "Iniciando...",
+      "statusDone": "Listo!",
+      "statusCancelled": "Cancelado.",
+      "error": "No se pudieron generar los mosaicos circundantes. Intentalo de nuevo."
+    }
   },
   "status": {
     "jobPreparing": "Preparando datos del trabajo...",
@@ -99,7 +120,15 @@
   },
   "export": {
     "errorGeotiff": "Error al exportar GeoTIFF. Revisa la consola para detalles.",
-    "errorBeamngLevel": "Error al exportar nivel de BeamNG. Revisa la consola para detalles."
+    "errorBeamngLevel": "Error al exportar nivel de BeamNG. Revisa la consola para detalles.",
+    "errorHeightmap": "Error al exportar heightmap. Revisa la consola para detalles.",
+    "errorTexture": "Error al exportar textura. Revisa la consola para detalles.",
+    "errorOsmTexture": "Error al exportar textura OSM. Revisa la consola para detalles.",
+    "errorHybridTexture": "Error al exportar textura hibrida. Revisa la consola para detalles.",
+    "errorRoadMask": "Error al exportar mascara de carreteras. Revisa la consola para detalles.",
+    "errorGlb": "Error al exportar GLB. Revisa la consola para detalles.",
+    "errorDae": "Error al exportar DAE. Revisa la consola para detalles.",
+    "errorTer": "Error al exportar TER. Revisa la consola para detalles."
   },
   "batch": {
     "copyConfig": "Copiar configuracion",
@@ -219,6 +248,10 @@
     "segmentedTip": "Satelite segmentado (bloques de color planos)",
     "noSegmentedHybrid": "No hay datos de hibrido segmentado disponibles",
     "segmentedHybridTip": "Satelite segmentado + overlay de carreteras",
+    "surroundingsTexture": "Textura de alrededores",
+    "surroundingTerrain": "Terreno circundante",
+    "surroundingDesc": "Mosaicos adyacentes adaptativos con mezcla de costuras y detalle satelital optimizado para vista previa.",
+    "wireframeMode": "Modo wireframe",
     "features3d": "Features 3D",
     "resetCamera": "Restablecer camara"
   },
@@ -237,10 +270,15 @@
     "osmData": "Datos OSM",
     "includeBackdrop": "Incluir fondo",
     "includeBuildings": "Incluir edificios",
+    "exportBuildings": "Exportar edificios OSM 3D",
     "applyFoundations": "Aplicar foundations",
+    "raiseUnderBuildings": "Elevar terreno bajo edificios inclinados",
     "water": "Agua",
+    "lakesRivers": "Lagos y rios",
     "treesBushes": "Arboles/arbustos",
+    "nativeForest": "Items de bosque nativos",
     "rocks": "Rocas",
+    "quarryRock": "Cobertura de cantera/roca",
     "roads": "Calles",
     "meshRoads": "Geometría malla 3D",
     "communityQualityNotice": "Las exportaciones de MapNG se disfrutan mejor como punto de partida. Para lanzamientos publicos, recomendamos dedicar trabajo adicional de world-building y pulido antes de publicarlas en hubs de mods.",
@@ -290,7 +328,22 @@
     "cleanupToolCredit": " para generar un mapa mucho mas detallado. Herramienta de AlexKidd.",
     "exportingBeamng": "Exportando nivel BeamNG",
     "mayTakeWhile": "Esto puede tardar en mapas grandes",
-    "elapsed": "Transcurrido"
+    "elapsed": "Transcurrido",
+    "hybrid": "Hibrido",
+    "surroundingTerrain": "Terreno circundante",
+    "assets2d": "Assets 2D",
+    "heightmap": "Heightmap",
+    "osmTexture": "Textura OSM",
+    "roadMask": "Mascara de carreteras",
+    "models3d": "Modelos 3D",
+    "centerTexture": "Textura central:",
+    "tiles": "Mosaicos:",
+    "center": "Centro",
+    "centerPlusSurroundings": "Centro + alrededores",
+    "surroundingsOnly": "Solo alrededores",
+    "glbModel": "Modelo GLB",
+    "colladaDae": "Collada DAE",
+    "beamngTerrain": "Terreno BeamNG"
   },
   "controlPanel": {
     "outputSettings": "Ajustes de salida",
@@ -312,7 +365,11 @@
     "osmCoverageUnavailable": "Lista de cobertura no disponible ahora.",
     "osmCoverageLoading": "Cargando cobertura…",
     "centerCoordinates": "Coordenadas del centro",
-    "configurationSession": "Configuracion y sesion"
+    "configurationSession": "Configuracion y sesion",
+    "modeBasic": "Básico",
+    "modeAdvanced": "Avanzado",
+    "modeBasicHint": "Solo el nivel de BeamNG. Cambia a Avanzado para descargar heightmaps, texturas y modelos 3D, teselas circundantes y más opciones de exportación.",
+    "modeAdvancedHint": "Todas las herramientas: descargas 2D y 3D, teselas circundantes, opciones de nivel por categoría y extras de la vista previa."
   },
   "batchExport": {
     "title": "Opciones de exportacion",
@@ -411,7 +468,7 @@
       "Elevación GeoTIFF (WGS84 o CRS de origen)",
       "Datos vectoriales OSM en GeoJSON",
       "Datos de trabajo (.mapng): una sesión completa guardada",
-      "El modo por lotes añade por casilla: mapas de altura de 16 bits, texturas satélite, OSM e híbridas, máscaras de carretera, GLB, DAE y .ter"
+      "El modo avanzado y el modo por lotes (por casilla) añaden: mapas de altura de 16 bits, texturas satélite, OSM e híbridas, máscaras de carretera, GLB, DAE y .ter"
     ],
     "osmTitle": "Datos de OpenStreetMap",
     "osmItems": [
