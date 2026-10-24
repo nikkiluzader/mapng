@@ -336,3 +336,29 @@ test('roads are carved where the export draws them, even on a 16 km map far nort
     assert.ok(Math.abs(p.x - u * (N - 1)) < 0.01 && Math.abs(p.y - v * (N - 1)) < 0.01, `(${u}, ${v}) → ${p.x}, ${p.y}`);
   }
 });
+
+test('a road with densely drawn curves climbs a slope without steps', async () => {
+  const { roundRoadCorners } = await import('../services/roadCurves.js');
+  const mpp = 1;
+  const bounds = makeBounds(W, H, mpp);
+  // Plane rising 5 % to the east; the leveler should leave its grade alone.
+  const hm = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) hm[y * W + x] = 100 + 0.05 * x;
+  const raw = hm.slice();
+  // A bent road whose bends become 1 m arc points (what roadCurves emits).
+  const [road] = roundRoadCorners([{
+    id: 'r', type: 'road', tags: { highway: 'secondary' },
+    geometry: [[20, 60], [90, 128], [160, 70], [235, 140]].map(([x, y]) => ({ lat: latAtPy(bounds, y), lng: lngAtPx(bounds, x) })),
+  }]).features;
+  assert.ok(road.geometry.length > 20, 'curves were rounded');
+  smoothRoadsInHeightmap(hm, W, H, bounds, [road], mpp);
+  let worst = 0;
+  for (let i = 0; i + 1 < road.geometry.length; i++) {
+    const a = road.geometry[i];
+    const x = Math.round(((a.lng - bounds.west) / (bounds.east - bounds.west)) * (W - 1));
+    const y = Math.round(((bounds.north - a.lat) / (bounds.north - bounds.south)) * (H - 1));
+    if (x < 40 || x > W - 40) continue; // ends are pinned/one-sided
+    worst = Math.max(worst, Math.abs(hm[y * W + x] - raw[y * W + x]));
+  }
+  assert.ok(worst < 0.1, `centerline moved ${worst.toFixed(3)} m off the slope`);
+});

@@ -48,32 +48,32 @@ function pointLineProjection(x, y, x1, y1, x2, y2) {
 }
 
 /**
- * Resample a polyline so that segments are no longer than maxSegmentLength (in pixels).
+ * Resample a polyline at a uniform arc-length spacing (pixels), keeping both
+ * ends. The profile smoothing window is counted in samples, so it must not
+ * depend on how densely the way was drawn: curves rounded into 1 m arc
+ * points (roadCurves.js) shrank the window to a few metres there and left
+ * the road profile stepped.
  */
-function resamplePolyline(points, maxSegmentLength) {
+function resampleUniform(points, spacing) {
     if (points.length < 2) return points;
-    const resampled = [points[0]];
-
+    const out = [points[0]];
+    let carry = 0;
     for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
         const p2 = points[i + 1];
-        const dx = p2.x - p1.x;
-        const dy = p2.y - p1.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist > maxSegmentLength) {
-            const numSegments = Math.ceil(dist / maxSegmentLength);
-            for (let j = 1; j < numSegments; j++) {
-                const t = j / numSegments;
-                resampled.push({
-                    x: p1.x + t * dx,
-                    y: p1.y + t * dy
-                });
-            }
+        const L = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        let s = spacing - carry;
+        while (s < L) {
+            out.push({ x: p1.x + ((p2.x - p1.x) * s) / L, y: p1.y + ((p2.y - p1.y) * s) / L });
+            s += spacing;
         }
-        resampled.push(p2);
+        carry = L - (s - spacing);
     }
-    return resampled;
+    const last = points[points.length - 1];
+    const tail = out[out.length - 1];
+    if (Math.hypot(last.x - tail.x, last.y - tail.y) > spacing * 0.25) out.push(last);
+    else out[out.length - 1] = last;
+    return out;
 }
 
 /**
@@ -214,7 +214,7 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
         if (!geom || geom.length < 2) continue;
 
         const rawPoints = geom.map((pt) => project(pt.lat, pt.lng));
-        const points = resamplePolyline(rawPoints, maxSegmentLengthPx);
+        const points = resampleUniform(rawPoints, maxSegmentLengthPx);
         if (points.length < 2) continue;
 
         const zOrig = new Float32Array(points.length);
