@@ -20,6 +20,7 @@ import { createLocalToWGS84 } from "./geoUtils.js";
 import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
+import { roundRoadCorners } from "./roadCurves.js";
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights } from "./terrariumSampling.js";
 import { scaleNativeDimsToProcessingMpp } from "./uploadBounds.js";
 import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSize.js";
@@ -2113,7 +2114,8 @@ export const fetchTerrainData = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.("Fetching OpenStreetMap data...");
-    osmFeatures = await fetchOSMData(finalBounds, { onStatus: onProgress, signal });
+    osmFeatures = await fetchOSMData(finalBounds, { onStatus: onProgress, signal })
+    osmFeatures = roundRoadCorners(osmFeatures).features;
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2476,7 +2478,8 @@ export const loadTerrainFromTif = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     emitProgress('Fetching OpenStreetMap data...');
-    osmFeatures = await fetchOSMData(finalBounds, { onStatus: emitProgress, signal });
+    osmFeatures = await fetchOSMData(finalBounds, { onStatus: emitProgress, signal })
+    osmFeatures = roundRoadCorners(osmFeatures).features;
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2701,7 +2704,8 @@ export const loadTerrainFromLaz = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.('Fetching OpenStreetMap data...');
-    osmFeatures = await fetchOSMData(fetchBounds, { onStatus: onProgress, signal });
+    osmFeatures = await fetchOSMData(fetchBounds, { onStatus: onProgress, signal })
+    osmFeatures = roundRoadCorners(osmFeatures).features;
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(fetchBounds),
       endpointUsed: null,
@@ -2887,7 +2891,7 @@ export const addOSMToTerrain = async (
   onProgress,
 ) => {
   onProgress?.("Fetching OpenStreetMap data...");
-  const osmFeatures = await fetchOSMData(terrainData.bounds, { onStatus: onProgress });
+  const osmFeatures = roundRoadCorners(await fetchOSMData(terrainData.bounds, { onStatus: onProgress })).features;
   const osmRequestInfo = getLastOSMRequestInfo() || {
     ...getOSMQueryParameters(terrainData.bounds),
     endpointUsed: null,
