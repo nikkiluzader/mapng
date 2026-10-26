@@ -182,3 +182,63 @@ test('the ground at an abutment meets the deck: a flat pad, filled under its end
   for (let x = -28; x <= -4; x += 2) assert.ok(at(x, 0) <= 3 - 0.03 * x - 0.14, `under the deck at x ${x}: ${at(x, 0).toFixed(2)}`);
   assert.ok(Math.abs(at(40, 0) - 3) < 1e-6, 'the ground beyond the pad untouched');
 });
+
+test('an overpass baked into the elevation: the road under it is not drawn over the hump', async () => {
+  const { generateDecalRoads } = await import('../services/exportBeamNGLevel.js');
+  // 1 km flat at 10 m; a 6.5 m ridge along y = 0 (the bridge and its
+  // embankments in the DEM), as I-65 under SR 114 in 30 m Terrarium
+  const N = 512; const size = 1000; const sq = size / (N - 1); const deg = size / 111320;
+  const hm = new Float32Array(N * N);
+  for (let r = 0; r < N; r++) {
+    const y = (0.5 - r / (N - 1)) * size;
+    for (let c = 0; c < N; c++) hm[r * N + c] = 10 + 6.5 * Math.exp(-((y / 15) ** 2));
+  }
+  const ll = (x, y) => ({ lat: (y / size) * deg, lng: (x / size) * deg });
+  const way = (id, pts, tags) => ({ id, type: 'road', geometry: pts.map(([x, y]) => ll(x, y)), tags });
+  const groups = generateDecalRoads({
+    width: N, height: N, minHeight: 10, maxHeight: 16.5, heightMap: hm,
+    bounds: { south: -deg / 2, north: deg / 2, west: -deg / 2, east: deg / 2 },
+    roadRules: { countryCode: 'US', region: 'Americas' },
+    osmFeatures: [
+      way('1', [[-300, 0], [-40, 0]], { highway: 'secondary', name: 'SR 114' }),
+      way('2', [[-40, 0], [40, 0]], { highway: 'secondary', name: 'SR 114', bridge: 'yes', layer: '1' }),
+      way('3', [[40, 0], [300, 0]], { highway: 'secondary', name: 'SR 114' }),
+      way('4', [[0, -300], [0, 300]], { highway: 'motorway', name: 'I-65', oneway: 'yes' }),
+    ],
+  }, sq);
+  const base = groups.flatMap((g) => g.__items).filter((d) => d.name.startsWith('dr_I_65') && d.material === 'road_asphalt_2lane');
+  const nodes = base.flatMap((d) => d.nodes);
+  const zNear = (y0) => nodes.reduce((best, n) => (Math.abs(n[1] - y0) < Math.abs(best[1] - y0) ? n : best))[2];
+  assert.ok(zNear(0) - zNear(80) < 0.6, `I-65 climbs ${(zNear(0) - zNear(80)).toFixed(2)} m under the bridge`);
+  assert.ok(groups.bridges.humps.length > 0, 'the hump was found');
+  const deck = groups.bridges.decks[0].parts[0];
+  const mid = deck.z[deck.xy.findIndex(([x]) => x >= 0)];
+  assert.ok(mid - zNear(0) > 5.5, `deck ${(mid - zNear(0)).toFixed(2)} m over I-65`);
+});
+
+test('a short flyover whose embankment cannot be raised is carried on along its approach', async () => {
+  const { generateDecalRoads } = await import('../services/exportBeamNGLevel.js');
+  // flat 1 km; a 60 m trunk_link bridge over a motorway, a frontage road
+  // right beside its approaches (no room for an embankment)
+  const N = 512; const size = 1000; const sq = size / (N - 1); const deg = size / 111320;
+  const ll = (x, y) => ({ lat: (y / size) * deg, lng: (x / size) * deg });
+  const way = (id, pts, tags) => ({ id, type: 'road', geometry: pts.map(([x, y]) => ll(x, y)), tags });
+  const groups = generateDecalRoads({
+    width: N, height: N, minHeight: 0, maxHeight: 1, heightMap: new Float32Array(N * N),
+    bounds: { south: -deg / 2, north: deg / 2, west: -deg / 2, east: deg / 2 },
+    roadRules: { countryCode: 'US', region: 'Americas' },
+    osmFeatures: [
+      way('1', [[-400, 0], [-30, 0]], { highway: 'trunk_link', oneway: 'yes' }),
+      way('2', [[-30, 0], [30, 0]], { highway: 'trunk_link', oneway: 'yes', bridge: 'yes', layer: '1' }),
+      way('3', [[30, 0], [400, 0]], { highway: 'trunk_link', oneway: 'yes' }),
+      way('4', [[0, -400], [0, 400]], { highway: 'motorway', name: 'I-1', oneway: 'yes' }),
+      way('5', [[-400, 9], [-40, 9]], { highway: 'residential', name: 'Frontage West' }),
+      way('6', [[40, 9], [400, 9]], { highway: 'residential', name: 'Frontage East' }),
+    ],
+  }, sq);
+  const b = groups.bridges;
+  assert.ok(b.carried > 0, 'carried on');
+  assert.ok(b.decks[0].roadShortfall < 0.6, `short ${b.decks[0].roadShortfall.toFixed(2)} m over the motorway`);
+  const ramp = groups.flatMap((g) => g.__items).filter((d) => d.class === 'DecalRoad' && d.overObjects && d.material === 'road_asphalt_2lane');
+  assert.ok(ramp.length >= 3, 'the approaches are drawn on the deck');
+});

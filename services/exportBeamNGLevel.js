@@ -37,7 +37,7 @@ import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
   solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck,
-  liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M,
+  liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE,
 } from './beamngBridges.js';
 import {
   solveTunnel, chainTunnelParts, isBoredTunnelTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, tunnelReach,
@@ -2078,7 +2078,6 @@ function shouldGenerateDecalRoads(highway, tags = {}) {
   if (!highway || ROAD_SKIP.has(highway)) return false;
   if (tags.area === 'yes') return false;
 
-  if (highway === 'trunk_link') return false;
 
   if (highway === 'service') return false;
 
@@ -2865,6 +2864,146 @@ function landOnBerms(parts, lowerRoads, groundAt) {
   return added;
 }
 
+// A deck neither the ground nor an embankment lets clear what it crosses
+// (an interchange's flyover ramp: OSM maps only the structure as the bridge,
+// and the embankments or retaining walls it climbs on are too narrow for 30 m
+// elevation to hold; at a junction no embankment can be raised) is carried on
+// along its approach roads instead, far enough to climb the shortfall at the
+// deck's grade: the approach is drawn on the deck there, as a walled ramp.
+const CARRY_MIN_SHORTFALL_M = 0.5;   // short by less than this: left as it is
+const CARRY_MAX_M = 300;             // never carried on further than this (per round)
+const CARRY_ROUNDS = 3;
+const CARRY_CLEAR_M = 25;           // stops this far short of another deck over (or under) the approach
+const CARRY_MIN_M = 20;              // shorter than this: not worth carrying on
+
+/**
+ * Carry decks on from their abutments along the approach roads: requests
+ * [{ x, y, length }] (an abutment and how far). Follows the approach and its
+ * plain continuations (one road on, no deck) up to `length`, trimming or
+ * dropping the lowerRoads it takes. Returns the parts added (each joined to
+ * its deck at the abutment, listing the approaches it runs on, .landedOn).
+ */
+function carryOnApproaches(parts, lowerRoads, requests, groundAt) {
+  const added = [];
+  const near = (p, x, y) => Math.hypot(p[0] - x, p[1] - y) < 1.5;
+  const endsAt = (xy, x, y) => near(xy[0], x, y) || near(xy[xy.length - 1], x, y);
+  // where segment a-b first crosses another deck's line in plan (fraction),
+  // or -1; a higher deck is solved after and clears the carried one
+  const crossesDeck = (a, b, own) => {
+    let first = -1;
+    for (const p of parts) {
+      if (p === own || (p.layer ?? 1) > (own.layer ?? 1)) continue;
+      for (let j = 0; j + 1 < p.xy.length; j++) {
+        const [cx, cy] = p.xy[j]; const [dx, dy] = p.xy[j + 1];
+        const den = (b[0] - a[0]) * (dy - cy) - (b[1] - a[1]) * (dx - cx);
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((cx - a[0]) * (dy - cy) - (cy - a[1]) * (dx - cx)) / den;
+        const u = ((cx - a[0]) * (b[1] - a[1]) - (cy - a[1]) * (b[0] - a[0])) / den;
+        if (t > 1e-6 && t <= 1 && u >= 0 && u <= 1 && (first < 0 || t < first)) first = t;
+      }
+    }
+    return first;
+  };
+  const roadBoxes = new Map();
+  // where segment a-b first meets another ground road (crossing it, or one
+  // ending on it: a junction partway along an OSM way), or -1
+  const meetsRoad = (a, b, skip) => {
+    const vx = b[0] - a[0]; const vy = b[1] - a[1];
+    const L2 = vx * vx + vy * vy || 1e-9;
+    let first = -1;
+    const take = (t) => { if (t > 1e-6 && t <= 1 && (first < 0 || t < first)) first = t; };
+    const box = [Math.min(a[0], b[0]) - 2, Math.min(a[1], b[1]) - 2, Math.max(a[0], b[0]) + 2, Math.max(a[1], b[1]) + 2];
+    for (const r of lowerRoads) {
+      if (skip.has(r)) continue;
+      if (!roadBoxes.has(r)) {
+        const xs = r.xy.map((q) => q[0]); const ys = r.xy.map((q) => q[1]);
+        roadBoxes.set(r, [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+      }
+      const rb = roadBoxes.get(r);
+      if (rb[0] > box[2] || rb[2] < box[0] || rb[1] > box[3] || rb[3] < box[1]) continue;
+      for (const e of [r.xy[0], r.xy[r.xy.length - 1]]) {
+        const t = ((e[0] - a[0]) * vx + (e[1] - a[1]) * vy) / L2;
+        if (t >= 0 && t <= 1 && Math.hypot(a[0] + vx * t - e[0], a[1] + vy * t - e[1]) < 2) take(t);
+      }
+      for (let j = 0; j + 1 < r.xy.length; j++) {
+        const [cx, cy] = r.xy[j]; const [dx, dy] = r.xy[j + 1];
+        const den = vx * (dy - cy) - vy * (dx - cx);
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((cx - a[0]) * (dy - cy) - (cy - a[1]) * (dx - cx)) / den;
+        const u = ((cx - a[0]) * vy - (cy - a[1]) * vx) / den;
+        if (u >= 0 && u <= 1) take(t);
+      }
+    }
+    return first;
+  };
+  for (const { x, y, length } of requests) {
+    const at = parts.filter((p) => endsAt(p.xy, x, y));
+    // two decks meeting there (a fork) or no deck: nothing to carry on
+    if (at.length !== 1) continue;
+    const start = lowerRoads.filter((r) => endsAt(r.xy, x, y));
+    if (start.length !== 1) continue;   // a junction at the abutment
+    // the approach and its plain continuations, as a path: [x, y, road, i]
+    // (point i of that road's line in walking order)
+    const path = [[x, y]];
+    const steps = [];
+    let from = [x, y];
+    let road = start[0];
+    let walked = 0;
+    let limit = length;
+    const used = new Set();
+    walk: while (road && !used.has(road)) {
+      used.add(road);
+      const fromStart = near(road.xy[0], from[0], from[1]);
+      const line = fromStart ? road.xy : [...road.xy].reverse();
+      steps.push({ road, fromStart, line });
+      for (let i = 0; i + 1 < line.length; i++) {
+        const L = Math.hypot(line[i + 1][0] - line[i][0], line[i + 1][1] - line[i][1]);
+        // the approach passes under another deck (or over one, no higher):
+        // it is at the ground there, so the carried deck stops well short
+        const t = crossesDeck(line[i], line[i + 1], at[0]);
+        if (t >= 0) limit = Math.min(limit, walked + t * L - CARRY_CLEAR_M);
+        // nor through a junction: a road meeting the approach is at grade
+        const tj = meetsRoad(line[i], line[i + 1], new Set([...used, ...start]));
+        if (tj >= 0) limit = Math.min(limit, walked + tj * L - CARRY_CLEAR_M);
+        if (walked + L >= limit) break walk;
+        walked += L;
+        path.push([line[i + 1][0], line[i + 1][1]]);
+      }
+      from = line[line.length - 1];
+      const next = lowerRoads.filter((r) => endsAt(r.xy, from[0], from[1]));
+      road = next.length === 1 && !parts.some((p) => endsAt(p.xy, from[0], from[1])) ? next[0] : null;
+    }
+    if (limit < CARRY_MIN_M) continue;
+    // now take the approach roads up to the limit
+    const xy = [[x, y]];
+    const landedOn = [];
+    let left = limit;
+    for (const { road, fromStart, line } of steps) {
+      landedOn.push(road.segIndex);
+      let cut = false;
+      for (let i = 0; i + 1 < line.length; i++) {
+        const L = Math.hypot(line[i + 1][0] - line[i][0], line[i + 1][1] - line[i][1]);
+        if (L >= left) {
+          const k = left / L;
+          const px = line[i][0] + (line[i + 1][0] - line[i][0]) * k;
+          const py = line[i][1] + (line[i + 1][1] - line[i][1]) * k;
+          xy.push([px, py]);
+          const rest = [[px, py, groundAt(px, py)], ...line.slice(i + 1)];
+          road.xy = fromStart ? rest : rest.reverse();
+          cut = true;
+          break;
+        }
+        xy.push([line[i + 1][0], line[i + 1][1]]);
+        left -= L;
+      }
+      if (cut) break;
+      lowerRoads.splice(lowerRoads.indexOf(road), 1);   // the whole road taken
+    }
+    if (xy.length >= 2) added.push({ ...at[0], xy, landedOn, carried: true });
+  }
+  return added;
+}
+
 // The approach road samples an abutment's height is fitted to (m from the
 // bridge's end), and the steepest grade that fit may carry on to it: about
 // the steepest streets (a hillside street climbing 23 % from a bridge, held
@@ -2901,6 +3040,8 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
   const structureOf = (tags, xy) => tags['bridge:structure']
     || outlines.find((o) => xy.filter(([x, y]) => inRing(x, y, o.ring)).length >= 0.2 * xy.length)?.structure
     || null;
+  // decks carried on along their approaches (carryOnApproaches), kept over re-collects
+  const carryOns = [];
   const collect = () => {
     tunnelEnds.length = 0;
     const parts = [];
@@ -2940,11 +3081,20 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
       parts.push(ext);
       partSeg.push(-1);
     }
+    for (const ext of carryOnApproaches(parts, lowerRoads, carryOns, groundAt)) {
+      parts.push(ext);
+      partSeg.push(-1);
+    }
     return { parts, partSeg, lowerRoads };
   };
   let { parts, partSeg, lowerRoads } = collect();
   const bySeg = new Map();
   if (!parts.length) return { bySeg, approaches: new Map(), decks: [], roadLines: [] };
+  // Overpasses baked into the elevation: the roads under them would climb
+  // over the deck's hump into it. Taken out first, so the roads (and the
+  // decks' clearance over them) see the ground under the bridge.
+  const humps = cutBridgeHumps(terrainData, squareSize, parts, lowerRoads, groundAt);
+  if (humps.length > 0) ({ parts, partSeg, lowerRoads } = collect());
   // An abutment meets its approach road at the height the road arrives at:
   // the ground along the approach, fitted and carried on to the bridge's end.
   // Never the ground at the end itself: bare-earth (lidar) elevation has the
@@ -3038,6 +3188,22 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
     ({ parts, partSeg, lowerRoads } = collect());
     decks = solveBridgeDecks(parts, { groundAt, endHeight, wetAt, lowerRoads, isFreeEnd });
   }
+  // Still short: carried on along the approaches, far enough to climb it.
+  // A few rounds: a deck carried higher asks more of the one over it.
+  for (let round = 0; round < CARRY_ROUNDS; round++) {
+    const before = carryOns.length;
+    for (const deck of decks) {
+      // over roads only: a deck low over water blocks nothing
+      if (!(deck.roadShortfall > CARRY_MIN_SHORTFALL_M)) continue;
+      const length = Math.min(CARRY_MAX_M, (deck.roadShortfall + 0.5) / DECK_MAX_GRADE);
+      for (const [x, y] of deck.abutments) {
+        if (!isFreeEnd(x, y) && !carryOns.some((c) => Math.hypot(c.x - x, c.y - y) < 1.5)) carryOns.push({ x, y, length });
+      }
+    }
+    if (carryOns.length === before) break;
+    ({ parts, partSeg, lowerRoads } = collect());
+    decks = solveBridgeDecks(parts, { groundAt, endHeight, wetAt, lowerRoads, isFreeEnd });
+  }
   gradeAbutments(terrainData, squareSize, decks);
   for (const deck of decks) for (const part of deck.parts) if (partSeg[part.index] >= 0) bySeg.set(partSeg[part.index], part);
   // approach roads a deck was carried on over (their road is drawn on it there)
@@ -3048,11 +3214,140 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
     }
   }
   return {
-    bySeg, approaches, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built,
+    bySeg, approaches, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built, humps,
+    carried: parts.filter((p) => p.carried).length,
     // for the export report: each part's OSM way (carried-on approaches have none)
-    partInfo: parts.map((p, i) => ({ ...(p.osm || { id: null, name: null, highway: null }), structure: p.structure ?? null, landing: partSeg[i] < 0 })),
+    partInfo: parts.map((p, i) => ({ ...(p.osm || { id: null, name: null, highway: null }), structure: p.structure ?? null, landing: partSeg[i] < 0 && !p.carried, carried: !!p.carried })),
     endHeight,
   };
+}
+
+// Overpasses in the elevation data. Bare-earth models are meant to have the
+// bridges taken out, but many (USGS 3DEP-derived 30 m Terrarium among them)
+// keep an overpass as a ridge across the road under it: I-65 under SR 114,
+// Indiana, rises 6.5 m over 40 m into the deck. Where a ground road crosses
+// under a bridge, the ground along the deck's normal is checked against the
+// line between the ground HUMP_SIDE_M either side of the deck; standing over
+// it by more than HUMP_MIN_M, the strip under the deck around the crossing
+// roads is lowered to that line (never raised), fading out along the deck.
+const HUMP_SIDE_M = [30, 45];   // ground this far either side of the deck: the real ground
+const HUMP_MIN_M = 1.5;         // a ridge over the line by this much is the bridge
+const HUMP_MARGIN_M = 6;        // cut beyond a crossing road's edge (shoulders) ...
+const HUMP_FADE_M = 10;         // ... then faded back to the ground along the deck
+
+/**
+ * Lower the baked-in overpass ridges under the bridge parts where ground
+ * roads (lowerRoads) cross them. Returns [{ x, y, lift }] per crossing cut
+ * (lift: metres the ground stood over the line at the crossing).
+ */
+function cutBridgeHumps(terrainData, squareSize, parts, lowerRoads, groundAt) {
+  const { width, height, minHeight } = terrainData;
+  const worldSize = width * squareSize;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const median = (v) => { const q = [...v].sort((m, n) => m - n); return q[q.length >> 1]; };
+  // the line through the real ground either side of the deck at (x, y),
+  // deck normal n: its height at offset d along n
+  const lineAcross = (x, y, nx, ny) => {
+    const side = (sign) => {
+      const v = [];
+      for (let d = HUMP_SIDE_M[0]; d <= HUMP_SIDE_M[1]; d += 2) v.push(groundAt(x + sign * nx * d, y + sign * ny * d));
+      return median(v);
+    };
+    const a = side(-1); const b = side(1);
+    const mid = (HUMP_SIDE_M[0] + HUMP_SIDE_M[1]) / 2;
+    return (d) => a + (b - a) * (d + mid) / (2 * mid);
+  };
+  const hm = heightMapEditor(terrainData);
+  const cuts = [];
+  for (const part of parts) {
+    const xy = part.xy;
+    const s = [0];
+    for (let i = 1; i < xy.length; i++) s.push(s[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+    // crossings: deck station, the crossing road's half width
+    const crossings = [];
+    for (const road of lowerRoads) {
+      if ((road.layer ?? 0) >= (part.layer ?? 1)) continue;
+      const q = road.xy;
+      for (let i = 0; i + 1 < xy.length; i++) {
+        const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
+        for (let j = 0; j + 1 < q.length; j++) {
+          const [cx, cy] = q[j]; const [dx, dy] = q[j + 1];
+          const den = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+          if (Math.abs(den) < 1e-9) continue;
+          const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / den;
+          const u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / den;
+          if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+          const x = ax + (bx - ax) * t; const y = ay + (by - ay) * t;
+          // an approach road starting at the deck's end only touches it
+          const near = (p) => Math.hypot(p[0] - x, p[1] - y) < 1;
+          if ((near(xy[0]) || near(xy[xy.length - 1])) && (near(q[0]) || near(q[q.length - 1]))) continue;
+          const L = Math.hypot(bx - ax, by - ay) || 1;
+          const nx = -(by - ay) / L; const ny = (bx - ax) / L;
+          const lift = groundAt(x, y) - lineAcross(x, y, nx, ny)(0);
+          if (lift > HUMP_MIN_M) crossings.push({ s: s[i] + t * L, x, y, half: road.half, lift });
+        }
+      }
+    }
+    if (!crossings.length) continue;
+    // the deck stations to cut (crossings merged), with the fade
+    const spans = crossings
+      .map((c) => [c.s - c.half - HUMP_MARGIN_M, c.s + c.half + HUMP_MARGIN_M])
+      .sort((a, b) => a[0] - b[0])
+      .reduce((out, sp) => {
+        const last = out[out.length - 1];
+        if (last && sp[0] <= last[1] + HUMP_FADE_M) last[1] = Math.max(last[1], sp[1]);
+        else out.push([...sp]);
+        return out;
+      }, []);
+    const weightAt = (st) => {
+      let w = 0;
+      for (const [a, b] of spans) {
+        if (st >= a && st <= b) return 1;
+        const off = st < a ? a - st : st - b;
+        w = Math.max(w, 1 - off / HUMP_FADE_M);
+      }
+      return Math.max(0, w);
+    };
+    const reach = HUMP_SIDE_M[0];
+    const xs = xy.map((p) => p[0]); const ys = xy.map((p) => p[1]);
+    const [c0, r1] = toPixel(Math.min(...xs) - reach, Math.min(...ys) - reach);
+    const [c1, r0] = toPixel(Math.max(...xs) + reach, Math.max(...ys) + reach);
+    const lines = new Map();   // per deck segment and station step: the line across
+    for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+      for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+        const [x, y] = toWorld(c, r);
+        let best = Infinity; let st = 0; let d = 0; let seg = 0; let foot = null;
+        for (let i = 0; i + 1 < xy.length; i++) {
+          const vx = xy[i + 1][0] - xy[i][0]; const vy = xy[i + 1][1] - xy[i][1];
+          const L2 = vx * vx + vy * vy || 1e-9;
+          const t = Math.max(0, Math.min(1, ((x - xy[i][0]) * vx + (y - xy[i][1]) * vy) / L2));
+          const px = xy[i][0] + vx * t; const py = xy[i][1] + vy * t;
+          const dist = Math.hypot(px - x, py - y);
+          if (dist < best) {
+            best = dist; st = s[i] + t * (s[i + 1] - s[i]); seg = i; foot = [px, py];
+            const L = Math.sqrt(L2);
+            d = ((x - px) * -vy + (y - py) * vx) / L;
+          }
+        }
+        if (best >= reach) continue;
+        const w = weightAt(st);
+        if (w <= 0) continue;
+        const L = Math.hypot(xy[seg + 1][0] - xy[seg][0], xy[seg + 1][1] - xy[seg][1]) || 1;
+        const nx = -(xy[seg + 1][1] - xy[seg][1]) / L; const ny = (xy[seg + 1][0] - xy[seg][0]) / L;
+        // the line across, per metre of station (shared by the pixels there)
+        const key = `${seg}:${Math.round(st)}`;
+        if (!lines.has(key)) lines.set(key, lineAcross(foot[0], foot[1], nx, ny));
+        const idx = r * width + c;
+        const now = hm.at(idx) - minHeight;
+        const target = lines.get(key)(d);
+        if (target >= now) continue;
+        hm.set(idx, now - (now - target) * w + minHeight);
+      }
+    }
+    for (const c of crossings) cuts.push({ x: c.x, y: c.y, lift: c.lift });
+  }
+  return cuts;
 }
 
 // The ground at each abutment meets the deck: the approach is graded to the
@@ -3263,6 +3558,10 @@ function raiseApproachEmbankments(terrainData, squareSize, ramps) {
           }
         }
         if (best > reach || along >= ramp.length) continue;
+        // only on the approach's side of the abutment: under the deck the
+        // ground is gradeAbutments' (a ramp's round end there reached the
+        // road crossing under the bridge, and the whole ramp was refused)
+        if ((x - ramp.abutment[0]) * ramp.dir[0] + (y - ramp.abutment[1]) * ramp.dir[1] < -0.5) continue;
         const top = roadZ + rampLift(along, ramp.lift, ramp.length);
         let target = (best <= flat ? top : top - (best - flat) * RAMP_SIDE_SLOPE) + minHeight;
         const idx = r * width + c;
@@ -4715,6 +5014,8 @@ function buildDetailedReportSections(d) {
   const decks = bridges?.decks || [];
   const partInfo = bridges?.partInfo || [];
   lines.push(`- Bridge decks: ${decks.length}, approach embankments built: ${bridges?.ramps ?? 0}`);
+  lines.push(`- Decks carried on along their approach roads to climb what they cross (walled ramps): ${bridges?.carried ?? 0}`);
+  lines.push(`- Overpasses baked into the elevation, cut out under the deck: ${(bridges?.humps || []).length}${(bridges?.humps || []).length ? ` (the ground stood ${(bridges.humps).map((h) => `${formatNumber(h.lift, 1)} m`).join(', ')} over the roads under them)` : ''}`);
   lines.push('- Heights are absolute (m above sea level); "ground" is the exported terrain under the point.');
   lines.push('- An abutment far from its ground means the deck meets its road above/below the terrain: look there first.');
   const daeByKey = new Map((d.bridgeDaes || []).map((b) => [b.key, b]));
@@ -4725,6 +5026,7 @@ function buildDetailedReportSections(d) {
     const names = [...new Set(named.map((x) => `${x.name || 'unnamed'} [${x.highway || '?'}]`))].join(', ') || 'n/a';
     const ways = [...new Set(named.map((x) => String(x.id ?? '?').replace(/_seg_\d+$/, '')))].join(', ');
     const landings = infos.filter((x) => x.landing).length;
+    const carriedOn = infos.filter((x) => x.carried).length;
     const length = deck.parts.reduce((n, p) => n + polylineLength(p.xy), 0);
     let maxGap = -Infinity; let minGap = Infinity; let sumGap = 0; let nGap = 0;
     for (const p of deck.parts) {
@@ -4739,7 +5041,7 @@ function buildDetailedReportSections(d) {
     const dae = daeByKey.get(key);
     lines.push('');
     lines.push(`Bridge ${key}: ${names}`);
-    lines.push(`  - OSM way(s): ${ways || 'n/a'}${landings ? `; ${landings} part(s) carried on over the approach road (lidar gap)` : ''}`);
+    lines.push(`  - OSM way(s): ${ways || 'n/a'}${landings ? `; ${landings} part(s) carried on over the approach road (lidar gap)` : ''}${carriedOn ? `; ${carriedOn} part(s) carried on along the approach to climb (walled ramp)` : ''}`);
     lines.push(`  - Length ${formatNumber(length, 1)} m in ${deck.parts.length} part(s), width ${formatNumber(2 * Math.max(...deck.parts.map((p) => p.half)), 1)} m, structure ${structure}, depth ${formatNumber(Math.max(...deck.parts.map((p) => p.depth ?? 0)), 2)} m, layer ${deck.layer ?? 'n/a'}`);
     lines.push(`  - Crosses: ${deck.crossed?.roads ?? 'n/a'} road(s), ${deck.crossed?.water ?? 'n/a'} water run(s)${deck.crossed?.nav ? `, ship channel clearance ${deck.crossed.nav} m` : ''}`);
     (deck.abutments || []).forEach(([ax, ay], j) => {
@@ -4752,7 +5054,7 @@ function buildDetailedReportSections(d) {
       lines.push(`  - Abutment ${j + 1} at (${formatNumber(ax, 1)}, ${formatNumber(ay, 1)}): deck ${formatNumber((z ?? NaN) + minH, 2)} m, ground ${formatNumber(g + minH, 2)} m (${z == null ? 'n/a' : `${z - g >= 0 ? '+' : ''}${formatNumber(z - g, 2)} m`}), approach road fit ${fit == null ? 'n/a' : `${formatNumber(fit + minH, 2)} m`}`);
     });
     lines.push(`  - Deck over ground: max ${formatNumber(maxGap, 2)} m, mean ${formatNumber(sumGap / Math.max(1, nGap), 2)} m, min ${formatNumber(minGap, 2)} m`);
-    lines.push(`  - Lowest clearance over a crossed road: ${Number.isFinite(minRoadGap) ? `${formatNumber(minRoadGap, 2)} m` : 'n/a'}; clearance shortfall: ${formatNumber(deck.shortfall ?? 0, 2)} m`);
+    lines.push(`  - Lowest clearance over a crossed road: ${Number.isFinite(minRoadGap) ? `${formatNumber(minRoadGap, 2)} m` : 'n/a'}; clearance shortfall over roads: ${formatNumber(deck.roadShortfall ?? 0, 2)} m, overall (water too): ${formatNumber(deck.shortfall ?? 0, 2)} m`);
     lines.push(`  - Object: bridge_${key}.dae${dae ? `, ${Math.round(dae.triangles)} triangles, origin (${dae.origin.map((v) => formatNumber(v, 1)).join(', ')})` : ' (not written: no geometry)'}`);
   });
 

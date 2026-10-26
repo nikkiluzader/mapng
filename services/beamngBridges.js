@@ -347,6 +347,13 @@ export function solveChain(parts, { groundAt, endHeight = groundAt, crossings = 
     const z = interp(result[cr.part], edges[cr.part].s, cr.s);
     result.minGap[cr.part] = Math.min(result.minGap[cr.part], z - cr.z);
   }
+  // How far under its clearance over the roads it crosses (water aside).
+  result.roadShortfall = 0;
+  for (const cr of crossings) {
+    if (cr.clear != null) continue;
+    const z = interp(result[cr.part], edges[cr.part].s, cr.s);
+    result.roadShortfall = Math.max(result.roadShortfall, cr.z + DECK_ROAD_CLEAR_M - z);
+  }
   result.abutments = ends.map((n) => endXY.get(n));
   return result;
 }
@@ -425,6 +432,7 @@ export function solveBridgeDecks(parts, {
         index: idx[k], xy: p.xy, z: zs[k], half: p.half, minGap: zs.minGap[k], depth: structureDepth(zs.minGap[k]),
       })),
       shortfall: zs.shortfall,
+      roadShortfall: zs.roadShortfall,
       abutments: zs.abutments,
       // for the export report: what it was lifted over
       crossed: { roads: crossings.filter((c) => c.clear == null).length, water: crossings.filter((c) => c.clear != null).length, nav },
