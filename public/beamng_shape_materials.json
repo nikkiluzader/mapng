@@ -6047,6 +6047,86 @@
       "persistentId": "5c352a12-eeeb-4e4a-a87a-21821fdc9c1b",
       "translucentBlendOp": "None"
     },
+    "trafficlight": {
+      "Stages": [
+        {
+          "animFlags": 16,
+          "baseColorMap": "/assets/materials/utility/trafficLight/instanced_trafficlight_lights.png",
+          "colorPaletteMap": "/assets/materials/utility/trafficLight/instanced_trafficlight_palette.color.png",
+          "emissive": true,
+          "emissiveFactor": [
+            1,
+            1,
+            1
+          ],
+          "emissiveIntensityNits": 5000,
+          "emissiveMap": "/assets/materials/utility/trafficLight/instanced_trafficlight_lights.png",
+          "instanceDiffuse": true,
+          "instanceEmissive": true,
+          "pixelSpecular": true,
+          "roughnessFactor": 0.607767701,
+          "sequenceFramePerSec": 10,
+          "sequenceSegmentSize": 0.00139999995,
+          "vertColor": true,
+          "vertColorEmissive": true
+        },
+        {
+          "animFlags": null,
+          "emissive": null,
+          "emissiveFactor": null,
+          "emissiveIntensityNits": null,
+          "instanceDiffuse": null,
+          "instanceEmissive": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "sequenceFramePerSec": null,
+          "sequenceSegmentSize": null,
+          "vertColor": null,
+          "vertColorEmissive": null
+        },
+        {
+          "animFlags": null,
+          "emissive": null,
+          "emissiveFactor": null,
+          "emissiveIntensityNits": null,
+          "instanceDiffuse": null,
+          "instanceEmissive": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "sequenceFramePerSec": null,
+          "sequenceSegmentSize": null,
+          "vertColor": null,
+          "vertColorEmissive": null
+        },
+        {
+          "animFlags": null,
+          "emissive": null,
+          "emissiveFactor": null,
+          "emissiveIntensityNits": null,
+          "instanceDiffuse": null,
+          "instanceEmissive": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "sequenceFramePerSec": null,
+          "sequenceSegmentSize": null,
+          "vertColor": null,
+          "vertColorEmissive": null
+        }
+      ],
+      "alphaRef": 239,
+      "annotation": "TRAFFIC_SIGNALS",
+      "castShadows": false,
+      "class": "Material",
+      "groundType": "METAL",
+      "mapTo": "trafficlight",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "trafficLight",
+      "persistentId": "93cf2335-f8b3-4738-9309-5834caa09def",
+      "translucent": true,
+      "translucentBlendOp": "AddAlpha",
+      "version": 1.5
+    },
     "ut_bld_metal_clean": {
       "Stages": [
         {

@@ -74,6 +74,13 @@ export const SIGNAL_MAST = {
   lightHeight: 12.5, lightForward: 5.4, radius: 24,
 };
 
+// West Coast USA's plain signal post (beamngSignals.js mounts heads on it).
+// Listed here so its 'trafficlight' material, defined only in West Coast
+// USA's own materials file, ships with the export.
+export const SIGNAL_POLE = {
+  shapeFile: '/levels/west_coast_usa/art/shapes/objects/pole_traffic1.dae',
+};
+
 // Traffic calming (services/trafficCalming.js). Driver Training's bolt-down
 // bump: speedbump1 is a module 1 m across the road (local y) and 0.55 m deep
 // (local x), 7.5 cm tall; speedbump2 / speedbump3 are its end caps, their

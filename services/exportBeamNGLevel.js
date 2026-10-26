@@ -4736,8 +4736,13 @@ const NATIVE_BARRIER_ASSETS = {
   },
 };
 
+// Every outdoor level gets one CloudLayer (Sky-and-Weather.md). The 0.39+
+// volumetric clouds read only coverage / windSpeed / windDirection /
+// altitudeKm; the legacy Textures/baseColor/exposure/texture fields are kept as
+// vanilla still saves them. The texture is the engine's global one
+// (gameengine.zip art/skies), not another level's.
 function buildCloudObjects(biome) {
-  if (biome?.levelName !== 'east_coast_usa') return [];
+  const overcast = biome?.levelName === 'east_coast_usa';
   return [{
     __parent: 'sky_and_sun',
     name: 'clouds',
@@ -4749,12 +4754,15 @@ function buildCloudObjects(biome) {
       { texDirection: [0.800000012, 0.200000003], texScale: 3, texSpeed: 0.0250000004 },
       { texDirection: [0.200000003, 0.5], texScale: 4, texSpeed: 0.0350000001 },
     ],
-    baseColor: [0.996078014, 0.996078014, 0.996078014, 0.996078014],
-    coverage: 1.20000005,
-    exposure: 1.29999995,
-    height: 3,
-    texture: 'levels/east_coast_usa/art/skies/SkyNormals_05.dds',
-    windSpeed: 0.200000003,
+    baseColor: [0.996078014, 0.996078014, 0.996078014, overcast ? 0.996078014 : 0.322],
+    // East Coast's own sky is heavily clouded; elsewhere West Coast USA's
+    // light cirrocumulus, which leaves coverage at the engine default.
+    ...(overcast ? { coverage: 1.2 } : {}),
+    exposure: overcast ? 1.29999995 : 1.45,
+    altitudeKm: overcast ? 3 : 1.4,
+    windSpeed: overcast ? 0.2 : 0.1,
+    windDirection: [1, 0],
+    texture: 'art/skies/clouds/clouds_normal_displacement.png',
   }];
 }
 
@@ -7458,6 +7466,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const minimapHalfExtent = Math.round(halfExtent * 100) / 100;
   const minimapImageRel = 'art/terrains/terrain.png';
 
+  // Sky date (TimeOfDay-and-Level-Metadata docs): since 0.39 the sun path,
+  // moon, stars and the sunset→sunrise night-light window come from
+  // TimeOfDay's latitude/longitude/date. Freeroam overwrites that date with
+  // info.json defaultDate (June 20 when missing), so both carry the export
+  // day — the season the user is looking at. utcOffset stays unset: the
+  // engine then derives it (and DST) from longitude, keeping clock ≈ sun.
+  const exportDay = new Date();
+  const skyDate = { year: exportDay.getFullYear(), month: exportDay.getMonth() + 1, day: exportDay.getDate() };
+
   zip.file(`${base}/info.json`, JSON.stringify({
     authors: 'mapng',
     biome: biome?.label || biome?.id || 'mapng',
@@ -7478,6 +7495,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     title: levelDisplayName,
     supportsTraffic,
     supportsTimeOfDay: true,
+    defaultDate: skyDate,
     country: resolvedCountry,
     region: getRegionForCountry(resolvedCountry, roadRules),
     roadRules: {
@@ -8146,6 +8164,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         name: 'tod',
         persistentId: generatePersistentId(),
         startTime: 0.15,
+        time: 0.15,
+        play: false,
+        latitude: roundTo(center.lat, 6),
+        longitude: roundTo(center.lng, 6),
+        ...skyDate,
       },
       {
         __parent: 'sky_and_sun',

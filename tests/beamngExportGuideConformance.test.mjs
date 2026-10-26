@@ -240,6 +240,65 @@ test('guide §10.9: exactly one theLevelInfo with globalEnviromentMap spelling',
   });
 });
 
+// ── Sky: 0.39+ celestial sky reads TimeOfDay place/date; one CloudLayer ──────
+test('sky: TimeOfDay carries the export location + date, matching info.json defaultDate', async () => {
+  await withZip(async (zip) => {
+    const sky = parseNDJSON(await readText(zip, 'main/MissionGroup/sky_and_sun/items.level.json'));
+    const tods = sky.filter((o) => o.class === 'TimeOfDay');
+    assert.equal(tods.length, 1, 'Expected exactly one TimeOfDay');
+    const [tod] = tods;
+    assert.equal(tod.latitude, 0.5);
+    assert.equal(tod.longitude, 0.5);
+    assert.equal(tod.time, tod.startTime, 'time mirrors startTime');
+    for (const k of ['year', 'month', 'day']) assert.ok(Number.isInteger(tod[k]), `TimeOfDay.${k}`);
+    // freeroam applies info.json defaultDate to TimeOfDay (June 20 when missing)
+    const info = JSON.parse(await readText(zip, 'info.json'));
+    assert.deepEqual(info.defaultDate, { year: tod.year, month: tod.month, day: tod.day });
+  });
+});
+
+test('sky: one CloudLayer with volumetric fields and an engine-global texture', async () => {
+  await withZip(async (zip) => {
+    const sky = parseNDJSON(await readText(zip, 'main/MissionGroup/sky_and_sun/items.level.json'));
+    const clouds = sky.filter((o) => o.class === 'CloudLayer');
+    assert.equal(clouds.length, 1, 'Expected exactly one CloudLayer');
+    const [cloud] = clouds;
+    assert.ok(cloud.altitudeKm > 0, 'altitudeKm');
+    assert.equal(cloud.windDirection.length, 2, 'windDirection');
+    assert.ok(cloud.windSpeed > 0, 'windSpeed');
+    assert.doesNotMatch(cloud.texture, /^\/?levels\//, 'cloud texture must not live in another level');
+  });
+});
+
+// ── Every __parent resolves to a SimGroup ─────────────────────────────────────
+test('scene tree: every __parent names an existing SimGroup', async () => {
+  await withZip(async (zip) => {
+    const all = [];
+    for (const path of Object.keys(zip.files)) {
+      if (path.startsWith(`${BASE}/main/`) && path.endsWith('items.level.json')) {
+        all.push(...parseNDJSON(await zip.file(path).async('string')));
+      }
+    }
+    const groups = new Set(all.filter((o) => o.class === 'SimGroup').map((o) => o.name));
+    assert.ok(groups.has('MissionGroup'));
+    for (const o of all) {
+      if (o.__parent !== undefined) assert.ok(groups.has(o.__parent), `${o.name}: __parent "${o.__parent}"`);
+    }
+  });
+});
+
+// ── Signal posts: the 'trafficlight' material is only defined in West Coast
+// USA's own materials file, which is not loaded in an exported level ─────────
+test('traffic signals: pole_traffic1 ships its trafficlight material', async () => {
+  await withZip(async (zip) => {
+    const defs = JSON.parse(await readText(zip, 'map_assets/official_assets/shape_materials/main.materials.json'));
+    assert.ok(
+      Object.values(defs).some((d) => String(d?.mapTo).toLowerCase() === 'trafficlight'),
+      'trafficlight material must be bundled',
+    );
+  });
+});
+
 // ── §10.10 — every forest4 type resolves in managedItemData ───────────────────
 test('guide §10.10: forest placements resolve to managedItemData types', async () => {
   await withZip(async (zip) => {
