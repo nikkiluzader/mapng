@@ -404,6 +404,8 @@
     "processingResolutionOptionHigh": "0.5 m/px (High detail)",
     "processingResolutionOptionStandard": "1.0 m/px (Standard)",
     "includeOsmFeatures": "Include OSM Features",
+    "overtureBuildings": "Add missing buildings and heights from Overture",
+    "overtureBuildingsHint": "OSM stays the source of buildings. Overture Maps adds a height to buildings OSM has none for, and the footprints OSM is missing (Microsoft and Google detected, national cadastres), as plain boxes in the default style.",
     "showOsmCoverage": "Show MapNG OSM coverage",
     "osmCoverageHint": "Inside the green outlines, OSM data loads from MapNG's own copy: fast, and unaffected by Overpass outages. Elsewhere it comes from Overpass.",
     "osmCoverageUnavailable": "Coverage list unavailable right now.",
@@ -524,6 +526,7 @@
       "Everywhere else: health-ranked Overpass mirrors with an edge cache",
       "Bring your own Overpass server (Tracestrack, Overspan); MapNG's copy still answers first where it can",
       "A banner tells you when the public Overpass servers are down",
+      "Overture Maps adds building heights and the footprints OSM is missing (on by default, under Include OSM Features)",
       "If every Overpass server fails, OSM data comes from Overture Maps' monthly release instead, so exports still work"
     ],
     "resolutionTitle": "Resolution",
@@ -697,7 +700,7 @@
         },
         {
           "name": "Overture Maps",
-          "desc": "Fallback map data when OpenStreetMap's Overpass servers are down: buildings, roads and land use from tiles.overturemaps.org (ODbL / CDLA)"
+          "desc": "Building heights and footprints OSM lacks (Microsoft and Google detected, national cadastres), and all map data when OpenStreetMap's Overpass servers are down; from tiles.overturemaps.org (ODbL / CDLA)"
         },
         {
           "name": "JSZip",

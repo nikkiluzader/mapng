@@ -574,6 +574,184 @@ export const buildElements = (recordsByTheme) => {
   return { elements };
 };
 
+// ── Hybrid: live OSM buildings + Overture's heights and missing footprints ──
+//
+// With Overpass working, OSM stays the source of buildings (fresh, all its
+// tags). Overture adds what OSM lacks: a height (mostly Microsoft's
+// ML-derived) on OSM buildings that have none, matched by the OSM way or
+// relation id Overture keeps in sources[].record_id ("w589465248@2"), and the
+// footprints with no OSM source at all (Microsoft / Google ML, Esri, national
+// cadastres) that don't overlap a live OSM building.
+
+// "w123" / "r123" for an Overture building drawn from OSM, else null.
+export const osmRecordKey = (props) => {
+  for (const s of json(props.sources) || []) {
+    const m = /^([wr])(\d+)(@|$)/.exec(String(s?.record_id || ''));
+    if (m && (s.dataset === 'OpenStreetMap' || s.provider === 'osm')) return `${m[1]}${m[2]}`;
+  }
+  return null;
+};
+
+const ringBox = (ring) => {
+  let w = Infinity; let s = Infinity; let e = -Infinity; let n = -Infinity;
+  for (const p of ring) { if (p.lon < w) w = p.lon; if (p.lon > e) e = p.lon; if (p.lat < s) s = p.lat; if (p.lat > n) n = p.lat; }
+  return { w, s, e, n };
+};
+const inRing = (pt, ring) => {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i]; const b = ring[j];
+    if ((a.lat > pt.lat) !== (b.lat > pt.lat) && pt.lon < ((b.lon - a.lon) * (pt.lat - a.lat)) / (b.lat - a.lat) + a.lon) inside = !inside;
+  }
+  return inside;
+};
+const ringCentroid = (ring) => {
+  let lat = 0; let lon = 0;
+  const pts = ring.length > 1 ? ring.slice(0, -1) : ring;
+  for (const p of pts) { lat += p.lat; lon += p.lon; }
+  return { lat: lat / pts.length, lon: lon / pts.length };
+};
+
+// Outer rings of the OSM building elements, keyed "w<id>" / "r<id>".
+const osmBuildingRings = (elements) => {
+  const rings = [];
+  const byKey = new Map();
+  for (const el of elements) {
+    if (!el.tags?.building) continue;
+    if (el.type === 'way' && el.geometry?.length > 2) {
+      byKey.set(`w${el.id}`, el); rings.push(el.geometry);
+    } else if (el.type === 'relation') {
+      byKey.set(`r${el.id}`, el);
+      for (const m of el.members || []) if (m.role !== 'inner' && m.geometry?.length > 2) rings.push(m.geometry);
+    }
+  }
+  return { rings, byKey };
+};
+
+const GRID = 0.002;   // degrees (~200 m) per overlap-index cell
+const overlapIndex = (rings) => {
+  const cells = new Map();
+  rings.forEach((ring, i) => {
+    const b = ringBox(ring);
+    for (let x = Math.floor(b.w / GRID); x <= Math.floor(b.e / GRID); x++) {
+      for (let y = Math.floor(b.s / GRID); y <= Math.floor(b.n / GRID); y++) {
+        const k = `${x},${y}`;
+        if (!cells.has(k)) cells.set(k, []);
+        cells.get(k).push(i);
+      }
+    }
+  });
+  return (ring) => {
+    const b = ringBox(ring);
+    const c = ringCentroid(ring);
+    const seen = new Set();
+    for (let x = Math.floor(b.w / GRID); x <= Math.floor(b.e / GRID); x++) {
+      for (let y = Math.floor(b.s / GRID); y <= Math.floor(b.n / GRID); y++) {
+        for (const i of cells.get(`${x},${y}`) || []) {
+          if (seen.has(i)) continue;
+          seen.add(i);
+          const other = rings[i];
+          const ob = ringBox(other);
+          if (ob.w > b.e || ob.e < b.w || ob.s > b.n || ob.n < b.s) continue;
+          if (inRing(c, other) || inRing(ringCentroid(other), ring)) return true;
+          const ix = (Math.min(b.e, ob.e) - Math.max(b.w, ob.w)) * (Math.min(b.n, ob.n) - Math.max(b.s, ob.s));
+          const smaller = Math.min((b.e - b.w) * (b.n - b.s), (ob.e - ob.w) * (ob.n - ob.s));
+          if (smaller > 0 && ix / smaller > 0.5) return true;
+        }
+      }
+    }
+    return false;
+  };
+};
+
+// Footprint ids stay clear of OSM ids and of the R2 tiles' negative piece ids.
+const EXTRA_ID_BASE = -1e12;
+
+/**
+ * Add Overture heights and footprints to live OSM `data` ({elements}),
+ * given collected Overture building records (collectFeatures of the
+ * buildings theme) and the export bounds. Returns { data, heightsAdded, footprintsAdded }; the
+ * input is not mutated.
+ */
+export const mergeOvertureBuildings = (data, buildingRecords, bounds = null) => {
+  // Tiles reach past the export box; footprints wholly outside it are dropped.
+  const touchesBounds = (ring) => {
+    if (!bounds) return true;
+    const b = ringBox(ring);
+    return !(b.w > bounds.east || b.e < bounds.west || b.s > bounds.north || b.n < bounds.south);
+  };
+  const elements = [...(data?.elements || [])];
+  const { rings, byKey } = osmBuildingRings(elements);
+  const overlaps = overlapIndex(rings);
+  let heightsAdded = 0;
+  let footprintsAdded = 0;
+  let nextId = EXTRA_ID_BASE;
+  const replaced = new Map();
+
+  for (const rec of buildingRecords) {
+    if (rec.layer !== 'building' || rec.kind !== 'polygon') continue;
+    const tags = buildingTags(rec.props);
+    if (!tags) continue;
+    const key = osmRecordKey(rec.props);
+    if (key) {
+      const el = byKey.get(key);
+      if (!el || el.tags.height || el.tags['building:levels'] || !(tags.height || tags['building:levels'])) continue;
+      const extra = { 'mapng:height_source': 'overture' };
+      if (tags.height) extra.height = tags.height;
+      if (tags['building:levels']) extra['building:levels'] = tags['building:levels'];
+      replaced.set(el, { ...el, tags: { ...el.tags, ...extra } });
+      heightsAdded++;
+      continue;
+    }
+    for (const polyRings of rec.whole || rec.pieces) {
+      if (!touchesBounds(polyRings[0]) || overlaps(polyRings[0])) continue;
+      const t = { ...tags, 'mapng:source': 'overture' };
+      if (polyRings.length === 1) {
+        elements.push({ type: 'way', id: nextId--, tags: t, geometry: polyRings[0] });
+      } else {
+        elements.push({
+          type: 'relation', id: nextId--, tags: { type: 'multipolygon', ...t },
+          members: polyRings.map((ring, i) => ({ type: 'way', ref: nextId--, role: i === 0 ? 'outer' : 'inner', geometry: ring })),
+        });
+      }
+      footprintsAdded++;
+    }
+  }
+  const out = replaced.size ? elements.map((el) => replaced.get(el) || el) : elements;
+  return { data: { ...data, elements: out }, heightsAdded, footprintsAdded };
+};
+
+const OVERTURE_EXTRAS_TIMEOUT_MS = 30000;
+
+/**
+ * Overture building records for bounds (for mergeOvertureBuildings), or null
+ * on any failure / timeout — the export then keeps plain OSM buildings.
+ */
+export const fetchOvertureBuildingRecords = async (bounds, { signal } = {}) => {
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+  const timer = setTimeout(() => controller.abort(), OVERTURE_EXTRAS_TIMEOUT_MS);
+  try {
+    const archive = archiveFor('buildings');
+    const header = await archive.getHeader();
+    const z = header.maxZoom;
+    const decoded = await pool(tilesCovering(bounds, z), MAX_IN_FLIGHT, async ({ x, y }) => {
+      controller.signal.throwIfAborted();
+      const tile = await archive.getZxy(z, x, y, controller.signal);
+      return tile?.data ? { z, x, y, layers: decodeMvt(new Uint8Array(tile.data)) } : null;
+    });
+    return collectFeatures(decoded.filter(Boolean));
+  } catch (err) {
+    if (signal?.aborted) throw err;
+    console.warn('[OSM] Overture buildings unavailable; keeping OSM buildings only:', err?.message || err);
+    return null;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener?.('abort', onAbort);
+  }
+};
+
 const pool = async (items, limit, fn) => {
   const out = new Array(items.length);
   let next = 0;

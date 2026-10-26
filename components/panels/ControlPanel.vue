@@ -180,6 +180,14 @@
           <p v-if="customOverpassUrl && !customOverpassValid" class="mt-0.5 text-amber-600 dark:text-amber-400">{{ t('controlPanel.customOverpassInvalid') }}</p>
           <p class="mt-0.5 leading-tight">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Overspan</a></p>
         </details>
+        <!-- Live OSM buildings + Overture's heights and missing footprints (services/overtureTiles.js) -->
+        <div v-if="fetchOSM" class="mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-600">
+          <BaseToggle v-model="overtureBuildings">
+            <Building2 :size="12" class="text-emerald-600 dark:text-emerald-400" />
+            <span class="text-xs">{{ t('controlPanel.overtureBuildings') }}</span>
+          </BaseToggle>
+          <p v-if="overtureBuildings" class="mt-0.5 ml-5 text-[10px] leading-tight text-gray-500 dark:text-gray-400">{{ t('controlPanel.overtureBuildingsHint') }}</p>
+        </div>
         <!-- Outlines of the OSM archives MapNG hosts, on the 2D map -->
         <div class="mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-600">
           <BaseToggle v-model="showOsmCoverage">
@@ -310,9 +318,9 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { CUSTOM_OVERPASS_STORAGE_KEY } from '../../services/osm.js';
+import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
-import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle, Map as MapIcon } from 'lucide-vue-next';
+import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle, Map as MapIcon, Building2 } from 'lucide-vue-next';
 import BaseToggle from '../base/BaseToggle.vue';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
@@ -433,6 +441,12 @@ watch(customOverpassUrl, (newVal) => {
 
 watch(fetchOSM, (newVal) => {
   localStorage.setItem('mapng_fetchOSM', String(newVal));
+});
+
+// On unless turned off; read by fetchOSMData (single tile and batch alike).
+const overtureBuildings = ref(localStorage.getItem(OVERTURE_BUILDINGS_STORAGE_KEY) !== 'false');
+watch(overtureBuildings, (newVal) => {
+  localStorage.setItem(OVERTURE_BUILDINGS_STORAGE_KEY, String(newVal));
 });
 
 // Persist GPXZ API key and reset status when it changes

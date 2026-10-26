@@ -102,7 +102,8 @@ test('worker /api/osm: skips failing / unusable mirrors, never caches them, 502 
 });
 
 test('client: on the deployed site, with no tile archive for the area, the Worker cache is tried first', async () => {
-  const store = new Map();
+  // Request order of the OSM chain only: the Overture building merge is off.
+  const store = new Map([['mapng_overtureBuildings', 'false']]);
   const originals = { location: globalThis.location, localStorage: globalThis.localStorage, fetch: globalThis.fetch };
   globalThis.location = { protocol: 'https:', origin: 'https://mapng.com' };
   globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };

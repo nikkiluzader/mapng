@@ -189,3 +189,83 @@ test('fetchOSMData falls back to Overture when every Overpass server fails', asy
     setOvertureArchiveFactory(null);
   }
 });
+
+// ── Hybrid: live OSM buildings + Overture heights and missing footprints ─────
+const osmSource = (wayId) => JSON.stringify([{ dataset: 'OpenStreetMap', provider: 'osm', record_id: `w${wayId}@3` }]);
+const square = (x, y, s = 60) => [[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]];
+
+test('hybrid: heights by OSM id, missing footprints added, overlaps and tagged heights left alone', async () => {
+  const { mergeOvertureBuildings } = await import('../services/overtureTiles.js');
+  const layers = decodeMvt(encodeMvt({ building: [
+    { type: 3, props: { id: 'o1', class: 'house', height: 5.5, sources: osmSource(101) }, parts: [square(100, 100)] },
+    { type: 3, props: { id: 'o2', class: 'house', height: 9, sources: osmSource(102) }, parts: [square(300, 100)] },
+    { type: 3, props: { id: 'ml1', subtype: 'residential', height: 4, sources: JSON.stringify([{ dataset: 'Microsoft ML Buildings' }]) }, parts: [square(600, 600)] },
+    { type: 3, props: { id: 'ml2', subtype: 'residential', sources: JSON.stringify([{ dataset: 'Google Open Buildings' }]) }, parts: [square(1000, 1000)] },
+  ] }));
+  const records = collectFeatures([{ z: Z, x: X, y: Y, layers }]);
+  const lonlat = ([px, py]) => {
+    const n = 2 ** Z;
+    return { lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * (Y + py / 4096)) / n))) * 180) / Math.PI, lon: ((X + px / 4096) / n) * 360 - 180 };
+  };
+  const osm = { elements: [
+    { type: 'way', id: 101, tags: { building: 'house' }, geometry: square(100, 100).map(lonlat) },
+    { type: 'way', id: 102, tags: { building: 'house', 'building:levels': '1' }, geometry: square(300, 100).map(lonlat) },
+    // A building mapped in OSM after Overture's snapshot, where Google has one too.
+    { type: 'way', id: 103, tags: { building: 'yes' }, geometry: square(1005, 1005, 50).map(lonlat) },
+    { type: 'way', id: 104, tags: { highway: 'residential' }, geometry: [lonlat([0, 0]), lonlat([50, 50])] },
+  ] };
+  const { data, heightsAdded, footprintsAdded } = mergeOvertureBuildings(osm, records);
+  const byId = new Map(data.elements.map((e) => [e.id, e]));
+  assert.equal(byId.get(101).tags.height, '5.5');
+  assert.equal(byId.get(101).tags['mapng:height_source'], 'overture');
+  assert.equal(byId.get(102).tags.height, undefined, 'OSM levels win over an Overture height');
+  assert.equal(osm.elements[0].tags.height, undefined, 'input is not mutated');
+  assert.equal(heightsAdded, 1);
+  const added = data.elements.filter((e) => e.tags?.['mapng:source'] === 'overture');
+  assert.equal(footprintsAdded, 1);
+  assert.equal(added.length, 1, 'the Google footprint under OSM way 103 is skipped');
+  assert.deepEqual({ ...added[0].tags }, { building: 'residential', height: '4', 'mapng:source': 'overture' });
+  assert.ok(added[0].id < -1e11, 'ids clear of OSM and R2 piece ids');
+});
+
+test('hybrid: fetchOSMData merges Overture buildings into live OSM; toggle off skips it', async () => {
+  const { fetchOSMData, getLastOSMRequestInfo, OVERTURE_BUILDINGS_STORAGE_KEY, setOsmTileSource } = await import('../services/osm.js');
+  const { PMTiles } = await import('pmtiles');
+  const { gzipSync } = await import('node:zlib');
+  // Live OSM from a stubbed MapNG tile archive: one road, no buildings.
+  const payload = { elements: [{ type: 'way', id: 1, tags: { highway: 'residential' },
+    geometry: [{ lat: 35.196, lon: -111.655 }, { lat: 35.2, lon: -111.65 }] }] };
+  const orig = { getHeader: PMTiles.prototype.getHeader, getZxy: PMTiles.prototype.getZxy, storage: globalThis.localStorage };
+  PMTiles.prototype.getHeader = async () => ({ minLon: -115, maxLon: -109, minLat: 31, maxLat: 37, maxZoom: 13 });
+  PMTiles.prototype.getZxy = async () => ({ data: new TextEncoder().encode(JSON.stringify(payload)).buffer });
+  const ml = encodeMvt({ building: [{ type: 3, props: { id: 'ml', subtype: 'residential', height: 4.2, sources: JSON.stringify([{ dataset: 'Microsoft ML Buildings' }]) }, parts: [square(1500, 1500)] }] });
+  let overtureReads = 0;
+  setOvertureArchiveFactory(() => ({
+    getHeader: async () => ({ maxZoom: Z }),
+    getZxy: async (z, x, y) => { overtureReads++; return x === X && y === Y ? { data: ml.buffer } : undefined; },
+  }));
+  const store = new Map();
+  globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v), removeItem: (k) => store.delete(k) };
+  const bounds = { west: -111.66, east: -111.645, south: 35.195, north: 35.205 };
+  try {
+    setOsmTileSource({ getKey: () => 'stub', getBytes: async () => ({ data: gzipSync(Buffer.alloc(1)).buffer }) });
+    const features = await fetchOSMData(bounds);
+    const info = getLastOSMRequestInfo();
+    assert.equal(info.endpointUsed, 'mapng-osm-tiles');
+    assert.deepEqual(info.overtureBuildings, { release: OVERTURE_RELEASE, heightsAdded: 0, footprintsAdded: 1 });
+    assert.ok(features.some((f) => f.type === 'building' && f.tags.height === '4.2'));
+
+    store.set(OVERTURE_BUILDINGS_STORAGE_KEY, 'false');
+    overtureReads = 0;
+    const plain = await fetchOSMData(bounds);
+    assert.equal(overtureReads, 0, 'no Overture reads with the toggle off');
+    assert.ok(!plain.some((f) => f.type === 'building'));
+    assert.equal(getLastOSMRequestInfo().overtureBuildings, undefined);
+  } finally {
+    setOsmTileSource(null);
+    setOvertureArchiveFactory(null);
+    PMTiles.prototype.getHeader = orig.getHeader;
+    PMTiles.prototype.getZxy = orig.getZxy;
+    globalThis.localStorage = orig.storage;
+  }
+});

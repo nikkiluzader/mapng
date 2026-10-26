@@ -3,9 +3,22 @@ import {
   buildOverpassQuery,
 } from "./overpassQuery.js";
 import { fetchOsmFromTiles, resolveOsmTileArchiveUrl } from "./osmTiles.js";
-import { OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture } from "./overtureTiles.js";
+import {
+  OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture, fetchOvertureBuildingRecords, mergeOvertureBuildings,
+} from "./overtureTiles.js";
 
 const OVERTURE_ENDPOINT = "overture-maps";
+
+// "Add missing buildings and heights from Overture" (on unless turned off):
+// live OSM buildings get Overture's heights and the footprints OSM lacks.
+export const OVERTURE_BUILDINGS_STORAGE_KEY = "mapng_overtureBuildings";
+const overtureBuildingsEnabled = () => {
+  try {
+    return globalThis.localStorage?.getItem(OVERTURE_BUILDINGS_STORAGE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+};
 
 // MapNG's own OSM tiles (services/osmTiles.js) are read first: an explicit
 // source (VITE_OSM_TILES_URL / setOsmTileSource), else on the deployed site
@@ -913,9 +926,22 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
         result = { endpoint: OVERTURE_ENDPOINT, data };
       }
     }
-    const { endpoint, data } = result;
+    const { endpoint } = result;
+    let { data } = result;
 
     console.log(`[OSM] Winner: ${endpoint} — ${data.elements?.length || 0} elements`);
+
+    let overtureBuildings = null;
+    if (endpoint !== OVERTURE_ENDPOINT && overtureBuildingsEnabled()) {
+      onStatus?.("Adding missing buildings and heights from Overture Maps...");
+      const records = await fetchOvertureBuildingRecords(bounds, { signal });
+      if (records) {
+        const merged = mergeOvertureBuildings(data, records, bounds);
+        data = merged.data;
+        overtureBuildings = { release: OVERTURE_RELEASE, heightsAdded: merged.heightsAdded, footprintsAdded: merged.footprintsAdded };
+        console.log(`[OSM] Overture: heights on ${merged.heightsAdded} OSM buildings, ${merged.footprintsAdded} footprints OSM lacks.`);
+      }
+    }
 
     lastOSMRequestInfo = {
       ...queryParams,
@@ -924,6 +950,7 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
       ...(endpoint === OVERTURE_ENDPOINT
         ? { overtureRelease: OVERTURE_RELEASE, attribution: OVERTURE_ATTRIBUTION }
         : {}),
+      ...(overtureBuildings ? { overtureBuildings, attribution: OVERTURE_ATTRIBUTION } : {}),
       startedAt,
       completedAt: new Date().toISOString(),
     };
