@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  solveBridgeDecks, waterClear, deckHeightAt, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
+  solveBridgeDecks, waterClear, deckHeightAt, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M, mergeOverlaps, buildDeckGeometry, deckEdges,
 } from '../services/beamngBridges.js';
 
 // A straight bridge along +x from x0 to x1 at y.
@@ -241,4 +241,71 @@ test('a short flyover whose embankment cannot be raised is carried on along its 
   assert.ok(b.decks[0].roadShortfall < 0.6, `short ${b.decks[0].roadShortfall.toFixed(2)} m over the motorway`);
   const ramp = groups.flatMap((g) => g.__items).filter((d) => d.class === 'DecalRoad' && d.overObjects && d.material === 'road_asphalt_2lane');
   assert.ok(ramp.length >= 3, 'the approaches are drawn on the deck');
+});
+
+// A ramp forking off a deck at a shallow angle: two branches from (0, 0),
+// one straight on, one bearing 15° left.
+const forkDeck = () => {
+  const n = 60;
+  const straight = Array.from({ length: n }, (_, k) => [2 * k, 0]);
+  const ramp = Array.from({ length: n }, (_, k) => [2 * k * Math.cos(0.26), 2 * k * Math.sin(0.26)]);
+  return {
+    parts: [
+      { xy: [[-60, 0], [-30, 0], [0, 0]], z: [8, 8, 8], half: 5 },
+      { xy: straight, z: straight.map(([x]) => 8 + 0.03 * x), half: 5 },
+      { xy: ramp, z: ramp.map(([x]) => 8 - 0.02 * x), half: 4 },
+    ],
+  };
+};
+
+test('a fork: the branches take one height while they overlap', () => {
+  const deck = forkDeck();
+  const [, a, b] = deck.parts;
+  mergeOverlaps(deck.parts);
+  // 20 m out the branches still overlap (5 m apart, halves 5 + 4)
+  const k = 10;
+  assert.ok(Math.abs(a.z[k] - deckHeightAt(b, a.xy[k][0], a.xy[k][1])) < 0.15, `step ${(a.z[k] - b.z[k]).toFixed(2)} m at 20 m`);
+  // 110 m out they are apart and keep their own heights
+  assert.ok(Math.abs(a.z[55] - (8 + 0.03 * 110)) < 0.05 && Math.abs(b.z[55] - (8 - 0.02 * 110 * Math.cos(0.26))) < 0.05);
+});
+
+test('a fork: no parapet stands on the other branch, none at the joins', () => {
+  const deck = forkDeck();
+  mergeOverlaps(deck.parts);
+  const { positions } = buildDeckGeometry(deck, { groundAt: () => -50 });
+  // parapet tops (0.9 m over the deck) inside the other branch's road
+  const [, a, b] = deck.parts;
+  let onRoad = 0;
+  for (let i = 0; i < positions.length; i += 3) {
+    const [x, y, z] = [positions[i], positions[i + 1], positions[i + 2]];
+    for (const [p, q] of [[a, b], [b, a]]) {
+      const zp = deckHeightAt(p, x, y);
+      if (Math.abs(z - zp - 0.9) > 0.05) continue;
+      // a parapet top: along p's own edge
+      const dp = Math.min(...p.xy.map(([px, py]) => Math.hypot(px - x, py - y)));
+      if (dp < p.half - 0.1 || dp > p.half + 1.5) continue;
+      // inside q's road (not its parapet strip), alongside it
+      const t = q.xy.findIndex(([qx]) => qx > x);
+      if (t < 1 || t > q.xy.length - 2) continue;
+      const d = Math.abs((x - q.xy[t][0]) * -(q.xy[t + 1][1] - q.xy[t][1]) + (y - q.xy[t][1]) * (q.xy[t + 1][0] - q.xy[t][0])) / 2;
+      if (d < q.half - 0.3) onRoad++;
+    }
+  }
+  assert.equal(onRoad, 0, 'parapet vertices on the other branch');
+});
+
+test('a fork: the branches start as wide as the deck coming in, then narrow to their own', () => {
+  const deck = forkDeck();
+  deck.parts[0].half = 8;   // a wide deck forking into a 5 m and a 4 m ramp
+  const e = deckEdges(deck);
+  // the straight branch is the right one (the ramp bears left)
+  assert.ok(Math.abs(e[2].hl[0] - 8) < 1e-6, `left edge of the left branch at the joint ${e[2].hl[0]}`);
+  assert.ok(Math.abs(e[1].hr[0] - 8) < 1e-6, `right edge of the right branch at the joint ${e[1].hr[0]}`);
+  assert.equal(e[2].hr[0], 4, 'inner sides keep their own width');
+  assert.equal(e[1].hr[e[1].hr.length - 1], 5, 'far out its own width');
+  // a plain join: the narrower part tapers up to the wider
+  const plain = { parts: [{ xy: [[-40, 0], [0, 0]], z: [0, 0], half: 6 }, { xy: [[0, 0], [20, 0], [40, 0], [60, 0]], z: [0, 0, 0, 0], half: 4 }] };
+  const ep = deckEdges(plain);
+  assert.equal(ep[1].hl[0], 6);
+  assert.equal(ep[1].hl[3], 4);
 });

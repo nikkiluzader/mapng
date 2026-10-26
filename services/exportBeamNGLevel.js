@@ -3984,6 +3984,9 @@ export function generateDecalRoads(terrainData, squareSize) {
       if (centerNodes.length < 2) continue;
       const bridgePart = bridges.bySeg.get(segIndex);
       if (bridgePart) bridgePart.half = styleHalfWidth;
+      // a deck carried on along this approach is as wide as the road on it
+      const carriedPart = bridges.approaches?.get(segIndex);
+      if (carriedPart) carriedPart.half = Math.max(carriedPart.half, styleHalfWidth);
       carriageways.push({
         owner: segIndex, nodes: centerNodes, half: styleHalfWidth,
         tags: renderTags, highway, urban: urbanRoad, wayId: feature.id, oneWay: isOneWay,

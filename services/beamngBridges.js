@@ -426,6 +426,7 @@ export function solveBridgeDecks(parts, {
       crossings.push(...waterCrossings(pi, p.xy, { wetAt, groundAt, nav }));
     });
     const zs = solveChain(chainParts, { groundAt, endHeight, crossings, isFreeEnd });
+    mergeOverlaps(chainParts.map((p, k) => ({ xy: p.xy, half: p.half, z: zs[k] })));
     const deck = {
       layer,
       parts: chainParts.map((p, k) => ({
@@ -441,6 +442,69 @@ export function solveBridgeDecks(parts, {
     for (const p of deck.parts) solvedLines.push({ layer, deck: true, xy: p.xy.map(([x, y], k) => [x, y, p.z[k]]), box: bbox(p.xy) });
   }
   return decks;
+}
+
+// Where a ramp forks off a deck (or two merge), the branches overlap in
+// plan for tens of metres after the shared node, each solved to its own
+// heights: two surfaces a step apart, undrivable. Walking out from the fork,
+// each branch takes the height the two share while it overlaps the other,
+// fading back to its own as they separate. (Only overlap running on from the
+// fork: a ramp crossing over its own deck elsewhere is one over the other.)
+const MERGE_FADE_M = 10;     // lateral room past touching over which the merge fades
+
+/** The nearest interior point of a polyline part to (x, y): { d, z } or null at its ends. */
+function nearestInterior(part, x, y) {
+  const { xy, z } = part;
+  let best = null;
+  for (let i = 0; i + 1 < xy.length; i++) {
+    const vx = xy[i + 1][0] - xy[i][0]; const vy = xy[i + 1][1] - xy[i][1];
+    const L2 = vx * vx + vy * vy || 1e-9;
+    const raw = ((x - xy[i][0]) * vx + (y - xy[i][1]) * vy) / L2;
+    const t = Math.max(0, Math.min(1, raw));
+    const d = Math.hypot(xy[i][0] + vx * t - x, xy[i][1] + vy * t - y);
+    if (!best || d < best.d) best = { d, z: z[i] + (z[i + 1] - z[i]) * t, end: (i === 0 && raw < 0) || (i === xy.length - 2 && raw > 1) };
+  }
+  return best && !best.end ? best : null;
+}
+
+/** Merge the heights of a chain's branches where they overlap off a fork (edits z in place). */
+export function mergeOverlaps(parts) {
+  const key = (p) => `${Math.round(p[0] / JOIN_M)},${Math.round(p[1] / JOIN_M)}`;
+  const joints = new Map();
+  parts.forEach((p, i) => {
+    if (p.xy.length < 2) return;
+    for (const k of [0, p.xy.length - 1]) {
+      const j = key(p.xy[k]);
+      if (!joints.has(j)) joints.set(j, []);
+      joints.get(j).push({ i, k });
+    }
+  });
+  const delta = parts.map((p) => p.z.map(() => 0));
+  const weight = parts.map((p) => p.z.map(() => 0));
+  for (const ends of joints.values()) {
+    if (ends.length < 3) continue;   // a fork (or merge) only
+    for (const ea of ends) {
+      for (const eb of ends) {
+        if (ea.i === eb.i) continue;
+        const a = parts[ea.i]; const b = parts[eb.i];
+        const reach = a.half + b.half;
+        const order = ea.k === 0 ? a.xy.map((_, k) => k) : a.xy.map((_, k) => a.xy.length - 1 - k);
+        let started = false;
+        for (const k of order) {
+          const n = nearestInterior(b, a.xy[k][0], a.xy[k][1]);
+          if (!n) { if (started) break; continue; }
+          started = true;
+          const w = n.d <= reach ? 1 : 1 - (n.d - reach) / MERGE_FADE_M;
+          if (w <= 0) break;
+          delta[ea.i][k] += w * ((a.z[k] + n.z) / 2 - a.z[k]);
+          weight[ea.i][k] += w;
+        }
+      }
+    }
+  }
+  parts.forEach((p, i) => {
+    for (let k = 0; k < p.z.length; k++) if (weight[i][k] > 0) p.z[k] += delta[i][k] / Math.max(1, weight[i][k]);
+  });
 }
 
 // Where a part crosses lines under it in plan: [{ part, s, z }]. Ground roads
@@ -513,6 +577,7 @@ const PIER_SPAN_MAX_M = 60;
 const PIER_MIN_CLEAR_M = 1.5;          // lower than this under the girders: the deck rests on the ground
 const PIER_ROAD_M = 7;                 // a pier keeps this far from a road's centreline under the deck
 const UV_M = 4;                        // concrete texture repeat
+const WALL_GAP_M = 2.5;                // under the structure less than this to the ground: walls down into it
 
 class Builder {
   constructor() { this.pos = []; this.uv = []; }
@@ -617,6 +682,104 @@ export function pierSites(part, { groundAt, roadLines = [] }) {
   return out;
 }
 
+// Deck widths at joins. Parts are as wide as their own road, so where a
+// wide road forks into narrower ramps the branches (both starting on its
+// centreline) left its edges hanging, and a narrow part joining a wide one
+// met it with a step. At a fork the outermost branches widen on their outer
+// side to the incoming deck's edge, tapering back over their overlap; at a
+// plain join the narrower part tapers up to the wider one.
+const TAPER_MIN_M = 25;
+const TAPER_MAX_M = 90;
+
+/**
+ * Per-point half widths of a deck's parts: [{ hl, hr }] (left / right of
+ * each part's own direction), from part.half widened at joins as above.
+ */
+export function deckEdges(deck) {
+  const parts = deck.parts;
+  const edges = parts.map((p) => ({ hl: p.xy.map(() => p.half), hr: p.xy.map(() => p.half) }));
+  // fork joints: the incoming deck's direction of travel into the branches
+  edges.forks = new Map();
+  const key = (p) => `${Math.round(p[0] / JOIN_M)},${Math.round(p[1] / JOIN_M)}`;
+  const joints = new Map();
+  parts.forEach((p, pi) => {
+    if (p.xy.length < 2) return;
+    for (const k of [0, p.xy.length - 1]) {
+      const j = key(p.xy[k]);
+      if (!joints.has(j)) joints.set(j, []);
+      joints.get(j).push({ pi, k });
+    }
+  });
+  // points from an end inward, with their distance from it
+  const fromEnd = ({ pi, k }) => {
+    const xy = parts[pi].xy;
+    const order = k === 0 ? xy.map((_, i) => i) : xy.map((_, i) => xy.length - 1 - i);
+    let d = 0;
+    return order.map((i, n) => {
+      if (n > 0) d += Math.hypot(xy[i][0] - xy[order[n - 1]][0], xy[i][1] - xy[order[n - 1]][1]);
+      return { i, d };
+    });
+  };
+  // the direction an end leaves its joint (over its first ~10 m)
+  const outward = (end) => {
+    const pts = fromEnd(end);
+    const far = pts.find((q) => q.d >= 10) || pts[pts.length - 1];
+    const xy = parts[end.pi].xy; const a = xy[pts[0].i]; const b = xy[far.i];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+  };
+  const smooth = (t) => t * t * (3 - 2 * t);
+  // widen one side ('l' / 'r' of the part's own direction) from an end
+  const widen = (end, side, target, L) => {
+    const e = edges[end.pi][side === 'l' ? 'hl' : 'hr'];
+    const own = parts[end.pi].half;
+    if (target <= own) return;
+    for (const { i, d } of fromEnd(end)) {
+      if (d >= L) break;
+      e[i] = Math.max(e[i], own + (target - own) * smooth(1 - d / L));
+    }
+  };
+  // outward-left of an end, as the part's own side
+  const leftOf = (end) => (end.k === 0 ? 'l' : 'r');
+  const rightOf = (end) => (end.k === 0 ? 'r' : 'l');
+  for (const ends of joints.values()) {
+    if (ends.length === 2) {
+      const [a, b] = ends;
+      const [n, w] = parts[a.pi].half < parts[b.pi].half ? [a, b] : [b, a];
+      for (const side of ['l', 'r']) widen(n, side, parts[w.pi].half, TAPER_MIN_M);
+      continue;
+    }
+    if (ends.length < 3) continue;
+    const dirs = ends.map(outward);
+    // the incoming deck: leaving the joint against all the others
+    const ti = ends.findIndex((_, i) => ends.every((__, j) => j === i || dirs[i][0] * dirs[j][0] + dirs[i][1] * dirs[j][1] < 0));
+    if (ti < 0) continue;
+    const trunk = ends[ti];
+    const fwd = [-dirs[ti][0], -dirs[ti][1]];
+    edges.forks.set(key(parts[trunk.pi].xy[trunk.k]), { fwd, trunk: trunk.pi });
+    const branches = ends.map((e, i) => ({ e, ang: Math.atan2(fwd[0] * dirs[i][1] - fwd[1] * dirs[i][0], fwd[0] * dirs[i][0] + fwd[1] * dirs[i][1]) }))
+      .filter((_, i) => i !== ti).sort((a, b) => b.ang - a.ang);
+    const H = parts[trunk.pi].half;
+    // over how long the outermost branches overlap each other
+    const lb = branches[0].e; const rb = branches[branches.length - 1].e;
+    const reach = parts[lb.pi].half + parts[rb.pi].half;
+    let overlap = 0;
+    for (const { i, d } of fromEnd(lb)) {
+      const q = parts[lb.pi].xy[i];
+      const n = nearestInterior(parts[rb.pi], q[0], q[1]);
+      if (n && n.d > reach) break;
+      overlap = d;
+    }
+    const L = Math.min(TAPER_MAX_M, Math.max(TAPER_MIN_M, overlap));
+    widen(lb, leftOf(lb), H, L);
+    widen(rb, rightOf(rb), H, L);
+    // an incoming deck narrower than a branch meets it widened instead
+    const widest = Math.max(...branches.map((x) => parts[x.e.pi].half));
+    for (const side of ['l', 'r']) widen(trunk, side, widest, TAPER_MIN_M);
+  }
+  return edges;
+}
+
 /**
  * The concrete of one solved deck as triangle soup: { positions, uvs }
  * (world space): slab with girders under it, a parapet along each edge,
@@ -624,54 +787,145 @@ export function pierSites(part, { groundAt, roadLines = [] }) {
  */
 export function buildDeckGeometry(deck, { groundAt, roadLines = [] } = {}) {
   const b = new Builder();
-  for (const part of deck.parts) {
-    const { xy, z, half } = part;
+  // part ends by joint: one end is the deck's end (an end cap), two a plain
+  // join (mitred flush, no cap), more a fork (no cap)
+  const key = (p) => `${Math.round(p[0] / JOIN_M)},${Math.round(p[1] / JOIN_M)}`;
+  const atJoint = new Map();
+  deck.parts.forEach((part, pi) => {
+    if (part.xy.length < 2) return;
+    for (const k of [0, part.xy.length - 1]) {
+      const j = key(part.xy[k]);
+      if (!atJoint.has(j)) atJoint.set(j, []);
+      atJoint.get(j).push({ pi, k });
+    }
+  });
+  const edges = deckEdges(deck);
+  for (const [pi, part] of deck.parts.entries()) {
+    const { xy, z } = part;
     if (xy.length < 2) continue;
+    const { hl, hr } = edges[pi];
     const depth = part.depth ?? DECK_DEPTH_M + GIRDER_D_M;
     const slab = Math.min(DECK_DEPTH_M, depth);
     const girders = depth >= DECK_DEPTH_M + GIRDER_D_M - 1e-6;
     const nrm = leftNormals(xy);
-    const at = (k, off, dz) => [xy[k][0] + nrm[k][0] * off, xy[k][1] + nrm[k][1] * off, z[k] + dz];
+    // across a plain join, the normal of both parts together; at a fork,
+    // the incoming deck's (all ends square to it: edges meeting flush)
+    for (const k of [0, xy.length - 1]) {
+      const fork = edges.forks.get(key(xy[k]));
+      if (fork) {
+        // leaving the joint: the branches along fwd, the incoming deck against it
+        const out = fork.trunk === pi ? [-fork.fwd[0], -fork.fwd[1]] : fork.fwd;
+        const t = k === 0 ? out : [-out[0], -out[1]];
+        nrm[k] = [-t[1], t[0]];
+        continue;
+      }
+      const here = atJoint.get(key(xy[k])) || [];
+      if (here.length !== 2) continue;
+      const other = here.find((e) => e.pi !== pi);
+      const o = deck.parts[other.pi].xy;
+      const beyond = other.k === 0 ? o[1] : o[o.length - 2];
+      const before = k === 0 ? beyond : xy[k - 1];
+      const after = k === 0 ? xy[1] : beyond;
+      const len = Math.hypot(after[0] - before[0], after[1] - before[1]) || 1;
+      nrm[k] = [-(after[1] - before[1]) / len, (after[0] - before[0]) / len];
+    }
+    // offsets: metres left of the centreline, or a function of the point
+    const at = (k, off, dz) => {
+      const o = typeof off === 'function' ? off(k) : off;
+      return [xy[k][0] + nrm[k][0] * o, xy[k][1] + nrm[k][1] * o, z[k] + dz];
+    };
     const row = (off, dz) => xy.map((_, k) => at(k, off, dz));
-    const out = half + PARAPET_W_M;
-    const L = row(out, 0); const R = row(-out, 0);
-    const Lb = row(out, -slab); const Rb = row(-out, -slab);
+    const outL = (k) => hl[k] + PARAPET_W_M; const outR = (k) => -(hr[k] + PARAPET_W_M);
+    // where an edge stands on another part of this deck at about its height
+    // (a fork's branches overlapping): no parapet, no side there
+    const onOther = (off) => xy.map((_, k) => {
+      const [x, y, zk] = at(k, off, 0);
+      return deck.parts.some((q, qi) => {
+        if (qi === pi || q.xy.length < 2) return false;
+        // at a joint the two share, the edges meet there: not alongside
+        const j = key(xy[k]);
+        if ((k === 0 || k === xy.length - 1) && (key(q.xy[0]) === j || key(q.xy[q.xy.length - 1]) === j)) return false;
+        // alongside it, not past its end (the part a join continues into)
+        const n = nearestInterior(q, x, y);
+        return !!n && n.d < q.half + PARAPET_W_M - 0.05 && Math.abs(n.z - zk) < 2;
+      });
+    });
+    const sides = [{ inner: (k) => hl[k], outer: outL, faceOut: (k) => [nrm[k][0], nrm[k][1], 0] }, { inner: (k) => -hr[k], outer: outR, faceOut: (k) => [-nrm[k][0], -nrm[k][1], 0] }]
+      .map((side) => ({ ...side, hidden: onOther(side.inner) }));
+    // strips over the runs of points where keep(k) holds
+    const runs = (A, B, keep, want) => {
+      for (let i = 0; i + 1 < A.length; i++) if (keep(i) && keep(i + 1)) b.quad(A[i], A[i + 1], B[i + 1], B[i], want(i));
+    };
+    const L = row(outL, 0); const R = row(outR, 0);
+    const Lb = row(outL, -slab); const Rb = row(outR, -slab);
     const left = (k) => [nrm[k][0], nrm[k][1], 0];
     const right = (k) => [-nrm[k][0], -nrm[k][1], 0];
     // slab: top (under the road decal), sides, underside
     b.strip(L, R, () => [0, 0, 1]);
-    b.strip(L, Lb, left);
-    b.strip(R, Rb, right);
+    runs(L, Lb, (k) => !sides[0].hidden[k], left);
+    runs(R, Rb, (k) => !sides[1].hidden[k], right);
     b.strip(Lb, Rb, () => [0, 0, -1]);
+    // Near the ground the sides go down into it, a retaining wall: no slab
+    // floating over the ground by an abutment or along a walled ramp
+    for (const side of sides) {
+      const ground = xy.map((_, k) => {
+        const [x, y] = at(k, side.outer, 0);
+        return groundAt ? groundAt(x, y) : -Infinity;
+      });
+      const low = (k) => !side.hidden[k] && z[k] - depth - ground[k] < WALL_GAP_M && z[k] - slab > ground[k];
+      const top = row(side.outer, -slab);
+      const foot = xy.map((_, k) => at(k, side.outer, ground[k] - FOOTING_M / 2 - z[k]));
+      runs(top, foot, low, side.faceOut);
+    }
     // girders (none on a thinned structure)
-    const ng = girders ? Math.max(2, Math.round((2 * half) / GIRDER_EVERY_M)) : 0;
+    const ng = girders ? Math.max(2, Math.round((2 * part.half) / GIRDER_EVERY_M)) : 0;
     for (let g = 0; g < ng; g++) {
-      const off = -(half - 0.6) + ((2 * (half - 0.6)) * g) / Math.max(1, ng - 1);
-      const GL = row(off + GIRDER_W_M / 2, -DECK_DEPTH_M); const GR = row(off - GIRDER_W_M / 2, -DECK_DEPTH_M);
-      const GLb = row(off + GIRDER_W_M / 2, -DECK_DEPTH_M - GIRDER_D_M);
-      const GRb = row(off - GIRDER_W_M / 2, -DECK_DEPTH_M - GIRDER_D_M);
+      const off = (k) => -(hr[k] - 0.6) + ((hl[k] + hr[k] - 1.2) * g) / Math.max(1, ng - 1);
+      const GL = row((k) => off(k) + GIRDER_W_M / 2, -DECK_DEPTH_M); const GR = row((k) => off(k) - GIRDER_W_M / 2, -DECK_DEPTH_M);
+      const GLb = row((k) => off(k) + GIRDER_W_M / 2, -DECK_DEPTH_M - GIRDER_D_M);
+      const GRb = row((k) => off(k) - GIRDER_W_M / 2, -DECK_DEPTH_M - GIRDER_D_M);
       b.strip(GL, GLb, left);
       b.strip(GR, GRb, right);
       b.strip(GLb, GRb, () => [0, 0, -1]);
     }
-    // parapets: inner face at the road's edge, top, outer face down to the slab
-    for (const [inner, outer, faceIn] of [[half, out, right], [-half, -out, left]]) {
-      const I0 = row(inner, 0); const I1 = row(inner, PARAPET_H_M);
-      const O1 = row(outer, PARAPET_H_M);
-      b.strip(I0, I1, faceIn);
-      b.strip(I1, O1, () => [0, 0, 1]);
-      b.strip(O1, row(outer, 0), faceIn === right ? left : right);
+    // parapets: inner face at the road's edge, top, outer face down to the
+    // slab; none where the edge stands on another branch of the deck
+    for (const side of sides) {
+      const keep = (k) => !side.hidden[k];
+      const faceIn = (k) => [-side.faceOut(k)[0], -side.faceOut(k)[1], 0];
+      const I0 = row(side.inner, 0); const I1 = row(side.inner, PARAPET_H_M);
+      const O1 = row(side.outer, PARAPET_H_M);
+      runs(I0, I1, keep, faceIn);
+      runs(I1, O1, keep, () => [0, 0, 1]);
+      runs(O1, row(side.outer, 0), keep, side.faceOut);
+      // a parapet's open ends (where it stops at a fork)
+      for (let k = 0; k < xy.length; k++) {
+        if (!keep(k)) continue;
+        const prev = k > 0 && keep(k - 1); const next = k + 1 < xy.length && keep(k + 1);
+        if (prev && next) continue;
+        if (!prev && !next) continue;
+        const j = prev ? k - 1 : k + 1;
+        const d = [xy[k][0] - xy[j][0], xy[k][1] - xy[j][1]];
+        const len = Math.hypot(d[0], d[1]) || 1;
+        if (k === 0 || k === xy.length - 1) continue;   // the part's end: capped below if a deck end
+        b.quad(at(k, side.inner, 0), at(k, side.outer, 0), at(k, side.outer, PARAPET_H_M), at(k, side.inner, PARAPET_H_M), [d[0] / len, d[1] / len, 0]);
+      }
     }
-    // end caps at the part's ends
+    // end caps at the deck's own ends only (not at joins or forks), down to
+    // the ground where it is close
     for (const k of [0, xy.length - 1]) {
+      if ((atJoint.get(key(xy[k])) || []).length !== 1) continue;
       const j = k === 0 ? 1 : xy.length - 2;
       const d = [(xy[k][0] - xy[j][0]), (xy[k][1] - xy[j][1]), 0];
       const len = Math.hypot(d[0], d[1]) || 1;
       const want = [d[0] / len, d[1] / len, 0];
-      b.quad(at(k, out, 0), at(k, -out, 0), at(k, -out, -slab), at(k, out, -slab), want);
-      for (const [inner, outer] of [[half, out], [-half, -out]]) {
-        b.quad(at(k, inner, 0), at(k, outer, 0), at(k, outer, PARAPET_H_M), at(k, inner, PARAPET_H_M), want);
-      }
+      const g = groundAt ? groundAt(xy[k][0], xy[k][1]) : -Infinity;
+      const bottom = z[k] - depth - g < WALL_GAP_M && z[k] - slab > g ? g - FOOTING_M / 2 - z[k] : -slab;
+      b.quad(at(k, outL, 0), at(k, outR, 0), at(k, outR, bottom), at(k, outL, bottom), want);
+      sides.forEach((side) => {
+        if (side.hidden[k]) return;
+        b.quad(at(k, side.inner, 0), at(k, side.outer, 0), at(k, side.outer, PARAPET_H_M), at(k, side.inner, PARAPET_H_M), want);
+      });
     }
     // piers
     for (const p of pierSites(part, { groundAt, roadLines })) {
