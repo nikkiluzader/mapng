@@ -335,7 +335,10 @@ const parseOverpassResponse = (data, bounds) => {
   for (const r of relations) {
     const tags = r.tags || {};
     if (!r.members) continue;
-    const isRoute = tags.type === "route" || tags.type === "superroute" || !!tags.highway || !!tags.network;
+    // a multipolygon's highway=* is an area (a plaza), not a route over its
+    // outline ways (a pool's edge became a pedestrian street)
+    const isRoute = tags.type !== "multipolygon"
+      && (tags.type === "route" || tags.type === "superroute" || !!tags.highway || !!tags.network);
     const isSite = tags.type === "site" || !!tags.historic || tags.type === "heritage";
     if (isRoute || isSite) {
       r.members.forEach((m) => {

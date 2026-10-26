@@ -1582,7 +1582,113 @@ const GLOBAL_DECAL_MATERIALS = {
 };
 
 // Paved surfaces drawn as concrete slabs instead of asphalt.
-const CONCRETE_SURFACES = new Set(['concrete', 'concrete:plates', 'concrete:lanes', 'paving_stones']);
+const CONCRETE_SURFACES = new Set(['concrete', 'concrete:plates', 'concrete:lanes']);
+
+// Stone and brick paving. The global decal-road library has none, so the
+// export ships its own decal-road materials over the game's shared tileable
+// textures (the ones Italy, Small Island and West Coast USA pave with; the
+// legacy diffuse/specular sets stay version-0 materials, as there). A
+// DecalRoad stretches its texture once across its width, so a paved road is
+// laid as parallel strips about one texture tile wide (tileM: metres one tile
+// of the texture covers, judged from its stone size).
+const PAVING_MATERIAL_BASE = {
+  class: 'Material',
+  alphaRef: 150,
+  annotation: 'ASPHALT',
+  castShadows: false,
+  materialTag0: 'RoadAndPath',
+  materialTag1: 'beamng',
+  translucent: true,
+  translucentZWrite: true,
+};
+export const PAVING_MATERIALS = {
+  // granite setts (surface=sett, cobblestone)
+  sett: {
+    tileM: 1.0,
+    material: {
+      ...PAVING_MATERIAL_BASE,
+      name: 'mapng_road_sett', mapTo: 'mapng_road_sett', persistentId: 'c5a1e7f2-3b84-4d0e-9a61-5f2d8b0c7a11',
+      Stages: [{
+        colorMap: '/assets/materials/tileable/paving/t_italy_cobblestone/t_italy_cobblestone_d.color.png',
+        normalMap: '/assets/materials/tileable/paving/t_italy_cobblestone/t_italy_cobblestone_n.normal.png',
+        specularMap: '/assets/materials/tileable/paving/t_italy_cobblestone/t_italy_cobblestone_s.color.png',
+        useAnisotropic: true,
+      }, {}, {}, {}],
+    },
+  },
+  // rounded field stones (surface=unhewn_cobblestone)
+  cobble: {
+    tileM: 1.4,
+    material: {
+      ...PAVING_MATERIAL_BASE,
+      name: 'mapng_road_cobble', mapTo: 'mapng_road_cobble', persistentId: 'c5a1e7f2-3b84-4d0e-9a61-5f2d8b0c7a12',
+      Stages: [{
+        colorMap: '/assets/materials/tileable/tile/si_cobblestone/si_cobblestone_d.dds',
+        normalMap: '/assets/materials/tileable/tile/si_cobblestone/si_cobblestone_n.dds',
+        specularMap: '/assets/materials/tileable/tile/si_cobblestone/si_cobblestone_s.dds',
+        useAnisotropic: true,
+      }, {}, {}, {}],
+    },
+  },
+  // interlocking concrete pavers (surface=paving_stones)
+  pavers: {
+    tileM: 1.0,
+    material: {
+      ...PAVING_MATERIAL_BASE,
+      name: 'mapng_road_pavers', mapTo: 'mapng_road_pavers', persistentId: 'c5a1e7f2-3b84-4d0e-9a61-5f2d8b0c7a13',
+      Stages: [{
+        colorMap: '/assets/materials/tileable/tile/italy_bld_hpaver/italy_hpaver_d.dds',
+        normalMap: '/assets/materials/tileable/tile/italy_bld_hpaver/italy_hpaver_n.dds',
+        specularMap: '/assets/materials/tileable/tile/italy_bld_hpaver/italy_hpaver_s.dds',
+        specularPower: 19,
+        useAnisotropic: true,
+      }, {}, {}, {}],
+    },
+  },
+  // herringbone brick (surface=bricks)
+  bricks: {
+    tileM: 1.4,
+    material: {
+      ...PAVING_MATERIAL_BASE,
+      name: 'mapng_road_bricks', mapTo: 'mapng_road_bricks', persistentId: 'c5a1e7f2-3b84-4d0e-9a61-5f2d8b0c7a14',
+      Stages: [{
+        ambientOcclusionMap: '/assets/materials/tileable/brick/t_bricks_herringbone_01/t_bricks_herringbone_01_ao.data.png',
+        baseColorMap: '/assets/materials/tileable/brick/t_bricks_herringbone_01/t_bricks_herringbone_01_b.color.png',
+        normalMap: '/assets/materials/tileable/brick/t_bricks_herringbone_01/t_bricks_herringbone_01_nm.normal.png',
+        roughnessMap: '/assets/materials/tileable/brick/t_bricks_herringbone_01/t_bricks_herringbone_01_r.data.png',
+      }, {}, {}, {}],
+      version: 1.5,
+    },
+  },
+};
+// More strips than this and the tiles grow instead (a wide plaza way).
+const PAVING_MAX_STRIPS = 10;
+
+/**
+ * The paving (PAVING_MATERIALS key) an OSM surface=* is laid in, or null.
+ * Paving stones in the Americas are red brick (historic US downtowns: St.
+ * Augustine's old streets), grey concrete pavers elsewhere.
+ */
+export function pavingOf(surface, { americas = false } = {}) {
+  const s = String(surface ?? '').trim().toLowerCase();
+  if (s === 'sett' || s === 'cobblestone' || s === 'cobblestone:flattened') return 'sett';
+  if (s === 'unhewn_cobblestone') return 'cobble';
+  if (s === 'paving_stones' || s.startsWith('paving_stones:')) return americas ? 'bricks' : 'pavers';
+  if (s === 'bricks' || s === 'brick' || s === 'clay') return 'bricks';
+  return null;
+}
+
+/**
+ * The strips a paved surface fullWidth wide is laid in: [{ offset, width,
+ * textureLength }], offsets from the centre line (metres, + = left).
+ */
+export function pavingStrips(paving, fullWidth) {
+  const { tileM } = PAVING_MATERIALS[paving];
+  const n = Math.max(1, Math.min(PAVING_MAX_STRIPS, Math.round(fullWidth / tileM)));
+  const w = fullWidth / n;
+  // a hair of overlap: no seam of ground between strips on curves
+  return Array.from({ length: n }, (_, k) => ({ offset: -fullWidth / 2 + w * (k + 0.5), width: w + 0.04, textureLength: w }));
+}
 // Metres one texture repeat covers along the road, per surface (official
 // usage: BeamNG.Earth 11 for road_asphalt_2lane, West Coast USA 40 for
 // road1_concrete, Johnson Valley 88 for m_dirt_road).
@@ -2329,15 +2435,26 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
     ? Math.min(options.drivingHalfWidth, styleHalfWidth)
     : styleHalfWidth;
   const laneShift = Number.isFinite(options.laneShift) ? options.laneShift : 0;
-  const separateAiPath = !isUnpaved && styleHalfWidth - drivingHalfWidth > 0.1;
+  const paving = isUnpaved ? null : pavingOf(tags.surface, { americas: options.markingStyle === 'americas' });
+  // paved in strips, none of which can carry the AI: an invisible path does
+  const separateAiPath = !isUnpaved && (!!paving || styleHalfWidth - drivingHalfWidth > 0.1);
 
   const concrete = !isUnpaved && CONCRETE_SURFACES.has(String(tags.surface ?? '').trim().toLowerCase());
   let layers = (ROAD_TEMPLATES[templateKey] || ROAD_TEMPLATES.default).filter((layer) => {
-    if (layer.name.startsWith('edge_')) return grassEdgeBlendEnabled;
+    // the asphalt-to-grass blend belongs to asphalt
+    if (layer.name.startsWith('edge_')) return grassEdgeBlendEnabled && !paving;
     return true;
-  }).map((layer) => (concrete && layer.name === 'asphalt'
-    ? { ...layer, material: GLOBAL_DECAL_MATERIALS.concrete, textureLength: SURFACE_TEXTURE_LENGTH.concrete }
-    : layer));
+  }).flatMap((layer) => {
+    if (layer.name !== 'asphalt') return [layer];
+    if (paving) {
+      return pavingStrips(paving, 2 * styleHalfWidth).map((strip) => ({
+        ...layer, ...strip, name: 'paving', material: PAVING_MATERIALS[paving].material.name, widthScale: undefined,
+      }));
+    }
+    return [concrete
+      ? { ...layer, material: GLOBAL_DECAL_MATERIALS.concrete, textureLength: SURFACE_TEXTURE_LENGTH.concrete }
+      : layer];
+  });
   if (separateAiPath) {
     // Like the official maps' road_invisible: the AI drives the lanes, not the
     // parking lane or shoulder the asphalt also covers.
@@ -2400,7 +2517,7 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
 
     // Use names that the BeamNG Road Spline Tool recognizes.
     let levelName = 'Layer';
-    if (layer.name === 'asphalt' || layer.name === 'dirt') levelName = 'Base';
+    if (layer.name === 'asphalt' || layer.name === 'dirt' || layer.name === 'paving') levelName = 'Base';
     else if (layer.name === 'line_center') levelName = 'Center Line';
     else if (layer.name === 'line_left') levelName = 'Edge Line - Left';
     else if (layer.name === 'line_right') levelName = 'Edge Line - Right';
@@ -2420,7 +2537,7 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
       startEndFade = [s, e];
     }
 
-    const isBaseSurface = layer.name === 'asphalt' || layer.name === 'dirt';
+    const isBaseSurface = layer.name === 'asphalt' || layer.name === 'dirt' || layer.name === 'paving';
     const decal = makeRoadDecal(layeredNodes, levelName, parentName, {
       material: layer.material,
       renderPriority: isBaseSurface ? getSurfaceRenderPriority(highway, tags) : layer.renderPriority,
@@ -3326,6 +3443,93 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
   return out;
 }
 
+// Pedestrian streets (highway=pedestrian: St. George Street, St. Augustine;
+// European old towns) carry no traffic, so they are no part of the road
+// network, but they are drawn: in their own surface, under every road that
+// meets them, with no paint, edge blend or AI path.
+const PEDESTRIAN_WIDTH_M = 6;
+const PEDESTRIAN_RENDER_PRIORITY = 16;
+
+/** The surface layers of a pedestrian street fullWidth wide (untagged: as paving stones). */
+export function pedestrianSurfaceLayers(surface, fullWidth, { americas = false } = {}) {
+  const s = String(surface ?? '').trim().toLowerCase();
+  const fade = { distanceFade: ASPHALT_BASE.distanceFade, breakAngle: 2 };
+  if (UNPAVED_SURFACES.has(s)) {
+    return [{ offset: 0, width: fullWidth * 1.1, material: GLOBAL_DECAL_MATERIALS.dirtRoad, textureLength: SURFACE_TEXTURE_LENGTH.dirt, ...fade }];
+  }
+  if (CONCRETE_SURFACES.has(s)) {
+    return [{ offset: 0, width: fullWidth, material: GLOBAL_DECAL_MATERIALS.concrete, textureLength: SURFACE_TEXTURE_LENGTH.concrete, ...fade }];
+  }
+  if (s === 'asphalt' || s === 'paved') {
+    return [{ offset: 0, width: fullWidth, material: GLOBAL_DECAL_MATERIALS.asphalt, textureLength: SURFACE_TEXTURE_LENGTH.asphalt, ...fade }];
+  }
+  const paving = pavingOf(s || 'paving_stones', { americas }) || pavingOf('paving_stones', { americas });
+  return pavingStrips(paving, fullWidth).map((strip) => ({ ...strip, material: PAVING_MATERIALS[paving].material.name, ...fade }));
+}
+
+/**
+ * DecalRoads for the pedestrian streets: { decals: [{ decal, street }] (street:
+ * its spline group's name), ways: [{ nodes, half }] (for keeping trees off) }.
+ */
+function buildPedestrianStreetDecals(terrainData, squareSize) {
+  const decals = [];
+  const ways = [];
+  const perStreet = new Map();
+  for (const feature of terrainData.osmFeatures || []) {
+    const tags = feature?.tags || {};
+    if (feature?.type !== 'road' || tags.highway !== 'pedestrian' || !(feature.geometry?.length >= 2)) continue;
+    // squares (area=yes) are polygons, not streets; bridges and tunnels have
+    // no deck or bore here
+    if (tags.area === 'yes' || isBridgeRoad(tags) || (tags.tunnel && tags.tunnel !== 'no')) continue;
+    const tagged = Number.parseFloat(tags.width);
+    const fullWidth = Number.isFinite(tagged) && tagged > 0 ? Math.min(40, Math.max(2, tagged)) : PEDESTRIAN_WIDTH_M;
+    const layers = pedestrianSurfaceLayers(tags.surface, fullWidth, { americas: getMarkingStyle(terrainData.roadRules) === 'americas' });
+    const street = sanitizeBeamNGObjectName(tags.name || `pedestrian_${feature.id}`, `pedestrian_${feature.id || 'x'}`);
+    const pieces = clipGeometryToMargin(feature.geometry, terrainData.bounds)
+      .map((s) => resampleGeometryToSpacing(s, ROAD_NODE_SPACING_M))
+      .flatMap((s) => chunkPolyline(s));
+    for (const piece of pieces) {
+      const nodes = [];
+      for (const pt of piece) {
+        const [x, y, z] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
+        if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+          nodes.push([Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, Math.round(z * 1000) / 1000, fullWidth / 2]);
+        }
+      }
+      if (nodes.length < 2) continue;
+      ways.push({ nodes, half: fullWidth / 2 });
+      const n = (perStreet.get(street) || 0) + 1;
+      perStreet.set(street, n);
+      layers.forEach((layer, k) => {
+        const decal = makeRoadDecal(offsetNodes(nodes, layer.offset, layer.width), 'Base', street, {
+          material: layer.material,
+          renderPriority: PEDESTRIAN_RENDER_PRIORITY,
+          breakAngle: layer.breakAngle,
+          textureLength: layer.textureLength,
+          startEndFade: [0, 0],
+          distanceFade: layer.distanceFade,
+        });
+        if (!decal) return;
+        decal.name = sanitizeBeamNGObjectName(`dr_${street}_p${n}_b${k + 1}`);
+        decals.push({ decal, street });
+      });
+    }
+  }
+  return { decals, ways };
+}
+
+/** The paving materials the decal groups use, by name (for main.materials.json). */
+export function usedPavingMaterials(groups) {
+  const byName = new Map(Object.values(PAVING_MATERIALS).map((p) => [p.material.name, p.material]));
+  const used = {};
+  for (const group of groups) {
+    for (const item of group.__items || []) {
+      if (byName.has(item.material)) used[item.material] = byName.get(item.material);
+    }
+  }
+  return used;
+}
+
 export function generateDecalRoads(terrainData, squareSize) {
   if (!terrainData.osmFeatures?.length) return [];
 
@@ -3516,7 +3720,8 @@ export function generateDecalRoads(terrainData, squareSize) {
         const roadNamePrefix = sanitizeBeamNGObjectName(`dr_${cleanName}`);
         for (let d = 0; d < layeredDecals.length; d++) {
           const decal = layeredDecals[d];
-          const layerCode = LAYER_CODE[decal.name] || `l${d + 1}`;
+          // paving strips are several Base layers: numbered
+          const layerCode = decal.__layer === 'paving' ? `b${d + 1}` : LAYER_CODE[decal.name] || `l${d + 1}`;
           decal.name = sanitizeBeamNGObjectName(`${roadNamePrefix}_${nameSuffix}_${layerCode}`);
           // On a bridge the road clips onto the deck, in a tunnel onto its
           // floor: without overObjects a DecalRoad is projected onto the
@@ -3528,6 +3733,9 @@ export function generateDecalRoads(terrainData, squareSize) {
       }
     }
   }
+
+  const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize);
+  for (const { decal, street } of pedestrianStreets.decals) getOrCreateSplineGroup(street).__items.push(decal);
 
   const carriagewayIndex = buildCarriagewayIndex(carriageways);
   const junctionMarkings = generateJunctionMarkingDecals(terrainData, squareSize, { carriageways: carriagewayIndex });
@@ -3555,6 +3763,7 @@ export function generateDecalRoads(terrainData, squareSize) {
       .flatMap((owners) => [...owners].filter((o) => o !== cw.owner));
   }
   Object.defineProperty(groups, 'carriageways', { value: carriageways, enumerable: false });
+  Object.defineProperty(groups, 'pedestrianStreets', { value: pedestrianStreets.ways, enumerable: false });
   Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
   Object.defineProperty(groups, 'tunnels', { value: tunnels, enumerable: false });
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
@@ -4497,6 +4706,8 @@ function buildDetailedReportSections(d) {
   listCounts(countBy(decals, (r) => r.material));
   lines.push(`- Carriageways (paint cut / sidewalk input): ${(groups.carriageways || []).length}`);
   lines.push(`- Crosswalk zones: ${(groups.crosswalkZones || []).length}`);
+  lines.push(`- Pedestrian streets drawn (highway=pedestrian, no traffic): ${(groups.pedestrianStreets || []).length} piece(s)`);
+  lines.push('- Stone and brick paving (surface=sett/cobblestone/unhewn_cobblestone/paving_stones/bricks) is laid in strips about one texture tile wide: mapng_road_* materials, art/roads/main.materials.json.');
 
   // ── Bridges ────────────────────────────────────────────────────────────────
   section('Bridges');
@@ -7690,6 +7901,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // under bridge decks.
   const clearOf = buildClearanceIndex([
     ...groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })),
+    ...(decalRoads.pedestrianStreets || []).map((way) => ({ points: way.nodes, half: way.half })),
     ...sidewalks.runs.map((run) => ({ points: run.points, half: run.width })),
   ]);
   let vegetationCleared = 0;
@@ -7881,6 +8093,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   zip.file(`${base}/signals.json`, JSON.stringify(signalData, null, 2));
   if (signalControllerDefinitions) {
     zip.file(`${base}/signalControllerDefinitions.json`, JSON.stringify(signalControllerDefinitions, null, 2));
+  }
+
+  // ── art/roads: the stone and brick paving decal-road materials ─────────────
+  const pavingMaterials = usedPavingMaterials(decalRoads);
+  if (Object.keys(pavingMaterials).length > 0) {
+    zip.file(`${base}/art/roads/main.materials.json`, JSON.stringify(pavingMaterials, null, 2));
   }
 
   // ── art/decals + main.decals.json: turn-lane arrows ───────────────────────
