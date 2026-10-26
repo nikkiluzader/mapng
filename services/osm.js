@@ -3,6 +3,9 @@ import {
   buildOverpassQuery,
 } from "./overpassQuery.js";
 import { fetchOsmFromTiles, resolveOsmTileArchiveUrl } from "./osmTiles.js";
+import { OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture } from "./overtureTiles.js";
+
+const OVERTURE_ENDPOINT = "overture-maps";
 
 // MapNG's own OSM tiles (services/osmTiles.js) are read first: an explicit
 // source (VITE_OSM_TILES_URL / setOsmTileSource), else on the deployed site
@@ -896,7 +899,21 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
         console.warn("[OSM] MapNG tiles unavailable, using Overpass:", tileError?.message || tileError);
       }
     }
-    const { endpoint, data } = result || await fetchFromOverpass({ query, bounds }, { onStatus, signal });
+    if (!result) {
+      try {
+        result = await fetchFromOverpass({ query, bounds }, { onStatus, signal });
+      } catch (overpassError) {
+        if (overpassError?.name === "AbortError" || signal?.aborted) throw overpassError;
+        // Last resort (services/overtureTiles.js): Overture's own tiles, on a
+        // CDN that doesn't share Overpass's outages.
+        console.warn("[OSM] Every Overpass server failed; falling back to Overture Maps.");
+        onStatus?.(`OpenStreetMap servers are unavailable; using Overture Maps data (release ${OVERTURE_RELEASE})...`);
+        const data = await fetchOsmFromOverture(bounds, { signal, onStatus });
+        if (!data) throw overpassError;
+        result = { endpoint: OVERTURE_ENDPOINT, data };
+      }
+    }
+    const { endpoint, data } = result;
 
     console.log(`[OSM] Winner: ${endpoint} — ${data.elements?.length || 0} elements`);
 
@@ -904,6 +921,9 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
       ...queryParams,
       endpointUsed: endpoint,
       elementCount: data.elements?.length || 0,
+      ...(endpoint === OVERTURE_ENDPOINT
+        ? { overtureRelease: OVERTURE_RELEASE, attribution: OVERTURE_ATTRIBUTION }
+        : {}),
       startedAt,
       completedAt: new Date().toISOString(),
     };

@@ -1,7 +1,7 @@
 {
   "overpassStatus": {
     "title": "OpenStreetMap servers aren't responding.",
-    "body": "None of the public Overpass servers are answering right now, so roads, buildings and other OSM features may not load outside the areas MapNG stores itself (turn on Show MapNG OSM coverage under Include OSM Features to see them). Try again in a few minutes, or add your own Overpass server there too.",
+    "body": "None of the public Overpass servers are answering right now. Outside the areas MapNG stores itself (turn on Show MapNG OSM coverage under Include OSM Features to see them), OSM features now load from Overture Maps instead: the same OpenStreetMap roads and places as of its last monthly release, plus extra building footprints and heights, but without lane counts and a few other details. Try again in a few minutes for live data, or add your own Overpass server there too.",
     "dismiss": "Hide this notice",
     "reopen": "OpenStreetMap servers aren't responding. Show details"
   },
@@ -523,7 +523,8 @@
       "Show MapNG OSM coverage outlines those regions on the map",
       "Everywhere else: health-ranked Overpass mirrors with an edge cache",
       "Bring your own Overpass server (Tracestrack, Overspan); MapNG's copy still answers first where it can",
-      "A banner tells you when the public Overpass servers are down"
+      "A banner tells you when the public Overpass servers are down",
+      "If every Overpass server fails, OSM data comes from Overture Maps' monthly release instead, so exports still work"
     ],
     "resolutionTitle": "Resolution",
     "resolutionStrong": "Output sizes from 512 to 16384 px at any processing scale (m/px).",
@@ -692,7 +693,11 @@
         },
         {
           "name": "OpenStreetMap",
-          "desc": "MapNG's own OSM archive on Cloudflare R2 (PMTiles, read by range), health-ranked Overpass mirrors with an edge cache, or your own Overpass server"
+          "desc": "MapNG's own OSM archive on Cloudflare R2 (PMTiles, read by range), health-ranked Overpass mirrors with an edge cache, or your own Overpass server, with Overture Maps as a last resort"
+        },
+        {
+          "name": "Overture Maps",
+          "desc": "Fallback map data when OpenStreetMap's Overpass servers are down: buildings, roads and land use from tiles.overturemaps.org (ODbL / CDLA)"
         },
         {
           "name": "JSZip",
