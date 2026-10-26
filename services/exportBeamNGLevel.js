@@ -40,6 +40,10 @@ import {
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M,
 } from './beamngBridges.js';
 import {
+  solveTunnel, chainTunnelParts, isBoredTunnelTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, tunnelReach,
+  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildTunnelObjects, LIGHT_SPACING_M,
+} from './beamngTunnels.js';
+import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
 } from './beamngPropLibrary.js';
 import {
@@ -810,6 +814,106 @@ function generateBridgeDAEs(decks, groundAt, roadLines) {
     colGeo.dispose();
   });
   return out;
+}
+
+export const TUNNEL_MATERIAL = 'mapng_tunnel_concrete';
+
+/** Tunnel lining / headwall concrete (the bridges' shared plain concrete). */
+function getTunnelMaterialDefs() {
+  const bridge = getBridgeMaterialDefs()[BRIDGE_MATERIAL];
+  return { [TUNNEL_MATERIAL]: { ...bridge, name: TUNNEL_MATERIAL, mapTo: TUNNEL_MATERIAL } };
+}
+
+/**
+ * Tunnel structures as Collada shapes: each tube piece and each portal
+ * (headwall + wingwalls) its own object, origin at its centre (lowest z):
+ * visual mesh + a Colmesh-1 collision copy.
+ * Returns [{ key, tunnel, part, origin, data, triangles }].
+ */
+function generateTunnelDAEs(tunnels) {
+  const out = [];
+  const write = (t, part, { pos, uv }) => {
+    if (!pos.length) return;
+    const origin = [0, 1, 2].map((a) => {
+      let lo = Infinity; let hi = -Infinity;
+      for (let k = a; k < pos.length; k += 3) { lo = Math.min(lo, pos[k]); hi = Math.max(hi, pos[k]); }
+      return Math.round((a === 2 ? lo : (lo + hi) / 2) * 100) / 100;
+    });
+    const positions = Float32Array.from(pos, (v, k) => v - origin[k % 3]);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(Float32Array.from(uv), 2));
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: TUNNEL_MATERIAL }));
+    mesh.name = `tunnel_${part}`;
+    const colGeo = new THREE.BufferGeometry();
+    colGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
+    colGeo.name = 'Colmesh-1';
+    const collision = new THREE.Mesh(colGeo, new THREE.MeshBasicMaterial({ name: TUNNEL_MATERIAL }));
+    collision.name = 'Colmesh-1';
+    const base00 = new THREE.Group();
+    base00.name = 'base00';
+    const start01 = new THREE.Group();
+    start01.name = 'start01';
+    start01.add(mesh);
+    start01.add(collision);
+    base00.add(start01);
+    base00.updateMatrixWorld(true);
+    const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
+    if (result?.data) out.push({ key: `${t.key}_${part}`, tunnel: t.key, part, origin, data: result.data, triangles: pos.length / 9 });
+    geo.dispose();
+    colGeo.dispose();
+  };
+  for (const t of tunnels) {
+    buildTubeGeometry(t).forEach((piece, i) => write(t, `tube${i + 1}`, piece));
+    if (t.portals[0]) write(t, 'portal_a', buildPortalGeometry(t, 'S'));
+    if (t.portals[1]) write(t, 'portal_b', buildPortalGeometry(t, 'N'));
+  }
+  return out;
+}
+
+// Tunnel lights over the whole level, at most (spaced out beyond it).
+const MAX_TUNNEL_LIGHTS = 4000;
+
+/**
+ * The 'tunnels' MissionGroup tree: a SimGroup per tunnel holding its
+ * structure objects, its lights + fixtures, and its Zones / Portals /
+ * ambience. { items, lightCount, zoneCount }.
+ */
+function buildTunnelGroups(tunnels, daes, levelName) {
+  const total = tunnels.reduce((n, t) => n + t.tubeLength, 0);
+  const lightSpacing = Math.max(LIGHT_SPACING_M, total / MAX_TUNNEL_LIGHTS);
+  const items = [];
+  let lightCount = 0;
+  let zoneCount = 0;
+  for (const t of tunnels) {
+    const group = `tunnel_${t.key}`;
+    const { lights, zones, lightCount: nl, zoneCount: nz } = buildTunnelObjects(t, group, generatePersistentId, { lightSpacing });
+    t.lights = nl;
+    t.zones = nz;
+    lightCount += nl;
+    zoneCount += nz;
+    const structure = daes.filter((d) => d.tunnel === t.key).map((d) => ({
+      __parent: group,
+      class: 'TSStatic',
+      name: `${group}_${d.part}`,
+      persistentId: generatePersistentId(),
+      position: d.origin,
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/tunnels/tunnel_${d.key}.dae`,
+      collisionType: 'Collision Mesh',
+      prebuildCollisionData: 0,
+      useInstanceRenderData: true,
+    }));
+    items.push({
+      class: 'SimGroup', name: group, persistentId: generatePersistentId(), __parent: 'tunnels',
+      __items: [
+        ...structure,
+        { class: 'SimGroup', name: `${group}_lights`, persistentId: generatePersistentId(), __parent: group, __items: lights },
+        { class: 'SimGroup', name: `${group}_zones`, persistentId: generatePersistentId(), __parent: group, __items: zones },
+      ],
+    });
+  }
+  return { items, lightCount, zoneCount, lightSpacing };
 }
 
 async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null) {
@@ -2658,7 +2762,13 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
   // OSM is clipped to the map: a bridge running on past the edge ends there,
   // but that end is no abutment.
   const edge = (terrainData.width * squareSize) / 2 - 3;
-  const isFreeEnd = (x, y) => Math.abs(x) >= edge || Math.abs(y) >= edge;
+  // A bridge meeting a tunnel (tunnel=yes road, bored by solveExportTunnels)
+  // has no ground approach there: that end is free too, and the tunnel takes
+  // its height from the deck. (Fitting it to the tunnel road's "ground" put
+  // the abutment on the hill over the tunnel.)
+  const tunnelEnds = [];
+  const isFreeEnd = (x, y) => Math.abs(x) >= edge || Math.abs(y) >= edge
+    || tunnelEnds.some(([tx, ty]) => Math.hypot(tx - x, ty - y) < 1.5);
   // Bridge outlines (man_made=bridge) carry the structure type more often
   // than the roads on them do.
   const outlines = (terrainData.osmFeatures || [])
@@ -2675,6 +2785,7 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
     || outlines.find((o) => xy.filter(([x, y]) => inRing(x, y, o.ring)).length >= 0.2 * xy.length)?.structure
     || null;
   const collect = () => {
+    tunnelEnds.length = 0;
     const parts = [];
     const partSeg = [];
     const lowerRoads = [];
@@ -2695,6 +2806,9 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
           osm: { id: seg.sourceFeature?.id ?? null, name: tags.name || tags.ref || null, highway: seg.highway },
         });
         partSeg.push(segIndex);
+      } else if (isBoredTunnelTag(tags)) {
+        // underground: nothing for a deck to clear, no ground to fit to
+        tunnelEnds.push(xy[0], xy[xy.length - 1]);
       } else {
         lowerRoads.push({
           segIndex,
@@ -3054,6 +3168,164 @@ function raiseApproachEmbankments(terrainData, squareSize, ramps) {
   return built;
 }
 
+const TUNNEL_APPROACH_M = 200;   // how far an approach road is followed out from a portal
+const TUNNEL_TOUCH_M = 1.5;      // a road ending this close to a tunnel's end continues it
+const TUNNEL_ROCK_M = 0.3;       // a bridge this far under the ground is still in the tunnel ...
+const TUNNEL_ROCK_REACH_M = 60;  // ... looked for this far along it
+const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - xy[i - 1][0], p[1] - xy[i - 1][1]) : 0), 0);
+
+/**
+ * Road tunnels (services/beamngTunnels.js) for the drawn tunnel=yes roads:
+ * chains them into paths, solves each under the ground, grades the cuttings,
+ * headwall backfill and any made-up cover into the export's own heightmap
+ * copy, and lists the terrain squares that open at the portals (layer-map
+ * indices, terrain space: 0,0 = SW). halfOf(seg) is the drawn carriageway's
+ * half width. Bridges are solved first: a bridge meeting a portal sets its
+ * height (and gets no cutting).
+ */
+function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf) {
+  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [] };
+  const toXY = (geometry) => geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
+  const groundAt = (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize);
+  const edge = (terrainData.width * squareSize) / 2 - 3;
+  const isFreeEnd = (x, y) => Math.abs(x) >= edge || Math.abs(y) >= edge;
+  const parts = [];
+  const others = [];
+  drivableRoads.forEach((seg, segIndex) => {
+    const tags = seg.sourceFeature?.tags || {};
+    if (!shouldGenerateDecalRoads(seg.highway, tags) || !Array.isArray(seg.geometry) || seg.geometry.length < 2) return;
+    const xy = toXY(seg.geometry);
+    if (isBoredTunnelTag(tags) && !isBridgeRoad(tags)) {
+      parts.push({
+        xy, segIndex, half: halfOf(seg),
+        osm: { id: seg.sourceFeature?.id ?? null, name: tags['tunnel:name'] || tags.name || tags.ref || null, highway: seg.highway },
+      });
+    } else {
+      others.push({ xy, segIndex, bridge: bridges.bySeg.get(segIndex) || null });
+    }
+  });
+  if (!parts.length) return out;
+  const { paths, branched } = chainTunnelParts(parts);
+  for (const group of branched) {
+    out.skipped.push({ osm: group.map((i) => parts[i].osm), reason: 'branches inside the tunnel', length: group.reduce((n, i) => n + pathLength(parts[i].xy), 0) });
+  }
+  // The road a tunnel end runs on into, followed outwards: the one most in
+  // line with the tunnel when several meet there; a bridge gives its deck
+  // height instead.
+  const approachAt = (end, dir) => {
+    const near = (p) => Math.hypot(p[0] - end[0], p[1] - end[1]) < TUNNEL_TOUCH_M;
+    let best = null;
+    for (const r of others) {
+      const a = r.xy[0]; const b = r.xy[r.xy.length - 1];
+      const line = near(a) ? r.xy : near(b) ? [...r.xy].reverse() : null;
+      if (!line || line.length < 2) continue;
+      const k = Math.min(line.length - 1, 3);
+      const L = Math.hypot(line[k][0] - line[0][0], line[k][1] - line[0][1]) || 1;
+      const align = ((line[k][0] - line[0][0]) * dir[0] + (line[k][1] - line[0][1]) * dir[1]) / L;
+      if (!best || align > best.align) best = { r, line, align };
+    }
+    if (!best) return null;
+    if (best.r.bridge) {
+      // OSM often joins tunnel and bridge metres inside the rock: the bore
+      // runs on along the bridge while the ground stays over its deck
+      const deck = best.r.bridge;
+      const dense = resample(best.line.map(([x, y]) => [x, y]), 2);
+      // (the last point within TUNNEL_ROCK_REACH_M still under ground: the
+      // abutment itself is graded to the deck)
+      let k = 1;
+      for (let j = 1, s = 0; j < dense.length - 1; j++) {
+        s += Math.hypot(dense[j][0] - dense[j - 1][0], dense[j][1] - dense[j - 1][1]);
+        if (s > TUNNEL_ROCK_REACH_M) break;
+        if (groundAt(dense[j][0], dense[j][1]) > deckHeightAt(deck, dense[j][0], dense[j][1]) + TUNNEL_ROCK_M) k = j + 1;
+      }
+      const rock = dense.slice(1, k);
+      const at = rock.length ? rock[rock.length - 1] : end;
+      return { xy: dense.slice(k - 1), deckZ: deckHeightAt(deck, at[0], at[1]), rock };
+    }
+    // on through plain continuations (one road in, one out)
+    const line = best.line.map(([x, y]) => [x, y]);
+    const used = new Set([best.r]);
+    let length = pathLength(line);
+    while (length < TUNNEL_APPROACH_M) {
+      const tip = line[line.length - 1];
+      const next = others.filter((r) => !used.has(r) && !r.bridge
+        && (Math.hypot(r.xy[0][0] - tip[0], r.xy[0][1] - tip[1]) < TUNNEL_TOUCH_M || Math.hypot(r.xy[r.xy.length - 1][0] - tip[0], r.xy[r.xy.length - 1][1] - tip[1]) < TUNNEL_TOUCH_M));
+      if (next.length !== 1) break;
+      used.add(next[0]);
+      const piece = Math.hypot(next[0].xy[0][0] - tip[0], next[0].xy[0][1] - tip[1]) < TUNNEL_TOUCH_M ? next[0].xy : [...next[0].xy].reverse();
+      line.push(...piece.slice(1).map(([x, y]) => [x, y]));
+      length = pathLength(line);
+    }
+    return { xy: line };
+  };
+  for (const path of paths) {
+    const xy = path.xy;
+    const half = Math.max(...path.idx.map((i) => parts[i].half));
+    const n = xy.length;
+    const dirOut = (a, b) => { const L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1; return [(a[0] - b[0]) / L, (a[1] - b[1]) / L]; };
+    const approaches = [approachAt(xy[0], dirOut(xy[0], xy[1])), approachAt(xy[n - 1], dirOut(xy[n - 1], xy[n - 2]))];
+    // the bore carried on along a bridge still in the rock
+    const bore = [...[...(approaches[0]?.rock || [])].reverse(), ...xy, ...(approaches[1]?.rock || [])];
+    const t = solveTunnel({ xy: bore, half }, { groundAt, approaches, isFreeEnd, squareSize });
+    const osm = path.idx.map((i) => parts[i].osm);
+    if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); continue; }
+    t.osm = osm;
+    t.approachKinds = approaches.map((a) => (!a ? null : Number.isFinite(a.deckZ) ? `bridge (${(a.rock || []).length} rock pts)` : `road ${Math.round(pathLength(a.xy))} m`));
+    t.key = `t${String(out.tunnels.length + 1).padStart(3, '0')}`;
+    t.groundBefore = t.line.map((p) => p.g);
+    out.tunnels.push(t);
+    for (const i of path.idx) out.bySeg.set(parts[i].segIndex, t);
+  }
+  if (!out.tunnels.length) return out;
+
+  // Terrain: graded into the export's copy, then the portal squares opened.
+  const { width, height, minHeight } = terrainData;
+  const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
+  const hm = heightMapEditor(terrainData);
+  const worldSize = width * squareSize;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const pixelBox = (t) => {
+    const [x0, y0, x1, y1] = tunnelReach(t);
+    const [c0, r1] = toPixel(x0, y0);
+    const [c1, r0] = toPixel(x1, y1);
+    return [Math.max(0, Math.floor(c0)), Math.max(0, Math.floor(r0)), Math.min(width - 1, Math.ceil(c1)), Math.min(height - 1, Math.ceil(r1))];
+  };
+  for (const t of out.tunnels) {
+    const [c0, r0, c1, r1] = pixelBox(t);
+    let changed = 0;
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const idx = r * width + c;
+        const h = hm.at(idx) - minHeight;
+        const [x, y] = toWorld(c, r);
+        const want = tunnelGroundAt(t, x, y, h);
+        if (Math.abs(want - h) > 1e-3) { hm.set(idx, Math.min(want + minHeight, maxHeight)); changed++; }
+      }
+    }
+    t.gradedPixels = changed;
+  }
+  const holes = new Set();
+  for (const t of out.tunnels) {
+    const [c0, r0, c1, r1] = pixelBox(t);
+    let opened = 0;
+    // square (c, r) spans pixels c..c+1 and r-1..r (north): layer index of
+    // its south-west sample
+    for (let r = Math.max(1, r0); r <= r1; r++) {
+      for (let c = c0; c < Math.min(c1, width - 1); c++) {
+        const corners = [hm.at(r * width + c), hm.at(r * width + c + 1), hm.at((r - 1) * width + c), hm.at((r - 1) * width + c + 1)];
+        const [x, y] = toWorld(c + 0.5, r - 0.5);
+        if (tunnelHoleAt(t, x, y, Math.min(...corners) - minHeight, Math.max(...corners) - minHeight)) { holes.add((height - 1 - r) * width + c); opened++; }
+      }
+    }
+    t.holes = opened;
+  }
+  out.holes = [...holes];
+  if (globalThis.__MAPNG_TUNNEL_DEBUG) globalThis.__MAPNG_TUNNEL_DEBUG(out, { groundAt, toWorld, toPixel, bridges, width, height, hmAt: (idx) => hm.at(idx) - minHeight });
+  console.log(`[BeamNG Export] Tunnels: ${out.tunnels.length} bored (${out.tunnels.map((t) => `${Math.round(t.tubeLength)} m`).join(', ')}), ${out.skipped.length} left on the ground, ${out.holes.length} portal hole square(s).`);
+  return out;
+}
+
 export function generateDecalRoads(terrainData, squareSize) {
   if (!terrainData.osmFeatures?.length) return [];
 
@@ -3073,6 +3345,17 @@ export function generateDecalRoads(terrainData, squareSize) {
   const bridges = solveExportBridges(drivableRoads, terrainData, squareSize);
   const stableHalfWidthMap = buildStableDecalHalfWidthMap(drivableRoads);
   const isUrbanRoad = buildUrbanRoadClassifier(terrainData.osmFeatures);
+  // Then tunnels: their cuttings are graded before any road samples the ground.
+  const tunnels = solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, (seg) => {
+    const tags = seg.sourceFeature?.tags || {};
+    const cs = estimateRoadCrossSection(tags, seg.highway, isOneWayRoad(tags), {
+      urban: isUrbanRoad(seg),
+      fallbackHalfWidth: (HIGHWAY_STYLE[seg.highway] ?? DEFAULT_ROAD_STYLE).width,
+    });
+    const stable = hasWidthTags(tags) ? null : stableHalfWidthMap.get(getDecalWidthCorridorKey(seg));
+    const driving = Number.isFinite(stable) && stable > 0 ? stable : cs.drivingHalfWidth;
+    return driving + (cs.leftExtra + cs.rightExtra) / 2;
+  });
   const giveWayKeys = collectGiveWayNodeKeys(terrainData.osmFeatures);
   const leftHandTraffic = !!terrainData.roadRules?.leftHandTraffic;
   const markingStyle = getMarkingStyle(terrainData.roadRules);
@@ -3174,9 +3457,11 @@ export function generateDecalRoads(terrainData, squareSize) {
         const [wx, wy, groundZ] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
         const deckPart = bridges.bySeg.get(segIndex);
         const carried = bridges.approaches?.get(segIndex);
+        const bore = tunnels.bySeg.get(segIndex);
         const wz = deckPart ? deckHeightAt(deckPart, wx, wy) + 0.1
           : carried && distanceToLine(carried.xy, wx, wy) < 1 ? deckHeightAt(carried, wx, wy) + 0.1
-            : groundZ;
+            : bore ? tunnelRoadZ(bore, wx, wy)
+              : groundZ;
         // Defense in depth: a non-finite node becomes an inf DecalRoad position
         // that BeamNG rejects at batch build, taking the whole road down. Source
         // geometry is already sanitized in buildRoadNetwork; skip here too so no
@@ -3199,7 +3484,7 @@ export function generateDecalRoads(terrainData, squareSize) {
       carriageways.push({
         owner: segIndex, nodes: centerNodes, half: styleHalfWidth,
         tags: renderTags, highway, urban: urbanRoad, wayId: feature.id, oneWay: isOneWay,
-        bridge: !!bridgePart,
+        bridge: !!bridgePart, tunnel: tunnels.bySeg.has(segIndex),
       });
 
       const layeredDecals = getLayeredRoadDecals(
@@ -3233,9 +3518,10 @@ export function generateDecalRoads(terrainData, squareSize) {
           const decal = layeredDecals[d];
           const layerCode = LAYER_CODE[decal.name] || `l${d + 1}`;
           decal.name = sanitizeBeamNGObjectName(`${roadNamePrefix}_${nameSuffix}_${layerCode}`);
-          // On a bridge the road clips onto the deck: without overObjects a
-          // DecalRoad is projected down onto the terrain under it.
-          if (bridges.bySeg.has(segIndex) || bridges.approaches?.has(segIndex)) decal.overObjects = true;
+          // On a bridge the road clips onto the deck, in a tunnel onto its
+          // floor: without overObjects a DecalRoad is projected onto the
+          // terrain (the hill over a tunnel).
+          if (bridges.bySeg.has(segIndex) || bridges.approaches?.has(segIndex) || tunnels.bySeg.has(segIndex)) decal.overObjects = true;
           splineGroup.__items.push(decal);
           if (isCutPaintLayer(decal.__layer)) paintDecals.push({ decal, group: splineGroup, owner: segIndex });
         }
@@ -3270,6 +3556,7 @@ export function generateDecalRoads(terrainData, squareSize) {
   }
   Object.defineProperty(groups, 'carriageways', { value: carriageways, enumerable: false });
   Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
+  Object.defineProperty(groups, 'tunnels', { value: tunnels, enumerable: false });
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
   return groups;
 }
@@ -4190,7 +4477,7 @@ function buildDetailedReportSections(d) {
   }
   lines.push(`- OSM road ways in the map: ${roadFeatures.length}`);
   for (const [k, e] of [...byClass.entries()].sort((a, b) => b[1].m - a[1].m)) {
-    lines.push(`  - ${k}: ${e.n} ways, ${formatNumber(e.m / 1000, 2)} km${e.bridges ? `, ${e.bridges} bridge` : ''}${e.tunnels ? `, ${e.tunnels} tunnel (drawn on the ground)` : ''}`);
+    lines.push(`  - ${k}: ${e.n} ways, ${formatNumber(e.m / 1000, 2)} km${e.bridges ? `, ${e.bridges} bridge` : ''}${e.tunnels ? `, ${e.tunnels} tunnel` : ''}`);
   }
   // generateDecalRoads returns one SimGroup per road name (and one for the
   // junction markings) with the DecalRoads inside
@@ -4257,6 +4544,49 @@ function buildDetailedReportSections(d) {
     lines.push(`  - Lowest clearance over a crossed road: ${Number.isFinite(minRoadGap) ? `${formatNumber(minRoadGap, 2)} m` : 'n/a'}; clearance shortfall: ${formatNumber(deck.shortfall ?? 0, 2)} m`);
     lines.push(`  - Object: bridge_${key}.dae${dae ? `, ${Math.round(dae.triangles)} triangles, origin (${dae.origin.map((v) => formatNumber(v, 1)).join(', ')})` : ' (not written: no geometry)'}`);
   });
+
+  // ── Tunnels ────────────────────────────────────────────────────────────────
+  section('Tunnels');
+  const tun = d.tunnels;
+  const bored = tun?.tunnels || [];
+  const left = tun?.skipped || [];
+  lines.push(`- Bored tunnels: ${bored.length}; tunnel=yes roads left on the ground: ${left.length}; portal hole squares: ${(tun?.holes || []).length}`);
+  lines.push('- Only drivable tunnel=yes roads are bored (building passages, culverts, galleries and covered ways stay as they were).');
+  lines.push('- A tunnel needs the ground over its road by the tube height + 1.5 m along most of it; short dips are filled over the tube.');
+  if (bored.length) lines.push(`- Ceiling lights every ${formatNumber(d.tunnelLightSpacing ?? 8, 1)} m (every 4 m within 30 m of a portal), on day and night`);
+  const describe = (osm) => [...new Set((osm || []).map((o) => `${o.name || 'unnamed'} [${o.highway || '?'}]`))].join(', ') || 'n/a';
+  const ways = (osm) => [...new Set((osm || []).map((o) => String(o.id ?? '?').replace(/_seg_\d+$/, '')))].join(', ');
+  const tunnelDaesByTunnel = new Map();
+  for (const dae of d.tunnelDaes || []) {
+    if (!tunnelDaesByTunnel.has(dae.tunnel)) tunnelDaesByTunnel.set(dae.tunnel, []);
+    tunnelDaesByTunnel.get(dae.tunnel).push(dae);
+  }
+  for (const t of bored) {
+    const a = t.line[t.iS]; const b = t.line[t.iN];
+    let minCover = Infinity; let maxCover = -Infinity;
+    for (let i = t.iS; i <= t.iN; i++) {
+      const c = t.line[i].g - t.line[i].z;
+      minCover = Math.min(minCover, c); maxCover = Math.max(maxCover, c);
+    }
+    const daes = tunnelDaesByTunnel.get(t.key) || [];
+    lines.push('');
+    lines.push(`Tunnel ${t.key}: ${describe(t.osm)}`);
+    lines.push(`  - OSM way(s): ${ways(t.osm) || 'n/a'}`);
+    lines.push(`  - Bore ${formatNumber(t.tubeLength, 1)} m of ${formatNumber(t.length, 1)} m mapped; inside width ${formatNumber(2 * t.W, 1)} m, crown ${formatNumber(t.crown, 2)} m over the road`);
+    const kind = { cut: 'cutting + wingwalls', bridge: 'meets a bridge', edge: 'map edge, no portal' };
+    lines.push(`  - Portal A (${kind[t.portalKind[0]]}) at (${formatNumber(a.x, 1)}, ${formatNumber(a.y, 1)}) road ${formatNumber(a.z + minH, 2)} m; portal B (${kind[t.portalKind[1]]}) at (${formatNumber(b.x, 1)}, ${formatNumber(b.y, 1)}) road ${formatNumber(b.z + minH, 2)} m`);
+    lines.push(`  - Ground over the road (before grading): ${formatNumber(minCover, 1)} to ${formatNumber(maxCover, 1)} m`);
+    for (const dip of t.dips || []) lines.push(`  - Dip in the cover ${formatNumber(dip.length, 0)} m long at ${formatNumber(dip.s - t.line[t.iS].s, 0)} m in: filled up to ${formatNumber(dip.depth, 1)} m over the tube`);
+    for (const [s0, s1] of t.exposed || []) lines.push(`  - Exposed tube ${formatNumber(s1 - s0, 0)} m (thin cover where it meets a bridge; terrain opened, not filled)`);
+    lines.push(`  - Terrain: ${t.gradedPixels ?? 0} grid points graded (cuttings, headwall backfill, cover), ${t.holes ?? 0} square(s) opened at the portals`);
+    lines.push(`  - Lights: ${t.lights ?? 0}, zones: ${t.zones ?? 0}`);
+    lines.push(`  - Objects: ${daes.map((x) => `tunnel_${x.key}.dae (${Math.round(x.triangles)} tris)`).join(', ') || 'none'}`);
+  }
+  if (left.length) {
+    lines.push('');
+    lines.push('Left on the ground (drawn over the terrain as before):');
+    for (const k of left) lines.push(`  - ${describe(k.osm)} (way ${ways(k.osm) || 'n/a'}, ${formatNumber(k.length ?? 0, 0)} m): ${k.reason}`);
+  }
 
   // ── Buildings ──────────────────────────────────────────────────────────────
   section('Buildings');
@@ -7067,7 +7397,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const includeRoads = roadType !== 'none';
   if (includeRoads) {
     const roadFeatureCount = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'road').length;
-    beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions and bridge decks…`);
+    beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions, bridge decks and tunnels…`);
     await yield_();
   }
   const decalRoads = includeRoads
@@ -7076,8 +7406,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
   const bridgeDecks = decalRoads.bridges?.decks || [];
-  const groundCarriageways = (decalRoads.carriageways || []).filter((cw) => !cw.bridge);
-  const underDeck = (x, y, z, zTop) => bridgeDecks.length > 0 && hitsDeck(bridgeDecks, x, y, z, zTop);
+  // Tunnels likewise: no sidewalks, lamps or props inside, nothing standing
+  // in a tube, a headwall or a cutting's walls (the hill over it is free).
+  const tunnelList = decalRoads.tunnels?.tunnels || [];
+  const groundCarriageways = (decalRoads.carriageways || []).filter((cw) => !cw.bridge && !cw.tunnel);
+  const underDeck = (x, y, z, zTop) => (bridgeDecks.length > 0 && hitsDeck(bridgeDecks, x, y, z, zTop))
+    || (tunnelList.length > 0 && hitsTunnel(tunnelList, x, y, z, zTop));
   const bridgeDaes = generateBridgeDAEs(
     bridgeDecks,
     (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
@@ -7085,6 +7419,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   );
   if (bridgeDecks.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles, one object per bridge.`);
+  }
+  const tunnelDaes = generateTunnelDAEs(tunnelList);
+  const tunnelGroups = buildTunnelGroups(tunnelList, tunnelDaes, levelName);
+  if (tunnelList.length > 0) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tunnels: ${tunnelList.length} bored, ${tunnelDaes.length} object(s), ${tunnelDaes.reduce((n, d) => n + d.triangles, 0)} triangles, ${tunnelGroups.lightCount} lights, ${tunnelGroups.zoneCount} zones.`);
   }
   if (includeRoads && includeSidewalks) {
     beginStep('sidewalks', `Building sidewalks, curbs and ramps along ${groundCarriageways.length} carriageways${bridgeDecks.length ? ` (${bridgeDecks.length} bridge decks built)` : ''}…`);
@@ -7236,8 +7575,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   beginStep('ter', `Writing the terrain binary (terrain.ter, ${size}×${size} heights + material layers)…`);
   await yield_();
+  // Tunnel portals: their terrain squares open (layer 255, Terrain-Files.md
+  // "Empty terrain / holes").
+  let terLayerMap = pbrResult?.layerMap ?? null;
+  const tunnelHoles = decalRoads.tunnels?.holes || [];
+  if (tunnelHoles.length > 0) {
+    if (!terLayerMap) terLayerMap = new Uint8Array(exportTerrainData.width * exportTerrainData.height);
+    for (const k of tunnelHoles) if (k >= 0 && k < terLayerMap.length) terLayerMap[k] = 255;
+  }
   const { blob: terBlob } = await exportTer(exportTerrainData, {
-    layerMap: pbrResult?.layerMap ?? null,
+    layerMap: terLayerMap,
     materialNames: pbrResult?.materialNames ?? null,
   });
 
@@ -7722,6 +8069,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
     zip.file(`${base}/map_assets/custom_assets/bridges/main.materials.json`, JSON.stringify(getBridgeMaterialDefs(), null, 2));
   }
+  if (tunnelDaes.length > 0) {
+    zip.folder(`${base}/map_assets/custom_assets/tunnels`);
+    for (const { key, data } of tunnelDaes) {
+      zip.file(`${base}/map_assets/custom_assets/tunnels/tunnel_${key}.dae`, await toZipBinary(data));
+    }
+    zip.file(`${base}/map_assets/custom_assets/tunnels/main.materials.json`, JSON.stringify(getTunnelMaterialDefs(), null, 2));
+  }
   if (powerWireDaes.length > 0) {
     zip.folder(`${base}/map_assets/custom_assets/power_lines`);
     for (const { key, data } of powerWireDaes) {
@@ -7795,6 +8149,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       buildingReport,
       bridges: decalRoads.bridges,
       bridgeDaes,
+      tunnels: decalRoads.tunnels,
+      tunnelDaes,
+      tunnelLightSpacing: tunnelGroups.lightSpacing,
       groundAtWorld: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       decalRoads,
       sidewalks,
@@ -8066,6 +8423,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       name: 'Decal_Roads',
       persistentId: generatePersistentId(),
     }] : []),
+    ...(tunnelGroups.items.length > 0 ? [{
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: 'tunnels',
+      persistentId: generatePersistentId(),
+    }] : []),
   ];
   zip.file(`${base}/main/MissionGroup/items.level.json`, toNDJSON(missionGroupItems));
 
@@ -8122,6 +8485,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // ── main/MissionGroup/Decal_Roads/items.level.json ────────────────────────
   if (decalRoads.length > 0) {
     writeSimGroupTree(zip, `${base}/main/MissionGroup/Decal_Roads`, decalRoads);
+  }
+
+  // ── main/MissionGroup/tunnels/… ─────────────────────────────────────────
+  // One SimGroup per tunnel: tube pieces + portals, ceiling lights (wcusa
+  // fixture, .link registered by rewriteForLinks), Zones / Portals / ambience.
+  if (tunnelGroups.items.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/tunnels`);
+    writeSimGroupTree(zip, `${base}/main/MissionGroup/tunnels`, rewriteForLinks(tunnelGroups.items));
   }
 
 
