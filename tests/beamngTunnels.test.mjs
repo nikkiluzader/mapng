@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   solveTunnel, chainTunnelParts, tunnelGroundAt, tunnelHoleAt, tunnelReach, nearestOnTunnel,
-  buildTubeGeometry, buildPortalGeometry, buildTunnelObjects, hitsTunnel, isBoredTunnelTag,
+  buildTubeGeometry, buildPortalGeometry, buildTunnelObjects, hitsTunnel, isBoredTunnelTag, absorbBranch,
   MAX_GRADE, LINING_M,
 } from '../services/beamngTunnels.js';
 
@@ -35,11 +35,38 @@ const spikeTunnel = () => solveTunnel({ xy: road(-400, 400), half: 4 }, {
   approaches: [{ xy: road(-400, -700) }, { xy: road(400, 700) }],
 });
 
-test('only plain tunnel=yes ways are bored', () => {
+test('tunnel=yes ways are built, and avalanche galleries; not passages or culverts', () => {
   assert.equal(isBoredTunnelTag({ tunnel: 'yes' }), true);
-  for (const v of ['building_passage', 'culvert', 'flooded', 'avalanche_protector', 'no', undefined]) {
+  assert.equal(isBoredTunnelTag({ tunnel: 'avalanche_protector' }), true);
+  for (const v of ['building_passage', 'culvert', 'flooded', 'no', undefined]) {
     assert.equal(isBoredTunnelTag({ tunnel: v }), false, String(v));
   }
+});
+
+// a hillside rising 0.5 m per m to the left (-x) of a road along +y
+const hillside = (x) => 50 - 0.5 * x;
+
+test('a tunnel on a hillside with too little rock over it is a gallery, not a sunken box', () => {
+  const t = solveTunnel({ xy: road(-150, 150), half: 4 }, { groundAt: hillside, approaches: [{ xy: road(-150, -400) }, { xy: road(150, 400) }] });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.kind, 'gallery');
+  assert.equal(t.uphill, -1, 'the wall on the uphill (left) side');
+  // the road stays where it is
+  for (const p of t.line) assert.ok(Math.abs(p.z - 50) < 0.5, `road at ${p.z.toFixed(2)}`);
+  // nothing opens; under the roof the floor is the road; uphill the rock is
+  // cut back over the roof; it is no box sunk under the slope
+  assert.equal(tunnelHoleAt(t, 0, 0, 40, 60), false);
+  assert.ok(Math.abs(tunnelGroundAt(t, -3, 0, hillside(-3)) - 50) < 0.5);
+  assert.ok(tunnelGroundAt(t, -12, 0, hillside(-12)) <= 50 + t.headTop + 4 * (12 - t.W - 1.1) + 1e-6);
+  const objs = buildTunnelObjects(t, 'g', () => 'id');
+  assert.equal(objs.lightCount, 0, 'open to the daylight: no lights');
+  assert.ok(buildTubeGeometry(t)[0].pos.length > 0);
+});
+
+test('tunnel=avalanche_protector is a gallery whatever the ground', () => {
+  const t = solveTunnel({ xy: road(-60, 60), half: 3, gallery: true }, { groundAt: hillside });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.kind, 'gallery');
 });
 
 test('the spike ridge: portals on the flanks, the road under the hill', () => {
@@ -85,11 +112,58 @@ test('terrain: no ground inside the bore, holes only just behind the headwalls',
   assert.equal(h(0, 0), ridge(0, 0), 'hill over the middle untouched');
 });
 
-test('a road on flat ground is no tunnel; nor is a short one', () => {
-  const flat = solveTunnel({ xy: road(-200, 200), half: 4 }, { groundAt: () => 10 });
-  assert.equal(flat.ok, false);
+test('a short way is no tunnel', () => {
   const short = solveTunnel({ xy: road(0, 12), half: 4 }, { groundAt: ridge });
   assert.equal(short.ok, false);
+});
+
+test('a tunnel mapped under flat ground is cut and cover: a box under the street, trenches out', () => {
+  const flat = () => 10;
+  const t = solveTunnel({ xy: road(-200, 200), half: 4 }, { groundAt: flat, approaches: [{ xy: road(-200, -600) }, { xy: road(200, 600) }] });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.kind, 'cutcover');
+  for (let i = t.iS; i <= t.iN; i++) assert.ok(10 - t.line[i].z >= t.need - 1e-6, `under the street at ${t.line[i].y}`);
+  assert.ok(t.need < 8, `${t.need.toFixed(1)} m deep: a box, not a bore`);
+  assert.ok(t.headTop - t.need < 0.5, 'headwall to the street, not 10 m over it');
+  // the trenches climb back to the street at the tunnel grade
+  assert.ok(Math.abs(t.line[0].z - 10) < 0.3 && Math.abs(t.line[t.line.length - 1].z - 10) < 0.3, 'trench ends at the street');
+  for (let i = 1; i < t.line.length; i++) {
+    assert.ok(Math.abs(t.line[i].z - t.line[i - 1].z) / (t.line[i].s - t.line[i - 1].s) <= MAX_GRADE + 0.01);
+  }
+  // the street over it is left alone
+  assert.equal(tunnelGroundAt(t, 0, 0, 10), 10);
+});
+
+test('a ramp splitting off inside a tunnel: one group, the main path and its branch', () => {
+  const main = [{ xy: [[0, -200], [0, 100]] }, { xy: [[0, 100], [0, 200]] }];
+  const ramp = { xy: [[0, 100], [8, 200]] };
+  const { paths, branched, trees } = chainTunnelParts([...main, ramp]);
+  assert.equal(paths.length, 0);
+  assert.equal(branched.length, 0);
+  assert.equal(trees.length, 1);
+  assert.equal(trees[0].main.idx.length, 2, 'the longest path is the main tunnel');
+  assert.deepEqual(trees[0].branches[0].xy[0], [0, 100], 'the branch starts at the junction');
+});
+
+test('a ramp taken into the tunnel: the bore widens on its side out to the portal, then its own trench', () => {
+  const flat = () => 10;
+  const t = solveTunnel({ xy: road(-200, 200), half: 4 }, { groundAt: flat, approaches: [{ xy: road(-200, -600) }, { xy: road(200, 600) }] });
+  // splitting off right 100 m in, 16 m off the main road at the portal, then away
+  const xy = [[0, 100], [8, 200], [40, 400]];
+  const res = absorbBranch(t, { xy, half: 2, tunnelLength: Math.hypot(8, 100) }, { groundAt: flat });
+  assert.equal(res.ok, true, res.reason);
+  const portal = t.line[t.iN];
+  // travel is +y: right of travel is +x
+  assert.ok(portal.wr - t.W > 5.5, `widened ${(portal.wr - t.W).toFixed(1)} m on the ramp's side at the portal`);
+  assert.equal(portal.wl, t.W, 'the other side as it was');
+  const before = t.line.find((p) => p.y > 0 && p.y < 90);
+  assert.ok(before.wr - t.W < 0.5, 'not widened before the junction');
+  assert.equal(t.cuts.length, 1, 'its own trench where it leaves the main one');
+  // the ramp's road is in the bore: inside the widened outline, no hole over it
+  assert.equal(hitsTunnel([t], 8, 199, t.line[t.iN].z + 1, t.line[t.iN].z + 2), true);
+  // and its own trench reaches down to it
+  const cut = t.cuts[0].line[1];
+  assert.ok(cut.z < 10 && tunnelGroundAt(t, cut.x, cut.y, 10) <= cut.z + 0.05, 'the ground cut down to the ramp');
 });
 
 test('a dip in the hill is made up with fill over the bore', () => {
@@ -111,14 +185,16 @@ test('a bridge meeting the portal: its height, no cutting', () => {
   assert.ok(t.line[0].y >= -215, 'no cutting out along the bridge');
 });
 
-test('tunnel parts chain into paths; a fork is left out', () => {
+test('tunnel parts chain into paths; a fork splits into the longest path and a branch', () => {
   const a = { xy: [[0, 0], [10, 0]] }; const b = { xy: [[20, 0], [10, 0]] }; const c = { xy: [[20, 0], [30, 0]] };
-  const { paths, branched } = chainTunnelParts([a, b, c]);
+  const { paths } = chainTunnelParts([a, b, c]);
   assert.equal(paths.length, 1);
   assert.deepEqual(paths[0].xy.map((p) => p[0]), [0, 10, 20, 30]);
-  const fork = chainTunnelParts([a, b, { xy: [[10, 0], [10, 10]] }]);
+  const fork = chainTunnelParts([a, b, { xy: [[10, 0], [10, 6]] }]);
   assert.equal(fork.paths.length, 0);
-  assert.equal(fork.branched.length, 1);
+  assert.equal(fork.branched.length, 0);
+  assert.equal(fork.trees.length, 1);
+  assert.equal(fork.trees[0].branches.length, 1);
 });
 
 test('geometry, lights and zones', () => {

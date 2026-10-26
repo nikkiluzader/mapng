@@ -37,7 +37,7 @@ export const LINING_M = 0.6;
 const archRise = (W) => Math.min(5, Math.max(3.5, 0.7 * W));
 
 // Portals
-const HEAD_TOP_M = 10.5;               // headwall top over the road
+const HEAD_TOP_M = 10.5;               // headwall top over the road (bored)
 const HEAD_BOTTOM_M = -1.5;
 const HEAD_SIDE_M = 5;                 // headwall reaches this far past the lining
 const BACKFILL_M = 8;                  // ground behind the headwall raised to its top this far in
@@ -46,7 +46,16 @@ const FACE_REACH_M = 60;               // to the natural ground (a cliff over a 
 const WING_GAP_M = 1.5;                // trench floor past the lining before the wingwall
 const WING_BOTTOM_M = -1;
 const WING_MIN_M = 0.4;                // a wingwall lower than this ends
-const TRENCH_MAX_M = 160;              // the cutting is looked for this far out
+const TRENCH_MAX_M = 400;              // the cutting / fill runs out at most this far (bored)
+const APPROACH_LAND_GRADE = 0.12;      // an approach still off the ground there lands at this grade
+
+// Cut-and-cover: a tunnel OSM maps under flat ground (a city deck park, an
+// underpass) is a box sunk below the street, its approaches in a trench.
+// Elevation data shows no trench (Deck Park, Phoenix: flat at street level).
+const CC_WALL_M = 5;                   // box walls ...
+const CC_ARCH_M = 0.8;                 // ... and a shallow vault
+const CC_COVER_M = 0.8;                // ground over the roof
+const CC_HEAD_OVER_M = 0.3;            // headwall top over the street
 const TRENCH_DONE_M = 0.25;            // the approach meets the ground again within this
 const APPROACH_FIT_M = [4, 40];        // approach road samples a portal's height is fitted to
 const APPROACH_MAX_GRADE = 0.25;
@@ -65,8 +74,11 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 /** OSM tunnel ways that get a bored tunnel (the rest stay on the ground). */
 export function isBoredTunnelTag(tags = {}) {
   const t = String(tags.tunnel ?? '').toLowerCase();
-  return t === 'yes';
+  return t === 'yes' || t === 'avalanche_protector';
 }
+
+/** An avalanche gallery: a roofed road on the hillside, open on the valley side. */
+export const isGalleryTag = (tags = {}) => String(tags.tunnel ?? '').toLowerCase() === 'avalanche_protector';
 
 /**
  * Tunnel parts joined end to end into simple paths: [{ idx: [part index in
@@ -85,6 +97,7 @@ export function chainTunnelParts(parts) {
   const used = new Set();
   const paths = [];
   const branched = [];
+  const trees = [];
   const degree = (k) => ends.get(k)?.length ?? 0;
   for (let i = 0; i < parts.length; i++) {
     if (used.has(i)) continue;
@@ -100,7 +113,11 @@ export function chainTunnelParts(parts) {
       }
     }
     const keys = group.flatMap((j) => [key(parts[j].xy[0]), key(parts[j].xy[parts[j].xy.length - 1])]);
-    if (keys.some((k) => degree(k) > 2)) { branched.push(group); continue; }
+    if (keys.some((k) => degree(k) > 2)) {
+      const tree = splitBranches(parts, group, ends, key);
+      if (tree) trees.push(tree); else branched.push(group);
+      continue;
+    }
     // walk from an end of degree 1 (or anywhere on a loop)
     let startKey = keys.find((k) => degree(k) === 1) ?? keys[0];
     const idx = [];
@@ -121,7 +138,71 @@ export function chainTunnelParts(parts) {
     if (left.size) { branched.push(group); continue; }
     paths.push({ idx, flip, xy });
   }
-  return { paths, branched };
+  return { paths, branched, trees };
+}
+
+/**
+ * A branching group of tunnel parts as its longest path (the main tunnel)
+ * and the chains hanging off it: { main: path, branches: [path, its xy
+ * starting at the junction] }, or null (a loop, or a branch off a branch).
+ */
+function splitBranches(parts, group, ends, key) {
+  // (a ramp counts for half its length: the carriageway is the main tunnel)
+  const len = (i) => {
+    const xy = parts[i].xy;
+    let L = 0;
+    for (let k = 1; k < xy.length; k++) L += Math.hypot(xy[k][0] - xy[k - 1][0], xy[k][1] - xy[k - 1][1]);
+    return String(parts[i].osm?.highway ?? '').endsWith('_link') ? L / 2 : L;
+  };
+  const inGroup = new Set(group);
+  const nextAt = (k, used) => (ends.get(k) || []).filter(({ i }) => inGroup.has(i) && !used.has(i));
+  const far = (i, at) => key(at === 0 ? parts[i].xy[parts[i].xy.length - 1] : parts[i].xy[0]);
+  // the longest simple path between two group ends (groups are small)
+  let best = null;
+  const walk = (k, used, path, L) => {
+    const options = nextAt(k, used);
+    if (!options.length && path.length && (!best || L > best.L)) best = { path: [...path], L };
+    for (const o of options) {
+      used.add(o.i);
+      path.push(o);
+      walk(far(o.i, o.at), used, path, L + len(o.i));
+      path.pop();
+      used.delete(o.i);
+    }
+  };
+  const groupKeys = [...new Set(group.flatMap((j) => [key(parts[j].xy[0]), key(parts[j].xy[parts[j].xy.length - 1])]))];
+  for (const k of groupKeys) if ((ends.get(k) || []).filter(({ i }) => inGroup.has(i)).length === 1) walk(k, new Set(), [], 0);
+  if (!best) return null;
+  const asPath = (steps) => {
+    const xy = [];
+    for (const { i, at } of steps) {
+      const pts = at === 0 ? parts[i].xy : [...parts[i].xy].reverse();
+      xy.push(...(xy.length ? pts.slice(1) : pts));
+    }
+    return { idx: steps.map((o) => o.i), flip: steps.map((o) => o.at === 1), xy };
+  };
+  const main = asPath(best.path);
+  const used = new Set(main.idx);
+  const mainKeys = new Set(main.idx.flatMap((j) => [key(parts[j].xy[0]), key(parts[j].xy[parts[j].xy.length - 1])]));
+  const branches = [];
+  for (const k of mainKeys) {
+    for (const o of nextAt(k, used)) {
+      // a chain from the junction outwards, one part after the next
+      const steps = [o];
+      used.add(o.i);
+      let at = far(o.i, o.at);
+      for (;;) {
+        const nx = nextAt(at, used);
+        if (nx.length !== 1) { if (nx.length > 1) return null; break; }
+        steps.push(nx[0]);
+        used.add(nx[0].i);
+        at = far(nx[0].i, nx[0].at);
+      }
+      branches.push(asPath(steps));
+    }
+  }
+  if (group.some((i) => !used.has(i))) return null;
+  return { main, branches };
 }
 
 /** A portal's height from the approach road's ground (Theil-Sen, as the bridges do). */
@@ -204,18 +285,158 @@ function stations(xy, step = STEP_M) {
  * Returns a tunnel ({ ok: true, line, iS, iN, W, wall, arch, ... }) or
  * { ok: false, reason }.
  */
-export function solveTunnel(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1 }) {
+export function solveTunnel(path, opts) {
+  if (path.gallery) return solveGallery(path, opts);
+  const bored = solveTunnelAs(path, opts, false);
+  if (bored.ok || !/not under ground|bore only/.test(bored.reason)) return bored;
+  // mapped as a tunnel, but too little ground over it: on a hillside (the
+  // 30 m elevation smooths a cliff road's rock away) a gallery; under flat
+  // ground (a city) cut and cover
+  if (crossSlope(path, opts.groundAt) > HILLSIDE_SLOPE) {
+    const gal = solveGallery(path, opts);
+    return gal.ok ? gal : bored;
+  }
+  const cc = solveTunnelAs(path, opts, true);
+  return cc.ok ? cc : bored;
+}
+
+// Galleries: a roof on a wall on the uphill side and columns on the valley
+// side, over the road where it is (on the surface); the hillside cut back
+// behind the wall and over the roof.
+const HILLSIDE_SLOPE = 0.12;           // ground across the road steeper than this: a hillside
+const GAL_H = 5.2;                     // clear height under the roof
+const GAL_ROOF_M = 0.7;
+const GAL_WALL_T = 0.6;
+const GAL_COLUMN_EVERY_M = 5;
+const GAL_COLUMN_M = 0.6;
+const GAL_VALLEY_CLEAR_M = 3;          // the valley side's ground kept down to the road this far past the columns
+
+/** The ground's slope across a path (median over its stations, rise per metre). */
+function crossSlope(path, groundAt) {
+  const st = stations(path.xy, 4);
+  const D = path.half + WALKWAY_M + 12;
+  const v = st.map((p) => {
+    const [xr, yr] = lateral(p, D); const [xl, yl] = lateral(p, -D);
+    return Math.abs(groundAt(xr, yr) - groundAt(xl, yl)) / (2 * D);
+  }).sort((a, b) => a - b);
+  return v[v.length >> 1] ?? 0;
+}
+
+/** A gallery over a path (the road on the ground, smoothed): a tunnel of kind 'gallery'. */
+export function solveGallery(path, { groundAt, squareSize = 1 }) {
+  const st = stations(path.xy);
+  const n = st.length;
+  const L = st[n - 1].s;
+  if (L < 10) return { ok: false, reason: `short (${Math.round(L)} m)`, length: L };
+  const W = path.half + WALKWAY_M;
+  const g = st.map((p) => groundAt(p.x, p.y));
+  // the road where it is, smoothed; its ends on the ground (it runs on
+  // over the terrain beyond them)
+  const z = smoothPinned(g, STEP_M, SMOOTH_SIGMA_M);
+  // the uphill side (+1 right of travel, -1 left): where the ground is higher
+  const D = W + 12;
+  let rise = 0;
+  for (const p of st) {
+    const [xr, yr] = lateral(p, D); const [xl, yl] = lateral(p, -D);
+    rise += groundAt(xr, yr) - groundAt(xl, yl);
+  }
+  const line = st.map((p, i) => ({ ...p, z: z[i], g: g[i], kind: 'tube', wl: W, wr: W }));
+  return {
+    ok: true, kind: 'gallery', line, iS: 0, iN: n - 1,
+    portals: [false, false], portalKind: ['edge', 'edge'],
+    W, wall: GAL_H, arch: 0, crown: GAL_H, need: GAL_H + GAL_ROOF_M, headTop: GAL_H + GAL_ROOF_M,
+    uphill: rise >= 0 ? 1 : -1,
+    length: L, tubeLength: L, fill: 0, short: 0, dips: [], exposed: [], squareSize,
+    headDepth: 0, stepAt: 0, wingT: GAL_WALL_T, wingD: W, headHalf: W + GAL_WALL_T + 1,
+    wings: { [-1]: new Map(), [1]: new Map() }, maxExtra: 0, cuts: [],
+  };
+}
+
+// The ground a gallery wants: its floor under the roof and the wall, the
+// rock cut back over the roof on the uphill side, the valley side only cut
+// down (1:1) where it stands over the road.
+function galleryGroundAt(t, x, y, h) {
+  const n = nearestOnTunnel(t, x, y, t.W + GAL_WALL_T + 60);
+  if (!n || n.beyond) return h;
+  const ad = Math.abs(n.d);
+  const edge = t.W + 0.5 + GAL_WALL_T;
+  if (ad <= edge) return n.z;
+  if ((Math.sign(n.d) || 1) === t.uphill) return Math.min(h, n.z + t.headTop + FACE_SLOPE * (ad - edge));
+  // valley side: no ground over the road showing between the columns
+  return Math.min(h, n.z + Math.max(0, ad - edge - GAL_VALLEY_CLEAR_M));
+}
+
+/** A gallery as triangles: roof slab, uphill wall, valley-side columns and beam; pieces like a tube's. */
+function buildGalleryGeometry(t) {
+  const T = makeTris();
+  const inner = t.W + 0.5;
+  const up = t.uphill;
+  const at = (p, u, v) => { const [x, y] = lateral(p, u); return [x, y, p.z + v]; };
+  // a box-section strip along the line between offsets u0..u1 (right of
+  // travel) and heights v0..v1: its four long faces, and end caps
+  const strip = (u0, u1, v0, v1) => {
+    const corners = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+    const mid = [(u0 + u1) / 2, (v0 + v1) / 2];
+    for (let i = 0; i + 1 < t.line.length; i++) {
+      const p = t.line[i]; const q = t.line[i + 1];
+      const c = at(p, mid[0], mid[1]);
+      const want = (cc) => [cc[0] - c[0], cc[1] - c[1], cc[2] - c[2]];
+      for (let k = 0; k < 4; k++) {
+        const [ua, va] = corners[k]; const [ub, vb] = corners[(k + 1) % 4];
+        const a = at(p, ua, va); const b = at(p, ub, vb); const cq = at(q, ua, va); const d = at(q, ub, vb);
+        const U = [p.s / 4, q.s / 4];
+        T.tri(a, b, cq, [[U[0], 0], [U[0], 1], [U[1], 0]], want);
+        T.tri(b, d, cq, [[U[0], 1], [U[1], 1], [U[1], 0]], want);
+      }
+    }
+    for (const [i, sgn] of [[0, -1], [t.line.length - 1, 1]]) {
+      const p = t.line[i];
+      const [a, b, c, d] = corners.map(([u, v]) => at(p, u, v));
+      const want = () => [sgn * p.tx, sgn * p.ty, 0];
+      T.tri(a, b, c, [[0, 0], [1, 0], [1, 1]], want);
+      T.tri(a, c, d, [[0, 0], [1, 1], [0, 1]], want);
+    }
+  };
+  const wallU = up * (inner + GAL_WALL_T / 2);
+  strip(-inner - GAL_WALL_T, inner + GAL_WALL_T, GAL_H, GAL_H + GAL_ROOF_M);             // roof
+  strip(wallU - GAL_WALL_T / 2, wallU + GAL_WALL_T / 2, -0.5, GAL_H);                    // uphill wall
+  const beamU = -up * (inner + GAL_WALL_T / 2);
+  strip(beamU - GAL_WALL_T / 2, beamU + GAL_WALL_T / 2, GAL_H - 0.8, GAL_H);             // valley beam
+  // columns under the beam
+  let next = 0;
+  for (const p of t.line) {
+    if (p.s < next) continue;
+    next = p.s + GAL_COLUMN_EVERY_M;
+    const [cx, cy] = lateral(p, beamU);
+    const h = GAL_COLUMN_M / 2;
+    const ux = [p.tx * h, p.ty * h]; const vx = [p.ty * h, -p.tx * h];
+    const c = (a, b, v) => [cx + ux[0] * a + vx[0] * b, cy + ux[1] * a + vx[1] * b, p.z + v];
+    const o = [cx, cy, p.z + GAL_H / 2];
+    const want = (cc) => [cc[0] - o[0], cc[1] - o[1], 0];
+    for (const [a0, b0, a1, b1] of [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]]) {
+      const A = c(a0, b0, -0.5); const B = c(a1, b1, -0.5); const C = c(a1, b1, GAL_H - 0.8); const D = c(a0, b0, GAL_H - 0.8);
+      T.tri(A, B, C, [[0, 0], [1, 0], [1, 1]], want);
+      T.tri(A, C, D, [[0, 0], [1, 1], [0, 1]], want);
+    }
+  }
+  return [{ pos: T.pos, uv: T.uv, from: t.line[0].s, to: t.line[t.line.length - 1].s }];
+}
+
+function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1 }, cutCover) {
   const st = stations(path.xy);
   const n = st.length;
   const L = st[n - 1].s;
   if (L < MIN_TUBE_M) return { ok: false, reason: `short (${Math.round(L)} m)`, length: L };
   const W = path.half + WALKWAY_M;
-  const arch = archRise(W);
-  const crown = WALL_M + arch;                 // inner crown over the road
-  const need = crown + LINING_M + MIN_COVER_M; // ground over the road for a bore
+  const wall = cutCover ? CC_WALL_M : WALL_M;
+  const arch = cutCover ? CC_ARCH_M : archRise(W);
+  const crown = wall + arch;                   // inner crown over the road
+  const need = crown + LINING_M + (cutCover ? CC_COVER_M : MIN_COVER_M); // ground over the road
   const g = st.map((p) => groundAt(p.x, p.y));
   const free = [isFreeEnd(st[0].x, st[0].y), isFreeEnd(st[n - 1].x, st[n - 1].y)];
   const bridged = [0, 1].map((e) => Number.isFinite(approaches[e]?.deckZ));
+  // a box sunk below a bridge's deck: no way down to it
+  if (cutCover && (bridged[0] || bridged[1])) return { ok: false, reason: 'a bridge meets a cut-and-cover tunnel', length: L };
   const endZ = [0, n - 1].map((i, e) => {
     const a = approaches[e];
     if (a && Number.isFinite(a.deckZ)) return a.deckZ;
@@ -235,23 +456,34 @@ export function solveTunnel(path, { groundAt, approaches = [null, null], isFreeE
   // No road climbs from one end to the other (mismatched OSM ends, or the
   // elevation data): left on the ground rather than a ramp inside the hill.
   const rise = Math.abs(endZ[1] - endZ[0]);
-  if (rise > MAX_GRADE * 1.5 * L + 5) return { ok: false, reason: `ends ${Math.round(rise)} m apart in height over ${Math.round(L)} m`, length: L };
-  // The straight grade between the portals, lowered under the hill where it
-  // would come too close to the surface, as far as the grade allows.
-  let z = st.map((p) => endZ[0] + ((endZ[1] - endZ[0]) * p.s) / (L || 1));
-  z = z.map((v, i) => Math.min(v, g[i] - need));
-  z[0] = endZ[0];
-  z[n - 1] = endZ[1];
-  for (let i = 1; i < n; i++) z[i] = Math.max(z[i], z[i - 1] - MAX_GRADE * (st[i].s - st[i - 1].s));
-  for (let i = n - 2; i >= 0; i--) z[i] = Math.max(z[i], z[i + 1] - MAX_GRADE * (st[i + 1].s - st[i].s));
-  z = smoothPinned(z, STEP_M, SMOOTH_SIGMA_M);
+  if (!cutCover && rise > MAX_GRADE * 1.5 * L + 5) return { ok: false, reason: `ends ${Math.round(rise)} m apart in height over ${Math.round(L)} m`, length: L };
+  let z;
+  if (cutCover) {
+    // the box under the street all along, no steeper than MAX_GRADE (the
+    // highest such line: as shallow as it can be)
+    const u = g.map((v) => v - need);
+    z = u.slice();
+    for (let i = 1; i < n; i++) z[i] = Math.min(z[i], z[i - 1] + MAX_GRADE * (st[i].s - st[i - 1].s));
+    for (let i = n - 2; i >= 0; i--) z[i] = Math.min(z[i], z[i + 1] + MAX_GRADE * (st[i + 1].s - st[i].s));
+    z = smoothPinned(z, STEP_M, SMOOTH_SIGMA_M).map((v, i) => Math.min(v, u[i]));
+  } else {
+    // The straight grade between the portals, lowered under the hill where it
+    // would come too close to the surface, as far as the grade allows.
+    z = st.map((p) => endZ[0] + ((endZ[1] - endZ[0]) * p.s) / (L || 1));
+    z = z.map((v, i) => Math.min(v, g[i] - need));
+    z[0] = endZ[0];
+    z[n - 1] = endZ[1];
+    for (let i = 1; i < n; i++) z[i] = Math.max(z[i], z[i - 1] - MAX_GRADE * (st[i].s - st[i - 1].s));
+    for (let i = n - 2; i >= 0; i--) z[i] = Math.max(z[i], z[i + 1] - MAX_GRADE * (st[i + 1].s - st[i].s));
+    z = smoothPinned(z, STEP_M, SMOOTH_SIGMA_M);
+  }
 
   // Portals: where the ground is first over the bore by the cover, from each
   // end (OSM ends often sit a little out on the approach); at a free end the
   // tube runs on to the map's edge. Where a bridge meets the tunnel the bore
   // runs out to it (out of a cliff face onto the bridge): the stretch with
   // thin cover there is left exposed, never filled.
-  const covered = (i) => g[i] - z[i] >= need;
+  const covered = (i) => g[i] - z[i] >= need - 1e-6;
   const c0 = z.findIndex((_, i) => covered(i));
   const c1 = n - 1 - [...z].reverse().findIndex((_, k) => covered(n - 1 - k));
   if (c0 < 0 || c1 <= c0) return { ok: false, reason: 'not under ground in the elevation data', length: L };
@@ -287,6 +519,8 @@ export function solveTunnel(path, { groundAt, approaches = [null, null], isFreeE
   // approach; z on the approaches eases from the portal height back to the
   // ground (cut or fill), no steeper than MAX_GRADE away from it.
   const line = st.map((p, i) => ({ ...p, z: z[i], g: g[i], kind: i < iS || i > iN ? 'cut' : 'tube' }));
+  // a cut-and-cover trench runs out until the road is back at the street
+  const trenchMax = cutCover ? need / MAX_GRADE + 60 : TRENCH_MAX_M;
   const extend = (e) => {
     const a = approaches[e];
     if (!a?.xy || a.xy.length < 2 || Number.isFinite(a.deckZ) || free[e]) return [];
@@ -295,12 +529,22 @@ export function solveTunnel(path, { groundAt, approaches = [null, null], isFreeE
     const out = [];
     let calm = 0;
     for (const p of ap) {
-      if (p.s > TRENCH_MAX_M) break;
+      if (p.s > trenchMax) break;
       const gr = groundAt(p.x, p.y);
       const zz = clamp(gr, z0 - MAX_GRADE * p.s, z0 + MAX_GRADE * p.s);
       out.push({ x: p.x, y: p.y, s: p.s, tx: p.tx, ty: p.ty, z: zz, g: gr, kind: 'cut' });
       calm = Math.abs(gr - zz) < TRENCH_DONE_M ? calm + 1 : 0;
       if (calm * STEP_M >= 10) break;
+    }
+    // Still off the ground at the end (a gully the road crosses on a fill,
+    // a hillside it cuts into): the last stretch steepens to a road's grade
+    // to land on it, rather than ending at a wall (Queen Creek: 33 m up)
+    const last = out[out.length - 1];
+    if (last && Math.abs(last.g - last.z) > TRENCH_DONE_M) {
+      for (const q of out) {
+        const back = last.s - q.s;
+        q.z = clamp(q.z, last.g - APPROACH_LAND_GRADE * back, last.g + APPROACH_LAND_GRADE * back);
+      }
     }
     return out;
   };
@@ -324,7 +568,10 @@ export function solveTunnel(path, { groundAt, approaches = [null, null], isFreeE
     // cutting, wingwalls and backfill, 'bridge' ones only the headwall
     portals: [!free[0], !free[1]],
     portalKind: [0, 1].map((e) => (free[e] ? 'edge' : bridged[e] ? 'bridge' : 'cut')),
-    W, wall: WALL_M, arch, crown, need,
+    kind: cutCover ? 'cutcover' : 'bored',
+    W, wall, arch, crown, need,
+    // headwall top over the road: a bore's tall face, a box's to the street
+    headTop: cutCover ? need + CC_HEAD_OVER_M : HEAD_TOP_M,
     length: L, tubeLength, fill: maxFill, short,
     dips: dips.map((dip) => ({ s: st[dip.from].s + s0, length: dip.length, depth: dip.depth })),
     exposed: exposed.map(([a, b]) => [a + s0, b + s0]),
@@ -337,8 +584,85 @@ export function solveTunnel(path, { groundAt, approaches = [null, null], isFreeE
   tunnel.wingT = Math.max(1.5, 1.5 * squareSize);
   tunnel.wingD = W + LINING_M + WING_GAP_M;
   tunnel.headHalf = Math.max(W + LINING_M + HEAD_SIDE_M, tunnel.wingD + tunnel.wingT + 1);
+  for (const q of tunnel.line) { q.wl = W; q.wr = W; }
+  tunnel.maxExtra = 0;
+  tunnel.cuts = [];
   tunnel.wings = wingTops(tunnel, groundAt);
   return tunnel;
+}
+
+/**
+ * Metres a station is wider than the tunnel's own road on one side (side
+ * +1 right of travel, -1 left): a ramp joining inside the tube or cutting
+ * widens it (absorbBranch).
+ */
+export const extraAt = (t, p, side) => Math.max(0, (side > 0 ? p.wr ?? t.W : p.wl ?? t.W) - t.W);
+// |d| from the road's own edge outward on that side (as if no extra width)
+const across = (t, n) => Math.max(0, Math.abs(n.d) - extraAt(t, t.line[n.i], Math.sign(n.d) || 1));
+
+// Ramps joining inside a tunnel (Deck Park, Phoenix: each I-10 on-ramp
+// splits off its carriageway 85 m inside and leaves by its own mouth 16 m
+// away) share one wide bore: the main tunnel widens on the ramp's side from
+// the junction out, through the portal and the cutting, while the ramp stays
+// within ABSORB_MAX_M of its walls; past that the ramp climbs out in a trench
+// of its own.
+const ABSORB_MAX_M = 24;
+const BRANCH_TRENCH_MAX_M = 400;
+
+/**
+ * Take a branch into a solved tunnel: branch { xy (from the junction
+ * outwards: its tunnel part, then its approach road), half, tunnelLength }.
+ * Widens t's stations (wl / wr), adds the branch's own trench to t.cuts.
+ * Returns { ok, reason?, absorbed (m), trench (m) }.
+ */
+export function absorbBranch(t, branch, { groundAt }) {
+  const st = stations(branch.xy);
+  let last = -1;
+  let lastZ = 0;
+  const touched = [];
+  for (let k = 0; k < st.length; k++) {
+    const b = st[k];
+    const n = nearestOnTunnel(t, b.x, b.y, t.W + ABSORB_MAX_M + 10);
+    if (!n || n.beyond) break;
+    const side = Math.sign(n.d) || 1;
+    const need = Math.abs(n.d) + branch.half + WALKWAY_M;
+    if (need - t.W > ABSORB_MAX_M) {
+      if (n.into > 0 && b.s < branch.tunnelLength) return { ok: false, reason: 'a ramp leaves the tube in a bore of its own' };
+      break;
+    }
+    for (const i of [n.i - 1, n.i, n.i + 1]) {
+      const p = t.line[i];
+      if (!p) continue;
+      if (side > 0) p.wr = Math.max(p.wr ?? t.W, need); else p.wl = Math.max(p.wl ?? t.W, need);
+      touched.push(i);
+    }
+    last = k;
+    lastZ = n.z;
+  }
+  if (last < 0) return { ok: false, reason: 'a ramp not alongside its tunnel' };
+  if (st[last].s < branch.tunnelLength - 2 * STEP_M) return { ok: false, reason: 'a ramp leaves the tunnel line inside it' };
+  // the widening without steps: each side a little smoothed (a max over its neighbours)
+  for (const key of ['wl', 'wr']) {
+    const v = t.line.map((p) => p[key] ?? t.W);
+    t.line.forEach((p, i) => { p[key] = Math.max(...v.slice(Math.max(0, i - 2), i + 3)); });
+  }
+  t.maxExtra = Math.max(0, ...t.line.map((p) => Math.max(p.wl, p.wr) - t.W));
+  // then on its own: rising from the road's height to the ground
+  const line = [];
+  let calm = 0;
+  for (let k = last; k < st.length; k++) {
+    const b = st[k];
+    const ds = b.s - st[last].s;
+    if (ds > BRANCH_TRENCH_MAX_M) break;
+    const gr = groundAt(b.x, b.y);
+    const z = clamp(gr, lastZ - MAX_GRADE * ds, lastZ + MAX_GRADE * ds);
+    line.push({ x: b.x, y: b.y, s: b.s, z });
+    calm = Math.abs(gr - z) < TRENCH_DONE_M ? calm + 1 : 0;
+    if (calm * STEP_M >= 10) break;
+  }
+  if (line.length >= 2 && line.some((q) => groundAt(q.x, q.y) - q.z > TRENCH_DONE_M)) t.cuts.push({ line, half: branch.half });
+  t.wings = wingTops(t, groundAt);
+  return { ok: true, absorbed: st[last].s, trench: line.length >= 2 ? line[line.length - 1].s - line[0].s : 0 };
 }
 
 // Wingwall tops per line index and side (-1 left, +1 right): the hillside
@@ -351,11 +675,11 @@ function wingTops(t, groundAt) {
   if (t.portalKind[1] === 'cut') ends.push([t.iN, 1]);
   for (const [i0, step] of ends) {
     for (const side of [-1, 1]) {
-      let cap = HEAD_TOP_M;
+      let cap = t.headTop;
       // from one station inside the headwall outwards
       for (let i = i0 - step; i >= 0 && i < t.line.length; i += step) {
         const p = t.line[i];
-        const [x, y] = lateral(p, side * (t.wingD + t.wingT + 1));
+        const [x, y] = lateral(p, side * (t.wingD + extraAt(t, p, side) + t.wingT + 1));
         cap = Math.min(cap, groundAt(x, y) - p.z);
         if (cap < WING_MIN_M) break;
         wings[side].set(i, cap);
@@ -403,26 +727,32 @@ export function nearestOnTunnel(t, x, y, reach = Infinity) {
 }
 
 function indexLine(line, cell = 16) {
+  // integer cell keys (cx, cy offset well clear of any level's extent)
+  const key = (cx, cy) => (cx + 32768) * 65536 + (cy + 32768);
   const cells = new Map();
   for (let i = 0; i + 1 < line.length; i++) {
     const x0 = Math.min(line[i].x, line[i + 1].x); const x1 = Math.max(line[i].x, line[i + 1].x);
     const y0 = Math.min(line[i].y, line[i + 1].y); const y1 = Math.max(line[i].y, line[i + 1].y);
     for (let cx = Math.floor(x0 / cell); cx <= Math.floor(x1 / cell); cx++) {
       for (let cy = Math.floor(y0 / cell); cy <= Math.floor(y1 / cell); cy++) {
-        const k = `${cx},${cy}`;
+        const k = key(cx, cy);
         if (!cells.has(k)) cells.set(k, []);
         cells.get(k).push(i);
       }
     }
   }
+  const all = line.slice(0, -1).map((_, i) => i);
   return {
+    // segment indices near (x, y) (a segment in two cells may come twice)
     near(x, y, reach) {
       const r = Number.isFinite(reach) ? Math.ceil(reach / cell) : 1e9;
-      if (r > 64) return line.slice(0, -1).map((_, i) => i);
-      const out = new Set();
-      for (let cx = Math.floor(x / cell) - r; cx <= Math.floor(x / cell) + r; cx++) {
-        for (let cy = Math.floor(y / cell) - r; cy <= Math.floor(y / cell) + r; cy++) {
-          for (const i of cells.get(`${cx},${cy}`) || []) out.add(i);
+      if (r > 64) return all;
+      const out = [];
+      const fx = Math.floor(x / cell); const fy = Math.floor(y / cell);
+      for (let cx = fx - r; cx <= fx + r; cx++) {
+        for (let cy = fy - r; cy <= fy + r; cy++) {
+          const list = cells.get(key(cx, cy));
+          if (list) for (const i of list) out.push(i);
         }
       }
       return out;
@@ -440,10 +770,33 @@ export function tunnelRoadZ(t, x, y) {
 
 /** The world box a tunnel's terrain edits can reach. */
 export function tunnelReach(t) {
-  const pad = t.headHalf + FACE_REACH_M + 4;
+  const pad = t.headHalf + (t.maxExtra || 0) + FACE_REACH_M + 4;
   let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
   for (const p of t.line) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
   return [x0 - pad, y0 - pad, x1 + pad, y1 + pad];
+}
+
+// A branch's own trench (absorbBranch): its floor at the road, 1:1 slopes up
+// to the ground beside it; only ever cut.
+function cutsGroundAt(t, x, y, h) {
+  for (const cut of t.cuts || []) {
+    if (!cut.index) cut.index = indexLine(cut.line);
+    const floor = cut.half + WALKWAY_M + WING_GAP_M;
+    let best = null;
+    for (const i of cut.index.near(x, y, floor + 40)) {
+      const a = cut.line[i]; const b = cut.line[i + 1];
+      const ex = b.x - a.x; const ey = b.y - a.y;
+      const L2 = ex * ex + ey * ey || 1e-9;
+      const raw = ((x - a.x) * ex + (y - a.y) * ey) / L2;
+      const f = clamp(raw, 0, 1);
+      const d = Math.hypot(a.x + ex * f - x, a.y + ey * f - y);
+      if (best && d >= best.d) continue;
+      best = { d, z: a.z + (b.z - a.z) * f, beyond: (i === 0 && raw < 0) || (i === cut.line.length - 2 && raw > 1) };
+    }
+    if (!best || best.beyond) continue;
+    h = Math.min(h, best.z + Math.max(0, best.d - floor));
+  }
+  return h;
 }
 
 /**
@@ -453,16 +806,26 @@ export function tunnelReach(t) {
  * headwall raised to its top; over the bore made up to the cover.
  */
 export function tunnelGroundAt(t, x, y, h) {
-  const n = nearestOnTunnel(t, x, y, t.headHalf + FACE_REACH_M);
-  if (!n || n.beyond) return h;
-  const ad = Math.abs(n.d);
+  if (t.kind === 'gallery') return galleryGroundAt(t, x, y, h);
+  h = cutsGroundAt(t, x, y, h);
+  const n = nearestOnTunnel(t, x, y, t.headHalf + (t.maxExtra || 0) + FACE_REACH_M);
+  if (!n) return h;
+  if (n.beyond) {
+    // past the outer end of an approach's cutting or fill: its slopes run on
+    // round the end (no wall across the road where the earthwork stops)
+    const end = n.i <= 1 ? t.line[0] : t.line[t.line.length - 1];
+    if (end.kind !== 'cut') return h;
+    const past = Math.hypot(x - end.x, y - end.y);
+    return clamp(h, end.z - past, end.z + past);
+  }
+  const ad = across(t, n);
   const p = t.line[n.i];
   if (n.into < t.stepAt) {
     // the cutting: its own stations, and the first metres inside a cutting's
     // portal (to the step in the headwall); inside a bridge's portal the
     // rock is cut back to the headwall's top
     if (n.into >= 0 && nearerPortalKind(t, n.s) === 'bridge') {
-      return Math.min(h, n.z + HEAD_TOP_M + FACE_SLOPE * Math.max(0, ad - t.headHalf));
+      return Math.min(h, n.z + t.headTop + FACE_SLOPE * Math.max(0, ad - t.headHalf));
     }
     // (in front of a cutting's face even where the nearest station is the
     // portal's own)
@@ -480,8 +843,8 @@ export function tunnelGroundAt(t, x, y, h) {
   let out = h;
   const kind = nearerPortalKind(t, n.s);
   if (kind !== 'edge' && n.into <= FACE_REACH_M) {
-    if (kind === 'cut' && n.into < t.headDepth + BACKFILL_M && ad <= t.headHalf + 1) out = Math.max(out, n.z + HEAD_TOP_M);
-    out = Math.min(out, n.z + HEAD_TOP_M + FACE_SLOPE * (Math.max(0, n.into - t.headDepth) + Math.max(0, ad - t.headHalf)));
+    if (kind === 'cut' && n.into < t.headDepth + BACKFILL_M && ad <= t.headHalf + 1) out = Math.max(out, n.z + t.headTop);
+    out = Math.min(out, n.z + t.headTop + FACE_SLOPE * (Math.max(0, n.into - t.headDepth) + Math.max(0, ad - t.headHalf)));
   }
   // over the bore: made up to the cover where the ground falls short (cut and
   // cover), 1:1 slopes down beside it; never over an exposed stretch
@@ -499,13 +862,14 @@ export function tunnelGroundAt(t, x, y, h) {
  * open a slot in the hillside over it.
  */
 export function tunnelHoleAt(t, x, y, lo, hi = lo) {
-  const n = nearestOnTunnel(t, x, y, t.W + LINING_M + t.squareSize * 2);
+  if (t.kind === 'gallery') return false;   // on the surface: nothing opens
+  const n = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + LINING_M + t.squareSize * 2);
   // in front of the face nothing opens (the road runs on the ground there),
   // but for a grid square at a bridge's portal (the deck carries the road)
   const front = nearerPortalKind(t, n?.s ?? 0) === 'bridge' ? -1.5 * t.squareSize : 0.3;
   if (!n || n.into < front || (n.into > t.headDepth + BACKFILL_M && !inExposed(t, n.s))) return false;
-  if (Math.abs(n.d) > t.W + LINING_M + 0.5 * t.squareSize) return false;
-  if (hi > n.z + HEAD_TOP_M + 0.5) return false;
+  if (across(t, n) > t.W + LINING_M + 0.5 * t.squareSize) return false;
+  if (hi > n.z + t.headTop + 0.5) return false;
   return lo < n.z + t.crown + LINING_M + 1;
 }
 
@@ -514,14 +878,14 @@ export function hitsTunnel(tunnels, x, y, z, zTop = z) {
   for (const t of tunnels) {
     if (!t.box) t.box = tunnelReach(t);
     if (x < t.box[0] || x > t.box[2] || y < t.box[1] || y > t.box[3]) continue;
-    const n = nearestOnTunnel(t, x, y, t.headHalf + 1);
+    const n = nearestOnTunnel(t, x, y, t.headHalf + (t.maxExtra || 0) + 1);
     if (!n) continue;
-    const ad = Math.abs(n.d);
+    const ad = across(t, n);
     const inTube = n.into >= -0.5 && ad <= t.W + LINING_M + 0.5;
     const inCut = n.into < 0 && t.line[n.i].kind === 'cut' && ad <= t.wingD + t.wingT + 0.5 && t.wings[Math.sign(n.d) || 1].has(n.i);
     const inHead = n.into >= -0.5 && n.into <= t.headDepth + 0.5 && ad <= t.headHalf + 0.5;
     if (!(inTube || inCut || inHead)) continue;
-    if (zTop >= n.z - 1 && z <= n.z + (inHead ? HEAD_TOP_M : t.crown + LINING_M) + 0.5) return true;
+    if (zTop >= n.z - 1 && z <= n.z + (inHead ? t.headTop : t.crown + LINING_M) + 0.5) return true;
   }
   return false;
 }
@@ -569,9 +933,19 @@ export const TUBE_PIECE_M = 250;
  * level, for the road decals to land on.
  */
 export function buildTubeGeometry(t) {
-  const inner = ring(t.W, 0, t.wall, t.arch);
-  const outer = ring(t.W + LINING_M, -LINING_M, t.wall, t.arch + LINING_M);
-  const at = (p, [u, v]) => [p.x + u * p.ty, p.y - u * p.tx, p.z + v];
+  if (t.kind === 'gallery') return buildGalleryGeometry(t);
+  // the section at a station: as wide as its road on each side (a ramp
+  // joining widens it), centred between its walls
+  const sections = new Map();
+  const section = (p) => {
+    if (!sections.has(p)) {
+      const wl = p.wl ?? t.W; const wr = p.wr ?? t.W;
+      const a = (wl + wr) / 2;
+      sections.set(p, { c: (wr - wl) / 2, loops: [ring(a, 0, t.wall, t.arch), ring(a + LINING_M, -LINING_M, t.wall, t.arch + LINING_M)] });
+    }
+    return sections.get(p);
+  };
+  const at = (p, [u, v]) => { const c = section(p).c; return [p.x + (u + c) * p.ty, p.y - (u + c) * p.tx, p.z + v]; };
   const arc = (loop) => {
     const a = [0];
     for (let k = 1; k <= loop.length; k++) {
@@ -590,11 +964,13 @@ export function buildTubeGeometry(t) {
     // a short last piece joins this one
     if (t.line[t.iN].s - t.line[i1].s < TUBE_PIECE_M / 4) i1 = t.iN;
     const T = makeTris();
-    for (const [loop, outward] of [[inner, false], [outer, true]]) {
-      const al = arc(loop);
+    for (const [which, outward] of [[0, false], [1, true]]) {
       for (let i = i0; i < i1; i++) {
         const p = t.line[i];
         const q = t.line[i + 1];
+        const loop = section(p).loops[which];
+        const loopQ = section(q).loops[which];
+        const al = arc(loop);
         const o = [p.x, p.y, p.z + t.wall / 2];
         const want = (c) => {
           const w = [c[0] - o[0], c[1] - o[1], c[2] - o[2]];
@@ -602,7 +978,7 @@ export function buildTubeGeometry(t) {
         };
         for (let k = 0; k < loop.length; k++) {
           const k2 = (k + 1) % loop.length;
-          const a = at(p, loop[k]); const b = at(p, loop[k2]); const c = at(q, loop[k]); const d = at(q, loop[k2]);
+          const a = at(p, loop[k]); const b = at(p, loop[k2]); const c = at(q, loopQ[k]); const d = at(q, loopQ[k2]);
           const U = [al[k] / 4, al[k + 1] / 4];
           const V = [p.s / 4, q.s / 4];
           T.tri(a, b, c, [[U[0], V[0]], [U[1], V[0]], [U[0], V[1]]], want);
@@ -615,6 +991,7 @@ export function buildTubeGeometry(t) {
       if (i !== t.iS && i !== t.iN) continue;
       const p = t.line[i];
       const want = () => [sgn * p.tx, sgn * p.ty, 0];
+      const [inner, outer] = section(p).loops;
       for (let k = 0; k < inner.length; k++) {
         const k2 = (k + 1) % inner.length;
         const a = at(p, inner[k]); const b = at(p, inner[k2]); const c = at(p, outer[k]); const d = at(p, outer[k2]);
@@ -638,15 +1015,20 @@ export function buildPortalGeometry(t, end) {
   const p = t.line[i];
   const tin = end === 'S' ? [p.tx, p.ty] : [-p.tx, -p.ty];   // into the tunnel
   const Lv = [-tin[1], tin[0]];                              // left of "into": a proper rotation
-  const outer = ring(t.W + LINING_M, -LINING_M, t.wall, t.arch + LINING_M);
+  // widths left / right of "into" (a ramp joining widens one side)
+  const wl = end === 'S' ? p.wl ?? t.W : p.wr ?? t.W;
+  const wr = end === 'S' ? p.wr ?? t.W : p.wl ?? t.W;
+  const outer = ring((wl + wr) / 2 + LINING_M, -LINING_M, t.wall, t.arch + LINING_M);
+  const c = (wl - wr) / 2;
+  const hl = t.headHalf + wl - t.W; const hr = t.headHalf + wr - t.W;
   const shape = new THREE.Shape();
-  shape.moveTo(-t.headHalf, HEAD_BOTTOM_M);
-  shape.lineTo(t.headHalf, HEAD_BOTTOM_M);
-  shape.lineTo(t.headHalf, HEAD_TOP_M);
-  shape.lineTo(-t.headHalf, HEAD_TOP_M);
+  shape.moveTo(-hr, HEAD_BOTTOM_M);
+  shape.lineTo(hl, HEAD_BOTTOM_M);
+  shape.lineTo(hl, t.headTop);
+  shape.lineTo(-hr, t.headTop);
   shape.closePath();
   const hole = new THREE.Path();
-  outer.forEach(([u, v], k) => (k ? hole.lineTo(u, Math.max(v, 0)) : hole.moveTo(u, Math.max(v, 0))));
+  outer.forEach(([u, v], k) => (k ? hole.lineTo(u + c, Math.max(v, 0)) : hole.moveTo(u + c, Math.max(v, 0))));
   hole.closePath();
   shape.holes.push(hole);
   const g = new THREE.ExtrudeGeometry(shape, { depth: t.headDepth, bevelEnabled: false });
@@ -668,10 +1050,10 @@ export function buildPortalGeometry(t, end) {
       run.push(k);
     }
     if (run.length < 2) continue;
-    const top = (k) => t.wings[side].get(k) ?? t.wings[side].get(i - step) ?? HEAD_TOP_M;
-    const corner = (k, d, v) => { const q = t.line[k]; const [x, y] = lateral(q, side * d); return [x, y, q.z + v]; };
+    const top = (k) => t.wings[side].get(k) ?? t.wings[side].get(i - step) ?? t.headTop;
+    const corner = (k, d, v) => { const q = t.line[k]; const [x, y] = lateral(q, side * (d + extraAt(t, q, side))); return [x, y, q.z + v]; };
     const sec = (k) => [corner(k, t.wingD, WING_BOTTOM_M), corner(k, t.wingD, top(k)), corner(k, t.wingD + t.wingT, top(k)), corner(k, t.wingD + t.wingT, WING_BOTTOM_M)];
-    const centre = (k) => { const q = t.line[k]; const [x, y] = lateral(q, side * (t.wingD + t.wingT / 2)); return [x, y, q.z + top(k) / 2]; };
+    const centre = (k) => { const q = t.line[k]; const [x, y] = lateral(q, side * (t.wingD + extraAt(t, q, side) + t.wingT / 2)); return [x, y, q.z + top(k) / 2]; };
     for (let r = 0; r + 1 < run.length; r++) {
       const A = sec(run[r]); const B = sec(run[r + 1]); const o = centre(run[r]);
       const want = (c) => [c[0] - o[0], c[1] - o[1], c[2] - o[2]];
@@ -735,9 +1117,14 @@ export function lightStations(t, spacing = LIGHT_SPACING_M) {
  * objects under `group` (SimGroup name); `id()` makes persistentIds.
  */
 export function buildTunnelObjects(t, group, id, { lightSpacing = LIGHT_SPACING_M } = {}) {
+  // a gallery is open to the daylight on its valley side: no lights, no zones
+  if (t.kind === 'gallery') return { lights: [], zones: [], lightCount: 0, zoneCount: 0, portalCount: 0 };
   const lights = [];
   lightStations(t, lightSpacing).forEach((i, k) => {
-    const p = t.line[i];
+    const q = t.line[i];
+    // over the middle of the section (off the road's centre where widened)
+    const [cx, cy] = lateral(q, ((q.wr ?? t.W) - (q.wl ?? t.W)) / 2);
+    const p = { ...q, x: cx, y: cy };
     const z = p.z + t.crown - 0.05;
     const name = `${group}_light_${String(k + 1).padStart(3, '0')}`;
     lights.push(
@@ -763,14 +1150,16 @@ export function buildTunnelObjects(t, group, id, { lightSpacing = LIGHT_SPACING_
     const dx = b.x - a.x; const dy = b.y - a.y; const Lc = Math.hypot(dx, dy) || 1;
     // the chord misses the bend's outside by its sagitta
     let sag = 0;
+    let wide = t.W;
     for (let i = cuts[c]; i <= cuts[c + 1]; i++) {
       const q = t.line[i];
       sag = Math.max(sag, Math.abs((q.x - a.x) * (dy / Lc) - (q.y - a.y) * (dx / Lc)));
+      wide = Math.max(wide, q.wl ?? t.W, q.wr ?? t.W);
     }
     const box = {
       position: [r3((a.x + b.x) / 2), r3((a.y + b.y) / 2), r3((a.z + b.z) / 2 + height / 2)],
       rotationMatrix: rot(yawTo(dx / Lc, dy / Lc)),
-      scale: [r3(2 * t.W + 3 + 2 * sag), r3(Lc + 1), r3(height + Math.abs(b.z - a.z) + 1.5)],
+      scale: [r3(2 * wide + 3 + 2 * sag), r3(Lc + 1), r3(height + Math.abs(b.z - a.z) + 1.5)],
     };
     zones.push(
       { class: 'Zone', name: `${group}_zone_${c + 1}`, persistentId: id(), __parent: `${group}_zones`, ...box, ambientLightColor: [0, 0, 0, 1], skyLightFactor: 0.05, useAmbientLightColor: true },
@@ -782,7 +1171,7 @@ export function buildTunnelObjects(t, group, id, { lightSpacing = LIGHT_SPACING_
     zones.push({
       class: 'Portal', name: `${group}_portal_${c + 1}`, persistentId: id(), __parent: `${group}_zones`,
       position: [r3(p.x), r3(p.y), r3(p.z + height / 2)], rotationMatrix: rot(yawTo(p.tx, p.ty)),
-      scale: [r3(2 * t.W + 2), 6, r3(height + 1)],
+      scale: [r3(2 * Math.max(t.W, p.wl ?? t.W, p.wr ?? t.W) + 2), 6, r3(height + 1)],
     });
   });
   return { lights, zones, lightCount: lights.length / 2, zoneCount: cuts.length - 1, portalCount: cuts.length };

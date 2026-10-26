@@ -309,3 +309,97 @@ test('a fork: the branches start as wide as the deck coming in, then narrow to t
   assert.equal(ep[1].hl[0], 6);
   assert.equal(ep[1].hl[3], 4);
 });
+
+// A flat 1 km map for the network cases below.
+const flatMap = async (features) => {
+  const { generateDecalRoads } = await import('../services/exportBeamNGLevel.js');
+  const N = 512; const size = 1000; const sq = size / (N - 1); const deg = size / 111320;
+  const ll = (x, y) => ({ lat: (y / size) * deg, lng: (x / size) * deg });
+  const groups = generateDecalRoads({
+    width: N, height: N, minHeight: 0, maxHeight: 1, heightMap: new Float32Array(N * N),
+    bounds: { south: -deg / 2, north: deg / 2, west: -deg / 2, east: deg / 2 },
+    roadRules: { countryCode: 'US', region: 'Americas' },
+    osmFeatures: features.map(([id, pts, tags]) => ({ id, type: 'road', geometry: pts.map(([x, y]) => ll(x, y)), tags })),
+  }, sq);
+  return groups;
+};
+
+test('a crossroads on an overpass is one deck: one height, no parapet across either road', async () => {
+  // two bridge ways crossing at a shared node (both running on through it)
+  // over a motorway along x = 0
+  const groups = await flatMap([
+    ['1', [[-300, 0], [-60, 0]], { highway: 'primary', name: 'A' }],
+    ['2', [[-60, 0], [0, 0], [60, 0]], { highway: 'primary', name: 'A', bridge: 'yes', layer: '1' }],
+    ['3', [[60, 0], [300, 0]], { highway: 'primary', name: 'A' }],
+    ['4', [[0, -300], [0, -60]], { highway: 'secondary', name: 'B' }],
+    ['5', [[0, -60], [0, 0], [0, 60]], { highway: 'secondary', name: 'B', bridge: 'yes', layer: '1' }],
+    ['6', [[0, 60], [0, 300]], { highway: 'secondary', name: 'B' }],
+    ['7', [[-30, -400], [-30, 400]], { highway: 'motorway', name: 'M', oneway: 'yes' }],
+  ]);
+  const { decks } = groups.bridges;
+  assert.equal(decks.length, 1, 'one deck');
+  const { buildDeckGeometry: build } = await import('../services/beamngBridges.js');
+  const P = build(decks[0], { groundAt: () => 0 }).positions;
+  const zAt0 = deckHeightAt(decks[0].parts.find((p) => p.xy.some(([x, y]) => Math.hypot(x, y) < 1)), 0, 0);
+  // no parapet top across the other road's carriageway: A's edge lines
+  // (|y| ~ hA) inside B's road (|x| < hB), and B's inside A's
+  const halfOf = (dx, dy) => decks[0].parts.find((p) => {
+    const [a, c] = [p.xy[0], p.xy[p.xy.length - 1]];
+    return Math.abs((c[0] - a[0]) * dy - (c[1] - a[1]) * dx) < 1e-6 * Math.hypot(c[0] - a[0], c[1] - a[1]) + 1e-3 && p.xy.some(([x, y]) => Math.hypot(x, y) < 1);
+  }).half;
+  const hA = halfOf(1, 0); const hB = halfOf(0, 1);
+  let across = 0;
+  for (let i = 0; i < P.length; i += 3) {
+    const [x, y, z] = [P[i], P[i + 1], P[i + 2]];
+    if (Math.abs(z - zAt0 - 0.9) > 0.05) continue;
+    if (Math.abs(x) < hB - 0.2 && Math.abs(y) < hA + 0.6) across++;
+    if (Math.abs(y) < hA - 0.2 && Math.abs(x) < hB + 0.6) across++;
+  }
+  assert.equal(across, 0, 'parapet vertices across the crossing roads');
+});
+
+test('carriageways merging into the street at the ends of their bridge: the deck comes down to it', async () => {
+  // a one-way pair over a motorway, each carried down its approach; the pair
+  // meets the two-way street beyond at a node no bridge reaches
+  const groups = await flatMap([
+    ['1', [[-6, -140], [-6, -60]], { highway: 'primary', name: 'A', oneway: 'yes' }],
+    ['2', [[-6, -60], [-6, 60]], { highway: 'primary', name: 'A', oneway: 'yes', bridge: 'yes', layer: '1' }],
+    ['3', [[6, 60], [6, -60]], { highway: 'primary', name: 'A', oneway: 'yes', bridge: 'yes', layer: '1' }],
+    ['4', [[-6, 60], [0, 200]], { highway: 'primary', name: 'A', oneway: 'yes' }],
+    ['5', [[0, 200], [6, 60]], { highway: 'primary', name: 'A', oneway: 'yes' }],
+    ['6', [[6, -60], [6, -140]], { highway: 'primary', name: 'A', oneway: 'yes' }],
+    ['8', [[0, 200], [0, 400]], { highway: 'primary', name: 'A' }],
+    ['7', [[-400, 0], [400, 0]], { highway: 'motorway', name: 'M', oneway: 'yes' }],
+  ]);
+  // every open end of every deck sits on the ground (no dead end in the air)
+  for (const deck of groups.bridges.decks) {
+    for (const [x, y] of deck.abutments) {
+      const part = deck.parts.find((p) => [p.xy[0], p.xy[p.xy.length - 1]].some((e) => Math.hypot(e[0] - x, e[1] - y) < 1));
+      assert.ok(Math.abs(deckHeightAt(part, x, y)) < 0.3, `deck end at (${x.toFixed(0)}, ${y.toFixed(0)}) ${deckHeightAt(part, x, y).toFixed(2)} m up`);
+    }
+  }
+});
+
+test('a street with junctions right by its bridge: the road under sinks instead', async () => {
+  // a 60 m bridge over a motorway, cross streets 20 m beyond each end (no room
+  // to ramp up 6.5 m)
+  const groups = await flatMap([
+    ['1', [[-200, -50], [-200, 50]], { highway: 'residential', name: 'W' }],
+    ['2', [[200, -50], [200, 50]], { highway: 'residential', name: 'E' }],
+    ['3', [[-200, 0], [-50, 0]], { highway: 'secondary', name: 'S' }],
+    ['4', [[-50, 0], [-30, 0]], { highway: 'secondary', name: 'S' }],
+    ['5', [[-30, 0], [30, 0]], { highway: 'secondary', name: 'S', bridge: 'yes', layer: '1' }],
+    ['6', [[30, 0], [50, 0]], { highway: 'secondary', name: 'S' }],
+    ['7', [[50, 0], [200, 0]], { highway: 'secondary', name: 'S' }],
+    ['8', [[-50, -50], [-50, 50]], { highway: 'residential', name: 'X1' }],
+    ['9', [[50, -50], [50, 50]], { highway: 'residential', name: 'X2' }],
+    ['10', [[0, -400], [0, 400]], { highway: 'motorway', name: 'M', oneway: 'yes' }],
+  ]);
+  const b = groups.bridges;
+  assert.ok(b.sunk > 0, 'the motorway sank');
+  assert.ok(b.decks[0].roadShortfall < 0.6, `short ${b.decks[0].roadShortfall.toFixed(2)} m`);
+  const m = groups.flatMap((g) => g.__items).filter((d) => d.name.startsWith('dr_M') && d.material === 'road_asphalt_2lane').flatMap((d) => d.nodes);
+  const zNear = (y0) => m.reduce((best, n) => (Math.abs(n[1] - y0) < Math.abs(best[1] - y0) ? n : best))[2];
+  assert.ok(zNear(0) < -3, `the motorway under the bridge at ${zNear(0).toFixed(2)} m`);
+  assert.ok(Math.abs(zNear(350)) < 0.3, 'back at the ground away from it');
+});
