@@ -69,3 +69,27 @@ test('coarse rasters and bridges are left alone', () => {
   const bridge = road('b', X_BENCH - 4, 20, 380, { bridge: 'yes', layer: '1' });
   assert.equal(snapRoadsToTerrain(hm, N, N, bounds, [bridge], 1, isGroundLevelRoad).features[0], bridge);
 });
+
+test('a ramp on a narrow embankment stays on it, not on the field beside', () => {
+  // a fill standing 4 m over flat ground, 12 m wide at its foot, its top
+  // rounded off as 1 m lidar shows it: the field beside is the flatter
+  // cross-section, 4 m down
+  const hm = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) hm[y * N + x] = Math.max(0, 4 - (4 / 6) * Math.abs(x - X_BENCH));
+  const r = road('ramp', X_BENCH, 20, 380, { highway: 'motorway_link', lanes: '2', oneway: 'yes' });
+  const { features } = snapRoadsToTerrain(hm, N, N, bounds, [r], 1, isGroundLevelRoad);
+  for (const p of features[0].geometry) assert.ok(Math.abs(xAt(p.lng) - X_BENCH) < 1, `node at x=${xAt(p.lng).toFixed(2)}`);
+});
+
+test('a carriageway never slides onto the one beside it', () => {
+  // flat ground east of a gentle bank: the road drawn on the bank would move
+  // onto the flat, where the other carriageway already runs
+  const hm = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) hm[y * N + x] = x < X_BENCH + 3 ? 0.15 * (X_BENCH + 3 - x) : 0;
+  const a = road('sb', X_BENCH, 20, 380, { highway: 'motorway', lanes: '2', oneway: 'yes' });
+  const b = road('nb', X_BENCH + 10, 20, 380, { highway: 'motorway', lanes: '2', oneway: 'yes' });
+  const alone = snapRoadsToTerrain(hm, N, N, bounds, [a], 1, isGroundLevelRoad).features[0];
+  assert.ok(alone.geometry.some((p) => xAt(p.lng) > X_BENCH + 4), 'alone it moves onto the flat');
+  const { features } = snapRoadsToTerrain(hm, N, N, bounds, [a, b], 1, isGroundLevelRoad);
+  for (const p of features[0].geometry) assert.ok(xAt(p.lng) < X_BENCH + 2.5, `node at x=${xAt(p.lng).toFixed(2)}`);
+});

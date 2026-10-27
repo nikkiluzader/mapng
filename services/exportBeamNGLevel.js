@@ -3486,7 +3486,12 @@ function solveExportBridges(drivableRoads, terrainData, squareSize, tunnels = []
 // line between the ground HUMP_SIDE_M either side of the deck; standing over
 // it by more than HUMP_MIN_M, the strip under the deck around the crossing
 // roads is lowered to that line (never raised), fading out along the deck.
+// The crossing road's own ground either side of the deck must agree: a road
+// on an embankment over low ground also stands over the line across the deck,
+// but its embankment runs on along the road (Jacksonville's I-295 loops: 4 m
+// pits dug under the flyovers), where a baked-in deck drops away both ways.
 const HUMP_SIDE_M = [30, 45];   // ground this far either side of the deck: the real ground
+const HUMP_ALONG_M = [25, 45];  // ... and this far along the crossing road, either side
 const HUMP_MIN_M = 1.5;         // a ridge over the line by this much is the bridge
 const HUMP_MARGIN_M = 6;        // cut beyond a crossing road's edge (shoulders) ...
 const HUMP_FADE_M = 10;         // ... then faded back to the ground along the deck
@@ -3515,6 +3520,32 @@ function cutBridgeHumps(terrainData, squareSize, parts, lowerRoads, groundAt) {
     const mid = (HUMP_SIDE_M[0] + HUMP_SIDE_M[1]) / 2;
     return (d) => a + (b - a) * (d + mid) / (2 * mid);
   };
+  // the crossing road's ground HUMP_ALONG_M either way from where it meets
+  // the deck (segment j at u): its height at the crossing, or null when the
+  // road is too short either side to tell
+  const lineAlong = (q, j, u) => {
+    const side = (sign) => {
+      const v = [];
+      let k = sign > 0 ? j + 1 : j;
+      let [px, py] = [q[j][0] + (q[j + 1][0] - q[j][0]) * u, q[j][1] + (q[j + 1][1] - q[j][1]) * u];
+      let walked = 0;
+      for (let d = HUMP_ALONG_M[0]; d <= HUMP_ALONG_M[1]; d += 2) {
+        while (k >= 0 && k < q.length) {
+          const L = Math.hypot(q[k][0] - px, q[k][1] - py);
+          if (walked + L >= d) {
+            const t = (d - walked) / (L || 1);
+            v.push(groundAt(px + (q[k][0] - px) * t, py + (q[k][1] - py) * t));
+            break;
+          }
+          walked += L; [px, py] = q[k]; k += sign;
+        }
+      }
+      return v.length >= 3 ? median(v) : null;
+    };
+    const a = side(-1); const b = side(1);
+    if (a == null && b == null) return null;
+    return (a ?? b) / 2 + (b ?? a) / 2;
+  };
   const hm = heightMapEditor(terrainData);
   const cuts = [];
   for (const part of parts) {
@@ -3541,7 +3572,8 @@ function cutBridgeHumps(terrainData, squareSize, parts, lowerRoads, groundAt) {
           if ((near(xy[0]) || near(xy[xy.length - 1])) && (near(q[0]) || near(q[q.length - 1]))) continue;
           const L = Math.hypot(bx - ax, by - ay) || 1;
           const nx = -(by - ay) / L; const ny = (bx - ax) / L;
-          const lift = groundAt(x, y) - lineAcross(x, y, nx, ny)(0);
+          const along = lineAlong(q, j, u);
+          const lift = groundAt(x, y) - Math.max(lineAcross(x, y, nx, ny)(0), along ?? -Infinity);
           // (by the deck's end the rise is its own approach embankment)
           const sAt = s[i] + t * L;
           if (sAt < HUMP_END_M || sAt > s[s.length - 1] - HUMP_END_M) continue;
@@ -6098,6 +6130,11 @@ const NATIVE_BARRIER_ASSETS = {
   stoneWall: { shapeName: BARRIER_SHAPES.stoneWall.shapeFile, segmentLength: 3, zOffset: 0, yawOffset: 0 },
   concreteWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, zOffset: 0, yawOffset: 0 },
   dryStoneWall: { shapeName: BARRIER_SHAPES.dryStoneWall.shapeFile, segmentLength: 6, zOffset: 0, yawOffset: 0 },
+  // a retaining wall holds the ground up: the concrete wall (1 m over its
+  // origin, 2 m under) stretched from the low side's ground to just over the
+  // high side's (highway retaining walls stood as 1 m stone garden walls at
+  // the foot of their fill)
+  retainingWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, zOffset: 0, yawOffset: 0, retaining: { above: 1, below: 2 } },
   brickWall: { shapeName: BARRIER_SHAPES.brickWall.shapeFile, segmentLength: 3.5, zOffset: 0, yawOffset: 0 },
   // the harbour railing runs along local -Y from its origin at one end
   // (+90° turns -Y onto the run): placed from each piece's start
@@ -6165,6 +6202,10 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
       return NATIVE_BARRIER_ASSETS.concreteWall;
     }
     if (material === 'brick' && Number.isFinite(height) && height >= 2) return NATIVE_BARRIER_ASSETS.brickWall;
+    // (retaining walls are concrete unless mapped as stone or brick)
+    if (barrierType === 'retaining_wall' && !['stone', 'brick', 'sandstone', 'limestone', 'granite'].includes(material)) {
+      return NATIVE_BARRIER_ASSETS.retainingWall;
+    }
     return NATIVE_BARRIER_ASSETS.stoneWall;
   }
 
@@ -6210,6 +6251,9 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
  * Includes repeated segment placement and optional post/endcap meshes where
  * the selected barrier asset defines them.
  */
+const RETAINING_TOP_M = 0.3;    // a retaining wall stands this far over the ground it holds
+const RETAINING_FOOT_M = 0.5;   // ... and reaches this far under the ground at its foot
+
 function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skipAt = () => false, skipLineAt = () => false } = {}) {
   const features = terrainData.osmFeatures?.filter((feature) => (
     feature.type === 'barrier' && Array.isArray(feature.geometry) && feature.geometry.length >= 2
@@ -6322,17 +6366,47 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     const at3 = (arr, i) => [arr[Math.max(0, i - 1)], arr[i], arr[Math.min(arr.length - 1, i + 1)]];
     const median3 = rawJointZ.map((_, i) => at3(rawJointZ, i).sort((a, b) => a - b)[1]);
     const jointZ = median3.map((_, i) => (i === 0 || i === median3.length - 1 ? median3[i] : at3(median3, i).reduce((a, b) => a + b, 0) / 3));
+    // a retaining wall's top follows the ground it holds (the high side), its
+    // foot the low side's: per joint, the top smoothed like the ground
+    let retainTop = null; let retainLow = null;
+    if (asset.retaining) {
+      const sides = Array.from({ length: panelCount + 1 }, (_, i) => {
+        const j = sampleAtDistance(i * panelSpacing);
+        const nx = -Math.sin(j.yaw); const ny = Math.cos(j.yaw);
+        const side = (sign) => Math.min(...[1.5, 2.5, 3.5].map((d) => getTerrainHeightAtWorldXY(j.x + sign * nx * d, j.y + sign * ny * d, terrainData, squareSize)));
+        const a = side(1); const b = side(-1);
+        return [Math.min(a, b), Math.max(Math.max(a, b) + RETAINING_TOP_M, Math.min(a, b) + asset.retaining.above)];
+      });
+      retainLow = sides.map(([low]) => low);
+      const rawTop = sides.map(([, top]) => top);
+      const m3 = rawTop.map((_, i) => at3(rawTop, i).sort((a, b) => a - b)[1]);
+      retainTop = m3.map((_, i) => (i === 0 || i === m3.length - 1 ? m3[i] : at3(m3, i).reduce((a, b) => a + b, 0) / 3));
+    }
 
     for (let i = 0; i < panelCount; i++) {
       if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
       const centerSample = sampleAtDistance((i + 0.5) * panelSpacing);
-      // tilted along the run to the (smoothed) ground between its ends
-      const rise = jointZ[i + 1] - jointZ[i];
+      // tilted along the run to the (smoothed) ground between its ends (a
+      // retaining wall: to its top)
+      const rise = retainTop ? retainTop[i + 1] - retainTop[i] : jointZ[i + 1] - jointZ[i];
       const pitch = Math.max(-BARRIER_MAX_PITCH, Math.min(BARRIER_MAX_PITCH, Math.atan2(rise, panelSpacing)));
       const panelTerrainZ = (jointZ[i] + jointZ[i + 1]) / 2;
       if (skipLineAt(centerSample.x, centerSample.y, panelTerrainZ, centerSample.yaw)) continue;
       // (a mesh with its origin at one end goes at the piece's start)
       const at = asset.fromStart ? { ...sampleAtDistance(i * panelSpacing), z: jointZ[i] } : { ...centerSample, z: panelTerrainZ };
+      // not on a drawn road or under a deck (OSM's line, or the road's width,
+      // put walls and fences across lanes where they meet)
+      if (skipAt(at.x, at.y, at.z)) continue;
+      let scaleZ = 1;
+      if (retainTop) {
+        // base under the low side's ground (the tilt lowers one end's foot
+        // by half the rise), top on the line through the joints' tops
+        const { above, below } = asset.retaining;
+        const top = (retainTop[i] + retainTop[i + 1]) / 2;
+        const foot = Math.min(retainLow[i], retainLow[i + 1]) - RETAINING_FOOT_M - Math.abs(rise) / 2;
+        scaleZ = Math.max(1, (top - foot) / (above + below));
+        at.z = top - above * scaleZ;
+      }
       objects.push({
         __parent: 'Barriers',
         class: 'TSStatic',
@@ -6344,6 +6418,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
           roundTo(at.z + (Number.isFinite(asset.zOffset) ? asset.zOffset : 0), 3),
         ],
         rotationMatrix: rotationMatrixFromYawPitch(centerSample.yaw, pitch, Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0),
+        ...(scaleZ !== 1 ? { scale: [1, 1, roundTo(scaleZ, 3)] } : {}),
         shapeName: asset.shapeName,
         useInstanceRenderData: true,
       });

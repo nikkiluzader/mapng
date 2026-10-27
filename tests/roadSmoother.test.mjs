@@ -362,3 +362,18 @@ test('a road with densely drawn curves climbs a slope without steps', async () =
   }
   assert.ok(worst < 0.1, `centerline moved ${worst.toFixed(3)} m off the slope`);
 });
+
+test('an approach ending at the foot of its bridge gap keeps its grade to the bridge', () => {
+  // 1 m lidar with the bridge taken out: an embankment at 10 m ending in a
+  // cliff at x = 150, the OSM node joining the bridge 2 m past its foot
+  const mpp = 1;
+  const bounds = makeBounds(W, H, mpp);
+  const hm = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) hm[y * W + x] = x <= 150 ? 10 : 0;
+  const row = 128;
+  const node = (x) => ({ lat: latAtPy(bounds, row), lng: lngAtPx(bounds, x) });
+  const approach = { id: 'a', type: 'road', tags: { highway: 'primary' }, geometry: [node(20), node(80), node(152)] };
+  const bridge = { id: 'b', type: 'road', tags: { highway: 'primary', bridge: 'yes', layer: '1' }, geometry: [node(152), node(240)] };
+  smoothRoadsInHeightmap(hm, W, H, bounds, [approach, bridge], mpp);
+  for (let x = 100; x <= 148; x += 4) assert.ok(Math.abs(hm[row * W + x] - 10) < 0.3, `x=${x}: ${hm[row * W + x].toFixed(2)}`);
+});

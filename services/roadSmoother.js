@@ -1,5 +1,5 @@
 import { createGridProjector } from './geoUtils.js';
-import { buildRoadNetwork, mergeLinearRoadSegments } from './roadNetwork.js';
+import { buildRoadNetwork, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
 
 const NO_DATA_VALUE = -99999;
@@ -23,6 +23,16 @@ const FEATHER_M = 6.0;
 // winning outright. Wide enough for junction overlaps and touching embankments,
 // far below the gap between a road core (1.0) and a neighbour's feather.
 const TIE_WEIGHT = 13;
+// Bare-earth (lidar) elevation has bridges taken out: the approach embankment
+// ends in a cliff, and the OSM node where the road meets its bridge often
+// lands at its foot (Jacksonville: 10 m down in the last 5 m). Where a ground
+// road ends on a bridge, its last BRIDGE_END_TRIM_M follow the grade the road
+// arrives with (fitted BRIDGE_END_FIT_M further back) wherever the ground
+// drops away from it by more than BRIDGE_END_TOL_M; the smoothing window
+// would otherwise drag the cliff 30 m up the approach.
+const BRIDGE_END_TRIM_M = 20;
+const BRIDGE_END_FIT_M = 45;
+const BRIDGE_END_TOL_M = 1;
 
 /**
  * Computes distance and projection parameter t of point (x,y) onto line segment (x1,y1)-(x2,y2)
@@ -204,7 +214,7 @@ function corridorHalfWidthMeters(corridor, isUrbanRoad) {
  * Build per-corridor elevation profiles: pixel-space sample points, original
  * and smoothed Z arrays, and cumulative arc length in metres.
  */
-function buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel) {
+function buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes = new Set()) {
     const maxSegmentLengthPx = Math.max(1, SAMPLE_SPACING_M / metersPerPixel);
     const windowSamples = Math.max(3, Math.round(SMOOTH_WINDOW_M / SAMPLE_SPACING_M));
     const profiles = [];
@@ -222,21 +232,55 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
             zOrig[i] = sampleHeight(heightMap, width, height, points[i].x, points[i].y);
         }
 
-        let zSmooth = zOrig;
-        for (let pass = 0; pass < SMOOTH_PASSES; pass++) {
-            zSmooth = smooth1DArray(zSmooth, windowSamples);
-        }
-
         const cumLenM = new Float32Array(points.length);
         for (let i = 1; i < points.length; i++) {
             const dx = points[i].x - points[i - 1].x;
             const dy = points[i].y - points[i - 1].y;
             cumLenM[i] = cumLenM[i - 1] + Math.hypot(dx, dy) * metersPerPixel;
         }
+        const baseKey = (key) => String(key).split('|')[0];
+        if (bridgeNodes.has(baseKey(corridor.startKey))) holdGradeToBridge(zOrig, cumLenM, false);
+        if (bridgeNodes.has(baseKey(corridor.endKey))) holdGradeToBridge(zOrig, cumLenM, true);
+
+        let zSmooth = zOrig;
+        for (let pass = 0; pass < SMOOTH_PASSES; pass++) {
+            zSmooth = smooth1DArray(zSmooth, windowSamples);
+        }
 
         profiles.push({ corridor, points, zOrig, zSmooth, cumLenM });
     }
     return profiles;
+}
+
+/**
+ * In place: the samples within BRIDGE_END_TRIM_M of one end of a profile (the
+ * end meeting a bridge) that stand off the grade fitted behind them, run
+ * from the end inwards, laid on that grade.
+ */
+function holdGradeToBridge(z, cumLenM, atEnd) {
+    const n = z.length;
+    const total = cumLenM[n - 1];
+    const dist = (i) => (atEnd ? total - cumLenM[i] : cumLenM[i]);
+    const fit = [];
+    for (let i = 0; i < n; i++) {
+        const d = dist(i);
+        if (d >= BRIDGE_END_TRIM_M && d <= BRIDGE_END_TRIM_M + BRIDGE_END_FIT_M && z[i] !== NO_DATA_VALUE) fit.push([d, z[i]]);
+    }
+    if (fit.length < 4) return;
+    // Theil-Sen: robust to a stretch of the fit still on the cliff
+    const slopes = [];
+    for (let i = 0; i < fit.length; i++) {
+        for (let j = i + 1; j < fit.length; j++) slopes.push((fit[j][1] - fit[i][1]) / (fit[j][0] - fit[i][0]));
+    }
+    const median = (v) => { const q = [...v].sort((a, b) => a - b); return q[q.length >> 1]; };
+    const slope = median(slopes);
+    const at0 = median(fit.map(([d, v]) => v - slope * d));
+    const order = atEnd ? Array.from({ length: n }, (_, k) => n - 1 - k) : Array.from({ length: n }, (_, k) => k);
+    let replace = -1;   // index (in order) of the innermost sample to lay on the grade
+    order.forEach((i, k) => {
+        if (dist(i) <= BRIDGE_END_TRIM_M && (z[i] === NO_DATA_VALUE || Math.abs(z[i] - (at0 + slope * dist(i))) > BRIDGE_END_TOL_M)) replace = k;
+    });
+    for (let k = 0; k <= replace; k++) z[order[k]] = at0 + slope * dist(order[k]);
 }
 
 /**
@@ -328,7 +372,15 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
 
     const project = createGridProjector(bounds, width, height);
     const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
-    const profiles = buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel);
+    // nodes where a ground road meets a bridge (or any raised way)
+    const bridgeNodes = new Set();
+    for (const f of osmFeatures) {
+        if (f?.type !== 'road' || !Array.isArray(f.geometry) || isGroundLevelRoad(f) || NON_DRIVEABLE_HIGHWAYS.has(f.tags?.highway)) continue;
+        const tags = f.tags || {};
+        if (tags.tunnel === 'yes' || tags.covered === 'yes') continue;
+        for (const p of f.geometry) bridgeNodes.add(makeRoadNodeKey(p));
+    }
+    const profiles = buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes);
     if (profiles.length === 0) return;
 
     pinJunctionElevations(profiles);

@@ -39,6 +39,18 @@ const JUNCTION_TAPER_M = 30;
 // along them, so the road follows the bench instead of cutting the chord.
 const DENSIFY_SPACING_M = 10;
 const MOVED_EPSILON_M = 0.05;
+// A bench is cut into the slope the OSM line rides: its centre lies about
+// the side slope times the shift from the OSM line's. Further than this off,
+// the flat ground found is another level: the field below a ramp's walled
+// embankment (Jacksonville: a toll ramp slid 7 m off its fill, 2.7 m down),
+// a cutting's rim, a frontage road.
+const LEVEL_M = 0.5;
+const LEVEL_PER_M = 0.15;
+// Other carriageways: a shift never takes the road onto one (a divided
+// motorway's flat median and the next carriageway are as flat as the road:
+// I-295 slid 8 m onto its express lanes).
+const NEIGHBOUR_REACH_M = 30;
+const CLEAR_HIGHWAYS_SKIP = new Set(['footway', 'path', 'cycleway', 'bridleway', 'steps', 'pedestrian', 'corridor', 'elevator', 'proposed', 'construction', 'abandoned', 'razed']);
 const NODE_POINT_TYPES = new Set(['street_furniture', 'traffic_calming']);
 
 function sampleHeight(heightMap, width, height, x, y) {
@@ -135,9 +147,50 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
     const boxR = Math.max(1, Math.round(BOX_RADIUS_M / SAMPLE_M));
     const taperPx = JUNCTION_TAPER_M / metersPerPixel;
 
+    // Every carriageway's segments (pixels) and half width, bucketed for the
+    // clearance check.
+    const cell = NEIGHBOUR_REACH_M / metersPerPixel;
+    const buckets = new Map();
+    osmFeatures.forEach((f, fi) => {
+        const tags = f?.tags || {};
+        if (f?.type !== 'road' || !tags.highway || CLEAR_HIGHWAYS_SKIP.has(tags.highway) || !Array.isArray(f.geometry)) return;
+        const half = estimateRoadCrossSection(tags, tags.highway, isOneWayRoad(tags), { urban: isUrbanRoad(f) }).carriagewayHalfWidth / metersPerPixel;
+        const p = f.geometry.map((g) => project(g.lat, g.lng));
+        for (let i = 0; i + 1 < p.length; i++) {
+            const seg = { fi, half, ax: p[i].x, ay: p[i].y, bx: p[i + 1].x, by: p[i + 1].y };
+            const c0 = Math.floor(Math.min(seg.ax, seg.bx) / cell); const c1 = Math.floor(Math.max(seg.ax, seg.bx) / cell);
+            const r0 = Math.floor(Math.min(seg.ay, seg.by) / cell); const r1 = Math.floor(Math.max(seg.ay, seg.by) / cell);
+            for (let c = c0; c <= c1; c++) for (let r = r0; r <= r1; r++) {
+                const k = `${c},${r}`;
+                if (!buckets.has(k)) buckets.set(k, []);
+                buckets.get(k).push(seg);
+            }
+        }
+    });
+    const neighboursOf = (fi, x, y) => {
+        const out = new Set();
+        const c = Math.floor(x / cell); const r = Math.floor(y / cell);
+        for (let dc = -1; dc <= 1; dc++) for (let dr = -1; dr <= 1; dr++) {
+            for (const seg of buckets.get(`${c + dc},${r + dr}`) || []) if (seg.fi !== fi) out.add(seg);
+        }
+        return [...out];
+    };
+    // Gap (px) between a carriageway of half width `half` centred at (x, y)
+    // and the nearest other one; negative where they overlap.
+    const clearance = (segs, half, x, y) => {
+        let gap = Infinity;
+        for (const s of segs) {
+            const vx = s.bx - s.ax; const vy = s.by - s.ay;
+            const L2 = vx * vx + vy * vy || 1e-9;
+            const t = Math.max(0, Math.min(1, ((x - s.ax) * vx + (y - s.ay) * vy) / L2));
+            gap = Math.min(gap, Math.hypot(s.ax + vx * t - x, s.ay + vy * t - y) - s.half - half);
+        }
+        return gap;
+    };
+
     const movedNodes = new Map();
     const allOffsets = [];
-    const out = osmFeatures.map((f) => {
+    const out = osmFeatures.map((f, fi) => {
         if (!isSnappableRoad(f)) return f;
         stats.roads++;
         const tags = f.tags || {};
@@ -172,10 +225,18 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
         let off = S.map(({ x, y, nx, ny }) => {
             const c0 = crossSectionCost(heightMap, width, height, x, y, nx, ny, halfPx, 0);
             if (!Number.isFinite(c0)) return 0;
+            const z0 = sampleHeight(heightMap, width, height, x, y);
+            const segs = neighboursOf(fi, x, y);
+            const gap0 = Math.min(0, clearance(segs, halfPx, x, y));
             let best = 0;
             let bestCost = c0;
             for (let d = -searchPx; d <= searchPx + 1e-9; d += stepPx) {
-                const c = crossSectionCost(heightMap, width, height, x, y, nx, ny, halfPx, d) + DISTANCE_PENALTY * Math.abs(d) * metersPerPixel;
+                const px = x + nx * d; const py = y + ny * d;
+                const dm = Math.abs(d) * metersPerPixel;
+                if (Math.abs(sampleHeight(heightMap, width, height, px, py) - z0) > LEVEL_M + LEVEL_PER_M * dm) continue;
+                // (a road already overlapping its neighbour may move, never further onto it)
+                if (segs.length && clearance(segs, halfPx, px, py) < gap0 - 1e-6) continue;
+                const c = crossSectionCost(heightMap, width, height, x, y, nx, ny, halfPx, d) + DISTANCE_PENALTY * dm;
                 if (c < bestCost) { bestCost = c; best = d; }
             }
             return c0 - bestCost > MIN_GAIN_M ? best : 0;
