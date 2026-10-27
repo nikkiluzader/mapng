@@ -413,7 +413,8 @@ test('a road passing under a short bridge near its abutment is cleared, not met 
     ['1', [[-300, 0], [-13, 0]], { highway: 'motorway', name: 'M', oneway: 'yes' }],
     ['2', [[-13, 0], [13, 0]], { highway: 'motorway', name: 'M', oneway: 'yes', bridge: 'yes', layer: '1' }],
     ['3', [[13, 0], [300, 0]], { highway: 'motorway', name: 'M', oneway: 'yes' }],
-    ['4', [[5, -300], [5, 300]], { highway: 'motorway_link', name: 'L', oneway: 'yes' }],
+    // (nodes every 5 m, as a curving ramp is mapped)
+    ['4', Array.from({ length: 121 }, (_, i) => [5, -300 + 5 * i]), { highway: 'motorway_link', name: 'L', oneway: 'yes' }],
   ]);
   const deck = groups.flatMap((g) => g.__items).filter((d) => d.name.startsWith('dr_M') && d.material === 'road_asphalt_2lane').flatMap((d) => d.nodes);
   const link = groups.flatMap((g) => g.__items).filter((d) => d.name.startsWith('dr_L') && d.material === 'road_asphalt_2lane').flatMap((d) => d.nodes);

@@ -2820,7 +2820,7 @@ const BERM_MIN_M = 1.5;         // the berm top over the bridge's end
 // abutment): VA 337 over I-264, Norfolk, came down onto the freeway
 const MAJOR_UNDER_ROADS = new Set(['motorway', 'trunk', 'primary']);
 const AT_GRADE_REACH_M = 12;     // as beamngBridges: a minor road met this near an abutment is at grade
-                                 // (unless it passes through: no node within AT_GRADE_REACH_M + 3)
+                                 // (unless it passes through: no junction of its own near the crossing)
 
 // Roads sunk under decks (sinkRoadsUnderDecks): the drop tapers off along
 // the road at SINK_GRADE, the cutting's floor its carriageway + shoulders,
@@ -3227,6 +3227,17 @@ function solveExportBridges(drivableRoads, terrainData, squareSize, tunnels = []
   // its height from the deck. (Fitting it to the tunnel road's "ground" put
   // the abutment on the hill over the tunnel.)
   const tunnelEnds = [];
+  // OSM nodes several ways share (whatever their layers): the junctions
+  const nodeRoads = new Map();
+  drivableRoads.forEach((seg, i) => {
+    for (const p of seg.geometry || []) {
+      const k = makeRoadNodeKey(p);
+      if (!nodeRoads.has(k)) nodeRoads.set(k, new Set());
+      nodeRoads.get(k).add(i);
+    }
+  });
+  const junctionsOf = (seg) => (seg.geometry || []).filter((p) => nodeRoads.get(makeRoadNodeKey(p))?.size > 1)
+    .map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
   const isFreeEnd = (x, y) => Math.abs(x) >= edge || Math.abs(y) >= edge
     || tunnelEnds.some(([tx, ty]) => Math.hypot(tx - x, ty - y) < 1.5);
   // Bridge outlines (man_made=bridge) carry the structure type more often
@@ -3278,6 +3289,7 @@ function solveExportBridges(drivableRoads, terrainData, squareSize, tunnels = []
           xy: xy.map(([x, y]) => [x, y, groundAt(x, y)]),
           half: (HIGHWAY_STYLE[seg.highway] ?? DEFAULT_ROAD_STYLE).width ?? 4,
           major: MAJOR_UNDER_ROADS.has(seg.highway),
+          junctions: junctionsOf(seg),
           highway: seg.highway,
         });
       }
@@ -3424,7 +3436,7 @@ function solveExportBridges(drivableRoads, terrainData, squareSize, tunnels = []
           // met right by an abutment is a junction at grade (the solver's rule)
           const at = (p) => Math.hypot(p[0] - px, p[1] - py) < 1.5;
           if ((at(part.xy[0]) || at(part.xy[part.xy.length - 1])) && (at(road.xy[0]) || at(road.xy[road.xy.length - 1]))) continue;
-          const through = road.xy.every((v) => Math.hypot(v[0] - px, v[1] - py) > AT_GRADE_REACH_M + 3);
+          const through = !road.junctions.some(([jx, jy]) => Math.hypot(jx - px, jy - py) < AT_GRADE_REACH_M + 3);
           if (!road.major && !through && deck.abutments.some(([ax, ay]) => Math.hypot(ax - px, ay - py) < AT_GRADE_REACH_M)) continue;
           const deficit = groundAt(px, py) + DECK_ROAD_CLEAR_M - deckHeightAt(part, px, py);
           if (deficit > SINK_MIN_M / 2) sinks.push({ road, at: [px, py], deficit: Math.min(SINK_MAX_M, deficit + 0.2) });

@@ -540,10 +540,11 @@ function planCrossings(partIndex, xy, lines, groundAt) {
         const near = (p) => Math.hypot(p[0] - px, p[1] - py) < 1;
         if ((near(xy[0]) || near(xy[xy.length - 1])) && (near(q[0]) || near(q[q.length - 1]))) continue;
         // (a major road under it is no ramp starting at the abutment: it is
-        // always cleared, never met at grade; nor is a road with no node
-        // anywhere near the crossing, which joins nothing there: Norfolk's
-        // loop ramps under 26 m I-264 decks)
-        const through = q.every((v) => Math.hypot(v[0] - px, v[1] - py) > AT_GRADE_REACH_M + AT_GRADE_M);
+        // always cleared, never met at grade; nor is a ground road with no
+        // junction (an OSM node shared with another way) near the crossing,
+        // which joins nothing there: Norfolk's loop ramps under 26 m I-264 decks)
+        const through = !line.deck && Array.isArray(line.junctions)
+          && !line.junctions.some(([jx, jy]) => Math.hypot(jx - px, jy - py) < AT_GRADE_REACH_M + AT_GRADE_M);
         out.push({ part: partIndex, s: s[i] + t * (s[i + 1] - s[i]), z: line.deck ? cz + (dz - cz) * u : groundAt(px, py), major: !!line.major || through });
       }
     }
