@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  solveBridgeDecks, waterClear, deckHeightAt, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M, mergeOverlaps, buildDeckGeometry, deckEdges,
+  solveBridgeDecks, waterClear, deckHeightAt, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M, mergeOverlaps, buildDeckGeometry, deckEdges, alongDeck,
 } from '../services/beamngBridges.js';
 
 // A straight bridge along +x from x0 to x1 at y.
@@ -420,4 +420,13 @@ test('a road passing under a short bridge near its abutment is cleared, not met 
   const near = (nodes, x, y) => nodes.reduce((b, n) => (Math.hypot(n[0] - x, n[1] - y) < Math.hypot(b[0] - x, b[1] - y) ? n : b))[2];
   const gap = near(deck, 5, 0) - near(link, 5, 0);
   assert.ok(gap > 5, `deck ${gap.toFixed(2)} m over the link`);
+});
+
+test('a railing along a deck over it is the deck\'s own; one crossing under it is not', () => {
+  // a deck along +x at 8 m, 4 m half width
+  const decks = [{ parts: [{ xy: [[0, 0], [100, 0]], z: [8, 8], half: 4 }] }];
+  assert.ok(alongDeck(decks, 50, 3, 0, 0), 'along the deck, under its edge');
+  assert.ok(!alongDeck(decks, 50, 3, 0, Math.PI / 2), 'across under it');
+  assert.ok(!alongDeck(decks, 50, 12, 0, 0), 'alongside, clear of it');
+  assert.ok(!alongDeck(decks, 50, 3, 7.5, 0), 'on the deck itself');
 });

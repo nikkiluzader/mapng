@@ -800,8 +800,12 @@ export function deckEdges(deck) {
  * (world space): slab with girders under it, a parapet along each edge,
  * piers.
  */
-export function buildDeckGeometry(deck, { groundAt, roadLines = [] } = {}) {
+export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: allNeighbours = [] } = {}) {
   const b = new Builder();
+  // other decks' parts near this one (their edges can stand on its parts)
+  const box = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const p of deck.parts) for (const [x, y] of p.xy) { box[0] = Math.min(box[0], x); box[1] = Math.min(box[1], y); box[2] = Math.max(box[2], x); box[3] = Math.max(box[3], y); }
+  const neighbours = allNeighbours.filter((q) => q.xy.some(([x, y]) => x > box[0] - 40 && x < box[2] + 40 && y > box[1] - 40 && y < box[3] + 40));
   // part ends by joint: one end is the deck's end (an end cap), two a plain
   // join (mitred flush, no cap), more a fork (no cap)
   const key = (p) => `${Math.round(p[0] / JOIN_M)},${Math.round(p[1] / JOIN_M)}`;
@@ -851,15 +855,18 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [] } = {}) {
     };
     const row = (off, dz) => xy.map((_, k) => at(k, off, dz));
     const outL = (k) => hl[k] + PARAPET_W_M; const outR = (k) => -(hr[k] + PARAPET_W_M);
-    // where an edge stands on another part of this deck at about its height
-    // (a fork's branches overlapping, a crossroads' corners): no parapet, no
-    // side there; alongside the other part, not past its end (the part a
-    // join continues into)
-    const hiddenAt = (x, y, zk) => deck.parts.some((q, qi) => {
-      if (qi === pi || q.xy.length < 2) return false;
+    // where an edge stands on another part of this deck (or of a neighbouring
+    // deck: two bridges' ramps forking apart) at about its height (a fork's
+    // branches overlapping, a crossroads' corners): no parapet, no side
+    // there; alongside the other part, not past its end (the part a join
+    // continues into)
+    const onPart = (q, x, y, zk) => {
+      if (q.xy.length < 2) return false;
       const n = nearestInterior(q, x, y);
       return !!n && n.d < q.half + PARAPET_W_M - 0.05 && Math.abs(n.z - zk) < 2;
-    });
+    };
+    const hiddenAt = (x, y, zk) => deck.parts.some((q, qi) => qi !== pi && onPart(q, x, y, zk))
+      || neighbours.some((q) => onPart(q, x, y, zk));
     // each side's visible stretches: [i, t0, t1] of segment i (from point i
     // to i + 1), the edge between hidden and shown found along the segment
     // (points are metres apart: a parapet cut at the nearer point runs on
@@ -997,6 +1004,32 @@ export function hitsDeck(decks, x, y, z, zTop, margin = 1) {
         if (Math.hypot(ax + vx * t - x, ay + vy * t - y) > part.half + PARAPET_W_M + margin) continue;
         const deckBottom = part.z[i] + (part.z[i + 1] - part.z[i]) * t - (part.depth ?? DECK_DEPTH_M + GIRDER_D_M);
         if (zTop > deckBottom - 0.5 && z < deckBottom) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether a line at (x, y, z) heading `yaw` (radians, world) runs along a deck
+ * standing over it: a railing OSM maps along a bridge, placed on the ground
+ * under it (the deck has its own parapets).
+ */
+export function alongDeck(decks, x, y, z, yaw, margin = 1.5) {
+  const ux = Math.cos(yaw); const uy = Math.sin(yaw);
+  for (const deck of decks) {
+    for (const part of deck.parts) {
+      const { xy } = part;
+      for (let i = 0; i + 1 < xy.length; i++) {
+        const [ax, ay] = xy[i];
+        const [bx, by] = xy[i + 1];
+        const vx = bx - ax; const vy = by - ay;
+        const L = Math.hypot(vx, vy) || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (L * L)));
+        if (Math.hypot(ax + vx * t - x, ay + vy * t - y) > part.half + PARAPET_W_M + margin) continue;
+        if (Math.abs((vx * ux + vy * uy) / L) < 0.85) continue;
+        const top = part.z[i] + (part.z[i + 1] - part.z[i]) * t;
+        if (top > z + 1) return true;
       }
     }
   }

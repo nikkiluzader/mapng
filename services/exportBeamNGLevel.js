@@ -37,7 +37,7 @@ import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS } from
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
-  solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck,
+  solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck, alongDeck,
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
 } from './beamngBridges.js';
 import {
@@ -781,7 +781,7 @@ function getBridgeMaterialDefs() {
 function generateBridgeDAEs(decks, groundAt, roadLines) {
   const out = [];
   decks.forEach((deck, i) => {
-    const g = buildDeckGeometry(deck, { groundAt, roadLines });
+    const g = buildDeckGeometry(deck, { groundAt, roadLines, neighbours: decks.filter((d) => d !== deck).flatMap((d) => d.parts) });
     if (!g.positions.length) return;
     const pts = deck.parts.flatMap((p) => p.xy.map(([x, y], k) => [x, y, p.z[k]]));
     const origin = [
@@ -6137,7 +6137,7 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
  * Includes repeated segment placement and optional post/endcap meshes where
  * the selected barrier asset defines them.
  */
-function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skipAt = () => false } = {}) {
+function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skipAt = () => false, skipLineAt = () => false } = {}) {
   const features = terrainData.osmFeatures?.filter((feature) => (
     feature.type === 'barrier' && Array.isArray(feature.geometry) && feature.geometry.length >= 2
   )) ?? [];
@@ -6251,6 +6251,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       const panelTerrainZ = isFenceAsset
         ? Math.max(startSample.terrainZ, endSample.terrainZ, centerSample.terrainZ)
         : centerSample.terrainZ;
+      if (skipLineAt(centerSample.x, centerSample.y, panelTerrainZ, centerSample.yaw)) continue;
       objects.push({
         __parent: 'Barriers',
         class: 'TSStatic',
@@ -6273,6 +6274,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       for (let i = 0; i < postCount; i++) {
         if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
         const sample = sampleAtDistance(i * panelSpacing);
+        if (skipLineAt(sample.x, sample.y, sample.terrainZ, sample.yaw)) continue;
         const rotationYaw = sample.yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
         objects.push({
           __parent: 'Barriers',
@@ -6320,7 +6322,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
         squareSize,
         Number.isFinite(asset.endZOffset) ? asset.endZOffset : asset.zOffset,
       );
-      objects.push({
+      if (!skipLineAt(worldStart[0], worldStart[1], worldStart[2], startYaw)) objects.push({
         __parent: 'Barriers',
         class: 'TSStatic',
         name: `barrier_${featureIndex}_end_start`,
@@ -6340,7 +6342,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
         squareSize,
         Number.isFinite(asset.endZOffset) ? asset.endZOffset : asset.zOffset,
       );
-      objects.push({
+      if (!skipLineAt(worldEnd[0], worldEnd[1], worldEnd[2], endYaw)) objects.push({
         __parent: 'Barriers',
         class: 'TSStatic',
         name: `barrier_${featureIndex}_end_finish`,
@@ -8720,6 +8722,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const barrierObjects = includeNativeBarriers
     ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome, {
       skipAt: (x, y, z) => onDrawnRoad(x, y, 0.3) || underDeck(x, y, z - 1, z + 2),
+      // guardrail / fence runs: not under a deck they run along (OSM's railing
+      // of the bridge, which has its own parapets, stood on the road under it)
+      skipLineAt: (x, y, z, yaw) => bridgeDecks.length > 0 && alongDeck(bridgeDecks, x, y, z, yaw),
     })
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
