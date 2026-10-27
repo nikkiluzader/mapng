@@ -539,11 +539,15 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // Still off the ground at the end (a gully the road crosses on a fill,
     // a hillside it cuts into): the last stretch steepens to a road's grade
     // to land on it, rather than ending at a wall (Queen Creek: 33 m up)
+    // (eased in along the whole approach: clamped near the end only, a
+    // ground falling faster than that grade cut the road off at the portal)
     const last = out[out.length - 1];
     if (last && Math.abs(last.g - last.z) > TRENCH_DONE_M) {
+      const miss = last.g - last.z;
+      const from = Math.max(0, last.s - Math.abs(miss) / APPROACH_LAND_GRADE * 2);
       for (const q of out) {
-        const back = last.s - q.s;
-        q.z = clamp(q.z, last.g - APPROACH_LAND_GRADE * back, last.g + APPROACH_LAND_GRADE * back);
+        const f = clamp((q.s - from) / Math.max(1e-6, last.s - from), 0, 1);
+        q.z += miss * f * f * (3 - 2 * f);
       }
     }
     return out;

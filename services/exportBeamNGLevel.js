@@ -2818,6 +2818,7 @@ const BERM_MIN_M = 1.5;         // the berm top over the bridge's end
 // 1:1 sides up to the ground.
 const SINK_GRADE = 0.04;
 const SINK_MAX_M = 8;
+const SINK_MIN_M = 1.0;         // a deck short by less than this is left (a gentle dip looked like a ramp)
 const SINK_SHOULDER_M = 1.5;
 
 /** Where polylines a and b cross in plan: [[x, y]]. */
@@ -2866,13 +2867,28 @@ function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads) {
     }
     return line;
   };
-  let cut = 0;
+  // every sink planned on the ground as it was (planned one after another
+  // on ground already cut, the cuts under one deck stacked: Deck Park's
+  // freeway went 15 m down), the ones at one crossing merged (the deepest)
+  const lines = new Map();
+  const plans = [];
   for (const sink of sinks) {
-    const line = resample(lineOf(sink.road).map(([x, y]) => [x, y]), 2).map(([x, y]) => [x, y, getTerrainHeightAtWorldXY(x, y, terrainData, squareSize)]);
-    const s = [0];
-    for (let i = 1; i < line.length; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+    if (!lines.has(sink.road)) {
+      const line = resample(lineOf(sink.road).map(([x, y]) => [x, y]), 2).map(([x, y]) => [x, y, getTerrainHeightAtWorldXY(x, y, terrainData, squareSize)]);
+      const s = [0];
+      for (let i = 1; i < line.length; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+      lines.set(sink.road, { line, s });
+    }
+    const { line, s } = lines.get(sink.road);
     let s0 = 0; let best = Infinity;
     line.forEach(([x, y], i) => { const d = Math.hypot(x - sink.at[0], y - sink.at[1]); if (d < best) { best = d; s0 = s[i]; } });
+    const same = plans.find((q) => q.road === sink.road && Math.abs(q.s0 - s0) < 30);
+    if (same) { same.deficit = Math.max(same.deficit, sink.deficit); continue; }
+    plans.push({ road: sink.road, line, s, s0, deficit: sink.deficit });
+  }
+  let cut = 0;
+  for (const sink of plans) {
+    const { line, s, s0 } = sink;
     const taper = sink.deficit / SINK_GRADE;
     const drop = (sv) => { const f = Math.max(0, 1 - Math.abs(sv - s0) / taper); return sink.deficit * f * f * (3 - 2 * f); };
     const floorHalf = sink.road.half + SINK_SHOULDER_M;
@@ -3324,7 +3340,7 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
   // its bridge has no room to climb: North 7th Street over I-10, Phoenix)
   const sinks = [];
   for (const deck of decks) {
-    if (!(deck.roadShortfall > CARRY_MIN_SHORTFALL_M)) continue;
+    if (!(deck.roadShortfall > SINK_MIN_M)) continue;
     for (const part of deck.parts) {
       for (const road of lowerRoads) {
         for (const [px, py] of planCrossingPoints(part.xy, road.xy)) {
@@ -3332,7 +3348,7 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
           const at = (p) => Math.hypot(p[0] - px, p[1] - py) < 1.5;
           if ((at(part.xy[0]) || at(part.xy[part.xy.length - 1])) && (at(road.xy[0]) || at(road.xy[road.xy.length - 1]))) continue;
           const deficit = groundAt(px, py) + DECK_ROAD_CLEAR_M - deckHeightAt(part, px, py);
-          if (deficit > 0.3) sinks.push({ road, at: [px, py], deficit: Math.min(SINK_MAX_M, deficit + 0.2) });
+          if (deficit > SINK_MIN_M / 2) sinks.push({ road, at: [px, py], deficit: Math.min(SINK_MAX_M, deficit + 0.2) });
         }
       }
     }
@@ -3480,7 +3496,10 @@ function cutBridgeHumps(terrainData, squareSize, parts, lowerRoads, groundAt) {
         const now = hm.at(idx) - minHeight;
         const target = lines.get(key)(d);
         if (target >= now) continue;
-        hm.set(idx, now - (now - target) * w + minHeight);
+        // faded out across the last HUMP_FADE_M before the ground it is
+        // measured against (a hard edge there was a step in the road under)
+        const wa = Math.min(1, Math.max(0, (reach - Math.abs(d)) / HUMP_FADE_M));
+        hm.set(idx, now - (now - target) * w * wa + minHeight);
       }
     }
     for (const c of crossings) cuts.push({ x: c.x, y: c.y, lift: c.lift });
@@ -3737,7 +3756,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - xy[
  * half width. Bridges are solved first: a bridge meeting a portal sets its
  * height (and gets no cutting).
  */
-function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set(), regrade = [] } = {}) {
+function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set() } = {}) {
   const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [] };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
@@ -3862,7 +3881,11 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
     for (const i of path.idx) out.bySeg.set(parts[i].segIndex, t);
     return t;
   };
-  for (const path of paths) solvePath(path);
+  // galleries wait for the tunnels' grading, and for the bridges (they run
+  // on from tunnel mouths and bridge ends: their ends meet the ground those
+  // leave)
+  const galleryPaths = paths.filter((path) => path.idx.some((i) => parts[i].gallery));
+  for (const path of paths) if (!galleryPaths.includes(path)) solvePath(path);
   // Ramps joining inside a tunnel: the main path solved, each ramp taken
   // into its bore (beamngTunnels absorbBranch) with the road it leaves on
   for (const { main, branches } of trees) {
@@ -3884,14 +3907,10 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
       for (const i of branch.idx) out.bySeg.set(parts[i].segIndex, t);
     }
   }
-  if (!out.tunnels.length && !regrade.length) return out;
+  if (!out.tunnels.length && (early || !galleryPaths.length)) return out;
 
   // Terrain: graded into the export's copy, then the portal squares opened.
-  // Galleries last (a gallery running on from a tunnel's mouth keeps its
-  // floor where the portal's cutting reaches), and those of an earlier phase
-  // again after this one's tunnels.
   const { width, height, minHeight } = terrainData;
-  const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
   const hm = heightMapEditor(terrainData);
   const worldSize = width * squareSize;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -3912,8 +3931,8 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
     if (nearestOnTunnel(t, x, y, reach)) return true;
     return (t.cuts || []).some((cut) => cut.line.some((q) => Math.hypot(q.x - x, q.y - y) < reach));
   };
-  const gradeOrder = [...out.tunnels.filter((t) => t.kind !== 'gallery'), ...out.tunnels.filter((t) => t.kind === 'gallery'), ...regrade];
-  for (const t of gradeOrder) {
+  const gradeAll = (list) => { for (const t of list) gradeOne(t); };
+  const gradeOne = (t) => {
     const [c0, r0, c1, r1] = pixelBox(t);
     let changed = 0;
     for (let br = r0; br <= r1; br += BLOCK) {
@@ -3925,12 +3944,21 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
             const h = hm.at(idx) - minHeight;
             const [x, y] = toWorld(c, r);
             const want = tunnelGroundAt(t, x, y, h);
-            if (Math.abs(want - h) > 1e-3) { hm.set(idx, Math.min(want + minHeight, maxHeight)); changed++; }
+            if (Math.abs(want - h) > 1e-3) { hm.set(idx, want + minHeight); changed++; }
           }
         }
       }
     }
-    t.gradedPixels = (regrade.includes(t) ? t.gradedPixels || 0 : 0) + changed;
+    t.gradedPixels = changed;
+  };
+  gradeAll(out.tunnels);
+  // then the galleries (and the hillside tunnels short of rock that become
+  // galleries), on the ground as it is now
+  if (!early) {
+    const before = out.tunnels.length;
+    for (const path of galleryPaths) solvePath(path);
+    const fresh = out.tunnels.slice(before);
+    gradeAll(fresh);
   }
   const holes = new Set();
   for (const t of out.tunnels) {
@@ -4088,7 +4116,7 @@ export function generateDecalRoads(terrainData, squareSize) {
   const done = new Set();
   const early = solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done });
   const bridges = solveExportBridges(drivableRoads, terrainData, squareSize);
-  const late = solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done, regrade: early.tunnels.filter((t) => t.kind === 'gallery') });
+  const late = solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
   const tunnels = joinTunnelPhases(early, late);
   const giveWayKeys = collectGiveWayNodeKeys(terrainData.osmFeatures);
   const leftHandTraffic = !!terrainData.roadRules?.leftHandTraffic;
@@ -5249,6 +5277,7 @@ function buildDetailedReportSections(d) {
   const partInfo = bridges?.partInfo || [];
   lines.push(`- Bridge decks: ${decks.length}, approach embankments built: ${bridges?.ramps ?? 0}`);
   lines.push(`- Decks carried on along their approach roads to climb what they cross (walled ramps): ${bridges?.carried ?? 0}`);
+  lines.push(`- Roads sunk into a cutting under a deck that could not clear them: ${bridges?.sunk ?? 0}`);
   lines.push(`- Overpasses baked into the elevation, cut out under the deck: ${(bridges?.humps || []).length}${(bridges?.humps || []).length ? ` (the ground stood ${(bridges.humps).map((h) => `${formatNumber(h.lift, 1)} m`).join(', ')} over the roads under them)` : ''}`);
   lines.push('- Heights are absolute (m above sea level); "ground" is the exported terrain under the point.');
   lines.push('- An abutment far from its ground means the deck meets its road above/below the terrain: look there first.');
@@ -8376,19 +8405,47 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // Tunnel portals: their terrain squares open (layer 255, Terrain-Files.md
   // "Empty terrain / holes").
   let terLayerMap = pbrResult?.layerMap ?? null;
+  // Under a gallery the road is on the ground (the painter leaves tunnel
+  // roads out, as under a hill): asphalt there, not grass growing through it
+  const asphaltLayer = (pbrResult?.materialNames || []).indexOf('asphalt');
+  if (terLayerMap && asphaltLayer >= 0) {
+    const n = exportTerrainData.width;
+    for (const t of (decalRoads.tunnels?.tunnels || []).filter((q) => q.kind === 'gallery')) {
+      for (let i = 0; i + 1 < t.line.length; i++) {
+        const p = t.line[i];
+        for (let d = -t.W; d <= t.W; d += squareSize / 2) {
+          const [x, y] = [p.x + d * p.ty, p.y - d * p.tx];
+          const c = Math.round(x / squareSize + n / 2); const r = Math.round(y / squareSize + n / 2);
+          if (c >= 0 && c < n && r >= 0 && r < n) terLayerMap[r * n + c] = asphaltLayer;
+        }
+      }
+    }
+  }
   const tunnelHoles = decalRoads.tunnels?.holes || [];
   if (tunnelHoles.length > 0) {
     if (!terLayerMap) terLayerMap = new Uint8Array(exportTerrainData.width * exportTerrainData.height);
     for (const k of tunnelHoles) if (k >= 0 && k < terLayerMap.length) terLayerMap[k] = 255;
   }
-  const { blob: terBlob } = await exportTer(exportTerrainData, {
+  // The terrain's range after grading: tunnel trenches and roads sunk under
+  // bridges reach below the source's lowest point on flat ground (Deck Park:
+  // a 7 m trench, the whole city within 3 m), a portal's backfill over its
+  // highest. Encoded from the old minimum they clamped to its floor; the
+  // block moves down instead, everything else keeping its height.
+  let gradedMin = Infinity; let gradedMax = -Infinity;
+  for (const v of exportTerrainData.heightMap) { if (v < gradedMin) gradedMin = v; if (v > gradedMax) gradedMax = v; }
+  const terrainBase = Math.min(exportTerrainData.minHeight, gradedMin);
+  const terrainTop = Math.max(exportTerrainData.maxHeight, gradedMax);
+  const terrainBlockZ = roundTo(terrainBase - exportTerrainData.minHeight, 3);
+  const terrainBlockMaxHeight = Math.max(1, Math.ceil(terrainTop - terrainBase));
+  const terData = { ...exportTerrainData, minHeight: terrainBase, maxHeight: terrainTop };
+  const { blob: terBlob } = await exportTer(terData, {
     layerMap: terLayerMap,
     materialNames: pbrResult?.materialNames ?? null,
   });
 
   beginStep('heightmap', `Encoding the 16-bit heightmap PNG (${size}×${size})…`);
   await yield_();
-  let heightmapBlob = await generateHeightmapPng(exportTerrainData, size);
+  let heightmapBlob = await generateHeightmapPng(terData, size);
 
   beginStep('thumbnail', 'Rendering the level preview thumbnail…');
   await yield_();
@@ -9394,9 +9451,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     class: 'TerrainBlock',
     name: 'theTerrain',
     persistentId: generatePersistentId(),
-    position: [-halfExtent, -halfExtent, 0],
+    position: [-halfExtent, -halfExtent, terrainBlockZ],
     squareSize,
-    maxHeight,
+    maxHeight: terrainBlockMaxHeight,
     baseTexSize: size,
     terrainFile: terrainBinaryVirtualPath,
     materialTextureSet: pbrResult?.textureSetName ?? '',
