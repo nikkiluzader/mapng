@@ -315,8 +315,9 @@ const flatMap = async (features) => {
   const { generateDecalRoads } = await import('../services/exportBeamNGLevel.js');
   const N = 512; const size = 1000; const sq = size / (N - 1); const deg = size / 111320;
   const ll = (x, y) => ({ lat: (y / size) * deg, lng: (x / size) * deg });
+  // (20 m above the sea: a road under a bridge sinks no lower than it)
   const groups = generateDecalRoads({
-    width: N, height: N, minHeight: 0, maxHeight: 1, heightMap: new Float32Array(N * N),
+    width: N, height: N, minHeight: 20, maxHeight: 21, heightMap: new Float32Array(N * N).fill(20),
     bounds: { south: -deg / 2, north: deg / 2, west: -deg / 2, east: deg / 2 },
     roadRules: { countryCode: 'US', region: 'Americas' },
     osmFeatures: features.map(([id, pts, tags]) => ({ id, type: 'road', geometry: pts.map(([x, y]) => ll(x, y)), tags })),
@@ -397,7 +398,8 @@ test('a street with junctions right by its bridge: the road under sinks instead'
   ]);
   const b = groups.bridges;
   assert.ok(b.sunk > 0, 'the motorway sank');
-  assert.ok(b.decks[0].roadShortfall < 0.6, `short ${b.decks[0].roadShortfall.toFixed(2)} m`);
+  // (sunk at most 5 m: a full 6.5 m cut flooded a coastal city's interchange)
+  assert.ok(b.decks[0].roadShortfall < 1.5, `short ${b.decks[0].roadShortfall.toFixed(2)} m`);
   const m = groups.flatMap((g) => g.__items).filter((d) => d.name.startsWith('dr_M') && d.material === 'road_asphalt_2lane').flatMap((d) => d.nodes);
   const zNear = (y0) => m.reduce((best, n) => (Math.abs(n[1] - y0) < Math.abs(best[1] - y0) ? n : best))[2];
   assert.ok(zNear(0) < -3, `the motorway under the bridge at ${zNear(0).toFixed(2)} m`);

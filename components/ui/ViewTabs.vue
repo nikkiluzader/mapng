@@ -3,12 +3,13 @@
     <button
       v-if="osmDown && osmDismissed"
       type="button"
-      class="flex items-center justify-center w-8 h-8 rounded-lg text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+      class="flex items-center gap-1 h-8 px-2 rounded-lg text-xs text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50"
       :title="t('overpassStatus.reopen')"
       :aria-label="t('overpassStatus.reopen')"
       @click="osmDismissed = false"
     >
-      <AlertTriangle :size="16" />
+      <Info :size="14" />
+      {{ t('overpassStatus.chip') }}
     </button>
     <BaseButton
       size="sm"
@@ -63,7 +64,7 @@
 <script setup>
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
-import { Globe, Layers, AlertTriangle } from 'lucide-vue-next';
+import { Globe, Layers, Info } from 'lucide-vue-next';
 import { useOverpassStatus } from '../../composables/useOverpassStatus.js';
 
 const { t } = useI18n({ useScope: 'global' });

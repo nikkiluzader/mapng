@@ -623,6 +623,7 @@ export function absorbBranch(t, branch, { groundAt }) {
   const st = stations(branch.xy);
   let last = -1;
   let lastZ = 0;
+  let lastAt = null;
   const touched = [];
   for (let k = 0; k < st.length; k++) {
     const b = st[k];
@@ -642,6 +643,7 @@ export function absorbBranch(t, branch, { groundAt }) {
     }
     last = k;
     lastZ = n.z;
+    lastAt = { i: n.i, side };
   }
   if (last < 0) return { ok: false, reason: 'a ramp not alongside its tunnel' };
   if (st[last].s < branch.tunnelLength - 2 * STEP_M) return { ok: false, reason: 'a ramp leaves the tunnel line inside it' };
@@ -665,6 +667,11 @@ export function absorbBranch(t, branch, { groundAt }) {
     if (calm * STEP_M >= 10) break;
   }
   if (line.length >= 2 && line.some((q) => groundAt(q.x, q.y) - q.z > TRENCH_DONE_M)) t.cuts.push({ line, half: branch.half });
+  // where it leaves the main cutting, an opening in that side's wall
+  if (lastAt) {
+    const g = Math.ceil((branch.half + WALKWAY_M + 4) / STEP_M);
+    t.wingGaps = [...(t.wingGaps || []), { side: lastAt.side, i0: lastAt.i - g, i1: lastAt.i + g }];
+  }
   t.wings = wingTops(t, groundAt);
   return { ok: true, absorbed: st[last].s, trench: line.length >= 2 ? line[line.length - 1].s - line[0].s : 0 };
 }
@@ -690,6 +697,8 @@ function wingTops(t, groundAt) {
       }
     }
   }
+  // gaps where a ramp leaves the cutting through its wall
+  for (const gap of t.wingGaps || []) for (let i = gap.i0; i <= gap.i1; i++) wings[gap.side].delete(i);
   return wings;
 }
 

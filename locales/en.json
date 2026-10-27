@@ -1,9 +1,10 @@
 {
   "overpassStatus": {
-    "title": "OpenStreetMap servers aren't responding.",
-    "body": "None of the public Overpass servers are answering right now. Outside the areas MapNG stores itself (turn on Show MapNG OSM coverage under Include OSM Features to see them), OSM features now load from Overture Maps instead: the same OpenStreetMap roads and places as of its last monthly release, plus extra building footprints and heights, but without lane counts and a few other details. Try again in a few minutes for live data, or add your own Overpass server there too.",
-    "dismiss": "Hide this notice",
-    "reopen": "OpenStreetMap servers aren't responding. Show details"
+    "title": "OpenStreetMap is down, but MapNG still works.",
+    "body": "Map data is coming from Overture Maps, a monthly backup copy of OpenStreetMap. A few details, like lane counts, may be missing. Live data comes back when OpenStreetMap does.",
+    "dismiss": "Minimize",
+    "reopen": "Using backup map data. Click for details",
+    "chip": "Backup map data"
   },
   "common": {
     "cancel": "Cancel"

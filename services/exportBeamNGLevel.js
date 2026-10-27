@@ -42,7 +42,7 @@ import {
 } from './beamngBridges.js';
 import {
   solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, tunnelReach,
-  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildTunnelObjects, LIGHT_SPACING_M,
+  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildTunnelObjects, LIGHT_SPACING_M, LINING_M, extraAt,
 } from './beamngTunnels.js';
 import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
@@ -2817,7 +2817,9 @@ const BERM_MIN_M = 1.5;         // the berm top over the bridge's end
 // the road at SINK_GRADE, the cutting's floor its carriageway + shoulders,
 // 1:1 sides up to the ground.
 const SINK_GRADE = 0.04;
-const SINK_MAX_M = 8;
+const SINK_GRADE_MAX = 0.06;    // steeper where a junction is near, never more
+const SINK_MAX_M = 5;
+const SINK_SEA_CLEAR_M = 0.5;   // the sunk road stays this far above sea level (Norfolk: cut 7 m down, flooded)
 const SINK_MIN_M = 1.0;         // a deck short by less than this is left (a gentle dip looked like a ramp)
 const SINK_SHOULDER_M = 1.5;
 
@@ -2843,8 +2845,10 @@ function planCrossingPoints(a, b) {
  * at: [x, y] (where the deck crosses), deficit (m) }. The road is followed
  * on through plain continuations for the taper. Returns the sinks cut.
  */
-function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads) {
+function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads, tunnels = []) {
   const { width, height, minHeight } = terrainData;
+  // sea level in the level's heights (the terrain's 0 is its lowest point)
+  const seaZ = -(Number(minHeight) || 0) + (Number(terrainData.seaLevelOffset) || 0);
   const hm = heightMapEditor(terrainData);
   const worldSize = width * squareSize;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -2865,8 +2869,10 @@ function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads) {
         if (end) line.push(...piece); else line.unshift(...piece.reverse());
       }
     }
+    lineRoads.set(road, used);
     return line;
   };
+  const lineRoads = new Map();
   // every sink planned on the ground as it was (planned one after another
   // on ground already cut, the cuts under one deck stacked: Deck Park's
   // freeway went 15 m down), the ones at one crossing merged (the deepest)
@@ -2886,11 +2892,22 @@ function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads) {
     if (same) { same.deficit = Math.max(same.deficit, sink.deficit); continue; }
     plans.push({ road: sink.road, line, s, s0, deficit: sink.deficit });
   }
-  let cut = 0;
+  const cut = [];
   for (const sink of plans) {
     const { line, s, s0 } = sink;
-    const taper = sink.deficit / SINK_GRADE;
-    const drop = (sv) => { const f = Math.max(0, 1 - Math.abs(sv - s0) / taper); return sink.deficit * f * f * (3 - 2 * f); };
+    // the other roads keep their ground (the cut's sides stop at a road
+    // running beside: a ramp next to the sunk one got a 3 m step)
+    const own = lineRoads.get(sink.road) || new Set([sink.road]);
+    // no deeper than the room to the road's ends allows (a junction there:
+    // the other roads meet it at its own height, no step), nor below the sea
+    const room = Math.min(s0 - s[0], s[s.length - 1] - s0);
+    const ground0 = line.reduce((b, p, i) => (Math.abs(s[i] - s0) < Math.abs(s[b] - s0) ? i : b), 0);
+    const aboveSea = line[ground0][2] - (seaZ + SINK_SEA_CLEAR_M);
+    const depth = Math.min(sink.deficit, SINK_GRADE_MAX * room, Math.max(0, aboveSea));
+    if (depth < SINK_MIN_M / 2) continue;
+    sink.deficit = depth;
+    const taper = Math.min(depth / SINK_GRADE, room);
+    const drop = (sv) => { const f = Math.max(0, 1 - Math.abs(sv - s0) / taper); return depth * f * f * (3 - 2 * f); };
     const floorHalf = sink.road.half + SINK_SHOULDER_M;
     const reach = floorHalf + sink.deficit + 1;
     // the stretch of the line the taper covers, and its box
@@ -2899,6 +2916,9 @@ function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads) {
     const xs = pts.map((p) => p.x); const ys = pts.map((p) => p.y);
     const [c0, r1] = toPixel(Math.min(...xs) - reach, Math.min(...ys) - reach);
     const [c1, r0] = toPixel(Math.max(...xs) + reach, Math.max(...ys) + reach);
+    const box = [Math.min(...xs) - reach - 20, Math.min(...ys) - reach - 20, Math.max(...xs) + reach + 20, Math.max(...ys) + reach + 20];
+    const others = lowerRoads.filter((r) => !own.has(r) && r.xy.some(([x, y]) => x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]));
+    const onOther = (x, y) => others.some((r) => distanceToLine(r.xy, x, y) < r.half + 1);
     for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
       for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
         const [x, y] = toWorld(c, r);
@@ -2915,11 +2935,18 @@ function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads) {
           target = a.z + (b.z - a.z) * t - drop(sv) + Math.max(0, d - floorHalf);
         }
         if (bestD > reach) continue;
+        if (bestD > floorHalf && onOther(x, y)) continue;
+        // never into the cover over a tunnel's tube
+        for (const t of tunnels) {
+          if (t.kind === 'gallery') continue;
+          const n = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + LINING_M + 4);
+          if (n && !n.beyond && n.into > -1) target = Math.max(target, n.z + t.need);
+        }
         const idx = r * width + c;
         if (target + minHeight < hm.at(idx)) hm.set(idx, target + minHeight);
       }
     }
-    cut++;
+    cut.push({ at: [line.reduce((b, p, i) => (Math.abs(s[i] - s0) < Math.abs(s[b] - s0) ? i : b), 0)].map((i) => [Math.round(line[i][0]), Math.round(line[i][1])])[0], depth: Math.round(sink.deficit * 10) / 10 });
   }
   return cut;
 }
@@ -3141,7 +3168,7 @@ function carryOnApproaches(parts, lowerRoads, requests, groundAt) {
 const APPROACH_FIT_M = [4, 40];
 const APPROACH_MAX_GRADE = 0.25;
 
-function solveExportBridges(drivableRoads, terrainData, squareSize) {
+function solveExportBridges(drivableRoads, terrainData, squareSize, tunnels = []) {
   const toXY = (geometry) => geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
   const groundAt = (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize);
   const wetAt = buildWaterLookup(terrainData, squareSize);
@@ -3353,7 +3380,8 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
       }
     }
   }
-  const sunk = sinks.length ? sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads) : 0;
+  const sunkAt = sinks.length ? sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads, tunnels) : [];
+  const sunk = sunkAt.length;
   if (sunk > 0) {
     ({ parts, partSeg, lowerRoads } = collect());
     decks = solveBridgeDecks(parts, { groundAt, endHeight, wetAt, lowerRoads, isFreeEnd, isAbutment: groundRoadStarts(lowerRoads, isFreeEnd) });
@@ -3368,7 +3396,7 @@ function solveExportBridges(drivableRoads, terrainData, squareSize) {
     }
   }
   return {
-    bySeg, approaches, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built, humps, sunk,
+    bySeg, approaches, decks, roadLines: lowerRoads.map((r) => r.xy), ramps: built, humps, sunk, sunkAt,
     carried: parts.filter((p) => p.carried).length,
     // for the export report: each part's OSM way (carried-on approaches have none)
     partInfo: parts.map((p, i) => ({ ...(p.osm || { id: null, name: null, highway: null }), structure: p.structure ?? null, landing: partSeg[i] < 0 && !p.carried, carried: !!p.carried })),
@@ -3388,6 +3416,7 @@ const HUMP_SIDE_M = [30, 45];   // ground this far either side of the deck: the 
 const HUMP_MIN_M = 1.5;         // a ridge over the line by this much is the bridge
 const HUMP_MARGIN_M = 6;        // cut beyond a crossing road's edge (shoulders) ...
 const HUMP_FADE_M = 10;         // ... then faded back to the ground along the deck
+const HUMP_END_M = 15;          // no cut this near a deck part's end (its approach fill)
 
 /**
  * Lower the baked-in overpass ridges under the bridge parts where ground
@@ -3439,7 +3468,10 @@ function cutBridgeHumps(terrainData, squareSize, parts, lowerRoads, groundAt) {
           const L = Math.hypot(bx - ax, by - ay) || 1;
           const nx = -(by - ay) / L; const ny = (bx - ax) / L;
           const lift = groundAt(x, y) - lineAcross(x, y, nx, ny)(0);
-          if (lift > HUMP_MIN_M) crossings.push({ s: s[i] + t * L, x, y, half: road.half, lift });
+          // (by the deck's end the rise is its own approach embankment)
+          const sAt = s[i] + t * L;
+          if (sAt < HUMP_END_M || sAt > s[s.length - 1] - HUMP_END_M) continue;
+          if (lift > HUMP_MIN_M) crossings.push({ s: sAt, x, y, half: road.half, lift });
         }
       }
     }
@@ -3498,7 +3530,9 @@ function cutBridgeHumps(terrainData, squareSize, parts, lowerRoads, groundAt) {
         if (target >= now) continue;
         // faded out across the last HUMP_FADE_M before the ground it is
         // measured against (a hard edge there was a step in the road under)
-        const wa = Math.min(1, Math.max(0, (reach - Math.abs(d)) / HUMP_FADE_M));
+        // (by the true distance: past the deck's end the offset across it
+        // is not the distance, and the cut stopped at a ring round the end)
+        const wa = Math.min(1, Math.max(0, (reach - best) / HUMP_FADE_M));
         hm.set(idx, now - (now - target) * w * wa + minHeight);
       }
     }
@@ -3812,6 +3846,7 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
     }
     if (!best) return null;
     if (early && best.r.bridgeRoad) return { defer: true };
+    usedByApproach.add(best.r);
     if (best.r.bridge) {
       // OSM often joins tunnel and bridge metres inside the rock: the bore
       // runs on along the bridge while the ground stays over its deck
@@ -3851,12 +3886,34 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
         .sort((a, b) => b.align - a.align);
       if (!next.length) break;
       used.add(next[0].r);
+      usedByApproach.add(next[0].r);
       line.push(...next[0].piece.slice(1).map(([x, y]) => [x, y]));
       length = pathLength(line);
     }
     return { xy: line };
   };
   const dirOut = (a, b) => { const L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1; return [(a[0] - b[0]) / L, (a[1] - b[1]) / L]; };
+  // roads an approach runs on (the rest meeting its cutting are side ramps)
+  const usedByApproach = new Set();
+  // Ramps joining an approach in its cutting (a freeway's on-ramp meeting it
+  // in the trench before the tunnel: the trench wall ran across it) are
+  // taken into the cutting like the ramps inside a tunnel: it widens on
+  // their side, and they leave through an opening in their own trench.
+  const takeSideRamps = (t) => {
+    if (t.kind === 'gallery') return;
+    for (const r of others) {
+      if (usedByApproach.has(r) || r.bridge || r.bridgeRoad) continue;
+      for (const end of [r.xy[0], r.xy[r.xy.length - 1]]) {
+        const n = nearestOnTunnel(t, end[0], end[1], t.W + 4);
+        if (!n || n.beyond || n.into >= 0 || Math.abs(n.d) > t.W + 3) continue;
+        if (groundAt(end[0], end[1]) - n.z < 0.5) continue;   // out where the cutting has run out
+        const xy = end === r.xy[0] ? r.xy : [...r.xy].reverse();
+        const half = halfOf(drivableRoads[r.segIndex]);
+        const res = absorbBranch(t, { xy: xy.map(([x, y]) => [x, y]), half, tunnelLength: 0 }, { groundAt });
+        if (res.ok) t.sideRamps = (t.sideRamps || 0) + 1;
+      }
+    }
+  };
   const solvePath = (path) => {
     const key = path.idx.join(',');
     if (done.has(key)) return undefined;   // solved (or left out) in the first phase
@@ -3907,6 +3964,9 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
       for (const i of branch.idx) out.bySeg.set(parts[i].segIndex, t);
     }
   }
+  // ramps meeting the approaches in their cuttings, now the tunnels' own
+  // ramps are in
+  for (const t of out.tunnels) takeSideRamps(t);
   if (!out.tunnels.length && (early || !galleryPaths.length)) return out;
 
   // Terrain: graded into the export's copy, then the portal squares opened.
@@ -4115,9 +4175,22 @@ export function generateDecalRoads(terrainData, squareSize) {
   // tunnels a bridge meets (a portal takes the deck's height).
   const done = new Set();
   const early = solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done });
-  const bridges = solveExportBridges(drivableRoads, terrainData, squareSize);
+  const bridges = solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   const late = solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
   const tunnels = joinTunnelPhases(early, late);
+  // a road reaching into a tube it is no part of (a ramp OSM ends a few
+  // metres into a tunnel's mouth, where the tube widens for it): on the
+  // tube's floor there, not draped over the headwall's backfill
+  const inTubeSeg = new Set();
+  const tubeAt = (x, y) => {
+    for (const t of tunnels.tunnels) {
+      if (t.kind === 'gallery') continue;
+      const n = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + 1);
+      if (!n || n.beyond || n.into < 0.3) continue;
+      if (Math.abs(n.d) - extraAt(t, t.line[n.i], Math.sign(n.d) || 1) <= t.W) return t;
+    }
+    return null;
+  };
   const giveWayKeys = collectGiveWayNodeKeys(terrainData.osmFeatures);
   const leftHandTraffic = !!terrainData.roadRules?.leftHandTraffic;
   const markingStyle = getMarkingStyle(terrainData.roadRules);
@@ -4219,7 +4292,8 @@ export function generateDecalRoads(terrainData, squareSize) {
         const [wx, wy, groundZ] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
         const deckPart = bridges.bySeg.get(segIndex);
         const carried = bridges.approaches?.get(segIndex);
-        const bore = tunnels.bySeg.get(segIndex);
+        const bore = tunnels.bySeg.get(segIndex) || tubeAt(wx, wy);
+        if (bore && !tunnels.bySeg.has(segIndex)) inTubeSeg.add(segIndex);
         const wz = deckPart ? deckHeightAt(deckPart, wx, wy) + 0.1
           : carried && distanceToLine(carried.xy, wx, wy) < 1 ? deckHeightAt(carried, wx, wy) + 0.1
             : bore ? tunnelRoadZ(bore, wx, wy)
@@ -4287,7 +4361,7 @@ export function generateDecalRoads(terrainData, squareSize) {
           // On a bridge the road clips onto the deck, in a tunnel onto its
           // floor: without overObjects a DecalRoad is projected onto the
           // terrain (the hill over a tunnel).
-          if (bridges.bySeg.has(segIndex) || bridges.approaches?.has(segIndex) || tunnels.bySeg.has(segIndex)) decal.overObjects = true;
+          if (bridges.bySeg.has(segIndex) || bridges.approaches?.has(segIndex) || tunnels.bySeg.has(segIndex) || inTubeSeg.has(segIndex)) decal.overObjects = true;
           splineGroup.__items.push(decal);
           if (isCutPaintLayer(decal.__layer)) paintDecals.push({ decal, group: splineGroup, owner: segIndex });
         }
@@ -5942,7 +6016,7 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
  * Includes repeated segment placement and optional post/endcap meshes where
  * the selected barrier asset defines them.
  */
-function buildNativeBarrierObjects(terrainData, squareSize, biome = null) {
+function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skipAt = () => false } = {}) {
   const features = terrainData.osmFeatures?.filter((feature) => (
     feature.type === 'barrier' && Array.isArray(feature.geometry) && feature.geometry.length >= 2
   )) ?? [];
@@ -5962,6 +6036,9 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null) {
       squareSize,
       Number.isFinite(zOffsetOverride) ? zOffsetOverride : asset.zOffset,
     );
+    // not across a drawn road, in a tunnel's cutting or under a deck (a fence
+    // OSM maps along an overpass stood in the trench under it)
+    if (skipAt(world[0], world[1], world[2])) return;
     objects.push({
       __parent: 'Barriers',
       class: 'TSStatic',
@@ -6968,14 +7045,19 @@ function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZ
  * plane where a tunnel reaches under sea level: none over its trenches, none
  * deeper than its roof over the tube.
  */
-function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dryZones, tunnels) {
+function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dryZones, tunnels, sourceHeightMap = terrainData.heightMap) {
   const waterProfile = getWaterProfile(biome);
   const minHeight = Number(terrainData?.minHeight);
   const seaZ = (Number.isFinite(minHeight) ? -minHeight : 0) + (Number(seaLevelOffset) || 0);
+  const before = { ...terrainData, heightMap: sourceHeightMap };
   const blocks = planSeaBlocks({
     size: terrainData.width * squareSize,
     seaZ,
-    heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
+    // the sea where the ground was below it before grading, and still is
+    heightAt: (x, y) => Math.max(
+      getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
+      getTerrainHeightAtWorldXY(x, y, before, squareSize),
+    ),
     zones: dryZones,
     minZ: Math.min(0, ...tunnels.flatMap((t) => t.line.map((p) => p.z))),
   });
@@ -8227,6 +8309,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions, bridge decks and tunnels…`);
     await yield_();
   }
+  // the ground before any grading: where the sea really is (a cut below sea
+  // level is no sea)
+  const sourceHeightMap = exportTerrainData.heightMap;
   const decalRoads = includeRoads
     ? generateDecalRoads(exportTerrainData, squareSize)
     : [];
@@ -8469,9 +8554,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // reaching under sea level, the sea is blocks around them, not the plane
   const dryZones = tunnelDryZones(tunnelList);
   const seaZ = -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0);
-  const seaAsBlocks = tunnelList.length > 0 && tunnelsBelow(tunnelList, seaZ);
+  // a plane floods every cut below sea level: the sea as blocks over the
+  // ground that was below it when a tunnel or a cut (a road sunk under a
+  // bridge, a trench) now reaches under it
+  let cutBelowSea = false;
+  if (exportTerrainData.heightMap !== sourceHeightMap) {
+    const seaAbs = seaZ + (Number(exportTerrainData.minHeight) || 0);
+    const hm = exportTerrainData.heightMap;
+    for (let i = 0; i < hm.length && !cutBelowSea; i++) cutBelowSea = hm[i] < seaAbs && sourceHeightMap[i] >= seaAbs;
+  }
+  const seaAsBlocks = (tunnelList.length > 0 && tunnelsBelow(tunnelList, seaZ)) || cutBelowSea;
   const seaObjects = seaAsBlocks
-    ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList)
+    ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList, sourceHeightMap)
     : [buildSeaLevelWaterPlane(exportTerrainData, biome, seaLevelOffset)];
   waterStats.sea = seaAsBlocks ? { blocks: seaObjects.length } : { plane: true };
   const waterObjects = [
@@ -8492,8 +8586,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   beginStep('furniture', 'Placing barriers, fences, road signs, traffic lights, lamps, benches and fuel stations…');
   await yield_();
+  const onDrawnRoad = buildClearanceIndex(groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })));
   const barrierObjects = includeNativeBarriers
-    ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome)
+    ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome, {
+      skipAt: (x, y, z) => onDrawnRoad(x, y, 0.3) || underDeck(x, y, z - 1, z + 2),
+    })
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);
   const signObjects = [...buildRoadSignProps(exportTerrainData, squareSize, {
