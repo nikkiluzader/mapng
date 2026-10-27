@@ -430,4 +430,7 @@ test('a railing along a deck over it is the deck\'s own; one crossing under it i
   assert.ok(!alongDeck(decks, 50, 3, 0, Math.PI / 2), 'across under it');
   assert.ok(!alongDeck(decks, 50, 12, 0, 0), 'alongside, clear of it');
   assert.ok(!alongDeck(decks, 50, 3, 7.5, 0), 'on the deck itself');
+  // 2 m past its edge: the railing of a real overpass, a ground road's beside a low ramp
+  assert.ok(alongDeck(decks, 50, 6.5, 0, 0), 'just outside an overpass 8 m up');
+  assert.ok(!alongDeck(decks, 50, 6.5, 6, 0), 'just outside a deck 2 m up');
 });

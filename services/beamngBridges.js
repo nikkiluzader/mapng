@@ -803,6 +803,9 @@ export function deckEdges(deck) {
  */
 export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: allNeighbours = [] } = {}) {
   const b = new Builder();
+  // the slab's top apart: the one surface the road decals may clip onto
+  // (projected over the parapets and sides they smeared down them)
+  const top = new Builder();
   // other decks' parts near this one (their edges can stand on its parts)
   const box = [Infinity, Infinity, -Infinity, -Infinity];
   for (const p of deck.parts) for (const [x, y] of p.xy) { box[0] = Math.min(box[0], x); box[1] = Math.min(box[1], y); box[2] = Math.max(box[2], x); box[3] = Math.max(box[3], y); }
@@ -905,7 +908,7 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: 
     const left = (k) => [nrm[k][0], nrm[k][1], 0];
     const right = (k) => [-nrm[k][0], -nrm[k][1], 0];
     // slab: top (under the road decal), sides, underside
-    b.strip(L, R, () => [0, 0, 1]);
+    top.strip(L, R, () => [0, 0, 1]);
     runs(L, Lb, sides[0].shown, left);
     runs(R, Rb, sides[1].shown, right);
     b.strip(Lb, Rb, () => [0, 0, -1]);
@@ -985,7 +988,12 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: 
       }
     }
   }
-  return { positions: b.pos, uvs: b.uv };
+  return {
+    positions: [...top.pos, ...b.pos],
+    uvs: [...top.uv, ...b.uv],
+    top: { positions: top.pos, uvs: top.uv },
+    sides: { positions: b.pos, uvs: b.uv },
+  };
 }
 
 /**
@@ -1016,7 +1024,7 @@ export function hitsDeck(decks, x, y, z, zTop, margin = 1) {
  * standing over it: a railing OSM maps along a bridge, placed on the ground
  * under it (the deck has its own parapets).
  */
-export function alongDeck(decks, x, y, z, yaw, margin = 1.5) {
+export function alongDeck(decks, x, y, z, yaw, margin = 1.5, farMargin = 3) {
   const ux = Math.cos(yaw); const uy = Math.sin(yaw);
   for (const deck of decks) {
     for (const part of deck.parts) {
@@ -1027,10 +1035,14 @@ export function alongDeck(decks, x, y, z, yaw, margin = 1.5) {
         const vx = bx - ax; const vy = by - ay;
         const L = Math.hypot(vx, vy) || 1e-9;
         const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (L * L)));
-        if (Math.hypot(ax + vx * t - x, ay + vy * t - y) > part.half + PARAPET_W_M + margin) continue;
+        const off = Math.hypot(ax + vx * t - x, ay + vy * t - y) - part.half - PARAPET_W_M;
+        if (off > farMargin) continue;
         if (Math.abs((vx * ux + vy * uy) / L) < 0.85) continue;
         const top = part.z[i] + (part.z[i + 1] - part.z[i]) * t;
-        if (top > z + 1) return true;
+        // by its edge under any deck; a little further out (OSM maps the
+        // railing wider than the deck is drawn) only under a real overpass,
+        // not a low ramp beside a ground road with its own guardrail
+        if (off <= margin ? top > z + 1 : top > z + 3) return true;
       }
     }
   }

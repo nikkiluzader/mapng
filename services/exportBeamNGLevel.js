@@ -780,19 +780,13 @@ function getBridgeMaterialDefs() {
  */
 function generateBridgeDAEs(decks, groundAt, roadLines) {
   const out = [];
-  decks.forEach((deck, i) => {
-    const g = buildDeckGeometry(deck, { groundAt, roadLines, neighbours: decks.filter((d) => d !== deck).flatMap((d) => d.parts) });
-    if (!g.positions.length) return;
-    const pts = deck.parts.flatMap((p) => p.xy.map(([x, y], k) => [x, y, p.z[k]]));
-    const origin = [
-      Math.round(pts.reduce((n, p) => n + p[0], 0) / pts.length * 100) / 100,
-      Math.round(pts.reduce((n, p) => n + p[1], 0) / pts.length * 100) / 100,
-      Math.round(Math.min(...pts.map((p) => p[2])) * 100) / 100,
-    ];
-    const positions = Float32Array.from(g.positions, (v, k) => v - origin[k % 3]);
+  // one Collada shape (visual mesh + a Colmesh-1 collision copy), origin-relative
+  const toDae = ({ positions: pos, uvs }, origin) => {
+    if (!pos.length) return null;
+    const positions = Float32Array.from(pos, (v, k) => v - origin[k % 3]);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.uvs), 2));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: BRIDGE_MATERIAL }));
     mesh.name = 'bridge_deck';
@@ -810,9 +804,24 @@ function generateBridgeDAEs(decks, groundAt, roadLines) {
     base00.add(start01);
     base00.updateMatrixWorld(true);
     const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
-    if (result?.data) out.push({ key: `b${String(i + 1).padStart(3, '0')}`, origin, data: result.data, triangles: g.positions.length / 9 });
     geo.dispose();
     colGeo.dispose();
+    return result?.data || null;
+  };
+  decks.forEach((deck, i) => {
+    const g = buildDeckGeometry(deck, { groundAt, roadLines, neighbours: decks.filter((d) => d !== deck).flatMap((d) => d.parts) });
+    if (!g.positions.length) return;
+    const pts = deck.parts.flatMap((p) => p.xy.map(([x, y], k) => [x, y, p.z[k]]));
+    const origin = [
+      Math.round(pts.reduce((n, p) => n + p[0], 0) / pts.length * 100) / 100,
+      Math.round(pts.reduce((n, p) => n + p[1], 0) / pts.length * 100) / 100,
+      Math.round(Math.min(...pts.map((p) => p[2])) * 100) / 100,
+    ];
+    // the road surface and the rest (parapets, sides, girders, piers) apart:
+    // decals clip onto the first only
+    const data = toDae(g.sides, origin);
+    const deckData = toDae(g.top, origin);
+    if (data || deckData) out.push({ key: `b${String(i + 1).padStart(3, '0')}`, origin, data, deckData, triangles: g.positions.length / 9 });
   });
   return out;
 }
@@ -5523,7 +5532,7 @@ function buildDetailedReportSections(d) {
     });
     lines.push(`  - Deck over ground: max ${formatNumber(maxGap, 2)} m, mean ${formatNumber(sumGap / Math.max(1, nGap), 2)} m, min ${formatNumber(minGap, 2)} m`);
     lines.push(`  - Lowest clearance over a crossed road: ${Number.isFinite(minRoadGap) ? `${formatNumber(minRoadGap, 2)} m` : 'n/a'}; clearance shortfall over roads: ${formatNumber(deck.roadShortfall ?? 0, 2)} m, overall (water too): ${formatNumber(deck.shortfall ?? 0, 2)} m`);
-    lines.push(`  - Object: bridge_${key}.dae${dae ? `, ${Math.round(dae.triangles)} triangles, origin (${dae.origin.map((v) => formatNumber(v, 1)).join(', ')})` : ' (not written: no geometry)'}`);
+    lines.push(`  - Objects: bridge_${key}.dae + bridge_${key}_deck.dae (the road surface)${dae ? `, ${Math.round(dae.triangles)} triangles, origin (${dae.origin.map((v) => formatNumber(v, 1)).join(', ')})` : ' (not written: no geometry)'}`);
   });
 
   // ── Tunnels ────────────────────────────────────────────────────────────────
@@ -6018,6 +6027,27 @@ function rotationMatrixFromYaw(yaw) {
   return [c, s, 0, -s, c, 0, 0, 0, 1];
 }
 
+/**
+ * A barrier panel's rotation: its run heading `yaw` tilted up by `pitch`
+ * (radians) to follow the ground, the mesh turned by `assetYaw` within that
+ * run (a mesh laid along its local Y). Rows are the local axes in world space,
+ * as rotationMatrixFromYaw's; West Coast USA tilts its guardrails so.
+ */
+function rotationMatrixFromYawPitch(yaw, pitch, assetYaw = 0) {
+  const cy = Math.cos(yaw); const sy = Math.sin(yaw);
+  const cp = Math.cos(pitch); const sp = Math.sin(pitch);
+  const run = [cp * cy, cp * sy, sp];
+  const left = [-sy, cy, 0];
+  const up = [-sp * cy, -sp * sy, cp];
+  const co = Math.cos(assetYaw); const so = Math.sin(assetYaw);
+  const x = run.map((v, i) => co * v + so * left[i]);
+  const y = run.map((v, i) => -so * v + co * left[i]);
+  return [...x, ...y, ...up].map((v) => roundTo(v, 6));
+}
+
+// steepest a barrier panel is tilted (past it, a cliff: it steps instead)
+const BARRIER_MAX_PITCH = Math.PI / 5;
+
 const NATIVE_BARRIER_ASSETS = {
   guardrail: {
     shapeName: '/levels/west_coast_usa/art/shapes/objects/guardrail1.dae',
@@ -6026,9 +6056,12 @@ const NATIVE_BARRIER_ASSETS = {
     // the rail runs along its local X, 2.4 m (West Coast USA lays them so,
     // 1.97 m apart: at +90° every panel stood across the road)
     segmentLength: 2,
-    zOffset: 0.15,
-    postZOffset: 0.02,
-    endZOffset: 0.08,
+    // the beam is centred on the rail's origin with its support reaching
+    // 0.91 m below, the post stands from its origin 1.1 m: West Coast USA's
+    // rails sit 0.96 m over their posts (at 0.15 the beam lay on the ground)
+    zOffset: 0.93,
+    postZOffset: 0,
+    endZOffset: 0.93,
     yawOffset: 0,
   },
   concrete: {
@@ -6213,7 +6246,6 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
 
     if (!Number.isFinite(totalLen) || totalLen < 0.5 || segmentStarts.length < 1) return;
 
-    const isFenceAsset = String(asset?.shapeName || '').toLowerCase().includes('wood_fence');
     const nominalSpacing = Math.max(0.75, Number(asset.segmentLength) || 2);
     const panelCount = Math.max(1, Math.round(totalLen / nominalSpacing));
     const panelSpacing = totalLen / panelCount;
@@ -6259,10 +6291,11 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       const startSample = sampleAtDistance(i * panelSpacing);
       const endSample = sampleAtDistance((i + 1) * panelSpacing);
       const centerSample = sampleAtDistance((i + 0.5) * panelSpacing);
-      const rotationYaw = centerSample.yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
-      const panelTerrainZ = isFenceAsset
-        ? Math.max(startSample.terrainZ, endSample.terrainZ, centerSample.terrainZ)
-        : centerSample.terrainZ;
+      // tilted along the run to the ground between its ends, its middle on the
+      // line between them (or lower, over a hump: never floating over a dip)
+      const rise = endSample.terrainZ - startSample.terrainZ;
+      const pitch = Math.max(-BARRIER_MAX_PITCH, Math.min(BARRIER_MAX_PITCH, Math.atan2(rise, panelSpacing)));
+      const panelTerrainZ = Math.min((startSample.terrainZ + endSample.terrainZ) / 2, centerSample.terrainZ);
       if (skipLineAt(centerSample.x, centerSample.y, panelTerrainZ, centerSample.yaw)) continue;
       objects.push({
         __parent: 'Barriers',
@@ -6274,7 +6307,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
           roundTo(centerSample.y, 3),
           roundTo(panelTerrainZ + (Number.isFinite(asset.zOffset) ? asset.zOffset : 0), 3),
         ],
-        rotationMatrix: rotationMatrixFromYaw(rotationYaw),
+        rotationMatrix: rotationMatrixFromYawPitch(centerSample.yaw, pitch, Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0),
         shapeName: asset.shapeName,
         useInstanceRenderData: true,
       });
@@ -9180,8 +9213,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalksDaeData = await toZipBinary(sidewalksDae);
   if (bridgeDaes.length > 0) {
     zip.folder(`${base}/map_assets/custom_assets/bridges`);
-    for (const { key, data } of bridgeDaes) {
-      zip.file(`${base}/map_assets/custom_assets/bridges/bridge_${key}.dae`, await toZipBinary(data));
+    for (const { key, data, deckData } of bridgeDaes) {
+      if (data) zip.file(`${base}/map_assets/custom_assets/bridges/bridge_${key}.dae`, await toZipBinary(data));
+      if (deckData) zip.file(`${base}/map_assets/custom_assets/bridges/bridge_${key}_deck.dae`, await toZipBinary(deckData));
     }
     zip.file(`${base}/map_assets/custom_assets/bridges/main.materials.json`, JSON.stringify(getBridgeMaterialDefs(), null, 2));
   }
@@ -9739,20 +9773,37 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     });
   }
 
-  // Bridge decks, one object per bridge. They collide, and the road decals on
-  // them project onto their tops (no decalType: None here).
-  for (const { key, origin } of bridgeDaes) {
-    levelObjectItems.push({
-      __parent: 'level_objects',
-      class: 'TSStatic',
-      name: `bridge_${key}`,
-      persistentId: generatePersistentId(),
-      position: origin,
-      shapeName: `/levels/${levelName}/map_assets/custom_assets/bridges/bridge_${key}.dae`,
-      collisionType: 'Collision Mesh',
-      prebuildCollisionData: 0,
-      useInstanceRenderData: true,
-    });
+  // Bridge decks, two objects per bridge, both colliding: the road surface,
+  // which the road decals project onto, and the rest (parapets, sides,
+  // girders, piers), which they must not smear down (decalType: None).
+  for (const { key, origin, data, deckData } of bridgeDaes) {
+    if (data) {
+      levelObjectItems.push({
+        __parent: 'level_objects',
+        class: 'TSStatic',
+        name: `bridge_${key}`,
+        persistentId: generatePersistentId(),
+        position: origin,
+        shapeName: `/levels/${levelName}/map_assets/custom_assets/bridges/bridge_${key}.dae`,
+        collisionType: 'Collision Mesh',
+        decalType: 'None',
+        prebuildCollisionData: 0,
+        useInstanceRenderData: true,
+      });
+    }
+    if (deckData) {
+      levelObjectItems.push({
+        __parent: 'level_objects',
+        class: 'TSStatic',
+        name: `bridge_${key}_deck`,
+        persistentId: generatePersistentId(),
+        position: origin,
+        shapeName: `/levels/${levelName}/map_assets/custom_assets/bridges/bridge_${key}_deck.dae`,
+        collisionType: 'Collision Mesh',
+        prebuildCollisionData: 0,
+        useInstanceRenderData: true,
+      });
+    }
   }
 
   // Overhead wires, one object per tile so the engine culls them by tile.
