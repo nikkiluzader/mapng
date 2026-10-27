@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   solveTunnel, chainTunnelParts, tunnelGroundAt, tunnelHoleAt, tunnelReach, nearestOnTunnel,
-  buildTubeGeometry, buildPortalGeometry, buildTunnelObjects, hitsTunnel, isBoredTunnelTag, absorbBranch,
+  buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, hitsTunnel, isBoredTunnelTag, absorbBranch,
   MAX_GRADE, LINING_M,
 } from '../services/beamngTunnels.js';
 
@@ -252,4 +252,73 @@ test('ends too far apart in height for any road grade: no tunnel', () => {
   const t = solveTunnel({ xy: road(-400, 200), half: 4 }, { groundAt: step, approaches: [{ xy: road(-400, -700) }, { xy: road(200, 500) }] });
   assert.equal(t.ok, false);
   assert.match(t.reason, /apart in height/);
+});
+
+test('a bore close behind a cliff face gets gallery windows through it, and nowhere else', () => {
+  // the spike ridge with a canyon east of the road (x > 14) along its middle
+  const canyon = (x, y) => (x > 14 && Math.abs(y) < 100 ? 20 : ridge(x, y));
+  const t = solveTunnel({ xy: road(-400, 400), half: 4 }, {
+    groundAt: canyon,
+    approaches: [{ xy: road(-400, -700) }, { xy: road(400, 700) }],
+  });
+  assert.ok(t.ok, t.reason);
+  assert.ok(t.windows.length >= 2, `${t.windows.length} windows`);
+  for (const w of t.windows) {
+    assert.equal(w.side, 1, 'on the canyon side (right of travel)');
+    assert.ok(Math.abs(w.y) + w.halfLen <= 100, `window at y=${w.y.toFixed(0)} inside the canyon stretch`);
+    assert.ok(w.face > t.W + LINING_M && w.face <= 15, `face at ${w.face}`);
+  }
+  for (let k = 1; k < t.windows.length; k++) assert.ok(t.windows[k].s - t.windows[k - 1].s >= 70, 'spaced out');
+  // one walk-in gallery (the one nearest a portal), the rest small windows
+  assert.equal(t.windows.filter((q) => q.kind === 'gallery').length, 1);
+  // the plain spike ridge has rock all round: none
+  assert.equal(spikeTunnel().windows.length, 0);
+
+  const { h, holes } = grade(t, canyon);
+  const w = t.windows[0];
+  const at = (a, r) => [Math.round(w.x + a * w.tx + r * w.ty), Math.round(w.y + a * w.ty - r * w.tx)];
+  // the face's line at the window's sill, the window's squares open down to it only
+  const [sx, sy] = at(0, Math.max(w.face, t.W + LINING_M + 1));
+  assert.ok(Math.abs(h(sx, sy) - (w.z + w.sill - 0.3)) < 0.35, `face line at ${(h(sx, sy) - w.z).toFixed(2)} over the road`);
+  const near = [...holes].map((k) => k.split(',').map(Number)).filter(([x, y]) => Math.abs(y + 0.5 - w.y) < 6);
+  assert.ok(near.length > 0, 'squares opened at the window');
+  for (const [x, y] of near) {
+    const c = [h(x, y), h(x + 1, y), h(x, y + 1), h(x + 1, y + 1)];
+    assert.ok(Math.min(...c) >= w.z + w.sill - 1.5 && Math.max(...c) <= w.z + Math.max(w.spring + w.rise + LINING_M + 1.5, t.need) + 0.5, `square ${x},${y} spans ${Math.min(...c).toFixed(1)}..${Math.max(...c).toFixed(1)}`);
+  }
+  // the tube's wall is open there, and the passage / face plate built
+  const geo = buildWindowGeometry(t);
+  assert.ok(geo && geo.pos.length > 0);
+  assert.ok(hitsTunnel([t], ...at(0, w.face - 1), w.z + 1, w.z + 2), 'the face plate counts as structure');
+  // nothing of the tube's wall across the middle of each opening
+  const crossing = (pieces, o, d) => {
+    let hits = 0;
+    for (const { pos } of pieces) {
+      for (let k = 0; k < pos.length; k += 9) {
+        const A = pos.slice(k, k + 3); const B = pos.slice(k + 3, k + 6); const C = pos.slice(k + 6, k + 9);
+        const e1 = B.map((v, i) => v - A[i]); const e2 = C.map((v, i) => v - A[i]);
+        const pv = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]];
+        const det = e1[0] * pv[0] + e1[1] * pv[1] + e1[2] * pv[2];
+        if (Math.abs(det) < 1e-9) continue;
+        const tv = o.map((v, i) => v - A[i]);
+        const u = (tv[0] * pv[0] + tv[1] * pv[1] + tv[2] * pv[2]) / det;
+        const qv = [tv[1] * e1[2] - tv[2] * e1[1], tv[2] * e1[0] - tv[0] * e1[2], tv[0] * e1[1] - tv[1] * e1[0]];
+        const v = (d[0] * qv[0] + d[1] * qv[1] + d[2] * qv[2]) / det;
+        const dist = (e2[0] * qv[0] + e2[1] * qv[1] + e2[2] * qv[2]) / det;
+        if (u >= 0 && v >= 0 && u + v <= 1 && dist >= 0 && dist <= 1) hits++;
+      }
+    }
+    return hits;
+  };
+  // a zone Portal through each window: from inside, the world beyond renders
+  let n = 0;
+  const objs = buildTunnelObjects(t, 'tunnel_t001', () => `id${n++}`);
+  assert.equal(objs.zones.filter((o) => o.class === 'Portal' && o.name.includes('window_portal')).length, t.windows.length);
+  for (const q of t.windows) {
+    const v = q.z + (q.floor + Math.min(t.wall, q.spring)) / 2 + 0.3;
+    const o = [q.x + q.side * (t.W - 0.5) * q.ty, q.y - q.side * (t.W - 0.5) * q.tx, v];
+    const d = [q.side * 1.5 * q.ty, -q.side * 1.5 * q.tx, 0];   // from inside the tube out through the wall
+    assert.equal(crossing(buildTubeGeometry(t), o, d), 0, `tube wall across the window at ${q.s.toFixed(0)}`);
+    assert.ok(crossing(buildTubeGeometry({ ...t, windows: [] }), o, d) > 0, 'a plain tube has its wall there');
+  }
 });

@@ -50,6 +50,29 @@ const TRENCH_MAX_M = 400;              // the cutting / fill runs out at most th
 const APPROACH_LAND_GRADE = 0.12;      // an approach still off the ground there lands at this grade
 const UNDER_BRIDGE_M = 6.5;            // an approach under a bridge stays this far under the ground there ...
 const UNDER_BRIDGE_FLAT_M = 10;        // ... this far either side of it
+
+// Gallery windows: where a bore runs this close behind a cliff face (the
+// open air at the window's sill this far past the lining), openings in its
+// wall look out through a short passage to the face (Zion–Mount Carmel's
+// galleries onto Pine Creek canyon). OSM does not map them; the elevation
+// shows where the rock is thin enough.
+const WINDOW_ROCK_M = 12;              // rock between the lining and the open air, at most
+const WINDOW_SPACING_M = 70;           // windows at least this far apart
+const WINDOW_END_CLEAR_M = 40;         // ... and this far inside the portals
+const WINDOW_VIEW_M = 6;               // the ground stays under the sill this far past the face
+const WINDOW_PLATE_SIDE_M = 1.5;       // face plate past the opening each side ...
+const WINDOW_PLATE_OVER_M = 1.5;       // ... and over it
+const WINDOW_PLATE_UNDER_M = 1.5;      // ... and under its sill
+const WINDOW_LEDGE_M = 3;              // the ground in front kept under the sill this far out (lowered only)
+const WINDOW_CURB_M = 0.2;             // a gallery's step up from the road
+// Two kinds: small windows (an opening in the wall, its sill over the
+// parapet height, a short passage out), and one walk-in gallery, the one
+// nearest a portal: floor at the road, an arched opening, a low wall at the
+// face (Zion–Mount Carmel's big gallery near its west portal).
+const WINDOW_KINDS = {
+  window: { segments: 2, floor: 1.2, sill: 1.2, spring: 3, rise: 0 },
+  gallery: { segments: 4, floor: 0, sill: 1, rise: 1.8 },   // spring: the tube's wall height
+};
 // the point at arc length u along stations
 const stationXY = (st, u) => {
   let best = st[0];
@@ -605,8 +628,103 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   tunnel.maxExtra = 0;
   tunnel.cuts = [];
   tunnel.wings = wingTops(tunnel, groundAt);
+  tunnel.windows = cutCover ? [] : findWindows(tunnel, groundAt);
   return tunnel;
 }
+
+/**
+ * Gallery windows along a bored tunnel: stations where the open air at the
+ * sill (and on past the face, a view, not a dimple) comes within
+ * WINDOW_ROCK_M of the lining on one side, thinnest first, spaced out.
+ * Each: { s, i (first station of the opening), j (last), side (+1 right of
+ * travel), face (offset of the cliff face from the road's centre line),
+ * z (road height at the opening's centre), grade, x, y, tx, ty }.
+ */
+function findWindows(t, groundAt) {
+  const outer = t.W + LINING_M;
+  const sS = t.line[t.iS].s; const sN = t.line[t.iN].s;
+  const faceAt = (p, side, sill) => {
+    for (let o = outer; o <= outer + WINDOW_ROCK_M; o += 0.5) {
+      const [x, y] = lateral(p, side * o);
+      if (groundAt(x, y) >= p.z + sill) continue;
+      // the view: the ground stays under the sill on past the face
+      for (let v = 1; v <= WINDOW_VIEW_M; v += 1) {
+        const [vx, vy] = lateral(p, side * (o + v));
+        if (groundAt(vx, vy) >= p.z + sill) return null;
+      }
+      return o;
+    }
+    return null;
+  };
+  // an opening of `segments` stations from i0, on a side: its face offset, or null
+  const fits = (i0, side, kind) => {
+    const { segments, sill } = WINDOW_KINDS[kind];
+    const i1 = i0 + segments;
+    if (i0 < t.iS || i1 > t.iN) return null;
+    const run = t.line.slice(i0, i1 + 1);
+    if (run.some((q) => q.s - sS < WINDOW_END_CLEAR_M || sN - q.s < WINDOW_END_CLEAR_M || inExposed(t, q.s))) return null;
+    // the opening's stations all at the road's own width (no ramp joining)
+    if (run.some((q) => (q.wl ?? t.W) !== t.W || (q.wr ?? t.W) !== t.W)) return null;
+    const faces = run.map((q) => faceAt(q, side, sill));
+    return faces.some((f) => f == null) ? null : Math.max(...faces);
+  };
+  const make = (i0, side, kind, face) => {
+    const k = WINDOW_KINDS[kind];
+    const a = t.line[i0]; const b = t.line[i0 + k.segments];
+    const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return {
+      kind, i: i0, j: i0 + k.segments, side, face, s: (a.s + b.s) / 2,
+      x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2,
+      tx: (b.x - a.x) / L, ty: (b.y - a.y) / L, grade: (b.z - a.z) / (b.s - a.s || 1), halfLen: L / 2,
+      floor: k.floor, sill: k.sill, spring: k.spring ?? t.wall, rise: k.rise,
+    };
+  };
+  const candidates = [];
+  for (let i = t.iS; i < t.iN; i++) {
+    for (const side of [-1, 1]) {
+      const face = fits(i, side, 'window');
+      if (face != null) candidates.push({ i, side, face });
+    }
+  }
+  candidates.sort((a, b) => a.face - b.face);
+  const picked = [];
+  for (const c of candidates) {
+    const w = make(c.i, c.side, 'window', c.face);
+    if (picked.some((q) => Math.abs(q.s - w.s) < WINDOW_SPACING_M)) continue;
+    picked.push(w);
+  }
+  // the one nearest a portal opens up into the walk-in gallery (where it fits)
+  const byPortal = [...picked].sort((a, b) => Math.min(a.s - sS, sN - a.s) - Math.min(b.s - sS, sN - b.s));
+  for (const w of byPortal) {
+    const shift = (WINDOW_KINDS.gallery.segments - WINDOW_KINDS.window.segments) / 2;
+    const face = fits(w.i - shift, w.side, 'gallery');
+    if (face == null) continue;
+    picked[picked.indexOf(w)] = make(w.i - shift, w.side, 'gallery', face);
+    break;
+  }
+  return picked.sort((a, b) => a.s - b.s);
+}
+
+// A point in a window's frame: a along the road from its centre, r out
+// through it (from the road's centre line), the road height there.
+const windowFrame = (w, x, y) => {
+  const dx = x - w.x; const dy = y - w.y;
+  const a = dx * w.tx + dy * w.ty;
+  return { a, r: w.side * (dx * w.ty - dy * w.tx), z: w.z + w.grade * a };
+};
+// A window's sizes across: the plate's front at the face (at least 2 m out
+// of the lining: its terrain band between, never over the tube), its back
+// up to the plate's depth inside, the opening's top.
+const windowDims = (t, w) => {
+  const outer = t.W + LINING_M;
+  const rF = Math.max(w.face, outer + 2);
+  const top = w.spring + w.rise;
+  return {
+    outer, rF, rP: Math.max(outer, rF - t.headDepth), top,
+    // (up to the cover made up over the bore, which runs on beside it)
+    plateHalf: w.halfLen + WINDOW_PLATE_SIDE_M, plateTop: Math.max(top + LINING_M + WINDOW_PLATE_OVER_M, t.need), plateBottom: w.sill - WINDOW_PLATE_UNDER_M,
+  };
+};
 
 /**
  * Metres a station is wider than the tunnel's own road on one side (side
@@ -872,6 +990,22 @@ export function tunnelGroundAt(t, x, y, h) {
     if (kind === 'cut' && n.into < t.headDepth + BACKFILL_M && ad <= t.headHalf + 1) out = Math.max(out, n.z + t.headTop);
     out = Math.min(out, n.z + t.headTop + FACE_SLOPE * (Math.max(0, n.into - t.headDepth) + Math.max(0, ad - t.headHalf)));
   }
+  // gallery windows: the ground in front kept under the sill, the rock over
+  // the face plate down to its top, and no fill made up in front of it
+  for (const w of t.windows || []) {
+    const f = windowFrame(w, x, y);
+    const D = windowDims(t, w);
+    // (over the tube itself the hill is left to the cover rules below)
+    if (Math.abs(f.a) > D.plateHalf + 2 || f.r < Math.max(D.outer, D.rP - 0.5)) continue;
+    // the face's line at the sill (raised or cut to it): the squares opened
+    // across the face end there, and the cliff goes on down under it
+    // (1.5 squares deep: a grid point in it wherever the grid runs)
+    if (f.r >= D.rF - 0.5 && f.r <= D.rF + t.squareSize && Math.abs(f.a) <= w.halfLen + 1) return f.z + w.sill - 0.3;
+    if (f.r > D.rF + t.squareSize && f.r <= D.rF + WINDOW_LEDGE_M && Math.abs(f.a) <= w.halfLen + 1) return Math.min(out, f.z + w.sill - 0.3);
+    if (f.r < D.rF - 0.5 && Math.abs(f.a) <= D.plateHalf) return Math.min(Math.max(out, f.z + D.plateTop - 0.2), f.z + D.plateTop);
+    // no cover made up in front of the plate (beside it, it hugs its sides)
+    if (Math.abs(f.a) <= D.plateHalf) return out;
+  }
   // over the bore: made up to the cover where the ground falls short (cut and
   // cover), 1:1 slopes down beside it; never over an exposed stretch
   if (inExposed(t, n.s)) return out;
@@ -889,6 +1023,15 @@ export function tunnelGroundAt(t, x, y, h) {
  */
 export function tunnelHoleAt(t, x, y, lo, hi = lo) {
   if (t.kind === 'gallery') return false;   // on the surface: nothing opens
+  // a gallery window: through the rock from the lining to the face (never a
+  // square standing over the face plate's top)
+  for (const w of t.windows || []) {
+    const f = windowFrame(w, x, y);
+    const D = windowDims(t, w);
+    if (Math.abs(f.a) > w.halfLen + 0.5 * t.squareSize || f.r < D.rP - 0.5 || f.r > D.rF + 1.5 * t.squareSize) continue;
+    if (hi > f.z + D.plateTop + 0.5 || lo < f.z + D.plateBottom) return false;
+    return lo < f.z + D.top + LINING_M + 1;
+  }
   const n = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + LINING_M + t.squareSize * 2);
   // in front of the face nothing opens (the road runs on the ground there),
   // but for a grid square at a bridge's portal (the deck carries the road)
@@ -912,6 +1055,14 @@ export function hitsTunnel(tunnels, x, y, z, zTop = z) {
     const inHead = n.into >= -0.5 && n.into <= t.headDepth + 0.5 && ad <= t.headHalf + 0.5;
     if (!(inTube || inCut || inHead)) continue;
     if (zTop >= n.z - 1 && z <= n.z + (inHead ? t.headTop : t.crown + LINING_M) + 0.5) return true;
+  }
+  // gallery windows: the passage and its face plate
+  for (const t of tunnels) {
+    for (const w of t.windows || []) {
+      const f = windowFrame(w, x, y);
+      const D = windowDims(t, w);
+      if (Math.abs(f.a) <= D.plateHalf + 0.5 && f.r >= t.W && f.r <= D.rF + 0.5 && zTop >= f.z + D.plateBottom && z <= f.z + D.plateTop + 0.5) return true;
+    }
   }
   return false;
 }
@@ -1002,7 +1153,24 @@ export function buildTubeGeometry(t) {
           const w = [c[0] - o[0], c[1] - o[1], c[2] - o[2]];
           return outward ? w : w.map((v) => -v);
         };
+        // a window: the wall on its side open from its sill to its top over
+        // the segment (the wall drawn under and over the opening)
+        const open = new Map((t.windows || []).filter((w) => i >= w.i && i < w.j)
+          .map((w) => [w.side > 0 ? loop.length - 2 : 0, w.kind === 'gallery' ? [WINDOW_CURB_M, t.wall] : [w.sill, Math.min(t.wall, w.spring)]]));
         for (let k = 0; k < loop.length; k++) {
+          if (open.has(k)) {
+            const [lo, hi] = open.get(k);
+            const k2 = (k + 1) % loop.length;
+            const v0 = Math.min(loop[k][1], loop[k2][1]); const v1 = Math.max(loop[k][1], loop[k2][1]);
+            const u = loop[k][0];
+            for (const [b0, b1] of [[v0, lo], [hi, v1]]) {
+              if (b1 - b0 < 1e-3) continue;
+              const a = at(p, [u, b0]); const b = at(p, [u, b1]); const c = at(q, [u, b0]); const d = at(q, [u, b1]);
+              T.tri(a, b, c, [[0, b0 / 4], [0, b1 / 4], [1, b0 / 4]], want);
+              T.tri(b, d, c, [[0, b1 / 4], [1, b1 / 4], [1, b0 / 4]], want);
+            }
+            continue;
+          }
           const k2 = (k + 1) % loop.length;
           const a = at(p, loop[k]); const b = at(p, loop[k2]); const c = at(q, loopQ[k]); const d = at(q, loopQ[k2]);
           const U = [al[k] / 4, al[k + 1] / 4];
@@ -1098,6 +1266,91 @@ export function buildPortalGeometry(t, end) {
     T.tri(Z[0], Z[2], Z[3], [[0, 0], [1, 1], [1, 0]], () => out);
   }
   return { pos: pos.concat(T.pos), uv: uv.concat(T.uv) };
+}
+
+/**
+ * The gallery windows' structure, one { pos, uv } for all of them (null
+ * without any): per window a parapet across the opening, a passage (floor,
+ * walls, roof slabs) out to the face, and the face plate round the opening.
+ */
+export function buildWindowGeometry(t) {
+  if (!t.windows?.length) return null;
+  const T = makeTris();
+  for (const w of t.windows) {
+    const D = windowDims(t, w);
+    const P = (a, r, v) => [w.x + a * w.tx + w.side * r * w.ty, w.y + a * w.ty - w.side * r * w.tx, w.z + w.grade * a + v];
+    const quad = (A, B, C, Dd, uvs, want) => { T.tri(A, B, C, [uvs[0], uvs[1], uvs[2]], want); T.tri(A, C, Dd, [uvs[0], uvs[2], uvs[3]], want); };
+    // a box in the window's frame, its faces outward
+    const box = (a0, a1, r0, r1, v0, v1) => {
+      const o = P((a0 + a1) / 2, (r0 + r1) / 2, (v0 + v1) / 2);
+      const want = (c) => [c[0] - o[0], c[1] - o[1], c[2] - o[2]];
+      const ua = (a1 - a0) / 4; const ur = (r1 - r0) / 4; const uv = (v1 - v0) / 4;
+      const f = (A, B, C, Dd, du, dv) => quad(A, B, C, Dd, [[0, 0], [du, 0], [du, dv], [0, dv]], want);
+      f(P(a0, r0, v0), P(a1, r0, v0), P(a1, r1, v0), P(a0, r1, v0), ua, ur);
+      f(P(a0, r0, v1), P(a1, r0, v1), P(a1, r1, v1), P(a0, r1, v1), ua, ur);
+      f(P(a0, r0, v0), P(a1, r0, v0), P(a1, r0, v1), P(a0, r0, v1), ua, uv);
+      f(P(a0, r1, v0), P(a1, r1, v0), P(a1, r1, v1), P(a0, r1, v1), ua, uv);
+      f(P(a0, r0, v0), P(a0, r1, v0), P(a0, r1, v1), P(a0, r0, v1), ur, uv);
+      f(P(a1, r0, v0), P(a1, r1, v0), P(a1, r1, v1), P(a1, r0, v1), ur, uv);
+    };
+    const h = w.halfLen;
+    // the opening's outline [a, v], grown by `inset` (the lining's outer
+    // skin): floor, the far jamb, an arch over a gallery or the flat head of
+    // a window, the near jamb
+    const outline = (inset) => {
+      const pts = [[-h - inset, w.floor - inset], [h + inset, w.floor - inset]];
+      if (w.rise > 0) {
+        const K = 10;
+        for (let k = 0; k <= K; k++) {
+          const th = (Math.PI * k) / K;
+          pts.push([(h + inset) * Math.cos(th), w.spring + (w.rise + inset) * Math.sin(th)]);
+        }
+      } else {
+        pts.push([h + inset, w.spring + inset], [-h - inset, w.spring + inset]);
+      }
+      return pts;
+    };
+    // the passage: its section swept from the tube's wall to the plate
+    // (floor, walls, roof; the inner skin faces in, the outer out)
+    for (const [inset, inward] of [[0, true], [LINING_M, false]]) {
+      const loop = outline(inset);
+      const centre = (r) => P(0, r, (w.floor + D.top) / 2);
+      for (let k = 0; k < loop.length; k++) {
+        const k2 = (k + 1) % loop.length;
+        const [a0, v0] = loop[k]; const [a1, v1] = loop[k2];
+        const want = (c) => { const o = centre((D.rP + t.W) / 2); const d = [c[0] - o[0], c[1] - o[1], c[2] - o[2]]; return inward ? d.map((v) => -v) : d; };
+        const L = Math.hypot(a1 - a0, v1 - v0) / 4;
+        quad(P(a0, t.W, v0), P(a1, t.W, v1), P(a1, D.rP, v1), P(a0, D.rP, v0), [[0, 0], [L, 0], [L, (D.rP - t.W) / 4], [0, (D.rP - t.W) / 4]], want);
+      }
+    }
+    if (w.kind === 'gallery') {
+      box(-h, h, t.W, t.W + LINING_M, w.floor - LINING_M, WINDOW_CURB_M);       // the step up from the road
+      box(-h, h, D.rF - 0.5, D.rF, w.floor, w.sill);                            // the low wall at the face
+    }
+    // the face plate round the opening: the outline cut out of a slab
+    const shape = new THREE.Shape();
+    shape.moveTo(-D.plateHalf, D.plateBottom); shape.lineTo(D.plateHalf, D.plateBottom);
+    shape.lineTo(D.plateHalf, D.plateTop); shape.lineTo(-D.plateHalf, D.plateTop); shape.closePath();
+    const hole = new THREE.Path();
+    outline(0).forEach(([a, v], k) => (k ? hole.lineTo(a, v) : hole.moveTo(a, v)));
+    hole.closePath();
+    shape.holes.push(hole);
+    const g = new THREE.ExtrudeGeometry(shape, { depth: D.rF - D.rP, bevelEnabled: false, curveSegments: 1 }).toNonIndexed();
+    const Pg = g.getAttribute('position');
+    const sub = (m, n) => [m[0] - n[0], m[1] - n[1], m[2] - n[2]];
+    const cross = (m, n) => [m[1] * n[2] - m[2] * n[1], m[2] * n[0] - m[0] * n[2], m[0] * n[1] - m[1] * n[0]];
+    for (let k = 0; k < Pg.count; k += 3) {
+      const loc = [0, 1, 2].map((j) => [Pg.getX(k + j), Pg.getY(k + j), Pg.getZ(k + j)]);
+      // the extrusion's own facing, carried into the window's frame
+      const nl = cross(sub(loc[1], loc[0]), sub(loc[2], loc[0]));
+      const wv = P(nl[0], nl[2], nl[1]); const w0 = P(0, 0, 0);
+      const want = () => sub(wv, w0);
+      const world = loc.map(([a, v, d]) => P(a, D.rP + d, v));
+      T.tri(world[0], world[1], world[2], loc.map(([a, v, d]) => [(a + d) / 4, v / 4]), want);
+    }
+    g.dispose();
+  }
+  return { pos: T.pos, uv: T.uv };
 }
 
 // ── Scene objects ───────────────────────────────────────────────────────────
@@ -1200,5 +1453,20 @@ export function buildTunnelObjects(t, group, id, { lightSpacing = LIGHT_SPACING_
       scale: [r3(2 * Math.max(t.W, p.wl ?? t.W, p.wr ?? t.W) + 2), 6, r3(height + 1)],
     });
   });
-  return { lights, zones, lightCount: lights.length / 2, zoneCount: cuts.length - 1, portalCount: cuts.length };
+  // a Portal through each window too: the zones render the world outside
+  // only through their portals (from inside, the canyon past a window was
+  // culled, sky only). Across the passage from inside the tube to the face,
+  // so it spans the zone's wall wherever the chord puts it on a bend.
+  (t.windows || []).forEach((w, k) => {
+    const D = windowDims(t, w);
+    const nx = w.side * w.ty; const ny = -w.side * w.tx;
+    const r0 = t.W - 1; const r1 = Math.max(D.rF, t.W + 6) + 0.5;
+    const rc = (r0 + r1) / 2;
+    zones.push({
+      class: 'Portal', name: `${group}_window_portal_${k + 1}`, persistentId: id(), __parent: `${group}_zones`,
+      position: [r3(w.x + nx * rc), r3(w.y + ny * rc), r3(w.z + (w.floor + D.top) / 2)], rotationMatrix: rot(yawTo(nx, ny)),
+      scale: [r3(2 * w.halfLen + 1), r3(r1 - r0), r3(D.top - w.floor + 1)],
+    });
+  });
+  return { lights, zones, lightCount: lights.length / 2, zoneCount: cuts.length - 1, portalCount: cuts.length + (t.windows || []).length };
 }

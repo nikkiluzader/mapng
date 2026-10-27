@@ -42,7 +42,7 @@ import {
 } from './beamngBridges.js';
 import {
   solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, tunnelReach,
-  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildTunnelObjects, LIGHT_SPACING_M, LINING_M, extraAt,
+  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, LIGHT_SPACING_M, LINING_M, extraAt,
 } from './beamngTunnels.js';
 import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
@@ -923,6 +923,8 @@ function generateTunnelDAEs(tunnels) {
     buildTubeGeometry(t).forEach((piece, i) => write(t, `tube${i + 1}`, piece));
     if (t.portals[0]) write(t, 'portal_a', buildPortalGeometry(t, 'S'));
     if (t.portals[1]) write(t, 'portal_b', buildPortalGeometry(t, 'N'));
+    const windows = buildWindowGeometry(t);
+    if (windows) write(t, 'windows', windows);
   }
   return out;
 }
@@ -958,7 +960,7 @@ function buildTunnelGroups(tunnels, daes, levelName) {
       collisionType: 'Collision Mesh',
       // roads ride the tube floors; a portal is all walls, which a road decal
       // clipped over objects above them (a ramp on a bridge) smears down
-      ...(d.part.startsWith('portal') ? { decalType: 'None' } : {}),
+      ...(d.part.startsWith('portal') || d.part === 'windows' ? { decalType: 'None' } : {}),
       prebuildCollisionData: 0,
       useInstanceRenderData: true,
     }));
@@ -5653,6 +5655,7 @@ function buildDetailedReportSections(d) {
     lines.push(`  - Ground over the road (before grading): ${formatNumber(minCover, 1)} to ${formatNumber(maxCover, 1)} m`);
     for (const dip of t.dips || []) lines.push(`  - Dip in the cover ${formatNumber(dip.length, 0)} m long at ${formatNumber(dip.s - t.line[t.iS].s, 0)} m in: filled up to ${formatNumber(dip.depth, 1)} m over the tube`);
     for (const [s0, s1] of t.exposed || []) lines.push(`  - Exposed tube ${formatNumber(s1 - s0, 0)} m (thin cover where it meets a bridge; terrain opened, not filled)`);
+    if (t.windows?.length) lines.push(`  - Gallery windows: ${t.windows.length} (the cliff face close beside the bore), at ${t.windows.map((w) => `${formatNumber(w.s - t.line[t.iS].s, 0)} m (${w.side > 0 ? 'right' : 'left'}, ${formatNumber(w.face - t.W - LINING_M, 1)} m of rock)`).join(', ')}`);
     lines.push(`  - Terrain: ${t.gradedPixels ?? 0} grid points graded (cuttings, headwall backfill, cover), ${t.holes ?? 0} square(s) opened at the portals`);
     lines.push(`  - Lights: ${t.lights ?? 0}, zones: ${t.zones ?? 0}`);
     lines.push(`  - Objects: ${daes.map((x) => `tunnel_${x.key}.dae (${Math.round(x.triangles)} tris)`).join(', ') || 'none'}`);
@@ -8844,6 +8847,20 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const tunnelHoles = decalRoads.tunnels?.holes || [];
   if (tunnelHoles.length > 0) {
     if (!terLayerMap) terLayerMap = new Uint8Array(exportTerrainData.width * exportTerrainData.height);
+    // a square opens by its south-west sample; its other corners keep their
+    // material, and ground cover grew from them into the opening (a gallery
+    // window full of floating grass): rock there, which grows none
+    const names = pbrResult?.materialNames || [];
+    const bare = [names.indexOf('ROCK'), names.indexOf('asphalt')].find((i) => i >= 0);
+    const n = exportTerrainData.width;
+    const isHole = new Set(tunnelHoles);
+    if (bare !== undefined) {
+      for (const k of tunnelHoles) {
+        for (const j of [k + 1, k + n, k + n + 1, k - 1, k - n, k - n - 1, k - n + 1, k + n - 1]) {
+          if (j >= 0 && j < terLayerMap.length && !isHole.has(j)) terLayerMap[j] = bare;
+        }
+      }
+    }
     for (const k of tunnelHoles) if (k >= 0 && k < terLayerMap.length) terLayerMap[k] = 255;
   }
   // The terrain's range after grading: tunnel trenches and roads sunk under
