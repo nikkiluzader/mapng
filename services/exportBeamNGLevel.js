@@ -46,6 +46,7 @@ import {
 } from './beamngTunnels.js';
 import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
+  BARRIER_SHAPES,
 } from './beamngPropLibrary.js';
 import {
   buildCarriagewayIndex,
@@ -6092,6 +6093,15 @@ const NATIVE_BARRIER_ASSETS = {
     zOffset: 1.7,
     yawOffset: Math.PI * 0.5,
   },
+  // walls (beamngPropLibrary BARRIER_SHAPES): along local X, the pieces a
+  // little shorter than the mesh so they overlap
+  stoneWall: { shapeName: BARRIER_SHAPES.stoneWall.shapeFile, segmentLength: 3, zOffset: 0, yawOffset: 0 },
+  concreteWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, zOffset: 0, yawOffset: 0 },
+  dryStoneWall: { shapeName: BARRIER_SHAPES.dryStoneWall.shapeFile, segmentLength: 6, zOffset: 0, yawOffset: 0 },
+  brickWall: { shapeName: BARRIER_SHAPES.brickWall.shapeFile, segmentLength: 3.5, zOffset: 0, yawOffset: 0 },
+  // the harbour railing runs along local -Y from its origin at one end
+  // (+90° turns -Y onto the run): placed from each piece's start
+  railing: { shapeName: BARRIER_SHAPES.railing.shapeFile, segmentLength: 3, zOffset: 0, yawOffset: Math.PI * 0.5, fromStart: true },
 };
 
 // Every outdoor level gets one CloudLayer (Sky-and-Weather.md). The 0.39+
@@ -6136,8 +6146,26 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
 
   if (!barrierType || barrierType === 'hedge') return null;
 
-  if (barrierType === 'guard_rail' || barrierType === 'guardrail' || barrierType === 'handrail') {
+  if (barrierType === 'guard_rail' || barrierType === 'guardrail') {
     return NATIVE_BARRIER_ASSETS.guardrail;
+  }
+
+  // railings and chains: no post-and-chain mesh ships, a harbour railing is
+  // the nearest (St. Augustine's seawall chains had been white picket fences)
+  if (barrierType === 'handrail' || barrierType === 'railing' || barrierType === 'chain') {
+    return NATIVE_BARRIER_ASSETS.railing;
+  }
+
+  // walls as walls, by what they are made of (stone unless OSM says otherwise)
+  if (barrierType === 'wall' || barrierType === 'city_wall' || barrierType === 'retaining_wall') {
+    const wallKind = String(tags.wall ?? '').trim().toLowerCase();
+    const height = Number.parseFloat(tags.height);
+    if (wallKind === 'dry_stone' || wallKind === 'gabion') return NATIVE_BARRIER_ASSETS.dryStoneWall;
+    if (material === 'concrete' || material === 'reinforced_concrete' || wallKind === 'noise_barrier' || wallKind === 'jersey_barrier') {
+      return NATIVE_BARRIER_ASSETS.concreteWall;
+    }
+    if (material === 'brick' && Number.isFinite(height) && height >= 2) return NATIVE_BARRIER_ASSETS.brickWall;
+    return NATIVE_BARRIER_ASSETS.stoneWall;
   }
 
   if (
@@ -6149,10 +6177,6 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
 
   if (
     barrierType === 'fence'
-    || barrierType === 'chain'
-    || barrierType === 'wall'
-    || barrierType === 'city_wall'
-    || barrierType === 'retaining_wall'
     || barrierType === 'block'
     || barrierType === 'cable_barrier'
     || barrierType === 'wire_fence'
@@ -6307,15 +6331,17 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       const pitch = Math.max(-BARRIER_MAX_PITCH, Math.min(BARRIER_MAX_PITCH, Math.atan2(rise, panelSpacing)));
       const panelTerrainZ = (jointZ[i] + jointZ[i + 1]) / 2;
       if (skipLineAt(centerSample.x, centerSample.y, panelTerrainZ, centerSample.yaw)) continue;
+      // (a mesh with its origin at one end goes at the piece's start)
+      const at = asset.fromStart ? { ...sampleAtDistance(i * panelSpacing), z: jointZ[i] } : { ...centerSample, z: panelTerrainZ };
       objects.push({
         __parent: 'Barriers',
         class: 'TSStatic',
         name: `${namePrefix}_${i + 1}`,
         persistentId: generatePersistentId(),
         position: [
-          roundTo(centerSample.x, 3),
-          roundTo(centerSample.y, 3),
-          roundTo(panelTerrainZ + (Number.isFinite(asset.zOffset) ? asset.zOffset : 0), 3),
+          roundTo(at.x, 3),
+          roundTo(at.y, 3),
+          roundTo(at.z + (Number.isFinite(asset.zOffset) ? asset.zOffset : 0), 3),
         ],
         rotationMatrix: rotationMatrixFromYawPitch(centerSample.yaw, pitch, Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0),
         shapeName: asset.shapeName,

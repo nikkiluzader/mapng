@@ -154,6 +154,22 @@ def main():
                 fd.setdefault(name.lower(), (name, v, folder_cased))
                 all_defs.setdefault(name.lower(), (name, v, folder_cased))
 
+    # materials the engine itself defines (gameengine.zip art/): always loaded
+    global_names = set()
+    engine = os.path.join(os.path.dirname(CONTENT), "gameengine.zip")
+    if os.path.exists(engine):
+        with zipfile.ZipFile(engine) as zf:
+            for n in zf.namelist():
+                if n.lower().startswith("art/") and n.lower().endswith("materials.json"):
+                    try:
+                        for k, v in lenient_json(zf.read(n)).items():
+                            if isinstance(v, dict):
+                                global_names.add(k.lower())
+                                if v.get("mapTo"):
+                                    global_names.add(str(v["mapTo"]).lower())
+                    except ValueError:
+                        pass
+
     sets = parse_asset_set_daes()
     # The regional tree palette (scripts/build-tree-library.py) is its own set,
     # emitted for every biome alongside the biome's asset sets.
@@ -181,6 +197,9 @@ def main():
             for name in sorted(used):
                 hit = folder_defs.get(folder, {}).get(name.lower()) or all_defs.get(name.lower())
                 if hit is None:
+                    # defined in the engine's own art/: loaded globally, nothing to ship
+                    if name.lower() in global_names:
+                        continue
                     problems.append((set_id, dae, f"no official def for '{name}'"))
                     continue
                 official_name, d, source_folder = hit

@@ -119,6 +119,8 @@ def game_zips():
         + glob.glob(os.path.join(CONTENT, "assets/*.zip"))
         + glob.glob(os.path.join(CONTENT, "assets/materials/*.zip"))
         + [os.path.join(CONTENT, "art_shapes.zip")]
+        # the engine's own art/ (global materials such as it_stone_wall)
+        + [z for z in [os.path.join(os.path.dirname(CONTENT), "gameengine.zip")] if os.path.exists(z)]
     )
 
 

@@ -5177,6 +5177,61 @@
       "translucentRecvShadows": true,
       "version": 1.5
     },
+    "brick_painted": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/brick/t_brick_white_paint_01/t_brick_white_paint_01_ao.data.png",
+          "baseColorMap": "/assets/materials/tileable/brick/t_brick_white_paint_01/t_brick_white_paint_01_b.color.png",
+          "detailBaseColorMapStrength": 0.5,
+          "detailMap": "/assets/materials/trim/concrete/tunnel/t_tunnel_detail_b.data.png",
+          "detailRoughnessMapStrength": 0.300000012,
+          "detailScale": [
+            0.100000001,
+            0.0500000007
+          ],
+          "normalMap": "/assets/materials/tileable/brick/t_brick_white_paint_01/t_brick_white_paint_01_nm.normal.png",
+          "normalMapStrength": 1.5,
+          "pixelSpecular": true,
+          "roughnessDetailMap": "/assets/materials/breakup/t_detail_concrete_02/t_detail_concrete_02_r.data.png",
+          "roughnessMap": "/assets/materials/tileable/brick/t_brick_white_paint_01/t_brick_white_paint_01_r.data.png",
+          "vertColor": true
+        },
+        {
+          "detailBaseColorMapStrength": null,
+          "detailRoughnessMapStrength": null,
+          "detailScale": null,
+          "normalMapStrength": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "detailBaseColorMapStrength": null,
+          "detailRoughnessMapStrength": null,
+          "detailScale": null,
+          "normalMapStrength": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        },
+        {
+          "detailBaseColorMapStrength": null,
+          "detailRoughnessMapStrength": null,
+          "detailScale": null,
+          "normalMapStrength": null,
+          "pixelSpecular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "mapTo": "brick_painted",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "name": "brick_painted",
+      "persistentId": "6b47e50a-065f-4dea-b141-701480e67a05",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "concrete_plain": {
       "Stages": [
         {
@@ -5501,6 +5556,155 @@
       "translucent": true,
       "translucentBlendOp": "None",
       "version": 1.5
+    },
+    "it_concrete_roadside_walls": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/concrete/it_concrete_roadside_walls/it_concrete_roadside_walls_d.dds",
+          "detailScale": [
+            0.300000012,
+            0.300000012
+          ],
+          "normalMap": "/assets/materials/tileable/concrete/it_concrete_roadside_walls/it_concrete_roadside_walls_n.dds",
+          "specularMap": "/assets/materials/tileable/concrete/it_concrete_roadside_walls/it_concrete_roadside_walls_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "it_concrete_roadside_walls",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "it_concrete_roadside_walls",
+      "persistentId": "eff15c8f-7476-4094-842a-817fceb2d6bd",
+      "translucentBlendOp": "None"
+    },
+    "italy_curb_concrete": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_d.dds",
+          "detailScale": [
+            6,
+            6
+          ],
+          "normalMap": "/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_n.dds",
+          "specularMap": "/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "SIDEWALK",
+      "class": "Material",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "italy_curb_concrete",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_curb_concrete",
+      "persistentId": "e2ef0c7a-3e38-4689-962c-cf8a8de05200",
+      "translucentBlendOp": "None"
+    },
+    "italy_guardrails": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/trim/metal/m_italy_guardrails/t_italy_guardrails_b.color.png",
+          "detailScale": [
+            6,
+            6
+          ],
+          "metallicFactor": 0.75,
+          "metallicMap": "/assets/materials/trim/metal/m_italy_guardrails/t_italy_guardrails_m.data.png",
+          "normalMap": "/assets/materials/trim/metal/m_italy_guardrails/t_italy_guardrails_nm.normal.png",
+          "roughnessMap": "/assets/materials/trim/metal/m_italy_guardrails/t_italy_guardrails_r.data.png",
+          "vertColor": true
+        },
+        {
+          "detailScale": null,
+          "metallicFactor": null,
+          "vertColor": true
+        },
+        {
+          "detailScale": null,
+          "metallicFactor": null,
+          "vertColor": null
+        },
+        {
+          "detailScale": null,
+          "metallicFactor": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "GUARD_RAIL",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "italy_guardrails",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_guardrails",
+      "persistentId": "c11fd14b-8569-4389-8faa-502379c8dbab",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "italy_rock_wall_tiling": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/stone/italy_rock_wall_tiling/italy_rock_wall_tiling_d.dds",
+          "detailScale": [
+            6,
+            6
+          ],
+          "normalMap": "/assets/materials/tileable/stone/italy_rock_wall_tiling/italy_rock_wall_tiling_n.dds",
+          "specularMap": "/assets/materials/tileable/stone/italy_rock_wall_tiling/italy_rock_wall_tiling_s.dds",
+          "useAnisotropic": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "doubleSided": true,
+      "groundType": "ROCK",
+      "mapTo": "italy_rock_wall_tiling",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_rock_wall_tiling",
+      "persistentId": "f80b908e-e2c8-41b7-a45e-e05ad4112876",
+      "translucentBlendOp": "None"
+    },
+    "italy_rock_wall_top": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/stone/italy_rock_wall_top/italy_rock_wall_top_d.dds",
+          "detailScale": [
+            6,
+            6
+          ],
+          "normalMap": "/assets/materials/tileable/stone/italy_rock_wall_top/italy_rock_wall_top_n.dds",
+          "specularMap": "/assets/materials/tileable/stone/italy_rock_wall_top/italy_rock_wall_top_s.dds",
+          "useAnisotropic": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "doubleSided": true,
+      "groundType": "ROCK",
+      "mapTo": "italy_rock_wall_top",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_rock_wall_top",
+      "persistentId": "2f1a78ae-69d1-4b6c-be38-6d39fdfead0b",
+      "translucentBlendOp": "None"
     },
     "lod_vertcol": {
       "Stages": [
@@ -6020,6 +6224,70 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "si_metal_clean": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/metal/si_metal_clean/si_metal_clean_d.dds",
+          "diffuseColor": [
+            0.988235354,
+            0.988235354,
+            0.988235354,
+            0.107000001
+          ],
+          "normalMap": "/assets/materials/tileable/metal/si_metal_clean/si_metal_clean_n.dds",
+          "pixelSpecular": true,
+          "roughnessFactor": 0.402321398,
+          "specularMap": "/assets/materials/tileable/metal/si_metal_clean/si_metal_clean_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "si_metal_clean",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "si_metal_clean",
+      "persistentId": "94cd4120-8f53-4b59-9fb1-e7ba2d37eb13",
+      "specularColor0": "0.1 0.1 0.1 0.1",
+      "specularStrength0": "0.05",
+      "translucentBlendOp": "None"
+    },
+    "si_wood": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/wood/si_wood/si_wood_d.dds",
+          "normalMap": "/assets/materials/tileable/wood/si_wood/si_wood_n.dds",
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "pixelSpecular": true,
+          "specularMap": "/assets/materials/tileable/wood/si_wood/si_wood_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "groundType": "WOOD",
+      "mapTo": "si_wood",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "si_wood",
+      "persistentId": "2c065c65-fdf5-454c-b0ab-4d13fb6ffb58",
+      "specularColor0": "0.1 0.1 0.1 0.1",
+      "specularStrength0": "0.05",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None"
+    },
     "speedbump": {
       "Stages": [
         {
@@ -6047,7 +6315,7 @@
       "persistentId": "5c352a12-eeeb-4e4a-a87a-21821fdc9c1b",
       "translucentBlendOp": "None"
     },
-    "trafficlight": {
+    "trafficLight": {
       "Stages": [
         {
           "animFlags": 16,

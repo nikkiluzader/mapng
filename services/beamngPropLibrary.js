@@ -103,6 +103,17 @@ export const BOLLARD_SHAPES = {
   concrete: { shapeFile: '/levels/east_coast_usa/art/shapes/clutter/clutter_city_bollard_concrete.dae' },
 };
 
+// OSM walls and railings (barriers drawn piece by piece along their line).
+// All run along local X with their origin on the ground, except the harbour
+// railing: along local -Y, its origin at one end, in centimetres.
+export const BARRIER_SHAPES = {
+  stoneWall: { shapeFile: '/levels/italy/art/shapes/buildings/italy_wall_stone.dae' },          // 3.1 m long, 0.9 m tall
+  concreteWall: { shapeFile: '/levels/italy/art/shapes/buildings/italy_wall_concrete.dae' },    // 3.2 m, 1.0 m
+  dryStoneWall: { shapeFile: '/levels/italy/art/shapes/buildings/italy_rock_wall_a_low.dae' },  // 6.3 m, 0.8 m
+  brickWall: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/wall_brick1.dae' },        // 3.6 m, 3.1 m
+  railing: { shapeFile: '/levels/small_island/art/shapes/buildings/si_harbour_railing.DAE' },   // 3.0 m, 1.07 m
+};
+
 // North American road signs from Utah (ut_roadsigns) and West Coast USA,
 // beside East Coast USA's in services/roadSigns.js. Their faces look along
 // local -Y, like East Coast USA's and the Vienna-convention set. (Paths
