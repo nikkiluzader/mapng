@@ -2820,6 +2820,7 @@ const BERM_MIN_M = 1.5;         // the berm top over the bridge's end
 // abutment): VA 337 over I-264, Norfolk, came down onto the freeway
 const MAJOR_UNDER_ROADS = new Set(['motorway', 'trunk', 'primary']);
 const AT_GRADE_REACH_M = 12;     // as beamngBridges: a minor road met this near an abutment is at grade
+                                 // (unless it passes through: no node within AT_GRADE_REACH_M + 3)
 
 // Roads sunk under decks (sinkRoadsUnderDecks): the drop tapers off along
 // the road at SINK_GRADE, the cutting's floor its carriageway + shoulders,
@@ -3423,7 +3424,8 @@ function solveExportBridges(drivableRoads, terrainData, squareSize, tunnels = []
           // met right by an abutment is a junction at grade (the solver's rule)
           const at = (p) => Math.hypot(p[0] - px, p[1] - py) < 1.5;
           if ((at(part.xy[0]) || at(part.xy[part.xy.length - 1])) && (at(road.xy[0]) || at(road.xy[road.xy.length - 1]))) continue;
-          if (!road.major && deck.abutments.some(([ax, ay]) => Math.hypot(ax - px, ay - py) < AT_GRADE_REACH_M)) continue;
+          const through = road.xy.every((v) => Math.hypot(v[0] - px, v[1] - py) > AT_GRADE_REACH_M + 3);
+          if (!road.major && !through && deck.abutments.some(([ax, ay]) => Math.hypot(ax - px, ay - py) < AT_GRADE_REACH_M)) continue;
           const deficit = groundAt(px, py) + DECK_ROAD_CLEAR_M - deckHeightAt(part, px, py);
           if (deficit > SINK_MIN_M / 2) sinks.push({ road, at: [px, py], deficit: Math.min(SINK_MAX_M, deficit + 0.2) });
         }
@@ -3949,6 +3951,11 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
   // in the trench before the tunnel: the trench wall ran across it) are
   // taken into the cutting like the ramps inside a tunnel: it widens on
   // their side, and they leave through an opening in their own trench.
+  // A road ending where a bridge starts climbs over the cutting rather than
+  // joining it (Norfolk's VA 337 flyover: its ground piece ends 7 m off I-264
+  // right where the next bridge piece starts).
+  const bridgeEnds = others.filter((o) => o.bridge || o.bridgeRoad).flatMap((o) => [o.xy[0], o.xy[o.xy.length - 1]]);
+  const meetsBridge = ([x, y]) => bridgeEnds.some((q) => Math.hypot(q[0] - x, q[1] - y) < TUNNEL_TOUCH_M);
   const takeSideRamps = (t) => {
     if (t.kind === 'gallery') return;
     for (const r of others) {
@@ -3957,6 +3964,7 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
         const n = nearestOnTunnel(t, end[0], end[1], t.W + 4);
         if (!n || n.beyond || n.into >= 0 || Math.abs(n.d) > t.W + 3) continue;
         if (groundAt(end[0], end[1]) - n.z < 0.5) continue;   // out where the cutting has run out
+        if (meetsBridge(end)) continue;
         const xy = end === r.xy[0] ? r.xy : [...r.xy].reverse();
         const half = halfOf(drivableRoads[r.segIndex]);
         const res = absorbBranch(t, { xy: xy.map(([x, y]) => [x, y]), half, tunnelLength: 0 }, { groundAt });
@@ -4205,14 +4213,55 @@ export function usedPavingMaterials(groups) {
   return used;
 }
 
+// A short untagged way between two bridge ways, joined by nothing else at
+// either end, is the same structure: mappers tag only the spans over
+// something (Norfolk's VA 337 flyovers: 14-29 m bridges with 17-54 m gaps
+// over the tunnel cuttings). Left on the ground, the road dives into the
+// gap between its decks.
+const BRIDGE_GAP_MAX_M = 60;
+
+export function bridgeOverShortGaps(features) {
+  const key = (g) => `${g.lat},${g.lng}`;
+  const atNode = new Map();
+  for (const f of features) for (const g of f.geometry) {
+    const k = key(g);
+    if (!atNode.has(k)) atNode.set(k, new Set());
+    atNode.get(k).add(f);
+  }
+  const isBridge = (f) => isBridgeRoad(f.tags) && !isBoredTunnelTag(f.tags);
+  const lengthM = (geom) => {
+    let s = 0;
+    for (let i = 1; i < geom.length; i++) {
+      const dy = (geom[i].lat - geom[i - 1].lat) * 111320;
+      const dx = (geom[i].lng - geom[i - 1].lng) * 111320 * Math.cos(geom[i].lat * Math.PI / 180);
+      s += Math.hypot(dx, dy);
+    }
+    return s;
+  };
+  return features.map((f) => {
+    const tags = f.tags || {};
+    if (isBridge(f) || (tags.tunnel && tags.tunnel !== 'no') || f.geometry.length < 2) return f;
+    if (lengthM(f.geometry) > BRIDGE_GAP_MAX_M) return f;
+    // its interior joins nothing; each end meets bridges only
+    if (f.geometry.slice(1, -1).some((g) => atNode.get(key(g)).size > 1)) return f;
+    let layer = 1;
+    for (const g of [f.geometry[0], f.geometry[f.geometry.length - 1]]) {
+      const others = [...atNode.get(key(g))].filter((o) => o !== f);
+      if (!others.length || !others.every(isBridge)) return f;
+      for (const o of others) layer = Math.max(layer, getEffectiveRoadLayer(o.tags));
+    }
+    return { ...f, tags: { ...tags, bridge: 'yes', layer: String(layer), 'mapng:bridge_gap': 'yes' } };
+  });
+}
+
 export function generateDecalRoads(terrainData, squareSize) {
   if (!terrainData.osmFeatures?.length) return [];
 
-  const sourceRoadFeatures = terrainData.osmFeatures.filter((feature) => {
+  const sourceRoadFeatures = bridgeOverShortGaps(terrainData.osmFeatures.filter((feature) => {
     if (feature?.type !== 'road' || !feature.geometry?.length) return false;
     const highway = feature.tags?.highway;
     return !!highway && !ROAD_SKIP.has(highway);
-  });
+  }));
   const roadNetwork = buildRoadNetwork(sourceRoadFeatures);
   const mergedRoadSegments = mergeLinearRoadSegments(
     roadNetwork.segments,

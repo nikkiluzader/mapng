@@ -392,8 +392,8 @@ test('a street with junctions right by its bridge: the road under sinks instead'
     ['5', [[-30, 0], [30, 0]], { highway: 'secondary', name: 'S', bridge: 'yes', layer: '1' }],
     ['6', [[30, 0], [50, 0]], { highway: 'secondary', name: 'S' }],
     ['7', [[50, 0], [200, 0]], { highway: 'secondary', name: 'S' }],
-    ['8', [[-50, -50], [-50, 50]], { highway: 'residential', name: 'X1' }],
-    ['9', [[50, -50], [50, 50]], { highway: 'residential', name: 'X2' }],
+    ['8', [[-50, -50], [-50, 0], [-50, 50]], { highway: 'residential', name: 'X1' }],
+    ['9', [[50, -50], [50, 0], [50, 50]], { highway: 'residential', name: 'X2' }],
     ['10', [[0, -400], [0, 400]], { highway: 'motorway', name: 'M', oneway: 'yes' }],
   ]);
   const b = groups.bridges;
@@ -404,4 +404,20 @@ test('a street with junctions right by its bridge: the road under sinks instead'
   const zNear = (y0) => m.reduce((best, n) => (Math.abs(n[1] - y0) < Math.abs(best[1] - y0) ? n : best))[2];
   assert.ok(zNear(0) < -3, `the motorway under the bridge at ${zNear(0).toFixed(2)} m`);
   assert.ok(Math.abs(zNear(350)) < 0.3, 'back at the ground away from it');
+});
+
+test('a road passing under a short bridge near its abutment is cleared, not met at grade', async () => {
+  // a 26 m motorway bridge; a link loops under it 8 m from one abutment and
+  // joins nothing there (Norfolk: I-264 over its loop ramps)
+  const groups = await flatMap([
+    ['1', [[-300, 0], [-13, 0]], { highway: 'motorway', name: 'M', oneway: 'yes' }],
+    ['2', [[-13, 0], [13, 0]], { highway: 'motorway', name: 'M', oneway: 'yes', bridge: 'yes', layer: '1' }],
+    ['3', [[13, 0], [300, 0]], { highway: 'motorway', name: 'M', oneway: 'yes' }],
+    ['4', [[5, -300], [5, 300]], { highway: 'motorway_link', name: 'L', oneway: 'yes' }],
+  ]);
+  const deck = groups.flatMap((g) => g.__items).filter((d) => d.name.startsWith('dr_M') && d.material === 'road_asphalt_2lane').flatMap((d) => d.nodes);
+  const link = groups.flatMap((g) => g.__items).filter((d) => d.name.startsWith('dr_L') && d.material === 'road_asphalt_2lane').flatMap((d) => d.nodes);
+  const near = (nodes, x, y) => nodes.reduce((b, n) => (Math.hypot(n[0] - x, n[1] - y) < Math.hypot(b[0] - x, b[1] - y) ? n : b))[2];
+  const gap = near(deck, 5, 0) - near(link, 5, 0);
+  assert.ok(gap > 5, `deck ${gap.toFixed(2)} m over the link`);
 });
