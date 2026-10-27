@@ -22,7 +22,7 @@ test('a short untagged way between two bridges becomes bridge', () => {
 
 test('gaps that are long, joined by another road, or not bridge-bounded stay on the ground', () => {
   const long = byId(bridgeOverShortGaps([
-    way('a', 36.8000, 36.8002, { bridge: 'yes' }), way('gap', 36.8002, 36.8010), way('b', 36.8010, 36.8012, { bridge: 'yes' }),
+    way('a', 36.8000, 36.8002, { bridge: 'yes' }), way('gap', 36.8002, 36.8014), way('b', 36.8014, 36.8016, { bridge: 'yes' }),
   ]));
   assert.equal(long.gap.tags.bridge, undefined);
   const joined = byId(bridgeOverShortGaps([

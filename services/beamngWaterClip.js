@@ -151,6 +151,36 @@ export function planSeaBlocks({ size, seaZ, heightAt, zones, minZ }) {
     }
     return false;
   };
+  // the sea is what the open water reaches: wet SEA_CELL_M cells joined to
+  // the map's edge (the coarse test the sea has always used: the DEM shows a
+  // river under sea level only here and there). A road cutting or a basin
+  // inland under sea level is no sea: Norfolk's sunk loop ramp filled with it.
+  const nR = Math.ceil(size / SEA_CELL_M);
+  const reached = new Uint8Array(nR * nR);
+  {
+    const wetR = new Uint8Array(nR * nR);
+    for (let j = 0; j < nR; j++) for (let i = 0; i < nR; i++) {
+      if (wet(-half + i * SEA_CELL_M, -half + j * SEA_CELL_M, SEA_CELL_M)) wetR[j * nR + i] = 1;
+    }
+    const stack = [];
+    for (let k = 0; k < nR; k++) for (const idx of [k, (nR - 1) * nR + k, k * nR, k * nR + nR - 1]) {
+      if (wetR[idx] && !reached[idx]) { reached[idx] = 1; stack.push(idx); }
+    }
+    while (stack.length) {
+      const idx = stack.pop();
+      const i = idx % nR; const j = (idx - i) / nR;
+      for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ii = i + di; const jj = j + dj;
+        if (ii < 0 || jj < 0 || ii >= nR || jj >= nR) continue;
+        const n2 = jj * nR + ii;
+        if (wetR[n2] && !reached[n2]) { reached[n2] = 1; stack.push(n2); }
+      }
+    }
+  }
+  const reachedIn = (x0, y0) => {
+    const i = Math.floor((x0 + half) / SEA_CELL_M); const j = Math.floor((y0 + half) / SEA_CELL_M);
+    return i >= 0 && j >= 0 && i < nR && j < nR && reached[j * nR + i] === 1;
+  };
   // a cell's depth: the full sea, clipped over a tube, 0 over a trench
   const depthIn = (x0, y0, cell) => {
     const floor = waterFloorIn(zones, x0, y0, x0 + cell, y0 + cell);
@@ -168,11 +198,11 @@ export function planSeaBlocks({ size, seaZ, heightAt, zones, minZ }) {
       if (near(x0, y0, x0 + SEA_CELL_M, y0 + SEA_CELL_M)) {
         for (let b = 0; b < sub; b++) for (let a = 0; a < sub; a++) {
           const fx = x0 + a * NEAR_CELL_M; const fy = y0 + b * NEAR_CELL_M;
-          if (!wet(fx, fy, NEAR_CELL_M)) continue;
+          if (!reachedIn(fx, fy) || !wet(fx, fy, NEAR_CELL_M)) continue;
           const d = depthIn(fx, fy, NEAR_CELL_M);
           if (d > 0) fine.set(`${i * sub + a},${j * sub + b}`, d);
         }
-      } else if (wet(x0, y0, SEA_CELL_M)) {
+      } else if (reachedIn(x0, y0)) {
         coarse.set(`${i},${j}`, floorDepth);
         if (i === 0) edgeWet.w++; if (i === nC - 1) edgeWet.e++;
         if (j === 0) edgeWet.s++; if (j === nC - 1) edgeWet.n++;

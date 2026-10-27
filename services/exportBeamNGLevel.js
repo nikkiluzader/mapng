@@ -4237,9 +4237,11 @@ export function usedPavingMaterials(groups) {
 // A short untagged way between two bridge ways, joined by nothing else at
 // either end, is the same structure: mappers tag only the spans over
 // something (Norfolk's VA 337 flyovers: 14-29 m bridges with 17-54 m gaps
-// over the tunnel cuttings). Left on the ground, the road dives into the
-// gap between its decks.
-const BRIDGE_GAP_MAX_M = 60;
+// over the tunnel cuttings; a 76 m embankment between its I-264 ramp's two
+// bridges). Left on the ground, the road dives into the gap between its
+// decks; where it does lie on the ground, the deck is laid on it.
+const BRIDGE_GAP_MAX_M = 100;
+const GAP_MINOR_HIGHWAYS = new Set(['service', 'track', 'path', 'footway', 'cycleway', 'bridleway', 'steps', 'pedestrian']);
 
 export function bridgeOverShortGaps(features) {
   const key = (g) => `${g.lat},${g.lng}`;
@@ -4263,8 +4265,10 @@ export function bridgeOverShortGaps(features) {
     const tags = f.tags || {};
     if (isBridge(f) || (tags.tunnel && tags.tunnel !== 'no') || f.geometry.length < 2) return f;
     if (lengthM(f.geometry) > BRIDGE_GAP_MAX_M) return f;
-    // its interior joins nothing; each end meets bridges only
-    if (f.geometry.slice(1, -1).some((g) => atNode.get(key(g)).size > 1)) return f;
+    // its interior joins nothing but minor ways (a service track tied onto
+    // a ramp's embankment); each end meets bridges only
+    const minor = (o) => GAP_MINOR_HIGHWAYS.has(o.tags?.highway);
+    if (f.geometry.slice(1, -1).some((g) => [...atNode.get(key(g))].some((o) => o !== f && !minor(o)))) return f;
     let layer = 1;
     for (const g of [f.geometry[0], f.geometry[f.geometry.length - 1]]) {
       const others = [...atNode.get(key(g))].filter((o) => o !== f);
@@ -6286,16 +6290,22 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       };
     };
 
+    // the ground at every joint, smoothed along the run (a median, then a
+    // mean, of each and its neighbours): on graded ground stepping by the
+    // metre the panels zig-zagged by ±20°
+    const jointCount = isClosedRing(geometry) ? panelCount : panelCount + 1;
+    const rawJointZ = Array.from({ length: panelCount + 1 }, (_, i) => sampleAtDistance(i * panelSpacing).terrainZ);
+    const at3 = (arr, i) => [arr[Math.max(0, i - 1)], arr[i], arr[Math.min(arr.length - 1, i + 1)]];
+    const median3 = rawJointZ.map((_, i) => at3(rawJointZ, i).sort((a, b) => a - b)[1]);
+    const jointZ = median3.map((_, i) => (i === 0 || i === median3.length - 1 ? median3[i] : at3(median3, i).reduce((a, b) => a + b, 0) / 3));
+
     for (let i = 0; i < panelCount; i++) {
       if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
-      const startSample = sampleAtDistance(i * panelSpacing);
-      const endSample = sampleAtDistance((i + 1) * panelSpacing);
       const centerSample = sampleAtDistance((i + 0.5) * panelSpacing);
-      // tilted along the run to the ground between its ends, its middle on the
-      // line between them (or lower, over a hump: never floating over a dip)
-      const rise = endSample.terrainZ - startSample.terrainZ;
+      // tilted along the run to the (smoothed) ground between its ends
+      const rise = jointZ[i + 1] - jointZ[i];
       const pitch = Math.max(-BARRIER_MAX_PITCH, Math.min(BARRIER_MAX_PITCH, Math.atan2(rise, panelSpacing)));
-      const panelTerrainZ = Math.min((startSample.terrainZ + endSample.terrainZ) / 2, centerSample.terrainZ);
+      const panelTerrainZ = (jointZ[i] + jointZ[i + 1]) / 2;
       if (skipLineAt(centerSample.x, centerSample.y, panelTerrainZ, centerSample.yaw)) continue;
       objects.push({
         __parent: 'Barriers',
@@ -6314,11 +6324,9 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     }
 
     if (asset.postShapeName) {
-      const isClosed = isClosedRing(geometry);
-      const postCount = isClosed ? panelCount : panelCount + 1;
-      for (let i = 0; i < postCount; i++) {
+      for (let i = 0; i < jointCount; i++) {
         if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
-        const sample = sampleAtDistance(i * panelSpacing);
+        const sample = { ...sampleAtDistance(i * panelSpacing), terrainZ: jointZ[i] };
         if (skipLineAt(sample.x, sample.y, sample.terrainZ, sample.yaw)) continue;
         const rotationYaw = sample.yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
         objects.push({

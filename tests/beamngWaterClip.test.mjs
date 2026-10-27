@@ -41,6 +41,16 @@ test('the sea as blocks: over the river, none in the trench, shallow over the tu
   assert.equal(at(trench.x, trench.y).length, 0, 'the trench is dry');
 });
 
+test('the sea fills only ground the open water reaches, not a hollow inland', () => {
+  // the river across the map (|y| < 60, joined to its edges) and a sunk road
+  // cutting at (300, 300), both under sea level; dry ground between
+  const ground = (x, y) => (Math.abs(y) < 60 || Math.hypot(x - 300, y - 300) < 30 ? -1 : 2);
+  const blocks = planSeaBlocks({ size: 1024, seaZ: 0, heightAt: ground, zones: [], minZ: -20 });
+  const at = (x, y) => blocks.filter((b) => Math.abs(x - b.cx) <= b.sx / 2 && Math.abs(y - b.cy) <= b.sy / 2);
+  assert.ok(at(-300, 0).length > 0, 'the river is sea');
+  assert.equal(at(300, 300).length, 0, 'the cutting stays dry');
+});
+
 test('rivers and lakes over a tunnel are held over its roof', () => {
   const t = tunnel();
   const zones = tunnelDryZones([t]);
