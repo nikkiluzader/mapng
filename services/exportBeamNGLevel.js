@@ -395,6 +395,50 @@ function findSpawnPosition(terrainData, center, squareSize) {
   };
 }
 
+const SPAWN_END_CLEAR_M = 20;    // this far from a carriageway's ends (junctions, bridge and tunnel ends)
+const SPAWN_MAX_GRADE = 0.08;    // along the road over ±SPAWN_GRADE_M
+const SPAWN_GRADE_M = 10;
+const SPAWN_ON_GROUND_M = 1;     // the road this close to the terrain: not on a deck or a walled ramp
+const SPAWN_CLASS_PENALTY_M = { service: 150, track: 400, unclassified: 50, living_street: 50 };
+
+/**
+ * The spawn on a drawn ground carriageway near the map's centre: a node
+ * clear of its ends, on a gentle grade, on the terrain and with nothing over
+ * it, facing along the road. Null without one (findSpawnPosition stands).
+ */
+function findRoadSpawn(carriageways, groundAt, covered = () => false, { leftHandTraffic = false } = {}) {
+  let best = null;
+  for (const cw of carriageways) {
+    const n = cw.nodes;
+    if (!Array.isArray(n) || n.length < 3 || NON_DRIVEABLE_HIGHWAYS.has(cw.highway)) continue;
+    const s = [0];
+    for (let i = 1; i < n.length; i++) s.push(s[i - 1] + Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]));
+    const total = s[s.length - 1];
+    const penalty = SPAWN_CLASS_PENALTY_M[cw.highway] ?? 0;
+    for (let i = 1; i + 1 < n.length; i++) {
+      if (s[i] < SPAWN_END_CLEAR_M || total - s[i] < SPAWN_END_CLEAR_M) continue;
+      const [x, y, z] = n[i];
+      const score = Math.hypot(x, y) + penalty;
+      if (best && score >= best.score) continue;
+      let a = i; while (a > 0 && s[i] - s[a] < SPAWN_GRADE_M) a--;
+      let b = i; while (b + 1 < n.length && s[b] - s[i] < SPAWN_GRADE_M) b++;
+      if (Math.abs(n[b][2] - n[a][2]) > SPAWN_MAX_GRADE * (s[b] - s[a])) continue;
+      if (Math.abs(z - groundAt(x, y)) > SPAWN_ON_GROUND_M || covered(x, y, z, z + 3)) continue;
+      const dx = n[b][0] - n[a][0]; const dy = n[b][1] - n[a][1]; const L = Math.hypot(dx, dy) || 1;
+      const fx = dx / L; const fy = dy / L;
+      // in the lane traffic keeps to on a two-way road, not on the centre line
+      const lane = cw.oneWay ? 0 : (cw.half / 2) * (leftHandTraffic ? -1 : 1);
+      best = {
+        score,
+        position: [roundTo(x + fy * lane, 2), roundTo(y - fx * lane, 2), roundTo(z + 0.5, 2)],
+        // rows: right, forward (BeamNG +Y), up
+        rotationMatrix: [roundTo(fy, 6), roundTo(-fx, 6), 0, roundTo(fx, 6), roundTo(fy, 6), 0, 0, 0, 1],
+      };
+    }
+  }
+  return best && { position: best.position, rotationMatrix: best.rotationMatrix };
+}
+
 /**
  * Load a URL into a canvas and re-encode as a PNG Blob.
  * Required because BeamNG's GBitmap::readPNG rejects non-PNG streams
@@ -8583,7 +8627,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // BeamNG TerrainBlock behaves poorly with maxHeight <= 0 (collision/road projection artifacts).
   const maxHeight = Math.max(1, Math.ceil(terrainHeightRange));
 
-  const { position: spawnPosition, rotationMatrix: spawnRotationMatrix } =
+  let { position: spawnPosition, rotationMatrix: spawnRotationMatrix } =
     findSpawnPosition(exportTerrainData, center, squareSize);
 
   // DecalRoads are the only road system (BeamNG's own levels use them, and the
@@ -8610,6 +8654,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const groundCarriageways = (decalRoads.carriageways || []).filter((cw) => !cw.bridge && !cw.tunnel);
   const underDeck = (x, y, z, zTop) => (bridgeDecks.length > 0 && hitsDeck(bridgeDecks, x, y, z, zTop))
     || (tunnelList.length > 0 && hitsTunnel(tunnelList, x, y, z, zTop));
+  // the spawn on a drawn road, not on the OSM line 3 m over the terrain (the
+  // road nearest the centre was Zion's tunnel: the car dropped onto the cliff
+  // over it)
+  const roadSpawn = findRoadSpawn(groundCarriageways, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), underDeck, { leftHandTraffic: resolvedRightHandDrive });
+  if (roadSpawn) ({ position: spawnPosition, rotationMatrix: spawnRotationMatrix } = roadSpawn);
   const bridgeDaes = generateBridgeDAEs(
     bridgeDecks,
     (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
