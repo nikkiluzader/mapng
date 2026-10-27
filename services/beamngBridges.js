@@ -284,14 +284,14 @@ export function solveChain(parts, { groundAt, endHeight = groundAt, crossings = 
     const clear = cr.clear ?? DECK_ROAD_CLEAR_M;
     // A road the deck meets right by an abutment and cannot clear is a
     // junction at grade: the deck comes down to it instead.
-    const atGrade = cr.clear == null
+    const atGrade = cr.clear == null && !cr.major
       && interp(toAbut[cr.part], e.s, cr.s) <= AT_GRADE_REACH_M
       && interp(cap[cr.part], e.s, cr.s) < cr.z + AT_GRADE_M;
     edges.forEach((e2, i) => {
       for (let k = 0; k < e2.s.length; k++) {
         let dk = along(d, e2, k);
         if (i === cr.part) dk = Math.min(dk, Math.abs(e2.s[k] - cr.s));
-        if (atGrade) cap[i][k] = Math.min(cap[i][k], cr.z + eased(dk, DECK_MAX_GRADE));
+        if (atGrade) { cap[i][k] = Math.min(cap[i][k], cr.z + eased(dk, DECK_MAX_GRADE)); cr.atGrade = true; }
         else req[i][k] = Math.max(req[i][k], cr.z + clear - eased(dk, DECK_GRADE));
       }
     });
@@ -356,7 +356,7 @@ export function solveChain(parts, { groundAt, endHeight = groundAt, crossings = 
   // How far under its clearance over the roads it crosses (water aside).
   result.roadShortfall = 0;
   for (const cr of crossings) {
-    if (cr.clear != null) continue;
+    if (cr.clear != null || cr.atGrade) continue;   // (a junction at grade by an abutment: not cleared)
     const z = interp(result[cr.part], edges[cr.part].s, cr.s);
     result.roadShortfall = Math.max(result.roadShortfall, cr.z + DECK_ROAD_CLEAR_M - z);
   }
@@ -539,7 +539,9 @@ function planCrossings(partIndex, xy, lines, groundAt) {
         const py = ay + (by - ay) * t;
         const near = (p) => Math.hypot(p[0] - px, p[1] - py) < 1;
         if ((near(xy[0]) || near(xy[xy.length - 1])) && (near(q[0]) || near(q[q.length - 1]))) continue;
-        out.push({ part: partIndex, s: s[i] + t * (s[i + 1] - s[i]), z: line.deck ? cz + (dz - cz) * u : groundAt(px, py) });
+        // (a major road under it is no ramp starting at the abutment: it is
+        // always cleared, never met at grade)
+        out.push({ part: partIndex, s: s[i] + t * (s[i + 1] - s[i]), z: line.deck ? cz + (dz - cz) * u : groundAt(px, py), major: !!line.major });
       }
     }
   }

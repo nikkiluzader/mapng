@@ -48,6 +48,14 @@ const WING_BOTTOM_M = -1;
 const WING_MIN_M = 0.4;                // a wingwall lower than this ends
 const TRENCH_MAX_M = 400;              // the cutting / fill runs out at most this far (bored)
 const APPROACH_LAND_GRADE = 0.12;      // an approach still off the ground there lands at this grade
+const UNDER_BRIDGE_M = 6.5;            // an approach under a bridge stays this far under the ground there ...
+const UNDER_BRIDGE_FLAT_M = 10;        // ... this far either side of it
+// the point at arc length u along stations
+const stationXY = (st, u) => {
+  let best = st[0];
+  for (const q of st) if (Math.abs(q.s - u) < Math.abs(best.s - u)) best = q;
+  return [best.x, best.y];
+};
 
 // Cut-and-cover: a tunnel OSM maps under flat ground (a city deck park, an
 // underpass) is a box sunk below the street, its approaches in a trench.
@@ -528,10 +536,15 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     const z0 = e === 0 ? z[0] : z[n - 1];
     const out = [];
     let calm = 0;
+    // a bridge over the approach: the road stays a deck's clearance under the
+    // ground there, then climbs (a depressed freeway goes on under the
+    // ramps crossing it before it rises)
+    const unders = (a.under || []).map((u) => ({ s: u, cap: groundAt(...stationXY(ap, u)) - UNDER_BRIDGE_M }));
     for (const p of ap) {
       if (p.s > trenchMax) break;
       const gr = groundAt(p.x, p.y);
-      const zz = clamp(gr, z0 - MAX_GRADE * p.s, z0 + MAX_GRADE * p.s);
+      let zz = clamp(gr, z0 - MAX_GRADE * p.s, z0 + MAX_GRADE * p.s);
+      for (const u of unders) zz = Math.min(zz, Math.max(u.cap + MAX_GRADE * Math.max(0, Math.abs(p.s - u.s) - UNDER_BRIDGE_FLAT_M), z0 - MAX_GRADE * p.s));
       out.push({ x: p.x, y: p.y, s: p.s, tx: p.tx, ty: p.ty, z: zz, g: gr, kind: 'cut' });
       calm = Math.abs(gr - zz) < TRENCH_DONE_M ? calm + 1 : 0;
       if (calm * STEP_M >= 10) break;

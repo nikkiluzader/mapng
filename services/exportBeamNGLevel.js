@@ -2813,13 +2813,17 @@ const BERM_RISE_M = 2;          // a rise this steep within BERM_STEP_M is a cli
 const BERM_STEP_M = 4;
 const BERM_MIN_M = 1.5;         // the berm top over the bridge's end
 
+// Road classes a deck always clears (never a junction at grade by its
+// abutment): VA 337 over I-264, Norfolk, came down onto the freeway
+const MAJOR_UNDER_ROADS = new Set(['motorway', 'trunk', 'primary']);
+const AT_GRADE_REACH_M = 12;     // as beamngBridges: a minor road met this near an abutment is at grade
+
 // Roads sunk under decks (sinkRoadsUnderDecks): the drop tapers off along
 // the road at SINK_GRADE, the cutting's floor its carriageway + shoulders,
 // 1:1 sides up to the ground.
 const SINK_GRADE = 0.04;
 const SINK_GRADE_MAX = 0.06;    // steeper where a junction is near, never more
-const SINK_MAX_M = 5;
-const SINK_SEA_CLEAR_M = 0.5;   // the sunk road stays this far above sea level (Norfolk: cut 7 m down, flooded)
+const SINK_MAX_M = 7;
 const SINK_MIN_M = 1.0;         // a deck short by less than this is left (a gentle dip looked like a ramp)
 const SINK_SHOULDER_M = 1.5;
 
@@ -2847,76 +2851,84 @@ function planCrossingPoints(a, b) {
  */
 function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads, tunnels = []) {
   const { width, height, minHeight } = terrainData;
-  // sea level in the level's heights (the terrain's 0 is its lowest point)
-  const seaZ = -(Number(minHeight) || 0) + (Number(terrainData.seaLevelOffset) || 0);
   const hm = heightMapEditor(terrainData);
   const worldSize = width * squareSize;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
   const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
   const near = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1.5;
-  // the road with its plain continuations, as one line with the ground on it
-  const lineOf = (road) => {
-    const line = road.xy.map((p) => [...p]);
+  const touching = (tip, used) => lowerRoads.filter((r) => !used.has(r) && (near(r.xy[0], tip) || near(r.xy[r.xy.length - 1], tip)));
+  const outward = (r, tip) => (near(r.xy[0], tip) ? r.xy : [...r.xy].reverse());
+  const heading = (pts) => {
+    const a = pts[0]; const b = pts[Math.min(pts.length - 1, 3)];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    return [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+  };
+  // A road as a line with the ground on it, every 2 m, from the ground as it
+  // was. through: on through junctions along the road most in line (a
+  // freeway sinks past the ramps meeting it), the others noted as branches
+  // ({ at: [x, y], roads }); else only on through plain continuations.
+  const lineOf = (road, from = null, through = true) => {
+    const raw = from ? outward(road, from).map((p) => [p[0], p[1]]) : road.xy.map((p) => [p[0], p[1]]);
     const used = new Set([road]);
-    for (const end of [0, 1]) {
-      for (let guard = 0; guard < 20; guard++) {
-        const tip = end ? line[line.length - 1] : line[0];
-        const next = lowerRoads.filter((r) => !used.has(r) && (near(r.xy[0], tip) || near(r.xy[r.xy.length - 1], tip)));
-        if (next.length !== 1) break;
-        used.add(next[0]);
-        let piece = near(next[0].xy[0], tip) ? next[0].xy : [...next[0].xy].reverse();
-        piece = piece.slice(1).map((p) => [...p]);
-        if (end) line.push(...piece); else line.unshift(...piece.reverse());
+    const branches = [];
+    for (const end of from ? [1] : [0, 1]) {
+      for (let guard = 0; guard < 40; guard++) {
+        const tip = end ? raw[raw.length - 1] : raw[0];
+        const prev = end ? raw[Math.max(0, raw.length - 4)] : raw[Math.min(raw.length - 1, 3)];
+        const dl = Math.hypot(tip[0] - prev[0], tip[1] - prev[1]) || 1;
+        const dir = [(tip[0] - prev[0]) / dl, (tip[1] - prev[1]) / dl];
+        const next = touching(tip, used);
+        if (!next.length) break;
+        let go = null;
+        if (next.length === 1) go = next[0];
+        else if (through) {
+          // (the same class first: a freeway goes on as the freeway, not
+          // down the ramp leaving it at a shallow angle)
+          const ranked = next.map((r) => { const h = heading(outward(r, tip)); return { r, a: h[0] * dir[0] + h[1] * dir[1] + (r.highway === road.highway ? 0.3 : 0) }; })
+            .sort((p, q) => q.a - p.a);
+          if (ranked[0].a - (ranked[0].r.highway === road.highway ? 0.3 : 0) > 0.8) go = ranked[0].r;
+        }
+        if (!go) break;
+        if (next.length > 1) branches.push({ at: [tip[0], tip[1]], roads: next.filter((r) => r !== go) });
+        next.forEach((r) => used.add(r));
+        const piece = outward(go, tip).slice(1).map((p) => [p[0], p[1]]);
+        if (end) raw.push(...piece); else raw.unshift(...piece.reverse());
       }
     }
-    lineRoads.set(road, used);
-    return line;
+    const line = resample(raw, 2).map(([x, y]) => [x, y, getTerrainHeightAtWorldXY(x, y, terrainData, squareSize)]);
+    const s = [0];
+    for (let i = 1; i < line.length; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+    const stationOf = (x, y) => { let best = Infinity; let sv = 0; line.forEach((p, i) => { const d = Math.hypot(p[0] - x, p[1] - y); if (d < best) { best = d; sv = s[i]; } }); return sv; };
+    return { line, s, used, branches: branches.map((b) => ({ ...b, s: stationOf(...b.at) })), stationOf };
   };
-  const lineRoads = new Map();
   // every sink planned on the ground as it was (planned one after another
   // on ground already cut, the cuts under one deck stacked: Deck Park's
   // freeway went 15 m down), the ones at one crossing merged (the deepest)
   const lines = new Map();
   const plans = [];
   for (const sink of sinks) {
-    if (!lines.has(sink.road)) {
-      const line = resample(lineOf(sink.road).map(([x, y]) => [x, y]), 2).map(([x, y]) => [x, y, getTerrainHeightAtWorldXY(x, y, terrainData, squareSize)]);
-      const s = [0];
-      for (let i = 1; i < line.length; i++) s.push(s[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
-      lines.set(sink.road, { line, s });
-    }
-    const { line, s } = lines.get(sink.road);
-    let s0 = 0; let best = Infinity;
-    line.forEach(([x, y], i) => { const d = Math.hypot(x - sink.at[0], y - sink.at[1]); if (d < best) { best = d; s0 = s[i]; } });
+    // a road in a tunnel's approach cutting is the tunnel's: already sunk
+    if (tunnels.some((t) => t.kind !== 'gallery' && (() => { const n = nearestOnTunnel(t, ...sink.at, t.W + 2); return n && !n.beyond && Math.abs(n.d) < t.W; })())) continue;
+    if (!lines.has(sink.road)) lines.set(sink.road, lineOf(sink.road));
+    const L = lines.get(sink.road);
+    const s0 = L.stationOf(...sink.at);
     const same = plans.find((q) => q.road === sink.road && Math.abs(q.s0 - s0) < 30);
     if (same) { same.deficit = Math.max(same.deficit, sink.deficit); continue; }
-    plans.push({ road: sink.road, line, s, s0, deficit: sink.deficit });
+    plans.push({ road: sink.road, L, s0, deficit: sink.deficit });
   }
-  const cut = [];
-  for (const sink of plans) {
-    const { line, s, s0 } = sink;
-    // the other roads keep their ground (the cut's sides stop at a road
-    // running beside: a ramp next to the sunk one got a 3 m step)
-    const own = lineRoads.get(sink.road) || new Set([sink.road]);
-    // no deeper than the room to the road's ends allows (a junction there:
-    // the other roads meet it at its own height, no step), nor below the sea
-    const room = Math.min(s0 - s[0], s[s.length - 1] - s0);
-    const ground0 = line.reduce((b, p, i) => (Math.abs(s[i] - s0) < Math.abs(s[b] - s0) ? i : b), 0);
-    const aboveSea = line[ground0][2] - (seaZ + SINK_SEA_CLEAR_M);
-    const depth = Math.min(sink.deficit, SINK_GRADE_MAX * room, Math.max(0, aboveSea));
-    if (depth < SINK_MIN_M / 2) continue;
-    sink.deficit = depth;
-    const taper = Math.min(depth / SINK_GRADE, room);
-    const drop = (sv) => { const f = Math.max(0, 1 - Math.abs(sv - s0) / taper); return depth * f * f * (3 - 2 * f); };
-    const floorHalf = sink.road.half + SINK_SHOULDER_M;
-    const reach = floorHalf + sink.deficit + 1;
-    // the stretch of the line the taper covers, and its box
-    const pts = line.map((p, i) => ({ x: p[0], y: p[1], z: p[2], s: s[i] })).filter((p) => Math.abs(p.s - s0) < taper);
-    if (pts.length < 2) continue;
+  const smooth = (f) => f * f * (3 - 2 * f);
+  // lower the ground along a line by drop(s) (its carriageway + shoulders the
+  // floor, 1:1 sides), sparing the roads not in `own` and tunnel cover
+  const cutAlong = (L, drop, sMin, sMax, floorHalf, depth, own) => {
+    const pts = L.line.map((p, i) => ({ x: p[0], y: p[1], z: p[2], s: L.s[i] })).filter((p) => p.s >= sMin && p.s <= sMax);
+    if (pts.length < 2) return;
+    const reach = floorHalf + depth + 1;
     const xs = pts.map((p) => p.x); const ys = pts.map((p) => p.y);
     const [c0, r1] = toPixel(Math.min(...xs) - reach, Math.min(...ys) - reach);
     const [c1, r0] = toPixel(Math.max(...xs) + reach, Math.max(...ys) + reach);
     const box = [Math.min(...xs) - reach - 20, Math.min(...ys) - reach - 20, Math.max(...xs) + reach + 20, Math.max(...ys) + reach + 20];
+    // the other roads keep their ground (the cut's sides stop at a road
+    // running beside: a ramp next to the sunk one got a 3 m step)
     const others = lowerRoads.filter((r) => !own.has(r) && r.xy.some(([x, y]) => x >= box[0] && x <= box[2] && y >= box[1] && y <= box[3]));
     const onOther = (x, y) => others.some((r) => distanceToLine(r.xy, x, y) < r.half + 1);
     for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
@@ -2931,8 +2943,7 @@ function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads, tunnels
           const d = Math.hypot(a.x + vx * t - x, a.y + vy * t - y);
           if (d >= bestD) continue;
           bestD = d;
-          const sv = a.s + (b.s - a.s) * t;
-          target = a.z + (b.z - a.z) * t - drop(sv) + Math.max(0, d - floorHalf);
+          target = a.z + (b.z - a.z) * t - drop(a.s + (b.s - a.s) * t) + Math.max(0, d - floorHalf);
         }
         if (bestD > reach) continue;
         if (bestD > floorHalf && onOther(x, y)) continue;
@@ -2946,7 +2957,37 @@ function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads, tunnels
         if (target + minHeight < hm.at(idx)) hm.set(idx, target + minHeight);
       }
     }
-    cut.push({ at: [line.reduce((b, p, i) => (Math.abs(s[i] - s0) < Math.abs(s[b] - s0) ? i : b), 0)].map((i) => [Math.round(line[i][0]), Math.round(line[i][1])])[0], depth: Math.round(sink.deficit * 10) / 10 });
+  };
+  const cut = [];
+  for (const sink of plans) {
+    const { L, s0 } = sink;
+    // (below the sea is fine: the sea is drawn where the ground was under it
+    // before any grading, so a cut stays dry); no deeper than the room to the
+    // line's ends allows
+    const room = Math.min(s0 - L.s[0], L.s[L.s.length - 1] - s0);
+    const depth = Math.min(sink.deficit, SINK_GRADE_MAX * room);
+    if (depth < SINK_MIN_M / 2) continue;
+    const taper = Math.min(depth / SINK_GRADE, room);
+    const drop = (sv) => depth * smooth(Math.max(0, 1 - Math.abs(sv - s0) / taper));
+    // the roads meeting it where it is lowered go down with it: each from
+    // the depth at the junction back up along itself
+    const branchCuts = [];
+    for (const br of L.branches) {
+      const dj = drop(br.s);
+      if (dj < 0.3) continue;
+      for (const road of br.roads) {
+        const B = lineOf(road, br.at, false);
+        const tB = Math.min(dj / SINK_GRADE, B.s[B.s.length - 1]);
+        branchCuts.push({ B, road, dj, tB });
+      }
+    }
+    const own = new Set([...L.used, ...branchCuts.flatMap((bc) => [...bc.B.used])]);
+    cutAlong(L, drop, s0 - taper, s0 + taper, sink.road.half + SINK_SHOULDER_M, depth, own);
+    for (const { B, road, dj, tB } of branchCuts) {
+      cutAlong(B, (sb) => dj * smooth(Math.max(0, 1 - sb / tB)), 0, tB, road.half + SINK_SHOULDER_M, dj, own);
+    }
+    const i0 = L.s.reduce((bi, sv, i) => (Math.abs(sv - s0) < Math.abs(L.s[bi] - s0) ? i : bi), 0);
+    cut.push({ at: [Math.round(L.line[i0][0]), Math.round(L.line[i0][1])], depth: Math.round(depth * 10) / 10, branches: branchCuts.length });
   }
   return cut;
 }
@@ -3121,7 +3162,9 @@ function carryOnApproaches(parts, lowerRoads, requests, groundAt) {
         if (t >= 0) limit = Math.min(limit, walked + t * L - CARRY_CLEAR_M);
         // nor through a junction: a road meeting the approach is at grade
         const tj = meetsRoad(line[i], line[i + 1], new Set([...used, ...start]));
-        if (tj >= 0) limit = Math.min(limit, walked + tj * L - CARRY_CLEAR_M);
+        // (up to it, not short of it: there the deck comes down to the road
+        // meeting it, as a ramp leaving a freeway is at its level at the gore)
+        if (tj >= 0) limit = Math.min(limit, walked + tj * L);
         if (walked + L >= limit) break walk;
         walked += L;
         path.push([line[i + 1][0], line[i + 1][1]]);
@@ -3230,6 +3273,8 @@ function solveExportBridges(drivableRoads, terrainData, squareSize, tunnels = []
           layer: Math.min(layer, 0),
           xy: xy.map(([x, y]) => [x, y, groundAt(x, y)]),
           half: (HIGHWAY_STYLE[seg.highway] ?? DEFAULT_ROAD_STYLE).width ?? 4,
+          major: MAJOR_UNDER_ROADS.has(seg.highway),
+          highway: seg.highway,
         });
       }
     });
@@ -3371,9 +3416,11 @@ function solveExportBridges(drivableRoads, terrainData, squareSize, tunnels = []
     for (const part of deck.parts) {
       for (const road of lowerRoads) {
         for (const [px, py] of planCrossingPoints(part.xy, road.xy)) {
-          // an approach meeting the deck's end only touches it
+          // an approach meeting the deck's end only touches it; a minor road
+          // met right by an abutment is a junction at grade (the solver's rule)
           const at = (p) => Math.hypot(p[0] - px, p[1] - py) < 1.5;
           if ((at(part.xy[0]) || at(part.xy[part.xy.length - 1])) && (at(road.xy[0]) || at(road.xy[road.xy.length - 1]))) continue;
+          if (!road.major && deck.abutments.some(([ax, ay]) => Math.hypot(ax - px, ay - py) < AT_GRADE_REACH_M)) continue;
           const deficit = groundAt(px, py) + DECK_ROAD_CLEAR_M - deckHeightAt(part, px, py);
           if (deficit > SINK_MIN_M / 2) sinks.push({ road, at: [px, py], deficit: Math.min(SINK_MAX_M, deficit + 0.2) });
         }
@@ -3922,6 +3969,21 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
     const n = xy.length;
     const approaches = [approachAt(xy[0], dirOut(xy[0], xy[1])), approachAt(xy[n - 1], dirOut(xy[n - 1], xy[n - 2]))];
     if (approaches.some((a) => a?.defer)) return undefined;   // meets a bridge: after the bridges
+    // bridge roads crossing an approach: where (arc length from the tunnel's end)
+    for (const a of approaches) {
+      if (!a?.xy || Number.isFinite(a.deckZ)) continue;
+      const sAlong = [0];
+      for (let i = 1; i < a.xy.length; i++) sAlong.push(sAlong[i - 1] + Math.hypot(a.xy[i][0] - a.xy[i - 1][0], a.xy[i][1] - a.xy[i - 1][1]));
+      a.under = [];
+      for (const r of others) {
+        if (!r.bridgeRoad) continue;
+        for (let i = 0; i + 1 < a.xy.length; i++) {
+          for (const [px, py] of planCrossingPoints([a.xy[i], a.xy[i + 1]], r.xy)) {
+            a.under.push(sAlong[i] + Math.hypot(px - a.xy[i][0], py - a.xy[i][1]));
+          }
+        }
+      }
+    }
     done.add(key);
     // the bore carried on along a bridge still in the rock
     const bore = [...[...(approaches[0]?.rock || [])].reverse(), ...xy, ...(approaches[1]?.rock || [])];
@@ -5892,11 +5954,13 @@ const NATIVE_BARRIER_ASSETS = {
     shapeName: '/levels/west_coast_usa/art/shapes/objects/guardrail1.dae',
     postShapeName: '/levels/west_coast_usa/art/shapes/objects/guardrailpost.dae',
     endShapeName: '/levels/west_coast_usa/art/shapes/objects/guardrail_end.dae',
-    segmentLength: 3.8,
+    // the rail runs along its local X, 2.4 m (West Coast USA lays them so,
+    // 1.97 m apart: at +90° every panel stood across the road)
+    segmentLength: 2,
     zOffset: 0.15,
     postZOffset: 0.02,
     endZOffset: 0.08,
-    yawOffset: Math.PI * 0.5,
+    yawOffset: 0,
   },
   concrete: {
     shapeName: '/levels/west_coast_usa/art/shapes/objects/jerseybarrier_3m.dae',
@@ -6106,7 +6170,11 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       const lat = a.lat + (b.lat - a.lat) * t;
       const lng = a.lng + (b.lng - a.lng) * t;
       const world = geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
-      const yaw = Math.atan2(b.lat - a.lat, b.lng - a.lng);
+      // in metres, not degrees (a degree of longitude is shorter: diagonal
+      // runs were skewed by several degrees)
+      const wa = geoToWorldPoint(a.lat, a.lng, terrainData, squareSize, 0);
+      const wb = geoToWorldPoint(b.lat, b.lng, terrainData, squareSize, 0);
+      const yaw = Math.atan2(wb[1] - wa[1], wb[0] - wa[0]);
       return {
         lat,
         lng,
@@ -6177,8 +6245,13 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     const endPt = feature.geometry[feature.geometry.length - 1];
     const prevPt = feature.geometry[feature.geometry.length - 2];
 
-    const startYaw = Math.atan2(nextPt.lat - startPt.lat, nextPt.lng - startPt.lng);
-    const endYaw = Math.atan2(endPt.lat - prevPt.lat, endPt.lng - prevPt.lng);
+    const yawFrom = (p, q) => {
+      const wp = geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
+      const wq = geoToWorldPoint(q.lat, q.lng, terrainData, squareSize, 0);
+      return Math.atan2(wq[1] - wp[1], wq[0] - wp[0]);
+    };
+    const startYaw = yawFrom(startPt, nextPt);
+    const endYaw = yawFrom(prevPt, endPt);
     const rotationStartYaw = startYaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
     const rotationEndYaw = endYaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
 
