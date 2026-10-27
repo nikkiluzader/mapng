@@ -902,6 +902,9 @@ function buildTunnelGroups(tunnels, daes, levelName) {
       position: d.origin,
       shapeName: `/levels/${levelName}/map_assets/custom_assets/tunnels/tunnel_${d.key}.dae`,
       collisionType: 'Collision Mesh',
+      // roads ride the tube floors; a portal is all walls, which a road decal
+      // clipped over objects above them (a ramp on a bridge) smears down
+      ...(d.part.startsWith('portal') ? { decalType: 'None' } : {}),
       prebuildCollisionData: 0,
       useInstanceRenderData: true,
     }));
@@ -4415,15 +4418,20 @@ export function generateDecalRoads(terrainData, squareSize) {
         segmentCounterByName.set(cleanName, segCount);
         const nameSuffix = `s${segCount}`;
         const roadNamePrefix = sanitizeBeamNGObjectName(`dr_${cleanName}`);
+        const onStructure = bridges.bySeg.has(segIndex) || tunnels.bySeg.has(segIndex) || inTubeSeg.has(segIndex);
         for (let d = 0; d < layeredDecals.length; d++) {
           const decal = layeredDecals[d];
           // paving strips are several Base layers: numbered
           const layerCode = decal.__layer === 'paving' ? `b${d + 1}` : LAYER_CODE[decal.name] || `l${d + 1}`;
+          // A grass verge hangs past the deck / tube floor: clipped over objects it
+          // smears down the walls and parapets below it, so it is left off there.
+          const edgeBlend = layerCode === 'ebl' || layerCode === 'ebr';
+          if (edgeBlend && onStructure) continue;
           decal.name = sanitizeBeamNGObjectName(`${roadNamePrefix}_${nameSuffix}_${layerCode}`);
           // On a bridge the road clips onto the deck, in a tunnel onto its
           // floor: without overObjects a DecalRoad is projected onto the
           // terrain (the hill over a tunnel).
-          if (bridges.bySeg.has(segIndex) || bridges.approaches?.has(segIndex) || tunnels.bySeg.has(segIndex) || inTubeSeg.has(segIndex)) decal.overObjects = true;
+          if (!edgeBlend && (onStructure || bridges.approaches?.has(segIndex))) decal.overObjects = true;
           splineGroup.__items.push(decal);
           if (isCutPaintLayer(decal.__layer)) paintDecals.push({ decal, group: splineGroup, owner: segIndex });
         }
