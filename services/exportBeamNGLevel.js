@@ -72,6 +72,7 @@ import {
   getDefaultLaneWidthMeters,
   isOneWayRoad,
   NON_DRIVEABLE_HIGHWAYS,
+  streetParkingSide,
 } from './roadWidth.js';
 import {
   getBeamNGBiomeById,
@@ -4259,6 +4260,7 @@ const FOOTPATH_MIN_M = 4;
 // elsewhere) and gravel in the country; the rest asphalt.
 const SERVICE_WIDTH_M = { driveway: 3.2, parking_aisle: 6, alley: 4, 'drive-through': 3.5, emergency_access: 3.5 };
 const SERVICE_DEFAULT_WIDTH_M = 4.5;
+const SERVICE_SPLIT_COS = Math.cos(45 * Math.PI / 180);
 
 /** The surface layers of a pedestrian street fullWidth wide (untagged: as paving stones). */
 export function pedestrianSurfaceLayers(surface, fullWidth, { americas = false } = {}) {
@@ -4308,6 +4310,14 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
   });
   const isUrban = buildUrbanRoadClassifier(terrainData.osmFeatures || []);
   let serviceCount = 0; let serviceLength = 0;
+  // vertices shared by two or more roads: a service road's square end there
+  // is carried on half its width, closing the corner where aisles meet
+  const nodeKey = (p) => `${p.lat.toFixed(7)},${p.lng.toFixed(7)}`;
+  const roadsAtNode = new Map();
+  for (const f of terrainData.osmFeatures || []) {
+    if (f?.type !== 'road' || !(f.geometry?.length >= 2)) continue;
+    for (const k of new Set(f.geometry.map(nodeKey))) roadsAtNode.set(k, (roadsAtNode.get(k) || 0) + 1);
+  }
   for (const feature of terrainData.osmFeatures || []) {
     const tags = feature?.tags || {};
     const footpath = Object.hasOwn(FOOTPATH_WIDTH_M, tags.highway);
@@ -4341,6 +4351,44 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
           world.push([Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, Math.round(z * 1000) / 1000, fullWidth / 2]);
         }
       }
+      if (service && world.length >= 2) {
+        const extend = (end, prev, atKey) => {
+          if ((roadsAtNode.get(atKey) || 0) < 2) return;
+          const dx = end[0] - prev[0]; const dy = end[1] - prev[1]; const d = Math.hypot(dx, dy);
+          if (d < 1e-6) return;
+          end[0] = Math.round((end[0] + (dx / d) * fullWidth / 2) * 1000) / 1000;
+          end[1] = Math.round((end[1] + (dy / d) * fullWidth / 2) * 1000) / 1000;
+        };
+        extend(world[0], world[1], nodeKey(piece[0]));
+        extend(world[world.length - 1], world[world.length - 2], nodeKey(piece[piece.length - 1]));
+      }
+      // a service road turning sharply (a car park's loop aisle turns 90° at
+      // its corners): one DecalRoad cannot, it pinches and leaves a gap; split
+      // there into pieces carried half the width past the corner
+      const serviceRuns = [];
+      if (service) {
+        let start = 0;
+        for (let k = 1; k + 1 < world.length; k++) {
+          const ax = world[k][0] - world[k - 1][0]; const ay = world[k][1] - world[k - 1][1];
+          const bx = world[k + 1][0] - world[k][0]; const by = world[k + 1][1] - world[k][1];
+          const la = Math.hypot(ax, ay); const lb = Math.hypot(bx, by);
+          if (la < 1e-6 || lb < 1e-6 || (ax * bx + ay * by) / (la * lb) > SERVICE_SPLIT_COS) continue;
+          const part = world.slice(start, k + 1).map((p) => [...p]);
+          const end = part[part.length - 1];
+          end[0] = Math.round((end[0] + (ax / la) * fullWidth / 2) * 1000) / 1000;
+          end[1] = Math.round((end[1] + (ay / la) * fullWidth / 2) * 1000) / 1000;
+          serviceRuns.push(part);
+          start = k;
+        }
+        const last = world.slice(start).map((p) => [...p]);
+        if (start > 0) {
+          const [p0, p1] = last;
+          const dx = p1[0] - p0[0]; const dy = p1[1] - p0[1]; const d = Math.hypot(dx, dy) || 1;
+          p0[0] = Math.round((p0[0] - (dx / d) * fullWidth / 2) * 1000) / 1000;
+          p0[1] = Math.round((p0[1] - (dy / d) * fullWidth / 2) * 1000) / 1000;
+        }
+        serviceRuns.push(last);
+      }
       // a footpath along a street's raised sidewalk is that sidewalk: its
       // stretches there are left out
       const runs = [];
@@ -4351,7 +4399,8 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
           if (onSidewalk(p[0], p[1], b[0] - a[0], b[1] - a[1])) { if (run.length) runs.push(run); run = []; } else run.push(p);
         });
         if (run.length) runs.push(run);
-      } else runs.push(world);
+      } else if (service) runs.push(...serviceRuns);
+      else runs.push(world);
       for (const nodes of runs) {
       if (nodes.length < 2) continue;
       if (footpath && pathLength(nodes) < FOOTPATH_MIN_M) continue;
@@ -4630,6 +4679,7 @@ export function generateDecalRoads(terrainData, squareSize) {
         owner: segIndex, nodes: centerNodes, half: styleHalfWidth,
         tags: renderTags, highway, urban: urbanRoad, wayId: feature.id, oneWay: isOneWay,
         bridge: !!bridgePart, tunnel: tunnels.bySeg.has(segIndex),
+        leftExtra: crossSection.leftExtra, rightExtra: crossSection.rightExtra,
       });
 
       const layeredDecals = getLayeredRoadDecals(
@@ -7808,6 +7858,7 @@ function buildClearanceIndex(strips) {
 // clear of buildings, roads and other aisles.
 const PARKING_BAY_W = 2.5;
 const PARKING_BAY_L = 5.5;
+const PARKING_BAY_DEPTHS = [PARKING_BAY_L, 4.8];
 const PARKING_AISLE_HALF = 3;
 const PARKING_END_CLEAR_M = 2;
 const PARKING_OLD_ID_BASE = 100000;
@@ -7820,6 +7871,7 @@ export function buildParkingMarkings(spots, terrainData, squareSize) {
   const seen = new Set();
   const decals = [];
   for (const sp of spots) {
+    if (sp.unmarked) continue;
     const [x, y] = sp.pos;
     const yaw = 2 * Math.atan2(sp.rot[2], sp.rot[3]);
     const ax = Math.cos(yaw); const ay = Math.sin(yaw);     // across the bay (local X)
@@ -7841,12 +7893,20 @@ export function buildParkingMarkings(spots, terrainData, squareSize) {
   return decals;
 }
 
-export function buildParkingSpots(terrainData, squareSize, carriageways = []) {
+// Street parking: spaces in the parking lane of every carriageway that has
+// one (OSM parking:* tags, or the urban default lane the cross-section
+// adds), parallel spaces a car long, angled / perpendicular stalls where
+// tagged, clear of junctions, side roads, driveways and crosswalks.
+const STREET_SPACE_L = 6.0;
+const STREET_STALL_W = 2.6;
+const STREET_JUNCTION_CLEAR_M = 4;   // past a crossing road's edge
+const STREET_DRIVEWAY_CLEAR_M = 2.5;
+
+export function buildParkingSpots(terrainData, squareSize, carriageways = [], { crosswalkZones = [], leftHandTraffic = false } = {}) {
   const toXY = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
   const feats = terrainData.osmFeatures || [];
   const aisles = feats.filter((f) => f?.type === 'road' && f.tags?.highway === 'service' && f.tags?.service === 'parking_aisle' && f.geometry?.length >= 2)
-    .map((f) => ({ id: f.id, xy: f.geometry.map(toXY), half: (Number.parseFloat(f.tags.width) / 2) || PARKING_AISLE_HALF }));
-  if (!aisles.length) return [];
+    .map((f) => ({ id: f.id, xy: f.geometry.map(toXY), half: (Number.parseFloat(f.tags.width) / 2) || PARKING_AISLE_HALF, surface: String(f.tags.surface || '').toLowerCase() }));
   const ringOf = (f) => f.geometry.map(toXY);
   const lots = feats.filter((f) => f?.tags?.amenity === 'parking' && f.geometry?.length >= 3 && !['multi-storey', 'underground', 'rooftop'].includes(f.tags.parking)).map(ringOf);
   const buildings = feats.filter((f) => f?.type === 'building' && f.geometry?.length >= 3).map(ringOf);
@@ -7894,6 +7954,37 @@ export function buildParkingSpots(terrainData, squareSize, carriageways = []) {
   const aislesAt = grid(segments(aisles), (sg) => boxOfXY(sg.xy, sg.half + PARKING_BAY_L));
   const spotGrid = new Map();
   const spots = [];
+  // bays as rectangles (corner rings), overlap by separating axes, shrunk a
+  // little so neighbours sharing a line do not count
+  const SPOT_CELL = 8;
+  const overlapsRect = (a, b) => {
+    for (const poly of [a, b]) {
+      for (let i = 0; i < 4; i++) {
+        const [x1, y1] = poly[i]; const [x2, y2] = poly[(i + 1) % 4];
+        const nx = y1 - y2; const ny = x2 - x1;
+        let amin = Infinity; let amax = -Infinity; let bmin = Infinity; let bmax = -Infinity;
+        for (const [px, py] of a) { const d = px * nx + py * ny; amin = Math.min(amin, d); amax = Math.max(amax, d); }
+        for (const [px, py] of b) { const d = px * nx + py * ny; bmin = Math.min(bmin, d); bmax = Math.max(bmax, d); }
+        const len = Math.hypot(nx, ny) || 1;
+        if (amax - bmin < 0.15 * len || bmax - amin < 0.15 * len) return false;
+      }
+    }
+    return true;
+  };
+  const overlapsSpot = (corners) => {
+    const cx = corners.reduce((t, p) => t + p[0], 0) / 4; const cy = corners.reduce((t, p) => t + p[1], 0) / 4;
+    for (let ox = -1; ox <= 1; ox++) for (let oy = -1; oy <= 1; oy++) {
+      for (const other of spotGrid.get(`${Math.floor(cx / SPOT_CELL) + ox},${Math.floor(cy / SPOT_CELL) + oy}`) || []) {
+        if (overlapsRect(corners, other)) return true;
+      }
+    }
+    return false;
+  };
+  const addSpotRect = (x, y, corners) => {
+    const k = `${Math.floor(x / SPOT_CELL)},${Math.floor(y / SPOT_CELL)}`;
+    if (!spotGrid.has(k)) spotGrid.set(k, []);
+    spotGrid.get(k).push(corners);
+  };
   for (const aisle of aisles) {
     // the lot this aisle runs in (its bays stay inside it), if it is mapped
     const lot = lots.find((ring) => aisle.xy.some(([x, y]) => inRing(x, y, ring)));
@@ -7907,31 +7998,31 @@ export function buildParkingSpots(terrainData, squareSize, carriageways = []) {
       for (const side of [1, -1]) {
         // the bay's depth runs away from the aisle: its local Y (scl [w, l, h])
         const dx = -uy * side; const dy = ux * side;
-        const off = aisle.half + PARKING_BAY_L / 2;
         const yaw = Math.atan2(-dx, dy);
         for (let k = 0; k < n; k++) {
           const s = start + k * PARKING_BAY_W;
-          const x = ax + ux * s + dx * off; const y = ay + uy * s + dy * off;
-          // the bay's corners
-          const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [x + ux * a * PARKING_BAY_W / 2 + dx * b * PARKING_BAY_L / 2, y + uy * a * PARKING_BAY_W / 2 + dy * b * PARKING_BAY_L / 2]);
+          // full depth, else a shorter bay where two rows meet back to back
+          let fit = null;
+          for (const depth of PARKING_BAY_DEPTHS) {
+            const o = aisle.half + depth / 2;
+            const cx = ax + ux * s + dx * o; const cy = ay + uy * s + dy * o;
+            const cs = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [cx + ux * a * PARKING_BAY_W / 2 + dx * b * depth / 2, cy + uy * a * PARKING_BAY_W / 2 + dy * b * depth / 2]);
+            if (!overlapsSpot(cs)) { fit = { x: cx, y: cy, corners: cs, depth }; break; }
+          }
+          if (!fit) continue;
+          const { x, y, corners, depth } = fit;
           if (lot && !corners.every(([cx, cy]) => inRing(cx, cy, lot))) continue;
           if (buildingsAt(x, y).some((ring) => corners.some(([cx, cy]) => inRing(cx, cy, ring)) || inRing(x, y, ring))) continue;
           if (roadsAt(x, y).some((sg) => distToLine(sg.xy, x, y) < sg.half + PARKING_BAY_L / 2)) continue;
           if (aislesAt(x, y).some((sg) => sg.line !== aisle && distToLine(sg.xy, x, y) < sg.half + PARKING_BAY_L / 2 - 0.3)) continue;
-          const sk = `${Math.floor(x / 4)},${Math.floor(y / 4)}`;
-          let near = false;
-          for (let ox = -1; ox <= 1 && !near; ox++) for (let oy = -1; oy <= 1 && !near; oy++) {
-            near = (spotGrid.get(`${Math.floor(x / 4) + ox},${Math.floor(y / 4) + oy}`) || []).some((sp) => Math.hypot(sp[0] - x, sp[1] - y) < PARKING_BAY_W * 0.9);
-          }
-          if (near) continue;
-          if (!spotGrid.has(sk)) spotGrid.set(sk, []);
-          spotGrid.get(sk).push([x, y]);
+          if (overlapsSpot(corners)) continue;
+          addSpotRect(x, y, corners);
           const z = getTerrainHeightAtWorldXY(x, y, terrainData, squareSize);
           spots.push({
             name: `parking_${aisle.id}_${i}_${side > 0 ? 'l' : 'r'}${k + 1}`,
             pos: [roundTo(x, 3), roundTo(y, 3), roundTo(z, 3)],
             rot: [0, 0, roundTo(Math.sin(yaw / 2), 6), roundTo(Math.cos(yaw / 2), 6)],
-            scl: [PARKING_BAY_W, PARKING_BAY_L, 3],
+            scl: [PARKING_BAY_W, depth, 3],
             color: [1, 1, 1],
             customFields: { names: {}, tags: {}, types: {}, values: {} },
             isMultiSpot: false,
@@ -7939,10 +8030,87 @@ export function buildParkingSpots(terrainData, squareSize, carriageways = []) {
             // load stopped in sortedList.lua); past the zones' ids
             oldId: PARKING_OLD_ID_BASE + spots.length,
           });
+          // the ground under the bay: its aisle's surface (terrain paint)
+          Object.defineProperty(spots[spots.length - 1], 'ground', { value: { corners, surface: aisle.surface, inLot: !!lot } });
         }
       }
     }
   }
+  // ── street parking ─────────────────────────────────────────────────────
+  const ground = carriageways.filter((cw) => !cw.bridge && !cw.tunnel && cw.nodes?.length >= 2);
+  const cwSegs = grid(ground.flatMap((cw) => cw.nodes.slice(0, -1).map((p, i) => ({ xy: [p, cw.nodes[i + 1]], half: cw.half, cw }))),
+    (sg) => boxOfXY(sg.xy, sg.half + STREET_JUNCTION_CLEAR_M + STREET_SPACE_L));
+  // driveways and other ways that are not drawn carriageways still need a gap
+  const minorWays = feats.filter((f) => f?.type === 'road' && f.geometry?.length >= 2
+    && ['service', 'track', 'unclassified', 'residential', 'living_street'].includes(f.tags?.highway))
+    .map((f) => ({ id: f.id, xy: f.geometry.map(toXY), half: 0 }));
+  const minorAt = grid(segments(minorWays), (sg) => boxOfXY(sg.xy, STREET_DRIVEWAY_CLEAR_M + STREET_SPACE_L));
+  const inZone = (x, y) => crosswalkZones.some((z) => {
+    const dx = x - z.x; const dy = y - z.y;
+    return Math.abs(dx * z.ux + dy * z.uy) < z.halfLength + STREET_SPACE_L / 2 && Math.abs(-dx * z.uy + dy * z.ux) < z.halfWidth + 1;
+  });
+  let streetSpaces = 0;
+  for (const cw of ground) {
+    const urban = !!cw.urban;
+    for (const side of ['left', 'right']) {
+      const extra = side === 'left' ? cw.leftExtra : cw.rightExtra;
+      if (!(extra > 1.5)) continue;
+      const kind = streetParkingSide(cw.tags || {}, cw.highway, cw.oneWay, { urban }, side);
+      if (!kind) continue;
+      const sgn = side === 'left' ? 1 : -1;
+      const parallel = kind.orientation === 'parallel';
+      const pitch = parallel ? STREET_SPACE_L : STREET_STALL_W;
+      const off = cw.half - extra / 2;
+      // cars face the traffic on their side (both sides with it on a one-way)
+      const facing = cw.oneWay || (side === 'right') !== leftHandTraffic ? 1 : -1;
+      // walk the centreline by arc length, a space every pitch metres
+      const xy = cw.nodes;
+      let carry = pitch / 2;
+      for (let i = 0; i + 1 < xy.length; i++) {
+        const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
+        const L = Math.hypot(bx - ax, by - ay);
+        if (L < 1e-6) continue;
+        const ux = (bx - ax) / L; const uy = (by - ay) / L;
+        const nx = -uy * sgn; const ny = ux * sgn;       // toward this side's kerb
+        let s = carry;
+        for (; s < L; s += pitch) {
+          const x = ax + ux * s + nx * off; const y = ay + uy * s + ny * off;
+          // the space's depth axis (local Y): along the road for a parallel
+          // space (its car's length), toward the kerb for a stall
+          const dx = parallel ? ux * facing : nx; const dy = parallel ? uy * facing : ny;
+          const wAcross = parallel ? extra : STREET_STALL_W;
+          const lAlong = parallel ? STREET_SPACE_L - 0.4 : extra;
+          const yaw = Math.atan2(-dx, dy);
+          if (cwSegs(x, y).some((sg) => sg.cw !== cw && sg.cw.wayId !== cw.wayId
+            && distToLine(sg.xy, x, y) < sg.half + STREET_JUNCTION_CLEAR_M + (parallel ? STREET_SPACE_L / 2 : STREET_STALL_W / 2))) continue;
+          if (minorAt(x, y).some((sg) => sg.line.id !== cw.wayId && distToLine(sg.xy, x, y) < STREET_DRIVEWAY_CLEAR_M + (parallel ? STREET_SPACE_L / 2 : STREET_STALL_W / 2))) continue;
+          if (inZone(x, y)) continue;
+          if (buildingsAt(x, y).some((ring) => inRing(x, y, ring))) continue;
+          const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [x + dy * a * wAcross / 2 + dx * b * lAlong / 2, y - dx * a * wAcross / 2 + dy * b * lAlong / 2]);
+          if (overlapsSpot(corners)) continue;
+          addSpotRect(x, y, corners);
+          const z = getTerrainHeightAtWorldXY(x, y, terrainData, squareSize);
+          const spot = {
+            name: `street_parking_${cw.wayId}_${side[0]}${streetSpaces + 1}`,
+            pos: [roundTo(x, 3), roundTo(y, 3), roundTo(z, 3)],
+            rot: [0, 0, roundTo(Math.sin(yaw / 2), 6), roundTo(Math.cos(yaw / 2), 6)],
+            scl: [roundTo(wAcross, 3), roundTo(lAlong, 3), 3],
+            color: [1, 1, 1],
+            customFields: { names: {}, tags: {}, types: {}, values: {} },
+            isMultiSpot: false,
+            oldId: PARKING_OLD_ID_BASE + spots.length,
+          };
+          // (painted stall lines for angled / perpendicular stalls only:
+          // parallel street parking is mostly unmarked)
+          if (parallel) Object.defineProperty(spot, 'unmarked', { value: true });
+          spots.push(spot);
+          streetSpaces++;
+        }
+        carry = s - L;
+      }
+    }
+  }
+
   return spots;
 }
 
@@ -8063,6 +8231,17 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
         const k = `${cx},${cy}`;
         if (!avoid.has(k)) avoid.set(k, []);
         avoid.get(k).push(item);
+      }
+    }
+  }
+  for (const ring of terrainData.parkingBayRings || []) {
+    const box = [Math.min(...ring.map((p) => p[0])) - 1, Math.min(...ring.map((p) => p[1])) - 1, Math.max(...ring.map((p) => p[0])) + 1, Math.max(...ring.map((p) => p[1])) + 1];
+    const item = { ring, box, isBuilding: false, isOpen: false };
+    for (let cx = Math.floor(box[0] / AVOID_CELL); cx <= Math.floor(box[2] / AVOID_CELL); cx++) {
+      for (let cy = Math.floor(box[1] / AVOID_CELL); cy <= Math.floor(box[3] / AVOID_CELL); cy++) {
+        const key = `${cx},${cy}`;
+        if (!avoid.has(key)) avoid.set(key, []);
+        avoid.get(key).push(item);
       }
     }
   }
@@ -9386,6 +9565,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
   }
 
+  // parking spaces (city.sites.json) now: the terrain paints their bays
+  const parkingSpots = buildParkingSpots(exportTerrainData, squareSize, decalRoads.carriageways || [], {
+    crosswalkZones: decalRoads.crosswalkZones || [],
+    leftHandTraffic: !!exportTerrainData.roadRules?.leftHandTraffic,
+  });
+  // (and the trees keep out of them)
+  exportTerrainData.parkingBayRings = parkingSpots.filter((sp) => sp.ground).map((sp) => sp.ground.corners);
+
   beginStep('materials', effectivePbrSource !== 'none'
     ? `Painting terrain materials from OSM land use (${size}×${size} layer map)…`
     : 'Writing the default terrain material…');
@@ -9395,6 +9582,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         imageCanvas,
         vegetationMask,
         groundClasses: exportTerrainData.groundClasses,
+        parkingBays: parkingSpots.filter((sp) => sp.ground && !sp.ground.inLot).map((sp) => sp.ground),
       })
     : null;
 
@@ -9754,7 +9942,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // Editor), with a zone along every named road: the minimap's label names
   // the road being driven (services/roadNameZones.js).
   const roadNameZones = buildRoadNameZones(decalRoads.carriageways || []);
-  const parkingSpots = buildParkingSpots(exportTerrainData, squareSize, decalRoads.carriageways || []);
   const parkingLines = roadType !== 'none' ? buildParkingMarkings(parkingSpots, exportTerrainData, squareSize) : [];
   if (parkingLines.length) {
     decalRoads.push({ class: 'SimGroup', name: 'parking_markings', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: parkingLines });

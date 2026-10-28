@@ -551,6 +551,22 @@ function rasterizePolygon(layerMap, size, ring, matIdx) {
  * Return material index for an OSM area/polygon feature, or -1 if unrecognized.
  */
 const LAWN = 9;
+// a parking bay's paint from its aisle's surface= (untagged: asphalt)
+function bayMaterial(surface) {
+  if (surface === 'concrete' || surface === 'paving_stones' || surface === 'sett') return 7;
+  if (surface === 'gravel' || surface === 'fine_gravel' || surface === 'compacted' || surface === 'pebblestone') return 6;
+  if (surface === 'dirt' || surface === 'ground' || surface === 'earth' || surface === 'unpaved' || surface === 'sand') return 2;
+  if (surface === 'grass' || surface === 'grass_paver') return LAWN;
+  return 5;
+}
+function inPxRing(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i]; const b = ring[j];
+    if ((a.py > y) !== (b.py > y) && x < ((b.px - a.px) * (y - a.py)) / ((b.py - a.py) || 1e-12) + a.px) inside = !inside;
+  }
+  return inside;
+}
 // osmTexture.js GROUND_CLASSES 'grass' (green, not dry) and 'trees': a
 // yard's lawn runs on under its trees (left out, every crown and house
 // shadow was a patch of weedy field grass in the lawn)
@@ -648,7 +664,7 @@ export function isVegetationColor(r, g, b) {
   return (h >= 60 && h <= 160 && s > 0.12) || (h >= 40 && h < 60 && s > 0.1 && max > 0.35);
 }
 
-function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groundClasses = null, dryLook = false } = {}) {
+function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groundClasses = null, dryLook = false, parkingBays = [] } = {}) {
   const { width: size, bounds, osmFeatures = [] } = terrainData;
   const metersPerPixel = worldSize / size;
   const layerMap = new Uint8Array(size * size);
@@ -706,6 +722,27 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
         if (!yard[i] || (layerMap[i] !== 1 && layerMap[i] !== 0)) continue;
         if (g ? lawnClasses.has(g.cls[gy + Math.min(g.w - 1, Math.floor((x / size) * g.w))]) : layerMap[i] === 1) layerMap[i] = LAWN;
       }
+    }
+  }
+
+  // 1d. Parking bays (world-space corner rings): their aisle's surface where
+  // the ground under them is still grass or bare (a lot OSM mapped only by
+  // its aisles; a mapped lot is painted already, gravel lots stay gravel)
+  if (parkingBays.length) {
+    const toLayer = (v) => (v / worldSize + 0.5) * (size - 1);
+    const soft = new Set([0, 1, 7, 8, LAWN]);   // (7: the generic concrete of commercial land)
+    for (const { corners, surface } of parkingBays) {
+      const mat = bayMaterial(surface);
+      const ring = corners.map(([x, y]) => ({ px: toLayer(x), py: toLayer(y) }));
+      const tmp = [];
+      let x0 = Infinity; let x1 = -Infinity; let y0 = Infinity; let y1 = -Infinity;
+      for (const p of ring) { x0 = Math.min(x0, p.px); x1 = Math.max(x1, p.px); y0 = Math.min(y0, p.py); y1 = Math.max(y1, p.py); }
+      for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(size - 1, Math.ceil(y1)); y++) {
+        for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(size - 1, Math.ceil(x1)); x++) {
+          if (soft.has(layerMap[y * size + x]) && inPxRing(x, y, ring)) tmp.push(y * size + x);
+        }
+      }
+      for (const i of tmp) layerMap[i] = mat;
     }
   }
 
@@ -1055,7 +1092,7 @@ function cloneMaterialTemplate(template) {
  * }>}
  */
 export async function buildTerrainMaterials(terrainData, worldSize, exportLevelName, biome, satelliteTexSize, options = {}) {
-  const { pbrSource = 'osm', imageCanvas = null, vegetationMask = null, groundClasses = null } = options;
+  const { pbrSource = 'osm', imageCanvas = null, vegetationMask = null, groundClasses = null, parkingBays = [] } = options;
   // desert looks: a yard is gravel or dry grass unless the satellite says lawn
   const dryLook = ['johnson_valley', 'utah'].includes(String(biome?.levelName || '').toLowerCase());
   const { width: size } = terrainData;
@@ -1085,7 +1122,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
   if (pbrSource === 'image' && imageCanvas) {
     layerMap = buildLayerMapFromImage(imageCanvas, size);
   } else {
-    layerMap = buildOSMLayerMap(terrainData, worldSize, vegetationMask, { groundClasses, dryLook });
+    layerMap = buildOSMLayerMap(terrainData, worldSize, vegetationMask, { groundClasses, dryLook, parkingBays });
   }
   // roads over either: the satellite-classified map draws none of its own
   paintRoadFootprints(layerMap, terrainData, worldSize);

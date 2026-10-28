@@ -1912,9 +1912,14 @@ export function classifyGround(r, g, b) {
   const exg = (2 * g - r - b) / 255;
   if (v < 0.16) return 7;                                         // shadow: taken from its neighbours
   if (b > g + 6 && b > r + 14 && v < 0.62) return 6;              // water
+  // grey first: dark asphalt has a faint green cast in some imagery (Phoenix
+  // lots at ~11 % saturation, RGB 58,64,57 came out as tree canopy), real
+  // leaves and grass are far more saturated (~40 %); a hazy lawn is greyish
+  // too but brighter, so only the dark greys
+  if (s < 0.16 && v < 0.3) return v < 0.19 ? 7 : 5;               // dark grey: asphalt (darker: shadow)
   // (green clearly over red: sand and straw have a little excess green too)
   if (g > r + 2 && (exg > 0.05 || (g > b + 8 && s > 0.14))) return v < 0.34 ? 0 : 1;   // canopy / grass
-  if (s < 0.13) return v < 0.24 ? 7 : 5;                          // grey: paved (dark grey: shadow)
+  if (s < 0.13) return 5;                                         // grey: paved
   if (r >= g && g >= b) {
     if (v > 0.62 && s < 0.4) return 4;                            // sand
     const hueish = (g - b) / ((r - b) || 1);                      // 1: yellow, 0: red
@@ -2037,6 +2042,32 @@ export const generateGameTexture = async (terrainData, options = {}) => {
     x: ((lng - bWest) / (bEast - bWest)) * canvas.width,
     y: ((bNorth - lat) / (bNorth - bSouth)) * canvas.height,
   });
+  // car parks mapped only by their aisles: a bay's depth of parking each side
+  // of every parking aisle (the export lays its bays there), under the rest
+  // (an aisle in a mapped car park: that outline is painted instead)
+  const lotRings = (terrainData.osmFeatures || []).filter((f) => f?.tags?.amenity === "parking" && f.geometry?.length >= 3).map((f) => f.geometry);
+  const inLot = (p) => lotRings.some((ring) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const a = ring[i]; const b = ring[j];
+      if ((a.lat > p.lat) !== (b.lat > p.lat) && p.lng < ((b.lng - a.lng) * (p.lat - a.lat)) / (b.lat - a.lat) + a.lng) inside = !inside;
+    }
+    return inside;
+  });
+  ctx.save();
+  ctx.strokeStyle = GAME_COLORS.parking;
+  ctx.lineCap = "butt";
+  ctx.lineJoin = "miter";
+  for (const f of terrainData.osmFeatures || []) {
+    if (f?.type !== "road" || f.tags?.highway !== "service" || f.tags?.service !== "parking_aisle" || !(f.geometry?.length >= 2)) continue;
+    if (inLot(f.geometry[Math.floor(f.geometry.length / 2)])) continue;
+    const aisleM = (Number.parseFloat(f.tags.width) > 0 ? Number.parseFloat(f.tags.width) : 6) + 2 * 5.5;
+    ctx.lineWidth = aisleM * METERS_TO_PX;
+    ctx.beginPath();
+    f.geometry.forEach((p, i) => { const q = toPixel(p.lat, p.lng); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+    ctx.stroke();
+  }
+  ctx.restore();
   renderFeaturesToCanvas(ctx, terrainData.osmFeatures || [], toPixel, METERS_TO_PX, {
     ...options,
     palette: GAME_COLORS,

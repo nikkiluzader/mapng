@@ -221,6 +221,26 @@ export function parseShoulderSideMeters(tags = {}, side) {
 }
 
 /**
+ * The parking on one side of a road ('left' | 'right' of its node order),
+ * by the same rules as its cross-section: { orientation } when cars park in
+ * that side's extra width (tagged, or the urban default lane), else null
+ * (a shoulder, an edge strip, nothing). orientation: 'parallel' |
+ * 'diagonal' | 'perpendicular'.
+ */
+export function streetParkingSide(tags = {}, highway, isOneWay = false, { urban = false } = {}, side) {
+  const parking = parseParkingSideMeters(tags, side);
+  const orientationOf = () => {
+    const value = tagFor(tags, [`parking:${side}`, 'parking:both', `parking:lane:${side}`, 'parking:lane:both']);
+    const o = tagFor(tags, [`parking:${side}:orientation`, 'parking:both:orientation']) || value;
+    return o === 'diagonal' || o === 'perpendicular' ? o : 'parallel';
+  };
+  if (parking !== null) return parking > 0 ? { orientation: orientationOf() } : null;
+  if (parseShoulderSideMeters(tags, side) !== null) return null;
+  const paved = !UNPAVED.has(String(tags.surface || '').toLowerCase()) && highway !== 'track';
+  return paved && urban && !isOneWay && PARKING_CLASSES.has(highway) ? { orientation: 'parallel' } : null;
+}
+
+/**
  * Full cross-section of a road.
  *
  * Returns { drivingHalfWidth, leftExtra, rightExtra, carriagewayHalfWidth,

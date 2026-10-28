@@ -46,3 +46,9 @@ test('area colours: an unknown tag value falls through to the next tag', () => {
   assert.ok(isUndergroundArea({ amenity: 'parking', parking: 'underground' }));
   assert.ok(!isUndergroundArea({ leisure: 'park' }) && !isUndergroundArea({ landuse: 'grass', layer: '1' }));
 });
+
+test('dark asphalt with a green cast is paved, not canopy', () => {
+  assert.equal(cls(58, 64, 57), 'paved', 'Phoenix lot asphalt');
+  assert.equal(cls(56, 59, 51), 'paved');
+  assert.equal(cls(40, 52, 32), 'trees', 'shaded canopy stays trees');
+});
