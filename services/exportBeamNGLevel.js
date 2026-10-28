@@ -8019,8 +8019,10 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
     const isBuilding = f?.type === 'building';
     const isWater = f?.type === 'water' || f?.tags?.natural === 'water' || f?.tags?.leisure === 'swimming_pool';
     // open ground no tree stands on: bunkers, greens, tees, fairways, pitches,
-    // running tracks (a crown overhanging one put its trunk in the sand)
-    const isOpen = TREELESS_GOLF.has(f?.tags?.golf) || f?.tags?.leisure === 'pitch' || f?.tags?.leisure === 'track';
+    // running tracks, car parks (a crown overhanging one put its trunk in
+    // the sand, or in a car park's aisle)
+    const isOpen = TREELESS_GOLF.has(f?.tags?.golf) || f?.tags?.leisure === 'pitch' || f?.tags?.leisure === 'track'
+      || (f?.tags?.amenity === 'parking' && !['multi-storey', 'underground', 'rooftop'].includes(f.tags.parking));
     if ((!isBuilding && !isWater && !isOpen) || !(f.geometry?.length >= 3)) continue;
     const ring = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
     const pad = isBuilding ? 2 : isOpen ? OPEN_GROUND_CLEAR_M : 1;

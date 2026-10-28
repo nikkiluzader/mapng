@@ -606,7 +606,17 @@ function areaMatIndex(feature) {
   if (lei === 'beach_resort') return 3;
   if (lei === 'track') return 5;
 
-  if (am === 'parking') return 7;
+  // car parks by their surface; asphalt when untagged (most are). Garages and
+  // underground decks are not the ground: their building or what is on top.
+  if (am === 'parking') {
+    const kind = t.parking;
+    if (kind === 'multi-storey' || kind === 'underground' || kind === 'rooftop') return -1;
+    if (sur === 'concrete' || sur === 'concrete:plates' || sur === 'paving_stones' || sur === 'sett' || sur === 'bricks') return 7;
+    if (sur === 'gravel' || sur === 'fine_gravel' || sur === 'pebblestone' || sur === 'compacted') return 6;
+    if (sur === 'dirt' || sur === 'ground' || sur === 'earth' || sur === 'unpaved' || sur === 'sand') return 2;
+    if (sur === 'grass' || sur === 'grass_paver') return LAWN;
+    return 5;
+  }
   if (am === 'fuel') return 5;
 
   if (sur === 'asphalt' || sur === 'paved') return 5;
