@@ -111,106 +111,8 @@ const isBoundaryOnlyArea = (tags) => {
   return !hasExplicitGroundCover(tags);
 };
 
-const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
-  if (!tags) return baseColor;
-  if (isBoundaryOnlyArea(tags)) return baseColor;
-
-  const isMarinaOrHarbor =
-    tags.leisure === "marina" ||
-    tags.water === "harbour" ||
-    tags.water === "dock" ||
-    tags.harbour === "yes" ||
-    tags["seamark:type"] === "harbour" ||
-    tags["seamark:type"] === "harbour_basin" ||
-    tags["seamark:harbour:category"] === "marina";
-  if (tags.landuse === "harbour") return COLORS.harbourLand;
-  if (isMarinaOrHarbor) return COLORS.marina;
-
-  // --- OSM2World inspired surface mapping ---
-  // Priority 1: Water
-  if (
-    tags.natural === "water" ||
-    tags.waterway ||
-    tags.landuse === "reservoir" ||
-    tags.landuse === "basin" ||
-    tags.water
-  )
-    return tags.source === "coastline" ? COLORS.ocean : COLORS.water;
-  if (tags.natural === "coastline") return COLORS.coastline;
-  if (tags.natural === "wetland" || tags.wetland) {
-    const type = tags.wetland;
-    if (type === "swamp") return COLORS.forest;
-    if (type === "mangrove") return COLORS.scrub;
-    if (type === "bog" || type === "fen" || type === "string_bog")
-      return COLORS.heath;
-    if (type === "marsh" || type === "reedbed" || type === "wet_meadow")
-      return COLORS.grass;
-    return COLORS.wetland;
-  }
-  if (tags.natural === "glacier") return COLORS.glacier;
-
-  // Priority 2: Specific High-Level Categories
-  if (tags.aeroway) {
-    if (["runway", "taxiway"].includes(tags.aeroway)) return COLORS.runway;
-    if (tags.aeroway === "apron") return COLORS.apron;
-    return COLORS.aeroway;
-  }
-
-  if (tags.amenity === "parking") return COLORS.parking;
-  if (
-    tags.amenity === "school" ||
-    tags.amenity === "university" ||
-    tags.amenity === "college" ||
-    tags.amenity === "kindergarten"
-  )
-    return COLORS.education;
-  if (tags.amenity === "hospital" || tags.amenity === "clinic")
-    return COLORS.hospital;
-
-  // Aquatic leisure / amenity
-  if (tags.leisure === "swimming_pool") return COLORS.swimming_pool;
-  if (tags.leisure === "water_park") return COLORS.swimming_pool;
-  if (
-    tags.leisure === "marina" ||
-    tags.water === "harbour" ||
-    tags.water === "dock" ||
-    tags.harbour === "yes" ||
-    tags["seamark:type"] === "harbour" ||
-    tags["seamark:type"] === "harbour_basin" ||
-    tags["seamark:harbour:category"] === "marina"
-  )
-    return COLORS.marina;
-  if (tags.amenity === "fountain") return COLORS.fountain;
-
-  // Cemetery variant tags
-  if (tags.amenity === "grave_yard") return COLORS.cemetery;
-
-  // Barriers that cover area
-  if (tags.barrier === "hedge") return COLORS.hedge;
-  if (tags.natural === "shrubbery") return COLORS.hedge;
-
-  if (tags.power === "plant" || tags.power === "substation")
-    return COLORS.power;
-  if (
-    tags.man_made === "pier" ||
-    tags.man_made === "breakwater" ||
-    tags.man_made === "groyne"
-  )
-    return COLORS.bare;
-  if (tags.man_made === "bridge") return COLORS.bridgeInfra;
-
-  // Priority 3: Surface / Landuse / Leisure generic mapping
-  const surface =
-    tags.surface ||
-    tags.material ||
-    tags.landcover ||
-    tags.landuse ||
-    tags.natural ||
-    tags.leisure ||
-    tags.golf ||
-    tags.recreation ||
-    tags.tourism;
-
+// The colour of one land-cover / land-use / surface value, or null.
+const colorOfSurface = (surface) => {
   if (["forest", "wood", "trees", "tree_row"].includes(surface))
     return COLORS.forest;
   if (
@@ -317,6 +219,124 @@ const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
   if (["attraction", "zoo", "camp_site", "theme_park"].includes(surface))
     return COLORS.tourism;
 
+  // (the audit of real exports: values that fell to the fallback colour)
+  if (["parking_space", "fuel", "bicycle_parking", "bus_station"].includes(surface)) return COLORS.parking;
+  if (["hot_tub"].includes(surface)) return COLORS.swimming_pool;
+  if (["religious", "picnic_site"].includes(surface)) return COLORS.park;
+  if (["cliff"].includes(surface)) return COLORS.bare;
+  if (["gravel", "pebblestone"].includes(surface)) return COLORS.quarry;
+  if (["asphalt", "paved"].includes(surface)) return COLORS.parking;
+  if (["concrete"].includes(surface)) return COLORS.tiles;
+  if (["generator", "plant", "substation"].includes(surface)) return COLORS.power;
+  // (not civic / care / hotel grounds: those are lawns, trees and car parks
+  // around a building, which the satellite or the default shows better
+  // than a flat commercial grey)
+  return null;
+};
+
+// Underground (a tunnel's outline, a culverted stream, an underground car
+// park): not the surface the texture shows, so not drawn at all.
+export const isUndergroundArea = (tags) => !!tags && (tags.man_made === "tunnel" || !!tags.tunnel
+  || tags.location === "underground" || tags.parking === "underground" || Number(tags.layer) < 0);
+
+export const getFeatureColor = (tags, baseColor = COLORS.defaultLanduse) => {
+  if (!tags) return baseColor;
+  if (isBoundaryOnlyArea(tags)) return baseColor;
+
+  const isMarinaOrHarbor =
+    tags.leisure === "marina" ||
+    tags.water === "harbour" ||
+    tags.water === "dock" ||
+    tags.harbour === "yes" ||
+    tags["seamark:type"] === "harbour" ||
+    tags["seamark:type"] === "harbour_basin" ||
+    tags["seamark:harbour:category"] === "marina";
+  if (tags.landuse === "harbour") return COLORS.harbourLand;
+  if (isMarinaOrHarbor) return COLORS.marina;
+
+  // --- OSM2World inspired surface mapping ---
+  // Priority 1: Water
+  if (
+    tags.natural === "water" ||
+    tags.waterway ||
+    tags.landuse === "reservoir" ||
+    tags.landuse === "basin" ||
+    tags.water
+  )
+    return tags.source === "coastline" ? COLORS.ocean : COLORS.water;
+  if (tags.natural === "coastline") return COLORS.coastline;
+  if (tags.natural === "wetland" || tags.wetland) {
+    const type = tags.wetland;
+    if (type === "swamp") return COLORS.forest;
+    if (type === "mangrove") return COLORS.scrub;
+    if (type === "bog" || type === "fen" || type === "string_bog")
+      return COLORS.heath;
+    if (type === "marsh" || type === "reedbed" || type === "wet_meadow")
+      return COLORS.grass;
+    return COLORS.wetland;
+  }
+  if (tags.natural === "glacier") return COLORS.glacier;
+
+  // Priority 2: Specific High-Level Categories
+  if (tags.aeroway) {
+    if (["runway", "taxiway"].includes(tags.aeroway)) return COLORS.runway;
+    if (tags.aeroway === "apron") return COLORS.apron;
+    return COLORS.aeroway;
+  }
+
+  if (tags.amenity === "parking") return COLORS.parking;
+  if (
+    tags.amenity === "school" ||
+    tags.amenity === "university" ||
+    tags.amenity === "college" ||
+    tags.amenity === "kindergarten"
+  )
+    return COLORS.education;
+  if (tags.amenity === "hospital" || tags.amenity === "clinic")
+    return COLORS.hospital;
+
+  // Aquatic leisure / amenity
+  if (tags.leisure === "swimming_pool") return COLORS.swimming_pool;
+  if (tags.leisure === "water_park") return COLORS.swimming_pool;
+  if (
+    tags.leisure === "marina" ||
+    tags.water === "harbour" ||
+    tags.water === "dock" ||
+    tags.harbour === "yes" ||
+    tags["seamark:type"] === "harbour" ||
+    tags["seamark:type"] === "harbour_basin" ||
+    tags["seamark:harbour:category"] === "marina"
+  )
+    return COLORS.marina;
+  if (tags.amenity === "fountain") return COLORS.fountain;
+
+  // Cemetery variant tags
+  if (tags.amenity === "grave_yard") return COLORS.cemetery;
+
+  // Barriers that cover area
+  if (tags.barrier === "hedge") return COLORS.hedge;
+  if (tags.natural === "shrubbery") return COLORS.hedge;
+
+  if (tags.power === "plant" || tags.power === "substation")
+    return COLORS.power;
+  if (
+    tags.man_made === "pier" ||
+    tags.man_made === "breakwater" ||
+    tags.man_made === "groyne"
+  )
+    return COLORS.bare;
+  if (tags.man_made === "bridge") return COLORS.bridgeInfra;
+
+  // Priority 3: Surface / Landuse / Leisure generic mapping: each tag in
+  // turn until one is known (an unknown surface=* value hid the pitch,
+  // park or yard colour its leisure / landuse tag would have given)
+  const candidates = [tags.surface, tags.material, tags.landcover, tags.landuse, tags.natural, tags.leisure,
+    tags.golf, tags.recreation, tags.tourism, tags.amenity, tags.power, tags.man_made];
+  for (const surface of candidates) {
+    if (!surface) continue;
+    const color = colorOfSurface(surface);
+    if (color) return color;
+  }
   return baseColor;
 };
 
@@ -1552,6 +1572,7 @@ const renderFeaturesToCanvas = (
 
   if (options.alpha) ctx.globalAlpha = options.alpha;
   for (const { f } of sortedLC) {
+    if (isUndergroundArea(f.tags)) continue;
     // (the game map leaves broad land use to the ground it classified)
     if (options.skipArea?.(f.tags, getFeatureColor(f.tags, baseColor) === baseColor)) continue;
     ctx.fillStyle = getFeatureColor(f.tags, baseColor);
