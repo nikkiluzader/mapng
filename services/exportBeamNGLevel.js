@@ -13,6 +13,7 @@ import { planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight } from './beamngTrees.js';
+import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations } from './buildingFoundations.js';
@@ -7933,6 +7934,77 @@ function scatterDensityOf(tags, wetland) {
   return 0;
 }
 
+// Canopy trees from the satellite ground classes (terrainData.groundClasses,
+// osmTexture.js satelliteGroundClasses): the trees of the yards, streets
+// and woods OSM never mapped. Each connected patch of tree-crown cells is a
+// tree (a yard's lone crown: one, at its middle) or, past CANOPY_SINGLE_M2,
+// a stand sampled at the density of an OSM wood.
+const CANOPY_CLASS = GROUND_CLASSES.indexOf('trees');
+const CANOPY_MIN_M2 = 12;          // smaller: noise the majority filter left
+const CANOPY_SINGLE_M2 = 160;      // up to here, one crown (or two touching)
+const CANOPY_TREES_PER_M2 = 0.0036;
+const CANOPY_MAPPED_TREE_M = 5;    // a mapped tree this close is that crown
+
+// Cells of a north-up w×h grid over bounds inside any of the rings (holes cut out).
+function rasterizeAreas(areas, w, h, bounds) {
+  const mask = new Uint8Array(w * h);
+  const { north, south, east, west } = bounds;
+  const gx = (lng) => ((lng - west) / (east - west)) * w;
+  const gy = (lat) => ((north - lat) / (north - south)) * h;
+  for (const { ring, holes } of areas) {
+    const rings = [ring, ...(holes || [])].map((r) => r.map((p) => [gx(p.lng), gy(p.lat)]));
+    let y0 = Infinity; let y1 = -Infinity;
+    for (const [, y] of rings[0]) { if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    for (let row = Math.max(0, Math.floor(y0)); row <= Math.min(h - 1, Math.ceil(y1)); row++) {
+      const cy = row + 0.5;
+      const xs = [];
+      for (const r of rings) {
+        for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+          const [xi, yi] = r[i]; const [xj, yj] = r[j];
+          if ((yi > cy) !== (yj > cy)) xs.push(xi + ((cy - yi) / (yj - yi)) * (xj - xi));
+        }
+      }
+      xs.sort((a, b) => a - b);
+      for (let k = 0; k + 1 < xs.length; k += 2) {
+        for (let col = Math.max(0, Math.ceil(xs[k] - 0.5)); col <= Math.min(w - 1, Math.floor(xs[k + 1] - 0.5)); col++) mask[row * w + col] = 1;
+      }
+    }
+  }
+  return mask;
+}
+
+/**
+ * Canopy patches outside `covered`: [{ cells: [index…], cx, cy }] in grid
+ * cells (4-connected), smallest dropped.
+ */
+function canopyPatches(cls, w, h, covered, minCells) {
+  const seen = new Uint8Array(w * h);
+  const patches = [];
+  const stack = [];
+  for (let start = 0; start < w * h; start++) {
+    if (seen[start] || cls[start] !== CANOPY_CLASS || covered[start]) continue;
+    const cells = [];
+    seen[start] = 1;
+    stack.push(start);
+    let sx = 0; let sy = 0;
+    while (stack.length) {
+      const i = stack.pop();
+      cells.push(i);
+      const x = i % w; const y = (i - x) / w;
+      sx += x; sy += y;
+      if (x > 0) visit(i - 1);
+      if (x < w - 1) visit(i + 1);
+      if (y > 0) visit(i - w);
+      if (y < h - 1) visit(i + w);
+    }
+    if (cells.length >= minCells) patches.push({ cells, cx: sx / cells.length + 0.5, cy: sy / cells.length + 0.5 });
+  }
+  return patches;
+  function visit(j) {
+    if (!seen[j] && cls[j] === CANOPY_CLASS && !covered[j]) { seen[j] = 1; stack.push(j); }
+  }
+}
+
 function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, biome) {
   // Buildings and water, for the scattered trees (a yard's tree is not in
   // the house or the pool): world rings bucketed by 32 m cells
@@ -8010,6 +8082,8 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
       const group = chooseTreeGroup({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed });
       return chooseTreeItem(group, { tags, lat: point.lat, lon: point.lng, seed, extra: signature(group) });
     };
+    const ground = terrainData.groundClasses?.cls?.length === terrainData.groundClasses?.w * terrainData.groundClasses?.h
+      ? terrainData.groundClasses : null;
     const centroidOf = (feature) => {
       const g = feature.geometry || [];
       const n = Math.max(1, g.length);
@@ -8066,7 +8140,8 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
           (wetland !== null && wetland !== 'swamp' && wetland !== 'mangrove' && wetland !== 'tidalflat');
         // trees scattered over parks, cemeteries, greens, golf courses and
         // the yards of a residential area (none had any but mapped ones)
-        const scatter = scatterDensityOf(tags, wetland);
+        // (with the satellite's canopy, the real trees stand there instead)
+        const scatter = ground ? 0 : scatterDensityOf(tags, wetland);
         if (scatter > 0) {
           const centre = centroidOf(feature);
           const urban = isUrbanPlace({ id: `area:${feature.id}`, geometry: [centre] });
@@ -8128,6 +8203,75 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
           });
         }
       }
+    }
+    if (ground) placeCanopyTrees();
+
+    function placeCanopyTrees() {
+      const { cls, w, h } = ground;
+      const { north, south, east, west } = terrainData.bounds;
+      const cellLat = (north - south) / h; const cellLng = (east - west) / w;
+      const cellM2 = ((terrainData.width * squareSize) / w) * ((terrainData.height * squareSize) / h);
+      // OSM's own woods and scrub keep their own trees
+      const areas = [];
+      const mapped = new Map();   // mapped trees by 8 m world cells
+      const MAPPED_CELL = 8;
+      for (const f of terrainData.osmFeatures || []) {
+        const t = f?.tags || {};
+        if (f?.type === 'vegetation' && f.geometry?.length === 1) {
+          const [x, y] = geoToWorldPoint(f.geometry[0].lat, f.geometry[0].lng, terrainData, squareSize, 0);
+          const k = `${Math.floor(x / MAPPED_CELL)},${Math.floor(y / MAPPED_CELL)}`;
+          if (!mapped.has(k)) mapped.set(k, []);
+          mapped.get(k).push([x, y]);
+          continue;
+        }
+        if (f?.type !== 'landuse' || !(f.geometry?.length >= 3)) continue;
+        const wet = t.natural === 'wetland' ? String(t.wetland || '').toLowerCase() : null;
+        if (t.natural === 'wood' || t.natural === 'forest' || t.landuse === 'forest' || t.landuse === 'orchard'
+          || t.landcover === 'trees' || t.natural === 'scrub' || t.natural === 'heath' || t.natural === 'shrubbery'
+          || t.landcover === 'scrub' || wet !== null) areas.push({ ring: f.geometry, holes: f.holes });
+      }
+      const covered = rasterizeAreas(areas, w, h, terrainData.bounds);
+      const nearMapped = (x, y) => {
+        const cx = Math.floor(x / MAPPED_CELL); const cy = Math.floor(y / MAPPED_CELL);
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            for (const [mx, my] of mapped.get(`${cx + dx},${cy + dy}`) || []) {
+              if ((mx - x) ** 2 + (my - y) ** 2 < CANOPY_MAPPED_TREE_M ** 2) return true;
+            }
+          }
+        }
+        return false;
+      };
+      const patches = canopyPatches(cls, w, h, covered, Math.max(1, Math.round(CANOPY_MIN_M2 / cellM2)));
+      let trees = 0;
+      patches.forEach((patch, pi) => {
+        const areaM2 = patch.cells.length * cellM2;
+        const seed = hashString(`canopy:${patch.cells[0]}`);
+        // spots: a crown's middle (if it is on the crown; a crescent's is
+        // not), else cells drawn at random
+        const spots = [];
+        const middle = Math.floor(patch.cy) * w + Math.floor(patch.cx);
+        const count = areaM2 <= CANOPY_SINGLE_M2 ? 1 : Math.max(1, Math.round(areaM2 * CANOPY_TREES_PER_M2 * treeDensityMultiplier));
+        if (count === 1 && cls[middle] === CANOPY_CLASS && !covered[middle]) spots.push([patch.cx, patch.cy]);
+        for (let k = 0; spots.length < count && k < count * 3; k++) {
+          const i = patch.cells[Math.floor(seededRandom(seed + k * 7.31) * patch.cells.length)];
+          const x = i % w; const y = (i - x) / w;
+          spots.push([x + seededRandom(seed + k * 3.7), y + seededRandom(seed + k * 5.3)]);
+        }
+        const urban = isUrbanPlace({ id: `canopy:${pi}`, geometry: [{ lat: north - patch.cy * cellLat, lng: west + patch.cx * cellLng }] });
+        spots.forEach(([gx, gy], k) => {
+          const point = { lat: north - gy * cellLat, lng: west + gx * cellLng };
+          const [x, y] = geoToWorldPoint(point.lat, point.lng, terrainData, squareSize, 0);
+          if (inBuildingOrWater(x, y) || nearMapped(x, y)) return;
+          const choice = pickTree({ kind: 'tree', tags: {}, point, urban, area: count > 1, seed: `canopy:${pi}:${k}` });
+          if (!choice) return;
+          const placement = makeForestPlacement(choice.type, point, terrainData, squareSize, seed + k, 1, 1);
+          placement.scale = roundTo(choice.scale, 6);
+          pushPlacement(placement);
+          trees++;
+        });
+      });
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Canopy trees: ${trees} from ${patches.length} satellite canopy patch(es) outside OSM woods.`);
     }
   }
 
@@ -8887,6 +9031,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const foundationInput = {
     ...td,
     osmFeatures: filterOSMFeaturesToBounds(td.osmFeatures, td.bounds),
+    // (a given ground-class grid is of the uncropped area: classified again)
+    groundClasses: didCropToSquare ? undefined : td.groundClasses,
   };
 
   let exportTerrainData = foundationInput;
@@ -9338,6 +9484,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const plants = [includeTrees && 'trees and bushes', includeRocks && 'rocks'].filter(Boolean).join(', ');
   beginStep('vegetation', plants ? `Planting ${plants}, ground cover and props…` : 'Placing ground cover and props…');
   await yield_();
+  // the satellite's tree crowns, for the canopy trees (the game texture's
+  // classification; none without a satellite image)
+  if (includeTrees && !exportTerrainData.groundClasses && exportTerrainData.satelliteTextureUrl) {
+    try {
+      exportTerrainData.groundClasses = await satelliteGroundClasses(exportTerrainData);
+    } catch (e) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Satellite canopy unavailable:`, e?.message || e);
+    }
+  }
   const forestPlacements = (includeTrees || includeRocks)
     ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome)
     : new Map();

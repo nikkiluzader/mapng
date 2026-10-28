@@ -1954,6 +1954,43 @@ function smoothClasses(cls, w, h, passes) {
   return src;
 }
 
+/** Smoothed ground classes (indices into GROUND_CLASSES) of RGBA pixels. */
+export function classifyGroundGrid(rgba, w, h) {
+  const cls = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) cls[i] = classifyGround(rgba[i * 4], rgba[i * 4 + 1], rgba[i * 4 + 2]);
+  return smoothClasses(cls, w, h, 3);
+}
+
+// About 2 m a cell: fine enough for a yard tree's crown, coarse enough to
+// average out cars and roof edges.
+const GROUND_CELL_M = 2;
+
+/**
+ * The satellite image (a canvas or image, else terrainData.satelliteTextureUrl)
+ * classified into ground classes on the heightmap's grid at about 2 m a
+ * cell: { cls, w, h }, north-up, or null without a satellite image. One
+ * classification for the game texture and the canopy trees.
+ */
+export const satelliteGroundClasses = async (terrainData, source = null) => {
+  let satellite = source?.width > 0 ? source : null;
+  if (!satellite && terrainData?.satelliteTextureUrl && typeof Image !== "undefined") {
+    const img = new Image();
+    img.src = terrainData.satelliteTextureUrl;
+    if (await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); }) && img.naturalWidth > 0) satellite = img;
+  }
+  if (!satellite || typeof document === "undefined") return null;
+  const processingMetersPerPixel = Number(terrainData?.processingMetersPerPixel) > 0 ? Number(terrainData.processingMetersPerPixel) : 1;
+  const cell = Math.max(1, Math.round(GROUND_CELL_M / processingMetersPerPixel));
+  const w = Math.max(16, Math.round(terrainData.width / cell)); const h = Math.max(16, Math.round(terrainData.height / cell));
+  const small = document.createElement("canvas");
+  small.width = w; small.height = h;
+  const sctx = small.getContext("2d");
+  sctx.imageSmoothingEnabled = true;
+  sctx.imageSmoothingQuality = "high";
+  sctx.drawImage(satellite, 0, 0, w, h);
+  return { cls: classifyGroundGrid(sctx.getImageData(0, 0, w, h).data, w, h), w, h };
+};
+
 export const generateGameTexture = async (terrainData, options = {}) => {
   const onProgress = options.onProgress;
   onProgress?.("Painting the game map texture...");
@@ -1970,25 +2007,14 @@ export const generateGameTexture = async (terrainData, options = {}) => {
   if (!ctx) throw new Error("Could not get 2D context");
 
   // the ground: classified from the satellite image (about 2 m a cell), else grass
-  let satellite = options.satelliteCanvas?.width > 0 ? options.satelliteCanvas : null;
-  if (!satellite && terrainData.satelliteTextureUrl) {
-    const img = new Image();
-    img.src = terrainData.satelliteTextureUrl;
-    if (await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); }) && img.naturalWidth > 0) satellite = img;
-  }
-  if (satellite) {
-    const cell = Math.max(1, Math.round(2 / processingMetersPerPixel));
-    const w = Math.max(16, Math.round(terrainData.width / cell)); const h = Math.max(16, Math.round(terrainData.height / cell));
+  const ground = await satelliteGroundClasses(terrainData, options.satelliteCanvas);
+  const satellite = !!ground;
+  if (ground) {
+    const { cls: smooth, w, h } = ground;
     const small = document.createElement("canvas");
     small.width = w; small.height = h;
     const sctx = small.getContext("2d");
-    sctx.imageSmoothingEnabled = true;
-    sctx.imageSmoothingQuality = "high";
-    sctx.drawImage(satellite, 0, 0, w, h);
-    const px = sctx.getImageData(0, 0, w, h);
-    const cls = new Uint8Array(w * h);
-    for (let i = 0; i < w * h; i++) cls[i] = classifyGround(px.data[i * 4], px.data[i * 4 + 1], px.data[i * 4 + 2]);
-    const smooth = smoothClasses(cls, w, h, 3);
+    const px = sctx.createImageData(w, h);
     for (let i = 0; i < w * h; i++) {
       const c = GROUND_COLORS[GROUND_CLASSES[smooth[i]]];
       px.data[i * 4] = c[0]; px.data[i * 4 + 1] = c[1]; px.data[i * 4 + 2] = c[2]; px.data[i * 4 + 3] = 255;
