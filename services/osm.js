@@ -264,7 +264,7 @@ const joinWays = (wayNodesList) => {
   return rings;
 };
 
-const parseOverpassResponse = (data, bounds) => {
+export const parseOverpassResponse = (data, bounds) => {
   const ways = {};
   const relations = [];
   const rawFeatures = [];
@@ -895,6 +895,64 @@ const fetchFromOverpass = async (request, { onStatus, signal } = {}) => {
   throw new Error(`All Overpass mirrors failed:\n${detail || String(lastFailure?.message || lastFailure)}`);
 };
 
+// Overture (services/overtureTiles.js: its own tiles, on a CDN that doesn't
+// share Overpass's outages) as soon as it is the better bet, not after every
+// mirror has timed out (six 60 s attempts during an outage): straight away
+// while every public mirror is known down (no paid server set), else raced
+// against Overpass once it has gone OVERTURE_HEDGE_MS without an answer;
+// the first answer wins and the other is cancelled.
+const OVERTURE_HEDGE_MS = 45000;
+
+const fetchOverpassOrOverture = async (request, { onStatus, signal } = {}) => {
+  const useOverture = async (why, innerSignal) => {
+    console.warn(`[OSM] ${why}; using Overture Maps.`);
+    onStatus?.(`OpenStreetMap servers are unavailable; using Overture Maps data (release ${OVERTURE_RELEASE})...`);
+    const data = await fetchOsmFromOverture(request.bounds, { signal: innerSignal, onStatus });
+    if (!data) throw new Error("Overture Maps returned no data");
+    return { endpoint: OVERTURE_ENDPOINT, data };
+  };
+  if (!readCustomOverpassUrl() && publicOverpassMirrorsDown()) {
+    try {
+      return await useOverture("Every public Overpass mirror is down", signal);
+    } catch (overtureError) {
+      if (overtureError?.name === "AbortError" || signal?.aborted) throw overtureError;
+      // (Overture failing too: try the mirrors anyway, they may be back)
+    }
+  }
+  const overpassCtl = new AbortController();
+  const overtureCtl = new AbortController();
+  const onAbort = () => { overpassCtl.abort(); overtureCtl.abort(); };
+  signal?.addEventListener?.("abort", onAbort, { once: true });
+  let hedgeTimer = null;
+  try {
+    return await new Promise((resolve, reject) => {
+      let overpassError = null; let overtureError = null; let overtureStarted = false; let done = false;
+      const finish = (fn, value) => { if (done) return; done = true; clearTimeout(hedgeTimer); fn(value); };
+      const startOverture = (why) => {
+        if (overtureStarted || done) return;
+        overtureStarted = true;
+        useOverture(why, overtureCtl.signal).then(
+          (r) => { overpassCtl.abort(); finish(resolve, r); },
+          (e) => { overtureError = e; if (overpassError) finish(reject, overpassError); },
+        );
+      };
+      fetchFromOverpass(request, { onStatus, signal: overpassCtl.signal }).then(
+        (r) => { overtureCtl.abort(); finish(resolve, r); },
+        (e) => {
+          if (signal?.aborted) return finish(reject, e);
+          overpassError = e;
+          if (!overtureStarted) startOverture("Every Overpass server failed");
+          else if (overtureError) finish(reject, e);
+        },
+      );
+      hedgeTimer = setTimeout(() => startOverture(`No Overpass answer in ${OVERTURE_HEDGE_MS / 1000} s`), OVERTURE_HEDGE_MS);
+    });
+  } finally {
+    clearTimeout(hedgeTimer);
+    signal?.removeEventListener?.("abort", onAbort);
+  }
+};
+
 export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
   console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
 
@@ -915,20 +973,7 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
         console.warn("[OSM] MapNG tiles unavailable, using Overpass:", tileError?.message || tileError);
       }
     }
-    if (!result) {
-      try {
-        result = await fetchFromOverpass({ query, bounds }, { onStatus, signal });
-      } catch (overpassError) {
-        if (overpassError?.name === "AbortError" || signal?.aborted) throw overpassError;
-        // Last resort (services/overtureTiles.js): Overture's own tiles, on a
-        // CDN that doesn't share Overpass's outages.
-        console.warn("[OSM] Every Overpass server failed; falling back to Overture Maps.");
-        onStatus?.(`OpenStreetMap servers are unavailable; using Overture Maps data (release ${OVERTURE_RELEASE})...`);
-        const data = await fetchOsmFromOverture(bounds, { signal, onStatus });
-        if (!data) throw overpassError;
-        result = { endpoint: OVERTURE_ENDPOINT, data };
-      }
-    }
+    if (!result) result = await fetchOverpassOrOverture({ query, bounds }, { onStatus, signal });
     const { endpoint } = result;
     let { data } = result;
 

@@ -744,6 +744,7 @@ export const fetchOvertureBuildingRecords = async (bounds, { signal } = {}) => {
     return collectFeatures(decoded.filter(Boolean));
   } catch (err) {
     if (signal?.aborted) throw err;
+    archives.delete('buildings');   // (retried next time, not failed for the session)
     console.warn('[OSM] Overture buildings unavailable; keeping OSM buildings only:', err?.message || err);
     return null;
   } finally {
@@ -789,6 +790,9 @@ export const fetchOsmFromOverture = async (bounds, { signal, onStatus } = {}) =>
     } catch (err) {
       if (err?.name === 'AbortError' || signal?.aborted) throw err;
       failures++;
+      // (a failed header is memoised in the archive: dropped, so the next
+      // fetch retries instead of failing for the rest of the session)
+      archives.delete(theme);
       console.warn(`[OSM] Overture ${theme} tiles failed:`, err?.message || err);
       recordsByTheme[theme] = [];
     }

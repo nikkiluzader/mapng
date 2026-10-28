@@ -97,3 +97,21 @@ test('cancelling aborts in-flight mirror requests', async () => {
     restoreStorage();
   }
 });
+
+test('while every public mirror is known down, Overture is asked straight away', async () => {
+  const { OVERPASS_ENDPOINTS } = await import('../services/overpassQuery.js');
+  const restoreStorage = installStorage();
+  const until = Date.now() + 10 * 60000;
+  globalThis.localStorage.setItem('mapng_overpass_health_v1', JSON.stringify(Object.fromEntries(OVERPASS_ENDPOINTS.map((e) => [e, { failAt: Date.now(), failKind: 'timeout', coolUntil: until }]))));
+  const { calls, restore } = installFetch(() => 'refuse');
+  try {
+    await fetchOSMData(BOUNDS);
+    const firstOverpass = calls.findIndex((h) => OVERPASS_ENDPOINTS.some((e) => new URL(e).host === h));
+    const firstOverture = calls.findIndex((h) => h.includes('overturemaps'));
+    assert.ok(firstOverture >= 0, `Overture asked (calls: ${calls.join(', ')})`);
+    assert.ok(firstOverpass < 0 || firstOverture < firstOverpass, 'before any Overpass mirror');
+  } finally {
+    restore();
+    restoreStorage();
+  }
+});
