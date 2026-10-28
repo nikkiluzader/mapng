@@ -532,7 +532,7 @@
 </style>
 
 <script setup>
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue';
+import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
@@ -1195,7 +1195,11 @@ const yieldToUi = async () => {
 };
 
 // Returns terrainData cropped to exportCropSize if a LAZ file drove the native size
-const getExportTerrainData = () => prepareCroppedTerrainData(props.terrainData);
+// The store's terrain data is deeply reactive: every OSM point read through
+// Vue's proxy made a wooded 8 km BeamNG export plant trees for 9 minutes
+// (~150x slower than the raw object). Exports only read it, so hand them
+// the raw object.
+const getExportTerrainData = () => prepareCroppedTerrainData(toRaw(props.terrainData));
 
 const resolveProcessingMetersPerPixel = (terrainData) => {
   const parsed = Number(terrainData?.processingMetersPerPixel);
