@@ -7812,6 +7812,35 @@ const PARKING_AISLE_HALF = 3;
 const PARKING_END_CLEAR_M = 2;
 const PARKING_OLD_ID_BASE = 100000;
 
+// Painted stall lines for those bays: each bay's two sides, square to its
+// aisle, the full bay depth (a side shared by two neighbours drawn once).
+const PARKING_LINE_W = 0.12;     // 4-6 in stall lines
+
+export function buildParkingMarkings(spots, terrainData, squareSize) {
+  const seen = new Set();
+  const decals = [];
+  for (const sp of spots) {
+    const [x, y] = sp.pos;
+    const yaw = 2 * Math.atan2(sp.rot[2], sp.rot[3]);
+    const ax = Math.cos(yaw); const ay = Math.sin(yaw);     // across the bay (local X)
+    const dx = -Math.sin(yaw); const dy = Math.cos(yaw);    // its depth (local Y)
+    const halfW = sp.scl[0] / 2; const halfL = sp.scl[1] / 2;
+    for (const side of [-1, 1]) {
+      const cx = x + ax * side * halfW; const cy = y + ay * side * halfW;
+      const key = `${Math.round(cx / 0.4)},${Math.round(cy / 0.4)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const node = (px, py) => [roundTo(px, 3), roundTo(py, 3), roundTo(getTerrainHeightAtWorldXY(px, py, terrainData, squareSize) + 0.1, 3), PARKING_LINE_W];
+      const decal = makeRoadDecal([node(cx - dx * halfL, cy - dy * halfL), node(cx + dx * halfL, cy + dy * halfL)],
+        sanitizeBeamNGObjectName(`parking_line_${decals.length + 1}`), 'parking_markings', {
+          material: GLOBAL_DECAL_MATERIALS.lineWhite, renderPriority: 1, breakAngle: 1, textureLength: 6.4,
+        });
+      if (decal) decals.push(decal);
+    }
+  }
+  return decals;
+}
+
 export function buildParkingSpots(terrainData, squareSize, carriageways = []) {
   const toXY = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
   const feats = terrainData.osmFeatures || [];
@@ -9726,6 +9755,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // the road being driven (services/roadNameZones.js).
   const roadNameZones = buildRoadNameZones(decalRoads.carriageways || []);
   const parkingSpots = buildParkingSpots(exportTerrainData, squareSize, decalRoads.carriageways || []);
+  const parkingLines = roadType !== 'none' ? buildParkingMarkings(parkingSpots, exportTerrainData, squareSize) : [];
+  if (parkingLines.length) {
+    decalRoads.push({ class: 'SimGroup', name: 'parking_markings', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: parkingLines });
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Parking: ${parkingSpots.length} spaces, ${parkingLines.length} stall lines.`);
+  }
   zip.file(`${base}/city.sites.json`, JSON.stringify({
     description: 'Description of these Sites. Contains Locations and Zones.',
     dir: `/levels/${levelName}/`,
