@@ -38,3 +38,14 @@ test('the sites file gets an even spread of at most 3000 parking spots', async (
   assert.equal(kept.size, all.size, 'every cell keeps some spots');
   assert.equal(sampleSiteSpots(spots.slice(0, 50)).length, 50, 'small sets untouched');
 });
+
+test('road node spacing stays 2 m normally and widens for huge road networks', async () => {
+  const { chooseRoadNodeSpacing } = await import('../services/exportBeamNGLevel.js');
+  const road = (km) => ({ type: 'road', geometry: [{ lat: 0, lng: 0 }, { lat: km / 111.32, lng: 0 }] });
+  assert.equal(chooseRoadNodeSpacing([road(50)]).spacing, 2, 'a normal map keeps 2 m');
+  const big = chooseRoadNodeSpacing(Array.from({ length: 82 }, () => road(10)));   // ~820 km, the 8 km Naples export
+  assert.ok(big.spacing > 2.7 && big.spacing < 3.1, `spacing ${big.spacing}`);
+  assert.ok(big.estimatedNodes / (big.spacing / 2) <= 650001, 'within the budget');
+  assert.equal(chooseRoadNodeSpacing(Array.from({ length: 1000 }, () => road(10))).spacing, 6, 'capped at 6 m');
+  chooseRoadNodeSpacing([]);   // (reset for later tests)
+});

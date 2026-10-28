@@ -1516,6 +1516,33 @@ function chunkPolyline(points, maxNodes = 250) {
 // the real terrain height at its own position (via geoToWorld) and the road hugs
 // the terrain instead of floating over valleys / cutting through crests.
 const ROAD_NODE_SPACING_M = 2.0;
+// BeamNG builds a level's DecalRoads in one pass at load, and past ~800k
+// nodes in all that pass draws nothing: a single-tile 8 km export at 8 m/px
+// (926k nodes over 1913 km of decal layers) loaded with every road
+// invisible (in game, 2026-10-28; 809k still drew). An export whose roads
+// would exceed DECAL_NODE_BUDGET at the base spacing spreads its nodes out
+// (decals hug the terrain between them anyway); normal exports keep 2 m.
+const DECAL_NODE_BUDGET = 650000;
+const DECAL_LAYERS_PER_ROAD = 2.3;   // surface, paint and AI layers per road metre, measured
+const MAX_ROAD_NODE_SPACING_M = 6;
+let roadNodeSpacingM = ROAD_NODE_SPACING_M;
+
+/** The node spacing that keeps this export's road decals within budget (and sets it). */
+export function chooseRoadNodeSpacing(osmFeatures = []) {
+  let lengthM = 0;
+  for (const f of osmFeatures) {
+    if (f?.type !== 'road' || !(f.geometry?.length >= 2)) continue;
+    const g = f.geometry;
+    for (let i = 1; i < g.length; i++) {
+      const dy = (g[i].lat - g[i - 1].lat) * 111320;
+      const dx = (g[i].lng - g[i - 1].lng) * 111320 * Math.cos((g[i].lat * Math.PI) / 180);
+      lengthM += Math.hypot(dx, dy);
+    }
+  }
+  const nodes = (lengthM / ROAD_NODE_SPACING_M) * DECAL_LAYERS_PER_ROAD;
+  roadNodeSpacingM = Math.min(MAX_ROAD_NODE_SPACING_M, ROAD_NODE_SPACING_M * Math.max(1, nodes / DECAL_NODE_BUDGET));
+  return { spacing: roadNodeSpacingM, lengthKm: lengthM / 1000, estimatedNodes: Math.round(nodes) };
+}
 const JUNCTION_MARKING_TRIM_M = 4.0;
 
 // Crossing roads of these classes should NOT cause lane markings to be trimmed
@@ -4343,7 +4370,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
     const layers = pedestrianSurfaceLayers(surface, fullWidth, { americas });
     const street = sanitizeBeamNGObjectName(tags.name || `${footpath ? tags.highway : service ? `service_${kind || 'road'}` : 'pedestrian'}_${feature.id}`, `pedestrian_${feature.id || 'x'}`);
     const pieces = clipGeometryToMargin(feature.geometry, terrainData.bounds)
-      .map((s) => resampleGeometryToSpacing(s, ROAD_NODE_SPACING_M))
+      .map((s) => resampleGeometryToSpacing(s, roadNodeSpacingM))
       .flatMap((s) => chunkPolyline(s));
     for (const piece of pieces) {
       const world = [];
@@ -4488,6 +4515,10 @@ export function bridgeOverShortGaps(features) {
 }
 
 export function generateDecalRoads(terrainData, squareSize) {
+  const budget = chooseRoadNodeSpacing(terrainData.osmFeatures || []);
+  if (budget.spacing > ROAD_NODE_SPACING_M) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road nodes every ${budget.spacing.toFixed(2)} m (not ${ROAD_NODE_SPACING_M} m): ${budget.lengthKm.toFixed(0)} km of roads would make ~${budget.estimatedNodes} DecalRoad nodes, past what BeamNG draws at load.`);
+  }
   if (!terrainData.osmFeatures?.length) return [];
 
   const sourceRoadFeatures = bridgeOverShortGaps(terrainData.osmFeatures.filter((feature) => {
@@ -4630,7 +4661,7 @@ export function generateDecalRoads(terrainData, squareSize) {
     // Clip to the terrain's safe inner boundary, splitting at crossings.
     // Then further chunk each segment so no single DecalRoad is too long.
     const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
-      .map(s => resampleGeometryToSpacing(s, ROAD_NODE_SPACING_M))
+      .map(s => resampleGeometryToSpacing(s, roadNodeSpacingM))
       .flatMap(s => chunkPolyline(s));
 
     if (clippedSegments.length === 0) continue;
@@ -5252,6 +5283,21 @@ function writeSimGroupTree(zip, folderPath, items) {
     return;
   }
 
+  // Sibling groups whose names differ only in case ("Via Alessandro
+  // Manzoni" / "VIa Alessandro Manzoni" in OSM) get separate folders that
+  // collide on Windows when the zip is extracted (it asks to overwrite, and
+  // a group's roads are lost): later ones are renamed, their children moved.
+  const taken = new Set();
+  for (const item of items) {
+    if (item.class !== 'SimGroup' || !item.name) continue;
+    let name = item.name;
+    for (let k = 2; taken.has(name.toLowerCase()); k++) name = `${item.name}_c${k}`;
+    if (name !== item.name) {
+      for (const child of item.__items || []) if (child.__parent === item.name) child.__parent = name;
+      item.name = name;
+    }
+    taken.add(name.toLowerCase());
+  }
   zip.file(`${folderPath}/items.level.json`, toNDJSON(items));
 
   for (const item of items) {
