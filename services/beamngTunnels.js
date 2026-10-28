@@ -1458,7 +1458,7 @@ const TUNNEL_LIGHT = {
   intensity: 45000,
   intensityUnit: 'cd',
   dayIntensity: '45000',
-  nightIntensity: '1500',
+  nightIntensity: '8000',   // (1500 left the tube nearly black at night)
   innerAngle: 25,
   outerAngle: 170,
   range: 15,

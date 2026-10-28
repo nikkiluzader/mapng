@@ -93,11 +93,19 @@ export const BUILDING_MATERIALS = {
   roofTin: 'mapng_bld_roof_tin',
 };
 
+// Lit windows at night: the window sheets' emissive maps scaled by the
+// building object's instanceColor, which the environment's night lights set
+// to the glow colour at dusk and to black at dawn (the buildings TSStatic is
+// flagged nightEmissive; core/environment.lua). The official materials of
+// these sheets never enable it.
+const NIGHT_WINDOWS = { emissiveFactor: [1, 1, 1], instanceEmissive: true, emissiveIntensityNits: 60 };
+
 const MATERIAL_STAGES = {
-  facade: pbr(`${TRIM}/plaster/t_highrise_plaster`, 't_highrise_plaster', { emissive: true, metallic: true }),
-  shop: pbr(`${TRIM}/metal/t_highrise_metal`, 't_highrise_metal', { metallic: true }),
+  facade: { ...pbr(`${TRIM}/plaster/t_highrise_plaster`, 't_highrise_plaster', { emissive: true, metallic: true }), ...NIGHT_WINDOWS },
+  shop: { ...pbr(`${TRIM}/metal/t_highrise_metal`, 't_highrise_metal', { emissive: true, metallic: true }), ...NIGHT_WINDOWS },
   office: {
-    ...pbr(`${TRIM}/metal/t_highrise_metal`, 't_highrise_metal', { metallic: true }),
+    ...pbr(`${TRIM}/metal/t_highrise_metal`, 't_highrise_metal', { emissive: true, metallic: true }),
+    ...NIGHT_WINDOWS,
     baseColorMap: `${TRIM}/metal/t_highrise_metal/t_highrise_metal_02_b.color.png`,
   },
   siding: pbr(`${TILE}/wood/weatherboards`, 't_weatherboards'),
@@ -142,16 +150,23 @@ const MATERIAL_STAGES = {
 };
 
 /** BeamNG material definitions for every name in BUILDING_MATERIALS. */
-export function getBuildingMaterialDefs() {
+// facadeEmissiveMap: the level's own night map for the plaster window sheet
+// (public/beamng_facade_e.png, scripts/build-facade-emissive.py: the
+// official one lights only the panel-window band, so houses stayed dark).
+export const FACADE_EMISSIVE_FILE = 'beamng_facade_e.png';
+
+export function getBuildingMaterialDefs({ facadeEmissiveMap = null } = {}) {
   const defs = {};
   for (const [key, name] of Object.entries(BUILDING_MATERIALS)) {
+    const stage = { ...MATERIAL_STAGES[key], vertColor: true };
+    if (key === 'facade' && facadeEmissiveMap) stage.emissiveMap = facadeEmissiveMap;
     defs[name] = {
       name,
       mapTo: name,
       class: 'Material',
       version: 1.5,
       annotation: 'BUILDINGS',
-      Stages: [{ ...MATERIAL_STAGES[key], vertColor: true }, {}, {}, {}],
+      Stages: [stage, {}, {}, {}],
       translucentBlendOp: 'None',
     };
   }

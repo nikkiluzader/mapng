@@ -827,7 +827,9 @@ test('traffic signals: heads link to signals.json instances; level masts get .li
     // North America: a West Coast USA signal mast per approach, its street light lit at night
     const masts = items.filter((o) => /pole_light_signal1\.dae$/.test(o.shapeName));
     assert.equal(masts.length, 4);
-    assert.equal(items.filter((o) => o.class === 'PointLight' && o.nightLight === '1').length, 4);
+    assert.equal(items.filter((o) => o.class === 'SpotLight' && o.nightLight === '1').length, 4);
+    // each mast names its light as child (the environment lights the lamp head with it)
+    assert.ok(masts.every((m) => items.some((o) => o.class === 'SpotLight' && o.name === m.child)));
     const missionGroup = parseNDJSON(await readText(zip, 'main/MissionGroup/items.level.json'));
     assert.ok(missionGroup.some((o) => o.name === 'traffic_signals'));
     // The West Coast USA mast is mirrored into this level through a .link file.
@@ -856,10 +858,13 @@ test('street lamps: a lit street gets poles with night lights', async () => {
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
     const items = parseNDJSON(await readText(zip, 'main/MissionGroup/street_furniture/items.level.json'));
     const poles = items.filter((o) => o.class === 'TSStatic' && /^street_lamp_gen_/.test(o.name));
-    const lights = items.filter((o) => o.class === 'PointLight' && /^street_lamp_gen_/.test(o.name));
+    const lights = items.filter((o) => o.class === 'SpotLight' && /^street_lamp_gen_/.test(o.name));
     assert.ok(poles.length > 0, 'generated lamp poles');
     assert.equal(lights.length, poles.length, 'one night light per pole');
     assert.ok(lights.every((l) => l.nightLight === '1' && l.castShadows === false));
+    // aimed down, linked from its pole
+    assert.ok(lights.every((l) => l.rotationMatrix[5] === -1));
+    assert.ok(poles.every((p) => lights.some((l) => l.name === p.child) && p.instanceColor?.[0] === 0));
   } finally {
     restore();
   }

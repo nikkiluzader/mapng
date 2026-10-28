@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
-import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature } from './beamngBuildings.js';
+import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
@@ -6938,19 +6938,13 @@ function buildTrafficSignalObjects(props = []) {
         shapeName: SIGNAL_MAST.shapeFile,
         annotation: 'TRAFFIC_SIGNALS',
         useInstanceRenderData: true,
+        ...lampLink(`signal_mast_${i}_light`),
       });
-      objects.push({
-        __parent: 'traffic_signals',
-        name: `signal_mast_${i}_light`,
-        persistentId: generatePersistentId(),
-        position: [
-          roundTo(prop.position[0] + Math.cos(prop.yaw) * SIGNAL_MAST.lightForward, 3),
-          roundTo(prop.position[1] + Math.sin(prop.yaw) * SIGNAL_MAST.lightForward, 3),
-          roundTo(prop.position[2] + SIGNAL_MAST.lightHeight, 3),
-        ],
-        ...STREET_LAMP_LIGHT_TEMPLATE,
-        radius: SIGNAL_MAST.radius,
-      });
+      objects.push(lampSpotLight(`signal_mast_${i}_light`, 'traffic_signals', [
+        roundTo(prop.position[0] + Math.cos(prop.yaw) * SIGNAL_MAST.lightForward, 3),
+        roundTo(prop.position[1] + Math.sin(prop.yaw) * SIGNAL_MAST.lightForward, 3),
+        roundTo(prop.position[2] + SIGNAL_MAST.lightHeight - 0.2, 3),
+      ], SIGNAL_MAST.lightHeight));
     } else if (prop.kind === 'signal_head') {
       objects.push({
         __parent: 'traffic_signals',
@@ -7003,18 +6997,41 @@ const GARAGE_LIGHT_TEMPLATE = {
   useColorTemperature: 'true',
 };
 
-const STREET_LAMP_LIGHT_TEMPLATE = {
-  class: 'PointLight',
-  attenuationRatio: [0, 0, 0],
-  brightness: 0.0795774609,
-  castShadows: false,
-  color: [1, 0.474550009, 0.156189993, 1],
-  intensity: 5000,
-  isEnabled: false,
-  nightLight: '1',
-  radius: 15,
-  useColorTemperature: 'true',
-};
+// Street lights as West Coast USA's own: a SpotLight aimed straight down
+// from the luminaire (a pool on the road, not a glow on every facade), and
+// the lamp TSStatic naming it as its `child` with instanceColor black, so
+// the environment's night lights switch the light on at dusk and light the
+// lamp head's emissive in the light's colour (core/environment.lua
+// addLinkedNightLights). No shadows (QA guidance: hundreds of instances).
+const LAMP_SPOT_DOWN = [1, 0, 0, 0, 0, -1, 0, 1, 0];   // local Y (the beam) down
+const LAMP_COLOUR = [0.95, 0.9, 0.82, 1];               // neutral LED white
+const LAMP_CD_AT_12M = 5000;
+export function lampSpotLight(name, parent, position, lightHeight = 8) {
+  return {
+    __parent: parent,
+    class: 'SpotLight',
+    name,
+    persistentId: generatePersistentId(),
+    position,
+    rotationMatrix: LAMP_SPOT_DOWN,
+    castShadows: false,
+    color: LAMP_COLOUR,
+    innerAngle: 25,
+    outerAngle: 150,
+    intensityUnit: 'cd',
+    // the engine's 5000 cd suits West Coast's 12.5 m cobra heads; lower
+    // lamps get less (ground light falls with the mounting height squared),
+    // or a 7 m pole lamp glares three times as bright on the road
+    intensity: Math.round(Math.max(1200, LAMP_CD_AT_12M * (lightHeight / 12.5) ** 2)),
+    isEnabled: false,
+    nightLight: '1',
+    range: roundTo(Math.max(20, lightHeight * 3.6), 2),
+    useColorTemperature: 'false',
+  };
+}
+// (a lamp TSStatic linked to its light)
+const lampLink = (lightName) => ({ child: lightName, instanceColor: [0, 0, 0, 1] });
+
 
 /**
  * Convert OSM street furniture nodes into native BeamNG objects:
@@ -7094,20 +7111,14 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
       rotationMatrix: rotationMatrixFromYaw(facing + (asset.yawOffset ?? 0)),
       shapeName: asset.shapeFile,
       useInstanceRenderData: true,
+      ...lampLink(`${name}_light`),
     });
     const forward = asset.lightForward ?? 0;
-    objects.push({
-      __parent: 'street_furniture',
-      name: `${name}_light`,
-      persistentId: generatePersistentId(),
-      position: [
-        roundTo(posX + Math.cos(facing) * forward, 3),
-        roundTo(posY + Math.sin(facing) * forward, 3),
-        roundTo(z + (asset.lightHeight ?? 6), 3),
-      ],
-      ...STREET_LAMP_LIGHT_TEMPLATE,
-      ...(asset.radius ? { radius: asset.radius } : {}),
-    });
+    objects.push(lampSpotLight(`${name}_light`, 'street_furniture', [
+      roundTo(posX + Math.cos(facing) * forward, 3),
+      roundTo(posY + Math.sin(facing) * forward, 3),
+      roundTo(z + (asset.lightHeight ?? 6) - 0.2, 3),
+    ], asset.lightHeight ?? 6));
     lampCount++;
   };
   // Which light a road gets: the tall cobra head on arterials, the davit
@@ -7227,18 +7238,13 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
       rotationMatrix: rotationMatrixFromYaw(p.yaw),
       shapeName: PROP_SHAPES.poleLamp.shapeFile,
       useInstanceRenderData: true,
+      ...lampLink(`pole_lamp_${i}_light`),
     });
-    objects.push({
-      __parent: 'street_furniture',
-      name: `pole_lamp_${i}_light`,
-      persistentId: generatePersistentId(),
-      position: [
-        roundTo(p.x - Math.cos(p.yaw) * POLE_LAMP_REACH_M, 3),
-        roundTo(p.y - Math.sin(p.yaw) * POLE_LAMP_REACH_M, 3),
-        roundTo(p.z + POLE_LAMP_Z - 0.2, 3),
-      ],
-      ...STREET_LAMP_LIGHT_TEMPLATE,
-    });
+    objects.push(lampSpotLight(`pole_lamp_${i}_light`, 'street_furniture', [
+      roundTo(p.x - Math.cos(p.yaw) * POLE_LAMP_REACH_M, 3),
+      roundTo(p.y - Math.sin(p.yaw) * POLE_LAMP_REACH_M, 3),
+      roundTo(p.z + POLE_LAMP_Z - 0.3, 3),
+    ], POLE_LAMP_Z));
     lampCount++;
     poleLamps++;
   }
@@ -10423,6 +10429,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     if (osmDaeData) {
       zip.folder(`${base}/map_assets/custom_assets/osm_objects`);
       zip.file(`${base}/map_assets/custom_assets/osm_objects/osm_objects.dae`, osmDaeData);
+      // lit windows at night for every window band (the official map lights one)
+      let facadeEmissive = null;
+      try {
+        const res = await fetch(`/${FACADE_EMISSIVE_FILE}`);
+        if (res.ok) facadeEmissive = new Uint8Array(await res.arrayBuffer());
+      } catch (_) {
+        // (no app server: the official emissive map stays)
+      }
       zip.file(`${base}/map_assets/custom_assets/osm_objects/main.materials.json`, JSON.stringify({
         osm_object: {
           class: 'Material',
@@ -10432,8 +10446,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           Stages: [{ diffuseColor: [1, 1, 1, 1], vertColor: true }],
           translucentBlendOp: 'None',
         },
-        ...getBuildingMaterialDefs(),
+        ...getBuildingMaterialDefs({
+          facadeEmissiveMap: facadeEmissive ? `/levels/${levelName}/map_assets/custom_assets/osm_objects/${FACADE_EMISSIVE_FILE}` : null,
+        }),
       }, null, 2));
+      if (facadeEmissive) zip.file(`${base}/map_assets/custom_assets/osm_objects/${FACADE_EMISSIVE_FILE}`, facadeEmissive);
     }
     if (sidewalksDae) {
       zip.folder(`${base}/map_assets/custom_assets/sidewalks`);
@@ -10852,6 +10869,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       decalType: 'Collision Mesh',
       prebuildCollisionData: 0,
       useInstanceRenderData: true,
+      // lit windows at night (beamngBuildings.js NIGHT_WINDOWS): the
+      // environment sets instanceColor to this warm interior light at dusk
+      instanceColor: [0, 0, 0, 1],
+      nightEmissive: '1',   // (a string, as official levels write it: JSON true or 1 is dropped)
+      nightEmissiveColor: '255 214 160',
     });
   }
 

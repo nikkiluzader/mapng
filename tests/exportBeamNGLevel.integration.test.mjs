@@ -369,7 +369,7 @@ test('exportBeamNGLevel emits native street furniture with engine-managed night 
     const items = parseNDJSON(await file.async('string'));
 
     const lamps = items.filter((i) => i?.class === 'TSStatic' && i.name?.startsWith('street_lamp_'));
-    const lights = items.filter((i) => i?.class === 'PointLight');
+    const lights = items.filter((i) => i?.class === 'SpotLight');
     const benches = items.filter((i) => i?.class === 'TSStatic' && i.name?.startsWith('bench_'));
 
     // The fixture has one pole lamp, one wire-suspended lamp, and one bench.
@@ -383,7 +383,7 @@ test('exportBeamNGLevel emits native street furniture with engine-managed night 
     const [light] = lights;
     assert.equal(light.nightLight, '1', 'street lights must set nightLight');
     assert.equal(light.isEnabled, false, 'nightLight lights start disabled');
-    assert.equal(light.castShadows, false, 'point lights must not cast shadows');
+    assert.equal(light.castShadows, false, 'street lights must not cast shadows');
 
     // The light belongs at the luminaire, above and offset from the pole base.
     const [lamp] = lamps;
