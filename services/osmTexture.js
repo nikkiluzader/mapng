@@ -1365,6 +1365,17 @@ const renderFeaturesToCanvas = (
   SCALE_FACTOR,
   options = {},
 ) => {
+  // a palette of its own (the game map texture): COLORS swapped for the
+  // draw, restored after (everything here is synchronous)
+  if (options.palette) {
+    const saved = { ...COLORS };
+    Object.assign(COLORS, options.palette);
+    try {
+      return renderFeaturesToCanvas(ctx, features, toPixel, SCALE_FACTOR, { ...options, palette: null });
+    } finally {
+      Object.assign(COLORS, saved);
+    }
+  }
   const drawPath = (points) => {
     if (points.length < 2) return;
     const start = toPixel(points[0].lat, points[0].lng);
@@ -1541,6 +1552,8 @@ const renderFeaturesToCanvas = (
 
   if (options.alpha) ctx.globalAlpha = options.alpha;
   for (const { f } of sortedLC) {
+    // (the game map leaves broad land use to the ground it classified)
+    if (options.skipArea?.(f.tags, getFeatureColor(f.tags, baseColor) === baseColor)) continue;
     ctx.fillStyle = getFeatureColor(f.tags, baseColor);
     if (f.geometry.length === 1) {
       // Skip vegetation points (trees, shrubs) as they are rendered as 3D models
@@ -1714,7 +1727,7 @@ const renderFeaturesToCanvas = (
   const buildings = features.filter((f) => f.type === "building");
   ctx.lineWidth = 0.5 * SCALE_FACTOR;
   buildings.forEach((f) => {
-    ctx.fillStyle = "#CDB8A6";
+    ctx.fillStyle = COLORS.buildingFill || "#CDB8A6";
     ctx.strokeStyle = COLORS.buildingStroke;
     drawPolygon(f);
     ctx.fill("evenodd");
@@ -1829,6 +1842,187 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
   if (!blob) console.warn("[OSM Texture] canvas.toBlob() returned null — canvas may be tainted or too large");
   const url = blob ? URL.createObjectURL(blob) : "";
   console.log(`[OSM Texture] Done — blob=${blob ? `${(blob.size / 1024).toFixed(0)} KB` : "null"}, url=${url ? "ok" : "empty"}`);
+  return { url, canvas, blob };
+};
+
+// ── Game map texture ─────────────────────────────────────────────────────────
+// A base texture made for the game rather than a map or a photo: flat,
+// natural ground colours (the satellite's shadows, cars, roofs and tile
+// seams left out), OSM's land cover where it is mapped, and where it is not
+// (OSM leaves it grey) the ground the satellite shows, sorted into a few
+// classes and painted flat. Broad land use (residential, commercial, farmland
+// ...) is left to that classification: a suburb is lawns, trees, drives and
+// roofs, not one grey.
+export const GROUND_CLASSES = ['trees', 'grass', 'dry', 'soil', 'sand', 'paved', 'water', 'shadow'];
+// Tuned to BeamNG's own base colour maps (t_terrain_base_b: East Coast USA,
+// Italy, West Coast USA, Jungle Rock Island): dark, muted olive greens, grey-
+// brown open ground; the detail textures sit on them at 15-25 % strength,
+// so these are the colours seen in game. Paved greys stay neutral: a warm
+// grey reads as vegetation to the export's grass mask (isVegetationColor).
+const GROUND_COLORS = {
+  trees: [63, 70, 39], grass: [82, 90, 49], dry: [109, 104, 76], soil: [126, 115, 97],
+  sand: [157, 141, 111], paved: [96, 95, 91], water: [74, 96, 104],
+};
+export const GAME_COLORS = {
+  forest: "#3f4627", scrub: "#605d37", heath: "#66603f", grass: "#525a31", orchard: "#4b5a2e", farmland: "#7e7361",
+  water: "#4a6068", wetland: "#4a5430", swamp: "#3f4627", glacier: "#9aa3a5", mud: "#5e5446",
+  bare: "#8f8676", sand: "#9d8d6f", dirt: "#7e7361", quarry: "#847a69",
+  residential: "#555c35", commercial: "#62615c", industrial: "#5d5c58", retail: "#66655f",
+  education: "#565e34", military: "#5e5c46", cemetery: "#4f5a30", sport: "#4d5c2e",
+  recreation: "#525a31", park: "#4f5a30", parking: "#4c4c49", aeroway: "#6b6a65", apron: "#62615c",
+  runway: "#454441", power: "#5d5c58", tourism: "#525a31", hospital: "#565e34",
+  swimming_pool: "#4f7d88", marina: "#62615c", harbourLand: "#5d5c58", fountain: "#4f7d88",
+  allotments: "#4f5a30", flowerbed: "#525a31", hedge: "#3f4627",
+  building: "#5d5c58", buildingFill: "#5d5c58", buildingStroke: "#565550", path: "#7e7361", track: "#6d6250",
+  sidewalk: "#7d7a72", barrier: "#5a4c3c", coastline: "#4a6068", ocean: "#4a6068", defaultLanduse: "#525a31",
+};
+// broad land use the classification paints instead (when there is a satellite
+// image), and natural vegetation: the imagery is newer than many outlines (a
+// clearing in a mapped wood) and tells canopy from grass on its own
+const BROAD_LANDUSE = new Set(['residential', 'commercial', 'retail', 'industrial', 'education', 'military', 'farmland', 'farmyard', 'construction', 'brownfield', 'greenfield', 'religious', 'institutional']);
+const NATURAL_COVER = new Set(['forest', 'wood', 'scrub', 'heath', 'grass', 'meadow', 'grassland', 'shrubbery', 'trees']);
+const leftToGround = (tags) => BROAD_LANDUSE.has(tags?.landuse) || BROAD_LANDUSE.has(tags?.amenity)
+  || NATURAL_COVER.has(tags?.landuse) || NATURAL_COVER.has(tags?.natural) || NATURAL_COVER.has(tags?.landcover);
+
+/** The ground class of a satellite pixel (index into GROUND_CLASSES). */
+export function classifyGround(r, g, b) {
+  const max = Math.max(r, g, b); const min = Math.min(r, g, b);
+  const v = max / 255; const s = max ? (max - min) / max : 0;
+  const exg = (2 * g - r - b) / 255;
+  if (v < 0.16) return 7;                                         // shadow: taken from its neighbours
+  if (b > g + 6 && b > r + 14 && v < 0.62) return 6;              // water
+  // (green clearly over red: sand and straw have a little excess green too)
+  if (g > r + 2 && (exg > 0.05 || (g > b + 8 && s > 0.14))) return v < 0.34 ? 0 : 1;   // canopy / grass
+  if (s < 0.13) return v < 0.24 ? 7 : 5;                          // grey: paved (dark grey: shadow)
+  if (r >= g && g >= b) {
+    if (v > 0.62 && s < 0.4) return 4;                            // sand
+    const hueish = (g - b) / ((r - b) || 1);                      // 1: yellow, 0: red
+    if (hueish > 0.62 && s < 0.5) return 2;                       // dry grass / straw
+    return 3;                                                     // bare soil
+  }
+  return g > r ? 1 : 3;
+}
+
+// 3x3 majority over the class grid, shadows not voting (and filled from
+// their neighbours): cars, roof edges and single dark pixels drop out
+function smoothClasses(cls, w, h, passes) {
+  let src = cls;
+  for (let pass = 0; pass < passes; pass++) {
+    const out = new Uint8Array(src.length);
+    const votes = new Uint16Array(GROUND_CLASSES.length);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        votes.fill(0);
+        for (let dy = -1; dy <= 1; dy++) {
+          const yy = Math.min(h - 1, Math.max(0, y + dy));
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = Math.min(w - 1, Math.max(0, x + dx));
+            const c = src[yy * w + xx];
+            if (c !== 7) votes[c] += dx === 0 && dy === 0 ? 2 : 1;
+          }
+        }
+        let best = src[y * w + x]; let n = 0;
+        for (let c = 0; c < 7; c++) if (votes[c] > n) { n = votes[c]; best = c; }
+        out[y * w + x] = n > 0 ? best : src[y * w + x];
+      }
+    }
+    src = out;
+  }
+  // any shadow still left: grass (the commonest ground under trees and roofs)
+  for (let i = 0; i < src.length; i++) if (src[i] === 7) src[i] = 1;
+  return src;
+}
+
+export const generateGameTexture = async (terrainData, options = {}) => {
+  const onProgress = options.onProgress;
+  onProgress?.("Painting the game map texture...");
+  const MAX_TEX_SIZE = 8192;
+  const requestedSize = Number(options.outputSize || terrainData.width || 1024);
+  const targetSize = Math.max(1, Math.min(MAX_TEX_SIZE, Math.floor(requestedSize)));
+  const SCALE_FACTOR = targetSize / Math.max(1, terrainData.width);
+  const processingMetersPerPixel = Number(terrainData?.processingMetersPerPixel) > 0 ? Number(terrainData.processingMetersPerPixel) : 1;
+  const METERS_TO_PX = SCALE_FACTOR / processingMetersPerPixel;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(terrainData.width * SCALE_FACTOR));
+  canvas.height = Math.max(1, Math.round(terrainData.height * SCALE_FACTOR));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not get 2D context");
+
+  // the ground: classified from the satellite image (about 2 m a cell), else grass
+  let satellite = options.satelliteCanvas?.width > 0 ? options.satelliteCanvas : null;
+  if (!satellite && terrainData.satelliteTextureUrl) {
+    const img = new Image();
+    img.src = terrainData.satelliteTextureUrl;
+    if (await new Promise((resolve) => { img.onload = () => resolve(true); img.onerror = () => resolve(false); }) && img.naturalWidth > 0) satellite = img;
+  }
+  if (satellite) {
+    const cell = Math.max(1, Math.round(2 / processingMetersPerPixel));
+    const w = Math.max(16, Math.round(terrainData.width / cell)); const h = Math.max(16, Math.round(terrainData.height / cell));
+    const small = document.createElement("canvas");
+    small.width = w; small.height = h;
+    const sctx = small.getContext("2d");
+    sctx.imageSmoothingEnabled = true;
+    sctx.imageSmoothingQuality = "high";
+    sctx.drawImage(satellite, 0, 0, w, h);
+    const px = sctx.getImageData(0, 0, w, h);
+    const cls = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) cls[i] = classifyGround(px.data[i * 4], px.data[i * 4 + 1], px.data[i * 4 + 2]);
+    const smooth = smoothClasses(cls, w, h, 3);
+    for (let i = 0; i < w * h; i++) {
+      const c = GROUND_COLORS[GROUND_CLASSES[smooth[i]]];
+      px.data[i * 4] = c[0]; px.data[i * 4 + 1] = c[1]; px.data[i * 4 + 2] = c[2]; px.data[i * 4 + 3] = 255;
+    }
+    sctx.putImageData(px, 0, 0);
+    // up to the texture with soft class edges
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(small, 0, 0, canvas.width, canvas.height);
+  } else {
+    ctx.fillStyle = GAME_COLORS.grass;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // OSM: land cover where mapped (broad land use left to the ground above
+  // when there was a satellite image), roads, paths, buildings
+  onProgress?.("Drawing land cover and roads on the game map...");
+  const { north: bNorth, south: bSouth, east: bEast, west: bWest } = terrainData.bounds;
+  const toPixel = (lat, lng) => ({
+    x: ((lng - bWest) / (bEast - bWest)) * canvas.width,
+    y: ((bNorth - lat) / (bNorth - bSouth)) * canvas.height,
+  });
+  renderFeaturesToCanvas(ctx, terrainData.osmFeatures || [], toPixel, METERS_TO_PX, {
+    ...options,
+    palette: GAME_COLORS,
+    baseColor: GAME_COLORS.defaultLanduse,
+    skipArea: satellite ? (tags, unmatched) => unmatched || leftToGround(tags) : null,
+  });
+
+  // gentle large-scale variation, then a fine grain: ground, not a vector map
+  const macro = document.createElement("canvas");
+  macro.width = 48; macro.height = 48;
+  const mctx = macro.getContext("2d");
+  const mdata = mctx.createImageData(48, 48);
+  let seed = 1234567;
+  const rand = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  for (let i = 0; i < 48 * 48; i++) {
+    const v = 128 + (rand() - 0.5) * 34;
+    mdata.data[i * 4] = v; mdata.data[i * 4 + 1] = v; mdata.data[i * 4 + 2] = v; mdata.data[i * 4 + 3] = 255;
+  }
+  mctx.putImageData(mdata, 0, 0);
+  ctx.save();
+  ctx.globalCompositeOperation = "overlay";
+  ctx.globalAlpha = 0.5;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(macro, 0, 0, canvas.width, canvas.height);
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = ctx.createPattern(createNoisePattern("#808080"), "repeat");
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
+  const blob = await new Promise((r) => canvas.toBlob((b) => r(b || null), "image/png"));
+  const url = blob ? URL.createObjectURL(blob) : "";
+  console.log(`[Game Texture] ${canvas.width}x${canvas.height}, ${satellite ? "ground classified from satellite" : "no satellite: grass ground"}, blob=${blob ? `${(blob.size / 1024).toFixed(0)} KB` : "null"}`);
   return { url, canvas, blob };
 };
 

@@ -194,6 +194,7 @@ export async function prepareCroppedTerrainData(terrainData) {
     'satelliteTextureUrl',
     'osmTextureUrl',
     'hybridTextureUrl',
+    'gameTextureUrl',
     'segmentedTextureUrl',
     'segmentedHybridTextureUrl',
   ];

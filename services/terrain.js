@@ -10,7 +10,7 @@ import { parseLazFile, parseLazFiles } from "./lazLoader.js";
 export { parseLazFile };
 import { parseAscFiles } from './ascLoader.js';
 import { rasterizeLazOffThread } from "./lazClient.js";
-import { generateOSMTexture, generateHybridTexture } from "./osmTexture.js";
+import { generateOSMTexture, generateHybridTexture, generateGameTexture } from "./osmTexture.js";
 import * as GeoTIFF from "geotiff";
 import {
   resampleHeightAndImageOffThread,
@@ -1677,6 +1677,7 @@ export const fetchTerrainData = async (
     keepSourceGeoTiffs = true,
     generateOSMTextureAsset = true,
     generateHybridTextureAsset = true,
+    generateGameTextureAsset = true,
     globalTileConcurrency = 20,
     processingMetersPerPixel = 1,
     targetBounds = null,
@@ -2198,6 +2199,14 @@ export const fetchTerrainData = async (
       terrainData.hybridTextureBlob = hybridResult.blob || null;
     }
 
+    if (generateGameTextureAsset) {
+      onProgress?.("Generating game map texture...");
+      const gameResult = await generateGameTexture(terrainData, { ...options, satelliteCanvas: hybridSatelliteCanvas });
+      terrainData.gameTextureUrl = gameResult.url;
+      terrainData.gameTextureCanvas = gameResult.canvas;
+      terrainData.gameTextureBlob = gameResult.blob || null;
+    }
+
   }
 
   releaseCanvas(hybridSatelliteCanvas);
@@ -2238,6 +2247,7 @@ export const loadTerrainFromTif = async (
   const {
     generateOSMTextureAsset = true,
     generateHybridTextureAsset = true,
+    generateGameTextureAsset = true,
     globalTileConcurrency = 20,
     elevationUnitOverride = 'auto',
     processingMetersPerPixel = 1,
@@ -2542,6 +2552,13 @@ export const loadTerrainFromTif = async (
       terrainData.hybridTextureCanvas = hybridResult.canvas;
       terrainData.hybridTextureBlob   = hybridResult.blob || null;
     }
+    if (generateGameTextureAsset) {
+      onProgress?.('Generating game map texture...');
+      const gameResult = await generateGameTexture(terrainData, { ...options, satelliteCanvas: hybridSatelliteCanvas });
+      terrainData.gameTextureUrl    = gameResult.url;
+      terrainData.gameTextureCanvas = gameResult.canvas;
+      terrainData.gameTextureBlob   = gameResult.blob || null;
+    }
   }
 
   releaseCanvas(hybridSatelliteCanvas);
@@ -2561,6 +2578,7 @@ export const loadTerrainFromLaz = async (
   const {
     generateOSMTextureAsset      = true,
     generateHybridTextureAsset   = true,
+    generateGameTextureAsset = true,
     globalTileConcurrency        = 20,
     elevationUnitOverride        = 'auto',
     processingMetersPerPixel     = 1,
@@ -2766,6 +2784,13 @@ export const loadTerrainFromLaz = async (
       terrainData.hybridTextureUrl    = hybridResult.url;
       terrainData.hybridTextureCanvas = hybridResult.canvas;
       terrainData.hybridTextureBlob   = hybridResult.blob || null;
+    }
+    if (generateGameTextureAsset) {
+      onProgress?.('Generating game map texture...');
+      const gameResult = await generateGameTexture(terrainData, { ...options, satelliteCanvas: hybridSatelliteCanvas });
+      terrainData.gameTextureUrl    = gameResult.url;
+      terrainData.gameTextureCanvas = gameResult.canvas;
+      terrainData.gameTextureBlob   = gameResult.blob || null;
     }
   }
 

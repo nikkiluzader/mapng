@@ -61,6 +61,7 @@ export const buildRunConfiguration = ({
       satellite: !!terrainData?.satelliteTextureUrl,
       osm: !!terrainData?.osmTextureUrl,
       hybrid: !!terrainData?.hybridTextureUrl,
+      game: !!terrainData?.gameTextureUrl,
       roadMask: !!terrainData?.osmFeatures?.length,
     },
     osmQuery: terrainData?.osmRequestInfo || null,

@@ -60,6 +60,7 @@
                 <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">{{ t('exportPanel.satelliteHybrid') }}</option>
                 <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">{{ t('exportPanel.satellite') }}</option>
                 <option v-if="hasOsmData" value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
+                <option v-if="hasOsmData" value="game" :disabled="!terrainData?.gameTextureUrl && !terrainData?.gameTextureCanvas">{{ t('exportPanel.gameMap') }}</option>
                 <option v-if="hasPaintedTexture" value="painted">{{ t('exportPanel.touchedUp') }}</option>
               </select>
               <button
@@ -604,6 +605,7 @@ const resolveBeamNGBaseTexture = (terrainData, preferred = 'osm') => {
     hybrid: !!terrainData?.hybridTextureUrl || !!terrainData?.hybridTextureCanvas,
     satellite: !!terrainData?.satelliteTextureUrl,
     osm: !!terrainData?.osmTextureUrl,
+    game: !!terrainData?.gameTextureUrl || !!terrainData?.gameTextureCanvas,
     none: true,
   };
 
@@ -684,6 +686,7 @@ const texturePaintKindAvailable = (kind) => {
   if (kind === 'hybrid') return !!(td.hybridTextureCanvas || td.hybridTextureBlob || td.hybridTextureUrl);
   if (kind === 'satellite') return !!td.satelliteTextureUrl;
   if (kind === 'osm') return !!(td.osmTextureCanvas || td.osmTextureBlob || td.osmTextureUrl);
+  if (kind === 'game') return !!(td.gameTextureCanvas || td.gameTextureBlob || td.gameTextureUrl);
   return false;
 };
 

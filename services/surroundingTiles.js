@@ -260,6 +260,7 @@ export const fetchSurroundingTiles = async (
           keepSourceGeoTiffs: false,
           generateOSMTextureAsset: false,
           generateHybridTextureAsset: false,
+          generateGameTextureAsset: false,
           globalTileConcurrency: 10,
           targetBounds: b,
         },

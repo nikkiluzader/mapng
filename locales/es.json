@@ -286,6 +286,7 @@
     "generatePlayableZip": "Generar paquete .zip jugable",
     "satellite": "Satelite",
     "satelliteHybrid": "Hibrido satelital",
+    "gameMap": "Mapa de juego",
     "touchedUp": "Retocada",
     "texturePaint": {
       "open": "Retocar textura base",

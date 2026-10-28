@@ -572,6 +572,10 @@ async function getTerrainTextureBlob(terrainData, textureType = 'hybrid') {
       if (terrainData.hybridTextureUrl) return await urlToPngBlob(terrainData.hybridTextureUrl);
     } else if (textureType === 'satellite') {
       if (terrainData.satelliteTextureUrl) return await urlToPngBlob(terrainData.satelliteTextureUrl);
+    } else if (textureType === 'game') {
+      if (terrainData.gameTextureCanvas) return new Promise(r => terrainData.gameTextureCanvas.toBlob(r, 'image/png'));
+      if (terrainData.gameTextureBlob) return terrainData.gameTextureBlob;
+      if (terrainData.gameTextureUrl) return await urlToPngBlob(terrainData.gameTextureUrl);
     } else if (textureType === 'osm') {
       if (terrainData.osmTextureCanvas) return new Promise(r => terrainData.osmTextureCanvas.toBlob(r, 'image/png'));
       if (terrainData.osmTextureBlob) return terrainData.osmTextureBlob;
@@ -8717,7 +8721,7 @@ async function generateZipToOPFS(zip, filename, onPercent) {
  * @param {object} terrainData
  * @param {object} center        — { lat, lng }
  * @param {object} [options]
- * @param {string}  [options.baseTexture='hybrid']         — 'none' | 'hybrid' | 'satellite' | 'osm' | 'painted'
+ * @param {string}  [options.baseTexture='hybrid']         — 'none' | 'hybrid' | 'satellite' | 'osm' | 'game' | 'painted'
  * @param {boolean} [options.includeBuildings=true]         — include generated OSM 3D objects (.dae)
  * @param {boolean} [options.includeSidewalks=true]         — raised curbs + sidewalks along drawn roads (.dae)
  * @param {boolean} [options.applyFoundations=true]         — apply terrain foundation pass under buildings
@@ -9132,7 +9136,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let texBlob = await getTerrainTextureBlob(exportTerrainData, baseTexture);
   report(`Fitting the base texture to the ${size}×${size} grid${texBlob ? ` (${formatBytes(texBlob.size)} source)` : ''}…`, 0.75);
   const fittedTexture = await fitBaseTexture(texBlob, size, {
-    allowFiner: baseTexture !== 'none' && baseTexture !== 'osm',
+    allowFiner: baseTexture !== 'none' && baseTexture !== 'osm' && baseTexture !== 'game',
   });
   texBlob = fittedTexture.blob;
   const terrainBaseTexSize = fittedTexture.size;
@@ -9142,7 +9146,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const effectivePbrSource = (pbrSource === 'image' && !imageCanvas) ? 'osm' : pbrSource;
 
   // Satellite-based textures show where unmapped ground is vegetated.
-  const vegetationMask = effectivePbrSource === 'osm' && ['hybrid', 'satellite', 'painted'].includes(baseTexture)
+  // (the game map paints the ground it classified: its greens are the grass)
+  const vegetationMask = effectivePbrSource === 'osm' && ['hybrid', 'satellite', 'painted', 'game'].includes(baseTexture)
     ? await buildVegetationMask(texBlob)
     : null;
 

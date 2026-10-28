@@ -318,6 +318,7 @@
     "generatePlayableZip": "Generate playable .zip package",
     "satellite": "Satellite",
     "satelliteHybrid": "Satellite Hybrid",
+    "gameMap": "Game Map",
     "touchedUp": "Touched up",
     "texturePaint": {
       "open": "Touch up base texture",

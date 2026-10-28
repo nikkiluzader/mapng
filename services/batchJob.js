@@ -1227,6 +1227,9 @@ async function resolveTileTextureSource(terrainData, baseTexture) {
     } else if (baseTexture === 'osm') {
       if (terrainData.osmTextureCanvas) return terrainData.osmTextureCanvas;
       if (terrainData.osmTextureUrl) return await loadImage(terrainData.osmTextureUrl);
+    } else if (baseTexture === 'game') {
+      if (terrainData.gameTextureCanvas) return terrainData.gameTextureCanvas;
+      if (terrainData.gameTextureUrl) return await loadImage(terrainData.gameTextureUrl);
     }
     if (terrainData.satelliteTextureUrl) return await loadImage(terrainData.satelliteTextureUrl);
   } catch {
@@ -1379,6 +1382,8 @@ async function assembleCombinedTerrainData(state, combined) {
       terrainData.hybridTextureCanvas = combined.texCanvas;
     } else if (combined.baseTexture === 'osm') {
       terrainData.osmTextureCanvas = combined.texCanvas;
+    } else if (combined.baseTexture === 'game') {
+      terrainData.gameTextureCanvas = combined.texCanvas;
     } else {
       cleanupUrl = await canvasToObjectURL(combined.texCanvas);
       terrainData.satelliteTextureUrl = cleanupUrl;
@@ -1499,6 +1504,7 @@ async function computeBatchElevationNormalization(state, scheduleFetch, onProgre
         generateSegmentedSatellite: false,
         generateOSMTextureAsset: false,
         generateHybridTextureAsset: false,
+        generateGameTextureAsset: false,
         generateSegmentedHybridAsset: false,
         globalTileConcurrency: Number(state.scheduler?.globalTileConcurrency || 20),
         processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
@@ -1573,6 +1579,7 @@ async function processTile(state, tile, ctx, signal) {
         const combinedBaseTexture = state.combinedLevel ? normalizeCombinedLevelOptions(state.levelOptions).baseTexture : null;
         const needsOsmTexture = !!(shouldFetchOSM && (state.exports.osmTexture || combinedBaseTexture === 'osm'));
         const needsHybridTexture = !!(shouldFetchOSM && (state.exports.hybridTexture || combinedBaseTexture === 'hybrid'));
+        const needsGameTexture = !!(shouldFetchOSM && combinedBaseTexture === 'game');
         return fetchTerrainData(
           tile.center,
           state.resolution,
@@ -1612,6 +1619,7 @@ async function processTile(state, tile, ctx, signal) {
             keepSourceGeoTiffs: !!state.exports.geotiff,
             generateOSMTextureAsset: needsOsmTexture,
             generateHybridTextureAsset: needsHybridTexture,
+            generateGameTextureAsset: needsGameTexture,
             globalTileConcurrency: Number(state.scheduler?.globalTileConcurrency || 20),
             processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
             flat: state.elevationSource === 'none',

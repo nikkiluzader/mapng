@@ -285,6 +285,7 @@
     "generatePlayableZip": "Сгенерировать играбельный .zip",
     "satellite": "Спутник",
     "satelliteHybrid": "Спутниковый гибрид",
+    "gameMap": "Игровая карта",
     "touchedUp": "Отредактированная",
     "texturePaint": {
       "open": "Подправить базовую текстуру",
