@@ -4247,6 +4247,13 @@ const FOOTPATH_DEFAULT_SURFACE = { footway: null, cycleway: null, path: 'dirt', 
 const FOOTPATH_SKIP = new Set(['crossing', 'traffic_island', 'access_aisle']);
 const FOOTPATH_ALONG_COS = 0.85;
 const FOOTPATH_MIN_M = 4;
+// Service roads (driveways, parking aisles, alleys, drive-throughs) are no
+// part of the road network either (no AI into private drives), but drawn:
+// their own surface, as wide as their kind, under the roads they meet.
+// Untagged, a driveway is concrete in town in the Americas (asphalt in town
+// elsewhere) and gravel in the country; the rest asphalt.
+const SERVICE_WIDTH_M = { driveway: 3.2, parking_aisle: 6, alley: 4, 'drive-through': 3.5, emergency_access: 3.5 };
+const SERVICE_DEFAULT_WIDTH_M = 4.5;
 
 /** The surface layers of a pedestrian street fullWidth wide (untagged: as paving stones). */
 export function pedestrianSurfaceLayers(surface, fullWidth, { americas = false } = {}) {
@@ -4294,21 +4301,30 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
     }
     return false;
   });
+  const isUrban = buildUrbanRoadClassifier(terrainData.osmFeatures || []);
+  let serviceCount = 0; let serviceLength = 0;
   for (const feature of terrainData.osmFeatures || []) {
     const tags = feature?.tags || {};
     const footpath = Object.hasOwn(FOOTPATH_WIDTH_M, tags.highway);
-    if (feature?.type !== 'road' || (tags.highway !== 'pedestrian' && !footpath) || !(feature.geometry?.length >= 2)) continue;
+    const service = tags.highway === 'service';
+    if (feature?.type !== 'road' || (tags.highway !== 'pedestrian' && !footpath && !service) || !(feature.geometry?.length >= 2)) continue;
     // squares (area=yes) are polygons, not streets; bridges and tunnels have
     // no deck or bore here
     if (tags.area === 'yes' || isBridgeRoad(tags) || (tags.tunnel && tags.tunnel !== 'no')) continue;
     if (footpath && (FOOTPATH_SKIP.has(String(tags.footway || '')) || tags.indoor === 'yes' || tags.level?.startsWith?.('-'))) continue;
     const tagged = Number.parseFloat(tags.width);
+    const kind = String(tags.service || '').trim().toLowerCase();
+    const lanes = Number.parseInt(tags.lanes, 10);
     const fullWidth = footpath
       ? (Number.isFinite(tagged) && tagged > 0 ? Math.min(8, Math.max(1, tagged)) : FOOTPATH_WIDTH_M[tags.highway])
-      : (Number.isFinite(tagged) && tagged > 0 ? Math.min(40, Math.max(2, tagged)) : PEDESTRIAN_WIDTH_M);
-    const surface = tags.surface || (footpath ? FOOTPATH_DEFAULT_SURFACE[tags.highway] ?? (americas ? 'concrete' : 'asphalt') : null);
+      : service
+        ? (Number.isFinite(tagged) && tagged > 0 ? Math.min(20, Math.max(2, tagged)) : lanes >= 2 ? Math.min(12, 3 * lanes) : SERVICE_WIDTH_M[kind] ?? SERVICE_DEFAULT_WIDTH_M)
+        : (Number.isFinite(tagged) && tagged > 0 ? Math.min(40, Math.max(2, tagged)) : PEDESTRIAN_WIDTH_M);
+    const surface = tags.surface
+      || (footpath ? FOOTPATH_DEFAULT_SURFACE[tags.highway] ?? (americas ? 'concrete' : 'asphalt') : null)
+      || (service ? (kind === 'driveway' ? (!isUrban(feature) ? 'gravel' : americas ? 'concrete' : 'asphalt') : 'asphalt') : null);
     const layers = pedestrianSurfaceLayers(surface, fullWidth, { americas });
-    const street = sanitizeBeamNGObjectName(tags.name || `${footpath ? tags.highway : 'pedestrian'}_${feature.id}`, `pedestrian_${feature.id || 'x'}`);
+    const street = sanitizeBeamNGObjectName(tags.name || `${footpath ? tags.highway : service ? `service_${kind || 'road'}` : 'pedestrian'}_${feature.id}`, `pedestrian_${feature.id || 'x'}`);
     const pieces = clipGeometryToMargin(feature.geometry, terrainData.bounds)
       .map((s) => resampleGeometryToSpacing(s, ROAD_NODE_SPACING_M))
       .flatMap((s) => chunkPolyline(s));
@@ -4335,6 +4351,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
       if (nodes.length < 2) continue;
       if (footpath && pathLength(nodes) < FOOTPATH_MIN_M) continue;
       if (footpath) footpaths.push({ nodes, half: fullWidth / 2 });
+      if (service) { serviceCount++; serviceLength += pathLength(nodes); }
       ways.push({ nodes, half: fullWidth / 2 });
       const n = (perStreet.get(street) || 0) + 1;
       perStreet.set(street, n);
@@ -4354,7 +4371,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
       }
     }
   }
-  return { decals, ways, footpaths };
+  return { decals, ways, footpaths, services: { count: serviceCount, length: serviceLength } };
 }
 
 /** The paving materials the decal groups use, by name (for main.materials.json). */
@@ -4689,6 +4706,7 @@ export function generateDecalRoads(terrainData, squareSize) {
   Object.defineProperty(groups, 'carriageways', { value: carriageways, enumerable: false });
   Object.defineProperty(groups, 'pedestrianStreets', { value: pedestrianStreets.ways, enumerable: false });
   Object.defineProperty(groups, 'footpaths', { value: pedestrianStreets.footpaths, enumerable: false });
+  Object.defineProperty(groups, 'serviceRoads', { value: pedestrianStreets.services, enumerable: false });
   Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
   Object.defineProperty(groups, 'tunnels', { value: tunnels, enumerable: false });
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
@@ -5632,7 +5650,9 @@ function buildDetailedReportSections(d) {
   lines.push(`- Carriageways (paint cut / sidewalk input): ${(groups.carriageways || []).length}`);
   lines.push(`- Crosswalk zones: ${(groups.crosswalkZones || []).length}`);
   const footpathCount = (groups.footpaths || []).length;
-  lines.push(`- Pedestrian streets drawn (highway=pedestrian, no traffic): ${(groups.pedestrianStreets || []).length - footpathCount} piece(s)`);
+  const serviceCount = groups.serviceRoads?.count || 0;
+  lines.push(`- Pedestrian streets drawn (highway=pedestrian, no traffic): ${(groups.pedestrianStreets || []).length - footpathCount - serviceCount} piece(s)`);
+  lines.push(`- Service roads drawn (driveways, parking aisles, alleys; no traffic): ${serviceCount} piece(s), ${formatNumber((groups.serviceRoads?.length || 0) / 1000, 2)} km`);
   lines.push(`- Footpaths, cycleways and trails drawn (beside a street's raised sidewalk left out): ${footpathCount} piece(s), ${formatNumber((groups.footpaths || []).reduce((n, f) => n + pathLength(f.nodes), 0) / 1000, 2)} km`);
   lines.push('- Stone and brick paving (surface=sett/cobblestone/unhewn_cobblestone/paving_stones/bricks) is laid in strips about one texture tile wide: mapng_road_* materials, art/roads/main.materials.json.');
 
