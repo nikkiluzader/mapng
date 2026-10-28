@@ -9345,6 +9345,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ? await buildVegetationMask(texBlob)
     : null;
 
+  // the satellite classified (the game texture's classes): green residential
+  // yards for the Lawn paint here, tree crowns for the canopy trees later
+  if (!exportTerrainData.groundClasses && exportTerrainData.satelliteTextureUrl && (includeTrees || effectivePbrSource === 'osm')) {
+    try {
+      exportTerrainData.groundClasses = await satelliteGroundClasses(exportTerrainData);
+    } catch (e) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Satellite ground classes unavailable:`, e?.message || e);
+    }
+  }
+
   beginStep('materials', effectivePbrSource !== 'none'
     ? `Painting terrain materials from OSM land use (${size}×${size} layer map)…`
     : 'Writing the default terrain material…');
@@ -9353,6 +9363,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         pbrSource: effectivePbrSource,
         imageCanvas,
         vegetationMask,
+        groundClasses: exportTerrainData.groundClasses,
       })
     : null;
 
@@ -9532,15 +9543,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const plants = [includeTrees && 'trees and bushes', includeRocks && 'rocks'].filter(Boolean).join(', ');
   beginStep('vegetation', plants ? `Planting ${plants}, ground cover and props…` : 'Placing ground cover and props…');
   await yield_();
-  // the satellite's tree crowns, for the canopy trees (the game texture's
-  // classification; none without a satellite image)
-  if (includeTrees && !exportTerrainData.groundClasses && exportTerrainData.satelliteTextureUrl) {
-    try {
-      exportTerrainData.groundClasses = await satelliteGroundClasses(exportTerrainData);
-    } catch (e) {
-      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Satellite canopy unavailable:`, e?.message || e);
-    }
-  }
   const forestPlacements = (includeTrees || includeRocks)
     ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome)
     : new Map();

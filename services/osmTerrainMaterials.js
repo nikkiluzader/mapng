@@ -551,6 +551,14 @@ function rasterizePolygon(layerMap, size, ring, matIdx) {
  * Return material index for an OSM area/polygon feature, or -1 if unrecognized.
  */
 const LAWN = 9;
+// osmTexture.js GROUND_CLASSES 'grass' (green, not dry) and 'trees': a
+// yard's lawn runs on under its trees (left out, every crown and house
+// shadow was a patch of weedy field grass in the lawn)
+const YARD_LAWN_CLASSES = new Set([0, 1]);
+// outside the desert looks also 'dry': a lawn in a dry spell or a winter
+// photo (Florida's are straw-coloured in the imagery); in a desert town dry
+// ground is the gravel or dirt yard itself
+const YARD_LAWN_CLASSES_GREEN_REGION = new Set([0, 1, 2]);
 function areaMatIndex(feature) {
   const t = feature.tags || {};
   const nat = t.natural, lu = t.landuse, lei = t.leisure, am = t.amenity, sur = t.surface;
@@ -630,7 +638,7 @@ export function isVegetationColor(r, g, b) {
   return (h >= 60 && h <= 160 && s > 0.12) || (h >= 40 && h < 60 && s > 0.1 && max > 0.35);
 }
 
-function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null) {
+function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groundClasses = null, dryLook = false } = {}) {
   const { width: size, bounds, osmFeatures = [] } = terrainData;
   const metersPerPixel = worldSize / size;
   const layerMap = new Uint8Array(size * size);
@@ -641,8 +649,10 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null) {
   // 1. Paint area polygons (painted first; roads go on top, paintRoadFootprints),
   // largest first: the green on its golf course, the park in its town.
   const areas = [];
+  const residential = [];
   for (const feature of osmFeatures) {
     if (feature.type === 'road') continue;
+    if (feature.tags?.landuse === 'residential' && feature.geometry?.length >= 3) residential.push(feature.geometry.map(pt => toPx(pt.lat, pt.lng)));
     const matIdx = areaMatIndex(feature);
     if (matIdx < 0 || !feature.geometry?.length) continue;
     const ring = feature.geometry.map(pt => toPx(pt.lat, pt.lng));
@@ -665,6 +675,26 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null) {
       const row = y * size;
       for (let x = 0; x < size; x++) {
         if (layerMap[row + x] === 0 && veg[my + Math.min(ms - 1, Math.floor(x * scale))]) layerMap[row + x] = 1;
+      }
+    }
+  }
+
+  // 1c. Residential yards: Lawn where they are lawn. With the satellite's
+  // ground classes, the cells it shows as green grass or trees (not the gravel yards
+  // of a desert town, the driveways or the bare lots); without, all the
+  // residential grass outside the desert looks.
+  if (residential.length && (groundClasses || !dryLook)) {
+    const yard = new Uint8Array(size * size);
+    for (const ring of residential) rasterizePolygon(yard, size, ring, 1);
+    const g = groundClasses?.cls?.length === groundClasses?.w * groundClasses?.h ? groundClasses : null;
+    const lawnClasses = dryLook ? YARD_LAWN_CLASSES : YARD_LAWN_CLASSES_GREEN_REGION;
+    for (let y = 0; y < size; y++) {
+      const gy = g ? Math.min(g.h - 1, Math.floor(((size - 1 - y) / size) * g.h)) * g.w : 0;   // classes are north-up
+      const row = y * size;
+      for (let x = 0; x < size; x++) {
+        const i = row + x;
+        if (!yard[i] || (layerMap[i] !== 1 && layerMap[i] !== 0)) continue;
+        if (g ? lawnClasses.has(g.cls[gy + Math.min(g.w - 1, Math.floor((x / size) * g.w))]) : layerMap[i] === 1) layerMap[i] = LAWN;
       }
     }
   }
@@ -1015,7 +1045,9 @@ function cloneMaterialTemplate(template) {
  * }>}
  */
 export async function buildTerrainMaterials(terrainData, worldSize, exportLevelName, biome, satelliteTexSize, options = {}) {
-  const { pbrSource = 'osm', imageCanvas = null, vegetationMask = null } = options;
+  const { pbrSource = 'osm', imageCanvas = null, vegetationMask = null, groundClasses = null } = options;
+  // desert looks: a yard is gravel or dry grass unless the satellite says lawn
+  const dryLook = ['johnson_valley', 'utah'].includes(String(biome?.levelName || '').toLowerCase());
   const { width: size } = terrainData;
   const baseSize = satelliteTexSize ?? size;
   // PBR *BaseTexSize fields are measured in TERRAIN GRID SQUARES (= base
@@ -1043,7 +1075,7 @@ export async function buildTerrainMaterials(terrainData, worldSize, exportLevelN
   if (pbrSource === 'image' && imageCanvas) {
     layerMap = buildLayerMapFromImage(imageCanvas, size);
   } else {
-    layerMap = buildOSMLayerMap(terrainData, worldSize, vegetationMask);
+    layerMap = buildOSMLayerMap(terrainData, worldSize, vegetationMask, { groundClasses, dryLook });
   }
   // roads over either: the satellite-classified map draws none of its own
   paintRoadFootprints(layerMap, terrainData, worldSize);
