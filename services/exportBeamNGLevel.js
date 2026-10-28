@@ -33,7 +33,7 @@ import {
 import { resolveRoadRulesAt } from './countryRules.js';
 import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
-import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS } from './beamngSidewalks.js';
+import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkSides } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
@@ -4237,6 +4237,16 @@ function joinTunnelPhases(a, b) {
 // meets them, with no paint, edge blend or AI path.
 const PEDESTRIAN_WIDTH_M = 6;
 const PEDESTRIAN_RENDER_PRIORITY = 16;
+// Footpaths, cycleways and trails (a neighbourhood's exercise path, a park's
+// walks) are drawn the same way, narrow: their own surface on the terrain.
+// One running along a street beside its raised sidewalk is that sidewalk
+// (mapped separately) and is left out; a street tagged sidewalk=separate gets
+// no raised one, its footway is drawn instead.
+const FOOTPATH_WIDTH_M = { footway: 1.8, cycleway: 2.5, path: 1.5, bridleway: 2 };
+const FOOTPATH_DEFAULT_SURFACE = { footway: null, cycleway: null, path: 'dirt', bridleway: 'dirt' };
+const FOOTPATH_SKIP = new Set(['crossing', 'traffic_island', 'access_aisle']);
+const FOOTPATH_ALONG_COS = 0.85;
+const FOOTPATH_MIN_M = 4;
 
 /** The surface layers of a pedestrian street fullWidth wide (untagged: as paving stones). */
 export function pedestrianSurfaceLayers(surface, fullWidth, { americas = false } = {}) {
@@ -4259,32 +4269,72 @@ export function pedestrianSurfaceLayers(surface, fullWidth, { americas = false }
  * DecalRoads for the pedestrian streets: { decals: [{ decal, street }] (street:
  * its spline group's name), ways: [{ nodes, half }] (for keeping trees off) }.
  */
-function buildPedestrianStreetDecals(terrainData, squareSize) {
+function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = []) {
   const decals = [];
   const ways = [];
+  const footpaths = [];
   const perStreet = new Map();
+  const americas = getMarkingStyle(terrainData.roadRules) === 'americas';
+  // the streets' raised sidewalks: [{ nodes, half, left, right }]
+  const streets = carriageways.filter((cw) => !cw.bridge && !cw.tunnel).map((cw) => ({ ...cw, ...sidewalkSides({ tags: cw.tags, highway: cw.highway, urban: cw.urban }) }));
+  // is a footpath's point (x, y), heading (dx, dy), that street's sidewalk?
+  const onSidewalk = (x, y, dx, dy) => streets.some((cw) => {
+    const n = cw.nodes;
+    for (let i = 0; i + 1 < n.length; i++) {
+      const vx = n[i + 1][0] - n[i][0]; const vy = n[i + 1][1] - n[i][1];
+      const L2 = vx * vx + vy * vy || 1e-9;
+      const t = ((x - n[i][0]) * vx + (y - n[i][1]) * vy) / L2;
+      if (t < 0 || t > 1) continue;
+      const L = Math.sqrt(L2);
+      const across = ((x - n[i][0]) * -vy + (y - n[i][1]) * vx) / L;   // + left of the street
+      const width = across > 0 ? cw.left : cw.right;
+      if (!(width > 0) || Math.abs(across) > cw.half + width + 1.5) continue;
+      const dl = Math.hypot(dx, dy) || 1;
+      if (Math.abs((dx * vx + dy * vy) / (dl * L)) >= FOOTPATH_ALONG_COS) return true;
+    }
+    return false;
+  });
   for (const feature of terrainData.osmFeatures || []) {
     const tags = feature?.tags || {};
-    if (feature?.type !== 'road' || tags.highway !== 'pedestrian' || !(feature.geometry?.length >= 2)) continue;
+    const footpath = Object.hasOwn(FOOTPATH_WIDTH_M, tags.highway);
+    if (feature?.type !== 'road' || (tags.highway !== 'pedestrian' && !footpath) || !(feature.geometry?.length >= 2)) continue;
     // squares (area=yes) are polygons, not streets; bridges and tunnels have
     // no deck or bore here
     if (tags.area === 'yes' || isBridgeRoad(tags) || (tags.tunnel && tags.tunnel !== 'no')) continue;
+    if (footpath && (FOOTPATH_SKIP.has(String(tags.footway || '')) || tags.indoor === 'yes' || tags.level?.startsWith?.('-'))) continue;
     const tagged = Number.parseFloat(tags.width);
-    const fullWidth = Number.isFinite(tagged) && tagged > 0 ? Math.min(40, Math.max(2, tagged)) : PEDESTRIAN_WIDTH_M;
-    const layers = pedestrianSurfaceLayers(tags.surface, fullWidth, { americas: getMarkingStyle(terrainData.roadRules) === 'americas' });
-    const street = sanitizeBeamNGObjectName(tags.name || `pedestrian_${feature.id}`, `pedestrian_${feature.id || 'x'}`);
+    const fullWidth = footpath
+      ? (Number.isFinite(tagged) && tagged > 0 ? Math.min(8, Math.max(1, tagged)) : FOOTPATH_WIDTH_M[tags.highway])
+      : (Number.isFinite(tagged) && tagged > 0 ? Math.min(40, Math.max(2, tagged)) : PEDESTRIAN_WIDTH_M);
+    const surface = tags.surface || (footpath ? FOOTPATH_DEFAULT_SURFACE[tags.highway] ?? (americas ? 'concrete' : 'asphalt') : null);
+    const layers = pedestrianSurfaceLayers(surface, fullWidth, { americas });
+    const street = sanitizeBeamNGObjectName(tags.name || `${footpath ? tags.highway : 'pedestrian'}_${feature.id}`, `pedestrian_${feature.id || 'x'}`);
     const pieces = clipGeometryToMargin(feature.geometry, terrainData.bounds)
       .map((s) => resampleGeometryToSpacing(s, ROAD_NODE_SPACING_M))
       .flatMap((s) => chunkPolyline(s));
     for (const piece of pieces) {
-      const nodes = [];
+      const world = [];
       for (const pt of piece) {
         const [x, y, z] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
         if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
-          nodes.push([Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, Math.round(z * 1000) / 1000, fullWidth / 2]);
+          world.push([Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000, Math.round(z * 1000) / 1000, fullWidth / 2]);
         }
       }
+      // a footpath along a street's raised sidewalk is that sidewalk: its
+      // stretches there are left out
+      const runs = [];
+      if (footpath) {
+        let run = [];
+        world.forEach((p, k) => {
+          const a = world[Math.max(0, k - 1)]; const b = world[Math.min(world.length - 1, k + 1)];
+          if (onSidewalk(p[0], p[1], b[0] - a[0], b[1] - a[1])) { if (run.length) runs.push(run); run = []; } else run.push(p);
+        });
+        if (run.length) runs.push(run);
+      } else runs.push(world);
+      for (const nodes of runs) {
       if (nodes.length < 2) continue;
+      if (footpath && pathLength(nodes) < FOOTPATH_MIN_M) continue;
+      if (footpath) footpaths.push({ nodes, half: fullWidth / 2 });
       ways.push({ nodes, half: fullWidth / 2 });
       const n = (perStreet.get(street) || 0) + 1;
       perStreet.set(street, n);
@@ -4301,9 +4351,10 @@ function buildPedestrianStreetDecals(terrainData, squareSize) {
         decal.name = sanitizeBeamNGObjectName(`dr_${street}_p${n}_b${k + 1}`);
         decals.push({ decal, street });
       });
+      }
     }
   }
-  return { decals, ways };
+  return { decals, ways, footpaths };
 }
 
 /** The paving materials the decal groups use, by name (for main.materials.json). */
@@ -4607,7 +4658,7 @@ export function generateDecalRoads(terrainData, squareSize) {
     }
   }
 
-  const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize);
+  const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize, carriageways);
   for (const { decal, street } of pedestrianStreets.decals) getOrCreateSplineGroup(street).__items.push(decal);
 
   const carriagewayIndex = buildCarriagewayIndex(carriageways);
@@ -4637,6 +4688,7 @@ export function generateDecalRoads(terrainData, squareSize) {
   }
   Object.defineProperty(groups, 'carriageways', { value: carriageways, enumerable: false });
   Object.defineProperty(groups, 'pedestrianStreets', { value: pedestrianStreets.ways, enumerable: false });
+  Object.defineProperty(groups, 'footpaths', { value: pedestrianStreets.footpaths, enumerable: false });
   Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
   Object.defineProperty(groups, 'tunnels', { value: tunnels, enumerable: false });
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
@@ -5579,7 +5631,9 @@ function buildDetailedReportSections(d) {
   listCounts(countBy(decals, (r) => r.material));
   lines.push(`- Carriageways (paint cut / sidewalk input): ${(groups.carriageways || []).length}`);
   lines.push(`- Crosswalk zones: ${(groups.crosswalkZones || []).length}`);
-  lines.push(`- Pedestrian streets drawn (highway=pedestrian, no traffic): ${(groups.pedestrianStreets || []).length} piece(s)`);
+  const footpathCount = (groups.footpaths || []).length;
+  lines.push(`- Pedestrian streets drawn (highway=pedestrian, no traffic): ${(groups.pedestrianStreets || []).length - footpathCount} piece(s)`);
+  lines.push(`- Footpaths, cycleways and trails drawn (beside a street's raised sidewalk left out): ${footpathCount} piece(s), ${formatNumber((groups.footpaths || []).reduce((n, f) => n + pathLength(f.nodes), 0) / 1000, 2)} km`);
   lines.push('- Stone and brick paving (surface=sett/cobblestone/unhewn_cobblestone/paving_stones/bricks) is laid in strips about one texture tile wide: mapng_road_* materials, art/roads/main.materials.json.');
 
   // ── Bridges ────────────────────────────────────────────────────────────────
@@ -6166,12 +6220,18 @@ const NATIVE_BARRIER_ASSETS = {
   concrete: {
     shapeName: '/levels/west_coast_usa/art/shapes/objects/jerseybarrier_3m.dae',
     segmentLength: 3,
+    meshLength: 3,
     zOffset: 0.05,
     yawOffset: Math.PI * 0.5,
   },
   fence: {
     shapeName: '/levels/east_coast_usa/art/shapes/buildings/eca_bld_wood_fence_a.DAE',
+    // its picket panel runs from its origin 1.95 m along +X (East Coast USA
+    // lays them 2 m apart): placed from each piece's start (centred, every
+    // panel stood a metre on and no corner closed)
     segmentLength: 2,
+    meshLength: 2,
+    fromStart: true,
     zOffset: 0.05,
     yawOffset: 0,
   },
@@ -6181,23 +6241,27 @@ const NATIVE_BARRIER_ASSETS = {
     // catchfence_d.dds). Its `chainlink` material resolves from BeamNG's global
     // library + /assets/, so nothing extra needs bundling.
     shapeName: '/levels/hirochi_raceway/art/shapes/objects/fence_pedestrian.dae',
-    // Mesh runs along its local Y axis (length ~2.0 m), like guardrail/jersey
-    // which use +90° here and orient correctly, so match that. min Z ≈ -1.7.
+    // Mesh runs along its local Y axis, like guardrail/jersey which use +90°
+    // here and orient correctly, so match that. min Z ≈ -1.7. It runs 2.16 m
+    // from a post at its origin along +Y (+90° turns +Y against the run):
+    // placed at each piece's end (centred, every panel stood a metre on)
     segmentLength: 2,
+    meshLength: 2.16,
+    fromEnd: true,
     zOffset: 1.7,
     yawOffset: Math.PI * 0.5,
   },
-  // walls (beamngPropLibrary BARRIER_SHAPES): along local X, the pieces a
-  // little shorter than the mesh so they overlap
-  stoneWall: { shapeName: BARRIER_SHAPES.stoneWall.shapeFile, segmentLength: 3, zOffset: 0, yawOffset: 0 },
-  concreteWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, zOffset: 0, yawOffset: 0 },
-  dryStoneWall: { shapeName: BARRIER_SHAPES.dryStoneWall.shapeFile, segmentLength: 6, zOffset: 0, yawOffset: 0 },
+  // walls (beamngPropLibrary BARRIER_SHAPES): along local X, centred
+  // (meshLength: the visible piece, measured from the official shapes)
+  stoneWall: { shapeName: BARRIER_SHAPES.stoneWall.shapeFile, segmentLength: 3, meshLength: 3.12, zOffset: 0, yawOffset: 0 },
+  concreteWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, meshLength: 3.04, zOffset: 0, yawOffset: 0 },
+  dryStoneWall: { shapeName: BARRIER_SHAPES.dryStoneWall.shapeFile, segmentLength: 6, meshLength: 6.33, zOffset: 0, yawOffset: 0 },
   // a retaining wall holds the ground up: the concrete wall (1 m over its
   // origin, 2 m under) stretched from the low side's ground to just over the
   // high side's (highway retaining walls stood as 1 m stone garden walls at
   // the foot of their fill)
-  retainingWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, zOffset: 0, yawOffset: 0, retaining: { above: 1, below: 2 } },
-  brickWall: { shapeName: BARRIER_SHAPES.brickWall.shapeFile, segmentLength: 3.5, zOffset: 0, yawOffset: 0 },
+  retainingWall: { shapeName: BARRIER_SHAPES.concreteWall.shapeFile, segmentLength: 3.1, meshLength: 3.04, zOffset: 0, yawOffset: 0, retaining: { above: 1, below: 2 } },
+  brickWall: { shapeName: BARRIER_SHAPES.brickWall.shapeFile, segmentLength: 3.5, meshLength: 3.42, zOffset: 0, yawOffset: 0 },
   // the harbour railing runs along local -Y from its origin at one end
   // (+90° turns -Y onto the run): placed from each piece's start
   railing: { shapeName: BARRIER_SHAPES.railing.shapeFile, segmentLength: 3, zOffset: 0, yawOffset: Math.PI * 0.5, fromStart: true },
@@ -6233,7 +6297,11 @@ function buildCloudObjects(biome) {
   }];
 }
 
-const MAX_NATIVE_BARRIER_OBJECTS = 8000;
+// Only a ceiling against runaway data: the engine has no object limit
+// (BeamNG's own levels place 22,256 TSStatics in West Coast USA, 18,679 in
+// Italy), and a suburb's garden fences and walls need ~18,000 pieces over
+// 2 km: at the old 8,000 more than half were left out.
+const MAX_NATIVE_BARRIER_OBJECTS = 50000;
 
 /**
  * Resolve OSM barrier tags to one of the native BeamNG barrier asset presets.
@@ -6313,6 +6381,8 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
  * Includes repeated segment placement and optional post/endcap meshes where
  * the selected barrier asset defines them.
  */
+const BARRIER_CORNER_RAD = (20 * Math.PI) / 180;   // a turn this sharp in a barrier's line: a panel joint on it
+const BARRIER_FIT_MIN = 0.85;   // a panel this much shorter than its mesh is scaled down to fit
 const RETAINING_TOP_M = 0.3;    // a retaining wall stands this far over the ground it holds
 const RETAINING_FOOT_M = 0.5;   // ... and reaches this far under the ground at its foot
 
@@ -6380,9 +6450,33 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
 
     if (!Number.isFinite(totalLen) || totalLen < 0.5 || segmentStarts.length < 1) return;
 
-    const nominalSpacing = Math.max(0.75, Number(asset.segmentLength) || 2);
-    const panelCount = Math.max(1, Math.round(totalLen / nominalSpacing));
-    const panelSpacing = totalLen / panelCount;
+    // (by the mesh's own length where it is known: every piece then scaled
+    // to its stretch lands on the next joint; official levels lay them at
+    // their length, unscaled, corners by hand)
+    const nominalSpacing = Math.max(0.75, Number(asset.meshLength) || Number(asset.segmentLength) || 2);
+    // Panel joints: one on every corner (a fence round a garden met itself
+    // in pieces: a panel spaced along the whole line straddled the corner at
+    // one side's angle), the panels evenly spaced between corners; a curve of
+    // short pieces is spaced along as one stretch.
+    const corners = [0];
+    for (let k = 1; k < segmentLengths.length; k++) {
+      const pa = geometry[segmentStarts[k - 1]]; const pb = geometry[segmentStarts[k - 1] + 1];
+      const qa = geometry[segmentStarts[k]]; const qb = geometry[segmentStarts[k] + 1];
+      const wa = geoToWorldPoint(pa.lat, pa.lng, terrainData, squareSize, 0); const wb = geoToWorldPoint(pb.lat, pb.lng, terrainData, squareSize, 0);
+      const wc = geoToWorldPoint(qa.lat, qa.lng, terrainData, squareSize, 0); const wd = geoToWorldPoint(qb.lat, qb.lng, terrainData, squareSize, 0);
+      let turn = Math.abs(Math.atan2(wd[1] - wc[1], wd[0] - wc[0]) - Math.atan2(wb[1] - wa[1], wb[0] - wa[0]));
+      if (turn > Math.PI) turn = 2 * Math.PI - turn;
+      if (turn > BARRIER_CORNER_RAD) corners.push(cumulative[k]);
+    }
+    corners.push(totalLen);
+    const joints = [];
+    for (let c = 0; c + 1 < corners.length; c++) {
+      const stretch = corners[c + 1] - corners[c];
+      const n = Math.max(1, Math.round(stretch / nominalSpacing));
+      for (let k = 0; k < n; k++) joints.push(corners[c] + (stretch * k) / n);
+    }
+    joints.push(totalLen);
+    const panelCount = joints.length - 1;
 
     /**
      * Sample interpolated geo/world coordinates and tangent at path distance.
@@ -6424,7 +6518,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     // mean, of each and its neighbours): on graded ground stepping by the
     // metre the panels zig-zagged by ±20°
     const jointCount = isClosedRing(geometry) ? panelCount : panelCount + 1;
-    const rawJointZ = Array.from({ length: panelCount + 1 }, (_, i) => sampleAtDistance(i * panelSpacing).terrainZ);
+    const rawJointZ = joints.map((d) => sampleAtDistance(d).terrainZ);
     const at3 = (arr, i) => [arr[Math.max(0, i - 1)], arr[i], arr[Math.min(arr.length - 1, i + 1)]];
     const median3 = rawJointZ.map((_, i) => at3(rawJointZ, i).sort((a, b) => a - b)[1]);
     const jointZ = median3.map((_, i) => (i === 0 || i === median3.length - 1 ? median3[i] : at3(median3, i).reduce((a, b) => a + b, 0) / 3));
@@ -6432,8 +6526,8 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     // foot the low side's: per joint, the top smoothed like the ground
     let retainTop = null; let retainLow = null;
     if (asset.retaining) {
-      const sides = Array.from({ length: panelCount + 1 }, (_, i) => {
-        const j = sampleAtDistance(i * panelSpacing);
+      const sides = joints.map((d) => {
+        const j = sampleAtDistance(d);
         const nx = -Math.sin(j.yaw); const ny = Math.cos(j.yaw);
         const side = (sign) => Math.min(...[1.5, 2.5, 3.5].map((d) => getTerrainHeightAtWorldXY(j.x + sign * nx * d, j.y + sign * ny * d, terrainData, squareSize)));
         const a = side(1); const b = side(-1);
@@ -6447,7 +6541,14 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
 
     for (let i = 0; i < panelCount; i++) {
       if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
-      const centerSample = sampleAtDistance((i + 0.5) * panelSpacing);
+      const panelSpacing = joints[i + 1] - joints[i];
+      // each piece stretched or shrunk to reach the next joint (a mesh of
+      // known length; others only shortened on a short stretch, not sticking
+      // out past both corners). Its mesh runs along local X, or Y at +90°.
+      const along = panelSpacing / nominalSpacing;
+      const fit = asset.meshLength ? Math.abs(along - 1) > 0.005 : along < BARRIER_FIT_MIN;
+      const alongY = Math.abs(Math.abs(Number(asset.yawOffset) || 0) - Math.PI / 2) < 0.01;
+      const centerSample = sampleAtDistance((joints[i] + joints[i + 1]) / 2);
       // tilted along the run to the (smoothed) ground between its ends (a
       // retaining wall: to its top)
       const rise = retainTop ? retainTop[i + 1] - retainTop[i] : jointZ[i + 1] - jointZ[i];
@@ -6455,7 +6556,9 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       const panelTerrainZ = (jointZ[i] + jointZ[i + 1]) / 2;
       if (skipLineAt(centerSample.x, centerSample.y, panelTerrainZ, centerSample.yaw)) continue;
       // (a mesh with its origin at one end goes at the piece's start)
-      const at = asset.fromStart ? { ...sampleAtDistance(i * panelSpacing), z: jointZ[i] } : { ...centerSample, z: panelTerrainZ };
+      const at = asset.fromStart ? { ...sampleAtDistance(joints[i]), z: jointZ[i] }
+        : asset.fromEnd ? { ...sampleAtDistance(joints[i + 1]), z: jointZ[i + 1] }
+          : { ...centerSample, z: panelTerrainZ };
       // not on a drawn road or under a deck (OSM's line, or the road's width,
       // put walls and fences across lanes where they meet)
       if (skipAt(at.x, at.y, at.z)) continue;
@@ -6480,7 +6583,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
           roundTo(at.z + (Number.isFinite(asset.zOffset) ? asset.zOffset : 0), 3),
         ],
         rotationMatrix: rotationMatrixFromYawPitch(centerSample.yaw, pitch, Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0),
-        ...(scaleZ !== 1 ? { scale: [1, 1, roundTo(scaleZ, 3)] } : {}),
+        ...(scaleZ !== 1 || fit ? { scale: alongY ? [1, roundTo(fit ? along : 1, 3), roundTo(scaleZ, 3)] : [roundTo(fit ? along : 1, 3), 1, roundTo(scaleZ, 3)] } : {}),
         shapeName: asset.shapeName,
         useInstanceRenderData: true,
       });
@@ -6489,7 +6592,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     if (asset.postShapeName) {
       for (let i = 0; i < jointCount; i++) {
         if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
-        const sample = { ...sampleAtDistance(i * panelSpacing), terrainZ: jointZ[i] };
+        const sample = { ...sampleAtDistance(joints[i]), terrainZ: jointZ[i] };
         if (skipLineAt(sample.x, sample.y, sample.terrainZ, sample.yaw)) continue;
         const rotationYaw = sample.yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
         objects.push({
