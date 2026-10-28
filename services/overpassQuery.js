@@ -57,7 +57,7 @@ export const OSM_FILTER = {
   wayKeys: [
     'highway', 'building', 'waterway', 'barrier', 'aeroway', 'man_made', 'public_transport',
     'power', 'military', 'historic', 'tourism', 'amenity', 'landuse', 'natural', 'leisure',
-    'water', 'wetland', 'surface', 'landcover',
+    'water', 'wetland', 'surface', 'landcover', 'golf',
   ],
   wayTags: [['area', 'yes'], ['natural', 'tree_row']],
   relationKeys: [

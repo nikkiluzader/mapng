@@ -1441,6 +1441,28 @@ const SHARED_GROUNDCOVER_MATERIAL_DEFS = {
     subSurfaceIntensity: 1,
     translucentBlendOp: 'None',
   },
+  // Mown lawn: the same short-grass sprites untinted, kept a few cm tall
+  // (west_coast_usa's mown_grass covers on its grass2 lawn).
+  mapng_gc_grass_mown: {
+    name: 'mapng_gc_grass_mown',
+    mapTo: 'unmapped_mat',
+    class: 'Material',
+    persistentId: 'f8a23d3d-4729-43dd-849c-e6d6d1523f74',
+    Stages: [{
+      ambientOcclusionMap: '/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_ao.data.png',
+      baseColorMap: '/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_b.color.png',
+      normalMap: '/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_nm.normal.png',
+      opacityMap: '/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_o.data.png',
+      roughnessMap: '/assets/materials/foliage/grass/t_grass_green_short_01/t_grass_green_short_01_r.data.png',
+    }, {}, {}, {}],
+    alphaRef: 35,
+    alphaTest: true,
+    annotation: 'NATURE',
+    doubleSided: true,
+    subSurface: true,
+    subSurfaceIntensity: 1,
+    translucentBlendOp: 'None',
+  },
   // Short grass with a dry yellow tint for scrub/dirt-grass areas
   // (east_coast_usa's 'm_grass_green_short_01' + the GC_Grass_close_3-style
   // dry diffuse tint).

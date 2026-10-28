@@ -8005,20 +8005,28 @@ function canopyPatches(cls, w, h, covered, minCells) {
   }
 }
 
+// (the paint rounds to 1 m cells and blends a cell further; a big trunk is ~1 m)
+const OPEN_GROUND_CLEAR_M = 4;
+const TREELESS_GOLF = new Set(['bunker', 'green', 'tee', 'fairway', 'driving_range', 'water_hazard', 'lateral_water_hazard']);
+
 function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, biome) {
-  // Buildings and water, for the scattered trees (a yard's tree is not in
-  // the house or the pool): world rings bucketed by 32 m cells
+  // Buildings, water and open playing ground, for the scattered and canopy
+  // trees (a yard's tree is not in the house or the pool): world rings
+  // bucketed by 32 m cells
   const AVOID_CELL = 32;
   const avoid = new Map();
   for (const f of terrainData.osmFeatures || []) {
     const isBuilding = f?.type === 'building';
     const isWater = f?.type === 'water' || f?.tags?.natural === 'water' || f?.tags?.leisure === 'swimming_pool';
-    if ((!isBuilding && !isWater) || !(f.geometry?.length >= 3)) continue;
+    // open ground no tree stands on: bunkers, greens, tees, fairways, pitches,
+    // running tracks (a crown overhanging one put its trunk in the sand)
+    const isOpen = TREELESS_GOLF.has(f?.tags?.golf) || f?.tags?.leisure === 'pitch' || f?.tags?.leisure === 'track';
+    if ((!isBuilding && !isWater && !isOpen) || !(f.geometry?.length >= 3)) continue;
     const ring = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
-    const pad = isBuilding ? 2 : 1;
+    const pad = isBuilding ? 2 : isOpen ? OPEN_GROUND_CLEAR_M : 1;
     const box = [Math.min(...ring.map((p) => p[0])) - pad, Math.min(...ring.map((p) => p[1])) - pad, Math.max(...ring.map((p) => p[0])) + pad, Math.max(...ring.map((p) => p[1])) + pad];
     if ((box[2] - box[0]) * (box[3] - box[1]) > 4e6) continue;   // a whole sea or lake: its own trees are not placed anyway
-    const item = { ring, box, isBuilding };
+    const item = { ring, box, isBuilding, isOpen };
     for (let cx = Math.floor(box[0] / AVOID_CELL); cx <= Math.floor(box[2] / AVOID_CELL); cx++) {
       for (let cy = Math.floor(box[1] / AVOID_CELL); cy <= Math.floor(box[3] / AVOID_CELL); cy++) {
         const k = `${cx},${cy}`;
@@ -8035,9 +8043,20 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
     }
     return inside;
   };
-  // (a building by its box grown 2 m: trunks and crowns clear of the walls)
+  const nearRingXY = (x, y, ring, d) => {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [ax, ay] = ring[j]; const [bx, by] = ring[i];
+      const dx = bx - ax; const dy = by - ay;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / ((dx * dx + dy * dy) || 1e-12)));
+      if ((ax + t * dx - x) ** 2 + (ay + t * dy - y) ** 2 < d * d) return true;
+    }
+    return false;
+  };
+  // (a building by its box grown 2 m: trunks and crowns clear of the walls;
+  // a bunker or green also by a strip round its edge, where its paint runs)
   const inBuildingOrWater = (x, y) => (avoid.get(`${Math.floor(x / AVOID_CELL)},${Math.floor(y / AVOID_CELL)}`) || [])
-    .some((it) => x >= it.box[0] && x <= it.box[2] && y >= it.box[1] && y <= it.box[3] && (it.isBuilding || inRingXY(x, y, it.ring)));
+    .some((it) => x >= it.box[0] && x <= it.box[2] && y >= it.box[1] && y <= it.box[3]
+      && (it.isBuilding || inRingXY(x, y, it.ring) || (it.isOpen && nearRingXY(x, y, it.ring, OPEN_GROUND_CLEAR_M))));
 
   const regularPlacementsByType = new Map();
   const priorityPlacementsByType = new Map();
@@ -8741,6 +8760,35 @@ function buildGroundCoverObjects(terrainData, squareSize, includeTrees, biome) {
         clumpExponent: -0.5, maxClumpCount: 4, minClumpCount: 2, probability: 0.4,
         sizeMax: 0.4, sizeMin: 0.25, windScale: 0.2 },
       {}, {}, {}, {}, {},
+    ],
+  });
+
+  // Lawns (parks, greens, cemeteries, golf fairways: the Lawn layer) get
+  // only mown grass a few cm tall, none of the long field grass above.
+  const lawnElements = Math.min(160000, Math.max(40000, Math.round(baseCoverMaxElements * 0.35)));
+  groundCoverObjects.push({
+    __parent: 'vegetation',
+    class: 'GroundCover',
+    name: 'mapng_lawn_cover',
+    persistentId: generatePersistentId(),
+    position: [0, 0, roundTo(centerHeight, 3)],
+    material: 'mapng_gc_grass_mown',
+    gridSize: gridSizeForElements(lawnElements),
+    radius: varietyRadius,
+    dissolveRadius: Math.max(50, roundTo(varietyRadius * 0.88, 3)),
+    shapeCullRadius: varietyRadius,
+    maxBillboardTiltAngle: 40,
+    maxElements: lawnElements,
+    seed: 41,
+    ...varietyWind,
+    Types: [
+      { billboardUVs: [0, 0.0078125, 1, 0.464843988], layer: 'Lawn',
+        clumpRadius: 1, maxClumpCount: 6, minClumpCount: 3, probability: 1,
+        sizeMax: 0.16, sizeMin: 0.08, windScale: 0.05 },
+      { billboardUVs: [0, 0.505124986, 1, 0.472656012], layer: 'Lawn',
+        clumpRadius: 1, maxClumpCount: 5, minClumpCount: 2, probability: 0.8,
+        sizeMax: 0.14, sizeMin: 0.07, windScale: 0.05 },
+      {}, {}, {}, {}, {}, {},
     ],
   });
 

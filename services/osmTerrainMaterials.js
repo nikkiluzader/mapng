@@ -19,8 +19,9 @@ import { getEffectiveRoadLayer } from './roadNetwork.js';
 import { sidewalkSides } from './beamngSidewalks.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
-// Index 0 = DefaultMaterial (satellite base), 1–8 = BeamNG-referenced materials.
-const MATERIAL_NAMES_LIST = ['DefaultMaterial', 'Grass', 'Dirt', 'BeachSand', 'ROCK', 'asphalt', 'GRAVEL', 'Concrete', 'DirtGrass'];
+// Index 0 = DefaultMaterial (satellite base), 1–9 = BeamNG-referenced materials
+// (9 Lawn: mown grass of parks, greens and cemeteries, under short cover only).
+const MATERIAL_NAMES_LIST = ['DefaultMaterial', 'Grass', 'Dirt', 'BeachSand', 'ROCK', 'asphalt', 'GRAVEL', 'Concrete', 'DirtGrass', 'Lawn'];
 
 // Ordered name list for the .ter material slot array and external consumers.
 export const MATERIAL_NAMES = MATERIAL_NAMES_LIST;
@@ -382,6 +383,10 @@ const REFERENCE_MATERIALS = [
   },
 ];
 
+// Lawn: east_coast's t_grass_01 (the green mown lawn official towns use,
+// west_coast's grass2) in every region: parks and greens are watered.
+REFERENCE_MATERIALS.push({ internalName: 'Lawn', template: { ...REFERENCE_MATERIALS[0].template } });
+
 function normalizeLevelName(value) {
   return String(value || '').toLowerCase();
 }
@@ -545,9 +550,16 @@ function rasterizePolygon(layerMap, size, ring, matIdx) {
 /**
  * Return material index for an OSM area/polygon feature, or -1 if unrecognized.
  */
+const LAWN = 9;
 function areaMatIndex(feature) {
   const t = feature.tags || {};
   const nat = t.natural, lu = t.landuse, lei = t.leisure, am = t.amenity, sur = t.surface;
+
+  // golf course parts: sand traps, mown tees / greens / fairways, long rough
+  if (t.golf === 'bunker') return 3;
+  if (t.golf === 'green' || t.golf === 'tee' || t.golf === 'fairway' || t.golf === 'driving_range') return LAWN;
+  if (t.golf === 'rough') return 1;
+  if (t.golf === 'water_hazard' || t.golf === 'lateral_water_hazard') return -1;
 
   if (nat === 'grass' || nat === 'meadow') return 1;
   if (nat === 'grassland') return 1;
@@ -560,11 +572,13 @@ function areaMatIndex(feature) {
   if (nat === 'mud') return 2;
   if (nat === 'water' || nat === 'wetland') return -1;
 
-  if (lu === 'grass' || lu === 'meadow' || lu === 'village_green') return 1;
-  if (lu === 'recreation_ground' || lu === 'allotments' || lu === 'cemetery') return 1;
+  if (lu === 'village_green' || lu === 'recreation_ground' || lu === 'cemetery') return LAWN;
+  if (lu === 'grass' || lu === 'meadow') return 1;
+  if (lu === 'allotments') return 1;
   if (lu === 'orchard' || lu === 'vineyard') return 1;
   if (lu === 'forest' || lu === 'wood') return 1;
-  if (lu === 'religious' || lu === 'greenfield') return 1;
+  if (lu === 'religious') return LAWN;
+  if (lu === 'greenfield') return 1;
   if (lu === 'farmland' || lu === 'farmyard' || lu === 'greenhouse_horticulture') return 2;
   if (lu === 'brownfield' || lu === 'construction' || lu === 'landfill') return 2;
   if (lu === 'military') return 2;
@@ -575,9 +589,11 @@ function areaMatIndex(feature) {
   if (lu === 'railway') return 6;
   if (lu === 'reservoir' || lu === 'basin') return -1;
 
-  if (lei === 'park' || lei === 'garden' || lei === 'playground') return 1;
-  if (lei === 'recreation_ground' || lei === 'pitch' || lei === 'golf_course') return 1;
-  if (lei === 'nature_reserve' || lei === 'common' || lei === 'dog_park') return 1;
+  // a pitch by its surface (clay, tartan, sand: further down), else turf
+  if (lei === 'pitch' && sur && sur !== 'grass') { /* by surface below */ } else if (lei === 'pitch') return LAWN;
+  if (lei === 'park' || lei === 'garden' || lei === 'playground' || lei === 'dog_park') return LAWN;
+  if (lei === 'recreation_ground' || lei === 'golf_course') return LAWN;
+  if (lei === 'nature_reserve' || lei === 'common') return 1;
   if (lei === 'sports_centre' || lei === 'stadium') return 7;
   if (lei === 'beach_resort') return 3;
   if (lei === 'track') return 5;
@@ -622,14 +638,20 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null) {
   // Linear projection shared with the OSM base texture + geoToWorld placement.
   const toPx = (lat, lng) => geoToTerrainPx(lat, lng, bounds, size);
 
-  // 1. Paint area polygons (painted first; roads go on top, paintRoadFootprints).
+  // 1. Paint area polygons (painted first; roads go on top, paintRoadFootprints),
+  // largest first: the green on its golf course, the park in its town.
+  const areas = [];
   for (const feature of osmFeatures) {
     if (feature.type === 'road') continue;
     const matIdx = areaMatIndex(feature);
     if (matIdx < 0 || !feature.geometry?.length) continue;
     const ring = feature.geometry.map(pt => toPx(pt.lat, pt.lng));
-    rasterizePolygon(layerMap, size, ring, matIdx);
+    let a = 0;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += ring[j].px * ring[i].py - ring[i].px * ring[j].py;
+    areas.push({ ring, matIdx, area: Math.abs(a) });
   }
+  areas.sort((p, q) => q.area - p.area);
+  for (const { ring, matIdx } of areas) rasterizePolygon(layerMap, size, ring, matIdx);
 
   // 1b. Ground no OSM area covers stays DefaultMaterial, where no grass
   // grows. Where the satellite shows vegetation there (unmapped lawns, woods
