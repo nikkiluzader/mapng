@@ -96,6 +96,12 @@ export const CALMING_SHAPES = {
   table: { shapeFile: '/levels/gridmap_v2/art/shapes/grid/s_gm_suspension_sbump_4x4_c.dae' },
 };
 
+// Carports (services/beamngCarports.js): Italy's dealership carport, an open
+// red steel roof on truss posts, 6.2 m deep (local X) by 14.5 m (local Y).
+export const CARPORT_SHAPE = {
+  shapeFile: '/levels/italy/art/shapes/buildings/dealerships/Italy_dealership_carport.dae',
+};
+
 // OSM barrier=bollard: the standard steel bollard (0.26 m, 1.68 m tall),
 // East Coast USA's concrete city bollard for material=concrete.
 export const BOLLARD_SHAPES = {

@@ -5584,6 +5584,141 @@
       "persistentId": "eff15c8f-7476-4094-842a-817fceb2d6bd",
       "translucentBlendOp": "None"
     },
+    "italy_bld_metal": {
+      "Stages": [
+        {
+          "baseColorFactor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            0.074000001
+          ],
+          "baseColorMap": "/assets/materials/tileable/metal/italy_bld_metal/t_italy_bld_metal_b.color.png",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            1,
+            1
+          ],
+          "metallicFactor": 0.200000003,
+          "normalMap": "/assets/materials/tileable/metal/italy_bld_metal/t_italy_bld_metal_nm.normal.png",
+          "roughnessMap": "/assets/materials/tileable/metal/italy_bld_metal/t_italy_bld_metal_r.data.png",
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "metallicFactor": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "groundType": "METAL",
+      "mapTo": "italy_bld_metal",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_bld_metal",
+      "persistentId": "6919d035-1fff-49a6-a29d-d31038008aa0",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "italy_bld_trim_metal": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/metal/italy_bld_trim_metal/italy_bld_trim_metal_d.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            0.5,
+            0.5
+          ],
+          "diffuseColor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            0.200000003
+          ],
+          "normalMap": "/assets/materials/trim/metal/italy_bld_trim_metal/italy_bld_trim_metal_n.dds",
+          "pixelSpecular": true,
+          "roughnessFactor": 0.546600401,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "specularMap": "/assets/materials/trim/metal/italy_bld_trim_metal/italy_bld_trim_metal_s.dds",
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "cubemap": "global_cubemap_metalblurred",
+      "doubleSided": true,
+      "groundType": "METAL",
+      "invertBackFaceNormals": true,
+      "mapTo": "italy_bld_trim_metal",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_bld_trim_metal",
+      "persistentId": "880141b1-c0d5-40e9-b097-89ab16f9c691",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None"
+    },
     "italy_curb_concrete": {
       "Stages": [
         {
@@ -6182,6 +6317,40 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "moderncorrugated_tin": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/metal/moderncorrugated_tin/eca_bld_moderncorrugated_tin_d.dds",
+          "normalMap": "/assets/materials/tileable/metal/moderncorrugated_tin/eca_bld_moderncorrugated_tin_n.dds",
+          "specularMap": "/assets/materials/tileable/metal/moderncorrugated_tin/eca_bld_moderncorrugated_tin_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "METAL",
+      "mapTo": "moderncorrugated_tin",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "east_coast_usa",
+      "name": "moderncorrugated_tin",
+      "persistentId": "09198305-ba95-4017-b1f0-f0a079fff073",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None"
+    },
     "roadsigns": {
       "Stages": [
         {
@@ -6315,7 +6484,7 @@
       "persistentId": "5c352a12-eeeb-4e4a-a87a-21821fdc9c1b",
       "translucentBlendOp": "None"
     },
-    "trafficlight": {
+    "trafficLight": {
       "Stages": [
         {
           "animFlags": 16,

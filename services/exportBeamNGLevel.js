@@ -7,6 +7,7 @@ import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
+import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
 import { planLakes, planRivers } from './beamngWater.js';
@@ -47,7 +48,7 @@ import {
 } from './beamngTunnels.js';
 import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
-  BARRIER_SHAPES,
+  BARRIER_SHAPES, CARPORT_SHAPE,
 } from './beamngPropLibrary.js';
 import {
   buildCarriagewayIndex,
@@ -989,7 +990,8 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
   // straight in world space (services/beamngBuildings.js).
   const squareSize = worldSize / terrainData.width;
   const { meshes: buildingMeshes, count: buildingCount, stats: buildingStats } = buildTexturedBuildings(
-    terrainData.osmFeatures,
+    // (carports are open roofs on posts: native carport models, not walls)
+    terrainData.osmFeatures.filter((f) => !isCarportFeature(f)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
   );
   if (reportStats) {
@@ -7909,7 +7911,7 @@ export function buildParkingSpots(terrainData, squareSize, carriageways = [], { 
     .map((f) => ({ id: f.id, xy: f.geometry.map(toXY), half: (Number.parseFloat(f.tags.width) / 2) || PARKING_AISLE_HALF, surface: String(f.tags.surface || '').toLowerCase() }));
   const ringOf = (f) => f.geometry.map(toXY);
   const lots = feats.filter((f) => f?.tags?.amenity === 'parking' && f.geometry?.length >= 3 && !['multi-storey', 'underground', 'rooftop'].includes(f.tags.parking)).map(ringOf);
-  const buildings = feats.filter((f) => f?.type === 'building' && f.geometry?.length >= 3).map(ringOf);
+  const buildings = feats.filter((f) => f?.type === 'building' && f.geometry?.length >= 3 && !isCarportFeature(f)).map(ringOf);
   const inRing = (x, y, ring) => {
     let inside = false;
     for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -9509,6 +9511,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       leftHandTraffic: !!exportTerrainData.roadRules?.leftHandTraffic,
     })
     : { statics: [], chevrons: [], signs: [], counts: {}, skipped: {} };
+  // carports: Italy's carport model tiled over each carport footprint
+  const carportObjects = planCarports(exportTerrainData.osmFeatures || [], (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0))
+    .map((t, i) => ({
+      __parent: 'carports',
+      class: 'TSStatic',
+      name: `carport_${i + 1}`,
+      persistentId: generatePersistentId(),
+      position: [roundTo(t.x, 3), roundTo(t.y, 3), roundTo(getTerrainHeightAtWorldXY(t.x, t.y, exportTerrainData, squareSize), 3)],
+      rotationMatrix: rotationMatrixFromYaw(t.yaw),
+      scale: t.scale.map((v) => roundTo(v, 4)),
+      shapeName: CARPORT_SHAPE.shapeFile,
+      collisionType: 'Collision Mesh',
+      useInstanceRenderData: true,
+    }));
+  if (carportObjects.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Carports: ${carportObjects.length} carport module(s).`);
   const trafficCalmingObjects = calming.statics.map((item, i) => ({
     __parent: 'traffic_calming',
     class: 'TSStatic',
@@ -9912,6 +9929,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   if (trafficCalmingObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/traffic_calming`);
+  }
+  if (carportObjects.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/carports`);
   }
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/vegetation`);
@@ -10544,6 +10564,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       name: 'gasStations',
       persistentId: generatePersistentId(),
     }] : []),
+    ...(carportObjects.length > 0 ? [{
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: 'carports',
+      persistentId: generatePersistentId(),
+    }] : []),
     ...(decalRoads.length > 0 ? [{
       __parent: 'MissionGroup',
       class: 'SimGroup',
@@ -10587,6 +10613,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // (signalInstance) so core_trafficSignals lights it with the AI's phase.
   if (trafficSignalObjects.length > 0) {
     zip.file(`${base}/main/MissionGroup/traffic_signals/items.level.json`, toNDJSON(rewriteForLinks(trafficSignalObjects)));
+  }
+
+  // ── main/MissionGroup/carports/items.level.json ─────────────────────────
+  if (carportObjects.length > 0) {
+    zip.file(`${base}/main/MissionGroup/carports/items.level.json`, toNDJSON(rewriteForLinks(carportObjects)));
   }
 
   // ── main/MissionGroup/traffic_calming/items.level.json ──────────────────
