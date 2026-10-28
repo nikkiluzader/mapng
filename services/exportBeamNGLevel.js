@@ -7797,7 +7797,57 @@ function buildClearanceIndex(strips) {
  *
  * Returns Map<managedForestType, placement[]>.
  */
+// Scattered trees per m² over open, tended or lived-in land (BeamNG's own
+// towns stand in trees; ours only had the ones OSM maps one by one).
+const SCATTER_TREES = {
+  park: 0.0005, garden: 0.0005, cemetery: 0.0005, recreation_ground: 0.0004, village_green: 0.0004,
+  golf_course: 0.0003, residential: 0.0006, wetland: 0.001,
+};
+function scatterDensityOf(tags, wetland) {
+  if (wetland === '') return SCATTER_TREES.wetland;   // an untagged wetland: trees among its bushes
+  if (tags.leisure === 'park' || tags.leisure === 'garden') return SCATTER_TREES.park;
+  if (tags.leisure === 'golf_course') return SCATTER_TREES.golf_course;
+  if (tags.landuse === 'cemetery' || tags.amenity === 'grave_yard') return SCATTER_TREES.cemetery;
+  if (tags.landuse === 'recreation_ground' || tags.leisure === 'recreation_ground') return SCATTER_TREES.recreation_ground;
+  if (tags.landuse === 'village_green') return SCATTER_TREES.village_green;
+  if (tags.landuse === 'residential') return SCATTER_TREES.residential;
+  return 0;
+}
+
 function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, biome) {
+  // Buildings and water, for the scattered trees (a yard's tree is not in
+  // the house or the pool): world rings bucketed by 32 m cells
+  const AVOID_CELL = 32;
+  const avoid = new Map();
+  for (const f of terrainData.osmFeatures || []) {
+    const isBuilding = f?.type === 'building';
+    const isWater = f?.type === 'water' || f?.tags?.natural === 'water' || f?.tags?.leisure === 'swimming_pool';
+    if ((!isBuilding && !isWater) || !(f.geometry?.length >= 3)) continue;
+    const ring = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
+    const pad = isBuilding ? 2 : 1;
+    const box = [Math.min(...ring.map((p) => p[0])) - pad, Math.min(...ring.map((p) => p[1])) - pad, Math.max(...ring.map((p) => p[0])) + pad, Math.max(...ring.map((p) => p[1])) + pad];
+    if ((box[2] - box[0]) * (box[3] - box[1]) > 4e6) continue;   // a whole sea or lake: its own trees are not placed anyway
+    const item = { ring, box, isBuilding };
+    for (let cx = Math.floor(box[0] / AVOID_CELL); cx <= Math.floor(box[2] / AVOID_CELL); cx++) {
+      for (let cy = Math.floor(box[1] / AVOID_CELL); cy <= Math.floor(box[3] / AVOID_CELL); cy++) {
+        const k = `${cx},${cy}`;
+        if (!avoid.has(k)) avoid.set(k, []);
+        avoid.get(k).push(item);
+      }
+    }
+  }
+  const inRingXY = (x, y, ring) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+      if (((yi > y) !== (yj > y)) && x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-12) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  // (a building by its box grown 2 m: trunks and crowns clear of the walls)
+  const inBuildingOrWater = (x, y) => (avoid.get(`${Math.floor(x / AVOID_CELL)},${Math.floor(y / AVOID_CELL)}`) || [])
+    .some((it) => x >= it.box[0] && x <= it.box[2] && y >= it.box[1] && y <= it.box[3] && (it.isBuilding || inRingXY(x, y, it.ring)));
+
   const regularPlacementsByType = new Map();
   const priorityPlacementsByType = new Map();
   const treeDensityMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER;
@@ -7881,17 +7931,37 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
       }
       if (feature.type === 'landuse') {
         const tags = feature.tags || {};
+        const wetland = tags.natural === 'wetland' ? String(tags.wetland || '').toLowerCase() : null;
         const isTreeArea =
           tags.natural === 'wood' ||
           tags.natural === 'forest' ||
           tags.landuse === 'forest' ||
           tags.landuse === 'orchard' ||
-          tags.landcover === 'trees';
+          tags.landcover === 'trees' ||
+          wetland === 'swamp' || wetland === 'mangrove';
         const isBushArea =
           tags.natural === 'scrub' ||
           tags.natural === 'heath' ||
           tags.natural === 'shrubbery' ||
-          tags.landcover === 'scrub';
+          tags.landcover === 'scrub' ||
+          (wetland !== null && wetland !== 'swamp' && wetland !== 'mangrove' && wetland !== 'tidalflat');
+        // trees scattered over parks, cemeteries, greens, golf courses and
+        // the yards of a residential area (none had any but mapped ones)
+        const scatter = scatterDensityOf(tags, wetland);
+        if (scatter > 0) {
+          const centre = centroidOf(feature);
+          const urban = isUrbanPlace({ id: `area:${feature.id}`, geometry: [centre] });
+          const placements = sampleAreaPlacements(feature, terrainData, squareSize, 'area_tree', scatter * treeDensityMultiplier,
+            BEAMNG_MAX_PLACEMENTS_PER_AREA, 1, 1, hashString(`${feature.id}:scatter`));
+          placements.forEach((placement, idx) => {
+            if (inBuildingOrWater(placement.pos[0], placement.pos[1])) return;
+            const choice = pickTree({ kind: 'tree', tags, point: centre, urban, area: true, seed: `${feature.id}:s${idx}` });
+            if (!choice) return;
+            placement.type = choice.type;
+            placement.scale = roundTo(choice.scale, 6);
+            pushPlacement(placement);
+          });
+        }
         if (!isTreeArea && !isBushArea) continue;
         const centre = centroidOf(feature);
         const urban = isUrbanPlace({ id: `area:${feature.id}`, geometry: [centre] });
