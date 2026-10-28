@@ -780,6 +780,305 @@ export function letterName(index) {
 }
 const MAX_AREA_M2 = 50000;
 
+// ── Multi-storey car parks ───────────────────────────────────────────────────
+// OSM building=parking, or a building with amenity=parking +
+// parking=multi-storey: no reusable garage ships with BeamNG (its levels'
+// garages are one-off site meshes), so one is built here: open concrete
+// decks GARAGE_FLOOR_M apart on perimeter columns, parapets round the upper
+// decks, and two ramp lanes along one long side climbing in turn, +u then
+// -u, so each deck's ramp starts where the last one landed (a drivable
+// helix). All of it is in the buildings' collision mesh.
+const GARAGE_FLOOR_M = 3.0;
+const GARAGE_SLAB_M = 0.3;
+const GARAGE_PARAPET_M = 1.0;
+const GARAGE_LANE_M = 3.6;
+const GARAGE_INSET_M = 1.0;      // (clear of the perimeter columns)
+const GARAGE_COLUMN_M = 0.5;
+const GARAGE_COLUMN_STEP_M = 8;
+const GARAGE_RAMP_WALL_M = 0.9;
+const GARAGE_BAY_W = 2.5;
+const GARAGE_BAY_L = 5.5;
+const GARAGE_AISLE_M = 6.5;
+const GARAGE_LINE_W = 0.12;
+const GARAGE_LIGHT_STEP_M = 9;
+const DECK_TINT = [0.58, 0.58, 0.57];
+const DECK_TOP_MAT = 'roofFlat';
+const DECK_TOP_TINT = [0.95, 0.92, 0.86];
+const LINE_TINT = [1, 1, 1];
+
+/** Whether an OSM feature is a multi-storey car park. */
+export function isGarageFeature(feature) {
+  const t = feature?.tags || {};
+  if (!t.building) return false;
+  if (t.building === 'parking') return true;
+  return t.amenity === 'parking' && t.parking === 'multi-storey';
+}
+
+function garageLevels(tags) {
+  const lv = Number.parseInt(tags['parking:levels'] ?? tags['building:levels'], 10);
+  if (Number.isFinite(lv) && lv > 0) return Math.max(2, Math.min(12, lv));
+  const h = parseMeters(tags.height);
+  if (Number.isFinite(h)) return Math.max(2, Math.min(12, Math.round(h / GARAGE_FLOOR_M)));
+  return 4;
+}
+
+/**
+ * The garage's layout in its oriented box, or null when the footprint is too
+ * small or too irregular to hold the ramps (it is built as a plain building).
+ */
+export function planGarage(ring, tags = {}) {
+  const box = orientedBox(ring);
+  if (!box) return null;
+  const area = Math.abs(signedArea(ring));
+  if (box.length < 30 || box.width < 14 || area / box.area < 0.8) return null;
+  const rampLen = Math.max(16, Math.min(26, box.length - 14));
+  const levels = garageLevels(tags);
+  // the lanes run along the box's -v side, inset from its edge
+  const v0 = -box.width / 2 + GARAGE_INSET_M;
+  return { box, levels, rampLen, a: -rampLen / 2, b: rampLen / 2, laneV: [v0, v0 + GARAGE_LANE_M, v0 + 2 * GARAGE_LANE_M] };
+}
+
+/**
+ * The bays of every deck: rows along the long side between the ramp lanes
+ * and the far parapet (bays, aisle, bays back to back, ...), clear of the
+ * cross-aisles at both ends. [{ u, v, du (+1: the car's nose toward +v),
+ * row }] in the garage's box frame; the same on every deck.
+ */
+export function garageBays(g, ring) {
+  const { box, laneV } = g;
+  const vS = laneV[2]; const vE = box.width / 2 - 0.8;
+  const uS = -box.length / 2 + 0.8 + GARAGE_AISLE_M; const uE = box.length / 2 - 0.8 - GARAGE_AISLE_M;
+  const rows = [];
+  let v = vE; let pending = 'row'; let id = 0;
+  // from the far parapet in: a row against it, an aisle, two rows back to
+  // back, an aisle, ... (a row's cars nose toward its back: the parapet or
+  // the other row)
+  while (v - vS >= GARAGE_BAY_L) {
+    if (pending === 'aisle') {
+      if (v - vS < GARAGE_AISLE_M + GARAGE_BAY_L) break;
+      v -= GARAGE_AISLE_M; pending = 'row2'; continue;
+    }
+    // (against the parapet: nose to +v; after an aisle: nose away from it, to -v)
+    rows.push({ v0: v - GARAGE_BAY_L, v1: v, nose: pending === 'row2' ? -1 : +1, id: id++ });
+    v -= GARAGE_BAY_L;
+    if (pending === 'row2' && v - vS >= GARAGE_BAY_L) { rows.push({ v0: v - GARAGE_BAY_L, v1: v, nose: +1, id: id++ }); v -= GARAGE_BAY_L; }
+    pending = 'aisle';
+  }
+  const { cx, cy, ux, uy } = box;
+  const vx = -uy; const vy = ux;
+  const P = (u, w) => [cx + ux * u + vx * w, cy + uy * u + vy * w];
+  const inside = (u, w) => inRingXY(...P(u, w), ring);
+  const n = Math.floor((uE - uS) / GARAGE_BAY_W);
+  const start = (uS + uE) / 2 - (n * GARAGE_BAY_W) / 2;
+  const bays = [];
+  for (const r of rows) {
+    for (let k = 0; k < n; k++) {
+      const u0 = start + k * GARAGE_BAY_W; const u1 = u0 + GARAGE_BAY_W;
+      if (![[u0, r.v0], [u1, r.v0], [u1, r.v1], [u0, r.v1]].every(([a, b]) => inside(a, b))) continue;
+      bays.push({ u: (u0 + u1) / 2, v: (r.v0 + r.v1) / 2, u0, u1, v0: r.v0, v1: r.v1, nose: r.nose, row: r.id, k });
+    }
+  }
+  return { bays, rows, start, n };
+}
+
+function inRingXY(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+    if (((yi > y) !== (yj > y)) && x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-12) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Parking spots and ceiling lights of the multi-storey car parks, for the
+ * level (city.sites.json, PointLights): { spots: [{ x, y, z, yaw }], lights:
+ * [{ x, y, z }] }. project(lat, lng) -> [x, y, ground z].
+ */
+export function garageExtras(features, project) {
+  const spots = []; const lights = [];
+  for (const f of features || []) {
+    if (f?.type !== 'building' || !isGarageFeature(f) || !(f.geometry?.length >= 3)) continue;
+    const projected = f.geometry.map((p) => project(p.lat, p.lng));
+    let ring = cleanRing(projected.map(([x, y]) => [x, y]));
+    if (ring.length < 3) continue;
+    if (signedArea(ring) < 0) ring = ring.reverse();
+    const g = planGarage(ring, f.tags || {});
+    if (!g) continue;
+    const base = Math.max(...projected.map((p) => p[2]).filter(Number.isFinite));
+    if (!Number.isFinite(base)) continue;
+    const { cx, cy, ux, uy } = g.box;
+    const vx = -uy; const vy = ux;
+    const P = (u, w) => [cx + ux * u + vx * w, cy + uy * u + vy * w];
+    const { bays } = garageBays(g, ring);
+    for (let k = 0; k < g.levels; k++) {
+      const z = base + k * GARAGE_FLOOR_M;
+      for (const b of bays) {
+        const [x, y] = P(b.u, b.v);
+        // local Y (the car's length) along the bay's depth, nose toward its back
+        const dx = vx * b.nose; const dy = vy * b.nose;
+        spots.push({ x, y, z, yaw: Math.atan2(-dx, dy), w: GARAGE_BAY_W, l: GARAGE_BAY_L });
+      }
+    }
+    // ceiling lights under every covered deck, on a grid clear of the ramp lanes
+    const nu = Math.max(1, Math.floor(g.box.length / GARAGE_LIGHT_STEP_M));
+    const nv = Math.max(1, Math.floor((g.box.width / 2 - g.laneV[2]) / GARAGE_LIGHT_STEP_M));
+    for (let k = 0; k < g.levels - 1; k++) {
+      const z = base + (k + 1) * GARAGE_FLOOR_M - GARAGE_SLAB_M - 0.15;
+      for (let i = 0; i < nu; i++) {
+        for (let j = 0; j < nv; j++) {
+          const u = -g.box.length / 2 + (i + 0.5) * (g.box.length / nu);
+          const w = g.laneV[2] + (j + 0.5) * ((g.box.width / 2 - g.laneV[2]) / nv);
+          const [x, y] = P(u, w);
+          if (inRingXY(x, y, ring)) lights.push({ x, y, z });
+        }
+      }
+    }
+  }
+  return { spots, lights };
+}
+
+const downTri = (m, mat, a, b, c, col) => m.tri(mat, a, c, b, [a[0] / ROOF_UV_M, a[1] / ROOF_UV_M], [c[0] / ROOF_UV_M, c[1] / ROOF_UV_M], [b[0] / ROOF_UV_M, b[1] / ROOF_UV_M], col);
+
+// (the driving surface matte: the concrete sheet mirrored the sky blue)
+function slabFaces(m, ring, holes, z, mat, col) {
+  flatRoof(m, ring, holes, z, DECK_TOP_MAT, DECK_TOP_TINT);
+  // underside
+  const contour = ring.map(([x, y]) => new THREE.Vector2(x, y));
+  const holeVecs = holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y)));
+  const all = [...ring, ...holes.flat()];
+  for (const [i, j, k] of THREE.ShapeUtils.triangulateShape(contour, holeVecs)) {
+    let a = all[i]; let b = all[j]; let c = all[k];
+    if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0) [b, c] = [c, b];
+    downTri(m, mat, [a[0], a[1], z - GARAGE_SLAB_M], [b[0], b[1], z - GARAGE_SLAB_M], [c[0], c[1], z - GARAGE_SLAB_M], col);
+  }
+  // edges (ring counter-clockwise: outward faces; holes clockwise: into the hole)
+  for (const r of [ring, ...holes]) {
+    for (let i = 0; i < r.length; i++) wallStrip(m, mat, r[i], r[(i + 1) % r.length], z - GARAGE_SLAB_M, z, col);
+  }
+}
+
+// a wall both faces (a parapet seen from the deck and from the street)
+function wallBoth(m, mat, a, b, z0, z1, col) {
+  wallStrip(m, mat, a, b, z0, z1, col);
+  wallStrip(m, mat, b, a, z0, z1, col);
+}
+
+function columnBox(m, mat, x, y, ux, uy, z0, z1, col) {
+  const h = GARAGE_COLUMN_M / 2;
+  const vx = -uy; const vy = ux;
+  const c = [[-h, -h], [h, -h], [h, h], [-h, h]].map(([p, q]) => [x + ux * p + vx * q, y + uy * p + vy * q]);
+  for (let i = 0; i < 4; i++) wallStrip(m, mat, c[i], c[(i + 1) % 4], z0, z1, col);
+}
+
+/** Builds one garage into the mesh builder. Returns the deck count. */
+function buildGarage(m, ring, holes, base, z0, g) {
+  const { box, levels, a, b, laneV } = g;
+  const { cx, cy, ux, uy } = box;
+  const vx = -uy; const vy = ux;
+  const P = (u, v) => [cx + ux * u + vx * v, cy + uy * u + vy * v];
+  const grey = [0.82, 0.82, 0.8];
+  const deckTint = DECK_TINT;
+  const { bays, rows } = garageBays(g, ring);
+  const zOf = (k) => base + k * GARAGE_FLOOR_M;
+  // lane j (ramp from deck j to j + 1): A (laneV 0-1) going +u when j is even,
+  // B (laneV 1-2) going -u when odd
+  const lane = (j) => (j % 2 === 0 ? [laneV[0], laneV[1]] : [laneV[1], laneV[2]]);
+  const rectHole = (v1, v2) => {
+    const r = [P(a, v1), P(b, v1), P(b, v2), P(a, v2)];
+    return signedArea(r) > 0 ? r.slice().reverse() : r;
+  };
+
+  // ground deck: the footprint at the highest ground, its sides down past the lowest
+  slabFaces(m, ring, holes, base, 'concrete', deckTint);
+  for (let i = 0; i < ring.length; i++) wallStrip(m, 'concrete', ring[i], ring[(i + 1) % ring.length], z0, base - GARAGE_SLAB_M, grey);
+
+  for (let k = 1; k < levels; k++) {
+    const z = zOf(k);
+    // the deck, open over the ramp lanes arriving (k - 1) and leaving (k)
+    const lanes = [lane(k - 1), ...(k < levels - 1 ? [lane(k)] : [])];
+    const v1 = Math.min(...lanes.map((l) => l[0])); const v2 = Math.max(...lanes.map((l) => l[1]));
+    slabFaces(m, ring, [...holes, rectHole(v1, v2)], z, 'concrete', deckTint);
+    // parapet round the deck
+    for (let i = 0; i < ring.length; i++) wallBoth(m, 'concrete', ring[i], ring[(i + 1) % ring.length], z, z + GARAGE_PARAPET_M, grey);
+  }
+
+  // perimeter columns between the decks, just inside the outline
+  for (let i = 0; i < ring.length; i++) {
+    const p = ring[i]; const q = ring[(i + 1) % ring.length];
+    const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    if (L < 1) continue;
+    const ex = (q[0] - p[0]) / L; const ey = (q[1] - p[1]) / L;
+    const nx = -ey; const ny = ex;       // inward (counter-clockwise ring)
+    const n = Math.max(1, Math.round(L / GARAGE_COLUMN_STEP_M));
+    for (let s = 0; s < n; s++) {
+      const t = (s + 0.5) / n * L;
+      const x = p[0] + ex * t + nx * (GARAGE_COLUMN_M / 2 + 0.1); const y = p[1] + ey * t + ny * (GARAGE_COLUMN_M / 2 + 0.1);
+      for (let k = 0; k < levels - 1; k++) columnBox(m, 'concrete', x, y, ex, ey, zOf(k), zOf(k + 1) - GARAGE_SLAB_M, grey);
+    }
+  }
+
+  // stall lines on every deck (paint as thin quads just over the slab: one
+  // decal would project onto every deck under it) and a column line where
+  // two rows meet back to back, every third bay
+  const lineQuad = (u, w0, w1, z) => {
+    const h = GARAGE_LINE_W / 2;
+    const q = [P(u - h, w0), P(u + h, w0), P(u + h, w1), P(u - h, w1)];
+    const pts = q.map(([x, y]) => [x, y, z]);
+    const nz = (pts[1][0] - pts[0][0]) * (pts[3][1] - pts[0][1]) - (pts[1][1] - pts[0][1]) * (pts[3][0] - pts[0][0]);
+    if (nz > 0) m.quad('stucco', pts[0], pts[1], pts[2], pts[3], [0, 0], [0.05, 0], [0.05, 1], [0, 1], LINE_TINT);
+    else m.quad('stucco', pts[0], pts[3], pts[2], pts[1], [0, 0], [0, 1], [0.05, 1], [0.05, 0], LINE_TINT);
+  };
+  const seenLine = new Set();
+  for (const bay of bays) {
+    for (const u of [bay.u0, bay.u1]) {
+      const key = `${bay.row}:${u.toFixed(2)}`;
+      if (seenLine.has(key)) continue;
+      seenLine.add(key);
+      for (let k = 0; k < levels; k++) lineQuad(u, bay.v0, bay.v1, zOf(k) + 0.012);
+    }
+  }
+  for (let r = 0; r + 1 < rows.length; r++) {
+    if (Math.abs(rows[r].v0 - rows[r + 1].v1) > 0.01) continue;   // back to back
+    const w = rows[r].v0;
+    const us = [...new Set(bays.filter((b) => b.row === rows[r].id && b.k % 3 === 0).map((b) => b.u0))];
+    for (const u of us) {
+      const [x, y] = P(u, w);
+      for (let k = 0; k < levels - 1; k++) columnBox(m, 'concrete', x, y, ux, uy, zOf(k), zOf(k + 1) - GARAGE_SLAB_M, grey);
+    }
+  }
+
+  // the ramps: a sloped slab per lane with a low wall each side
+  for (let j = 0; j < levels - 1; j++) {
+    const [w1, w2] = lane(j);
+    const up = j % 2 === 0;
+    const uLo = up ? a : b; const uHi = up ? b : a;
+    const zLo = zOf(j); const zHi = zOf(j + 1);
+    const p1 = P(uLo, w1); const p2 = P(uLo, w2); const p3 = P(uHi, w2); const p4 = P(uHi, w1);
+    const t1 = [p1[0], p1[1], zLo]; const t2 = [p2[0], p2[1], zLo]; const t3 = [p3[0], p3[1], zHi]; const t4 = [p4[0], p4[1], zHi];
+    const len = Math.abs(b - a);
+    const uv = [[0, w1 / ROOF_UV_M], [0, w2 / ROOF_UV_M], [len / ROOF_UV_M, w2 / ROOF_UV_M], [len / ROOF_UV_M, w1 / ROOF_UV_M]];
+    // top face up, whichever way the lane runs
+    const nz = (t2[0] - t1[0]) * (t4[1] - t1[1]) - (t2[1] - t1[1]) * (t4[0] - t1[0]);
+    if (nz > 0) m.quad(DECK_TOP_MAT, t1, t2, t3, t4, uv[0], uv[1], uv[2], uv[3], DECK_TOP_TINT);
+    else m.quad(DECK_TOP_MAT, t1, t4, t3, t2, uv[0], uv[3], uv[2], uv[1], DECK_TOP_TINT);
+    const d = GARAGE_SLAB_M;
+    const b1 = [t1[0], t1[1], zLo - d]; const b2 = [t2[0], t2[1], zLo - d]; const b3 = [t3[0], t3[1], zHi - d]; const b4 = [t4[0], t4[1], zHi - d];
+    if (nz > 0) m.quad('concrete', b1, b4, b3, b2, uv[0], uv[3], uv[2], uv[1], deckTint);
+    else m.quad('concrete', b1, b2, b3, b4, uv[0], uv[1], uv[2], uv[3], deckTint);
+    // side walls (both faces), sloping with the ramp
+    for (const [s0, s1] of [[t1, t4], [t2, t3]]) {
+      const w = GARAGE_RAMP_WALL_M;
+      const q0 = [s0[0], s0[1], s0[2] - d]; const q1 = [s1[0], s1[1], s1[2] - d];
+      const r0 = [s0[0], s0[1], s0[2] + w]; const r1 = [s1[0], s1[1], s1[2] + w];
+      const L2 = Math.hypot(s1[0] - s0[0], s1[1] - s0[1]) / SIDING_UV_M;
+      m.quad('concrete', q0, q1, r1, r0, [0, 0], [L2, 0], [L2, 0.4], [0, 0.4], grey);
+      m.quad('concrete', q1, q0, r0, r1, [0, 0], [L2, 0], [L2, 0.4], [0, 0.4], grey);
+    }
+  }
+  return levels;
+}
+
 export function buildTexturedBuildings(features, project, { maxBuildings = 20000 } = {}) {
   const meshes = [];
   let builder = new MeshBuilder();
@@ -828,6 +1127,17 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const zMax = Math.max(...grounds);
     const c = f.geometry[0];
     const seed = `${f.id}:${c.lat.toFixed(6)}:${c.lng.toFixed(6)}`;
+    // a multi-storey car park: decks and ramps (else, too small or odd for
+    // ramps, a plain building)
+    const garage = isGarageFeature(f) ? planGarage(ring, tags) : null;
+    if (garage) {
+      buildGarage(builder, ring, holes, zMax, zMin - FOUNDATION_M, garage);
+      stats.garages = (stats.garages || 0) + 1;
+      bump(stats.kinds, 'garage');
+      count++;
+      if (++inBatch >= MESH_BATCH) flush();
+      continue;
+    }
     const box = orientedBox(ring);
     const rectFill = box && box.area > 0 ? area / box.area : 0;
     const plan = planBuilding(tags, { area, seed, lat: c.lat, lon: c.lng, rectFill });

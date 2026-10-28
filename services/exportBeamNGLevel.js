@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
-import { buildTexturedBuildings, getBuildingMaterialDefs } from './beamngBuildings.js';
+import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
@@ -6989,6 +6989,20 @@ const PATH_LAMP_MIN_M = 8;
 // Vanilla wcusa street lamp light (lightemitters_vintage sodium pairing,
 // 400+ instances) — with castShadows forced off per QA guidance. isEnabled
 // false + nightLight "1" makes the engine run them dusk-to-dawn, no lua.
+// Car park ceiling lights: on day and night (it is dark under a deck),
+// neutral white, short reach, no shadows.
+const GARAGE_LIGHT_TEMPLATE = {
+  class: 'PointLight',
+  attenuationRatio: [0, 0, 0],
+  brightness: 0.0795774609,
+  castShadows: false,
+  color: [1, 0.92, 0.82, 1],
+  intensity: 7000,
+  isEnabled: true,
+  radius: 13,
+  useColorTemperature: 'true',
+};
+
 const STREET_LAMP_LIGHT_TEMPLATE = {
   class: 'PointLight',
   attenuationRatio: [0, 0, 0],
@@ -9621,6 +9635,33 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     crosswalkZones: decalRoads.crosswalkZones || [],
     leftHandTraffic: !!exportTerrainData.roadRules?.leftHandTraffic,
   });
+  // multi-storey car parks (beamngBuildings.js): a spot per bay on every
+  // deck (their lines are painted in the mesh) and ceiling lights
+  const garage = includeBuildings
+    ? garageExtras(exportTerrainData.osmFeatures || [], (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0))
+    : { spots: [], lights: [] };
+  for (const g of garage.spots) {
+    const spot = {
+      name: `garage_parking_${parkingSpots.length + 1}`,
+      pos: [roundTo(g.x, 3), roundTo(g.y, 3), roundTo(g.z, 3)],
+      rot: [0, 0, roundTo(Math.sin(g.yaw / 2), 6), roundTo(Math.cos(g.yaw / 2), 6)],
+      scl: [g.w, g.l, 3],
+      color: [1, 1, 1],
+      customFields: { names: {}, tags: {}, types: {}, values: {} },
+      isMultiSpot: false,
+      oldId: 100000 + parkingSpots.length,
+    };
+    Object.defineProperty(spot, 'unmarked', { value: true });
+    parkingSpots.push(spot);
+  }
+  const garageLightObjects = garage.lights.map((l, i) => ({
+    ...GARAGE_LIGHT_TEMPLATE,
+    __parent: 'garage_lights',
+    name: `garage_light_${i + 1}`,
+    persistentId: generatePersistentId(),
+    position: [roundTo(l.x, 3), roundTo(l.y, 3), roundTo(l.z, 3)],
+  }));
+  if (garage.spots.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Garages: ${garage.spots.length} deck spaces, ${garageLightObjects.length} ceiling lights.`);
   // (and the trees keep out of them)
   exportTerrainData.parkingBayRings = parkingSpots.filter((sp) => sp.ground).map((sp) => sp.ground.corners);
 
@@ -9932,6 +9973,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   if (carportObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/carports`);
+  }
+  if (garageLightObjects.length > 0) {
+    zip.folder(`${base}/main/MissionGroup/garage_lights`);
   }
   if (forestFiles.length > 0 || groundCoverObjects.length > 0) {
     zip.folder(`${base}/main/MissionGroup/vegetation`);
@@ -10570,6 +10614,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       name: 'carports',
       persistentId: generatePersistentId(),
     }] : []),
+    ...(garageLightObjects.length > 0 ? [{
+      __parent: 'MissionGroup',
+      class: 'SimGroup',
+      name: 'garage_lights',
+      persistentId: generatePersistentId(),
+    }] : []),
     ...(decalRoads.length > 0 ? [{
       __parent: 'MissionGroup',
       class: 'SimGroup',
@@ -10613,6 +10663,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // (signalInstance) so core_trafficSignals lights it with the AI's phase.
   if (trafficSignalObjects.length > 0) {
     zip.file(`${base}/main/MissionGroup/traffic_signals/items.level.json`, toNDJSON(rewriteForLinks(trafficSignalObjects)));
+  }
+
+  if (garageLightObjects.length > 0) {
+    zip.file(`${base}/main/MissionGroup/garage_lights/items.level.json`, toNDJSON(garageLightObjects));
   }
 
   // ── main/MissionGroup/carports/items.level.json ─────────────────────────
