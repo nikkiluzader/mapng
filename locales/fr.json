@@ -128,7 +128,8 @@
     "errorRoadMask": "Échec de l'export du masque routier. Voir la console pour les details.",
     "errorGlb": "Échec de l'export GLB. Voir la console pour les details.",
     "errorDae": "Échec de l'export DAE. Voir la console pour les details.",
-    "errorTer": "Échec de l'export TER. Voir la console pour les details."
+    "errorTer": "Échec de l'export TER. Voir la console pour les details.",
+    "errorGameTexture": "Échec de l'export de la texture de jeu."
   },
   "batch": {
     "copyConfig": "Copier la configuration",
@@ -285,7 +286,6 @@
     "generatePlayableZip": "Generer un package .zip jouable",
     "satellite": "Satellite",
     "satelliteHybrid": "Hybride satellite",
-    "gameMap": "Carte de jeu",
     "touchedUp": "Retouchee",
     "texturePaint": {
       "open": "Retoucher la texture de base",
@@ -343,7 +343,8 @@
     "surroundingsOnly": "Environs uniquement",
     "glbModel": "Modele GLB",
     "colladaDae": "Collada DAE",
-    "beamngTerrain": "Terrain BeamNG"
+    "beamngTerrain": "Terrain BeamNG",
+    "gameTexture": "Texture de jeu"
   },
   "controlPanel": {
     "outputSettings": "Paramètres de sortie",

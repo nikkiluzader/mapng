@@ -128,7 +128,8 @@
     "errorRoadMask": "Nie udało się wyeksportować maski drogi. Szczegóły w konsoli.",
     "errorGlb": "Nie udało się wyeksportować GLB. Szczegóły w konsoli.",
     "errorDae": "Nie udało się wyeksportować DAE. Szczegóły w konsoli.",
-    "errorTer": "Nie udało się wyeksportować TER. Szczegóły w konsoli."
+    "errorTer": "Nie udało się wyeksportować TER. Szczegóły w konsoli.",
+    "errorGameTexture": "Nie udało się wyeksportować tekstury gry."
   },
   "batch": {
     "copyConfig": "Skopiuj konfigurację",
@@ -285,7 +286,6 @@
     "generatePlayableZip": "Wygeneruj pakiet .zip do gry",
     "satellite": "Satelita",
     "satelliteHybrid": "Satelita hybrydowa",
-    "gameMap": "Mapa gry",
     "touchedUp": "Poprawiona",
     "texturePaint": {
       "open": "Popraw teksturę bazową",
@@ -343,7 +343,8 @@
     "surroundingsOnly": "Tylko otoczenie",
     "glbModel": "Model GLB",
     "colladaDae": "Collada DAE",
-    "beamngTerrain": "Teren BeamNG"
+    "beamngTerrain": "Teren BeamNG",
+    "gameTexture": "Tekstura gry"
   },
   "controlPanel": {
     "outputSettings": "Ustawienia wyjścia",

@@ -27,7 +27,7 @@
           <option value="hybrid">{{ t('exportPanel.satelliteHybrid') }}</option>
           <option value="satellite">{{ t('exportPanel.satellite') }}</option>
           <option v-if="includeOSM" value="osm">{{ t('exportPanel.osm') }}</option>
-          <option v-if="includeOSM" value="game">{{ t('exportPanel.gameMap') }}</option>
+          <option v-if="includeOSM" value="game">{{ t('exportPanel.gameTexture') }}</option>
         </select>
       </div>
 

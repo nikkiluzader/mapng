@@ -128,7 +128,8 @@
     "errorRoadMask": "Не удалось экспортировать маску дорог. Подробности в консоли.",
     "errorGlb": "Не удалось экспортировать GLB. Подробности в консоли.",
     "errorDae": "Не удалось экспортировать DAE. Подробности в консоли.",
-    "errorTer": "Не удалось экспортировать TER. Подробности в консоли."
+    "errorTer": "Не удалось экспортировать TER. Подробности в консоли.",
+    "errorGameTexture": "Не удалось экспортировать игровую текстуру."
   },
   "batch": {
     "copyConfig": "Копировать конфигурацию",
@@ -285,7 +286,6 @@
     "generatePlayableZip": "Сгенерировать играбельный .zip",
     "satellite": "Спутник",
     "satelliteHybrid": "Спутниковый гибрид",
-    "gameMap": "Игровая карта",
     "touchedUp": "Отредактированная",
     "texturePaint": {
       "open": "Подправить базовую текстуру",
@@ -343,7 +343,8 @@
     "surroundingsOnly": "Только окружение",
     "glbModel": "GLB-модель",
     "colladaDae": "Collada DAE",
-    "beamngTerrain": "Рельеф BeamNG"
+    "beamngTerrain": "Рельеф BeamNG",
+    "gameTexture": "Игровая текстура"
   },
   "controlPanel": {
     "outputSettings": "Параметры вывода",

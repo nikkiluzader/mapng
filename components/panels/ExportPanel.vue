@@ -60,7 +60,7 @@
                 <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">{{ t('exportPanel.satelliteHybrid') }}</option>
                 <option value="satellite" :disabled="!terrainData?.satelliteTextureUrl">{{ t('exportPanel.satellite') }}</option>
                 <option v-if="hasOsmData" value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
-                <option v-if="hasOsmData" value="game" :disabled="!terrainData?.gameTextureUrl && !terrainData?.gameTextureCanvas">{{ t('exportPanel.gameMap') }}</option>
+                <option v-if="hasOsmData" value="game" :disabled="!terrainData?.gameTextureUrl && !terrainData?.gameTextureCanvas">{{ t('exportPanel.gameTexture') }}</option>
                 <option v-if="hasPaintedTexture" value="painted">{{ t('exportPanel.touchedUp') }}</option>
               </select>
               <button
@@ -267,18 +267,18 @@
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
 
-          <!-- Hybrid Texture -->
+          <!-- Game Texture -->
           <button 
-            @click="downloadHybridTexture"
-            :disabled="!terrainData.hybridTextureUrl || isAnyExporting"
+            @click="downloadGameTexture"
+            :disabled="(!terrainData.gameTextureUrl && !terrainData.gameTextureCanvas) || isAnyExporting"
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isExportingHybridTexture" :size="20" class="animate-spin text-[#FF6600]" />
-              <img v-else-if="hybridPreviewUrl" :src="hybridPreviewUrl" class="w-full h-full object-cover" />
+              <Loader2 v-if="isExportingGameTexture" :size="20" class="animate-spin text-[#FF6600]" />
+              <img v-else-if="gamePreviewUrl" :src="gamePreviewUrl" class="w-full h-full object-cover" />
               <Layers v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.satelliteHybrid') }}</span>
+            <span class="text-[11px] font-medium">{{ t('exportPanel.gameTexture') }}</span>
             <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
@@ -576,6 +576,7 @@ const isExportingHeightmap = ref(false);
 const isExportingTexture = ref(false);
 const isExportingOSMTexture = ref(false);
 const isExportingHybridTexture = ref(false);
+const isExportingGameTexture = ref(false);
 const isExportingRoadMask = ref(false);
 const isExportingGeoTIFF = ref(false);
 const isExportingGLB = ref(false);
@@ -773,6 +774,7 @@ const isAnyExporting = computed(() => (
   isExportingTexture.value ||
   isExportingOSMTexture.value ||
   isExportingHybridTexture.value ||
+  isExportingGameTexture.value ||
   isExportingRoadMask.value ||
   isExportingGeoTIFF.value ||
   isExportingGLB.value ||
@@ -805,6 +807,7 @@ const THUMB_SIZE = 256;
 const satellitePreviewUrl = ref('');
 const osmPreviewUrl = ref('');
 const hybridPreviewUrl = ref('');
+const gamePreviewUrl = ref('');
 let satellitePreviewToken = 0;
 let osmPreviewToken = 0;
 let hybridPreviewToken = 0;
@@ -907,10 +910,21 @@ watch(
   { immediate: true },
 );
 
+let gamePreviewToken = 0;
+watch(
+  () => props.terrainData?.gameTextureUrl,
+  (url) => {
+    const token = ++gamePreviewToken;
+    updatePreviewUrl(url, gamePreviewUrl, () => token === gamePreviewToken);
+  },
+  { immediate: true },
+);
+
 onUnmounted(() => {
   clearPreviewUrl(satellitePreviewUrl);
   clearPreviewUrl(osmPreviewUrl);
   clearPreviewUrl(hybridPreviewUrl);
+  clearPreviewUrl(gamePreviewUrl);
   releaseTexturePaintUrls();
 });
 
@@ -1282,6 +1296,30 @@ const downloadOSMTexture = async () => {
     alert(t('export.errorOsmTexture'));
   } finally {
     isExportingOSMTexture.value = false;
+  }
+};
+
+const downloadGameTexture = async () => {
+  const td0 = props.terrainData;
+  if (!td0?.gameTextureUrl && !td0?.gameTextureCanvas) return;
+  isExportingGameTexture.value = true;
+  try {
+    await yieldToUi();
+    const td = await getExportTerrainData();
+    const filename = `game_texture_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}.png`;
+    let url = td.gameTextureUrl ?? td0.gameTextureUrl;
+    if (!url && (td.gameTextureCanvas || td0.gameTextureCanvas)) {
+      const blob = await new Promise((r) => (td.gameTextureCanvas || td0.gameTextureCanvas).toBlob(r, 'image/png'));
+      url = URL.createObjectURL(blob);
+    }
+    await downloadBlobUrlAsFile(url, filename, 'image/', 'image/png');
+    notifyExportSuccess('texture_game', filename);
+    downloadMetadataSidecar(filename, buildExportMetadata('texture_game', filename));
+  } catch (error) {
+    console.error('Failed to export game texture:', error);
+    alert(t('export.errorGameTexture'));
+  } finally {
+    isExportingGameTexture.value = false;
   }
 };
 

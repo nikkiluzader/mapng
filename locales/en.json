@@ -137,7 +137,8 @@
     "errorRoadMask": "Failed to export road mask. See console for details.",
     "errorGlb": "Failed to export GLB. See console for details.",
     "errorDae": "Failed to export DAE. See console for details.",
-    "errorTer": "Failed to export TER. See console for details."
+    "errorTer": "Failed to export TER. See console for details.",
+    "errorGameTexture": "Failed to export the game texture."
   },
   "batch": {
     "copyConfig": "Copy Configuration",
@@ -318,7 +319,6 @@
     "generatePlayableZip": "Generate playable .zip package",
     "satellite": "Satellite",
     "satelliteHybrid": "Satellite Hybrid",
-    "gameMap": "Game Map",
     "touchedUp": "Touched up",
     "texturePaint": {
       "open": "Touch up base texture",
@@ -377,7 +377,8 @@
     "realWorldScale": "Real-world scale (1 unit = 1 m)",
     "glbModel": "GLB Model",
     "colladaDae": "Collada DAE",
-    "beamngTerrain": "BeamNG Terrain"
+    "beamngTerrain": "BeamNG Terrain",
+    "gameTexture": "Game Texture"
   },
   "controlPanel": {
     "sessionData": "Session Data",

@@ -128,7 +128,8 @@
     "errorRoadMask": "Road-Mask-Export fehlgeschlagen. Details in der Konsole.",
     "errorGlb": "GLB-Export fehlgeschlagen. Details in der Konsole.",
     "errorDae": "DAE-Export fehlgeschlagen. Details in der Konsole.",
-    "errorTer": "TER-Export fehlgeschlagen. Details in der Konsole."
+    "errorTer": "TER-Export fehlgeschlagen. Details in der Konsole.",
+    "errorGameTexture": "Export der Spieltextur fehlgeschlagen."
   },
   "batch": {
     "copyConfig": "Konfiguration kopieren",
@@ -285,7 +286,6 @@
     "generatePlayableZip": "Spielbares .zip-Paket erzeugen",
     "satellite": "Satellit",
     "satelliteHybrid": "Satellit Hybrid",
-    "gameMap": "Spielkarte",
     "touchedUp": "Nachbearbeitet",
     "texturePaint": {
       "open": "Basistextur nachbearbeiten",
@@ -343,7 +343,8 @@
     "surroundingsOnly": "Nur Umgebung",
     "glbModel": "GLB-Modell",
     "colladaDae": "Collada DAE",
-    "beamngTerrain": "BeamNG-Terrain"
+    "beamngTerrain": "BeamNG-Terrain",
+    "gameTexture": "Spieltextur"
   },
   "controlPanel": {
     "outputSettings": "Ausgabeeinstellungen",
