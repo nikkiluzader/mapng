@@ -4321,9 +4321,35 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
   // the streets' raised sidewalks: [{ nodes, half, left, right }]
   const streets = carriageways.filter((cw) => !cw.bridge && !cw.tunnel).map((cw) => ({ ...cw, ...sidewalkSides({ tags: cw.tags, highway: cw.highway, urban: cw.urban }) }));
   // is a footpath's point (x, y), heading (dx, dy), that street's sidewalk?
-  const onSidewalk = (x, y, dx, dy) => streets.some((cw) => {
+  // (street segments binned on a grid by their reach: scanning every segment
+  // for every footpath point froze Manhattan's export for over 16 minutes)
+  const SIDEWALK_CELL_M = 32;
+  const sidewalkCells = new Map();
+  const cellOf = (x, y) => `${Math.floor(x / SIDEWALK_CELL_M)},${Math.floor(y / SIDEWALK_CELL_M)}`;
+  for (const cw of streets) {
+    const reach = cw.half + Math.max(cw.left || 0, cw.right || 0) + 1.5;
+    if (!(Math.max(cw.left || 0, cw.right || 0) > 0)) continue;
     const n = cw.nodes;
     for (let i = 0; i + 1 < n.length; i++) {
+      const x0 = Math.floor((Math.min(n[i][0], n[i + 1][0]) - reach) / SIDEWALK_CELL_M);
+      const x1 = Math.floor((Math.max(n[i][0], n[i + 1][0]) + reach) / SIDEWALK_CELL_M);
+      const y0 = Math.floor((Math.min(n[i][1], n[i + 1][1]) - reach) / SIDEWALK_CELL_M);
+      const y1 = Math.floor((Math.max(n[i][1], n[i + 1][1]) + reach) / SIDEWALK_CELL_M);
+      for (let cx = x0; cx <= x1; cx++) {
+        for (let cy = y0; cy <= y1; cy++) {
+          const key = `${cx},${cy}`;
+          let list = sidewalkCells.get(key);
+          if (!list) sidewalkCells.set(key, (list = []));
+          list.push(cw, i);
+        }
+      }
+    }
+  }
+  const onSidewalk = (x, y, dx, dy) => {
+    const list = sidewalkCells.get(cellOf(x, y));
+    if (!list) return false;
+    for (let j = 0; j < list.length; j += 2) {
+      const cw = list[j]; const i = list[j + 1]; const n = cw.nodes;
       const vx = n[i + 1][0] - n[i][0]; const vy = n[i + 1][1] - n[i][1];
       const L2 = vx * vx + vy * vy || 1e-9;
       const t = ((x - n[i][0]) * vx + (y - n[i][1]) * vy) / L2;
@@ -4336,7 +4362,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
       if (Math.abs((dx * vx + dy * vy) / (dl * L)) >= FOOTPATH_ALONG_COS) return true;
     }
     return false;
-  });
+  };
   const isUrban = buildUrbanRoadClassifier(terrainData.osmFeatures || []);
   let serviceCount = 0; let serviceLength = 0;
   // vertices shared by two or more roads: a service road's square end there
