@@ -343,3 +343,57 @@ export async function applyBuildingFoundations(terrainData, options = {}) {
 
   return { ...terrainData, heightMap, maxHeight: newMaxHeight };
 }
+
+/**
+ * Multi-storey car parks (services/beamngBuildings.js isGarageFeature): the
+ * ground deck is flat, so the terrain is graded to it: the footprint to its
+ * median ground (the high side cut, the low side filled) and blended back to
+ * the natural ground round it at about 1:8 (GARAGE_GRADE), so the street
+ * meets the ground deck instead of a step. Returns new terrain data (the
+ * height map cloned) or the input when there is nothing to grade.
+ */
+const GARAGE_GRADE = 0.125;
+const GARAGE_MIN_BLEND_M = 6;
+const GARAGE_MAX_BLEND_M = 20;
+
+export async function gradeGarageFootprints(terrainData, isGarage, { yieldFn = null } = {}) {
+  const { width, bounds, osmFeatures = [] } = terrainData;
+  const size = width;
+  const garages = osmFeatures.filter((f) => f?.type === 'building' && f.geometry?.length >= 3 && isGarage(f));
+  if (!garages.length) return terrainData;
+  const heightMap = new Float32Array(terrainData.heightMap);
+  const source = terrainData.heightMap;
+  const mpp = estimateMetersPerPixel(terrainData);
+  let maxHeight = terrainData.maxHeight;
+  let minHeight = terrainData.minHeight;
+  for (const garage of garages) {
+    const ring = garage.geometry.map((pt) => geoToHeightMapPx(pt.lat, pt.lng, bounds, size));
+    const core = uniqueIndices(rasterizePolygonIndices(ring, size, 1));
+    if (!core.length) continue;
+    const heights = core.map((i) => source[i]).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!heights.length) continue;
+    const target = percentileFromSorted(heights, 0.5);
+    const relief = Math.max(target - heights[0], heights[heights.length - 1] - target);
+    if (relief < 0.05) continue;
+    for (const i of core) heightMap[i] = target;
+    // blend out ring by ring: the band d px out takes (1 - smoothstep) of the
+    // way to the deck height
+    const blendM = Math.max(GARAGE_MIN_BLEND_M, Math.min(GARAGE_MAX_BLEND_M, relief / GARAGE_GRADE));
+    const blendPx = Math.max(1, Math.round(blendM / mpp));
+    const done = new Set(core);
+    for (let d = 1; d <= blendPx; d++) {
+      const band = uniqueIndices(rasterizePolygonIndices(ring, size, 1 + d)).filter((i) => !done.has(i));
+      const alpha = 1 - smoothstep01(d / (blendPx + 1));
+      for (const i of band) {
+        done.add(i);
+        const natural = source[i];
+        if (!Number.isFinite(natural)) continue;
+        heightMap[i] = natural + alpha * (target - natural);
+      }
+    }
+    maxHeight = Math.max(maxHeight, target);
+    minHeight = Math.min(minHeight, target);
+    if (yieldFn) await yieldFn();
+  }
+  return { ...terrainData, heightMap, maxHeight, minHeight };
+}

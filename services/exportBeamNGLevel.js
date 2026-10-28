@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
-import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras } from './beamngBuildings.js';
+import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
@@ -17,7 +17,7 @@ import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, unde
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
-import { applyBuildingFoundations } from './buildingFoundations.js';
+import { applyBuildingFoundations, gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
@@ -9343,12 +9343,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     groundClasses: didCropToSquare ? undefined : td.groundClasses,
   };
 
-  let exportTerrainData = foundationInput;
+  // multi-storey car parks: the terrain graded to their flat ground deck
+  let exportTerrainData = includeBuildings
+    ? await gradeGarageFootprints(foundationInput, isGarageFeature, { yieldFn: yield_ })
+    : foundationInput;
   if (applyFoundations) {
     beginStep('foundations', 'Preparing building foundations…');
     await yield_();
     exportTerrainData = await applyBuildingFoundations(
-      foundationInput,
+      exportTerrainData,
       {
         yieldFn: yield_,
         onProgress: ({ completed, total, applied, skipped }) => {

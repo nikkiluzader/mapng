@@ -796,6 +796,7 @@ const GARAGE_INSET_M = 1.0;      // (clear of the perimeter columns)
 const GARAGE_COLUMN_M = 0.5;
 const GARAGE_COLUMN_STEP_M = 8;
 const GARAGE_RAMP_WALL_M = 0.9;
+const GARAGE_RAMP_EASE_M = 3;
 const GARAGE_BAY_W = 2.5;
 const GARAGE_BAY_L = 5.5;
 const GARAGE_AISLE_M = 6.5;
@@ -1048,32 +1049,46 @@ function buildGarage(m, ring, holes, base, z0, g) {
     }
   }
 
-  // the ramps: a sloped slab per lane with a low wall each side
+  // the ramps: a sloped slab per lane with a low wall each side, easing in
+  // and out (the slope rises from 0 over GARAGE_RAMP_EASE_M at each end, so
+  // a car meets both decks flat instead of a kink)
+  const len = Math.abs(b - a);
+  const e = Math.min(0.3, GARAGE_RAMP_EASE_M / len);
+  const sMax = 1 / (1 - e);
+  const rise = (t) => (t < e ? sMax * t * t / (2 * e)
+    : t > 1 - e ? 1 - sMax * (1 - t) * (1 - t) / (2 * e)
+      : sMax * e / 2 + sMax * (t - e));
+  const ts = [0, e / 3, (2 * e) / 3, e, 1 - e, 1 - (2 * e) / 3, 1 - e / 3, 1];
+  const d = GARAGE_SLAB_M;
   for (let j = 0; j < levels - 1; j++) {
     const [w1, w2] = lane(j);
     const up = j % 2 === 0;
     const uLo = up ? a : b; const uHi = up ? b : a;
     const zLo = zOf(j); const zHi = zOf(j + 1);
-    const p1 = P(uLo, w1); const p2 = P(uLo, w2); const p3 = P(uHi, w2); const p4 = P(uHi, w1);
-    const t1 = [p1[0], p1[1], zLo]; const t2 = [p2[0], p2[1], zLo]; const t3 = [p3[0], p3[1], zHi]; const t4 = [p4[0], p4[1], zHi];
-    const len = Math.abs(b - a);
-    const uv = [[0, w1 / ROOF_UV_M], [0, w2 / ROOF_UV_M], [len / ROOF_UV_M, w2 / ROOF_UV_M], [len / ROOF_UV_M, w1 / ROOF_UV_M]];
-    // top face up, whichever way the lane runs
-    const nz = (t2[0] - t1[0]) * (t4[1] - t1[1]) - (t2[1] - t1[1]) * (t4[0] - t1[0]);
-    if (nz > 0) m.quad(DECK_TOP_MAT, t1, t2, t3, t4, uv[0], uv[1], uv[2], uv[3], DECK_TOP_TINT);
-    else m.quad(DECK_TOP_MAT, t1, t4, t3, t2, uv[0], uv[3], uv[2], uv[1], DECK_TOP_TINT);
-    const d = GARAGE_SLAB_M;
-    const b1 = [t1[0], t1[1], zLo - d]; const b2 = [t2[0], t2[1], zLo - d]; const b3 = [t3[0], t3[1], zHi - d]; const b4 = [t4[0], t4[1], zHi - d];
-    if (nz > 0) m.quad('concrete', b1, b4, b3, b2, uv[0], uv[3], uv[2], uv[1], deckTint);
-    else m.quad('concrete', b1, b2, b3, b4, uv[0], uv[1], uv[2], uv[3], deckTint);
-    // side walls (both faces), sloping with the ramp
-    for (const [s0, s1] of [[t1, t4], [t2, t3]]) {
-      const w = GARAGE_RAMP_WALL_M;
-      const q0 = [s0[0], s0[1], s0[2] - d]; const q1 = [s1[0], s1[1], s1[2] - d];
-      const r0 = [s0[0], s0[1], s0[2] + w]; const r1 = [s1[0], s1[1], s1[2] + w];
-      const L2 = Math.hypot(s1[0] - s0[0], s1[1] - s0[1]) / SIDING_UV_M;
-      m.quad('concrete', q0, q1, r1, r0, [0, 0], [L2, 0], [L2, 0.4], [0, 0.4], grey);
-      m.quad('concrete', q1, q0, r0, r1, [0, 0], [L2, 0], [L2, 0.4], [0, 0.4], grey);
+    for (let i = 0; i + 1 < ts.length; i++) {
+      const tA = ts[i]; const tB = ts[i + 1];
+      const uA = uLo + (uHi - uLo) * tA; const uB = uLo + (uHi - uLo) * tB;
+      const zA = zLo + (zHi - zLo) * rise(tA); const zB = zLo + (zHi - zLo) * rise(tB);
+      const p1 = P(uA, w1); const p2 = P(uA, w2); const p3 = P(uB, w2); const p4 = P(uB, w1);
+      const t1 = [p1[0], p1[1], zA]; const t2 = [p2[0], p2[1], zA]; const t3 = [p3[0], p3[1], zB]; const t4 = [p4[0], p4[1], zB];
+      const L = Math.abs(uB - uA) / ROOF_UV_M; const L0 = Math.abs(uA - uLo) / ROOF_UV_M;
+      const uv = [[L0, w1 / ROOF_UV_M], [L0, w2 / ROOF_UV_M], [L0 + L, w2 / ROOF_UV_M], [L0 + L, w1 / ROOF_UV_M]];
+      // top face up, whichever way the lane runs
+      const nz = (t2[0] - t1[0]) * (t4[1] - t1[1]) - (t2[1] - t1[1]) * (t4[0] - t1[0]);
+      if (nz > 0) m.quad(DECK_TOP_MAT, t1, t2, t3, t4, uv[0], uv[1], uv[2], uv[3], DECK_TOP_TINT);
+      else m.quad(DECK_TOP_MAT, t1, t4, t3, t2, uv[0], uv[3], uv[2], uv[1], DECK_TOP_TINT);
+      const b1 = [t1[0], t1[1], zA - d]; const b2 = [t2[0], t2[1], zA - d]; const b3 = [t3[0], t3[1], zB - d]; const b4 = [t4[0], t4[1], zB - d];
+      if (nz > 0) m.quad('concrete', b1, b4, b3, b2, uv[0], uv[3], uv[2], uv[1], deckTint);
+      else m.quad('concrete', b1, b2, b3, b4, uv[0], uv[1], uv[2], uv[3], deckTint);
+      // side walls (both faces), following the ramp
+      for (const [s0, s1] of [[t1, t4], [t2, t3]]) {
+        const w = GARAGE_RAMP_WALL_M;
+        const q0 = [s0[0], s0[1], s0[2] - d]; const q1 = [s1[0], s1[1], s1[2] - d];
+        const r0 = [s0[0], s0[1], s0[2] + w]; const r1 = [s1[0], s1[1], s1[2] + w];
+        const L2 = Math.hypot(s1[0] - s0[0], s1[1] - s0[1]) / SIDING_UV_M;
+        m.quad('concrete', q0, q1, r1, r0, [0, 0], [L2, 0], [L2, 0.4], [0, 0.4], grey);
+        m.quad('concrete', q1, q0, r0, r1, [0, 0], [L2, 0], [L2, 0.4], [0, 0.4], grey);
+      }
     }
   }
   return levels;
