@@ -23,3 +23,18 @@ test('a garage on a slope gets a flat pad blended back into the hillside', async
   for (let x = 160; x < 200; x++) assert.ok(Math.abs(h(x + 1, 120) - h(x, 120)) < 0.6, `no step at x=${x}`);
   assert.notEqual(out.heightMap, heightMap, 'the input height map is not changed');
 });
+
+test('the sites file gets an even spread of at most 3000 parking spots', async () => {
+  const { sampleSiteSpots, SITES_MAX_PARKING_SPOTS } = await import('../services/exportBeamNGLevel.js');
+  const spots = [];
+  for (let i = 0; i < 20000; i++) spots.push({ name: `s${i}`, pos: [(i % 200) * 10, Math.floor(i / 200) * 10, 0], oldId: i });
+  const out = sampleSiteSpots(spots);
+  assert.equal(out.length, SITES_MAX_PARKING_SPOTS);
+  assert.equal(new Set(out.map((s) => s.name)).size, out.length, 'no repeats');
+  assert.deepEqual(out.map((s) => s.oldId), out.map((_, i) => 100000 + i), 'oldIds renumbered');
+  // every 64 m cell of the 2 x 1 km test area keeps some
+  const all = new Set(spots.map((s) => `${Math.floor(s.pos[0] / 64)},${Math.floor(s.pos[1] / 64)}`));
+  const kept = new Set(out.map((s) => `${Math.floor(s.pos[0] / 64)},${Math.floor(s.pos[1] / 64)}`));
+  assert.equal(kept.size, all.size, 'every cell keeps some spots');
+  assert.equal(sampleSiteSpots(spots.slice(0, 50)).length, 50, 'small sets untouched');
+});

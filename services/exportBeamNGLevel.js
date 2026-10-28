@@ -7918,6 +7918,41 @@ const STREET_STALL_W = 2.6;
 const STREET_JUNCTION_CLEAR_M = 4;   // past a crossing road's edge
 const STREET_DRIVEWAY_CLEAR_M = 2.5;
 
+// The Sites loader (gameplay/util/sortedList.lua onDeserialized) re-sorts
+// its whole list after every spot it adds: n spots cost ~n² log n, and
+// 20133 spots held the loading screen 77 s (official levels: 452 at most
+// in one file). city.sites.json gets an even spread of at most this many
+// (the painted bays are all kept); parked traffic only fills spots near
+// the player anyway.
+export const SITES_MAX_PARKING_SPOTS = 3000;
+const SITES_SAMPLE_CELL_M = 64;
+
+export function sampleSiteSpots(spots, max = SITES_MAX_PARKING_SPOTS) {
+  if (spots.length <= max) return spots;
+  // round-robin over 64 m cells: every neighbourhood keeps some
+  const cells = new Map();
+  for (const sp of spots) {
+    const k = `${Math.floor(sp.pos[0] / SITES_SAMPLE_CELL_M)},${Math.floor(sp.pos[1] / SITES_SAMPLE_CELL_M)}`;
+    if (!cells.has(k)) cells.set(k, []);
+    cells.get(k).push(sp);
+  }
+  // each cell's spots alternating along it (every other one first), then
+  // one per cell per round
+  const lists = [...cells.values()].map((l) => [...l.filter((_, i) => i % 2 === 0), ...l.filter((_, i) => i % 2 === 1)]);
+  const picked = [];
+  for (let round = 0; picked.length < max; round++) {
+    let any = false;
+    for (const list of lists) {
+      if (round >= list.length) continue;
+      any = true;
+      picked.push(list[round]);
+      if (picked.length >= max) break;
+    }
+    if (!any) break;
+  }
+  return picked.map((sp, i) => ({ ...sp, oldId: PARKING_OLD_ID_BASE + i }));
+}
+
 export function buildParkingSpots(terrainData, squareSize, carriageways = [], { crosswalkZones = [], leftHandTraffic = false } = {}) {
   const toXY = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
   const feats = terrainData.osmFeatures || [];
@@ -10054,7 +10089,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     filename: 'city.sites.json',
     locations: {},
     name: 'city.sites.json',
-    parkingSpots,
+    parkingSpots: sampleSiteSpots(parkingSpots),
     zones: roadNameZones,
   }));
 
