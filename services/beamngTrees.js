@@ -73,6 +73,35 @@ export function coniferShare(lat, lon) {
   return 0.6;
 }
 
+/**
+ * Summer-dry (Mediterranean-type) coasts, where scrub is chaparral / maquis:
+ * California's coast, the Mediterranean, central Chile, the Cape and south /
+ * south-west Australia.
+ */
+export function summerDry(lat, lon) {
+  // California west of the deserts: the south coast (LA, San Diego, Santa
+  // Barbara), the central coast and Bay Area, the Sacramento Valley foothills
+  if (lat > 32 && lat < 36.5 && lon < -117 && lon > -121) return true;
+  if (lat > 34 && lat < 42 && lon < -121 && lon > -125) return true;
+  if (lat >= 36.5 && lat < 40.5 && lon < -120.5 && lon > -122) return true;
+  if (lat > 30 && lat < 45 && lon > -10 && lon < 40) return true;              // Mediterranean basin
+  if (lat < -30 && lat > -38 && lon > -74 && lon < -70) return true;           // central Chile
+  if (lat < -32 && lat > -35 && lon > 17 && lon < 24) return true;             // Western Cape
+  if (lat < -30 && lat > -39 && ((lon > 114 && lon < 120) || (lon > 135 && lon < 146))) return true;   // SW / S Australia
+  return false;
+}
+
+/**
+ * The plants under the trees of a wood here ('fern' | 'tropical_understory'),
+ * or null where its floor is grass or bare (the dry West, summer-dry coasts).
+ */
+export function understoryGroup(lat, lon) {
+  const c = treeClimate(lat, lon);
+  if (c.dryWest || c.hotDesert || summerDry(lat, lon)) return null;
+  if (c.tropics) return 'tropical_understory';
+  return 'fern';
+}
+
 // ── What OSM says about a tree ───────────────────────────────────────────────
 
 export function treeHintFromTags(tags = {}) {
@@ -109,7 +138,10 @@ export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = fa
   const c = treeClimate(lat, lon);
   const u = hash01(seed, 'group');
   if (kind === 'shrub') {
-    return c.dryWest || (!northAmerica(lat, lon) && Math.abs(lat) < 42 && c.hotDesert) ? 'desert_shrub' : 'shrub';
+    if (summerDry(lat, lon)) return 'shrub_west';
+    if (c.dryWest || (!northAmerica(lat, lon) && Math.abs(lat) < 42 && c.hotDesert)) return 'desert_shrub';
+    if (c.tropics) return 'tropical_understory';
+    return 'shrub';
   }
   const hint = treeHintFromTags(tags);
   let g;

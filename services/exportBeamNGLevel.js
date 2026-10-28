@@ -12,7 +12,7 @@ import { placeBollards } from './bollards.js';
 import { planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
-import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight } from './beamngTrees.js';
+import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
@@ -8140,7 +8140,11 @@ const CANOPY_CLASS = GROUND_CLASSES.indexOf('trees');
 const CANOPY_MIN_M2 = 12;          // smaller: noise the majority filter left
 const CANOPY_SINGLE_M2 = 160;      // up to here, one crown (or two touching)
 const CANOPY_TREES_PER_M2 = 0.0036;
-const CANOPY_MAPPED_TREE_M = 5;    // a mapped tree this close is that crown
+const CANOPY_MAPPED_TREE_M = 5;
+// Plants under the trees of a wood or a large canopy stand (ferns; broad
+// leaves in the tropics; none on dry floors): per m², and the least stand.
+const UNDERSTORY_PER_M2 = 0.012;
+const UNDERSTORY_MIN_STAND_M2 = 1500;    // a mapped tree this close is that crown
 
 // Cells of a north-up w×h grid over bounds inside any of the rings (holes cut out).
 function rasterizeAreas(areas, w, h, bounds) {
@@ -8410,6 +8414,19 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
             placement.scale = roundTo(choice.scale, 6);
             pushPlacement(placement);
           });
+          // the wood's floor: ferns, or broad leaves in the tropics (not
+          // under an orchard's mown rows)
+          const floor = isOrchard ? null : understoryGroup(centre.lat, centre.lng);
+          if (floor) {
+            sampleAreaPlacements(feature, terrainData, squareSize, 'area_bush', UNDERSTORY_PER_M2 * bushDensityMultiplier,
+              BEAMNG_MAX_PLACEMENTS_PER_AREA, 1, 1, hashString(`${feature.id}:floor`)).forEach((placement, idx) => {
+              const choice = chooseTreeItem(floor, { lat: centre.lat, lon: centre.lng, seed: `${feature.id}:f${idx}` });
+              if (!choice) return;
+              placement.type = choice.type;
+              placement.scale = roundTo(choice.scale, 6);
+              pushPlacement(placement);
+            });
+          }
         }
         if (isBushArea) {
           const placements = sampleAreaPlacements(
@@ -8488,6 +8505,23 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
           spots.push([x + seededRandom(seed + k * 3.7), y + seededRandom(seed + k * 5.3)]);
         }
         const urban = isUrbanPlace({ id: `canopy:${pi}`, geometry: [{ lat: north - patch.cy * cellLat, lng: west + patch.cx * cellLng }] });
+      // a stand's floor (not a yard's lone tree or a town's street trees)
+      const floor = areaM2 >= UNDERSTORY_MIN_STAND_M2 && !urban ? understoryGroup(north - patch.cy * cellLat, west + patch.cx * cellLng) : null;
+      if (floor) {
+        const n = Math.round(areaM2 * UNDERSTORY_PER_M2 * bushDensityMultiplier);
+        for (let k = 0; k < n; k++) {
+          const i = patch.cells[Math.floor(seededRandom(seed + 9000 + k * 7.77) * patch.cells.length)];
+          const gx = (i % w) + seededRandom(seed + 9000 + k * 3.1); const gy = Math.floor(i / w) + seededRandom(seed + 9000 + k * 5.9);
+          const point = { lat: north - gy * cellLat, lng: west + gx * cellLng };
+          const [x, y] = geoToWorldPoint(point.lat, point.lng, terrainData, squareSize, 0);
+          if (inBuildingOrWater(x, y)) continue;
+          const choice = chooseTreeItem(floor, { lat: point.lat, lon: point.lng, seed: `canopy:${pi}:f${k}` });
+          if (!choice) continue;
+          const placement = makeForestPlacement(choice.type, point, terrainData, squareSize, seed + 9000 + k, 1, 1);
+          placement.scale = roundTo(choice.scale, 6);
+          pushPlacement(placement);
+        }
+      }
         spots.forEach(([gx, gy], k) => {
           const point = { lat: north - gy * cellLat, lng: west + gx * cellLng };
           const [x, y] = geoToWorldPoint(point.lat, point.lng, terrainData, squareSize, 0);

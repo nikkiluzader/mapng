@@ -98,3 +98,24 @@ test('tree shapes link their shipped imposters beside the mirrored copy', async 
   assert.equal(links[`${base}.imposter.dds.link`], '/levels/west_coast_usa/art/shapes/trees/trees_palm/fanpalm_tall.dae.imposter.dds');
   assert.ok(links[`${base}.imposter_normals.dds.link`] && links[`${base}.asset.json.link`]);
 });
+
+test('bushes and woods floors follow the climate', async () => {
+  const { chooseTreeGroup: group, understoryGroup } = await import('../services/beamngTrees.js');
+  const shrub = (lat, lon) => group({ kind: 'shrub', lat, lon, seed: 's' });
+  assert.equal(shrub(33.45, -112.07), 'desert_shrub', 'Phoenix');
+  assert.equal(shrub(34.05, -118.25), 'shrub_west', 'Los Angeles chaparral');
+  assert.equal(shrub(43.3, 5.4), 'shrub_west', 'Marseille maquis');
+  assert.equal(shrub(1.35, 103.8), 'tropical_understory', 'Singapore');
+  assert.equal(shrub(51.5, -0.1), 'shrub', 'London');
+  assert.equal(understoryGroup(42.4, -71.1), 'fern', 'Massachusetts woods');
+  assert.equal(understoryGroup(1.35, 103.8), 'tropical_understory');
+  assert.equal(understoryGroup(33.45, -112.07), null, 'no ferns in the desert');
+  assert.equal(understoryGroup(37.8, -122.3), null, 'summer-dry California: grass floors');
+});
+
+test('the desert side of California keeps desert bushes', async () => {
+  const { chooseTreeGroup: group } = await import('../services/beamngTrees.js');
+  assert.equal(group({ kind: 'shrub', lat: 33.83, lon: -116.55, seed: 's' }), 'desert_shrub', 'Palm Springs');
+  assert.equal(group({ kind: 'shrub', lat: 39.53, lon: -119.81, seed: 's' }), 'desert_shrub', 'Reno');
+  assert.equal(group({ kind: 'shrub', lat: 36.17, lon: -115.14, seed: 's' }), 'desert_shrub', 'Las Vegas');
+});

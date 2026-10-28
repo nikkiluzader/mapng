@@ -49,6 +49,9 @@ UT = "/levels/Utah/art/shapes/"
 JV = "/levels/johnson_valley/art/shapes/"
 JRI = "/levels/jungle_rock_island/art/shapes/"
 IT = "/levels/italy/art/shapes/"
+SI = "/levels/small_island/art/shapes/"
+DT = "/levels/driver_training/art/shapes/"
+ATT = "/levels/automation_test_track/art/shapes/"
 
 # group -> [(shape path without .dae, measured height m)]
 GROUPS = {
@@ -75,6 +78,34 @@ GROUPS = {
         (ECA + "trees/trees_douglasfir/tree_douglasfir_bush_a", 2.7), (ECA + "trees/trees_oak/tree_oak_bush_c", 3.1),
         (ECA + "trees/trees_beech/tree_beech_bush_b", 3.3), (ECA + "trees/trees_beech/tree_beech_bush_c", 3.9),
         (ECA + "trees/trees_oak/tree_oak_bush_b", 4.1),
+        # (heights of the additions measured in game from TSStatic world boxes, 2026-10-28)
+        (ECA + "trees/trees_beech/tree_beech_bush_a", 1.2), (ECA + "trees/trees_oak/tree_oak_bush_a", 1.3),
+        (ECA + "trees/ECA_coast_bush/generibush_small", 2.1), (ECA + "trees/trees_douglasfir/tree_douglasfir_bush_b", 2.1),
+        (ECA + "trees/trees_aspen/tree_aspen_bush_b", 2.5), (ECA + "trees/trees_aspen/tree_aspen_bush_c", 3.3),
+    ],
+    # West Coast chaparral and Mediterranean scrub (California coast, the
+    # Mediterranean, other summer-dry coasts): wide, low, grey-green bushes
+    "shrub_west": [
+        (SI + "trees/trees_italy/fluffy_bush", 2.8), (SI + "trees/trees_italy/cork_oak_bush_medium", 3.0),
+        (WCA + "trees/trees_shrub/shrub_e", 3.2), (WCA + "trees/trees_shrub/shrub_f", 3.2),
+        (WCA + "trees/trees_shrub/shrub_a", 3.6), (WCA + "trees/trees_shrub/shrub_d", 3.8),
+        (SI + "trees/trees_italy/scraggly_bush", 3.8), (WCA + "trees/trees_shrub/shrub_c", 4.0),
+        (WCA + "trees/trees_shrub/shrub_b", 4.2), (WCA + "trees/trees_shrub/shrub_g", 5.0),
+        (SI + "trees/trees_italy/maritime_pine_bush", 5.1),
+    ],
+    # forest floor of temperate woods
+    "fern": [
+        (ECA + "groundcover/lush_ferns_01_a", 1.0), (DT + "groundcover/lush_ferns_02_a", 1.1),
+        (DT + "groundcover/lush_ferns_01_b", 1.5), (DT + "groundcover/lush_ferns_02_b", 1.5),
+    ],
+    # broad-leaved plants under tropical trees
+    "tropical_understory": [
+        (JRI + "trees/tropical_wide_leaves/tropical_plant_02_a", 2.8),
+        (JRI + "trees/tropical_wide_leaves/tropical_plant_03_a", 3.3),
+        (JRI + "trees/tropical_wide_leaves/tropical_plant_01_b", 3.6),
+        (JRI + "trees/bush_tropical_1/tro_bush_small", 3.9), (JRI + "trees/bush_tropical_2/tro_bush_2_tiny", 5.2),
+        (JRI + "trees/tropical_wide_leaves/tropical_plant_01_a", 6.0),
+        (JRI + "trees/tropical_wide_leaves/tropical_plant_03_c", 6.2),
     ],
     "pine_west": [
         (WCA + "trees/trees_conifer/pine_radiata_small", 8.6), (WCA + "trees/trees_conifer/pine_radiata_forest", 13.3),
@@ -109,6 +140,9 @@ GROUPS = {
         (UT + "groundcover/s_gc_utah_grey_bush_03", 1.0), (JV + "groundcover/s_gc_jv_dry_bush_03", 1.0),
         (UT + "trees/Juniper/Juniper_bush_small_01", 1.2), (UT + "trees/Juniper/Juniper_bush_small_dry_01", 2.0),
         (UT + "trees/Juniper/Juniper_bush_medium_01", 2.4), (JV + "trees/deserttrees/deserttree_bush_medium", 2.9),
+        (UT + "trees/Juniper/Juniper_bush_small_02", 2.1), (UT + "trees/Juniper/Juniper_bush_small_dry_02", 2.2),
+        (UT + "trees/Juniper/Juniper_bush_small_dry_03", 2.9), (UT + "trees/Juniper/Juniper_bush_large_dry_01", 2.6),
+        (UT + "trees/Juniper/Juniper_bush_large_dry_02", 2.9), (JV + "trees/deserttrees/deserttree_bush_medium_dead", 2.5),
     ],
     "tropical": [
         (JRI + "trees/bush_tropical_1/tro_bush_huge", 5.5), (JRI + "trees/bush_tropical_2/tro_bush_2_small", 6.1),
