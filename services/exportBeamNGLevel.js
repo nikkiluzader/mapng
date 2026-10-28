@@ -7797,6 +7797,121 @@ function buildClearanceIndex(strips) {
  *
  * Returns Map<managedForestType, placement[]>.
  */
+// Parking spaces (city.sites.json parkingSpots: BeamNG's parked traffic,
+// missions and garages park in them; the exports had none). A row of bays
+// each side of every parking aisle, square to it, inside its lot's outline,
+// clear of buildings, roads and other aisles.
+const PARKING_BAY_W = 2.5;
+const PARKING_BAY_L = 5.5;
+const PARKING_AISLE_HALF = 3;
+const PARKING_END_CLEAR_M = 2;
+const PARKING_OLD_ID_BASE = 100000;
+
+export function buildParkingSpots(terrainData, squareSize, carriageways = []) {
+  const toXY = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
+  const feats = terrainData.osmFeatures || [];
+  const aisles = feats.filter((f) => f?.type === 'road' && f.tags?.highway === 'service' && f.tags?.service === 'parking_aisle' && f.geometry?.length >= 2)
+    .map((f) => ({ id: f.id, xy: f.geometry.map(toXY), half: (Number.parseFloat(f.tags.width) / 2) || PARKING_AISLE_HALF }));
+  if (!aisles.length) return [];
+  const ringOf = (f) => f.geometry.map(toXY);
+  const lots = feats.filter((f) => f?.tags?.amenity === 'parking' && f.geometry?.length >= 3 && !['multi-storey', 'underground', 'rooftop'].includes(f.tags.parking)).map(ringOf);
+  const buildings = feats.filter((f) => f?.type === 'building' && f.geometry?.length >= 3).map(ringOf);
+  const inRing = (x, y, ring) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+      if (((yi > y) !== (yj > y)) && x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-12) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  const distToLine = (xy, x, y) => {
+    let best = Infinity;
+    for (let i = 0; i + 1 < xy.length; i++) {
+      const vx = xy[i + 1][0] - xy[i][0]; const vy = xy[i + 1][1] - xy[i][1];
+      const L2 = vx * vx + vy * vy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((x - xy[i][0]) * vx + (y - xy[i][1]) * vy) / L2));
+      best = Math.min(best, Math.hypot(xy[i][0] + vx * t - x, xy[i][1] + vy * t - y));
+    }
+    return best;
+  };
+  const roads = carriageways.filter((cw) => !cw.bridge && !cw.tunnel).map((cw) => ({ xy: cw.nodes, half: cw.half }));
+  // everything bucketed by 32 m cells (a city's thousands of bays checked
+  // against its thousands of buildings took a minute unindexed)
+  const CELL = 32;
+  const grid = (items, boxOf) => {
+    const g = new Map();
+    for (const it of items) {
+      const [x0, y0, x1, y1] = boxOf(it);
+      for (let cx = Math.floor(x0 / CELL); cx <= Math.floor(x1 / CELL); cx++) {
+        for (let cy = Math.floor(y0 / CELL); cy <= Math.floor(y1 / CELL); cy++) {
+          const k = `${cx},${cy}`;
+          if (!g.has(k)) g.set(k, []);
+          g.get(k).push(it);
+        }
+      }
+    }
+    return (x, y) => g.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || [];
+  };
+  const boxOfXY = (xy, pad) => [Math.min(...xy.map((p) => p[0])) - pad, Math.min(...xy.map((p) => p[1])) - pad, Math.max(...xy.map((p) => p[0])) + pad, Math.max(...xy.map((p) => p[1])) + pad];
+  // (lines split into their segments, so a long road is only near its own cells)
+  const segments = (lines) => lines.flatMap((l) => l.xy.slice(0, -1).map((p, i) => ({ xy: [p, l.xy[i + 1]], half: l.half, line: l })));
+  const buildingsAt = grid(buildings, (ring) => boxOfXY(ring, 1));
+  const roadsAt = grid(segments(roads), (sg) => boxOfXY(sg.xy, sg.half + PARKING_BAY_L));
+  const aislesAt = grid(segments(aisles), (sg) => boxOfXY(sg.xy, sg.half + PARKING_BAY_L));
+  const spotGrid = new Map();
+  const spots = [];
+  for (const aisle of aisles) {
+    // the lot this aisle runs in (its bays stay inside it), if it is mapped
+    const lot = lots.find((ring) => aisle.xy.some(([x, y]) => inRing(x, y, ring)));
+    for (let i = 0; i + 1 < aisle.xy.length; i++) {
+      const [ax, ay] = aisle.xy[i]; const [bx, by] = aisle.xy[i + 1];
+      const L = Math.hypot(bx - ax, by - ay);
+      if (L < PARKING_BAY_W + 2 * PARKING_END_CLEAR_M) continue;
+      const ux = (bx - ax) / L; const uy = (by - ay) / L;
+      const n = Math.floor((L - 2 * PARKING_END_CLEAR_M) / PARKING_BAY_W);
+      const start = (L - n * PARKING_BAY_W) / 2 + PARKING_BAY_W / 2;
+      for (const side of [1, -1]) {
+        // the bay's depth runs away from the aisle: its local Y (scl [w, l, h])
+        const dx = -uy * side; const dy = ux * side;
+        const off = aisle.half + PARKING_BAY_L / 2;
+        const yaw = Math.atan2(-dx, dy);
+        for (let k = 0; k < n; k++) {
+          const s = start + k * PARKING_BAY_W;
+          const x = ax + ux * s + dx * off; const y = ay + uy * s + dy * off;
+          // the bay's corners
+          const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [x + ux * a * PARKING_BAY_W / 2 + dx * b * PARKING_BAY_L / 2, y + uy * a * PARKING_BAY_W / 2 + dy * b * PARKING_BAY_L / 2]);
+          if (lot && !corners.every(([cx, cy]) => inRing(cx, cy, lot))) continue;
+          if (buildingsAt(x, y).some((ring) => corners.some(([cx, cy]) => inRing(cx, cy, ring)) || inRing(x, y, ring))) continue;
+          if (roadsAt(x, y).some((sg) => distToLine(sg.xy, x, y) < sg.half + PARKING_BAY_L / 2)) continue;
+          if (aislesAt(x, y).some((sg) => sg.line !== aisle && distToLine(sg.xy, x, y) < sg.half + PARKING_BAY_L / 2 - 0.3)) continue;
+          const sk = `${Math.floor(x / 4)},${Math.floor(y / 4)}`;
+          let near = false;
+          for (let ox = -1; ox <= 1 && !near; ox++) for (let oy = -1; oy <= 1 && !near; oy++) {
+            near = (spotGrid.get(`${Math.floor(x / 4) + ox},${Math.floor(y / 4) + oy}`) || []).some((sp) => Math.hypot(sp[0] - x, sp[1] - y) < PARKING_BAY_W * 0.9);
+          }
+          if (near) continue;
+          if (!spotGrid.has(sk)) spotGrid.set(sk, []);
+          spotGrid.get(sk).push([x, y]);
+          const z = getTerrainHeightAtWorldXY(x, y, terrainData, squareSize);
+          spots.push({
+            name: `parking_${aisle.id}_${i}_${side > 0 ? 'l' : 'r'}${k + 1}`,
+            pos: [roundTo(x, 3), roundTo(y, 3), roundTo(z, 3)],
+            rot: [0, 0, roundTo(Math.sin(yaw / 2), 6), roundTo(Math.cos(yaw / 2), 6)],
+            scl: [PARKING_BAY_W, PARKING_BAY_L, 3],
+            color: [1, 1, 1],
+            customFields: { names: {}, tags: {}, types: {}, values: {} },
+            isMultiSpot: false,
+            // the Sites loader keys its id map by oldId (missing, the level
+            // load stopped in sortedList.lua); past the zones' ids
+            oldId: PARKING_OLD_ID_BASE + spots.length,
+          });
+        }
+      }
+    }
+  }
+  return spots;
+}
+
 // Scattered trees per m² over open, tended or lived-in land (BeamNG's own
 // towns stand in trees; ours only had the ones OSM maps one by one).
 const SCATTER_TREES = {
@@ -9398,13 +9513,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // Editor), with a zone along every named road: the minimap's label names
   // the road being driven (services/roadNameZones.js).
   const roadNameZones = buildRoadNameZones(decalRoads.carriageways || []);
+  const parkingSpots = buildParkingSpots(exportTerrainData, squareSize, decalRoads.carriageways || []);
   zip.file(`${base}/city.sites.json`, JSON.stringify({
     description: 'Description of these Sites. Contains Locations and Zones.',
     dir: `/levels/${levelName}/`,
     filename: 'city.sites.json',
     locations: {},
     name: 'city.sites.json',
-    parkingSpots: [],
+    parkingSpots,
     zones: roadNameZones,
   }));
 
