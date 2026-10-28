@@ -796,12 +796,49 @@ export function deckEdges(deck) {
   return edges;
 }
 
+const MEDIAN_MAX_M = 6;          // carriageways closer than this (edge to edge) share one slab
+const MEDIAN_PARALLEL_COS = 0.9;
+
+/**
+ * Per point of part `pi`, the median (m, edge to edge) to a parallel part
+ * at its height beside each edge, or 0: { left: [], right: [] }.
+ */
+function medianAcross(deck, pi, xy, z, nrm, hl, hr, neighbours) {
+  const others = [...deck.parts.filter((q, qi) => qi !== pi), ...neighbours].filter((q) => q.xy.length >= 2);
+  const out = { left: xy.map(() => 0), right: xy.map(() => 0) };
+  xy.forEach((p, k) => {
+    const a = xy[Math.max(0, k - 1)]; const b = xy[Math.min(xy.length - 1, k + 1)];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const tx = (b[0] - a[0]) / L; const ty = (b[1] - a[1]) / L;
+    for (const [side, h, list] of [[1, hl[k], out.left], [-1, hr[k], out.right]]) {
+      const ex = p[0] + nrm[k][0] * side * h; const ey = p[1] + nrm[k][1] * side * h;
+      for (const q of others) {
+        for (let i = 0; i + 1 < q.xy.length; i++) {
+          const vx = q.xy[i + 1][0] - q.xy[i][0]; const vy = q.xy[i + 1][1] - q.xy[i][1];
+          const L2 = vx * vx + vy * vy || 1e-9;
+          const raw = ((ex - q.xy[i][0]) * vx + (ey - q.xy[i][1]) * vy) / L2;
+          if (raw < 0 || raw > 1) continue;
+          const qx = q.xy[i][0] + vx * raw; const qy = q.xy[i][1] + vy * raw;
+          const gap = Math.hypot(qx - ex, qy - ey) - q.half;
+          if (gap <= 0.05 || gap > MEDIAN_MAX_M) continue;
+          // beyond this edge (not across the part), parallel, at its height
+          if (((qx - p[0]) * nrm[k][0] + (qy - p[1]) * nrm[k][1]) * side <= h) continue;
+          if (Math.abs((tx * vx + ty * vy) / Math.sqrt(L2)) < MEDIAN_PARALLEL_COS) continue;
+          if (Math.abs(q.z[i] + (q.z[i + 1] - q.z[i]) * raw - z[k]) > 1) continue;
+          list[k] = list[k] > 0 ? Math.min(list[k], gap) : gap;
+        }
+      }
+    }
+  });
+  return out;
+}
+
 /**
  * The concrete of one solved deck as triangle soup: { positions, uvs }
  * (world space): slab with girders under it, a parapet along each edge,
  * piers.
  */
-export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: allNeighbours = [] } = {}) {
+export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads: allGroundRoads = [], neighbours: allNeighbours = [] } = {}) {
   const b = new Builder();
   // the slab's top apart: the one surface the road decals may clip onto
   // (projected over the parapets and sides they smeared down them)
@@ -810,6 +847,9 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: 
   const box = [Infinity, Infinity, -Infinity, -Infinity];
   for (const p of deck.parts) for (const [x, y] of p.xy) { box[0] = Math.min(box[0], x); box[1] = Math.min(box[1], y); box[2] = Math.max(box[2], x); box[3] = Math.max(box[3], y); }
   const neighbours = allNeighbours.filter((q) => q.xy.some(([x, y]) => x > box[0] - 40 && x < box[2] + 40 && y > box[1] - 40 && y < box[3] + 40));
+  // ground roads there (a street climbing onto the deck runs on the ground
+  // right up to it, at its height)
+  const groundRoads = allGroundRoads.filter((q) => q.xy.some(([x, y]) => x > box[0] - 20 && x < box[2] + 20 && y > box[1] - 20 && y < box[3] + 20));
   // part ends by joint: one end is the deck's end (an end cap), two a plain
   // join (mitred flush, no cap), more a fork (no cap)
   const key = (p) => `${Math.round(p[0] / JOIN_M)},${Math.round(p[1] / JOIN_M)}`;
@@ -852,13 +892,19 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: 
       const len = Math.hypot(after[0] - before[0], after[1] - before[1]) || 1;
       nrm[k] = [-(after[1] - before[1]) / len, (after[0] - before[0]) / len];
     }
+    // A divided road's carriageways side by side on the deck, a median apart
+    // (OSM maps each as its own way): one slab across, no parapets facing
+    // each other in the middle of the road (Deck Park's 7th Street).
+    const median = medianAcross(deck, pi, xy, z, nrm, hl, hr, neighbours);
+    const hlM = hl.map((h, k) => (median.left[k] > 0 ? h + median.left[k] / 2 - PARAPET_W_M + 0.05 : h));
+    const hrM = hr.map((h, k) => (median.right[k] > 0 ? h + median.right[k] / 2 - PARAPET_W_M + 0.05 : h));
     // offsets: metres left of the centreline, or a function of the point
     const at = (k, off, dz) => {
       const o = typeof off === 'function' ? off(k) : off;
       return [xy[k][0] + nrm[k][0] * o, xy[k][1] + nrm[k][1] * o, z[k] + dz];
     };
     const row = (off, dz) => xy.map((_, k) => at(k, off, dz));
-    const outL = (k) => hl[k] + PARAPET_W_M; const outR = (k) => -(hr[k] + PARAPET_W_M);
+    const outL = (k) => hlM[k] + PARAPET_W_M; const outR = (k) => -(hrM[k] + PARAPET_W_M);
     // where an edge stands on another part of this deck (or of a neighbouring
     // deck: two bridges' ramps forking apart) at about its height (a fork's
     // branches overlapping, a crossroads' corners): no parapet, no side
@@ -869,18 +915,23 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: 
       const n = nearestInterior(q, x, y);
       return !!n && n.d < q.half + PARAPET_W_M - 0.05 && Math.abs(n.z - zk) < 2;
     };
+    const onGroundRoad = (q, x, y, zk) => {
+      const n = nearestInterior(q, x, y);
+      return !!n && n.d < q.half - 0.3 && Math.abs(n.z - zk) < 1;
+    };
     const hiddenAt = (x, y, zk) => deck.parts.some((q, qi) => qi !== pi && onPart(q, x, y, zk))
-      || neighbours.some((q) => onPart(q, x, y, zk));
+      || neighbours.some((q) => onPart(q, x, y, zk))
+      || groundRoads.some((q) => onGroundRoad(q, x, y, zk));
     // each side's visible stretches: [i, t0, t1] of segment i (from point i
     // to i + 1), the edge between hidden and shown found along the segment
     // (points are metres apart: a parapet cut at the nearer point runs on
     // across a crossroads' corner)
-    const visible = (off) => {
+    const visible = (off, med) => {
       const pt = (i, t) => {
         const a = at(i, off, 0); const c = at(i + 1, off, 0);
         return [a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, a[2] + (c[2] - a[2]) * t];
       };
-      const hid = xy.map((_, k) => (k + 1 < xy.length ? hiddenAt(...pt(k, 0)) : hiddenAt(...pt(k - 1, 1))));
+      const hid = xy.map((_, k) => med[k] > 0 || (k + 1 < xy.length ? hiddenAt(...pt(k, 0)) : hiddenAt(...pt(k - 1, 1))));
       const out = [];
       for (let i = 0; i + 1 < xy.length; i++) {
         if (!hid[i] && !hid[i + 1]) { out.push([i, 0, 1]); continue; }
@@ -894,8 +945,8 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], neighbours: 
       }
       return out;
     };
-    const sides = [{ inner: (k) => hl[k], outer: outL, faceOut: (k) => [nrm[k][0], nrm[k][1], 0] }, { inner: (k) => -hr[k], outer: outR, faceOut: (k) => [-nrm[k][0], -nrm[k][1], 0] }]
-      .map((side) => ({ ...side, shown: visible(side.inner) }));
+    const sides = [{ inner: (k) => hlM[k], outer: outL, faceOut: (k) => [nrm[k][0], nrm[k][1], 0], med: median.left }, { inner: (k) => -hrM[k], outer: outR, faceOut: (k) => [-nrm[k][0], -nrm[k][1], 0], med: median.right }]
+      .map((side) => ({ ...side, shown: visible(side.inner, side.med) }));
     // strips between point rows A and B over the stretches [i, t0, t1]
     const lerp3 = (p, q, t) => [p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t];
     const runs = (A, B, stretches, want) => {

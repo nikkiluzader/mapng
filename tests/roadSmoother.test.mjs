@@ -377,3 +377,20 @@ test('an approach ending at the foot of its bridge gap keeps its grade to the br
   smoothRoadsInHeightmap(hm, W, H, bounds, [approach, bridge], mpp);
   for (let x = 100; x <= 148; x += 4) assert.ok(Math.abs(hm[row * W + x] - 10) < 0.3, `x=${x}: ${hm[row * W + x].toFixed(2)}`);
 });
+
+test('a step no road has (an elevated ramp the lidar took out) becomes a drivable grade', () => {
+  // flat at 0 to x = 150, then a 9 m wall up to a street level: the ramp
+  // ends on the street (no bridge tag, nothing over it in the data)
+  const mpp = 1;
+  const bounds = makeBounds(W, H, mpp);
+  const hm = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) hm[y * W + x] = x <= 150 ? 0 : 9;
+  const row = 128;
+  const node = (x) => ({ lat: latAtPy(bounds, row), lng: lngAtPx(bounds, x) });
+  const ramp = { id: 'r', type: 'road', tags: { highway: 'motorway_link' }, geometry: [node(10), node(100), node(170)] };
+  smoothRoadsInHeightmap(hm, W, H, bounds, [ramp], mpp);
+  let worst = 0;
+  for (let x = 20; x < 168; x++) worst = Math.max(worst, Math.abs(hm[row * W + x + 1] - hm[row * W + x]));
+  assert.ok(worst < 0.16, `steepest grade ${(worst * 100).toFixed(0)} %`);
+  assert.ok(hm[row * W + 165] > 8.5, 'it still reaches the street');
+});

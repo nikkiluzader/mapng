@@ -33,6 +33,14 @@ const TIE_WEIGHT = 13;
 const BRIDGE_END_TRIM_M = 20;
 const BRIDGE_END_FIT_M = 45;
 const BRIDGE_END_TOL_M = 1;
+// A step in a road's ground no road has (more than CLIFF_M between samples
+// SAMPLE_SPACING_M apart): a structure bare-earth elevation took out that OSM
+// does not tag as a bridge (Deck Park's HOV ramps climbing 9 m out of the
+// I-10 median to 3rd Street: the lidar flat to the headwall, then a wall).
+// The low side is lifted on a fill at CLIFF_GRADE from the top of the step
+// until it meets its ground; the smoothing left a hump no car could climb.
+const CLIFF_M = 3;
+const CLIFF_GRADE = 0.1;
 
 /**
  * Computes distance and projection parameter t of point (x,y) onto line segment (x1,y1)-(x2,y2)
@@ -242,6 +250,8 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
         if (bridgeNodes.has(baseKey(corridor.startKey))) holdGradeToBridge(zOrig, cumLenM, false);
         if (bridgeNodes.has(baseKey(corridor.endKey))) holdGradeToBridge(zOrig, cumLenM, true);
 
+        liftOverCliffs(zOrig, cumLenM);
+
         let zSmooth = zOrig;
         for (let pass = 0; pass < SMOOTH_PASSES; pass++) {
             zSmooth = smooth1DArray(zSmooth, windowSamples);
@@ -281,6 +291,28 @@ function holdGradeToBridge(z, cumLenM, atEnd) {
         if (dist(i) <= BRIDGE_END_TRIM_M && (z[i] === NO_DATA_VALUE || Math.abs(z[i] - (at0 + slope * dist(i))) > BRIDGE_END_TOL_M)) replace = k;
     });
     for (let k = 0; k <= replace; k++) z[order[k]] = at0 + slope * dist(order[k]);
+}
+
+/**
+ * In place: at each step of more than CLIFF_M between neighbouring samples,
+ * the low side raised to the grade CLIFF_GRADE down from the step's top,
+ * outwards until the ground stands over that grade.
+ */
+function liftOverCliffs(z, cumLenM) {
+    const n = z.length;
+    for (let i = 0; i + 1 < n; i++) {
+        if (z[i] === NO_DATA_VALUE || z[i + 1] === NO_DATA_VALUE) continue;
+        const rise = z[i + 1] - z[i];
+        if (Math.abs(rise) <= CLIFF_M) continue;
+        const top = rise > 0 ? i + 1 : i;
+        const step = rise > 0 ? -1 : 1;   // from the top down the low side
+        for (let k = top + step; k >= 0 && k < n; k += step) {
+            if (z[k] === NO_DATA_VALUE) break;
+            const want = z[top] - CLIFF_GRADE * Math.abs(cumLenM[top] - cumLenM[k]);
+            if (z[k] >= want) break;
+            z[k] = want;
+        }
+    }
 }
 
 /**

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   solveTunnel, chainTunnelParts, tunnelGroundAt, tunnelHoleAt, tunnelReach, nearestOnTunnel,
-  buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, hitsTunnel, isBoredTunnelTag, absorbBranch,
+  buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, hitsTunnel, isBoredTunnelTag, absorbBranch, fitBesideRoads,
   MAX_GRADE, LINING_M,
 } from '../services/beamngTunnels.js';
 
@@ -321,4 +321,33 @@ test('a bore close behind a cliff face gets gallery windows through it, and nowh
     assert.equal(crossing(buildTubeGeometry(t), o, d), 0, `tube wall across the window at ${q.s.toFixed(0)}`);
     assert.ok(crossing(buildTubeGeometry({ ...t, windows: [] }), o, d) > 0, 'a plain tube has its wall there');
   }
+});
+
+test('another road beside a portal: its ground left alone, the headwall and wingwalls clear of it', () => {
+  const t = spikeTunnel();
+  const p = t.line[t.iS];
+  // a ramp running alongside the cutting, its edge 2 m past the lining
+  const off = t.W + LINING_M + 2 + 3.5;
+  const ramp = { xy: [[p.x + off, p.y - 200], [p.x + off, p.y + 30]], half: 3.5 };
+  const plain = buildPortalGeometry(t, 'S').pos;
+  const reachOf = (pos) => { let m = 0; for (let i = 0; i < pos.length; i += 3) if (pos[i + 1] < p.y + 3) m = Math.max(m, pos[i] - p.x); return m; };
+  assert.ok(reachOf(plain) > off - 3.5, 'without the ramp the headwall reaches into it');
+  fitBesideRoads(t, [ramp], ridge);
+  assert.ok(reachOf(buildPortalGeometry(t, 'S').pos) <= off - 3.5 + 0.05, 'headwall and wingwall stop at its edge');
+  // its ground is not graded
+  for (let y = p.y - 60; y <= p.y; y += 5) assert.equal(tunnelGroundAt(t, p.x + off, y, ridge(p.x + off, y)), ridge(p.x + off, y));
+  // the far side keeps its full headwall
+  let left = 0;
+  for (let i = 0; i < plain.length; i += 3) left = Math.min(left, plain[i] - p.x);
+  let left2 = 0; const pos2 = buildPortalGeometry(t, 'S').pos;
+  for (let i = 0; i < pos2.length; i += 3) left2 = Math.min(left2, pos2[i] - p.x);
+  assert.ok(Math.abs(left2 - left) < 0.01, 'the other side unchanged');
+  // a street crossing over the tube still gets the cover over it (low ground
+  // there opened squares down to the box)
+  const q = t.line[t.iS + 4];
+  const street = { xy: [[q.x - 30, q.y], [q.x + 30, q.y]], half: 4 };
+  const before = tunnelGroundAt(t, q.x, q.y, q.z);
+  fitBesideRoads(t, [ramp, street], ridge);
+  assert.equal(tunnelGroundAt(t, q.x, q.y, q.z), before, 'cover over the tube under the street');
+  assert.ok(before > q.z + t.crown, 'made up over the crown');
 });

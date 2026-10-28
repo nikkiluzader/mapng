@@ -42,7 +42,7 @@ import {
 } from './beamngBridges.js';
 import {
   solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, tunnelReach,
-  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, LIGHT_SPACING_M, LINING_M, extraAt,
+  hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
 } from './beamngTunnels.js';
 import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
@@ -823,7 +823,7 @@ function getBridgeMaterialDefs() {
  * at the bridge's centre: visual mesh + a Colmesh-1 collision copy.
  * Returns [{ key, origin: [x, y, z], data, triangles }].
  */
-function generateBridgeDAEs(decks, groundAt, roadLines) {
+function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = []) {
   const out = [];
   // one Collada shape (visual mesh + a Colmesh-1 collision copy), origin-relative
   const toDae = ({ positions: pos, uvs }, origin) => {
@@ -854,7 +854,7 @@ function generateBridgeDAEs(decks, groundAt, roadLines) {
     return result?.data || null;
   };
   decks.forEach((deck, i) => {
-    const g = buildDeckGeometry(deck, { groundAt, roadLines, neighbours: decks.filter((d) => d !== deck).flatMap((d) => d.parts) });
+    const g = buildDeckGeometry(deck, { groundAt, roadLines, groundRoads, neighbours: decks.filter((d) => d !== deck).flatMap((d) => d.parts) });
     if (!g.positions.length) return;
     const pts = deck.parts.flatMap((p) => p.xy.map(([x, y], k) => [x, y, p.z[k]]));
     const origin = [
@@ -4056,6 +4056,7 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
   // right where the next bridge piece starts).
   const bridgeEnds = others.filter((o) => o.bridge || o.bridgeRoad).flatMap((o) => [o.xy[0], o.xy[o.xy.length - 1]]);
   const meetsBridge = ([x, y]) => bridgeEnds.some((q) => Math.hypot(q[0] - x, q[1] - y) < TUNNEL_TOUCH_M);
+  const absorbedSide = new Set();
   const takeSideRamps = (t) => {
     if (t.kind === 'gallery') return;
     for (const r of others) {
@@ -4068,7 +4069,7 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
         const xy = end === r.xy[0] ? r.xy : [...r.xy].reverse();
         const half = halfOf(drivableRoads[r.segIndex]);
         const res = absorbBranch(t, { xy: xy.map(([x, y]) => [x, y]), half, tunnelLength: 0 }, { groundAt });
-        if (res.ok) t.sideRamps = (t.sideRamps || 0) + 1;
+        if (res.ok) { t.sideRamps = (t.sideRamps || 0) + 1; absorbedSide.add(r); }
       }
     }
   };
@@ -4140,6 +4141,10 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
   // ramps meeting the approaches in their cuttings, now the tunnels' own
   // ramps are in
   for (const t of out.tunnels) takeSideRamps(t);
+  // the other roads beside them: their ground left alone, walls clear of them
+  const besides = others.filter((r) => !usedByApproach.has(r) && !absorbedSide.has(r) && !r.bridge && !r.bridgeRoad && !out.bySeg.has(r.segIndex))
+    .map((r) => ({ xy: r.xy, half: halfOf(drivableRoads[r.segIndex]) }));
+  for (const t of out.tunnels) if (t.kind !== 'gallery') fitBesideRoads(t, besides, groundAt);
   if (!out.tunnels.length && (early || !galleryPaths.length)) return out;
 
   // Terrain: graded into the export's copy, then the portal squares opened.
@@ -4400,12 +4405,20 @@ export function generateDecalRoads(terrainData, squareSize) {
   // metres into a tunnel's mouth, where the tube widens for it): on the
   // tube's floor there, not draped over the headwall's backfill
   const inTubeSeg = new Set();
-  const tubeAt = (x, y) => {
+  // the tube a ground road's point at (x, y) runs inside (a ramp joining in
+  // the bore), heading (dx, dy); a road crossing it runs over it instead (a
+  // street over a cut-and-cover box: North 3rd Street over Deck Park's I-10
+  // dropped 10 m into the tunnel)
+  const TUBE_ALONG_COS = 0.5;
+  const tubeAt = (x, y, dx = 0, dy = 0) => {
     for (const t of tunnels.tunnels) {
       if (t.kind === 'gallery') continue;
       const n = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + 1);
       if (!n || n.beyond || n.into < 0.3) continue;
-      if (Math.abs(n.d) - extraAt(t, t.line[n.i], Math.sign(n.d) || 1) <= t.W) return t;
+      const q = t.line[n.i];
+      const L = Math.hypot(dx, dy);
+      if (L > 1e-6 && Math.abs((dx * q.tx + dy * q.ty) / L) < TUBE_ALONG_COS) continue;
+      if (Math.abs(n.d) - extraAt(t, q, Math.sign(n.d) || 1) <= t.W) return t;
     }
     return null;
   };
@@ -4503,14 +4516,16 @@ export function generateDecalRoads(terrainData, squareSize) {
     for (let i = 0; i < clippedSegments.length; i++) {
       const segment = clippedSegments[i];
       const rawNodes = [];
-      for (const pt of segment) {
+      const segWorld = segment.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1));
+      for (let k = 0; k < segment.length; k++) {
         // geoToWorldPoint, not geoToWorld: the latter quantizes X/Y/Z to 0.1 m,
         // which at 2 m node spacing puts visible lateral jitter into the spline
         // (and its painted lines). Road nodes are mm-rounded below instead.
-        const [wx, wy, groundZ] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0.1);
+        const [wx, wy, groundZ] = segWorld[k];
+        const before = segWorld[Math.max(0, k - 1)]; const after = segWorld[Math.min(segment.length - 1, k + 1)];
         const deckPart = bridges.bySeg.get(segIndex);
         const carried = bridges.approaches?.get(segIndex);
-        const bore = tunnels.bySeg.get(segIndex) || tubeAt(wx, wy);
+        const bore = tunnels.bySeg.get(segIndex) || tubeAt(wx, wy, after[0] - before[0], after[1] - before[1]);
         if (bore && !tunnels.bySeg.has(segIndex)) inTubeSeg.add(segIndex);
         const wz = deckPart ? deckHeightAt(deckPart, wx, wy) + 0.1
           : carried && distanceToLine(carried.xy, wx, wy) < 1 ? deckHeightAt(carried, wx, wy) + 0.1
@@ -8666,6 +8681,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     bridgeDecks,
     (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
     decalRoads.bridges?.roadLines || [],
+    // the drawn ground roads (a deck's parapet standing on one at its height,
+    // where the street climbs onto the deck, is left out)
+    groundCarriageways.map((cw) => ({ xy: cw.nodes.map((nd) => [nd[0], nd[1]]), z: cw.nodes.map((nd) => nd[2]), half: cw.half })),
   );
   if (bridgeDecks.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles, one object per bridge.`);

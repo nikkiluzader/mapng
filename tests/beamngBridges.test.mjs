@@ -434,3 +434,53 @@ test('a railing along a deck over it is the deck\'s own; one crossing under it i
   assert.ok(alongDeck(decks, 50, 6.5, 0, 0), 'just outside an overpass 8 m up');
   assert.ok(!alongDeck(decks, 50, 6.5, 6, 0), 'just outside a deck 2 m up');
 });
+
+test('a divided road on one deck: one slab across the median, no parapets facing each other', () => {
+  // two carriageways along x, 5 m half widths, their edges 3 m apart (a
+  // median), on one deck at 10 m
+  const line = (y) => Array.from({ length: 31 }, (_, i) => [i * 2, y]);
+  const part = (y) => ({ xy: line(y), z: line(y).map(() => 10), half: 5 });
+  const deck = { parts: [part(6.5), part(-6.5)] };
+  const { positions } = buildDeckGeometry(deck, { groundAt: () => -50 });
+  let inMedian = 0; let topAcross = 0;
+  for (let i = 0; i < positions.length; i += 3) {
+    const [x, y, z] = [positions[i], positions[i + 1], positions[i + 2]];
+    if (x < 6 || x > 54) continue;
+    if (Math.abs(y) < 1.4 && z > 10.2) inMedian++;    // anything standing in the median
+  }
+  const top = buildDeckGeometry(deck, { groundAt: () => -50 }).top.positions;
+  for (let i = 0; i < top.length; i += 3) if (Math.abs(top[i + 1]) < 0.2) topAcross++;
+  assert.equal(inMedian, 0, 'parapet vertices in the median');
+  assert.ok(topAcross > 0, 'the slab top reaches across the median');
+  // 12 m apart (two bridges side by side, not a median): each keeps its parapets
+  const apart = { parts: [part(11), part(-11)] };
+  const p2 = buildDeckGeometry(apart, { groundAt: () => -50 }).positions;
+  let walls = 0;
+  for (let i = 0; i < p2.length; i += 3) if (Math.abs(p2[i + 1]) < 6.5 && Math.abs(p2[i + 1]) > 5.5 && p2[i + 2] > 10.5) walls++;
+  assert.ok(walls > 0, 'separate decks keep their inner parapets');
+});
+
+test("no parapet across a street where it climbs onto the deck at the deck's height", () => {
+  // a ramp deck leaving at an angle over the end of a ground street (both at
+  // 10 m there), and a road passing 7 m under the deck
+  const ramp = { xy: Array.from({ length: 21 }, (_, i) => [i * 2, i * 0.8]), z: Array.from({ length: 21 }, () => 10), half: 4 };
+  const street = { xy: Array.from({ length: 11 }, (_, i) => [-10 + i * 3, 0]), z: Array.from({ length: 11 }, () => 10), half: 6 };
+  const under = { xy: Array.from({ length: 11 }, (_, i) => [30, -15 + i * 4]), z: Array.from({ length: 11 }, () => 3), half: 4 };
+  const wallsOver = (road, groundRoads) => {
+    const { positions } = buildDeckGeometry({ parts: [ramp] }, { groundAt: () => -50, groundRoads });
+    let n = 0;
+    for (let i = 0; i < positions.length; i += 3) {
+      const [x, y, z] = [positions[i], positions[i + 1], positions[i + 2]];
+      // inside the street's lanes (it runs along y = 0 from x = -10 to 20)
+      if (x > -9 && x < 19 && Math.abs(y) < road.half - 0.6 && Math.abs(z - 10.9) < 0.05) n++;
+    }
+    return n;
+  };
+  assert.ok(wallsOver(street, []) > 0, 'without the street, the parapet runs across it');
+  assert.equal(wallsOver(street, [street, under]), 0, 'parapet tops standing on the street');
+  // the road passing under keeps the deck's parapets over it
+  const { positions } = buildDeckGeometry({ parts: [ramp] }, { groundAt: () => -50, groundRoads: [street, under] });
+  let over = 0;
+  for (let i = 0; i < positions.length; i += 3) if (Math.abs(positions[i] - 30) < 3 && Math.abs(positions[i + 2] - 10.9) < 0.05) over++;
+  assert.ok(over > 0, 'parapets over the road below stay');
+});
