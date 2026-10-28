@@ -44,6 +44,18 @@ const pbr = (dir, base, { emissive = false, metallic = false } = {}) => ({
   ...(emissive ? { emissiveMap: `${dir}/${base}_e.color.png` } : {}),
 });
 
+// a PBR set without an AO map, and an older diffuse + normal set (_d / _n)
+const pbrNoAo = (dir, base) => ({
+  baseColorMap: `${dir}/${base}_b.color.png`,
+  normalMap: `${dir}/${base}_nm.normal.png`,
+  roughnessMap: `${dir}/${base}_r.data.png`,
+});
+const legacy = (dir, base, roughness) => ({
+  baseColorMap: `${dir}/${base}_d.dds`,
+  normalMap: `${dir}/${base}_n.dds`,
+  roughnessFactor: roughness,
+});
+
 export const BUILDING_MATERIALS = {
   facade: 'mapng_bld_facade',
   shop: 'mapng_bld_shop',
@@ -58,6 +70,27 @@ export const BUILDING_MATERIALS = {
   roofSlate: 'mapng_bld_roof_slate',
   roofShingle: 'mapng_bld_roof_shingle',
   roofMetal: 'mapng_bld_roof_metal',
+  // variants (each a family's alternative, picked per building)
+  brickEca: 'mapng_bld_brick_eca',
+  brickDark: 'mapng_bld_brick_dark',
+  brickPainted: 'mapng_bld_brick_painted',
+  brickWhite: 'mapng_bld_brick_white',
+  cladding: 'mapng_bld_cladding',
+  claddingOld: 'mapng_bld_cladding_old',
+  plaster: 'mapng_bld_plaster',
+  rendered: 'mapng_bld_rendered',
+  stoneClean: 'mapng_bld_stone_clean',
+  stoneFacade: 'mapng_bld_stone_facade',
+  stoneMixed: 'mapng_bld_stone_mixed',
+  blockwall: 'mapng_bld_blockwall',
+  concrete: 'mapng_bld_concrete',
+  metalWhite: 'mapng_bld_metal_white',
+  roofRounded: 'mapng_bld_roof_rounded',
+  roofItaly: 'mapng_bld_roof_italy',
+  roofOchre: 'mapng_bld_roof_ochre',
+  roofSlateTiles: 'mapng_bld_roof_slate_tiles',
+  roofWood: 'mapng_bld_roof_wood',
+  roofTin: 'mapng_bld_roof_tin',
 };
 
 const MATERIAL_STAGES = {
@@ -81,6 +114,31 @@ const MATERIAL_STAGES = {
     roughnessFactor: 0.85,
   },
   roofMetal: pbr(`${TILE}/metal/cladding_zinc`, 't_metal_cladded_zinc', { metallic: true }),
+  brickEca: legacy(`${TILE}/brick/eca_bld_bricks`, 'eca_bld_bricks', 0.85),
+  brickDark: { baseColorMap: `${TILE}/brick/eca_bld_bricks_dark/eca_bld_bricks_dark_d.dds`, normalMap: `${TILE}/brick/eca_bld_bricks/eca_bld_bricks_n.dds`, roughnessFactor: 0.85 },
+  brickPainted: {
+    baseColorMap: `${TILE}/brick/brick_painted/t_brick_painted_b.color.png`,
+    normalMap: `${TILE}/brick/brick_painted/t_brick_plain_nm.normal.png`,
+    roughnessMap: `${TILE}/brick/brick_painted/t_brick_plain_r.data.png`,
+    ambientOcclusionMap: `${TILE}/brick/brick_painted/t_brick_plain_ao.data.png`,
+  },
+  brickWhite: pbr(`${TILE}/brick/t_brick_white_paint_01`, 't_brick_white_paint_01'),
+  cladding: legacy(`${TILE}/wood/eca_bld_woodcladding_new`, 'eca_bld_woodcladding_new', 0.8),
+  claddingOld: legacy(`${TILE}/wood/eca_bld_woodcladding_old`, 'eca_bld_woodcladding_01', 0.85),
+  plaster: pbrNoAo(`${TILE}/plaster/m_plaster_float`, 't_plaster_float'),
+  rendered: legacy(`${TILE}/plaster/eca_bld_modernwall`, 'eca_bld_modernwall', 0.8),
+  stoneClean: legacy(`${TILE}/stone/eca_bld_stone_clean`, 'eca_bld_stone_clean', 0.85),
+  stoneFacade: { baseColorMap: `${TILE}/stone/m_stone_facade/t_stone_facade_d.color.png`, normalMap: `${TILE}/stone/m_stone_facade/t_stone_facade_nm.normal.png`, roughnessFactor: 0.85 },
+  stoneMixed: pbr(`${TILE}/stone/m_stonebrick_mixed_01`, 't_stonebrick_mixed_01'),
+  blockwall: pbr(`${TILE}/brick/ind_blockwall`, 't_concrete_cinderblock_01'),
+  concrete: legacy(`${TILE}/concrete/eca_bld_concrete`, 'eca_bld_concrete', 0.9),
+  metalWhite: pbr(`${TILE}/metal/corrugated_modern`, 't_metal_corrugated_01', { metallic: true }),
+  roofRounded: pbr(`${TILE}/roofing/m_roof_slates_rounded`, 't_roof_slates_rounded'),
+  roofItaly: pbrNoAo(`${TILE}/roofing/t_italy_bld_roof_tiles`, 't_italy_bld_roof_tiles'),
+  roofOchre: pbr(`${TILE}/roofing/m_roof_slates_ochre`, 't_roof_slates_ochre'),
+  roofSlateTiles: pbrNoAo(`${TILE}/roofing/t_slate_rooftiles_01`, 't_slate_rooftiles_01'),
+  roofWood: pbr(`${TILE}/roofing/eca_bld_wood_rooftiles`, 't_eca_bld_wood_rooftiles'),
+  roofTin: pbr(`${TILE}/metal/m_si_metal_roof`, 't_si_metal_roof', { metallic: true }),
 };
 
 /** BeamNG material definitions for every name in BUILDING_MATERIALS. */
@@ -123,6 +181,11 @@ const HOUSE_BAY_M = 3.4;
 const WIN_OUT_M = 0.03;
 const FOUNDATION_M = 0.6;
 const ROOF_OVERHANG_M = 0.35;
+// A pitched roof is a slab: its underside (painted soffit boards under the
+// overhang) this far under the tiles, fascia boards round its edges. The
+// tiles alone face up only: seen from under the eaves the overhang was gone.
+const ROOF_THICK_M = 0.12;
+const SOFFIT_TINT = [0.93, 0.92, 0.9];
 const RECT_FILL = 0.85;     // footprint / oriented-box area needed for a pitched roof
 
 const bandV = (band) => {
@@ -159,23 +222,28 @@ const pickShare = (shares, r) => {
 
 // ── Regional habits (coarse boxes, after BeamNG.Earth's region_style) ────────
 
-const US_ROOFS = [['roofSlate', [0, 1, 2, 3]], ['roofShingle', [0, 1, 2, 3]]];
+const US_ROOFS = [['roofSlate', [0, 1, 2, 3]], ['roofShingle', [0, 1, 2, 3]], ['roofShingle', [4, 5, 6, 7]], ['roofSlateTiles', [1, 2]], ['roofWood', [0, 1]]];
 const CLAY = ['roofSlate', [4, 5, 6]];
+const CLAY_ROUND = ['roofRounded', [0, 1]];
+const CLAY_TILE = ['roofItaly', [0, 1]];
+const OCHRE = ['roofOchre', [0, 1]];
 const DARK = ['roofSlate', [7, 8, 9]];
+const DARK_TILE = ['roofSlateTiles', [0, 1, 2]];
+const TIN = ['roofTin', [0, 1, 2, 3]];
 const REGIONS = {
   us_east: { brick: 0.75, walls: [['siding', 0.75], ['brick', 0.25]], hipped: 0.4, roofs: US_ROOFS, pitch: 32 },
   us_south: { brick: 0.35, walls: [['siding', 0.75], ['brick', 0.25]], hipped: 0.4, roofs: US_ROOFS, pitch: 30 },
   us_plains: { brick: 0.15, walls: [['siding', 0.8], ['brick', 0.2]], hipped: 0.4, roofs: US_ROOFS, pitch: 30 },
-  us_west: { brick: 0.15, walls: [['stucco', 0.65], ['siding', 0.25], ['brick', 0.1]], hipped: 0.5, roofs: US_ROOFS, pitch: 24 },
-  alpine: { brick: 0.05, walls: [['siding', 0.45], ['stucco', 0.55]], hipped: 0.15, roofs: [DARK, ['roofSlate', [9, 5]]], pitch: 24 },
-  europe_north: { brick: 0.5, walls: [['brick', 0.45], ['stucco', 0.55]], hipped: 0.3, roofs: [CLAY, DARK], pitch: 42 },
-  nordic: { brick: 0.12, walls: [['siding', 0.65], ['stucco', 0.35]], hipped: 0.2, roofs: [DARK, CLAY], pitch: 35 },
-  mediterranean: { brick: 0.08, walls: [['stucco', 0.85], ['stone', 0.15]], hipped: 0.5, roofs: [CLAY], pitch: 22 },
-  latin_america: { brick: 0.15, walls: [['stucco', 0.8], ['brick', 0.2]], hipped: 0.3, roofs: [CLAY, ['roofMetal', [0, 1]]], pitch: 20 },
-  east_asia: { brick: 0.1, walls: [['stucco', 0.6], ['panel', 0.4]], hipped: 0.5, roofs: [DARK, ['roofMetal', [0, 4]]], pitch: 25 },
-  oceania: { brick: 0.35, walls: [['brick', 0.4], ['siding', 0.3], ['stucco', 0.3]], hipped: 0.7, roofs: [['roofMetal', [0, 1, 4]], CLAY], pitch: 24 },
-  cool: { brick: 0.3, walls: [['siding', 0.5], ['brick', 0.3], ['stucco', 0.2]], hipped: 0.3, roofs: [DARK, ['roofMetal', [0, 1]]], pitch: 35 },
-  warm: { brick: 0.15, walls: [['stucco', 0.8], ['brick', 0.2]], hipped: 0.4, roofs: [CLAY, ['roofMetal', [0, 1, 3]]], pitch: 22 },
+  us_west: { brick: 0.15, walls: [['stucco', 0.65], ['siding', 0.25], ['brick', 0.1]], hipped: 0.5, roofs: [...US_ROOFS, CLAY_ROUND, CLAY_TILE], pitch: 24 },
+  alpine: { brick: 0.05, walls: [['siding', 0.45], ['stucco', 0.55]], hipped: 0.15, roofs: [DARK, DARK_TILE, ['roofSlate', [9, 5]], ['roofWood', [0, 1]]], pitch: 24 },
+  europe_north: { brick: 0.5, walls: [['brick', 0.45], ['stucco', 0.55]], hipped: 0.3, roofs: [CLAY, CLAY_TILE, DARK, DARK_TILE], pitch: 42 },
+  nordic: { brick: 0.12, walls: [['siding', 0.65], ['stucco', 0.35]], hipped: 0.2, roofs: [DARK, DARK_TILE, CLAY, TIN], pitch: 35 },
+  mediterranean: { brick: 0.08, walls: [['stucco', 0.85], ['stone', 0.15]], hipped: 0.5, roofs: [CLAY, CLAY_ROUND, CLAY_TILE, OCHRE], pitch: 22 },
+  latin_america: { brick: 0.15, walls: [['stucco', 0.8], ['brick', 0.2]], hipped: 0.3, roofs: [CLAY, CLAY_ROUND, CLAY_TILE, ['roofMetal', [0, 1]], TIN], pitch: 20 },
+  east_asia: { brick: 0.1, walls: [['stucco', 0.6], ['panel', 0.4]], hipped: 0.5, roofs: [DARK, DARK_TILE, ['roofMetal', [0, 4]]], pitch: 25 },
+  oceania: { brick: 0.35, walls: [['brick', 0.4], ['siding', 0.3], ['stucco', 0.3]], hipped: 0.7, roofs: [['roofMetal', [0, 1, 4]], TIN, CLAY, CLAY_TILE], pitch: 24 },
+  cool: { brick: 0.3, walls: [['siding', 0.5], ['brick', 0.3], ['stucco', 0.2]], hipped: 0.3, roofs: [DARK, DARK_TILE, ['roofMetal', [0, 1]], TIN], pitch: 35 },
+  warm: { brick: 0.15, walls: [['stucco', 0.8], ['brick', 0.2]], hipped: 0.4, roofs: [CLAY, CLAY_ROUND, OCHRE, ['roofMetal', [0, 1, 3]], TIN], pitch: 22 },
 };
 
 export function regionStyle(lat, lon) {
@@ -208,11 +276,43 @@ const WALL_TINTS = {
   shop: [[1, 1, 1]],
   office: [[1, 1, 1]],
 };
+// Each family's alternatives (a building picks one: the same family, a
+// different texture), with their shares
+const WALL_VARIANTS = {
+  siding: [['siding', 0.45], ['cladding', 0.35], ['claddingOld', 0.2]],
+  brick: [['brick', 0.3], ['brickEca', 0.3], ['brickDark', 0.15], ['brickPainted', 0.15], ['brickWhite', 0.1]],
+  stucco: [['stucco', 0.45], ['plaster', 0.3], ['rendered', 0.25]],
+  stone: [['stone', 0.35], ['stoneClean', 0.25], ['stoneFacade', 0.2], ['stoneMixed', 0.2]],
+  panel: [['panel', 0.45], ['blockwall', 0.3], ['concrete', 0.25]],
+  metalwall: [['metalwall', 0.55], ['metalWhite', 0.45]],
+};
+Object.assign(WALL_TINTS, {
+  cladding: WALL_TINTS.siding,
+  claddingOld: [[1, 1, 1], [0.92, 0.88, 0.8], [0.85, 0.8, 0.74]],
+  brickEca: [[1, 1, 1], [0.92, 0.88, 0.84], [1, 0.95, 0.88]],
+  brickDark: [[1, 1, 1], [0.92, 0.9, 0.88]],
+  brickPainted: [[1, 1, 1], [0.95, 0.9, 0.8], [0.8, 0.85, 0.9], [0.9, 0.8, 0.72], [0.75, 0.8, 0.72], [0.62, 0.64, 0.68]],
+  brickWhite: [[1, 1, 1], [0.96, 0.94, 0.9]],
+  plaster: WALL_TINTS.stucco,
+  rendered: [...WALL_TINTS.stucco, [0.85, 0.86, 0.88], [0.78, 0.8, 0.82]],
+  stoneClean: [[1, 1, 1], [0.95, 0.92, 0.86]],
+  stoneFacade: [[1, 1, 1], [0.95, 0.92, 0.86]],
+  stoneMixed: [[1, 1, 1], [0.92, 0.9, 0.86]],
+  blockwall: [[1, 1, 1], [0.95, 0.93, 0.88], [0.85, 0.85, 0.85], [0.9, 0.86, 0.78]],
+  concrete: [[1, 1, 1], [0.9, 0.9, 0.9]],
+  metalWhite: WALL_TINTS.metalwall,
+});
 const ROOF_TINTS = {
   roofFlat: [[0.85, 0.85, 0.85], [0.62, 0.62, 0.64], [0.95, 0.93, 0.88], [0.45, 0.45, 0.46], [0.75, 0.7, 0.64]],
   roofSlate: [[1, 1, 1], [0.8, 0.66, 0.56], [0.76, 0.8, 0.9], [0.62, 0.62, 0.62], [0.95, 0.52, 0.36], [0.78, 0.4, 0.3], [1, 0.66, 0.46], [0.42, 0.43, 0.46], [0.3, 0.31, 0.33], [0.48, 0.38, 0.32]],
   roofShingle: [[0.75, 0.72, 0.7], [0.55, 0.5, 0.48], [0.7, 0.56, 0.48], [0.62, 0.66, 0.72], [0.95, 0.52, 0.36], [0.78, 0.4, 0.3], [0.42, 0.43, 0.46], [0.36, 0.42, 0.52]],
   roofMetal: [[0.85, 0.86, 0.88], [0.55, 0.57, 0.6], [0.45, 0.58, 0.48], [0.62, 0.3, 0.26], [0.4, 0.42, 0.48]],
+  roofRounded: [[1, 1, 1], [0.9, 0.8, 0.72]],
+  roofItaly: [[1, 1, 1], [0.92, 0.85, 0.78]],
+  roofOchre: [[1, 1, 1], [0.9, 0.85, 0.8]],
+  roofSlateTiles: [[1, 1, 1], [0.8, 0.82, 0.86], [0.65, 0.66, 0.7]],
+  roofWood: [[1, 1, 1], [0.85, 0.8, 0.75]],
+  roofTin: [[1, 1, 1], [0.75, 0.78, 0.8], [0.62, 0.3, 0.26], [0.45, 0.58, 0.48]],
 };
 const JITTER = 0.06;
 
@@ -394,6 +494,9 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill }) {
     }
   }
   const shopFloor = kind === 'block' && !office && (hasShop || SHOP_CLASSES.has(cls)) && floors >= 1;
+  // the family's texture for this building
+  const wallFamily = wall;
+  if (wall && WALL_VARIANTS[wall]) wall = pickShare(WALL_VARIANTS[wall], r('variant'));
 
   const wallKey = office ? 'office' : (band ? 'facade' : wall);
   const tagged = parseColour(tags['building:colour'] || tags['building:color'] || tags.colour);
@@ -402,7 +505,7 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill }) {
   let roofMat = 'roofFlat';
   let roofTint;
   if (roof !== 'flat') {
-    const [mat, idx] = kind === 'shed' && r('shedroof') < 0.5 ? ['roofMetal', [0, 1, 2, 3]] : pick(style.roofs, r('roofkind'));
+    const [mat, idx] = kind === 'shed' && r('shedroof') < 0.5 ? pick([['roofMetal', [0, 1, 2, 3]], TIN], r('shedroofkind')) : pick(style.roofs, r('roofkind'));
     roofMat = mat;
     roofTint = ROOF_TINTS[mat][pick(idx, r('rooftint'))];
   } else if (kind === 'industrial' && r('indroof') < 0.4) {
@@ -417,7 +520,7 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill }) {
   const jitter = 1 + JITTER * (2 * r('jit') - 1);
   const shade = (c) => c.map((v) => Math.max(0, Math.min(1, v * jitter)));
   return {
-    kind, cls, floors, floorH, eaveH, roof, pitch, wall, band, office, shopFloor,
+    kind, cls, floors, floorH, eaveH, roof, pitch, wall, wallFamily, band, office, shopFloor,
     wallTint: shade(wallTint), roofMat, roofTint: shade(roofTint),
     windows: kind === 'house',
   };
@@ -585,7 +688,9 @@ function pitchedRoof(m, box, z, plan, wallMat, wallUv) {
       const e0 = P(end * hl, -end * hw, eaveDrop); const e1 = P(end * hl, end * hw, eaveDrop); const r = P(end * rl, 0, rise);
       m.tri(mat, e0, e1, r, uvR(-hw, 0), uvR(hw, 0), uvR(0, slope), col);
     }
-  } else {
+  }
+  roofUnderside(m, P, { hl, hw, rl, rise, eaveDrop, hipped: plan.roof === 'hipped' });
+  if (plan.roof !== 'hipped') {
     // gable ends in the wall material, flush with the walls' oriented box
     const gw = box.width / 2;
     for (const end of [1, -1]) {
@@ -593,6 +698,58 @@ function pitchedRoof(m, box, z, plan, wallMat, wallUv) {
       const a = P(end * l, -end * gw, 0); const b = P(end * l, end * gw, 0); const c = P(end * l, 0, rise);
       const L = box.width;
       m.tri(wallMat, a, b, c, [0, z / wallUv], [L / wallUv, z / wallUv], [L / 2 / wallUv, (z + rise) / wallUv], plan.wallTint);
+    }
+  }
+}
+
+// A quad in the soffit material, turned to face `want` (the slab's faces
+// are built in whatever order, then turned outwards).
+function facingQuad(m, a, b, c, d, want, uvs) {
+  const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+  const [ua, ub, uc, ud] = uvs;
+  if (n[0] * want[0] + n[1] * want[1] + n[2] * want[2] >= 0) m.quad('stucco', a, b, c, d, ua, ub, uc, ud, SOFFIT_TINT);
+  else m.quad('stucco', a, d, c, b, ua, ud, uc, ub, SOFFIT_TINT);
+}
+
+/**
+ * The underside and edges of a pitched roof (P: roof frame to world; u along
+ * the ridge, v across it): every slope again ROOF_THICK_M under the tiles,
+ * facing down, and fascia boards along the eaves and up the gable edges.
+ */
+function roofUnderside(m, P, { hl, hw, rl, rise, eaveDrop, hipped }) {
+  const t = -ROOF_THICK_M;
+  const D = (u, v, h) => P(u, v, h + t);
+  const uv = (a, b) => [[0, 0], [a / SIDING_UV_M, 0], [a / SIDING_UV_M, b / SIDING_UV_M], [0, b / SIDING_UV_M]];
+  const down = [0, 0, -1];
+  const centre = P(0, 0, 0);
+  const out = (p) => [p[0] - centre[0], p[1] - centre[1], 0];
+  const slope = Math.hypot(hw, rise - eaveDrop);
+  for (const side of [1, -1]) {
+    // under the long slope
+    facingQuad(m, D(-hl, side * hw, eaveDrop), D(hl, side * hw, eaveDrop), D(rl, 0, rise), D(-rl, 0, rise), down, uv(2 * hl, slope));
+    // the eave's fascia
+    const a = P(-hl, side * hw, eaveDrop); const b = P(hl, side * hw, eaveDrop);
+    facingQuad(m, a, b, D(hl, side * hw, eaveDrop), D(-hl, side * hw, eaveDrop), out(P(0, side * hw, 0)), uv(2 * hl, ROOF_THICK_M));
+  }
+  for (const end of [1, -1]) {
+    if (hipped) {
+      // under the hip's end, its eave's fascia
+      const e0 = D(end * hl, -end * hw, eaveDrop); const e1 = D(end * hl, end * hw, eaveDrop); const r = D(end * rl, 0, rise);
+      const n = [e1[0] - e0[0], e1[1] - e0[1], e1[2] - e0[2]];
+      const v = [r[0] - e0[0], r[1] - e0[1], r[2] - e0[2]];
+      const nrm = [n[1] * v[2] - n[2] * v[1], n[2] * v[0] - n[0] * v[2], n[0] * v[1] - n[1] * v[0]];
+      if (nrm[2] > 0) m.tri('stucco', e0, r, e1, [0, 0], [0.5, 1], [1, 0], SOFFIT_TINT);
+      else m.tri('stucco', e0, e1, r, [0, 0], [1, 0], [0.5, 1], SOFFIT_TINT);
+      const a = P(end * hl, -end * hw, eaveDrop); const b = P(end * hl, end * hw, eaveDrop);
+      facingQuad(m, a, b, e1, e0, out(P(end * hl, 0, 0)), uv(2 * hw, ROOF_THICK_M));
+    } else {
+      // the gable's two rake fascias, eave to ridge
+      for (const side of [1, -1]) {
+        const a = P(end * hl, side * hw, eaveDrop); const b = P(end * hl, 0, rise);
+        facingQuad(m, a, b, D(end * hl, 0, rise), D(end * hl, side * hw, eaveDrop), out(P(end * hl, 0, 0)), uv(slope, ROOF_THICK_M));
+      }
     }
   }
 }
@@ -678,8 +835,9 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const base = zMax;
     const z0 = zMin - FOUNDATION_M;
     const eave = base + plan.eaveH;
-    const plinthMat = plan.wall && plan.wall !== 'siding' ? plan.wall : 'panel';
-    const plinthTint = plan.wall && plan.wall !== 'siding' ? plan.wallTint : [0.8, 0.8, 0.8];
+    // (no wooden plinth: concrete under wood)
+    const plinthMat = plan.wall && plan.wallFamily !== 'siding' ? plan.wall : 'panel';
+    const plinthTint = plan.wall && plan.wallFamily !== 'siding' ? plan.wallTint : [0.8, 0.8, 0.8];
 
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i]; const b = ring[(i + 1) % ring.length];

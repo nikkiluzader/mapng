@@ -35,11 +35,11 @@ test('planBuilding: classes, tags and region decide the look', () => {
   assert.equal(planBuilding({ building: 'office', 'building:levels': '30' }, opts({ area: 2000 })).office, true, 'towers are glass');
   assert.equal(planBuilding({ building: 'retail' }, opts({ area: 600 })).shopFloor, true, 'shopfront ground floor');
   assert.equal(planBuilding({ building: 'warehouse' }, opts({ area: 5000 })).kind, 'industrial');
-  assert.equal(planBuilding({ building: 'house', 'building:material': 'brick' }, opts()).wall, 'brick');
+  assert.equal(planBuilding({ building: 'house', 'building:material': 'brick' }, opts()).wallFamily, 'brick');
   assert.equal(planBuilding({ building: 'house', 'roof:shape': 'flat' }, opts()).roof, 'flat');
   // US West houses lean stucco, US East siding/brick (over many seeds).
-  const westStucco = [...Array(50)].filter((_, i) => planBuilding({ building: 'house' }, opts({ seed: `w${i}` })).wall === 'stucco').length;
-  const eastStucco = [...Array(50)].filter((_, i) => planBuilding({ building: 'house' }, opts({ seed: `e${i}`, lat: 40, lon: -75 })).wall === 'stucco').length;
+  const westStucco = [...Array(50)].filter((_, i) => planBuilding({ building: 'house' }, opts({ seed: `w${i}` })).wallFamily === 'stucco').length;
+  const eastStucco = [...Array(50)].filter((_, i) => planBuilding({ building: 'house' }, opts({ seed: `e${i}`, lat: 40, lon: -75 })).wallFamily === 'stucco').length;
   assert.ok(westStucco > 20 && eastStucco === 0, `west ${westStucco}, east ${eastStucco}`);
 });
 
@@ -78,6 +78,7 @@ test('buildTexturedBuildings: textured, outward-facing, deterministic geometry',
   const pos = meshes[0].geometry.getAttribute('position');
   const a = new THREE.Vector3(); const b = new THREE.Vector3(); const c = new THREE.Vector3();
   let walls = 0; let roofs = 0;
+  const ups = []; const downs = [];
   for (let i = 0; i < pos.count; i += 3) {
     a.fromBufferAttribute(pos, i); b.fromBufferAttribute(pos, i + 1); c.fromBufferAttribute(pos, i + 2);
     const n = new THREE.Vector3().subVectors(b, a).cross(new THREE.Vector3().subVectors(c, a));
@@ -90,10 +91,23 @@ test('buildTexturedBuildings: textured, outward-facing, deterministic geometry',
       assert.ok(n.x * (m.x - centre[0]) + n.y * (m.y - centre[1]) > 0, `wall faces out at ${m.x.toFixed(1)},${m.y.toFixed(1)}`);
     } else {
       roofs++;
-      assert.ok(n.z > 0, 'roof faces up');
+      (n.z > 0 ? ups : downs).push([a.clone(), b.clone(), c.clone(), m]);
     }
   }
   assert.ok(walls > 20 && roofs > 4);
+  // faces turned down are a pitched roof's underside: tiles over each of them
+  const zOver = ([p, q, r], x, y) => {
+    const d = (q.y - r.y) * (p.x - r.x) + (r.x - q.x) * (p.y - r.y);
+    if (Math.abs(d) < 1e-9) return null;
+    const l1 = ((q.y - r.y) * (x - r.x) + (r.x - q.x) * (y - r.y)) / d;
+    const l2 = ((r.y - p.y) * (x - r.x) + (p.x - r.x) * (y - r.y)) / d;
+    const l3 = 1 - l1 - l2;
+    return l1 >= -1e-6 && l2 >= -1e-6 && l3 >= -1e-6 ? l1 * p.z + l2 * q.z + l3 * r.z : null;
+  };
+  assert.ok(downs.length > 0, 'pitched roofs have an underside');
+  for (const [, , , m] of downs) {
+    assert.ok(ups.some((t) => { const z = zOver(t, m.x, m.y); return z !== null && z > m.z + 0.05 && z < m.z + 0.5; }), `underside at ${m.x.toFixed(1)},${m.y.toFixed(1)} has tiles over it`);
+  }
 
   const again = buildTexturedBuildings(feats, project).meshes[0].geometry.getAttribute('position').array;
   assert.deepEqual(Array.from(again), Array.from(pos.array), 'same input, same building');
