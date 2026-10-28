@@ -8339,7 +8339,7 @@ function canopyPatches(cls, w, h, covered, minCells) {
 const OPEN_GROUND_CLEAR_M = 4;
 const TREELESS_GOLF = new Set(['bunker', 'green', 'tee', 'fairway', 'driving_range', 'water_hazard', 'lateral_water_hazard']);
 
-function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, biome) {
+async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, biome, tick = async () => {}) {
   // Buildings, water and open playing ground, for the scattered and canopy
   // trees (a yard's tree is not in the house or the pool): world rings
   // bucketed by 32 m cells
@@ -8453,6 +8453,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
     };
 
     for (const feature of terrainData.osmFeatures || []) {
+      await tick();
       if (feature.type === 'vegetation' && feature.geometry?.length === 1) {
         const seed = hashString(`${feature.id}:${feature.geometry[0].lat}:${feature.geometry[0].lng}`);
         const point = feature.geometry[0];
@@ -8579,9 +8580,9 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
         }
       }
     }
-    if (ground) placeCanopyTrees();
+    if (ground) await placeCanopyTrees();
 
-    function placeCanopyTrees() {
+    async function placeCanopyTrees() {
       const { cls, w, h } = ground;
       const { north, south, east, west } = terrainData.bounds;
       const cellLat = (north - south) / h; const cellLng = (east - west) / w;
@@ -8619,7 +8620,9 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
       };
       const patches = canopyPatches(cls, w, h, covered, Math.max(1, Math.round(CANOPY_MIN_M2 / cellM2)));
       let trees = 0;
-      patches.forEach((patch, pi) => {
+      for (let pi = 0; pi < patches.length; pi++) {
+      const patch = patches[pi];
+      await tick();
         const areaM2 = patch.cells.length * cellM2;
         const seed = hashString(`canopy:${patch.cells[0]}`);
         // spots: a crown's middle (if it is on the crown; a crescent's is
@@ -8662,7 +8665,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
           pushPlacement(placement);
           trees++;
         });
-      });
+      }
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Canopy trees: ${trees} from ${patches.length} satellite canopy patch(es) outside OSM woods.`);
     }
   }
@@ -8671,6 +8674,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
     const rockTypes = getRockCandidates(biome);
     for (const feature of terrainData.osmFeatures || []) {
       if (feature.type !== 'landuse') continue;
+      await tick();
       const tags = feature.tags || {};
       const isRockArea =
         tags.landuse === 'quarry' ||
@@ -9970,9 +9974,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const plants = [includeTrees && 'trees and bushes', includeRocks && 'rocks'].filter(Boolean).join(', ');
   beginStep('vegetation', plants ? `Planting ${plants}, ground cover and props…` : 'Placing ground cover and props…');
   await yield_();
+  // (the browser gets the thread back every ~50 ms: a heavily wooded 8 km
+  // map planted for minutes in one go, and Chrome offered to kill the page)
+  let lastYield = performance.now();
+  const tick = async () => {
+    if (performance.now() - lastYield < 50) return;
+    await yield_();
+    lastYield = performance.now();
+  };
+  const vegT0 = performance.now();
   const forestPlacements = (includeTrees || includeRocks)
-    ? buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome)
+    ? await buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome, tick)
     : new Map();
+  // (where a slow planting step spends its time, in the report's console log)
+  const vegLap = (what) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Vegetation timing: ${what} at ${((performance.now() - vegT0) / 1000).toFixed(1)} s.`);
+  vegLap(`${[...forestPlacements.values()].reduce((n, l) => n + l.length, 0)} placements chosen`);
   // Trees, bushes and rocks keep off the roads and sidewalks (OSM woods and
   // scrub are often drawn right over the roads through them) and out from
   // under bridge decks.
@@ -9984,7 +10000,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let vegetationCleared = 0;
   for (const [type, list] of forestPlacements) {
     const margin = (treeItemHeight(type) ?? 10) < 4 ? VEGETATION_CLEAR_LOW_M : VEGETATION_CLEAR_TREE_M;
-    const kept = list.filter(({ pos: [x, y, z] }) => !clearOf(x, y, margin) && !underDeck(x, y, z, z + 12));
+    const kept = [];
+    for (let i = 0; i < list.length; i++) {
+      if ((i & 4095) === 0) await tick();
+      const { pos: [x, y, z] } = list[i];
+      if (!clearOf(x, y, margin) && !underDeck(x, y, z, z + 12)) kept.push(list[i]);
+    }
     vegetationCleared += list.length - kept.length;
     if (kept.length) forestPlacements.set(type, kept);
     else forestPlacements.delete(type);
@@ -10003,9 +10024,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const binType = (x, y) => PROP_BINS[Math.floor(propHash(x.toFixed(1), y.toFixed(1), 'bin') * PROP_BINS.length)];
   for (const [x, y, z] of mappedStreetProps.bins) addPropPlacement(binType(x, y), x, y, z, propHash(x, y) * Math.PI * 2);
   for (const b of streetProps.bins) addPropPlacement(binType(b.x, b.y), b.x, b.y, b.z, b.yaw);
+  vegLap('kept off roads, props added');
   const forestFiles = serializeForestFiles(forestPlacements);
+  vegLap('forest files written');
   const groundCoverObjects = buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, biome);
   const managedForestItemData = cloneManagedItemData(Array.from(forestPlacements.keys()), biome);
+  vegLap('ground cover and item data done');
 
   let backdropDaeBlob = null;
   let backdropTextureFiles = [];
