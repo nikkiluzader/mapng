@@ -155,6 +155,8 @@
       </ResolutionSelector>
       <ProcessingResolutionInput
         :model-value="processingMetersPerPixel"
+        :resolution="resolution"
+        per-tile
         @update:model-value="(v) => emit('update:processingMetersPerPixel', v)"
       />
     </div>

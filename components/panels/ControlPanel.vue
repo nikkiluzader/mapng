@@ -158,6 +158,7 @@
 
       <ProcessingResolutionInput
         :model-value="processingMetersPerPixel"
+        :resolution="Number(resolution) || 0"
         @update:model-value="(v) => $emit('update:processingMetersPerPixel', v)"
       />
 

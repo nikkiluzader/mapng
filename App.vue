@@ -409,10 +409,14 @@ const uploadedNoDataOverride = ref(NODATA_AUTO);
 // Layer priority for the current upload, as an array of layer ids. Null means
 // "as detected" (newest survey first); also per-upload, so never persisted.
 const uploadedLayerOrder = ref(null);
+// 0.1-10 m/px (components/controls/ProcessingResolutionInput.vue): saved
+// values and loaded session configs are held to it too
+const PROCESSING_MPP_MIN = 0.1;
+const PROCESSING_MPP_MAX = 10;
 const normalizeProcessingMpp = (value) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) return 1;
-  return Number(parsed.toFixed(10));
+  return Number(Math.min(PROCESSING_MPP_MAX, Math.max(PROCESSING_MPP_MIN, parsed)).toFixed(10));
 };
 
 const storedProcessingMpp = normalizeProcessingMpp(localStorage.getItem('mapng_processing_mpp') || 1);
@@ -420,10 +424,7 @@ const processingMetersPerPixel = ref(
   storedProcessingMpp,
 );
 
-const getEffectiveProcessingMpp = (value = processingMetersPerPixel.value) => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
-};
+const getEffectiveProcessingMpp = (value = processingMetersPerPixel.value) => normalizeProcessingMpp(value);
 
 const handleProcessingMetersPerPixelChange = (value) => {
   const parsed = normalizeProcessingMpp(value);
