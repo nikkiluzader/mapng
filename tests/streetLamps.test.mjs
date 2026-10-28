@@ -44,3 +44,12 @@ test('wide roads are lit from both sides; junction mouths and mapped lamps stay 
   const mapped = generateRoadLamps([street()], [[0, -5]]);
   assert.ok(mapped.every((l) => Math.hypot(l.x, l.y + 5) >= 24), 'no doubling up beside a mapped lamp');
 });
+
+test('outside North America, town residential streets are lit by default', () => {
+  const plain = street({ tags: {} });
+  assert.equal(generateRoadLamps([plain]).length, 0, 'North America: the utility poles carry the lamps');
+  const lamps = generateRoadLamps([plain], [], Infinity, { litStreets: true });
+  assert.ok(lamps.length >= 9 && lamps.length <= 10, `${lamps.length} lamps over 400 m at 40 m`);
+  assert.equal(generateRoadLamps([{ ...plain, urban: false }], [], Infinity, { litStreets: true }).length, 0, 'not in the country');
+  assert.equal(generateRoadLamps([street({ tags: { lit: 'no' } })], [], Infinity, { litStreets: true }).length, 0, 'lit=no wins');
+});

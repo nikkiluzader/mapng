@@ -7005,7 +7005,9 @@ const GARAGE_LIGHT_TEMPLATE = {
 // addLinkedNightLights). No shadows (QA guidance: hundreds of instances).
 const LAMP_SPOT_DOWN = [1, 0, 0, 0, 0, -1, 0, 1, 0];   // local Y (the beam) down
 const LAMP_COLOUR = [0.95, 0.9, 0.82, 1];               // neutral LED white
-const LAMP_CD_AT_12M = 5000;
+const LAMP_CD_AT_12M = 3500;   // (the engine's 5000 cd washed out lamp-lined arterials)
+const WALL_LAMP_HEIGHT_M = 5;     // a lantern on a facade
+const HUNG_LAMP_HEIGHT_M = 6.5;   // hung on a wire over the carriageway
 export function lampSpotLight(name, parent, position, lightHeight = 8) {
   return {
     __parent: parent,
@@ -7019,9 +7021,9 @@ export function lampSpotLight(name, parent, position, lightHeight = 8) {
     innerAngle: 25,
     outerAngle: 150,
     intensityUnit: 'cd',
-    // the engine's 5000 cd suits West Coast's 12.5 m cobra heads; lower
-    // lamps get less (ground light falls with the mounting height squared),
-    // or a 7 m pole lamp glares three times as bright on the road
+    // LAMP_CD_AT_12M at a 12.5 m cobra head; lower lamps get less (ground
+    // light falls with the mounting height squared), or a 7 m pole lamp
+    // glares three times as bright on the road
     intensity: Math.round(Math.max(1200, LAMP_CD_AT_12M * (lightHeight / 12.5) ** 2)),
     isEnabled: false,
     nightLight: '1',
@@ -7133,8 +7135,27 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     const isLamp = tags.highway === 'street_lamp';
     const isBench = !isLamp && tags.amenity === 'bench';
     if (!isLamp && !isBench) continue;
-    if (isLamp && ['wall', 'wall_mounted', 'ceiling', 'wire'].includes(String(tags.support))) continue;
     if (isLamp && lampCount >= MAX_STREET_LAMPS) continue;
+    // A lantern on a wall or hung on a wire over the street (old European
+    // towns are lit almost only so: Bologna maps 743 wall and 676 wire lamps
+    // to 71 on masts): no pole to place, but its light, where it hangs.
+    if (isLamp && ['wall', 'wall_mounted', 'ceiling', 'wire', 'suspended'].includes(String(tags.support ?? tags.lamp_mount))) {
+      if (String(tags.support) === 'ceiling') continue;   // (under arcades, galleries: not the street)
+      const pt = features[i].geometry[0];
+      if (!Number.isFinite(pt?.lat) || !Number.isFinite(pt?.lng)) continue;
+      const [lx, ly] = geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0);
+      const key = cellKey(lx, ly);
+      if (lampCells.has(key)) continue;
+      lampCells.add(key);
+      const z = getTerrainHeightAtWorldXY(lx, ly, terrainData, squareSize);
+      const tagged = Number.parseFloat(tags.height);
+      const h = Number.isFinite(tagged) && tagged > 2 && tagged < 15 ? tagged
+        : String(tags.support) === 'wire' ? HUNG_LAMP_HEIGHT_M : WALL_LAMP_HEIGHT_M;
+      if (underDeck(lx, ly, z, z + h + 1)) continue;
+      objects.push(lampSpotLight(`street_lamp_${lampCount}_light`, 'street_furniture', [roundTo(lx, 3), roundTo(ly, 3), roundTo(z + h, 3)], h));
+      lampCount++;
+      continue;
+    }
     if (isBench && benchCount >= MAX_BENCHES) continue;
 
     const pt = features[i].geometry[0];
@@ -7189,7 +7210,12 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   // Lamps along lit streets: OSM maps few street_lamp nodes, so lit roads
   // (lit=yes, or urban main roads without a lit tag) get poles at a steady
   // spacing (BeamNG.Earth plan B3).
-  const generatedLamps = generateRoadLamps(carriageways, osmLampSpots, LAMP_LIMIT - lampCount);
+  // town residential streets lit too, except in North America where the
+  // utility poles carry their lamps (streetProps.js townPoles)
+  const midLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
+  const midLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
+  const northAmerica = midLat > 24 && midLng > -170 && midLng < -50;
+  const generatedLamps = generateRoadLamps(carriageways, osmLampSpots, LAMP_LIMIT - lampCount, { litStreets: !northAmerica });
   for (let i = 0; i < generatedLamps.length; i++) {
     const lamp = generatedLamps[i];
     addLamp(lamp.x, lamp.y, lamp.facing, `street_lamp_gen_${i}`, lampFor(lamp.highway));

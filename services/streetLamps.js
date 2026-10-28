@@ -15,6 +15,7 @@ const DEFAULT_SPACING_M = 40;
 const KERB_SETBACK_M = 1.0;
 // Wide roads (4+ lanes) are lit from both sides, staggered.
 const BOTH_SIDES_MIN_HALF_M = 6;
+const BOTH_SIDES_SPACING_FACTOR = 1.6;
 // Keep junction mouths and crosswalk corners clear.
 const JUNCTION_CLEAR_M = 10;
 const ROAD_CLEAR_M = 0.5;
@@ -23,11 +24,18 @@ const NEAR_MAPPED_FACTOR = 0.6;
 
 const norm = (value) => String(value ?? '').trim().toLowerCase();
 
-export function isLitRoad({ tags = {}, highway, urban }) {
+// Town streets too where no utility-pole lamps light them (outside North
+// America: Leeds and Tokyo had ~25 lamps a km², residential streets being
+// lit but rarely tagged lit=*), lamp columns at RESIDENTIAL_SPACING_M.
+const LIT_BY_DEFAULT_URBAN_STREETS = new Set(['residential', 'unclassified', 'living_street']);
+const RESIDENTIAL_SPACING_M = 40;
+
+export function isLitRoad({ tags = {}, highway, urban }, { litStreets = false } = {}) {
   const lit = norm(tags.lit);
   if (lit === 'no' || lit === 'disused') return false;
   if (LIT_VALUES.has(lit)) return true;
-  return !!urban && LIT_BY_DEFAULT_URBAN.has(String(highway ?? '').replace(/_link$/, ''));
+  const cls = String(highway ?? '').replace(/_link$/, '');
+  return !!urban && (LIT_BY_DEFAULT_URBAN.has(cls) || (litStreets && LIT_BY_DEFAULT_URBAN_STREETS.has(cls)));
 }
 
 // Deterministic 0..1 from a way id, so re-exports place poles identically.
@@ -44,7 +52,7 @@ function seededFraction(key) {
  * Lamp spots: [{ x, y, facing }] with `facing` the yaw from the pole toward
  * the road (the lamp arm reaches over the carriageway).
  */
-export function generateRoadLamps(carriageways, mappedLamps = [], budget = Infinity) {
+export function generateRoadLamps(carriageways, mappedLamps = [], budget = Infinity, { litStreets = false } = {}) {
   if (!carriageways.length || budget <= 0) return [];
   const index = buildCarriagewayIndex(carriageways);
   const lamps = [];
@@ -52,9 +60,12 @@ export function generateRoadLamps(carriageways, mappedLamps = [], budget = Infin
   const tooClose = (x, y, spacing) => taken.some((t) => Math.hypot(t.x - x, t.y - y) < Math.min(spacing, t.spacing) * NEAR_MAPPED_FACTOR);
 
   for (const cw of carriageways) {
-    if (!isLitRoad(cw)) continue;
-    const spacing = SPACING_M[String(cw.highway ?? '').replace(/_link$/, '')] ?? DEFAULT_SPACING_M;
+    if (!isLitRoad(cw, { litStreets })) continue;
     const sides = cw.half >= BOTH_SIDES_MIN_HALF_M ? [-1, 1] : [-1];
+    // lit from both sides, each side's poles further apart (staggered at the
+    // class spacing both sides together flooded a Plano arterial white)
+    const cls = String(cw.highway ?? '').replace(/_link$/, '');
+    const spacing = (SPACING_M[cls] ?? (LIT_BY_DEFAULT_URBAN_STREETS.has(cls) ? RESIDENTIAL_SPACING_M : DEFAULT_SPACING_M)) * (sides.length > 1 ? BOTH_SIDES_SPACING_FACTOR : 1);
     const start = seededFraction(cw.wayId ?? cw.owner) * spacing;
     sides.forEach((side, sideIndex) => {
       // Staggered: the second side starts half a spacing later.

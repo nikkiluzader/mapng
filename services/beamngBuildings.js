@@ -189,6 +189,10 @@ const BAND_OFFICE = [1, 4, null];
 const BAND_SHOP = [2, 2, null];
 // One sash window (with sill) cut from the plaster sheet: u0, u1, v0, v1.
 const WIN_UV = [53 / 1024, 154 / 1024, 1 - (512 + 238) / 1024, 1 - (512 + 45) / 1024];
+// The same sash window from band 2's bay 3, which the night map
+// (public/beamng_facade_e.png) leaves unlit: a house nobody is home in.
+const WIN_UV_DARK = [664 / 1024, 765 / 1024, WIN_UV[2], WIN_UV[3]];
+const HOUSE_LIT_SHARE = 0.65;
 const WIN_W = 1.05;
 const WIN_H = 1.75;
 const WIN_SILL = 0.85;
@@ -636,13 +640,13 @@ function bandFloor(m, mat, band, a, b, z0, z1, col, seed, edge, floor) {
   }
 }
 
-function houseWindows(m, a, b, base, floors, floorH, zTop) {
+function houseWindows(m, a, b, base, floors, floorH, zTop, winUv = WIN_UV) {
   const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   const nb = Math.floor(L / HOUSE_BAY_M);
   if (nb < 1 || L < 2) return;
   const dx = (b[0] - a[0]) / L; const dy = (b[1] - a[1]) / L;
   const ox = dy * WIN_OUT_M; const oy = -dx * WIN_OUT_M;      // outward (ring is counter-clockwise)
-  const [u0, u1, v0, v1] = WIN_UV;
+  const [u0, u1, v0, v1] = winUv;
   const white = [1, 1, 1];
   for (let f = 0; f < floors; f++) {
     const zf = base + f * floorH + WIN_SILL;
@@ -1194,7 +1198,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
         }
       } else {
         wallStrip(builder, plan.wall, a, b, base, eave, plan.wallTint);
-        if (plan.windows) houseWindows(builder, a, b, base, plan.floors, plan.floorH, eave);
+        if (plan.windows) houseWindows(builder, a, b, base, plan.floors, plan.floorH, eave, hash01(seed, 'lit') < HOUSE_LIT_SHARE ? WIN_UV : WIN_UV_DARK);
       }
     }
     for (const hole of holes) {

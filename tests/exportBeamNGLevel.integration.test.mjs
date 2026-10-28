@@ -373,14 +373,16 @@ test('exportBeamNGLevel emits native street furniture with engine-managed night 
     const benches = items.filter((i) => i?.class === 'TSStatic' && i.name?.startsWith('bench_'));
 
     // The fixture has one pole lamp, one wire-suspended lamp, and one bench.
-    // Wire/wall/ceiling lamps mark a luminaire with no pole, so they're skipped.
+    // A wire / wall lamp has no pole to place, only its light where it hangs.
     assert.equal(lamps.length, 1, 'expected exactly one pole-mounted lamp');
     assert.equal(benches.length, 1, 'expected exactly one bench');
-    assert.equal(lights.length, 1, 'each placed lamp needs exactly one light');
+    assert.equal(lights.length, 2, 'a light for the pole lamp and one for the hung lamp');
+    const light = lights.find((l) => l.name === lamps[0].child);
+    assert.ok(light, 'the pole lamp names its light as child');
+    assert.ok(lights.every((l) => l.nightLight === '1' && l.castShadows === false));
 
     // BeamNG QA (Wonly): nightLight lets the engine run street lights
     // dusk-to-dawn with no custom lua, and point lights must not cast shadows.
-    const [light] = lights;
     assert.equal(light.nightLight, '1', 'street lights must set nightLight');
     assert.equal(light.isEnabled, false, 'nightLight lights start disabled');
     assert.equal(light.castShadows, false, 'street lights must not cast shadows');
