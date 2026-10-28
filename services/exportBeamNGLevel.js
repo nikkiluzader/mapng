@@ -7644,7 +7644,12 @@ function makeForestPlacement(type, point, terrainData, squareSize, seed, scaleMi
 // GPU-bound. 1.5/1.0 keeps coverage convincing at a fraction of the cost.
 const BEAMNG_TREE_DENSITY_MULTIPLIER = 1.5;
 const BEAMNG_GRASS_DENSITY_MULTIPLIER = 1.0;
-const BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE = 12000;
+// Ceilings only (BeamNG's own levels: Johnson Valley 663,057 forest items,
+// Cliff 604,718, Italy 206,042; up to 72,936 of a single item in Cliff). At
+// 12,000 per type and 3,600 per polygon, big forests came out thin.
+const BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE = 75000;
+const BEAMNG_MAX_FOREST_PLACEMENTS = 650000;
+const BEAMNG_MAX_PLACEMENTS_PER_AREA = 250000;
 const BEAMNG_MAX_GROUNDCOVER_ELEMENTS = 650000;
 // Grass billboards are camera-relative: GroundCover generates elements out to
 // `radius` meters from the viewer. Official levels keep this around 80–160 m;
@@ -7800,13 +7805,16 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
   /**
    * Add a forest placement to priority or regular buckets with hard caps.
    */
+  let placed = 0;
   const pushPlacement = (placement, { priority = false } = {}) => {
     if (!getManagedForestTemplate(biome, placement.type)) return;
+    if (placed >= BEAMNG_MAX_FOREST_PLACEMENTS) return;
     const target = priority ? priorityPlacementsByType : regularPlacementsByType;
     if (!target.has(placement.type)) target.set(placement.type, []);
     const list = target.get(placement.type);
     if (list.length >= BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE) return;
     list.push(placement);
+    placed++;
   };
 
   if (includeTrees) {
@@ -7897,7 +7905,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
             squareSize,
             'area_tree',
             (isOrchard ? 0.0028 : 0.0036) * treeDensityMultiplier,
-            (isOrchard ? 1800 : 3600) * treeDensityMultiplier,
+            BEAMNG_MAX_PLACEMENTS_PER_AREA,
             1,
             1,
             hashString(`${feature.id}:tree_area`),
@@ -7917,7 +7925,7 @@ function buildForestPlacements(terrainData, squareSize, { includeTrees, includeR
             squareSize,
             'area_bush',
             0.004 * bushDensityMultiplier,
-            400 * bushDensityMultiplier,
+            BEAMNG_MAX_PLACEMENTS_PER_AREA,
             1,
             1,
             hashString(feature.id),
