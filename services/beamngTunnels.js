@@ -861,14 +861,51 @@ export function fitBesideRoads(t, roads, groundAt) {
 }
 
 // is (x, y) on one of the tunnel's other roads (within `margin` of its edge)?
-function onForeignRoad(t, x, y, margin) {
-  for (const r of t.foreign || []) {
+// (their segments binned on a grid per road list: grading scanned every
+// road for every ground cell, a box tunnel under Manhattan's grid took ages;
+// margins past FOREIGN_PAD_M scan everything)
+const FOREIGN_CELL_M = 16;
+const FOREIGN_PAD_M = 2;
+const foreignGrids = new WeakMap();
+function foreignGridFor(roads) {
+  let grid = foreignGrids.get(roads);
+  if (grid) return grid;
+  grid = new Map();
+  for (const r of roads) {
+    const pad = r.half + FOREIGN_PAD_M;
     for (let i = 0; i + 1 < r.xy.length; i++) {
       const [ax, ay] = r.xy[i]; const [bx, by] = r.xy[i + 1];
-      const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1e-9;
-      const f = clamp(((x - ax) * vx + (y - ay) * vy) / L2, 0, 1);
-      if (Math.hypot(ax + vx * f - x, ay + vy * f - y) <= r.half + margin) return true;
+      for (let gx = Math.floor((Math.min(ax, bx) - pad) / FOREIGN_CELL_M); gx <= Math.floor((Math.max(ax, bx) + pad) / FOREIGN_CELL_M); gx++) {
+        for (let gy = Math.floor((Math.min(ay, by) - pad) / FOREIGN_CELL_M); gy <= Math.floor((Math.max(ay, by) + pad) / FOREIGN_CELL_M); gy++) {
+          const key = `${gx},${gy}`;
+          if (!grid.has(key)) grid.set(key, []);
+          grid.get(key).push(r, i);
+        }
+      }
     }
+  }
+  foreignGrids.set(roads, grid);
+  return grid;
+}
+
+const onForeignSegment = (r, i, x, y, margin) => {
+  const [ax, ay] = r.xy[i]; const [bx, by] = r.xy[i + 1];
+  const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1e-9;
+  const f = clamp(((x - ax) * vx + (y - ay) * vy) / L2, 0, 1);
+  return Math.hypot(ax + vx * f - x, ay + vy * f - y) <= r.half + margin;
+};
+
+function onForeignRoad(t, x, y, margin) {
+  const roads = t.foreign;
+  if (!roads?.length) return false;
+  if (margin <= FOREIGN_PAD_M) {
+    const cell = foreignGridFor(roads).get(`${Math.floor(x / FOREIGN_CELL_M)},${Math.floor(y / FOREIGN_CELL_M)}`);
+    if (!cell) return false;
+    for (let j = 0; j < cell.length; j += 2) if (onForeignSegment(cell[j], cell[j + 1], x, y, margin)) return true;
+    return false;
+  }
+  for (const r of roads) {
+    for (let i = 0; i + 1 < r.xy.length; i++) if (onForeignSegment(r, i, x, y, margin)) return true;
   }
   return false;
 }

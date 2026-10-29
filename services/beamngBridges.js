@@ -1051,23 +1051,64 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
  * Whether something standing at (x, y) from z up to zTop would reach into a
  * deck above it (a lamp or pole under an overpass).
  */
-export function hitsDeck(decks, x, y, z, zTop, margin = 1) {
+// Deck segments binned on a grid per deck list (rebuilt if the list grows):
+// every lamp, pole and wire point scanned every deck, a minute of
+// Manhattan's export. Margins past DECK_GRID_PAD_M scan everything.
+const DECK_GRID_CELL_M = 32;
+const DECK_GRID_PAD_M = 2;
+const deckGrids = new WeakMap();
+function deckGridFor(decks) {
+  const cached = deckGrids.get(decks);
+  if (cached && cached.count === decks.length) return cached.grid;
+  const grid = new Map();
   for (const deck of decks) {
     for (const part of deck.parts) {
       const { xy } = part;
+      const pad = part.half + PARAPET_W_M + DECK_GRID_PAD_M;
       for (let i = 0; i + 1 < xy.length; i++) {
-        const [ax, ay] = xy[i];
-        const [bx, by] = xy[i + 1];
-        const vx = bx - ax; const vy = by - ay;
-        const L2 = vx * vx + vy * vy || 1e-9;
-        const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
-        if (Math.hypot(ax + vx * t - x, ay + vy * t - y) > part.half + PARAPET_W_M + margin) continue;
-        const deckBottom = part.z[i] + (part.z[i + 1] - part.z[i]) * t - (part.depth ?? DECK_DEPTH_M + GIRDER_D_M);
-        if (zTop > deckBottom - 0.5 && z < deckBottom) return true;
+        const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
+        for (let gx = Math.floor((Math.min(ax, bx) - pad) / DECK_GRID_CELL_M); gx <= Math.floor((Math.max(ax, bx) + pad) / DECK_GRID_CELL_M); gx++) {
+          for (let gy = Math.floor((Math.min(ay, by) - pad) / DECK_GRID_CELL_M); gy <= Math.floor((Math.max(ay, by) + pad) / DECK_GRID_CELL_M); gy++) {
+            const key = `${gx},${gy}`;
+            if (!grid.has(key)) grid.set(key, []);
+            grid.get(key).push(part, i);
+          }
+        }
+      }
+    }
+  }
+  deckGrids.set(decks, { count: decks.length, grid });
+  return grid;
+}
+
+export function hitsDeck(decks, x, y, z, zTop, margin = 1) {
+  if (margin <= DECK_GRID_PAD_M) {
+    const cell = deckGridFor(decks).get(`${Math.floor(x / DECK_GRID_CELL_M)},${Math.floor(y / DECK_GRID_CELL_M)}`);
+    if (!cell) return false;
+    for (let j = 0; j < cell.length; j += 2) {
+      if (deckSegmentHit(cell[j], cell[j + 1], x, y, z, zTop, margin)) return true;
+    }
+    return false;
+  }
+  for (const deck of decks) {
+    for (const part of deck.parts) {
+      for (let i = 0; i + 1 < part.xy.length; i++) {
+        if (deckSegmentHit(part, i, x, y, z, zTop, margin)) return true;
       }
     }
   }
   return false;
+}
+
+function deckSegmentHit(part, i, x, y, z, zTop, margin) {
+  const [ax, ay] = part.xy[i];
+  const [bx, by] = part.xy[i + 1];
+  const vx = bx - ax; const vy = by - ay;
+  const L2 = vx * vx + vy * vy || 1e-9;
+  const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
+  if (Math.hypot(ax + vx * t - x, ay + vy * t - y) > part.half + PARAPET_W_M + margin) return false;
+  const deckBottom = part.z[i] + (part.z[i + 1] - part.z[i]) * t - (part.depth ?? DECK_DEPTH_M + GIRDER_D_M);
+  return zTop > deckBottom - 0.5 && z < deckBottom;
 }
 
 /**
