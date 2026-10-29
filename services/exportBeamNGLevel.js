@@ -4541,6 +4541,29 @@ export function bridgeOverShortGaps(features) {
 }
 
 export function generateDecalRoads(terrainData, squareSize) {
+  const steps = decalRoadSteps(terrainData, squareSize);
+  for (;;) {
+    const { done, value } = steps.next();
+    if (done) return value;
+  }
+}
+
+/**
+ * generateDecalRoads, handing the browser the thread back (`yieldFn`) at
+ * each pause: Manhattan's road layout ran ~45 s in one go and Chrome offered
+ * to kill the page.
+ */
+export async function generateDecalRoadsYielding(terrainData, squareSize, yieldFn) {
+  const steps = decalRoadSteps(terrainData, squareSize);
+  for (;;) {
+    const { done, value } = steps.next();
+    if (done) return value;
+    await yieldFn();
+  }
+}
+
+// The road layout, pausing (yield) between its phases and every 200 roads.
+function* decalRoadSteps(terrainData, squareSize) {
   const budget = chooseRoadNodeSpacing(terrainData.osmFeatures || []);
   if (budget.spacing > ROAD_NODE_SPACING_M) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road nodes every ${budget.spacing.toFixed(2)} m (not ${ROAD_NODE_SPACING_M} m): ${budget.lengthKm.toFixed(0)} km of roads would make ~${budget.estimatedNodes} DecalRoad nodes, past what BeamNG draws at load.`);
@@ -4579,8 +4602,11 @@ export function generateDecalRoads(terrainData, squareSize) {
   // tunnels a bridge meets (a portal takes the deck's height).
   const done = new Set();
   const early = solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done });
+  yield;
   const bridges = solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
+  yield;
   const late = solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
+  yield;
   const tunnels = joinTunnelPhases(early, late);
   // a road reaching into a tube it is no part of (a ramp OSM ends a few
   // metres into a tunnel's mouth, where the tube widens for it): on the
@@ -4640,6 +4666,7 @@ export function generateDecalRoads(terrainData, squareSize) {
   const paintDecals = [];
 
   for (let segIndex = 0; segIndex < drivableRoads.length; segIndex++) {
+    if (segIndex % 200 === 199) yield;
     const segmentFeature = drivableRoads[segIndex];
     const feature = segmentFeature.sourceFeature;
     const highway = segmentFeature.highway;
@@ -4789,12 +4816,16 @@ export function generateDecalRoads(terrainData, squareSize) {
     }
   }
 
+  yield;
   const pedestrianStreets = buildPedestrianStreetDecals(terrainData, squareSize, carriageways);
+  yield;
   for (const { decal, street } of pedestrianStreets.decals) getOrCreateSplineGroup(street).__items.push(decal);
 
   const carriagewayIndex = buildCarriagewayIndex(carriageways);
   const junctionMarkings = generateJunctionMarkingDecals(terrainData, squareSize, { carriageways: carriagewayIndex });
+  yield;
   cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || []);
+  yield;
 
   const groups = Array.from(roadSplinesByName.values()).filter((g) => g.__items.length > 0);
 
@@ -9581,7 +9612,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // level is no sea)
   const sourceHeightMap = exportTerrainData.heightMap;
   const decalRoads = includeRoads
-    ? generateDecalRoads(exportTerrainData, squareSize)
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_)
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
