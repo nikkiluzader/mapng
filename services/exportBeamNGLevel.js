@@ -20,6 +20,7 @@ import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations, gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
+import { buildStructureGraph } from './structures/graph.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
 import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
@@ -4608,6 +4609,16 @@ function* decalRoadSteps(terrainData, squareSize) {
     const driving = Number.isFinite(stable) && stable > 0 ? stable : cs.drivingHalfWidth;
     return driving + (cs.leftExtra + cs.rightExtra) / 2;
   };
+  // The structure solver's road graph (stage A), built on the untouched
+  // ground. Shadow mode: nothing reads it yet but the report.
+  const graphEdge = (terrainData.width * squareSize) / 2 - 3;
+  const structureGraph = buildStructureGraph(drivableRoads, {
+    project: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
+    groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
+    halfOf,
+    isFreeEnd: (x, y) => Math.abs(x) >= graphEdge || Math.abs(y) >= graphEdge,
+  });
+  yield;
   // Tunnels and bridges, their earthworks graded before any road samples the
   // ground. The tunnels meeting no bridge first: a bridge over a tunnel's
   // trench (North 7th Street over I-10 at Deck Park, Phoenix) spans it at the
@@ -4871,6 +4882,7 @@ function* decalRoadSteps(terrainData, squareSize) {
   Object.defineProperty(groups, 'bridges', { value: bridges, enumerable: false });
   Object.defineProperty(groups, 'tunnels', { value: tunnels, enumerable: false });
   Object.defineProperty(groups, 'crosswalkZones', { value: junctionMarkings.zones || [], enumerable: false });
+  Object.defineProperty(groups, 'structureGraph', { value: structureGraph, enumerable: false });
   return groups;
 }
 
@@ -5871,6 +5883,10 @@ function buildDetailedReportSections(d) {
         lines.push(`  - ${title}:`);
         for (const p of list) lines.push(`    - ${p.value} at (${p.at.join(', ')}) ${p.what}`);
       }
+    }
+    const sg = d.decalRoads?.structureGraph?.stats;
+    if (sg) {
+      lines.push(`- Structure solver graph (not used for the level yet): ${sg.nodes} nodes, ${sg.edges} edges (${sg.bridgeEdges} bridge, ${sg.tunnelEdges} tunnel), ${sg.stations} stations; ${sg.joints} joints where a road goes onto a bridge, into a tunnel or changes layer, ${sg.junctions} junctions (${sg.multiLevelJunctions} mixing layers), ${sg.ends} dead ends, ${sg.edgeOfMap} roads leaving the map`);
     }
     lines.push(`- Checked in ${sc.ms} ms.`);
   }

@@ -90,7 +90,7 @@ export const STRUCTURE_SCENES = [
     // a layer-2 ramp deck joins a layer-1 deck at a shared node over a road
     build: () => terrain(flat, [
       way(1, [[-450, 0], [-80, 0]], { highway: 'motorway', oneway: 'yes' }),
-      way(2, [[-80, 0], [80, 0]], { highway: 'motorway', oneway: 'yes', bridge: 'yes', layer: '1' }),
+      way(2, [[-80, 0], [-40, 0], [80, 0]], { highway: 'motorway', oneway: 'yes', bridge: 'yes', layer: '1' }),
       way(3, [[80, 0], [450, 0]], { highway: 'motorway', oneway: 'yes' }),
       way(4, [[-250, 140], [-40, 0]], { highway: 'motorway_link', oneway: 'yes', bridge: 'yes', layer: '2' }),
       way(5, [[-450, 140], [-250, 140]], { highway: 'motorway_link', oneway: 'yes' }),
