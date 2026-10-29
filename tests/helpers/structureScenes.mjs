@@ -184,5 +184,5 @@ export async function runStructureScene(scene) {
     throughDeck: checks.throughDecks.through,
     spikes: checks.spikes.spikes,
   };
-  return { groups, checks, summary };
+  return { groups, checks, summary, td, squareSize: SQ };
 }
