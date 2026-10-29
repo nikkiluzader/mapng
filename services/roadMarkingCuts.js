@@ -150,12 +150,37 @@ export function parallelHalfWidthAt(index, x, y, dir) {
   return parallelRoadAt(index, x, y, dir)?.half ?? null;
 }
 
+// Zones binned on the carriageway grid, built once per zone list: scanning
+// every crosswalk for every 0.5 m paint sample was most of Manhattan's
+// road layout.
+const zoneGrids = new WeakMap();
+function zoneGridFor(zones) {
+  let grid = zoneGrids.get(zones);
+  if (grid) return grid;
+  grid = new Map();
+  for (const z of zones) {
+    const r = Math.hypot(z.halfLength, z.halfWidth);
+    for (let gx = Math.floor((z.x - r) / CELL_M); gx <= Math.floor((z.x + r) / CELL_M); gx++) {
+      for (let gy = Math.floor((z.y - r) / CELL_M); gy <= Math.floor((z.y + r) / CELL_M); gy++) {
+        const key = `${gx},${gy}`;
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(z);
+      }
+    }
+  }
+  zoneGrids.set(zones, grid);
+  return grid;
+}
+
 /**
  * Crosswalk bands as cut zones: { x, y, ux, uy (along the road), halfLength,
  * halfWidth }. Lines along the road stop at them.
  */
 export function isInZone(zones, x, y) {
-  for (const z of zones) {
+  if (!zones?.length) return false;
+  const cell = zoneGridFor(zones).get(`${Math.floor(x / CELL_M)},${Math.floor(y / CELL_M)}`);
+  if (!cell) return false;
+  for (const z of cell) {
     const dx = x - z.x;
     const dy = y - z.y;
     const along = dx * z.ux + dy * z.uy;
