@@ -19,7 +19,7 @@ import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations, gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
-import { measureStructures } from './structures/metrics.js';
+import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
 import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
@@ -4823,6 +4823,8 @@ function* decalRoadSteps(terrainData, squareSize) {
           // floor: without overObjects a DecalRoad is projected onto the
           // terrain (the hill over a tunnel).
           if (!edgeBlend && (onStructure || bridges.approaches?.has(segIndex))) decal.overObjects = true;
+          // (the road it belongs to, for the structure checks; not serialized)
+          Object.defineProperty(decal, '__owner', { value: segIndex, enumerable: false });
           splineGroup.__items.push(decal);
           if (isCutPaintLayer(decal.__layer)) paintDecals.push({ decal, group: splineGroup, owner: segIndex });
         }
@@ -5853,6 +5855,23 @@ function buildDetailedReportSections(d) {
     }
     const sp = sc.spikes;
     lines.push(`- Terrain spikes / pits near structures (> 2 m off their 3×3 median): ${sp.spikes} of ${sp.pixels} pixels${sp.worst ? `; worst ${formatNumber(sp.worst.off, 2)} m${at(sp.worst)}` : ''}`);
+    // the worst places of each check, to fly to (F11 world editor or free camera)
+    const places = [
+      ['Steps where roads meet (m)', sc.joints.top],
+      ['Too steep on bridges/tunnels (grade)', sc.grades.structure.top],
+      ['Too steep on ground roads (grade)', sc.grades.ground.top],
+      ['Crossings short of clearance (m short)', sc.crossings.top],
+      ['Ground roads off the terrain (m)', sc.groundGaps?.top],
+      ['Terrain through decks (m)', sc.throughDecks?.top],
+      ['Terrain spikes / pits (m)', sc.spikes.top],
+    ].filter(([, list]) => list?.length);
+    if (places.length) {
+      lines.push('- Worst places per check (value, world x, y, what):');
+      for (const [title, list] of places) {
+        lines.push(`  - ${title}:`);
+        for (const p of list) lines.push(`    - ${p.value} at (${p.at.join(', ')}) ${p.what}`);
+      }
+    }
     lines.push(`- Checked in ${sc.ms} ms.`);
   }
 
@@ -10580,7 +10599,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       buildingReport,
       bridges: decalRoads.bridges,
       structureChecks: measureStructures({
-        carriageways: decalRoads.carriageways || [],
+        carriageways: roadLinesFromDecals(decalRoads),
         decks: bridgeDecks,
         tunnels: tunnelList,
         groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),

@@ -19,7 +19,7 @@ const GRADE_MAX = {
   tertiary: 0.15, tertiary_link: 0.15,
 };
 const GRADE_DEFAULT = 0.18;
-const GRADE_MIN_RUN_M = 2;        // node pairs closer than this are skipped
+const GRADE_RUN_M = 4;            // grade over the shortest run of nodes at least this long
 // Vertical space a road passing over another needs: the bridge design value
 // (deck top over the road under it: headroom + structure), less a tolerance
 // for DecalRoad offsets.
@@ -47,6 +47,40 @@ function worst(list, key) {
   let best = null;
   for (const item of list) if (!best || item[key] > best[key]) best = item;
   return best;
+}
+
+// The TOP_N worst of a list, as { value, at: [x, y], ...labels }, for the
+// report's list of places to look.
+const TOP_N = 10;
+function top(list, key, label) {
+  return [...list].sort((a, b) => b[key] - a[key]).slice(0, TOP_N)
+    .map((it) => ({ value: round(it[key], key === 'grade' ? 3 : 2), at: [round(it.x, 1), round(it.y, 1)], what: label(it) }));
+}
+
+/**
+ * The roads as they ship: every road piece's base surface DecalRoad (its
+ * centreline; every drivable road has one, not every one an AI path; named
+ * ..._b whatever its surface) with
+ * its carriageway's class and structure flags. Later passes
+ * move DecalRoad nodes after the carriageways are recorded (a pit sunk into a
+ * deck road went unseen when the checks read the carriageways), so the checks
+ * measure these. Falls back to the carriageways when no decal is tagged.
+ */
+export function roadLinesFromDecals(groups) {
+  const carriageways = groups?.carriageways || [];
+  const byOwner = new Map();
+  for (const cw of carriageways) if (!byOwner.has(cw.owner)) byOwner.set(cw.owner, cw);
+  const lines = [];
+  for (const g of groups || []) {
+    for (const d of g.__items || []) {
+      // (the base layer is named after its surface: asphalt, dirt, gravel...;
+      // its decal name ends in _b)
+      if (!/_b$/.test(d.name || '') || d.__owner === undefined || !(d.nodes?.length >= 2)) continue;
+      const cw = byOwner.get(d.__owner);
+      if (cw) lines.push({ ...cw, nodes: d.nodes });
+    }
+  }
+  return lines.length ? lines : carriageways;
 }
 
 /** Steps where two carriageways meet: their end nodes at different heights. */
@@ -83,7 +117,7 @@ export function checkJoints(carriageways) {
     }
   }
   const w = worst(steps, 'dz');
-  return { joints, steps: steps.length, worst: w && { dz: round(w.dz), at: [round(w.x, 1), round(w.y, 1)], roads: [w.a, w.b] } };
+  return { joints, steps: steps.length, worst: w && { dz: round(w.dz), at: [round(w.x, 1), round(w.y, 1)], roads: [w.a, w.b] }, top: top(steps, 'dz', (it) => `${it.a} / ${it.b}`) };
 }
 
 /** Stretches steeper than their road class should be. */
@@ -93,21 +127,27 @@ export function checkGrades(carriageways) {
   for (const cw of carriageways) {
     const n = cw.nodes || [];
     const max = GRADE_MAX[cw.highway] ?? GRADE_DEFAULT;
+    // (nodes are ~2 m apart: each grade spans the shortest run of nodes at
+    // least GRADE_RUN_M long, so a pit a few nodes wide still shows)
+    let j = 0;
+    let ds = 0;
     for (let i = 0; i + 1 < n.length; i++) {
-      const ds = Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
-      if (ds < GRADE_MIN_RUN_M) continue;
+      if (j <= i) { j = i; ds = 0; }
+      while (j + 1 < n.length && ds < GRADE_RUN_M) { ds += Math.hypot(n[j + 1][0] - n[j][0], n[j + 1][1] - n[j][1]); j++; }
+      if (ds < GRADE_RUN_M) break;
       pairs++;
-      const grade = Math.abs(n[i + 1][2] - n[i][2]) / ds;
+      const grade = Math.abs(n[j][2] - n[i][2]) / ds;
       if (grade > max) {
         (isStructure(cw) ? over.structure : over.ground).push({
-          grade, max, x: (n[i][0] + n[i + 1][0]) / 2, y: (n[i][1] + n[i + 1][1]) / 2, road: roadName(cw),
+          grade, max, x: (n[i][0] + n[j][0]) / 2, y: (n[i][1] + n[j][1]) / 2, road: roadName(cw),
         });
       }
+      ds -= Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
     }
   }
   const pack = (list) => {
     const w = worst(list, 'grade');
-    return { count: list.length, worst: w && { grade: round(w.grade, 3), limit: w.max, at: [round(w.x, 1), round(w.y, 1)], road: w.road } };
+    return { count: list.length, worst: w && { grade: round(w.grade, 3), limit: w.max, at: [round(w.x, 1), round(w.y, 1)], road: w.road }, top: top(list, 'grade', (it) => `${it.road} (limit ${Math.round(it.max * 100)}%)`) };
   };
   return { pairs, structure: pack(over.structure), ground: pack(over.ground) };
 }
@@ -183,7 +223,7 @@ export function checkCrossings(carriageways) {
     }
   }
   const w = worst(short, 'shortfall');
-  return { crossings, short: short.length, worst: w && { gap: round(w.gap), need: CROSSING_SEPARATION_M, at: [round(w.x, 1), round(w.y, 1)], roads: w.roads } };
+  return { crossings, short: short.length, worst: w && { gap: round(w.gap), need: CROSSING_SEPARATION_M, at: [round(w.x, 1), round(w.y, 1)], roads: w.roads }, top: top(short, 'shortfall', (it) => `${it.roads.join(' / ')} (gap ${round(it.gap)} m)`) };
 }
 
 /** Ground roads floating over or buried in the terrain. */
@@ -201,7 +241,7 @@ export function checkGroundGaps(carriageways, groundAt) {
     }
   }
   const w = worst(gaps, 'gap');
-  return { nodes, off: gaps.length, worst: w && { dz: round(w.dz), at: [round(w.x, 1), round(w.y, 1)], road: w.road } };
+  return { nodes, off: gaps.length, worst: w && { dz: round(w.dz), at: [round(w.x, 1), round(w.y, 1)], road: w.road }, top: top(gaps, 'gap', (it) => `${it.road} (${it.dz > 0 ? 'over' : 'under'} the ground)`) };
 }
 
 /**
@@ -253,7 +293,7 @@ export function checkThroughDecks(decks, groundAt) {
     }
   });
   const w = worst(hits, 'by');
-  return { samples, through: hits.length, worst: w && { by: round(w.by), at: [round(w.x, 1), round(w.y, 1)], deck: w.deck } };
+  return { samples, through: hits.length, worst: w && { by: round(w.by), at: [round(w.x, 1), round(w.y, 1)], deck: w.deck }, top: top(hits, 'by', (it) => it.deck) };
 }
 
 /**
@@ -309,7 +349,7 @@ export function checkSpikes(decks, tunnels, grid) {
     }
   }
   const w = worst(spikes, 'off');
-  return { pixels, spikes: spikes.length, worst: w && { off: round(w.off), at: [round(w.x, 1), round(w.y, 1)] } };
+  return { pixels, spikes: spikes.length, worst: w && { off: round(w.off), at: [round(w.x, 1), round(w.y, 1)] }, top: top(spikes, 'off', () => 'terrain') };
 }
 
 /**
