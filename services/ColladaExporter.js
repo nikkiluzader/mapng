@@ -204,12 +204,17 @@ class ColladaExporter {
         `<float_array id="${name}-array" count="${array.length}">`
       );
 
-      // Write float data in chunks to avoid allocation overflow
+      // Write float data in chunks to avoid allocation overflow. Values are
+      // rounded to 1e-5 (0.01 mm in metres, ~1.6 mm in the normalised scene
+      // units of a 16 km map; plenty for normals, UVs, colours):
+      // a Float32 printed in full ("1234.5677490234375") made Manhattan's
+      // building DAE 3.7 GB and took 26 s to write.
       const CHUNK = 65536;
       for (let i = 0; i < array.length; i += CHUNK) {
         if (i > 0) parts.push(' ');
         const end = Math.min(i + CHUNK, array.length);
-        const slice = Array.prototype.slice.call(array, i, end);
+        const slice = new Array(end - i);
+        for (let k = i; k < end; k++) slice[k - i] = Math.round(array[k] * 1e5) / 1e5;
         parts.push(slice.join(' '));
       }
 
