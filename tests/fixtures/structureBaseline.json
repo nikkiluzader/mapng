@@ -1,0 +1,134 @@
+{
+ "overpass on flat ground": {
+  "decks": 1,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "three-level stack": {
+  "decks": 2,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 1,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "bridge over a river between banks": {
+  "decks": 1,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "mountain tunnel through a ridge": {
+  "decks": 0,
+  "tunnels": 1,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 4
+ },
+ "urban cut-and-cover under a street grid": {
+  "decks": 0,
+  "tunnels": 1,
+  "steps": 2,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 4
+ },
+ "ramp joint between decks of different layers": {
+  "decks": 2,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 16,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "bridge tagged over nothing (culvert)": {
+  "decks": 1,
+  "tunnels": 0,
+  "steps": 2,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "tunnel tagged on flat ground": {
+  "decks": 0,
+  "tunnels": 1,
+  "steps": 2,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 4
+ },
+ "deck running off the map edge": {
+  "decks": 1,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "two crossings closer than a ramp": {
+  "decks": 1,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "footbridge over a road (not built yet)": {
+  "decks": 0,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "path under a road (not built yet)": {
+  "decks": 0,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ }
+}

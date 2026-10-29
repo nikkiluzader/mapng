@@ -5842,14 +5842,14 @@ function buildDetailedReportSections(d) {
     const gl = (o, what) => `${o.count} stretch(es) on ${what}${o.worst ? `; worst ${formatNumber(o.worst.grade * 100, 1)}% (limit ${formatNumber(o.worst.limit * 100, 0)}%) on ${o.worst.road}${at(o.worst)}` : ''}`;
     lines.push(`- Steeper than the road class allows: ${gl(g.structure, 'bridges/tunnels')}; ${gl(g.ground, 'ground roads')}`);
     const c = sc.crossings;
-    lines.push(`- Grade-separated crossings short of ${formatNumber(6.7, 1)} m (clearance + deck): ${c.short} of ${c.crossings}${c.worst ? `; worst ${formatNumber(c.worst.gap, 2)} m between ${c.worst.roads.join(' and ')}${at(c.worst)}` : ''}`);
+    lines.push(`- Grade-separated crossings short of 6.5 m (deck top over the road under it): ${c.short} of ${c.crossings}${c.worst ? `; worst ${formatNumber(c.worst.gap, 2)} m between ${c.worst.roads.join(' and ')}${at(c.worst)}` : ''}`);
     if (sc.groundGaps) {
       const gg = sc.groundGaps;
       lines.push(`- Ground road nodes floating over / buried in the terrain (> 0.5 m): ${gg.off} of ${gg.nodes}${gg.worst ? `; worst ${formatNumber(gg.worst.dz, 2)} m on ${gg.worst.road}${at(gg.worst)}` : ''}`);
     }
     if (sc.throughDecks) {
       const td = sc.throughDecks;
-      lines.push(`- Terrain through a deck's underside: ${td.through} of ${td.samples} samples${td.worst ? `; worst ${formatNumber(td.worst.by, 2)} m on ${td.worst.deck}${at(td.worst)}` : ''}`);
+      lines.push(`- Terrain over a deck's road surface or up into its clear underside: ${td.through} of ${td.samples} samples${td.worst ? `; worst ${formatNumber(td.worst.by, 2)} m on ${td.worst.deck}${at(td.worst)}` : ''}`);
     }
     const sp = sc.spikes;
     lines.push(`- Terrain spikes / pits near structures (> 2 m off their 3×3 median): ${sp.spikes} of ${sp.pixels} pixels${sp.worst ? `; worst ${formatNumber(sp.worst.off, 2)} m${at(sp.worst)}` : ''}`);
@@ -6381,7 +6381,7 @@ function geoToWorldPoint(lat, lng, terrainData, squareSize, zOffset = 0) {
  * world-space X/Y position. Inverse of geoToWorldPoint's planar mapping:
  *   worldX = (u - 0.5) * worldSize ; worldY = (0.5 - v) * worldSize.
  */
-function getTerrainHeightAtWorldXY(worldX, worldY, terrainData, squareSize) {
+export function getTerrainHeightAtWorldXY(worldX, worldY, terrainData, squareSize) {
   const { bounds, width } = terrainData;
   const worldSize = width * squareSize;
   const u = worldX / worldSize + 0.5;
