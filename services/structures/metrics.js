@@ -5,6 +5,8 @@
 //
 // Nothing here knows about any place: every check is geometry.
 
+import { DECK_ROAD_CLEAR_M } from '../beamngBridges.js';
+
 // Where two carriageway ends count as one joint (horizontal, m).
 const JOINT_REACH_M = 0.3;
 // A joint whose two sides differ by more than this is a step (m).
@@ -18,8 +20,11 @@ const GRADE_MAX = {
 };
 const GRADE_DEFAULT = 0.18;
 const GRADE_MIN_RUN_M = 2;        // node pairs closer than this are skipped
-// Vertical space a road passing over another needs: clearance + deck.
-const CROSSING_SEPARATION_M = 4.5 + 2.2;
+// Vertical space a road passing over another needs: the bridge design value
+// (deck top over the road under it: headroom + structure), less a tolerance
+// for DecalRoad offsets.
+const CROSSING_SEPARATION_M = DECK_ROAD_CLEAR_M;
+const CROSSING_TOLERANCE_M = 0.1;
 // Ground road nodes further than this from the terrain are floating or buried.
 const GROUND_GAP_M = 0.5;
 // Terrain sample over a deck's underside by more than this pokes through.
@@ -167,7 +172,7 @@ export function checkCrossings(carriageways) {
         // join (not a grade separation)
         if (!isStructure(A) && !isStructure(B) && layerOf(A) === layerOf(B) && gap < 1) continue;
         crossings++;
-        if (gap < CROSSING_SEPARATION_M) {
+        if (gap < CROSSING_SEPARATION_M - CROSSING_TOLERANCE_M) {
           short.push({
             shortfall: CROSSING_SEPARATION_M - gap, gap,
             x: na[i][0] + (na[i + 1][0] - na[i][0]) * hit.t, y: na[i][1] + (na[i + 1][1] - na[i][1]) * hit.t,
@@ -199,7 +204,13 @@ export function checkGroundGaps(carriageways, groundAt) {
   return { nodes, off: gaps.length, worst: w && { dz: round(w.dz), at: [round(w.x, 1), round(w.y, 1)], road: w.road } };
 }
 
-/** Terrain standing up through a deck's underside. */
+/**
+ * Terrain through a deck: standing over its road surface, or poking up into
+ * its underside where the ground before and after is clear of it. A low deck
+ * resting on its fill and a deck landing on its abutment are by design (the
+ * bridge code lets a deck rest where it runs within 1.5 m of the ground), so
+ * they are not counted.
+ */
 export function checkThroughDecks(decks, groundAt) {
   const hits = [];
   let samples = 0;
@@ -209,22 +220,34 @@ export function checkThroughDecks(decks, groundAt) {
       const { xy, z } = part;
       if (!xy || !z) continue;
       const under = part.depth ?? DECK_UNDERSIDE_M;
+      // samples along the part: per lane offset, ground, underside and top
+      const rows = [];
       for (let i = 0; i + 1 < xy.length; i++) {
         const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
         const L = Math.hypot(bx - ax, by - ay);
         if (L < 1e-6) continue;
         const nx = -(by - ay) / L; const ny = (bx - ax) / L;
         const steps = Math.max(1, Math.ceil(L / DECK_SAMPLE_M));
-        for (let k = 0; k <= steps; k++) {
+        for (let k = (rows.length ? 1 : 0); k <= steps; k++) {
           const f = k / steps;
           const cx = ax + (bx - ax) * f; const cy = ay + (by - ay) * f;
-          const bottom = z[i] + (z[i + 1] - z[i]) * f - under;
-          for (const o of [-part.half, 0, part.half]) {
-            const g = groundAt(cx + nx * o, cy + ny * o);
-            if (!Number.isFinite(g)) continue;
-            samples++;
-            if (g > bottom + THROUGH_DECK_M) hits.push({ by: g - bottom, x: cx + nx * o, y: cy + ny * o, deck: name });
+          const top = z[i] + (z[i + 1] - z[i]) * f;
+          rows.push([-part.half, 0, part.half].map((o) => ({ x: cx + nx * o, y: cy + ny * o, g: groundAt(cx + nx * o, cy + ny * o), top, bottom: top - under })));
+        }
+      }
+      const NEAR = 3;   // samples (6 m) before and after for "clear around it"
+      for (let k = 0; k < rows.length; k++) {
+        for (let lane = 0; lane < 3; lane++) {
+          const s0 = rows[k][lane];
+          if (!Number.isFinite(s0.g)) continue;
+          samples++;
+          let by = 0;
+          if (s0.g > s0.top + THROUGH_DECK_M) by = s0.g - s0.top;          // over the road surface
+          else if (s0.g > s0.bottom + THROUGH_DECK_M && k >= NEAR && k + NEAR < rows.length) {
+            const before = rows[k - NEAR][lane]; const after = rows[k + NEAR][lane];
+            if (before.g < before.bottom - 1 && after.g < after.bottom - 1) by = s0.g - s0.bottom;   // into a clear underside
           }
+          if (by > 0) hits.push({ by, x: s0.x, y: s0.y, deck: name });
         }
       }
     }
