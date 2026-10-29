@@ -110,6 +110,7 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
       layer: Number.isFinite(seg.layer) ? seg.layer : (Number.parseInt(tags.layer, 10) || 0),
       half: halfOf(seg),
       ...structureOf(tags),
+      structure: tags['bridge:structure'] || '',
       length: st.s[st.s.length - 1],
       ...st,
       g,

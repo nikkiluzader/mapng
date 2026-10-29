@@ -21,6 +21,7 @@ import { applyBuildingFoundations, gradeGarageFootprints } from './buildingFound
 import { ColladaExporter } from './ColladaExporter.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
+import { findCrossings } from './structures/crossings.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
 import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
@@ -4618,6 +4619,8 @@ function* decalRoadSteps(terrainData, squareSize) {
     halfOf,
     isFreeEnd: (x, y) => Math.abs(x) >= graphEdge || Math.abs(y) >= graphEdge,
   });
+  // stage B: crossings and their order, bridges over water (shadow mode too)
+  structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
   yield;
   // Tunnels and bridges, their earthworks graded before any road samples the
   // ground. The tunnels meeting no bridge first: a bridge over a tunnel's
@@ -5887,6 +5890,8 @@ function buildDetailedReportSections(d) {
     const sg = d.decalRoads?.structureGraph?.stats;
     if (sg) {
       lines.push(`- Structure solver graph (not used for the level yet): ${sg.nodes} nodes, ${sg.edges} edges (${sg.bridgeEdges} bridge, ${sg.tunnelEdges} tunnel), ${sg.stations} stations; ${sg.joints} joints where a road goes onto a bridge, into a tunnel or changes layer, ${sg.junctions} junctions (${sg.multiLevelJunctions} mixing layers), ${sg.ends} dead ends, ${sg.edgeOfMap} roads leaving the map`);
+      const cx = d.decalRoads.structureGraph.crossings?.stats;
+      if (cx) lines.push(`- Structure solver crossings (not used yet): ${cx.crossings} grade-separated (${cx.byLayer} by OSM layer, ${cx.byBridge} by bridge tag, ${cx.byTunnel} by tunnel tag), ${cx.unjoined} ground roads crossing level that OSM did not join; ${cx.waterRuns} bridge run(s) over water (${cx.channels} ship channel)`);
     }
     lines.push(`- Checked in ${sc.ms} ms.`);
   }
