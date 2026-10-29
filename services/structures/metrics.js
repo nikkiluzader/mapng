@@ -352,6 +352,115 @@ export function checkSpikes(decks, tunnels, grid) {
   return { pixels, spikes: spikes.length, worst: w && { off: round(w.off), at: [round(w.x, 1), round(w.y, 1)] }, top: top(spikes, 'off', () => 'terrain') };
 }
 
+// ── Road surface: what the road smoothing left under ground roads ─────────
+// Grade change over a few metres (a bump or dip), by road class.
+const KINK_MAX = {
+  motorway: 0.04, motorway_link: 0.05, trunk: 0.04, trunk_link: 0.05,
+  primary: 0.06, primary_link: 0.06, secondary: 0.06, secondary_link: 0.06,
+};
+const KINK_DEFAULT = 0.1;
+const KINK_RUN_M = 6;             // grade before and after a point, over this far
+const CROSS_STEP_M = 6;           // cross-section samples along a road
+const CROSS_SLOPE_MAX = 0.08;     // tilt across the road
+const CROSS_HUMP_M = 0.2;         // centre off the line between the two edges
+const JUNCTION_RING_M = 12;       // compare a junction's centre with this far out
+const JUNCTION_BUMP_M = 0.25;
+
+// height and position along a node list at arc length s (clamped)
+function along(n, s) {
+  let acc = 0;
+  for (let i = 0; i + 1 < n.length; i++) {
+    const L = Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
+    if (acc + L >= s || i + 2 === n.length) {
+      const f = L > 0 ? Math.min(1, Math.max(0, (s - acc) / L)) : 0;
+      return [n[i][0] + (n[i + 1][0] - n[i][0]) * f, n[i][1] + (n[i + 1][1] - n[i][1]) * f, n[i][2] + (n[i + 1][2] - n[i][2]) * f];
+    }
+    acc += L;
+  }
+  return n[n.length - 1];
+}
+
+/**
+ * The terrain under ground roads (the road smoothing's result): bumps and
+ * dips along them, tilt or a hump across them, and bumps or dips at the
+ * centre of junctions. `lines` as roadLinesFromDecals gives them.
+ */
+export function checkRoadSurface(lines, groundAt) {
+  const kinks = []; const cross = []; const bumps = [];
+  let kinkPts = 0; let crossPts = 0;
+  const ground = lines.filter((cw) => !isStructure(cw) && (cw.nodes || []).length >= 2);
+  for (const cw of ground) {
+    const n = cw.nodes;
+    const s = [0];
+    for (let i = 1; i < n.length; i++) s.push(s[i - 1] + Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]));
+    const total = s[s.length - 1];
+    const max = KINK_MAX[cw.highway] ?? KINK_DEFAULT;
+    // along: grade over the KINK_RUN_M before and after each point; one hit
+    // per bump (skip on past it)
+    for (let at = KINK_RUN_M; at + KINK_RUN_M <= total; at += 2) {
+      kinkPts++;
+      const a = along(n, at - KINK_RUN_M); const b = along(n, at); const c = along(n, at + KINK_RUN_M);
+      const kink = Math.abs((c[2] - b[2]) - (b[2] - a[2])) / KINK_RUN_M;
+      if (kink > max) { kinks.push({ kink, max, x: b[0], y: b[1], road: roadName(cw) }); at += KINK_RUN_M; }
+    }
+    // across: the ground at both edges and the centre
+    const half = cw.half || 3;
+    for (let at = 0; at <= total; at += CROSS_STEP_M) {
+      const p = along(n, at); const q = along(n, Math.min(total, at + 1));
+      const dx = q[0] - p[0]; const dy = q[1] - p[1]; const L = Math.hypot(dx, dy);
+      if (L < 1e-6) continue;
+      const nx = -dy / L; const ny = dx / L;
+      const gl = groundAt(p[0] + nx * half, p[1] + ny * half); const gr = groundAt(p[0] - nx * half, p[1] - ny * half); const gc = groundAt(p[0], p[1]);
+      if (![gl, gr, gc].every(Number.isFinite)) continue;
+      crossPts++;
+      const tilt = Math.abs(gl - gr) / (2 * half);
+      const hump = gc - (gl + gr) / 2;
+      if (tilt > CROSS_SLOPE_MAX || Math.abs(hump) > CROSS_HUMP_M) {
+        cross.push({ bad: Math.max(tilt / CROSS_SLOPE_MAX, Math.abs(hump) / CROSS_HUMP_M), tilt, hump, x: p[0], y: p[1], road: roadName(cw) });
+      }
+    }
+  }
+  // junctions: ground-road ends meeting three or more at a point
+  const ends = new Map();
+  ground.forEach((cw, li) => {
+    const n = cw.nodes;
+    for (const [node, fromStart] of [[n[0], true], [n[n.length - 1], false]]) {
+      const key = `${Math.round(node[0])},${Math.round(node[1])}`;
+      if (!ends.has(key)) ends.set(key, []);
+      ends.get(key).push({ li, fromStart, x: node[0], y: node[1] });
+    }
+  });
+  let junctions = 0;
+  for (const list of ends.values()) {
+    if (new Set(list.map((e) => e.li)).size < 3) continue;
+    junctions++;
+    const cx = list.reduce((a, e) => a + e.x, 0) / list.length; const cy = list.reduce((a, e) => a + e.y, 0) / list.length;
+    const gc = groundAt(cx, cy);
+    const ring = [];
+    for (const e of list) {
+      const n = ground[e.li].nodes;
+      let total = 0;
+      for (let i = 1; i < n.length; i++) total += Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]);
+      if (total < JUNCTION_RING_M) continue;
+      const p = along(n, e.fromStart ? JUNCTION_RING_M : total - JUNCTION_RING_M);
+      const g = groundAt(p[0], p[1]);
+      if (Number.isFinite(g)) ring.push(g);
+    }
+    if (ring.length < 3 || !Number.isFinite(gc)) continue;
+    const bump = gc - ring.reduce((a, v) => a + v, 0) / ring.length;
+    if (Math.abs(bump) > JUNCTION_BUMP_M) {
+      const names = [...new Set(list.map((e) => roadName(ground[e.li])))].slice(0, 3).join(' / ');
+      bumps.push({ size: Math.abs(bump), bump, x: cx, y: cy, roads: names });
+    }
+  }
+  const wk = worst(kinks, 'kink'); const wc = worst(cross, 'bad'); const wb = worst(bumps, 'size');
+  return {
+    kinks: { points: kinkPts, count: kinks.length, worst: wk && { kink: round(wk.kink, 3), limit: wk.max, at: [round(wk.x, 1), round(wk.y, 1)], road: wk.road }, top: top(kinks, 'kink', (it) => `${it.road} (limit ${Math.round(it.max * 100)}%)`) },
+    cross: { points: crossPts, count: cross.length, worst: wc && { tilt: round(wc.tilt, 3), hump: round(wc.hump), at: [round(wc.x, 1), round(wc.y, 1)], road: wc.road }, top: top(cross, 'bad', (it) => `${it.road} (tilt ${Math.round(it.tilt * 100)}%, hump ${round(it.hump)} m)`) },
+    junctions: { checked: junctions, count: bumps.length, worst: wb && { bump: round(wb.bump), at: [round(wb.x, 1), round(wb.y, 1)], roads: wb.roads }, top: top(bumps, 'size', (it) => `${it.roads} (${it.bump > 0 ? 'bump' : 'dip'})`) },
+  };
+}
+
 /**
  * All structure checks for one export. `carriageways` as generateDecalRoads
  * returns them ({ nodes: [[x, y, z, w]...], bridge, tunnel, highway, tags }),
@@ -367,6 +476,7 @@ export function measureStructures({ carriageways = [], decks = [], tunnels = [],
     groundGaps: groundAt ? checkGroundGaps(carriageways, groundAt) : null,
     throughDecks: groundAt ? checkThroughDecks(decks, groundAt) : null,
     spikes: checkSpikes(decks, tunnels, grid),
+    surface: groundAt ? checkRoadSurface(carriageways, groundAt) : null,
   };
   result.ms = Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - t0);
   return result;
