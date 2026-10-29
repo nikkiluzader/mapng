@@ -73,3 +73,28 @@ test('spikes: an isolated pillar beside a deck is found, a retaining-wall step i
   assert.equal(r.spikes, 1);
   assert.equal(r.worst.off, 9);
 });
+
+test('road surface: a smooth road passes; a bump, a sideways tilt and a round junction hump are found', async () => {
+  const { checkRoadSurface } = await import('../services/structures/metrics.js');
+  // ground roads draped on terrain h(x, y), nodes every 2 m
+  const line = (h, x0, y0, x1, y1, extra = {}) => {
+    const L = Math.hypot(x1 - x0, y1 - y0); const n = Math.round(L / 2); const nodes = [];
+    for (let i = 0; i <= n; i++) { const x = x0 + (x1 - x0) * i / n; const y = y0 + (y1 - y0) * i / n; nodes.push([x, y, h(x, y), 3.5]); }
+    return { nodes, highway: 'secondary', half: 3.5, tags: {}, ...extra };
+  };
+  const smooth = (x) => 0.03 * x;
+  const flatOk = checkRoadSurface([line(smooth, 0, 0, 200, 0)], smooth);
+  assert.equal(flatOk.kinks.count + flatOk.cross.count + flatOk.junctions.count, 0);
+  const bumpy = (x) => 0.6 * Math.exp(-(((x - 100) / 3) ** 2));
+  assert.ok(checkRoadSurface([line(bumpy, 0, 0, 200, 0)], bumpy).kinks.count >= 1, 'bump found');
+  const tilted = (x, y) => 0.15 * y;
+  assert.ok(checkRoadSurface([line(tilted, 0, 0, 200, 0)], tilted).cross.count > 0, 'tilt found');
+  const disc = (x, y) => (Math.hypot(x, y) < 6 ? 0.5 : 0);
+  const arms = [[60, 0], [-60, 0], [0, 60], [0, -60]].map(([x, y]) => line(disc, 0, 0, x, y));
+  const j = checkRoadSurface(arms, disc);
+  assert.equal(j.junctions.checked, 1);
+  assert.equal(j.junctions.count, 1);
+  assert.equal(j.junctions.worst.bump, 0.5);
+  // a bridge is not a ground road
+  assert.equal(checkRoadSurface([line(bumpy, 0, 0, 200, 0, { bridge: true })], bumpy).kinks.points, 0);
+});

@@ -5870,6 +5870,13 @@ function buildDetailedReportSections(d) {
     }
     const sp = sc.spikes;
     lines.push(`- Terrain spikes / pits near structures (> 2 m off their 3×3 median): ${sp.spikes} of ${sp.pixels} pixels${sp.worst ? `; worst ${formatNumber(sp.worst.off, 2)} m${at(sp.worst)}` : ''}`);
+    const rs = sc.surface;
+    if (rs) {
+      lines.push('- Road surface (the terrain the road smoothing left under ground roads):');
+      lines.push(`  - Bumps / dips along roads (grade changing more than the class allows within 6 m): ${rs.kinks.count} of ${rs.kinks.points} points${rs.kinks.worst ? `; worst ${formatNumber(rs.kinks.worst.kink * 100, 1)}% (limit ${formatNumber(rs.kinks.worst.limit * 100, 0)}%) on ${rs.kinks.worst.road}${at(rs.kinks.worst)}` : ''}`);
+      lines.push(`  - Tilted (> 8%) or humped (> 0.2 m) across the road: ${rs.cross.count} of ${rs.cross.points} cross-sections${rs.cross.worst ? `; worst tilt ${formatNumber(rs.cross.worst.tilt * 100, 1)}%, hump ${formatNumber(rs.cross.worst.hump, 2)} m on ${rs.cross.worst.road}${at(rs.cross.worst)}` : ''}`);
+      lines.push(`  - Junction centres bumped or dipped (> 0.25 m off the roads 12 m out): ${rs.junctions.count} of ${rs.junctions.checked} junctions${rs.junctions.worst ? `; worst ${formatNumber(rs.junctions.worst.bump, 2)} m at ${rs.junctions.worst.roads}${at(rs.junctions.worst)}` : ''}`);
+    }
     // the worst places of each check, to fly to (F11 world editor or free camera)
     const places = [
       ['Steps where roads meet (m)', sc.joints.top],
@@ -5879,6 +5886,9 @@ function buildDetailedReportSections(d) {
       ['Ground roads off the terrain (m)', sc.groundGaps?.top],
       ['Terrain through decks (m)', sc.throughDecks?.top],
       ['Terrain spikes / pits (m)', sc.spikes.top],
+      ['Road bumps / dips (grade change)', sc.surface?.kinks.top],
+      ['Road tilted / humped across', sc.surface?.cross.top],
+      ['Junction centre bumps / dips (m)', sc.surface?.junctions.top],
     ].filter(([, list]) => list?.length);
     if (places.length) {
       lines.push('- Worst places per check (value, world x, y, what):');
