@@ -22,6 +22,8 @@ import { ColladaExporter } from './ColladaExporter.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
+import { solveProfilesSteps } from './structures/profileSolve.js';
+import { checkJoints, checkGrades, checkCrossings } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
 import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
@@ -4622,6 +4624,19 @@ function* decalRoadSteps(terrainData, squareSize) {
   // stage B: crossings and their order, bridges over water (shadow mode too)
   structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
   yield;
+  // stage C: every road's profile in one solve (shadow mode: measured with
+  // the same checks as the level's roads, for the report)
+  {
+    const t0 = performance.now();
+    structureGraph.profile = yield* solveProfilesSteps(structureGraph);
+    structureGraph.profile.ms = Math.round(performance.now() - t0);
+    const lines = structureGraph.edges.map((e, k) => ({
+      nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
+      highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
+    }));
+    structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
+  }
+  yield;
   // Tunnels and bridges, their earthworks graded before any road samples the
   // ground. The tunnels meeting no bridge first: a bridge over a tunnel's
   // trench (North 7th Street over I-10 at Deck Park, Phoenix) spans it at the
@@ -5902,6 +5917,10 @@ function buildDetailedReportSections(d) {
       lines.push(`- Structure solver graph (not used for the level yet): ${sg.nodes} nodes, ${sg.edges} edges (${sg.bridgeEdges} bridge, ${sg.tunnelEdges} tunnel), ${sg.stations} stations; ${sg.joints} joints where a road goes onto a bridge, into a tunnel or changes layer, ${sg.junctions} junctions (${sg.multiLevelJunctions} mixing layers), ${sg.ends} dead ends, ${sg.edgeOfMap} roads leaving the map`);
       const cx = d.decalRoads.structureGraph.crossings?.stats;
       if (cx) lines.push(`- Structure solver crossings (not used yet): ${cx.crossings} grade-separated (${cx.byLayer} by OSM layer, ${cx.byBridge} by bridge tag, ${cx.byTunnel} by tunnel tag), ${cx.unjoined} ground roads crossing level that OSM did not join; ${cx.waterRuns} bridge run(s) over water (${cx.channels} ship channel)`);
+      const pf = d.decalRoads.structureGraph.profile; const pv = d.decalRoads.structureGraph.previewChecks;
+      if (pf && pv) {
+        lines.push(`- Structure solver profile preview (not used yet; ${pf.rounds} rounds, ${pf.ms} ms): steps ${pv.joints.steps}, too steep ${pv.grades.structure.count + pv.grades.ground.count}, short crossings ${pv.crossings.short} of ${pv.crossings.crossings}; remaining violations: joints ${pf.residual.joint} m, crossings ${pf.residual.crossing} m, grade +${pf.residual.grade}, water ${pf.residual.water} m, tunnel cover ${pf.residual.cover} m`);
+      }
     }
     lines.push(`- Checked in ${sc.ms} ms.`);
   }
