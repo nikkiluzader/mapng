@@ -19,6 +19,7 @@ import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations, gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
+import { measureStructures } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
 import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
@@ -5829,6 +5830,32 @@ function buildDetailedReportSections(d) {
   lines.push(`- Footpaths, cycleways and trails drawn (beside a street's raised sidewalk left out): ${footpathCount} piece(s), ${formatNumber((groups.footpaths || []).reduce((n, f) => n + pathLength(f.nodes), 0) / 1000, 2)} km`);
   lines.push('- Stone and brick paving (surface=sett/cobblestone/unhewn_cobblestone/paving_stones/bricks) is laid in strips about one texture tile wide: mapng_road_* materials, art/roads/main.materials.json.');
 
+  // ── Structure checks ───────────────────────────────────────────────────────
+  const sc = d.structureChecks;
+  if (sc) {
+    section('Structure checks');
+    lines.push('- How well roads, bridges and tunnels fit together and the terrain around them. 0 is the goal for every count; "at" is world x, y in metres (F11 world editor coordinates).');
+    const at = (w) => (w ? ` at (${w.at.join(', ')})` : '');
+    const j = sc.joints;
+    lines.push(`- Steps where roads meet (ends > ${0.1} m apart in height): ${j.steps} of ${j.joints} joints${j.worst ? `; worst ${formatNumber(j.worst.dz, 2)} m between ${j.worst.roads.join(' and ')}${at(j.worst)}` : ''}`);
+    const g = sc.grades;
+    const gl = (o, what) => `${o.count} stretch(es) on ${what}${o.worst ? `; worst ${formatNumber(o.worst.grade * 100, 1)}% (limit ${formatNumber(o.worst.limit * 100, 0)}%) on ${o.worst.road}${at(o.worst)}` : ''}`;
+    lines.push(`- Steeper than the road class allows: ${gl(g.structure, 'bridges/tunnels')}; ${gl(g.ground, 'ground roads')}`);
+    const c = sc.crossings;
+    lines.push(`- Grade-separated crossings short of ${formatNumber(6.7, 1)} m (clearance + deck): ${c.short} of ${c.crossings}${c.worst ? `; worst ${formatNumber(c.worst.gap, 2)} m between ${c.worst.roads.join(' and ')}${at(c.worst)}` : ''}`);
+    if (sc.groundGaps) {
+      const gg = sc.groundGaps;
+      lines.push(`- Ground road nodes floating over / buried in the terrain (> 0.5 m): ${gg.off} of ${gg.nodes}${gg.worst ? `; worst ${formatNumber(gg.worst.dz, 2)} m on ${gg.worst.road}${at(gg.worst)}` : ''}`);
+    }
+    if (sc.throughDecks) {
+      const td = sc.throughDecks;
+      lines.push(`- Terrain through a deck's underside: ${td.through} of ${td.samples} samples${td.worst ? `; worst ${formatNumber(td.worst.by, 2)} m on ${td.worst.deck}${at(td.worst)}` : ''}`);
+    }
+    const sp = sc.spikes;
+    lines.push(`- Terrain spikes / pits near structures (> 2 m off their 3×3 median): ${sp.spikes} of ${sp.pixels} pixels${sp.worst ? `; worst ${formatNumber(sp.worst.off, 2)} m${at(sp.worst)}` : ''}`);
+    lines.push(`- Checked in ${sc.ms} ms.`);
+  }
+
   // ── Bridges ────────────────────────────────────────────────────────────────
   section('Bridges');
   const bridges = d.bridges;
@@ -10552,6 +10579,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       jobLog,
       buildingReport,
       bridges: decalRoads.bridges,
+      structureChecks: measureStructures({
+        carriageways: decalRoads.carriageways || [],
+        decks: bridgeDecks,
+        tunnels: tunnelList,
+        groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+        grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
+      }),
       bridgeDaes,
       tunnels: decalRoads.tunnels,
       tunnelDaes,
