@@ -75,7 +75,8 @@ test('buildTexturedBuildings: textured, outward-facing, deterministic geometry',
 
   // Every wall triangle faces away from its building's centre; roofs face up.
   const centres = [[6, 4.5], [55, 10], [130, 20]];
-  const pos = meshes[0].geometry.getAttribute('position');
+  // (indexed geometry: walk its triangles on a de-indexed copy)
+  const pos = meshes[0].geometry.toNonIndexed().getAttribute('position');
   const a = new THREE.Vector3(); const b = new THREE.Vector3(); const c = new THREE.Vector3();
   let walls = 0; let roofs = 0;
   const ups = []; const downs = [];
@@ -110,7 +111,7 @@ test('buildTexturedBuildings: textured, outward-facing, deterministic geometry',
   }
 
   const again = buildTexturedBuildings(feats, project).meshes[0].geometry.getAttribute('position').array;
-  assert.deepEqual(Array.from(again), Array.from(pos.array), 'same input, same building');
+  assert.deepEqual(Array.from(again), Array.from(meshes[0].geometry.getAttribute('position').array), 'same input, same building');
 });
 
 test('material defs: v1.5, vertex-coloured, one per material name', () => {
@@ -133,6 +134,7 @@ test('a whole neighbourhood builds (regression: spread into push() overflowed th
   // "buildings_1", "buildings_2" nodes made the shape invalid in-game.
   for (const m of meshes) assert.doesNotMatch(m.name, /\d$/, `mesh name ${m.name} must not end in a digit`);
   assert.equal(new Set(meshes.map((m) => m.name)).size, meshes.length, 'unique names');
-  const vertices = meshes.reduce((n, m) => n + m.geometry.getAttribute('position').count, 0);
-  assert.ok(vertices > 100000, `${vertices} vertices`);
+  // (indexed: three corners per triangle, as many as unshared vertices were)
+  const corners = meshes.reduce((n, m) => n + m.geometry.index.count, 0);
+  assert.ok(corners > 100000, `${corners} triangle corners`);
 });

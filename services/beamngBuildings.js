@@ -554,48 +554,64 @@ class MeshBuilder {
 
   part(mat) {
     let p = this.parts.get(mat);
-    if (!p) { p = { pos: [], uv: [], col: [] }; this.parts.set(mat, p); }
+    if (!p) { p = { pos: [], uv: [], col: [], idx: [] }; this.parts.set(mat, p); }
     return p;
   }
 
   tri(mat, a, b, c, ua, ub, uc, col) {
     const p = this.part(mat);
+    const base = p.pos.length / 3;
     p.pos.push(...a, ...b, ...c);
     p.uv.push(...ua, ...ub, ...uc);
     for (let i = 0; i < 3; i++) p.col.push(col[0], col[1], col[2]);
+    p.idx.push(base, base + 1, base + 2);
   }
 
-  /** Quad a-b-c-d counter-clockwise seen from its front. */
+  /**
+   * Quad a-b-c-d counter-clockwise seen from its front: four shared
+   * vertices, not six (indexed: a third less vertex data in the DAE, which
+   * ran to gigabytes for a city).
+   */
   quad(mat, a, b, c, d, ua, ub, uc, ud, col) {
-    this.tri(mat, a, b, c, ua, ub, uc, col);
-    this.tri(mat, a, c, d, ua, uc, ud, col);
+    const p = this.part(mat);
+    const base = p.pos.length / 3;
+    p.pos.push(...a, ...b, ...c, ...d);
+    p.uv.push(...ua, ...ub, ...uc, ...ud);
+    for (let i = 0; i < 4; i++) p.col.push(col[0], col[1], col[2]);
+    p.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
   }
 
   toMesh(name) {
     // Copy into preallocated typed arrays: spreading a whole neighbourhood's
     // vertices into push() overflows the call stack.
     let total = 0;
-    for (const p of this.parts.values()) total += p.pos.length / 3;
+    let totalIdx = 0;
+    for (const p of this.parts.values()) { total += p.pos.length / 3; totalIdx += p.idx.length; }
     if (total === 0) return null;
     const geo = new THREE.BufferGeometry();
     const pos = new Float32Array(total * 3);
     const uv = new Float32Array(total * 2);
     const col = new Float32Array(total * 3);
+    const index = new Uint32Array(totalIdx);
     const materials = [];
     let start = 0;
+    let istart = 0;
     for (const [mat, p] of this.parts) {
       const count = p.pos.length / 3;
       if (count === 0) continue;
       pos.set(p.pos, start * 3);
       uv.set(p.uv, start * 2);
       col.set(p.col, start * 3);
-      geo.addGroup(start, count, materials.length);
+      for (let k = 0; k < p.idx.length; k++) index[istart + k] = p.idx[k] + start;
+      geo.addGroup(istart, p.idx.length, materials.length);
       materials.push(new THREE.MeshStandardMaterial({ name: BUILDING_MATERIALS[mat], vertexColors: true }));
       start += count;
+      istart += p.idx.length;
     }
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(index, 1));
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, materials);
     mesh.name = name;

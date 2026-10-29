@@ -998,7 +998,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
     reportStats.built = buildingCount;
     reportStats.stats = buildingStats;
     reportStats.meshes = buildingMeshes.length;
-    reportStats.triangles = buildingMeshes.reduce((n, m) => n + (m.geometry.getAttribute('position')?.count || 0) / 3, 0);
+    reportStats.triangles = buildingMeshes.reduce((n, m) => n + (m.geometry.index?.count ?? m.geometry.getAttribute('position')?.count ?? 0) / 3, 0);
   }
 
   // Barriers are exported as native TSStatic objects in BeamNG scene JSON,
@@ -1039,6 +1039,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
     const parts = buildingMeshes.map((mesh) => {
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', mesh.geometry.getAttribute('position').clone());
+      if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
       return g;
     });
     const collisionGeom = mergeGeometries(parts);
