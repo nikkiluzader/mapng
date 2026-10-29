@@ -1105,6 +1105,9 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
   // Compute world matrices with base00 as the root (not a Scene).
   base00.updateMatrixWorld(true);
 
+  // (the browser gets the thread back between building the meshes and
+  // writing them: together ~15 s for Manhattan's 51k buildings)
+  await new Promise((r) => setTimeout(r, 0));
   // Pass base00 directly so it becomes the top-level node in <visual_scene>,
   // matching the reference flag asset structure.
   const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
@@ -3978,7 +3981,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - xy[
  * half width. Bridges are solved first: a bridge meeting a portal sets its
  * height (and gets no cutting).
  */
-function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set() } = {}) {
+function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set() } = {}) {
   const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [] };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
@@ -4205,7 +4208,6 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
     if (nearestOnTunnel(t, x, y, reach)) return true;
     return (t.cuts || []).some((cut) => cut.line.some((q) => Math.hypot(q.x - x, q.y - y) < reach));
   };
-  const gradeAll = (list) => { for (const t of list) gradeOne(t); };
   const gradeOne = (t) => {
     const [c0, r0, c1, r1] = pixelBox(t);
     let changed = 0;
@@ -4225,29 +4227,39 @@ function solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, hal
     }
     t.gradedPixels = changed;
   };
-  gradeAll(out.tunnels);
+  // (a pause after each tunnel graded: the browser gets the thread back)
+  for (const t of out.tunnels) { gradeOne(t); yield; }
   // then the galleries (and the hillside tunnels short of rock that become
   // galleries), on the ground as it is now
   if (!early) {
     const before = out.tunnels.length;
     for (const path of galleryPaths) solvePath(path);
     const fresh = out.tunnels.slice(before);
-    gradeAll(fresh);
+    for (const t of fresh) { gradeOne(t); yield; }
   }
   const holes = new Set();
   for (const t of out.tunnels) {
     const [c0, r0, c1, r1] = pixelBox(t);
     let opened = 0;
     // square (c, r) spans pixels c..c+1 and r-1..r (north): layer index of
-    // its south-west sample
-    for (let r = Math.max(1, r0); r <= r1; r++) {
-      for (let c = c0; c < Math.min(c1, width - 1); c++) {
-        const corners = [hm.at(r * width + c), hm.at(r * width + c + 1), hm.at((r - 1) * width + c), hm.at((r - 1) * width + c + 1)];
-        const [x, y] = toWorld(c + 0.5, r - 0.5);
-        if (tunnelHoleAt(t, x, y, Math.min(...corners) - minHeight, Math.max(...corners) - minHeight)) { holes.add((height - 1 - r) * width + c); opened++; }
+    // its south-west sample (blocks far from the tube skipped, as in the
+    // grading: every square of a long diagonal tunnel's box took 17 s in
+    // Manhattan)
+    const rStart = Math.max(1, r0); const cEnd = Math.min(c1, width - 1);
+    for (let br = rStart; br <= r1; br += BLOCK) {
+      for (let bc = c0; bc < cEnd; bc += BLOCK) {
+        if (!nearBlock(t, bc, br)) continue;
+        for (let r = br; r < Math.min(r1 + 1, br + BLOCK); r++) {
+          for (let c = bc; c < Math.min(cEnd, bc + BLOCK); c++) {
+            const corners = [hm.at(r * width + c), hm.at(r * width + c + 1), hm.at((r - 1) * width + c), hm.at((r - 1) * width + c + 1)];
+            const [x, y] = toWorld(c + 0.5, r - 0.5);
+            if (tunnelHoleAt(t, x, y, Math.min(...corners) - minHeight, Math.max(...corners) - minHeight)) { holes.add((height - 1 - r) * width + c); opened++; }
+          }
+        }
       }
     }
     t.holes = opened;
+    yield;
   }
   out.holes = [...holes];
   if (globalThis.__MAPNG_TUNNEL_DEBUG) globalThis.__MAPNG_TUNNEL_DEBUG(out, { groundAt, toWorld, toPixel, bridges, width, height, hmAt: (idx) => hm.at(idx) - minHeight });
@@ -4602,11 +4614,11 @@ function* decalRoadSteps(terrainData, squareSize) {
   // Then the bridges (the road nodes on a bridge ride on its deck), then the
   // tunnels a bridge meets (a portal takes the deck's height).
   const done = new Set();
-  const early = solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done });
+  const early = yield* solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done });
   yield;
   const bridges = solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   yield;
-  const late = solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
+  const late = yield* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
   yield;
   const tunnels = joinTunnelPhases(early, late);
   // a road reaching into a tube it is no part of (a ramp OSM ends a few
@@ -9629,6 +9641,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // over it)
   const roadSpawn = findRoadSpawn(groundCarriageways, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), underDeck, { leftHandTraffic: resolvedRightHandDrive });
   if (roadSpawn) ({ position: spawnPosition, rotationMatrix: spawnRotationMatrix } = roadSpawn);
+  await yield_();
   const bridgeDaes = generateBridgeDAEs(
     bridgeDecks,
     (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
@@ -9640,7 +9653,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (bridgeDecks.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles, one object per bridge.`);
   }
+  await yield_();
   const tunnelDaes = generateTunnelDAEs(tunnelList);
+  await yield_();
   const tunnelGroups = buildTunnelGroups(tunnelList, tunnelDaes, levelName);
   if (tunnelList.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tunnels: ${tunnelList.length} bored, ${tunnelDaes.length} object(s), ${tunnelDaes.reduce((n, d) => n + d.triangles, 0)} triangles, ${tunnelGroups.lightCount} lights, ${tunnelGroups.zoneCount} zones.`);
