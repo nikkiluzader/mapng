@@ -35,7 +35,8 @@ const CELL_M = 32;
 const round = (v, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 const roadName = (cw) => cw?.tags?.name || cw?.tags?.ref || cw?.highway || 'road';
 const layerOf = (cw) => Number.parseInt(cw?.tags?.layer, 10) || 0;
-const isStructure = (cw) => !!(cw?.bridge || cw?.tunnel);
+// (carried: an approach road a deck is carried on along, a walled ramp)
+const isStructure = (cw) => !!(cw?.bridge || cw?.carried || cw?.tunnel);
 
 function worst(list, key) {
   let best = null;

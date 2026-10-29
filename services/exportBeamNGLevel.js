@@ -4778,7 +4778,7 @@ function* decalRoadSteps(terrainData, squareSize) {
       carriageways.push({
         owner: segIndex, nodes: centerNodes, half: styleHalfWidth,
         tags: renderTags, highway, urban: urbanRoad, wayId: feature.id, oneWay: isOneWay,
-        bridge: !!bridgePart, tunnel: tunnels.bySeg.has(segIndex),
+        bridge: !!bridgePart, carried: !!carriedPart, tunnel: tunnels.bySeg.has(segIndex),
         leftExtra: crossSection.leftExtra, rightExtra: crossSection.rightExtra,
       });
 
