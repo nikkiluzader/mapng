@@ -48,7 +48,7 @@ export function composeTerrain(graph, grid) {
     }
     return t;
   };
-  const stats = { pixels: 0, capped: 0, corridors: 0 };
+  const stats = { pixels: 0, capped: 0, corridors: 0, wallPixels: 0, roadUnderDeckTooLow: 0 };
   if (!z) return { tiles, stats, heightAt: () => NaN, apply: () => {} };
 
   // kind per station of every edge
@@ -131,9 +131,15 @@ export function composeTerrain(graph, grid) {
           const tt = d <= core ? 0 : (d - core) / slope;
           if (tt >= 1) continue;
           const target = zc + (h0 - zc) * smoothstep(tt);
-          // nearest core wins; equals average
-          if (tt < t.w[j] - 1e-3) { t.w[j] = tt; t.h[j] = target; t.n[j] = 1; }
-          else if (Math.abs(tt - t.w[j]) <= 1e-3) { t.h[j] = (t.h[j] * t.n[j] + target) / (t.n[j] + 1); t.n[j] = Math.min(255, t.n[j] + 1); }
+          // the road whose core is physically nearest owns the pixel (inside
+          // two cores, the nearer centreline; equal: averaged). Two roads side by side at different
+          // heights then meet in a step midway between them, where a
+          // retaining wall stands, instead of tilting into both.
+          // negative inside a road's core (the nearer centreline wins there
+          // too); abutment fill never counts as a road core
+          const out = abutment ? Math.max(1e-3, d - core) : d - core;
+          if (out < t.w[j] - 1e-3) { t.w[j] = out; t.h[j] = target; t.n[j] = 1; }
+          else if (Math.abs(out - t.w[j]) <= 1e-3) { t.h[j] = (t.h[j] * t.n[j] + target) / (t.n[j] + 1); t.n[j] = Math.min(255, t.n[j] + 1); }
         }
       }
     }
@@ -146,6 +152,9 @@ export function composeTerrain(graph, grid) {
     const j = (r % TILE) * TILE + (c % TILE);
     const base = Number.isFinite(t.w[j]) ? t.h[j] : raw(c, r) - minHeight;
     if (!Number.isFinite(t.w[j]) && !Number.isFinite(t.cap[j])) return NaN;
+    // a road's own core is never dug below its surface by a deck over it
+    // (too little room there is the crossing's problem, counted, not a trench)
+    if (t.w[j] <= 0) return base;
     return Math.min(base, t.cap[j]);
   };
   for (const [key, t] of tiles) {
@@ -153,11 +162,25 @@ export function composeTerrain(graph, grid) {
     for (let j = 0; j < TILE * TILE; j++) {
       if (Number.isFinite(t.w[j]) || Number.isFinite(t.cap[j])) {
         stats.pixels++;
+        if (t.w[j] <= 0 && t.cap[j] < t.h[j]) stats.roadUnderDeckTooLow++;
         if (Number.isFinite(t.cap[j])) {
           const c = tc * TILE + (j % TILE); const r = tr * TILE + Math.floor(j / TILE);
           if (c < width && r < height && edited(c, r) < (Number.isFinite(t.w[j]) ? t.h[j] : raw(c, r) - minHeight)) stats.capped++;
         }
       }
+    }
+  }
+  // steps between neighbouring edited pixels: where retaining walls go
+  const WALL_STEP_M = 0.5;
+  for (const key of tiles.keys()) {
+    const tc = Math.floor(key / 65536); const tr = key - tc * 65536;
+    for (let j = 0; j < TILE * TILE; j++) {
+      const c = tc * TILE + (j % TILE); const r = tr * TILE + Math.floor(j / TILE);
+      if (c + 1 >= width || r + 1 >= height) continue;
+      const h = edited(c, r);
+      if (!Number.isFinite(h)) continue;
+      const hx = edited(c + 1, r); const hy = edited(c, r + 1);
+      if ((Number.isFinite(hx) && Math.abs(hx - h) > WALL_STEP_M) || (Number.isFinite(hy) && Math.abs(hy - h) > WALL_STEP_M)) stats.wallPixels++;
     }
   }
   const heightAt = (x, y) => {

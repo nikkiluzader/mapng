@@ -5933,7 +5933,7 @@ function buildDetailedReportSections(d) {
       const vt = d.decalRoads.structureGraph.terrain;
       if (vt) {
         const su = vt.surface;
-        lines.push(`- Structure solver v2 TERRAIN APPLIED (test switch): ${vt.pixels} pixels, ${vt.capped} held under decks, ${vt.ms} ms; under the solver's roads: ${su.kinks.count} bumps/dips, ${su.cross.count} tilted/humped cross-sections, ${su.junctions.count} of ${su.junctions.checked} junction centres off`);
+        lines.push(`- Structure solver v2 TERRAIN APPLIED (test switch): ${vt.pixels} pixels, ${vt.capped} held under decks, ${vt.wallPixels} on retaining-wall steps, ${vt.roadUnderDeckTooLow} road-core pixels under a deck too low over them (not dug), ${vt.ms} ms; under the solver's roads: ${su.kinks.count} bumps/dips, ${su.cross.count} tilted/humped cross-sections, ${su.junctions.count} of ${su.junctions.checked} junction centres off`);
         for (const [title, list] of [['bumps/dips', su.kinks.top], ['cross-sections', su.cross.top], ['junctions', su.junctions.top]]) {
           if (list?.length) lines.push(`  - v2 worst ${title}: ${list.slice(0, 5).map((p) => `${p.value} at (${p.at.join(', ')}) ${p.what}`).join('; ')}`);
         }
