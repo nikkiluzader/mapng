@@ -24,7 +24,8 @@ import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
-import { checkJoints, checkGrades, checkCrossings } from './structures/metrics.js';
+import { composeTerrain } from './structures/terrainCompose.js';
+import { checkJoints, checkGrades, checkCrossings, checkRoadSurface } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
 import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
@@ -4636,6 +4637,7 @@ function* decalRoadSteps(terrainData, squareSize) {
       highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
     }));
     structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
+    Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
     // stage D: what each stretch becomes
     structureGraph.classes = classifyStructures(structureGraph);
   }
@@ -5927,6 +5929,14 @@ function buildDetailedReportSections(d) {
         const label = { deck: 'deck', embankment: 'embankment', boredTunnel: 'bored tunnel', cutAndCover: 'cut-and-cover', cutting: 'cutting' };
         const parts = order.filter((k) => cl.byKind[k]).map((k) => `${label[k]} ${cl.byKind[k]} (${formatNumber(cl.lengthByKind[k] / 1000, 2)} km)`);
         lines.push(`- Structure solver classes (not used yet): ${parts.join(', ') || 'all ground'}; ${cl.culverts} bridge tag(s) over nothing (culverts), ${cl.untaggedDecks} untagged stretch(es) that need a deck, ${cl.openTunnels} tunnel tag(s) too shallow for a roof (open cutting)`);
+      }
+      const vt = d.decalRoads.structureGraph.terrain;
+      if (vt) {
+        const su = vt.surface;
+        lines.push(`- Structure solver v2 TERRAIN APPLIED (test switch): ${vt.pixels} pixels, ${vt.capped} held under decks, ${vt.ms} ms; under the solver's roads: ${su.kinks.count} bumps/dips, ${su.cross.count} tilted/humped cross-sections, ${su.junctions.count} of ${su.junctions.checked} junction centres off`);
+        for (const [title, list] of [['bumps/dips', su.kinks.top], ['cross-sections', su.cross.top], ['junctions', su.junctions.top]]) {
+          if (list?.length) lines.push(`  - v2 worst ${title}: ${list.slice(0, 5).map((p) => `${p.value} at (${p.at.join(', ')}) ${p.what}`).join('; ')}`);
+        }
       }
       if (pf && pv) {
         lines.push(`- Structure solver profile preview (not used yet; ${pf.rounds} rounds, ${pf.ms} ms): steps ${pv.joints.steps}, too steep ${pv.grades.structure.count + pv.grades.ground.count}, short crossings ${pv.crossings.short} of ${pv.crossings.crossings}; remaining violations: joints ${pf.residual.joint} m, crossings ${pf.residual.crossing} m, grade +${pf.residual.grade}, water ${pf.residual.water} m, tunnel cover ${pf.residual.cover} m`);
@@ -9735,6 +9745,23 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
+  // Structure solver v2 terrain (stage E), behind a test switch until the
+  // bridge and tunnel objects come from the solver too: the terrain the
+  // solved roads need, composed and written in one pass over the result.
+  const sg = decalRoads.structureGraph;
+  if (options.structureSolver === 'v2-terrain' && sg?.classes) {
+    const t0 = performance.now();
+    const composed = composeTerrain(sg, {
+      heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+      worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+    });
+    const hm = heightMapEditor(exportTerrainData);
+    composed.apply((idx, v) => hm.set(idx, v));
+    sg.terrain = { ...composed.stats, ms: Math.round(performance.now() - t0) };
+    sg.terrain.surface = checkRoadSurface(sg.previewLines || [], (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2 terrain: ${composed.stats.pixels} pixels in ${composed.stats.corridors} corridors, ${composed.stats.capped} held under decks, ${sg.terrain.ms} ms.`);
+    await yield_();
+  }
   const bridgeDecks = decalRoads.bridges?.decks || [];
   // Tunnels likewise: no sidewalks, lamps or props inside, nothing standing
   // in a tube, a headwall or a cutting's walls (the hill over it is free).
