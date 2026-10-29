@@ -163,11 +163,11 @@ export const SCENE_SQUARE_SIZE = SQ;
  */
 export async function runStructureScene(scene) {
   const { generateDecalRoads, getTerrainHeightAtWorldXY } = await import('../../services/exportBeamNGLevel.js');
-  const { measureStructures } = await import('../../services/structures/metrics.js');
+  const { measureStructures, roadLinesFromDecals } = await import('../../services/structures/metrics.js');
   const td = scene.build();
   const groups = generateDecalRoads(td, SQ);
   const checks = measureStructures({
-    carriageways: groups.carriageways || [],
+    carriageways: roadLinesFromDecals(groups),
     decks: groups.bridges?.decks || [],
     tunnels: groups.tunnels?.tunnels || [],
     groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, td, SQ),
