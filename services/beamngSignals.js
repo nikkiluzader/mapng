@@ -181,6 +181,49 @@ function inferSignalLaneRole(tags = {}) {
   ]);
 }
 
+// Roads binned by bounding box on a lat/lng grid, cached per road list:
+// each signal approach scanned every road on the map (Manhattan's ~3k
+// signals x 40k roads). nearbyRoads returns every road whose box comes
+// within maxDistance of the point, so results are unchanged.
+const ROAD_GRID_DEG = 0.002;
+const roadGrids = new WeakMap();
+function roadGridFor(roadFeatures) {
+  let grid = roadGrids.get(roadFeatures);
+  if (grid) return grid;
+  grid = new Map();
+  for (const road of roadFeatures) {
+    const geom = road?.geometry;
+    if (!Array.isArray(geom) || geom.length < 2) continue;
+    let minLat = Infinity; let maxLat = -Infinity; let minLng = Infinity; let maxLng = -Infinity;
+    for (const p of geom) {
+      if (p.lat < minLat) minLat = p.lat; if (p.lat > maxLat) maxLat = p.lat;
+      if (p.lng < minLng) minLng = p.lng; if (p.lng > maxLng) maxLng = p.lng;
+    }
+    for (let gy = Math.floor(minLat / ROAD_GRID_DEG); gy <= Math.floor(maxLat / ROAD_GRID_DEG); gy++) {
+      for (let gx = Math.floor(minLng / ROAD_GRID_DEG); gx <= Math.floor(maxLng / ROAD_GRID_DEG); gx++) {
+        const key = `${gx},${gy}`;
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(road);
+      }
+    }
+  }
+  roadGrids.set(roadFeatures, grid);
+  return grid;
+}
+
+function nearbyRoads(point, roadFeatures, maxDistance) {
+  const grid = roadGridFor(roadFeatures);
+  const dLat = maxDistance / 111320;
+  const dLng = maxDistance / (111320 * Math.max(0.01, Math.cos((point.lat * Math.PI) / 180)));
+  const out = new Set();
+  for (let gy = Math.floor((point.lat - dLat) / ROAD_GRID_DEG); gy <= Math.floor((point.lat + dLat) / ROAD_GRID_DEG); gy++) {
+    for (let gx = Math.floor((point.lng - dLng) / ROAD_GRID_DEG); gx <= Math.floor((point.lng + dLng) / ROAD_GRID_DEG); gx++) {
+      for (const road of grid.get(`${gx},${gy}`) || []) out.add(road);
+    }
+  }
+  return out;
+}
+
 function inferRoadLaneRoleNearPoint(point, signalDir, roadFeatures, maxDistance = 35) {
   if (!Array.isArray(roadFeatures) || roadFeatures.length === 0) return 'unknown';
 
@@ -189,7 +232,7 @@ function inferRoadLaneRoleNearPoint(point, signalDir, roadFeatures, maxDistance 
   const maxDistSq = maxDistance * maxDistance;
   let best = null;
 
-  for (const road of roadFeatures) {
+  for (const road of nearbyRoads(point, roadFeatures, maxDistance)) {
     const geom = road.geometry;
     for (let i = 0; i < geom.length - 1; i++) {
       const a = geom[i];
@@ -246,7 +289,7 @@ function inferNearestRoadHighwayNearPoint(point, signalDir, roadFeatures, maxDis
   const maxDistSq = maxDistance * maxDistance;
   let best = null;
 
-  for (const road of roadFeatures) {
+  for (const road of nearbyRoads(point, roadFeatures, maxDistance)) {
     const geom = road.geometry;
     for (let i = 0; i < geom.length - 1; i++) {
       const a = geom[i];
@@ -300,7 +343,7 @@ function hasProtectedTurnHintNearPoint(point, signalDir, roadFeatures, maxDistan
   const metersPerDegLng = 111320 * Math.cos((point.lat * Math.PI) / 180);
   const maxDistSq = maxDistance * maxDistance;
 
-  for (const road of roadFeatures) {
+  for (const road of nearbyRoads(point, roadFeatures, maxDistance)) {
     if (!roadHasLeftTurnHint(road.tags || {})) continue;
     const geom = road.geometry;
 

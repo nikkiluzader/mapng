@@ -1055,7 +1055,7 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
 // every lamp, pole and wire point scanned every deck, a minute of
 // Manhattan's export. Margins past DECK_GRID_PAD_M scan everything.
 const DECK_GRID_CELL_M = 32;
-const DECK_GRID_PAD_M = 2;
+const DECK_GRID_PAD_M = 4;
 const deckGrids = new WeakMap();
 function deckGridFor(decks) {
   const cached = deckGrids.get(decks);
@@ -1118,27 +1118,38 @@ function deckSegmentHit(part, i, x, y, z, zTop, margin) {
  */
 export function alongDeck(decks, x, y, z, yaw, margin = 1.5, farMargin = 3) {
   const ux = Math.cos(yaw); const uy = Math.sin(yaw);
+  if (Math.max(margin, farMargin) <= DECK_GRID_PAD_M) {
+    const cell = deckGridFor(decks).get(`${Math.floor(x / DECK_GRID_CELL_M)},${Math.floor(y / DECK_GRID_CELL_M)}`);
+    if (!cell) return false;
+    for (let j = 0; j < cell.length; j += 2) {
+      if (deckSegmentAlong(cell[j], cell[j + 1], x, y, z, ux, uy, margin, farMargin)) return true;
+    }
+    return false;
+  }
   for (const deck of decks) {
     for (const part of deck.parts) {
-      const { xy } = part;
-      for (let i = 0; i + 1 < xy.length; i++) {
-        const [ax, ay] = xy[i];
-        const [bx, by] = xy[i + 1];
-        const vx = bx - ax; const vy = by - ay;
-        const L = Math.hypot(vx, vy) || 1e-9;
-        const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (L * L)));
-        const off = Math.hypot(ax + vx * t - x, ay + vy * t - y) - part.half - PARAPET_W_M;
-        if (off > farMargin) continue;
-        if (Math.abs((vx * ux + vy * uy) / L) < 0.85) continue;
-        const top = part.z[i] + (part.z[i + 1] - part.z[i]) * t;
-        // by its edge under any deck; a little further out (OSM maps the
-        // railing wider than the deck is drawn) only under a real overpass,
-        // not a low ramp beside a ground road with its own guardrail
-        if (off <= margin ? top > z + 1 : top > z + 3) return true;
+      for (let i = 0; i + 1 < part.xy.length; i++) {
+        if (deckSegmentAlong(part, i, x, y, z, ux, uy, margin, farMargin)) return true;
       }
     }
   }
   return false;
+}
+
+function deckSegmentAlong(part, i, x, y, z, ux, uy, margin, farMargin) {
+  const [ax, ay] = part.xy[i];
+  const [bx, by] = part.xy[i + 1];
+  const vx = bx - ax; const vy = by - ay;
+  const L = Math.hypot(vx, vy) || 1e-9;
+  const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / (L * L)));
+  const off = Math.hypot(ax + vx * t - x, ay + vy * t - y) - part.half - PARAPET_W_M;
+  if (off > farMargin) return false;
+  if (Math.abs((vx * ux + vy * uy) / L) < 0.85) return false;
+  const top = part.z[i] + (part.z[i + 1] - part.z[i]) * t;
+  // by its edge under any deck; a little further out (OSM maps the
+  // railing wider than the deck is drawn) only under a real overpass,
+  // not a low ramp beside a ground road with its own guardrail
+  return off <= margin ? top > z + 1 : top > z + 3;
 }
 
 // ── Approach embankments (MapNG; BeamNG.Earth streams its terrain and cannot) ─
