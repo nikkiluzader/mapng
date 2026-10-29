@@ -211,6 +211,25 @@
             {{ t('preview.hybrid') }}
           </button>
           <button
+            @click="textureType = 'game'"
+            :disabled="!terrainData.gameTextureUrl && !terrainData.gameTextureCanvas"
+            :title="
+              !terrainData.gameTextureUrl && !terrainData.gameTextureCanvas
+                ? t('preview.noGameData')
+                : t('preview.showGameLayer')
+            "
+            :class="[
+              'flex-1 text-xs py-1.5 rounded transition-colors',
+              textureType === 'game'
+                ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+                : !terrainData.gameTextureUrl && !terrainData.gameTextureCanvas
+                  ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
+            ]"
+          >
+            {{ t('preview.game') }}
+          </button>
+          <button
             @click="textureType = 'none'"
             :class="[
               'flex-1 text-xs py-1.5 rounded transition-colors',

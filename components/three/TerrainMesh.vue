@@ -446,7 +446,8 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
 const textureCache = reactive({
   satellite: null,
   osm: null,
-  hybrid: null
+  hybrid: null,
+  game: null
 });
 
 // Track canvas refs for direct CanvasTexture usage
@@ -549,6 +550,13 @@ watch(() => props.terrainData?.hybridTextureUrl, (url) => {
     textureCache.hybrid = loadTexture(url);
     if (!url) console.warn("[TerrainMesh] hybrid texture: no canvas and no url — texture will be null");
   }
+}, { immediate: true });
+
+// Game Texture: from its URL, or its canvas without freeing it (the BeamNG
+// export reads terrainData.gameTextureCanvas)
+watch(() => [props.terrainData?.gameTextureUrl, props.terrainData?.gameTextureCanvas], ([url, canvas]) => {
+  if (textureCache.game) textureCache.game.dispose();
+  textureCache.game = url ? loadTexture(url) : (canvas ? loadCanvasTexture(canvas, () => {}) : null);
 }, { immediate: true });
 
 // The currently active texture is just a lookup in our cache
