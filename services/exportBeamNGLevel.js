@@ -10551,6 +10551,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         },
       ]
     : processingLog.slice();
+  // (structure checks, for the report and returned with the zip)
+  const structureChecks = measureStructures({
+    carriageways: roadLinesFromDecals(decalRoads),
+    decks: bridgeDecks,
+    tunnels: tunnelList,
+    groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+    grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
+  });
   const reportContents = buildBeamNGExportReport({
     terrainData: exportTerrainData,
     originalTerrainData: terrainData,
@@ -10598,13 +10606,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       jobLog,
       buildingReport,
       bridges: decalRoads.bridges,
-      structureChecks: measureStructures({
-        carriageways: roadLinesFromDecals(decalRoads),
-        decks: bridgeDecks,
-        tunnels: tunnelList,
-        groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
-        grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
-      }),
+      structureChecks,
       bridgeDaes,
       tunnels: decalRoads.tunnels,
       tunnelDaes,
@@ -11365,5 +11367,5 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   lastPct = 100;
   onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - exportT0, completed: processingLog[processingLog.length - 1] ?? null });
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
-  return { blob: zipBlob, filename: `${levelName}.zip` };
+  return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks };
 }
