@@ -8,6 +8,23 @@ const SPEED_DEFAULT = 10;
 const APPROACH_M = 70;      // road driven before and after a structure
 const JOIN_M = 4;           // line ends this close continue each other
 const EDGE_CLEAR_M = 60;    // routes stay this far inside the map's edge
+const KIND_SLOTS = { tunnel: 2 }; // routes per round (more tunnel runs)
+const TUNNEL_APART_M = 15;  // twin bores are routes of their own
+// turn routes
+const TURN_CLASSES = new Set(['residential', 'unclassified', 'tertiary', 'secondary', 'primary', 'living_street']);
+// (bigger streets first; tertiary ones last)
+const TURN_RANK = { primary: 0, secondary: 1, residential: 2, unclassified: 3, living_street: 4, tertiary: 5 };
+const TURN_ROUTE_M = 350;    // walk this far
+const TURN_MAX = 4;          // turns at most
+const TURN_MIN_DEG = 35;     // a turn, not going straight on
+const TURN_MAX_DEG = 150;    // not doubling back
+const TURN_GAP_M = 60;       // straight on at least this far between turns
+const TURN_SPACING_M = 150;  // turn routes this far apart (other parts of the map)
+const TURN_CRUISE_MS = 12;
+const TURN_SPEED_MS = 7;     // through a turn
+const TURN_SLOW_M = 15;      // ... from this far either side of it
+// a stable spread order over the map: interleaves its quarters
+const spreadKey = (c) => { const m = c.points[c.points.length >> 1]; return ((Math.floor(m[0] / 97) * 73856093) ^ (Math.floor(m[1] / 97) * 19349663)) >>> 0; };
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const len = (p) => p.reduce((s, q, i) => (i ? s + dist(q, p[i - 1]) : 0), 0);
@@ -25,10 +42,12 @@ function take(points, m) {
  * with APPROACH_M of the road that continues it at either end.
  * lines: [{ k: road|deck|tunnel|sidewalk, hw, road, p: [[x, y, z]...] }].
  * offset: start each kind's list at its Nth longest (other routes);
- * worldSize: the map's width, routes kept EDGE_CLEAR_M inside its edge.
- * Returns [{ kind, road, points: [[x, y, z]...], speed, half }].
+ * worldSize: the map's width, routes kept EDGE_CLEAR_M inside its edge;
+ * kinds: of deck, tunnel, turns (street walks through junctions), steep.
+ * Returns [{ kind, road, points: [[x, y, z]...], speed, half, halves, speeds? }]
+ * (halves: each point's own road's half width; speeds: per point, turn routes).
  */
-export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0, worldSize = 0 } = {}) {
+export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0, worldSize = 0, kinds = ['deck', 'tunnel', 'turns'] } = {}) {
   const drivable = lines.filter((l) => l.k !== 'sidewalk' && l.p.length >= 2 && !['footway', 'path', 'steps', 'cycleway', 'pedestrian', 'bridleway', 'track'].includes(l.road));
   // the line continuing a point (an end of another line there), best aligned
   const continuation = (pt, dir, self) => {
@@ -39,7 +58,7 @@ export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0, wo
         if (dist(end, pt) > JOIN_M || pts.length < 2) continue;
         const d2 = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]]; const n2 = Math.hypot(...d2) || 1;
         const align = (dir[0] * d2[0] + dir[1] * d2[1]) / n2;
-        if (align > 0.5 && (!best || align > best.align)) best = { pts, align, road: l.road };
+        if (align > 0.5 && (!best || align > best.align)) best = { pts, align, road: l.road, hw: l.hw };
       }
     }
     return best;
@@ -53,7 +72,11 @@ export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0, wo
     const before = continuation(p[0], n(dStart), l);
     const head = before ? take(before.pts, APPROACH_M).reverse() : [];
     const tail = after ? take(after.pts, APPROACH_M) : [];
-    return [...head.slice(0, -1), ...p, ...tail.slice(1)];
+    // (each point keeps its own road's half width: the approaches may be
+    // narrower than the structure)
+    const pts = [...head.slice(0, -1), ...p, ...tail.slice(1)];
+    pts.halves = [...head.slice(0, -1).map(() => before.hw || 3), ...p.map(() => l.hw || 3), ...tail.slice(1).map(() => after.hw || 3)];
+    return pts;
   };
   // the stretch of a route clear of the map's edge (EDGE_CLEAR_M: room to
   // stop; a route run to the edge sent the car off the map) holding `mid`
@@ -66,41 +89,108 @@ export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0, wo
     if (!isIn(pts[m])) return [];
     let a = m; while (a > 0 && isIn(pts[a - 1])) a--;
     let b = m; while (b + 1 < pts.length && isIn(pts[b + 1])) b++;
-    return pts.slice(a, b + 1);
+    const out = pts.slice(a, b + 1);
+    if (pts.halves) out.halves = pts.halves.slice(a, b + 1);
+    return out;
   };
   const candidates = [];
   for (const l of drivable) {
     if (l.k === 'deck' && len(l.p) >= 15) candidates.push({ kind: 'deck', l });
-    else if (l.k === 'tunnel' && len(l.p) >= 20) candidates.push({ kind: 'tunnel', l });
+    else if (l.k === 'tunnel' && len(l.p) >= 20) {
+      // (both ways through: a portal is met from either side)
+      candidates.push({ kind: 'tunnel', l, src: l });
+      candidates.push({ kind: 'tunnel', l: { ...l, p: [...l.p].reverse() }, src: l, reversed: true });
+    }
     else if (l.k === 'road' && len(l.p) >= 40) {
       let rise = 0;
       for (let i = 1; i < l.p.length; i++) rise = Math.max(rise, Math.abs(l.p[i][2] - l.p[i - 1][2]) / (dist(l.p[i], l.p[i - 1]) || 1));
       if (rise > steepGrade) candidates.push({ kind: 'steep', l });
     }
   }
+  // turn routes: walks through the street network from ordinary streets,
+  // turning at junctions (left and right in turn), slowing for each turn
+  if (kinds.includes('turns')) {
+    const streets = drivable.filter((l) => l.k === 'road' && TURN_CLASSES.has(l.road));
+    const ends = [];
+    streets.forEach((l) => { ends.push([l, 0], [l, l.p.length - 1]); });
+    const dir = (a, b) => { const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1; return [dx / L, dy / L]; };
+    // continuations at a point: [line, points in walking order]
+    const nextAt = (pt, self) => ends.filter(([l, i]) => l !== self && dist(l.p[i], pt) <= JOIN_M).map(([l, i]) => [l, i === 0 ? l.p : [...l.p].reverse()]);
+    for (const start of streets) {
+      if (len(start.p) < 30) continue;
+      let pts = [...start.p]; let cur = start; let turns = 0; let wantLeft = true; let sinceTurn = len(pts);
+      const turnAt = []; const seen = new Set([start]); const halves = start.p.map(() => start.hw || 3);
+      while (len(pts) < TURN_ROUTE_M) {
+        const tail = pts[pts.length - 1];
+        const din = dir(pts[pts.length - 2], tail);
+        let turn = null; let straight = null;
+        for (const [l, q] of nextAt(tail, cur)) {
+          if (q.length < 2 || seen.has(l)) continue;
+          const dout = dir(q[0], q[1]);
+          const cross = din[0] * dout[1] - din[1] * dout[0]; const dot = din[0] * dout[0] + din[1] * dout[1];
+          const ang = Math.atan2(cross, dot) * 180 / Math.PI;   // + left
+          if (Math.abs(ang) < TURN_MIN_DEG) { if (!straight || Math.abs(ang) < Math.abs(straight.ang)) straight = { l, q, ang }; continue; }
+          if (Math.abs(ang) > TURN_MAX_DEG) continue;
+          const score = (ang > 0) === wantLeft ? 0 : 1;
+          if (!turn || score < turn.score) turn = { l, q, score, ang };
+        }
+        // a turn once far enough on from the last (and while turns are left),
+        // else straight on; a turn when there is no straight on
+        const next = turn && turns < TURN_MAX && (sinceTurn >= TURN_GAP_M || !straight) ? turn : straight || (turns < TURN_MAX ? turn : null);
+        if (!next) break;
+        const turned = next === turn;
+        if (turned) { turnAt.push(pts.length - 1); turns++; wantLeft = next.ang < 0; sinceTurn = 0; }
+        sinceTurn += len(next.q);
+        halves.push(...next.q.slice(1).map(() => next.l.hw || 3));
+        pts = [...pts, ...next.q.slice(1)]; cur = next.l; seen.add(next.l);
+      }
+      if (turns < 2) continue;
+      pts.halves = halves;
+      candidates.push({ kind: 'turns', l: start, points: pts, turnAt, road: start.road });
+    }
+  }
   // every kind in turn, longest first within a kind
   const byKind = new Map();
-  for (const c of candidates) { if (!byKind.has(c.kind)) byKind.set(c.kind, []); byKind.get(c.kind).push(c); }
+  for (const c of candidates) {
+    if (!kinds.includes(c.kind)) continue;
+    if (!byKind.has(c.kind)) byKind.set(c.kind, []); byKind.get(c.kind).push(c);
+  }
   // (offset: the Nth longest of each kind first, the ones before it last:
   // other routes over the same level)
   for (const [kind, list] of byKind) {
-    list.sort((a, b) => len(b.l.p) - len(a.l.p));
+    // (turn walks: by more turns, then all over the map, not one quarter)
+    if (kind === 'turns') list.sort((a, b) => (TURN_RANK[a.road] ?? 9) - (TURN_RANK[b.road] ?? 9) || b.turnAt.length - a.turnAt.length || spreadKey(a) - spreadKey(b));
+    else list.sort((a, b) => len(b.l.p) - len(a.l.p));
     const k = list.length ? offset % list.length : 0;
     byKind.set(kind, [...list.slice(k), ...list.slice(0, k)]);
   }
   const routes = [];
   const used = [];
+  const slots = [...byKind.keys()].flatMap((k) => Array(KIND_SLOTS[k] || 1).fill(k));
   while (routes.length < max && [...byKind.values()].some((l) => l.length)) {
-    for (const list of byKind.values()) {
+    for (const kind of slots) {
+      const list = byKind.get(kind);
       const c = list.shift();
       if (!c || routes.length >= max) continue;
       // (not the same place twice: a parallel carriageway or a piece of one)
-      const mid = c.l.p[c.l.p.length >> 1];
-      if (used.some((u) => dist(u, mid) < 40)) continue;
-      used.push(mid);
-      const points = inside(extend(c.l), c.l.p[c.l.p.length >> 1]);
+      const src = c.points || c.l.p;
+      const mid = src[src.length >> 1];
+      const apart = c.kind === 'turns' ? TURN_SPACING_M : c.kind === 'tunnel' ? TUNNEL_APART_M : 40;
+      // (a tunnel's run the other way is not "the same place")
+      if (used.some((u) => dist(u, mid) < apart && !(c.src && u.src === c.src && u.reversed !== !!c.reversed))) continue;
+      const full = c.points || extend(c.l);
+      const points = inside(full, mid);
       if (points.length < 2) continue;
-      routes.push({ kind: c.kind, road: c.l.road, points, speed: SPEED[c.l.road] ?? SPEED_DEFAULT, half: c.l.hw || 3 });
+      used.push(Object.assign([...mid], { src: c.src, reversed: !!c.reversed }));
+      const route = { kind: c.kind, road: c.road || c.l.road, points, speed: SPEED[c.l.road] ?? SPEED_DEFAULT, half: c.l.hw || 3, halves: points.halves || points.map(() => c.l.hw || 3) };
+      if (c.turnAt) {
+        // slow through each turn (the AI is held to the speed at a point)
+        const turns = c.turnAt.map((i) => full[i]);
+        route.speed = Math.min(route.speed, TURN_CRUISE_MS);
+        route.speeds = points.map((q) => (turns.some((t) => dist(t, q) < TURN_SLOW_M) ? TURN_SPEED_MS : route.speed));
+        route.turns = turns.filter((t) => points.includes(t)).length;
+      }
+      routes.push(route);
     }
   }
   return routes;

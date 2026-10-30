@@ -32,13 +32,16 @@ import { EYE_GOOGLE_M, PITCH, H_FOV, bearing, levelGeo, streetView, vFovFor } fr
 import { key } from '../sweep/env.mjs';
 
 const args = process.argv.slice(2);
-const level = args.find((a, i) => !a.startsWith('--') && !['--routes', '--json', '--only', '--out', '--vary'].includes(args[i - 1]));
+const level = args.find((a, i) => !a.startsWith('--') && !['--routes', '--json', '--only', '--out', '--vary', '--kinds'].includes(args[i - 1]));
 const opt = (n, d) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const URL_MCP = process.env.BEAMNG_MCP_URL || 'http://127.0.0.1:29292/mcp';
-if (!level) { console.error('usage: driveTest.mjs <levelName> [--load] [--routes 12] [--only N] [--out dir] [--json out.json] [--no-street] [--vary N] [--reverse]'); process.exit(2); }
+if (!level) { console.error('usage: driveTest.mjs <levelName> [--load] [--routes 12] [--only N] [--out dir] [--json out.json] [--no-street] [--vary N] [--reverse] [--kinds deck,tunnel,turns,steep]'); process.exit(2); }
 const OVERHEAD_CLEAR_M = 4.2; // a structure over a start lower than this blocks it
 const PATH_EDGE_M = 1.3;    // the AI's corridor this far inside the road's edges
 const PATH_MIN_R_M = 1;
+const END_EASE_M = 60;       // the AI eases off over a route's last metres
+const END_SPEED_MS = 4;
+const STOP_DECEL_MS2 = 5;    // braking assumed when judging the stopping distance
 const STOP_HANDOVER_MS = 3;  // the brake hands over to the parking brake below this speed
 const SPAWN_TRIES = 3;
 const MAX_SANE_MS = 100;   // a speed reading past this is the game's teleport artefact
@@ -331,7 +334,7 @@ async function drive(route, n) {
   // A bad spawn is photographed and tried again further on, SPAWN_TRIES
   // times; none good: the route is reported as not spawned.
   const spawns = [];
-  let damage0 = null; let spawned = false;
+  let damage0 = null; let spawned = false; let k0 = 0;
   for (let a = 0; a < starts.length; a++) {
     const q0 = p[starts[a]];
     const rest = p.slice(starts[a]);
@@ -388,7 +391,7 @@ async function drive(route, n) {
     if (speed > 1.5) problems.push(`moving ${speed.toFixed(1)} m/s after settling`);
     const spawn = { x: Math.round(q0[0]), y: Math.round(q0[1]), roll, pitch, problems };
     spawns.push(spawn);
-    if (!problems.length) { p = rest; damage0 = dmgB; spawned = true; break; }
+    if (!problems.length) { p = rest; k0 = starts[a]; damage0 = dmgB; spawned = true; break; }
     if (dmgA !== null && dmgB !== null && dmgB - dmgA > 50) spawn.parts = await damagedParts();
     await status(`bad spawn (${problems.join(', ')})${spawn.parts?.length ? `: ${partsText(spawn.parts)} damaged` : ''}; taking screenshots`);
     spawn.shots = await capture(n, `spawn ${a + 1}`, { pause: false, street: false });
@@ -408,8 +411,17 @@ async function drive(route, n) {
   // the AI's corridor: a radius (half width; the docs say width), kept a
   // car's width inside the road's edges (the whole width as the radius
   // let it cut lines into the parapets)
-  const pathRadius = Math.max(PATH_MIN_R_M, route.half - PATH_EDGE_M);
-  const script = p.map((q, i) => `{x=${q[0].toFixed(2)},y=${q[1].toFixed(2)},z=${q[2].toFixed(2)},r=${pathRadius.toFixed(1)},v=${(i === 0 ? route.speed * 0.6 : route.speed).toFixed(1)}}`).join(',');
+  // (each point's own road: an approach may be narrower than the structure)
+  // (easing off over the last END_EASE_M: arriving at speed, the car slid
+  // on past the route's end into whatever is there)
+  const toEnd = new Array(p.length).fill(0);
+  for (let i = p.length - 2; i >= 0; i--) toEnd[i] = toEnd[i + 1] + Math.hypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]);
+  const speedAt = (i) => {
+    const v = i === 0 ? route.speed * 0.6 : (route.speeds?.[k0 + i] ?? route.speed);
+    return toEnd[i] < END_EASE_M ? Math.min(v, END_SPEED_MS + (v - END_SPEED_MS) * (toEnd[i] / END_EASE_M)) : v;
+  };
+  const radiusAt = (i) => Math.max(PATH_MIN_R_M, (route.halves?.[k0 + i] ?? route.half) - PATH_EDGE_M);
+  const script = p.map((q, i) => `{x=${q[0].toFixed(2)},y=${q[1].toFixed(2)},z=${q[2].toFixed(2)},r=${radiusAt(i).toFixed(1)},v=${speedAt(i).toFixed(1)}}`).join(',');
   await lua(`
     _G.mapngDrive = { samples = {}, on = true }
     local veh = be:getPlayerVehicle(0)
@@ -432,12 +444,13 @@ async function drive(route, n) {
   const end = p[p.length - 1];
   const length = p.reduce((s, q, i) => (i ? s + Math.hypot(q[0] - p[i - 1][0], q[1] - p[i - 1][1]) : 0), 0);
   const timeout = Date.now() + (length / route.speed * 2.5 + 20) * 1000;
-  let stillFor = 0; let reversing = 0; let incident = null; const trail = [];
+  let stillFor = 0; let reversing = 0; let incident = null; let reachedEnd = false; const trail = [];
   const started = Date.now();
   while (Date.now() < timeout) {
     await sleep(500);
     const [x, y, z, sp, fwd] = (await lua('local v = be:getPlayerVehicle(0) local p = v:getPosition() local u = v:getVelocity() local d = v:getDirectionVector():normalized() return string.format("%.2f,%.2f,%.2f,%.2f,%.2f", p.x, p.y, p.z, math.sqrt(u.x*u.x+u.y*u.y), u:dot(d))')).split(',').map(Number);
-    if (Math.hypot(x - end[0], y - end[1]) < 10) break;
+    // (the end within the car's stopping distance)
+    if (Math.hypot(x - end[0], y - end[1]) < 10 + (sp * sp) / (2 * STOP_DECEL_MS2)) { reachedEnd = true; break; }
     // the moment something goes wrong: a crash, stuck, under the road
     const dmg = await damageNow();
     let near = p[0]; for (const q of p) if (Math.hypot(q[0] - x, q[1] - y) < Math.hypot(near[0] - x, near[1] - y)) near = q;
@@ -475,6 +488,8 @@ async function drive(route, n) {
   await stopCar();
   const damage1 = await damageNow();
   const result = analyseDrive({ ...route, points: p }, samples, { settle: 1.5, damage: damage0 !== null && damage1 !== null ? { start: damage0, end: damage1 } : null });
+  // (stopped at its stopping distance from the end: done)
+  if (reachedEnd && !incident) result.completed = true;
   if (incident) {
     result.incident = incident;
     const what = [incident.impact ? `${incident.impact.where} impact ${incident.impact.dv} m/s` : '', incident.parts?.length ? partsText(incident.parts, 3) : ''].filter(Boolean).join('; ');
@@ -500,10 +515,13 @@ async function main() {
   if (!data?.lines) throw new Error(`${level} has no road lines in its probes (re-export: probes v3)`);
   if (data.geo?.bounds && data.geo?.worldSize) GEO = levelGeo(data.geo);
   ROADS = data.lines.filter((l) => l.k !== 'sidewalk' && !NON_DRIVABLE.has(l.road));
-  let routes = buildRoutes(data.lines, { max: Number(opt('--routes', '12')), offset: Number(opt('--vary', '0')), worldSize: data.geo?.worldSize || 0 });
+  let routes = buildRoutes(data.lines, {
+    max: Number(opt('--routes', '12')), offset: Number(opt('--vary', '0')), worldSize: data.geo?.worldSize || 0,
+    ...(args.includes('--kinds') ? { kinds: opt('--kinds', '').split(',') } : {}),
+  });
   // --reverse: every route driven end to start (against a one-way road's
   // traffic: the structures are what is tested)
-  if (args.includes('--reverse')) routes = routes.map((r) => ({ ...r, points: [...r.points].reverse(), kind: `${r.kind} reversed` }));
+  if (args.includes('--reverse')) routes = routes.map((r) => ({ ...r, points: [...r.points].reverse(), ...(r.speeds ? { speeds: [...r.speeds].reverse() } : {}), ...(r.halves ? { halves: [...r.halves].reverse() } : {}), kind: `${r.kind} reversed` }));
   // --only N: just route N (to watch one)
   if (args.includes('--only')) routes = [routes[Number(opt('--only', '1')) - 1]].filter(Boolean);
   console.log(`Drive tests: ${level} (${routes.length} routes)`);
@@ -511,7 +529,7 @@ async function main() {
   let bad = false;
   for (const [i, route] of routes.entries()) {
     let r;
-    STATUS_PREFIX = `MapNG drive test ${i + 1}/${routes.length} · ${route.kind} ${route.road} · `;
+    STATUS_PREFIX = `MapNG drive test ${i + 1}/${routes.length} · ${route.kind}${route.turns ? ` (${route.turns} turns)` : ''} ${route.road} · `;
     try { r = await drive(route, i + 1); } catch (err) { r = { completed: false, events: [{ type: 'error', value: String(err.message).slice(0, 120) }] }; await calm(); }
     results.push({ i, kind: route.kind, road: route.road, start: route.points[0].map(Math.round), ...r });
     // (a respawn that then drove is noted, photographed, not a failure)
