@@ -104,7 +104,9 @@ async function aim(x, y, zHint, h, { eye, vFov, pitch = -3 }) {
     local q = quatFromDir(d, vec3(0, 0, 1))
     core_camera.setPosRot(0, ${x}, ${y}, z, q.x, q.y, q.z, q.w)
     core_camera.setFOV(0, ${vFov.toFixed(3)})
-    ui_visibility.set(false)
+    -- (after a level load the UI's state reads hidden while the HUD shows:
+    -- set it shown, then hidden, so the hide takes)
+    ui_visibility.set(true) ui_visibility.set(false)
     return string.format('%.2f', z)`);
 }
 const deg = (r) => (r * 180) / Math.PI;

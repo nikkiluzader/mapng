@@ -352,15 +352,20 @@ function buildingIndex(rings) {
   };
 }
 
-// Runs cut where their slab (its middle or its back edge) would stand on
-// blocked ground: blocked(run, x, y, zRoad).
+// Runs fitted to the ground beside them: where the full slab would stand on
+// blocked ground (a building at the road's edge, another carriageway) it
+// narrows to what fits (a city sidewalk between the kerb and the house
+// fronts), down to MIN_FIT_M; narrower than that it is cut. A run splits
+// where its width changes. blocked(run, x, y, zRoad).
+const MIN_FIT_M = 1.0;
 function splitRunsWhereBlocked(runs, blocked) {
   const STEP = 1;
   const out = [];
   for (const run of runs) {
+    const widths = [run.width, run.width * 0.75, run.width * 0.5, MIN_FIT_M].filter((w, i, a) => w >= MIN_FIT_M - 1e-6 && a.indexOf(w) === i && w <= run.width + 1e-6);
     const p = run.points;
-    let piece = []; let last = null;
-    const flush = () => { if (piece.length >= 2 && runLength(piece) >= MIN_RUN_M) out.push({ ...run, points: piece }); piece = []; };
+    let piece = []; let pieceW = null; let last = null;
+    const flush = () => { if (piece.length >= 2 && runLength(piece) >= MIN_RUN_M) out.push({ ...run, width: pieceW, points: piece }); piece = []; };
     for (let i = 0; i + 1 < p.length; i++) {
       const a = p[i]; const b = p[i + 1];
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -370,17 +375,20 @@ function splitRunsWhereBlocked(runs, blocked) {
       for (let k = i === 0 ? 0 : 1; k <= n; k++) {
         const t = k / n;
         const q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-        const mid = run.width / 2 + CURB_W; const back = run.width + CURB_W;
-        if (blocked(run, q[0] + nx * mid, q[1] + ny * mid, q[2]) || blocked(run, q[0] + nx * back, q[1] + ny * back, q[2])) {
-          // (the last free point before the cut ends the piece)
-          if (last && piece[piece.length - 1] !== last) piece.push(last);
-          last = null;
+        // the widest slab whose middle and back edge stand on free ground
+        const fits = widths.find((w) => {
+          const mid = w / 2 + CURB_W; const back = w + CURB_W;
+          return !blocked(run, q[0] + nx * mid, q[1] + ny * mid, q[2]) && !blocked(run, q[0] + nx * back, q[1] + ny * back, q[2]);
+        }) ?? null;
+        if (fits !== pieceW) {
+          // (the last point at the old width ends its piece; a new width starts here)
+          if (pieceW !== null && last && piece[piece.length - 1] !== last) piece.push(last);
           flush();
-          continue;
+          pieceW = fits;
         }
-        // (the run's own vertices, and the first point after a cut)
-        if (k === n || k === 0 || piece.length === 0) piece.push(q);
         last = q;
+        if (fits === null) continue;
+        if (k === n || k === 0 || piece.length === 0) piece.push(q);
       }
     }
     flush();
