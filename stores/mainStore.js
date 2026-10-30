@@ -44,6 +44,11 @@ export const useMainStore = defineStore('main', () => {
   // asset / 3D model downloads, Surrounding Tiles, per-category level export
   // toggles and the preview's surroundings + wireframe. Basic is the default.
   const advancedMode = ref(localStorage.getItem('mapng_advanced_mode') === 'true');
+  // Raw terrain (advanced mode only): generation leaves the elevation and OSM
+  // roads exactly as pulled (no height blur, road rounding, snapping or road
+  // smoothing). Read it through rawTerrainActive so basic mode never applies it.
+  const rawTerrain = ref(localStorage.getItem('mapng_raw_terrain') === 'true');
+  const rawTerrainActive = computed(() => advancedMode.value && rawTerrain.value);
 
   if (batchMode.value && Number(resolution.value) > 8192) {
     resolution.value = 8192;
@@ -108,6 +113,11 @@ export const useMainStore = defineStore('main', () => {
     localStorage.setItem('mapng_advanced_mode', String(advancedMode.value));
     // Hidden Surrounding Tiles must not keep drawing on the map or feeding exports.
     if (!advancedMode.value) surroundingTilePositions.value = [];
+  }
+
+  function setRawTerrain(value) {
+    rawTerrain.value = !!value;
+    localStorage.setItem('mapng_raw_terrain', String(rawTerrain.value));
   }
 
   function toggleDarkMode() {
@@ -181,6 +191,9 @@ export const useMainStore = defineStore('main', () => {
     toggleDarkMode,
     advancedMode,
     setAdvancedMode,
+    rawTerrain,
+    rawTerrainActive,
+    setRawTerrain,
     setBatchMode,
     setBatchGridCols,
     setBatchGridRows,

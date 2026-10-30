@@ -60,6 +60,24 @@
       :vertical-unit-override="elevationUnitOverride"
     />
 
+    <!-- Raw terrain (advanced mode): skip every road/terrain reshaping step
+         of the data pull, for users who trust their own elevation source. -->
+    <div
+      v-if="store.advancedMode"
+      class="p-2 rounded border transition-colors"
+      :class="store.rawTerrain
+        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-400 dark:border-amber-500'
+        : 'bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600'"
+    >
+      <BaseToggle :model-value="store.rawTerrain" @update:model-value="store.setRawTerrain">
+        <Lock :size="12" :class="store.rawTerrain ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'" />
+        <span class="font-medium">{{ t('controlPanel.rawTerrain') }}</span>
+      </BaseToggle>
+      <p class="mt-1 ml-5 text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+        {{ t(store.rawTerrain ? 'controlPanel.rawTerrainOn' : 'controlPanel.rawTerrainOff') }}
+      </p>
+    </div>
+
     <!-- Generate Actions -->
     <GenerateActions
       :is-generating="isGenerating"
@@ -321,7 +339,7 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
-import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle, Map as MapIcon, Building2 } from 'lucide-vue-next';
+import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle, Map as MapIcon, Building2, Lock } from 'lucide-vue-next';
 import BaseToggle from '../base/BaseToggle.vue';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
@@ -642,6 +660,7 @@ const buildRunConfiguration = () => buildRunConfigurationBase({
   terrainData: props.terrainData,
   extra: {
     processingMetersPerPixel: metersPerPixel.value,
+    rawTerrain: store.rawTerrainActive,
   },
 });
 
