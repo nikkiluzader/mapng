@@ -274,21 +274,17 @@ async function stopCar() {
   await lua(`be:getPlayerVehicle(0):queueLuaCommand('input.event("parkingbrake", 1, 1) input.event("brake", 0, 1)') return 'ok'`);
 }
 
-// the car stopped, repaired, physics on, the logger off (after an incident
-// or an error: a wreck left churning hung the game)
+// after an incident or an error: the logger and the AI off, the car's
+// controls let go and physics paused where it is (a wreck left churning
+// hung the game). The next spawn places it at its start before physics
+// runs again: no detour by the level's spawn point.
 async function calm() {
   await lua(`if _G.mapngDrive then _G.mapngDrive.on = false end
-    be:setPhysicsRunning(true)
     local v = be:getPlayerVehicle(0)
-    if v then
-      v:queueLuaCommand('ai.setMode("disabled") input.event("throttle", 0, 1) input.event("brake", 0, 1) input.event("parkingbrake", 1, 1)')
-      -- out of whatever it is jammed in: back to the level's spawn, repaired
-      local sp = scenetree.findObject('spawn_default')
-      if sp then local p = sp:getPosition() local q = quat(sp:getRotation()) v:setPosRot(p.x, p.y, p.z + 0.5, q.x, q.y, q.z, q.w) end
-      v:queueLuaCommand('obj:requestReset(RESET_PHYSICS)')
-    end
+    if v then v:queueLuaCommand('ai.setMode("disabled") input.event("throttle", 0, 1) input.event("brake", 0, 1)') end
     return 'ok'`).catch(() => {});
-  await sleep(800);
+  await sleep(200);
+  await lua(`be:setPhysicsRunning(false) return 'ok'`).catch(() => {});
 }
 
 async function damageNow() {
@@ -331,12 +327,10 @@ async function drive(route, n) {
     let k = 1; while (k < rest.length - 1 && Math.hypot(rest[k][0] - q0[0], rest[k][1] - q0[1]) < 5) k++;
     const dx = rest[k][0] - q0[0]; const dy = rest[k][1] - q0[1]; const L = Math.hypot(dx, dy) || 1;
     await status(`spawning${a ? ` (try ${a + 1})` : ''}`);
-    // a fresh car (repaired, brakes released: the last drive ended braking)
-    await lua(`be:setPhysicsRunning(true)
-      be:getPlayerVehicle(0):queueLuaCommand('ai.setMode("disabled") input.event("brake", 0, 1) input.event("parkingbrake", 0, 1) obj:requestReset(RESET_PHYSICS)')
-      return 'ok'`);
-    await sleep(800);
+    // straight to the start with physics paused, then a fresh car there
+    // (repaired, brakes released: the last drive ended on the parking brake)
     const placed = await lua(`
+      be:setPhysicsRunning(false)
       local veh = be:getPlayerVehicle(0)
       -- the reference point's height over the bottom of the car
       local bb = veh:getSpawnWorldOOBB()
@@ -359,6 +353,9 @@ async function drive(route, n) {
       veh:resetBrokenFlexMesh()
       return string.format('%.3f,%.3f', ground, refH)`);
     const [ground, refH] = placed.split(',').map(Number);
+    await lua(`be:setPhysicsRunning(true)
+      be:getPlayerVehicle(0):queueLuaCommand('ai.setMode("disabled") input.event("throttle", 0, 1) input.event("brake", 0, 1) input.event("parkingbrake", 0, 1) obj:requestReset(RESET_PHYSICS)')
+      return 'ok'`);
     await sleep(SPAWN_GRACE_S * 1000);
     const dmgA = await damageNow();
     await sleep(1500);
@@ -502,6 +499,7 @@ async function main() {
     console.log(`  ${serious.length || !r.completed ? 'FAIL' : 'ok  '} ${String(i + 1).padStart(2)} ${route.kind.padEnd(6)} ${String(route.road).padEnd(14)} ${r.completed ? 'done' : `${r.progress ?? 0}/${r.length ?? '?'} m`} max vert ${r.maxVertAcc ?? '-'} m/s², dev ${r.maxDeviation ?? '-'} m${evs ? ` · ${evs}` : ''}`);
   }
   STATUS_PREFIX = '';
+  await lua(`be:setPhysicsRunning(true) return 'ok'`).catch(() => {});
   await status(`MapNG drive tests done: ${results.filter((x) => x.completed && !x.incident).length} of ${results.length} routes clean`, 15);
   const out = opt('--json');
   if (out) fs.writeFileSync(out, JSON.stringify({ level, results }, null, 1));
