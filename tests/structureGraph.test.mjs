@@ -82,3 +82,14 @@ test('a road joining another mid-way splits it there, across layers', () => {
   assert.equal(g.stats.edges, 3, 'the deck split at the shared vertex');
   assert.equal(g.stats.multiLevelJunctions, 1);
 });
+
+test('a shared vertex nudged a few cm on one road still joins it', () => {
+  const g = buildStructureGraph([
+    seg([[0, 0], [100.15, 0.1]]),
+    seg([[100, 0], [160, 0]], { bridge: 'yes' }),
+    seg([[160, 0], [260, 0]]),
+    seg([[0, 5], [99.5, 5], [99.6, 5.2]]),   // (one road's own close vertices stay apart)
+  ], { project });
+  assert.equal(g.stats.joints, 2, 'both deck ends are joints');
+  assert.equal(g.stats.edges, 4);
+});

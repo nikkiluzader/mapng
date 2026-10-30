@@ -141,5 +141,27 @@
   "groundGaps": 0,
   "throughDeck": 0,
   "spikes": 0
+ },
+ "track down through a steep gully": {
+  "decks": 0,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 49,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
+ },
+ "hillside road with a stream bridge": {
+  "decks": 1,
+  "tunnels": 0,
+  "steps": 1,
+  "steepStructure": 2,
+  "steepGround": 8,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
  }
 }

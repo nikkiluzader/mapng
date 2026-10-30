@@ -50,3 +50,25 @@ test('profile: a bridge over a ship channel never lifts the streets beyond it', 
     }
   });
 });
+
+test('profile: an untagged track goes down through a gully, never a tall deck over it', async () => {
+  const g = await solved('track down through a steep gully');
+  const k = g.edges.findIndex((e) => e.highway === 'track');
+  const z = g.profile.z[k]; const e = g.edges[k];
+  let worst = 0;
+  for (let i = 0; i < z.length; i++) worst = Math.max(worst, Math.abs(z[i] - e.g[i]));
+  assert.ok(worst <= 3.05, `track ${worst.toFixed(1)} m off its ground`);
+  assert.equal(g.classes.segments.filter((s) => s.kind === 'deck').length, 0, 'no deck');
+});
+
+test('profile: a hillside stream bridge never lifts the roads down the hill', async () => {
+  const g = await solved('hillside road with a stream bridge');
+  g.edges.forEach((e, k) => {
+    if (e.bridge) return;
+    const z = g.profile.z[k];
+    for (let i = 0; i < z.length; i++) {
+      if (Math.abs(e.y[i] - 110) < 150) continue;   // (its approach ramps)
+      assert.ok(Math.abs(z[i] - e.g[i]) < 0.5, `${e.highway} ${(z[i] - e.g[i]).toFixed(1)} m off its ground at y ${e.y[i].toFixed(0)}`);
+    }
+  });
+});

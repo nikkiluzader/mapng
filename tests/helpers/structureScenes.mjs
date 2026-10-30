@@ -80,6 +80,27 @@ export const STRUCTURE_SCENES = [
     ]),
   },
   {
+    name: 'track down through a steep gully',
+    // a V gully 25 m deep, its sides about 1:2, along y = 0; an untagged
+    // track crosses it (no bridge mapped: it goes down and up)
+    build: () => terrain((x, y) => 40 - 25 * Math.max(0, 1 - Math.abs(y) / 50), [
+      way(1, [[0, -450], [0, 450]], { highway: 'track' }),
+    ]),
+    future: true,
+  },
+  {
+    name: 'hillside road with a stream bridge',
+    // a 12 % hillside rising north; a road climbs it with a short bridge
+    // over a stream, and a street at its foot meets it
+    build: () => terrain((x, y) => 50 + 0.12 * y, [
+      way(1, [[0, -450], [0, 100]], { highway: 'secondary' }),
+      way(2, [[0, 100], [0, 120]], { highway: 'secondary', bridge: 'yes', layer: '1' }),
+      way(3, [[0, 120], [0, 450]], { highway: 'secondary' }),
+      way(4, [[-400, -400], [0, -400], [400, -400]], { highway: 'residential' }),
+      water(5, [[-480, 110], [480, 110]], { waterway: 'stream', width: '6' }),
+    ]),
+  },
+  {
     name: 'mountain tunnel through a ridge',
     // a 60 m ridge along y = 0, the road crossing it north-south
     build: () => terrain((x, y) => 10 + 60 * Math.exp(-((y / 140) ** 2)), [
