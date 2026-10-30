@@ -41,6 +41,25 @@ const BRIDGE_END_TOL_M = 1;
 // until it meets its ground; the smoothing left a hump no car could climb.
 const CLIFF_M = 3;
 const CLIFF_GRADE = 0.1;
+// Only an isolated step is a removed structure: the ground within
+// CLIFF_SIDE_M before and after it no steeper than CLIFF_SIDE_GRADE. A road
+// down a steep hillside (or an OSM line across one) steps at every sample,
+// and lifting each built fake embankments up to 21 m tall on mountain lidar.
+// Nor is a fill taller than CLIFF_MAX_LIFT_M a removed ramp.
+const CLIFF_SIDE_M = 15;
+const CLIFF_SIDE_GRADE = 0.1;
+const CLIFF_MAX_LIFT_M = 10;
+// Fine rasters (lidar-resolution GPXZ / USGS / KRON86) already hold the
+// real road surface: the coarse tuning above (30 m x 3 smoothing, 60 m
+// junction ramps) is for lumpy 30 m data and on lidar cut real crests and
+// filled real sags, leaving the corridor in a trench or on a ridge with
+// creases along its edges. Fine mode keeps the flat cross-section (what
+// hides OSM running a metre or two off the bench) and only takes out
+// elevation noise along the road.
+const TUNING = {
+  coarse: { window: SMOOTH_WINDOW_M, passes: SMOOTH_PASSES, ramp: JUNCTION_RAMP_M, feather: FEATHER_M },
+  fine: { window: 20, passes: 2, ramp: 40, feather: 6 },
+};
 
 /**
  * Computes distance and projection parameter t of point (x,y) onto line segment (x1,y1)-(x2,y2)
@@ -222,9 +241,9 @@ function corridorHalfWidthMeters(corridor, isUrbanRoad) {
  * Build per-corridor elevation profiles: pixel-space sample points, original
  * and smoothed Z arrays, and cumulative arc length in metres.
  */
-function buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes = new Set()) {
+function buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes = new Set(), tuning = TUNING.coarse) {
     const maxSegmentLengthPx = Math.max(1, SAMPLE_SPACING_M / metersPerPixel);
-    const windowSamples = Math.max(3, Math.round(SMOOTH_WINDOW_M / SAMPLE_SPACING_M));
+    const windowSamples = Math.max(3, Math.round(tuning.window / SAMPLE_SPACING_M));
     const profiles = [];
 
     for (const corridor of corridors) {
@@ -253,7 +272,7 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
         liftOverCliffs(zOrig, cumLenM);
 
         let zSmooth = zOrig;
-        for (let pass = 0; pass < SMOOTH_PASSES; pass++) {
+        for (let pass = 0; pass < tuning.passes; pass++) {
             zSmooth = smooth1DArray(zSmooth, windowSamples);
         }
 
@@ -304,14 +323,26 @@ function liftOverCliffs(z, cumLenM) {
         if (z[i] === NO_DATA_VALUE || z[i + 1] === NO_DATA_VALUE) continue;
         const rise = z[i + 1] - z[i];
         if (Math.abs(rise) <= CLIFF_M) continue;
+        // the ground's grade over CLIFF_SIDE_M before and after the step
+        const sideGrade = (from, dir) => {
+            let k = from;
+            while (k + dir >= 0 && k + dir < n && z[k + dir] !== NO_DATA_VALUE && Math.abs(cumLenM[k + dir] - cumLenM[from]) <= CLIFF_SIDE_M) k += dir;
+            const run = Math.abs(cumLenM[k] - cumLenM[from]);
+            return run > 0 ? Math.abs(z[k] - z[from]) / run : 0;
+        };
+        if (sideGrade(i, -1) > CLIFF_SIDE_GRADE || sideGrade(i + 1, 1) > CLIFF_SIDE_GRADE) continue;
         const top = rise > 0 ? i + 1 : i;
         const step = rise > 0 ? -1 : 1;   // from the top down the low side
+        const lifts = [];
+        let tall = false;
         for (let k = top + step; k >= 0 && k < n; k += step) {
             if (z[k] === NO_DATA_VALUE) break;
             const want = z[top] - CLIFF_GRADE * Math.abs(cumLenM[top] - cumLenM[k]);
             if (z[k] >= want) break;
-            z[k] = want;
+            if (want - z[k] > CLIFF_MAX_LIFT_M) { tall = true; break; }
+            lifts.push([k, want]);
         }
+        if (!tall) for (const [k, want] of lifts) z[k] = want;
     }
 }
 
@@ -323,7 +354,7 @@ function liftOverCliffs(z, cumLenM) {
  * the junction (OSM ways usually END at intersections, so the smoothing
  * window is one-sided there — maximizing the disagreement).
  */
-function pinJunctionElevations(profiles) {
+function pinJunctionElevations(profiles, tuning = TUNING.coarse) {
     const endpointCounts = new Map();
     const bump = (key) => endpointCounts.set(key, (endpointCounts.get(key) || 0) + 1);
     for (const p of profiles) {
@@ -351,7 +382,7 @@ function pinJunctionElevations(profiles) {
         const totalLen = cumLenM[n - 1];
         // Cap each ramp at half the corridor so the two end corrections never
         // overlap — guaranteeing the endpoints land exactly on consensus.
-        const ramp = Math.min(JUNCTION_RAMP_M, totalLen / 2);
+        const ramp = Math.min(tuning.ramp, totalLen / 2);
         if (!(ramp > 0)) continue;
 
         const startAgg = junctionAgg.get(p.corridor.startKey);
@@ -392,7 +423,8 @@ function pinJunctionElevations(profiles) {
  * roads onto their cut, it only evens out what is left. skipTracks keeps it
  * off unpaved tracks there — flattening them on real hillsides cut terraces.
  */
-export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeatures, metersPerPixel, { skipTracks = false } = {}) {
+export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeatures, metersPerPixel, { skipTracks = false, fine = false, tuning: override = null } = {}) {
+    const tuning = { ...(fine ? TUNING.fine : TUNING.coarse), ...(override || {}) };
     if (!osmFeatures || osmFeatures.length === 0) return;
 
     const groundRoads = osmFeatures.filter((f) => isGroundLevelRoad(f) && !(skipTracks && f.tags?.highway === 'track'));
@@ -412,10 +444,10 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
         if (tags.tunnel === 'yes' || tags.covered === 'yes') continue;
         for (const p of f.geometry) bridgeNodes.add(makeRoadNodeKey(p));
     }
-    const profiles = buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes);
+    const profiles = buildCorridorProfiles(corridors, heightMap, width, height, project, metersPerPixel, bridgeNodes, tuning);
     if (profiles.length === 0) return;
 
-    pinJunctionElevations(profiles);
+    pinJunctionElevations(profiles, tuning);
 
     // Global accumulators. roadZ is the target height, roadW the strongest
     // claim any corridor has on the pixel (quantized to 1/255 — the weight only
@@ -431,7 +463,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
 
         const radiusMeters = corridorHalfWidthMeters(corridor, isUrbanRoad);
         // The core is flat. We add an extra margin for feathering back to the terrain.
-        const radiusPx = Math.max(1, (radiusMeters + FEATHER_M) / metersPerPixel);
+        const radiusPx = Math.max(1, (radiusMeters + tuning.feather) / metersPerPixel);
         const coreRadiusPx = Math.max(1, radiusMeters / metersPerPixel);
 
         // Per-corridor strongest-weight pass: adjacent 5 m segments of one
