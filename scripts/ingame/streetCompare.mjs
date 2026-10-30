@@ -86,6 +86,16 @@ async function grab(scale = 0.75) {
   throw new Error('no screenshot');
 }
 
+// the HUD off: after a level load the UI reads hidden while the HUD (CEF)
+// still shows; showing then hiding the CEF layer takes
+// (in two calls: shown and hidden within one frame does nothing)
+async function hideHud() {
+  await lua('ui_visibility.setCef(true) return "ok"');
+  await sleep(400);
+  await lua('ui_visibility.setCef(false) ui_visibility.set(false) return "ok"');
+  await sleep(600);
+}
+
 // put the camera at world (x, y), `eye` m over the surface under it, facing
 // compass heading h (degrees clockwise from north), slightly down
 // (vFov: BeamNG's setFOV is the vertical field of view, measured)
@@ -104,9 +114,7 @@ async function aim(x, y, zHint, h, { eye, vFov, pitch = -3 }) {
     local q = quatFromDir(d, vec3(0, 0, 1))
     core_camera.setPosRot(0, ${x}, ${y}, z, q.x, q.y, q.z, q.w)
     core_camera.setFOV(0, ${vFov.toFixed(3)})
-    -- (after a level load the UI's state reads hidden while the HUD shows:
-    -- set it shown, then hidden, so the hide takes)
-    ui_visibility.set(true) ui_visibility.set(false)
+
     return string.format('%.2f', z)`);
 }
 const deg = (r) => (r * 180) / Math.PI;
@@ -213,7 +221,8 @@ async function googleNear(x, y, roadHeading) {
   if (!GKEY) return null;
   const [lat, lng] = toLatLng(x, y);
   const meta = await (await fetch(`https://maps.googleapis.com${signGoogle(`/maps/api/streetview/metadata?location=${lat.toFixed(7)},${lng.toFixed(7)}&radius=${SEARCH_M}&source=outdoor&key=${GKEY}`)}`)).json();
-  if (meta.status !== 'OK') return null;
+  // (Google's own cars only: user panoramas are indoor rooms, boats, drones)
+  if (meta.status !== 'OK' || !/google/i.test(meta.copyright || '')) return null;
   const [px, py] = toWorld(meta.location.lat, meta.location.lng);
   const d = Math.hypot(px - x, py - y);
   // facing the spot from the panorama, or along the road when standing on it
@@ -261,6 +270,7 @@ async function main() {
   const failures = opt('--tests') ? JSON.parse(fs.readFileSync(opt('--tests'), 'utf8')).failures || [] : [];
   fs.mkdirSync(OUT, { recursive: true });
   const fovBefore = await lua('return core_camera.getFovDeg()');
+  await hideHud();
   // the game screen's shape, from one screenshot
   const probe = jpegSize(await grab());
   const screenAspect = probe ? probe.w / probe.h : 16 / 9;

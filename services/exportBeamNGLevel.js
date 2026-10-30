@@ -10,7 +10,7 @@ import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarage
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
-import { planLakes, planRivers } from './beamngWater.js';
+import { carveLakeBeds, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
@@ -7907,9 +7907,9 @@ function seededRandom(seed) {
  * lake's level (services/beamngWater.js planLakes). A WaterBlock's surface is
  * at its position; its volume reaches scale.z / 2 below.
  */
-function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZones = []) {
+function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZones = [], plan = null) {
   const waterProfile = getWaterProfile(biome);
-  const { tiles, stats: lakeStats } = planLakes({
+  const { tiles, stats: lakeStats } = plan || planLakes({
     features: terrainData.osmFeatures || [],
     toWorld: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
     heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
@@ -10132,6 +10132,30 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       })
     : null;
 
+  // Standing water planned before the terrain is written: lakes whose
+  // ground the elevation data records at the water's surface get a bed
+  // (the water showed nowhere over it), and the water blocks use this plan
+  let lakePlan = null;
+  if (includeWater) {
+    try {
+      lakePlan = planLakes({
+        features: exportTerrainData.osmFeatures || [],
+        toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
+        heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      });
+      const beds = carveLakeBeds(lakePlan.lakes, {
+        heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+        worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+      });
+      const hmLake = heightMapEditor(exportTerrainData);
+      beds.apply((idx, v) => hmLake.set(idx, v));
+      lakePlan.stats.bedPixels = beds.pixels;
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds skipped: ${err?.message || err}`);
+      lakePlan = null;
+    }
+  }
+
   beginStep('ter', `Writing the terrain binary (terrain.ter, ${size}×${size} heights + material layers)…`);
   await yield_();
   // Tunnel portals: their terrain squares open (layer 255, Terrain-Files.md
@@ -10260,7 +10284,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ...seaObjects,
     ...(includeWater
       ? [
-          ...buildWaterBlockObjects(exportTerrainData, squareSize, biome, waterStats.lakes, dryZones),
+          ...buildWaterBlockObjects(exportTerrainData, squareSize, biome, waterStats.lakes, dryZones, lakePlan),
           ...buildRiverObjects(exportTerrainData, squareSize, biome,
             groundCarriageways.map((c) => ({ points: c.nodes, half: c.half })), waterStats.rivers, dryZones),
         ]
