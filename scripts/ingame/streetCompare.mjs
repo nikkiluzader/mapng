@@ -5,7 +5,7 @@
 // running BeamNG.drive (through its MCP server, like runIngameTests.mjs).
 //
 //   node scripts/ingame/streetCompare.mjs <levelName> [--load] [--spots 20]
-//        [--tests ingame.json] [--source both|mapillary|google] [--out dir]
+//        [--tests ingame.json] [--source both|mapillary|google] [--out dir] [--min-year 2020]
 //
 // Keys come from ~/.config/mapng/mapng.env (MAPILLARY_ACCESS_TOKEN,
 // GOOGLE_STREETVIEW_KEY, GOOGLE_STREETVIEW_SIGNING_SECRET) and are never
@@ -26,8 +26,14 @@ const URL_MCP = process.env.BEAMNG_MCP_URL || 'http://127.0.0.1:29292/mcp';
 const SPOTS = Number(opt('--spots', '20'));
 const SOURCE = opt('--source', 'both');
 const OUT = path.join(opt('--out', path.join(os.tmpdir(), 'mapng-streetcompare')), level || '');
-const EYE_M = 2.2;          // camera over the road surface (a car-mounted street camera)
-const FOV = 90;
+// camera over the road surface: Google's car mast; Mapillary's mostly
+// dashcams and phones held in a car
+const EYE_GOOGLE_M = 2.5;
+const EYE_MAPILLARY_M = 1.5;
+const H_FOV = 90;           // Google's horizontal field of view (BeamNG's setFOV is VERTICAL)
+const MAX_DISTORTION = 0.15; // |k1| over this: too bent to compare with a pinhole render
+const MIN_YEAR = Number(opt('--min-year', '0'));
+const YEARS_APART = 3;      // flag a pair this many years apart
 const SEARCH_M = 45;        // photos this far from a spot
 const SPACING_M = 90;       // spots at least this far apart
 if (!level) { console.error('usage: streetCompare.mjs <levelName> [--load] [--spots 20] [--tests ingame.json] [--source both|mapillary|google] [--out dir]'); process.exit(2); }
@@ -76,20 +82,70 @@ async function grab(scale = 0.75) {
   throw new Error('no screenshot');
 }
 
-// put the camera at world (x, y), EYE_M over the surface under it, facing
+// put the camera at world (x, y), `eye` m over the surface under it, facing
 // compass heading h (degrees clockwise from north), slightly down
-async function aim(x, y, zHint, h) {
+// (vFov: BeamNG's setFOV is the vertical field of view, measured)
+async function aim(x, y, zHint, h, { eye, vFov, pitch = -3 }) {
   return lua(`
     if not commands.isFreeCamera() then commands.setFreeCamera() end
-    local r = castRay(vec3(${x}, ${y}, ${zHint + 8}), vec3(${x}, ${y}, ${zHint - 30}), true, true)
-    local z = (r and r.pt.z or ${zHint}) + ${EYE_M}
-    local a = math.rad(${h})
-    local d = vec3(math.sin(a), math.cos(a), -0.06):normalized()
+    -- on the terrain, or a deck / sidewalk right there, never a roof or a tree
+    local g = core_terrain.getTerrainHeight(vec3(${x}, ${y}, 0)) or ${zHint}
+    local r = castRay(vec3(${x}, ${y}, ${zHint + 3}), vec3(${x}, ${y}, ${zHint - 30}), true, true)
+    local name = r and r.obj and r.obj.getName and r.obj:getName() or ''
+    local base = g
+    if r and (name:find('^bridge_') or name:find('^sidewalks')) and r.pt.z > g then base = r.pt.z end
+    local z = base + ${eye}
+    local a = math.rad(${h}); local p = math.rad(${pitch})
+    local d = vec3(math.sin(a) * math.cos(p), math.cos(a) * math.cos(p), math.sin(p))
     local q = quatFromDir(d, vec3(0, 0, 1))
     core_camera.setPosRot(0, ${x}, ${y}, z, q.x, q.y, q.z, q.w)
-    core_camera.setFOV(0, ${FOV})
+    core_camera.setFOV(0, ${vFov.toFixed(3)})
     ui_visibility.set(false)
     return string.format('%.2f', z)`);
+}
+const deg = (r) => (r * 180) / Math.PI;
+const rad = (d) => (d * Math.PI) / 180;
+// vertical field of view for a horizontal one at an aspect (width / height)
+const vFovFor = (hFov, aspect) => deg(2 * Math.atan(Math.tan(rad(hFov) / 2) / aspect));
+
+// width / height of a JPEG (its first SOF marker)
+function jpegSize(buf) {
+  let i = 2;
+  while (i + 9 < buf.length) {
+    if (buf[i] !== 0xff) { i++; continue; }
+    const m = buf[i + 1]; const len = buf.readUInt16BE(i + 2);
+    if (m >= 0xc0 && m <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(m)) return { h: buf.readUInt16BE(i + 5), w: buf.readUInt16BE(i + 7) };
+    i += 2 + len;
+  }
+  return null;
+}
+
+// a Mapillary camera's view: horizontal / vertical field of view from its
+// focal length (normalised by the image's longer side), and its pitch from
+// the computed rotation (OpenSfM angle-axis, world -> camera; world east,
+// north, up)
+function mapillaryView(im) {
+  const [f, k1 = 0] = im.camera_parameters || [];
+  if (im.camera_type !== 'perspective' || !(f > 0) || !im.width || !im.height) return null;
+  if (Math.abs(k1) > MAX_DISTORTION) return null;
+  const long = Math.max(im.width, im.height);
+  const hFov = deg(2 * Math.atan((im.width / long) / (2 * f)));
+  const vFov = deg(2 * Math.atan((im.height / long) / (2 * f)));
+  let pitch = 0;
+  const r = im.computed_rotation;
+  if (Array.isArray(r) && r.length === 3) {
+    const th = Math.hypot(...r);
+    if (th > 1e-9) {
+      const [kx, ky, kz] = r.map((v) => v / th);
+      const c = Math.cos(th); const sn = Math.sin(th); const t = 1 - c;
+      // the camera's viewing axis in the world: R^T (0, 0, 1) = R's third row
+      const dz = t * kz * kz + c;
+      const dx = t * kx * kz - sn * ky; const dy = t * ky * kz + sn * kx;
+      const len = Math.hypot(dx, dy, dz) || 1;
+      pitch = Math.max(-15, Math.min(15, deg(Math.asin(dz / len))));
+    }
+  }
+  return { hFov, vFov, pitch, aspect: im.width / im.height, k1 };
 }
 
 // ── geo ─────────────────────────────────────────────────────────────────
@@ -105,25 +161,38 @@ const toWorld = (lat, lng) => {
 const bearing = (dx, dy) => ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
 
 // ── photos ──────────────────────────────────────────────────────────────
-async function mapillaryNear(x, y) {
+// how far a photo's heading is from facing along the road (either way)
+const offRoadAxis = (h, roadH) => {
+  if (!Number.isFinite(roadH)) return 0;
+  const a = Math.abs((((h - roadH) % 360) + 540) % 360 - 180);   // 0..180 from facing along
+  return Math.min(a, 180 - a);                                   // 0..90, either direction
+};
+async function mapillaryNear(x, y, roadH) {
   if (!MAPILLARY) return null;
   const [lat, lng] = toLatLng(x, y);
   const dLat = SEARCH_M / 111320; const dLng = SEARCH_M / (111320 * Math.cos((lat * Math.PI) / 180));
-  const url = `https://graph.mapillary.com/images?fields=id,captured_at,compass_angle,computed_compass_angle,geometry,computed_geometry,is_pano,thumb_1024_url&limit=50&bbox=${[lng - dLng, lat - dLat, lng + dLng, lat + dLat].join(',')}`;
+  const url = `https://graph.mapillary.com/images?fields=id,captured_at,compass_angle,computed_compass_angle,geometry,computed_geometry,computed_rotation,is_pano,camera_type,camera_parameters,width,height,make,model,thumb_1024_url&limit=100&bbox=${[lng - dLng, lat - dLat, lng + dLng, lat + dLat].join(',')}`;
   const res = await fetch(url, { headers: { Authorization: `OAuth ${MAPILLARY}` } });
   if (!res.ok) return null;
   const list = (await res.json()).data || [];
   let best = null;
   for (const im of list) {
     if (im.is_pano || !im.thumb_1024_url) continue;
+    if (MIN_YEAR && new Date(im.captured_at).getUTCFullYear() < MIN_YEAR) continue;
+    // (a fisheye, a 360 or a lens we know nothing of: no fair comparison)
+    const view = mapillaryView(im);
+    if (!view) continue;
     const g = (im.computed_geometry || im.geometry)?.coordinates;
     if (!g) continue;
     const [px, py] = toWorld(g[1], g[0]);
     const d = Math.hypot(px - x, py - y);
     const age = (Date.now() - im.captured_at) / (365 * 86400e3);
-    // near first; a newer photo wins between two about as near
-    const score = d + age * 2;
-    if (!best || score < best.score) best = { score, d, x: px, y: py, h: im.computed_compass_angle ?? im.compass_angle, id: im.id, date: new Date(im.captured_at).toISOString().slice(0, 10), url: im.thumb_1024_url };
+    // near first; a newer photo wins between two about as near; a photo
+    // facing along the road (a camera in a car on it) over one from a yard
+    const along = offRoadAxis(im.computed_compass_angle ?? im.compass_angle, roadH);
+    if (along > 45) continue;
+    const score = d + age * 2 + along * 0.3;
+    if (!best || score < best.score) best = { score, d, x: px, y: py, h: im.computed_compass_angle ?? im.compass_angle, id: im.id, date: new Date(im.captured_at).toISOString().slice(0, 10), url: im.thumb_1024_url, view, camera: [im.make, im.model].filter(Boolean).join(' ') };
   }
   return best;
 }
@@ -145,8 +214,10 @@ async function googleNear(x, y, roadHeading) {
   const h = d > 6 ? bearing(x - px, y - py) : (roadHeading ?? 0);
   return { d, x: px, y: py, h, pano: meta.pano_id, date: meta.date || '', lat: meta.location.lat, lng: meta.location.lng };
 }
-async function googleImage(g) {
-  const q = `/maps/api/streetview?size=640x400&pano=${g.pano}&heading=${g.h.toFixed(1)}&pitch=-3&fov=${FOV}&source=outdoor&key=${GKEY}`;
+async function googleImage(g, aspect) {
+  // (the game screen's shape, so its view and Google's frame the same)
+  const w = 640; const hgt = Math.min(640, Math.round(w / aspect));
+  const q = `/maps/api/streetview?size=${w}x${hgt}&pano=${g.pano}&heading=${g.h.toFixed(1)}&pitch=-3&fov=${H_FOV}&source=outdoor&key=${GKEY}`;
   const res = await fetch(`https://maps.googleapis.com${signGoogle(q)}`);
   return res.ok ? Buffer.from(await res.arrayBuffer()) : null;
 }
@@ -184,10 +255,13 @@ async function main() {
   const failures = opt('--tests') ? JSON.parse(fs.readFileSync(opt('--tests'), 'utf8')).failures || [] : [];
   fs.mkdirSync(OUT, { recursive: true });
   const fovBefore = await lua('return core_camera.getFovDeg()');
+  // the game screen's shape, from one screenshot
+  const probe = jpegSize(await grab());
+  const screenAspect = probe ? probe.w / probe.h : 16 / 9;
   const rows = [];
   for (const spot of pickSpots(data.probes, failures)) {
     if (rows.length >= SPOTS) break;
-    const mly = SOURCE !== 'google' ? await mapillaryNear(spot.x, spot.y) : null;
+    const mly = SOURCE !== 'google' ? await mapillaryNear(spot.x, spot.y, spot.h) : null;
     const goo = SOURCE !== 'mapillary' ? await googleNear(spot.x, spot.y, spot.h) : null;
     if (!mly && !goo) continue;
     const n = String(rows.length + 1).padStart(2, '0');
@@ -195,14 +269,16 @@ async function main() {
     // the game from each photo's own place and heading
     if (mly) {
       fs.writeFileSync(path.join(OUT, `${n}_mapillary.jpg`), Buffer.from(await (await fetch(mly.url)).arrayBuffer()));
-      await aim(mly.x, mly.y, spot.z, mly.h); await sleep(900);
+      // the photo's own vertical view (the wider game screen is cropped to
+      // the photo's shape on the page)
+      await aim(mly.x, mly.y, spot.z, mly.h, { eye: EYE_MAPILLARY_M, vFov: mly.view.vFov, pitch: mly.view.pitch }); await sleep(900);
       fs.writeFileSync(path.join(OUT, `${n}_game_m.jpg`), await grab());
       row.shots.m = `${n}_game_m.jpg`;
     }
     if (goo) {
-      const img = await googleImage(goo);
+      const img = await googleImage(goo, screenAspect);
       if (img) fs.writeFileSync(path.join(OUT, `${n}_google.jpg`), img);
-      await aim(goo.x, goo.y, spot.z, goo.h); await sleep(900);
+      await aim(goo.x, goo.y, spot.z, goo.h, { eye: EYE_GOOGLE_M, vFov: vFovFor(H_FOV, screenAspect), pitch: -3 }); await sleep(900);
       fs.writeFileSync(path.join(OUT, `${n}_game_g.jpg`), await grab());
       row.shots.g = `${n}_game_g.jpg`;
       row.gImage = !!img;
@@ -212,7 +288,8 @@ async function main() {
   }
   await lua(`core_camera.setFOV(0, ${Number(fovBefore) || 65}) ui_visibility.set(true) return 'ok'`);
   // the page
-  const cell = (src, cap) => `<figure>${src ? `<img src="${src}" loading="lazy">` : '<div class="none">no image</div>'}<figcaption>${cap}</figcaption></figure>`;
+  const cell = (src, cap, aspect) => `<figure>${src ? `<img src="${src}" loading="lazy"${aspect ? ` style="aspect-ratio:${aspect.toFixed(4)};object-fit:cover"` : ''}>` : '<div class="none">no image</div>'}<figcaption>${cap}</figcaption></figure>`;
+  const yearOf = (d) => Number(String(d || '').slice(0, 4)) || null;
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Street compare: ${esc(level)}</title><style>
 body{font:14px system-ui,sans-serif;margin:16px;background:#111;color:#ddd}h1{font-size:18px}
@@ -220,13 +297,15 @@ body{font:14px system-ui,sans-serif;margin:16px;background:#111;color:#ddd}h1{fo
 figure{margin:0;flex:1 1 300px;max-width:520px}img{width:100%;border-radius:4px}.none{aspect-ratio:16/10;display:grid;place-items:center;background:#222}
 figcaption{font-size:12px;color:#999;margin-top:4px}.why{color:#f88}a{color:#8cf}
 </style></head><body><h1>Street photos vs game: ${esc(level)}</h1>
-<p>Each row: the real photo and the game from the same place and heading (camera ${EYE_M} m over the road, ${FOV}° field of view). Mapillary images CC-BY-SA; Google images for viewing only, not stored or used as data.</p>
+<p>Each row: the real photo and the game from the same place, heading and field of view (Google: ${H_FOV}° wide at ${EYE_GOOGLE_M} m; Mapillary: each photo's own lens, perspective cameras only, at ${EYE_MAPILLARY_M} m, the game cropped to the photo's shape). Mapillary images CC-BY-SA; Google images for viewing only, not stored or used as data.</p>
 ${rows.map((r) => {
     const [lat, lng] = toLatLng(r.spot.x, r.spot.y);
     const head = `<b>${r.n}</b> ${esc(r.spot.k)} ${esc(r.spot.road || '')} at (${Math.round(r.spot.x)}, ${Math.round(r.spot.y)}) · ${lat.toFixed(6)}, ${lng.toFixed(6)}${r.spot.why ? ` · <span class="why">test: ${esc(r.spot.why)}</span>` : ''}`;
     const parts = [];
-    if (r.mly) parts.push(`<div class="pair">${cell(`${r.n}_mapillary.jpg`, `Mapillary ${esc(r.mly.date)}, ${Math.round(r.mly.d)} m from the spot, heading ${Math.round(r.mly.h)}° · <a href="https://www.mapillary.com/app/?pKey=${r.mly.id}">open</a>`)}${cell(r.shots.m, 'game, same place and heading')}</div>`);
-    if (r.goo) parts.push(`<div class="pair">${cell(r.gImage ? `${r.n}_google.jpg` : '', `Google ${esc(r.goo.date)}, ${Math.round(r.goo.d)} m from the spot, heading ${Math.round(r.goo.h)}° · <a href="https://www.google.com/maps/@?api=1&map_action=pano&pano=${r.goo.pano}&heading=${Math.round(r.goo.h)}">open</a>`)}${cell(r.shots.g, 'game, same place and heading')}</div>`);
+    const ym = yearOf(r.mly?.date); const yg = yearOf(r.goo?.date);
+    const apart = ym && yg && Math.abs(ym - yg) >= YEARS_APART ? ` <span class="why">photos ${Math.abs(ym - yg)} years apart</span>` : '';
+    if (r.mly) parts.push(`<div class="pair">${cell(`${r.n}_mapillary.jpg`, `Mapillary ${esc(r.mly.date)}${apart}, ${Math.round(r.mly.d)} m from the spot, heading ${Math.round(r.mly.h)}°, ${r.mly.view.hFov.toFixed(0)}°×${r.mly.view.vFov.toFixed(0)}° view, pitch ${r.mly.view.pitch.toFixed(1)}°${r.mly.camera ? `, ${esc(r.mly.camera)}` : ''} · <a href="https://www.mapillary.com/app/?pKey=${r.mly.id}">open</a>`)}${cell(r.shots.m, `game, same place, heading and lens (${EYE_MAPILLARY_M} m up)`, r.mly.view.aspect)}</div>`);
+    if (r.goo) parts.push(`<div class="pair">${cell(r.gImage ? `${r.n}_google.jpg` : '', `Google ${esc(r.goo.date)}, ${Math.round(r.goo.d)} m from the spot, heading ${Math.round(r.goo.h)}°, ${H_FOV}° wide · <a href="https://www.google.com/maps/@?api=1&map_action=pano&pano=${r.goo.pano}&heading=${Math.round(r.goo.h)}">open</a>`)}${cell(r.shots.g, `game, same place, heading and ${H_FOV}° view (${EYE_GOOGLE_M} m up)`)}</div>`);
     return `<div class="row"><div>${head}</div>${parts.join('')}</div>`;
   }).join('\n')}
 </body></html>`;
