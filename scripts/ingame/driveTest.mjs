@@ -37,6 +37,7 @@ const opt = (n, d) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const URL_MCP = process.env.BEAMNG_MCP_URL || 'http://127.0.0.1:29292/mcp';
 if (!level) { console.error('usage: driveTest.mjs <levelName> [--load] [--routes 12] [--only N] [--out dir] [--json out.json] [--no-street] [--vary N] [--reverse]'); process.exit(2); }
 const SPAWN_TRIES = 3;
+const MAX_SANE_MS = 100;   // a speed reading past this is the game's teleport artefact
 const SPAWN_GRACE_S = 0.5;  // nothing counted while the car lands
 const SPAWN_ROLL_DEG = 8;   // tilted sideways more: a bad spawn (nose up or down: a hill)
 const REVERSE_MS = -1;      // backing up this fast (the AI's own recovery): stopped and photographed
@@ -230,7 +231,7 @@ async function damagedParts() {
   // parts past BeamNG's damage score, and the damaged deform groups (the
   // working parts: radiator, engine, headlights, ...), which minor crashes
   // reach first
-  const code = `local t = {} for k, v in pairs(beamstate.getPartDamageData()) do t[#t + 1] = string.format('%s=%.3f', tostring(v.name or k), v.damage) end for g, d in pairs(beamstate.deformGroupDamage or {}) do if d.damage and d.damage > 0.01 then t[#t + 1] = string.format('%s=%.3f', tostring(g), math.min(1, d.damage)) end end return table.concat(t, ';')`;
+  const code = `local t = {} for k, v in pairs(beamstate.getPartDamageData()) do t[#t + 1] = string.format('%s=%.3f', type(v.name) == 'string' and v.name or tostring(k), v.damage) end for g, d in pairs(beamstate.deformGroupDamage or {}) do if d.damage and d.damage > 0.01 then t[#t + 1] = string.format('%s=%.3f', tostring(g), math.min(1, d.damage)) end end return table.concat(t, ';')`;
   try {
     await mcp('run_lua_vehicle', { code });
     for (let i = 0; i < 10; i++) {
@@ -365,7 +366,12 @@ async function drive(route, n) {
     const st = await lua(`local v = be:getPlayerVehicle(0) local d = v:getDirectionVector() local u = v:getDirectionVectorUp()
       local r = d:cross(u):normalized() local pos = v:getPosition() local vel = v:getVelocity()
       return string.format('%.2f,%.2f,%.2f,%.2f', math.deg(math.asin(math.max(-1, math.min(1, r.z)))), math.deg(math.asin(math.max(-1, math.min(1, d:normalized().z)))), pos.z, vel:length())`);
-    const [roll, pitch, z, speed] = st.split(',').map(Number);
+    const [roll, pitch, z, speedRaw] = st.split(',').map(Number);
+    // (just after a teleport the game can report an impossible speed: read
+    // again, and never judge one past MAX_SANE_MS)
+    let speed = speedRaw;
+    if (!(speed < MAX_SANE_MS)) { await sleep(500); speed = Number(await lua('return string.format("%.2f", be:getPlayerVehicle(0):getVelocity():length())')); }
+    if (!(speed < MAX_SANE_MS)) speed = 0;
     const problems = [];
     if (dmgA !== null && dmgB !== null && dmgB - dmgA > 50) problems.push(`damaged ${Math.round(dmgB - dmgA)} settling`);
     if (Math.abs(roll) > SPAWN_ROLL_DEG) problems.push(`tilted ${Math.round(roll)}° sideways`);
