@@ -15,9 +15,16 @@ const ROAD_STEP_M = 40;
 const DECK_STEP_M = 12;
 const SIDEWALK_STEP_M = 30;
 const TUNNEL_STEP_M = 15;
-const MAX = { road: 600, deck: 300, sidewalk: 400, tunnel: 150 };
+const MAX = { road: 600, deck: 300, sidewalk: 400, tunnel: 150, under: 200 };
+const UNDER_STEP_M = 10;
+const LINE_STEP_M = 8;
 
 const r2 = (v) => Math.round(v * 100) / 100;
+// headroom a road under a deck needs, by its class: trucks 4.0 m + margin;
+// a track or service way a van; a path a person or a bike
+const UNDER_CLEAR_M = 4.3;
+const UNDER_CLEAR_BY = { track: 3.5, service: 3.5, footway: 2.5, path: 2.5, cycleway: 2.5, pedestrian: 2.5, steps: 2.5, bridleway: 2.5 };
+const underClear = (road) => UNDER_CLEAR_BY[road] ?? UNDER_CLEAR_M;
 // compass heading (degrees clockwise from north; world y is north) of a direction
 const heading = (dx, dy) => Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360);
 
@@ -38,6 +45,17 @@ function along(nodes, step, offset = step / 2) {
   return out;
 }
 
+// a node line thinned to points at least LINE_STEP_M apart (ends kept)
+function thinLine(nodes) {
+  const out = [nodes[0]];
+  for (let i = 1; i < nodes.length - 1; i++) {
+    const l = out[out.length - 1];
+    if (Math.hypot(nodes[i][0] - l[0], nodes[i][1] - l[1]) >= LINE_STEP_M) out.push(nodes[i]);
+  }
+  if (nodes.length > 1) out.push(nodes[nodes.length - 1]);
+  return out;
+}
+
 // every n-th, to at most max (deterministic)
 const thin = (list, max) => (list.length <= max ? list : list.filter((_, i) => i % Math.ceil(list.length / max) === 0));
 
@@ -51,10 +69,18 @@ const thin = (list, max) => (list.length <= max ? list : list.filter((_, i) => i
  * east, west }, worldSize } for latitude / longitude.
  */
 export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underStructure = () => false, inTunnel = () => true, spawn = null, curbHeight = 0.15, geo = null }) {
-  const road = []; const deck = []; const sidewalk = []; const tunnel = [];
+  const road = []; const deck = []; const sidewalk = []; const tunnel = []; const under = [];
+  const lines = [];
   for (const cw of carriageways) {
     const n = cw.nodes || [];
     if (n.length < 2) continue;
+    // the drawn line itself (thinned to LINE_STEP_M), for street-level checks
+    // and spot categories: k road | deck | tunnel, half width, roundabout
+    lines.push({
+      k: cw.tunnel ? 'tunnel' : (cw.carried || cw.bridge) ? 'deck' : 'road',
+      hw: r2(cw.half || 3), road: cw.highway, ...(String(cw.tags?.junction || '') === 'roundabout' ? { rb: 1 } : {}),
+      p: thinLine(n).map((q) => [r2(q[0]), r2(q[1]), r2(q[2])]),
+    });
     if (cw.tunnel) {
       // (only where a tunnel was built over it: a tunnel=yes road left in
       // the open is a road like any other)
@@ -66,14 +92,24 @@ export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underS
       for (const p of along(n, DECK_STEP_M)) deck.push({ k: 'deck', x: r2(p.x), y: r2(p.y), z: r2(p.z), h: heading(p.dx, p.dy), road: cw.highway });
     } else {
       for (const p of along(n, ROAD_STEP_M)) {
-        // (a road under a deck or in a tunnel's shadow: the ray meets that first)
-        if (underStructure(p.x, p.y, p.z, p.z + 60)) continue;
+        // (a road under a deck: probed for its clearance instead, the ray
+        // from above meets the deck first)
+        if (underStructure(p.x, p.y, p.z, p.z + 60)) {
+          if (!inTunnel(p.x, p.y, p.z, p.z + 3)) under.push({ k: 'under', x: r2(p.x), y: r2(p.y), z: r2(p.z), h: heading(p.dx, p.dy), road: cw.highway });
+          continue;
+        }
         road.push({ k: 'road', x: r2(p.x), y: r2(p.y), z: r2(p.z), h: heading(p.dx, p.dy), road: cw.highway });
+      }
+      // roads under decks are short: probe them closer
+      for (const p of along(n, UNDER_STEP_M)) {
+        if (under.some((q) => Math.hypot(q.x - p.x, q.y - p.y) < UNDER_STEP_M)) continue;
+        if (underStructure(p.x, p.y, p.z, p.z + 60) && !inTunnel(p.x, p.y, p.z, p.z + 3)) under.push({ k: 'under', x: r2(p.x), y: r2(p.y), z: r2(p.z), h: heading(p.dx, p.dy), road: cw.highway });
       }
     }
   }
   for (const run of sidewalkRuns) {
     const w = run.width;
+    lines.push({ k: 'sidewalk', w: r2(w), side: run.side, p: thinLine(run.points).map((q) => [r2(q[0]), r2(q[1]), r2(q[2])]) });
     for (const p of along(run.points, SIDEWALK_STEP_M)) {
       const nx = -p.dy * run.side; const ny = p.dx * run.side;
       const x = p.x + nx * (w / 2 + 0.15); const y = p.y + ny * (w / 2 + 0.15);
@@ -83,11 +119,12 @@ export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underS
   }
   const probes = [
     ...thin(road, MAX.road), ...thin(deck, MAX.deck), ...thin(sidewalk, MAX.sidewalk), ...thin(tunnel, MAX.tunnel),
+    ...thin(under, MAX.under),
   ];
   if (spawn) probes.push({ k: 'spawn', x: r2(spawn[0]), y: r2(spawn[1]), z: r2(spawn[2]) });
   // geo: the level's frame (world x east, y north, centred), so a probe can
   // be matched with street photos: lng = west + (x / worldSize + 0.5) * (east - west)
-  return { version: 2, ...(geo ? { geo } : {}), probes };
+  return { version: 3, ...(geo ? { geo } : {}), probes, lines };
 }
 
 /**
@@ -120,6 +157,10 @@ export function judgeProbes(probes, hits) {
     if (p.k === 'tunnel') {
       if (dz === null || Math.abs(dz) > 0.6) fail(p, 'tunnel road surface off', { dz: dz === null ? null : r2(dz), obj });
       else if (!Number.isFinite(h.roof) || h.roof > 12) fail(p, 'no roof over the tunnel road', { roof: h.roof ?? null });
+    } else if (p.k === 'under') {
+      // up from the road: the deck's underside at least UNDER_CLEAR_M over it
+      if (ldz === null || Math.abs(ldz) > 0.6) fail(p, 'road under the deck off its surface', { dz: ldz === null ? null : r2(ldz), obj: lobj });
+      else if (Number.isFinite(h.roof) && h.roof < underClear(p.road)) fail(p, `low clearance under ${h.roofObj || 'the deck'}`, { clear: r2(h.roof), need: underClear(p.road), obj: h.roofObj });
     } else if (p.k === 'spawn') {
       // (from a car's height: a spawn on a street under a bridge is fine)
       if (ldz === null || ldz < -3 || ldz > 1) fail(p, 'spawn not over a surface near it', { dz: ldz === null ? null : r2(ldz), obj: lobj });

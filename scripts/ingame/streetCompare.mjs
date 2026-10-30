@@ -38,6 +38,12 @@ const H_FOV = 90;           // Google's horizontal field of view (BeamNG's setFO
 const MAX_DISTORTION = 0.15; // |k1| over this: too bent to compare with a pinhole render
 const MIN_YEAR = Number(opt('--min-year', '0'));
 const YEARS_APART = 3;      // flag a pair this many years apart
+const STREET_M = 6;         // a panorama this far past a carriageway's edge at most (street level)
+const TOD = 0.08;           // fixed time of day for every game shot (morning sun, BeamNG's 0..1 day)
+// the review rubric: each pair scored 0 (wrong) .. 2 (matches), null = not visible
+const RUBRIC = ['alignment', 'roadWidth', 'markings', 'sidewalks', 'structures', 'terrain', 'buildings', 'vegetation', 'furniture'];
+// spot categories, each given a share of the spots in turn
+const CATEGORIES = ['failure', 'junction', 'roundabout', 'steep', 'ramp', 'bridge', 'under', 'portal', 'sidewalk', 'street'];
 const SEARCH_M = 45;        // photos this far from a spot
 const SPACING_M = 90;       // spots at least this far apart
 if (!level) { console.error('usage: streetCompare.mjs <levelName> [--load] [--spots 20] [--tests ingame.json] [--source google|mapillary|both] [--out dir] [--min-year 2020]'); process.exit(2); }
@@ -99,23 +105,31 @@ async function hideHud() {
 // put the camera at world (x, y), `eye` m over the surface under it, facing
 // compass heading h (degrees clockwise from north), slightly down
 // (vFov: BeamNG's setFOV is the vertical field of view, measured)
-async function aim(x, y, zHint, h, { eye, vFov, pitch = -3 }) {
+async function aim(x, y, zHint, h, { eye, vFov, pitch = -3, level = null }) {
   return lua(`
     if not commands.isFreeCamera() then commands.setFreeCamera() end
+    local base
+    ${level ? `
+    -- on the drawn road level under the photo: its surface just there
+    local r = castRay(vec3(${x}, ${y}, ${level.z + 1.5}), vec3(${x}, ${y}, ${level.z - 3}), true, true)
+    base = r and r.pt.z or ${level.z}` : `
     -- on the terrain, or a deck / sidewalk right there, never a roof or a tree
     local g = core_terrain.getTerrainHeight(vec3(${x}, ${y}, 0)) or ${zHint}
     local r = castRay(vec3(${x}, ${y}, ${zHint + 3}), vec3(${x}, ${y}, ${zHint - 30}), true, true)
     local name = r and r.obj and r.obj.getName and r.obj:getName() or ''
-    local base = g
-    if r and (name:find('^bridge_') or name:find('^sidewalks')) and r.pt.z > g then base = r.pt.z end
+    base = g
+    if r and (name:find('^bridge_') or name:find('^sidewalks')) and r.pt.z > g then base = r.pt.z end`}
     local z = base + ${eye}
+    -- a building straight over the camera (it stands in one in the game)
+    local up = castRay(vec3(${x}, ${y}, z), vec3(${x}, ${y}, z + 8), true, true)
+    local upName = up and up.obj and up.obj.getName and up.obj:getName() or ''
+    local blocked = (up and not upName:find('^bridge_') and not upName:find('^tunnel_') and not upName:find('[Ff]orest')) and upName or ''
     local a = math.rad(${h}); local p = math.rad(${pitch})
     local d = vec3(math.sin(a) * math.cos(p), math.cos(a) * math.cos(p), math.sin(p))
     local q = quatFromDir(d, vec3(0, 0, 1))
     core_camera.setPosRot(0, ${x}, ${y}, z, q.x, q.y, q.z, q.w)
     core_camera.setFOV(0, ${vFov.toFixed(3)})
-
-    return string.format('%.2f', z)`);
+    return string.format('%.2f|%s', z, blocked)`);
 }
 const deg = (r) => (r * 180) / Math.PI;
 const rad = (d) => (d * Math.PI) / 180;
@@ -199,6 +213,7 @@ async function mapillaryNear(x, y, roadH) {
     const g = (im.computed_geometry || im.geometry)?.coordinates;
     if (!g) continue;
     const [px, py] = toWorld(g[1], g[0]);
+    if (LINES.length && !atStreetLevel(px, py)) continue;
     const d = Math.hypot(px - x, py - y);
     const age = (Date.now() - im.captured_at) / (365 * 86400e3);
     // near first; a newer photo wins between two about as near; a photo
@@ -224,6 +239,7 @@ async function googleNear(x, y, roadHeading) {
   // (Google's own cars only: user panoramas are indoor rooms, boats, drones)
   if (meta.status !== 'OK' || !/google/i.test(meta.copyright || '')) return null;
   const [px, py] = toWorld(meta.location.lat, meta.location.lng);
+  if (LINES.length && !atStreetLevel(px, py)) return null;
   const d = Math.hypot(px - x, py - y);
   // facing the spot from the panorama, or along the road when standing on it
   const h = d > 6 ? bearing(x - px, y - py) : (roadHeading ?? 0);
@@ -238,19 +254,122 @@ async function googleImage(g, aspect) {
 }
 
 // ── spots ───────────────────────────────────────────────────────────────
+// the level's drawn lines (mapng_probes.json v3) as a segment grid
+let LINES = [];
+const SEG = new Map();
+function indexLines(lines) {
+  LINES = lines || [];
+  LINES.forEach((l, li) => {
+    for (let i = 0; i + 1 < l.p.length; i++) {
+      const [ax, ay] = l.p[i]; const [bx, by] = l.p[i + 1];
+      for (let cx = Math.floor(Math.min(ax, bx) / 32) - 1; cx <= Math.floor(Math.max(ax, bx) / 32) + 1; cx++) {
+        for (let cy = Math.floor(Math.min(ay, by) / 32) - 1; cy <= Math.floor(Math.max(ay, by) / 32) + 1; cy++) {
+          const k = `${cx},${cy}`;
+          if (!SEG.has(k)) SEG.set(k, []);
+          SEG.get(k).push([li, i]);
+        }
+      }
+    }
+  });
+}
+// distance from (x, y) to a line's centre (and its height there), per line kind
+function nearestLine(x, y, kinds) {
+  let best = null;
+  for (const [li, i] of SEG.get(`${Math.floor(x / 32)},${Math.floor(y / 32)}`) || []) {
+    const l = LINES[li];
+    if (!kinds.includes(l.k)) continue;
+    const [ax, ay, az] = l.p[i]; const [bx, by, bz] = l.p[i + 1];
+    const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy || 1e-9;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2));
+    const d = Math.hypot(ax + dx * t - x, ay + dy * t - y);
+    if (!best || d < best.d) best = { d, l, z: az + (bz - az) * t, grade: Math.abs(bz - az) / Math.sqrt(L2) };
+  }
+  return best;
+}
+// the drawn levels under (x, y): every road, deck or tunnel line whose
+// carriageway (+2 m) it stands on, with the line's height there
+function levelsAt(x, y) {
+  const out = [];
+  for (const [li, i] of SEG.get(`${Math.floor(x / 32)},${Math.floor(y / 32)}`) || []) {
+    const l = LINES[li];
+    if (!['road', 'deck', 'tunnel'].includes(l.k)) continue;
+    const [ax, ay, az] = l.p[i]; const [bx, by, bz] = l.p[i + 1];
+    const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy || 1e-9;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2));
+    const d = Math.hypot(ax + dx * t - x, ay + dy * t - y);
+    if (d <= l.hw + 2) out.push({ k: l.k, z: az + (bz - az) * t, d });
+  }
+  // one entry per level (3 m apart)
+  out.sort((a, b) => a.z - b.z);
+  return out.filter((v, i) => i === 0 || v.z - out[i - 1].z > 3);
+}
+// the level a photo was taken on and, where roads stack, the other one:
+// a deck spot prefers the deck, a tunnel the tunnel, others the ground road
+function cameraLevels(x, y, spot) {
+  const lv = levelsAt(x, y);
+  if (!lv.length) return { main: null, alt: null };
+  const want = spot.k === 'deck' ? 'deck' : spot.k === 'tunnel' ? 'tunnel' : 'road';
+  const main = lv.find((v) => v.k === want) || (want === 'road' ? lv.find((v) => v.k !== 'tunnel') : null) || lv[0];
+  const alt = lv.find((v) => v !== main) || null;
+  return { main, alt };
+}
+
+// street level: on a carriageway or a deck (within STREET_M of its edge), or
+// on a sidewalk (a tunnel's road counts: its inside is compared too);
+// not in a yard, on a roof or indoors
+function atStreetLevel(x, y) {
+  const r = nearestLine(x, y, ['road', 'deck', 'tunnel']);
+  if (r && r.d <= r.l.hw + STREET_M) return true;
+  const s = nearestLine(x, y, ['sidewalk']);
+  return !!s && s.d <= (s.l.w || 2) + 1.5;
+}
+
+function categoryOf(p) {
+  if (p.why) return 'failure';
+  if (p.k === 'deck') return 'bridge';
+  if (p.k === 'under') return 'under';
+  if (p.k === 'sidewalk') return 'sidewalk';
+  if (p.k === 'tunnel') return 'portal';
+  const near = (pred, r) => LINES.some((l) => pred(l) && [l.p[0], l.p[l.p.length - 1]].some((q) => Math.hypot(q[0] - p.x, q[1] - p.y) < r));
+  if (near((l) => l.k === 'tunnel', 40)) return 'portal';
+  const here = nearestLine(p.x, p.y, ['road']);
+  if (here?.l.rb) return 'roundabout';
+  if (near((l) => l.k === 'deck', 80)) return 'ramp';
+  // three or more drawn road ends meeting near it
+  let ends = 0;
+  for (const l of LINES) if (l.k === 'road') for (const q of [l.p[0], l.p[l.p.length - 1]]) if (Math.hypot(q[0] - p.x, q[1] - p.y) < 18) ends++;
+  if (ends >= 3) return 'junction';
+  if (here && here.grade > 0.08) return 'steep';
+  return 'street';
+}
+
+// spots across the level: every category in turn (test failures first),
+// SPACING_M apart
 function pickSpots(probes, failures) {
+  const pool = new Map(CATEGORIES.map((c) => [c, []]));
+  for (const f of failures) pool.get('failure').push({ ...f });
+  for (const p of probes) {
+    // (portals from the roads at a tunnel's ends: no street photos inside)
+    if (!['road', 'deck', 'sidewalk', 'under'].includes(p.k)) continue;
+    pool.get(categoryOf(p)).push(p);
+  }
+  // (spread within a category: walk it with a stride)
+  for (const [c, list] of pool) {
+    if (c === 'failure' || list.length < 2) continue;
+    const stride = Math.max(1, Math.floor(list.length / 12));
+    pool.set(c, list.filter((_, i) => i % stride === 0));
+  }
   const out = [];
   const far = (p) => out.every((q) => Math.hypot(q.x - p.x, q.y - p.y) >= SPACING_M);
-  // the test failures first (each a place to look at), then an even spread
-  for (const f of failures) if (out.length < Math.ceil(SPOTS / 2) && far(f)) out.push({ ...f, why: f.why });
-  const pool = probes.filter((p) => ['road', 'deck', 'sidewalk'].includes(p.k));
-  const quota = { road: 0.5, deck: 0.25, sidewalk: 0.25 };
-  for (const k of Object.keys(quota)) {
-    const list = pool.filter((p) => p.k === k);
-    const want = Math.round(SPOTS * quota[k]);
-    let got = 0;
-    for (let i = 0; i < list.length && got < want && out.length < SPOTS * 3; i += Math.max(1, Math.floor(list.length / (want * 3)))) {
-      if (far(list[i])) { out.push(list[i]); got++; }
+  let added = true;
+  while (added && out.length < SPOTS * 3) {
+    added = false;
+    for (const c of CATEGORIES) {
+      const list = pool.get(c);
+      while (list.length) {
+        const p = list.shift();
+        if (far(p)) { out.push({ ...p, category: c }); added = true; break; }
+      }
     }
   }
   return out;
@@ -267,9 +386,13 @@ async function main() {
   const data = JSON.parse(raw);
   if (!data.geo) throw new Error(`${level} was exported before probes carried the level's frame (re-export it)`);
   GEO = data.geo;
+  indexLines(data.lines);
+  if (!data.lines) process.stderr.write('(no road lines in this level\'s probes: street level not enforced; re-export for v3 probes)\n');
   const failures = opt('--tests') ? JSON.parse(fs.readFileSync(opt('--tests'), 'utf8')).failures || [] : [];
   fs.mkdirSync(OUT, { recursive: true });
   const fovBefore = await lua('return core_camera.getFovDeg()');
+  // the same light for every shot
+  const todBefore = await lua(`local t = core_environment.getTimeOfDay() local was = t.time t.time = ${TOD} t.play = false core_environment.setTimeOfDay(t) return tostring(was)`);
   await hideHud();
   // the game screen's shape, from one screenshot
   const probe = jpegSize(await grab());
@@ -294,15 +417,28 @@ async function main() {
     if (goo) {
       const img = await googleImage(goo, screenAspect);
       if (img) fs.writeFileSync(path.join(OUT, `${n}_google.jpg`), img);
-      await aim(goo.x, goo.y, spot.z, goo.h, { eye: EYE_GOOGLE_M, vFov: vFovFor(H_FOV, screenAspect), pitch: -3 }); await sleep(900);
+      // on the road level under the panorama; where roads stack, from the
+      // other level too (which one Google's car was on is not known)
+      const { main, alt } = LINES.length ? cameraLevels(goo.x, goo.y, spot) : { main: null, alt: null };
+      const view = { eye: EYE_GOOGLE_M, vFov: vFovFor(H_FOV, screenAspect), pitch: -3 };
+      const [, blocked] = String(await aim(goo.x, goo.y, spot.z, goo.h, { ...view, level: main })).split('|');
+      await sleep(900);
       fs.writeFileSync(path.join(OUT, `${n}_game_g.jpg`), await grab());
       row.shots.g = `${n}_game_g.jpg`;
       row.gImage = !!img;
+      row.level = main ? main.k : 'terrain';
+      if (blocked) row.blocked = blocked;
+      if (alt) {
+        await aim(goo.x, goo.y, spot.z, goo.h, { ...view, level: alt }); await sleep(900);
+        fs.writeFileSync(path.join(OUT, `${n}_game_g2.jpg`), await grab());
+        row.shots.g2 = `${n}_game_g2.jpg`;
+        row.altLevel = alt.k;
+      }
     }
     rows.push(row);
-    process.stderr.write(`spot ${n}: ${spot.k} (${Math.round(spot.x)}, ${Math.round(spot.y)})${mly ? ` mapillary ${Math.round(mly.d)} m` : ''}${goo ? ` google ${Math.round(goo.d)} m` : ''}\n`);
+    process.stderr.write(`spot ${n}: ${spot.category} ${spot.k} (${Math.round(spot.x)}, ${Math.round(spot.y)})${mly ? ` mapillary ${Math.round(mly.d)} m` : ''}${goo ? ` google ${Math.round(goo.d)} m` : ''}\n`);
   }
-  await lua(`core_camera.setFOV(0, ${Number(fovBefore) || 65}) ui_visibility.set(true) return 'ok'`);
+  await lua(`core_camera.setFOV(0, ${Number(fovBefore) || 65}) local t = core_environment.getTimeOfDay() t.time = ${Number(todBefore) || 0} core_environment.setTimeOfDay(t) ui_visibility.set(true) return 'ok'`);
   // the page
   const cell = (src, cap, aspect) => `<figure>${src ? `<img src="${src}" loading="lazy"${aspect ? ` style="aspect-ratio:${aspect.toFixed(4)};object-fit:cover"` : ''}>` : '<div class="none">no image</div>'}<figcaption>${cap}</figcaption></figure>`;
   const yearOf = (d) => Number(String(d || '').slice(0, 4)) || null;
@@ -316,17 +452,29 @@ figcaption{font-size:12px;color:#999;margin-top:4px}.why{color:#f88}a{color:#8cf
 <p>Each row: the real photo and the game from the same place, heading and field of view (Google: ${H_FOV}° wide at ${EYE_GOOGLE_M} m; Mapillary: each photo's own lens, perspective cameras only, at ${EYE_MAPILLARY_M} m, the game cropped to the photo's shape). Mapillary images CC-BY-SA; Google images for viewing only, not stored or used as data.</p>
 ${rows.map((r) => {
     const [lat, lng] = toLatLng(r.spot.x, r.spot.y);
-    const head = `<b>${r.n}</b> ${esc(r.spot.k)} ${esc(r.spot.road || '')} at (${Math.round(r.spot.x)}, ${Math.round(r.spot.y)}) · ${lat.toFixed(6)}, ${lng.toFixed(6)}${r.spot.why ? ` · <span class="why">test: ${esc(r.spot.why)}</span>` : ''}`;
+    const head = `<b>${r.n}</b> [${esc(r.spot.category)}] ${esc(r.spot.k)} ${esc(r.spot.road || '')} at (${Math.round(r.spot.x)}, ${Math.round(r.spot.y)}) · ${lat.toFixed(6)}, ${lng.toFixed(6)}${r.spot.why ? ` · <span class="why">test: ${esc(r.spot.why)}</span>` : ''}`;
     const parts = [];
     const ym = yearOf(r.mly?.date); const yg = yearOf(r.goo?.date);
     const apart = ym && yg && Math.abs(ym - yg) >= YEARS_APART ? ` <span class="why">photos ${Math.abs(ym - yg)} years apart</span>` : '';
     if (r.mly) parts.push(`<div class="pair">${cell(`${r.n}_mapillary.jpg`, `Mapillary ${esc(r.mly.date)}${apart}, ${Math.round(r.mly.d)} m from the spot, heading ${Math.round(r.mly.h)}°, ${r.mly.view.hFov.toFixed(0)}°×${r.mly.view.vFov.toFixed(0)}° view, pitch ${r.mly.view.pitch.toFixed(1)}°${r.mly.camera ? `, ${esc(r.mly.camera)}` : ''} · <a href="https://www.mapillary.com/app/?pKey=${r.mly.id}">open</a>`)}${cell(r.shots.m, `game, same place, heading and lens (${EYE_MAPILLARY_M} m up)`, r.mly.view.aspect)}</div>`);
-    if (r.goo) parts.push(`<div class="pair">${cell(r.gImage ? `${r.n}_google.jpg` : '', `Google ${esc(r.goo.date)}, ${Math.round(r.goo.d)} m from the spot, heading ${Math.round(r.goo.h)}°, ${H_FOV}° wide · <a href="https://www.google.com/maps/@?api=1&map_action=pano&pano=${r.goo.pano}&heading=${Math.round(r.goo.h)}">open</a>`)}${cell(r.shots.g, `game, same place, heading and ${H_FOV}° view (${EYE_GOOGLE_M} m up)`)}</div>`);
+    if (r.goo) parts.push(`<div class="pair">${cell(r.gImage ? `${r.n}_google.jpg` : '', `Google ${esc(r.goo.date)}, ${Math.round(r.goo.d)} m from the spot, heading ${Math.round(r.goo.h)}°, ${H_FOV}° wide · <a href="https://www.google.com/maps/@?api=1&map_action=pano&pano=${r.goo.pano}&heading=${Math.round(r.goo.h)}">open</a>`)}${cell(r.shots.g, `game on the ${esc(r.level)} level, same place, heading and ${H_FOV}° view (${EYE_GOOGLE_M} m up)${r.blocked ? ` <span class="why">camera under ${esc(r.blocked)}</span>` : ''}`)}${r.shots.g2 ? cell(r.shots.g2, `game on the ${esc(r.altLevel)} level (roads stack here)`) : ''}</div>`);
     return `<div class="row"><div>${head}</div>${parts.join('')}</div>`;
   }).join('\n')}
 </body></html>`;
   fs.writeFileSync(path.join(OUT, 'index.html'), html);
   fs.writeFileSync(path.join(OUT, 'spots.json'), JSON.stringify(rows.map(({ shots, ...r }) => r), null, 1));
+  // the review to fill in: each pair scored per RUBRIC item, notes; kept
+  // (no images) so scores can be compared over runs
+  const review = {
+    level, date: new Date().toISOString().slice(0, 10), rubric: RUBRIC, scale: '0 wrong, 1 partly, 2 matches, null not visible',
+    pairs: rows.map((r) => ({
+      n: r.n, category: r.spot.category, kind: r.spot.k, road: r.spot.road || null, x: Math.round(r.spot.x), y: Math.round(r.spot.y),
+      test: r.spot.why || null, google: r.goo ? { pano: r.goo.pano, date: r.goo.date, d: Math.round(r.goo.d), h: Math.round(r.goo.h) } : null,
+      level: r.level || null, altLevel: r.altLevel || null, matchedLevel: null, cameraBlocked: r.blocked || null,
+      scores: Object.fromEntries(RUBRIC.map((k) => [k, null])), notes: '',
+    })),
+  };
+  if (!fs.existsSync(path.join(OUT, 'review.json'))) fs.writeFileSync(path.join(OUT, 'review.json'), JSON.stringify(review, null, 1));
   console.log(`${rows.length} spot(s): ${path.join(OUT, 'index.html')}`);
 }
 

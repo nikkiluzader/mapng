@@ -41,3 +41,30 @@ test('judge: tree crowns over a road pass; a building over it, a gap under a sid
   assert.match(failures.find((f) => f.k === 'deck').why, /no deck under the road/);
   assert.deepEqual(byKind.tunnel, { n: 1, fail: 0 });
 });
+
+test('probes: road lines, and roads under a deck probed for clearance', () => {
+  const { probes, lines, version } = buildIngameProbes({
+    carriageways: [line(10, { half: 4, tags: { junction: 'roundabout' } }), line(20, { carried: true })],
+    sidewalkRuns: [{ points: [[-100, 4, 10], [100, 4, 10]], side: 1, width: 2, highway: 'primary' }],
+    underStructure: (x) => x > 150,
+    inTunnel: () => false,
+  });
+  assert.equal(version, 3);
+  assert.deepEqual(lines.map((l) => l.k), ['road', 'deck', 'sidewalk']);
+  assert.equal(lines[0].rb, 1);
+  assert.equal(lines[0].hw, 4);
+  assert.ok(lines[0].p.length >= 2 && lines[0].p.every((q) => q.length === 3));
+  const under = probes.filter((p) => p.k === 'under');
+  assert.ok(under.length >= 3 && under.every((p) => p.x > 150), 'roads under the deck');
+});
+
+test('judge: a road under a deck with too little headroom fails', () => {
+  const probes = [{ k: 'under', x: 0, y: 0, z: 10 }, { k: 'under', x: 5, y: 0, z: 10 }];
+  const hits = [
+    { z: 10.02, lz: 10.02, lobj: 'theTerrain', lcls: 'TerrainBlock', roof: 5.4, roofObj: 'bridge_b001' },
+    { z: 10.02, lz: 10.02, lobj: 'theTerrain', lcls: 'TerrainBlock', roof: 3.1, roofObj: 'bridge_b001' },
+  ];
+  const { byKind, failures } = judgeProbes(probes, hits);
+  assert.deepEqual(byKind.under, { n: 2, fail: 1 });
+  assert.match(failures[0].why, /low clearance/);
+});

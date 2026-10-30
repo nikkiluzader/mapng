@@ -50,7 +50,7 @@ async function loadLevel() {
 }
 
 // rays for a batch of probes; one line per probe:
-// z|obj|class|below|roof|lowZ|lowObj|lowClass
+// z|obj|class|below|roof|lowZ|lowObj|lowClass|roofObj
 const RAY_LUA = `
 local out = {}
 local function hit(a, b)
@@ -62,8 +62,15 @@ end
 for line in string.gmatch(PROBES, '[^;]+') do
   local k, x, y, z = line:match('(%a+),([%-%d%.]+),([%-%d%.]+),([%-%d%.]+)')
   x, y, z = tonumber(x), tonumber(y), tonumber(z)
-  local hz, obj, cls, below, roof, lz, lobj, lcls
-  if k == 'tunnel' then
+  local hz, obj, cls, below, roof, lz, lobj, lcls, roofObj
+  if k == 'under' then
+    -- the road under a deck: its surface from a car's height, the deck's
+    -- underside straight up from it
+    lz, lobj, lcls = hit(vec3(x, y, z + 2.5), vec3(x, y, z - 40))
+    hz, obj, cls = lz, lobj, lcls
+    local rz, robj = hit(vec3(x, y, (lz or z) + 0.3), vec3(x, y, z + 40))
+    if rz then roof = rz - (lz or z); roofObj = robj end
+  elseif k == 'tunnel' then
     hz, obj, cls = hit(vec3(x, y, z + 1.5), vec3(x, y, z - 10))
     local rz = hit(vec3(x, y, z + 1.5), vec3(x, y, z + 40))
     if rz then roof = rz - z end
@@ -76,7 +83,7 @@ for line in string.gmatch(PROBES, '[^;]+') do
       if gz then below = lz - gz end
     end
   end
-  out[#out + 1] = string.format('%s|%s|%s|%s|%s|%s|%s|%s', hz and string.format('%.3f', hz) or '', obj or '', cls or '', below and string.format('%.3f', below) or '', roof and string.format('%.2f', roof) or '', lz and string.format('%.3f', lz) or '', lobj or '', lcls or '')
+  out[#out + 1] = string.format('%s|%s|%s|%s|%s|%s|%s|%s|%s', hz and string.format('%.3f', hz) or '', obj or '', cls or '', below and string.format('%.3f', below) or '', roof and string.format('%.2f', roof) or '', lz and string.format('%.3f', lz) or '', lobj or '', lcls or '', roofObj or '')
 end
 return table.concat(out, ';')`;
 
@@ -94,9 +101,9 @@ async function main() {
     const list = batch.map((p) => `${p.k},${p.x},${p.y},${p.z}`).join(';');
     const text = await lua(`local PROBES = '${list}'\n${RAY_LUA}`);
     for (const line of text.split(';')) {
-      const [z, obj, cls, below, roof, lz, lobj, lcls] = line.split('|');
+      const [z, obj, cls, below, roof, lz, lobj, lcls, roofObj] = line.split('|');
       const num = (v) => (v === '' || v === undefined ? NaN : Number(v));
-      hits.push({ z: num(z), obj, cls, below: num(below), roof: num(roof), lz: num(lz), lobj, lcls });
+      hits.push({ z: num(z), obj, cls, below: num(below), roof: num(roof), lz: num(lz), lobj, lcls, roofObj });
     }
   }
   const { byKind, failures } = judgeProbes(probes, hits);
