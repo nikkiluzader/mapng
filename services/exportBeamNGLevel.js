@@ -4619,34 +4619,43 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const driving = Number.isFinite(stable) && stable > 0 ? stable : cs.drivingHalfWidth;
     return driving + (cs.leftExtra + cs.rightExtra) / 2;
   };
-  // The structure solver's road graph (stage A), built on the untouched
-  // ground. Shadow mode: nothing reads it yet but the report.
-  const graphEdge = (terrainData.width * squareSize) / 2 - 3;
-  const structureGraph = buildStructureGraph(drivableRoads, {
-    project: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
-    groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
-    halfOf,
-    isFreeEnd: (x, y) => Math.abs(x) >= graphEdge || Math.abs(y) >= graphEdge,
-  });
-  // stage B: crossings and their order, bridges over water (shadow mode too)
-  structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
-  yield;
-  // stage C: every road's profile in one solve (shadow mode: measured with
-  // the same checks as the level's roads, for the report)
-  {
-    const t0 = performance.now();
-    structureGraph.profile = yield* solveProfilesSteps(structureGraph);
-    structureGraph.profile.ms = Math.round(performance.now() - t0);
-    const lines = structureGraph.edges.map((e, k) => ({
-      nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
-      highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
-    }));
-    structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
-    Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
-    // stage D: what each stretch becomes
-    structureGraph.classes = classifyStructures(structureGraph);
+  // The structure solver (graph, crossings, profile, classes). Shadow mode
+  // unless options.structureSolver asks for it: a failure here is logged
+  // and skipped, never an export failure.
+  let structureGraph = null;
+  try {
+    // The structure solver's road graph (stage A), built on the untouched
+    // ground. Shadow mode: nothing reads it yet but the report.
+    const graphEdge = (terrainData.width * squareSize) / 2 - 3;
+    structureGraph = buildStructureGraph(drivableRoads, {
+      project: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
+      groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
+      halfOf,
+      isFreeEnd: (x, y) => Math.abs(x) >= graphEdge || Math.abs(y) >= graphEdge,
+    });
+    // stage B: crossings and their order, bridges over water (shadow mode too)
+    structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
+    yield;
+    // stage C: every road's profile in one solve (shadow mode: measured with
+    // the same checks as the level's roads, for the report)
+    {
+      const t0 = performance.now();
+      structureGraph.profile = yield* solveProfilesSteps(structureGraph);
+      structureGraph.profile.ms = Math.round(performance.now() - t0);
+      const lines = structureGraph.edges.map((e, k) => ({
+        nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
+        highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
+      }));
+      structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
+      Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
+      // stage D: what each stretch becomes
+      structureGraph.classes = classifyStructures(structureGraph);
+    }
+    yield;
+  } catch (err) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver skipped: ${err?.message || err}`);
+    structureGraph = null;
   }
-  yield;
   // Tunnels and bridges, their earthworks graded before any road samples the
   // ground. The tunnels meeting no bridge first: a bridge over a tunnel's
   // trench (North 7th Street over I-10 at Deck Park, Phoenix) spans it at the
@@ -10660,13 +10669,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       ]
     : processingLog.slice();
   // (structure checks, for the report and returned with the zip)
-  const structureChecks = measureStructures({
-    carriageways: roadLinesFromDecals(decalRoads),
-    decks: bridgeDecks,
-    tunnels: tunnelList,
-    groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
-    grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
-  });
+  let structureChecks = null;
+  try {
+    structureChecks = measureStructures({
+      carriageways: roadLinesFromDecals(decalRoads),
+      decks: bridgeDecks,
+      tunnels: tunnelList,
+      groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
+    });
+  } catch (err) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure checks skipped: ${err?.message || err}`);
+  }
   const reportContents = buildBeamNGExportReport({
     terrainData: exportTerrainData,
     originalTerrainData: terrainData,
