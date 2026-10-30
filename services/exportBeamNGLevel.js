@@ -43,7 +43,8 @@ import {
 import { resolveRoadRulesAt } from './countryRules.js';
 import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
-import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkSides } from './beamngSidewalks.js';
+import { buildIngameProbes } from './ingameProbes.js';
+import { buildSidewalkMeshes, checkSidewalkGround, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkSides } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
@@ -6148,6 +6149,8 @@ function buildDetailedReportSections(d) {
   section('Sidewalks and Street Furniture');
   const sw = d.sidewalks || {};
   lines.push(`- Sidewalk curb runs: ${(sw.runs || []).length}, meshes: ${(sw.meshes || []).length}, triangles (with medians): ${sw.triangles ?? 0}`);
+  const swg = d.structureChecks?.sidewalks;
+  if (swg) lines.push(`- Sidewalks on the terrain: ${swg.floating} of ${swg.samples} samples floating, ${swg.buried} buried; ground graded under them: ${sw.groundPixels ?? 0} pixels${swg.worst ? `; worst ${swg.worst.gap} m at (${swg.worst.at.join(', ')}) on a ${swg.worst.road}` : ''}`);
   const medianRuns = sw.medianRuns || [];
   const medianM = medianRuns.reduce((n, r) => n + polylineLength(r.points), 0);
   lines.push(`- Divided-road medians: ${medianRuns.length} island run(s), ${formatNumber(medianM / 1000, 2)} km of curb, on ${new Set(medianRuns.map((r) => r.owner)).size} carriageway(s)`);
@@ -9908,6 +9911,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     })
     : { meshes: [], runs: [], triangles: 0 };
   if (sidewalks.runs.length > 0) {
+    // the ground under the slabs (they hang at road height + the curb)
+    const graded = gradeSidewalkGround(sidewalks.runs, groundCarriageways, {
+      heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+      worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+    }, { overhead: underDeck });
+    const hmSide = heightMapEditor(exportTerrainData);
+    graded.apply((idx, v) => hmSide.set(idx, v));
+    sidewalks.groundPixels = graded.pixels;
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${(sidewalks.medianRuns || []).length} median island runs, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
   }
   const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);
@@ -10749,6 +10760,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
     });
+    structureChecks.sidewalks = checkSidewalkGround(sidewalks.runs, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure checks skipped: ${err?.message || err}`);
   }
@@ -10826,6 +10838,19 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     },
   });
   zip.file(`${base}/export_report.txt`, reportContents);
+  // in-game test probes (scripts/ingame/runIngameTests.mjs)
+  let ingameProbes = null;
+  try {
+    ingameProbes = buildIngameProbes({
+      carriageways: roadLinesFromDecals(decalRoads),
+      sidewalkRuns: sidewalks.runs,
+      underStructure: underDeck,
+      spawn: spawnPosition,
+    });
+    zip.file(`${base}/mapng_probes.json`, JSON.stringify(ingameProbes));
+  } catch (err) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} In-game probes skipped: ${err?.message || err}`);
+  }
 
   const terrainBinaryPath = `${base}/art/terrains/terrain.ter`;
   const terrainHeightmapPath = `${base}/art/terrains/terrain.terrainheightmap.png`;
@@ -11560,5 +11585,5 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   lastPct = 100;
   onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - exportT0, completed: processingLog[processingLog.length - 1] ?? null });
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
-  return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks };
+  return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes };
 }

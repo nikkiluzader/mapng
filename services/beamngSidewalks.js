@@ -813,3 +813,129 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
   flush();
   return { meshes, runs, corners, medianRuns, triangles };
 }
+
+// Ground under the sidewalks: a slab hangs at its road's height plus the
+// curb, so where the terrain beside a road is lower (an embankment, a street
+// climbing a hillside) it floated, and where higher it was buried. The ground
+// under each slab is set just under its top, then blends back to the terrain
+// past its back edge over a run sized to the height difference. No road's own
+// surface is touched (runs already stop short of other carriageways).
+const GROUND_UNDER_M = 0.04;     // the terrain this far under the slab's top
+const GROUND_BLEND_MIN_M = 1;
+const GROUND_BLEND_MAX_M = 10;
+const GROUND_BLEND_RUN = 2;      // 1 m of height difference blends over 2 m
+const GROUND_ROAD_MARGIN_M = 0.3;
+
+const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+/**
+ * Terrain edits that put the ground under every sidewalk run.
+ *   grid: { heightMap, width, height, worldSize, minHeight } (raw heights;
+ *         world z = raw - minHeight, world x, y centred, y north)
+ * overhead(x, y, z, zTop): a deck or tunnel there (the ground is not raised).
+ * Returns { pixels, apply(set) }: set(idx, raw) for every edited pixel.
+ */
+export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () => false } = {}) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const index = buildCarriagewayIndex(carriageways);
+  const onRoad = (x, y) => isOnOtherCarriageway(index, x, y, GROUND_ROAD_MARGIN_M, () => false);
+  // per pixel: the best claim (smallest distance out past a slab; inside a
+  // slab 0, averaged among slabs)
+  const best = new Map();   // idx -> [key, sum, n]
+  for (const run of runs || []) {
+    const p = run.points;
+    const w = run.width + CURB_W;
+    for (let i = 0; i + 1 < p.length; i++) {
+      const [ax, ay, az] = p[i]; const [bx, by, bz] = p[i + 1];
+      const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy;
+      if (L2 < 1e-6) continue;
+      const L = Math.sqrt(L2);
+      // outward: left of travel for side 1, right for side -1
+      const nx = (-dy / L) * run.side; const ny = (dx / L) * run.side;
+      const zTop = (az + bz) / 2 + CURB_H + CROSS_SLOPE * w;
+      const reach = w + GROUND_BLEND_MAX_M;
+      const xs = [ax, bx, ax + nx * reach, bx + nx * reach]; const ys = [ay, by, ay + ny * reach, by + ny * reach];
+      const [c0, r0] = toPixel(Math.min(...xs), Math.max(...ys));
+      const [c1, r1] = toPixel(Math.max(...xs), Math.min(...ys));
+      for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+        for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+          const [x, y] = toWorld(c, r);
+          const t = ((x - ax) * dx + (y - ay) * dy) / L2;
+          if (t < 0 || t > 1) continue;
+          const o = (x - ax) * nx + (y - ay) * ny;   // out from the curb line
+          if (o < 0 || o > reach) continue;
+          const idx = r * width + c;
+          const ground = heightMap[idx] - minHeight;
+          const zRoad = az + (bz - az) * t;
+          const top = zRoad + CURB_H + CROSS_SLOPE * Math.min(o, w) - GROUND_UNDER_M;
+          let key; let target;
+          if (o <= w) { key = 0; target = top; } else {
+            const blend = Math.min(GROUND_BLEND_MAX_M, Math.max(GROUND_BLEND_MIN_M, Math.abs(ground - top) * GROUND_BLEND_RUN));
+            const f = (o - w) / blend;
+            if (f >= 1) continue;
+            key = o - w; target = top + (ground - top) * smooth01(f);
+          }
+          const prev = best.get(idx);
+          if (!prev || key < prev[0] - 1e-6) best.set(idx, [key, target, 1]);
+          else if (Math.abs(key - prev[0]) <= 1e-6) { prev[1] += target; prev[2]++; }
+        }
+      }
+    }
+  }
+  const edits = [];
+  for (const [idx, [, sum, n]] of best) {
+    const r = Math.floor(idx / width); const c = idx - r * width;
+    const [x, y] = toWorld(c, r);
+    if (onRoad(x, y)) continue;
+    const z = sum / n;
+    // (never raised up into a deck or tunnel over it)
+    if (z > heightMap[idx] - minHeight && overhead(x, y, z, z + 6)) continue;
+    edits.push([idx, z + minHeight]);
+  }
+  return { pixels: edits.length, apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+}
+
+/**
+ * How well the sidewalks sit on the terrain: every 2 m along each run, at
+ * the slab's middle and back edge, the terrain against the slab's top.
+ * Floating: a gap under the slab deeper than its faces reach (CURB_H + SINK);
+ * buried: the terrain over the slab's top. groundAt(x, y): world z.
+ */
+export function checkSidewalkGround(runs, groundAt, { step = 2 } = {}) {
+  let samples = 0; let floating = 0; let buried = 0; let worst = null;
+  const list = [];
+  const FLOAT_M = CURB_H + SINK + 0.1;
+  const BURIED_M = 0.08;
+  for (const run of runs || []) {
+    const p = run.points;
+    const w = run.width + CURB_W;
+    let carry = 0;
+    for (let i = 0; i + 1 < p.length; i++) {
+      const [ax, ay, az] = p[i]; const [bx, by, bz] = p[i + 1];
+      const L = Math.hypot(bx - ax, by - ay);
+      if (L < 1e-6) continue;
+      const nx = (-(by - ay) / L) * run.side; const ny = ((bx - ax) / L) * run.side;
+      for (let s = carry; s <= L; s += step) {
+        const t = s / L;
+        const x0 = ax + (bx - ax) * t; const y0 = ay + (by - ay) * t; const zr = az + (bz - az) * t;
+        for (const o of [w / 2, w - 0.05]) {
+          const top = zr + CURB_H + CROSS_SLOPE * o;
+          const g = groundAt(x0 + nx * o, y0 + ny * o);
+          if (!Number.isFinite(g)) continue;
+          samples++;
+          const gap = top - g;
+          if (gap > FLOAT_M) floating++;
+          else if (-gap > BURIED_M) buried++;
+          if (gap > FLOAT_M || -gap > BURIED_M) {
+            list.push([Math.round(x0 + nx * o), Math.round(y0 + ny * o), Math.round(gap * 100) / 100, run.highway, run.width]);
+            if (!worst || Math.abs(gap) > Math.abs(worst.gap)) worst = { gap: Math.round(gap * 100) / 100, at: [Math.round(x0 + nx * o), Math.round(y0 + ny * o)], road: run.highway };
+          }
+        }
+      }
+      carry = (carry - L) % step; if (carry < 0) carry += step;
+    }
+  }
+  return { samples, floating, buried, worst, list: globalThis.__MAPNG_SW_LIST ? list : undefined };
+}

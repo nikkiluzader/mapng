@@ -48,7 +48,8 @@ const LONG_GRADE_M = 30;      // the terrain's own slope, over this far either s
 const HILLSIDE_M = 100;       // ... and over this far: as steep there, a real hillside
 const HILLSIDE_FACTOR = 1.5;  // a road on a hillside may run this much steeper (back down to it)
 const HILLSIDE_MAX = 0.35;
-const GROUND_BAND_M = 3;      // an untagged road's free fill / cut for grades
+const GROUND_BAND_M = 6;      // an untagged road's free fill / cut for grades
+const UNDER_FREE_M = 3;       // a road under a deck is cleared from at most this over its ground
 
 // Allowed rise per station step of an edge: the class limit, or the
 // terrain's real slope over +-LONG_GRADE_M where steeper (a mountain road
@@ -245,7 +246,7 @@ export function* solveProfilesSteps(graph) {
       // ground: one lifted with the deck (a ramp up to it) must not lift the
       // deck in turn, round after round (a deck climbed 35 m so)
       let under = at(dn, Z);
-      if (!edges[dn.edge].bridge && !edges[dn.edge].external) under = Math.min(under, at(dn, G) + GROUND_BAND_M);
+      if (!edges[dn.edge].bridge && !edges[dn.edge].external) under = Math.min(under, at(dn, G) + UNDER_FREE_M);
       const need = under + c.sep;
       seeds.push([off[up.edge] + up.i, need], [off[up.edge] + up.i + 1, need]);
     }
@@ -256,10 +257,15 @@ export function* solveProfilesSteps(graph) {
     // it up (a crossing, water, a pinned road) or down (cover): grades it
     // can't meet within the band, it follows the terrain (never a tall deck
     // over a gully); a bridge meeting it follows it
+    // (a lift spread far over the network is finite everywhere, far under
+    // the ground: it does not free a road from the band)
     for (let v = 0; v < N; v++) {
       if (!banded[v]) continue;
-      if (L[v] === -Infinity) L[v] = G[v] - GROUND_BAND_M;
-      if (U[v] === Infinity) U[v] = G[v] + GROUND_BAND_M;
+      // (a road a lift or cap reaches, a ramp toward a crossing or a portal,
+      // keeps its freedom: capped at the band it kinked)
+      if (L[v] > G[v] - GROUND_BAND_M || U[v] < G[v] + GROUND_BAND_M) continue;
+      L[v] = Math.max(L[v], G[v] - GROUND_BAND_M);
+      U[v] = Math.min(U[v], G[v] + GROUND_BAND_M);
     }
     for (let v = 0; v < N; v++) Z[v] = Math.min(U[v], Math.max(L[v], Z[v]));
     // smooth inside the envelopes; one height where ends meet

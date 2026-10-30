@@ -57,7 +57,7 @@ test('profile: an untagged track goes down through a gully, never a tall deck ov
   const z = g.profile.z[k]; const e = g.edges[k];
   let worst = 0;
   for (let i = 0; i < z.length; i++) worst = Math.max(worst, Math.abs(z[i] - e.g[i]));
-  assert.ok(worst <= 3.05, `track ${worst.toFixed(1)} m off its ground`);
+  assert.ok(worst <= 6.05, `track ${worst.toFixed(1)} m off its ground`);
   assert.equal(g.classes.segments.filter((s) => s.kind === 'deck').length, 0, 'no deck');
 });
 
