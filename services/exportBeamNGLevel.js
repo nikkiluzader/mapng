@@ -4014,7 +4014,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - xy[
  * height (and gets no cutting).
  */
 function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set() } = {}) {
-  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [] };
+  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set() };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
   const early = !bridges;
@@ -4252,7 +4252,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
             const h = hm.at(idx) - minHeight;
             const [x, y] = toWorld(c, r);
             const want = tunnelGroundAt(t, x, y, h);
-            if (Math.abs(want - h) > 1e-3) { hm.set(idx, want + minHeight); changed++; }
+            if (Math.abs(want - h) > 1e-3) { hm.set(idx, want + minHeight); changed++; if (want < h - CUT_KEEP_M) out.graded.add(idx); }
           }
         }
       }
@@ -4300,6 +4300,9 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
 }
 
 /** The two tunnel phases as one result (keys numbered through both). */
+// a tunnel's cutting: ground it lowered by more than this (out.graded)
+const CUT_KEEP_M = 0.1;
+
 function joinTunnelPhases(a, b) {
   const tunnels = [...a.tunnels, ...b.tunnels];
   tunnels.forEach((t, i) => { t.key = `t${String(i + 1).padStart(3, '0')}`; });
@@ -4308,6 +4311,7 @@ function joinTunnelPhases(a, b) {
     bySeg: new Map([...a.bySeg, ...b.bySeg]),
     skipped: [...a.skipped, ...b.skipped],
     holes: [...new Set([...a.holes, ...b.holes])],
+    graded: new Set([...(a.graded || []), ...(b.graded || [])]),
   };
 }
 
@@ -9874,9 +9878,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   if ((options.structureSolver === 'v2-terrain' || options.structureSolver === 'v2') && sg?.classes) {
     const t0 = performance.now();
+    // (the ground today's tunnels dug out, their cuttings, is theirs: only a
+    // road's own surface is composed over it; their fill and cover is
+    // composed as any ground)
+    const tunnelGraded = decalRoads.tunnels?.graded;
     const composed = composeTerrain(sg, {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+      keep: tunnelGraded?.size ? (idx) => tunnelGraded.has(idx) : null,
     });
     const hm = heightMapEditor(exportTerrainData);
     composed.apply((idx, v) => hm.set(idx, v));

@@ -19,6 +19,13 @@ const CELL_M = 32;
 // A hit this close to a node both edges share is their junction, not a
 // crossing.
 const SHARED_NODE_M = 2;
+// Decks of different layers this much closer than their half widths' sum
+// overlap; not counted this near a junction they share.
+const OVERLAP_SHARE = 0.85;
+const OVERLAP_NODE_M = 30;
+const OVERLAP_CELL_M = 16;
+const OVERLAP_ALIGN = 0.8;      // |cos| of the angle between them
+const OVERLAP_RUN_M = 20;
 // Classes that are paths, not roads: what they need over or under them.
 const PATH_CLASSES = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway', 'track']);
 const PATH_UNDER_M = 2.5 + 2.2;       // headroom over a path + a road deck
@@ -56,7 +63,8 @@ function cross(ax, ay, bx, by, cx, cy, dx, dy) {
 /**
  * Crossings and water runs of a structure graph (graph.js).
  *   waterAt(x, y) -> 0 land, 1 water, 2 ship channel (buildWaterLookup)
- * Returns { crossings, unjoined, water, stats }:
+ * Returns { crossings, overlaps, unjoined, water, stats } (overlaps: as
+ * crossings, decks of different layers alongside with their lanes overlapping):
  *   crossing { a: { edge, i, f, s }, b: { ... }, x, y, upper: 'a'|'b', rule, sep }
  *     (i + f: the station interval and fraction along it)
  *   water { edge, i0, i1, s0, s1, run, channel, need }  (bridge edges only)
@@ -117,6 +125,68 @@ export function findCrossings(graph, { waterAt = null } = {}) {
           x, y, upper: order.upper, rule: order.rule, sep: requiredSeparation(upper, lower),
         });
       }
+    }
+  }
+
+  const overlaps = [];
+  // Decks of different layers side by side whose lanes overlap (a ramp
+  // running alongside, partly under, the motorway a layer up) never cross,
+  // yet need the same clearance where they overlap: 0.9 m apart, a car on
+  // the lower deck drove into the upper one's edge. Not round a junction
+  // the two share (a ramp changing layer where it joins).
+  {
+    const cells = new Map();
+    // (decks both: a bridge beside a street on the ground, a canal bridge by
+    // the quay, is the composer's step, not a lift)
+    const road = (e) => e.bridge && !PATH_CLASSES.has(e.highway);
+    edges.forEach((e, k) => {
+      if (!road(e)) return;
+      for (let i = 0; i < e.s.length; i++) {
+        const key = `${Math.floor(e.x[i] / OVERLAP_CELL_M)},${Math.floor(e.y[i] / OVERLAP_CELL_M)}`;
+        if (!cells.has(key)) cells.set(key, []);
+        cells.get(key).push(k, i);
+      }
+    });
+    const found = [];
+    const nearShared = (A, B, x, y) => sharedNodes(A, B).some((n) => n && Math.hypot(n.x - x, n.y - y) < OVERLAP_NODE_M);
+    // (running alongside: across each other is a crossing, found above)
+    const dir = (e, i) => { const a = Math.max(0, i - 1); const b = Math.min(e.s.length - 1, i + 1); const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy) || 1; return [dx / L, dy / L]; };
+    edges.forEach((A, ka) => {
+      if (!road(A)) return;
+      for (let i = 0; i < A.s.length; i++) {
+        const cx = Math.floor(A.x[i] / OVERLAP_CELL_M); const cy = Math.floor(A.y[i] / OVERLAP_CELL_M);
+        const best = new Map();
+        for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+          const list = cells.get(`${cx + dx},${cy + dy}`) || [];
+          for (let j = 0; j < list.length; j += 2) {
+            const kb = list[j]; const B = edges[kb];
+            // (each pair once, from the upper road's stations)
+            if (kb === ka || !(A.layer > B.layer)) continue;
+            const ib = list[j + 1];
+            const d = Math.hypot(B.x[ib] - A.x[i], B.y[ib] - A.y[i]);
+            if (d >= (A.half + B.half) * OVERLAP_SHARE) continue;
+            if (!best.has(kb) || d < best.get(kb)[1]) best.set(kb, [ib, d]);
+          }
+        }
+        for (const [kb, [ib]] of best) {
+          const B = edges[kb];
+          if (nearShared(A, B, A.x[i], A.y[i])) continue;
+          const [ax, ay] = dir(A, i); const [bx, by] = dir(B, ib);
+          if (Math.abs(ax * bx + ay * by) < OVERLAP_ALIGN) continue;
+          found.push({
+            a: { edge: ka, ...placeOn(A, A.s[i]) }, b: { edge: kb, ...placeOn(B, B.s[ib]) },
+            x: A.x[i], y: A.y[i], upper: 'a', rule: 'overlap', sep: requiredSeparation(A, B),
+          });
+        }
+      }
+    });
+    // (alongside for a stretch, OVERLAP_RUN_M at least: not two decks
+    // brushing past each other)
+    const runs = new Map();
+    for (const c of found) { const key = `${c.a.edge}:${c.b.edge}`; if (!runs.has(key)) runs.set(key, []); runs.get(key).push(c); }
+    for (const list of runs.values()) {
+      const ss = list.map((c) => c.a.s);
+      if (Math.max(...ss) - Math.min(...ss) >= OVERLAP_RUN_M) overlaps.push(...list);
     }
   }
 
@@ -232,11 +302,11 @@ export function findCrossings(graph, { waterAt = null } = {}) {
     }
   }
 
-  const stats = { crossings: crossings.length, byLayer: 0, byBridge: 0, byTunnel: 0, unjoined, waterRuns: water.length, channels: water.filter((w) => w.channel).length };
+  const stats = { crossings: crossings.length, byLayer: 0, byBridge: 0, byTunnel: 0, overlaps: overlaps.length, unjoined, waterRuns: water.length, channels: water.filter((w) => w.channel).length };
   for (const c of crossings) {
     if (c.rule === 'layer') stats.byLayer++;
     else if (c.rule === 'bridge') stats.byBridge++;
     else stats.byTunnel++;
   }
-  return { crossings, unjoined, water, stats };
+  return { crossings, overlaps, unjoined, water, stats };
 }

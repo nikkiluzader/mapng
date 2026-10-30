@@ -94,3 +94,33 @@ test('profile: twin carriageways over a strait both take the named structure cle
   for (const t of tops) assert.ok(t > 15, `deck only ${t.toFixed(1)} m over the strait`);
   assert.ok(Math.abs(tops[0] - tops[1]) < 1, `carriageways ${tops.map((t) => t.toFixed(1)).join(' / ')}`);
 });
+
+test('a lift up a tunnel approach gives way to the pinned portal: steeper, not a wall', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // approach (motorway) from a junction at x = -110 over another tunnel
+  // (needs the road 6.3 m over that tube's -0.1 m) down to a portal at x = 0
+  // pinned at -4.1; ground falls 6.2 -> 0.7 along it
+  const n = 31; const x = []; const s = []; const g = [];
+  for (let i = 0; i < n; i++) { x.push(-110 + i * 110 / (n - 1)); s.push(i * 110 / (n - 1)); g.push(6.2 - 5.5 * i / (n - 1)); }
+  const approach = { id: 0, x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(s), g: Float64Array.from(g), from: 'J', to: 'P', highway: 'motorway', layer: 0, half: 5, bridge: false, tunnel: false };
+  const tubeX = Float64Array.from({ length: 11 }, (_, i) => i * 10);
+  const tube = { id: 1, x: tubeX, y: new Float64Array(11), s: tubeX.slice(), g: new Float64Array(11).fill(8), from: 'P', to: 'Q', highway: 'motorway', layer: -1, half: 5, bridge: false, tunnel: true, external: true };
+  const crossX = Float64Array.from({ length: 11 }, (_, i) => -20 + i * 4);
+  const other = { id: 2, x: new Float64Array(11).fill(-110), y: crossX, s: Float64Array.from({ length: 11 }, (_, i) => i * 4), g: new Float64Array(11).fill(6.2), from: 'U', to: 'V', highway: 'motorway', layer: -1, half: 5, bridge: false, tunnel: true, external: true };
+  const nodes = new Map([
+    ['J', { edges: [{ edge: 0, end: 0 }] }], ['P', { edges: [{ edge: 0, end: 1 }, { edge: 1, end: 0 }] }],
+    ['Q', { edges: [{ edge: 1, end: 1 }] }], ['U', { edges: [{ edge: 2, end: 0 }] }], ['V', { edges: [{ edge: 2, end: 1 }] }],
+  ]);
+  const pins = [];
+  for (let i = 0; i < 11; i++) pins.push([1, i, -4.1 + i * 0.05], [2, i, -0.1]);
+  const graph = {
+    edges: [approach, tube, other], nodes, pins, tunnelsPinned: true,
+    crossings: { crossings: [{ a: { edge: 0, i: 0, f: 0, s: 0 }, b: { edge: 2, i: 5, f: 0, s: 20 }, upper: 'a', rule: 'layer', sep: 6.3 }], water: [] },
+  };
+  const { z } = solveProfiles(graph);
+  assert.ok(Math.abs(z[0][n - 1] + 4.1) < 0.1, `meets the portal: ${z[0][n - 1].toFixed(2)}`);
+  assert.ok(Math.abs(z[1][0] + 4.1) < 0.1, 'the pinned tube stays');
+  assert.ok(z[0][0] > 6, `over the other tube at the junction: ${z[0][0].toFixed(2)}`);
+  let steep = 0; for (let i = 1; i < n; i++) steep = Math.max(steep, Math.abs(z[0][i] - z[0][i - 1]) / (s[i] - s[i - 1]));
+  assert.ok(steep < 0.15, `drivable all the way: ${(steep * 100).toFixed(1)} %`);
+});

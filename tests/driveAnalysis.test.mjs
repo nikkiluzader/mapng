@@ -41,3 +41,20 @@ test('drive analysis: a smooth drive passes; a step, a fall and getting stuck ar
   assert.ok(fell.events.some((e) => e.type === 'stuck'));
   assert.equal(fell.completed, false);
 });
+
+test('impact side: from the sharpest change of velocity, in the car\'s frame', async () => {
+  const { impactOf } = await import('../scripts/lib/driveAnalysis.mjs');
+  // driving north at 12 m/s, then stopped dead (front), shoved east (hit on
+  // its left), thrown up (underside)
+  const run = (after) => {
+    const out = [];
+    for (let t = 0; t < 3; t += 0.02) out.push({ t, x: 0, y: t * 12, z: 0, vx: 0, vy: 12, vz: 0 });
+    for (let t = 3; t < 4; t += 0.02) out.push({ t, x: 0, y: 36, z: 0, ...after });
+    return out;
+  };
+  assert.equal(impactOf(run({ vx: 0, vy: 0, vz: 0 })).where, 'front');
+  assert.equal(impactOf(run({ vx: 9, vy: 12, vz: 0 })).where, 'left side');
+  assert.equal(impactOf(run({ vx: -9, vy: 12, vz: 0 })).where, 'right side');
+  assert.equal(impactOf(run({ vx: 0, vy: 12, vz: 6 })).where, 'underside');
+  assert.equal(impactOf(run({ vx: 0, vy: 12, vz: 0 })), null, 'no impact');
+});

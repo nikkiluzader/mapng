@@ -18,10 +18,10 @@
 // Google's terms: its images are fetched to look at only. They stay in the
 // output folder (default: the system temp dir), are never committed and are
 // never used to derive map data. Mapillary images are CC-BY-SA.
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { EYE_GOOGLE_M, H_FOV, levelGeo, streetView, vFovFor } from '../lib/streetView.mjs';
 
 const args = process.argv.slice(2);
 const level = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a) && !args[args.indexOf(a) - 1]?.startsWith('--'));
@@ -32,9 +32,7 @@ const SOURCE = opt('--source', 'google');   // Google's consistent views; Mapill
 const OUT = path.join(opt('--out', path.join(os.tmpdir(), 'mapng-streetcompare')), level || '');
 // camera over the road surface: Google's car mast; Mapillary's mostly
 // dashcams and phones held in a car
-const EYE_GOOGLE_M = 2.5;
 const EYE_MAPILLARY_M = 1.5;
-const H_FOV = 90;           // Google's horizontal field of view (BeamNG's setFOV is VERTICAL)
 const MAX_DISTORTION = 0.15; // |k1| over this: too bent to compare with a pinhole render
 const MIN_YEAR = Number(opt('--min-year', '0'));
 const YEARS_APART = 3;      // flag a pair this many years apart
@@ -134,8 +132,6 @@ async function aim(x, y, zHint, h, { eye, vFov, pitch = -3, level = null }) {
 }
 const deg = (r) => (r * 180) / Math.PI;
 const rad = (d) => (d * Math.PI) / 180;
-// vertical field of view for a horizontal one at an aspect (width / height)
-const vFovFor = (hFov, aspect) => deg(2 * Math.atan(Math.tan(rad(hFov) / 2) / aspect));
 
 // width / height of a JPEG (its first SOF marker)
 function jpegSize(buf) {
@@ -179,15 +175,8 @@ function mapillaryView(im) {
 
 // ── geo ─────────────────────────────────────────────────────────────────
 let GEO;
-const toLatLng = (x, y) => {
-  const { bounds: b, worldSize: W } = GEO;
-  return [b.north - (0.5 - y / W) * (b.north - b.south), b.west + (x / W + 0.5) * (b.east - b.west)];
-};
-const toWorld = (lat, lng) => {
-  const { bounds: b, worldSize: W } = GEO;
-  return [((lng - b.west) / (b.east - b.west) - 0.5) * W, (0.5 - (b.north - lat) / (b.north - b.south)) * W];
-};
-const bearing = (dx, dy) => ((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360;
+let toLatLng; let toWorld;
+const setGeo = (geo) => { GEO = geo; ({ toLatLng, toWorld } = levelGeo(geo)); };
 
 // ── photos ──────────────────────────────────────────────────────────────
 // how far a photo's heading is from facing along the road (either way)
@@ -227,58 +216,15 @@ async function mapillaryNear(x, y, roadH) {
   return best;
 }
 
-const signGoogle = (pathQuery) => {
-  if (!GSECRET) return pathQuery;
-  const k = Buffer.from(GSECRET.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
-  const sig = crypto.createHmac('sha1', k).update(pathQuery).digest('base64').replace(/\+/g, '-').replace(/\//g, '_');
-  return `${pathQuery}&signature=${sig}`;
-};
-// Google's car panoramas only: Google's copyright (not user uploads) and
-// standing on a drivable carriageway (not the pedestrian Trekker's).
-// Google's metadata (free) returns the default panorama nearest a point,
-// not always the newest; positions a little along and across the road often
-// find newer drives. The newest street-level panorama among them wins
-// (ties: the nearest). The Static API has no date parameter.
-const GOOGLE_SAMPLES = [[0, 0], [10, 0], [-10, 0], [20, 0], [-20, 0], [0, 6], [0, -6], [10, 6], [-10, -6]];
-async function googleMeta(lat, lng, radius) {
-  const meta = await (await fetch(`https://maps.googleapis.com${signGoogle(`/maps/api/streetview/metadata?location=${lat.toFixed(7)},${lng.toFixed(7)}&radius=${radius}&source=outdoor&key=${GKEY}`)}`)).json();
-  // (Google's own cars only: user panoramas are indoor rooms, boats, drones)
-  return meta.status === 'OK' && /google/i.test(meta.copyright || '') ? meta : null;
-}
+// Google's car panoramas only (Google's copyright, standing on a drivable
+// carriageway, not the pedestrian Trekker's), the newest among positions a
+// little along and across the road (scripts/lib/streetView.mjs)
+const SV = streetView({ key: GKEY, secret: GSECRET });
 async function googleNear(x, y, roadHeading) {
-  if (!GKEY) return null;
-  // along the road (its heading) and across it
-  const a = rad(Number.isFinite(roadHeading) ? roadHeading : 0);
-  const ux = Math.sin(a); const uy = Math.cos(a);
-  const seen = new Map();
-  for (const [along, across] of GOOGLE_SAMPLES) {
-    const sx = x + ux * along + uy * across; const sy = y + uy * along - ux * across;
-    const [lat, lng] = toLatLng(sx, sy);
-    const meta = await googleMeta(lat, lng, along || across ? 12 : SEARCH_M);
-    if (!meta || seen.has(meta.pano_id)) continue;
-    const [px, py] = toWorld(meta.location.lat, meta.location.lng);
-    // Google's car only: on a drivable carriageway, not a sidewalk or a path
-    if (LINES.length && !onCarriageway(px, py)) continue;
-    const d = Math.hypot(px - x, py - y);
-    if (d > SEARCH_M) continue;
-    seen.set(meta.pano_id, { meta, px, py, d });
-  }
-  const list = [...seen.values()].filter((c) => !MIN_YEAR || Number(String(c.meta.date || '0').slice(0, 4)) >= MIN_YEAR);
-  if (!list.length) return null;
-  // newest first (dates are YYYY-MM), then nearest
-  list.sort((p, q) => String(q.meta.date || '').localeCompare(String(p.meta.date || '')) || p.d - q.d);
-  const { meta, px, py, d } = list[0];
-  // facing the spot from the panorama, or along the road when standing on it
-  const h = d > 6 ? bearing(x - px, y - py) : (roadHeading ?? 0);
-  return { d, x: px, y: py, h, pano: meta.pano_id, date: meta.date || '', lat: meta.location.lat, lng: meta.location.lng, candidates: seen.size, oldest: list[list.length - 1].meta.date || '' };
+  if (!SV) return null;
+  return SV.newestNear(x, y, roadHeading, { geo: { toLatLng, toWorld }, onRoad: LINES.length ? onCarriageway : null, searchM: SEARCH_M, minYear: MIN_YEAR });
 }
-async function googleImage(g, aspect) {
-  // (the game screen's shape, so its view and Google's frame the same)
-  const w = 640; const hgt = Math.min(640, Math.round(w / aspect));
-  const q = `/maps/api/streetview?size=${w}x${hgt}&pano=${g.pano}&heading=${g.h.toFixed(1)}&pitch=-3&fov=${H_FOV}&source=outdoor&key=${GKEY}`;
-  const res = await fetch(`https://maps.googleapis.com${signGoogle(q)}`);
-  return res.ok ? Buffer.from(await res.arrayBuffer()) : null;
-}
+const googleImage = (g, aspect) => SV.image(g.pano, g.h, aspect);
 
 // ── spots ───────────────────────────────────────────────────────────────
 // the level's drawn lines (mapng_probes.json v3) as a segment grid
@@ -423,7 +369,7 @@ async function main() {
   if (!raw) throw new Error(`no mapng_probes.json in ${level}`);
   const data = JSON.parse(raw);
   if (!data.geo) throw new Error(`${level} was exported before probes carried the level's frame (re-export it)`);
-  GEO = data.geo;
+  setGeo(data.geo);
   indexLines(data.lines);
   if (!data.lines) process.stderr.write('(no road lines in this level\'s probes: street level and car-only panoramas not enforced; re-export for v3 probes)\n');
   const failures = opt('--tests') ? JSON.parse(fs.readFileSync(opt('--tests'), 'utf8')).failures || [] : [];

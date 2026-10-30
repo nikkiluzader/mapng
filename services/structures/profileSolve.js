@@ -50,6 +50,7 @@ const HILLSIDE_FACTOR = 1.5;  // a road on a hillside may run this much steeper 
 const HILLSIDE_MAX = 0.35;
 const GROUND_BAND_M = 6;      // an untagged road's free fill / cut for grades
 const UNDER_FREE_M = 3;       // a road under a deck is cleared from at most this over its ground
+const PIN_REACH_FACTOR = 2.5; // a lift reaches no higher than this many times the grade limit climbs from a pinned road
 
 // Allowed rise per station step of an edge: the class limit, or the
 // terrain's real slope over +-LONG_GRADE_M where steeper (a mountain road
@@ -108,7 +109,8 @@ function makeHeap(key, sign) {
  */
 export function* solveProfilesSteps(graph) {
   const { edges, nodes } = graph;
-  const crossings = graph.crossings?.crossings || [];
+  // (roads of different layers alongside, overlapping: held apart as crossings are)
+  const crossings = [...(graph.crossings?.crossings || []), ...(graph.crossings?.overlaps || [])];
   const water = graph.crossings?.water || [];
   // one index space over all stations
   const off = []; let N = 0;
@@ -144,14 +146,14 @@ export function* solveProfilesSteps(graph) {
 
   // envelope from seeds: lower (max of seed - allowed fall) or upper (min of
   // seed + allowed rise), spread over the network
-  const spread = (seeds, sign) => {
+  const spread = (seeds, sign, scale = 1) => {
     const env = new Float64Array(N).fill(sign > 0 ? -Infinity : Infinity);
     const heap = makeHeap(env, sign);
     for (const [v, h] of seeds) if (sign * (h - env[v]) > 0) { env[v] = h; heap.push(v); }
     while (heap.size()) {
       const v = heap.pop(); const list = nbr[v];
       for (let j = 0; j < list.length; j += 2) {
-        const u = list[j]; const cand = env[v] - sign * list[j + 1];
+        const u = list[j]; const cand = env[v] - sign * scale * list[j + 1];
         if (sign * (cand - env[u]) > 1e-9) { env[u] = cand; heap.push(u); }
       }
     }
@@ -183,6 +185,11 @@ export function* solveProfilesSteps(graph) {
     });
   }
   const U = spread(capSeeds, -1);
+  // the highest a road can be and still reach the pinned roads at a steep
+  // but drivable grade: a lift (a crossing far up a tunnel's approach) gives
+  // way there, the approach runs steeper into the portal instead of
+  // arriving metres over the pinned road (a wall across the lanes)
+  const pinReach = pins.length ? spread(pins, -1, PIN_REACH_FACTOR) : null;
   // fixed lower seeds: bridge runs over water
   const waterSeeds = pins.slice();
   for (const run of water) for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, G[off[run.edge] + i] + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M]);
@@ -258,6 +265,7 @@ export function* solveProfilesSteps(graph) {
       seeds.push([off[up.edge] + up.i, need], [off[up.edge] + up.i + 1, need]);
     }
     L = spread(seeds, 1);
+    if (pinReach) for (let v = 0; v < N; v++) if (L[v] > pinReach[v]) L[v] = pinReach[v];
     // where a lift and a cap collide, the lift wins (clearance over cover)
     for (let v = 0; v < N; v++) if (L[v] > U[v]) U[v] = L[v];
     // a road with no structure tag stays near its ground where nothing asks

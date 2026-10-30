@@ -23,9 +23,10 @@ function take(points, m) {
  * Routes over the level's structures: each deck, tunnel and steep stretch
  * with APPROACH_M of the road that continues it at either end.
  * lines: [{ k: road|deck|tunnel|sidewalk, hw, road, p: [[x, y, z]...] }].
+ * offset: start each kind's list at its Nth longest (other routes).
  * Returns [{ kind, road, points: [[x, y, z]...], speed, half }].
  */
-export function buildRoutes(lines, { max = 12, steepGrade = 0.08 } = {}) {
+export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0 } = {}) {
   const drivable = lines.filter((l) => l.k !== 'sidewalk' && l.p.length >= 2 && !['footway', 'path', 'steps', 'cycleway', 'pedestrian', 'bridleway', 'track'].includes(l.road));
   // the line continuing a point (an end of another line there), best aligned
   const continuation = (pt, dir, self) => {
@@ -65,7 +66,13 @@ export function buildRoutes(lines, { max = 12, steepGrade = 0.08 } = {}) {
   // every kind in turn, longest first within a kind
   const byKind = new Map();
   for (const c of candidates) { if (!byKind.has(c.kind)) byKind.set(c.kind, []); byKind.get(c.kind).push(c); }
-  for (const list of byKind.values()) list.sort((a, b) => len(b.l.p) - len(a.l.p));
+  // (offset: the Nth longest of each kind first, the ones before it last:
+  // other routes over the same level)
+  for (const [kind, list] of byKind) {
+    list.sort((a, b) => len(b.l.p) - len(a.l.p));
+    const k = list.length ? offset % list.length : 0;
+    byKind.set(kind, [...list.slice(k), ...list.slice(0, k)]);
+  }
   const routes = [];
   const used = [];
   while (routes.length < max && [...byKind.values()].some((l) => l.length)) {
@@ -149,4 +156,34 @@ export function analyseDrive(route, samples, { damage = null, bumpAcc = 7, airTi
     progress: Math.round(progress), length: Math.round(total),
     events, maxVertAcc: Math.round(maxAcc * 10) / 10, maxDeviation: Math.round(maxDev * 10) / 10,
   };
+}
+
+// where the car was hit, from the drive's own log: the sharpest change of
+// velocity in its last seconds, in the car's frame (its way of travel
+// just before): front, rear, left / right side, underside (thrown up by a
+// step); with the change in m/s
+export function impactOf(samples) {
+  if (samples.length < 20) return null;
+  const end = samples[samples.length - 1].t;
+  let best = null;
+  for (let i = 5; i < samples.length; i++) {
+    const a = samples[i - 5]; const b = samples[i];
+    if (b.t < end - 3) continue;
+    const dv = [b.vx - a.vx, b.vy - a.vy, b.vz - a.vz];
+    const m = Math.hypot(...dv);
+    if (!best || m > best.m) best = { m, dv, i: i - 5 };
+  }
+  if (!best || best.m < 1.5) return null;
+  // way of travel 0.3 s before
+  let k = best.i; while (k > 0 && samples[best.i].t - samples[k].t < 0.3) k--;
+  const v = samples[k]; const sp = Math.hypot(v.vx, v.vy);
+  if (sp < 0.5) return null;
+  const f = [v.vx / sp, v.vy / sp]; const right = [f[1], -f[0]];
+  const along = best.dv[0] * f[0] + best.dv[1] * f[1];
+  const side = best.dv[0] * right[0] + best.dv[1] * right[1];
+  const up = best.dv[2];
+  const where = Math.abs(up) > Math.max(Math.abs(along), Math.abs(side)) ? (up > 0 ? 'underside' : 'landing')
+    : Math.abs(along) >= Math.abs(side) ? (along < 0 ? 'front' : 'rear')
+      : (side > 0 ? 'left side' : 'right side');   // pushed right: hit on its left
+  return { where, dv: Math.round(best.m * 10) / 10, at: [Math.round(samples[best.i].x), Math.round(samples[best.i].y)] };
 }

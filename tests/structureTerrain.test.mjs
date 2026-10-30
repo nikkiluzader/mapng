@@ -67,3 +67,33 @@ test('tunnels: no edit over a bored tunnel', async () => {
   const e = g.edges[seg.edge]; const mid = (seg.i0 + seg.i1) >> 1;
   assert.ok(Math.abs(out.heightAt(e.x[mid], e.y[mid]) - e.g[mid]) < 0.05, 'the ridge over the tube untouched');
 });
+
+test('a road into a tunnel: no corridor past the portal; a tunnel builder\'s ground kept beside the road', () => {
+  // an approach along +x to a portal at x = 0 (its node shared with a tube
+  // stretch another builder owns); ground 8 m over the cut road everywhere
+  const width = 201; const height = 201; const worldSize = 200;
+  const hm = new Float32Array(width * height).fill(8);
+  const line = (x0, n) => {
+    const x = []; const y = []; const s = []; const g = [];
+    for (let i = 0; i < n; i++) { x.push(x0 + i * 3); y.push(0); s.push(i * 3); g.push(8); }
+    return { x: Float64Array.from(x), y: Float64Array.from(y), s: Float64Array.from(s), g: Float64Array.from(g), half: 4, highway: 'primary' };
+  };
+  const approach = { ...line(-60, 21), from: 'a', to: 'portal' };
+  const tube = { ...line(0, 21), from: 'portal', to: 'b' };
+  const graph = {
+    edges: [approach, tube],
+    profile: { z: [new Float64Array(21).fill(-4), new Float64Array(21).fill(-4)] },
+    classes: { segments: [{ edge: 0, i0: 0, i1: 20, kind: 'cutting' }, { edge: 1, i0: 0, i1: 20, kind: 'external' }] },
+  };
+  const idx = (x, y) => Math.round(100 - y) * width + Math.round(x + 100);
+  // the builder's cutting beside the road, a band 8 to 10 m out (a lone
+  // pixel would be despiked)
+  const kept = new Set();
+  for (let x = -40; x <= -10; x++) for (const y of [8, 9, 10, -8, -9, -10]) kept.add(idx(x, y));
+  const out = composeTerrain(graph, { heightMap: hm, width, height, worldSize, minHeight: 0, keep: (i) => kept.has(i) });
+  assert.ok(Math.abs(out.heightAt(-20, 0) + 4) < 0.05, 'the cut road');
+  for (const x of [2, 4, 6]) assert.ok(Math.abs(out.heightAt(x, 0) - 8) < 0.05, `no cut ${x} m into the tube: ${out.heightAt(x, 0).toFixed(2)}`);
+  const written = new Map(); out.apply((i, v) => written.set(i, v));
+  assert.ok(!written.has(idx(-20, 9)) && !written.has(idx(-20, -9)), 'the kept ground untouched');
+  assert.ok(written.has(idx(-20, 6)), 'beside it the side slope is composed');
+});

@@ -28,14 +28,16 @@ const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 /**
  * Compose the terrain edits for a solved, classified graph.
- *   grid: { heightMap, width, height, worldSize, minHeight } (raw heights;
- *         world z = raw - minHeight, world x, y centred, y north)
+ *   grid: { heightMap, width, height, worldSize, minHeight, keep? } (raw
+ *         heights; world z = raw - minHeight, world x, y centred, y north;
+ *         keep(idx): ground another builder shaped, left alone outside the
+ *         road cores)
  * Returns { tiles, stats, heightAt(x, y), apply(set) }:
  *   heightAt: the composed terrain in world z (edits over the current grid)
  *   apply(set): calls set(idx, raw) for every edited pixel
  */
 export function composeTerrain(graph, grid) {
-  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const { heightMap, width, height, worldSize, minHeight = 0, keep = null } = grid;
   const z = graph.profile?.z;
   const segments = graph.classes?.segments || [];
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -85,12 +87,45 @@ export function composeTerrain(graph, grid) {
     return out;
   });
 
+  // ends that run into a tube (a tunnel's or another builder's stretch,
+  // left to it): no corridor round them, a cutting's floor carried on past
+  // the portal stood the terrain inside the tube
+  const TUBE = new Set(['boredTunnel', 'cutAndCover', 'external']);
+  // (a tube another builder builds: an unbuilt tunnel road stays on the
+  // ground, its approach composed on into it)
+  const BUILT = new Set(['external']);
+  const tubeNode = new Set();
+  for (const [id, kinds] of nodeKinds) if (kinds.some((kk) => BUILT.has(kk))) tubeNode.add(id);
+  // where a road goes into one, a plane across it: none of the road's
+  // corridor beyond (every segment's rounded reach, not the last one's only)
+  const PORTAL_PLANE_M = 40;
+  const portalPlanes = graph.edges.map((e, k) => {
+    const n = e.s.length; const kinds = kindOf[k]; const out = [];
+    // at station `at`, facing from station `a` toward `b` (into the tube)
+    const plane = (at, a, b) => {
+      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy);
+      if (L > 1e-6) out.push([e.x[at], e.y[at], dx / L, dy / L]);
+    };
+    if (n < 2) return out;
+    if (tubeNode.has(e.to) && !TUBE.has(kinds[n - 2])) plane(n - 1, n - 2, n - 1);
+    if (tubeNode.has(e.from) && !TUBE.has(kinds[0])) plane(0, 1, 0);
+    for (let j = 1; j + 1 < n; j++) {
+      if (BUILT.has(kinds[j]) && !TUBE.has(kinds[j - 1])) plane(j, j - 1, j);
+      if (!TUBE.has(kinds[j]) && BUILT.has(kinds[j - 1])) plane(j - 1, j, j - 1);
+    }
+    return out;
+  });
+  // pixels a corridor reached but left alone (past a portal, a tunnel's
+  // cutting): still despiked, a lone one among composed ground stood metres
+  // proud
+  const left = new Set();
   const abutmentOff = (kind, k, j) => (kind === 'deck' && toAbutment[k][j] < ABUTMENT_M ? DECK_UNDER_M : 0);
   graph.edges.forEach((e, k) => {
     const zk = z[k];
     for (let i = 0; i + 1 < e.s.length; i++) {
       const kind = kindOf[k][i];
-      if (kind === 'boredTunnel' || kind === 'cutAndCover' || kind === 'external') continue;
+      if (TUBE.has(kind)) continue;
+      const planes = portalPlanes[k];
       // a deck's ends on fill are abutments: fill under the deck (below)
       const abutment = kind === 'deck' && Math.min(toAbutment[k][i], toAbutment[k][i + 1]) < ABUTMENT_M;
       const deck = kind === 'deck' && !abutment;
@@ -114,6 +149,7 @@ export function composeTerrain(graph, grid) {
         for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
           const [x, y] = toWorld(c, r);
           const uRaw = ((x - ax) * vx + (y - ay) * vy) / L2;
+          if (planes.length && planes.some(([px, py, dx, dy]) => (x - px) * dx + (y - py) * dy > 0 && Math.hypot(x - px, y - py) < PORTAL_PLANE_M)) { left.add(r * width + c); continue; }
           const u = Math.max(0, Math.min(1, uRaw));
           const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
           if (d > reach) continue;
@@ -133,6 +169,9 @@ export function composeTerrain(graph, grid) {
           }
           const tt = d <= core ? 0 : (d - core) / slope;
           if (tt >= 1) continue;
+          // ground another builder shaped (a tunnel's cutting): its own
+          // except under the road's surface
+          if (keep && d > core && keep(r * width + c)) { left.add(r * width + c); continue; }
           const target = zc + (h0 - zc) * smoothstep(tt);
           // the road whose core is physically nearest owns the pixel (inside
           // two cores, the nearer centreline; equal: averaged). Two roads side by side at different
@@ -204,8 +243,11 @@ export function composeTerrain(graph, grid) {
       for (let j = 0; j < TILE * TILE; j++) {
         const c = tc * TILE + (j % TILE); const r = tr * TILE + Math.floor(j / TILE);
         if (c < 1 || r < 1 || c + 1 >= width || r + 1 >= height) continue;
-        const h = edited(c, r);
-        if (!Number.isFinite(h)) continue;
+        let h = edited(c, r);
+        if (!Number.isFinite(h)) {
+          if (!left.has(r * width + c)) continue;
+          h = raw(c, r) - minHeight;
+        }
         let n = 0;
         for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) win[n++] = value(c + dc, r + dr);
         win.sort();
