@@ -10862,6 +10862,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       underStructure: underDeck,
       inTunnel: (x, y, z, zTop) => tunnelList.length > 0 && hitsTunnel(tunnelList, x, y, z, zTop),
       spawn: spawnPosition,
+      geo: { bounds: exportTerrainData.bounds, worldSize: exportTerrainData.width * squareSize },
     });
     zip.file(`${base}/mapng_probes.json`, JSON.stringify(ingameProbes));
   } catch (err) {

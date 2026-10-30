@@ -18,6 +18,8 @@ const TUNNEL_STEP_M = 15;
 const MAX = { road: 600, deck: 300, sidewalk: 400, tunnel: 150 };
 
 const r2 = (v) => Math.round(v * 100) / 100;
+// compass heading (degrees clockwise from north; world y is north) of a direction
+const heading = (dx, dy) => Math.round(((Math.atan2(dx, dy) * 180) / Math.PI + 360) % 360);
 
 // points every `step` m along a node line (x, y, z), each with its heading
 function along(nodes, step, offset = step / 2) {
@@ -45,9 +47,10 @@ const thin = (list, max) => (list.length <= max ? list : list.filter((_, i) => i
  *   buildSidewalkMeshes (points on the curb line at road height, side, width);
  * underStructure(x, y, z, zTop): a deck or tunnel over the point;
  * inTunnel(x, y, z, zTop): a built tunnel there;
- * curbHeight: a slab's top over its road.
+ * curbHeight: a slab's top over its road; geo: { bounds: { north, south,
+ * east, west }, worldSize } for latitude / longitude.
  */
-export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underStructure = () => false, inTunnel = () => true, spawn = null, curbHeight = 0.15 }) {
+export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underStructure = () => false, inTunnel = () => true, spawn = null, curbHeight = 0.15, geo = null }) {
   const road = []; const deck = []; const sidewalk = []; const tunnel = [];
   for (const cw of carriageways) {
     const n = cw.nodes || [];
@@ -60,12 +63,12 @@ export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underS
         else if (!underStructure(p.x, p.y, p.z, p.z + 60)) road.push({ k: 'road', x: r2(p.x), y: r2(p.y), z: r2(p.z), road: cw.highway });
       }
     } else if (cw.carried || cw.bridge) {
-      for (const p of along(n, DECK_STEP_M)) deck.push({ k: 'deck', x: r2(p.x), y: r2(p.y), z: r2(p.z), road: cw.highway });
+      for (const p of along(n, DECK_STEP_M)) deck.push({ k: 'deck', x: r2(p.x), y: r2(p.y), z: r2(p.z), h: heading(p.dx, p.dy), road: cw.highway });
     } else {
       for (const p of along(n, ROAD_STEP_M)) {
         // (a road under a deck or in a tunnel's shadow: the ray meets that first)
         if (underStructure(p.x, p.y, p.z, p.z + 60)) continue;
-        road.push({ k: 'road', x: r2(p.x), y: r2(p.y), z: r2(p.z), road: cw.highway });
+        road.push({ k: 'road', x: r2(p.x), y: r2(p.y), z: r2(p.z), h: heading(p.dx, p.dy), road: cw.highway });
       }
     }
   }
@@ -75,14 +78,16 @@ export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underS
       const nx = -p.dy * run.side; const ny = p.dx * run.side;
       const x = p.x + nx * (w / 2 + 0.15); const y = p.y + ny * (w / 2 + 0.15);
       if (underStructure(x, y, p.z, p.z + 60)) continue;
-      sidewalk.push({ k: 'sidewalk', x: r2(x), y: r2(y), z: r2(p.z + curbHeight), road: run.highway });
+      sidewalk.push({ k: 'sidewalk', x: r2(x), y: r2(y), z: r2(p.z + curbHeight), h: heading(p.dx, p.dy), road: run.highway });
     }
   }
   const probes = [
     ...thin(road, MAX.road), ...thin(deck, MAX.deck), ...thin(sidewalk, MAX.sidewalk), ...thin(tunnel, MAX.tunnel),
   ];
   if (spawn) probes.push({ k: 'spawn', x: r2(spawn[0]), y: r2(spawn[1]), z: r2(spawn[2]) });
-  return { version: 1, probes };
+  // geo: the level's frame (world x east, y north, centred), so a probe can
+  // be matched with street photos: lng = west + (x / worldSize + 0.5) * (east - west)
+  return { version: 2, ...(geo ? { geo } : {}), probes };
 }
 
 /**
