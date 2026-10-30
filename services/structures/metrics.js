@@ -77,7 +77,9 @@ export function roadLinesFromDecals(groups) {
       // its decal name ends in _b)
       if (!/_b$/.test(d.name || '') || d.__owner === undefined || !(d.nodes?.length >= 2)) continue;
       const cw = byOwner.get(d.__owner);
-      if (cw) lines.push({ ...cw, nodes: d.nodes });
+      // (a decal drawn onto a deck projects onto objects: on a structure,
+      // whatever its road's tags say)
+      if (cw) lines.push({ ...cw, nodes: d.nodes, ...(d.overObjects ? { carried: true } : {}) });
     }
   }
   return lines.length ? lines : carriageways;

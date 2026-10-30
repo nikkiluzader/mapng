@@ -29,6 +29,7 @@ const DECK_UNDER_M = 2.2;     // deck depth under its road surface
 const OUTER_ROUNDS = 6;       // crossing requirements refreshed this often
 const SWEEPS = 120;           // smoothing sweeps per round (or until settled)
 const SETTLED_M = 0.005;
+const LONG_GRADE_M = 30;      // the terrain's own slope, over this far either side
 
 // binary heap of station indices ordered by key (max-heap when sign = 1)
 function makeHeap(key, sign) {
@@ -113,6 +114,51 @@ export function* solveProfilesSteps(graph) {
   const waterSeeds = [];
   for (const run of water) for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, G[off[run.edge] + i] + run.need + DECK_UNDER_M]);
 
+  // allowed rise per station step: the class limit, or the terrain's real
+  // slope over +-LONG_GRADE_M where steeper (a mountain road keeps its
+  // slope; a short hollow or spike in the elevation data, steeper than the
+  // slope around it, is bridged by fill or cut)
+  const stepRise = edges.map((e, k) => {
+    const lim = gradeLimit(e.highway);
+    const n = e.s.length; const out = new Float64Array(Math.max(0, n - 1));
+    let a = 0; let b = 0;
+    for (let i = 0; i + 1 < n; i++) {
+      const mid = (e.s[i] + e.s[i + 1]) / 2;
+      while (a + 1 < n && e.s[a + 1] <= mid - LONG_GRADE_M) a++;
+      while (b + 1 < n && e.s[b] < mid + LONG_GRADE_M) b++;
+      const span = e.s[b] - e.s[a];
+      const terrain = span > 1 ? Math.abs(G[off[k] + b] - G[off[k] + a]) / span : 0;
+      // (a deck or tunnel does not follow the ground: its class limit only)
+      out[i] = (e.bridge || e.tunnel ? lim : Math.max(lim, terrain)) * (e.s[i + 1] - e.s[i]);
+    }
+    return out;
+  });
+  // station indices that are an edge's end at a node: held by the junction
+  // value while grades are clamped (the clamp works inward from them)
+  const nodeEnd = new Uint8Array(N);
+  for (const node of nodes.values()) {
+    if (node.edges.length < 2) continue;
+    for (const { edge, end } of node.edges) nodeEnd[off[edge] + (end === 0 ? 0 : edges[edge].s.length - 1)] = 1;
+  }
+  const clampGrades = () => {
+    let moved = 0;
+    edges.forEach((e, k) => {
+      const base = off[k]; const rise = stepRise[k]; const n = e.s.length;
+      for (let i = 0; i + 1 < n; i++) {
+        const v = base + i + 1;
+        if (nodeEnd[v]) continue;
+        const next = Math.min(U[v], Math.max(L[v], Math.min(Z[v - 1] + rise[i], Math.max(Z[v - 1] - rise[i], Z[v]))));
+        moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
+      }
+      for (let i = n - 2; i >= 0; i--) {
+        const v = base + i;
+        if (nodeEnd[v]) continue;
+        const next = Math.min(U[v], Math.max(L[v], Math.min(Z[v + 1] + rise[i], Math.max(Z[v + 1] - rise[i], Z[v]))));
+        moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
+      }
+    });
+    return moved;
+  };
   const Z = Float64Array.from(G, (g, v) => Math.min(g, U[v]));
   let L = new Float64Array(N).fill(-Infinity);
   let rounds = 0;
@@ -145,13 +191,19 @@ export function* solveProfilesSteps(graph) {
         const mean = Math.min(Math.max(sz / sw, lo), Math.max(lo, hi));
         for (const v of ends) { moved = Math.max(moved, Math.abs(Z[v] - mean)); Z[v] = mean; }
       }
+      // grades last, inward from the junction values (so a junction
+      // averaged toward one road never leaves a jump on another)
+      moved = Math.max(moved, clampGrades());
       if (sweep % 30 === 29) yield;
       if (moved < SETTLED_M) break;
     }
     yield;
   }
   const z = edges.map((e, k) => Z.slice(off[k], off[k] + e.s.length));
-  return { z, rounds, residual: profileResidual(graph, z) };
+  const result = { z, rounds, residual: profileResidual(graph, z) };
+  // (debug: the envelopes, for tools)
+  if (globalThis.__MAPNG_STRUCT_DEBUG) Object.defineProperty(result, 'debug', { value: { L, U, off }, enumerable: false });
+  return result;
 }
 
 /** Solve without yielding. */

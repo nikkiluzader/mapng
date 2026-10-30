@@ -25,6 +25,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
+import { decksFromSolver, applySolvedHeights } from './structures/adapters.js';
 import { checkJoints, checkGrades, checkCrossings, checkRoadSurface } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
@@ -2727,6 +2728,10 @@ function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, z
       // A cut end is a clean paint edge, not a faded road terminus.
       ...(decal.startEndFade ? { startEndFade: [0, 0] } : {}),
     }));
+    for (const r of replacements) {
+      if (decal.__owner !== undefined) Object.defineProperty(r, '__owner', { value: decal.__owner, enumerable: false });
+      if (decal.__layer !== undefined) Object.defineProperty(r, '__layer', { value: decal.__layer, enumerable: false });
+    }
     group.__items.splice(at, 1, ...replacements);
     if (runs.length === 0) removed++;
     pieces += runs.length;
@@ -4573,8 +4578,8 @@ export function generateDecalRoads(terrainData, squareSize) {
  * each pause: Manhattan's road layout ran ~45 s in one go and Chrome offered
  * to kill the page.
  */
-export async function generateDecalRoadsYielding(terrainData, squareSize, yieldFn) {
-  const steps = decalRoadSteps(terrainData, squareSize);
+export async function generateDecalRoadsYielding(terrainData, squareSize, yieldFn, opts = {}) {
+  const steps = decalRoadSteps(terrainData, squareSize, opts);
   for (;;) {
     const { done, value } = steps.next();
     if (done) return value;
@@ -4583,7 +4588,7 @@ export async function generateDecalRoadsYielding(terrainData, squareSize, yieldF
 }
 
 // The road layout, pausing (yield) between its phases and every 200 roads.
-function* decalRoadSteps(terrainData, squareSize) {
+function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const budget = chooseRoadNodeSpacing(terrainData.osmFeatures || []);
   if (budget.spacing > ROAD_NODE_SPACING_M) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road nodes every ${budget.spacing.toFixed(2)} m (not ${ROAD_NODE_SPACING_M} m): ${budget.lengthKm.toFixed(0)} km of roads would make ~${budget.estimatedNodes} DecalRoad nodes, past what BeamNG draws at load.`);
@@ -4651,7 +4656,11 @@ function* decalRoadSteps(terrainData, squareSize) {
   const done = new Set();
   const early = yield* solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done });
   yield;
-  const bridges = solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
+  // (structure solver v2: the decks come from the solver after the road
+  // layout, so today's bridge passes are skipped)
+  const bridges = opts.structureSolver === 'v2'
+    ? { bySeg: new Map(), approaches: new Map(), decks: [], roadLines: [], ramps: 0, humps: [], sunk: 0, sunkAt: [], carried: 0, partInfo: [], endHeight: () => null }
+    : solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   yield;
   const late = yield* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
   yield;
@@ -9741,7 +9750,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // level is no sea)
   const sourceHeightMap = exportTerrainData.heightMap;
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_)
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { structureSolver: options.structureSolver })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
@@ -9749,7 +9758,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // bridge and tunnel objects come from the solver too: the terrain the
   // solved roads need, composed and written in one pass over the result.
   const sg = decalRoads.structureGraph;
-  if (options.structureSolver === 'v2-terrain' && sg?.classes) {
+  // v2: bridge decks from the solver's deck stretches, every road decal at
+  // its solved height (the terrain is composed just below)
+  if (options.structureSolver === 'v2' && sg?.classes) {
+    const decks = decksFromSolver(sg);
+    const parts = decks.flatMap((d) => d.parts);
+    decalRoads.bridges.decks = decks;
+    decalRoads.bridges.partInfo = parts.map((p) => ({ ...p.osm, structure: p.structure ?? null, landing: false, carried: false }));
+    const applied = applySolvedHeights(decalRoads, sg);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2: ${decks.length} deck(s) of ${parts.length} part(s); ${applied.nodes} road nodes in ${applied.decals} decals at their solved heights.`);
+    await yield_();
+  }
+  if ((options.structureSolver === 'v2-terrain' || options.structureSolver === 'v2') && sg?.classes) {
     const t0 = performance.now();
     const composed = composeTerrain(sg, {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
@@ -9759,6 +9779,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     composed.apply((idx, v) => hm.set(idx, v));
     sg.terrain = { ...composed.stats, ms: Math.round(performance.now() - t0) };
     sg.terrain.surface = checkRoadSurface(sg.previewLines || [], (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
+    if (globalThis.__MAPNG_STRUCT_DEBUG) globalThis.__MAPNG_STRUCT_DEBUG(sg, { decalRoads, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2 terrain: ${composed.stats.pixels} pixels in ${composed.stats.corridors} corridors, ${composed.stats.capped} held under decks, ${sg.terrain.ms} ms.`);
     await yield_();
   }
