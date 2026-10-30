@@ -130,5 +130,16 @@
   "groundGaps": 0,
   "throughDeck": 0,
   "spikes": 0
+ },
+ "short bridge over a ship channel in a town": {
+  "decks": 1,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 0,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
  }
 }

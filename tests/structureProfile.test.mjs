@@ -34,3 +34,19 @@ test('profile: ground roads stay on the ground away from structures', async () =
   for (let i = 0; i < z.length; i++) if (Math.abs(e.y[i]) > 120) assert.ok(Math.abs(z[i] - e.g[i]) < 0.05, `motorway off the ground at y ${e.y[i].toFixed(0)}`);
   assert.equal(gradeLimit('motorway'), 0.05);
 });
+
+test('profile: a bridge over a ship channel never lifts the streets beyond it', async () => {
+  const g = await solved('short bridge over a ship channel in a town');
+  const run = g.crossings.water[0];
+  assert.ok(run, 'a water run');
+  assert.ok(run.channel && run.wanted >= 50, 'a ship channel was found');
+  assert.ok(run.need < 10, `clearance capped by the bridge's own length (${run.need})`);
+  g.edges.forEach((e, k) => {
+    if (e.bridge) return;
+    const z = g.profile.z[k];
+    for (let i = 0; i < z.length; i++) {
+      if (Math.abs(e.x[i]) < 190) continue;
+      assert.ok(Math.abs(z[i] - e.g[i]) < 0.3, `${e.highway} lifted ${(z[i] - e.g[i]).toFixed(1)} m at x ${e.x[i].toFixed(0)}`);
+    }
+  });
+});

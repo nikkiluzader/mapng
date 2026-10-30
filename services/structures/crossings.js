@@ -8,6 +8,11 @@
 // about any place.
 
 import { DECK_ROAD_CLEAR_M, NAV_CLEAR_M, navClearance, waterClear } from '../beamngBridges.js';
+import { gradeLimit } from './profileSolve.js';
+
+const MOVABLE_CLEAR_M = 6;      // a drawbridge sits low and opens for ships
+const REACH_SHARE = 0.8;        // of the climb its length allows (room for vertical curves)
+const WATER_CLEAR_FLOOR_M = 2.5; // over water a deck always keeps this much
 import { cellsAlong } from './metrics.js';
 
 const CELL_M = 32;
@@ -115,6 +120,39 @@ export function findCrossings(graph, { waterAt = null } = {}) {
     }
   }
 
+  // How far each node is from the ground along bridge-tagged edges: a
+  // bridge's clearance over water is a wish its own length must reach (at
+  // its class grade, down to both ends); it never lifts the streets beyond.
+  const bridgeReach = new Map();
+  {
+    const touch = new Map();   // node -> touches a non-bridge edge or the map's edge
+    const deg = new Map();
+    for (const e of edges) for (const n of [e.from, e.to]) {
+      if (n === undefined) continue;
+      deg.set(n, (deg.get(n) || 0) + 1);
+      if (!e.bridge) touch.set(n, true);
+    }
+    const dist = new Map();
+    const queue = [];
+    for (const [n, d] of deg) if (touch.get(n) || d === 1) { dist.set(n, 0); queue.push(n); }
+    const adj = new Map();
+    for (const e of edges) {
+      if (!e.bridge || e.from === undefined || e.to === undefined) continue;
+      (adj.get(e.from) || adj.set(e.from, []).get(e.from)).push([e.to, e.length]);
+      (adj.get(e.to) || adj.set(e.to, []).get(e.to)).push([e.from, e.length]);
+    }
+    // (few nodes: a simple label-correcting pass)
+    while (queue.length) {
+      const n = queue.shift();
+      for (const [m, L] of adj.get(n) || []) {
+        const d = dist.get(n) + L;
+        if (!(dist.get(m) <= d)) { dist.set(m, d); queue.push(m); }
+      }
+    }
+    for (const [n, d] of dist) bridgeReach.set(n, d);
+  }
+  const reachOf = (n) => (n === undefined ? 0 : bridgeReach.get(n) ?? 0);
+
   // bridge edges over water: the wet runs and the clearance each needs
   const water = [];
   if (waterAt) {
@@ -127,8 +165,15 @@ export function findCrossings(graph, { waterAt = null } = {}) {
         if (i0 >= 0) {
           const i1 = i - 1;
           const run = e.s[i1] - e.s[i0];
-          const need = channel ? NAV_CLEAR_M : Math.max(waterClear(run), navClearance(e.structure));
-          water.push({ edge: e.id, i0, i1, s0: e.s[i0], s1: e.s[i1], run, channel, need });
+          let need = channel ? NAV_CLEAR_M : Math.max(waterClear(run), navClearance(e.structure));
+          if (e.movable) need = Math.min(waterClear(run), MOVABLE_CLEAR_M);
+          // what the bridge can climb to between its ends (the lower side)
+          const toStart = e.s[i0] + reachOf(e.from);
+          const toEnd = e.s[e.s.length - 1] - e.s[i1] + reachOf(e.to);
+          const reach = gradeLimit(e.highway) * Math.min(toStart, toEnd) * REACH_SHARE;
+          const wanted = need;
+          need = Math.max(Math.min(need, reach), Math.min(need, WATER_CLEAR_FLOOR_M));
+          water.push({ edge: e.id, i0, i1, s0: e.s[i0], s1: e.s[i1], run, channel, need, wanted });
           i0 = -1;
         }
       }

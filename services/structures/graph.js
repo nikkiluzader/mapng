@@ -24,6 +24,8 @@ export function structureOf(tags = {}) {
   return {
     bridge,
     tunnel,
+    // a drawbridge opens for ships: no navigation clearance under it
+    movable: tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
     covered: tags.covered === 'yes',
     cutting: !!tags.cutting && tags.cutting !== 'no',
     embankment: !!tags.embankment && tags.embankment !== 'no',

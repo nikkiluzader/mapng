@@ -68,6 +68,18 @@ export const STRUCTURE_SCENES = [
     ]),
   },
   {
+    name: 'short bridge over a ship channel in a town',
+    // a town at 4 m either side of a 240 m channel (0 m) marked for ships; the
+    // 300 m bridge can't climb to a ship's clearance: it stays a town bridge
+    build: () => terrain((x) => 4 - 4 * Math.exp(-((x / 120) ** 6)), [
+      way(1, [[-450, 0], [-150, 0]], { highway: 'primary' }),
+      way(2, [[-150, 0], [150, 0]], { highway: 'primary', bridge: 'yes', layer: '1' }),
+      way(3, [[150, 0], [450, 0]], { highway: 'primary' }),
+      ...[-400, -300, -200, 200, 300, 400].map((x, i) => way(10 + i, [[x, -300], [x, 0], [x, 300]], { highway: 'residential' })),
+      water(5, [[0, -480], [0, 480]], { waterway: 'river', width: '200', ship: 'yes' }),
+    ]),
+  },
+  {
     name: 'mountain tunnel through a ridge',
     // a 60 m ridge along y = 0, the road crossing it north-south
     build: () => terrain((x, y) => 10 + 60 * Math.exp(-((y / 140) ** 2)), [
