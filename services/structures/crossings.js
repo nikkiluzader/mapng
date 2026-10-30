@@ -8,6 +8,7 @@
 // about any place.
 
 import { DECK_ROAD_CLEAR_M, NAV_CLEAR_M, navClearance, waterClear } from '../beamngBridges.js';
+import { cellsAlong } from './metrics.js';
 
 const CELL_M = 32;
 // A hit this close to a node both edges share is their junction, not a
@@ -69,16 +70,12 @@ export function findCrossings(graph, { waterAt = null } = {}) {
     const v = verts[ei];
     for (let k = 0; k + 1 < v.length; k++) {
       const i0 = v[k]; const i1 = v[k + 1];
-      const x0 = Math.floor(Math.min(e.x[i0], e.x[i1]) / CELL_M); const x1 = Math.floor(Math.max(e.x[i0], e.x[i1]) / CELL_M);
-      const y0 = Math.floor(Math.min(e.y[i0], e.y[i1]) / CELL_M); const y1 = Math.floor(Math.max(e.y[i0], e.y[i1]) / CELL_M);
-      for (let gx = x0; gx <= x1; gx++) {
-        for (let gy = y0; gy <= y1; gy++) {
-          const key = `${gx},${gy}`;
-          let list = grid.get(key);
-          if (!list) grid.set(key, (list = []));
-          list.push(ei, k);
-        }
-      }
+      cellsAlong(e.x[i0], e.y[i0], e.x[i1], e.y[i1], CELL_M, (gx, gy) => {
+        const key = `${gx},${gy}`;
+        let list = grid.get(key);
+        if (!list) grid.set(key, (list = []));
+        list.push(ei, k);
+      });
     }
   });
   // station interval i and fraction f at arc length s along an edge

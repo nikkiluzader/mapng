@@ -35,7 +35,24 @@ const DECK_UNDERSIDE_M = 2.2;     // DECK_DEPTH_M + GIRDER_D_M (beamngBridges)
 // (a step, like a retaining wall, keeps the median on one side: not counted).
 const SPIKE_M = 2;
 const SPIKE_REACH_M = 25;         // around decks and tunnel lines
-const CELL_M = 32;
+const CELL_M = 8;               // crossing grid (short station segments: small cells keep pairs few)
+
+// The grid cells a segment passes through, exactly (a grid traversal: a
+// bounding box made a long diagonal segment fill a square of cells).
+export function cellsAlong(ax, ay, bx, by, cell, visit) {
+  let cx = Math.floor(ax / cell); let cy = Math.floor(ay / cell);
+  const ex = Math.floor(bx / cell); const ey = Math.floor(by / cell);
+  const dx = bx - ax; const dy = by - ay;
+  const sx = Math.sign(dx); const sy = Math.sign(dy);
+  const tdx = dx !== 0 ? Math.abs(cell / dx) : Infinity; const tdy = dy !== 0 ? Math.abs(cell / dy) : Infinity;
+  let tmx = dx !== 0 ? ((sx > 0 ? (cx + 1) * cell - ax : ax - cx * cell) / Math.abs(dx)) : Infinity;
+  let tmy = dy !== 0 ? ((sy > 0 ? (cy + 1) * cell - ay : ay - cy * cell) / Math.abs(dy)) : Infinity;
+  visit(cx, cy);
+  for (let guard = 0; (cx !== ex || cy !== ey) && guard < 100000; guard++) {
+    if (tmx < tmy) { tmx += tdx; cx += sx; } else { tmy += tdy; cy += sy; }
+    visit(cx, cy);
+  }
+}
 
 const round = (v, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 const roadName = (cw) => cw?.tags?.name || cw?.tags?.ref || cw?.highway || 'road';
@@ -178,15 +195,11 @@ export function checkCrossings(carriageways) {
   carriageways.forEach((cw, ci) => {
     const n = cw.nodes || [];
     for (let i = 0; i + 1 < n.length; i++) {
-      const x0 = Math.floor(Math.min(n[i][0], n[i + 1][0]) / CELL_M); const x1 = Math.floor(Math.max(n[i][0], n[i + 1][0]) / CELL_M);
-      const y0 = Math.floor(Math.min(n[i][1], n[i + 1][1]) / CELL_M); const y1 = Math.floor(Math.max(n[i][1], n[i + 1][1]) / CELL_M);
-      for (let gx = x0; gx <= x1; gx++) {
-        for (let gy = y0; gy <= y1; gy++) {
-          const key = `${gx},${gy}`;
-          if (!grid.has(key)) grid.set(key, []);
-          grid.get(key).push(ci, i);
-        }
-      }
+      cellsAlong(n[i][0], n[i][1], n[i + 1][0], n[i + 1][1], CELL_M, (gx, gy) => {
+        const key = `${gx},${gy}`;
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(ci, i);
+      });
     }
   });
   const seen = new Set();
@@ -372,8 +385,21 @@ const JUNCTION_BUMP_M = 0.25;
 // raised over a sag meets the untouched terrain in a line).
 const CREASE_SLOPE_CHANGE = 0.3;
 
-// height and position along a node list at arc length s (clamped)
-function along(n, s) {
+// height and position along a node list at arc length s (clamped); with a
+// cursor { i, acc } successive calls with growing s walk on from the last
+// segment instead of from the start (long roads were quadratic)
+function along(n, s, cursor = null) {
+  if (cursor) {
+    while (cursor.i + 2 < n.length) {
+      const L = Math.hypot(n[cursor.i + 1][0] - n[cursor.i][0], n[cursor.i + 1][1] - n[cursor.i][1]);
+      if (cursor.acc + L >= s) break;
+      cursor.acc += L; cursor.i++;
+    }
+    const i = cursor.i;
+    const L = Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
+    const f = L > 0 ? Math.min(1, Math.max(0, (s - cursor.acc) / L)) : 0;
+    return [n[i][0] + (n[i + 1][0] - n[i][0]) * f, n[i][1] + (n[i + 1][1] - n[i][1]) * f, n[i][2] + (n[i + 1][2] - n[i][2]) * f];
+  }
   let acc = 0;
   for (let i = 0; i + 1 < n.length; i++) {
     const L = Math.hypot(n[i + 1][0] - n[i][0], n[i + 1][1] - n[i][1]);
@@ -403,16 +429,18 @@ export function checkRoadSurface(lines, groundAt) {
     const max = KINK_MAX[cw.highway] ?? KINK_DEFAULT;
     // along: grade over the KINK_RUN_M before and after each point; one hit
     // per bump (skip on past it)
+    const ca = { i: 0, acc: 0 }; const cb = { i: 0, acc: 0 }; const cc = { i: 0, acc: 0 };
     for (let at = KINK_RUN_M; at + KINK_RUN_M <= total; at += 2) {
       kinkPts++;
-      const a = along(n, at - KINK_RUN_M); const b = along(n, at); const c = along(n, at + KINK_RUN_M);
+      const a = along(n, at - KINK_RUN_M, ca); const b = along(n, at, cb); const c = along(n, at + KINK_RUN_M, cc);
       const kink = Math.abs((c[2] - b[2]) - (b[2] - a[2])) / KINK_RUN_M;
       if (kink > max) { kinks.push({ kink, max, x: b[0], y: b[1], road: roadName(cw) }); at += KINK_RUN_M; }
     }
     // across: the ground at both edges and the centre
     const half = cw.half || 3;
+    const cp = { i: 0, acc: 0 }; const cq = { i: 0, acc: 0 };
     for (let at = 0; at <= total; at += CROSS_STEP_M) {
-      const p = along(n, at); const q = along(n, Math.min(total, at + 1));
+      const p = along(n, at, cp); const q = along(n, Math.min(total, at + 1), cq);
       const dx = q[0] - p[0]; const dy = q[1] - p[1]; const L = Math.hypot(dx, dy);
       if (L < 1e-6) continue;
       const nx = -dy / L; const ny = dx / L;

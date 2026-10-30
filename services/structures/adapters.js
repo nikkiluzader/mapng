@@ -104,8 +104,24 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
       };
       for (const node of d.nodes) {
         const acc = { best: Infinity, k: -1, i: 0 };
-        if (lastK >= 0) scan(lastK, lastI - 8, lastI + 8, acc, node);
-        if (acc.best > 9) { acc.best = Infinity; for (const k of pieces) scan(k, 0, edges[k].s.length - 1, acc, node); }
+        if (lastK >= 0) {
+          // track along the road: widen the window only while the best match
+          // sits on its edge (layers offset sideways never match closely, so
+          // a distance test would rescan the whole road at every node)
+          let w = 8;
+          for (;;) {
+            acc.best = Infinity; scan(lastK, lastI - w, lastI + w, acc, node);
+            const n = edges[lastK].s.length;
+            const atEdge = (acc.i === Math.max(0, lastI - w) && acc.i > 0) || (acc.i === Math.min(n - 1, lastI + w) && acc.i < n - 1);
+            if (!atEdge || w > n) break;
+            w *= 2;
+          }
+          // the end of this piece: the next piece may be nearer
+          const n = edges[lastK].s.length;
+          if (pieces.length > 1 && (acc.i === 0 || acc.i === n - 1)) for (const k of pieces) if (k !== lastK) scan(k, 0, edges[k].s.length - 1, acc, node);
+        } else {
+          for (const k of pieces) scan(k, 0, edges[k].s.length - 1, acc, node);
+        }
         if (acc.best === Infinity) continue;
         lastK = acc.k; lastI = acc.i;
         // interpolate along the station line (snapping 2 m nodes to 4 m

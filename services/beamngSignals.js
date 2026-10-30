@@ -957,15 +957,22 @@ export function makeRoadClearance(roadFeatures, projector) {
       const seg = { a: pts[i], b: pts[i + 1], half };
       const idx = segments.push(seg) - 1;
       const pad = half + POLE_CLEARANCE_M;
-      const x0 = Math.floor((Math.min(seg.a[0], seg.b[0]) - pad) / CELL);
-      const x1 = Math.floor((Math.max(seg.a[0], seg.b[0]) + pad) / CELL);
-      const y0 = Math.floor((Math.min(seg.a[1], seg.b[1]) - pad) / CELL);
-      const y1 = Math.floor((Math.max(seg.a[1], seg.b[1]) + pad) / CELL);
-      for (let gx = x0; gx <= x1; gx++) {
-        for (let gy = y0; gy <= y1; gy++) {
-          const key = `${gx},${gy}`;
-          if (!grid.has(key)) grid.set(key, []);
-          grid.get(key).push(idx);
+      // the cells near the segment, walked along it (its bounding box made a
+      // long diagonal road fill a square of cells: quadratic in its length)
+      const len = Math.hypot(seg.b[0] - seg.a[0], seg.b[1] - seg.a[1]);
+      const steps = Math.max(1, Math.ceil(len / (CELL / 2)));
+      const seen = new Set();
+      for (let k = 0; k <= steps; k++) {
+        const px = seg.a[0] + (seg.b[0] - seg.a[0]) * (k / steps);
+        const py = seg.a[1] + (seg.b[1] - seg.a[1]) * (k / steps);
+        for (let gx = Math.floor((px - pad - CELL / 2) / CELL); gx <= Math.floor((px + pad + CELL / 2) / CELL); gx++) {
+          for (let gy = Math.floor((py - pad - CELL / 2) / CELL); gy <= Math.floor((py + pad + CELL / 2) / CELL); gy++) {
+            const key = `${gx},${gy}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            if (!grid.has(key)) grid.set(key, []);
+            grid.get(key).push(idx);
+          }
         }
       }
     }

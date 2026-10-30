@@ -4652,7 +4652,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   yield;
   // (structure solver v2: the decks come from the solver after the road
   // layout, so today's bridge passes are skipped)
-  const bridges = opts.structureSolver === 'v2'
+  // (no graph, e.g. it failed on this map: today's bridge passes instead)
+  const bridges = opts.structureSolver === 'v2' && structureGraph
     ? { bySeg: new Map(), approaches: new Map(), decks: [], roadLines: [], ramps: 0, humps: [], sunk: 0, sunkAt: [], carried: 0, partInfo: [], endHeight: () => null }
     : solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   yield;
@@ -5959,16 +5960,16 @@ function buildDetailedReportSections(d) {
     }
     const sg = d.decalRoads?.structureGraph?.stats;
     if (sg) {
-      lines.push(`- Structure solver graph (not used for the level yet): ${sg.nodes} nodes, ${sg.edges} edges (${sg.bridgeEdges} bridge, ${sg.tunnelEdges} tunnel), ${sg.stations} stations; ${sg.joints} joints where a road goes onto a bridge, into a tunnel or changes layer, ${sg.junctions} junctions (${sg.multiLevelJunctions} mixing layers), ${sg.ends} dead ends, ${sg.edgeOfMap} roads leaving the map`);
+      lines.push(`- Structure solver graph: ${sg.nodes} nodes, ${sg.edges} edges (${sg.bridgeEdges} bridge, ${sg.tunnelEdges} tunnel), ${sg.stations} stations; ${sg.joints} joints where a road goes onto a bridge, into a tunnel or changes layer, ${sg.junctions} junctions (${sg.multiLevelJunctions} mixing layers), ${sg.ends} dead ends, ${sg.edgeOfMap} roads leaving the map`);
       const cx = d.decalRoads.structureGraph.crossings?.stats;
-      if (cx) lines.push(`- Structure solver crossings (not used yet): ${cx.crossings} grade-separated (${cx.byLayer} by OSM layer, ${cx.byBridge} by bridge tag, ${cx.byTunnel} by tunnel tag), ${cx.unjoined} ground roads crossing level that OSM did not join; ${cx.waterRuns} bridge run(s) over water (${cx.channels} ship channel)`);
+      if (cx) lines.push(`- Structure solver crossings: ${cx.crossings} grade-separated (${cx.byLayer} by OSM layer, ${cx.byBridge} by bridge tag, ${cx.byTunnel} by tunnel tag), ${cx.unjoined} ground roads crossing level that OSM did not join; ${cx.waterRuns} bridge run(s) over water (${cx.channels} ship channel)`);
       const pf = d.decalRoads.structureGraph.profile; const pv = d.decalRoads.structureGraph.previewChecks;
       const cl = d.decalRoads.structureGraph.classes?.stats;
       if (cl?.lengthByKind) {
         const order = ['deck', 'embankment', 'boredTunnel', 'cutAndCover', 'cutting'];
         const label = { deck: 'deck', embankment: 'embankment', boredTunnel: 'bored tunnel', cutAndCover: 'cut-and-cover', cutting: 'cutting' };
         const parts = order.filter((k) => cl.byKind[k]).map((k) => `${label[k]} ${cl.byKind[k]} (${formatNumber(cl.lengthByKind[k] / 1000, 2)} km)`);
-        lines.push(`- Structure solver classes (not used yet): ${parts.join(', ') || 'all ground'}; ${cl.culverts} bridge tag(s) over nothing (culverts), ${cl.untaggedDecks} untagged stretch(es) that need a deck, ${cl.openTunnels} tunnel tag(s) too shallow for a roof (open cutting)`);
+        lines.push(`- Structure solver classes: ${parts.join(', ') || 'all ground'}; ${cl.culverts} bridge tag(s) over nothing (culverts), ${cl.untaggedDecks} untagged stretch(es) that need a deck, ${cl.openTunnels} tunnel tag(s) too shallow for a roof (open cutting)`);
       }
       const vt = d.decalRoads.structureGraph.terrain;
       if (vt) {
@@ -5979,10 +5980,40 @@ function buildDetailedReportSections(d) {
         }
       }
       if (pf && pv) {
-        lines.push(`- Structure solver profile preview (not used yet; ${pf.rounds} rounds, ${pf.ms} ms): steps ${pv.joints.steps}, too steep ${pv.grades.structure.count + pv.grades.ground.count}, short crossings ${pv.crossings.short} of ${pv.crossings.crossings}; remaining violations: joints ${pf.residual.joint} m, crossings ${pf.residual.crossing} m, grade +${pf.residual.grade}, water ${pf.residual.water} m, tunnel cover ${pf.residual.cover} m`);
+        lines.push(`- Structure solver profile (${pf.rounds} rounds, ${pf.ms} ms): steps ${pv.joints.steps}, too steep ${pv.grades.structure.count + pv.grades.ground.count}, short crossings ${pv.crossings.short} of ${pv.crossings.crossings}; remaining violations: joints ${pf.residual.joint} m, crossings ${pf.residual.crossing} m, grade +${pf.residual.grade}, water ${pf.residual.water} m, tunnel cover ${pf.residual.cover} m`);
       }
     }
     lines.push(`- Checked in ${sc.ms} ms.`);
+  }
+
+  // ── Structures (solver) ───────────────────────────────────────────────────
+  const sgr = d.decalRoads?.structureGraph;
+  if (sgr?.built && sgr.classes && sgr.profile) {
+    section('Structures (solver)');
+    lines.push('- Every road\'s height solved at once (joints level, crossings cleared, grade limits per class, bridges over water, tunnel cover), then each stretch classed from its height over the ground and its tags; the terrain is composed once from the result.');
+    const cl = sgr.classes.stats;
+    const label = { deck: 'deck', embankment: 'embankment', boredTunnel: 'bored tunnel', cutAndCover: 'cut-and-cover', cutting: 'cutting', external: 'tunnel (today\'s builder)' };
+    for (const k of ['deck', 'embankment', 'cutting', 'cutAndCover', 'boredTunnel', 'external']) {
+      if (cl.byKind[k]) lines.push(`  - ${label[k]}: ${cl.byKind[k]} stretch(es), ${formatNumber((cl.lengthByKind[k] || 0) / 1000, 2)} km`);
+    }
+    lines.push(`- Bridge tags over nothing (culverts, no deck): ${cl.culverts}; approaches carried on as decks where a fill would reach a road below: ${cl.carried || 0} station(s); untagged stretches that needed a deck: ${cl.untaggedDecks}`);
+    const r = sgr.profile.residual;
+    lines.push(`- Left unmet by the solve (0 is the goal): joints ${r.joint} m, crossings ${r.crossing} m short, grades +${r.grade} over the limit, water clearance ${r.water} m short, tunnel cover ${r.cover} m short`);
+    const t = sgr.terrain;
+    if (t) lines.push(`- Terrain: ${t.pixels} pixels composed in ${t.ms} ms, ${t.capped} held under decks, ${t.despiked || 0} despiked, ${t.wallPixels} on retaining-wall steps, ${t.roadUnderDeckTooLow} road-core pixels under a deck too low over them`);
+    const decksList = d.bridges?.decks || [];
+    if (decksList.length) {
+      lines.push('- Decks (b###, parts, length, highest over the ground):');
+      decksList.forEach((deck, i) => {
+        let len = 0; let hi = 0;
+        for (const p of deck.parts) {
+          for (let k = 1; k < p.xy.length; k++) len += Math.hypot(p.xy[k][0] - p.xy[k - 1][0], p.xy[k][1] - p.xy[k - 1][1]);
+          const e = sgr.edges[p.edge];
+          if (e) for (let k = 0; k < e.s.length; k++) if (e.s[k] >= p.s0 && e.s[k] <= p.s1) hi = Math.max(hi, sgr.profile.z[p.edge][k] - e.g[k]);
+        }
+        lines.push(`  - b${String(i + 1).padStart(3, '0')}: ${deck.parts.length} part(s), ${formatNumber(len, 0)} m, up to ${formatNumber(hi, 1)} m${deck.parts.some((p) => !sgr.edges[p.edge]?.bridge) ? ' (includes untagged / carried stretches)' : ''}`);
+      });
+    }
   }
 
   // ── Bridges ────────────────────────────────────────────────────────────────
@@ -9541,7 +9572,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // export keeps its share of that for export_report.txt.
   const jobLog = captureConsole();
   try {
-    return await runBeamNGLevelExport(terrainData, center, options, jobLog);
+    // The structure solver builds bridges, decks and the terrain around them
+    // by default; structureSolver: 'v1' keeps today's bridge passes.
+    const structureSolver = options.structureSolver ?? 'v2';
+    return await runBeamNGLevelExport(terrainData, center, { ...options, structureSolver }, jobLog);
   } finally {
     jobLog.restore();
   }
@@ -9799,6 +9833,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     for (const e of sg.edges) { const h = drawnHalf.get(e.seg); if (h > e.half) e.half = h; }
     const decks = decksFromSolver(sg);
     const parts = decks.flatMap((d) => d.parts);
+    sg.built = true;
     decalRoads.bridges.decks = decks;
     decalRoads.bridges.roadLines = roadLinesFromSolver(sg);
     decalRoads.bridges.partInfo = parts.map((p) => ({ ...p.osm, structure: p.structure ?? null, landing: false, carried: false }));
