@@ -321,7 +321,73 @@ export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
  * is left of the run's direction (the sidewalk lies on that side of the curb)
  * and owner is the carriageway's.
  */
-export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map() } = {}) {
+// Building footprints (world rings) in a grid, for point-in-footprint tests.
+const BUILDING_CELL_M = 32;
+function buildingIndex(rings) {
+  const cells = new Map();
+  for (const ring of rings) {
+    if (!ring || ring.length < 3) continue;
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    const item = { ring, x0, y0, x1, y1 };
+    for (let cx = Math.floor(x0 / BUILDING_CELL_M); cx <= Math.floor(x1 / BUILDING_CELL_M); cx++) {
+      for (let cy = Math.floor(y0 / BUILDING_CELL_M); cy <= Math.floor(y1 / BUILDING_CELL_M); cy++) {
+        const k = `${cx},${cy}`;
+        if (!cells.has(k)) cells.set(k, []);
+        cells.get(k).push(item);
+      }
+    }
+  }
+  return (x, y) => {
+    for (const it of cells.get(`${Math.floor(x / BUILDING_CELL_M)},${Math.floor(y / BUILDING_CELL_M)}`) || []) {
+      if (x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;
+      let inside = false;
+      const r = it.ring;
+      for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+        if ((r[i][1] > y) !== (r[j][1] > y) && x < ((r[j][0] - r[i][0]) * (y - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) inside = !inside;
+      }
+      if (inside) return true;
+    }
+    return false;
+  };
+}
+
+// Runs cut where the middle of their slab would stand inside a building.
+function splitRunsAtBuildings(runs, inBuilding) {
+  const STEP = 1;
+  const out = [];
+  for (const run of runs) {
+    const p = run.points;
+    let piece = []; let last = null;
+    const flush = () => { if (piece.length >= 2 && runLength(piece) >= MIN_RUN_M) out.push({ ...run, points: piece }); piece = []; };
+    for (let i = 0; i + 1 < p.length; i++) {
+      const a = p[i]; const b = p[i + 1];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (L < 1e-6) continue;
+      const nx = (-(b[1] - a[1]) / L) * run.side; const ny = ((b[0] - a[0]) / L) * run.side;
+      const n = Math.max(1, Math.ceil(L / STEP));
+      for (let k = i === 0 ? 0 : 1; k <= n; k++) {
+        const t = k / n;
+        const q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+        const mid = run.width / 2 + CURB_W;
+        if (inBuilding(q[0] + nx * mid, q[1] + ny * mid)) {
+          // (the last free point before the cut ends the piece)
+          if (last && piece[piece.length - 1] !== last) piece.push(last);
+          last = null;
+          flush();
+          continue;
+        }
+        // (the run's own vertices, and the first point after a cut)
+        if (k === n || k === 0 || piece.length === 0) piece.push(q);
+        last = q;
+      }
+    }
+    flush();
+  }
+  return out;
+}
+
+export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map(), buildings = [] } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const sidesOf = streetSides(carriageways);
   // Driveways and parking aisles (OSM service roads, not carriageways of
@@ -340,7 +406,9 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
       }
     }
   }
-  const runs = mergeRuns(pieces).filter((run) => runLength(run.points) >= MIN_RUN_M);
+  let runs = mergeRuns(pieces).filter((run) => runLength(run.points) >= MIN_RUN_M);
+  // a slab never runs into a building (a footprint at the road's edge)
+  if (buildings?.length) runs = splitRunsAtBuildings(runs, buildingIndex(buildings));
   if (nearDriveway) for (const run of runs) run.dips = dipsAlong(run.points, (x, y) => nearDriveway(x, y, DRIVEWAY_HALF_M));
   return runs;
 }

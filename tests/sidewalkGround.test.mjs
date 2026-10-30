@@ -32,3 +32,17 @@ test('sidewalk ground: never raised into a deck over it', () => {
   assert.ok(groundAt(g)(-30, 4.5) > 12, 'graded where open');
   assert.equal(groundAt(g)(30, 4.5), 10, 'left under the deck');
 });
+
+test('sidewalk runs stop where they would run into a building', async () => {
+  const { buildSidewalkRuns } = await import('../services/beamngSidewalks.js');
+  const cw = { nodes: [[-100, 0, 10], [100, 0, 10]], half: 3.5, owner: 1, highway: 'residential', tags: { sidewalk: 'both' }, oneWay: false };
+  const open = buildSidewalkRuns([cw]);
+  // a building on the north side from x 0 to 30, its wall 1 m off the curb
+  const building = [[0, 4.5], [30, 4.5], [30, 30], [0, 30]];
+  const cut = buildSidewalkRuns([cw], { buildings: [building] });
+  const north = (runs) => runs.filter((r) => r.points[0][1] > 0);
+  assert.equal(north(open).length, 1);
+  assert.equal(north(cut).length, 2, 'split around the building');
+  for (const r of north(cut)) for (const p of r.points) assert.ok(p[0] <= 0.5 || p[0] >= 29.5, `slab at x ${p[0]} inside the building`);
+  assert.equal(cut.filter((r) => r.points[0][1] < 0).length, 1, 'the other side is untouched');
+});

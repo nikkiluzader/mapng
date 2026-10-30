@@ -1917,6 +1917,16 @@ const STABLE_DECAL_WIDTH_HIGHWAYS = new Set([
   'secondary_link',
 ]);
 
+// A building part that does not reach the ground (a canopy, a roof over a
+// forecourt, an overhang on columns, a bridge between buildings).
+function isRaisedBuildingPart(tags = {}) {
+  const b = String(tags.building || '').toLowerCase();
+  if (['roof', 'canopy', 'carport', 'bridge'].includes(b) || tags['building:part'] === 'roof') return true;
+  const minLevel = Number.parseFloat(tags['building:min_level'] ?? tags.min_level);
+  const minHeight = Number.parseFloat(tags.min_height);
+  return (Number.isFinite(minLevel) && minLevel > 0) || (Number.isFinite(minHeight) && minHeight > 0) || Number.parseInt(tags.layer, 10) > 0;
+}
+
 function getDecalMergeStyleKey(segment) {
   const tags = segment?.tags || {};
   return JSON.stringify([
@@ -9904,6 +9914,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalks = includeRoads && includeSidewalks
     ? buildSidewalkMeshes(groundCarriageways, {
       zones: decalRoads.crosswalkZones || [],
+      // building footprints at ground level: no slab into a wall
+      buildings: (exportTerrainData.osmFeatures || [])
+        .filter((f) => f.type === 'building' && f.geometry?.length > 2 && !isRaisedBuildingPart(f.tags))
+        .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0))),
       // driveways and parking aisles: the curb lowered where they cross
       driveways: (exportTerrainData.osmFeatures || [])
         .filter((f) => f.type === 'road' && f.tags?.highway === 'service' && f.geometry?.length > 1)
