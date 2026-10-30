@@ -2772,6 +2772,7 @@ const SHIP_CHANNEL_REACH_M = 150;
  * wetAt(x, y): 0 on land, 1 over OSM water (areas, rivers / streams by a
  * typical width, the sea by its coastline), 2 over a ship channel.
  */
+const WATER_AREA_NATURAL = new Set(['strait', 'bay']);
 export function buildWaterLookup(terrainData, squareSize) {
   const CELL = 64;
   const cells = new Map();
@@ -2785,9 +2786,12 @@ export function buildWaterLookup(terrainData, squareSize) {
     }
   };
   for (const f of terrainData.osmFeatures || []) {
-    if (f.type !== 'water' || !Array.isArray(f.geometry) || f.geometry.length < 2) continue;
+    // (a strait or bay is water too, though parsed as land cover: a river
+    // mouth mapped as one, its banks off the map, had no water under its bridge)
+    const openWater = WATER_AREA_NATURAL.has(f.tags?.natural);
+    if ((f.type !== 'water' && !openWater) || !Array.isArray(f.geometry) || f.geometry.length < 2) continue;
     const xy = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
-    const waterway = f.tags?.waterway;
+    const waterway = openWater ? undefined : f.tags?.waterway;
     const half = WATERWAY_HALF_M[waterway];
     const closed = xy.length > 3 && Math.hypot(xy[0][0] - xy[xy.length - 1][0], xy[0][1] - xy[xy.length - 1][1]) < 0.5;
     const pad = half ?? 0;

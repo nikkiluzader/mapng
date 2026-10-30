@@ -86,3 +86,11 @@ test('profile: a road under the deck it joins never lifts the deck round after r
   const top = Math.max(...g.profile.z[k].map((z, i) => z - g.edges[k].g[i]));
   assert.ok(top < 6.5 + 3 + 1, `deck ${top.toFixed(1)} m over the ground`);
 });
+
+test('profile: twin carriageways over a strait both take the named structure clearance', async () => {
+  const g = await solved('twin suspension bridge over a strait');
+  const tops = g.edges.map((e, k) => Math.max(...g.profile.z[k].map((z, i) => z - e.g[i])));
+  assert.equal(g.crossings.water.length, 2, 'the strait is water under both');
+  for (const t of tops) assert.ok(t > 15, `deck only ${t.toFixed(1)} m over the strait`);
+  assert.ok(Math.abs(tops[0] - tops[1]) < 1, `carriageways ${tops.map((t) => t.toFixed(1)).join(' / ')}`);
+});

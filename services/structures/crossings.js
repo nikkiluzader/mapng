@@ -168,6 +168,35 @@ export function findCrossings(graph, { waterAt = null } = {}) {
   }
   const reachOf = (n) => (n === undefined ? 0 : bridgeReach.get(n) ?? 0);
 
+  // twin carriageways of one bridge: an edge alongside a bridge edge that
+  // names its structure (suspension, cable-stayed) takes it (OSM often tags
+  // one carriageway only: the other stood 40 m lower beside it)
+  const structureOf = new Map();
+  {
+    const TWIN_M = 30;
+    const tagged = edges.filter((e) => e.bridge && e.structure);
+    const cells = new Map();
+    for (const e of tagged) for (let i = 0; i < e.s.length; i++) {
+      const k = `${Math.floor(e.x[i] / TWIN_M)},${Math.floor(e.y[i] / TWIN_M)}`;
+      if (!cells.has(k)) cells.set(k, []);
+      cells.get(k).push(e, i);
+    }
+    for (const e of edges) {
+      if (!e.bridge || e.structure || !tagged.length) continue;
+      const votes = new Map(); let near = 0;
+      for (let i = 0; i < e.s.length; i++) {
+        const cx = Math.floor(e.x[i] / TWIN_M); const cy = Math.floor(e.y[i] / TWIN_M);
+        let hit = null;
+        for (let dx = -1; dx <= 1 && !hit; dx++) for (let dy = -1; dy <= 1 && !hit; dy++) {
+          const list = cells.get(`${cx + dx},${cy + dy}`) || [];
+          for (let j = 0; j < list.length; j += 2) if (Math.hypot(list[j].x[list[j + 1]] - e.x[i], list[j].y[list[j + 1]] - e.y[i]) <= TWIN_M) { hit = list[j]; break; }
+        }
+        if (hit) { near++; votes.set(hit.structure, (votes.get(hit.structure) || 0) + 1); }
+      }
+      if (near >= 0.5 * e.s.length) structureOf.set(e.id, [...votes].sort((a, b) => b[1] - a[1])[0][0]);
+    }
+  }
+
   // bridge edges over water: the wet runs and the clearance each needs
   const water = [];
   if (waterAt) {
@@ -182,7 +211,8 @@ export function findCrossings(graph, { waterAt = null } = {}) {
           const run = e.s[i1] - e.s[i0];
           // (a ship's clearance over a long wet run only, as the bridge pass:
           // a bridge near a harbour's channel line is not over the channel)
-          let need = Math.max(waterClear(run), run >= NAV_RUN_M ? (channel ? NAV_CLEAR_M : navClearance(e.structure)) : 0);
+          const nav = navClearance(e.structure || structureOf.get(e.id));
+          let need = Math.max(waterClear(run), run >= NAV_RUN_M ? (channel ? NAV_CLEAR_M : nav) : 0);
           if (e.movable || movableBridge.has(e.id)) need = Math.min(waterClear(run), MOVABLE_CLEAR_M);
           // what the bridge can climb to at each station between its ends
           // (the lower side): it rises toward its middle, never beyond

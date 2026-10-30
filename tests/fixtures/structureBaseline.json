@@ -185,5 +185,16 @@
   "groundGaps": 0,
   "throughDeck": 0,
   "spikes": 0
+ },
+ "twin suspension bridge over a strait": {
+  "decks": 2,
+  "tunnels": 0,
+  "steps": 0,
+  "steepStructure": 296,
+  "steepGround": 0,
+  "shortCrossings": 0,
+  "groundGaps": 0,
+  "throughDeck": 0,
+  "spikes": 0
  }
 }

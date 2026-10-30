@@ -127,6 +127,16 @@ export const STRUCTURE_SCENES = [
     ]),
   },
   {
+    name: 'twin suspension bridge over a strait',
+    // a strait (parsed as land cover) under the whole map, crossed by two
+    // carriageways off both edges; only one names its structure
+    build: () => terrain(() => 1, [
+      way(1, [[-480, 10], [480, 10]], { highway: 'motorway', oneway: 'yes', bridge: 'viaduct', 'bridge:structure': 'suspension', layer: '4' }),
+      way(2, [[480, -10], [-480, -10]], { highway: 'motorway', oneway: 'yes', bridge: 'viaduct', layer: '4' }),
+      { id: 'rel_3', type: 'landuse', geometry: [[-500, -500], [500, -500], [500, 500], [-500, 500]].map(([x, y]) => ll(x, y)), tags: { natural: 'strait', type: 'multipolygon' } },
+    ]),
+  },
+  {
     name: 'mountain tunnel through a ridge',
     // a 60 m ridge along y = 0, the road crossing it north-south
     build: () => terrain((x, y) => 10 + 60 * Math.exp(-((y / 140) ** 2)), [
