@@ -45,8 +45,8 @@ export const useMainStore = defineStore('main', () => {
   // toggles and the preview's surroundings + wireframe. Basic is the default.
   const advancedMode = ref(localStorage.getItem('mapng_advanced_mode') === 'true');
   // Raw terrain (advanced mode only): generation leaves the elevation and OSM
-  // roads exactly as pulled (no height blur, road rounding, snapping or road
-  // smoothing). Read it through rawTerrainActive so basic mode never applies it.
+  // roads exactly as pulled (no height blur, road snapping or road smoothing;
+  // the road curves stay). Read it through rawTerrainActive so basic mode never applies it.
   const rawTerrain = ref(localStorage.getItem('mapng_raw_terrain') === 'true');
   const rawTerrainActive = computed(() => advancedMode.value && rawTerrain.value);
 

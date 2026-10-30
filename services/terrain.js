@@ -141,13 +141,14 @@ const globalTerrainSmoothRadius = (metersPerPixel) => {
   return r >= 1 ? r : false;
 };
 
-// Raw terrain (advanced mode): the user wants their elevation and OSM exactly
-// as pulled. Generation then skips every step that reshapes them: the height
-// blur, road corner rounding, snapping roads sideways onto the terrain and
-// smoothing/levelling roads into it. No-data holes are still filled (a level
-// can't have holes). The export's own structures (bridges, tunnels) still
+// Raw terrain (advanced mode): the user wants their elevation exactly as
+// pulled. Generation then skips every step that reshapes it: the height blur,
+// snapping roads sideways onto the terrain and smoothing/levelling roads into
+// it. No-data holes are still filled (a level can't have holes). Road corners
+// are still rounded: that shapes only the road lines (the DecalRoad curves),
+// never the terrain. The export's own structures (bridges, tunnels) still
 // grade the terrain as usual.
-const shapeRoads = (osmFeatures, raw) => (raw ? osmFeatures : roundRoadCorners(osmFeatures).features);
+const shapeRoads = (osmFeatures) => roundRoadCorners(osmFeatures).features;
 
 const decodeTerrariumHeight = (r, g, b) => {
   const h = r * 256 + g + b / 256 - 32768;
@@ -2124,7 +2125,7 @@ export const fetchTerrainData = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.("Fetching OpenStreetMap data...");
-    osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: onProgress, signal }), raw);
+    osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: onProgress, signal }));
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2500,7 +2501,7 @@ export const loadTerrainFromTif = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     emitProgress('Fetching OpenStreetMap data...');
-    osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: emitProgress, signal }), raw);
+    osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: emitProgress, signal }));
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2735,7 +2736,7 @@ export const loadTerrainFromLaz = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.('Fetching OpenStreetMap data...');
-    osmFeatures = shapeRoads(await fetchOSMData(fetchBounds, { onStatus: onProgress, signal }), raw);
+    osmFeatures = shapeRoads(await fetchOSMData(fetchBounds, { onStatus: onProgress, signal }));
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(fetchBounds),
       endpointUsed: null,
@@ -2931,7 +2932,7 @@ export const addOSMToTerrain = async (
   onProgress,
 ) => {
   onProgress?.("Fetching OpenStreetMap data...");
-  const osmFeatures = shapeRoads(await fetchOSMData(terrainData.bounds, { onStatus: onProgress }), !!terrainData.raw);
+  const osmFeatures = shapeRoads(await fetchOSMData(terrainData.bounds, { onStatus: onProgress }));
   const osmRequestInfo = getLastOSMRequestInfo() || {
     ...getOSMQueryParameters(terrainData.bounds),
     endpointUsed: null,
