@@ -2785,6 +2785,7 @@ const SHIP_CHANNEL_REACH_M = 150;
  */
 const WATER_AREA_NATURAL = new Set(['strait', 'bay']);
 const ROAD_LAYER_MARGIN_M = 0.3;   // asphalt painted this far past a road's drawn edge
+const LAKE_KEEP_M = 4;             // no lake bed this far past a ground road's edge (sidewalk + quay)
 export function buildWaterLookup(terrainData, squareSize) {
   const CELL = 64;
   const cells = new Map();
@@ -10150,10 +10151,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
         heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       });
+      // (no bed within LAKE_KEEP_M of a ground road's edge: its sidewalk and
+      // quay stay on their ground)
+      const quayIndex = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
       const beds = carveLakeBeds(lakePlan.lakes, {
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
         worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
-      });
+      }, { keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) });
       const hmLake = heightMapEditor(exportTerrainData);
       beds.apply((idx, v) => hmLake.set(idx, v));
       lakePlan.stats.bedPixels = beds.pixels;

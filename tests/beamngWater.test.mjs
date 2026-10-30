@@ -135,3 +135,17 @@ test('lake beds: every lake recorded flat at its surface gets a bed, shore shall
   assert.ok(Math.abs(at(30, -30) - (level2 - 1.5)) < 0.05, 'the lower pond gets its own bed');
   assert.equal(at(10, -30), 5, 'between them untouched');
 });
+
+test('lake beds: no bed under ground a road keeps (its sidewalk, the quay)', async () => {
+  const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
+  const N = 101; const SIZE = 100;
+  const hm = new Float32Array(N * N).fill(5);
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+  const ring = [[-40, -20], [0, -20], [0, 20], [-40, 20], [-40, -20]];
+  const plan = planLakes({ features: [{ type: 'water', tags: { natural: 'water' }, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) }], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+  carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 }, { keep: (x) => x > -6 })
+    .apply((idx, v) => { hm[idx] = v; });
+  assert.equal(at(-3, 0), 5, 'kept beside the road');
+  assert.ok(at(-20, 0) < 4, 'carved in the middle');
+});

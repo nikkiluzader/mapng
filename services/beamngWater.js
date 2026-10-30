@@ -371,9 +371,11 @@ const distToRing = (x, y, ring) => {
 /**
  * Terrain edits for lake beds. grid: { heightMap, width, height, worldSize,
  * minHeight } (raw heights; world z = raw - minHeight; world x, y centred,
- * y north). Returns { pixels, apply(set) }: set(idx, raw).
+ * y north). keep(x, y): ground left as it is (a road and its sidewalks: a
+ * canal's outline often reaches the quay, and a bed under it left the
+ * sidewalks floating). Returns { pixels, apply(set) }: set(idx, raw).
  */
-export function carveLakeBeds(lakes, grid) {
+export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
   const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
@@ -384,7 +386,7 @@ export function carveLakeBeds(lakes, grid) {
     for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
       for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
         const [x, y] = toWorld(c, r);
-        if (!poly.contains(x, y)) continue;
+        if (!poly.contains(x, y) || keep(x, y)) continue;
         const idx = r * width + c;
         const ground = heightMap[idx] - minHeight;
         if (ground < level - LAKE_BED_M) continue;
