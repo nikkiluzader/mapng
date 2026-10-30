@@ -352,8 +352,9 @@ function buildingIndex(rings) {
   };
 }
 
-// Runs cut where the middle of their slab would stand inside a building.
-function splitRunsAtBuildings(runs, inBuilding) {
+// Runs cut where their slab (its middle or its back edge) would stand on
+// blocked ground: blocked(run, x, y).
+function splitRunsWhereBlocked(runs, blocked) {
   const STEP = 1;
   const out = [];
   for (const run of runs) {
@@ -369,8 +370,8 @@ function splitRunsAtBuildings(runs, inBuilding) {
       for (let k = i === 0 ? 0 : 1; k <= n; k++) {
         const t = k / n;
         const q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-        const mid = run.width / 2 + CURB_W;
-        if (inBuilding(q[0] + nx * mid, q[1] + ny * mid)) {
+        const mid = run.width / 2 + CURB_W; const back = run.width + CURB_W - 0.1;
+        if (blocked(run, q[0] + nx * mid, q[1] + ny * mid) || blocked(run, q[0] + nx * back, q[1] + ny * back)) {
           // (the last free point before the cut ends the piece)
           if (last && piece[piece.length - 1] !== last) piece.push(last);
           last = null;
@@ -407,8 +408,14 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
     }
   }
   let runs = mergeRuns(pieces).filter((run) => runLength(run.points) >= MIN_RUN_M);
-  // a slab never runs into a building (a footprint at the road's edge)
-  if (buildings?.length) runs = splitRunsAtBuildings(runs, buildingIndex(buildings));
+  // a slab never runs into a building (a footprint at the road's edge) or
+  // out over another carriageway (a sunken centre road beside a side road)
+  {
+    const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
+    const owners = new Map(carriageways.map((cw) => [cw.owner, new Set([cw.owner, ...(cw.continuations || [])])]));
+    runs = splitRunsWhereBlocked(runs, (run, x, y) => inBuilding(x, y)
+      || isOnOtherCarriageway(index, x, y, 0, (o) => owners.get(run.owner)?.has(o)));
+  }
   if (nearDriveway) for (const run of runs) run.dips = dipsAlong(run.points, (x, y) => nearDriveway(x, y, DRIVEWAY_HALF_M));
   return runs;
 }

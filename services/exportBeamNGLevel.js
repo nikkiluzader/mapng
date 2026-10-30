@@ -10859,6 +10859,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       carriageways: roadLinesFromDecals(decalRoads),
       sidewalkRuns: sidewalks.runs,
       underStructure: underDeck,
+      inTunnel: (x, y, z, zTop) => tunnelList.length > 0 && hitsTunnel(tunnelList, x, y, z, zTop),
       spawn: spawnPosition,
     });
     zip.file(`${base}/mapng_probes.json`, JSON.stringify(ingameProbes));

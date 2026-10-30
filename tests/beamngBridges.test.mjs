@@ -484,3 +484,10 @@ test("no parapet across a street where it climbs onto the deck at the deck's hei
   for (let i = 0; i < positions.length; i += 3) if (Math.abs(positions[i] - 30) < 3 && Math.abs(positions[i + 2] - 10.9) < 0.05) over++;
   assert.ok(over > 0, 'parapets over the road below stay');
 });
+
+test('deck geometry: a part whose two ends meet (a loop) builds', async () => {
+  const { buildDeckGeometry } = await import('../services/beamngBridges.js');
+  const ring = [[0, 0], [40, 0], [40, 40], [0, 40], [0, 0]];
+  const deck = { parts: [{ index: 0, xy: ring, z: ring.map(() => 10), half: 4 }] };
+  assert.doesNotThrow(() => buildDeckGeometry(deck, { groundAt: () => 0 }));
+});

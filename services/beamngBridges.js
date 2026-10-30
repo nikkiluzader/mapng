@@ -888,6 +888,8 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
       const here = atJoint.get(key(xy[k])) || [];
       if (here.length !== 2) continue;
       const other = here.find((e) => e.pi !== pi);
+      // (a part whose two ends meet, a loop: nothing else to align with)
+      if (!other) continue;
       const o = deck.parts[other.pi].xy;
       const beyond = other.k === 0 ? o[1] : o[o.length - 2];
       const before = k === 0 ? beyond : xy[k - 1];

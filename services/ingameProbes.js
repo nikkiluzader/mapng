@@ -44,15 +44,21 @@ const thin = (list, max) => (list.length <= max ? list : list.filter((_, i) => i
  *   bridge?, tunnel? }] (roadLinesFromDecals); sidewalkRuns: from
  *   buildSidewalkMeshes (points on the curb line at road height, side, width);
  * underStructure(x, y, z, zTop): a deck or tunnel over the point;
+ * inTunnel(x, y, z, zTop): a built tunnel there;
  * curbHeight: a slab's top over its road.
  */
-export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underStructure = () => false, spawn = null, curbHeight = 0.15 }) {
+export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underStructure = () => false, inTunnel = () => true, spawn = null, curbHeight = 0.15 }) {
   const road = []; const deck = []; const sidewalk = []; const tunnel = [];
   for (const cw of carriageways) {
     const n = cw.nodes || [];
     if (n.length < 2) continue;
     if (cw.tunnel) {
-      for (const p of along(n, TUNNEL_STEP_M)) tunnel.push({ k: 'tunnel', x: r2(p.x), y: r2(p.y), z: r2(p.z), road: cw.highway });
+      // (only where a tunnel was built over it: a tunnel=yes road left in
+      // the open is a road like any other)
+      for (const p of along(n, TUNNEL_STEP_M)) {
+        if (inTunnel(p.x, p.y, p.z, p.z + 3)) tunnel.push({ k: 'tunnel', x: r2(p.x), y: r2(p.y), z: r2(p.z), road: cw.highway });
+        else if (!underStructure(p.x, p.y, p.z, p.z + 60)) road.push({ k: 'road', x: r2(p.x), y: r2(p.y), z: r2(p.z), road: cw.highway });
+      }
     } else if (cw.carried || cw.bridge) {
       for (const p of along(n, DECK_STEP_M)) deck.push({ k: 'deck', x: r2(p.x), y: r2(p.y), z: r2(p.z), road: cw.highway });
     } else {
@@ -110,7 +116,8 @@ export function judgeProbes(probes, hits) {
       if (dz === null || Math.abs(dz) > 0.6) fail(p, 'tunnel road surface off', { dz: dz === null ? null : r2(dz), obj });
       else if (!Number.isFinite(h.roof) || h.roof > 12) fail(p, 'no roof over the tunnel road', { roof: h.roof ?? null });
     } else if (p.k === 'spawn') {
-      if (dz === null || dz < -3 || dz > 1) fail(p, 'spawn not over a surface near it', { dz: dz === null ? null : r2(dz), obj });
+      // (from a car's height: a spawn on a street under a bridge is fine)
+      if (ldz === null || ldz < -3 || ldz > 1) fail(p, 'spawn not over a surface near it', { dz: ldz === null ? null : r2(ldz), obj: lobj });
     } else if (ldz === null && dz === null) {
       fail(p, 'nothing under it (a hole in the world)');
     } else {

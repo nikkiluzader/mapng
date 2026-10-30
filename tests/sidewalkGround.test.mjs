@@ -46,3 +46,13 @@ test('sidewalk runs stop where they would run into a building', async () => {
   for (const r of north(cut)) for (const p of r.points) assert.ok(p[0] <= 0.5 || p[0] >= 29.5, `slab at x ${p[0]} inside the building`);
   assert.equal(cut.filter((r) => r.points[0][1] < 0).length, 1, 'the other side is untouched');
 });
+
+test('sidewalk runs stop where their slab would lie on another carriageway', async () => {
+  const { buildSidewalkRuns } = await import('../services/beamngSidewalks.js');
+  const side = { nodes: [[-100, 0, 14], [100, 0, 14]], half: 3, owner: 1, highway: 'residential', tags: { sidewalk: 'left' }, oneWay: true };
+  // a sunken centre road beside it from x 0 on, its edge 4.5 m off the side road's centre
+  const centre = { nodes: [[0, 8.5], [100, 8.5]].map(([x, y]) => [x, y, 10]), half: 4, owner: 2, highway: 'primary', tags: { sidewalk: 'no' }, oneWay: true };
+  const runs = buildSidewalkRuns([side, centre]).filter((r) => r.owner === 1);
+  assert.ok(runs.length >= 1);
+  for (const r of runs) for (const p of r.points) assert.ok(p[0] <= 0.5, `slab over the centre road at x ${p[0]}`);
+});
