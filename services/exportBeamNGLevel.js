@@ -2784,6 +2784,7 @@ const SHIP_CHANNEL_REACH_M = 150;
  * typical width, the sea by its coastline), 2 over a ship channel.
  */
 const WATER_AREA_NATURAL = new Set(['strait', 'bay']);
+const ROAD_LAYER_MARGIN_M = 0.3;   // asphalt painted this far past a road's drawn edge
 export function buildWaterLookup(terrainData, squareSize) {
   const CELL = 64;
   const cells = new Map();
@@ -10152,6 +10153,33 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       }
     }
   }
+  // Under every paved road on the ground, asphalt to its drawn edge: ground
+  // cover grows by terrain layer, not by what is drawn over it, and the
+  // painter's road strips (from OSM) need not match the drawn carriageway
+  // (parking lanes, solver widths): grass grew through the road's edges
+  if (terLayerMap && asphaltLayer >= 0) {
+    const n = exportTerrainData.width;
+    const UNPAVED = new Set(['unpaved', 'gravel', 'fine_gravel', 'dirt', 'earth', 'ground', 'grass', 'sand', 'mud', 'compacted', 'pebblestone', 'woodchips']);
+    let painted = 0;
+    for (const cw of groundCarriageways) {
+      if (UNPAVED.has(String(cw.tags?.surface || '').toLowerCase()) || cw.highway === 'track' || cw.highway === 'path') continue;
+      const nodes = cw.nodes || []; const reach = (cw.half || 3) + ROAD_LAYER_MARGIN_M;
+      for (let i = 0; i + 1 < nodes.length; i++) {
+        const [ax, ay] = nodes[i]; const [bx, by] = nodes[i + 1];
+        const L = Math.hypot(bx - ax, by - ay);
+        if (L < 1e-6) continue;
+        const ux = (bx - ax) / L; const uy = (by - ay) / L;
+        for (let s = 0; s <= L; s += squareSize / 2) {
+          for (let d = -reach; d <= reach; d += squareSize / 2) {
+            const x = ax + ux * s - uy * d; const y = ay + uy * s + ux * d;
+            const c = Math.round(x / squareSize + n / 2); const r = Math.round(y / squareSize + n / 2);
+            if (c >= 0 && c < n && r >= 0 && r < n && terLayerMap[r * n + c] !== asphaltLayer) { terLayerMap[r * n + c] = asphaltLayer; painted++; }
+          }
+        }
+      }
+    }
+    if (pbrResult) pbrResult.roadLayerPixels = painted;
+  }
   const tunnelHoles = decalRoads.tunnels?.holes || [];
   if (tunnelHoles.length > 0) {
     if (!terLayerMap) terLayerMap = new Uint8Array(exportTerrainData.width * exportTerrainData.height);
@@ -10333,11 +10361,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let vegetationCleared = 0;
   for (const [type, list] of forestPlacements) {
     const margin = (treeItemHeight(type) ?? 10) < 4 ? VEGETATION_CLEAR_LOW_M : VEGETATION_CLEAR_TREE_M;
+    // (a tree's own height under a deck: a 20 m tree under a 15 m deck grew
+    // up through its road)
+    const reach = Math.max(12, (treeItemHeight(type) ?? 10) + 1);
     const kept = [];
     for (let i = 0; i < list.length; i++) {
       if ((i & 4095) === 0) await tick();
       const { pos: [x, y, z] } = list[i];
-      if (!clearOf(x, y, margin) && !underDeck(x, y, z, z + 12)) kept.push(list[i]);
+      if (!clearOf(x, y, margin) && !underDeck(x, y, z, z + reach)) kept.push(list[i]);
     }
     vegetationCleared += list.length - kept.length;
     if (kept.length) forestPlacements.set(type, kept);
