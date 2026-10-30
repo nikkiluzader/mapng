@@ -233,6 +233,8 @@ const signGoogle = (pathQuery) => {
   const sig = crypto.createHmac('sha1', k).update(pathQuery).digest('base64').replace(/\+/g, '-').replace(/\//g, '_');
   return `${pathQuery}&signature=${sig}`;
 };
+// Google's car panoramas only: Google's copyright (not user uploads) and
+// standing on a drivable carriageway (not the pedestrian Trekker's).
 // Google's metadata (free) returns the default panorama nearest a point,
 // not always the newest; positions a little along and across the road often
 // find newer drives. The newest street-level panorama among them wins
@@ -255,7 +257,8 @@ async function googleNear(x, y, roadHeading) {
     const meta = await googleMeta(lat, lng, along || across ? 12 : SEARCH_M);
     if (!meta || seen.has(meta.pano_id)) continue;
     const [px, py] = toWorld(meta.location.lat, meta.location.lng);
-    if (LINES.length && !atStreetLevel(px, py)) continue;
+    // Google's car only: on a drivable carriageway, not a sidewalk or a path
+    if (LINES.length && !onCarriageway(px, py)) continue;
     const d = Math.hypot(px - x, py - y);
     if (d > SEARCH_M) continue;
     seen.set(meta.pano_id, { meta, px, py, d });
@@ -348,6 +351,17 @@ function atStreetLevel(x, y) {
   return !!s && s.d <= (s.l.w || 2) + 1.5;
 }
 
+// on a drivable carriageway (within CAR_M of its edge): where Google's car
+// drives. Google's own pedestrian (Trekker) panoramas carry the same
+// copyright and no flag; standing on a sidewalk, a path or in a park they
+// fail this
+const CAR_M = 1.5;
+function onCarriageway(x, y) {
+  const r = nearestLine(x, y, ['road', 'deck', 'tunnel']);
+  return !!r && r.d <= r.l.hw + CAR_M && !NON_DRIVABLE.has(r.l.road);
+}
+const NON_DRIVABLE = new Set(['footway', 'path', 'pedestrian', 'steps', 'cycleway', 'bridleway', 'corridor', 'track']);
+
 function categoryOf(p) {
   if (p.why) return 'failure';
   if (p.k === 'deck') return 'bridge';
@@ -411,7 +425,7 @@ async function main() {
   if (!data.geo) throw new Error(`${level} was exported before probes carried the level's frame (re-export it)`);
   GEO = data.geo;
   indexLines(data.lines);
-  if (!data.lines) process.stderr.write('(no road lines in this level\'s probes: street level not enforced; re-export for v3 probes)\n');
+  if (!data.lines) process.stderr.write('(no road lines in this level\'s probes: street level and car-only panoramas not enforced; re-export for v3 probes)\n');
   const failures = opt('--tests') ? JSON.parse(fs.readFileSync(opt('--tests'), 'utf8')).failures || [] : [];
   fs.mkdirSync(OUT, { recursive: true });
   const fovBefore = await lua('return core_camera.getFovDeg()');
