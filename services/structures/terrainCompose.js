@@ -19,7 +19,8 @@ const SLOPE_MAX_M = 40;
 const DECK_UNDER_M = 2.2;      // deck depth under its road surface
 const DECK_CLEAR_M = 0.5;      // terrain at least this far under a deck's underside
 const DECK_REACH_M = 1.5;      // past a deck's half width
-const ABUTMENT_M = 8;          // a deck end on fill rests on it this far: no cap there
+const ABUTMENT_M = 8;
+const DECK_ABUT_CLEAR_M = 0.3;  // abutment fill stops this far under the deck's underside          // a deck end on fill rests on it this far: no cap there
 
 const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
@@ -114,7 +115,7 @@ export function composeTerrain(graph, grid) {
           const u = Math.max(0, Math.min(1, uRaw));
           const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
           if (d > reach) continue;
-          const zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M : 0);
+          const zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0);
           const t = tileFor(c, r); const j = (r % TILE) * TILE + (c % TILE);
           if (deck) {
             // under the deck only, not round its ends
@@ -148,8 +149,12 @@ export function composeTerrain(graph, grid) {
     }
   });
 
-  // the edited value of a pixel in world z, or NaN if untouched
+  // the edited value of a pixel in world z, or NaN if untouched (a despiked
+  // pixel's value from `spiked`)
+  const spiked = new Map();
   const edited = (c, r) => {
+    const sv = spiked.get(r * width + c);
+    if (sv !== undefined) return sv;
     const t = tiles.get(Math.floor(c / TILE) * 65536 + Math.floor(r / TILE));
     if (!t) return NaN;
     const j = (r % TILE) * TILE + (c % TILE);
@@ -172,6 +177,31 @@ export function composeTerrain(graph, grid) {
         }
       }
     }
+  }
+  // despike: an edited pixel more than SPIKE_M off the median of its 3x3
+  // neighbourhood takes the median (corners where three corridors meet at
+  // different heights left single pixels standing metres proud)
+  const SPIKE_M = 2;
+  const win = new Float64Array(9);
+  const value = (c, r) => { const e = edited(c, r); return Number.isFinite(e) ? e : raw(c, r) - minHeight; };
+  for (let pass = 0; pass < 2; pass++) {
+    const fix = [];
+    for (const key of tiles.keys()) {
+      const tc = Math.floor(key / 65536); const tr = key - tc * 65536;
+      for (let j = 0; j < TILE * TILE; j++) {
+        const c = tc * TILE + (j % TILE); const r = tr * TILE + Math.floor(j / TILE);
+        if (c < 1 || r < 1 || c + 1 >= width || r + 1 >= height) continue;
+        const h = edited(c, r);
+        if (!Number.isFinite(h)) continue;
+        let n = 0;
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) win[n++] = value(c + dc, r + dr);
+        win.sort();
+        if (Math.abs(h - win[4]) > SPIKE_M) fix.push([r * width + c, win[4]]);
+      }
+    }
+    for (const [idx, v] of fix) spiked.set(idx, v);
+    stats.despiked = (stats.despiked || 0) + fix.length;
+    if (!fix.length) break;
   }
   // steps between neighbouring edited pixels: where retaining walls go
   const WALL_STEP_M = 0.5;
