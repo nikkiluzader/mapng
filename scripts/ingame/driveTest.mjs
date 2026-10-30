@@ -36,8 +36,13 @@ const level = args.find((a, i) => !a.startsWith('--') && !['--routes', '--json',
 const opt = (n, d) => (args.includes(n) ? args[args.indexOf(n) + 1] : d);
 const URL_MCP = process.env.BEAMNG_MCP_URL || 'http://127.0.0.1:29292/mcp';
 if (!level) { console.error('usage: driveTest.mjs <levelName> [--load] [--routes 12] [--only N] [--out dir] [--json out.json] [--no-street] [--vary N] [--reverse]'); process.exit(2); }
+const OVERHEAD_CLEAR_M = 4.2; // a structure over a start lower than this blocks it
+const PATH_EDGE_M = 1.3;    // the AI's corridor this far inside the road's edges
+const PATH_MIN_R_M = 1;
+const STOP_HANDOVER_MS = 3;  // the brake hands over to the parking brake below this speed
 const SPAWN_TRIES = 3;
 const MAX_SANE_MS = 100;   // a speed reading past this is the game's teleport artefact
+const SPAWN_DROP_M = 0.5;   // dropped from this over the surface (placed touching it, tyres clipped into the road)
 const SPAWN_GRACE_S = 0.5;  // nothing counted while the car lands
 const SPAWN_ROLL_DEG = 8;   // tilted sideways more: a bad spawn (nose up or down: a hill)
 const REVERSE_MS = -1;      // backing up this fast (the AI's own recovery): stopped and photographed
@@ -127,6 +132,7 @@ async function capture(n, type, { pause = true, tag = 'crash', street = true } =
 // logged; the poll that noticed it is up to a second late), from the drive's
 // own log: the car put back there, repaired, facing its way of travel
 const REWIND_S = 2;
+const SPAWN_QUIET_S = 1;   // no rewind for a crash this soon after the start
 function rewindPoint(samples) {
   if (samples.length < 10) return null;
   const end = samples[samples.length - 1].t;
@@ -151,7 +157,7 @@ async function captureRewind(n, type, samples) {
     v:queueLuaCommand('ai.setMode("disabled") obj:requestReset(RESET_PHYSICS)')
     return 'ok'`);
   await sleep(500);
-  await lua(`local v = be:getPlayerVehicle(0) local q = quatFromDir(vec3(${q.dx}, ${q.dy}, 0))
+  await lua(`local v = be:getPlayerVehicle(0) local q = carRot(vec3(${q.dx}, ${q.dy}, 0))
     v:setPosRot(${q.x}, ${q.y}, ${q.z}, q.x, q.y, q.z, q.w) v:resetBrokenFlexMesh() return 'ok'`);
   await sleep(250);
   return capture(n, type, { tag: 'rewind' });
@@ -261,17 +267,19 @@ const partsText = (parts, n = 4) => (parts?.length ? parts.slice(0, n).map((p) =
 let STATUS_PREFIX = '';
 const status = (msg, ttl = 600) => lua(`ui_message(${JSON.stringify(`${STATUS_PREFIX}${msg}`)}, ${ttl}, 'mapngDriveTest', 'directions_car') return 'ok'`).catch(() => {});
 
-// brake to a stop, then the parking brake on and the brake off (held at a
-// standstill, the brake of the arcade gearbox is reverse: after the last
-// route the car backed away until it crashed)
+// brake down to a crawl, then the parking brake (the arcade gearbox turns
+// a held brake near a standstill into reverse throttle: the drivetrain
+// took 39 million damage on every stop, and the car reversed after the
+// last route)
 async function stopCar() {
   await lua(`be:getPlayerVehicle(0):queueLuaCommand('ai.setMode("disabled") input.event("throttle", 0, 1) input.event("brake", 1, 1)') return 'ok'`);
-  for (let i = 0; i < 10; i++) {
-    await sleep(400);
+  for (let i = 0; i < 60; i++) {
     const sp = Number(await lua('local v = be:getPlayerVehicle(0) return string.format("%.2f", v:getVelocity():length())'));
-    if (!(sp > 0.5)) break;
+    if (!(sp > STOP_HANDOVER_MS)) break;
+    await sleep(100);
   }
-  await lua(`be:getPlayerVehicle(0):queueLuaCommand('input.event("parkingbrake", 1, 1) input.event("brake", 0, 1)') return 'ok'`);
+  await lua(`be:getPlayerVehicle(0):queueLuaCommand('input.event("brake", 0, 1) input.event("parkingbrake", 1, 1)') return 'ok'`);
+  await sleep(1500);
 }
 
 // after an incident or an error: the logger and the AI off, the car's
@@ -306,16 +314,19 @@ async function drive(route, n) {
     // a building does not see its walls)
     const over = await lua(`
       local x, y, z = ${p[i][0]}, ${p[i][1]}, ${p[i][2]}
-      local up = castRay(vec3(x, y, z + 0.5), vec3(x, y, z + 6), true, true)
+      -- (a deck or tube overhead blocks only as low as a car fits under:
+      -- a road under a higher bridge is a fine start)
+      local up = castRay(vec3(x, y, z + 0.5), vec3(x, y, z + ${OVERHEAD_CLEAR_M}), true, true)
       local down = castRay(vec3(x, y, z + 80), vec3(x, y, z - 5), true, true)
       local downName = down and down.obj and down.obj.getName and down.obj:getName() or ''
-      local roofOver = down and down.pt.z > z + 1.5 and not downName:find('[Ff]orest')
+      local structure = downName:find('^bridge_') or downName:find('^tunnel_') or downName:find('[Ff]orest')
+      local roofOver = down and down.pt.z > z + 1.5 and not structure
       return (up or roofOver) and 'blocked' or 'clear'`);
     if (over === 'clear') starts.push(i);
   }
-  // spawn: at a clear start, tyres on the surface (from the car's own
-  // bounding box: dropped from too high, or placed into the road, it hit
-  // hard and slowed the game), nothing counted for SPAWN_GRACE_S; then
+  // spawn: at a clear start, tyres SPAWN_DROP_M over the surface (from the
+  // car's own bounding box: dropped from too high, or placed into the road,
+  // it hit hard and slowed the game), nothing counted for SPAWN_GRACE_S; then
   // settled, undamaged, not tilted sideways (nose up or down is a hill).
   // A bad spawn is photographed and tried again further on, SPAWN_TRIES
   // times; none good: the route is reported as not spawned.
@@ -348,8 +359,8 @@ async function drive(route, n) {
       end
       -- exactly there (safeTeleport moves a car that overlaps scenery to a
       -- 'safe' spot elsewhere: in a tunnel everything overlaps)
-      local q = quatFromDir(vec3(${dx / L}, ${dy / L}, 0))
-      veh:setPosRot(${q0[0]}, ${q0[1]}, ground + refH + 0.05, q.x, q.y, q.z, q.w)
+      local q = carRot(vec3(${dx / L}, ${dy / L}, 0))
+      veh:setPosRot(${q0[0]}, ${q0[1]}, ground + refH + ${SPAWN_DROP_M}, q.x, q.y, q.z, q.w)
       veh:resetBrokenFlexMesh()
       return string.format('%.3f,%.3f', ground, refH)`);
     const [ground, refH] = placed.split(',').map(Number);
@@ -387,14 +398,18 @@ async function drive(route, n) {
     const why = !starts.length ? 'a building or structure over the road at every start' : spawns.map((q) => q.problems.join(', ')).join(' / ');
     if (!starts.length) {
       // (a structure over the whole start: the car would be placed inside it)
-      await lua(`local v = be:getPlayerVehicle(0) local q = quatFromDir(vec3(1, 0, 0)) v:setPosRot(${p[0][0]}, ${p[0][1]}, ${p[0][2] + 0.4}, q.x, q.y, q.z, q.w) return 'ok'`);
+      await lua(`local v = be:getPlayerVehicle(0) local q = carRot(vec3(1, 0, 0)) v:setPosRot(${p[0][0]}, ${p[0][1]}, ${p[0][2] + 0.4}, q.x, q.y, q.z, q.w) return 'ok'`);
       await sleep(1500);
       spawns.push({ x: Math.round(p[0][0]), y: Math.round(p[0][1]), problems: ['start blocked'], shots: await capture(n, 'start blocked', { pause: false, street: false }) });
       await calm();
     }
     return { completed: false, progress: 0, length: 0, spawns, events: [{ type: 'no spawn', x: spawns[0]?.x, y: spawns[0]?.y, value: why }], incident: { type: 'no spawn' } };
   }
-  const script = p.map((q, i) => `{x=${q[0].toFixed(2)},y=${q[1].toFixed(2)},z=${q[2].toFixed(2)},r=${(route.half * 2).toFixed(1)},v=${(i === 0 ? route.speed * 0.6 : route.speed).toFixed(1)}}`).join(',');
+  // the AI's corridor: a radius (half width; the docs say width), kept a
+  // car's width inside the road's edges (the whole width as the radius
+  // let it cut lines into the parapets)
+  const pathRadius = Math.max(PATH_MIN_R_M, route.half - PATH_EDGE_M);
+  const script = p.map((q, i) => `{x=${q[0].toFixed(2)},y=${q[1].toFixed(2)},z=${q[2].toFixed(2)},r=${pathRadius.toFixed(1)},v=${(i === 0 ? route.speed * 0.6 : route.speed).toFixed(1)}}`).join(',');
   await lua(`
     _G.mapngDrive = { samples = {}, on = true }
     local veh = be:getPlayerVehicle(0)
@@ -448,7 +463,10 @@ async function drive(route, n) {
     incident.shots = await capture(n, incident.type);
     incident.street = incident.shots.street ?? null;
     // and REWIND_S earlier: what the car was driving into
-    if (incident.type === 'crash' || incident.type === 'reversing') {
+    // (not when it happened just after the spawn: 2 s earlier is before it)
+    const t0 = samples.length ? samples[0].t : 0;
+    const impactT = incident.impact?.t ?? (samples.length ? samples[samples.length - 1].t : 0);
+    if ((incident.type === 'crash' || incident.type === 'reversing') && impactT - t0 > REWIND_S + SPAWN_QUIET_S) {
       incident.rewindShots = await captureRewind(n, incident.type, samples);
       incident.rewindStreet = incident.rewindShots?.street ?? null;
     }
@@ -471,6 +489,10 @@ async function main() {
   if (args.includes('--load')) { process.stderr.write(`loading ${level}...\n`); await loadLevel(); }
   const mission = await lua('return getMissionFilename()');
   if (!mission.includes(`/levels/${level}/`)) throw new Error(`loaded level is ${mission}, not ${level} (use --load)`);
+  // a car's rotation facing a direction: the vehicle model faces the other
+  // way, so turned half round as spawn.safeTeleport does (setPosRot with
+  // quatFromDir alone put every car backwards at its start)
+  await lua(`_G.carRot = function(dir) return quat(0, 0, 1, 0) * quatFromDir(dir, vec3(0, 0, 1)) end return 'ok'`);
   // (the HUD back on: a run cut short leaves it hidden from a screenshot)
   await lua('ui_visibility.setCef(true) return "ok"').catch(() => {});
   const raw = await lua(`local f = readFile('/levels/${level}/mapng_probes.json') return f or ''`);
@@ -478,7 +500,7 @@ async function main() {
   if (!data?.lines) throw new Error(`${level} has no road lines in its probes (re-export: probes v3)`);
   if (data.geo?.bounds && data.geo?.worldSize) GEO = levelGeo(data.geo);
   ROADS = data.lines.filter((l) => l.k !== 'sidewalk' && !NON_DRIVABLE.has(l.road));
-  let routes = buildRoutes(data.lines, { max: Number(opt('--routes', '12')), offset: Number(opt('--vary', '0')) });
+  let routes = buildRoutes(data.lines, { max: Number(opt('--routes', '12')), offset: Number(opt('--vary', '0')), worldSize: data.geo?.worldSize || 0 });
   // --reverse: every route driven end to start (against a one-way road's
   // traffic: the structures are what is tested)
   if (args.includes('--reverse')) routes = routes.map((r) => ({ ...r, points: [...r.points].reverse(), kind: `${r.kind} reversed` }));

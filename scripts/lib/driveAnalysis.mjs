@@ -7,6 +7,7 @@ const SPEED = { motorway: 25, motorway_link: 18, trunk: 22, trunk_link: 16, prim
 const SPEED_DEFAULT = 10;
 const APPROACH_M = 70;      // road driven before and after a structure
 const JOIN_M = 4;           // line ends this close continue each other
+const EDGE_CLEAR_M = 60;    // routes stay this far inside the map's edge
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const len = (p) => p.reduce((s, q, i) => (i ? s + dist(q, p[i - 1]) : 0), 0);
@@ -23,10 +24,11 @@ function take(points, m) {
  * Routes over the level's structures: each deck, tunnel and steep stretch
  * with APPROACH_M of the road that continues it at either end.
  * lines: [{ k: road|deck|tunnel|sidewalk, hw, road, p: [[x, y, z]...] }].
- * offset: start each kind's list at its Nth longest (other routes).
+ * offset: start each kind's list at its Nth longest (other routes);
+ * worldSize: the map's width, routes kept EDGE_CLEAR_M inside its edge.
  * Returns [{ kind, road, points: [[x, y, z]...], speed, half }].
  */
-export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0 } = {}) {
+export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0, worldSize = 0 } = {}) {
   const drivable = lines.filter((l) => l.k !== 'sidewalk' && l.p.length >= 2 && !['footway', 'path', 'steps', 'cycleway', 'pedestrian', 'bridleway', 'track'].includes(l.road));
   // the line continuing a point (an end of another line there), best aligned
   const continuation = (pt, dir, self) => {
@@ -52,6 +54,19 @@ export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0 } =
     const head = before ? take(before.pts, APPROACH_M).reverse() : [];
     const tail = after ? take(after.pts, APPROACH_M) : [];
     return [...head.slice(0, -1), ...p, ...tail.slice(1)];
+  };
+  // the stretch of a route clear of the map's edge (EDGE_CLEAR_M: room to
+  // stop; a route run to the edge sent the car off the map) holding `mid`
+  const lim = worldSize ? worldSize / 2 - EDGE_CLEAR_M : Infinity;
+  const isIn = (q) => Math.abs(q[0]) <= lim && Math.abs(q[1]) <= lim;
+  const inside = (pts, mid) => {
+    if (!Number.isFinite(lim)) return pts;
+    let m = 0; let bd = Infinity;
+    pts.forEach((q, i) => { const d = dist(q, mid); if (d < bd) { bd = d; m = i; } });
+    if (!isIn(pts[m])) return [];
+    let a = m; while (a > 0 && isIn(pts[a - 1])) a--;
+    let b = m; while (b + 1 < pts.length && isIn(pts[b + 1])) b++;
+    return pts.slice(a, b + 1);
   };
   const candidates = [];
   for (const l of drivable) {
@@ -83,7 +98,8 @@ export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0 } =
       const mid = c.l.p[c.l.p.length >> 1];
       if (used.some((u) => dist(u, mid) < 40)) continue;
       used.push(mid);
-      const points = extend(c.l);
+      const points = inside(extend(c.l), c.l.p[c.l.p.length >> 1]);
+      if (points.length < 2) continue;
       routes.push({ kind: c.kind, road: c.l.road, points, speed: SPEED[c.l.road] ?? SPEED_DEFAULT, half: c.l.hw || 3 });
     }
   }
@@ -185,5 +201,5 @@ export function impactOf(samples) {
   const where = Math.abs(up) > Math.max(Math.abs(along), Math.abs(side)) ? (up > 0 ? 'underside' : 'landing')
     : Math.abs(along) >= Math.abs(side) ? (along < 0 ? 'front' : 'rear')
       : (side > 0 ? 'left side' : 'right side');   // pushed right: hit on its left
-  return { where, dv: Math.round(best.m * 10) / 10, at: [Math.round(samples[best.i].x), Math.round(samples[best.i].y)] };
+  return { where, dv: Math.round(best.m * 10) / 10, at: [Math.round(samples[best.i].x), Math.round(samples[best.i].y)], t: samples[best.i].t };
 }

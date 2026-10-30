@@ -58,3 +58,14 @@ test('impact side: from the sharpest change of velocity, in the car\'s frame', a
   assert.equal(impactOf(run({ vx: 0, vy: 12, vz: 6 })).where, 'underside');
   assert.equal(impactOf(run({ vx: 0, vy: 12, vz: 0 })), null, 'no impact');
 });
+
+test('routes stay clear of the map edge (room to stop)', () => {
+  const lines = [
+    { k: 'road', hw: 4, road: 'primary', p: [[-100, 0, 10], [-50, 0, 10]] },
+    { k: 'deck', hw: 4, road: 'primary', p: [[-50, 0, 10], [0, 0, 10], [50, 0, 10]] },
+    { k: 'road', hw: 4, road: 'primary', p: [[50, 0, 10], [80, 0, 10], [110, 0, 10], [128, 0, 10]] },
+  ];
+  const [r] = buildRoutes(lines, { worldSize: 256 });
+  assert.ok(r.points.every((q) => Math.abs(q[0]) <= 128 - 60), JSON.stringify(r.points.map((q) => q[0])));
+  assert.ok(r.points.some((q) => q[0] <= -50) && r.points.some((q) => q[0] >= 50), 'the deck kept whole');
+});
