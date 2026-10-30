@@ -5,7 +5,11 @@
 // running BeamNG.drive (through its MCP server, like runIngameTests.mjs).
 //
 //   node scripts/ingame/streetCompare.mjs <levelName> [--load] [--spots 20]
-//        [--tests ingame.json] [--source both|mapillary|google] [--out dir] [--min-year 2020]
+//        [--tests ingame.json] [--source google|mapillary|both] [--out dir] [--min-year 2020]
+//
+// Google Street View is the default reference: it renders the exact heading,
+// field of view and frame asked for, so the game view lines up. Mapillary
+// (--source mapillary|both) varies by camera: lenses, mounts and years.
 //
 // Keys come from ~/.config/mapng/mapng.env (MAPILLARY_ACCESS_TOKEN,
 // GOOGLE_STREETVIEW_KEY, GOOGLE_STREETVIEW_SIGNING_SECRET) and are never
@@ -24,7 +28,7 @@ const level = args.find((a) => !a.startsWith('--') && !/^\d+$/.test(a) && !args[
 const opt = (name, dflt) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : dflt; };
 const URL_MCP = process.env.BEAMNG_MCP_URL || 'http://127.0.0.1:29292/mcp';
 const SPOTS = Number(opt('--spots', '20'));
-const SOURCE = opt('--source', 'both');
+const SOURCE = opt('--source', 'google');   // Google's consistent views; Mapillary on request
 const OUT = path.join(opt('--out', path.join(os.tmpdir(), 'mapng-streetcompare')), level || '');
 // camera over the road surface: Google's car mast; Mapillary's mostly
 // dashcams and phones held in a car
@@ -36,7 +40,7 @@ const MIN_YEAR = Number(opt('--min-year', '0'));
 const YEARS_APART = 3;      // flag a pair this many years apart
 const SEARCH_M = 45;        // photos this far from a spot
 const SPACING_M = 90;       // spots at least this far apart
-if (!level) { console.error('usage: streetCompare.mjs <levelName> [--load] [--spots 20] [--tests ingame.json] [--source both|mapillary|google] [--out dir]'); process.exit(2); }
+if (!level) { console.error('usage: streetCompare.mjs <levelName> [--load] [--spots 20] [--tests ingame.json] [--source google|mapillary|both] [--out dir] [--min-year 2020]'); process.exit(2); }
 
 // ── keys ────────────────────────────────────────────────────────────────
 const envText = (() => { try { return fs.readFileSync(path.join(os.homedir(), '.config/mapng/mapng.env'), 'utf8'); } catch { return ''; } })();
