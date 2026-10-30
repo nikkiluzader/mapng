@@ -68,8 +68,47 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
   const overWater = edges.map((e) => new Uint8Array(e.s.length));
   for (const run of graph.crossings?.water || []) for (let i = run.i0; i <= run.i1; i++) overWater[run.edge][i] = 1;
 
+  // stations where a fill could not stand: a lifted road whose embankment
+  // (its half width + a 1:2 slope down to the ground) would spill onto
+  // another road lower down nearby, not one it meets at a node. Carried on
+  // as a deck there (today's walled ramps), so the road below keeps its edge.
+  const CELL = 16;
+  const grid = new Map();
+  edges.forEach((e, k) => {
+    for (let i = 0; i < e.s.length; i++) {
+      const key = `${Math.floor(e.x[i] / CELL)},${Math.floor(e.y[i] / CELL)}`;
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(k, i);
+    }
+  });
+  const crowded = edges.map((e, k) => {
+    const out = new Uint8Array(e.s.length);
+    for (let i = 0; i < e.s.length; i++) {
+      const h = z[k][i] - e.g[i];
+      if (!(h >= 0.5)) continue;
+      const reach = e.half + 1 + 2 * h;
+      const cx = Math.floor(e.x[i] / CELL); const cy = Math.floor(e.y[i] / CELL); const cr = Math.ceil(reach / CELL);
+      search: for (let gx = cx - cr; gx <= cx + cr; gx++) {
+        for (let gy = cy - cr; gy <= cy + cr; gy++) {
+          const list = grid.get(`${gx},${gy}`);
+          if (!list) continue;
+          for (let j = 0; j < list.length; j += 2) {
+            const k2 = list[j]; const i2 = list[j + 1];
+            if (k2 === k) continue;
+            const o = edges[k2];
+            if (o.from === e.from || o.from === e.to || o.to === e.from || o.to === e.to) continue;   // meets it
+            if (z[k][i] - z[k2][i2] < 1.5) continue;
+            const d = Math.hypot(o.x[i2] - e.x[i], o.y[i2] - e.y[i]) - o.half;
+            if (d < reach) { out[i] = 1; break search; }
+          }
+        }
+      }
+    }
+    return out;
+  });
+
   const segments = [];
-  const stats = { byKind: {}, lengthByKind: {}, culverts: 0, openTunnels: 0, untaggedDecks: 0 };
+  const stats = { byKind: {}, lengthByKind: {}, culverts: 0, openTunnels: 0, untaggedDecks: 0, carried: 0 };
   edges.forEach((e, k) => {
     const tags = { bridge: e.bridge, tunnel: e.tunnel };
     const kinds = new Array(e.s.length);
@@ -77,6 +116,7 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
       const h = z[k][i] - e.g[i];
       const st = { tags, h, cover: -h - ROOF_M, overRoad: !!overRoad[k][i], overWater: !!overWater[k][i] };
       kinds[i] = (rules.find((r) => matches(r, st)) || { kind: 'ground' }).kind;
+      if (kinds[i] === 'embankment' && crowded[k][i]) { kinds[i] = 'deck'; stats.carried++; }
     }
     // runs, then merge the short ones into their higher-ranked neighbour
     let runs = [];

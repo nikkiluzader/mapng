@@ -137,7 +137,10 @@ export function composeTerrain(graph, grid) {
           // retaining wall stands, instead of tilting into both.
           // negative inside a road's core (the nearer centreline wins there
           // too); abutment fill never counts as a road core
-          const out = abutment ? Math.max(1e-3, d - core) : d - core;
+          // (inside any road core beats every side slope, and among cores the
+          // nearer centreline wins outright: a wide road must not take a
+          // narrower road's own surface just because its core reaches)
+          const out = abutment ? Math.max(1e-3, d - core) : (d <= core ? -1000 + d : d - core);
           if (out < t.w[j] - 1e-3) { t.w[j] = out; t.h[j] = target; t.n[j] = 1; }
           else if (Math.abs(out - t.w[j]) <= 1e-3) { t.h[j] = (t.h[j] * t.n[j] + target) / (t.n[j] + 1); t.n[j] = Math.min(255, t.n[j] + 1); }
         }
