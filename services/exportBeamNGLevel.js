@@ -5914,6 +5914,7 @@ function buildDetailedReportSections(d) {
       lines.push(`  - Bumps / dips along roads (grade changing more than the class allows within 6 m): ${rs.kinks.count} of ${rs.kinks.points} points${rs.kinks.worst ? `; worst ${formatNumber(rs.kinks.worst.kink * 100, 1)}% (limit ${formatNumber(rs.kinks.worst.limit * 100, 0)}%) on ${rs.kinks.worst.road}${at(rs.kinks.worst)}` : ''}`);
       lines.push(`  - Tilted (> 8%) or humped (> 0.2 m) across the road: ${rs.cross.count} of ${rs.cross.points} cross-sections${rs.cross.worst ? `; worst tilt ${formatNumber(rs.cross.worst.tilt * 100, 1)}%, hump ${formatNumber(rs.cross.worst.hump, 2)} m on ${rs.cross.worst.road}${at(rs.cross.worst)}` : ''}`);
       lines.push(`  - Junction centres bumped or dipped (> 0.25 m off the roads 12 m out): ${rs.junctions.count} of ${rs.junctions.checked} junctions${rs.junctions.worst ? `; worst ${formatNumber(rs.junctions.worst.bump, 2)} m at ${rs.junctions.worst.roads}${at(rs.junctions.worst)}` : ''}`);
+      lines.push(`  - Creases just outside road edges (ground slope changing > 30% between 1-4 m and 4-8 m out): ${rs.creases.count} of ${rs.creases.points} points${rs.creases.worst ? `; worst ${formatNumber(rs.creases.worst.change * 100, 0)}% on ${rs.creases.worst.road}${at(rs.creases.worst)}` : ''}`);
     }
     // the worst places of each check, to fly to (F11 world editor or free camera)
     const places = [
@@ -5927,6 +5928,7 @@ function buildDetailedReportSections(d) {
       ['Road bumps / dips (grade change)', sc.surface?.kinks.top],
       ['Road tilted / humped across', sc.surface?.cross.top],
       ['Junction centre bumps / dips (m)', sc.surface?.junctions.top],
+      ['Creases beside roads (slope change)', sc.surface?.creases.top],
     ].filter(([, list]) => list?.length);
     if (places.length) {
       lines.push('- Worst places per check (value, world x, y, what):');

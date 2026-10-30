@@ -367,6 +367,10 @@ const CROSS_SLOPE_MAX = 0.08;     // tilt across the road
 const CROSS_HUMP_M = 0.2;         // centre off the line between the two edges
 const JUNCTION_RING_M = 12;       // compare a junction's centre with this far out
 const JUNCTION_BUMP_M = 0.25;
+// A crease just outside a road's edge: the ground's slope changing sharply
+// between 1-4 m and 4-8 m out (a smoothed corridor sunk into a crest or
+// raised over a sag meets the untouched terrain in a line).
+const CREASE_SLOPE_CHANGE = 0.3;
 
 // height and position along a node list at arc length s (clamped)
 function along(n, s) {
@@ -388,8 +392,8 @@ function along(n, s) {
  * centre of junctions. `lines` as roadLinesFromDecals gives them.
  */
 export function checkRoadSurface(lines, groundAt) {
-  const kinks = []; const cross = []; const bumps = [];
-  let kinkPts = 0; let crossPts = 0;
+  const kinks = []; const cross = []; const bumps = []; const creases = [];
+  let kinkPts = 0; let crossPts = 0; let creasePts = 0;
   const ground = lines.filter((cw) => !isStructure(cw) && (cw.nodes || []).length >= 2);
   for (const cw of ground) {
     const n = cw.nodes;
@@ -417,6 +421,14 @@ export function checkRoadSurface(lines, groundAt) {
       crossPts++;
       const tilt = Math.abs(gl - gr) / (2 * half);
       const hump = gc - (gl + gr) / 2;
+      for (const side of [1, -1]) {
+        const at = (o) => groundAt(p[0] + side * nx * (half + o), p[1] + side * ny * (half + o));
+        const h1 = at(1); const h4 = at(4); const h8 = at(8);
+        if (![h1, h4, h8].every(Number.isFinite)) continue;
+        creasePts++;
+        const change = Math.abs((h8 - h4) / 4 - (h4 - h1) / 3);
+        if (change > CREASE_SLOPE_CHANGE) creases.push({ change, x: p[0] + side * nx * (half + 4), y: p[1] + side * ny * (half + 4), road: roadName(cw) });
+      }
       if (tilt > CROSS_SLOPE_MAX || Math.abs(hump) > CROSS_HUMP_M) {
         cross.push({ bad: Math.max(tilt / CROSS_SLOPE_MAX, Math.abs(hump) / CROSS_HUMP_M), tilt, hump, x: p[0], y: p[1], road: roadName(cw) });
       }
@@ -455,8 +467,9 @@ export function checkRoadSurface(lines, groundAt) {
       bumps.push({ size: Math.abs(bump), bump, x: cx, y: cy, roads: names });
     }
   }
-  const wk = worst(kinks, 'kink'); const wc = worst(cross, 'bad'); const wb = worst(bumps, 'size');
+  const wk = worst(kinks, 'kink'); const wc = worst(cross, 'bad'); const wb = worst(bumps, 'size'); const wr = worst(creases, 'change');
   return {
+    creases: { points: creasePts, count: creases.length, worst: wr && { change: round(wr.change, 2), at: [round(wr.x, 1), round(wr.y, 1)], road: wr.road }, top: top(creases, 'change', (it) => it.road) },
     kinks: { points: kinkPts, count: kinks.length, worst: wk && { kink: round(wk.kink, 3), limit: wk.max, at: [round(wk.x, 1), round(wk.y, 1)], road: wk.road }, top: top(kinks, 'kink', (it) => `${it.road} (limit ${Math.round(it.max * 100)}%)`) },
     cross: { points: crossPts, count: cross.length, worst: wc && { tilt: round(wc.tilt, 3), hump: round(wc.hump), at: [round(wc.x, 1), round(wc.y, 1)], road: wc.road }, top: top(cross, 'bad', (it) => `${it.road} (tilt ${Math.round(it.tilt * 100)}%, hump ${round(it.hump)} m)`) },
     junctions: { checked: junctions, count: bumps.length, worst: wb && { bump: round(wb.bump), at: [round(wb.x, 1), round(wb.y, 1)], roads: wb.roads }, top: top(bumps, 'size', (it) => `${it.roads} (${it.bump > 0 ? 'bump' : 'dip'})`) },
