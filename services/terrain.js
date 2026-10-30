@@ -2126,20 +2126,22 @@ export const fetchTerrainData = async (
     };
   }
 
-  // Roads on every source get smoothed and levelled. Global 30 m terrain (and
-  // coarse GPXZ, which is blurred like it) is lumpy and stair-stepped under
-  // roads and gets the full treatment. Fine rasters (1 m lidar) already hold
-  // the real road cut, but OSM often runs a few metres beside it: move the
-  // roads onto it first, so levelling barely has to reshape the ground, and
-  // leave unpaved tracks alone.
+  // Coarse terrain (global 30 m, coarse GPXZ blurred like it) is lumpy and
+  // stair-stepped under roads: roads are smoothed and levelled into it.
+  // Fine rasters (GPXZ / USGS / KRON86 at lidar resolution) already hold the
+  // real road surface, so the terrain is left untouched (levelling carved
+  // lines and dips into it); only the OSM roads move sideways onto the cut
+  // they are drawn a few metres beside, which changes no terrain. The
+  // export's structure solver shapes road profiles on either.
+  const fineRaster = !!rawData && !shouldSmooth;
   if (!flat && osmFeatures.length > 0) {
-    const fineRaster = !!rawData && !shouldSmooth;
     if (fineRaster) {
       onProgress?.("Aligning roads with the terrain...");
       osmFeatures = snapRoadsToTerrain(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, isGroundLevelRoad).features;
+    } else {
+      onProgress?.("Smoothing roads in heightmap...");
+      smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, { skipTracks: false });
     }
-    onProgress?.("Smoothing roads in heightmap...");
-    smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, { skipTracks: fineRaster });
   }
 
   // 6. Calculate Min/Max
