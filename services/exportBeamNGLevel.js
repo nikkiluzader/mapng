@@ -1925,6 +1925,9 @@ function getDecalMergeStyleKey(segment) {
     tags.ref || '',
     tags.oneway || '',
     tags.surface || '',
+    // (a drawbridge span stays its own segment: the structure solver keeps
+    // the whole bridge low by it)
+    tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
   ]);
 }
 

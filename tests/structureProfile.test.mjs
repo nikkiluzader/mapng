@@ -72,3 +72,17 @@ test('profile: a hillside stream bridge never lifts the roads down the hill', as
     }
   });
 });
+
+test('profile: a bridge with a drawbridge span stays low over the channel', async () => {
+  const g = await solved('drawbridge over a ship channel');
+  let worst = 0;
+  g.edges.forEach((e, k) => { if (e.bridge) for (let i = 0; i < e.s.length; i++) worst = Math.max(worst, g.profile.z[k][i] - e.g[i]); });
+  assert.ok(worst < 6 + 2.2 + 1.5, `deck ${worst.toFixed(1)} m over the water`);
+});
+
+test('profile: a road under the deck it joins never lifts the deck round after round', async () => {
+  const g = await solved('service road under the deck it joins');
+  const k = g.edges.findIndex((e) => e.bridge);
+  const top = Math.max(...g.profile.z[k].map((z, i) => z - g.edges[k].g[i]));
+  assert.ok(top < 6.5 + 3 + 1, `deck ${top.toFixed(1)} m over the ground`);
+});

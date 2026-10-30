@@ -151,6 +151,21 @@ export function findCrossings(graph, { waterAt = null } = {}) {
     }
     for (const [n, d] of dist) bridgeReach.set(n, d);
   }
+  // bridges with a movable span: the whole bridge is low (its fixed spans
+  // either side of a drawbridge do not hump up over the channel)
+  const movableBridge = new Set();
+  {
+    const parent = new Map();
+    const find = (n) => { while (parent.get(n) !== n) { parent.set(n, parent.get(parent.get(n))); n = parent.get(n); } return n; };
+    const add = (n) => { if (!parent.has(n)) parent.set(n, n); };
+    for (const e of edges) {
+      if (!e.bridge || e.from === undefined || e.to === undefined) continue;
+      add(e.from); add(e.to); parent.set(find(e.from), find(e.to));
+    }
+    const lowRoots = new Set();
+    for (const e of edges) if (e.bridge && e.movable && parent.has(e.from)) lowRoots.add(find(e.from));
+    for (const e of edges) if (e.bridge && parent.has(e.from) && lowRoots.has(find(e.from))) movableBridge.add(e.id);
+  }
   const reachOf = (n) => (n === undefined ? 0 : bridgeReach.get(n) ?? 0);
 
   // bridge edges over water: the wet runs and the clearance each needs
@@ -168,7 +183,7 @@ export function findCrossings(graph, { waterAt = null } = {}) {
           // (a ship's clearance over a long wet run only, as the bridge pass:
           // a bridge near a harbour's channel line is not over the channel)
           let need = Math.max(waterClear(run), run >= NAV_RUN_M ? (channel ? NAV_CLEAR_M : navClearance(e.structure)) : 0);
-          if (e.movable) need = Math.min(waterClear(run), MOVABLE_CLEAR_M);
+          if (e.movable || movableBridge.has(e.id)) need = Math.min(waterClear(run), MOVABLE_CLEAR_M);
           // what the bridge can climb to at each station between its ends
           // (the lower side): it rises toward its middle, never beyond
           const wanted = need;

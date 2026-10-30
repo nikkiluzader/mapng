@@ -102,6 +102,31 @@ export const STRUCTURE_SCENES = [
     ]),
   },
   {
+    name: 'drawbridge over a ship channel',
+    // the town bridge again with a movable middle span: all of it stays low
+    build: () => terrain((x) => 4 - 4 * Math.exp(-((x / 120) ** 6)), [
+      way(1, [[-450, 0], [-150, 0]], { highway: 'primary' }),
+      way(2, [[-150, 0], [-15, 0]], { highway: 'primary', bridge: 'yes', layer: '1' }),
+      way(3, [[-15, 0], [15, 0]], { highway: 'primary', bridge: 'movable', 'bridge:movable': 'bascule', layer: '1' }),
+      way(4, [[15, 0], [150, 0]], { highway: 'primary', bridge: 'yes', layer: '1' }),
+      way(5, [[150, 0], [450, 0]], { highway: 'primary' }),
+      water(6, [[-120, -480], [120, -480], [120, 480], [-120, 480], [-120, -480]], { natural: 'water', water: 'river' }),
+      water(7, [[0, -480], [0, 480]], { waterway: 'river', ship: 'yes' }),
+    ]),
+  },
+  {
+    name: 'service road under the deck it joins',
+    // a service road leaves the deck mid-way and doubles back under it: it
+    // ramps up toward the deck, and must not push it up in turn
+    build: () => terrain(flat, [
+      way(1, [[-450, 0], [-120, 0]], { highway: 'trunk' }),
+      way(2, [[-120, 0], [60, 0], [120, 0]], { highway: 'trunk', bridge: 'yes', layer: '1' }),
+      way(3, [[120, 0], [450, 0]], { highway: 'trunk' }),
+      way(4, [[0, -450], [0, 450]], { highway: 'primary' }),
+      way(5, [[60, 0], [52, -8], [40, 8], [-300, 8]], { highway: 'service' }),
+    ]),
+  },
+  {
     name: 'mountain tunnel through a ridge',
     // a 60 m ridge along y = 0, the road crossing it north-south
     build: () => terrain((x, y) => 10 + 60 * Math.exp(-((y / 140) ** 2)), [

@@ -241,7 +241,12 @@ export function* solveProfilesSteps(graph) {
     const seeds = waterSeeds.slice();
     for (const c of crossings) {
       const up = c[c.upper]; const dn = c[c.upper === 'a' ? 'b' : 'a'];
-      const need = at(dn, Z) + c.sep;
+      // a road under with no structure of its own is cleared from near its
+      // ground: one lifted with the deck (a ramp up to it) must not lift the
+      // deck in turn, round after round (a deck climbed 35 m so)
+      let under = at(dn, Z);
+      if (!edges[dn.edge].bridge && !edges[dn.edge].external) under = Math.min(under, at(dn, G) + GROUND_BAND_M);
+      const need = under + c.sep;
       seeds.push([off[up.edge] + up.i, need], [off[up.edge] + up.i + 1, need]);
     }
     L = spread(seeds, 1);
