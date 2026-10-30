@@ -4686,6 +4686,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   if (structureGraph) {
     try {
       structureGraph.pins = [];
+      structureGraph.tunnelsPinned = opts.structureSolver === 'v2';
       structureGraph.edges.forEach((e, k) => {
         const t = opts.structureSolver === 'v2' ? tunnels.bySeg.get(e.seg) : null;
         if (!t) return;

@@ -32,7 +32,7 @@ export function buildCarriagewayIndex(carriageways) {
       const b = cw.nodes[i + 1];
       const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       const idx = segments.push({
-        ax: a[0], ay: a[1], bx: b[0], by: b[1], half: cw.half, owner: cw.owner,
+        ax: a[0], ay: a[1], bx: b[0], by: b[1], az: a[2], bz: b[2], half: cw.half, owner: cw.owner,
         ux: (b[0] - a[0]) / len, uy: (b[1] - a[1]) / len,
       }) - 1;
       const pad = cw.half + 4;
@@ -40,6 +40,26 @@ export function buildCarriagewayIndex(carriageways) {
     }
   }
   return { segments, grid };
+}
+
+/**
+ * The carriageways under (x, y), widened by `margin`: [{ owner, z }] with
+ * each one's road height there.
+ */
+export function carriagewaysAt(index, x, y, margin) {
+  const out = [];
+  const cell = index.grid.get(`${Math.floor(x / CELL_M)},${Math.floor(y / CELL_M)}`);
+  if (!cell) return out;
+  for (const idx of cell) {
+    const s = index.segments[idx];
+    const dx = s.bx - s.ax; const dy = s.by - s.ay;
+    const len = dx * dx + dy * dy;
+    const t = len > 0 ? Math.max(0, Math.min(1, ((x - s.ax) * dx + (y - s.ay) * dy) / len)) : 0;
+    const ex = s.ax + t * dx - x; const ey = s.ay + t * dy - y;
+    const reach = s.half + margin;
+    if (ex * ex + ey * ey < reach * reach) out.push({ owner: s.owner, z: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * t });
+  }
+  return out;
 }
 
 /**

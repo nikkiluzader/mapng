@@ -15,7 +15,7 @@
 // BeamNG.Earth's (server/sidewalks.py), measured on official US curbs.
 
 import * as THREE from 'three';
-import { buildCarriagewayIndex, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
+import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
 
 const CURB_H = 0.15;          // m above the road
@@ -353,7 +353,7 @@ function buildingIndex(rings) {
 }
 
 // Runs cut where their slab (its middle or its back edge) would stand on
-// blocked ground: blocked(run, x, y).
+// blocked ground: blocked(run, x, y, zRoad).
 function splitRunsWhereBlocked(runs, blocked) {
   const STEP = 1;
   const out = [];
@@ -370,8 +370,8 @@ function splitRunsWhereBlocked(runs, blocked) {
       for (let k = i === 0 ? 0 : 1; k <= n; k++) {
         const t = k / n;
         const q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-        const mid = run.width / 2 + CURB_W; const back = run.width + CURB_W - 0.1;
-        if (blocked(run, q[0] + nx * mid, q[1] + ny * mid) || blocked(run, q[0] + nx * back, q[1] + ny * back)) {
+        const mid = run.width / 2 + CURB_W; const back = run.width + CURB_W;
+        if (blocked(run, q[0] + nx * mid, q[1] + ny * mid, q[2]) || blocked(run, q[0] + nx * back, q[1] + ny * back, q[2])) {
           // (the last free point before the cut ends the piece)
           if (last && piece[piece.length - 1] !== last) piece.push(last);
           last = null;
@@ -412,9 +412,12 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
   // out over another carriageway (a sunken centre road beside a side road)
   {
     const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
-    const owners = new Map(carriageways.map((cw) => [cw.owner, new Set([cw.owner, ...(cw.continuations || [])])]));
-    runs = splitRunsWhereBlocked(runs, (run, x, y) => inBuilding(x, y)
-      || isOnOtherCarriageway(index, x, y, 0, (o) => owners.get(run.owner)?.has(o)));
+    const continues = new Map(carriageways.map((cw) => [cw.owner, new Set(cw.continuations || [])]));
+    // (the street's own continuation counts too where it is on another
+    // level: a garage ramp leaving the street beside it)
+    runs = splitRunsWhereBlocked(runs, (run, x, y, z) => inBuilding(x, y)
+      || carriagewaysAt(index, x, y, GROUND_ROAD_MARGIN_M).some((c) => c.owner !== run.owner
+        && (!continues.get(run.owner)?.has(c.owner) || Math.abs(c.z - z) > 1)));
   }
   if (nearDriveway) for (const run of runs) run.dips = dipsAlong(run.points, (x, y) => nearDriveway(x, y, DRIVEWAY_HALF_M));
   return runs;

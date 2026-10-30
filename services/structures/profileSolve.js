@@ -161,7 +161,12 @@ export function* solveProfilesSteps(graph) {
 
   // fixed upper seeds: tunnel interiors under cover
   const capSeeds = [];
-  edges.forEach((e, k) => { if (e.tunnel && !e.external) for (let i = 1; i + 1 < e.s.length; i++) capSeeds.push([off[k] + i, G[off[k] + i] - TUNNEL_COVER_M]); });
+  // (with another builder's tunnels pinned, a tunnel road it did not build,
+  // a garage entrance too short to bore, stays a road: no cover over it)
+  edges.forEach((e, k) => {
+    if (!e.tunnel || e.external || graph.tunnelsPinned) return;
+    for (let i = 1; i + 1 < e.s.length; i++) capSeeds.push([off[k] + i, G[off[k] + i] - TUNNEL_COVER_M]);
+  });
   // pinned stations (roads another builder places: today's tunnels) are
   // held at their height from above and below
   const pins = (graph.pins || []).filter(([k, i, h]) => edges[k] && i < edges[k].s.length && Number.isFinite(h)).map(([k, i, h]) => [off[k] + i, h]);
@@ -242,6 +247,8 @@ export function* solveProfilesSteps(graph) {
     const seeds = waterSeeds.slice();
     for (const c of crossings) {
       const up = c[c.upper]; const dn = c[c.upper === 'a' ? 'b' : 'a'];
+      // (over a tunnel road nobody built: it is on the ground, crossed level)
+      if (graph.tunnelsPinned && edges[dn.edge].tunnel && !edges[dn.edge].external) continue;
       // a road under with no structure of its own is cleared from near its
       // ground: one lifted with the deck (a ramp up to it) must not lift the
       // deck in turn, round after round (a deck climbed 35 m so)
