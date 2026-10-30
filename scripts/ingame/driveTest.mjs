@@ -92,6 +92,10 @@ const carCam = (fwd, right, up, lookFwd = 0, lookUp = 0.6) => `if not commands.i
       local r = d:cross(vec3(0, 0, 1)):normalized()
       local c = p + d * ${fwd} + r * ${right} + vec3(0, 0, ${up})
       local t = p + d * ${lookFwd} + vec3(0, 0, ${lookUp})
+      -- in close of a wall, roof or deck between (in a tunnel: inside it)
+      local eye = p + vec3(0, 0, 1)
+      local hit = castRay(eye, c, true, true)
+      if hit then c = eye + (c - eye):normalized() * math.max(0.8, hit.dist - 0.4) end
       local q = quatFromDir((t - c):normalized(), vec3(0, 0, 1))
       core_camera.setPosRot(0, c.x, c.y, c.z, q.x, q.y, q.z, q.w)`;
 // every side of the car from outside, from above, and the hood view

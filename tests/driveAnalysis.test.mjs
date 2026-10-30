@@ -9,6 +9,7 @@ test('routes: a deck with the road continuing it at both ends, a tunnel, a steep
     { k: 'road', hw: 4, road: 'primary', p: straight(-200, -50, 0, 10) },
     { k: 'deck', hw: 4, road: 'primary', p: straight(-50, 50, 0, 10) },
     { k: 'road', hw: 4, road: 'primary', p: straight(50, 200, 0, 10) },
+    { k: 'road', hw: 4, road: 'secondary', p: straight(-200, -100, 300, -5) },
     { k: 'tunnel', hw: 4, road: 'secondary', p: straight(-100, 100, 300, -5) },
     { k: 'road', hw: 3, road: 'residential', p: straight(-100, 0, -300, 0).map(([x, y], i) => [x, y, i * 1.2]) },
     { k: 'sidewalk', w: 2, p: straight(-50, 50, 6, 10) },
@@ -91,9 +92,32 @@ test('turn routes: through a street grid, turning at junctions, slower through e
 
 test('tunnels: driven both ways, twin bores each', () => {
   const lines = [
+    { k: 'road', hw: 4, road: 'motorway', p: [[-200, 0, 0], [-100, 0, 0]] },
     { k: 'tunnel', hw: 4, road: 'motorway', p: [[-100, 0, 0], [0, 0, 0], [100, 0, 0]] },
+    { k: 'road', hw: 4, road: 'motorway', p: [[100, 0, 0], [200, 0, 0]] },
+    { k: 'road', hw: 4, road: 'motorway', p: [[200, 20, 0], [100, 20, 0]] },
     { k: 'tunnel', hw: 4, road: 'motorway', p: [[100, 20, 0], [0, 20, 0], [-100, 20, 0]] },
+    { k: 'road', hw: 4, road: 'motorway', p: [[-100, 20, 0], [-200, 20, 0]] },
   ];
   const routes = buildRoutes(lines, { kinds: ['tunnel'], max: 8 });
   assert.equal(routes.length, 4, routes.map((r) => r.points[0][0]).join(' '));
+});
+
+test('tunnel runs go through the tunnel\'s pieces and out of a portal', () => {
+  const lines = [
+    { k: 'road', hw: 4, road: 'motorway', p: [[-300, 0, 0], [-200, 0, 0]] },
+    { k: 'tunnel', hw: 4, road: 'motorway', p: [[-200, 0, 0], [-100, 0, 0]] },
+    { k: 'tunnel', hw: 4, road: 'motorway', p: [[-100, 0, 0], [0, 0, 0], [100, 0, 0]] },
+    { k: 'tunnel', hw: 4, road: 'motorway', p: [[100, 0, 0], [200, 0, 0]] },
+    { k: 'road', hw: 4, road: 'motorway', p: [[200, 0, 0], [300, 0, 0]] },
+    // a tube with no way out on the map: no run
+    { k: 'tunnel', hw: 4, road: 'motorway', p: [[-300, 300, 0], [300, 300, 0]] },
+  ];
+  const routes = buildRoutes(lines, { kinds: ['tunnel'], max: 8 });
+  assert.ok(routes.length >= 2);
+  for (const r of routes) {
+    assert.ok(Math.abs(r.points[0][1]) < 1, 'not the closed tube');
+    const xs = r.points.map((q) => q[0]);
+    assert.ok(Math.min(...xs) < -200 || Math.max(...xs) > 200, 'out past a portal');
+  }
 });

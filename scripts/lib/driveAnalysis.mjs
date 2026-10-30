@@ -10,6 +10,8 @@ const JOIN_M = 4;           // line ends this close continue each other
 const EDGE_CLEAR_M = 60;    // routes stay this far inside the map's edge
 const KIND_SLOTS = { tunnel: 2 }; // routes per round (more tunnel runs)
 const TUNNEL_APART_M = 15;  // twin bores are routes of their own
+const THROUGH_HOPS = 6;     // tunnel pieces followed out to a portal
+const THROUGH_MAX_M = 900;
 // turn routes
 const TURN_CLASSES = new Set(['residential', 'unclassified', 'tertiary', 'secondary', 'primary', 'living_street']);
 // (bigger streets first; tertiary ones last)
@@ -58,24 +60,45 @@ export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0, wo
         if (dist(end, pt) > JOIN_M || pts.length < 2) continue;
         const d2 = [pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]]; const n2 = Math.hypot(...d2) || 1;
         const align = (dir[0] * d2[0] + dir[1] * d2[1]) / n2;
-        if (align > 0.5 && (!best || align > best.align)) best = { pts, align, road: l.road, hw: l.hw };
+        if (align > 0.5 && (!best || align > best.align)) best = { pts, align, road: l.road, hw: l.hw, l };
       }
     }
     return best;
   };
-  const extend = (l) => {
+  const n = (d) => { const L = Math.hypot(...d) || 1; return [d[0] / L, d[1] / L]; };
+  // on from a line's end: APPROACH_M of the road continuing it; through:
+  // through the tunnel pieces continuing it first, out of the portal (a
+  // tunnel split into pieces left routes starting and ending in the tube).
+  // Returns { pts, halves, portal } walking away from the line.
+  const walkOut = (pt, dir, self, through) => {
+    const pts = []; const halves = []; let at = pt; let d = dir; let from = self; let portal = false;
+    for (let hop = 0; hop < (through ? THROUGH_HOPS : 1); hop++) {
+      const c = continuation(at, d, from);
+      if (!c || c.l === self) break;
+      if (through && c.l.k === 'tunnel') {
+        if (len(pts) > THROUGH_MAX_M) break;
+        pts.push(...c.pts.slice(1)); halves.push(...c.pts.slice(1).map(() => c.hw || 3));
+        at = c.pts[c.pts.length - 1]; d = n([at[0] - c.pts[c.pts.length - 2][0], at[1] - c.pts[c.pts.length - 2][1]]); from = c.l;
+        continue;
+      }
+      const a = take(c.pts, APPROACH_M).slice(1);
+      pts.push(...a); halves.push(...a.map(() => c.hw || 3));
+      portal = c.l.k !== 'tunnel';
+      break;
+    }
+    return { pts, halves, portal };
+  };
+  const extend = (l, self = l, through = false) => {
     const p = l.p;
     const dEnd = [p[p.length - 1][0] - p[p.length - 2][0], p[p.length - 1][1] - p[p.length - 2][1]];
     const dStart = [p[0][0] - p[1][0], p[0][1] - p[1][1]];
-    const n = (d) => { const L = Math.hypot(...d) || 1; return [d[0] / L, d[1] / L]; };
-    const after = continuation(p[p.length - 1], n(dEnd), l);
-    const before = continuation(p[0], n(dStart), l);
-    const head = before ? take(before.pts, APPROACH_M).reverse() : [];
-    const tail = after ? take(after.pts, APPROACH_M) : [];
+    const after = walkOut(p[p.length - 1], n(dEnd), self, through);
+    const before = walkOut(p[0], n(dStart), self, through);
     // (each point keeps its own road's half width: the approaches may be
     // narrower than the structure)
-    const pts = [...head.slice(0, -1), ...p, ...tail.slice(1)];
-    pts.halves = [...head.slice(0, -1).map(() => before.hw || 3), ...p.map(() => l.hw || 3), ...tail.slice(1).map(() => after.hw || 3)];
+    const pts = [...[...before.pts].reverse(), ...p, ...after.pts];
+    pts.halves = [...[...before.halves].reverse(), ...p.map(() => l.hw || 3), ...after.halves];
+    pts.portals = (before.portal ? 1 : 0) + (after.portal ? 1 : 0);
     return pts;
   };
   // the stretch of a route clear of the map's edge (EDGE_CLEAR_M: room to
@@ -178,7 +201,9 @@ export function buildRoutes(lines, { max = 12, steepGrade = 0.08, offset = 0, wo
       const apart = c.kind === 'turns' ? TURN_SPACING_M : c.kind === 'tunnel' ? TUNNEL_APART_M : 40;
       // (a tunnel's run the other way is not "the same place")
       if (used.some((u) => dist(u, mid) < apart && !(c.src && u.src === c.src && u.reversed !== !!c.reversed))) continue;
-      const full = c.points || extend(c.l);
+      const full = c.points || extend(c.l, c.src || c.l, c.kind === 'tunnel');
+      // (a tunnel run passes a portal: in or out of the tube)
+      if (c.kind === 'tunnel' && !full.portals) continue;
       const points = inside(full, mid);
       if (points.length < 2) continue;
       used.push(Object.assign([...mid], { src: c.src, reversed: !!c.reversed }));
