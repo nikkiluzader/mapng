@@ -25,7 +25,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
-import { decksFromSolver, applySolvedHeights } from './structures/adapters.js';
+import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
 import { checkJoints, checkGrades, checkCrossings, checkRoadSurface } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
@@ -9775,6 +9775,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const decks = decksFromSolver(sg);
     const parts = decks.flatMap((d) => d.parts);
     decalRoads.bridges.decks = decks;
+    decalRoads.bridges.roadLines = roadLinesFromSolver(sg);
     decalRoads.bridges.partInfo = parts.map((p) => ({ ...p.osm, structure: p.structure ?? null, landing: false, carried: false }));
     const applied = applySolvedHeights(decalRoads, sg);
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2: ${decks.length} deck(s) of ${parts.length} part(s); ${applied.nodes} road nodes in ${applied.decals} decals at their solved heights.`);

@@ -641,7 +641,10 @@ function leftNormals(xy) {
   });
 }
 
-const nearAnySegment = (p, lines, r) => lines.some((line) => {
+// (a line carrying its road's half width keeps piers off all of its lanes)
+const PIER_ROAD_EDGE_M = 1.5;
+const nearAnySegment = (p, lines, r0) => lines.some((line) => {
+  const r = line.half !== undefined ? Math.max(r0, line.half + PIER_ROAD_EDGE_M) : r0;
   for (let j = 0; j + 1 < line.length; j++) {
     const [ax, ay] = line[j];
     const [bx, by] = line[j + 1];

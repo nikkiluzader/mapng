@@ -22,7 +22,10 @@ const GRADE_DEFAULT = 0.15;
 export const gradeLimit = (highway) => GRADE_LIMIT[highway] ?? GRADE_DEFAULT;
 
 const W_GROUND = 1;           // pull of a ground road's station to its ground
-const W_STRUCTURE = 0.002;    // a tagged bridge / tunnel station: nearly free
+// A tagged bridge / tunnel station: no pull to the ground at all (even a
+// tiny one summed over a long deck sagged it toward the ground below, a
+// crest at each end); held only by smoothing, joints and envelopes.
+const W_STRUCTURE = 0;
 const SMOOTH = 0.35;          // pull toward the neighbours' average
 const TUNNEL_COVER_M = 7;     // road surface this far under the ground in a tunnel (tube + roof)
 const DECK_UNDER_M = 2.2;     // deck depth under its road surface
@@ -188,7 +191,9 @@ export function* solveProfilesSteps(graph) {
       for (const ends of meets) {
         let sw = 0; let sz = 0; let lo = -Infinity; let hi = Infinity;
         for (const v of ends) { sw += W[v]; sz += W[v] * Z[v]; lo = Math.max(lo, L[v]); hi = Math.min(hi, U[v]); }
-        const mean = Math.min(Math.max(sz / sw, lo), Math.max(lo, hi));
+        // (all structure ends: no ground pull anywhere, a plain average)
+        const avg = sw > 0 ? sz / sw : ends.reduce((a, v) => a + Z[v], 0) / ends.length;
+        const mean = Math.min(Math.max(avg, lo), Math.max(lo, hi));
         for (const v of ends) { moved = Math.max(moved, Math.abs(Z[v] - mean)); Z[v] = mean; }
       }
       // grades last, inward from the junction values (so a junction

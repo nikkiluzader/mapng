@@ -47,6 +47,28 @@ export function decksFromSolver(graph) {
 }
 
 /**
+ * The roads a deck's piers must keep off: every stretch of the solved graph
+ * that is not a deck, as [[x, y, z]...] lines carrying their half width.
+ */
+export function roadLinesFromSolver(graph) {
+  const { edges } = graph;
+  const z = graph.profile?.z;
+  if (!z) return [];
+  const kindOf = edges.map((e) => new Array(e.s.length).fill('ground'));
+  for (const seg of graph.classes?.segments || []) for (let i = seg.i0; i <= seg.i1; i++) kindOf[seg.edge][i] = seg.kind;
+  const lines = [];
+  edges.forEach((e, k) => {
+    let line = null;
+    for (let i = 0; i < e.s.length; i++) {
+      if (kindOf[k][i] === 'deck') { line = null; continue; }
+      if (!line) { line = []; line.half = e.half; lines.push(line); }
+      line.push([e.x[i], e.y[i], z[k][i]]);
+    }
+  });
+  return lines.filter((l) => l.length >= 2);
+}
+
+/**
  * Set every road decal's node heights from the solved profile: each node to
  * the nearest station of its road's graph edges. A decal with any node on a
  * deck stretch projects onto objects (the deck). Decals carry their road
