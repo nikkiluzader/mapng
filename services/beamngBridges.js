@@ -48,7 +48,7 @@ const WATER_STEP_M = 16;
 // tagged deep_draft=yes; BeamNG.Earth reads it from the National Bridge
 // Inventory).
 export const NAV_CLEAR_M = 50;
-const NAV_RUN_M = 100;
+export const NAV_RUN_M = 100;
 const NAV_STRUCTURES = new Set(['cable-stayed', 'suspension']);
 export const navClearance = (structure) => (NAV_STRUCTURES.has(String(structure || '').toLowerCase()) ? NAV_CLEAR_M : 0);
 

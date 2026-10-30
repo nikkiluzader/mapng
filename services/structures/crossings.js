@@ -7,7 +7,7 @@
 // these into hard constraints. Pure geometry and tags: nothing here knows
 // about any place.
 
-import { DECK_ROAD_CLEAR_M, NAV_CLEAR_M, navClearance, waterClear } from '../beamngBridges.js';
+import { DECK_ROAD_CLEAR_M, NAV_CLEAR_M, NAV_RUN_M, navClearance, waterClear } from '../beamngBridges.js';
 import { gradeLimit } from './profileSolve.js';
 
 const MOVABLE_CLEAR_M = 6;      // a drawbridge sits low and opens for ships
@@ -165,15 +165,22 @@ export function findCrossings(graph, { waterAt = null } = {}) {
         if (i0 >= 0) {
           const i1 = i - 1;
           const run = e.s[i1] - e.s[i0];
-          let need = channel ? NAV_CLEAR_M : Math.max(waterClear(run), navClearance(e.structure));
+          // (a ship's clearance over a long wet run only, as the bridge pass:
+          // a bridge near a harbour's channel line is not over the channel)
+          let need = Math.max(waterClear(run), run >= NAV_RUN_M ? (channel ? NAV_CLEAR_M : navClearance(e.structure)) : 0);
           if (e.movable) need = Math.min(waterClear(run), MOVABLE_CLEAR_M);
-          // what the bridge can climb to between its ends (the lower side)
-          const toStart = e.s[i0] + reachOf(e.from);
-          const toEnd = e.s[e.s.length - 1] - e.s[i1] + reachOf(e.to);
-          const reach = gradeLimit(e.highway) * Math.min(toStart, toEnd) * REACH_SHARE;
+          // what the bridge can climb to at each station between its ends
+          // (the lower side): it rises toward its middle, never beyond
           const wanted = need;
-          need = Math.max(Math.min(need, reach), Math.min(need, WATER_CLEAR_FLOOR_M));
-          water.push({ edge: e.id, i0, i1, s0: e.s[i0], s1: e.s[i1], run, channel, need, wanted });
+          const needs = [];
+          for (let k = i0; k <= i1; k++) {
+            const toStart = e.s[k] + reachOf(e.from);
+            const toEnd = e.s[e.s.length - 1] - e.s[k] + reachOf(e.to);
+            const reach = gradeLimit(e.highway) * Math.min(toStart, toEnd) * REACH_SHARE;
+            needs.push(Math.max(Math.min(need, reach), Math.min(need, WATER_CLEAR_FLOOR_M)));
+          }
+          need = Math.max(...needs);
+          water.push({ edge: e.id, i0, i1, s0: e.s[i0], s1: e.s[i1], run, channel, need, needs, wanted });
           i0 = -1;
         }
       }

@@ -12,6 +12,7 @@
 // there. Pure geometry and tags; nothing here knows about any place.
 
 import { makeRoadNodeKey } from '../roadNetwork.js';
+import { isBoredTunnelTag } from '../beamngTunnels.js';
 
 export const STATION_M = 4;
 const JOIN_M = 0.5;
@@ -20,7 +21,8 @@ const JOIN_M = 0.5;
 export function structureOf(tags = {}) {
   const bridge = (!!tags.bridge && tags.bridge !== 'no')
     || tags.man_made === 'bridge' || tags.location === 'elevated' || tags.location === 'overground';
-  const tunnel = (!!tags.tunnel && tags.tunnel !== 'no')
+  // (as the tunnel builder: a building passage or culvert stays on the ground)
+  const tunnel = isBoredTunnelTag(tags)
     || tags.location === 'underground' || tags.location === 'underwater';
   return {
     bridge,

@@ -76,7 +76,8 @@ export const STRUCTURE_SCENES = [
       way(2, [[-150, 0], [150, 0]], { highway: 'primary', bridge: 'yes', layer: '1' }),
       way(3, [[150, 0], [450, 0]], { highway: 'primary' }),
       ...[-400, -300, -200, 200, 300, 400].map((x, i) => way(10 + i, [[x, -300], [x, 0], [x, 300]], { highway: 'residential' })),
-      water(5, [[0, -480], [0, 480]], { waterway: 'river', width: '200', ship: 'yes' }),
+      water(5, [[-120, -480], [120, -480], [120, 480], [-120, 480], [-120, -480]], { natural: 'water', water: 'river' }),
+      water(6, [[0, -480], [0, 480]], { waterway: 'river', ship: 'yes' }),
     ]),
   },
   {

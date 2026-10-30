@@ -179,7 +179,7 @@ export function* solveProfilesSteps(graph) {
   const U = spread(capSeeds, -1);
   // fixed lower seeds: bridge runs over water
   const waterSeeds = pins.slice();
-  for (const run of water) for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, G[off[run.edge] + i] + run.need + DECK_UNDER_M]);
+  for (const run of water) for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, G[off[run.edge] + i] + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M]);
 
   // station indices that are an edge's end at a node: held by the junction
   // value while grades are clamped (the clamp works inward from them)
@@ -344,7 +344,7 @@ export function profileResidual(graph, z) {
     if (e.tunnel) for (let i = 1; i + 1 < e.s.length; i++) cover = Math.max(cover, z[k][i] - (e.g[i] - TUNNEL_COVER_M));
   });
   for (const run of graph.crossings?.water || []) {
-    for (let i = run.i0; i <= run.i1; i++) water = Math.max(water, edges[run.edge].g[i] + run.need + DECK_UNDER_M - z[run.edge][i]);
+    for (let i = run.i0; i <= run.i1; i++) water = Math.max(water, edges[run.edge].g[i] + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M - z[run.edge][i]);
   }
   const r = (v) => Math.round(Math.max(0, v) * 1000) / 1000;
   return { joint: r(joint), crossing: r(crossing), grade: r(grade), water: r(water), cover: r(cover) };
