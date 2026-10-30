@@ -9792,6 +9792,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // v2: bridge decks from the solver's deck stretches, every road decal at
   // its solved height (the terrain is composed just below)
   if (options.structureSolver === 'v2' && sg?.classes) {
+    // the solver's widths up to the widths the roads are drawn at (shoulders,
+    // parking lanes): the terrain cores and decks must cover the drawn road
+    const drawnHalf = new Map();
+    for (const cw of decalRoads.carriageways || []) drawnHalf.set(cw.owner, Math.max(drawnHalf.get(cw.owner) || 0, cw.half || 0));
+    for (const e of sg.edges) { const h = drawnHalf.get(e.seg); if (h > e.half) e.half = h; }
     const decks = decksFromSolver(sg);
     const parts = decks.flatMap((d) => d.parts);
     decalRoads.bridges.decks = decks;

@@ -20,6 +20,8 @@ const DECK_UNDER_M = 2.2;      // deck depth under its road surface
 const DECK_CLEAR_M = 0.5;      // terrain at least this far under a deck's underside
 const DECK_REACH_M = 1.5;      // past a deck's half width
 const ABUTMENT_M = 8;
+const CORE_STEP_M = 2;          // road cores this far apart in height are on two levels
+const CORE_OUTER = 0.6;         // ...where the lower road may take the upper's outer core only
 const DECK_ABUT_CLEAR_M = 0.3;  // abutment fill stops this far under the deck's underside          // a deck end on fill rests on it this far: no cap there
 
 const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
@@ -44,7 +46,7 @@ export function composeTerrain(graph, grid) {
     const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
     let t = tiles.get(key);
     if (!t) {
-      t = { h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), n: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
+      t = { h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), q: new Float32Array(TILE * TILE).fill(1), n: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
       tiles.set(key, t);
     }
     return t;
@@ -142,8 +144,19 @@ export function composeTerrain(graph, grid) {
           // nearer centreline wins outright: a wide road must not take a
           // narrower road's own surface just because its core reaches)
           const out = abutment ? Math.max(1e-3, d - core) : (d <= core ? -1000 + d : d - core);
-          if (out < t.w[j] - 1e-3) { t.w[j] = out; t.h[j] = target; t.n[j] = 1; }
-          else if (Math.abs(out - t.w[j]) <= 1e-3) { t.h[j] = (t.h[j] * t.n[j] + target) / (t.n[j] + 1); t.n[j] = Math.min(255, t.n[j] + 1); }
+          // two road cores overlapping at clearly different heights: the lower
+          // road keeps its whole drawn width (the upper stands behind a wall)
+          // (only in the upper road's outer margin: its centre stays its own)
+          const q = d / core;   // how far out in this road's core (0 centre, 1 edge)
+          const bothCores = out < -500 && t.w[j] < -500;
+          const twoLevels = bothCores && Math.abs(target - t.h[j]) > CORE_STEP_M;
+          if (twoLevels) {
+            const lowerIsNew = target < t.h[j];
+            const upperQ = lowerIsNew ? t.q[j] : q;
+            const take = upperQ > CORE_OUTER ? lowerIsNew : out < t.w[j] - 1e-3;
+            if (take) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; }
+          } else if (out < t.w[j] - 1e-3) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; }
+          else if (!twoLevels && Math.abs(out - t.w[j]) <= 1e-3) { t.h[j] = (t.h[j] * t.n[j] + target) / (t.n[j] + 1); t.n[j] = Math.min(255, t.n[j] + 1); }
         }
       }
     }
