@@ -141,6 +141,14 @@ const globalTerrainSmoothRadius = (metersPerPixel) => {
   return r >= 1 ? r : false;
 };
 
+// Raw terrain (advanced mode): the user wants their elevation and OSM exactly
+// as pulled. Generation then skips every step that reshapes them: the height
+// blur, road corner rounding, snapping roads sideways onto the terrain and
+// smoothing/levelling roads into it. No-data holes are still filled (a level
+// can't have holes). The export's own structures (bridges, tunnels) still
+// grade the terrain as usual.
+const shapeRoads = (osmFeatures, raw) => (raw ? osmFeatures : roundRoadCorners(osmFeatures).features);
+
 const decodeTerrariumHeight = (r, g, b) => {
   const h = r * 256 + g + b / 256 - 32768;
   // Tolerance, not an exact sentinel match: AWS resamples the Terrarium tiles
@@ -1682,6 +1690,7 @@ export const fetchTerrainData = async (
     processingMetersPerPixel = 1,
     targetBounds = null,
     flat = false,
+    raw = false,
   } = generationOptions || {};
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
@@ -2096,7 +2105,7 @@ export const fetchTerrainData = async (
     width,
     height,
     "bilinear",
-    shouldSmooth || (!rawData && !flat && globalTerrainSmoothRadius(effectiveMetersPerPixel)),
+    !raw && (shouldSmooth || (!rawData && !flat && globalTerrainSmoothRadius(effectiveMetersPerPixel))),
     fallbackSamplerData,
     // GPXZ is generally hole-free; if GPXZ chunks failed, keep fill enabled.
     !(useGPXZ && rawData && !gpxzChunkFailures),
@@ -2115,8 +2124,7 @@ export const fetchTerrainData = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.("Fetching OpenStreetMap data...");
-    osmFeatures = await fetchOSMData(finalBounds, { onStatus: onProgress, signal })
-    osmFeatures = roundRoadCorners(osmFeatures).features;
+    osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: onProgress, signal }), raw);
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2135,7 +2143,7 @@ export const fetchTerrainData = async (
   // real crests and filled real sags, carving lines and dips); tracks are
   // left alone.
   const fineRaster = !!rawData && !shouldSmooth;
-  if (!flat && osmFeatures.length > 0) {
+  if (!flat && !raw && osmFeatures.length > 0) {
     if (fineRaster) {
       onProgress?.("Aligning roads with the terrain...");
       osmFeatures = snapRoadsToTerrain(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, isGroundLevelRoad).features;
@@ -2178,6 +2186,7 @@ export const fetchTerrainData = async (
     sourceGeoTiffs,
     processingMetersPerPixel: effectiveMetersPerPixel,
     flat,
+    raw,
   };
 
   if (includeOSM && osmFeatures.length > 0) {
@@ -2258,6 +2267,7 @@ export const loadTerrainFromTif = async (
     gapFillSource = GAP_FILL_STANDARD,
     gpxzApiKey = '',
     layerOrder = null,
+    raw = false,
   } = generationOptions || {};
 
   const effectiveMetersPerPixel = Number.isFinite(Number(processingMetersPerPixel)) && Number(processingMetersPerPixel) > 0
@@ -2490,8 +2500,7 @@ export const loadTerrainFromTif = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     emitProgress('Fetching OpenStreetMap data...');
-    osmFeatures = await fetchOSMData(finalBounds, { onStatus: emitProgress, signal })
-    osmFeatures = roundRoadCorners(osmFeatures).features;
+    osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: emitProgress, signal }), raw);
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2536,6 +2545,7 @@ export const loadTerrainFromTif = async (
       source: elevationUnit.source,
     },
     processingMetersPerPixel: effectiveMetersPerPixel,
+    raw,
   };
 
   if (includeOSM && osmFeatures.length > 0) {
@@ -2587,6 +2597,7 @@ export const loadTerrainFromLaz = async (
     targetBounds                 = null,
     preferNativeCoverage         = true,
     fillLazEdgeGapsWithGlobalDem = true,
+    raw                          = false,
   } = generationOptions || {};
 
   const effectiveMetersPerPixel = Number.isFinite(Number(processingMetersPerPixel)) && Number(processingMetersPerPixel) > 0
@@ -2724,8 +2735,7 @@ export const loadTerrainFromLaz = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.('Fetching OpenStreetMap data...');
-    osmFeatures = await fetchOSMData(fetchBounds, { onStatus: onProgress, signal })
-    osmFeatures = roundRoadCorners(osmFeatures).features;
+    osmFeatures = shapeRoads(await fetchOSMData(fetchBounds, { onStatus: onProgress, signal }), raw);
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(fetchBounds),
       endpointUsed: null,
@@ -2769,6 +2779,7 @@ export const loadTerrainFromLaz = async (
     processingMetersPerPixel: effectiveMetersPerPixel,
     // Custom upload exports default to full processed dimensions.
     exportCropSize: null,
+    raw,
   };
 
   if (includeOSM && osmFeatures.length > 0) {
@@ -2824,6 +2835,7 @@ export const loadTerrainFromUploadedElevation = async (
       processingMetersPerPixel = 1,
       targetBounds = null,
       preferNativeCoverage = true,
+      raw = false,
     } = generationOptions || {};
 
     const bounds = targetBounds
@@ -2845,6 +2857,7 @@ export const loadTerrainFromUploadedElevation = async (
       {
         processingMetersPerPixel,
         targetBounds: bounds,
+        raw,
       },
     );
   }
@@ -2918,7 +2931,7 @@ export const addOSMToTerrain = async (
   onProgress,
 ) => {
   onProgress?.("Fetching OpenStreetMap data...");
-  const osmFeatures = roundRoadCorners(await fetchOSMData(terrainData.bounds, { onStatus: onProgress })).features;
+  const osmFeatures = shapeRoads(await fetchOSMData(terrainData.bounds, { onStatus: onProgress }), !!terrainData.raw);
   const osmRequestInfo = getLastOSMRequestInfo() || {
     ...getOSMQueryParameters(terrainData.bounds),
     endpointUsed: null,

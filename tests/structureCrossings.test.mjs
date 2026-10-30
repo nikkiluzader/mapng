@@ -50,3 +50,27 @@ test('river: the bridge has one wet run with a clearance', async () => {
   assert.equal(water.length, 1);
   assert.ok(water[0].run > 5 && water[0].need >= 2.5);
 });
+
+test('roads of different layers alongside, lanes overlapping: held apart; across each other: a crossing only', async () => {
+  const { findCrossings } = await import('../services/structures/crossings.js');
+  const edge = (id, pts, o) => {
+    const x = []; const y = []; const s = []; let acc = 0;
+    for (let k = 0; k + 1 < pts.length; k++) {
+      const [ax, ay] = pts[k]; const [bx, by] = pts[k + 1]; const L = Math.hypot(bx - ax, by - ay); const n = Math.ceil(L / 4);
+      for (let i = k ? 1 : 0; i <= n; i++) { x.push(ax + (bx - ax) * i / n); y.push(ay + (by - ay) * i / n); s.push(acc + L * i / n); }
+      acc += L;
+    }
+    const vertex = new Uint8Array(x.length); vertex[0] = 1; vertex[x.length - 1] = 1;
+    return { id, x: Float64Array.from(x), y: Float64Array.from(y), s: Float64Array.from(s), g: new Float64Array(x.length), vertex, length: acc, from: `${id}a`, to: `${id}b`, bridge: true, tunnel: false, highway: 'motorway', ...o };
+  };
+  const nodes = new Map();
+  const alongside = { edges: [edge(0, [[-100, 0], [100, 0]], { layer: 3, half: 5.8 }), edge(1, [[-100, 6], [100, 6]], { layer: 2, half: 3.5, highway: 'motorway_link' })], nodes };
+  const a = findCrossings(alongside);
+  assert.equal(a.crossings.length, 0);
+  assert.ok(a.overlaps.length > 20, `overlap stations: ${a.overlaps.length}`);
+  assert.ok(a.overlaps.every((c) => alongside.edges[c.a.edge].layer === 3 && c.upper === 'a' && c.sep > 5));
+  const across = { edges: [edge(0, [[-100, 0], [100, 0]], { layer: 3, half: 5.8 }), edge(1, [[0, -100], [0, 100]], { layer: 2, half: 3.5 })], nodes };
+  const b = findCrossings(across);
+  assert.equal(b.crossings.length, 1);
+  assert.equal(b.overlaps.length, 0);
+});

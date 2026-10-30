@@ -10,7 +10,7 @@ import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarage
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
-import { planLakes, planRivers } from './beamngWater.js';
+import { carveLakeBeds, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
@@ -25,7 +25,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
-import { decksFromSolver, applySolvedHeights } from './structures/adapters.js';
+import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
 import { checkJoints, checkGrades, checkCrossings, checkRoadSurface } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
@@ -43,7 +43,8 @@ import {
 import { resolveRoadRulesAt } from './countryRules.js';
 import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
-import { buildSidewalkMeshes, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkSides } from './beamngSidewalks.js';
+import { buildIngameProbes } from './ingameProbes.js';
+import { buildSidewalkMeshes, checkSidewalkGround, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkSides } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
@@ -1916,6 +1917,16 @@ const STABLE_DECAL_WIDTH_HIGHWAYS = new Set([
   'secondary_link',
 ]);
 
+// A building part that does not reach the ground (a canopy, a roof over a
+// forecourt, an overhang on columns, a bridge between buildings).
+function isRaisedBuildingPart(tags = {}) {
+  const b = String(tags.building || '').toLowerCase();
+  if (['roof', 'canopy', 'carport', 'bridge'].includes(b) || tags['building:part'] === 'roof') return true;
+  const minLevel = Number.parseFloat(tags['building:min_level'] ?? tags.min_level);
+  const minHeight = Number.parseFloat(tags.min_height);
+  return (Number.isFinite(minLevel) && minLevel > 0) || (Number.isFinite(minHeight) && minHeight > 0) || Number.parseInt(tags.layer, 10) > 0;
+}
+
 function getDecalMergeStyleKey(segment) {
   const tags = segment?.tags || {};
   return JSON.stringify([
@@ -1925,6 +1936,9 @@ function getDecalMergeStyleKey(segment) {
     tags.ref || '',
     tags.oneway || '',
     tags.surface || '',
+    // (a drawbridge span stays its own segment: the structure solver keeps
+    // the whole bridge low by it)
+    tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
   ]);
 }
 
@@ -2769,6 +2783,9 @@ const SHIP_CHANNEL_REACH_M = 150;
  * wetAt(x, y): 0 on land, 1 over OSM water (areas, rivers / streams by a
  * typical width, the sea by its coastline), 2 over a ship channel.
  */
+const WATER_AREA_NATURAL = new Set(['strait', 'bay']);
+const ROAD_LAYER_MARGIN_M = 0.3;   // asphalt painted this far past a road's drawn edge
+const LAKE_KEEP_M = 4;             // no lake bed this far past a ground road's edge (sidewalk + quay)
 export function buildWaterLookup(terrainData, squareSize) {
   const CELL = 64;
   const cells = new Map();
@@ -2782,9 +2799,12 @@ export function buildWaterLookup(terrainData, squareSize) {
     }
   };
   for (const f of terrainData.osmFeatures || []) {
-    if (f.type !== 'water' || !Array.isArray(f.geometry) || f.geometry.length < 2) continue;
+    // (a strait or bay is water too, though parsed as land cover: a river
+    // mouth mapped as one, its banks off the map, had no water under its bridge)
+    const openWater = WATER_AREA_NATURAL.has(f.tags?.natural);
+    if ((f.type !== 'water' && !openWater) || !Array.isArray(f.geometry) || f.geometry.length < 2) continue;
     const xy = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
-    const waterway = f.tags?.waterway;
+    const waterway = openWater ? undefined : f.tags?.waterway;
     const half = WATERWAY_HALF_M[waterway];
     const closed = xy.length > 3 && Math.hypot(xy[0][0] - xy[xy.length - 1][0], xy[0][1] - xy[xy.length - 1][1]) < 0.5;
     const pad = half ?? 0;
@@ -3994,7 +4014,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - xy[
  * height (and gets no cutting).
  */
 function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set() } = {}) {
-  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [] };
+  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set() };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
   const early = !bridges;
@@ -4232,7 +4252,10 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
             const h = hm.at(idx) - minHeight;
             const [x, y] = toWorld(c, r);
             const want = tunnelGroundAt(t, x, y, h);
-            if (Math.abs(want - h) > 1e-3) { hm.set(idx, want + minHeight); changed++; }
+            if (Math.abs(want - h) > 1e-3) { hm.set(idx, want + minHeight); changed++; if (want < h - CUT_KEEP_M) out.graded.add(idx); }
+            // over the tube itself (inside its portals): the tunnel's alone
+            const on = t.portals[0] || t.portals[1] ? nearestOnTunnel(t, x, y, t.headHalf) : null;
+            if (on && on.into >= 0 && !on.beyond) out.tube.add(idx);
           }
         }
       }
@@ -4280,6 +4303,9 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
 }
 
 /** The two tunnel phases as one result (keys numbered through both). */
+// a tunnel's cutting: ground it lowered by more than this (out.graded)
+const CUT_KEEP_M = 0.1;
+
 function joinTunnelPhases(a, b) {
   const tunnels = [...a.tunnels, ...b.tunnels];
   tunnels.forEach((t, i) => { t.key = `t${String(i + 1).padStart(3, '0')}`; });
@@ -4288,6 +4314,8 @@ function joinTunnelPhases(a, b) {
     bySeg: new Map([...a.bySeg, ...b.bySeg]),
     skipped: [...a.skipped, ...b.skipped],
     holes: [...new Set([...a.holes, ...b.holes])],
+    graded: new Set([...(a.graded || []), ...(b.graded || [])]),
+    tube: new Set([...(a.tube || []), ...(b.tube || [])]),
   };
 }
 
@@ -4636,21 +4664,6 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // stage B: crossings and their order, bridges over water (shadow mode too)
     structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
     yield;
-    // stage C: every road's profile in one solve (shadow mode: measured with
-    // the same checks as the level's roads, for the report)
-    {
-      const t0 = performance.now();
-      structureGraph.profile = yield* solveProfilesSteps(structureGraph);
-      structureGraph.profile.ms = Math.round(performance.now() - t0);
-      const lines = structureGraph.edges.map((e, k) => ({
-        nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
-        highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
-      }));
-      structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
-      Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
-      // stage D: what each stretch becomes
-      structureGraph.classes = classifyStructures(structureGraph);
-    }
     yield;
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver skipped: ${err?.message || err}`);
@@ -4667,13 +4680,50 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   yield;
   // (structure solver v2: the decks come from the solver after the road
   // layout, so today's bridge passes are skipped)
-  const bridges = opts.structureSolver === 'v2'
+  // (no graph, e.g. it failed on this map: today's bridge passes instead)
+  const bridges = opts.structureSolver === 'v2' && structureGraph
     ? { bySeg: new Map(), approaches: new Map(), decks: [], roadLines: [], ramps: 0, humps: [], sunk: 0, sunkAt: [], carried: 0, partInfo: [], endHeight: () => null }
     : solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   yield;
   const late = yield* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
   yield;
   const tunnels = joinTunnelPhases(early, late);
+  // The structure solver's profile and classes (stages C, D), after today's
+  // tunnels. Building the level ('v2'), today's tunnels' roads are pinned
+  // at the tunnels' own heights (until the solver builds tunnels too), so
+  // approaches grade into the portals; in shadow mode it keeps its own
+  // tunnel rules.
+  if (structureGraph) {
+    try {
+      structureGraph.pins = [];
+      structureGraph.tunnelsPinned = opts.structureSolver === 'v2';
+      structureGraph.edges.forEach((e, k) => {
+        const t = opts.structureSolver === 'v2' ? tunnels.bySeg.get(e.seg) : null;
+        if (!t) return;
+        e.external = true;
+        for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i])]);
+      });
+      // stage C: every road's profile in one solve (shadow mode: measured with
+      // the same checks as the level's roads, for the report)
+      {
+        const t0 = performance.now();
+        structureGraph.profile = yield* solveProfilesSteps(structureGraph);
+        structureGraph.profile.ms = Math.round(performance.now() - t0);
+        const lines = structureGraph.edges.map((e, k) => ({
+          nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
+          highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
+        }));
+        structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
+        Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
+        // stage D: what each stretch becomes
+        structureGraph.classes = classifyStructures(structureGraph);
+      }
+      yield;
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver profile skipped: ${err?.message || err}`);
+      structureGraph.profile = null; structureGraph.classes = null;
+    }
+  }
   // a road reaching into a tube it is no part of (a ramp OSM ends a few
   // metres into a tunnel's mouth, where the tube widens for it): on the
   // tube's floor there, not draped over the headwall's backfill
@@ -5939,16 +5989,16 @@ function buildDetailedReportSections(d) {
     }
     const sg = d.decalRoads?.structureGraph?.stats;
     if (sg) {
-      lines.push(`- Structure solver graph (not used for the level yet): ${sg.nodes} nodes, ${sg.edges} edges (${sg.bridgeEdges} bridge, ${sg.tunnelEdges} tunnel), ${sg.stations} stations; ${sg.joints} joints where a road goes onto a bridge, into a tunnel or changes layer, ${sg.junctions} junctions (${sg.multiLevelJunctions} mixing layers), ${sg.ends} dead ends, ${sg.edgeOfMap} roads leaving the map`);
+      lines.push(`- Structure solver graph: ${sg.nodes} nodes, ${sg.edges} edges (${sg.bridgeEdges} bridge, ${sg.tunnelEdges} tunnel), ${sg.stations} stations; ${sg.joints} joints where a road goes onto a bridge, into a tunnel or changes layer, ${sg.junctions} junctions (${sg.multiLevelJunctions} mixing layers), ${sg.ends} dead ends, ${sg.edgeOfMap} roads leaving the map`);
       const cx = d.decalRoads.structureGraph.crossings?.stats;
-      if (cx) lines.push(`- Structure solver crossings (not used yet): ${cx.crossings} grade-separated (${cx.byLayer} by OSM layer, ${cx.byBridge} by bridge tag, ${cx.byTunnel} by tunnel tag), ${cx.unjoined} ground roads crossing level that OSM did not join; ${cx.waterRuns} bridge run(s) over water (${cx.channels} ship channel)`);
+      if (cx) lines.push(`- Structure solver crossings: ${cx.crossings} grade-separated (${cx.byLayer} by OSM layer, ${cx.byBridge} by bridge tag, ${cx.byTunnel} by tunnel tag), ${cx.unjoined} ground roads crossing level that OSM did not join; ${cx.waterRuns} bridge run(s) over water (${cx.channels} ship channel)`);
       const pf = d.decalRoads.structureGraph.profile; const pv = d.decalRoads.structureGraph.previewChecks;
       const cl = d.decalRoads.structureGraph.classes?.stats;
       if (cl?.lengthByKind) {
         const order = ['deck', 'embankment', 'boredTunnel', 'cutAndCover', 'cutting'];
         const label = { deck: 'deck', embankment: 'embankment', boredTunnel: 'bored tunnel', cutAndCover: 'cut-and-cover', cutting: 'cutting' };
         const parts = order.filter((k) => cl.byKind[k]).map((k) => `${label[k]} ${cl.byKind[k]} (${formatNumber(cl.lengthByKind[k] / 1000, 2)} km)`);
-        lines.push(`- Structure solver classes (not used yet): ${parts.join(', ') || 'all ground'}; ${cl.culverts} bridge tag(s) over nothing (culverts), ${cl.untaggedDecks} untagged stretch(es) that need a deck, ${cl.openTunnels} tunnel tag(s) too shallow for a roof (open cutting)`);
+        lines.push(`- Structure solver classes: ${parts.join(', ') || 'all ground'}; ${cl.culverts} bridge tag(s) over nothing (culverts), ${cl.untaggedDecks} untagged stretch(es) that need a deck, ${cl.openTunnels} tunnel tag(s) too shallow for a roof (open cutting)`);
       }
       const vt = d.decalRoads.structureGraph.terrain;
       if (vt) {
@@ -5959,10 +6009,40 @@ function buildDetailedReportSections(d) {
         }
       }
       if (pf && pv) {
-        lines.push(`- Structure solver profile preview (not used yet; ${pf.rounds} rounds, ${pf.ms} ms): steps ${pv.joints.steps}, too steep ${pv.grades.structure.count + pv.grades.ground.count}, short crossings ${pv.crossings.short} of ${pv.crossings.crossings}; remaining violations: joints ${pf.residual.joint} m, crossings ${pf.residual.crossing} m, grade +${pf.residual.grade}, water ${pf.residual.water} m, tunnel cover ${pf.residual.cover} m`);
+        lines.push(`- Structure solver profile (${pf.rounds} rounds, ${pf.ms} ms): steps ${pv.joints.steps}, too steep ${pv.grades.structure.count + pv.grades.ground.count}, short crossings ${pv.crossings.short} of ${pv.crossings.crossings}; remaining violations: joints ${pf.residual.joint} m, crossings ${pf.residual.crossing} m, grade +${pf.residual.grade}, water ${pf.residual.water} m, tunnel cover ${pf.residual.cover} m`);
       }
     }
     lines.push(`- Checked in ${sc.ms} ms.`);
+  }
+
+  // ── Structures (solver) ───────────────────────────────────────────────────
+  const sgr = d.decalRoads?.structureGraph;
+  if (sgr?.built && sgr.classes && sgr.profile) {
+    section('Structures (solver)');
+    lines.push('- Every road\'s height solved at once (joints level, crossings cleared, grade limits per class, bridges over water, tunnel cover), then each stretch classed from its height over the ground and its tags; the terrain is composed once from the result.');
+    const cl = sgr.classes.stats;
+    const label = { deck: 'deck', embankment: 'embankment', boredTunnel: 'bored tunnel', cutAndCover: 'cut-and-cover', cutting: 'cutting', external: 'tunnel (today\'s builder)' };
+    for (const k of ['deck', 'embankment', 'cutting', 'cutAndCover', 'boredTunnel', 'external']) {
+      if (cl.byKind[k]) lines.push(`  - ${label[k]}: ${cl.byKind[k]} stretch(es), ${formatNumber((cl.lengthByKind[k] || 0) / 1000, 2)} km`);
+    }
+    lines.push(`- Bridge tags over nothing (culverts, no deck): ${cl.culverts}; approaches carried on as decks where a fill would reach a road below: ${cl.carried || 0} station(s); untagged stretches that needed a deck: ${cl.untaggedDecks}`);
+    const r = sgr.profile.residual;
+    lines.push(`- Left unmet by the solve (0 is the goal): joints ${r.joint} m, crossings ${r.crossing} m short, grades +${r.grade} over the limit, water clearance ${r.water} m short, tunnel cover ${r.cover} m short`);
+    const t = sgr.terrain;
+    if (t) lines.push(`- Terrain: ${t.pixels} pixels composed in ${t.ms} ms, ${t.capped} held under decks, ${t.despiked || 0} despiked, ${t.wallPixels} on retaining-wall steps, ${t.roadUnderDeckTooLow} road-core pixels under a deck too low over them`);
+    const decksList = d.bridges?.decks || [];
+    if (decksList.length) {
+      lines.push('- Decks (b###, parts, length, highest over the ground):');
+      decksList.forEach((deck, i) => {
+        let len = 0; let hi = 0;
+        for (const p of deck.parts) {
+          for (let k = 1; k < p.xy.length; k++) len += Math.hypot(p.xy[k][0] - p.xy[k - 1][0], p.xy[k][1] - p.xy[k - 1][1]);
+          const e = sgr.edges[p.edge];
+          if (e) for (let k = 0; k < e.s.length; k++) if (e.s[k] >= p.s0 && e.s[k] <= p.s1) hi = Math.max(hi, sgr.profile.z[p.edge][k] - e.g[k]);
+        }
+        lines.push(`  - b${String(i + 1).padStart(3, '0')}: ${deck.parts.length} part(s), ${formatNumber(len, 0)} m, up to ${formatNumber(hi, 1)} m${deck.parts.some((p) => !sgr.edges[p.edge]?.bridge) ? ' (includes untagged / carried stretches)' : ''}`);
+      });
+    }
   }
 
   // ── Bridges ────────────────────────────────────────────────────────────────
@@ -6090,6 +6170,8 @@ function buildDetailedReportSections(d) {
   section('Sidewalks and Street Furniture');
   const sw = d.sidewalks || {};
   lines.push(`- Sidewalk curb runs: ${(sw.runs || []).length}, meshes: ${(sw.meshes || []).length}, triangles (with medians): ${sw.triangles ?? 0}`);
+  const swg = d.structureChecks?.sidewalks;
+  if (swg) lines.push(`- Sidewalks on the terrain: ${swg.floating} of ${swg.samples} samples floating, ${swg.buried} buried; ground graded under them: ${sw.groundPixels ?? 0} pixels${swg.worst ? `; worst ${swg.worst.gap} m at (${swg.worst.at.join(', ')}) on a ${swg.worst.road}` : ''}`);
   const medianRuns = sw.medianRuns || [];
   const medianM = medianRuns.reduce((n, r) => n + polylineLength(r.points), 0);
   lines.push(`- Divided-road medians: ${medianRuns.length} island run(s), ${formatNumber(medianM / 1000, 2)} km of curb, on ${new Set(medianRuns.map((r) => r.owner)).size} carriageway(s)`);
@@ -7770,7 +7852,14 @@ function sanitizeBeamNGObjectName(value, fallback = 'road') {
 
   if (!cleaned) cleaned = String(fallback || 'road').replace(/[^A-Za-z0-9_]/g, '_');
   if (!/^[A-Za-z_]/.test(cleaned)) cleaned = `r_${cleaned}`;
-  if (cleaned.length > 48) cleaned = cleaned.slice(0, 48).replace(/_+$/g, '');
+  // (cut to 48: the start kept and a hash of the whole, so long names that
+  // differ only at their end stay apart; a plain cut made duplicate object
+  // names, which BeamNG resolves by dropping one)
+  if (cleaned.length > 48) {
+    let h = 2166136261;
+    for (let i = 0; i < cleaned.length; i++) { h ^= cleaned.charCodeAt(i); h = Math.imul(h, 16777619); }
+    cleaned = `${cleaned.slice(0, 40).replace(/_+$/g, '')}_${(h >>> 0).toString(36).slice(0, 7)}`;
+  }
   return cleaned || 'road';
 }
 
@@ -7834,9 +7923,9 @@ function seededRandom(seed) {
  * lake's level (services/beamngWater.js planLakes). A WaterBlock's surface is
  * at its position; its volume reaches scale.z / 2 below.
  */
-function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZones = []) {
+function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZones = [], plan = null) {
   const waterProfile = getWaterProfile(biome);
-  const { tiles, stats: lakeStats } = planLakes({
+  const { tiles, stats: lakeStats } = plan || planLakes({
     features: terrainData.osmFeatures || [],
     toWorld: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
     heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
@@ -9521,7 +9610,10 @@ export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // export keeps its share of that for export_report.txt.
   const jobLog = captureConsole();
   try {
-    return await runBeamNGLevelExport(terrainData, center, options, jobLog);
+    // The structure solver builds bridges, decks and the terrain around them
+    // by default; structureSolver: 'v1' keeps today's bridge passes.
+    const structureSolver = options.structureSolver ?? 'v2';
+    return await runBeamNGLevelExport(terrainData, center, { ...options, structureSolver }, jobLog);
   } finally {
     jobLog.restore();
   }
@@ -9772,19 +9864,33 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // v2: bridge decks from the solver's deck stretches, every road decal at
   // its solved height (the terrain is composed just below)
   if (options.structureSolver === 'v2' && sg?.classes) {
+    // the solver's widths up to the widths the roads are drawn at (shoulders,
+    // parking lanes): the terrain cores and decks must cover the drawn road
+    const drawnHalf = new Map();
+    for (const cw of decalRoads.carriageways || []) drawnHalf.set(cw.owner, Math.max(drawnHalf.get(cw.owner) || 0, cw.half || 0));
+    for (const e of sg.edges) { const h = drawnHalf.get(e.seg); if (h > e.half) e.half = h; }
     const decks = decksFromSolver(sg);
     const parts = decks.flatMap((d) => d.parts);
+    sg.built = true;
     decalRoads.bridges.decks = decks;
+    decalRoads.bridges.roadLines = roadLinesFromSolver(sg);
     decalRoads.bridges.partInfo = parts.map((p) => ({ ...p.osm, structure: p.structure ?? null, landing: false, carried: false }));
-    const applied = applySolvedHeights(decalRoads, sg);
+    // (tunnels still come from today's builder: their roads keep its heights)
+    const applied = applySolvedHeights(decalRoads, sg, { skipOwners: new Set(decalRoads.tunnels?.bySeg?.keys?.() || []) });
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2: ${decks.length} deck(s) of ${parts.length} part(s); ${applied.nodes} road nodes in ${applied.decals} decals at their solved heights.`);
     await yield_();
   }
   if ((options.structureSolver === 'v2-terrain' || options.structureSolver === 'v2') && sg?.classes) {
     const t0 = performance.now();
+    // (the ground today's tunnels dug out, their cuttings, is theirs: only a
+    // road's own surface is composed over it; their fill and cover is
+    // composed as any ground)
+    const tunnelGraded = decalRoads.tunnels?.graded;
     const composed = composeTerrain(sg, {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+      keep: tunnelGraded?.size ? (idx) => tunnelGraded.has(idx) : null,
+      tube: decalRoads.tunnels?.tube?.size ? (idx) => decalRoads.tunnels.tube.has(idx) : null,
     });
     const hm = heightMapEditor(exportTerrainData);
     composed.apply((idx, v) => hm.set(idx, v));
@@ -9832,6 +9938,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalks = includeRoads && includeSidewalks
     ? buildSidewalkMeshes(groundCarriageways, {
       zones: decalRoads.crosswalkZones || [],
+      // building footprints at ground level: no slab into a wall
+      buildings: (exportTerrainData.osmFeatures || [])
+        .filter((f) => f.type === 'building' && f.geometry?.length > 2 && !isRaisedBuildingPart(f.tags))
+        .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0))),
       // driveways and parking aisles: the curb lowered where they cross
       driveways: (exportTerrainData.osmFeatures || [])
         .filter((f) => f.type === 'road' && f.tags?.highway === 'service' && f.geometry?.length > 1)
@@ -9839,6 +9949,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     })
     : { meshes: [], runs: [], triangles: 0 };
   if (sidewalks.runs.length > 0) {
+    // the ground under the slabs (they hang at road height + the curb)
+    const graded = gradeSidewalkGround(sidewalks.runs, groundCarriageways, {
+      heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+      worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+    }, { overhead: underDeck });
+    const hmSide = heightMapEditor(exportTerrainData);
+    graded.apply((idx, v) => hmSide.set(idx, v));
+    sidewalks.groundPixels = graded.pixels;
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${sidewalks.runs.length} curb runs, ${(sidewalks.medianRuns || []).length} median island runs, ${sidewalks.triangles} triangles in ${sidewalks.meshes.length} mesh(es).`);
   }
   const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);
@@ -10036,6 +10154,33 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       })
     : null;
 
+  // Standing water planned before the terrain is written: lakes whose
+  // ground the elevation data records at the water's surface get a bed
+  // (the water showed nowhere over it), and the water blocks use this plan
+  let lakePlan = null;
+  if (includeWater) {
+    try {
+      lakePlan = planLakes({
+        features: exportTerrainData.osmFeatures || [],
+        toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
+        heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      });
+      // (no bed within LAKE_KEEP_M of a ground road's edge: its sidewalk and
+      // quay stay on their ground)
+      const quayIndex = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
+      const beds = carveLakeBeds(lakePlan.lakes, {
+        heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+        worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+      }, { keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) });
+      const hmLake = heightMapEditor(exportTerrainData);
+      beds.apply((idx, v) => hmLake.set(idx, v));
+      lakePlan.stats.bedPixels = beds.pixels;
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds skipped: ${err?.message || err}`);
+      lakePlan = null;
+    }
+  }
+
   beginStep('ter', `Writing the terrain binary (terrain.ter, ${size}×${size} heights + material layers)…`);
   await yield_();
   // Tunnel portals: their terrain squares open (layer 255, Terrain-Files.md
@@ -10056,6 +10201,33 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         }
       }
     }
+  }
+  // Under every paved road on the ground, asphalt to its drawn edge: ground
+  // cover grows by terrain layer, not by what is drawn over it, and the
+  // painter's road strips (from OSM) need not match the drawn carriageway
+  // (parking lanes, solver widths): grass grew through the road's edges
+  if (terLayerMap && asphaltLayer >= 0) {
+    const n = exportTerrainData.width;
+    const UNPAVED = new Set(['unpaved', 'gravel', 'fine_gravel', 'dirt', 'earth', 'ground', 'grass', 'sand', 'mud', 'compacted', 'pebblestone', 'woodchips']);
+    let painted = 0;
+    for (const cw of groundCarriageways) {
+      if (UNPAVED.has(String(cw.tags?.surface || '').toLowerCase()) || cw.highway === 'track' || cw.highway === 'path') continue;
+      const nodes = cw.nodes || []; const reach = (cw.half || 3) + ROAD_LAYER_MARGIN_M;
+      for (let i = 0; i + 1 < nodes.length; i++) {
+        const [ax, ay] = nodes[i]; const [bx, by] = nodes[i + 1];
+        const L = Math.hypot(bx - ax, by - ay);
+        if (L < 1e-6) continue;
+        const ux = (bx - ax) / L; const uy = (by - ay) / L;
+        for (let s = 0; s <= L; s += squareSize / 2) {
+          for (let d = -reach; d <= reach; d += squareSize / 2) {
+            const x = ax + ux * s - uy * d; const y = ay + uy * s + ux * d;
+            const c = Math.round(x / squareSize + n / 2); const r = Math.round(y / squareSize + n / 2);
+            if (c >= 0 && c < n && r >= 0 && r < n && terLayerMap[r * n + c] !== asphaltLayer) { terLayerMap[r * n + c] = asphaltLayer; painted++; }
+          }
+        }
+      }
+    }
+    if (pbrResult) pbrResult.roadLayerPixels = painted;
   }
   const tunnelHoles = decalRoads.tunnels?.holes || [];
   if (tunnelHoles.length > 0) {
@@ -10137,7 +10309,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ...seaObjects,
     ...(includeWater
       ? [
-          ...buildWaterBlockObjects(exportTerrainData, squareSize, biome, waterStats.lakes, dryZones),
+          ...buildWaterBlockObjects(exportTerrainData, squareSize, biome, waterStats.lakes, dryZones, lakePlan),
           ...buildRiverObjects(exportTerrainData, squareSize, biome,
             groundCarriageways.map((c) => ({ points: c.nodes, half: c.half })), waterStats.rivers, dryZones),
         ]
@@ -10238,11 +10410,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let vegetationCleared = 0;
   for (const [type, list] of forestPlacements) {
     const margin = (treeItemHeight(type) ?? 10) < 4 ? VEGETATION_CLEAR_LOW_M : VEGETATION_CLEAR_TREE_M;
+    // (a tree's own height under a deck: a 20 m tree under a 15 m deck grew
+    // up through its road)
+    const reach = Math.max(12, (treeItemHeight(type) ?? 10) + 1);
     const kept = [];
     for (let i = 0; i < list.length; i++) {
       if ((i & 4095) === 0) await tick();
       const { pos: [x, y, z] } = list[i];
-      if (!clearOf(x, y, margin) && !underDeck(x, y, z, z + 12)) kept.push(list[i]);
+      if (!clearOf(x, y, margin) && !underDeck(x, y, z, z + reach)) kept.push(list[i]);
     }
     vegetationCleared += list.length - kept.length;
     if (kept.length) forestPlacements.set(type, kept);
@@ -10680,6 +10855,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       grid: { heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, worldSize: exportTerrainData.width * squareSize },
     });
+    structureChecks.sidewalks = checkSidewalkGround(sidewalks.runs, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure checks skipped: ${err?.message || err}`);
   }
@@ -10757,6 +10933,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     },
   });
   zip.file(`${base}/export_report.txt`, reportContents);
+  // in-game test probes (scripts/ingame/runIngameTests.mjs)
+  let ingameProbes = null;
+  try {
+    ingameProbes = buildIngameProbes({
+      carriageways: roadLinesFromDecals(decalRoads),
+      sidewalkRuns: sidewalks.runs,
+      underStructure: underDeck,
+      inTunnel: (x, y, z, zTop) => tunnelList.length > 0 && hitsTunnel(tunnelList, x, y, z, zTop),
+      spawn: spawnPosition,
+      geo: { bounds: exportTerrainData.bounds, worldSize: exportTerrainData.width * squareSize },
+    });
+    zip.file(`${base}/mapng_probes.json`, JSON.stringify(ingameProbes));
+  } catch (err) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} In-game probes skipped: ${err?.message || err}`);
+  }
 
   const terrainBinaryPath = `${base}/art/terrains/terrain.ter`;
   const terrainHeightmapPath = `${base}/art/terrains/terrain.terrainheightmap.png`;
@@ -11491,5 +11682,5 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   lastPct = 100;
   onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - exportT0, completed: processingLog[processingLog.length - 1] ?? null });
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
-  return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks };
+  return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes };
 }

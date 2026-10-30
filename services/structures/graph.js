@@ -12,18 +12,23 @@
 // there. Pure geometry and tags; nothing here knows about any place.
 
 import { makeRoadNodeKey } from '../roadNetwork.js';
+import { isBoredTunnelTag } from '../beamngTunnels.js';
 
 export const STATION_M = 4;
+const JOIN_M = 0.5;
 
 /** Structure flags of a road from its OSM tags. */
 export function structureOf(tags = {}) {
   const bridge = (!!tags.bridge && tags.bridge !== 'no')
     || tags.man_made === 'bridge' || tags.location === 'elevated' || tags.location === 'overground';
-  const tunnel = (!!tags.tunnel && tags.tunnel !== 'no')
+  // (as the tunnel builder: a building passage or culvert stays on the ground)
+  const tunnel = isBoredTunnelTag(tags)
     || tags.location === 'underground' || tags.location === 'underwater';
   return {
     bridge,
     tunnel,
+    // a drawbridge opens for ships: no navigation clearance under it
+    movable: tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
     covered: tags.covered === 'yes',
     cutting: !!tags.cutting && tags.cutting !== 'no',
     embankment: !!tags.embankment && tags.embankment !== 'no',
@@ -70,8 +75,33 @@ function stationsAlong(xy, stationM) {
 export function buildStructureGraph(segments, { project, groundAt = null, halfOf = () => 3.5, isFreeEnd = () => false, stationM = STATION_M } = {}) {
   const nodes = new Map();
   const edges = [];
+  // vertices of different roads within JOIN_M are one point (a shared OSM
+  // vertex nudged a few cm by curve fitting or snapping on one road only:
+  // by exact position a bridge and its approach never met)
+  const canon = new Map();     // key -> canonical key
+  const cells = new Map();     // 1 m cell -> [{ key, x, y, seg }]
+  const keyOf = (p, segIndex) => {
+    const key = makeRoadNodeKey(p);
+    const known = canon.get(key);
+    if (known) return known;
+    const [x, y] = project(p.lat, p.lng);
+    const cx = Math.floor(x); const cy = Math.floor(y);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (const c of cells.get(`${cx + dx},${cy + dy}`) || []) {
+          if (c.seg !== segIndex && Math.hypot(c.x - x, c.y - y) <= JOIN_M) { canon.set(key, c.key); return c.key; }
+        }
+      }
+    }
+    canon.set(key, key);
+    const cell = `${cx},${cy}`;
+    if (!cells.has(cell)) cells.set(cell, []);
+    cells.get(cell).push({ key, x, y, seg: segIndex });
+    return key;
+  };
+  segments.forEach((seg, segIndex) => { for (const p of seg.geometry || []) keyOf(p, segIndex); });
   const nodeAt = (pt, x, y) => {
-    const key = makeRoadNodeKey(pt);
+    const key = canon.get(makeRoadNodeKey(pt)) || makeRoadNodeKey(pt);
     let node = nodes.get(key);
     if (!node) { node = { id: key, x, y, edges: [] }; nodes.set(key, node); }
     return node;
@@ -80,14 +110,14 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
   // position, whatever its layer (a ramp joining a deck mid-way)
   const shared = new Map();
   for (const seg of segments) {
-    for (const key of new Set((seg.geometry || []).map((p) => makeRoadNodeKey(p)))) shared.set(key, (shared.get(key) || 0) + 1);
+    for (const key of new Set((seg.geometry || []).map((p) => canon.get(makeRoadNodeKey(p))))) shared.set(key, (shared.get(key) || 0) + 1);
   }
   const pieces = [];
   segments.forEach((seg, segIndex) => {
     const geom = seg.geometry || [];
     let start = 0;
     for (let i = 1; i < geom.length; i++) {
-      if (i === geom.length - 1 || (shared.get(makeRoadNodeKey(geom[i])) || 0) >= 2) {
+      if (i === geom.length - 1 || (shared.get(canon.get(makeRoadNodeKey(geom[i]))) || 0) >= 2) {
         pieces.push({ seg, segIndex, geom: geom.slice(start, i + 1) });
         start = i;
       }

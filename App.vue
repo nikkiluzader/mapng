@@ -580,6 +580,7 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     uploadedLayerOrder: uploadedLayerOrder.value,
     gapFillSource,
     uploadedAreaMode: uploadedAreaMode.value,
+    rawTerrain: store.rawTerrainActive,
     // Include file identity so changing uploads always invalidates cached terrain.
     uploadedElevation: uploadSignature,
   });
@@ -753,6 +754,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
   const useGPXZ = normalizedSource === 'gpxz';
   const useKRON86 = normalizedSource === 'kron86';
   const useFlat = normalizedSource === 'none';
+  const raw = store.rawTerrainActive;
   const requestKey = buildGenerationKey(
     center.value,
     resolution.value,
@@ -782,6 +784,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       cachedParams.resolution === newParams.resolution &&
       Number(cachedParams.processingMetersPerPixel || 1) === Number(newParams.processingMetersPerPixel || 1) &&
       cachedParams.elevationSource === newParams.elevationSource &&
+      !!cachedParams.rawTerrain === !!newParams.rawTerrain &&
       (cachedParams.gpxzKeySig ?? '') === (newParams.gpxzKeySig ?? '');
 
     if (requestKey === lastGenerationKey.value) {
@@ -868,6 +871,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
           processingMetersPerPixel: Number(processingMpp || 1),
           targetBounds,
           preferNativeCoverage: uploadedAreaMode.value !== 'crop',
+          raw,
         },
       );
     } else {
@@ -885,6 +889,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         {
           processingMetersPerPixel: Number(processingMpp || 1),
           flat: useFlat,
+          raw,
         },
       );
     }

@@ -19,20 +19,26 @@ const SLOPE_MAX_M = 40;
 const DECK_UNDER_M = 2.2;      // deck depth under its road surface
 const DECK_CLEAR_M = 0.5;      // terrain at least this far under a deck's underside
 const DECK_REACH_M = 1.5;      // past a deck's half width
-const ABUTMENT_M = 8;          // a deck end on fill rests on it this far: no cap there
+const ABUTMENT_M = 8;
+const CORE_STEP_M = 2;          // road cores this far apart in height are on two levels
+const CORE_OUTER = 0.6;         // ...where the lower road may take the upper's outer core only
+const DECK_ABUT_CLEAR_M = 0.3;  // abutment fill stops this far under the deck's underside          // a deck end on fill rests on it this far: no cap there
 
 const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 /**
  * Compose the terrain edits for a solved, classified graph.
- *   grid: { heightMap, width, height, worldSize, minHeight } (raw heights;
- *         world z = raw - minHeight, world x, y centred, y north)
+ *   grid: { heightMap, width, height, worldSize, minHeight, keep? } (raw
+ *         heights; world z = raw - minHeight, world x, y centred, y north;
+ *         keep(idx): ground another builder shaped, left alone outside the
+ *         road cores; tube(idx): ground over a built tube, composed only under a
+ *         road's own surface)
  * Returns { tiles, stats, heightAt(x, y), apply(set) }:
  *   heightAt: the composed terrain in world z (edits over the current grid)
  *   apply(set): calls set(idx, raw) for every edited pixel
  */
 export function composeTerrain(graph, grid) {
-  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const { heightMap, width, height, worldSize, minHeight = 0, keep = null, tube = null } = grid;
   const z = graph.profile?.z;
   const segments = graph.classes?.segments || [];
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -43,7 +49,7 @@ export function composeTerrain(graph, grid) {
     const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
     let t = tiles.get(key);
     if (!t) {
-      t = { h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), n: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
+      t = { h: new Float32Array(TILE * TILE), w: new Float32Array(TILE * TILE).fill(Infinity), q: new Float32Array(TILE * TILE).fill(1), n: new Uint8Array(TILE * TILE), cap: new Float32Array(TILE * TILE).fill(Infinity) };
       tiles.set(key, t);
     }
     return t;
@@ -82,12 +88,45 @@ export function composeTerrain(graph, grid) {
     return out;
   });
 
+  // ends that run into a tube (a tunnel's or another builder's stretch,
+  // left to it): no corridor round them, a cutting's floor carried on past
+  // the portal stood the terrain inside the tube
+  const TUBE = new Set(['boredTunnel', 'cutAndCover', 'external']);
+  // (a tube another builder builds: an unbuilt tunnel road stays on the
+  // ground, its approach composed on into it)
+  const BUILT = new Set(['external']);
+  const tubeNode = new Set();
+  for (const [id, kinds] of nodeKinds) if (kinds.some((kk) => BUILT.has(kk))) tubeNode.add(id);
+  // where a road goes into one, a plane across it: none of the road's
+  // corridor beyond (every segment's rounded reach, not the last one's only)
+  const PORTAL_PLANE_M = 40;
+  const portalPlanes = graph.edges.map((e, k) => {
+    const n = e.s.length; const kinds = kindOf[k]; const out = [];
+    // at station `at`, facing from station `a` toward `b` (into the tube)
+    const plane = (at, a, b) => {
+      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy);
+      if (L > 1e-6) out.push([e.x[at], e.y[at], dx / L, dy / L]);
+    };
+    if (n < 2) return out;
+    if (tubeNode.has(e.to) && !TUBE.has(kinds[n - 2])) plane(n - 1, n - 2, n - 1);
+    if (tubeNode.has(e.from) && !TUBE.has(kinds[0])) plane(0, 1, 0);
+    for (let j = 1; j + 1 < n; j++) {
+      if (BUILT.has(kinds[j]) && !TUBE.has(kinds[j - 1])) plane(j, j - 1, j);
+      if (!TUBE.has(kinds[j]) && BUILT.has(kinds[j - 1])) plane(j - 1, j, j - 1);
+    }
+    return out;
+  });
+  // pixels a corridor reached but left alone (past a portal, a tunnel's
+  // cutting): still despiked, a lone one among composed ground stood metres
+  // proud
+  const left = new Set();
   const abutmentOff = (kind, k, j) => (kind === 'deck' && toAbutment[k][j] < ABUTMENT_M ? DECK_UNDER_M : 0);
   graph.edges.forEach((e, k) => {
     const zk = z[k];
     for (let i = 0; i + 1 < e.s.length; i++) {
       const kind = kindOf[k][i];
-      if (kind === 'boredTunnel' || kind === 'cutAndCover') continue;
+      if (TUBE.has(kind)) continue;
+      const planes = portalPlanes[k];
       // a deck's ends on fill are abutments: fill under the deck (below)
       const abutment = kind === 'deck' && Math.min(toAbutment[k][i], toAbutment[k][i + 1]) < ABUTMENT_M;
       const deck = kind === 'deck' && !abutment;
@@ -111,10 +150,11 @@ export function composeTerrain(graph, grid) {
         for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
           const [x, y] = toWorld(c, r);
           const uRaw = ((x - ax) * vx + (y - ay) * vy) / L2;
+          if (planes.length && planes.some(([px, py, dx, dy]) => (x - px) * dx + (y - py) * dy > 0 && Math.hypot(x - px, y - py) < PORTAL_PLANE_M)) { left.add(r * width + c); continue; }
           const u = Math.max(0, Math.min(1, uRaw));
           const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
           if (d > reach) continue;
-          const zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M : 0);
+          const zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0);
           const t = tileFor(c, r); const j = (r % TILE) * TILE + (c % TILE);
           if (deck) {
             // under the deck only, not round its ends
@@ -130,6 +170,14 @@ export function composeTerrain(graph, grid) {
           }
           const tt = d <= core ? 0 : (d - core) / slope;
           if (tt >= 1) continue;
+          // ground over a built tube is the tunnel's: only a road's own
+          // surface on it (a street over the box) is composed, not a road's
+          // rounded end or side slope reaching over it (a cutting's end, its
+          // road meeting the tube by a short link: dug into the portal)
+          if (tube && (d > core || uRaw < 0 || uRaw > 1) && tube(r * width + c)) { left.add(r * width + c); continue; }
+          // ground another builder shaped (a tunnel's cutting): its own
+          // except under the road's surface
+          if (keep && d > core && keep(r * width + c)) { left.add(r * width + c); continue; }
           const target = zc + (h0 - zc) * smoothstep(tt);
           // the road whose core is physically nearest owns the pixel (inside
           // two cores, the nearer centreline; equal: averaged). Two roads side by side at different
@@ -137,16 +185,34 @@ export function composeTerrain(graph, grid) {
           // retaining wall stands, instead of tilting into both.
           // negative inside a road's core (the nearer centreline wins there
           // too); abutment fill never counts as a road core
-          const out = abutment ? Math.max(1e-3, d - core) : d - core;
-          if (out < t.w[j] - 1e-3) { t.w[j] = out; t.h[j] = target; t.n[j] = 1; }
-          else if (Math.abs(out - t.w[j]) <= 1e-3) { t.h[j] = (t.h[j] * t.n[j] + target) / (t.n[j] + 1); t.n[j] = Math.min(255, t.n[j] + 1); }
+          // (inside any road core beats every side slope, and among cores the
+          // nearer centreline wins outright: a wide road must not take a
+          // narrower road's own surface just because its core reaches)
+          const out = abutment ? Math.max(1e-3, d - core) : (d <= core ? -1000 + d : d - core);
+          // two road cores overlapping at clearly different heights: the lower
+          // road keeps its whole drawn width (the upper stands behind a wall)
+          // (only in the upper road's outer margin: its centre stays its own)
+          const q = d / core;   // how far out in this road's core (0 centre, 1 edge)
+          const bothCores = out < -500 && t.w[j] < -500;
+          const twoLevels = bothCores && Math.abs(target - t.h[j]) > CORE_STEP_M;
+          if (twoLevels) {
+            const lowerIsNew = target < t.h[j];
+            const upperQ = lowerIsNew ? t.q[j] : q;
+            const take = upperQ > CORE_OUTER ? lowerIsNew : out < t.w[j] - 1e-3;
+            if (take) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; }
+          } else if (out < t.w[j] - 1e-3) { t.w[j] = out; t.h[j] = target; t.q[j] = q; t.n[j] = 1; }
+          else if (!twoLevels && Math.abs(out - t.w[j]) <= 1e-3) { t.h[j] = (t.h[j] * t.n[j] + target) / (t.n[j] + 1); t.n[j] = Math.min(255, t.n[j] + 1); }
         }
       }
     }
   });
 
-  // the edited value of a pixel in world z, or NaN if untouched
+  // the edited value of a pixel in world z, or NaN if untouched (a despiked
+  // pixel's value from `spiked`)
+  const spiked = new Map();
   const edited = (c, r) => {
+    const sv = spiked.get(r * width + c);
+    if (sv !== undefined) return sv;
     const t = tiles.get(Math.floor(c / TILE) * 65536 + Math.floor(r / TILE));
     if (!t) return NaN;
     const j = (r % TILE) * TILE + (c % TILE);
@@ -169,6 +235,34 @@ export function composeTerrain(graph, grid) {
         }
       }
     }
+  }
+  // despike: an edited pixel more than SPIKE_M off the median of its 3x3
+  // neighbourhood takes the median (corners where three corridors meet at
+  // different heights left single pixels standing metres proud)
+  const SPIKE_M = 2;
+  const win = new Float64Array(9);
+  const value = (c, r) => { const e = edited(c, r); return Number.isFinite(e) ? e : raw(c, r) - minHeight; };
+  for (let pass = 0; pass < 2; pass++) {
+    const fix = [];
+    for (const key of tiles.keys()) {
+      const tc = Math.floor(key / 65536); const tr = key - tc * 65536;
+      for (let j = 0; j < TILE * TILE; j++) {
+        const c = tc * TILE + (j % TILE); const r = tr * TILE + Math.floor(j / TILE);
+        if (c < 1 || r < 1 || c + 1 >= width || r + 1 >= height) continue;
+        let h = edited(c, r);
+        if (!Number.isFinite(h)) {
+          if (!left.has(r * width + c)) continue;
+          h = raw(c, r) - minHeight;
+        }
+        let n = 0;
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) win[n++] = value(c + dc, r + dr);
+        win.sort();
+        if (Math.abs(h - win[4]) > SPIKE_M) fix.push([r * width + c, win[4]]);
+      }
+    }
+    for (const [idx, v] of fix) spiked.set(idx, v);
+    stats.despiked = (stats.despiked || 0) + fix.length;
+    if (!fix.length) break;
   }
   // steps between neighbouring edited pixels: where retaining walls go
   const WALL_STEP_M = 0.5;

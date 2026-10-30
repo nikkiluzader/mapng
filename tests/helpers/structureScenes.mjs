@@ -68,6 +68,75 @@ export const STRUCTURE_SCENES = [
     ]),
   },
   {
+    name: 'short bridge over a ship channel in a town',
+    // a town at 4 m either side of a 240 m channel (0 m) marked for ships; the
+    // 300 m bridge can't climb to a ship's clearance: it stays a town bridge
+    build: () => terrain((x) => 4 - 4 * Math.exp(-((x / 120) ** 6)), [
+      way(1, [[-450, 0], [-150, 0]], { highway: 'primary' }),
+      way(2, [[-150, 0], [150, 0]], { highway: 'primary', bridge: 'yes', layer: '1' }),
+      way(3, [[150, 0], [450, 0]], { highway: 'primary' }),
+      ...[-400, -300, -200, 200, 300, 400].map((x, i) => way(10 + i, [[x, -300], [x, 0], [x, 300]], { highway: 'residential' })),
+      water(5, [[-120, -480], [120, -480], [120, 480], [-120, 480], [-120, -480]], { natural: 'water', water: 'river' }),
+      water(6, [[0, -480], [0, 480]], { waterway: 'river', ship: 'yes' }),
+    ]),
+  },
+  {
+    name: 'track down through a steep gully',
+    // a V gully 25 m deep, its sides about 1:2, along y = 0; an untagged
+    // track crosses it (no bridge mapped: it goes down and up)
+    build: () => terrain((x, y) => 40 - 25 * Math.max(0, 1 - Math.abs(y) / 50), [
+      way(1, [[0, -450], [0, 450]], { highway: 'track' }),
+    ]),
+    future: true,
+  },
+  {
+    name: 'hillside road with a stream bridge',
+    // a 12 % hillside rising north; a road climbs it with a short bridge
+    // over a stream, and a street at its foot meets it
+    build: () => terrain((x, y) => 50 + 0.12 * y, [
+      way(1, [[0, -450], [0, 100]], { highway: 'secondary' }),
+      way(2, [[0, 100], [0, 120]], { highway: 'secondary', bridge: 'yes', layer: '1' }),
+      way(3, [[0, 120], [0, 450]], { highway: 'secondary' }),
+      way(4, [[-400, -400], [0, -400], [400, -400]], { highway: 'residential' }),
+      water(5, [[-480, 110], [480, 110]], { waterway: 'stream', width: '6' }),
+    ]),
+  },
+  {
+    name: 'drawbridge over a ship channel',
+    // the town bridge again with a movable middle span: all of it stays low
+    build: () => terrain((x) => 4 - 4 * Math.exp(-((x / 120) ** 6)), [
+      way(1, [[-450, 0], [-150, 0]], { highway: 'primary' }),
+      way(2, [[-150, 0], [-15, 0]], { highway: 'primary', bridge: 'yes', layer: '1' }),
+      way(3, [[-15, 0], [15, 0]], { highway: 'primary', bridge: 'movable', 'bridge:movable': 'bascule', layer: '1' }),
+      way(4, [[15, 0], [150, 0]], { highway: 'primary', bridge: 'yes', layer: '1' }),
+      way(5, [[150, 0], [450, 0]], { highway: 'primary' }),
+      water(6, [[-120, -480], [120, -480], [120, 480], [-120, 480], [-120, -480]], { natural: 'water', water: 'river' }),
+      water(7, [[0, -480], [0, 480]], { waterway: 'river', ship: 'yes' }),
+    ]),
+  },
+  {
+    name: 'service road under the deck it joins',
+    // a service road leaves the deck mid-way and doubles back under it: it
+    // ramps up toward the deck, and must not push it up in turn
+    build: () => terrain(flat, [
+      way(1, [[-450, 0], [-120, 0]], { highway: 'trunk' }),
+      way(2, [[-120, 0], [60, 0], [120, 0]], { highway: 'trunk', bridge: 'yes', layer: '1' }),
+      way(3, [[120, 0], [450, 0]], { highway: 'trunk' }),
+      way(4, [[0, -450], [0, 450]], { highway: 'primary' }),
+      way(5, [[60, 0], [52, -8], [40, 8], [-300, 8]], { highway: 'service' }),
+    ]),
+  },
+  {
+    name: 'twin suspension bridge over a strait',
+    // a strait (parsed as land cover) under the whole map, crossed by two
+    // carriageways off both edges; only one names its structure
+    build: () => terrain(() => 1, [
+      way(1, [[-480, 10], [480, 10]], { highway: 'motorway', oneway: 'yes', bridge: 'viaduct', 'bridge:structure': 'suspension', layer: '4' }),
+      way(2, [[480, -10], [-480, -10]], { highway: 'motorway', oneway: 'yes', bridge: 'viaduct', layer: '4' }),
+      { id: 'rel_3', type: 'landuse', geometry: [[-500, -500], [500, -500], [500, 500], [-500, 500]].map(([x, y]) => ll(x, y)), tags: { natural: 'strait', type: 'multipolygon' } },
+    ]),
+  },
+  {
     name: 'mountain tunnel through a ridge',
     // a 60 m ridge along y = 0, the road crossing it north-south
     build: () => terrain((x, y) => 10 + 60 * Math.exp(-((y / 140) ** 2)), [

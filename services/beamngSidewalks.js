@@ -15,7 +15,7 @@
 // BeamNG.Earth's (server/sidewalks.py), measured on official US curbs.
 
 import * as THREE from 'three';
-import { buildCarriagewayIndex, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
+import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
 
 const CURB_H = 0.15;          // m above the road
@@ -321,7 +321,82 @@ export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
  * is left of the run's direction (the sidewalk lies on that side of the curb)
  * and owner is the carriageway's.
  */
-export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map() } = {}) {
+// Building footprints (world rings) in a grid, for point-in-footprint tests.
+const BUILDING_CELL_M = 32;
+function buildingIndex(rings) {
+  const cells = new Map();
+  for (const ring of rings) {
+    if (!ring || ring.length < 3) continue;
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    const item = { ring, x0, y0, x1, y1 };
+    for (let cx = Math.floor(x0 / BUILDING_CELL_M); cx <= Math.floor(x1 / BUILDING_CELL_M); cx++) {
+      for (let cy = Math.floor(y0 / BUILDING_CELL_M); cy <= Math.floor(y1 / BUILDING_CELL_M); cy++) {
+        const k = `${cx},${cy}`;
+        if (!cells.has(k)) cells.set(k, []);
+        cells.get(k).push(item);
+      }
+    }
+  }
+  return (x, y) => {
+    for (const it of cells.get(`${Math.floor(x / BUILDING_CELL_M)},${Math.floor(y / BUILDING_CELL_M)}`) || []) {
+      if (x < it.x0 || x > it.x1 || y < it.y0 || y > it.y1) continue;
+      let inside = false;
+      const r = it.ring;
+      for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+        if ((r[i][1] > y) !== (r[j][1] > y) && x < ((r[j][0] - r[i][0]) * (y - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) inside = !inside;
+      }
+      if (inside) return true;
+    }
+    return false;
+  };
+}
+
+// Runs fitted to the ground beside them: where the full slab would stand on
+// blocked ground (a building at the road's edge, another carriageway) it
+// narrows to what fits (a city sidewalk between the kerb and the house
+// fronts), down to MIN_FIT_M; narrower than that it is cut. A run splits
+// where its width changes. blocked(run, x, y, zRoad).
+const MIN_FIT_M = 1.0;
+function splitRunsWhereBlocked(runs, blocked) {
+  const STEP = 1;
+  const out = [];
+  for (const run of runs) {
+    const widths = [run.width, run.width * 0.75, run.width * 0.5, MIN_FIT_M].filter((w, i, a) => w >= MIN_FIT_M - 1e-6 && a.indexOf(w) === i && w <= run.width + 1e-6);
+    const p = run.points;
+    let piece = []; let pieceW = null; let last = null;
+    const flush = () => { if (piece.length >= 2 && runLength(piece) >= MIN_RUN_M) out.push({ ...run, width: pieceW, points: piece }); piece = []; };
+    for (let i = 0; i + 1 < p.length; i++) {
+      const a = p[i]; const b = p[i + 1];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (L < 1e-6) continue;
+      const nx = (-(b[1] - a[1]) / L) * run.side; const ny = ((b[0] - a[0]) / L) * run.side;
+      const n = Math.max(1, Math.ceil(L / STEP));
+      for (let k = i === 0 ? 0 : 1; k <= n; k++) {
+        const t = k / n;
+        const q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+        // the widest slab whose middle and back edge stand on free ground
+        const fits = widths.find((w) => {
+          const mid = w / 2 + CURB_W; const back = w + CURB_W;
+          return !blocked(run, q[0] + nx * mid, q[1] + ny * mid, q[2]) && !blocked(run, q[0] + nx * back, q[1] + ny * back, q[2]);
+        }) ?? null;
+        if (fits !== pieceW) {
+          // (the last point at the old width ends its piece; a new width starts here)
+          if (pieceW !== null && last && piece[piece.length - 1] !== last) piece.push(last);
+          flush();
+          pieceW = fits;
+        }
+        last = q;
+        if (fits === null) continue;
+        if (k === n || k === 0 || piece.length === 0) piece.push(q);
+      }
+    }
+    flush();
+  }
+  return out;
+}
+
+export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map(), buildings = [] } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const sidesOf = streetSides(carriageways);
   // Driveways and parking aisles (OSM service roads, not carriageways of
@@ -340,7 +415,18 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
       }
     }
   }
-  const runs = mergeRuns(pieces).filter((run) => runLength(run.points) >= MIN_RUN_M);
+  let runs = mergeRuns(pieces).filter((run) => runLength(run.points) >= MIN_RUN_M);
+  // a slab never runs into a building (a footprint at the road's edge) or
+  // out over another carriageway (a sunken centre road beside a side road)
+  {
+    const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
+    const continues = new Map(carriageways.map((cw) => [cw.owner, new Set(cw.continuations || [])]));
+    // (the street's own continuation counts too where it is on another
+    // level: a garage ramp leaving the street beside it)
+    runs = splitRunsWhereBlocked(runs, (run, x, y, z) => inBuilding(x, y)
+      || carriagewaysAt(index, x, y, GROUND_ROAD_MARGIN_M).some((c) => c.owner !== run.owner
+        && (!continues.get(run.owner)?.has(c.owner) || Math.abs(c.z - z) > 1)));
+  }
   if (nearDriveway) for (const run of runs) run.dips = dipsAlong(run.points, (x, y) => nearDriveway(x, y, DRIVEWAY_HALF_M));
   return runs;
 }
@@ -812,4 +898,130 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
   }
   flush();
   return { meshes, runs, corners, medianRuns, triangles };
+}
+
+// Ground under the sidewalks: a slab hangs at its road's height plus the
+// curb, so where the terrain beside a road is lower (an embankment, a street
+// climbing a hillside) it floated, and where higher it was buried. The ground
+// under each slab is set just under its top, then blends back to the terrain
+// past its back edge over a run sized to the height difference. No road's own
+// surface is touched (runs already stop short of other carriageways).
+const GROUND_UNDER_M = 0.04;     // the terrain this far under the slab's top
+const GROUND_BLEND_MIN_M = 1;
+const GROUND_BLEND_MAX_M = 10;
+const GROUND_BLEND_RUN = 2;      // 1 m of height difference blends over 2 m
+const GROUND_ROAD_MARGIN_M = 0.3;
+
+const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+/**
+ * Terrain edits that put the ground under every sidewalk run.
+ *   grid: { heightMap, width, height, worldSize, minHeight } (raw heights;
+ *         world z = raw - minHeight, world x, y centred, y north)
+ * overhead(x, y, z, zTop): a deck or tunnel there (the ground is not raised).
+ * Returns { pixels, apply(set) }: set(idx, raw) for every edited pixel.
+ */
+export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () => false } = {}) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const index = buildCarriagewayIndex(carriageways);
+  const onRoad = (x, y) => isOnOtherCarriageway(index, x, y, GROUND_ROAD_MARGIN_M, () => false);
+  // per pixel: the best claim (smallest distance out past a slab; inside a
+  // slab 0, averaged among slabs)
+  const best = new Map();   // idx -> [key, sum, n]
+  for (const run of runs || []) {
+    const p = run.points;
+    const w = run.width + CURB_W;
+    for (let i = 0; i + 1 < p.length; i++) {
+      const [ax, ay, az] = p[i]; const [bx, by, bz] = p[i + 1];
+      const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy;
+      if (L2 < 1e-6) continue;
+      const L = Math.sqrt(L2);
+      // outward: left of travel for side 1, right for side -1
+      const nx = (-dy / L) * run.side; const ny = (dx / L) * run.side;
+      const zTop = (az + bz) / 2 + CURB_H + CROSS_SLOPE * w;
+      const reach = w + GROUND_BLEND_MAX_M;
+      const xs = [ax, bx, ax + nx * reach, bx + nx * reach]; const ys = [ay, by, ay + ny * reach, by + ny * reach];
+      const [c0, r0] = toPixel(Math.min(...xs), Math.max(...ys));
+      const [c1, r1] = toPixel(Math.max(...xs), Math.min(...ys));
+      for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+        for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+          const [x, y] = toWorld(c, r);
+          const t = ((x - ax) * dx + (y - ay) * dy) / L2;
+          if (t < 0 || t > 1) continue;
+          const o = (x - ax) * nx + (y - ay) * ny;   // out from the curb line
+          if (o < 0 || o > reach) continue;
+          const idx = r * width + c;
+          const ground = heightMap[idx] - minHeight;
+          const zRoad = az + (bz - az) * t;
+          const top = zRoad + CURB_H + CROSS_SLOPE * Math.min(o, w) - GROUND_UNDER_M;
+          let key; let target;
+          if (o <= w) { key = 0; target = top; } else {
+            const blend = Math.min(GROUND_BLEND_MAX_M, Math.max(GROUND_BLEND_MIN_M, Math.abs(ground - top) * GROUND_BLEND_RUN));
+            const f = (o - w) / blend;
+            if (f >= 1) continue;
+            key = o - w; target = top + (ground - top) * smooth01(f);
+          }
+          const prev = best.get(idx);
+          if (!prev || key < prev[0] - 1e-6) best.set(idx, [key, target, 1]);
+          else if (Math.abs(key - prev[0]) <= 1e-6) { prev[1] += target; prev[2]++; }
+        }
+      }
+    }
+  }
+  const edits = [];
+  for (const [idx, [, sum, n]] of best) {
+    const r = Math.floor(idx / width); const c = idx - r * width;
+    const [x, y] = toWorld(c, r);
+    if (onRoad(x, y)) continue;
+    const z = sum / n;
+    // (never raised up into a deck or tunnel over it)
+    if (z > heightMap[idx] - minHeight && overhead(x, y, z, z + 6)) continue;
+    edits.push([idx, z + minHeight]);
+  }
+  return { pixels: edits.length, apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+}
+
+/**
+ * How well the sidewalks sit on the terrain: every 2 m along each run, at
+ * the slab's middle and back edge, the terrain against the slab's top.
+ * Floating: a gap under the slab deeper than its faces reach (CURB_H + SINK);
+ * buried: the terrain over the slab's top. groundAt(x, y): world z.
+ */
+export function checkSidewalkGround(runs, groundAt, { step = 2 } = {}) {
+  let samples = 0; let floating = 0; let buried = 0; let worst = null;
+  const list = [];
+  const FLOAT_M = CURB_H + SINK + 0.1;
+  const BURIED_M = 0.08;
+  for (const run of runs || []) {
+    const p = run.points;
+    const w = run.width + CURB_W;
+    let carry = 0;
+    for (let i = 0; i + 1 < p.length; i++) {
+      const [ax, ay, az] = p[i]; const [bx, by, bz] = p[i + 1];
+      const L = Math.hypot(bx - ax, by - ay);
+      if (L < 1e-6) continue;
+      const nx = (-(by - ay) / L) * run.side; const ny = ((bx - ax) / L) * run.side;
+      for (let s = carry; s <= L; s += step) {
+        const t = s / L;
+        const x0 = ax + (bx - ax) * t; const y0 = ay + (by - ay) * t; const zr = az + (bz - az) * t;
+        for (const o of [w / 2, w - 0.05]) {
+          const top = zr + CURB_H + CROSS_SLOPE * o;
+          const g = groundAt(x0 + nx * o, y0 + ny * o);
+          if (!Number.isFinite(g)) continue;
+          samples++;
+          const gap = top - g;
+          if (gap > FLOAT_M) floating++;
+          else if (-gap > BURIED_M) buried++;
+          if (gap > FLOAT_M || -gap > BURIED_M) {
+            list.push([Math.round(x0 + nx * o), Math.round(y0 + ny * o), Math.round(gap * 100) / 100, run.highway, run.width]);
+            if (!worst || Math.abs(gap) > Math.abs(worst.gap)) worst = { gap: Math.round(gap * 100) / 100, at: [Math.round(x0 + nx * o), Math.round(y0 + ny * o)], road: run.highway };
+          }
+        }
+      }
+      carry = (carry - L) % step; if (carry < 0) carry += step;
+    }
+  }
+  return { samples, floating, buried, worst, list: globalThis.__MAPNG_SW_LIST ? list : undefined };
 }

@@ -48,7 +48,7 @@ const WATER_STEP_M = 16;
 // tagged deep_draft=yes; BeamNG.Earth reads it from the National Bridge
 // Inventory).
 export const NAV_CLEAR_M = 50;
-const NAV_RUN_M = 100;
+export const NAV_RUN_M = 100;
 const NAV_STRUCTURES = new Set(['cable-stayed', 'suspension']);
 export const navClearance = (structure) => (NAV_STRUCTURES.has(String(structure || '').toLowerCase()) ? NAV_CLEAR_M : 0);
 
@@ -641,7 +641,10 @@ function leftNormals(xy) {
   });
 }
 
-const nearAnySegment = (p, lines, r) => lines.some((line) => {
+// (a line carrying its road's half width keeps piers off all of its lanes)
+const PIER_ROAD_EDGE_M = 1.5;
+const nearAnySegment = (p, lines, r0) => lines.some((line) => {
+  const r = line.half !== undefined ? Math.max(r0, line.half + PIER_ROAD_EDGE_M) : r0;
   for (let j = 0; j + 1 < line.length; j++) {
     const [ax, ay] = line[j];
     const [bx, by] = line[j + 1];
@@ -656,9 +659,26 @@ const nearAnySegment = (p, lines, r) => lines.some((line) => {
 /**
  * Piers under one solved part: [{ x, y, u, width, zTop, zBottom }], evenly
  * spaced, none where the deck nearly rests on the ground, moved off (or left
- * out next to) the roads under it.
+ * out next to) the roads under it and the lanes of lower decks (decks:
+ * parts { xy, z, half }).
  */
-export function pierSites(part, { groundAt, roadLines = [] }) {
+// a deck's lanes under a pier: within its half width (and the edge margin)
+// of a foot, at a height between the pier's foot and its top
+const deckUnder = (p, decks, zLow, zHigh) => decks.some((q) => {
+  const r = (q.half ?? 0) + PIER_ROAD_EDGE_M;
+  for (let j = 0; j + 1 < q.xy.length; j++) {
+    const [ax, ay] = q.xy[j]; const [bx, by] = q.xy[j + 1];
+    const vx = bx - ax; const vy = by - ay;
+    const L2 = vx * vx + vy * vy || 1e-9;
+    const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - ay) * vy) / L2));
+    if (Math.hypot(ax + vx * t - p[0], ay + vy * t - p[1]) >= r) continue;
+    const zq = q.z[j] + (q.z[j + 1] - q.z[j]) * t;
+    if (zq > zLow && zq < zHigh) return true;
+  }
+  return false;
+});
+
+export function pierSites(part, { groundAt, roadLines = [], decks = [] }) {
   const { xy, z, half } = part;
   const s = arcLengths(xy);
   const L = s[s.length - 1];
@@ -688,6 +708,8 @@ export function pierSites(part, { groundAt, roadLines = [] }) {
       const zTop = z[j] + (z[j + 1] - z[j]) * f - under;
       const g = groundAt(x, y);
       if (zTop - g < PIER_MIN_CLEAR_M) break;
+      // (nor through a lower deck's lanes: stacked ramps, a car hit one)
+      if (foot.some((p) => deckUnder(p, decks, g - 1, zTop))) continue;
       out.push({ x, y, u, width, pierWidth: pw, zTop, zBottom: g - FOOTING_M });
       break;
     }
@@ -885,6 +907,8 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
       const here = atJoint.get(key(xy[k])) || [];
       if (here.length !== 2) continue;
       const other = here.find((e) => e.pi !== pi);
+      // (a part whose two ends meet, a loop: nothing else to align with)
+      if (!other) continue;
       const o = deck.parts[other.pi].xy;
       const beyond = other.k === 0 ? o[1] : o[o.length - 2];
       const before = k === 0 ? beyond : xy[k - 1];
@@ -1023,7 +1047,7 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
       });
     }
     // piers
-    for (const p of pierSites(part, { groundAt, roadLines })) {
+    for (const p of pierSites(part, { groundAt, roadLines, decks: [...deck.parts.filter((q) => q !== part), ...neighbours] })) {
       const deckW = p.width;
       if (deckW > PIER_BENT_W_M) {
         const cols = Math.max(2, Math.round(deckW / 8));

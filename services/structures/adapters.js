@@ -47,13 +47,36 @@ export function decksFromSolver(graph) {
 }
 
 /**
+ * The roads a deck's piers must keep off: every stretch of the solved graph
+ * that is not a deck, as [[x, y, z]...] lines carrying their half width.
+ */
+export function roadLinesFromSolver(graph) {
+  const { edges } = graph;
+  const z = graph.profile?.z;
+  if (!z) return [];
+  const kindOf = edges.map((e) => new Array(e.s.length).fill('ground'));
+  for (const seg of graph.classes?.segments || []) for (let i = seg.i0; i <= seg.i1; i++) kindOf[seg.edge][i] = seg.kind;
+  const lines = [];
+  edges.forEach((e, k) => {
+    let line = null;
+    for (let i = 0; i < e.s.length; i++) {
+      if (kindOf[k][i] === 'deck') { line = null; continue; }
+      if (!line) { line = []; line.half = e.half; lines.push(line); }
+      line.push([e.x[i], e.y[i], z[k][i]]);
+    }
+  });
+  return lines.filter((l) => l.length >= 2);
+}
+
+/**
  * Set every road decal's node heights from the solved profile: each node to
  * the nearest station of its road's graph edges. A decal with any node on a
  * deck stretch projects onto objects (the deck). Decals carry their road
- * as the non-serialized __owner (the drivable segment index).
+ * as the non-serialized __owner (the drivable segment index); skipOwners:
+ * owners another builder places (today's tunnels until stage G covers them).
  * Returns { decals, nodes } changed.
  */
-export function applySolvedHeights(groups, graph, { deckLift = 0.02 } = {}) {
+export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners = null } = {}) {
   const { edges } = graph;
   const z = graph.profile?.z;
   if (!z) return { decals: 0, nodes: 0 };
@@ -65,6 +88,8 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02 } = {}) {
   for (const g of groups || []) {
     for (const d of g.__items || []) {
       if (d.__owner === undefined || !Array.isArray(d.nodes)) continue;
+      // (roads another builder owns, today's tunnels, keep their heights)
+      if (skipOwners?.has(d.__owner)) continue;
       const pieces = bySeg.get(d.__owner);
       if (!pieces) continue;
       let onDeck = false;
@@ -79,8 +104,24 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02 } = {}) {
       };
       for (const node of d.nodes) {
         const acc = { best: Infinity, k: -1, i: 0 };
-        if (lastK >= 0) scan(lastK, lastI - 8, lastI + 8, acc, node);
-        if (acc.best > 9) { acc.best = Infinity; for (const k of pieces) scan(k, 0, edges[k].s.length - 1, acc, node); }
+        if (lastK >= 0) {
+          // track along the road: widen the window only while the best match
+          // sits on its edge (layers offset sideways never match closely, so
+          // a distance test would rescan the whole road at every node)
+          let w = 8;
+          for (;;) {
+            acc.best = Infinity; scan(lastK, lastI - w, lastI + w, acc, node);
+            const n = edges[lastK].s.length;
+            const atEdge = (acc.i === Math.max(0, lastI - w) && acc.i > 0) || (acc.i === Math.min(n - 1, lastI + w) && acc.i < n - 1);
+            if (!atEdge || w > n) break;
+            w *= 2;
+          }
+          // the end of this piece: the next piece may be nearer
+          const n = edges[lastK].s.length;
+          if (pieces.length > 1 && (acc.i === 0 || acc.i === n - 1)) for (const k of pieces) if (k !== lastK) scan(k, 0, edges[k].s.length - 1, acc, node);
+        } else {
+          for (const k of pieces) scan(k, 0, edges[k].s.length - 1, acc, node);
+        }
         if (acc.best === Infinity) continue;
         lastK = acc.k; lastI = acc.i;
         // interpolate along the station line (snapping 2 m nodes to 4 m

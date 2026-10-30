@@ -1,0 +1,491 @@
+{
+ "_note": "Test areas for scripts/sweep (fetchArea.mjs --catalog fetches missing ones into MAPNG_AREAS). smoke: the set run on every change touching terrain, roads or structures; all: before main. Categories say what each area exercises; keep three or more areas per category, from different countries and data sources.",
+ "areas": [
+  {
+   "name": "naldo",
+   "lat": 30.311616,
+   "lng": -81.655369,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "interchange",
+    "overpass"
+   ],
+   "smoke": true
+  },
+  {
+   "name": "kingst",
+   "lat": 29.892374,
+   "lng": -81.313419,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "water-bridge",
+    "movable-bridge",
+    "city-grid"
+   ],
+   "smoke": true
+  },
+  {
+   "name": "deckpark_g",
+   "lat": 33.4628,
+   "lng": -112.0735,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "overpass",
+    "tunnel",
+    "city"
+   ],
+   "smoke": true
+  },
+  {
+   "name": "twirly",
+   "lat": 30.253099,
+   "lng": -81.516151,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "interchange"
+   ]
+  },
+  {
+   "name": "zion",
+   "lat": 37.2134,
+   "lng": -112.9595,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "tunnel",
+    "mountain"
+   ],
+   "smoke": true
+  },
+  {
+   "name": "miami836",
+   "lat": 25.7935,
+   "lng": -80.2645,
+   "size": 1024,
+   "dem": "t30",
+   "categories": [
+    "interchange",
+    "water-bridge"
+   ]
+  },
+  {
+   "name": "i65",
+   "lat": 40.94075,
+   "lng": -87.22094,
+   "size": 1024,
+   "dem": "t30",
+   "categories": [
+    "rural",
+    "overpass"
+   ]
+  },
+  {
+   "name": "tokyo",
+   "lat": 35.648,
+   "lng": 139.66,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "city",
+    "overpass"
+   ]
+  },
+  {
+   "name": "axen",
+   "lat": 46.9431,
+   "lng": 8.62,
+   "size": 2048,
+   "dem": "t30",
+   "categories": [
+    "tunnel",
+    "gallery",
+    "mountain",
+    "lake"
+   ]
+  },
+  {
+   "name": "bologna",
+   "lat": 44.494,
+   "lng": 11.343,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "city-grid",
+    "old-town"
+   ]
+  },
+  {
+   "name": "leeds",
+   "lat": 53.815,
+   "lng": -1.58,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "rural",
+    "suburb"
+   ]
+  },
+  {
+   "name": "glacier_view",
+   "lat": 61.807,
+   "lng": -147.7,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "mountain",
+    "water-bridge"
+   ]
+  },
+  {
+   "name": "lisbon",
+   "lat": 38.6916,
+   "lng": -9.1774,
+   "size": 2048,
+   "dem": "t30",
+   "categories": [
+    "suspension-bridge",
+    "strait"
+   ]
+  },
+  {
+   "name": "sydney",
+   "lat": -33.8523,
+   "lng": 151.2108,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "water-bridge",
+    "harbour",
+    "city"
+   ]
+  },
+  {
+   "name": "istanbul",
+   "lat": 41.0453,
+   "lng": 29.034,
+   "size": 2048,
+   "dem": "t30",
+   "categories": [
+    "suspension-bridge",
+    "strait",
+    "coarse-data"
+   ]
+  },
+  {
+   "name": "hongkong",
+   "lat": 22.355,
+   "lng": 114.129,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "hillside",
+    "city",
+    "overpass"
+   ]
+  },
+  {
+   "name": "rotterdam",
+   "lat": 51.9093,
+   "lng": 4.4868,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "water-bridge",
+    "city"
+   ]
+  },
+  {
+   "name": "chongqing",
+   "lat": 29.552,
+   "lng": 106.58,
+   "size": 2048,
+   "dem": "t30",
+   "categories": [
+    "hillside",
+    "interchange",
+    "tunnel",
+    "coarse-data"
+   ]
+  },
+  {
+   "name": "oslo",
+   "lat": 59.9075,
+   "lng": 10.755,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "tunnel",
+    "overpass",
+    "harbour",
+    "city"
+   ]
+  },
+  {
+   "name": "stelvio",
+   "lat": 46.529,
+   "lng": 10.452,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "mountain",
+    "switchbacks"
+   ],
+   "smoke": true
+  },
+  {
+   "name": "pendleton",
+   "lat": 38.63283,
+   "lng": -79.389267,
+   "size": 4096,
+   "dem": "gpxz",
+   "categories": [
+    "mountain",
+    "rural"
+   ]
+  },
+  {
+   "name": "w_sf_russian",
+   "lat": 37.8015,
+   "lng": -122.418,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "hillside",
+    "city-grid",
+    "sidewalks"
+   ],
+   "smoke": true
+  },
+  {
+   "name": "w_la_fourlevel",
+   "lat": 34.0618,
+   "lng": -118.2475,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "interchange",
+    "stacked-decks"
+   ]
+  },
+  {
+   "name": "w_seattle",
+   "lat": 47.6085,
+   "lng": -122.334,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "hillside",
+    "overpass",
+    "air-rights"
+   ]
+  },
+  {
+   "name": "w_pittsburgh",
+   "lat": 40.4385,
+   "lng": -80.011,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "water-bridge",
+    "tunnel"
+   ]
+  },
+  {
+   "name": "w_boston_zakim",
+   "lat": 42.368,
+   "lng": -71.063,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "tunnel",
+    "cable-stayed",
+    "interchange",
+    "air-rights"
+   ]
+  },
+  {
+   "name": "w_rome",
+   "lat": 41.8935,
+   "lng": 12.479,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "old-town",
+    "water-bridge",
+    "coarse-data"
+   ]
+  },
+  {
+   "name": "w_i70_idaho",
+   "lat": 39.742,
+   "lng": -105.514,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "mountain",
+    "freeway"
+   ]
+  },
+  {
+   "name": "w_neworleans",
+   "lat": 29.942,
+   "lng": -90.059,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "water-bridge",
+    "city"
+   ]
+  },
+  {
+   "name": "w_paris_maillot",
+   "lat": 48.878,
+   "lng": 2.283,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "tunnel",
+    "roundabout",
+    "city"
+   ]
+  },
+  {
+   "name": "w_london_hammer",
+   "lat": 51.492,
+   "lng": -0.2245,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "overpass",
+    "city"
+   ]
+  },
+  {
+   "name": "w_genoa",
+   "lat": 44.411,
+   "lng": 8.929,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "hillside",
+    "overpass",
+    "tunnel",
+    "coarse-data"
+   ]
+  },
+  {
+   "name": "w_monaco",
+   "lat": 43.739,
+   "lng": 7.425,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "hillside",
+    "tunnel",
+    "switchbacks",
+    "air-rights"
+   ]
+  },
+  {
+   "name": "w_barcelona",
+   "lat": 41.3915,
+   "lng": 2.165,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "city-grid",
+    "sidewalks",
+    "sunken-road"
+   ],
+   "smoke": true
+  },
+  {
+   "name": "w_amsterdam",
+   "lat": 52.3705,
+   "lng": 4.889,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "canals",
+    "city-grid",
+    "water-bridge"
+   ],
+   "smoke": true
+  },
+  {
+   "name": "w_prague",
+   "lat": 50.0865,
+   "lng": 14.4135,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "water-bridge",
+    "old-town",
+    "coarse-data"
+   ]
+  },
+  {
+   "name": "w_seoul_han",
+   "lat": 37.5175,
+   "lng": 126.996,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "water-bridge",
+    "coarse-data"
+   ]
+  },
+  {
+   "name": "w_singapore",
+   "lat": 1.2905,
+   "lng": 103.856,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "water-bridge",
+    "city",
+    "coarse-data"
+   ]
+  },
+  {
+   "name": "w_wellington",
+   "lat": -41.286,
+   "lng": 174.776,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "hillside",
+    "overpass",
+    "harbour"
+   ]
+  },
+  {
+   "name": "w_bergen",
+   "lat": 60.3915,
+   "lng": 5.3225,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "harbour",
+    "tunnel",
+    "city"
+   ]
+  },
+  {
+   "name": "w_capetown",
+   "lat": -33.922,
+   "lng": 18.422,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "city",
+    "overpass",
+    "coarse-data"
+   ]
+  }
+ ]
+}

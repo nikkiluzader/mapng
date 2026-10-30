@@ -906,3 +906,14 @@ test('sidewalks: tagged street gets a curb mesh with collision, materials and a 
     restore();
   }
 });
+
+test('level lint: the export passes the BeamNG format linter with no errors', async () => {
+  const { lintLevelZip } = await import('../scripts/lib/levelLint.mjs');
+  await withZip(async (zip) => {
+    const bytes = await zip.generateAsync({ type: 'uint8array' });
+    const { findings, counts } = await lintLevelZip(bytes);
+    const errors = findings.filter((f) => f.level === 'error');
+    assert.deepEqual(errors, [], JSON.stringify(errors.slice(0, 5)));
+    assert.ok(counts.objects > 10 && counts.decalRoads > 0, JSON.stringify(counts));
+  });
+});

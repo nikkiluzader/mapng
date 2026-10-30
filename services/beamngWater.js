@@ -288,10 +288,11 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
 
 /**
  * Lake tiles: [{ cx, cy, sx, sy, z, lake }] (WaterBlock rectangles, z the
- * water surface), plus stats.
+ * water surface), plus stats and lakes [{ poly, level }] (carveLakeBeds).
  */
 export function planLakes({ features = [], toWorld, heightAt }) {
   const tiles = [];
+  const lakes = [];   // { poly, level } for carveLakeBeds
   const stats = { lakes: 0, dry: 0, tiles: 0 };
   let lakeIndex = 0;
   for (const f of features) {
@@ -341,8 +342,60 @@ export function planLakes({ features = [], toWorld, heightAt }) {
     if (!lakeTiles.length) continue;
     stats.lakes++;
     for (const tile of lakeTiles) tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: lakeIndex, name: t.name || null });
+    lakes.push({ poly, level });
     lakeIndex++;
   }
   stats.tiles = tiles.length;
-  return { tiles, stats };
+  return { tiles, stats, lakes };
+}
+
+// A bed under standing water: elevation data that records a water body's
+// surface as its ground (lidar off canals, harbours, ponds) left the terrain
+// level with the water, which then never showed (Amsterdam's canals: water
+// 5 cm over the ground). Inside each lake the ground near its level is
+// lowered to LAKE_BED_M under it, sloping up to LAKE_BED_EDGE_M under it over
+// LAKE_BANK_M from the shore. Ground already deeper is left; nothing raised.
+const LAKE_BED_M = 1.5;
+const LAKE_BED_EDGE_M = 0.3;
+const LAKE_BANK_M = 3;
+const distToRing = (x, y, ring) => {
+  let best = Infinity;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [ax, ay] = ring[j]; const [bx, by] = ring[i];
+    const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy || 1e-9;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2));
+    best = Math.min(best, Math.hypot(ax + dx * t - x, ay + dy * t - y));
+  }
+  return best;
+};
+/**
+ * Terrain edits for lake beds. grid: { heightMap, width, height, worldSize,
+ * minHeight } (raw heights; world z = raw - minHeight; world x, y centred,
+ * y north). keep(x, y): ground left as it is (a road and its sidewalks: a
+ * canal's outline often reaches the quay, and a bed under it left the
+ * sidewalks floating). Returns { pixels, apply(set) }: set(idx, raw).
+ */
+export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const edits = new Map();
+  for (const { poly, level } of lakes || []) {
+    const [x0, y0, x1, y1] = poly.box;
+    const [c0, r0] = toPixel(x0, y1); const [c1, r1] = toPixel(x1, y0);
+    for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+      for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+        const [x, y] = toWorld(c, r);
+        if (!poly.contains(x, y) || keep(x, y)) continue;
+        const idx = r * width + c;
+        const ground = heightMap[idx] - minHeight;
+        if (ground < level - LAKE_BED_M) continue;
+        const d = Math.min(distToRing(x, y, poly.outer), ...poly.holes.map((h) => distToRing(x, y, h)));
+        const depth = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, d / LAKE_BANK_M);
+        const target = level - depth;
+        if (target < ground) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
+      }
+    }
+  }
+  return { pixels: edits.size, apply(set) { for (const [idx, v] of edits) set(idx, v); } };
 }
