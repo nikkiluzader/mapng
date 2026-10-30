@@ -38,6 +38,7 @@ const H_FOV = 90;           // Google's horizontal field of view (BeamNG's setFO
 const MAX_DISTORTION = 0.15; // |k1| over this: too bent to compare with a pinhole render
 const MIN_YEAR = Number(opt('--min-year', '0'));
 const YEARS_APART = 3;      // flag a pair this many years apart
+const OLD_YEARS = 5;        // flag a photo this many years old (the newest there is)
 const STREET_M = 6;         // a panorama this far past a carriageway's edge at most (street level)
 const TOD = 0.08;           // fixed time of day for every game shot (morning sun, BeamNG's 0..1 day)
 // the review rubric: each pair scored 0 (wrong) .. 2 (matches), null = not visible
@@ -232,18 +233,41 @@ const signGoogle = (pathQuery) => {
   const sig = crypto.createHmac('sha1', k).update(pathQuery).digest('base64').replace(/\+/g, '-').replace(/\//g, '_');
   return `${pathQuery}&signature=${sig}`;
 };
+// Google's metadata (free) returns the default panorama nearest a point,
+// not always the newest; positions a little along and across the road often
+// find newer drives. The newest street-level panorama among them wins
+// (ties: the nearest). The Static API has no date parameter.
+const GOOGLE_SAMPLES = [[0, 0], [10, 0], [-10, 0], [20, 0], [-20, 0], [0, 6], [0, -6], [10, 6], [-10, -6]];
+async function googleMeta(lat, lng, radius) {
+  const meta = await (await fetch(`https://maps.googleapis.com${signGoogle(`/maps/api/streetview/metadata?location=${lat.toFixed(7)},${lng.toFixed(7)}&radius=${radius}&source=outdoor&key=${GKEY}`)}`)).json();
+  // (Google's own cars only: user panoramas are indoor rooms, boats, drones)
+  return meta.status === 'OK' && /google/i.test(meta.copyright || '') ? meta : null;
+}
 async function googleNear(x, y, roadHeading) {
   if (!GKEY) return null;
-  const [lat, lng] = toLatLng(x, y);
-  const meta = await (await fetch(`https://maps.googleapis.com${signGoogle(`/maps/api/streetview/metadata?location=${lat.toFixed(7)},${lng.toFixed(7)}&radius=${SEARCH_M}&source=outdoor&key=${GKEY}`)}`)).json();
-  // (Google's own cars only: user panoramas are indoor rooms, boats, drones)
-  if (meta.status !== 'OK' || !/google/i.test(meta.copyright || '')) return null;
-  const [px, py] = toWorld(meta.location.lat, meta.location.lng);
-  if (LINES.length && !atStreetLevel(px, py)) return null;
-  const d = Math.hypot(px - x, py - y);
+  // along the road (its heading) and across it
+  const a = rad(Number.isFinite(roadHeading) ? roadHeading : 0);
+  const ux = Math.sin(a); const uy = Math.cos(a);
+  const seen = new Map();
+  for (const [along, across] of GOOGLE_SAMPLES) {
+    const sx = x + ux * along + uy * across; const sy = y + uy * along - ux * across;
+    const [lat, lng] = toLatLng(sx, sy);
+    const meta = await googleMeta(lat, lng, along || across ? 12 : SEARCH_M);
+    if (!meta || seen.has(meta.pano_id)) continue;
+    const [px, py] = toWorld(meta.location.lat, meta.location.lng);
+    if (LINES.length && !atStreetLevel(px, py)) continue;
+    const d = Math.hypot(px - x, py - y);
+    if (d > SEARCH_M) continue;
+    seen.set(meta.pano_id, { meta, px, py, d });
+  }
+  const list = [...seen.values()].filter((c) => !MIN_YEAR || Number(String(c.meta.date || '0').slice(0, 4)) >= MIN_YEAR);
+  if (!list.length) return null;
+  // newest first (dates are YYYY-MM), then nearest
+  list.sort((p, q) => String(q.meta.date || '').localeCompare(String(p.meta.date || '')) || p.d - q.d);
+  const { meta, px, py, d } = list[0];
   // facing the spot from the panorama, or along the road when standing on it
   const h = d > 6 ? bearing(x - px, y - py) : (roadHeading ?? 0);
-  return { d, x: px, y: py, h, pano: meta.pano_id, date: meta.date || '', lat: meta.location.lat, lng: meta.location.lng };
+  return { d, x: px, y: py, h, pano: meta.pano_id, date: meta.date || '', lat: meta.location.lat, lng: meta.location.lng, candidates: seen.size, oldest: list[list.length - 1].meta.date || '' };
 }
 async function googleImage(g, aspect) {
   // (the game screen's shape, so its view and Google's frame the same)
@@ -436,7 +460,7 @@ async function main() {
       }
     }
     rows.push(row);
-    process.stderr.write(`spot ${n}: ${spot.category} ${spot.k} (${Math.round(spot.x)}, ${Math.round(spot.y)})${mly ? ` mapillary ${Math.round(mly.d)} m` : ''}${goo ? ` google ${Math.round(goo.d)} m` : ''}\n`);
+    process.stderr.write(`spot ${n}: ${spot.category} ${spot.k} (${Math.round(spot.x)}, ${Math.round(spot.y)})${mly ? ` mapillary ${Math.round(mly.d)} m` : ''}${goo ? ` google ${goo.date} (newest of ${goo.candidates}) ${Math.round(goo.d)} m` : ''}\n`);
   }
   await lua(`core_camera.setFOV(0, ${Number(fovBefore) || 65}) local t = core_environment.getTimeOfDay() t.time = ${Number(todBefore) || 0} core_environment.setTimeOfDay(t) ui_visibility.set(true) return 'ok'`);
   // the page
@@ -457,7 +481,7 @@ ${rows.map((r) => {
     const ym = yearOf(r.mly?.date); const yg = yearOf(r.goo?.date);
     const apart = ym && yg && Math.abs(ym - yg) >= YEARS_APART ? ` <span class="why">photos ${Math.abs(ym - yg)} years apart</span>` : '';
     if (r.mly) parts.push(`<div class="pair">${cell(`${r.n}_mapillary.jpg`, `Mapillary ${esc(r.mly.date)}${apart}, ${Math.round(r.mly.d)} m from the spot, heading ${Math.round(r.mly.h)}°, ${r.mly.view.hFov.toFixed(0)}°×${r.mly.view.vFov.toFixed(0)}° view, pitch ${r.mly.view.pitch.toFixed(1)}°${r.mly.camera ? `, ${esc(r.mly.camera)}` : ''} · <a href="https://www.mapillary.com/app/?pKey=${r.mly.id}">open</a>`)}${cell(r.shots.m, `game, same place, heading and lens (${EYE_MAPILLARY_M} m up)`, r.mly.view.aspect)}</div>`);
-    if (r.goo) parts.push(`<div class="pair">${cell(r.gImage ? `${r.n}_google.jpg` : '', `Google ${esc(r.goo.date)}, ${Math.round(r.goo.d)} m from the spot, heading ${Math.round(r.goo.h)}°, ${H_FOV}° wide · <a href="https://www.google.com/maps/@?api=1&map_action=pano&pano=${r.goo.pano}&heading=${Math.round(r.goo.h)}">open</a>`)}${cell(r.shots.g, `game on the ${esc(r.level)} level, same place, heading and ${H_FOV}° view (${EYE_GOOGLE_M} m up)${r.blocked ? ` <span class="why">camera under ${esc(r.blocked)}</span>` : ''}`)}${r.shots.g2 ? cell(r.shots.g2, `game on the ${esc(r.altLevel)} level (roads stack here)`) : ''}</div>`);
+    if (r.goo) parts.push(`<div class="pair">${cell(r.gImage ? `${r.n}_google.jpg` : '', `Google ${esc(r.goo.date)}${yearOf(r.goo.date) && new Date().getFullYear() - yearOf(r.goo.date) >= OLD_YEARS ? ` <span class="why">${new Date().getFullYear() - yearOf(r.goo.date)} years old (newest of ${r.goo.candidates} nearby)</span>` : ` (newest of ${r.goo.candidates} nearby)`}, ${Math.round(r.goo.d)} m from the spot, heading ${Math.round(r.goo.h)}°, ${H_FOV}° wide · <a href="https://www.google.com/maps/@?api=1&map_action=pano&pano=${r.goo.pano}&heading=${Math.round(r.goo.h)}">open</a>`)}${cell(r.shots.g, `game on the ${esc(r.level)} level, same place, heading and ${H_FOV}° view (${EYE_GOOGLE_M} m up)${r.blocked ? ` <span class="why">camera under ${esc(r.blocked)}</span>` : ''}`)}${r.shots.g2 ? cell(r.shots.g2, `game on the ${esc(r.altLevel)} level (roads stack here)`) : ''}</div>`);
     return `<div class="row"><div>${head}</div>${parts.join('')}</div>`;
   }).join('\n')}
 </body></html>`;
