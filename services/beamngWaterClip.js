@@ -14,7 +14,7 @@ import { LINING_M, WALKWAY_M, extraAt } from './beamngTunnels.js';
 const ROOF_CLEAR_M = 0.3;      // water stops this far over a tube's roof
 const TUBE_PAD_M = 1.5;        // past the lining
 const OPEN_PAD_M = 2;          // past a trench's walls
-const MIN_DEPTH_M = 0.2;       // water shallower than this is left out
+const MIN_DEPTH_M = 0.25;      // water shallower than this is left out (a River's depth is 0.25..500 m: BeamNG docs)
 const SEA_CELL_M = 64;         // the sea's blocks away from tunnels ...
 const NEAR_CELL_M = 8;         // ... and near them
 const NEAR_PAD_M = 24;         // "near": within this of a dry zone

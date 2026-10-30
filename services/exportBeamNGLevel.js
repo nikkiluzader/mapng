@@ -7843,7 +7843,14 @@ function sanitizeBeamNGObjectName(value, fallback = 'road') {
 
   if (!cleaned) cleaned = String(fallback || 'road').replace(/[^A-Za-z0-9_]/g, '_');
   if (!/^[A-Za-z_]/.test(cleaned)) cleaned = `r_${cleaned}`;
-  if (cleaned.length > 48) cleaned = cleaned.slice(0, 48).replace(/_+$/g, '');
+  // (cut to 48: the start kept and a hash of the whole, so long names that
+  // differ only at their end stay apart; a plain cut made duplicate object
+  // names, which BeamNG resolves by dropping one)
+  if (cleaned.length > 48) {
+    let h = 2166136261;
+    for (let i = 0; i < cleaned.length; i++) { h ^= cleaned.charCodeAt(i); h = Math.imul(h, 16777619); }
+    cleaned = `${cleaned.slice(0, 40).replace(/_+$/g, '')}_${(h >>> 0).toString(36).slice(0, 7)}`;
+  }
   return cleaned || 'road';
 }
 
