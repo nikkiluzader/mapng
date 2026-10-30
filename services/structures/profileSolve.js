@@ -51,6 +51,8 @@ const HILLSIDE_MAX = 0.35;
 const GROUND_BAND_M = 6;      // an untagged road's free fill / cut for grades
 const UNDER_FREE_M = 3;       // a road under a deck is cleared from at most this over its ground
 const PIN_REACH_FACTOR = 2.5; // a lift reaches no higher than this many times the grade limit climbs from a pinned road
+const FORK_SHARE = 0.9;       // forking decks overlap: closer than this share of their half widths' sum
+const FORK_FALL = 0.03;       // cross fall across a fork's one surface
 
 // Allowed rise per station step of an edge: the class limit, or the
 // terrain's real slope over +-LONG_GRADE_M where steeper (a mountain road
@@ -227,6 +229,33 @@ export function* solveProfilesSteps(graph) {
   const links = [];
   edges.forEach((e, k) => { for (let i = 0; i + 1 < e.s.length; i++) links.push(off[k] + i, off[k] + i + 1, stepRise[k][i]); });
   for (const ends of meets) for (let a = 1; a < ends.length; a++) links.push(ends[0], ends[a], 0);
+  // decks forking at a node are one surface until their lanes part: from
+  // the node out, each station of one held to the other's nearest within
+  // a cross fall, as long as they overlap (a ramp left the motorway's deck
+  // 2 m under it 15 m on; a car drove into its underside). Grade links
+  // only: never spread as a lift.
+  for (const node of nodes.values()) {
+    const decks = node.edges.filter(({ edge }) => edges[edge].bridge && !edges[edge].external);
+    for (let a = 0; a < decks.length; a++) {
+      for (let b = a + 1; b < decks.length; b++) {
+        const A = edges[decks[a].edge]; const B = edges[decks[b].edge];
+        if (A.layer !== B.layer) continue;
+        const reach = (A.half + B.half) * FORK_SHARE;
+        const nA = A.s.length; const nB = B.s.length;
+        const iA = (k) => (decks[a].end === 0 ? k : nA - 1 - k);
+        const iB = (k) => (decks[b].end === 0 ? k : nB - 1 - k);
+        let kb = 0;
+        for (let ka = 1; ka < nA; ka++) {
+          const xa = A.x[iA(ka)]; const ya = A.y[iA(ka)];
+          // (B's nearest station, walking out with A)
+          while (kb + 1 < nB && Math.hypot(B.x[iB(kb + 1)] - xa, B.y[iB(kb + 1)] - ya) <= Math.hypot(B.x[iB(kb)] - xa, B.y[iB(kb)] - ya)) kb++;
+          const d = Math.hypot(B.x[iB(kb)] - xa, B.y[iB(kb)] - ya);
+          if (d >= reach || kb === 0) { if (d >= reach) break; continue; }
+          links.push(off[decks[a].edge] + iA(ka), off[decks[b].edge] + iB(kb), FORK_FALL * d + 0.02);
+        }
+      }
+    }
+  }
   const freedomOf = (v) => 1 / (W[v] + 0.01);
   const projectNetwork = () => {
     let moved = 0;

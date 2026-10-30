@@ -659,9 +659,26 @@ const nearAnySegment = (p, lines, r0) => lines.some((line) => {
 /**
  * Piers under one solved part: [{ x, y, u, width, zTop, zBottom }], evenly
  * spaced, none where the deck nearly rests on the ground, moved off (or left
- * out next to) the roads under it.
+ * out next to) the roads under it and the lanes of lower decks (decks:
+ * parts { xy, z, half }).
  */
-export function pierSites(part, { groundAt, roadLines = [] }) {
+// a deck's lanes under a pier: within its half width (and the edge margin)
+// of a foot, at a height between the pier's foot and its top
+const deckUnder = (p, decks, zLow, zHigh) => decks.some((q) => {
+  const r = (q.half ?? 0) + PIER_ROAD_EDGE_M;
+  for (let j = 0; j + 1 < q.xy.length; j++) {
+    const [ax, ay] = q.xy[j]; const [bx, by] = q.xy[j + 1];
+    const vx = bx - ax; const vy = by - ay;
+    const L2 = vx * vx + vy * vy || 1e-9;
+    const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - ay) * vy) / L2));
+    if (Math.hypot(ax + vx * t - p[0], ay + vy * t - p[1]) >= r) continue;
+    const zq = q.z[j] + (q.z[j + 1] - q.z[j]) * t;
+    if (zq > zLow && zq < zHigh) return true;
+  }
+  return false;
+});
+
+export function pierSites(part, { groundAt, roadLines = [], decks = [] }) {
   const { xy, z, half } = part;
   const s = arcLengths(xy);
   const L = s[s.length - 1];
@@ -691,6 +708,8 @@ export function pierSites(part, { groundAt, roadLines = [] }) {
       const zTop = z[j] + (z[j + 1] - z[j]) * f - under;
       const g = groundAt(x, y);
       if (zTop - g < PIER_MIN_CLEAR_M) break;
+      // (nor through a lower deck's lanes: stacked ramps, a car hit one)
+      if (foot.some((p) => deckUnder(p, decks, g - 1, zTop))) continue;
       out.push({ x, y, u, width, pierWidth: pw, zTop, zBottom: g - FOOTING_M });
       break;
     }
@@ -1028,7 +1047,7 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
       });
     }
     // piers
-    for (const p of pierSites(part, { groundAt, roadLines })) {
+    for (const p of pierSites(part, { groundAt, roadLines, decks: [...deck.parts.filter((q) => q !== part), ...neighbours] })) {
       const deckW = p.width;
       if (deckW > PIER_BENT_W_M) {
         const cols = Math.max(2, Math.round(deckW / 8));

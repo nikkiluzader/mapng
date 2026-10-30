@@ -124,3 +124,25 @@ test('a lift up a tunnel approach gives way to the pinned portal: steeper, not a
   let steep = 0; for (let i = 1; i < n; i++) steep = Math.max(steep, Math.abs(z[0][i] - z[0][i - 1]) / (s[i] - s[i - 1]));
   assert.ok(steep < 0.15, `drivable all the way: ${(steep * 100).toFixed(1)} %`);
 });
+
+test('decks forking at a node stay one surface while their lanes overlap', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // a motorway deck and a ramp deck leave node F side by side, parting
+  // slowly; the ramp's far end is pinned 4 m lower than the motorway's
+  const line = (dy, n, step = 4) => {
+    const x = []; const y = []; const s = [];
+    for (let i = 0; i < n; i++) { x.push(i * step); y.push(i * step * dy); s.push(Math.hypot(i * step, i * step * dy)); }
+    return { x: Float64Array.from(x), y: Float64Array.from(y), s: Float64Array.from(s), g: new Float64Array(n).fill(0) };
+  };
+  const main = { ...line(0, 41), from: 'F', to: 'M', highway: 'motorway', layer: 1, half: 5, bridge: true, tunnel: false };
+  const ramp = { ...line(0.12, 41), from: 'F', to: 'R', highway: 'motorway_link', layer: 1, half: 4, bridge: true, tunnel: false };
+  const nodes = new Map([['F', { edges: [{ edge: 0, end: 0 }, { edge: 1, end: 0 }] }], ['M', { edges: [{ edge: 0, end: 1 }] }], ['R', { edges: [{ edge: 1, end: 1 }] }]]);
+  const pins = [[0, 0, 12], [0, 40, 16], [1, 40, 8]];
+  const { z } = solveProfiles({ edges: [main, ramp], nodes, pins, crossings: { crossings: [], water: [] } });
+  // overlapping while 0.12 * x < 0.9 * 9: about the first 65 m
+  for (let i = 1; i <= 14; i++) {
+    let best = 0; let bd = Infinity;
+    for (let k = 0; k < 41; k++) { const d = Math.hypot(ramp.x[k] - main.x[i], ramp.y[k] - main.y[i]); if (d < bd) { bd = d; best = k; } }
+    assert.ok(Math.abs(z[0][i] - z[1][best]) <= 0.03 * bd + 0.05, `step ${(z[0][i] - z[1][best]).toFixed(2)} m at ${main.x[i]} m`);
+  }
+});
