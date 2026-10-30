@@ -27,6 +27,8 @@ const NOTCH_FILL_M = 40;               // often just OSM a few m off a cliff fac
 const MAX_SHORT_SHARE = 0.4;           // more of the tube than this short of cover: not a tunnel here
 export const MIN_TUBE_M = 20;          // a shorter bore is left on the ground
 const SMOOTH_SIGMA_M = 15;             // vertical curves on the profile
+const PORTAL_CURVE_SIGMA_M = 8;        // ... and on the whole road with its approaches (no V at a portal)
+const CURVE_COVER_M = 0.5;             // cover those curves may take in the tube
 const JOIN_M = 0.5;
 
 // Cross-section (m): the road's carriageway + a walkway each side, walls,
@@ -498,6 +500,13 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     for (let i = 1; i < n; i++) z[i] = Math.min(z[i], z[i - 1] + MAX_GRADE * (st[i].s - st[i - 1].s));
     for (let i = n - 2; i >= 0; i--) z[i] = Math.min(z[i], z[i + 1] + MAX_GRADE * (st[i + 1].s - st[i].s));
     z = smoothPinned(z, STEP_M, SMOOTH_SIGMA_M).map((v, i) => Math.min(v, u[i]));
+    // the cap cut steps back into the smoothed line where the street's
+    // ground jumps (a flat landing inside the portal, then 0.3 m up in 2 m:
+    // cars grounded on it): the grade limit again, by lowering only (more
+    // cover; a hair under the limit, as the checks judge it)
+    const g2 = MAX_GRADE * 0.97;
+    for (let i = 1; i < n; i++) z[i] = Math.min(z[i], z[i - 1] + g2 * (st[i].s - st[i - 1].s));
+    for (let i = n - 2; i >= 0; i--) z[i] = Math.min(z[i], z[i + 1] + g2 * (st[i + 1].s - st[i].s));
   } else {
     // The straight grade between the portals, lowered under the hill where it
     // would come too close to the surface, as far as the grade allows.
@@ -600,6 +609,19 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     else p.s = s0 + L + p.s;
   });
   const off = before.length;
+  // vertical curves over the whole road, approaches and tube together (the
+  // tube and its cutting met in a V at the portal, 6 % down to 6 % up: cars
+  // grounded on it); both far ends stay where they are
+  // (in the tube the curve takes at most CURVE_COVER_M of the cover)
+  if (all.length >= 3) {
+    const zs = smoothPinned(all.map((p) => p.z), STEP_M, PORTAL_CURVE_SIGMA_M);
+    all.forEach((p, k) => {
+      const tube = k >= before.length + iS && k <= before.length + iN;
+      // (raised at most to the cover's give, or where it already was: a
+      // stretch exposed onto a bridge stays)
+      p.z = tube ? Math.min(zs[k], Math.max(p.z, p.g - need + CURVE_COVER_M)) : zs[k];
+    });
+  }
   const tunnel = {
     ok: true,
     line: all,

@@ -31,13 +31,14 @@ const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
  *   grid: { heightMap, width, height, worldSize, minHeight, keep? } (raw
  *         heights; world z = raw - minHeight, world x, y centred, y north;
  *         keep(idx): ground another builder shaped, left alone outside the
- *         road cores)
+ *         road cores; tube(idx): ground over a built tube, composed only under a
+ *         road's own surface)
  * Returns { tiles, stats, heightAt(x, y), apply(set) }:
  *   heightAt: the composed terrain in world z (edits over the current grid)
  *   apply(set): calls set(idx, raw) for every edited pixel
  */
 export function composeTerrain(graph, grid) {
-  const { heightMap, width, height, worldSize, minHeight = 0, keep = null } = grid;
+  const { heightMap, width, height, worldSize, minHeight = 0, keep = null, tube = null } = grid;
   const z = graph.profile?.z;
   const segments = graph.classes?.segments || [];
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -169,6 +170,11 @@ export function composeTerrain(graph, grid) {
           }
           const tt = d <= core ? 0 : (d - core) / slope;
           if (tt >= 1) continue;
+          // ground over a built tube is the tunnel's: only a road's own
+          // surface on it (a street over the box) is composed, not a road's
+          // rounded end or side slope reaching over it (a cutting's end, its
+          // road meeting the tube by a short link: dug into the portal)
+          if (tube && (d > core || uRaw < 0 || uRaw > 1) && tube(r * width + c)) { left.add(r * width + c); continue; }
           // ground another builder shaped (a tunnel's cutting): its own
           // except under the road's surface
           if (keep && d > core && keep(r * width + c)) { left.add(r * width + c); continue; }
