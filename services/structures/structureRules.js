@@ -9,6 +9,7 @@
 
 const ROOF_M = 6;            // road surface to the outside of a cut-and-cover roof (5 m headroom + slab)
 const OVER_ROAD_MARGIN_M = 3; // a deck reaches this far past a crossed road's edge
+const DECK_MIN_H = 1.5;       // lowest a deck stands over the ground (its structure under it)
 
 /**
  * The rules, first match wins. Conditions (all must hold):
@@ -31,9 +32,9 @@ export const STRUCTURE_RULES = [
 ];
 
 // Shortest run of each kind; a shorter one merges into a neighbour.
-export const MIN_RUN_M = { deck: 10, embankment: 8, boredTunnel: 40, cutAndCover: 10, cutting: 8, ground: 6 };
+export const MIN_RUN_M = { external: 0, deck: 10, embankment: 8, boredTunnel: 40, cutAndCover: 10, cutting: 8, ground: 6 };
 // Which neighbour a short run joins: the higher ranked one.
-const RANK = { deck: 6, boredTunnel: 5, cutAndCover: 4, embankment: 3, cutting: 2, ground: 1 };
+const RANK = { external: 9, deck: 6, boredTunnel: 5, cutAndCover: 4, embankment: 3, cutting: 2, ground: 1 };
 
 function matches(rule, st) {
   if (rule.tag && !st.tags[rule.tag]) return false;
@@ -61,6 +62,8 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
   const overRoad = edges.map((e) => new Uint8Array(e.s.length));
   for (const c of graph.crossings?.crossings || []) {
     const up = c[c.upper]; const dn = c[c.upper === 'a' ? 'b' : 'a'];
+    // (over a tunnel the road stands on the ground or its roof: no deck)
+    if (edges[dn.edge].tunnel || edges[dn.edge].external) continue;
     const e = edges[up.edge];
     const reach = (edges[dn.edge].half || 4) + OVER_ROAD_MARGIN_M;
     for (let i = 0; i < e.s.length; i++) if (Math.abs(e.s[i] - up.s) <= reach) overRoad[up.edge][i] = 1;
@@ -116,7 +119,11 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
       const h = z[k][i] - e.g[i];
       const st = { tags, h, cover: -h - ROOF_M, overRoad: !!overRoad[k][i], overWater: !!overWater[k][i] };
       kinds[i] = (rules.find((r) => matches(r, st)) || { kind: 'ground' }).kind;
-      if (kinds[i] === 'embankment' && crowded[k][i]) { kinds[i] = 'deck'; stats.carried++; }
+      if (kinds[i] === 'embankment' && crowded[k][i] && h >= DECK_MIN_H) { kinds[i] = 'deck'; stats.carried++; }
+      // a deck has its underside below the ground lower than this (a ramp's
+      // first metres off a junction): fill there, unless over a road or water
+      if (kinds[i] === 'deck' && h < DECK_MIN_H && !st.overRoad && !st.overWater) kinds[i] = h >= 0.5 ? 'embankment' : 'ground';
+      if (e.external) kinds[i] = 'external';   // placed by another builder (today's tunnels)
     }
     // runs, then merge the short ones into their higher-ranked neighbour
     let runs = [];

@@ -20,6 +20,18 @@ const GRADE_LIMIT = {
 };
 const GRADE_DEFAULT = 0.15;
 export const gradeLimit = (highway) => GRADE_LIMIT[highway] ?? GRADE_DEFAULT;
+// The steepest a road of each class follows its terrain where the terrain is
+// steeper than its limit (a mountain street climbs with its hillside; a
+// motorway ramp never climbs a 34% wall that bare-earth elevation shows
+// where a ramp structure was taken out: it is built on fill or a deck).
+// (the structure checks' limits per class, so a solved road never fails
+// them by following its terrain; minor roads climb steeper hillsides)
+const GRADE_CEILING = {
+  motorway: 0.06, motorway_link: 0.08, trunk: 0.07, trunk_link: 0.08,
+  primary: 0.1, primary_link: 0.1, secondary: 0.12, secondary_link: 0.12,
+  tertiary: 0.15, tertiary_link: 0.15,
+};
+const GRADE_CEILING_DEFAULT = 0.25;
 
 const W_GROUND = 1;           // pull of a ground road's station to its ground
 // A tagged bridge / tunnel station: no pull to the ground at all (even a
@@ -111,10 +123,14 @@ export function* solveProfilesSteps(graph) {
 
   // fixed upper seeds: tunnel interiors under cover
   const capSeeds = [];
-  edges.forEach((e, k) => { if (e.tunnel) for (let i = 1; i + 1 < e.s.length; i++) capSeeds.push([off[k] + i, G[off[k] + i] - TUNNEL_COVER_M]); });
+  edges.forEach((e, k) => { if (e.tunnel && !e.external) for (let i = 1; i + 1 < e.s.length; i++) capSeeds.push([off[k] + i, G[off[k] + i] - TUNNEL_COVER_M]); });
+  // pinned stations (roads another builder places: today's tunnels) are
+  // held at their height from above and below
+  const pins = (graph.pins || []).filter(([k, i, h]) => edges[k] && i < edges[k].s.length && Number.isFinite(h)).map(([k, i, h]) => [off[k] + i, h]);
+  capSeeds.push(...pins);
   const U = spread(capSeeds, -1);
   // fixed lower seeds: bridge runs over water
-  const waterSeeds = [];
+  const waterSeeds = pins.slice();
   for (const run of water) for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, G[off[run.edge] + i] + run.need + DECK_UNDER_M]);
 
   // allowed rise per station step: the class limit, or the terrain's real
@@ -132,7 +148,8 @@ export function* solveProfilesSteps(graph) {
       const span = e.s[b] - e.s[a];
       const terrain = span > 1 ? Math.abs(G[off[k] + b] - G[off[k] + a]) / span : 0;
       // (a deck or tunnel does not follow the ground: its class limit only)
-      out[i] = (e.bridge || e.tunnel ? lim : Math.max(lim, terrain)) * (e.s[i + 1] - e.s[i]);
+      const ceiling = (GRADE_CEILING[e.highway] ?? GRADE_CEILING_DEFAULT) * 0.97;   // (a margin under the checks)
+      out[i] = (e.bridge || e.tunnel ? lim : Math.max(lim, Math.min(terrain, ceiling))) * (e.s[i + 1] - e.s[i]);
     }
     return out;
   });
@@ -160,6 +177,32 @@ export function* solveProfilesSteps(graph) {
         moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
       }
     });
+    return moved;
+  };
+  // grade links over the whole network: along every edge (its allowed rise
+  // per step) and between the ends meeting at a node (none); each excess is
+  // split by how freely its two stations may move (a deck freely, a ground
+  // road held by its ground), then held inside the envelopes
+  const links = [];
+  edges.forEach((e, k) => { for (let i = 0; i + 1 < e.s.length; i++) links.push(off[k] + i, off[k] + i + 1, stepRise[k][i]); });
+  for (const ends of meets) for (let a = 1; a < ends.length; a++) links.push(ends[0], ends[a], 0);
+  const freedomOf = (v) => 1 / (W[v] + 0.01);
+  const projectNetwork = () => {
+    let moved = 0;
+    for (let pass = 0; pass < 4; pass++) {
+      const fwd = pass % 2 === 0;
+      for (let j = fwd ? 0 : links.length - 3; fwd ? j < links.length : j >= 0; j += fwd ? 3 : -3) {
+        const a = links[j]; const b = links[j + 1]; const rise = links[j + 2];
+        const d = Z[b] - Z[a];
+        const excess = Math.abs(d) - rise;
+        if (excess <= 1e-6) continue;
+        const fa = freedomOf(a); const fb = freedomOf(b); const sign = Math.sign(d);
+        const za = Math.min(U[a], Math.max(L[a], Z[a] + sign * excess * fa / (fa + fb)));
+        const zb = Math.min(U[b], Math.max(L[b], Z[b] - sign * excess * fb / (fa + fb)));
+        moved = Math.max(moved, Math.abs(za - Z[a]), Math.abs(zb - Z[b]));
+        Z[a] = za; Z[b] = zb;
+      }
+    }
     return moved;
   };
   const Z = Float64Array.from(G, (g, v) => Math.min(g, U[v]));
@@ -197,8 +240,11 @@ export function* solveProfilesSteps(graph) {
         for (const v of ends) { moved = Math.max(moved, Math.abs(Z[v] - mean)); Z[v] = mean; }
       }
       // grades last, inward from the junction values (so a junction
-      // averaged toward one road never leaves a jump on another)
+      // averaged toward one road never leaves a jump on another), then over
+      // the whole network: junction heights must also be reachable along the
+      // roads between them
       moved = Math.max(moved, clampGrades());
+      moved = Math.max(moved, projectNetwork());
       if (sweep % 30 === 29) yield;
       if (moved < SETTLED_M) break;
     }

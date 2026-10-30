@@ -4636,21 +4636,6 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // stage B: crossings and their order, bridges over water (shadow mode too)
     structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
     yield;
-    // stage C: every road's profile in one solve (shadow mode: measured with
-    // the same checks as the level's roads, for the report)
-    {
-      const t0 = performance.now();
-      structureGraph.profile = yield* solveProfilesSteps(structureGraph);
-      structureGraph.profile.ms = Math.round(performance.now() - t0);
-      const lines = structureGraph.edges.map((e, k) => ({
-        nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
-        highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
-      }));
-      structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
-      Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
-      // stage D: what each stretch becomes
-      structureGraph.classes = classifyStructures(structureGraph);
-    }
     yield;
   } catch (err) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver skipped: ${err?.message || err}`);
@@ -4674,6 +4659,41 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const late = yield* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
   yield;
   const tunnels = joinTunnelPhases(early, late);
+  // The structure solver's profile and classes (stages C, D), after today's
+  // tunnels. Building the level ('v2'), today's tunnels' roads are pinned
+  // at the tunnels' own heights (until the solver builds tunnels too), so
+  // approaches grade into the portals; in shadow mode it keeps its own
+  // tunnel rules.
+  if (structureGraph) {
+    try {
+      structureGraph.pins = [];
+      structureGraph.edges.forEach((e, k) => {
+        const t = opts.structureSolver === 'v2' ? tunnels.bySeg.get(e.seg) : null;
+        if (!t) return;
+        e.external = true;
+        for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i])]);
+      });
+      // stage C: every road's profile in one solve (shadow mode: measured with
+      // the same checks as the level's roads, for the report)
+      {
+        const t0 = performance.now();
+        structureGraph.profile = yield* solveProfilesSteps(structureGraph);
+        structureGraph.profile.ms = Math.round(performance.now() - t0);
+        const lines = structureGraph.edges.map((e, k) => ({
+          nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
+          highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
+        }));
+        structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
+        Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
+        // stage D: what each stretch becomes
+        structureGraph.classes = classifyStructures(structureGraph);
+      }
+      yield;
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver profile skipped: ${err?.message || err}`);
+      structureGraph.profile = null; structureGraph.classes = null;
+    }
+  }
   // a road reaching into a tube it is no part of (a ramp OSM ends a few
   // metres into a tunnel's mouth, where the tube widens for it): on the
   // tube's floor there, not draped over the headwall's backfill
@@ -9777,7 +9797,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     decalRoads.bridges.decks = decks;
     decalRoads.bridges.roadLines = roadLinesFromSolver(sg);
     decalRoads.bridges.partInfo = parts.map((p) => ({ ...p.osm, structure: p.structure ?? null, landing: false, carried: false }));
-    const applied = applySolvedHeights(decalRoads, sg);
+    // (tunnels still come from today's builder: their roads keep its heights)
+    const applied = applySolvedHeights(decalRoads, sg, { skipOwners: new Set(decalRoads.tunnels?.bySeg?.keys?.() || []) });
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2: ${decks.length} deck(s) of ${parts.length} part(s); ${applied.nodes} road nodes in ${applied.decals} decals at their solved heights.`);
     await yield_();
   }

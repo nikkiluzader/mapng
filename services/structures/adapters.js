@@ -72,10 +72,11 @@ export function roadLinesFromSolver(graph) {
  * Set every road decal's node heights from the solved profile: each node to
  * the nearest station of its road's graph edges. A decal with any node on a
  * deck stretch projects onto objects (the deck). Decals carry their road
- * as the non-serialized __owner (the drivable segment index).
+ * as the non-serialized __owner (the drivable segment index); skipOwners:
+ * owners another builder places (today's tunnels until stage G covers them).
  * Returns { decals, nodes } changed.
  */
-export function applySolvedHeights(groups, graph, { deckLift = 0.02 } = {}) {
+export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners = null } = {}) {
   const { edges } = graph;
   const z = graph.profile?.z;
   if (!z) return { decals: 0, nodes: 0 };
@@ -87,6 +88,8 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02 } = {}) {
   for (const g of groups || []) {
     for (const d of g.__items || []) {
       if (d.__owner === undefined || !Array.isArray(d.nodes)) continue;
+      // (roads another builder owns, today's tunnels, keep their heights)
+      if (skipOwners?.has(d.__owner)) continue;
       const pieces = bySeg.get(d.__owner);
       if (!pieces) continue;
       let onDeck = false;

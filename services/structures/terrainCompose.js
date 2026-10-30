@@ -88,7 +88,7 @@ export function composeTerrain(graph, grid) {
     const zk = z[k];
     for (let i = 0; i + 1 < e.s.length; i++) {
       const kind = kindOf[k][i];
-      if (kind === 'boredTunnel' || kind === 'cutAndCover') continue;
+      if (kind === 'boredTunnel' || kind === 'cutAndCover' || kind === 'external') continue;
       // a deck's ends on fill are abutments: fill under the deck (below)
       const abutment = kind === 'deck' && Math.min(toAbutment[k][i], toAbutment[k][i + 1]) < ABUTMENT_M;
       const deck = kind === 'deck' && !abutment;
