@@ -120,3 +120,36 @@ test('shapingPlan on a hand-made graph: approaches belong to the structure they 
   assert.equal(plan.skip(1, 0), true);
   assert.equal(plan.skip(0, 0), false);
 });
+
+test('simple bridge spans its dip rim to rim, not only the OSM bridge stretch (Wasatch Blvd shape)', async () => {
+  const { simpleSpans } = await import('../services/structures/shaping.js');
+  // a road heading north: flat at 72 m, the OSM bridge from y 30 to 57 down
+  // the near slope to the floor (66.5), the floor (65.9 at y 63) and the far
+  // wall up to 71 m at y 80 all on the next road, then flat (measured in game)
+  const ground = (y) => {
+    if (y <= 32) return 72;
+    if (y <= 57) return 72 - (y - 32) * (5.5 / 25);
+    if (y <= 63) return 66.5 - (y - 57) * 0.1;
+    if (y <= 80) return 65.9 + (y - 63) * (5.1 / 17);
+    return 71 - (y - 80) * 0.004;
+  };
+  const edge = (from, to, y0, y1, extra = {}) => {
+    const ys = []; for (let y = y0; y <= y1 + 1e-9; y += 2.5) ys.push(y);
+    return { from, to, s: Float64Array.from(ys, (y) => y - y0), x: new Float64Array(ys.length), y: Float64Array.from(ys), g: Float64Array.from(ys, ground), half: 7, layer: 0, highway: 'secondary', ...extra };
+  };
+  const graph = { edges: [edge('a', 'b', -100, 30), edge('b', 'c', 30, 57.5, { bridge: true, layer: 1 }), edge('c', 'd', 57.5, 200)] };
+  const { list, pins } = simpleSpans(graph, new Set([1]));
+  assert.equal(list.length, 1);
+  const [sp] = list;
+  // A at the near rim (~72 m, y 30-32), B at the far rim (~71 m, y ~80)
+  assert.ok(Math.abs(sp.from[2] - 72) < 0.2 && sp.from[1] <= 32.5 && sp.from[1] >= 20, `A at y ${sp.from[1]} z ${sp.from[2]}`);
+  assert.ok(Math.abs(sp.to[2] - 71) < 0.2 && Math.abs(sp.to[1] - 80) <= 5, `B at y ${sp.to[1]} z ${sp.to[2]}`);
+  // the deck straight between them, never under the ground
+  for (const [k, i, z] of pins) {
+    const y = graph.edges[k].y[i];
+    const line = sp.from[2] + (sp.to[2] - sp.from[2]) * (y - sp.from[1]) / (sp.to[1] - sp.from[1]);
+    assert.ok(z >= graph.edges[k].g[i] - 1e-9 && Math.abs(z - line) < 0.05, `y ${y}: ${z.toFixed(2)} vs line ${line.toFixed(2)}`);
+  }
+  // and it reaches onto the far approach (where OSM's bridge had stopped)
+  assert.ok(pins.some(([k]) => k === 2));
+});

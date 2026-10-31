@@ -4759,6 +4759,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         const plan = shapingPlan(structureGraph, shaping);
         structureGraph.fixed = plan.fixed;
         structureGraph.noCut = plan.noCut;
+        // (each plain deck's span, rim to rim, pinned as today's tunnels are)
+        structureGraph.pins.push(...plan.pins);
         Object.defineProperty(structureGraph, 'shaping', { value: plan, enumerable: false });
       }
       // stage C: every road's profile in one solve (shadow mode: measured with
@@ -4775,7 +4777,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
         // stage D: what each stretch becomes
         structureGraph.classes = classifyStructures(structureGraph);
-        if (structureGraph.shaping) structureGraph.classes = rawDeckClasses(structureGraph, structureGraph.classes, structureGraph.shaping.rawDeck);
+        if (structureGraph.shaping) structureGraph.classes = rawDeckClasses(structureGraph, structureGraph.classes, structureGraph.shaping.rawDeck, structureGraph.shaping.span);
         // no bridges: a stretch the solve still left high is fill, never a deck
         if (!includeBridges) for (const seg of structureGraph.classes.segments) if (seg.kind === 'deck') seg.kind = 'embankment';
       }
@@ -5955,6 +5957,16 @@ function shapingReportLines(sh, section) {
     const pct = p.stations ? ` (${((100 * p.fixedStations) / p.stations).toFixed(1)}%)` : '';
     lines.push(`- Road stations held exactly on the ground: ${p.fixedStations} of ${p.stations}${pct}; ordinary roads ${p.byRole.road}, bridge approaches ${p.byRole.bridge}, overpass approaches ${p.byRole.overpass}, tunnel roads and approaches ${p.byRole.tunnel}`);
     lines.push(`- Bridge/overpass roads built as plain decks (no embankment or abutment fill; deck wherever the road is ${'>'}0.1 m over the ground, its ends on the ground): ${p.rawDecks} road(s), ${sh.rawDeckParts} deck stretch(es)`);
+    const spans = p.spans || [];
+    if (spans.length) {
+      lines.push(`- Plain decks spanning a dip rim to rim (straight from where the road leaves the ground to where it meets it again, past the OSM bridge's ends where the dip runs on): ${spans.length}`);
+      for (const sp of spans.slice(0, 20)) {
+        const at = (q) => `(${formatNumber(q[0], 0)}, ${formatNumber(q[1], 0)}) at ${formatNumber(q[2], 1)} m`;
+        lines.push(`  - ${formatNumber(sp.length, 0)} m from ${at(sp.from)} to ${at(sp.to)}; OSM's bridge ${formatNumber(sp.osmLength, 0)} m`);
+      }
+      if (spans.length > 20) lines.push(`  - … ${spans.length - 20} more`);
+    }
+    if (p.rawDecks > spans.length) lines.push(`- Plain decks with no dip under them (flat ground or an overpass whose embankments the elevation lacks): ramped up within their own length, at up to twice the class grade`);
   } else {
     lines.push('- Road stations held on the ground: none (every road shaped as usual)');
   }

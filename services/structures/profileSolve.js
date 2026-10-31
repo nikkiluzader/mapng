@@ -188,6 +188,8 @@ export function* solveProfilesSteps(graph) {
   // held at their height from above and below
   const pins = (graph.pins || []).filter(([k, i, h]) => edges[k] && i < edges[k].s.length && Number.isFinite(h)).map(([k, i, h]) => [off[k] + i, h]);
   capSeeds.push(...pins);
+  const pinned = new Uint8Array(N);
+  for (const [v] of pins) pinned[v] = 1;
   // roads with no structure tag: held near their ground (below)
   const banded = new Uint8Array(N);
   {
@@ -342,7 +344,7 @@ export function* solveProfilesSteps(graph) {
     // meeting there too, so a bridge lifted over a road comes down to it)
     for (const ends of meets) {
       const h = ends.find((v) => held[v]);
-      if (h === undefined) continue;
+      if (h === undefined || ends.some((v) => pinned[v])) continue;
       for (const v of ends) { L[v] = G[h]; U[v] = G[h]; }
     }
     for (let v = 0; v < N; v++) Z[v] = Math.min(U[v], Math.max(L[v], Z[v]));

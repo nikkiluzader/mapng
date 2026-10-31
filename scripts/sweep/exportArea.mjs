@@ -6,7 +6,8 @@
 //
 // Writes <out>/<levelName>.zip (default scratch/sweep) and, beside it,
 // <levelName>.checks.json (the export's structure checks). EXPORT_OPTS (JSON)
-// adds export options (structures, terrain shaping). --fix-stubs puts
+// adds export options (structures, terrain shaping); RAW=1 skips the data
+// pull's road snapping and smoothing (the app's raw terrain). --fix-stubs puts
 // real images where the headless canvas left stubs, so the level loads clean
 // in game. STRUCT=v1|v2|v2-terrain picks the structure solver.
 import fs from 'node:fs';
@@ -32,15 +33,17 @@ const osmFeatures = JSON.parse(fs.readFileSync(path.join(dir, 'osm.json')));
 const heightMap = new Float32Array(fs.readFileSync(path.join(dir, `${dem}.f32`)).buffer.slice(0));
 // as the app: fine terrain: roads onto its cut, then the light fine-mode
 // smoothing; coarse (30 m): the full smoothing
+// (RAW=1: as the app's raw terrain, the elevation left as fetched)
 const fine = dem === 'gpxz';
+const raw = !!process.env.RAW;
 let osmRoads = osmFeatures;
-if (fine) osmRoads = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmFeatures, meta.mpp, isGroundLevelRoad).features;
-smoothRoadsInHeightmap(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, { skipTracks: fine, fine });
+if (fine && !raw) osmRoads = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmFeatures, meta.mpp, isGroundLevelRoad).features;
+if (!raw) smoothRoadsInHeightmap(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, { skipTracks: fine, fine });
 let minHeight = Infinity; let maxHeight = -Infinity;
 for (const v of heightMap) { if (v < minHeight) minHeight = v; if (v > maxHeight) maxHeight = v; }
 const terrainData = {
   width: meta.size, height: meta.size, minHeight, maxHeight, bounds: meta.bounds, heightMap, osmFeatures: osmRoads,
-  processingMetersPerPixel: meta.mpp,
+  processingMetersPerPixel: meta.mpp, raw,
 };
 
 const t0 = Date.now();
