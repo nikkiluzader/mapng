@@ -25,6 +25,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
+import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
 import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
 import { checkJoints, checkGrades, checkCrossings, checkRoadSurface } from './structures/metrics.js';
@@ -6287,6 +6288,8 @@ function buildDetailedReportSections(d) {
     const avg = (a) => (br.built ? a.sum / br.built : NaN);
     lines.push(`- Floors: min ${br.built ? st.floors.min : 'n/a'}, mean ${formatNumber(avg(st.floors), 1)}, max ${st.floors.max}`);
     lines.push(`- Eave height: min ${br.built ? formatNumber(st.height.min, 1) : 'n/a'} m, mean ${formatNumber(avg(st.height), 1)} m, max ${formatNumber(st.height.max, 1)} m`);
+    const hs = st.heightSource || {};
+    lines.push(`- Heights from: OSM tags ${hs.tagged || 0}, Overture (Microsoft / Google ML) ${hs.overture || 0}, the median of tagged neighbours of the same kind within 120 m ${hs.neighbours || 0}, estimated from class and size ${hs.estimated || 0}`);
     lines.push(`- On sloping ground: ${st.groundSpread.over3m} footprint(s) span more than 3 m of terrain (max ${formatNumber(st.groundSpread.max, 1)} m; their plinth reaches the lowest corner)`);
     lines.push(`- Shop fronts: ${st.shopFronts}, offices: ${st.offices}, courtyards (inner rings): ${st.withHoles}`);
     const sorted = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]);
@@ -6294,6 +6297,15 @@ function buildDetailedReportSections(d) {
     lines.push('- OSM building=* classes:'); listCounts(sorted(st.classes), 30);
     lines.push('- Roofs:'); listCounts(sorted(st.roofs));
     lines.push('- Wall materials:'); listCounts(sorted(st.walls));
+  }
+  const bc = d.buildingConflicts;
+  if (bc) {
+    lines.push(`- Buildings on roads (each footprint checked against the roads' driving lanes; tunnels, building passages, covered ways, bridges, driveways and parking aisles never count):`);
+    lines.push(`  - Machine-learned / cadastre outlines (Overture, no OSM source) on a road, left out: ${bc.dropped.length}`);
+    lines.push(`  - OSM buildings reaching into the lanes, cut back along the lanes' edge: ${bc.clipped.length} (OSM buildings are never left out)`);
+    lines.push(`  - OSM buildings largely on a road, kept as mapped: ${bc.flagged.length}${bc.flagged.length ? ' (check these in the map data: a misplaced footprint, or a road through a passage not tagged tunnel=building_passage)' : ''}`);
+    for (const x of bc.flagged.slice(0, 25)) lines.push(`    - ${x.id}: ${Math.round(x.share * 100)}% of it on the lanes`);
+    if (bc.flagged.length > 25) lines.push(`    - … ${bc.flagged.length - 25} more`);
   }
 
   // ── Sidewalks and street furniture ─────────────────────────────────────────
@@ -9905,9 +9917,24 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     td = await prepareCroppedTerrainData({ ...td, exportCropSize: cropSize });
   }
 
+  // buildings standing on drawn roads: ML outlines left out, OSM ones cut
+  // back from the lanes (buildingRoadConflicts.js), before anything is built
+  // on or around them
+  let buildingConflicts = null;
+  let boundedFeatures = filterOSMFeaturesToBounds(td.osmFeatures, td.bounds);
+  if (includeBuildings && boundedFeatures?.length) {
+    const b = td.bounds; const ws = td.width * computeSquareSize(td);
+    const project = (lat, lng) => [((lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - lat) / (b.north - b.south)) * ws];
+    const unproject = (x, y) => ({ lat: b.north - (0.5 - y / ws) * (b.north - b.south), lng: b.west + (x / ws + 0.5) * (b.east - b.west) });
+    buildingConflicts = resolveBuildingRoadConflicts(boundedFeatures, { project, unproject, urbanAt: buildUrbanRoadClassifier(boundedFeatures) });
+    boundedFeatures = buildingConflicts.features;
+    if (buildingConflicts.dropped.length || buildingConflicts.clipped.length || buildingConflicts.flagged.length) {
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings on roads: ${buildingConflicts.dropped.length} ML outline(s) left out, ${buildingConflicts.clipped.length} OSM building(s) cut back from the lanes, ${buildingConflicts.flagged.length} largely on a road kept as mapped.`);
+    }
+  }
   const foundationInput = {
     ...td,
-    osmFeatures: filterOSMFeaturesToBounds(td.osmFeatures, td.bounds),
+    osmFeatures: boundedFeatures,
     // (a given ground-class grid is of the uncropped area: classified again)
     groundClasses: didCropToSquare ? undefined : td.groundClasses,
   };
@@ -11061,6 +11088,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     detail: {
       jobLog,
       buildingReport,
+      buildingConflicts,
       shaping: {
         rawTerrain: !!terrainData?.raw,
         includeBridges,

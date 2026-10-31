@@ -448,7 +448,7 @@ function parseMeters(value) {
  * Returns { kind, floors, floorH, roof, pitch, wall, band, shopFloor, office,
  *           wallTint, roofMat, roofTint, windows }.
  */
-export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill }) {
+export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levelsHint = null }) {
   const cls = String(tags.building || tags['building:part'] || 'yes').toLowerCase();
   const style = regionStyle(lat, lon);
   const r = (k) => hash01(seed, k);
@@ -466,15 +466,25 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill }) {
   const roofH = parseMeters(tags['roof:height']);
   const levels = Number.parseFloat(tags['building:levels'] ?? tags.levels);
   let floors;
+  let heightSource = tags['mapng:height_source'] === 'overture' || tags['mapng:source'] === 'overture' ? 'overture' : 'tagged';
   if (Number.isFinite(levels) && levels > 0) floors = Math.round(levels);
   else if (Number.isFinite(explicitH)) floors = Math.max(1, Math.round((explicitH - (Number.isFinite(roofH) ? roofH : 0)) / floorH));
-  else if (kind === 'shed' || kind === 'industrial') floors = 1;
+  else if (kind === 'shed' || kind === 'industrial') { floors = 1; heightSource = 'estimated'; }
+  // the street's own heights: the median of the tagged buildings of its kind
+  // around it (BeamNG.Earth's #461: predicted floors too few, every street
+  // alike), a floor either way now and then
+  else if (Number.isFinite(levelsHint) && levelsHint >= 1) {
+    const j = r('hintJitter');
+    floors = Math.max(1, levelsHint + (j < 0.2 ? -1 : j > 0.8 ? 1 : 0));
+    heightSource = 'neighbours';
+  }
   else if (kind === 'house') floors = r('floors') < (area < 90 ? 0.75 : 0.35) ? 1 : 2;
   else if (cls === 'apartments') floors = 3 + Math.floor(r('floors') * 3);
   else if (BIG_BOX_CLASSES.has(cls)) floors = 1;
   else if (area < 400) floors = 1 + Math.floor(r('floors') * 2);
   else if (area < 2000) floors = 2 + Math.floor(r('floors') * 2);
   else floors = 3 + Math.floor(r('floors') * 3);
+  if (!Number.isFinite(levels) && !Number.isFinite(explicitH) && heightSource !== 'neighbours') heightSource = 'estimated';
   floors = Math.max(1, Math.min(floors, 120));
   // Industrial halls: one tall storey, a hashed height when unmapped.
   const hallH = kind === 'industrial' ? 6 + 4 * r('hall') : null;
@@ -539,7 +549,7 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill }) {
   const jitter = 1 + JITTER * (2 * r('jit') - 1);
   const shade = (c) => c.map((v) => Math.max(0, Math.min(1, v * jitter)));
   return {
-    kind, cls, floors, floorH, eaveH, roof, pitch, wall, wallFamily, band, office, shopFloor,
+    kind, cls, floors, floorH, eaveH, roof, pitch, wall, wallFamily, band, office, shopFloor, heightSource,
     wallTint: shade(wallTint), roofMat, roofTint: shade(roofTint),
     windows: kind === 'house',
   };
@@ -1129,6 +1139,64 @@ function buildGarage(m, ring, holes, base, z0, g) {
   return levels;
 }
 
+// The kind of street a building's height is compared within: houses with
+// houses, blocks (flats, shops, offices) with blocks; sheds and halls not at all.
+const heightGroup = (tags = {}, area) => {
+  const cls = tags.building || 'yes';
+  if (SHED_CLASSES.has(cls) || INDUSTRIAL_CLASSES.has(cls) || (cls === 'yes' && area < 40)) return null;
+  if (HOUSE_CLASSES.has(cls) || (cls === 'yes' && area < 220)) return 'house';
+  return 'block';
+};
+const NEIGHBOUR_LEVELS_M = 120;   // tagged buildings this close count
+const NEIGHBOUR_LEVELS_MIN = 4;   // ... at least this many of them
+const LEVEL_GUESS_M = 3;          // (a tagged height as floors, for the median)
+
+/**
+ * For each building with no height or levels: the median floors of the
+ * tagged buildings of its group within NEIGHBOUR_LEVELS_M (at least
+ * NEIGHBOUR_LEVELS_MIN of them). Map feature -> floors.
+ */
+export function neighbourLevels(features, project) {
+  const known = []; const unknown = [];
+  const CELL = NEIGHBOUR_LEVELS_M;
+  const grid = new Map();
+  for (const f of features || []) {
+    if (f?.type !== 'building' || !Array.isArray(f.geometry) || f.geometry.length < 3) continue;
+    const tags = f.tags || {};
+    let cx = 0; let cy = 0; let a = 0;
+    const pts = f.geometry.map((p) => project(p.lat, p.lng));
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]);
+    for (const p of pts) { cx += p[0]; cy += p[1]; }
+    cx /= pts.length; cy /= pts.length;
+    const group = heightGroup(tags, Math.abs(a) / 2);
+    if (!group) continue;
+    const lv = Number.parseFloat(tags['building:levels'] ?? tags.levels);
+    const h = parseMeters(tags.height);
+    const floors = Number.isFinite(lv) && lv > 0 ? Math.round(lv) : Number.isFinite(h) && h > 0 ? Math.max(1, Math.round(h / LEVEL_GUESS_M)) : null;
+    if (floors !== null) {
+      const k = `${Math.floor(cx / CELL)},${Math.floor(cy / CELL)}`;
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push({ x: cx, y: cy, group, floors });
+      known.push(1);
+    } else unknown.push({ f, x: cx, y: cy, group });
+  }
+  const out = new Map();
+  if (!known.length) return out;
+  for (const u of unknown) {
+    const near = [];
+    const gx = Math.floor(u.x / CELL); const gy = Math.floor(u.y / CELL);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      for (const k of grid.get(`${gx + dx},${gy + dy}`) || []) {
+        if (k.group === u.group && Math.hypot(k.x - u.x, k.y - u.y) <= NEIGHBOUR_LEVELS_M) near.push(k.floors);
+      }
+    }
+    if (near.length < NEIGHBOUR_LEVELS_MIN) continue;
+    near.sort((a, b) => a - b);
+    out.set(u.f, near[Math.floor(near.length / 2)]);
+  }
+  return out;
+}
+
 export function buildTexturedBuildings(features, project, { maxBuildings = 20000 } = {}) {
   const meshes = [];
   let builder = new MeshBuilder();
@@ -1142,7 +1210,9 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     floors: { min: Infinity, max: 0, sum: 0 }, height: { min: Infinity, max: 0, sum: 0 },
     groundSpread: { max: 0, over3m: 0 },
     shopFronts: 0, offices: 0, withHoles: 0,
+    heightSource: {},
   };
+  const levelsHints = neighbourLevels(features, project);
   const bump = (map, key) => { map[key] = (map[key] || 0) + 1; };
 
   const flush = () => {
@@ -1190,7 +1260,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     }
     const box = orientedBox(ring);
     const rectFill = box && box.area > 0 ? area / box.area : 0;
-    const plan = planBuilding(tags, { area, seed, lat: c.lat, lon: c.lng, rectFill });
+    const plan = planBuilding(tags, { area, seed, lat: c.lat, lon: c.lng, rectFill, levelsHint: levelsHints.get(f) ?? null });
+    bump(stats.heightSource, plan.heightSource);
 
     const base = zMax;
     const z0 = zMin - FOUNDATION_M;

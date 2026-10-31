@@ -141,7 +141,8 @@ test('buildings: a footprint inside two tiles\' buffers comes out once, with hei
   const { elements } = buildElements({ buildings: collectFeatures([a, b]) });
   const houses = elements.filter((e) => e.tags?.building === 'house');
   assert.equal(houses.length, 1);
-  assert.deepEqual(houses[0].tags, { building: 'house', height: '6.3', 'building:levels': '2', 'roof:shape': 'gabled', 'building:colour': '#ffffff' });
+  // (no OSM source in its props: an ML / cadastre outline, marked for the export's road check)
+  assert.deepEqual(houses[0].tags, { building: 'house', height: '6.3', 'building:levels': '2', 'roof:shape': 'gabled', 'building:colour': '#ffffff', 'mapng:source': 'overture' });
   assert.ok(!elements.some((e) => e.tags?.building === 'parking'), 'underground buildings are left out');
 });
 

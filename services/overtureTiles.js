@@ -543,7 +543,12 @@ export const buildElements = (recordsByTheme) => {
       }
       if (rec.kind === 'polygon') {
         let tags = null;
-        if (theme === 'buildings') tags = rec.layer === 'building' ? buildingTags(p) : null;
+        if (theme === 'buildings') {
+          tags = rec.layer === 'building' ? buildingTags(p) : null;
+          // (a footprint with no OSM source: an ML or cadastre outline, as the
+          // hybrid path marks it, so the export can trust it less)
+          if (tags && !osmRecordKey(p)) tags['mapng:source'] = 'overture';
+        }
         else if (theme === 'base') tags = baseTags(rec.layer, p);
         else if (theme === 'places') tags = placeTags(p);
         if (!tags || !keepWay(tags)) continue;

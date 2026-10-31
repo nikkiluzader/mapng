@@ -138,3 +138,26 @@ test('a whole neighbourhood builds (regression: spread into push() overflowed th
   const corners = meshes.reduce((n, m) => n + m.geometry.index.count, 0);
   assert.ok(corners > 100000, `${corners} triangle corners`);
 });
+
+test('unmapped heights follow the tagged buildings of their kind nearby', async () => {
+  const { neighbourLevels, planBuilding } = await import('../services/beamngBuildings.js');
+  const P = (x, y) => ({ lat: y / 1e5, lng: x / 1e5 });
+  const sq = (x, y, s, tags) => ({ type: 'building', tags, geometry: [P(x, y), P(x + s, y), P(x + s, y + s), P(x, y + s)] });
+  const project = (lat, lng) => [lng * 1e5, lat * 1e5];
+  // a block of tagged 6-floor apartment buildings, one untagged among them,
+  // one untagged house (other group), one untagged block far away
+  const feats = [
+    ...[0, 30, 60, 90, 120].map((x) => sq(x, 0, 20, { building: 'apartments', 'building:levels': '6' })),
+    sq(150, 0, 20, { building: 'apartments' }),
+    sq(150, 40, 9, { building: 'house' }),
+    sq(2000, 0, 20, { building: 'apartments' }),
+  ];
+  const hints = neighbourLevels(feats, project);
+  assert.equal(hints.get(feats[5]), 6);
+  assert.equal(hints.has(feats[6]), false, 'a house never takes the flats\' height');
+  assert.equal(hints.has(feats[7]), false, 'too far from any tagged building');
+  const plan = planBuilding({ building: 'apartments' }, { area: 400, seed: 'x', lat: 0, lon: 0, rectFill: 1, levelsHint: 6 });
+  assert.ok(plan.floors >= 5 && plan.floors <= 7);
+  assert.equal(plan.heightSource, 'neighbours');
+  assert.equal(planBuilding({ building: 'apartments', 'building:levels': '9' }, { area: 400, seed: 'x', lat: 0, lon: 0, rectFill: 1, levelsHint: 6 }).floors, 9);
+});
