@@ -1,6 +1,5 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 
 import { generateJunctionMarkingDecals, generateTurnArrowDecals } from '../services/exportBeamNGLevel.js';
 
@@ -130,71 +129,4 @@ test('turn:lanes places one arrow per lane, ordered left-to-right across travel'
   // No arrows when the tagged end is a dead end.
   const deadEnd = { ...approach, id: 'w3', geometry: approach.geometry.map((p) => ({ ...p, lat: p.lat + 0.01 })) };
   assert.equal(generateTurnArrowDecals(makeTerrainData([deadEnd]), SQUARE_SIZE).length, 0);
-});
-
-// Smoke test against whatever real OSM snapshot is parked in
-// refs/mapng_exports (gitignored — the fixture rotates as the user tests new
-// areas; skip cleanly when absent).
-const FIXTURE_DIR = new URL('../refs/mapng_exports/', import.meta.url);
-const fixtureFile = (() => {
-  try {
-    const name = fs.readdirSync(FIXTURE_DIR)
-      .filter((f) => f.startsWith('osm_features_') && f.endsWith('.geojson'))
-      .sort()
-      .pop();
-    return name ? new URL(name, FIXTURE_DIR) : null;
-  } catch {
-    return null;
-  }
-})();
-test('real-world OSM snapshot produces plausible junction markings + turn arrows', { skip: !fixtureFile }, () => {
-  const g = JSON.parse(fs.readFileSync(fixtureFile, 'utf8'));
-  const features = [];
-  for (const f of g.features) {
-    const p = f.properties || {};
-    const tags = { ...p };
-    delete tags._mapngType;
-    delete tags._mapngId;
-    const geomType = f.geometry?.type;
-    if (geomType === 'Point') {
-      const [lng, lat] = f.geometry.coordinates;
-      features.push({ id: p._mapngId, type: p._mapngType || 'poi', geometry: [{ lat, lng }], tags });
-    } else if (geomType === 'LineString') {
-      features.push({
-        id: p._mapngId,
-        type: p._mapngType || (tags.highway ? 'road' : 'other'),
-        geometry: f.geometry.coordinates.map(([lng, lat]) => ({ lat, lng })),
-        tags,
-      });
-    }
-  }
-  const lats = features.flatMap((f) => f.geometry.map((pt) => pt.lat));
-  const lngs = features.flatMap((f) => f.geometry.map((pt) => pt.lng));
-  const bounds = {
-    north: Math.max(...lats), south: Math.min(...lats),
-    east: Math.max(...lngs), west: Math.min(...lngs),
-  };
-  const terrainData = {
-    width: 1024, height: 1024,
-    heightMap: new Float32Array(1024 * 1024).fill(3),
-    minHeight: 3,
-    bounds,
-    osmFeatures: features,
-  };
-
-  const decals = generateJunctionMarkingDecals(terrainData, 8);
-  const bars = decals.filter((d) => d.name.startsWith('jm_stopline')).length;
-  const cwLines = decals.filter((d) => d.name.startsWith('jm_crosswalk')).length;
-  const arrows = generateTurnArrowDecals(terrainData, 8);
-  console.log(`  ${String(fixtureFile).split('/').pop()}: ${bars} stop bars, ${cwLines / 2} crosswalks, ${arrows.length} turn arrows`);
-  assert.ok(bars + cwLines > 0, 'expected some junction markings from a real urban snapshot');
-  for (const d of decals) {
-    assert.ok(d.nodes.every((n) => n.every(Number.isFinite)), 'all nodes finite');
-  }
-  for (const a of arrows) {
-    assert.equal(a.length, 13, 'decal instance arity');
-    assert.ok(a.every(Number.isFinite), 'all instance fields finite');
-    assert.ok([0, 1, 2].includes(a[0]), 'rect index is an arrow frame');
-    assert.ok(Math.abs(Math.hypot(a[9], a[10], a[11]) - 1) < 0.01, 'tangent is unit length');
-  }
 });

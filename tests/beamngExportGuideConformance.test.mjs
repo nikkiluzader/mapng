@@ -115,9 +115,15 @@ async function readText(zip, rel) {
   return f.async('string');
 }
 
+// The default export, built once and read by every test that only inspects
+// it (it was rebuilt for each of them: about a minute of the suite).
+let defaultZip = null;
 async function withZip(fn) {
   const restore = installCanvasPolyfill();
-  try { return await fn(await exportZip()); } finally { restore(); }
+  try {
+    if (!defaultZip) defaultZip = exportZip();
+    return await fn(await defaultZip);
+  } finally { restore(); }
 }
 
 // ── §10.1 — single sanitized levels/<id> root ────────────────────────────────

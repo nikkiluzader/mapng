@@ -229,7 +229,16 @@ function parseNDJSON(text) {
     .map((line) => JSON.parse(line));
 }
 
-async function runExportForRoadType(roadType, { includeTrees = false, pbrSource = 'none', terrainOverrides = {}, includeBuildings = false, baseTexture = 'none' } = {}) {
+// One export per distinct set of options: the tests only read the zip, so the
+// same export is shared instead of rebuilt (each one takes several seconds).
+const exportCache = new Map();
+function runExportForRoadType(roadType, opts = {}) {
+  const key = JSON.stringify([roadType, opts]);
+  if (!exportCache.has(key)) exportCache.set(key, buildExportForRoadType(roadType, opts));
+  return exportCache.get(key);
+}
+
+async function buildExportForRoadType(roadType, { includeTrees = false, pbrSource = 'none', terrainOverrides = {}, includeBuildings = false, baseTexture = 'none' } = {}) {
   const result = await exportBeamNGLevel(
     { ...makeTerrainData(), ...terrainOverrides },
     { lat: 0.5, lng: 0.5 },

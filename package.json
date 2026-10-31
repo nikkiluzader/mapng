@@ -10,7 +10,8 @@
     "deploy": "npm run deploy:prod",
     "deploy:prod": "npm run build && npx wrangler deploy",
     "deploy:dev": "npm run build && npx wrangler deploy --env dev",
-    "test:beamng": "node --test tests/baseTexture.test.mjs tests/nodataDetect.test.mjs tests/terrariumRepair.test.mjs tests/gapFillBlend.test.mjs tests/exportTer.test.mjs tests/beamngLinkFiles.test.mjs tests/beamngRuntimeMaterials.test.mjs tests/beamngExportConformance.test.mjs tests/beamngExportGuideConformance.test.mjs tests/beamngMapNavigation.test.mjs tests/countryRules.test.mjs tests/beamngSignals.test.mjs tests/roadSigns.test.mjs tests/streetLamps.test.mjs tests/beamngSidewalks.test.mjs tests/roadNetwork.test.mjs tests/roadSmoother.test.mjs tests/roadSnap.test.mjs tests/roadCurves.test.mjs tests/roadMarkings.test.mjs tests/roadMarkingCuts.test.mjs tests/junctionMarkings.test.mjs tests/backdropMaterials.test.mjs tests/exportBeamNGLevel.integration.test.mjs tests/overpassMirrors.test.mjs tests/roadCrossSection.test.mjs tests/osmWorkerCache.test.mjs tests/osmTiles.test.mjs tests/overtureTiles.test.mjs tests/beamngBuildings.test.mjs tests/beamngTrees.test.mjs tests/beamngRegion.test.mjs tests/streetProps.test.mjs tests/beamngBridges.test.mjs tests/beamngTunnels.test.mjs tests/roadPaving.test.mjs tests/beamngWaterClip.test.mjs tests/generationProgress.test.mjs tests/trafficCalming.test.mjs tests/curveWarningSigns.test.mjs tests/beamngWater.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:beamng": "npm test"
   },
   "dependencies": {
     "@tresjs/cientos": "^4.3.1",
