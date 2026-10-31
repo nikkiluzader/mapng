@@ -27,6 +27,7 @@ import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { styleDecks, linkCrossings, thinArchDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
 import { prepareSurvey, lidarPins } from './lidarDecks.js';
+import { buildLampGlowDAE, lampGlowMaterialDef, LAMP_GLOW_SHAPE } from './lampGlow.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
 import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
@@ -10320,6 +10321,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // (each part's drawn half widths per point: decks widen where they join and fork)
   for (const d of bridgeDecks) deckEdges(d).forEach((e, i) => { d.parts[i].halfL = e.hl; d.parts[i].halfR = e.hr; });
   let underDeckBeds = 0;
+  let lampGlowCount = 0;   // (street lamps' night glows, lampGlow.js)
   // the ground roads the rivers keep off and the lake beds' quays (a deck's
   // stretch is no ground carriageway: splitOnDecks)
   const riverRoads = () => groundCarriageways.map((c) => ({ points: c.nodes, half: c.half }));
@@ -11818,6 +11820,27 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // street_lamp/bench nodes. rewriteForLinks registers .link files for the
   // level-scoped meshes (core /art/shapes paths pass through untouched).
   if (streetFurnitureObjects.length > 0) {
+    // each street lamp's glow seen from afar at night (lampGlow.js): one
+    // shared shape at the lamp head, night emissive, no collision
+    const glowObjects = streetFurnitureObjects
+      .filter((o) => o.class === 'SpotLight' && o.nightLight === '1' && /^(street_lamp|pole_lamp)/.test(o.name))
+      .map((l) => ({
+        __parent: 'street_furniture', class: 'TSStatic', name: `lamp_glow_${l.name.replace(/_light$/, '')}`, persistentId: generatePersistentId(),
+        shapeName: `/levels/${levelName}/map_assets/custom_assets/lamp_glow/${LAMP_GLOW_SHAPE}`,
+        position: [l.position[0], l.position[1], roundTo(l.position[2] - 0.15, 3)],
+        collisionType: 'None', decalType: 'None', nightEmissive: '1',
+        nightEmissiveColor: [1, 0.86, 0.66, 1], instanceColor: [0, 0, 0, 1],
+      }));
+    if (glowObjects.length) {
+      const glowDae = buildLampGlowDAE();
+      if (glowDae) {
+        zip.file(`${base}/map_assets/custom_assets/lamp_glow/${LAMP_GLOW_SHAPE}`, await toZipBinary(glowDae));
+        zip.file(`${base}/map_assets/custom_assets/lamp_glow/main.materials.json`, JSON.stringify({ [lampGlowMaterialDef().name]: lampGlowMaterialDef() }, null, 2));
+        streetFurnitureObjects.push(...glowObjects);
+        lampGlowCount = glowObjects.length;
+        console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Lamp glows: ${lampGlowCount} (night only, seen from afar)`);
+      }
+    }
     zip.file(`${base}/main/MissionGroup/street_furniture/items.level.json`, toNDJSON(rewriteForLinks(streetFurnitureObjects)));
   }
 

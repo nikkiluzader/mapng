@@ -384,6 +384,10 @@ test('exportBeamNGLevel emits native street furniture with engine-managed night 
     // The fixture has one pole lamp, one wire-suspended lamp, and one bench.
     // A wire / wall lamp has no pole to place, only its light where it hangs.
     assert.equal(lamps.length, 1, 'expected exactly one pole-mounted lamp');
+    // every street lamp's light gets its night glow (lampGlow.js): night emissive, no collision
+    const glows = items.filter((i) => i?.class === 'TSStatic' && i.name?.startsWith('lamp_glow_'));
+    assert.equal(glows.length, lights.filter((l) => /^(street_lamp|pole_lamp)/.test(l.name)).length);
+    assert.ok(glows.every((g) => g.nightEmissive === '1' && g.collisionType === 'None' && /lamp_glow\.dae$/.test(g.shapeName)));
     assert.equal(benches.length, 1, 'expected exactly one bench');
     assert.equal(lights.length, 2, 'a light for the pole lamp and one for the hung lamp');
     const light = lights.find((l) => l.name === lamps[0].child);

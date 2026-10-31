@@ -193,7 +193,7 @@ const WIN_UV = [53 / 1024, 154 / 1024, 1 - (512 + 238) / 1024, 1 - (512 + 45) / 
 // The same sash window from band 2's bay 3, which the night map
 // (public/beamng_facade_e.png) leaves unlit: a house nobody is home in.
 const WIN_UV_DARK = [664 / 1024, 765 / 1024, WIN_UV[2], WIN_UV[3]];
-const HOUSE_LIT_SHARE = 0.65;
+const HOUSE_LIT_SHARE = 0.4;   // (0.65 read as a street with every house awake; about four in ten at night)
 const WIN_W = 1.05;
 const WIN_H = 1.75;
 const WIN_SILL = 0.85;
