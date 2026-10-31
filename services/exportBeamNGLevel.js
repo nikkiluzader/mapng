@@ -25,6 +25,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
+import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
 import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
 import { checkJoints, checkGrades, checkCrossings, checkRoadSurface } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
@@ -4013,7 +4014,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - xy[
  * half width. Bridges are solved first: a bridge meeting a portal sets its
  * height (and gets no cutting).
  */
-function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set() } = {}) {
+function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set(), shape = true } = {}) {
   const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set() };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
@@ -4251,7 +4252,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
             const idx = r * width + c;
             const h = hm.at(idx) - minHeight;
             const [x, y] = toWorld(c, r);
-            const want = tunnelGroundAt(t, x, y, h);
+            const want = shape ? tunnelGroundAt(t, x, y, h) : h;
             if (Math.abs(want - h) > 1e-3) { hm.set(idx, want + minHeight); changed++; if (want < h - CUT_KEEP_M) out.graded.add(idx); }
             // over the tube itself (inside its portals): the tunnel's alone
             const on = t.portals[0] || t.portals[1] ? nearestOnTunnel(t, x, y, t.headHalf) : null;
@@ -4262,14 +4263,29 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     }
     t.gradedPixels = changed;
   };
+  // terrain shaping at tunnels switched off: only the tunnels whose roads
+  // already meet the ground at their portals are built (no cutting, backfill
+  // or cover; the portal holes still open, they change no height); the
+  // rest stay roads on the ground
+  const keepFitting = (list) => {
+    if (shape) return list;
+    return list.filter((t) => {
+      const misfit = tunnelGroundMisfit(t);
+      if (misfit.ok) return true;
+      out.tunnels.splice(out.tunnels.indexOf(t), 1);
+      for (const [seg, tt] of [...out.bySeg]) if (tt === t) out.bySeg.delete(seg);
+      out.skipped.push({ osm: t.osm, reason: misfit.reason, length: t.length, shaping: true });
+      return false;
+    });
+  };
   // (a pause after each tunnel graded: the browser gets the thread back)
-  for (const t of out.tunnels) { gradeOne(t); yield; }
+  for (const t of keepFitting([...out.tunnels])) { gradeOne(t); yield; }
   // then the galleries (and the hillside tunnels short of rock that become
   // galleries), on the ground as it is now
   if (!early) {
     const before = out.tunnels.length;
     for (const path of galleryPaths) solvePath(path);
-    const fresh = out.tunnels.slice(before);
+    const fresh = keepFitting(out.tunnels.slice(before));
     for (const t of fresh) { gradeOne(t); yield; }
   }
   const holes = new Set();
@@ -4300,6 +4316,28 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
   if (globalThis.__MAPNG_TUNNEL_DEBUG) globalThis.__MAPNG_TUNNEL_DEBUG(out, { groundAt, toWorld, toPixel, bridges, width, height, hmAt: (idx) => hm.at(idx) - minHeight });
   console.log(`[BeamNG Export] Tunnels: ${out.tunnels.length} bored (${out.tunnels.map((t) => `${Math.round(t.tubeLength)} m`).join(', ')}), ${out.skipped.length} left on the ground, ${out.holes.length} portal hole square(s).`);
   return out;
+}
+
+// terrain shaping at tunnels off: a tunnel is built only where its road
+// outside the portals runs within this of the ground (no cutting needed)
+const RAW_TUNNEL_FIT_M = 1;
+
+/**
+ * Whether a solved tunnel fits the ground as it is: a cut-and-cover box
+ * never does (dug out and covered over); a bore or gallery when its road
+ * outside the tube stays within RAW_TUNNEL_FIT_M of the ground.
+ * Returns { ok, reason, worst }.
+ */
+export function tunnelGroundMisfit(t) {
+  if (t.kind === 'cutcover') return { ok: false, reason: 'a cut-and-cover box needs the ground dug out and covered (terrain shaping at tunnels is off)', worst: null };
+  let worst = 0;
+  t.line.forEach((p, k) => {
+    if (k >= t.iS && k <= t.iN) return;
+    if (Number.isFinite(p.z) && Number.isFinite(p.g)) worst = Math.max(worst, Math.abs(p.z - p.g));
+  });
+  return worst <= RAW_TUNNEL_FIT_M
+    ? { ok: true, reason: null, worst }
+    : { ok: false, reason: `its approach would need ${worst.toFixed(1)} m of cutting or fill (terrain shaping at tunnels is off)`, worst };
 }
 
 /** The two tunnel phases as one result (keys numbered through both). */
@@ -4593,8 +4631,8 @@ export function bridgeOverShortGaps(features) {
   });
 }
 
-export function generateDecalRoads(terrainData, squareSize) {
-  const steps = decalRoadSteps(terrainData, squareSize);
+export function generateDecalRoads(terrainData, squareSize, opts = {}) {
+  const steps = decalRoadSteps(terrainData, squareSize, opts);
   for (;;) {
     const { done, value } = steps.next();
     if (done) return value;
@@ -4617,6 +4655,9 @@ export async function generateDecalRoadsYielding(terrainData, squareSize, yieldF
 
 // The road layout, pausing (yield) between its phases and every 200 roads.
 function* decalRoadSteps(terrainData, squareSize, opts = {}) {
+  const includeBridges = opts.includeBridges !== false;
+  const includeTunnels = opts.includeTunnels !== false;
+  const shaping = shapingSwitches(opts.shaping);
   const budget = chooseRoadNodeSpacing(terrainData.osmFeatures || []);
   if (budget.spacing > ROAD_NODE_SPACING_M) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road nodes every ${budget.spacing.toFixed(2)} m (not ${ROAD_NODE_SPACING_M} m): ${budget.lengthKm.toFixed(0)} km of roads would make ~${budget.estimatedNodes} DecalRoad nodes, past what BeamNG draws at load.`);
@@ -4661,8 +4702,13 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       halfOf,
       isFreeEnd: (x, y) => Math.abs(x) >= graphEdge || Math.abs(y) >= graphEdge,
     });
+    // (bridges / tunnels switched off: those roads are plain roads)
+    if (!includeBridges) for (const e of structureGraph.edges) e.bridge = false;
+    if (!includeTunnels) for (const e of structureGraph.edges) e.tunnel = false;
     // stage B: crossings and their order, bridges over water (shadow mode too)
     structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
+    // no bridges: nothing is lifted over anything, every road on its ground
+    if (!includeBridges) structureGraph.crossings = { ...structureGraph.crossings, crossings: [], overlaps: [], water: [] };
     yield;
     yield;
   } catch (err) {
@@ -4676,16 +4722,20 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   // Then the bridges (the road nodes on a bridge ride on its deck), then the
   // tunnels a bridge meets (a portal takes the deck's height).
   const done = new Set();
-  const early = yield* solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done });
+  const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set() });
+  const early = includeTunnels ? yield* solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done, shape: shaping.tunnels }) : noTunnels();
   yield;
   // (structure solver v2: the decks come from the solver after the road
   // layout, so today's bridge passes are skipped)
   // (no graph, e.g. it failed on this map: today's bridge passes instead)
-  const bridges = opts.structureSolver === 'v2' && structureGraph
-    ? { bySeg: new Map(), approaches: new Map(), decks: [], roadLines: [], ramps: 0, humps: [], sunk: 0, sunkAt: [], carried: 0, partInfo: [], endHeight: () => null }
+  // (today's passes shape the ground at every bridge: none with bridges or
+  // their shaping switched off)
+  const noBridges = () => ({ bySeg: new Map(), approaches: new Map(), decks: [], roadLines: [], ramps: 0, humps: [], sunk: 0, sunkAt: [], carried: 0, partInfo: [], endHeight: () => null });
+  const bridges = (opts.structureSolver === 'v2' && structureGraph) || !includeBridges || !shaping.bridges || !shaping.overpasses
+    ? noBridges()
     : solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   yield;
-  const late = yield* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done });
+  const late = includeTunnels ? yield* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done, shape: shaping.tunnels }) : noTunnels();
   yield;
   const tunnels = joinTunnelPhases(early, late);
   // The structure solver's profile and classes (stages C, D), after today's
@@ -4703,6 +4753,14 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         e.external = true;
         for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i])]);
       });
+      // terrain shaping switched off somewhere: the stations held on their
+      // ground, the bridges built as decks wherever they leave it
+      if (!allShaping(shaping)) {
+        const plan = shapingPlan(structureGraph, shaping);
+        structureGraph.fixed = plan.fixed;
+        structureGraph.noCut = plan.noCut;
+        Object.defineProperty(structureGraph, 'shaping', { value: plan, enumerable: false });
+      }
       // stage C: every road's profile in one solve (shadow mode: measured with
       // the same checks as the level's roads, for the report)
       {
@@ -4717,6 +4775,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
         // stage D: what each stretch becomes
         structureGraph.classes = classifyStructures(structureGraph);
+        if (structureGraph.shaping) structureGraph.classes = rawDeckClasses(structureGraph, structureGraph.classes, structureGraph.shaping.rawDeck);
+        // no bridges: a stretch the solve still left high is fill, never a deck
+        if (!includeBridges) for (const seg of structureGraph.classes.segments) if (seg.kind === 'deck') seg.kind = 'embankment';
       }
       yield;
     } catch (err) {
@@ -5861,6 +5922,60 @@ function captureConsole() {
  * built (roads, bridges, buildings, furniture, vegetation, water, terrain
  * materials), the machine it ran on, and the job's console output.
  */
+const onOff = (v) => (v ? 'on' : 'OFF');
+
+/**
+ * The terrain-shaping and structure switches, what each one covers and what
+ * it did in this export, for export_report.txt. `section(title)` writes a
+ * section heading into the caller's lines; returns the lines below it.
+ */
+function shapingReportLines(sh, section) {
+  section('Terrain Shaping and Structures');
+  const lines = [];
+  const unchanged = !sh.rawTerrain && sh.includeBridges && sh.includeTunnels && sh.master && sh.roads && sh.bridges && sh.overpasses && sh.tunnels && sh.extras && sh.foundations === sh.foundationsRequested;
+  lines.push(unchanged
+    ? '- All defaults: the terrain was shaped for roads, bridges, overpasses, tunnels, sidewalks and lakes as usual.'
+    : '- Some terrain shaping was switched off (advanced mode). Off means the export left those heights exactly as generated.');
+  lines.push('', 'Data generation (before the export)');
+  lines.push(`- Raw terrain: ${sh.rawTerrain ? 'on (no height blur, road snapping or road smoothing/levelling at generation; road curves kept)' : 'off (roads snapped, smoothed and levelled into the terrain at generation)'}`);
+  lines.push('', 'Structures built');
+  lines.push(`- Bridges & overpasses: ${onOff(sh.includeBridges)}${sh.includeBridges ? ` (${sh.decksBuilt} deck(s) built)` : ' (bridge roads drawn on the ground; no road lifted over another)'}`);
+  lines.push(`- Tunnels: ${onOff(sh.includeTunnels)}${sh.includeTunnels ? ` (${sh.tunnelsBuilt} built)` : ' (tunnel roads drawn over the ground)'}`);
+  lines.push('', 'Terrain shaping at export');
+  lines.push(`- Master switch: ${onOff(sh.master)}${sh.master ? '' : ' (every switch below off, building foundations too)'}`);
+  lines.push(`- Under roads (ground levelled to each road's smoothed profile, with side slopes): ${onOff(sh.roads)}`);
+  lines.push(`- At bridges over water and valleys (approach embankments, abutment fill, ground kept clear under the deck): ${onOff(sh.bridges)}`);
+  lines.push(`- At overpasses over roads (the same, for decks over another road): ${onOff(sh.overpasses)}`);
+  lines.push(`- At tunnels (portal cuttings, headwall backfill, cut-and-cover cover): ${onOff(sh.tunnels)} (portal holes always open: they change no height)`);
+  lines.push(`- Sidewalks, lake beds and car parks (ground under curbs and slabs, lake beds, multi-storey car park decks): ${onOff(sh.extras)}`);
+  lines.push(`- Building foundations: ${onOff(sh.foundations)}${sh.foundationsRequested && !sh.foundations ? ' (requested, but the master switch is off)' : ''}`);
+  lines.push('', 'What the switches did here');
+  const p = sh.plan;
+  if (p) {
+    const pct = p.stations ? ` (${((100 * p.fixedStations) / p.stations).toFixed(1)}%)` : '';
+    lines.push(`- Road stations held exactly on the ground: ${p.fixedStations} of ${p.stations}${pct}; ordinary roads ${p.byRole.road}, bridge approaches ${p.byRole.bridge}, overpass approaches ${p.byRole.overpass}, tunnel roads and approaches ${p.byRole.tunnel}`);
+    lines.push(`- Bridge/overpass roads built as plain decks (no embankment or abutment fill; deck wherever the road is ${'>'}0.1 m over the ground, its ends on the ground): ${p.rawDecks} road(s), ${sh.rawDeckParts} deck stretch(es)`);
+  } else {
+    lines.push('- Road stations held on the ground: none (every road shaped as usual)');
+  }
+  if (sh.composedPixels != null) lines.push(`- Terrain grid points shaped for roads and structures: ${sh.composedPixels}${sh.skippedPieces ? `; ${sh.skippedPieces} road piece(s) left unshaped` : ''}`);
+  if (sh.tunnelsNotFitting?.length) {
+    lines.push(`- Tunnels left as roads on the ground because they don't fit the ground without shaping: ${sh.tunnelsNotFitting.length}`);
+    for (const t of sh.tunnelsNotFitting.slice(0, 15)) {
+      const names = [...new Set((t.osm || []).map((o) => o?.name || (o?.id != null ? `way ${o.id}` : null)).filter(Boolean))];
+      lines.push(`  - ${names.join(', ') || 'unnamed'} (${formatNumber(t.length, 0)} m): ${t.reason}`);
+    }
+    if (sh.tunnelsNotFitting.length > 15) lines.push(`  - … ${sh.tunnelsNotFitting.length - 15} more`);
+  }
+  lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
+  if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}`);
+  if (p && sh.residual) {
+    lines.push(`- Worst left unmet with roads held on the ground: clearance short by ${formatNumber(sh.residual.crossing, 2)} m, water clearance short by ${formatNumber(sh.residual.water, 2)} m, grade ${formatNumber(sh.residual.grade * 100, 1)}% over the class limit, junction step ${formatNumber(sh.residual.joint, 2)} m (0 = met)`);
+    lines.push('  (a plain deck must climb within its own length: it may ramp up to twice its class grade, and where even that can\'t reach the clearance, the clearance gives way)');
+  }
+  return lines;
+}
+
 function buildDetailedReportSections(d) {
   const lines = [];
   const section = (title) => { lines.push('', title, '-'.repeat(title.length)); };
@@ -5892,6 +6007,9 @@ function buildDetailedReportSections(d) {
   const mem = typeof performance !== 'undefined' ? performance.memory : null;
   lines.push(`- JS heap at report time: ${mem ? `${formatBytes(mem.usedJSHeapSize)} used of ${formatBytes(mem.jsHeapSizeLimit)} limit` : 'n/a'}`);
   lines.push(`- Disk streaming for the ZIP (OPFS): ${typeof nav?.storage?.getDirectory === 'function' ? 'available' : 'unavailable (in-memory ZIP)'}`);
+
+  // ── Terrain shaping ────────────────────────────────────────────────────────
+  if (d.shaping) lines.push(...shapingReportLines(d.shaping, section));
 
   // ── Roads ──────────────────────────────────────────────────────────────────
   section('Roads');
@@ -6325,6 +6443,12 @@ function buildBeamNGExportReport({
     `- Base texture: ${options?.baseTexture ?? 'n/a'}`,
     `- Include buildings: ${formatBool(options?.includeBuildings)}`,
     `- Apply foundations: ${formatBool(options?.applyFoundations)}`,
+    `- Include bridges & overpasses: ${formatBool(options?.includeBridges !== false)}`,
+    `- Include tunnels: ${formatBool(options?.includeTunnels !== false)}`,
+    `- Terrain shaping at export (master): ${formatBool(options?.shapeTerrain !== false)}`,
+    `- Shape terrain under roads / at bridges / at overpasses / at tunnels / sidewalks+lakes+car parks: ${[options?.shapeRoads, options?.shapeBridges, options?.shapeOverpasses, options?.shapeTunnels, options?.shapeExtras].map((v) => (options?.shapeTerrain !== false && v !== false ? 'Yes' : 'No')).join(' / ')}`,
+    `- Raw terrain at data generation: ${formatBool(!!originalTerrainData?.raw)}`,
+    '  (details: "Terrain Shaping and Structures" below)',
     `- Include backdrop: ${formatBool(options?.includeBackdrop)}`,
     `- PBR materials: ${effectivePbrSource === 'none' ? 'No' : 'Yes'}`,
     `- PBR source requested: ${options?.requestedPbrSource ?? 'n/a'}`,
@@ -9624,8 +9748,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     baseTexture = 'hybrid',
     includeBuildings = true,
     includeSidewalks = true,
-    applyFoundations = true,
+    applyFoundations: requestedFoundations = true,
     includeBackdrop = false,
+    includeBridges = true,
+    includeTunnels = true,
     includeWater = true,
     seaLevelOffset = 0,
     includeNativeBarriers = true,
@@ -9643,6 +9769,19 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     rightHandDrive,
     onProgress,
   } = options;
+  // Terrain shaping at export (advanced mode): a master switch and one per
+  // kind of road. Off, the export leaves those heights exactly as generated;
+  // the foundations under buildings go with the master switch.
+  const shapingOptions = {
+    terrain: options.shapeTerrain !== false,
+    roads: options.shapeRoads !== false,
+    bridges: options.shapeBridges !== false,
+    overpasses: options.shapeOverpasses !== false,
+    tunnels: options.shapeTunnels !== false,
+  };
+  const shaping = shapingSwitches(shapingOptions);
+  const shapeExtras = shapingOptions.terrain && options.shapeExtras !== false;
+  const applyFoundations = requestedFoundations && shapingOptions.terrain;
   // Backward compat: generatePbrMaterials (bool) → pbrSource (string)
   let pbrSource = options.pbrSource;
   if (pbrSource === undefined) {
@@ -9667,6 +9806,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       includeTrees,
       includeRocks,
       backdropElevationSource,
+      includeBridges,
+      includeTunnels,
+      shaping: { ...shaping, extras: shapeExtras, master: shapingOptions.terrain },
       roadType,
       biomeId,
       levelName: requestedLevelName,
@@ -9759,7 +9901,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   };
 
   // multi-storey car parks: the terrain graded to their flat ground deck
-  let exportTerrainData = includeBuildings
+  let exportTerrainData = includeBuildings && shapeExtras
     ? await gradeGarageFootprints(foundationInput, isGarageFeature, { yieldFn: yield_ })
     : foundationInput;
   if (applyFoundations) {
@@ -9853,7 +9995,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // level is no sea)
   const sourceHeightMap = exportTerrainData.heightMap;
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { structureSolver: options.structureSolver })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { structureSolver: options.structureSolver, includeBridges, includeTunnels, shaping: shapingOptions })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
@@ -9891,6 +10033,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
       keep: tunnelGraded?.size ? (idx) => tunnelGraded.has(idx) : null,
       tube: decalRoads.tunnels?.tube?.size ? (idx) => decalRoads.tunnels.tube.has(idx) : null,
+      skip: sg.shaping?.skip || null,
     });
     const hm = heightMapEditor(exportTerrainData);
     composed.apply((idx, v) => hm.set(idx, v));
@@ -9948,7 +10091,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         .map((f) => f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0))),
     })
     : { meshes: [], runs: [], triangles: 0 };
-  if (sidewalks.runs.length > 0) {
+  if (sidewalks.runs.length > 0 && shapeExtras) {
     // the ground under the slabs (they hang at road height + the curb)
     const graded = gradeSidewalkGround(sidewalks.runs, groundCarriageways, {
       heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
@@ -10168,7 +10311,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // (no bed within LAKE_KEEP_M of a ground road's edge: its sidewalk and
       // quay stay on their ground)
       const quayIndex = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
-      const beds = carveLakeBeds(lakePlan.lakes, {
+      // (terrain shaping off: the water stands on the ground as generated)
+      const beds = !shapeExtras ? { pixels: 0, apply: () => {} } : carveLakeBeds(lakePlan.lakes, {
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
         worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
       }, { keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) });
@@ -10905,6 +11049,29 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     detail: {
       jobLog,
       buildingReport,
+      shaping: {
+        rawTerrain: !!terrainData?.raw,
+        includeBridges,
+        includeTunnels,
+        master: shapingOptions.terrain,
+        roads: shaping.roads,
+        bridges: shaping.bridges,
+        overpasses: shaping.overpasses,
+        tunnels: shaping.tunnels,
+        extras: shapeExtras,
+        foundationsRequested: requestedFoundations,
+        foundations: applyFoundations,
+        plan: sg?.shaping?.stats || null,
+        decksBuilt: bridgeDecks.length,
+        rawDeckParts: (sg?.classes?.segments || []).filter((seg) => seg.raw && seg.kind === 'deck').length,
+        tunnelsBuilt: tunnelList.length,
+        tunnelsNotFitting: (decalRoads.tunnels?.skipped || []).filter((t) => t.shaping),
+        composedPixels: sg?.terrain?.pixels ?? null,
+        skippedPieces: sg?.terrain?.skipped ?? 0,
+        sidewalkGroundPixels: sidewalks.groundPixels || 0,
+        lakeBedPixels: lakePlan?.stats?.bedPixels ?? null,
+        residual: sg?.profile?.residual || null,
+      },
       bridges: decalRoads.bridges,
       structureChecks,
       bridgeDaes,

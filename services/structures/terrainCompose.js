@@ -32,13 +32,14 @@ const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
  *         heights; world z = raw - minHeight, world x, y centred, y north;
  *         keep(idx): ground another builder shaped, left alone outside the
  *         road cores; tube(idx): ground over a built tube, composed only under a
- *         road's own surface)
+ *         road's own surface); skip(k, i): the piece i..i+1 of edge k is
+ *         left alone (terrain shaping switched off for it)
  * Returns { tiles, stats, heightAt(x, y), apply(set) }:
  *   heightAt: the composed terrain in world z (edits over the current grid)
  *   apply(set): calls set(idx, raw) for every edited pixel
  */
 export function composeTerrain(graph, grid) {
-  const { heightMap, width, height, worldSize, minHeight = 0, keep = null, tube = null } = grid;
+  const { heightMap, width, height, worldSize, minHeight = 0, keep = null, tube = null, skip = null } = grid;
   const z = graph.profile?.z;
   const segments = graph.classes?.segments || [];
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -126,6 +127,8 @@ export function composeTerrain(graph, grid) {
     for (let i = 0; i + 1 < e.s.length; i++) {
       const kind = kindOf[k][i];
       if (TUBE.has(kind)) continue;
+      // terrain shaping switched off for this piece (structures/shaping.js)
+      if (skip && skip(k, i)) { stats.skipped = (stats.skipped || 0) + 1; continue; }
       const planes = portalPlanes[k];
       // a deck's ends on fill are abutments: fill under the deck (below)
       const abutment = kind === 'deck' && Math.min(toAbutment[k][i], toAbutment[k][i + 1]) < ABUTMENT_M;

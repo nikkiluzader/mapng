@@ -125,7 +125,7 @@
           <div class="flex items-center justify-between gap-2 px-0.5">
             <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.applyFoundations') }}</span>
             <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGApplyFoundations" :disabled="!hasOsmData" :class="CHECKBOX" />
+              <input type="checkbox" v-model="beamNGApplyFoundations" :disabled="!hasOsmData || !beamNGShapeTerrain" :class="CHECKBOX" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.raiseUnderBuildings') }}</span>
             </label>
           </div>
@@ -152,6 +152,75 @@
               <input type="checkbox" v-model="beamNGIncludeWater" :disabled="!hasOsmData" :class="CHECKBOX" />
               <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.lakesRivers') }}</span>
             </label>
+          </div>
+
+          <!-- Structures and terrain shaping (advanced mode): what the export
+               builds and which of its terrain edits it makes -->
+          <div class="space-y-1.5 p-2 rounded border border-gray-200 dark:border-gray-600">
+            <div class="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{{ t('exportPanel.structuresHeading') }}</div>
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBridges') }}</span>
+              <label class="flex items-center gap-1.5" :class="!hasOsmData ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                <input type="checkbox" v-model="beamNGIncludeBridges" :disabled="!hasOsmData" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.includeBridgesHint') }}</span>
+              </label>
+            </div>
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeTunnels') }}</span>
+              <label class="flex items-center gap-1.5" :class="!hasOsmData ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                <input type="checkbox" v-model="beamNGIncludeTunnels" :disabled="!hasOsmData" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.includeTunnelsHint') }}</span>
+              </label>
+            </div>
+          </div>
+
+          <div
+            class="space-y-1.5 p-2 rounded border transition-colors"
+            :class="beamNGShapeTerrain ? 'border-gray-200 dark:border-gray-600' : 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/20'"
+          >
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{{ t('exportPanel.shapingHeading') }}</span>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" v-model="beamNGShapeTerrain" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.shapeTerrain') }}</span>
+              </label>
+            </div>
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeRoads') }}</span>
+              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                <input type="checkbox" v-model="beamNGShapeRoads" :disabled="!beamNGShapeTerrain" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeRoadsHint') }}</span>
+              </label>
+            </div>
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeBridges') }}</span>
+              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain || !beamNGIncludeBridges ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                <input type="checkbox" v-model="beamNGShapeBridges" :disabled="!beamNGShapeTerrain || !beamNGIncludeBridges" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeBridgesHint') }}</span>
+              </label>
+            </div>
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeOverpasses') }}</span>
+              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain || !beamNGIncludeBridges ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                <input type="checkbox" v-model="beamNGShapeOverpasses" :disabled="!beamNGShapeTerrain || !beamNGIncludeBridges" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeOverpassesHint') }}</span>
+              </label>
+            </div>
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeTunnels') }}</span>
+              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain || !beamNGIncludeTunnels ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                <input type="checkbox" v-model="beamNGShapeTunnels" :disabled="!beamNGShapeTerrain || !beamNGIncludeTunnels" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeTunnelsHint') }}</span>
+              </label>
+            </div>
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeExtras') }}</span>
+              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                <input type="checkbox" v-model="beamNGShapeExtras" :disabled="!beamNGShapeTerrain" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeExtrasHint') }}</span>
+              </label>
+            </div>
+            <p class="text-[9px] leading-snug text-gray-500 dark:text-gray-400 px-0.5">{{ t('exportPanel.shapingNote') }}</p>
           </div>
           </template>
 
@@ -634,6 +703,17 @@ const beamNGIncludeBuildings = ref(localStorage.getItem('mapng_beamNGIncludeBuil
 // their own), so switching to advanced changes nothing until a box is changed.
 const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFoundations') === 'true');
 const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
+// Structures and the export's terrain shaping (advanced mode; basic builds
+// and shapes everything). Off, the export leaves those heights as generated.
+const storedOn = (key) => localStorage.getItem(key) !== 'false';
+const beamNGIncludeBridges = ref(storedOn('mapng_beamNGIncludeBridges'));
+const beamNGIncludeTunnels = ref(storedOn('mapng_beamNGIncludeTunnels'));
+const beamNGShapeTerrain = ref(storedOn('mapng_beamNGShapeTerrain'));
+const beamNGShapeRoads = ref(storedOn('mapng_beamNGShapeRoads'));
+const beamNGShapeBridges = ref(storedOn('mapng_beamNGShapeBridges'));
+const beamNGShapeOverpasses = ref(storedOn('mapng_beamNGShapeOverpasses'));
+const beamNGShapeTunnels = ref(storedOn('mapng_beamNGShapeTunnels'));
+const beamNGShapeExtras = ref(storedOn('mapng_beamNGShapeExtras'));
 const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') !== 'false');
@@ -869,6 +949,14 @@ watch(beamNGPbrSource, (v) => localStorage.setItem('mapng_beamNGPbrSource', v));
 watch(beamNGBackdropSource, (v) => localStorage.setItem('mapng_beamNGBackdropSource', v));
 watch(beamNGIncludeBuildings, (v) => localStorage.setItem('mapng_beamNGIncludeBuildings', String(v)));
 watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoundations', String(v)));
+watch(beamNGIncludeBridges, (v) => localStorage.setItem('mapng_beamNGIncludeBridges', String(v)));
+watch(beamNGIncludeTunnels, (v) => localStorage.setItem('mapng_beamNGIncludeTunnels', String(v)));
+watch(beamNGShapeTerrain, (v) => localStorage.setItem('mapng_beamNGShapeTerrain', String(v)));
+watch(beamNGShapeRoads, (v) => localStorage.setItem('mapng_beamNGShapeRoads', String(v)));
+watch(beamNGShapeBridges, (v) => localStorage.setItem('mapng_beamNGShapeBridges', String(v)));
+watch(beamNGShapeOverpasses, (v) => localStorage.setItem('mapng_beamNGShapeOverpasses', String(v)));
+watch(beamNGShapeTunnels, (v) => localStorage.setItem('mapng_beamNGShapeTunnels', String(v)));
+watch(beamNGShapeExtras, (v) => localStorage.setItem('mapng_beamNGShapeExtras', String(v)));
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGSeaLevelOffset, (v) => {
   const normalized = normalizeBeamNGSeaLevelOffset(v);
@@ -1651,6 +1739,17 @@ const handleBeamNGLevelExport = async () => {
       : normalizeBeamNGSeaLevelOffset(beamNGSeaLevelOffset.value);
     const effectiveIncludeTrees = hasOsmData.value && (!advanced || beamNGIncludeTrees.value);
     const effectiveIncludeRocks = hasOsmData.value && (!advanced || beamNGIncludeRocks.value);
+    // structures and terrain shaping: all on in basic mode
+    const structureOptions = {
+      includeBridges: !advanced || beamNGIncludeBridges.value,
+      includeTunnels: !advanced || beamNGIncludeTunnels.value,
+      shapeTerrain: !advanced || beamNGShapeTerrain.value,
+      shapeRoads: !advanced || beamNGShapeRoads.value,
+      shapeBridges: !advanced || beamNGShapeBridges.value,
+      shapeOverpasses: !advanced || beamNGShapeOverpasses.value,
+      shapeTunnels: !advanced || beamNGShapeTunnels.value,
+      shapeExtras: !advanced || beamNGShapeExtras.value,
+    };
     const effectiveBackdropGpxzApiKey = effectiveBackdropSource === 'gpxz' ? String(props.gpxzApiKey || '') : '';
 
     console.log(`${BEAMNG_EXPORT_UI_LOG} Effective export options:`, {
@@ -1666,6 +1765,7 @@ const handleBeamNGLevelExport = async () => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       includeRocks: effectiveIncludeRocks,
+      ...structureOptions,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
       requestedResolution: props.resolution,
@@ -1683,6 +1783,7 @@ const handleBeamNGLevelExport = async () => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       includeRocks: effectiveIncludeRocks,
+      ...structureOptions,
       roadType: effectiveRoadType,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,

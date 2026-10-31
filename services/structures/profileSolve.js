@@ -53,6 +53,7 @@ const UNDER_FREE_M = 3;       // a road under a deck is cleared from at most thi
 const PIN_REACH_FACTOR = 2.5; // a lift reaches no higher than this many times the grade limit climbs from a pinned road
 const FORK_SHARE = 0.9;       // forking decks overlap: closer than this share of their half widths' sum
 const FORK_FALL = 0.03;       // cross fall across a fork's one surface
+const RAW_DECK_RAMP_FACTOR = 2; // a deck that may not shape its approaches ramps up to this many times its class limit
 
 // Allowed rise per station step of an edge: the class limit, or the
 // terrain's real slope over +-LONG_GRADE_M where steeper (a mountain road
@@ -126,7 +127,17 @@ export function* solveProfilesSteps(graph) {
       edgeOf[v] = k;
     }
   });
-  const stepRise = edges.map((e) => allowedRise(e));
+  // stations held exactly on their ground (terrain shaping switched off:
+  // structures/shaping.js) and stations that may not go below it
+  const held = new Uint8Array(N); const noCut = new Uint8Array(N);
+  edges.forEach((e, k) => {
+    const f = graph.fixed?.[k];
+    if (f) for (let i = 0; i < e.s.length; i++) if (f[i]) held[off[k] + i] = 1;
+    if (graph.noCut?.[k]) noCut.fill(1, off[k], off[k] + e.s.length);
+  });
+  // (a plain deck between held approaches, terrain shaping off, may ramp
+  // this much steeper than its class: it must rise within its own length)
+  const stepRise = edges.map((e, k) => (graph.noCut?.[k] ? allowedRise(e).map((r) => r * RAW_DECK_RAMP_FACTOR) : allowedRise(e)));
   // neighbours: along each edge (with the step's allowed rise) and between
   // the ends meeting at a node (no rise)
   const nbr = Array.from({ length: N }, () => []);
@@ -147,13 +158,15 @@ export function* solveProfilesSteps(graph) {
   }
 
   // envelope from seeds: lower (max of seed - allowed fall) or upper (min of
-  // seed + allowed rise), spread over the network
-  const spread = (seeds, sign, scale = 1) => {
+  // seed + allowed rise), spread over the network (never on through a held
+  // station: it stays on its ground, and so does what lies beyond it)
+  const spread = (seeds, sign, scale = 1, blockHeld = true) => {
     const env = new Float64Array(N).fill(sign > 0 ? -Infinity : Infinity);
     const heap = makeHeap(env, sign);
     for (const [v, h] of seeds) if (sign * (h - env[v]) > 0) { env[v] = h; heap.push(v); }
     while (heap.size()) {
       const v = heap.pop(); const list = nbr[v];
+      if (blockHeld && held[v]) continue;
       for (let j = 0; j < list.length; j += 2) {
         const u = list[j]; const cand = env[v] - sign * scale * list[j + 1];
         if (sign * (cand - env[u]) > 1e-9) { env[u] = cand; heap.push(u); }
@@ -192,6 +205,15 @@ export function* solveProfilesSteps(graph) {
   // way there, the approach runs steeper into the portal instead of
   // arriving metres over the pinned road (a wall across the lanes)
   const pinReach = pins.length ? spread(pins, -1, PIN_REACH_FACTOR) : null;
+  // likewise from the held stations, for the roads that may not dig (a
+  // plain deck between held approaches: a clearance it can't reach at a
+  // drivable grade from its ends gives way, never a wall at each end)
+  let heldReach = null;
+  if (noCut.some((x) => x)) {
+    const seeds = [];
+    for (let v = 0; v < N; v++) if (held[v]) seeds.push([v, G[v]]);
+    if (seeds.length) heldReach = spread(seeds, -1, 1, false);
+  }
   // fixed lower seeds: bridge runs over water
   const waterSeeds = pins.slice();
   for (const run of water) for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, G[off[run.edge] + i] + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M]);
@@ -295,6 +317,7 @@ export function* solveProfilesSteps(graph) {
     }
     L = spread(seeds, 1);
     if (pinReach) for (let v = 0; v < N; v++) if (L[v] > pinReach[v]) L[v] = pinReach[v];
+    if (heldReach) for (let v = 0; v < N; v++) if (noCut[v] && L[v] > heldReach[v]) L[v] = Math.max(G[v], heldReach[v]);
     // where a lift and a cap collide, the lift wins (clearance over cover)
     for (let v = 0; v < N; v++) if (L[v] > U[v]) U[v] = L[v];
     // a road with no structure tag stays near its ground where nothing asks
@@ -310,6 +333,17 @@ export function* solveProfilesSteps(graph) {
       if (L[v] > G[v] - GROUND_BAND_M || U[v] < G[v] + GROUND_BAND_M) continue;
       L[v] = Math.max(L[v], G[v] - GROUND_BAND_M);
       U[v] = Math.min(U[v], G[v] + GROUND_BAND_M);
+    }
+    // terrain shaping off: held stations on their ground, no-cut ones over it
+    for (let v = 0; v < N; v++) {
+      if (held[v]) { L[v] = G[v]; U[v] = G[v]; } else if (noCut[v] && L[v] < G[v]) { L[v] = G[v]; if (U[v] < L[v]) U[v] = L[v]; }
+    }
+    // (a junction with a held road is at that road's ground: every end
+    // meeting there too, so a bridge lifted over a road comes down to it)
+    for (const ends of meets) {
+      const h = ends.find((v) => held[v]);
+      if (h === undefined) continue;
+      for (const v of ends) { L[v] = G[h]; U[v] = G[h]; }
     }
     for (let v = 0; v < N; v++) Z[v] = Math.min(U[v], Math.max(L[v], Z[v]));
     // smooth inside the envelopes; one height where ends meet
@@ -383,6 +417,8 @@ export function profileResidual(graph, z) {
   }
   for (const c of graph.crossings?.crossings || []) {
     const up = c[c.upper]; const dn = c[c.upper === 'a' ? 'b' : 'a'];
+    // (over a tunnel road nobody built: crossed level by design, as in the solve)
+    if (graph.tunnelsPinned && edges[dn.edge].tunnel && !edges[dn.edge].external) continue;
     const zu = z[up.edge][up.i] * (1 - up.f) + z[up.edge][up.i + 1] * up.f;
     const zd = z[dn.edge][dn.i] * (1 - dn.f) + z[dn.edge][dn.i + 1] * dn.f;
     crossing = Math.max(crossing, c.sep - (zu - zd));

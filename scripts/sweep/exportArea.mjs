@@ -5,7 +5,8 @@
 //   node scripts/sweep/exportArea.mjs <area> [gpxz|t30] [levelName] [--out dir] [--fix-stubs]
 //
 // Writes <out>/<levelName>.zip (default scratch/sweep) and, beside it,
-// <levelName>.checks.json (the export's structure checks). --fix-stubs puts
+// <levelName>.checks.json (the export's structure checks). EXPORT_OPTS (JSON)
+// adds export options (structures, terrain shaping). --fix-stubs puts
 // real images where the headless canvas left stubs, so the level loads clean
 // in game. STRUCT=v1|v2|v2-terrain picks the structure solver.
 import fs from 'node:fs';
@@ -48,6 +49,8 @@ const { blob, structureChecks } = await exportBeamNGLevel(terrainData, meta.cent
   includeBuildings: true, applyFoundations: false, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,
   ...(process.env.STRUCT ? { structureSolver: process.env.STRUCT } : {}),
+  // extra export options as JSON, e.g. EXPORT_OPTS='{"shapeTerrain":false}'
+  ...(process.env.EXPORT_OPTS ? JSON.parse(process.env.EXPORT_OPTS) : {}),
   levelName, elevationSource: 'upload', requestedResolution: meta.size, requestedProcessingMetersPerPixel: meta.mpp,
   onProgress: ({ step, pct }) => { if (process.stderr.isTTY) process.stderr.write(`\r[${pct}%] ${String(step).slice(0, 70).padEnd(70)}`); },
 });
