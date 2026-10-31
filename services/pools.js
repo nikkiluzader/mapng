@@ -313,7 +313,7 @@ function ladder(m, p, w, n, zWater, zDeck) {
 }
 
 // a square bar from p to q (3D points), r its half thickness
-function bar(m, mat, p, q, r, col) {
+export function bar(m, mat, p, q, r, col) {
   const d = [q[0] - p[0], q[1] - p[1], q[2] - p[2]];
   const L = Math.hypot(...d) || 1;
   const f = d.map((v) => v / L);

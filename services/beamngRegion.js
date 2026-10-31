@@ -63,6 +63,8 @@ export function dryCoverShare(features = [], lat = 0, mapAreaM2 = 0) {
 
 const mediterranean = (lat, lon) => lat > 30 && lat < 46 && lon > -10 && lon < 40;
 const northAmerica = (lat, lon) => lat > 24 && lon > -170 && lon < -50;
+/** Where sport=football means the gridiron game (US, Canada), not soccer (sportsFields.js). */
+export const footballIsGridiron = (lat, lon) => northAmerica(lat, lon);
 
 /**
  * { biomeId, reason } for an export at (lat, lon).

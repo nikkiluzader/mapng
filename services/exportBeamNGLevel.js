@@ -9,6 +9,7 @@ import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.
 import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
 import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
 import { streetIndex } from './buildingDetails.js';
+import { planPitches, pitchFootprints } from './sportsFields.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
@@ -6410,6 +6411,8 @@ function buildDetailedReportSections(d) {
     lines.push(`- Shop fronts: ${st.shopFronts}, offices: ${st.offices}, courtyards (inner rings): ${st.withHoles}`);
     const dt = st.details || {};
     lines.push(`- Details: parapets ${dt.parapets || 0}, shop awnings / fascias ${dt.shopfronts || 0}, verandas ${dt.veranda || 0}, door hoods ${dt.hood || 0}, front steps ${dt.steps || 0}, chimneys ${dt.chimneys || 0}, roof plant pieces ${dt.roofPlant || 0}, church towers ${dt.towers || 0}, domes ${dt.domes || 0}, silos / tanks ${dt.silos || 0}, passage openings ${dt.passages || 0}, castles / forts ${dt.forts || 0} (merlons ${dt.merlons || 0}, sentry boxes ${dt.sentryBoxes || 0}, corner towers ${dt.cornerTowers || 0}, gates ${dt.gates || 0})`);
+    if (dt.pitches) lines.push(`- Sports fields (OSM leisure=pitch / track by sport=*: surface by surface=* or the sport's usual one, regulation markings scaled to the mapped size, goals, posts, hoops, nets, fences): ${Object.entries(dt.pitches).map(([k, v]) => `${k} ${v}`).join(', ')}`);
+    if (dt.seating) lines.push(`- Seating (building=grandstand, leisure=bleachers: tiered seats facing the nearest field): ${Object.entries(dt.seating).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.pools) lines.push(`- Swimming pools (OSM leisure=swimming_pool, outdoors: sunk in the ground with a deck, its terrain squares opened; lane pools, wading pools, above-ground pools): ${Object.entries(dt.pools).map(([k, v]) => `${k} ${v}`).join(', ')}; shapes (free-form outlines smoothed, the rest as mapped): ${Object.entries(dt.poolShapes || {}).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.fountains) lines.push(`- Fountains (OSM amenity=fountain / drinking_water, by kind from fountain=* and shape: stone basins with water, bowls, jets, obelisks, pools, wall spouts, splash pads, drinking posts): ${Object.entries(dt.fountains).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     const sorted = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]);
@@ -9052,11 +9055,12 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
   const avoid = new Map();
   for (const f of terrainData.osmFeatures || []) {
     const isBuilding = f?.type === 'building';
-    const isWater = f?.type === 'water' || f?.tags?.natural === 'water' || f?.tags?.leisure === 'swimming_pool';
+    const isWater = f?.type === 'water' || f?.tags?.natural === 'water';
     // open ground no tree stands on: bunkers, greens, tees, fairways, pitches,
     // running tracks, car parks (a crown overhanging one put its trunk in
     // the sand, or in a car park's aisle)
-    const isOpen = TREELESS_GOLF.has(f?.tags?.golf) || f?.tags?.leisure === 'pitch' || f?.tags?.leisure === 'track'
+    // (a pool by its deck too: services/pools.js, up to 4 m round it)
+    const isOpen = TREELESS_GOLF.has(f?.tags?.golf) || f?.tags?.leisure === 'pitch' || f?.tags?.leisure === 'track' || f?.tags?.leisure === 'swimming_pool'
       || (f?.tags?.amenity === 'parking' && !['multi-storey', 'underground', 'rooftop'].includes(f.tags.parking));
     if ((!isBuilding && !isWater && !isOpen) || !(f.geometry?.length >= 3)) continue;
     const ring = f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
@@ -9105,6 +9109,9 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
   const inBuildingOrWater = (x, y) => (avoid.get(`${Math.floor(x / AVOID_CELL)},${Math.floor(y / AVOID_CELL)}`) || [])
     .some((it) => x >= it.box[0] && x <= it.box[2] && y >= it.box[1] && y <= it.box[3]
       && (it.isBuilding || inRingXY(x, y, it.ring) || (it.isOpen && nearRingXY(x, y, it.ring, OPEN_GROUND_CLEAR_M))));
+
+  const inOpenOrWater = (x, y) => (avoid.get(`${Math.floor(x / AVOID_CELL)},${Math.floor(y / AVOID_CELL)}`) || [])
+    .some((it) => !it.isBuilding && x >= it.box[0] && x <= it.box[2] && y >= it.box[1] && y <= it.box[3] && inRingXY(x, y, it.ring));
 
   const regularPlacementsByType = new Map();
   const priorityPlacementsByType = new Map();
@@ -9186,6 +9193,10 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
           });
           if (!choice) continue;
           const placement = makeForestPlacement(choice.type, sampledPoint, terrainData, squareSize, cloneSeed, 1, 1);
+          // not in a pool, on a court or a field (a copy scattered round a
+          // mapped tree landed on a basketball slab); the copies not in a
+          // building either (the mapped tree itself may stand by a wall)
+          if (i > 0 ? inBuildingOrWater(placement.pos[0], placement.pos[1]) : inOpenOrWater(placement.pos[0], placement.pos[1])) continue;
           placement.scale = roundTo(choice.scale, 6);
           pushPlacement(placement, { priority: isTreeRow });
         }
@@ -10851,6 +10862,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const project = (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0);
     const { holes: poolHoles, paved } = poolFootprints(planPools(feats, project, { squareSize, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) }));
     paved.push(...fountainFootprints(planFountains(feats, project)));
+    paved.push(...pitchFootprints(planPitches(feats, project, { groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) })));
     if (poolHoles.length || paved.length) {
       if (!terLayerMap) terLayerMap = new Uint8Array(exportTerrainData.width * exportTerrainData.height);
       // the terrain's own grid: sample (i, j), counted from the south-west

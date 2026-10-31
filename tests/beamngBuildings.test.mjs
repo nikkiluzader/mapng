@@ -125,7 +125,7 @@ test('material defs: v1.5, vertex-coloured, one per material name', () => {
     assert.equal(defs[name]?.version, 1.5, name);
     assert.equal(defs[name].Stages[0].vertColor, true);
     const maps = Object.entries(defs[name].Stages[0]).filter(([k]) => k.endsWith('Map') && k !== 'emissiveMap');
-    assert.ok(maps.length > 0, `${name}: a texture`);
+    assert.ok(maps.length > 0 || Array.isArray(defs[name].Stages[0].baseColorFactor), `${name}: a texture or a colour`);
     for (const [k, v] of maps) assert.ok(v.startsWith('/assets/'), `${name} ${k}: only global /assets textures`);
   }
   assert.ok(defs.mapng_bld_facade.Stages[0].emissiveMap, 'lit windows at night');

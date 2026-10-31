@@ -32,6 +32,7 @@ import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet,
 import * as THREE from 'three';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
 import { planPools, buildPool, POOL_MATERIAL_STAGES } from './pools.js';
+import { planPitches, buildPitch, planSeating, buildSeating, SPORTS_MATERIAL_STAGES, SPORTS_MATERIAL_FLAGS } from './sportsFields.js';
 
 // ── Materials ───────────────────────────────────────────────────────────────
 
@@ -102,6 +103,13 @@ export const BUILDING_MATERIALS = {
   // swimming pools (services/pools.js)
   poolTile: 'mapng_pool_tile',
   poolDeck: 'mapng_pool_deck',
+  // sports fields (services/sportsFields.js)
+  linePaint: 'mapng_sport_line_paint',
+  turf: 'mapng_sport_turf',
+  dirt: 'mapng_sport_dirt',
+  sand: 'mapng_sport_sand',
+  chainlink: 'mapng_sport_chainlink',
+  netting: 'mapng_sport_netting',
 };
 
 // Lit windows at night: the window sheets' emissive maps scaled by the
@@ -162,6 +170,7 @@ const MATERIAL_STAGES = {
   smoothConcrete: pbr(`${TILE}/concrete/m_concrete_floor_polish`, 't_concrete_smooth_large'),
   ...FOUNTAIN_MATERIAL_STAGES,
   ...POOL_MATERIAL_STAGES,
+  ...SPORTS_MATERIAL_STAGES,
 };
 
 /** BeamNG material definitions for every name in BUILDING_MATERIALS. */
@@ -185,6 +194,8 @@ export function getBuildingMaterialDefs({ facadeEmissiveMap = null } = {}) {
       translucentBlendOp: 'None',
       // (falling water: a thin sheet seen from both sides, added over what is behind it)
       ...(key === 'fountainSpray' ? { translucent: true, translucentBlendOp: 'Add', translucentZWrite: false, doubleSided: true, castShadows: false } : {}),
+      // (fences and nets: cut out by their opacity, both sides drawn)
+      ...(SPORTS_MATERIAL_FLAGS[key] || {}),
     };
   }
   return defs;
@@ -1365,6 +1376,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     // building=tower + man_made=pier stood as an office tower in the roadway):
     // the bridge builder draws its piers and the bridge styles its towers
     if (BRIDGE_PART_MAN_MADE.has(tags.man_made) || BRIDGE_PART_BUILDINGS.has(tags.building)) { stats.skipped.bridgeParts = (stats.skipped.bridgeParts || 0) + 1; continue; }
+    // stands beside a field: tiered seating (sportsFields.js buildSeating), not a block
+    if (tags.building === 'grandstand' || tags.building === 'bleachers' || tags.leisure === 'bleachers') { stats.skipped.seating = (stats.skipped.seating || 0) + 1; continue; }
     const holes = (f.holes || []).map((h) => {
       let hr = cleanRing(h.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]));
       if (hr.length >= 3 && signedArea(hr) > 0) hr = hr.reverse();
@@ -1618,6 +1631,24 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
   if (Object.keys(poolKinds).length) { stats.details.pools = poolKinds; stats.details.poolShapes = poolShapes; }
+  // sports fields and the stands beside them (services/sportsFields.js)
+  const pitchKinds = {};
+  const pitches = planPitches(features, project, { groundAt });
+  for (const p of pitches) {
+    const tile = tileFor(p.ring);
+    const built = buildPitch(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, p);
+    if (!built) continue;
+    bump(pitchKinds, built);
+    if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+  }
+  if (Object.keys(pitchKinds).length) stats.details.pitches = pitchKinds;
+  const seatKinds = {};
+  for (const st of planSeating(features, project, pitches)) {
+    const tile = tileFor(st.ring);
+    bump(seatKinds, buildSeating(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, st));
+    if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+  }
+  if (Object.keys(seatKinds).length) stats.details.seating = seatKinds;
   for (const t of tiles.values()) if (t.inBatch) flushTile(t);
   const tileList = [...tiles.values()].filter((t) => t.full.length).map(({ key, origin, full, lite }) => ({ key, origin, full, lite }));
   stats.tiles = tileList.length;
