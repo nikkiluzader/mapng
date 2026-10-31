@@ -307,6 +307,12 @@ export const parseOverpassResponse = (data, bounds) => {
             id: el.id.toString(), type: "street_furniture",
             geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
           });
+        } else if (el.tags.amenity === "fountain" || el.tags.amenity === "drinking_water") {
+          // fountains and drinking posts (services/fountains.js)
+          rawFeatures.push({
+            id: el.id.toString(), type: "fountain",
+            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+          });
         } else if (el.tags.amenity === "fuel" || el.tags.amenity === "charging_station") {
           rawFeatures.push({
             id: el.id.toString(), type: "fuel_station",

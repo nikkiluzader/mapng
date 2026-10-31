@@ -30,6 +30,7 @@
  */
 import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
 import * as THREE from 'three';
+import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
 
 // ── Materials ───────────────────────────────────────────────────────────────
 
@@ -92,6 +93,9 @@ export const BUILDING_MATERIALS = {
   roofSlateTiles: 'mapng_bld_roof_slate_tiles',
   roofWood: 'mapng_bld_roof_wood',
   roofTin: 'mapng_bld_roof_tin',
+  // fountains (services/fountains.js): their water and falling water
+  fountainWater: 'mapng_fountain_water',
+  fountainSpray: 'mapng_fountain_spray',
 };
 
 // Lit windows at night: the window sheets' emissive maps scaled by the
@@ -148,6 +152,7 @@ const MATERIAL_STAGES = {
   roofSlateTiles: pbrNoAo(`${TILE}/roofing/t_slate_rooftiles_01`, 't_slate_rooftiles_01'),
   roofWood: pbr(`${TILE}/roofing/eca_bld_wood_rooftiles`, 't_eca_bld_wood_rooftiles'),
   roofTin: pbr(`${TILE}/metal/m_si_metal_roof`, 't_si_metal_roof', { metallic: true }),
+  ...FOUNTAIN_MATERIAL_STAGES,
 };
 
 /** BeamNG material definitions for every name in BUILDING_MATERIALS. */
@@ -169,6 +174,8 @@ export function getBuildingMaterialDefs({ facadeEmissiveMap = null } = {}) {
       annotation: 'BUILDINGS',
       Stages: [stage, {}, {}, {}],
       translucentBlendOp: 'None',
+      // (falling water: a thin sheet seen from both sides, added over what is behind it)
+      ...(key === 'fountainSpray' ? { translucent: true, translucentBlendOp: 'Add', translucentZWrite: false, doubleSided: true, castShadows: false } : {}),
     };
   }
   return defs;
@@ -1580,6 +1587,16 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (holes.length) stats.withHoles++;
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
+  // fountains: basins, bowls and jets from the fountain library (services/fountains.js)
+  const fountainKinds = {};
+  for (const fo of planFountains(features, project)) {
+    const tile = tileFor(fo.ring || [fo.centre]);
+    const built = buildFountain(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, fo, streets);
+    if (!built) continue;
+    bump(fountainKinds, built);
+    if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+  }
+  if (Object.keys(fountainKinds).length) stats.details.fountains = fountainKinds;
   for (const t of tiles.values()) if (t.inBatch) flushTile(t);
   const tileList = [...tiles.values()].filter((t) => t.full.length).map(({ key, origin, full, lite }) => ({ key, origin, full, lite }));
   stats.tiles = tileList.length;

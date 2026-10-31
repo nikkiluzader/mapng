@@ -186,28 +186,38 @@ test('a wide or tidal flat river outline is area water with no ribbon; narrow or
   assert.equal(planRivers({ features: wide, toWorld, heightAt: sloped }).rivers.length, 1);
 });
 
-test('lake tiles reach a diagonal shore everywhere and pass it by at most one small cell', () => {
+test('lake tiles reach a diagonal shore everywhere where the bank is higher; on flat ground they keep to the outline', () => {
   // a 600 m square turned 30 degrees: every shore diagonal to the grid
   const c = Math.cos(Math.PI / 6); const s = Math.sin(Math.PI / 6);
   const pts = box(-300, -300, 300, 300).map(([x, y]) => [x * c - y * s, x * s + y * c]);
   const feat = ring(pts, { natural: 'water', water: 'lake' });
-  const { tiles, lakes } = planLakes({ features: [feat], toWorld, heightAt: () => 1 });
-  const poly = lakes[0].poly;
-  const under = (x, y) => tiles.some((t) => Math.abs(x - t.cx) <= t.sx / 2 && Math.abs(y - t.cy) <= t.sy / 2);
-  let missed = 0;
-  for (let x = -420; x <= 420; x += 3) for (let y = -420; y <= 420; y += 3) if (poly.contains(x, y) && !under(x, y)) missed++;
-  assert.equal(missed, 0, 'no gap between the water and the shore');
-  // the farthest a tile corner reaches past the shore
+  const inside = (x, y) => { const u = x * c + y * s; const v = -x * s + y * c; return Math.abs(u) <= 300 && Math.abs(v) <= 300; };
   const dist = (x, y) => Math.min(...pts.map((a, i) => {
     const b = pts[(i + 1) % pts.length]; const vx = b[0] - a[0]; const vy = b[1] - a[1];
     const f = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / (vx * vx + vy * vy)));
     return Math.hypot(a[0] + vx * f - x, a[1] + vy * f - y);
   }));
-  let past = 0;
-  for (const t of tiles) for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-    const x = t.cx + (dx * t.sx) / 2; const y = t.cy + (dy * t.sy) / 2;
-    if (!poly.contains(x, y)) past = Math.max(past, dist(x, y));
-  }
-  assert.ok(past <= 4 * Math.SQRT2 + 0.5, `at most one 4 m cell past the shore: ${past.toFixed(1)} m`);
-  assert.ok(tiles.length < 600, `tiles: ${tiles.length}`);
+  const measure = (heightAt) => {
+    const { tiles } = planLakes({ features: [feat], toWorld, heightAt });
+    const under = (x, y) => tiles.some((t) => Math.abs(x - t.cx) <= t.sx / 2 && Math.abs(y - t.cy) <= t.sy / 2);
+    let missed = 0; let depthMissed = 0;
+    for (let x = -420; x <= 420; x += 3) for (let y = -420; y <= 420; y += 3) {
+      if (inside(x, y) && !under(x, y)) { missed++; depthMissed = Math.max(depthMissed, dist(x, y)); }
+    }
+    let past = 0;
+    for (const t of tiles) for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      const x = t.cx + (dx * t.sx) / 2; const y = t.cy + (dy * t.sy) / 2;
+      if (!inside(x, y)) past = Math.max(past, dist(x, y));
+    }
+    return { tiles, missed, depthMissed, past };
+  };
+  // banks 2 m over the water: no gap at all, past the shore by one 4 m cell at most
+  const banked = measure((x, y) => (inside(x, y) ? 1 : 3));
+  assert.equal(banked.missed, 0, 'no gap between the water and the shore');
+  assert.ok(banked.past <= 4 * Math.SQRT2 + 0.5, `at most one 4 m cell past the shore: ${banked.past.toFixed(1)} m`);
+  assert.ok(banked.tiles.length < 600, `tiles: ${banked.tiles.length}`);
+  // flat ground: cells past the shore dropped, within half a cell either way
+  const level = measure(() => 1);
+  assert.ok(level.past <= 2 * Math.SQRT2 + 0.5, `half a cell past the shore at most: ${level.past.toFixed(1)} m`);
+  assert.ok(level.depthMissed <= 2 * Math.SQRT2 + 0.5, `gaps only along the shore: ${level.depthMissed.toFixed(1)} m`);
 });

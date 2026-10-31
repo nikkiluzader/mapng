@@ -71,6 +71,7 @@ export const OSM_FILTER = {
     ['highway', 'street_lamp'], ['barrier', 'bollard'], ['amenity', 'bench'],
     ['emergency', 'fire_hydrant'], ['amenity', 'waste_basket'], ['power', 'pole'],
     ['traffic_calming', 'bump'], ['traffic_calming', 'hump'], ['traffic_calming', 'table'], ['traffic_calming', 'cushion'],
+    ['amenity', 'fountain'], ['amenity', 'drinking_water'],
   ],
 };
 

@@ -371,9 +371,12 @@ function mergeMask(wet, nx, ny, x0, y0, cell, out) {
  * Rectangles covering a polygon: a grid of cells (a quarter of `cell` within
  * SHORE_CELL_M, coarser where the grid would pass SHORE_GRID_MAX across),
  * every one the outline touches kept, merged greedily. The water reaches the
- * shore everywhere, past it by at most one cell. Exported for tests.
+ * shore everywhere, past it by at most one cell, and only where
+ * keepOutside(x, y) at the cell's centre (the bank standing over the water
+ * hides it; on flat ground a cell past the shore showed as a step of water
+ * over the plaza, the fountain basins). Exported for tests.
  */
-export function tileOutline(poly, cell) {
+export function tileOutline(poly, cell, keepOutside = () => true) {
   const [x0, y0, x1, y1] = poly.box;
   const c = Math.min(cell, Math.max(SHORE_CELL_M[0], Math.min(SHORE_CELL_M[1], cell / 4), Math.max(x1 - x0, y1 - y0) / SHORE_GRID_MAX));
   const nx = Math.max(1, Math.ceil((x1 - x0) / c)); const ny = Math.max(1, Math.ceil((y1 - y0) / c));
@@ -388,6 +391,16 @@ export function tileOutline(poly, cell) {
       }
     }
   }
+  // (only the mask's edge cells can lie past the shore)
+  const edge = (i, j) => i === 0 || j === 0 || i === nx - 1 || j === ny - 1
+    || !wet[j * nx + i - 1] || !wet[j * nx + i + 1] || !wet[(j - 1) * nx + i] || !wet[(j + 1) * nx + i];
+  const drop = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    if (!wet[j * nx + i] || !edge(i, j)) continue;
+    const x = x0 + (i + 0.5) * c; const y = y0 + (j + 0.5) * c;
+    if (!poly.contains(x, y) && !keepOutside(x, y)) drop.push(j * nx + i);
+  }
+  for (const k of drop) wet[k] = 0;
   return mergeMask(wet, nx, ny, x0, y0, c, []);
 }
 
@@ -405,6 +418,8 @@ export function planLakes({ features = [], toWorld, heightAt }) {
     const t = f.tags || {};
     const river = isRiverbank(t);
     if (t.waterway && !river) continue;
+    // (a fountain's basin is built with it: services/fountains.js)
+    if (norm(t.amenity) === 'fountain') continue;
     if (['sea', 'ocean'].includes(norm(t.place)) || norm(t.natural) === 'bay' || ['dock', 'harbour'].includes(norm(t.water)) || norm(t.leisure) === 'marina') continue;
     const isLake = river || (norm(t.natural) === 'water' ? (!t.water || LAKE_WATER.has(norm(t.water))) : ['reservoir', 'basin'].includes(norm(t.landuse)));
     if (!isLake) continue;
@@ -418,9 +433,10 @@ export function planLakes({ features = [], toWorld, heightAt }) {
     const inside = groundInside(poly, heightAt);
     const level = inside[inside.length >> 1] + 0.05;
     // tiles: every small cell the outline touches, merged (the water reaches
-    // the shore, over the bank by at most one cell: the bank hides it)
+    // the shore; past it by at most one cell, and only where the bank stands
+    // over the water and hides it)
     const area = Math.abs(poly.outer.reduce((a, p, i) => { const q = poly.outer[(i + 1) % poly.outer.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
-    const lakeTiles = tileOutline(poly, Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16)));
+    const lakeTiles = tileOutline(poly, Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16)), (x, y) => heightAt(x, y) > level);
     if (!lakeTiles.length) continue;
     stats.lakes++;
     for (const tile of lakeTiles) tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: lakeIndex, name: t.name || null });
