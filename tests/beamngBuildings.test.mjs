@@ -75,6 +75,7 @@ test('buildTexturedBuildings: textured, outward-facing, deterministic geometry',
 
   // Every wall triangle faces away from its building's centre; roofs face up.
   const centres = [[6, 4.5], [55, 10], [130, 20]];
+  const boxes = [{ c: centres[0], x0: 0, x1: 12, y0: 0, y1: 9 }, { c: centres[1], x0: 40, x1: 70, y0: 0, y1: 20 }, { c: centres[2], x0: 100, x1: 160, y0: 0, y1: 40 }];
   // (indexed geometry: walk its triangles on a de-indexed copy)
   const pos = meshes[0].geometry.toNonIndexed().getAttribute('position');
   const a = new THREE.Vector3(); const b = new THREE.Vector3(); const c = new THREE.Vector3();
@@ -88,6 +89,10 @@ test('buildTexturedBuildings: textured, outward-facing, deterministic geometry',
     const m = new THREE.Vector3().add(a).add(b).add(c).divideScalar(3);
     const centre = centres.reduce((best, cc) => (Math.hypot(m.x - cc[0], m.y - cc[1]) < Math.hypot(m.x - best[0], m.y - best[1]) ? cc : best));
     if (Math.abs(n.z) < 0.01) {
+      // (the outline's walls: a parapet's inside and the roof plant face where they must)
+      const box = boxes.find((bx) => bx.c === centre);
+      const onOutline = Math.min(Math.abs(m.x - box.x0), Math.abs(m.x - box.x1), Math.abs(m.y - box.y0), Math.abs(m.y - box.y1)) < 0.05;
+      if (!onOutline) continue;
       walls++;
       assert.ok(n.x * (m.x - centre[0]) + n.y * (m.y - centre[1]) > 0, `wall faces out at ${m.x.toFixed(1)},${m.y.toFixed(1)}`);
     } else {

@@ -28,6 +28,7 @@
  * (metres, Z up) with one geometry group per material; their material names
  * match getBuildingMaterialDefs().
  */
+import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, chimney, roofPlant, churchTower, mosque, silo } from './buildingDetails.js';
 import * as THREE from 'three';
 
 // ── Materials ───────────────────────────────────────────────────────────────
@@ -250,19 +251,19 @@ const DARK = ['roofSlate', [7, 8, 9]];
 const DARK_TILE = ['roofSlateTiles', [0, 1, 2]];
 const TIN = ['roofTin', [0, 1, 2, 3]];
 const REGIONS = {
-  us_east: { brick: 0.75, walls: [['siding', 0.75], ['brick', 0.25]], hipped: 0.4, roofs: US_ROOFS, pitch: 32 },
-  us_south: { brick: 0.35, walls: [['siding', 0.75], ['brick', 0.25]], hipped: 0.4, roofs: US_ROOFS, pitch: 30 },
-  us_plains: { brick: 0.15, walls: [['siding', 0.8], ['brick', 0.2]], hipped: 0.4, roofs: US_ROOFS, pitch: 30 },
-  us_west: { brick: 0.15, walls: [['stucco', 0.65], ['siding', 0.25], ['brick', 0.1]], hipped: 0.5, roofs: [...US_ROOFS, CLAY_ROUND, CLAY_TILE], pitch: 24 },
-  alpine: { brick: 0.05, walls: [['siding', 0.45], ['stucco', 0.55]], hipped: 0.15, roofs: [DARK, DARK_TILE, ['roofSlate', [9, 5]], ['roofWood', [0, 1]]], pitch: 24 },
-  europe_north: { brick: 0.5, walls: [['brick', 0.45], ['stucco', 0.55]], hipped: 0.3, roofs: [CLAY, CLAY_TILE, DARK, DARK_TILE], pitch: 42 },
-  nordic: { brick: 0.12, walls: [['siding', 0.65], ['stucco', 0.35]], hipped: 0.2, roofs: [DARK, DARK_TILE, CLAY, TIN], pitch: 35 },
-  mediterranean: { brick: 0.08, walls: [['stucco', 0.85], ['stone', 0.15]], hipped: 0.5, roofs: [CLAY, CLAY_ROUND, CLAY_TILE, OCHRE], pitch: 22 },
-  latin_america: { brick: 0.15, walls: [['stucco', 0.8], ['brick', 0.2]], hipped: 0.3, roofs: [CLAY, CLAY_ROUND, CLAY_TILE, ['roofMetal', [0, 1]], TIN], pitch: 20 },
-  east_asia: { brick: 0.1, walls: [['stucco', 0.6], ['panel', 0.4]], hipped: 0.5, roofs: [DARK, DARK_TILE, ['roofMetal', [0, 4]]], pitch: 25 },
-  oceania: { brick: 0.35, walls: [['brick', 0.4], ['siding', 0.3], ['stucco', 0.3]], hipped: 0.7, roofs: [['roofMetal', [0, 1, 4]], TIN, CLAY, CLAY_TILE], pitch: 24 },
-  cool: { brick: 0.3, walls: [['siding', 0.5], ['brick', 0.3], ['stucco', 0.2]], hipped: 0.3, roofs: [DARK, DARK_TILE, ['roofMetal', [0, 1]], TIN], pitch: 35 },
-  warm: { brick: 0.15, walls: [['stucco', 0.8], ['brick', 0.2]], hipped: 0.4, roofs: [CLAY, CLAY_ROUND, OCHRE, ['roofMetal', [0, 1, 3]], TIN], pitch: 22 },
+  us_east: { brick: 0.75, walls: [['siding', 0.75], ['brick', 0.25]], hipped: 0.4, roofs: US_ROOFS, pitch: 32, entrance: 'veranda', chimney: 0.6, tanks: true },
+  us_south: { brick: 0.35, walls: [['siding', 0.75], ['brick', 0.25]], hipped: 0.4, roofs: US_ROOFS, pitch: 30, entrance: 'veranda', chimney: 0.3 },
+  us_plains: { brick: 0.15, walls: [['siding', 0.8], ['brick', 0.2]], hipped: 0.4, roofs: US_ROOFS, pitch: 30, entrance: 'veranda', chimney: 0.45 },
+  us_west: { brick: 0.15, walls: [['stucco', 0.65], ['siding', 0.25], ['brick', 0.1]], hipped: 0.5, roofs: [...US_ROOFS, CLAY_ROUND, CLAY_TILE], pitch: 24, entrance: 'veranda', chimney: 0.2 },
+  alpine: { brick: 0.05, walls: [['siding', 0.45], ['stucco', 0.55]], hipped: 0.15, roofs: [DARK, DARK_TILE, ['roofSlate', [9, 5]], ['roofWood', [0, 1]]], pitch: 24, entrance: 'hood', chimney: 0.65 },
+  europe_north: { brick: 0.5, walls: [['brick', 0.45], ['stucco', 0.55]], hipped: 0.3, roofs: [CLAY, CLAY_TILE, DARK, DARK_TILE], pitch: 42, entrance: 'hood', chimney: 0.7 },
+  nordic: { brick: 0.12, walls: [['siding', 0.65], ['stucco', 0.35]], hipped: 0.2, roofs: [DARK, DARK_TILE, CLAY, TIN], pitch: 35, entrance: 'hood', chimney: 0.55 },
+  mediterranean: { brick: 0.08, walls: [['stucco', 0.85], ['stone', 0.15]], hipped: 0.5, roofs: [CLAY, CLAY_ROUND, CLAY_TILE, OCHRE], pitch: 22, entrance: 'steps', chimney: 0.2 },
+  latin_america: { brick: 0.15, walls: [['stucco', 0.8], ['brick', 0.2]], hipped: 0.3, roofs: [CLAY, CLAY_ROUND, CLAY_TILE, ['roofMetal', [0, 1]], TIN], pitch: 20, entrance: 'steps', chimney: 0.08 },
+  east_asia: { brick: 0.1, walls: [['stucco', 0.6], ['panel', 0.4]], hipped: 0.5, roofs: [DARK, DARK_TILE, ['roofMetal', [0, 4]]], pitch: 25, entrance: 'steps', chimney: 0.08 },
+  oceania: { brick: 0.35, walls: [['brick', 0.4], ['siding', 0.3], ['stucco', 0.3]], hipped: 0.7, roofs: [['roofMetal', [0, 1, 4]], TIN, CLAY, CLAY_TILE], pitch: 24, entrance: 'veranda', chimney: 0.3 },
+  cool: { brick: 0.3, walls: [['siding', 0.5], ['brick', 0.3], ['stucco', 0.2]], hipped: 0.3, roofs: [DARK, DARK_TILE, ['roofMetal', [0, 1]], TIN], pitch: 35, entrance: 'hood', chimney: 0.55 },
+  warm: { brick: 0.15, walls: [['stucco', 0.8], ['brick', 0.2]], hipped: 0.4, roofs: [CLAY, CLAY_ROUND, OCHRE, ['roofMetal', [0, 1, 3]], TIN], pitch: 22, entrance: 'steps', chimney: 0.12 },
 };
 
 export function regionStyle(lat, lon) {
@@ -493,6 +494,10 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
 
   // Roof: tagged, else pitched for houses/sheds that are box-shaped enough.
   let roof = String(tags['roof:shape'] || '').toLowerCase();
+  // the shapes not drawn as such, as their nearest (gambrel / saltbox barns and
+  // houses are gabled; mansard and half-hipped ones hipped; domes are flat
+  // roofs with a dome on top elsewhere)
+  roof = { gambrel: 'gabled', saltbox: 'gabled', 'half-hipped': 'hipped', mansard: 'hipped', dome: 'flat', onion: 'flat', round: 'flat' }[roof] || roof;
   if (!['flat', 'gabled', 'hipped', 'pyramidal', 'skillion'].includes(roof)) {
     roof = (kind === 'house' || (kind === 'shed' && area > 12)) && rectFill >= RECT_FILL
       ? (r('hip') < style.hipped ? 'hipped' : 'gabled')
@@ -546,11 +551,31 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
   const taggedRoof = parseColour(tags['roof:colour'] || tags['roof:color']);
   if (taggedRoof) roofTint = taggedRoof;
 
+  // a place of worship is no block of flats: plain stone walls one tall storey
+  // high, a steep gabled slate roof where its footprint takes one (its tower or
+  // dome comes from buildingDetails.js); a mosque keeps a flat roof under its dome
+  const worship = tags.amenity === 'place_of_worship' || ['church', 'chapel', 'cathedral', 'mosque', 'temple', 'synagogue', 'shrine'].includes(cls);
+  if (worship) {
+    const mosqueLike = cls === 'mosque' || String(tags.religion || '').toLowerCase() === 'muslim';
+    band = null; office = false;
+    // (unmistakably stone: the smooth ECA ashlar read as white boards from a street away)
+    wall = material === 'brick' ? 'brick' : pick(['stone', 'stoneMixed', 'stoneFacade'], r('worshipWall'));
+    if (!Number.isFinite(levels) && !Number.isFinite(explicitH)) { floors = 1; eaveH = Math.max(6.5, Math.min(12, 5 + Math.sqrt(area) / 6)); }
+    if (!mosqueLike && rectFill >= 0.72 && !['flat', 'hipped'].includes(String(tags['roof:shape'] || '').toLowerCase())) roof = 'gabled';
+    else if (mosqueLike) roof = 'flat';
+    if (roof === 'gabled') {
+      roofMat = 'roofSlate';
+      roofTint = taggedRoof || ROOF_TINTS.roofSlate[pick([7, 8, 9], r('worshipRoof'))];
+    }
+  }
+  const worshipPitch = worship && roof === 'gabled' ? 45 : null;
+  const worshipTint = worship ? (tagged || pick(WALL_TINTS.stone, r('worshipTint'))) : null;
   const jitter = 1 + JITTER * (2 * r('jit') - 1);
   const shade = (c) => c.map((v) => Math.max(0, Math.min(1, v * jitter)));
   return {
-    kind, cls, floors, floorH, eaveH, roof, pitch, wall, wallFamily, band, office, shopFloor, heightSource,
-    wallTint: shade(wallTint), roofMat, roofTint: shade(roofTint),
+    kind, cls, floors, floorH, eaveH, roof, pitch: worshipPitch ?? pitch, wall, wallFamily: worship ? wall : wallFamily, band, office, shopFloor: shopFloor && !worship, heightSource,
+    entrance: style.entrance || 'steps', chimneyShare: style.chimney ?? 0.3, tanks: !!style.tanks,
+    wallTint: shade(worshipTint || wallTint), roofMat, roofTint: shade(roofTint),
     windows: kind === 'house',
   };
 }
@@ -810,7 +835,12 @@ function roofUnderside(m, P, { hl, hw, rl, rise, eaveDrop, hipped }) {
  * buildings so no single geometry grows unbounded.
  */
 const MESH_BATCH = 400;
-export const BUILDING_TILE_M = 256;   // buildings' shapes: one per tile this size (the export may pick larger on big maps)
+export const BUILDING_TILE_M = 256;
+const SKIRT_SLOPE_M = 1;       // ground falling more than this under a footprint: the walls carry on SKIRT_M under its lowest corner
+const SKIRT_M = 3;
+const SHOP_STREET_M = 20;      // a shop's wall this near a street gets its shopfronts
+const ROOF_PLANT_M2 = 200;     // flat roofs this large carry plant
+const WORSHIP_CLASSES = new Set(['church', 'chapel', 'cathedral', 'mosque', 'temple', 'synagogue', 'shrine']);   // buildings' shapes: one per tile this size (the export may pick larger on big maps)
 
 // BeamNG reads trailing digits of a Collada node name as its detail level
 // (official shapes: *_a700, *_a160, Colmesh-1), so "buildings_1" + "buildings_2"
@@ -1238,7 +1268,9 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     groundSpread: { max: 0, over3m: 0 },
     shopFronts: 0, offices: 0, withHoles: 0,
     heightSource: {},
+    details: {},
   };
+  const streets = streetIndex(features, project);
   const levelsHints = neighbourLevels(features, project);
   const bump = (map, key) => { map[key] = (map[key] || 0) + 1; };
 
@@ -1280,6 +1312,19 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const tile = tileFor(ring);
     builder = new TeeBuilder(tile.fullB, tile.liteB);
     detailB = tile.fullB;
+    // silos and tanks: cylinders on their footprint's circle
+    const siloKind = tags.man_made === 'silo' || ['silo', 'grain_silo'].includes(tags.building) ? 'silo'
+      : (tags.man_made === 'storage_tank' || ['storage_tank', 'tank'].includes(tags.building) ? 'tank' : null);
+    if (siloKind && area < 2500) {
+      const tagH = parseMeters(tags.height);
+      const h = Number.isFinite(tagH) ? tagH : (siloKind === 'silo' ? 14 + 12 * hash01(seed, 'siloH') : 7 + 6 * hash01(seed, 'tankH'));
+      silo(builder, ring, zMin - FOUNDATION_M, zMax - (zMin - FOUNDATION_M) + h, siloKind, siloKind === 'tank' ? [0.9, 0.9, 0.88] : [0.78, 0.77, 0.73]);
+      stats.details.silos = (stats.details.silos || 0) + 1;
+      bump(stats.kinds, siloKind);
+      count++;
+      if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+      continue;
+    }
     const garage = isGarageFeature(f) ? planGarage(ring, tags) : null;
     if (garage) {
       buildGarage(builder, ring, holes, zMax, zMin - FOUNDATION_M, garage);
@@ -1295,41 +1340,124 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     bump(stats.heightSource, plan.heightSource);
 
     const base = zMax;
-    const z0 = zMin - FOUNDATION_M;
+    // the walls reach down past the lowest ground: on a slope a skirt, so no
+    // corner floats over the falling street
+    const z0 = zMin - (zMax - zMin > SKIRT_SLOPE_M ? SKIRT_M : FOUNDATION_M);
     const eave = base + plan.eaveH;
     // (no wooden plinth: concrete under wood)
     const plinthMat = plan.wall && plan.wallFamily !== 'siding' ? plan.wall : 'panel';
     const plinthTint = plan.wall && plan.wallFamily !== 'siding' ? plan.wallTint : [0.8, 0.8, 0.8];
+    const rnd = (...k) => hash01(seed, ...k);
+    // the ground under a wall's middle (from the footprint's corners)
+    const groundNear = (pt) => {
+      let best = zMin; let bd = Infinity;
+      for (const q of projected) { const d = Math.hypot(q[0] - pt[0], q[1] - pt[1]); if (d < bd && Number.isFinite(q[2])) { bd = d; best = q[2]; } }
+      return best;
+    };
+    // passages through the building: the walls open over the road for the
+    // ground floor's height
+    const zOpen = base + Math.max(3.2, plan.floorH);
+    const crossings = streets.passages.length ? passageCrossings(ring, streets.passages) : [];
 
-    for (let i = 0; i < ring.length; i++) {
-      const a = ring[i]; const b = ring[(i + 1) % ring.length];
-      if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
-      // below the floors: a plain plinth down past the lowest ground
-      wallStrip(builder, plinthMat, a, b, z0, base, plinthTint);
+    // one wall piece p..q (fractions t0..t1 of edge i), open below zOpen if `open`
+    const wallPiece = (a, b, i, open) => {
+      if (!open) wallStrip(builder, plinthMat, a, b, z0, base, plinthTint);
       if (plan.band || plan.office) {
         const sheetMat = plan.office ? 'office' : 'facade';
         for (let fl = 0; fl < plan.floors; fl++) {
           const zb = base + fl * plan.floorH;
           const zt = fl === plan.floors - 1 ? eave : base + (fl + 1) * plan.floorH;
-          if (fl === 0 && plan.shopFloor) bandFloor(builder, 'shop', BAND_SHOP, a, b, zb, zt, [1, 1, 1], seed, i, fl);
-          else bandFloor(builder, sheetMat, plan.band, a, b, zb, zt, plan.wallTint, seed, i, fl);
+          if (open && zt <= zOpen + 0.01) continue;
+          const zb2 = open ? Math.max(zb, zOpen) : zb;
+          if (fl === 0 && plan.shopFloor && !open) bandFloor(builder, 'shop', BAND_SHOP, a, b, zb, zt, [1, 1, 1], seed, i, fl);
+          else if (zb2 < zt) bandFloor(builder, sheetMat, plan.band, a, b, zb2, zt, plan.wallTint, seed, i, fl);
         }
       } else {
-        wallStrip(builder, plan.wall, a, b, base, eave, plan.wallTint);
-        if (plan.windows) houseWindows(detailB, a, b, base, plan.floors, plan.floorH, eave, hash01(seed, 'lit') < HOUSE_LIT_SHARE ? WIN_UV : WIN_UV_DARK);
+        wallStrip(builder, plan.wall, a, b, open ? zOpen : base, eave, plan.wallTint);
+        if (plan.windows && !open) houseWindows(detailB, a, b, base, plan.floors, plan.floorH, eave, hash01(seed, 'lit') < HOUSE_LIT_SHARE ? WIN_UV : WIN_UV_DARK);
       }
+    };
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i]; const b = ring[(i + 1) % ring.length];
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
+      const openings = crossings.length ? passageOpenings(a, b, streets.passages) : [];
+      if (!openings.length) { wallPiece(a, b, i, false); continue; }
+      const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+      let t = 0;
+      for (const [o0, o1] of openings) {
+        if (o0 > t + 1e-3) wallPiece(at(t), at(o0), i, false);
+        wallPiece(at(o0), at(o1), i, true);
+        t = o1;
+      }
+      if (t < 1 - 1e-3) wallPiece(at(t), b, i, false);
+      stats.details.passages = (stats.details.passages || 0) + openings.length;
     }
+    for (const c of crossings) passageInside(builder, c.p, c.q, c.half + 0.25, zMin, zOpen, 'concrete', [0.72, 0.71, 0.68]);
     for (const hole of holes) {
       for (let i = 0; i < hole.length; i++) {
         wallStrip(builder, plinthMat, hole[i], hole[(i + 1) % hole.length], z0, eave, plinthTint);
       }
     }
 
-    if (plan.roof === 'flat' || !box) {
+    const flat = plan.roof === 'flat' || !box;
+    if (flat) {
       flatRoof(builder, ring, holes, eave, plan.roofMat, plan.roofTint);
     } else {
       const wallMat = plan.wall || 'stucco';
       pitchedRoof(builder, box, eave, plan, wallMat, SIDING_UV_M, detailB);
+    }
+
+    // ── details (buildingDetails.js) ──
+    const worship = tags.amenity === 'place_of_worship' || WORSHIP_CLASSES.has(plan.cls);
+    const religion = String(tags.religion || '').toLowerCase();
+    const rise = box && !flat ? Math.tan((plan.pitch * Math.PI) / 180) * (box.width / 2) : 0;
+    const crownMat = plan.band === BAND_BRICK ? 'brick' : (plan.wall || 'rendered');
+    // a parapet with its coping on flat-roofed blocks (the facade carried up),
+    // a string course under it near the camera
+    const parapeted = flat && plan.kind === 'block' && plan.floors >= 2 && !plan.office && !holes.length && !worship;
+    if (parapeted) {
+      parapet(builder, ring, eave, crownMat, plan.wallTint);
+      stringCourse(detailB, ring, eave, crownMat, plan.wallTint.map((v) => Math.min(1, v * 1.08)));
+      stats.details.parapets = (stats.details.parapets || 0) + 1;
+    }
+    // shopfronts along the walls that face a street
+    if (plan.shopFloor) {
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i]; const b = ring[(i + 1) % ring.length];
+        const d = streets.facing(a, b);
+        if (d === null || d > SHOP_STREET_M) continue;
+        if (crossings.length && passageOpenings(a, b, streets.passages).length) continue;
+        stats.details.shopfronts = (stats.details.shopfronts || 0) + shopfronts(detailB, a, b, base + plan.floorH, (k1, k2) => rnd('shop', i, k1, k2));
+      }
+    }
+    if (plan.kind === 'house') {
+      // the entrance on the wall facing the nearest street
+      let door = -1; let dmin = Infinity;
+      for (let i = 0; i < ring.length; i++) {
+        const d = streets.facing(ring[i], ring[(i + 1) % ring.length]);
+        if (d !== null && d < dmin) { dmin = d; door = i; }
+      }
+      if (door >= 0) {
+        const a = ring[door]; const b = ring[(door + 1) % ring.length];
+        const style = rnd('entrance') < 0.65 ? plan.entrance : 'steps';
+        const built = entrance(detailB, a, b, base, groundNear([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), style, flat ? 'roofFlat' : plan.roofMat, plan.roofTint, (...k) => rnd('ent', ...k));
+        if (built) stats.details[built] = (stats.details[built] || 0) + 1;
+        if (built && globalThis.__MAPNG_BLD_DEBUG) globalThis.__MAPNG_BLD_DEBUG({ kind: built, at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], out: [(b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]), -(b[0] - a[0]) / Math.hypot(b[0] - a[0], b[1] - a[1])], id: f.id });
+      }
+      if (!flat && rnd('chimney') < plan.chimneyShare) {
+        chimney(detailB, box, eave, rise, plan.wall || 'stucco', plan.wallTint, (...k) => rnd('chim', ...k));
+        stats.details.chimneys = (stats.details.chimneys || 0) + 1;
+      }
+    }
+    // roof plant on big flat roofs; water tanks on mid-rises where they stand
+    if (flat && box && area >= ROOF_PLANT_M2 && plan.kind !== 'house' && !worship) {
+      const tanks = plan.tanks && plan.floors >= 4 && plan.floors <= 20 && !plan.office && rnd('tank') < 0.3;
+      stats.details.roofPlant = (stats.details.roofPlant || 0) + roofPlant(detailB, ring, box, eave, area, crownMat, plan.wallTint, { tanks }, (...k) => rnd('plant', ...k));
+    }
+    // places of worship: their tower or dome, seen from afar
+    if (worship && box) {
+      if (religion === 'muslim' || plan.cls === 'mosque') { mosque(builder, ring, box, eave, plan.wall || 'stucco', plan.wallTint, (...k) => rnd('mosque', ...k)); stats.details.domes = (stats.details.domes || 0) + 1; }
+      else if (!religion || religion === 'christian') { churchTower(builder, box, eave, rise, plan.wall || 'stone', plan.wallTint, plan.roofMat === 'roofFlat' ? 'roofSlate' : plan.roofMat, plan.roofTint, (...k) => rnd('tower', ...k)); stats.details.towers = (stats.details.towers || 0) + 1; }
     }
 
     count++;
