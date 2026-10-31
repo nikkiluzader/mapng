@@ -752,3 +752,24 @@ function cableStayedCrossing(pylonB, cableB, deck, groundAt) {
     }
   }
 }
+
+const ARCH_SLAB_M = 0.5;      // a deck arch's road slab: the vault and its spandrels carry it, no girders
+
+/**
+ * Deck arches (stone or concrete, not a steel through arch) carry their road on the vault: the parts with
+ * an arch span get a thin slab (part.depth) so no girders hang into the vault. Returns the parts thinned.
+ */
+export function thinArchDecks(decks) {
+  let n = 0;
+  for (const deck of decks) {
+    const st = deck.style;
+    if (!st || !(st.type === 'stoneArch' || st.type === 'arch')) continue;
+    for (const sp of st.spans) {
+      if (st.type === 'arch' && sp.s1 - sp.s0 >= THROUGH_ARCH_M) continue;
+      const part = deck.parts[sp.part];
+      if (!part || (part.depth ?? Infinity) <= ARCH_SLAB_M) continue;
+      part.depth = ARCH_SLAB_M; n++;
+    }
+  }
+  return n;
+}

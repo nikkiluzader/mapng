@@ -210,3 +210,13 @@ test('a neighbour widened at a join (its drawn half widths, not its lanes\' half
   const feet = g.cable.segments.map(([a]) => a).filter((a) => a[1] < 0);
   for (const f of feet) assert.ok(f[1] > -6.6, `a stay's foot under the widened deck at y ${f[1].toFixed(2)}`);
 });
+
+test('a deck arch carries a thin slab (no girders in its vault); a truss keeps its deck', async () => {
+  const { thinArchDecks } = await import('../services/bridgeStyles.js');
+  const arch = { parts: [part(0, 14, 0, 2.6, { structure: 'humpback' })] };
+  const truss = { parts: [part(0, 100, 0, 12, { structure: 'truss' })] };
+  styleDecks([arch, truss], { groundAt: flat });
+  assert.equal(thinArchDecks([arch, truss]), 1);
+  assert.equal(arch.parts[0].depth, 0.5);
+  assert.equal(truss.parts[0].depth, undefined);
+});

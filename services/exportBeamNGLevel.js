@@ -25,7 +25,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
-import { styleDecks, linkCrossings, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
+import { styleDecks, linkCrossings, thinArchDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
 import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
@@ -10361,6 +10361,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     .map((f) => ({ ring: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), tags: f.tags || {} }));
   const styledBridges = styleDecks(bridgeDecks, { outlines: bridgeOutlines, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
   linkCrossings(bridgeDecks, { roads: groundCarriageways.map((cw) => ({ xy: cw.nodes, half: cw.half })) });
+  // (a deck arch's road on its vault: a thin slab, no girders in the vault)
+  thinArchDecks(bridgeDecks);
   if (styledBridges) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge styles: ${bridgeDecks.filter((d) => d.style).map((d) => d.style.type).join(', ')}.`);
   const bridgeDaes = generateBridgeDAEs(
     bridgeDecks,
