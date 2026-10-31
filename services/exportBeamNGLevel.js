@@ -6403,7 +6403,7 @@ function buildDetailedReportSections(d) {
     lines.push(`- On sloping ground: ${st.groundSpread.over3m} footprint(s) span more than 3 m of terrain (max ${formatNumber(st.groundSpread.max, 1)} m; their plinth reaches the lowest corner)`);
     lines.push(`- Shop fronts: ${st.shopFronts}, offices: ${st.offices}, courtyards (inner rings): ${st.withHoles}`);
     const dt = st.details || {};
-    lines.push(`- Details: parapets ${dt.parapets || 0}, shop awnings / fascias ${dt.shopfronts || 0}, verandas ${dt.veranda || 0}, door hoods ${dt.hood || 0}, front steps ${dt.steps || 0}, chimneys ${dt.chimneys || 0}, roof plant pieces ${dt.roofPlant || 0}, church towers ${dt.towers || 0}, domes ${dt.domes || 0}, silos / tanks ${dt.silos || 0}, passage openings ${dt.passages || 0}`);
+    lines.push(`- Details: parapets ${dt.parapets || 0}, shop awnings / fascias ${dt.shopfronts || 0}, verandas ${dt.veranda || 0}, door hoods ${dt.hood || 0}, front steps ${dt.steps || 0}, chimneys ${dt.chimneys || 0}, roof plant pieces ${dt.roofPlant || 0}, church towers ${dt.towers || 0}, domes ${dt.domes || 0}, silos / tanks ${dt.silos || 0}, passage openings ${dt.passages || 0}, castles / forts ${dt.forts || 0} (merlons ${dt.merlons || 0}, sentry boxes ${dt.sentryBoxes || 0}, corner towers ${dt.cornerTowers || 0}, gates ${dt.gates || 0})`);
     const sorted = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]);
     lines.push('- Kinds:'); listCounts(sorted(st.kinds));
     lines.push('- OSM building=* classes:'); listCounts(sorted(st.classes), 30);

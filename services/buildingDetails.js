@@ -596,3 +596,211 @@ export function naveRect(ring, boxInfo) {
   const sm = (best.s0 + best.s1) / 2; const tm = (best.lo + best.hi) / 2;
   return { cx: cx + ux * sm + vx * tm, cy: cy + uy * sm + vy * tm, ux, uy, length: best.L, width: best.w, area: best.L * best.w };
 }
+
+// ── Castles and forts ────────────────────────────────────────────────────────
+
+const GATE_WOOD = [0.4, 0.27, 0.17];
+// a castle's crenellations (tall merlons, narrow gaps) and a fort's parapet
+// (long stretches of wall, narrow embrasures for its guns)
+export const BATTLEMENTS = {
+  castle: { base: 0.9, merlon: 1.0, w: 1.5, gap: 0.8, t: 0.7 },
+  fortress: { base: 0.6, merlon: 0.9, w: 5.5, gap: 1.0, t: 1.2 },
+};
+
+/**
+ * Battlements on the wall top at zRoof: a parapet `base` high in the wall's
+ * stone, then merlons `merlon` high with gaps between them along each edge
+ * (each edge laid out from its middle, so its corners stand solid). Returns
+ * the merlons built.
+ */
+export function battlements(m, ring, zRoof, wallMat, wallTint, { base, merlon, w, gap, t }) {
+  const n = ring.length;
+  const inner = insetRing(ring, t);
+  const top = zRoof + base;
+  let count = 0;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const a = ring[i]; const b = ring[j];
+    const L = len2(v2(a, b));
+    if (L < 0.05) continue;
+    wallQuad(m, wallMat, a, b, zRoof, top, wallTint);
+    wallQuad(m, wallMat, inner[i], inner[j], zRoof, top, wallTint, 3, false);
+    m.quad(wallMat, [...a, top], [...b, top], [...inner[j], top], [...inner[i], top], [0, 0], [L / 3, 0], [L / 3, t / 3], [0, t / 3], wallTint);
+    // merlons: whole ones, centred on the edge, a solid one at each end
+    const d = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const inw = [-d[1], d[0]];
+    const k = Math.max(1, Math.floor((L + gap) / (w + gap)));
+    const span = k * w + (k - 1) * gap;
+    const ww = k === 1 ? Math.min(w, L) : w + (L - span) / k;   // stretched to fill the edge end to end
+    for (let q = 0; q < k; q++) {
+      const t0 = q * (ww + gap);
+      const mid = t0 + ww / 2;
+      if (mid > L) break;
+      const c = [a[0] + d[0] * mid + inw[0] * (t / 2), a[1] + d[1] * mid + inw[1] * (t / 2)];
+      box(m, wallMat, c, d, ww / 2, t / 2, top, top + merlon, wallTint, { uvM: 3 });
+      count++;
+    }
+  }
+  return count;
+}
+
+/** The salient corners of a ring (counter-clockwise): convex, sharper than maxAngle degrees inside. */
+export function salientCorners(ring, maxAngle) {
+  const n = ring.length; const out = [];
+  for (let i = 0; i < n; i++) {
+    const p = ring[i]; const a = ring[(i - 1 + n) % n]; const b = ring[(i + 1) % n];
+    const e1 = v2(a, p); const e2 = v2(p, b);
+    const l1 = len2(e1); const l2 = len2(e2);
+    if (l1 < 1.5 || l2 < 1.5) continue;
+    const cross = e1[0] * e2[1] - e1[1] * e2[0];
+    if (cross <= 0) continue;   // a re-entrant corner
+    const inside = 180 - (Math.acos(Math.max(-1, Math.min(1, (e1[0] * e2[0] + e1[1] * e2[1]) / (l1 * l2)))) * 180) / Math.PI;
+    if (inside > maxAngle) continue;
+    // the outward bisector
+    const o = [e1[0] / l1 - e2[0] / l2, e1[1] / l1 - e2[1] / l2]; const ol = len2(o) || 1;
+    out.push({ i, p, out: [o[0] / ol, o[1] / ol], inside, arms: Math.min(l1, l2) });
+  }
+  return out;
+}
+
+/**
+ * A castle's corners: the salient corners of its outline's convex hull,
+ * simplified to tol metres (a corner tower mapped into the outline is a
+ * cluster of short edges; its hull's corner is where the tower stands).
+ */
+export function castleCorners(ring, maxAngle, tol) {
+  return salientCorners(simplifyRing(convexHull(ring), tol), maxAngle);
+}
+
+/**
+ * A tower already drawn into a castle's outline at a hull corner: the ring's
+ * points within reach of it, when they curve round (five or more) — their
+ * centre and mean radius — or null.
+ */
+export function mappedTower(ring, corner, reach) {
+  const near = ring.filter((q) => len2(v2(q, corner.p)) <= reach);
+  if (near.length < 5) return null;
+  // (the arc's centre: the circle through its ends and middle point)
+  const [a, b, c] = [near[0], near[Math.floor(near.length / 2)], near.at(-1)];
+  const d = 2 * (a[0] * (b[1] - c[1]) + b[0] * (c[1] - a[1]) + c[0] * (a[1] - b[1]));
+  if (Math.abs(d) < 1e-6) return null;
+  const s2 = (q) => q[0] * q[0] + q[1] * q[1];
+  const centre = [(s2(a) * (b[1] - c[1]) + s2(b) * (c[1] - a[1]) + s2(c) * (a[1] - b[1])) / d, (s2(a) * (c[0] - b[0]) + s2(b) * (a[0] - c[0]) + s2(c) * (b[0] - a[0])) / d];
+  const r = near.reduce((t, q) => t + len2(v2(q, centre)), 0) / near.length;
+  return Number.isFinite(r) && r < reach ? { centre, r } : null;
+}
+
+/** The convex hull of plan points, counter-clockwise. */
+export function convexHull(pts) {
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = []; const upper = [];
+  for (const q of p) { while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), q) <= 0) lower.pop(); lower.push(q); }
+  for (const q of p.slice().reverse()) { while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), q) <= 0) upper.pop(); upper.push(q); }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+
+/** A closed ring simplified (Douglas-Peucker) to tol metres, from its point farthest from its centre (a corner). */
+export function simplifyRing(ring0, tol) {
+  if (ring0.length < 4) return ring0;
+  const cx = ring0.reduce((t, q) => t + q[0], 0) / ring0.length; const cy = ring0.reduce((t, q) => t + q[1], 0) / ring0.length;
+  let s0 = 0; let sd = -1;
+  ring0.forEach((q, i) => { const d = Math.hypot(q[0] - cx, q[1] - cy); if (d > sd) { sd = d; s0 = i; } });
+  const ring = [...ring0.slice(s0), ...ring0.slice(0, s0)];
+  // (split at the point farthest from the first: a closed ring in two open runs)
+  let far = 0; let fd = -1;
+  ring.forEach((q, i) => { const d = len2(v2(ring[0], q)); if (d > fd) { fd = d; far = i; } });
+  const dp = (pts) => {
+    if (pts.length < 3) return pts;
+    const a = pts[0]; const b = pts.at(-1); const ab = v2(a, b); const L = len2(ab) || 1;
+    let k = -1; let dm = 0;
+    for (let i = 1; i < pts.length - 1; i++) { const d = Math.abs(ab[0] * (pts[i][1] - a[1]) - ab[1] * (pts[i][0] - a[0])) / L; if (d > dm) { dm = d; k = i; } }
+    if (dm <= tol) return [a, b];
+    return [...dp(pts.slice(0, k + 1)).slice(0, -1), ...dp(pts.slice(k))];
+  };
+  const one = dp(ring.slice(0, far + 1)); const two = dp([...ring.slice(far), ring[0]]);
+  return [...one.slice(0, -1), ...two.slice(0, -1)];
+}
+
+/**
+ * A sentry box (garita) cantilevered off a fort's salient corner: a round
+ * stone turret on a corbel below the parapet, a dark slit all round, a
+ * domed cap.
+ */
+export function sentryBox(m, corner, zRoof, wallMat, wallTint, { r = 1.0, top = 2.6 } = {}) {
+  const c = [corner.p[0] + corner.out[0] * r * 0.55, corner.p[1] + corner.out[1] * r * 0.55];
+  // the corbel: stepped rings under the turret
+  cylinder(m, wallMat, c[0], c[1], r * 0.55, zRoof - 1.6, zRoof - 0.9, wallTint, { n: 10, top: false });
+  cylinder(m, wallMat, c[0], c[1], r * 0.8, zRoof - 0.9, zRoof - 0.3, wallTint, { n: 12, top: false });
+  cylinder(m, wallMat, c[0], c[1], r, zRoof - 0.3, zRoof + top - 0.9, wallTint, { n: 14, top: false });
+  // the lookout slit, then the drum and cap
+  cylinder(m, wallMat, c[0], c[1], r - 0.04, zRoof + top - 0.9, zRoof + top - 0.6, wallTint.map((v) => v * 0.25), { n: 14, top: false });
+  cylinder(m, wallMat, c[0], c[1], r, zRoof + top - 0.6, zRoof + top, wallTint, { n: 14, top: false });
+  dome(m, wallMat, c[0], c[1], r * 1.04, zRoof + top, wallTint, { n: 14, rings: 4, rise: 0.8 });
+  // (its underside: the corbel's foot closed)
+  const p = circle(c[0], c[1], r * 0.55, 10);
+  for (let i = 1; i + 1 < 10; i++) m.tri(wallMat, [...p[0], zRoof - 1.6], [...p[i + 1], zRoof - 1.6], [...p[i], zRoof - 1.6], [0, 0], [1, 0], [1, 1], wallTint);
+}
+
+/**
+ * A castle's round corner tower from the ground (z0) to over the wall top:
+ * crenellated, or (cone) a conical slate roof. Returns its top.
+ */
+export function cornerTower(m, corner, z0, zRoof, wallMat, wallTint, roofMat, roofTint, { r = 3, cone: conical = false, centre = null } = {}) {
+  const c = centre || [corner.p[0] + corner.out[0] * r * 0.35, corner.p[1] + corner.out[1] * r * 0.35];
+  const top = zRoof + Math.max(3, r * 1.2);
+  const n = 18;
+  cylinder(m, wallMat, c[0], c[1], r, z0, top, wallTint, { n });
+  // a dark arrow slit or two up its outer face
+  for (const f of [0.35, 0.65]) {
+    const z = z0 + (top - z0) * f;
+    const p = [c[0] + corner.out[0] * (r + 0.03), c[1] + corner.out[1] * (r + 0.03)];
+    box(m, wallMat, p, [-corner.out[1], corner.out[0]], 0.15, 0.05, z, z + 1.4, wallTint.map((v) => v * 0.2));
+  }
+  if (conical) {
+    cylinder(m, wallMat, c[0], c[1], r + 0.3, top - 0.5, top, wallTint, { n, top: false });
+    cone(m, roofMat, c[0], c[1], r + 0.45, top, top + r * 1.9, roofTint, { n });
+    return top + r * 1.9;
+  }
+  // a corbelled ring over the shaft, merlons round its rim
+  cylinder(m, wallMat, c[0], c[1], r + 0.35, top - 0.6, top + 0.9, wallTint, { n });
+  const k = Math.max(6, Math.round((2 * Math.PI * (r + 0.35)) / 2.2));
+  for (let q = 0; q < k; q++) {
+    const a = (2 * Math.PI * q) / k;
+    const u = [Math.cos(a), Math.sin(a)]; const along = [-u[1], u[0]];
+    const pc = [c[0] + u[0] * (r + 0.05), c[1] + u[1] * (r + 0.05)];
+    box(m, wallMat, pc, along, Math.PI * (r + 0.35) / k * 0.62, 0.3, top + 0.9, top + 1.9, wallTint, { uvM: 3 });
+  }
+  return top + 1.9;
+}
+
+/**
+ * A gate in the middle of wall a-b (counter-clockwise ring: outside on the
+ * right): a round-arched portal in a stone surround, its wooden doors set
+ * back. Returns false where the wall is too short.
+ */
+export function fortGate(m, a, b, base, wallMat, wallTint, { w = 3.6, h = 4.2 } = {}) {
+  const e = v2(a, b); const L = len2(e);
+  if (L < w + 3) return false;
+  const d = [e[0] / L, e[1] / L]; const out = [d[1], -d[0]];
+  const mid = [a[0] + e[0] / 2, a[1] + e[1] / 2];
+  const at = (s, k) => [mid[0] + d[0] * s + out[0] * k, mid[1] + d[1] * s + out[1] * k];
+  // the surround, standing proud of the wall
+  const sw = w / 2 + 0.7; const sh = h + w / 2 + 0.8;
+  box(m, wallMat, at(0, 0.2), d, sw, 0.2, base - 0.3, base + sh, wallTint.map((v) => Math.min(1, v * 1.08)), { uvM: 3 });
+  // the doors: a rectangle and its round head, just in front of the surround
+  // (weatherboards turned upright: the planks of a gate; uv u runs up the door)
+  const k = 0.45; const col = GATE_WOOD;
+  const P = (s, z) => [...at(s, k), z];
+  const U = (s, z) => [(z - base) / 2, (s + w / 2) / 2];
+  m.quad('siding', P(-w / 2, base), P(w / 2, base), P(w / 2, base + h), P(-w / 2, base + h), U(-w / 2, base), U(w / 2, base), U(w / 2, base + h), U(-w / 2, base + h), col);
+  const segs = 10;
+  for (let q = 0; q < segs; q++) {
+    const t0 = Math.PI * (q / segs); const t1 = Math.PI * ((q + 1) / segs);
+    const p0 = P((w / 2) * Math.cos(t0), base + h + (w / 2) * Math.sin(t0));
+    const p1 = P((w / 2) * Math.cos(t1), base + h + (w / 2) * Math.sin(t1));
+    m.tri('siding', P(0, base + h), p0, p1, U(0, base + h), U((w / 2) * Math.cos(t0), base + h + (w / 2) * Math.sin(t0)), U((w / 2) * Math.cos(t1), base + h + (w / 2) * Math.sin(t1)), col);
+  }
+  // iron straps across the doors
+  for (const z of [base + 0.8, base + h * 0.55]) box(m, 'concrete', at(0, k + 0.03), d, w / 2, 0.03, z, z + 0.12, [0.12, 0.12, 0.13]);
+  return true;
+}

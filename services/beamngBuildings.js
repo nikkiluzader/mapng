@@ -28,7 +28,7 @@
  * (metres, Z up) with one geometry group per material; their material names
  * match getBuildingMaterialDefs().
  */
-import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET } from './buildingDetails.js';
+import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
 import * as THREE from 'three';
 
 // ── Materials ───────────────────────────────────────────────────────────────
@@ -444,6 +444,30 @@ function parseMeters(value) {
   return /ft|'/.test(raw) ? n * 0.3048 : n;
 }
 
+const FORT_CLASSES = new Set(['castle', 'fort', 'fortress', 'citadel']);
+// castles in name only: palaces, manors, stately homes, chateaux
+const PALACE_CASTLES = new Set(['palace', 'stately', 'manor', 'chateau', 'château', 'schloss']);
+// star forts and artillery forts (low walls, sentry boxes on the bastions),
+// as against a castle (tall walls, crenellations, round corner towers)
+const FORTRESS_TYPES = new Set(['fortress', 'fort', 'citadel', 'kremlin', 'shiro']);
+const FORT_WORKS = /\b(ravelin|bastion|redoubt|lunette|demi-?lune|hornwork|crownwork|casemate|blockhouse|curtain wall)s?\b/i;
+
+/**
+ * A castle or fort from its tags: 'fortress' (an artillery or star fort),
+ * 'castle', or null (not one, or a palace called a castle).
+ */
+export function fortKind(tags = {}) {
+  const type = String(tags.castle_type || '').toLowerCase().split(/[;,]/)[0].trim();
+  const hist = String(tags.historic || '').toLowerCase();
+  const cls = String(tags.building || '').toLowerCase();
+  // (a fort's outworks mapped as historic buildings by their name: a ravelin, a bastion, a redoubt)
+  if (hist && !FORT_CLASSES.has(hist) && FORT_WORKS.test(String(tags.name || ''))) return 'fortress';
+  if (!(FORT_CLASSES.has(hist) || FORT_CLASSES.has(cls) || type)) return null;
+  if (PALACE_CASTLES.has(type)) return null;
+  if (FORTRESS_TYPES.has(type) || hist === 'fort' || cls === 'fort' || cls === 'fortress' || cls === 'citadel') return 'fortress';
+  return 'castle';
+}
+
 /**
  * How one footprint is built. Pure; deterministic per footprint (seed).
  * Returns { kind, floors, floorH, roof, pitch, wall, band, shopFloor, office,
@@ -573,15 +597,30 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
       roofTint = taggedRoof || ROOF_TINTS.roofSlate[pick([7, 8, 9], r('worshipRoof'))];
     }
   }
+  // a castle or fort is no office block: bare stone walls, no windows, a flat
+  // stone top behind battlements (buildingDetails.js: merlons, corner towers
+  // or sentry boxes, a gate); a palace or manor called a castle keeps the
+  // ordinary look
+  const fort = fortKind(tags);
+  if (fort) {
+    band = null; office = false; kind = 'block';
+    wall = material === 'brick' ? 'brickDark' : (fort === 'fortress' ? 'stoneMixed' : pick(['stone', 'stoneMixed', 'stoneClean'], r('fortWall')));
+    // (the wall walk paved flat: the rubble stone on the floor read as a rock field)
+    roof = 'flat'; roofMat = 'concrete';
+    roofTint = [0.6, 0.58, 0.54];
+    // (a level count is a fort's casemates or a castle's halls, not office floors: the walls stand tall)
+    if (!Number.isFinite(explicitH)) eaveH = Math.min(18, Math.max(fort === 'fortress' ? 8 : 10, floors * 3.6));
+  }
+  const fortTint = fort ? (tagged || pick(fort === 'fortress' ? [[0.96, 0.94, 0.9], [0.9, 0.89, 0.86]] : [[0.92, 0.9, 0.85], [0.84, 0.82, 0.78], [1, 0.97, 0.9]], r('fortTint'))) : null;
   const worshipPitch = worship && roof === 'gabled' ? 45 : null;
   const worshipTint = worship ? (tagged || pick([[1, 0.96, 0.9], [0.96, 0.92, 0.84], [0.92, 0.9, 0.86]], r('worshipTint'))) : null;
   const jitter = 1 + JITTER * (2 * r('jit') - 1);
   const shade = (c) => c.map((v) => Math.max(0, Math.min(1, v * jitter)));
   return {
-    kind, cls, floors, floorH, eaveH, roof, pitch: worshipPitch ?? pitch, wall, wallFamily: worship ? wall : wallFamily, band, office, shopFloor: shopFloor && !worship, heightSource,
+    kind, cls, floors, floorH, eaveH, roof, pitch: worshipPitch ?? pitch, wall, wallFamily: worship || fort ? wall : wallFamily, band, office, shopFloor: shopFloor && !worship && !fort, heightSource, fort,
     entrance: style.entrance || 'steps', chimneyShare: style.chimney ?? 0.3, tanks: !!style.tanks,
-    wallTint: shade(worshipTint || wallTint), roofMat, roofTint: shade(roofTint),
-    windows: kind === 'house',
+    wallTint: shade(fortTint || worshipTint || wallTint), roofMat, roofTint: shade(roofTint),
+    windows: kind === 'house' && !fort,
   };
 }
 
@@ -848,6 +887,9 @@ const SKIRT_SLOPE_M = 1;       // ground falling more than this under a footprin
 const SKIRT_M = 3;
 const SHOP_STREET_M = 20;      // a shop's wall this near a street gets its shopfronts
 const ROOF_PLANT_M2 = 200;     // flat roofs this large carry plant
+const FORT_POINT_DEG = 100;    // a fort's corners sharper than this inside: its bastions' points (sentry boxes; a bastion's shoulders run 105-110)
+const CASTLE_CORNER_DEG = 135; // a castle's corners sharper than this: round towers
+const FORT_CORNERS_MAX = 12;
 const WORSHIP_CLASSES = new Set(['church', 'chapel', 'cathedral', 'mosque', 'temple', 'synagogue', 'shrine']);   // buildings' shapes: one per tile this size (the export may pick larger on big maps)
 
 // BeamNG reads trailing digits of a Collada node name as its detail level
@@ -1435,7 +1477,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const crownMat = plan.band === BAND_BRICK ? 'brick' : (plan.wall || 'rendered');
     // a parapet with its coping on flat-roofed blocks (the facade carried up),
     // a string course under it near the camera
-    const parapeted = flat && (plan.kind === 'block' || worship) && (plan.floors >= 2 || worship) && !plan.office && !holes.length;
+    const parapeted = flat && (plan.kind === 'block' || worship) && (plan.floors >= 2 || worship) && !plan.office && !holes.length && !plan.fort;
     if (parapeted) {
       parapet(builder, ring, eave, crownMat, plan.wallTint);
       stringCourse(detailB, ring, eave, crownMat, plan.wallTint.map((v) => Math.min(1, v * 1.08)));
@@ -1471,9 +1513,47 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       }
     }
     // roof plant on big flat roofs; water tanks on mid-rises where they stand
-    if (flat && box && area >= ROOF_PLANT_M2 && plan.kind !== 'house' && !worship) {
+    if (flat && box && area >= ROOF_PLANT_M2 && plan.kind !== 'house' && !worship && !plan.fort) {
       const tanks = plan.tanks && plan.floors >= 4 && plan.floors <= 20 && !plan.office && rnd('tank') < 0.3;
       stats.details.roofPlant = (stats.details.roofPlant || 0) + roofPlant(detailB, ring, box, eave, area, crownMat, plan.wallTint, { tanks }, (...k) => rnd('plant', ...k));
+    }
+    // castles and forts: battlements round the wall top, a fort's sentry
+    // boxes on its bastions' points (and the cordon under its parapet), a
+    // castle's round towers on its corners, a gate toward the street
+    if (plan.fort) {
+      const bm = BATTLEMENTS[plan.fort];
+      stats.details.merlons = (stats.details.merlons || 0) + battlements(builder, ring, eave, plan.wall, plan.wallTint, bm);
+      // (a castle's towers on its outline's hull corners: towers mapped into the outline are clusters of short edges)
+      const corners = (plan.fort === 'fortress' ? salientCorners(ring, FORT_POINT_DEG) : castleCorners(ring, CASTLE_CORNER_DEG, Math.max(2, 0.08 * Math.sqrt(area))))
+        .filter((c) => c.arms >= (plan.fort === 'fortress' ? 4 : 6))
+        .sort((p, q) => p.inside - q.inside).slice(0, FORT_CORNERS_MAX);
+      if (plan.fort === 'fortress') {
+        stringCourse(detailB, ring, eave, plan.wall, plan.wallTint.map((v) => Math.min(1, v * 1.06)));
+        for (const c of corners) sentryBox(detailB, c, eave, plan.wall, plan.wallTint);
+        stats.details.sentryBoxes = (stats.details.sentryBoxes || 0) + corners.length;
+      } else {
+        const coned = rnd('fortCone') < 0.35;
+        const r0 = Math.max(2.2, Math.min(4.5, 0.08 * Math.sqrt(area), corners.length ? Math.min(...corners.map((c) => c.arms)) * 0.3 : 4.5));
+        for (const c of corners) {
+          // (a round tower mapped into the outline: ours stands on it, its size)
+          const t = mappedTower(ring, c, r0 * 2.5);
+          cornerTower(builder, c, z0, eave, plan.wall, plan.wallTint, 'roofSlate', ROOF_TINTS.roofSlate[8], t ? { r: Math.max(2.2, Math.min(7, t.r + 0.1)), cone: coned, centre: t.centre } : { r: r0, cone: coned });
+        }
+        stats.details.cornerTowers = (stats.details.cornerTowers || 0) + corners.length;
+      }
+      // the gate: on the wall nearest a street (the longest wall if none faces
+      // one); none where a road already passes through the walls
+      let gate = -1; let best = crossings.length ? -Infinity : Infinity;
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i]; const b = ring[(i + 1) % ring.length];
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (L < 7) continue;
+        const d = streets.facing(a, b);
+        const score = d === null ? 1000 - L : d;
+        if (score < best) { best = score; gate = i; }
+      }
+      if (gate >= 0 && fortGate(detailB, ring[gate], ring[(gate + 1) % ring.length], Math.min(groundNear(ring[gate]), groundNear(ring[(gate + 1) % ring.length])), plan.wall, plan.wallTint)) stats.details.gates = (stats.details.gates || 0) + 1;
+      stats.details.forts = (stats.details.forts || 0) + 1;
     }
     // places of worship: their tower or dome, seen from afar
     if (worship && box) {
