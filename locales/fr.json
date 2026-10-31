@@ -257,7 +257,9 @@
     "surroundingDesc": "Tuiles adjacentes adaptatives avec fusion des jonctions et detail satellite optimise pour un chargement plus rapide.",
     "wireframeMode": "Mode fil de fer",
     "features3d": "Elements 3D",
-    "resetCamera": "Reinitialiser la caméra"
+    "resetCamera": "Reinitialiser la caméra",
+    "previewNote": "Aperçu uniquement : un coup d'œil rapide et allégé sur votre terrain, vos routes et vos bâtiments. Le niveau BeamNG exporté est généré en pleine qualité et rend bien mieux en jeu.",
+    "dismissNote": "Masquer"
   },
   "exportPanel": {
     "osmMissing": "Données OSM manquantes",

@@ -257,7 +257,9 @@
     "surroundingDesc": "Tessere adiacenti adattive con blending cuciture e dettaglio satellite ottimizzato per anteprima per caricamento più veloce.",
     "wireframeMode": "Modalità Wireframe",
     "features3d": "Funzionalità 3D",
-    "resetCamera": "Ripristina Telecamera"
+    "resetCamera": "Ripristina Telecamera",
+    "previewNote": "Solo un'anteprima: uno sguardo rapido e leggero a terreno, strade ed edifici. Il livello BeamNG esportato è generato a pieno dettaglio e in gioco appare molto meglio.",
+    "dismissNote": "Nascondi"
   },
   "exportPanel": {
     "osmMissing": "Dato OSM mancante",

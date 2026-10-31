@@ -257,7 +257,9 @@
     "surroundingDesc": "Adaptacyjne sąsiednie kafelki ze zszywaniem szwów i optymalizowanym szczegółami satelity dla szybszego ładowania.",
     "wireframeMode": "Tryb szkieletu",
     "features3d": "Funkcje 3D",
-    "resetCamera": "Resetuj kamerę"
+    "resetCamera": "Resetuj kamerę",
+    "previewNote": "Tylko podgląd: szybki, uproszczony widok terenu, dróg i budynków. Wyeksportowany poziom BeamNG jest tworzony w pełnej szczegółowości i w grze wygląda znacznie lepiej.",
+    "dismissNote": "Ukryj"
   },
   "exportPanel": {
     "osmMissing": "Dane OSM brakują",

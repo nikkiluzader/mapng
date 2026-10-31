@@ -257,7 +257,9 @@
     "surroundingDesc": "Mosaicos adyacentes adaptativos con mezcla de costuras y detalle satelital optimizado para vista previa.",
     "wireframeMode": "Modo wireframe",
     "features3d": "Features 3D",
-    "resetCamera": "Restablecer camara"
+    "resetCamera": "Restablecer camara",
+    "previewNote": "Solo una vista previa: un vistazo rápido y ligero a tu terreno, carreteras y edificios. El nivel de BeamNG exportado se genera con todo el detalle y se ve mucho mejor en el juego.",
+    "dismissNote": "Ocultar"
   },
   "exportPanel": {
     "osmMissing": "Faltan datos OSM",

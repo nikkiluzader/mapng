@@ -363,6 +363,23 @@
       </div>
     </div>
 
+    <!-- Preview-only note (bottom right: the memory widget sits bottom centre) -->
+    <div
+      v-if="showPreviewNote && webGLAvailable && !webGLRuntimeError"
+      class="absolute bottom-4 right-4 z-20 max-w-xs flex items-start gap-2 pl-3 pr-1.5 py-2 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 text-white/85 text-[11px] leading-snug shadow-lg"
+      role="note"
+    >
+      <Info :size="14" class="shrink-0 mt-px text-[#FF6600]" />
+      <span>{{ t('preview.previewNote') }}</span>
+      <button
+        @click="dismissPreviewNote"
+        class="shrink-0 p-0.5 rounded text-white/50 hover:text-white hover:bg-white/10 transition-colors"
+        :title="t('preview.dismissNote')"
+        :aria-label="t('preview.dismissNote')"
+      >
+        <X :size="13" />
+      </button>
+    </div>
   </div>
 </template>
 
@@ -378,6 +395,8 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  Info,
+  X,
 } from "lucide-vue-next";
 
 const { t } = useI18n({ useScope: 'global' });
@@ -496,6 +515,16 @@ const showWater = ref(true);
 const waterLevelOffsetMeters = ref(0);
 const showSurroundings = ref(false);
 const showSceneSettings = ref(false);
+
+// "Preview only" note: the preview is a quick, light look at the data; the
+// exported level is built at full detail. Dismissed once, it stays dismissed.
+const PREVIEW_NOTE_KEY = 'mapng_preview_note_dismissed';
+const readNoteDismissed = () => { try { return localStorage.getItem(PREVIEW_NOTE_KEY) === '1'; } catch { return false; } };
+const showPreviewNote = ref(!readNoteDismissed());
+const dismissPreviewNote = () => {
+  showPreviewNote.value = false;
+  try { localStorage.setItem(PREVIEW_NOTE_KEY, '1'); } catch { /* private mode: shown again next visit */ }
+};
 const isSurroundingsLoading = ref(false);
 const surroundingsSatelliteProgress = reactive({
   completed: 0,

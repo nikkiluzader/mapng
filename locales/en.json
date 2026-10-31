@@ -286,7 +286,9 @@
     "features3d": "3D Features",
     "water": "Water",
     "seaLevelOffset": "Sea Level Offset",
-    "resetCamera": "Reset Camera"
+    "resetCamera": "Reset Camera",
+    "previewNote": "Preview only: a quick, lightweight look at your terrain, roads and buildings. The exported BeamNG level is built at full detail and looks much better in game.",
+    "dismissNote": "Dismiss"
   },
   "exportPanel": {
     "osmMissing": "OSM Data missing",

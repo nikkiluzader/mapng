@@ -257,7 +257,9 @@
     "surroundingDesc": "Adaptive angrenzende Tiles mit Nahtübergängen und für Vorschau optimierten Satellitendetails für schnelleres Laden.",
     "wireframeMode": "Drahtgittermodus",
     "features3d": "3D-Features",
-    "resetCamera": "Kamera zurücksetzen"
+    "resetCamera": "Kamera zurücksetzen",
+    "previewNote": "Nur eine Vorschau: ein schneller, vereinfachter Blick auf Gelände, Straßen und Gebäude. Das exportierte BeamNG-Level wird in voller Detailstufe erstellt und sieht im Spiel deutlich besser aus.",
+    "dismissNote": "Ausblenden"
   },
   "exportPanel": {
     "osmMissing": "OSM-Daten fehlen",
