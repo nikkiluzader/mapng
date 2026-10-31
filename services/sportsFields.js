@@ -383,7 +383,8 @@ function rugbyPosts(stone, p, s) {
 // a basketball hoop facing +dir, its backboard over s (the baseline + 1.2 m)
 function hoop(stone, full, p, sBoard, dir) {
   const tc = (p.box.t0 + p.box.t1) / 2;
-  const sPole = sBoard - dir * 1.1;
+  // (the pole behind the baseline, the board 1.2 m inside it on a long arm)
+  const sPole = sBoard - dir * 2.1;
   const [px, py] = F(p, sPole, tc); const z = p.fieldZ(px, py);
   box(stone, 'metalWhite', [px, py], p.box.u, 0.09, 0.09, z - 0.3, z + 3.45, [0.25, 0.27, 0.3]);
   bar(stone, 'metalWhite', onField(p, sPole, tc, 3.35), onField(p, sBoard - dir * 0.05, tc, 3.35), 0.06, [0.25, 0.27, 0.3]);
