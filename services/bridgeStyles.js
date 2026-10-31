@@ -211,7 +211,7 @@ export function styleDecks(decks, { outlines = [], groundAt }) {
 
 /** Whether a pier at (x, y) of part pi stands inside one of the deck's styled spans (it spans it). */
 export function inStyledSpan(deck, pi, x, y) {
-  if (!deck.style || !['truss', 'arch', 'stoneArch'].includes(deck.style.type)) return false;
+  if (!deck.style || !['truss', 'arch', 'stoneArch', 'suspension', 'cable'].includes(deck.style.type)) return false;
   const part = deck.parts[pi];
   const s = arcs(part.xy);
   let best = Infinity; let at = 0;
@@ -232,7 +232,7 @@ export function inStyledSpan(deck, pi, x, y) {
  * c, d, want)) filled. depthOf(part): the deck's depth under its road surface.
  */
 export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () => 1.2 }) {
-  const out = { steel: newBuilder(), concrete: newBuilder(), stone: newBuilder() };
+  const out = { steel: newBuilder(), concrete: newBuilder(), stone: newBuilder(), cable: newBuilder() };
   const st = deck.style;
   if (!st) return out;
   for (const sp of st.spans) {
@@ -250,6 +250,12 @@ export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () =>
       }
     }
     else if (st.type === 'arch' && L >= THROUGH_ARCH_M) arch(out.steel, part, sArr, sp, off, L);
+    else if (st.type === 'suspension' || st.type === 'cable') {
+      // one set of towers per crossing, drawn by its lead deck (once, on its main span)
+      if ((st.crossing?.lead ?? deck) !== deck || sp !== mainSpan(deck).sp) continue;
+      if (st.type === 'suspension') suspensionCrossing(st.paint !== 'grey' ? out.steel : out.concrete, out.cable, deck, groundAt);
+      else cableStayedCrossing(out.concrete, out.cable, deck, groundAt);
+    }
     else if (st.type === 'arch' || st.type === 'stoneArch') {
       // a row of deck arches, each about as wide as the deck stands high (x 2.2), piers between them
       // (stone where tagged so, and short arches: canal and river arches under 30 m are nearly all masonry)
@@ -401,6 +407,185 @@ function deckArch(b, part, sArr, sp, L, groundAt, depth, stone) {
     for (const o of [half * 0.55, -half * 0.55]) {
       const p = along(part, sp.s0 + L * t, o, sArr);
       beam(b, [p[0], p[1], zr], [p[0], p[1], zd], 0.7, 0.7);
+    }
+  }
+}
+
+// ── suspension and cable-stayed ──────────────────────────────────────────────
+
+const LEG = [2.4, 3.0];       // a tower's / pylon's leg
+const CABLE = [0.55, 0.55];   // a suspension's main cable
+const STAY = [0.18, 0.18];    // stays and hangers
+const XBEAM = [2, 2.4];       // a tower's cross beams
+
+/** A tower's two legs either side of the deck at s, from the ground (or water) to `top`, cross beams. */
+function tower(b, part, sArr, s, off, top, groundAt, depth = 2) {
+  const legs = [off + 0.6, -(off + 0.6)].map((o) => along(part, s, o, sArr));
+  for (const p of legs) {
+    const g = groundAt(p[0], p[1]);
+    // (legs lean in a little toward the top)
+    const inward = [(legs[0][0] + legs[1][0]) / 2 - p[0], (legs[0][1] + legs[1][1]) / 2 - p[1]];
+    const L = Math.hypot(...inward) || 1;
+    const lean = Math.min(1.2, L * 0.15);
+    beam(b, [p[0], p[1], g - 1], [p[0] + (inward[0] / L) * lean, p[1] + (inward[1] / L) * lean, top], LEG[0], LEG[1]);
+  }
+  const zDeck = along(part, s, 0, sArr)[2];
+  // cross beams: under the deck, high over the lanes, at the top
+  for (const z of [zDeck - depth - 0.6, Math.max(zDeck + ARCH_HEADROOM_M + 2, (zDeck + top) / 2), top - 1.5]) {
+    if (z <= zDeck - depth - 0.6 && z - groundAt(legs[0][0], legs[0][1]) < 3) continue;
+    beam(b, [legs[0][0], legs[0][1], z], [legs[1][0], legs[1][1], z], XBEAM[0], XBEAM[1]);
+  }
+  return legs;
+}
+
+// ── crossings of cable-stayed and suspension decks ──────────────────────────
+
+const CROSSING_M = 45;        // cable / suspension decks this close side by side: one crossing, one set of towers
+
+/**
+ * Group the cable-stayed and suspension decks side by side into crossings: the deck with the longest span
+ * leads (deck.style.crossing = { decks, lead }); the others draw nothing of their own (their piers still
+ * left out). Call after styleDecks.
+ */
+export function linkCrossings(decks) {
+  const cs = decks.filter((d) => d.style && (d.style.type === 'cable' || d.style.type === 'suspension'));
+  const longest = (d) => Math.max(...d.style.spans.map((sp) => sp.s1 - sp.s0));
+  const near = (a, b) => a.parts.some((p) => p.xy.some(([x, y]) => b.parts.some((q) => q.xy.some(([u, v]) => Math.hypot(u - x, v - y) < CROSSING_M))));
+  const groups = [];
+  for (const d of cs) {
+    const g = groups.find((gr) => gr[0].style.type === d.style.type && gr.some((o) => near(o, d)));
+    if (g) g.push(d); else groups.push([d]);
+  }
+  for (const g of groups) {
+    const lead = g.reduce((a, b) => (longest(b) > longest(a) ? b : a));
+    for (const d of g) d.style.crossing = { decks: g, lead };
+  }
+  return groups.length;
+}
+
+/** A deck's main span: { part, sArr, sp, L }. */
+const mainSpan = (deck) => {
+  const sp = deck.style.spans.reduce((a, b) => (b.s1 - b.s0 > a.s1 - a.s0 ? b : a));
+  const part = deck.parts[sp.part];
+  return { part, sArr: arcs(part.xy), sp, L: sp.s1 - sp.s0 };
+};
+
+/** The arc length on a part nearest (x, y). */
+function nearestS(part, sArr, x, y) {
+  let best = Infinity; let at = 0;
+  for (let i = 0; i + 1 < part.xy.length; i++) {
+    const [ax, ay] = part.xy[i]; const [bx, by] = part.xy[i + 1];
+    const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
+    const d = Math.hypot(ax + vx * t - x, ay + vy * t - y);
+    if (d < best) { best = d; at = sArr[i] + t * Math.sqrt(L2); }
+  }
+  return at;
+}
+
+/**
+ * At station s of the lead's span: the crossing's two outer deck edges, [{ deck span, s on it, off (its
+ * outer edge's offset on its own part: + left / - right) }, ...] (left, right), and the legs' points.
+ */
+function crossingEdges(crossing, lead, s) {
+  const P = along(lead.part, s, 0, lead.sArr);
+  const Q = along(lead.part, Math.min(lead.sArr.at(-1), s + 1), 0, lead.sArr);
+  const ul = Math.hypot(Q[0] - P[0], Q[1] - P[1]) || 1;
+  const n = [-(Q[1] - P[1]) / ul, (Q[0] - P[0]) / ul];
+  let left = null; let right = null;
+  for (const d of crossing.decks) {
+    const m = d === lead.deck ? lead : { ...mainSpan(d), deck: d };
+    const sd = nearestS(m.part, m.sArr, P[0], P[1]);
+    const c = along(m.part, sd, 0, m.sArr);
+    const lat = (c[0] - P[0]) * n[0] + (c[1] - P[1]) * n[1];
+    // which of this deck's edges faces out (its own left may be the crossing's right)
+    const c2 = along(m.part, Math.min(m.sArr.at(-1), sd + 1), 0, m.sArr);
+    const same = ((c2[0] - c[0]) * (Q[0] - P[0]) + (c2[1] - c[1]) * (Q[1] - P[1])) >= 0 ? 1 : -1;
+    const edge = m.part.half + PARAPET_W_M + SIDE_GAP_M;
+    if (!left || lat + edge > left.lat) left = { m, sd, off: same * edge, lat: lat + edge, dirSign: same };
+    if (!right || lat - edge < right.lat) right = { m, sd, off: -same * edge, lat: lat - edge, dirSign: same };
+  }
+  const leg = (lat) => [P[0] + n[0] * (lat + Math.sign(lat || 1) * 0.8), P[1] + n[1] * (lat + Math.sign(lat || 1) * 0.8), P[2]];
+  return { left, right, legs: [leg(left.lat), leg(right.lat)], zDeck: P[2] };
+}
+
+/** A tower at a crossing station: two legs from the ground to `top` outside the outer decks, cross beams. */
+function crossingTower(b, legs, zDeck, top, groundAt) {
+  const mid = [(legs[0][0] + legs[1][0]) / 2, (legs[0][1] + legs[1][1]) / 2];
+  const tops = legs.map((p) => {
+    const g = groundAt(p[0], p[1]);
+    const L = Math.hypot(mid[0] - p[0], mid[1] - p[1]) || 1;
+    const lean = Math.min(1.5, L * 0.12);
+    const t = [p[0] + ((mid[0] - p[0]) / L) * lean, p[1] + ((mid[1] - p[1]) / L) * lean, top];
+    beam(b, [p[0], p[1], g - 1], t, LEG[0], LEG[1]);
+    return t;
+  });
+  for (const z of [Math.max(zDeck + ARCH_HEADROOM_M + 2.5, zDeck + (top - zDeck) * 0.55), top - 1.5]) {
+    const f = (z - (groundAt(legs[0][0], legs[0][1]) - 1)) / (top - (groundAt(legs[0][0], legs[0][1]) - 1));
+    const at = (k) => [legs[k][0] + (tops[k][0] - legs[k][0]) * f, legs[k][1] + (tops[k][1] - legs[k][1]) * f, z];
+    beam(b, at(0), at(1), XBEAM[0], XBEAM[1]);
+  }
+  return tops;
+}
+
+function suspensionCrossing(towerB, cableB, deck, groundAt) {
+  const crossing = deck.style.crossing || { decks: [deck], lead: deck };
+  const lead = { ...mainSpan(deck), deck };
+  const { sp, L } = lead;
+  const side = L >= 300 ? 0.18 : 0.02;
+  const t0 = sp.s0 + L * side; const t1 = sp.s1 - L * side;
+  const main = t1 - t0;
+  const A = crossingEdges(crossing, lead, t0); const B = crossingEdges(crossing, lead, t1);
+  const H = Math.max(22, main / 8.5);
+  const topsA = crossingTower(towerB, A.legs, A.zDeck, A.zDeck + H, groundAt);
+  const topsB = crossingTower(towerB, B.legs, B.zDeck, B.zDeck + H, groundAt);
+  // each side: the main cable from tower top to tower top over the outer deck's edge, hangers down to it
+  for (const k of [0, 1]) {
+    const edgeA = k === 0 ? A.left : A.right;
+    const m = edgeA.m;
+    const sA = edgeA.sd; const sB = nearestS(m.part, m.sArr, B.legs[k][0], B.legs[k][1]);
+    const n = Math.max(16, Math.round(main / 10));
+    const pts = [];
+    for (let i = 0; i <= n; i++) {
+      const t = i / n; const sd = sA + (sB - sA) * t;
+      const d = along(m.part, sd, edgeA.off, m.sArr);
+      const chord = topsA[k][2] + (topsB[k][2] - topsA[k][2]) * t; const low = d[2] + 2;
+      pts.push([topsA[k][0] + (topsB[k][0] - topsA[k][0]) * t, topsA[k][1] + (topsB[k][1] - topsA[k][1]) * t, chord - (chord - low) * 4 * t * (1 - t)]);
+      if (i > 0 && i < n && pts[i][2] - d[2] > 1.2) beam(cableB, [d[0], d[1], d[2] + 0.2], pts[i], STAY[0], STAY[1]);
+    }
+    for (let i = 0; i < n; i++) beam(cableB, pts[i], pts[i + 1], CABLE[0], CABLE[1]);
+    // side spans down to the anchorages at the run's ends
+    for (const [top, sEnd] of [[topsA[k], sp.s0], [topsB[k], sp.s1]]) {
+      const e = along(lead.part, sEnd, k === 0 ? lead.part.half + PARAPET_W_M + SIDE_GAP_M : -(lead.part.half + PARAPET_W_M + SIDE_GAP_M), lead.sArr);
+      if (Math.hypot(e[0] - top[0], e[1] - top[1]) > 6) beam(cableB, top, [e[0], e[1], e[2] + 0.5], CABLE[0], CABLE[1]);
+    }
+  }
+}
+
+function cableStayedCrossing(pylonB, cableB, deck, groundAt) {
+  const crossing = deck.style.crossing || { decks: [deck], lead: deck };
+  const lead = { ...mainSpan(deck), deck };
+  const { sp, L } = lead;
+  const stations = L >= 220 ? [sp.s0 + L * 0.27, sp.s1 - L * 0.27] : [sp.s0 + L / 2];
+  const reach = stations.length === 2 ? L * 0.26 : L * 0.48;
+  for (const ps of stations) {
+    const C = crossingEdges(crossing, lead, ps);
+    const H = Math.max(25, reach * 0.42);
+    const tops = crossingTower(pylonB, C.legs, C.zDeck, C.zDeck + H, groundAt);
+    const nStay = Math.max(4, Math.round(reach / 12));
+    // each leg's stays to the outer deck on its side only (none across another deck's lanes)
+    for (const k of [0, 1]) {
+      const edge = k === 0 ? C.left : C.right;
+      const m = edge.m;
+      for (const dir of [-1, 1]) {
+        for (let j = 1; j <= nStay; j++) {
+          const sd = edge.sd + dir * edge.dirSign * (reach * j) / nStay;
+          if (sd < m.sp.s0 || sd > m.sp.s1) continue;
+          const d = along(m.part, sd, edge.off, m.sArr);
+          const zHead = tops[k][2] - 1 - (H * 0.3) * (1 - j / nStay);
+          beam(cableB, [d[0], d[1], d[2] + 0.3], [tops[k][0], tops[k][1], zHead], STAY[0], STAY[1]);
+        }
+      }
     }
   }
 }

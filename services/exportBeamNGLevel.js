@@ -25,7 +25,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
-import { styleDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
+import { styleDecks, linkCrossings, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
 import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
@@ -915,7 +915,7 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = []) {
     const deckData = toDae(g.top, origin);
     const extras = [];
     if (style) {
-      for (const [kind, b, material] of [['steel', style.steel, steelMaterial(deck.style.paint)], ['struct', style.concrete, BRIDGE_MATERIAL], ['stone', style.stone, BRIDGE_STONE_MATERIAL]]) {
+      for (const [kind, b, material] of [['steel', style.steel, steelMaterial(deck.style.paint)], ['struct', style.concrete, BRIDGE_MATERIAL], ['stone', style.stone, BRIDGE_STONE_MATERIAL], ['cables', style.cable, steelMaterial('black')]]) {
         if (!b.pos.length) continue;
         const d = toDae({ positions: b.pos, uvs: b.uv }, origin, material);
         if (d) extras.push({ kind, data: d, triangles: b.pos.length / 9 });
@@ -6372,7 +6372,7 @@ function buildDetailedReportSections(d) {
     lines.push('- No buildings exported (none in the map, or buildings off).');
   } else {
     lines.push(`- OSM building footprints: ${st.footprints}, built: ${br.built}`);
-    lines.push(`- Skipped: invalid geometry ${st.skipped.badGeometry}, under 4 m² ${st.skipped.tiny}, over 50,000 m² (non-industrial) ${st.skipped.oversize}, no terrain under them ${st.skipped.noGround}, over the building cap ${st.skipped.overCap}`);
+    lines.push(`- Skipped: invalid geometry ${st.skipped.badGeometry}, under 4 m² ${st.skipped.tiny}, over 50,000 m² (non-industrial) ${st.skipped.oversize}, no terrain under them ${st.skipped.noGround}, over the building cap ${st.skipped.overCap}, bridge piers / towers mapped as buildings (drawn by the bridges) ${st.skipped.bridgeParts || 0}`);
     lines.push(`- Shapes: ${br.tiles ?? 0} building tile(s) (each a full detail level near the camera and a lite one from about ${BUILDING_LITE_FROM_M} m: no laid-over windows, soffits or small details), ${br.meshes} full mesh(es), ${Math.round(br.triangles)} triangles; collision: the lite walls and roofs`);
     const avg = (a) => (br.built ? a.sum / br.built : NaN);
     lines.push(`- Floors: min ${br.built ? st.floors.min : 'n/a'}, mean ${formatNumber(avg(st.floors), 1)}, max ${st.floors.max}`);
@@ -10191,6 +10191,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     .filter((f) => f.type === 'bridge_infra' && f.geometry?.length > 2)
     .map((f) => ({ ring: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), tags: f.tags || {} }));
   const styledBridges = styleDecks(bridgeDecks, { outlines: bridgeOutlines, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
+  linkCrossings(bridgeDecks);
   if (styledBridges) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge styles: ${bridgeDecks.filter((d) => d.style).map((d) => d.style.type).join(', ')}.`);
   const bridgeDaes = generateBridgeDAEs(
     bridgeDecks,
