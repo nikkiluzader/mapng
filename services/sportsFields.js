@@ -142,15 +142,27 @@ export function planPitches(features, project, { groundAt = null } = {}) {
       const h = cleanRing(f.holes[0].map((q) => project(q.lat, q.lng)));
       if (h.length >= 3) hole = poolShape(h) === 'freeform' ? smoothRing(h) : h;
     }
-    // a track's infield: its mapped inner ring, else the lanes' width in from its edge
-    if (sport === 'track' && !hole) hole = insetPts(ring, Math.max(4, Math.min(10, Number.parseInt(t.lanes, 10) || 6)) * 1.22 + 0.3);
-    const bx = orientedBox(ring);
+    let bx = orientedBox(ring);
     if (!bx) continue;
+    // a track shaped like the usual oval (straights and semicircles): drawn as
+    // that exact oval, its lanes exact offsets of it (offsetting the mapped
+    // outline crossed lane lines where it was noisy)
+    let stadium = false;
+    if (sport === 'track') {
+      const ideal = stadiumRing(bx, 0);
+      const now = Math.abs(signedArea(ring));
+      if (Math.abs(signedArea(ideal) - now) / now < 0.08 && (bx.s1 - bx.s0) > (bx.t1 - bx.t0)) { ring = ideal; stadium = true; area = signedArea(ideal); }
+    }
+    // a track's infield: its mapped inner ring, else the lanes' width in from its edge
+    if (sport === 'track' && (!hole || stadium)) {
+      const lanes = Math.max(4, Math.min(10, Number.parseInt(t.lanes, 10) || 6));
+      hole = stadium ? stadiumRing(bx, lanes * 1.22 + 0.3) : insetPts(ring, lanes * 1.22 + 0.3);
+    }
     // (an untagged field: a hard court when small, else a grass field)
     const usual = sport === 'multi' && area > 1000 ? 'grass' : USUAL_SURFACE[sport];
     const surface = SURFACE_OF[String(t.surface || '').toLowerCase()] || SURFACE_OF[usual] || 'grass';
     const grounds = pts.map((p) => p[2]).filter(Number.isFinite);
-    pending.push({ id: f.id, sport, surface, ring, hole, box: bx, area, seed: String(f.id), tags: t, z0: Math.min(...grounds), z1: Math.max(...grounds) });
+    pending.push({ id: f.id, sport, surface, ring, hole, box: bx, area, stadium, seed: String(f.id), tags: t, z0: Math.min(...grounds), z1: Math.max(...grounds) });
   }
   runOff(pending);
   for (const p of pending) {
@@ -770,6 +782,17 @@ function handball(stone, full, p, futsal) {
   }
 }
 
+// the usual track oval in a box: straights along s, semicircles at the ends, d in from its edge (counter-clockwise)
+function stadiumRing(bx, d) {
+  const W = bx.t1 - bx.t0; const tc = (bx.t0 + bx.t1) / 2;
+  const r = W / 2 - d; const a = bx.s0 + W / 2; const b = bx.s1 - W / 2;
+  const out = [];
+  const n = 16;
+  for (let i = 0; i <= n; i++) { const ang = -Math.PI / 2 + (Math.PI * i) / n; out.push(frameAt(bx, b + r * Math.cos(ang), tc + r * Math.sin(ang))); }
+  for (let i = 0; i <= n; i++) { const ang = Math.PI / 2 + (Math.PI * i) / n; out.push(frameAt(bx, a + r * Math.cos(ang), tc + r * Math.sin(ang))); }
+  return out;
+}
+
 function track(stone, full, p) {
   // the infield grassed (a field inside it lies over this, a few cm higher)
   if (p.hole && p.slab === null) {
@@ -793,7 +816,7 @@ function track(stone, full, p) {
   const lanes = Math.max(4, Math.min(10, Number.parseInt(p.tags.lanes, 10) || 6));
   const ring = p.ring;
   for (let k = 1; k < lanes; k++) {
-    const r = insetPts(ring, k * 1.22);
+    const r = p.stadium ? stadiumRing(p.box, k * 1.22) : insetPts(ring, k * 1.22);
     for (let i = 0; i < r.length; i++) strip(full, PAINT_MAT, p, r[i], r[(i + 1) % r.length], 0.05, PAINT);
   }
   const inner = p.hole || insetPts(ring, lanes * 1.22);

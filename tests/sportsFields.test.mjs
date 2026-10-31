@@ -88,3 +88,26 @@ test('bleachers face the field beside them; a large grandstand gets a roof', () 
   const zAt = (y) => Math.max(...seatTops.filter((q) => Math.abs(q[1] - y) < 0.8).map((q) => q[2]));
   assert.ok(zAt(farY) > zAt(nearY), 'higher at the back');
 });
+
+test('a track shaped like the usual oval is drawn as that oval: lanes exact offsets, never crossing', async () => {
+  // a 400 m track outline drawn with a dozen noisy points
+  const pts = [];
+  for (let i = 0; i < 12; i++) {
+    const a = (2 * Math.PI * i) / 12; const r = 1 + (i % 3 === 0 ? 0.02 : -0.01);
+    const x = Math.cos(a) > 0 ? 42.2 + 36.8 * Math.cos(a) * r : -42.2 + 36.8 * Math.cos(a) * r;
+    pts.push([x, 36.8 * Math.sin(a) * r]);
+  }
+  const [p] = planPitches([area('t', pts, { leisure: 'track', sport: 'athletics', lanes: '8' })], project, { groundAt });
+  assert.ok(p.stadium, 'fitted as the usual oval');
+  const stone = recorder(); const full = recorder();
+  buildPitch(stone, full, p);
+  // the lane lines: every painted point at a whole number of lanes in from the oval's edge (within the line's width)
+  const W = p.box.t1 - p.box.t0; const r0 = W / 2;
+  const a = p.box.s0 + r0; const b = p.box.s1 - r0;
+  const dist = (x, y) => { const s = x * p.box.u[0] + y * p.box.u[1]; const t = -x * p.box.u[1] + y * p.box.u[0] - (p.box.t0 + p.box.t1) / 2; const sc = Math.max(a, Math.min(b, s)); return r0 - Math.hypot(s - sc, t); };
+  const paint = full.tris.filter((t) => t.mat === 'linePaint').flatMap((t) => t.pts);
+  for (const q of paint) {
+    const d = dist(q[0], q[1]); const k = Math.round(d / 1.22);
+    assert.ok(Math.abs(d - k * 1.22) < 0.35 || Math.abs(d - (8 * 1.22 + 0.3)) < 0.35, `paint ${d.toFixed(2)} m in: not on a lane line`);
+  }
+});
