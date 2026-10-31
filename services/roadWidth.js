@@ -89,6 +89,10 @@ export function getDefaultLaneCount(highway, isOneWay) {
 /**
  * Return min/max half-width bounds for a given highway class.
  */
+// A width measured between a street's buildings (streetWidths.js) may be
+// narrower than the class minimum: an old town's or Tokyo's one-lane street.
+const MEASURED_MIN_HALF_M = 1.5;
+
 export function getRoadHalfWidthClamp(highway) {
   if (['motorway', 'motorway_link', 'trunk', 'trunk_link'].includes(highway)) {
     return { min: 3.5, max: 9.0 };
@@ -287,6 +291,27 @@ export function estimateRoadCrossSection(tags = {}, highway, isOneWay = false, {
     carriagewayHalfWidth = drivingHalfWidth + (leftExtra + rightExtra) / 2;
   } else {
     carriagewayHalfWidth = drivingHalfWidth + (leftExtra + rightExtra) / 2;
+    // the curb-to-curb width measured between the street's buildings
+    // (streetWidths.js) fitted onto the default lanes and extras: narrower,
+    // the parking / shoulders give way first, then the lanes (to the measured
+    // minimum); wider, the extras grow and the lanes stay
+    const measured = parseRoadWidthMeters(tags['mapng:carriageway_width']);
+    if (Number.isFinite(measured) && measured > 0) {
+      const half = measured / 2;
+      const extras = (leftExtra + rightExtra) / 2;
+      if (half < carriagewayHalfWidth) {
+        const keepExtras = Math.max(0, half - drivingHalfWidth);
+        const f = extras > 0 ? Math.min(1, keepExtras / extras) : 0;
+        leftExtra *= f; rightExtra *= f;
+        drivingHalfWidth = Math.max(Math.min(drivingHalfWidth, MEASURED_MIN_HALF_M), half - (leftExtra + rightExtra) / 2);
+      } else if (extras > 0) {
+        const f = (half - drivingHalfWidth) / extras;
+        leftExtra *= f; rightExtra *= f;
+      } else {
+        leftExtra = rightExtra = half - drivingHalfWidth;
+      }
+      carriagewayHalfWidth = drivingHalfWidth + (leftExtra + rightExtra) / 2;
+    }
   }
 
   return {

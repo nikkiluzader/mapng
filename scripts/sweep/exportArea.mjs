@@ -7,7 +7,8 @@
 // Writes <out>/<levelName>.zip (default scratch/sweep) and, beside it,
 // <levelName>.checks.json (the export's structure checks). EXPORT_OPTS (JSON)
 // adds export options (structures, terrain shaping); RAW=1 skips the data
-// pull's road snapping and smoothing (the app's raw terrain). --fix-stubs puts
+// pull's road snapping and smoothing (the app's raw terrain); NOWIDTH=1 skips
+// the street widths measured between the buildings (an A/B check). --fix-stubs puts
 // real images where the headless canvas left stubs, so the level loads clean
 // in game. STRUCT=v1|v2|v2-terrain picks the structure solver.
 import fs from 'node:fs';
@@ -16,6 +17,7 @@ import { execFileSync } from 'node:child_process';
 import { exportBeamNGLevel } from '../../services/exportBeamNGLevel.js';
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from '../../services/roadSmoother.js';
 import { snapRoadsToTerrain } from '../../services/roadSnap.js';
+import { measureStreetWidths } from '../../services/streetWidths.js';
 import { installCanvasPolyfill } from './polyfill.mjs';
 import { AREAS_DIR, OUT_DIR } from './env.mjs';
 
@@ -36,8 +38,9 @@ const heightMap = new Float32Array(fs.readFileSync(path.join(dir, `${dem}.f32`))
 // (RAW=1: as the app's raw terrain, the elevation left as fetched)
 const fine = dem === 'gpxz';
 const raw = !!process.env.RAW;
-let osmRoads = osmFeatures;
-if (fine && !raw) osmRoads = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmFeatures, meta.mpp, isGroundLevelRoad).features;
+// (as the app's data pull: street widths from the buildings along them)
+let osmRoads = process.env.NOWIDTH ? osmFeatures : measureStreetWidths(osmFeatures).features;
+if (fine && !raw) osmRoads = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, isGroundLevelRoad).features;
 if (!raw) smoothRoadsInHeightmap(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, { skipTracks: fine, fine });
 let minHeight = Infinity; let maxHeight = -Infinity;
 for (const v of heightMap) { if (v < minHeight) minHeight = v; if (v > maxHeight) maxHeight = v; }

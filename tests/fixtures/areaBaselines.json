@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
- "recorded": "2026-10-30",
- "commit": "2a383cb",
+ "recorded": "2026-10-31",
+ "commit": "101c066",
  "areas": {
   "naldo": {
    "steps": 0,
@@ -121,19 +121,19 @@
    "groundGaps": 24,
    "thruDeck": 4,
    "spikes": 0,
-   "bumps": 9,
-   "cross": 211,
+   "bumps": 10,
+   "cross": 198,
    "junctions": 30,
-   "creases": 811,
-   "swFloat": 57,
-   "swBuried": 53,
+   "creases": 824,
+   "swFloat": 71,
+   "swBuried": 70,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 1,
    "maxDeckH": 2.42,
    "deckKm": 0.02,
    "tunnels": 0,
-   "seconds": 8
+   "seconds": 9
   },
   "w_barcelona": {
    "steps": 0,

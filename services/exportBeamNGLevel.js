@@ -1956,7 +1956,8 @@ function getDecalWidthCorridorKey(segment) {
 }
 
 function hasWidthTags(tags = {}) {
-  return ['width', 'lanes', 'lanes:forward', 'lanes:backward']
+  // (mapng:carriageway_width: measured between the street's buildings, streetWidths.js)
+  return ['width', 'lanes', 'lanes:forward', 'lanes:backward', 'mapng:carriageway_width']
     .some((key) => tags[key] !== undefined && String(tags[key]).trim() !== '');
 }
 
@@ -6027,6 +6028,10 @@ function buildDetailedReportSections(d) {
   // ── Roads ──────────────────────────────────────────────────────────────────
   section('Roads');
   const roadFeatures = (td?.osmFeatures || []).filter((f) => f.type === 'road' && f.geometry?.length > 1);
+  {
+    const measuredRoads = roadFeatures.filter((f) => f.tags?.['mapng:carriageway_width']);
+    lines.push(`- Street widths measured between the buildings along them (no width tag in OSM): ${measuredRoads.length} of ${roadFeatures.length} roads${measuredRoads.length ? `; median ${formatNumber(measuredRoads.map((f) => Number(f.tags['mapng:carriageway_width'])).sort((a, b) => a - b)[Math.floor(measuredRoads.length / 2)], 1)} m curb to curb (lanes keep their class width; parking and shoulders give way or grow)` : ''}`);
+  }
   const byClass = new Map();
   for (const f of roadFeatures) {
     const k = f.tags?.highway || 'n/a';
