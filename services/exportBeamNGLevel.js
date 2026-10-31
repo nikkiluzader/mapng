@@ -10,7 +10,7 @@ import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarage
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
-import { carveLakeBeds, planLakes, planRivers } from './beamngWater.js';
+import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
@@ -6065,6 +6065,8 @@ function shapingReportLines(sh, section) {
   }
   lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
   if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}`);
+  if (sh.levelledUnderDecks) lines.push(`- Ground under bridge decks levelled to the ground beside them (the elevation data held the deck's own shape): ${sh.levelledUnderDecks} grid points`);
+  if (sh.underDeckBedPixels) lines.push(`- Hidden water beds dug (under bridge decks, where the elevation data held the deck: a dam; along outlined rivers where the ground stood over the water): ${sh.underDeckBedPixels} grid points`);
   if (p && sh.residual) {
     lines.push(`- Worst left unmet with roads held on the ground: clearance short by ${formatNumber(sh.residual.crossing, 2)} m, water clearance short by ${formatNumber(sh.residual.water, 2)} m, grade ${formatNumber(sh.residual.grade * 100, 1)}% over the class limit, junction step ${formatNumber(sh.residual.joint, 2)} m (0 = met)`);
     lines.push('  (a plain deck must climb within its own length: it may ramp up to twice its class grade, and where even that can\'t reach the clearance, the clearance gives way)');
@@ -8255,13 +8257,54 @@ function buildSeaLevelWaterPlane(terrainData, biome, seaLevelOffset = 0) {
 }
 
 /**
+ * Carriageways split into their stretches on and off the given deck parts
+ * (a part's road: graph edge -> segment, the carriageway's owner), the
+ * stretches on one flagged bridge. A node is on a part within its half width
+ * of the part's line.
+ */
+export function splitOnDecks(carriageways, parts, edges) {
+  const byOwner = new Map();
+  for (const p of parts) {
+    const seg = edges?.[p.edge]?.seg;
+    if (seg === undefined) continue;
+    if (!byOwner.has(seg)) byOwner.set(seg, []);
+    byOwner.get(seg).push(p);
+  }
+  const onPart = (q, p) => {
+    for (let i = 0; i + 1 < p.xy.length; i++) {
+      const [ax, ay] = p.xy[i]; const [bx, by] = p.xy[i + 1];
+      const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((q[0] - ax) * vx + (q[1] - ay) * vy) / L2));
+      if (Math.hypot(ax + vx * t - q[0], ay + vy * t - q[1]) <= Math.max(1, p.half * 0.5)) return true;
+    }
+    return false;
+  };
+  const out = [];
+  for (const cw of carriageways) {
+    const own = byOwner.get(cw.owner);
+    if (!own || cw.bridge || cw.tunnel) { out.push(cw); continue; }
+    const flags = cw.nodes.map((q) => own.some((p) => onPart(q, p)));
+    if (!flags.some(Boolean)) { out.push(cw); continue; }
+    let start = 0;
+    for (let i = 1; i <= cw.nodes.length; i++) {
+      if (i < cw.nodes.length && flags[i] === flags[start]) continue;
+      // each stretch shares its boundary node with the next (no gap in the road)
+      const nodes = cw.nodes.slice(start, Math.min(cw.nodes.length, i + 1));
+      if (nodes.length >= 2) out.push({ ...cw, nodes, bridge: flags[start] });
+      start = i;
+    }
+  }
+  return out;
+}
+
+/**
  * Rivers along year-round waterway centrelines (services/beamngWater.js
  * planRivers): per-node width from the riverbank outline, surface in the
  * channel, kept off the roads; ripples drift downstream at the river's flow.
  */
-function buildRiverObjects(terrainData, squareSize, biome, roads = [], stats = {}, dryZones = []) {
+function buildRiverObjects(terrainData, squareSize, biome, roads = [], stats = {}, dryZones = [], plan = null) {
   const waterProfile = getWaterProfile(biome);
-  const { rivers, stats: riverStats } = planRivers({
+  const { rivers, stats: riverStats } = plan || planRivers({
     features: terrainData.osmFeatures || [],
     toWorld: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
     heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
@@ -10147,6 +10190,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     decalRoads.bridges.decks = decks;
     decalRoads.bridges.roadLines = roadLinesFromSolver(sg);
     decalRoads.bridges.partInfo = parts.map((p) => ({ ...p.osm, structure: p.structure ?? null, landing: false, carried: false }));
+    // the carriageways on the solver's decks are bridges: split where a
+    // road's deck stretch begins and ends (today's builder flags them as it
+    // lays them; a v2 deck's road came out as ground: sidewalks and quays
+    // built beside the deck, rivers cut under every bridge)
+    if (Array.isArray(decalRoads.carriageways)) {
+      const split = splitOnDecks(decalRoads.carriageways, parts, sg.edges);
+      decalRoads.carriageways.splice(0, decalRoads.carriageways.length, ...split);
+    }
     // (tunnels still come from today's builder: their roads keep its heights)
     const applied = applySolvedHeights(decalRoads, sg, { skipOwners: new Set(decalRoads.tunnels?.bySeg?.keys?.() || []) });
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2: ${decks.length} deck(s) of ${parts.length} part(s); ${applied.nodes} road nodes in ${applied.decals} decals at their solved heights.`);
@@ -10186,12 +10237,128 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const roadSpawn = findRoadSpawn(groundCarriageways, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), underDeck, { leftHandTraffic: resolvedRightHandDrive });
   if (roadSpawn) ({ position: spawnPosition, rotationMatrix: spawnRotationMatrix } = roadSpawn);
   await yield_();
+  // water under the decks: its bed carved there (the elevation data often
+  // holds the deck itself, a dam the river hid in), before the bridges are
+  // built over it (their arches spring from the bed)
+  // (each part's drawn half widths per point: decks widen where they join and fork)
+  for (const d of bridgeDecks) deckEdges(d).forEach((e, i) => { d.parts[i].halfL = e.hl; d.parts[i].halfR = e.hr; });
+  let underDeckBeds = 0;
+  // the ground roads the rivers keep off and the lake beds' quays (a deck's
+  // stretch is no ground carriageway: splitOnDecks)
+  const riverRoads = () => groundCarriageways.map((c) => ({ points: c.nodes, half: c.half }));
+  let deckCover = null;
+  const W0 = exportTerrainData.width; const H0 = exportTerrainData.height;
+  if (bridgeDecks.length > 0) {
+    const W = W0; const H = H0; const worldSize = W * squareSize;
+    const covered = new Uint8Array(W * H);
+    for (const d of bridgeDecks) {
+      const edges = deckEdges(d);
+      d.parts.forEach((p, pi) => {
+        for (let i = 0; i + 1 < p.xy.length; i++) {
+          const [ax, ay] = p.xy[i]; const [bx, by] = p.xy[i + 1];
+          const reach = Math.max(edges[pi].hl[i], edges[pi].hr[i], edges[pi].hl[i + 1], edges[pi].hr[i + 1]) + PARAPET_W_M + 1;
+          const L = Math.hypot(bx - ax, by - ay); const n = Math.max(1, Math.ceil(L / (squareSize * 0.5)));
+          for (let k = 0; k <= n; k++) {
+            const x = ax + ((bx - ax) * k) / n; const y = ay + ((by - ay) * k) / n;
+            const cc = (x / worldSize + 0.5) * (W - 1); const rr = (0.5 - y / worldSize) * (H - 1); const rp = reach / squareSize;
+            for (let r = Math.max(0, Math.floor(rr - rp)); r <= Math.min(H - 1, Math.ceil(rr + rp)); r++) {
+              for (let c = Math.max(0, Math.floor(cc - rp)); c <= Math.min(W - 1, Math.ceil(cc + rp)); c++) if (Math.hypot(c - cc, r - rr) <= rp) covered[r * W + c] = 1;
+            }
+          }
+        }
+      });
+    }
+    deckCover = covered;
+  }
+  // the rivers planned once, on the ground before any bed is dug (planned
+  // after the lake beds, a canal through a lake took its surface from the
+  // bed: 1.3 m under the lake beside it)
+  let riverPlan = null;
+  if (includeWater) {
+    try {
+      riverPlan = planRivers({
+        features: exportTerrainData.osmFeatures || [],
+        toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
+        heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+        roads: riverRoads(),
+      });
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Rivers not planned: ${err?.message || err}`);
+    }
+  }
+  // the deck's own shape in the elevation data levelled away under it (a dam
+  // over the sea, a lake, a valley), its ends on their abutments' fill left
+  let levelledUnderDecks = 0;
+  const loweredUnderDecks = new Set();   // (for the remnant fill after the beds)
+  if (bridgeDecks.length > 0 && shapingOptions.terrain && shapingOptions.bridges) {
+    try {
+      // where water lies beside a deck: the sea, a lake, a river's width
+      const seaLocal = -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0);
+      const lakePolys = includeWater ? planLakes({
+        features: exportTerrainData.osmFeatures || [],
+        toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
+        heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      }).lakes.map((l) => l.poly) : [];
+      const riverSegs = (riverPlan?.rivers || []).flatMap((r) => r.nodes.slice(0, -1).map((a, i) => [a, r.nodes[i + 1]]));
+      const wet = (x, y) => {
+        if (getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) <= seaLocal + 0.5) return true;
+        if (lakePolys.some((p) => p.contains(x, y))) return true;
+        return riverSegs.some(([a, b]) => {
+          const vx = b[0] - a[0]; const vy = b[1] - a[1]; const L2 = vx * vx + vy * vy || 1e-9;
+          const t = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / L2));
+          return Math.hypot(a[0] + vx * t - x, a[1] + vy * t - y) <= (a[3] + (b[3] - a[3]) * t) / 2 + 1;
+        });
+      };
+      // (ground roads and their sidewalks keep their ground)
+      const keepRoads = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
+      const lev = levelUnderDecks(bridgeDecks, {
+        heightMap: exportTerrainData.heightMap, width: W0, height: H0, worldSize: W0 * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+      }, (x, y) => isOnOtherCarriageway(keepRoads, x, y, 0, () => false), PARAPET_W_M, wet);
+      const hmLev = heightMapEditor(exportTerrainData);
+      lev.apply((idx, v) => hmLev.set(idx, v));
+      for (const i of lev.indices()) loweredUnderDecks.add(i);
+      levelledUnderDecks = lev.pixels;
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Levelling under decks skipped: ${err?.message || err}`);
+    }
+  }
+  if (includeWater && shapeExtras && deckCover && riverPlan) {
+    try {
+      const W = W0; const H = H0; const worldSize = W * squareSize;
+      const covered = deckCover;
+      const heightAt = (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize);
+      const toWorld = (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0);
+      const { rivers } = riverPlan;
+      // (ground roads and a margin keep their ground: quays, a bridge's approach)
+      const bedKeep = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
+      // (under a deck: the approach road and its sidewalks, no quay margin past them)
+      const bedKeepTight = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + 2.5 })));
+      const { lakes } = planLakes({ features: exportTerrainData.osmFeatures || [], toWorld, heightAt });
+      const beds = carveWaterUnderDecks({ rivers, lakes }, {
+        heightMap: exportTerrainData.heightMap, width: W, height: H, worldSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+      }, (idx) => covered[idx] === 1, (x, y) => isOnOtherCarriageway(bedKeep, x, y, 0, () => false),
+      // (under a deck only the approach road and its sidewalks: the quay margin left a dam at the bridge's ends)
+      (x, y) => isOnOtherCarriageway(bedKeepTight, x, y, 0, () => false));
+      const hmBed = heightMapEditor(exportTerrainData);
+      beds.apply((idx, v) => hmBed.set(idx, v));
+      for (const i of beds.indices()) loweredUnderDecks.add(i);
+      underDeckBeds = beds.pixels;
+      // single pixels left standing among the lowered ones (shards on the banks)
+      const toW = (c, r) => [((c / (W - 1)) - 0.5) * worldSize, (0.5 - r / (H - 1)) * worldSize];
+      const rem = fillRemnants(exportTerrainData.heightMap, W, H, loweredUnderDecks, {
+        keep: (c, r) => { const [x, y] = toW(c, r); return isOnOtherCarriageway(bedKeep, x, y, 0, () => false); },
+      });
+      rem.apply((idx, v) => hmBed.set(idx, v));
+      underDeckBeds += rem.pixels;
+      if (sg) sg.underDeckBeds = beds.pixels;
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Water beds under decks skipped: ${err?.message || err}`);
+    }
+  }
   // what each bridge is (bridgeStyles.js): from its road's tags or its outline's
   const bridgeOutlines = (exportTerrainData.osmFeatures || [])
     .filter((f) => f.type === 'bridge_infra' && f.geometry?.length > 2)
     .map((f) => ({ ring: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), tags: f.tags || {} }));
-  // (each part's drawn half widths per point: decks widen where they join and fork)
-  for (const d of bridgeDecks) deckEdges(d).forEach((e, i) => { d.parts[i].halfL = e.hl; d.parts[i].halfR = e.hr; });
   const styledBridges = styleDecks(bridgeDecks, { outlines: bridgeOutlines, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
   linkCrossings(bridgeDecks, { roads: groundCarriageways.map((cw) => ({ xy: cw.nodes, half: cw.half })) });
   if (styledBridges) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge styles: ${bridgeDecks.filter((d) => d.style).map((d) => d.style.type).join(', ')}.`);
@@ -10449,7 +10616,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       });
       // (no bed within LAKE_KEEP_M of a ground road's edge: its sidewalk and
       // quay stay on their ground)
-      const quayIndex = buildCarriagewayIndex(groundCarriageways.map((cw) => ({ ...cw, half: (cw.half || 3) + LAKE_KEEP_M })));
+      // (a deck's road no quay: the bed runs on under the bridge)
+      const quayIndex = buildCarriagewayIndex(riverRoads().map((r) => ({ nodes: r.points, half: (r.half || 3) + LAKE_KEEP_M })));
       // (terrain shaping off: the water stands on the ground as generated)
       const beds = !shapeExtras ? { pixels: 0, apply: () => {} } : carveLakeBeds(lakePlan.lakes, {
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
@@ -10598,7 +10766,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       ? [
           ...buildWaterBlockObjects(exportTerrainData, squareSize, biome, waterStats.lakes, dryZones, lakePlan),
           ...buildRiverObjects(exportTerrainData, squareSize, biome,
-            groundCarriageways.map((c) => ({ points: c.nodes, half: c.half })), waterStats.rivers, dryZones),
+            riverRoads(), waterStats.rivers, dryZones, riverPlan),
         ]
       : []),
   ];
@@ -11215,6 +11383,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         skippedPieces: sg?.terrain?.skipped ?? 0,
         sidewalkGroundPixels: sidewalks.groundPixels || 0,
         lakeBedPixels: lakePlan?.stats?.bedPixels ?? null,
+        underDeckBedPixels: underDeckBeds,
+        levelledUnderDecks,
         residual: sg?.profile?.residual || null,
       },
       bridges: decalRoads.bridges,

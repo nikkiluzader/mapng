@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-10-31",
- "commit": "101c066",
+ "commit": "ab6c800",
  "areas": {
   "naldo": {
    "steps": 0,
@@ -10,12 +10,12 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 24,
-   "spikes": 8,
+   "spikes": 6,
    "bumps": 6,
    "cross": 50,
    "junctions": 1,
-   "creases": 1094,
-   "swFloat": 34,
+   "creases": 1093,
+   "swFloat": 4,
    "swBuried": 0,
    "lintErrors": 0,
    "lintWarnings": 3,
@@ -23,7 +23,7 @@
    "maxDeckH": 11.16,
    "deckKm": 7.46,
    "tunnels": 0,
-   "seconds": 18
+   "seconds": 20
   },
   "kingst": {
    "steps": 0,
@@ -42,10 +42,10 @@
    "lintErrors": 0,
    "lintWarnings": 3,
    "decks": 5,
-   "maxDeckH": 8.41,
+   "maxDeckH": 9.45,
    "deckKm": 0.99,
    "tunnels": 0,
-   "seconds": 13
+   "seconds": 15
   },
   "deckpark_g": {
    "steps": 0,
@@ -67,7 +67,7 @@
    "maxDeckH": 9.28,
    "deckKm": 1.77,
    "tunnels": 2,
-   "seconds": 27
+   "seconds": 31
   },
   "zion": {
    "steps": 0,
@@ -76,17 +76,17 @@
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
-   "spikes": 881,
+   "spikes": 878,
    "bumps": 3,
    "cross": 0,
    "junctions": 0,
-   "creases": 1059,
+   "creases": 1071,
    "swFloat": 0,
    "swBuried": 0,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 1,
-   "maxDeckH": 7.6,
+   "maxDeckH": 9.2,
    "deckKm": 0.05,
    "tunnels": 1,
    "seconds": 4
@@ -133,7 +133,7 @@
    "maxDeckH": 2.42,
    "deckKm": 0.02,
    "tunnels": 0,
-   "seconds": 9
+   "seconds": 13
   },
   "w_barcelona": {
    "steps": 0,
@@ -146,7 +146,7 @@
    "bumps": 0,
    "cross": 2,
    "junctions": 0,
-   "creases": 1,
+   "creases": 2,
    "swFloat": 6,
    "swBuried": 0,
    "lintErrors": 0,
@@ -155,7 +155,7 @@
    "maxDeckH": 0,
    "deckKm": 0,
    "tunnels": 0,
-   "seconds": 8
+   "seconds": 16
   },
   "w_amsterdam": {
    "steps": 0,
@@ -163,21 +163,21 @@
    "steepGround": 0,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 30,
-   "spikes": 126,
+   "thruDeck": 31,
+   "spikes": 300,
    "bumps": 7,
-   "cross": 61,
+   "cross": 62,
    "junctions": 1,
-   "creases": 127,
-   "swFloat": 26,
-   "swBuried": 846,
+   "creases": 122,
+   "swFloat": 33,
+   "swBuried": 674,
    "lintErrors": 0,
    "lintWarnings": 3,
    "decks": 52,
-   "maxDeckH": 6.75,
+   "maxDeckH": 8.88,
    "deckKm": 1.57,
    "tunnels": 0,
-   "seconds": 11
+   "seconds": 19
   }
  }
 }

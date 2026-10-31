@@ -259,15 +259,16 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
     }
     for (let i = 1; i < med.length; i++) med[i] = Math.min(med[i], med[i - 1]);
     // keep off the roads; cut where one crosses at grade
-    let piece = [];
+    let piece = []; let pieceOutline = [];
     const flush = () => {
       let L = 0;
       for (let k = 1; k < piece.length; k++) L += Math.hypot(piece[k][0] - piece[k - 1][0], piece[k][1] - piece[k - 1][1]);
       if (piece.length >= 2 && L >= MIN_PIECE_M) {
-        rivers.push({ kind: chain.kind, name: chain.tags.name || null, flow: spec.flow, nodes: piece });
+        // (outline: per node, its width measured across a mapped water outline)
+        rivers.push({ kind: chain.kind, name: chain.tags.name || null, flow: spec.flow, nodes: piece, outline: pieceOutline });
         stats.pieces++;
       }
-      piece = [];
+      piece = []; pieceOutline = [];
     };
     centres.forEach(([x, y], i) => {
       let edge = edgeDistance(x, y);
@@ -280,6 +281,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
       const half = Math.max(RIVER_MIN_HALF_M, Math.min(widths[i] / 2, edge - ROAD_MARGIN_M));
       const width = 2 * half;
       piece.push([x, y, med[i] + SURFACE_ABOVE_M, width, Math.min(DEPTH_M[1], Math.max(DEPTH_M[0], width / 8))]);
+      pieceOutline.push(fromOutline[i]);
     });
     flush();
   }
@@ -397,5 +399,195 @@ export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
       }
     }
   }
-  return { pixels: edits.size, apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+  return { pixels: edits.size, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+}
+
+// Water hidden in the ground: under a bridge deck the elevation data often
+// holds the deck itself (lidar: the canal under Amsterdam's bridges came out
+// 3 m over the water, a dam with the river hidden in it, the bridge's arches
+// springing from its top), and the deck's terrain cap only lowers it to just
+// under the deck; between two bridges, or where the data smoothed over a
+// narrow canal, a strip stood up the same way. A bed is carved to
+// HIDDEN_BED_M under the water's surface: under decks wherever a river or a
+// lake passes, and along a river whose width comes from its mapped outline
+// wherever the ground stands at most HIDDEN_BANK_MAX_M over its water (higher
+// is a bank the outline overlaps, left alone); sloping up to the edge over
+// HIDDEN_SLOPE_M. Ground roads are kept (keep(x, y)): their quays and
+// approaches stay on their ground.
+const HIDDEN_BED_M = 1.5;
+const HIDDEN_SLOPE_M = 2;
+const HIDDEN_BANK_MAX_M = 4;
+
+/**
+ * Terrain edits for hidden water beds. rivers: planRivers' [{ nodes: [[x, y,
+ * surface, width, depth]], outline }]; lakes: planLakes' [{ poly, level }];
+ * grid as carveLakeBeds; covered(idx): a pixel under a deck; keep(x, y):
+ * ground left as it is. Returns { pixels, apply(set) } (set(idx, raw)); only
+ * ever lowers.
+ */
+export function carveWaterUnderDecks({ rivers = [], lakes = [] }, grid, covered, keep = () => false, keepUnder = keep) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const edits = new Map();
+  const lower = (idx, target) => {
+    if (target < heightMap[idx] - minHeight) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
+  };
+  for (const { nodes, outline } of rivers) {
+    for (let i = 0; i + 1 < nodes.length; i++) {
+      const [ax, ay, az, aw] = nodes[i]; const [bx, by, bz, bw] = nodes[i + 1];
+      const outlined = !!(outline?.[i] && outline?.[i + 1]);
+      const reach = Math.max(aw, bw) / 2;
+      const [c0, r0] = toPixel(Math.min(ax, bx) - reach, Math.max(ay, by) + reach);
+      const [c1, r1] = toPixel(Math.max(ax, bx) + reach, Math.min(ay, by) - reach);
+      const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1e-9;
+      for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+        for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+          const idx = r * width + c;
+          const under = covered(idx);
+          if (!under && !outlined) continue;
+          const [x, y] = toWorld(c, r);
+          const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
+          const half = (aw + (bw - aw) * t) / 2;
+          const d = Math.hypot(ax + vx * t - x, ay + vy * t - y);
+          if (d > half) continue;
+          const surface = az + (bz - az) * t;
+          const ground = heightMap[idx] - minHeight;
+          if (!under && ground > surface + HIDDEN_BANK_MAX_M) continue;
+          if (ground <= surface - HIDDEN_BED_M || (under ? keepUnder(x, y) : keep(x, y))) continue;
+          lower(idx, surface - HIDDEN_BED_M * Math.min(1, (half - d) / HIDDEN_SLOPE_M + 0.2));
+        }
+      }
+    }
+  }
+  for (const { poly, level } of lakes) {
+    const [x0, y0, x1, y1] = poly.box;
+    const [c0, r0] = toPixel(x0, y1); const [c1, r1] = toPixel(x1, y0);
+    for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+      for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+        const idx = r * width + c;
+        if (!covered(idx)) continue;
+        const [x, y] = toWorld(c, r);
+        if (!poly.contains(x, y) || keepUnder(x, y)) continue;
+        const d = Math.min(distToRing(x, y, poly.outer), ...poly.holes.map((h) => distToRing(x, y, h)));
+        lower(idx, level - HIDDEN_BED_M * Math.min(1, d / HIDDEN_SLOPE_M + 0.2));
+      }
+    }
+  }
+  return { pixels: edits.size, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+}
+
+// A deck's own shape in the elevation data: under it the ground is held no
+// higher than the line between the ground just outside its two sides (across
+// the deck, station by station), where water lies beside it (wet(x, y): over
+// roads and valleys the solver's corridors shape the ground), so the dam the
+// deck left in the data goes. A deck's last LEVEL_END_M rest on their
+// abutments' fill and are left unless water lies on both sides there; ground
+// roads are kept (keep).
+const LEVEL_END_M = 6;
+const LEVEL_READ_M = [1, 5];  // the ground beside a deck: the lowest this far past its side (the data's dam is wider than the deck)
+const LEVEL_PAST_M = 2;       // levelled this far past its sides (the dam's edges)
+
+/**
+ * Terrain edits levelling the ground under decks. decks: [{ parts: [{ xy, half,
+ * halfL?, halfR? }] }]; grid as carveLakeBeds. Returns { pixels, apply(set) };
+ * only ever lowers.
+ */
+export function levelUnderDecks(decks, grid, keep = () => false, extra = 0.4, wet = () => true) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const px = worldSize / (width - 1);
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const at = (x, y) => {
+    const [c, r] = toPixel(x, y);
+    const ci = Math.round(c); const ri = Math.round(r);
+    if (ci < 0 || ri < 0 || ci >= width || ri >= height) return null;
+    return { idx: ri * width + ci, z: heightMap[ri * width + ci] - minHeight };
+  };
+  const edits = new Map();
+  for (const deck of decks) {
+    for (const p of deck.parts) {
+      const xy = p.xy;
+      const s = [0]; for (let i = 1; i < xy.length; i++) s.push(s[i - 1] + Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]));
+      const L = s.at(-1);
+      for (let i = 0; i + 1 < xy.length; i++) {
+        const [ax, ay] = xy[i]; const [bx, by] = xy[i + 1];
+        const segL = s[i + 1] - s[i]; if (segL < 1e-6) continue;
+        const ux = (bx - ax) / segL; const uy = (by - ay) / segL; const nx = -uy; const ny = ux;
+        for (let d = 0; d < segL; d += px * 0.7) {
+          const sd = s[i] + d;
+          const atEnd = sd < LEVEL_END_M || sd > L - LEVEL_END_M;
+          const f = d / segL;
+          const hl = (p.halfL ? p.halfL[i] + (p.halfL[i + 1] - p.halfL[i]) * f : p.half) + extra;
+          const hr = (p.halfR ? p.halfR[i] + (p.halfR[i + 1] - p.halfR[i]) * f : p.half) + extra;
+          const cx = ax + ux * d; const cy = ay + uy * d;
+          const beside = (sign, h) => {
+            let best = null;
+            for (let o = h + LEVEL_READ_M[0]; o <= h + LEVEL_READ_M[1]; o += px * 0.7) {
+              const q = at(cx + sign * nx * o, cy + sign * ny * o);
+              if (q && (!best || q.z < best.z)) best = { z: q.z, o };
+            }
+            return best;
+          };
+          const gl = beside(1, hl); const gr = beside(-1, hr);
+          if (!gl || !gr) continue;
+          // (over water only: over roads and valleys the solver's corridors shape the ground)
+          const wetL = wet(cx + nx * gl.o, cy + ny * gl.o); const wetR = wet(cx - nx * gr.o, cy - ny * gr.o);
+          if (!wetL && !wetR) continue;
+          // (an end with water on both sides is over the water, not on its abutment's fill)
+          if (atEnd && !(wetL && wetR)) continue;
+          for (let o = -(hr + LEVEL_PAST_M); o <= hl + LEVEL_PAST_M; o += px * 0.7) {
+            const x = cx + nx * o; const y = cy + ny * o;
+            const q = at(x, y);
+            if (!q || keep(x, y)) continue;
+            const t = Math.max(0, Math.min(1, (o + gr.o) / (gl.o + gr.o)));
+            const target = gr.z + (gl.z - gr.z) * t;
+            if (target < q.z - 0.05) edits.set(q.idx, Math.min(edits.get(q.idx) ?? Infinity, target + minHeight));
+          }
+        }
+      }
+    }
+  }
+  return { pixels: edits.size, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+}
+
+/**
+ * The pixels the beds and the levelling skipped standing alone among lowered
+ * ones (a river's edge or a deck's side through the grid left single pixels
+ * standing metres proud: shards along the banks): a pixel with at least five
+ * of its eight neighbours lowered takes their median, if lower, `rounds`
+ * times. lowered: Set of indices already lowered. Returns { pixels,
+ * apply(set) }; heightMap is read as it now stands.
+ */
+export function fillRemnants(heightMap, width, height, lowered, { rounds = 2, keep = () => false } = {}) {
+  const edits = new Map();
+  const z = (i) => edits.get(i) ?? heightMap[i];
+  const low = new Set(lowered);
+  for (let k = 0; k < rounds; k++) {
+    const cand = new Set();
+    for (const i of low) {
+      const c = i % width; const r = (i - c) / width;
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        const cc = c + dc; const rr = r + dr;
+        if ((dr || dc) && cc >= 0 && rr >= 0 && cc < width && rr < height && !low.has(rr * width + cc)) cand.add(rr * width + cc);
+      }
+    }
+    const next = [];
+    for (const i of cand) {
+      const c = i % width; const r = (i - c) / width;
+      if (keep(c, r)) continue;
+      const ns = [];
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (!dr && !dc) continue;
+        const j = (r + dr) * width + (c + dc);
+        if (r + dr >= 0 && c + dc >= 0 && r + dr < height && c + dc < width && low.has(j)) ns.push(z(j));
+      }
+      if (ns.length < 5) continue;
+      ns.sort((a, b) => a - b);
+      const m = ns[ns.length >> 1];
+      if (m < z(i) - 0.05) next.push([i, m]);
+    }
+    for (const [i, m] of next) { edits.set(i, m); low.add(i); }
+    if (!next.length) break;
+  }
+  return { pixels: edits.size, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
 }
