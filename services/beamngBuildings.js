@@ -31,6 +31,7 @@
 import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
 import * as THREE from 'three';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
+import { planPools, buildPool, POOL_MATERIAL_STAGES } from './pools.js';
 
 // ── Materials ───────────────────────────────────────────────────────────────
 
@@ -93,9 +94,14 @@ export const BUILDING_MATERIALS = {
   roofSlateTiles: 'mapng_bld_roof_slate_tiles',
   roofWood: 'mapng_bld_roof_wood',
   roofTin: 'mapng_bld_roof_tin',
-  // fountains (services/fountains.js): their water and falling water
-  fountainWater: 'mapng_fountain_water',
+  // fountains (services/fountains.js): their falling water (standing water is WaterBlocks)
   fountainSpray: 'mapng_fountain_spray',
+  // smooth stone: fountains
+  marbleCut: 'mapng_bld_marble_cut',
+  smoothConcrete: 'mapng_bld_smooth_concrete',
+  // swimming pools (services/pools.js)
+  poolTile: 'mapng_pool_tile',
+  poolDeck: 'mapng_pool_deck',
 };
 
 // Lit windows at night: the window sheets' emissive maps scaled by the
@@ -152,7 +158,10 @@ const MATERIAL_STAGES = {
   roofSlateTiles: pbrNoAo(`${TILE}/roofing/t_slate_rooftiles_01`, 't_slate_rooftiles_01'),
   roofWood: pbr(`${TILE}/roofing/eca_bld_wood_rooftiles`, 't_eca_bld_wood_rooftiles'),
   roofTin: pbr(`${TILE}/metal/m_si_metal_roof`, 't_si_metal_roof', { metallic: true }),
+  marbleCut: pbr(`${TILE}/stone/m_marble_cut`, 't_marble_cut'),
+  smoothConcrete: pbr(`${TILE}/concrete/m_concrete_floor_polish`, 't_concrete_smooth_large'),
   ...FOUNTAIN_MATERIAL_STAGES,
+  ...POOL_MATERIAL_STAGES,
 };
 
 /** BeamNG material definitions for every name in BUILDING_MATERIALS. */
@@ -1295,7 +1304,7 @@ export function neighbourLevels(features, project) {
   return out;
 }
 
-export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M } = {}) {
+export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null } = {}) {
   const meshes = [];
   let count = 0;
   // buildings grouped by tile (their footprint's centre): one shape per tile
@@ -1597,6 +1606,18 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
   if (Object.keys(fountainKinds).length) stats.details.fountains = fountainKinds;
+  // swimming pools (services/pools.js; their terrain squares opened by the exporter)
+  const poolKinds = {};
+  const poolShapes = {};
+  for (const p of planPools(features, project, { squareSize, groundAt })) {
+    if (p.shape) bump(poolShapes, p.shape);
+    const tile = tileFor(p.ring);
+    const built = buildPool(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, p);
+    if (!built) continue;
+    bump(poolKinds, built);
+    if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+  }
+  if (Object.keys(poolKinds).length) { stats.details.pools = poolKinds; stats.details.poolShapes = poolShapes; }
   for (const t of tiles.values()) if (t.inBatch) flushTile(t);
   const tileList = [...tiles.values()].filter((t) => t.full.length).map(({ key, origin, full, lite }) => ({ key, origin, full, lite }));
   stats.tiles = tileList.length;

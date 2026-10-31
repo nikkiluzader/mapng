@@ -418,8 +418,8 @@ export function planLakes({ features = [], toWorld, heightAt }) {
     const t = f.tags || {};
     const river = isRiverbank(t);
     if (t.waterway && !river) continue;
-    // (a fountain's basin is built with it: services/fountains.js)
-    if (norm(t.amenity) === 'fountain') continue;
+    // (a fountain's basin or a pool is built with it: services/fountains.js, pools.js)
+    if (norm(t.amenity) === 'fountain' || norm(t.leisure) === 'swimming_pool') continue;
     if (['sea', 'ocean'].includes(norm(t.place)) || norm(t.natural) === 'bay' || ['dock', 'harbour'].includes(norm(t.water)) || norm(t.leisure) === 'marina') continue;
     const isLake = river || (norm(t.natural) === 'water' ? (!t.water || LAKE_WATER.has(norm(t.water))) : ['reservoir', 'basin'].includes(norm(t.landuse)));
     if (!isLake) continue;

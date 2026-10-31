@@ -28,6 +28,7 @@
 
 import * as THREE from 'three';
 import { cylinder, cone, dome, box, wallQuad, insetRing } from './buildingDetails.js';
+import { coverRing } from './waterCover.js';
 
 export const FOUNTAIN_KINDS = ['tiered', 'jets', 'obelisk', 'pool', 'bowl', 'bubbler', 'wall', 'splash'];
 const KIND_OF_TAG = {
@@ -48,10 +49,12 @@ const SKIRT_M = 0.3;             // the rim reaches this far under the lowest gr
 const POOL_AREA_M2 = 600;
 const POOL_ASPECT = 2.5;
 const MAX_FOUNTAINS = 3000;
-const STONES = [['stoneClean', [0.95, 0.93, 0.88]], ['stoneFacade', [1, 0.97, 0.92]], ['stucco', [0.93, 0.9, 0.84]]];
+// smooth white or grey stone: cut marble, polished concrete
+const STONES = [['marbleCut', [1, 1, 0.98]], ['marbleCut', [0.8, 0.81, 0.82]], ['smoothConcrete', [1, 0.99, 0.97]], ['smoothConcrete', [0.74, 0.75, 0.76]]];
 const WHITE = [1, 1, 1];
+const BASIN_TILE = [0.3, 0.5, 0.55];
 
-const hash01 = (...parts) => {
+export const hash01 = (...parts) => {
   let h = 2166136261;
   const s = parts.join('|');
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
@@ -59,7 +62,7 @@ const hash01 = (...parts) => {
   return (h >>> 0) / 4294967296;
 };
 const num = (v) => { const x = Number.parseFloat(String(v ?? '').replace(',', '.')); return Number.isFinite(x) && x > 0 ? x : null; };
-const signedArea = (r) => r.reduce((a, p, i) => { const q = r[(i + 1) % r.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+export const signedArea = (r) => r.reduce((a, p, i) => { const q = r[(i + 1) % r.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
 const circle = (cx, cy, r, n, phase = 0) => Array.from({ length: n }, (_, i) => [cx + r * Math.cos(phase + (2 * Math.PI * i) / n), cy + r * Math.sin(phase + (2 * Math.PI * i) / n)]);
 
 /** A fountain's kind from its tags and (for an outline) its size and shape. */
@@ -73,7 +76,7 @@ export function fountainKind(tags = {}, { area = 0, aspect = 1, node = true } = 
   return 'tiered';
 }
 
-function cleanRing(pts) {
+export function cleanRing(pts) {
   const out = [];
   for (const p of pts) {
     const q = out[out.length - 1];
@@ -82,7 +85,7 @@ function cleanRing(pts) {
   if (out.length > 1 && Math.hypot(out[0][0] - out.at(-1)[0], out[0][1] - out.at(-1)[1]) < 0.05) out.pop();
   return out;
 }
-function inRing(x, y, ring) {
+export function inRing(x, y, ring) {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
     const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
@@ -134,6 +137,19 @@ function aspectOf(ring) {
   return best;
 }
 
+/** (x, y) -> inside some building footprint. */
+export function buildingTest(features, project) {
+  const buildings = [];
+  for (const f of features || []) {
+    if (f?.type !== 'building' || !(f.geometry?.length >= 3)) continue;
+    const ring = f.geometry.map((p) => project(p.lat, p.lng));
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    buildings.push({ ring, box: [x0, y0, x1, y1] });
+  }
+  return (x, y) => buildings.some(({ ring, box: b }) => x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3] && inRing(x, y, ring));
+}
+
 /**
  * Fountains to build: [{ id, kind, ring (counter-clockwise, the basin's outer
  * edge; null for bowl / bubbler / wall), centre, room, z0 (lowest ground),
@@ -159,17 +175,9 @@ export function planFountains(features, project) {
     out.push({ id: f.id, kind: ['bowl', 'bubbler', 'wall'].includes(kind) ? 'tiered' : kind, ring, centre, room, z0: Math.min(...grounds), z1: Math.max(...grounds), tags: t, seed, mapped: true });
     areas.push(ring);
   }
-  // building footprints: a node inside one is indoors (a drinking fountain in
-  // a school or a mall, under the roof) unless tagged outdoor
-  const buildings = [];
-  for (const f of features || []) {
-    if (f?.type !== 'building' || !(f.geometry?.length >= 3)) continue;
-    const ring = f.geometry.map((p) => project(p.lat, p.lng));
-    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
-    for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
-    buildings.push({ ring, box: [x0, y0, x1, y1] });
-  }
-  const indoors = (x, y) => buildings.some(({ ring, box: b }) => x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3] && inRing(x, y, ring));
+  // a node inside a building is indoors (a drinking fountain in a school or
+  // a mall, under the roof) unless tagged outdoor
+  const indoors = buildingTest(features, project);
   for (const f of features || []) {
     if (out.length >= MAX_FOUNTAINS) break;
     const t = f?.tags || {};
@@ -194,16 +202,22 @@ export function planFountains(features, project) {
   return out;
 }
 
+/** The ground each fountain covers (basins and splash pads): no ground cover grows through it. */
+export function fountainFootprints(fountains) {
+  return fountains.filter((fo) => fo.ring).map((fo) => (fo.kind === 'splash' ? fo.ring : insetRing(fo.ring, -RIM.over)));
+}
+
 // ── Geometry ─────────────────────────────────────────────────────────────────
 
-// A flat polygon (holes allowed), facing up, at height z.
-function flat(m, mat, outer, holes, z, col, uvM = 2) {
+// A flat polygon (holes allowed), facing up, at height z (or z(x, y)).
+export function flat(m, mat, outer, holes, z, col, uvM = 2) {
   const tri = THREE.ShapeUtils.triangulateShape(outer.map(([x, y]) => new THREE.Vector2(x, y)), holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))));
   const all = [...outer, ...holes.flat()];
   for (const [i, j, k] of tri) {
     let [a, b, c] = [all[i], all[j], all[k]];
     if ((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) < 0) [b, c] = [c, b];
-    m.tri(mat, [a[0], a[1], z], [b[0], b[1], z], [c[0], c[1], z], [a[0] / uvM, a[1] / uvM], [b[0] / uvM, b[1] / uvM], [c[0] / uvM, c[1] / uvM], col);
+    const h = typeof z === 'function' ? z : () => z;
+    m.tri(mat, [a[0], a[1], h(a[0], a[1])], [b[0], b[1], h(b[0], b[1])], [c[0], c[1], h(c[0], c[1])], [a[0] / uvM, a[1] / uvM], [b[0] / uvM, b[1] / uvM], [c[0] / uvM, c[1] / uvM], col);
   }
 }
 
@@ -228,7 +242,7 @@ export function lathe(m, mat, cx, cy, profile, col, { n = 24, uvM = 1 } = {}) {
 }
 
 // A basin: the outer wall down past the ground, a coping over it, the inner
-// wall down to the water, and the water.
+// wall down to a tiled floor, and the water over it.
 function basin(stone, wet, ring, zLow, zTop, mat, tint, { w = RIM.w } = {}) {
   const out = insetRing(ring, -RIM.over);
   const inner = insetRing(ring, w);
@@ -242,7 +256,10 @@ function basin(stone, wet, ring, zLow, zTop, mat, tint, { w = RIM.w } = {}) {
   flat(stone, mat, out, [inner.slice().reverse()], zTop, tint, 1);
   const zWater = zTop - WATER_BELOW_M;
   for (let i = 0; i < inner.length; i++) wallQuad(stone, mat, inner[i], inner[(i + 1) % inner.length], zWater - 0.3, zTop, tint, 1, false);
-  flat(wet, 'fountainWater', inner, [], zWater, WHITE, 6);
+  // a tiled floor (the water is clear: the ground showed through it)
+  flat(stone, 'poolTile', inner, [], zWater - 0.3, BASIN_TILE, 1.5);
+  // (the water is WaterBlocks: recorded for fountainWaterBlocks; under the rim at most most of its width)
+  wet.water?.(inner, zWater, w * 0.8, 0.4);
   return { zWater, inner };
 }
 
@@ -261,7 +278,7 @@ function bowl(stone, wet, cx, cy, R, zLip, rs, mat, tint, zFall = null) {
     [rs, zLip - R * 0.45], [R * 0.55, zLip - R * 0.32], [R * 0.88, zLip - R * 0.14], [R, zLip - 0.04],
     [R, zLip + 0.04], [R - 0.06, zLip + 0.06], [R - 0.09, zLip - 0.02], [R * 0.6, zLip - R * 0.25],
   ], tint, { n: 24 });
-  flat(wet, 'fountainWater', circle(cx, cy, R - 0.08, 24), [], zLip - 0.03, WHITE, 6);
+  wet.water?.(circle(cx, cy, R - 0.08, 24), zLip - 0.03, 0.06, 0.25);
   if (zFall !== null && zFall < zLip - 0.1) {
     // (a thin sheet, its material double-sided)
     lathe(wet, 'fountainSpray', cx, cy, [[R + 0.22, zFall], [R + 0.08, zLip - 0.15], [R + 0.02, zLip + 0.02]], WHITE, { n: 24, uvM: 1.5 });
@@ -429,17 +446,8 @@ export function buildFountain(stone, full, fo, streets = null) {
   }
 }
 
-/** The water surface and the falling-water sheets (BeamNG material stages). */
+/** The falling-water sheets (BeamNG material stage; the standing water is WaterBlocks). */
 export const FOUNTAIN_MATERIAL_STAGES = {
-  fountainWater: {
-    baseColorFactor: [0.06, 0.16, 0.17, 1],
-    normalMap: '/assets/materials/tileable/water/water_effects/ripple2_nm.normal.dds',
-    roughnessFactor: 0.05,
-    metallicFactor: 0,
-    animFlags: 1,
-    scrollDir: [0.03, 0.05],
-    scrollSpeed: 0.4,
-  },
   // (added over the scene: the texture's dark streaks clear, its white ones show)
   fountainSpray: {
     baseColorMap: '/assets/materials/tileable/water/water_effects/river_white_water_b.color.dds',
@@ -451,3 +459,17 @@ export const FOUNTAIN_MATERIAL_STAGES = {
     scrollSpeed: 1.2,
   },
 };
+
+/**
+ * A fountain's standing water (its basin, its bowls) as WaterBlock
+ * rectangles: [{ cx, cy, sx, sy, u, z, depth }], each reaching under the rim
+ * or the lip (waterCover.js). streets: as for buildFountain (a wall fountain
+ * faces the same way).
+ */
+export function fountainWaterBlocks(fo, streets = null) {
+  const out = [];
+  const none = { tri() {}, quad() {} };
+  const wet = { ...none, water: (ring, z, cap, depth) => { for (const b of coverRing(ring, { cap, h: Math.max(0.1, Math.min(0.3, cap * 1.5)) })) out.push({ ...b, z, depth }); } };
+  buildFountain(none, wet, fo, streets);
+  return out;
+}

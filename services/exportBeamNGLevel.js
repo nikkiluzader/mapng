@@ -6,6 +6,9 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
+import { planPools, poolFootprints, poolWaterBlocks, POOL_WATER_BLOCK } from './pools.js';
+import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
+import { streetIndex } from './buildingDetails.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
@@ -1043,7 +1046,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
     // (carports are open roofs on posts: native carport models, not walls)
     terrainData.osmFeatures.filter((f) => !isCarportFeature(f)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
-    { tileM: buildingTileSize(worldSize) },
+    { tileM: buildingTileSize(worldSize), squareSize, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) },
   );
   if (reportStats) {
     reportStats.built = buildingCount;
@@ -6404,6 +6407,7 @@ function buildDetailedReportSections(d) {
     lines.push(`- Shop fronts: ${st.shopFronts}, offices: ${st.offices}, courtyards (inner rings): ${st.withHoles}`);
     const dt = st.details || {};
     lines.push(`- Details: parapets ${dt.parapets || 0}, shop awnings / fascias ${dt.shopfronts || 0}, verandas ${dt.veranda || 0}, door hoods ${dt.hood || 0}, front steps ${dt.steps || 0}, chimneys ${dt.chimneys || 0}, roof plant pieces ${dt.roofPlant || 0}, church towers ${dt.towers || 0}, domes ${dt.domes || 0}, silos / tanks ${dt.silos || 0}, passage openings ${dt.passages || 0}, castles / forts ${dt.forts || 0} (merlons ${dt.merlons || 0}, sentry boxes ${dt.sentryBoxes || 0}, corner towers ${dt.cornerTowers || 0}, gates ${dt.gates || 0})`);
+    if (dt.pools) lines.push(`- Swimming pools (OSM leisure=swimming_pool, outdoors: sunk in the ground with a deck, its terrain squares opened; lane pools, wading pools, above-ground pools): ${Object.entries(dt.pools).map(([k, v]) => `${k} ${v}`).join(', ')}; shapes (free-form outlines smoothed, the rest as mapped): ${Object.entries(dt.poolShapes || {}).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.fountains) lines.push(`- Fountains (OSM amenity=fountain / drinking_water, by kind from fountain=* and shape: stone basins with water, bowls, jets, obelisks, pools, wall spouts, splash pads, drinking posts): ${Object.entries(dt.fountains).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     const sorted = (o) => Object.entries(o).sort((a, b) => b[1] - a[1]);
     lines.push('- Kinds:'); listCounts(sorted(st.kinds));
@@ -6467,6 +6471,7 @@ function buildDetailedReportSections(d) {
   listCounts(countBy(d.waterObjects || [], (o) => o.class));
   const ws = d.waterObjects?.stats;
   if (ws?.sea?.blocks != null) lines.push(`- Sea: ${ws.sea.blocks} WaterBlocks in place of the sea-level plane (a tunnel reaches under sea level: no water in its trenches, none deeper than its roof over the tube)`);
+  if (ws?.pools?.poolBlocks || ws?.pools?.fountainBlocks) lines.push(`- Pool and fountain water: ${ws.pools.poolBlocks} WaterBlocks in ${ws.pools.pools} pools, ${ws.pools.fountainBlocks} in ${ws.pools.fountains} fountains (clear, pale blue, slow ripples; each reaching under its coping or rim)`);
   if (ws?.lakes?.riverAreas) lines.push(`- Wide or tidal rivers as area water (WaterBlocks at the river's level, no River ribbon in them): ${ws.lakes.riverAreas}`);
   if (ws?.lakes?.clippedOverTunnels) lines.push(`- Lake tiles held over a tunnel's roof: ${ws.lakes.clippedOverTunnels}`);
   if (ws?.rivers?.nodesClippedOverTunnels) lines.push(`- River nodes held over a tunnel's roof (or left out over its trench): ${ws.rivers.nodesClippedOverTunnels}`);
@@ -6864,6 +6869,15 @@ async function prefetchLidarDecks(terrainData, squareSize, options, onProgress) 
     demAtAbs: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) + minHeight,
     zAbs: [minHeight, maxHeight + 60],
   });
+}
+
+function inRingXY(x, y, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
 }
 
 function geoToWorldPoint(lat, lng, terrainData, squareSize, zOffset = 0) {
@@ -8234,6 +8248,47 @@ function seededRandom(seed) {
  * lake's level (services/beamngWater.js planLakes). A WaterBlock's surface is
  * at its position; its volume reaches scale.z / 2 below.
  */
+/**
+ * The swimming pools' and fountains' water: WaterBlocks in each one's frame,
+ * reaching under its coping or rim (services/pools.js, fountains.js), all
+ * with the pools' look (clear, pale blue, slow ripples).
+ */
+function buildPoolWaterObjects(terrainData, squareSize, biome, stats = {}) {
+  const waterProfile = getWaterProfile(biome);
+  const features = terrainData.osmFeatures || [];
+  const project = (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
+  const pools = planPools(features, project, { squareSize, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) });
+  const fountains = planFountains(features, project);
+  const streets = fountains.some((f) => f.kind === 'wall') ? streetIndex(features, project) : null;
+  const { rippleSpeeds, ...look } = POOL_WATER_BLOCK;
+  const out = [];
+  const add = (b, name) => {
+    const block = {
+      ...structuredClone(WATER_BLOCK_TEMPLATE),
+      cubemap: waterProfile.waterCubemap,
+      foamTex: waterProfile.waterFoamTex,
+      rippleTex: waterProfile.waterRippleTex,
+      ...structuredClone(look),
+      gridSize: Math.max(1, Math.floor(Math.min(100, b.sx, b.sy))),
+      gridElementSize: roundTo(clamp(Math.min(b.sx, b.sy) / 32, 0.05, 4), 2),
+      name,
+      persistentId: generatePersistentId(),
+      __parent: 'Water',
+      position: [roundTo(b.cx, 3), roundTo(b.cy, 3), roundTo(b.z, 3)],
+      // (the block's x along its rectangle)
+      rotationMatrix: [roundTo(b.u[0], 6), roundTo(b.u[1], 6), 0, roundTo(-b.u[1], 6), roundTo(b.u[0], 6), 0, 0, 0, 1],
+      scale: [roundTo(b.sx, 3), roundTo(b.sy, 3), roundTo(b.depth * 2, 2)],
+    };
+    block['Ripples (texture animation)'] = block['Ripples (texture animation)'].map((r, j) => ({ ...r, rippleSpeed: rippleSpeeds[j] ?? r.rippleSpeed }));
+    out.push(block);
+  };
+  pools.forEach((p, k) => poolWaterBlocks(p).forEach((b, i) => add(b, `pool_${k}_${i}`)));
+  const poolBlocks = out.length;
+  fountains.forEach((f, k) => fountainWaterBlocks(f, streets).forEach((b, i) => add(b, `fountain_${k}_${i}`)));
+  Object.assign(stats, { pools: pools.length, poolBlocks, fountains: fountains.length, fountainBlocks: out.length - poolBlocks });
+  return out;
+}
+
 function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZones = [], plan = null) {
   const waterProfile = getWaterProfile(biome);
   const { tiles, stats: lakeStats } = plan || planLakes({
@@ -10783,6 +10838,55 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
     for (const k of tunnelHoles) if (k >= 0 && k < terLayerMap.length) terLayerMap[k] = 255;
   }
+  // Swimming pools: their terrain squares opened (the pool's walls and floor
+  // are the building tiles' mesh, its deck covers the opening's edge); a bare
+  // layer under the decks, fountain basins and splash pads (ground cover grew
+  // up through them)
+  // (the pools and fountains are the building tiles' meshes: none without them)
+  if (includeBuildings) try {
+    const feats = exportTerrainData.osmFeatures || [];
+    const project = (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0);
+    const { holes: poolHoles, paved } = poolFootprints(planPools(feats, project, { squareSize, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) }));
+    paved.push(...fountainFootprints(planFountains(feats, project)));
+    if (poolHoles.length || paved.length) {
+      if (!terLayerMap) terLayerMap = new Uint8Array(exportTerrainData.width * exportTerrainData.height);
+      const W = exportTerrainData.width; const H = exportTerrainData.height; const worldSize = W * squareSize;
+      const toWorld = (c, r) => [((c / (W - 1)) - 0.5) * worldSize, (0.5 - r / (H - 1)) * worldSize];
+      const pixelBox = (ring) => {
+        let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+        for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+        const c = (x) => Math.round((x / worldSize + 0.5) * (W - 1)); const r = (y) => Math.round((0.5 - y / worldSize) * (H - 1));
+        return [Math.max(1, c(x0) - 1), Math.max(1, r(y1) - 1), Math.min(W - 2, c(x1) + 1), Math.min(H - 2, r(y0) + 1)];
+      };
+      const names = pbrResult?.materialNames || [];
+      const bare = [names.indexOf('asphalt'), names.indexOf('ROCK')].find((i) => i >= 0);
+      let barePixels = 0;
+      if (bare !== undefined) {
+        for (const ring of paved) {
+          const [c0, r0, c1, r1] = pixelBox(ring);
+          for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+            const [x, y] = toWorld(c, r);
+            const k = (H - 1 - r) * W + c;
+            if (terLayerMap[k] !== 255 && inRingXY(x, y, ring)) { terLayerMap[k] = bare; barePixels++; }
+          }
+        }
+      }
+      // square (c, r) spans pixels c..c+1 and r-1..r: open when all of it is under the pool or its deck
+      let opened = 0;
+      for (const ring of poolHoles) {
+        const [c0, r0, c1, r1] = pixelBox(ring);
+        for (let r = r0; r <= r1; r++) for (let c = c0; c < c1; c++) {
+          if ([[c, r], [c + 1, r], [c, r - 1], [c + 1, r - 1]].every(([cc, rr]) => inRingXY(...toWorld(cc, rr), ring))) {
+            terLayerMap[(H - 1 - r) * W + c] = 255; opened++;
+          }
+        }
+      }
+      if (pbrResult) { pbrResult.poolHoleSquares = opened; pbrResult.pavedBarePixels = barePixels; }
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Pools: ${poolHoles.length} sunk (${opened} terrain squares opened); ${barePixels} px bare under decks / basins.`);
+    }
+  } catch (err) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Pool holes skipped: ${err?.message || err}`);
+  }
   // The terrain's range after grading: tunnel trenches and roads sunk under
   // bridges reach below the source's lowest point on flat ground (Deck Park:
   // a 7 m trench, the whole city within 3 m), a portal's backfill over its
@@ -10844,8 +10948,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList, sourceHeightMap)
     : [buildSeaLevelWaterPlane(exportTerrainData, biome, seaLevelOffset)];
   waterStats.sea = seaAsBlocks ? { blocks: seaObjects.length } : { plane: true };
+  waterStats.pools = {};
   const waterObjects = [
     ...seaObjects,
+    ...(includeBuildings ? buildPoolWaterObjects(exportTerrainData, squareSize, biome, waterStats.pools) : []),
     ...(includeWater
       ? [
           ...buildWaterBlockObjects(exportTerrainData, squareSize, biome, waterStats.lakes, dryZones, lakePlan),

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fountainKind, planFountains, buildFountain, FOUNTAIN_KINDS } from '../services/fountains.js';
+import { fountainKind, planFountains, buildFountain, fountainWaterBlocks, FOUNTAIN_KINDS } from '../services/fountains.js';
 
 // world metres = (lng, lat); ground 10 m everywhere
 const project = (lat, lng) => [lng, lat, 10];
@@ -75,16 +75,20 @@ test('every kind builds: stone in both levels, water facing up inside the basin,
     built.add(kind);
     assert.ok(stone.tris.length > 0, `${kind}: stonework`);
     assert.ok(stone.tris.every((x) => !/fountain/.test(x.mat)), `${kind}: no water or spray in the collision`);
-    const water = full.tris.filter((x) => x.mat === 'fountainWater');
+    const water = fountainWaterBlocks(fo);
     if (kind !== 'splash' && kind !== 'bubbler') assert.ok(water.length > 0, `${kind}: water`);
-    assert.ok(water.every((x) => normalZ(x.pts) > 0), `${kind}: water faces up`);
     if (fo.ring) {
       const R = Math.max(...fo.ring.map(([x, y]) => Math.hypot(x, y)));
       assert.ok(full.tris.every((x) => x.pts.every((p) => Math.hypot(p[0], p[1]) <= R + 0.3)), `${kind}: within its basin`);
+      // the water's corners under the rim (inside the basin's outer edge)
+      for (const b of water) for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+        const x = b.cx + (b.u[0] * sx * b.sx - b.u[1] * sy * b.sy) / 2; const y = b.cy + (b.u[1] * sx * b.sx + b.u[0] * sy * b.sy) / 2;
+        assert.ok(Math.hypot(x, y) <= R + 0.02, `${kind}: water corner ${Math.hypot(x, y).toFixed(2)} past the rim ${R.toFixed(2)}`);
+      }
     }
     // water above the ground, the lowest under the basin's rim (0.45 m) or in a raised bowl
-    for (const w of water) for (const p of w.pts) assert.ok(p[2] > 10 && p[2] < 16, `${kind}: water height ${p[2]}`);
-    if (fo.ring && water.length) assert.ok(Math.min(...water.flatMap((w) => w.pts.map((p) => p[2]))) < 10.45, `${kind}: basin water under the rim`);
+    for (const w of water) assert.ok(w.z > 10 && w.z < 16, `${kind}: water height ${w.z}`);
+    if (fo.ring && water.length) assert.ok(Math.min(...water.map((w) => w.z)) < 10.45, `${kind}: basin water under the rim`);
   }
   // pools from a long outline, jets along it
   const [pool] = planFountains([area('p', [[0, 0], [40, 0], [40, 8], [0, 8]], { amenity: 'fountain', fountain: 'nozzle' })], project);
