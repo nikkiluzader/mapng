@@ -697,17 +697,28 @@ test('exportBeamNGLevel ships textured buildings with every material defined', a
         ],
       },
     });
-    const dae = await zip.file(`${base}/map_assets/custom_assets/osm_objects/osm_objects.dae`)?.async('string');
-    assert.ok(dae, 'osm_objects.dae exported');
-    const used = new Set([...dae.matchAll(/<material id="[^"]+" name="([^"]+)"/g)].map((m) => m[1]));
-    assert.ok([...used].some((n) => n.startsWith('mapng_bld_')), `textured materials used: ${[...used]}`);
-    assert.match(dae, /<geometry id="Colmesh-1/, 'buildings collide');
-    // BeamNG reads trailing digits in node names as detail levels; only the
-    // scene roots and the collision mesh may carry them.
-    for (const [, name] of dae.matchAll(/<node [^>]*name="([^"]+)"/g)) {
-      if (['base00', 'start01', 'Colmesh-1'].includes(name)) continue;
-      assert.doesNotMatch(name, /\d$/, `node "${name}" would be read as a detail level`);
+    // one shape per building tile (beamngBuildings.js / buildBuildingTileDAEs)
+    const tileFiles = Object.keys(zip.files).filter((n) => n.startsWith(`${base}/map_assets/custom_assets/osm_objects/buildings/`) && n.endsWith('.dae'));
+    assert.ok(tileFiles.length >= 1, 'building tile shapes exported');
+    const used = new Set();
+    for (const file of tileFiles) {
+      const dae = await zip.file(file).async('string');
+      for (const m of dae.matchAll(/<material id="[^"]+" name="([^"]+)"/g)) used.add(m[1]);
+      assert.match(dae, /<geometry id="Colmesh-1/, 'buildings collide');
+      // BeamNG reads trailing digits in node names as detail levels: only the
+      // scene roots, the collision mesh and the two detail levels carry them,
+      // a full one (bld<a><size>) over a lite one drawn down to size 2
+      const names = [...dae.matchAll(/<node [^>]*name="([^"]+)"/g)].map((m) => m[1]);
+      for (const name of names) {
+        if (['base00', 'start01', 'Colmesh-1'].includes(name)) continue;
+        assert.match(name, /^(bld[a-z]+\d+|lite[a-z]+2)$/, `node "${name}" is a detail level`);
+      }
+      assert.ok(names.some((n) => /^bld[a-z]+\d+$/.test(n)) && names.some((n) => /^lite[a-z]+2$/.test(n)), 'full and lite detail levels');
     }
+    assert.ok([...used].some((n) => n.startsWith('mapng_bld_')), `textured materials used: ${[...used]}`);
+    // each tile placed as its own object at its origin
+    const objects = (await zip.file(`${base}/main/MissionGroup/level_objects/items.level.json`).async('string')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    assert.equal(objects.filter((o) => String(o.name).startsWith('buildings_') && o.class === 'TSStatic').length, tileFiles.length);
 
     const defs = JSON.parse(await zip.file(`${base}/map_assets/custom_assets/osm_objects/main.materials.json`).async('string'));
     for (const name of used) assert.ok(defs[name], `material ${name} defined`);

@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
-import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE } from './beamngBuildings.js';
+import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
@@ -1000,10 +1000,11 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
   // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
   // straight in world space (services/beamngBuildings.js).
   const squareSize = worldSize / terrainData.width;
-  const { meshes: buildingMeshes, count: buildingCount, stats: buildingStats } = buildTexturedBuildings(
+  const { meshes: buildingMeshes, count: buildingCount, stats: buildingStats, tiles: buildingTiles } = buildTexturedBuildings(
     // (carports are open roofs on posts: native carport models, not walls)
     terrainData.osmFeatures.filter((f) => !isCarportFeature(f)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
+    { tileM: buildingTileSize(worldSize) },
   );
   if (reportStats) {
     reportStats.built = buildingCount;
@@ -1030,9 +1031,11 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
 
   // Verify there is at least one mesh child — an empty group means no features
   // were of a type that produces geometry (e.g. only road centrelines).
-  let hasMesh = buildingMeshes.length > 0;
+  // (the buildings are their own tile shapes now: buildBuildingTileDAEs)
+  const tileDaes = await buildBuildingTileDAEs(buildingTiles || []);
+  let hasMesh = false;
   osmGroup.traverse(c => { if (c.isMesh) hasMesh = true; });
-  if (!hasMesh) return null;
+  if (!hasMesh) return { data: null, tiles: tileDaes };
 
   // Transform: scene-space (Y-up, normalised) → BeamNG world-space (Z-up, metres)
   const s = worldSize / SCENE_SIZE;
@@ -1043,27 +1046,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
     0,  0,  0,  1,
   );
 
-  // Collision: every building's walls and roofs, positions only.
-  // BeamNG identifies collision geometry by the <geometry id> starting with "Col".
   let buildingCollisionMesh = null;
-  if (buildingMeshes.length > 0) {
-    const parts = buildingMeshes.map((mesh) => {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', mesh.geometry.getAttribute('position').clone());
-      if (mesh.geometry.index) g.setIndex(mesh.geometry.index.clone());
-      return g;
-    });
-    const collisionGeom = mergeGeometries(parts);
-    parts.forEach((g) => g.dispose());
-    if (collisionGeom) {
-      collisionGeom.name = 'Colmesh-1';
-      buildingCollisionMesh = new THREE.Mesh(
-        collisionGeom,
-        new THREE.MeshBasicMaterial({ name: 'osm_object', color: 0xffffff }),
-      );
-      buildingCollisionMesh.name = 'Colmesh-1';
-    }
-  }
 
   osmGroup.traverse(child => {
     if (!child.isMesh) return;
@@ -1109,7 +1092,6 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
   const start01 = new THREE.Group();
   start01.name = 'start01';
   start01.add(osmGroup);
-  for (const mesh of buildingMeshes) start01.add(mesh);
   if (buildingCollisionMesh) start01.add(buildingCollisionMesh);
   base00.add(start01);
 
@@ -1122,8 +1104,71 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
   // Pass base00 directly so it becomes the top-level node in <visual_scene>,
   // matching the reference flag asset structure.
   const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
-  if (!result?.data) return null;
-  return result.data;
+  return { data: result?.data || null, tiles: tileDaes };
+}
+
+// Building tiles (beamngBuildings.js): the map's width over this, at least
+// BUILDING_TILE_M (a 16 km map: ~1000 shapes of 512 m, not 4000 of 256 m)
+const BUILDING_TILES_ACROSS = 32;
+const buildingTileSize = (worldSize) => Math.max(BUILDING_TILE_M, worldSize / BUILDING_TILES_ACROSS);
+// The lite mesh takes over at about this distance from a tile: the engine's
+// detail size is (shape radius) x ENGINE_PX / distance (BeamNG.Earth's
+// measurement, 2560 x 1440 at high mesh quality; lower settings switch nearer)
+const BUILDING_LITE_FROM_M = 400;
+const ENGINE_DETAIL_PX = 4100;
+const LITE_DOWN_TO_PX = 2;      // the lite mesh drawn down to this detail size (the stock shapes' smallest)
+
+/**
+ * One Collada shape per building tile: base00 > start01 > the full meshes
+ * (detail size from the tile's radius: shown nearer than about
+ * BUILDING_LITE_FROM_M), the lite meshes (down to LITE_DOWN_TO_PX) and the
+ * lite geometry again as the collision mesh (Colmesh-1). Positions relative
+ * to the tile's origin. Returns [{ key, origin: [x, y], data }].
+ */
+async function buildBuildingTileDAEs(tiles) {
+  const out = [];
+  for (const t of tiles) {
+    const [ox, oy] = t.origin;
+    const base00 = new THREE.Group(); base00.name = 'base00';
+    const start01 = new THREE.Group(); start01.name = 'start01';
+    base00.add(start01);
+    const box = new THREE.Box3();
+    for (const m of [...t.full, ...t.lite]) {
+      m.geometry.translate(-ox, -oy, 0);
+      m.geometry.computeBoundingBox();
+      box.union(m.geometry.boundingBox);
+    }
+    const radius = box.isEmpty() ? 1 : box.getSize(new THREE.Vector3()).length() / 2;
+    const fullPx = Math.max(LITE_DOWN_TO_PX + 1, Math.round((radius * ENGINE_DETAIL_PX) / BUILDING_LITE_FROM_M));
+    t.full.forEach((m, i) => { m.name = `bld${letterName(i)}${fullPx}`; start01.add(m); });
+    const lites = t.lite.length ? t.lite : t.full;
+    lites.forEach((m, i) => {
+      const lm = t.lite.length ? m : m.clone();
+      lm.name = `lite${letterName(i)}${LITE_DOWN_TO_PX}`;
+      start01.add(lm);
+    });
+    // collision: the lite walls and roofs (positions only)
+    const parts = lites.map((m) => {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', m.geometry.getAttribute('position').clone());
+      if (m.geometry.index) g.setIndex(m.geometry.index.clone());
+      return g;
+    });
+    const colGeom = mergeGeometries(parts);
+    parts.forEach((g) => g.dispose());
+    if (colGeom) {
+      colGeom.name = 'Colmesh-1';
+      const col = new THREE.Mesh(colGeom, new THREE.MeshBasicMaterial({ name: 'osm_object', color: 0xffffff }));
+      col.name = 'Colmesh-1';
+      start01.add(col);
+    }
+    base00.updateMatrixWorld(true);
+    const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
+    if (result?.data) out.push({ key: t.key, origin: [ox, oy], data: result.data, fullPx });
+    // (the thread back between tiles: a city is hundreds of them)
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  return out;
 }
 
 /**
@@ -6289,7 +6334,7 @@ function buildDetailedReportSections(d) {
   } else {
     lines.push(`- OSM building footprints: ${st.footprints}, built: ${br.built}`);
     lines.push(`- Skipped: invalid geometry ${st.skipped.badGeometry}, under 4 m² ${st.skipped.tiny}, over 50,000 m² (non-industrial) ${st.skipped.oversize}, no terrain under them ${st.skipped.noGround}, over the building cap ${st.skipped.overCap}`);
-    lines.push(`- Meshes: ${br.meshes}, triangles: ${Math.round(br.triangles)}, collision: one mesh of every wall and roof`);
+    lines.push(`- Shapes: ${br.tiles ?? 0} building tile(s) (each a full detail level near the camera and a lite one from about ${BUILDING_LITE_FROM_M} m: no laid-over windows, soffits or small details), ${br.meshes} full mesh(es), ${Math.round(br.triangles)} triangles; collision: the lite walls and roofs`);
     const avg = (a) => (br.built ? a.sum / br.built : NaN);
     lines.push(`- Floors: min ${br.built ? st.floors.min : 'n/a'}, mean ${formatNumber(avg(st.floors), 1)}, max ${st.floors.max}`);
     lines.push(`- Eave height: min ${br.built ? formatNumber(st.height.min, 1) : 'n/a'} m, mean ${formatNumber(avg(st.height), 1)} m, max ${formatNumber(st.height.max, 1)} m`);
@@ -10462,11 +10507,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let previewBlob = await generatePreviewBlob(exportTerrainData);
 
   let osmDaeBlob = null;
+  let buildingTileDaes = [];
   const buildingReport = {};
   if (includeBuildings) {
     beginStep('buildings', `Building textured 3D buildings (${(exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building').length} OSM footprints)…`);
     await yield_();
-    osmDaeBlob = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport);
+    const osm = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport);
+    osmDaeBlob = osm?.data || null;
+    buildingTileDaes = osm?.tiles || [];
+    buildingReport.tiles = buildingTileDaes.length;
   } else {
     await yield_();
   }
@@ -11176,10 +11225,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   heightmapBlob = null;
 
   // ── map_assets/custom_assets/ (OSM 3D objects and/or terrain backdrop) ──────────────────
-  if (osmDaeData || sidewalksDae || backdropDaeData || mapngFlagFiles.length > 0) {
-    if (osmDaeData) {
+  if (osmDaeData || buildingTileDaes.length || sidewalksDae || backdropDaeData || mapngFlagFiles.length > 0) {
+    if (osmDaeData || buildingTileDaes.length) {
       zip.folder(`${base}/map_assets/custom_assets/osm_objects`);
-      zip.file(`${base}/map_assets/custom_assets/osm_objects/osm_objects.dae`, osmDaeData);
+      if (osmDaeData) zip.file(`${base}/map_assets/custom_assets/osm_objects/osm_objects.dae`, osmDaeData);
+      // the buildings, one shape per tile (full + lite detail levels)
+      for (const t of buildingTileDaes) zip.file(`${base}/map_assets/custom_assets/osm_objects/buildings/bld_${t.key}.dae`, await toZipBinary(t.data));
       // lit windows at night for every window band (the official map lights one)
       let facadeEmissive = null;
       try {
@@ -11607,6 +11658,25 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // top-down). BeamNG convention: leading "levels/…", no leading slash.
     minimapImage: `levels/${levelName}/${minimapImageRel}`,
   }];
+
+  // the building tiles: lit windows at night as the old single shape had them
+  for (const t of buildingTileDaes) {
+    levelObjectItems.push({
+      __parent: 'level_objects',
+      class: 'TSStatic',
+      name: `buildings_${t.key}`,
+      persistentId: generatePersistentId(),
+      position: [roundTo(t.origin[0], 3), roundTo(t.origin[1], 3), 0],
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/osm_objects/buildings/bld_${t.key}.dae`,
+      collisionType: 'Collision Mesh',
+      decalType: 'Collision Mesh',
+      prebuildCollisionData: 0,
+      useInstanceRenderData: true,
+      instanceColor: [0, 0, 0, 1],
+      nightEmissive: '1',
+      nightEmissiveColor: '255 214 160',
+    });
+  }
 
   if (osmDaeBlob) {
     levelObjectItems.push({

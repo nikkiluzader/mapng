@@ -704,7 +704,7 @@ function flatRoof(m, ring, holes, z, mat, col) {
   }
 }
 
-function pitchedRoof(m, box, z, plan, wallMat, wallUv) {
+function pitchedRoof(m, box, z, plan, wallMat, wallUv, detail = m) {
   const { cx, cy, ux, uy } = box;
   const vx = -uy; const vy = ux;
   const hl = box.length / 2 + ROOF_OVERHANG_M;
@@ -734,7 +734,8 @@ function pitchedRoof(m, box, z, plan, wallMat, wallUv) {
       m.tri(mat, e0, e1, r, uvR(-hw, 0), uvR(hw, 0), uvR(0, slope), col);
     }
   }
-  roofUnderside(m, P, { hl, hw, rl, rise, eaveDrop, hipped: plan.roof === 'hipped' });
+  // (the painted underside: near detail only)
+  roofUnderside(detail, P, { hl, hw, rl, rise, eaveDrop, hipped: plan.roof === 'hipped' });
   if (plan.roof !== 'hipped') {
     // gable ends in the wall material, flush with the walls' oriented box
     const gw = box.width / 2;
@@ -809,11 +810,21 @@ function roofUnderside(m, P, { hl, hw, rl, rise, eaveDrop, hipped }) {
  * buildings so no single geometry grows unbounded.
  */
 const MESH_BATCH = 400;
+export const BUILDING_TILE_M = 256;   // buildings' shapes: one per tile this size (the export may pick larger on big maps)
 
 // BeamNG reads trailing digits of a Collada node name as its detail level
 // (official shapes: *_a700, *_a160, Colmesh-1), so "buildings_1" + "buildings_2"
 // made the whole shape "invalid detail levels" and nothing rendered. Batch
 // names use letters: buildings_a, buildings_b, ... buildings_aa.
+// Both detail levels at once: what a building is made of goes to its tile's
+// full and lite meshes alike; laid-over windows, soffits and the like only to
+// the full one (the lite mesh is what a tile shows from a few hundred metres).
+class TeeBuilder {
+  constructor(a, b) { this.a = a; this.b = b; }
+  tri(...args) { this.a.tri(...args); this.b.tri(...args); }
+  quad(...args) { this.a.quad(...args); this.b.quad(...args); }
+}
+
 export function letterName(index) {
   let n = index;
   let out = '';
@@ -1197,11 +1208,27 @@ export function neighbourLevels(features, project) {
   return out;
 }
 
-export function buildTexturedBuildings(features, project, { maxBuildings = 20000 } = {}) {
+export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M } = {}) {
   const meshes = [];
-  let builder = new MeshBuilder();
-  let inBatch = 0;
   let count = 0;
+  // buildings grouped by tile (their footprint's centre): one shape per tile
+  // with a full and a lite detail level, so far tiles draw less and the
+  // engine culls what is out of view (one shape for a whole city did neither)
+  const tiles = new Map();
+  const tileFor = (ring) => {
+    let cx = 0; let cy = 0;
+    for (const [x, y] of ring) { cx += x; cy += y; }
+    const tx = Math.floor(cx / ring.length / tileM); const ty = Math.floor(cy / ring.length / tileM);
+    const key = `${tx}_${ty}`;
+    let t = tiles.get(key);
+    if (!t) {
+      t = { key, origin: [(tx + 0.5) * tileM, (ty + 0.5) * tileM], full: [], lite: [], fullB: new MeshBuilder(), liteB: new MeshBuilder(), inBatch: 0 };
+      tiles.set(key, t);
+    }
+    return t;
+  };
+  let builder = null;
+  let detailB = null;
   // For the export report: why footprints were left out, and what was built.
   const stats = {
     footprints: 0,
@@ -1215,11 +1242,12 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   const levelsHints = neighbourLevels(features, project);
   const bump = (map, key) => { map[key] = (map[key] || 0) + 1; };
 
-  const flush = () => {
-    const mesh = builder.toMesh(`buildings_${letterName(meshes.length)}`);
-    if (mesh) meshes.push(mesh);
-    builder = new MeshBuilder();
-    inBatch = 0;
+  const flushTile = (t) => {
+    const full = t.fullB.toMesh(`buildings_${letterName(meshes.length)}`);
+    if (full) { meshes.push(full); t.full.push(full); }
+    const lite = t.liteB.toMesh(`lite_${letterName(t.lite.length)}`);
+    if (lite) t.lite.push(lite);
+    t.fullB = new MeshBuilder(); t.liteB = new MeshBuilder(); t.inBatch = 0;
   };
 
   for (const f of features) {
@@ -1249,13 +1277,16 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const seed = `${f.id}:${c.lat.toFixed(6)}:${c.lng.toFixed(6)}`;
     // a multi-storey car park: decks and ramps (else, too small or odd for
     // ramps, a plain building)
+    const tile = tileFor(ring);
+    builder = new TeeBuilder(tile.fullB, tile.liteB);
+    detailB = tile.fullB;
     const garage = isGarageFeature(f) ? planGarage(ring, tags) : null;
     if (garage) {
       buildGarage(builder, ring, holes, zMax, zMin - FOUNDATION_M, garage);
       stats.garages = (stats.garages || 0) + 1;
       bump(stats.kinds, 'garage');
       count++;
-      if (++inBatch >= MESH_BATCH) flush();
+      if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
       continue;
     }
     const box = orientedBox(ring);
@@ -1285,7 +1316,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
         }
       } else {
         wallStrip(builder, plan.wall, a, b, base, eave, plan.wallTint);
-        if (plan.windows) houseWindows(builder, a, b, base, plan.floors, plan.floorH, eave, hash01(seed, 'lit') < HOUSE_LIT_SHARE ? WIN_UV : WIN_UV_DARK);
+        if (plan.windows) houseWindows(detailB, a, b, base, plan.floors, plan.floorH, eave, hash01(seed, 'lit') < HOUSE_LIT_SHARE ? WIN_UV : WIN_UV_DARK);
       }
     }
     for (const hole of holes) {
@@ -1298,7 +1329,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       flatRoof(builder, ring, holes, eave, plan.roofMat, plan.roofTint);
     } else {
       const wallMat = plan.wall || 'stucco';
-      pitchedRoof(builder, box, eave, plan, wallMat, SIDING_UV_M);
+      pitchedRoof(builder, box, eave, plan, wallMat, SIDING_UV_M, detailB);
     }
 
     count++;
@@ -1314,8 +1345,10 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (plan.shopFloor) stats.shopFronts++;
     if (plan.office) stats.offices++;
     if (holes.length) stats.withHoles++;
-    if (++inBatch >= MESH_BATCH) flush();
+    if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
-  flush();
-  return { meshes, count, stats };
+  for (const t of tiles.values()) if (t.inBatch) flushTile(t);
+  const tileList = [...tiles.values()].filter((t) => t.full.length).map(({ key, origin, full, lite }) => ({ key, origin, full, lite }));
+  stats.tiles = tileList.length;
+  return { meshes, count, stats, tiles: tileList };
 }
