@@ -29,7 +29,8 @@ import { hash01, signedArea, cleanRing, inRing, flat, buildingTest } from './fou
 import { orientedBox, frameAt, coverRing } from './waterCover.js';
 
 const DECK_MIN_M = 1.2;          // the paved deck round a sunk pool
-const DECK_PER_SQUARE = 1.45;    // ... at least this many terrain squares wide (every opened square under it)
+const DECK_PER_SQUARE = 1.62;    // ... at least this many terrain squares wide (a square touching the pool lies under it: its diagonal and the margin)
+const HOLE_MARGIN_M = 0.15;      // squares opened this far past the pool's wall
 const COPING_M = 0.35;
 // The deck: a rectangle round the pool (its own frame), DECK_SIZE * sqrt(the
 // pool's area) past it within DECK_MARGIN_M, pulled back from roads (their
@@ -236,10 +237,29 @@ export function poolFootprints(pools) {
   const holes = []; const paved = [];
   for (const p of pools) {
     if (p.kind === 'above') { paved.push(p.ring); continue; }
-    holes.push(insetRing(p.ring, -(p.deck - 0.05)));
-    paved.push(p.deckRect || insetRing(p.ring, -p.deck));
+    const cover = p.deckRect || insetRing(p.ring, -p.deck);
+    // (open: every square the pool touches, a margin past its wall; cover: the deck over the opening's edge)
+    holes.push({ open: insetRing(p.ring, -HOLE_MARGIN_M), cover });
+    paved.push(cover);
   }
   return { holes, paved };
+}
+
+/**
+ * Whether a terrain square (its corners, an axis-aligned square) opens for a
+ * pool: when any of it touches the pool (with the margin), and all of it
+ * lies under the deck. (Only squares wholly inside the pool opened: a square
+ * the curved wall cut across stayed, its ground showing inside the pool.)
+ */
+export function squareOpens(corners, hole) {
+  if (!corners.every(([x, y]) => inRing(x, y, hole.cover))) return false;
+  const xs = corners.map((q) => q[0]); const ys = corners.map((q) => q[1]);
+  const x0 = Math.min(...xs); const x1 = Math.max(...xs); const y0 = Math.min(...ys); const y1 = Math.max(...ys);
+  if (hole.open.some(([x, y]) => x >= x0 && x <= x1 && y >= y0 && y <= y1)) return true;
+  for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) {
+    if (inRing(x0 + ((x1 - x0) * i) / 4, y0 + ((y1 - y0) * j) / 4, hole.open)) return true;
+  }
+  return false;
 }
 
 // the nearest point of the pool's wall to q: { p, w (along the wall), n (into the pool) }

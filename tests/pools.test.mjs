@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { planPools, buildPool, poolFootprints, deckWidth, poolWaterBlocks, poolWaterLevel } from '../services/pools.js';
+import { planPools, buildPool, poolFootprints, deckWidth, poolWaterBlocks, poolWaterLevel, squareOpens } from '../services/pools.js';
 
 // world metres = (lng, lat); ground 5 m everywhere
 const project = (lat, lng) => [lng, lat, 5];
@@ -59,10 +59,15 @@ test('a sunk pool: a tiled floor below the water, everything inside its deck, op
     assert.ok(Math.min(...xs) <= -deckWidth(1) && Math.max(...xs) >= w + deckWidth(1) && Math.min(...ys) <= -deckWidth(1) && Math.max(...ys) >= h + deckWidth(1), `${id}: deck round the pool`);
     const out = [[Math.min(...xs) - 0.1, Math.min(...ys) - 0.1], [Math.max(...xs) + 0.1, Math.min(...ys) - 0.1], [Math.max(...xs) + 0.1, Math.max(...ys) + 0.1], [Math.min(...xs) - 0.1, Math.max(...ys) + 0.1]];
     assert.ok(full.tris.every((x) => x.pts.every((q) => inRing(q[0], q[1], out))), `${id}: within its deck`);
-    const { holes, paved } = poolFootprints([p]);
-    // every point of the opening is under the pool or its deck (no hole shows past the deck)
-    for (let x = -3; x <= w + 3; x += 0.25) for (let y = -3; y <= h + 3; y += 0.25) {
-      if (inRing(x, y, holes[0])) assert.ok(inRing(x, y, paved[0]), `${id}: (${x}, ${y}) opened but not covered`);
+    const { holes } = poolFootprints([p]);
+    // on 1 m squares: every square any of the pool touches opens, every opened one lies under the deck
+    for (let c = -6; c < w + 6; c++) for (let r = -6; r < h + 6; r++) {
+      const sq = [[c, r], [c + 1, r], [c + 1, r + 1], [c, r + 1]];
+      const opens = squareOpens(sq, holes[0]);
+      let touches = false;
+      for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) if (inRing(c + i / 8, r + j / 8, p.ring)) touches = true;
+      if (touches) assert.ok(opens, `${id}: square (${c}, ${r}) under the pool left closed`);
+      if (opens) assert.ok(sq.every(([x, y]) => inRing(x, y, holes[0].cover)), `${id}: square (${c}, ${r}) opened past the deck`);
     }
   }
 });
@@ -156,4 +161,16 @@ test('pool shapes drawn as mapped: rectangles, L shapes, octagons, clipped corne
   assert.equal(poolShape([[0, 0], [10, 0], [8, 5], [2, 5]]), 'simple', 'a trapezoid');
   assert.equal(poolShape(fine), 'detailed');
   assert.equal(poolShape([[0, 0], [5, -1], [9, 1], [10, 4], [7, 6], [4, 4.5], [1, 5]]), 'freeform');
+});
+
+test('pool holes: a smoothed kidney opens every square its curved wall crosses', () => {
+  const kidney = [[0.3, 0.2], [5.1, -1.1], [9.2, 0.9], [10.4, 4.2], [7.3, 6.1], [4.2, 4.4], [1.1, 5.3]];
+  const [k] = planPools([area('k', kidney, { leisure: 'swimming_pool' })], project);
+  const { holes } = poolFootprints([k]);
+  for (let c = -4; c < 15; c++) for (let r = -5; r < 11; r++) {
+    const sq = [[c, r], [c + 1, r], [c + 1, r + 1], [c, r + 1]];
+    let touches = false;
+    for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) if (inRing(c + i / 8, r + j / 8, k.ring)) touches = true;
+    if (touches) assert.ok(squareOpens(sq, holes[0]), `square (${c}, ${r}) under the curved wall left closed`);
+  }
 });

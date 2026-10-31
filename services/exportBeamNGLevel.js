@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
-import { planPools, poolFootprints, poolWaterBlocks, POOL_WATER_BLOCK } from './pools.js';
+import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
 import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
 import { streetIndex } from './buildingDetails.js';
 import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
@@ -10871,13 +10871,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           }
         }
       }
-      // square (c, r) spans pixels c..c+1 and r-1..r: open when all of it is under the pool or its deck
+      // square (c, r) spans pixels c..c+1 and r-1..r: open when it touches the
+      // pool (and lies under its deck, services/pools.js squareOpens)
       let opened = 0;
-      for (const ring of poolHoles) {
-        const [c0, r0, c1, r1] = pixelBox(ring);
+      for (const hole of poolHoles) {
+        const [c0, r0, c1, r1] = pixelBox(hole.open);
         for (let r = r0; r <= r1; r++) for (let c = c0; c < c1; c++) {
-          if ([[c, r], [c + 1, r], [c, r - 1], [c + 1, r - 1]].every(([cc, rr]) => inRingXY(...toWorld(cc, rr), ring))) {
-            terLayerMap[(H - 1 - r) * W + c] = 255; opened++;
+          if (squareOpens([[c, r], [c + 1, r], [c, r - 1], [c + 1, r - 1]].map(([cc, rr]) => toWorld(cc, rr)), hole)) {
+            // (the flag on the sample at its north-west corner, heightmap row
+            // r - 1: on its south-west one, row r, the opening came out a row
+            // south of the pool, ground left along its north wall; measured in game)
+            terLayerMap[(H - r) * W + c] = 255; opened++;
           }
         }
       }
