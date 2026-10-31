@@ -69,7 +69,7 @@ export function edgeRoles(graph) {
  * piece i..i+1 of edge k alone. `rawDeck`: edges built as decks wherever
  * they leave the ground. `stats` for the report.
  */
-export function shapingPlan(graph, sw) {
+export function shapingPlan(graph, sw, { measured = [] } = {}) {
   const { edges } = graph;
   const roles = edgeRoles(graph);
   const shapes = (role) => (role === 'tunnel' ? sw.tunnels : role === 'overpass' ? sw.overpasses : role === 'bridge' ? sw.bridges : sw.roads);
@@ -124,7 +124,7 @@ export function shapingPlan(graph, sw) {
   // each plain deck spans its dip from rim to rim (not only the stretch OSM
   // tags as the bridge): its stations pinned on the straight line between
   // the rims, freed from the ground
-  const spans = rawDeck.size ? simpleSpans(graph, rawDeck) : { pins: [], span: edges.map(() => null), list: [] };
+  const spans = rawDeck.size ? simpleSpans(graph, rawDeck, measured) : { pins: [], span: edges.map(() => null), list: [] };
   spans.pins.forEach(([k, i]) => {
     if (fixed[k]?.[i]) { fixed[k][i] = 0; stats.fixedStations--; }
   });
@@ -140,15 +140,19 @@ export function shapingPlan(graph, sw) {
  * the approach most in line at each end (up to SPAN_SEARCH_M), then from the
  * floor of the dip (the lowest ground within DIP_REACH_M of the bridge)
  * climbed out on each side to its rim: where the ground stops rising
- * steeper than the class grade, or passes a crest. The deck runs straight
- * from rim to rim (never under the ground between); a bridge with no dip
+ * steeper than the class grade, or passes a crest (flat ground on the
+ * floor, a wide river, is no rim). The deck runs straight from rim to rim
+ * (never under the ground between), through the stations already pinned in
+ * `measured` ([[k, i, z]]: lidar heights) where it has them; a bridge with no dip
  * under it is left to the profile solve. OSM often ends a
  * bridge short of the far wall, or on a slope; the rims are where the road
  * really leaves the ground. Returns { pins: [[k, i, z]], span: per edge
  * Uint8Array | null, list: [{ edges, length, from, to }] }.
  */
-export function simpleSpans(graph, rawDeck) {
+export function simpleSpans(graph, rawDeck, measured = []) {
   const { edges } = graph;
+  // (stations already pinned, the bridge's measured heights: the line from rim to rim runs through them)
+  const known = new Map(measured.map(([k, i, z]) => [`${k}:${i}`, z]));
   const pins = []; const span = edges.map(() => null); const list = [];
   const ends = new Map();   // node -> [{ k, end }]
   edges.forEach((e, k) => {
@@ -251,7 +255,8 @@ export function simpleSpans(graph, rawDeck) {
         if (g[j] < g[best] - RIM_DROP_M) break;                // over the crest
         const rise = (g[j] - g[j - dir]) / Math.max(1e-6, Math.abs(s[j] - s[j - dir]));
         if (g[j] > g[best]) best = j;
-        if (rise < lim) { if (flatFrom === null) flatFrom = j; if (Math.abs(s[j] - s[flatFrom]) >= RIM_FLAT_M) break; } else flatFrom = null;
+        // (flat ground still on the floor, a wide river's bed, is no rim: the walk goes on to its bank)
+        if (rise < lim && g[j] - g[m] >= DIP_MIN_M) { if (flatFrom === null) flatFrom = j; if (Math.abs(s[j] - s[flatFrom]) >= RIM_FLAT_M) break; } else flatFrom = null;
       }
       return best;
     };
@@ -262,6 +267,16 @@ export function simpleSpans(graph, rawDeck) {
     if (Math.min(g[A], g[B]) - g[m] < DIP_MIN_M) continue;
     A = Math.min(A, b0); B = Math.max(B, b1);
     const zA = g[A]; const zB = g[B]; const L = s[B] - s[A] || 1;
+    // the rims and every measured station between them, in order along the span
+    const anchors = [[s[A], zA]];
+    for (let j = A + 1; j < B; j++) { const z = known.get(`${path[j][0]}:${path[j][1]}`); if (Number.isFinite(z)) anchors.push([s[j], z]); }
+    anchors.push([s[B], zB]);
+    let at = 0;
+    const lineAt = (sj) => {
+      while (at + 2 < anchors.length && anchors[at + 1][0] <= sj) at++;
+      const [s0, z0] = anchors[at]; const [s1, z1] = anchors[at + 1];
+      return z0 + (z1 - z0) * Math.min(1, Math.max(0, (sj - s0) / (s1 - s0 || 1)));
+    };
     const pinAt = (k, i, z) => {
       if (span[k]?.[i]) return;
       pins.push([k, i, z]);
@@ -270,7 +285,7 @@ export function simpleSpans(graph, rawDeck) {
     };
     for (let j = A; j <= B; j++) {
       const [k, i] = path[j];
-      const z = Math.max(zA + (zB - zA) * (s[j] - s[A]) / L, g[j]);
+      const z = known.get(`${k}:${i}`) ?? Math.max(lineAt(s[j]), g[j]);
       pinAt(k, i, z);
       // every road end meeting at a junction on the span at the deck's height
       // (one held on its ground there pulled the junction, and the deck, down)

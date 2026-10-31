@@ -153,3 +153,25 @@ test('simple bridge spans its dip rim to rim, not only the OSM bridge stretch (W
   // and it reaches onto the far approach (where OSM's bridge had stopped)
   assert.ok(pins.some(([k]) => k === 2));
 });
+
+test('a plain deck with measured heights: rim to rim through them, no dip to the line', async () => {
+  const { simpleSpans } = await import('../services/structures/shaping.js');
+  // water at 0 from y 0 to 95, an abutment up to 4.6 m by y 100, then the island falling gently;
+  // the bridge y -50..96 measured at 6 m out to y 90 (the survey's last points short of its end)
+  const ground = (y) => (y <= 95 ? (y < -50 ? 5 : 0) : y <= 100 ? (y - 95) * 0.92 : 4.6 - (y - 100) * 0.03);
+  const edge = (from, to, y0, y1, extra = {}) => {
+    const ys = []; for (let y = y0; y <= y1 + 1e-9; y += 2) ys.push(y);
+    return { from, to, s: Float64Array.from(ys, (y) => y - y0), x: new Float64Array(ys.length), y: Float64Array.from(ys), g: Float64Array.from(ys, ground), half: 5, layer: 0, highway: 'primary', ...extra };
+  };
+  const graph = { edges: [edge('a', 'b', -120, -50), edge('b', 'c', -50, 96, { bridge: true, layer: 1 }), edge('c', 'd', 96, 200)] };
+  const measured = [];
+  graph.edges[1].y.forEach((y, i) => { if (y <= 90) measured.push([1, i, 6]); });
+  const { pins } = simpleSpans(graph, new Set([1]), measured);
+  const zAt = new Map(pins.map(([k, i, z]) => [`${k}:${i}`, z]));
+  for (const [k, i, z] of measured) assert.equal(zAt.get(`${k}:${i}`) ?? z, z, 'measured stations keep their height');
+  // from the last measured station (6 m at y 90) down to the abutment's top: never under 4.6 before the rim, no dip
+  const tail = pins.filter(([k, i]) => graph.edges[k].y[i] > 90).sort((p, q) => graph.edges[p[0]].y[p[1]] - graph.edges[q[0]].y[q[1]]);
+  assert.ok(tail.length >= 3);
+  for (let j = 1; j < tail.length; j++) assert.ok(tail[j][2] <= tail[j - 1][2] + 1e-9, 'falls steadily onto the abutment');
+  assert.ok(tail.every(([, , z]) => z >= 4.5), `stays on the abutment top: ${tail.map((p) => p[2].toFixed(2)).join(' ')}`);
+});

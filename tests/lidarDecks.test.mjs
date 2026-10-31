@@ -66,7 +66,30 @@ test('pins: a bridge measured along most of it pinned, a movable span never', as
   const edge = (extra) => ({ bridge: true, layer: 1, half: 4, s: Float64Array.from(xs.map((_, i) => i * 4)), x: Float64Array.from(xs), y: Float64Array.from(xs.map(() => 0)), ...extra });
   const graph = { edges: [edge({ wayId: 1 }), edge({ wayId: 2, movable: 'bascule' }), { bridge: false, s: [0, 1], x: [0, 1], y: [0, 0] }] };
   const { pins, bridges } = lidarPins(graph, { grid, datum: { scale: FT, offset: 2 } }, () => 10, 5);
-  assert.equal(bridges.length, 1);
-  assert.ok(bridges[0].pinned && pins.length >= xs.length - 2);
+  assert.equal(bridges.length, 2);
+  assert.ok(bridges[0].pinned && !bridges[1].pinned && pins.length >= xs.length - 2);
   assert.ok(pins.every(([k, , z]) => k === 0 && Math.abs(z - 13) < 0.3), 'world z (minus minHeight 5)');
+});
+
+test('pins: an unpinned span between two measured ones laid straight between their ends', async () => {
+  const { lidarPins } = await import('../services/lidarDecks.js');
+  const grid = pointGrid([cloud()], (x, y) => [x, y]);
+  // a bridge along x: fixed -48..-12, a bascule in two leaves -12..0..12, fixed 12..48; a stub off the far end unmeasured
+  const edge = (x0, x1, from, to, extra) => {
+    const xs = []; for (let x = x0; x <= x1 + 1e-9; x += 2) xs.push(x);
+    return { bridge: true, layer: 1, half: 4, from, to, s: Float64Array.from(xs.map((x) => x - x0)), x: Float64Array.from(xs), y: Float64Array.from(xs.map(() => 0)), ...extra };
+  };
+  // (the first leaf drawn from the middle out, c to b: walked backwards)
+  const leaf = edge(-12, 0, 'c', 'b', { movable: 'bascule' }); leaf.x = leaf.x.slice().reverse();
+  const edges = [edge(-48, -12, 'a', 'b'), leaf, edge(0, 12, 'c', 'd', { movable: 'bascule' }), edge(12, 48, 'd', 'e'), edge(48, 58, 'e', 'f', { movable: 'lift' })];
+  const nodes = new Map();
+  edges.forEach((e, k) => { for (const [id, end] of [[e.from, 0], [e.to, 1]]) { if (!nodes.has(id)) nodes.set(id, { id, edges: [] }); nodes.get(id).edges.push({ edge: k, end }); } });
+  const { pins, bridges } = lidarPins({ edges, nodes }, { grid, datum: { scale: FT, offset: 2 } }, () => 10, 5);
+  for (const k of [1, 2]) {
+    const mine = pins.filter((p) => p[0] === k);
+    assert.equal(mine.length, edges[k].s.length, `leaf ${k} pinned at every station`);
+    assert.ok(mine.every(([, , z]) => Math.abs(z - 13) < 0.3), `leaf ${k} level with the fixed spans`);
+  }
+  assert.ok(!pins.some((p) => p[0] === 4), 'a span with one measured neighbour keeps its inferred profile');
+  assert.deepEqual(bridges.filter((b) => b.bridged).map((b) => b.k).sort(), [1, 2]);
 });

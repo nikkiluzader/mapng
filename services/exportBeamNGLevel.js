@@ -4850,7 +4850,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       // terrain shaping switched off somewhere: the stations held on their
       // ground, the bridges built as decks wherever they leave it
       if (!allShaping(shaping)) {
-        const plan = shapingPlan(structureGraph, shaping);
+        // (the rim-to-rim line of a plain deck runs through its measured heights)
+        const plan = shapingPlan(structureGraph, shaping, { measured: structureGraph.pins });
         structureGraph.fixed = plan.fixed;
         structureGraph.noCut = plan.noCut;
         // (each plain deck's span, rim to rim, pinned as today's tunnels are)
@@ -6079,7 +6080,7 @@ function shapingReportLines(sh, section) {
   else if (sh.lidar.skipped) lines.push(`- Measured bridge heights (US lidar): not used, ${sh.lidar.skipped}`);
   else {
     const d = sh.lidar.datum;
-    lines.push(`- Measured bridge heights (US lidar, USGS 3DEP ${sh.lidar.dataset}): ${sh.lidar.pinned} of ${sh.lidar.bridges} bridge stretches pinned at ${sh.lidar.stations} measured stations; the rest kept the inferred profile (measured along under 60% of their length, or movable)`);
+    lines.push(`- Measured bridge heights (US lidar, USGS 3DEP ${sh.lidar.dataset}): ${sh.lidar.pinned} of ${sh.lidar.bridges} bridge stretches pinned at ${sh.lidar.stations} stations; ${sh.lidar.bridged ?? 0} more (movable spans, or measured along under 60% of their length) laid straight between measured neighbours, the rest kept the inferred profile`);
     lines.push(`  - Survey: ${sh.lidar.nodes} octree nodes, ${(sh.lidar.bytes / 1e6).toFixed(1)} MB, ${sh.lidar.points} points; tied to the terrain from its ground points: ${d.scale === 1 ? 'metres' : 'feet'}, ${d.offset >= 0 ? '+' : ''}${d.offset.toFixed(2)} m, spread ${d.spread.toFixed(2)} m over ${d.n} samples`);
     if (sh.lidar.partial.length) lines.push(`  - Not pinned (OSM way, stations measured/total): ${sh.lidar.partial.slice(0, 20).join(', ')}${sh.lidar.partial.length > 20 ? ', …' : ''}`);
   }
@@ -11470,6 +11471,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           dataset: lidar.dataset, nodes: lidar.nodes, bytes: lidar.bytes, points: lidar.points, datum: lidar.datum,
           bridges: lidar.result?.bridges?.length ?? 0, pinned: lidar.result?.bridges?.filter((b) => b.pinned).length ?? 0,
           stations: lidar.result?.pins?.length ?? 0,
+          bridged: lidar.result?.bridges?.filter((b) => b.bridged).length ?? 0,
           partial: (lidar.result?.bridges || []).filter((b) => !b.pinned).map((b) => `${b.wayId ?? '?'} ${b.measured}/${b.stations}`),
         }) : null,
         residual: sg?.profile?.residual || null,

@@ -228,7 +228,33 @@ export function deckProfile(grid, line, half, datum, groundAt, { rank = 0, maxGr
     const ok = nb.filter(([z, d]) => Math.abs(z - out[i]) <= maxGrade * d + 0.3).length;
     if (ok < nb.length / 2) clean[i] = NaN;
   }
-  return clean;
+  return longestDeck(clean, s, maxGrade);
+}
+
+// the deck along a profile: its measured stations split where they jump
+// more steeply than maxGrade allows (a stretch seen through an open grating,
+// or the machinery under it), the longest piece kept with every other piece
+// in line with the kept ones; the rest NaN
+function longestDeck(z, s, maxGrade) {
+  const fits = (i, j) => Math.abs(z[j] - z[i]) <= maxGrade * Math.abs(s[j] - s[i]) + 0.3;
+  const pieces = []; let prev = -1;
+  for (let i = 0; i < z.length; i++) {
+    if (!Number.isFinite(z[i])) continue;
+    if (prev < 0 || !fits(prev, i)) pieces.push({ a: i, b: i });
+    else pieces[pieces.length - 1].b = i;
+    prev = i;
+  }
+  if (pieces.length < 2) return z;
+  const len = (p) => s[p.b] - s[p.a];
+  const main = pieces.reduce((a, b) => (len(b) > len(a) ? b : a));
+  const keep = new Set([main]);
+  // outward from the longest: a piece joins when it lines up with the nearest kept station
+  const at = pieces.indexOf(main);
+  for (let j = at + 1, last = main.b; j < pieces.length; j++) if (fits(last, pieces[j].a)) { keep.add(pieces[j]); last = pieces[j].b; }
+  for (let j = at - 1, first = main.a; j >= 0; j--) if (fits(pieces[j].b, first)) { keep.add(pieces[j]); first = pieces[j].a; }
+  const out = new Float64Array(z.length).fill(NaN);
+  for (const p of keep) for (let i = p.a; i <= p.b; i++) out[i] = z[i];
+  return out;
 }
 
 /**
@@ -279,23 +305,95 @@ const MIN_COVER = 0.6;         // a bridge measured at fewer of its stations kee
  * Pins for the structure solver from a survey: every bridge edge of the
  * graph (not a movable span: its survey caught it raised, or saw through its
  * grating) measured at MIN_COVER of its stations or more is pinned where it
- * was measured. survey: { grid, datum }; groundAtAbs(x, y): our ground plus
- * minHeight. Returns { pins: [[k, i, z]] (world z), bridges: [{ k, wayId,
- * stations, measured, pinned, meanLift }] }.
+ * was measured. A run of bridge edges left unpinned (a movable span, one the
+ * survey barely saw) between two pinned ones is pinned on the straight line
+ * between their ends: a closed bascule or lift span lies level with its
+ * approaches, and the inferred profile would sag between measured
+ * neighbours metres higher. survey: { grid, datum }; groundAtAbs(x, y): our
+ * ground plus minHeight. Returns { pins: [[k, i, z]] (world z), bridges:
+ * [{ k, wayId, stations, measured, pinned, meanLift, bridged }] }.
  */
 export function lidarPins(graph, survey, groundAtAbs, minHeight) {
   const pins = []; const bridges = [];
+  const measuredZ = new Map();   // edge -> its stations' measured z (NaN where not), pinned edges only
   graph.edges.forEach((e, k) => {
-    if (!e.bridge || e.tunnel || e.external || e.movable || e.s.length < 2) return;
+    if (!e.bridge || e.tunnel || e.external || e.s.length < 2) return;
+    if (e.movable) { bridges.push({ k, wayId: e.wayId ?? null, stations: e.s.length, measured: 0, pinned: false, meanLift: null }); return; }
     const line = Array.from(e.s, (_, i) => [e.x[i], e.y[i]]);
     const z = deckProfile(survey.grid, line, e.half || 4, survey.datum, groundAtAbs, { rank: Math.max(0, (Number(e.layer) || 1) - 1) });
     let measured = 0; let lift = 0;
     for (let i = 0; i < z.length; i++) if (Number.isFinite(z[i])) { measured++; lift += z[i] - groundAtAbs(line[i][0], line[i][1]); }
     const pinned = measured >= MIN_COVER * z.length;
-    if (pinned) for (let i = 0; i < z.length; i++) if (Number.isFinite(z[i])) pins.push([k, i, z[i] - minHeight]);
+    if (pinned) {
+      for (let i = 0; i < z.length; i++) if (Number.isFinite(z[i])) pins.push([k, i, z[i] - minHeight]);
+      measuredZ.set(k, z);
+    }
     bridges.push({ k, wayId: e.wayId ?? null, stations: z.length, measured, pinned, meanLift: measured ? lift / measured : null });
   });
+  for (const b of bridgeUnpinnedRuns(graph, bridges, measuredZ)) pins.push(...b.map(([k, i, z]) => [k, i, z - minHeight]));
   return { pins, bridges };
+}
+
+// a pinned edge walked in from the end touching a node to its first
+// measured station: { z, tail: [[k, i]] the unmeasured stations before it,
+// in order from the node }, or null
+function endZ(graph, k, end, measuredZ) {
+  const z = measuredZ.get(k); const n = z.length; const tail = [];
+  for (let j = 0; j < n; j++) {
+    const i = end === 0 ? j : n - 1 - j;
+    if (Number.isFinite(z[i])) return { z: z[i], tail };
+    tail.push([k, i]);
+  }
+  return null;
+}
+
+// runs of unpinned bridge edges through nodes they pass straight through,
+// each closed at both ends by a pinned bridge edge: [[k, i, zWorld]] per
+// run, its stations on the straight line between the measured stations
+// nearest it (the pinned edges' unmeasured ends included)
+function bridgeUnpinnedRuns(graph, bridges, measuredZ) {
+  const unpinned = new Set(bridges.filter((b) => !b.pinned).map((b) => b.k));
+  if (!unpinned.size || !measuredZ.size || !graph.nodes) return [];
+  const nodeOf = (id) => (graph.nodes.get ? graph.nodes.get(id) : graph.nodes[id]);
+  const isBridge = (k) => { const e = graph.edges[k]; return e.bridge && !e.tunnel && !e.external; };
+  const seen = new Set(); const out = [];
+  for (const k0 of unpinned) {
+    if (seen.has(k0)) continue;
+    // walk both ways from k0: [k, forward] in order, and what closes each end
+    const run = [[k0, true]]; seen.add(k0);
+    const ends = [null, null];
+    for (const dir of [0, 1]) {
+      let k = k0; let node = dir === 0 ? graph.edges[k0].from : graph.edges[k0].to;
+      for (;;) {
+        const others = (nodeOf(node)?.edges || []).filter((r) => r.edge !== k && isBridge(r.edge));
+        if (others.length !== 1) break;
+        const { edge: next, end } = others[0];
+        if (measuredZ.has(next)) { ends[dir] = endZ(graph, next, end, measuredZ); break; }
+        if (!unpinned.has(next) || seen.has(next)) break;
+        seen.add(next);
+        const forward = dir === 0 ? end === 1 : end === 0;
+        if (dir === 0) run.unshift([next, forward]); else run.push([next, forward]);
+        k = next; node = end === 0 ? graph.edges[next].to : graph.edges[next].from;
+      }
+    }
+    if (!ends[0] || !ends[1]) continue;
+    // the stations in order, start to end: the first end's tail (walked back
+    // toward its measured station), the run, the second end's tail
+    const order = [...ends[0].tail.slice().reverse()];
+    for (const [k, fwd] of run) { const n = graph.edges[k].s.length; for (let j = 0; j < n; j++) order.push([k, fwd ? j : n - 1 - j]); }
+    order.push(...ends[1].tail);
+    const dist = [0];
+    for (let j = 1; j < order.length; j++) {
+      const [k1, i1] = order[j - 1]; const [k2, i2] = order[j];
+      dist.push(dist[j - 1] + Math.hypot(graph.edges[k2].x[i2] - graph.edges[k1].x[i1], graph.edges[k2].y[i2] - graph.edges[k1].y[i1]));
+    }
+    // (the measured stations sit one station step beyond each end)
+    const step = (j) => (order.length > 1 ? dist[1] - dist[0] : 0) * j;
+    const total = dist[dist.length - 1] + 2 * step(1);
+    out.push(order.map(([k, i], j) => [k, i, ends[0].z + (ends[1].z - ends[0].z) * ((dist[j] + step(1)) / total)]));
+    for (const [k] of run) { const b = bridges.find((x) => x.k === k); if (b) b.bridged = true; }
+  }
+  return out;
 }
 
 /**
