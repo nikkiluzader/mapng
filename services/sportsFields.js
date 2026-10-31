@@ -53,7 +53,7 @@ const SURFACE_OF = {
 // surfaces that lie on the ground (the rest are a flat slab)
 const ON_GROUND = new Set(['grass', 'turf', 'sand', 'dirt', 'gravel', 'tartan']);   // (a track is graded to the ground's lie, not a raised slab)
 const LOOK = {
-  grass: ['turf', [0.62, 0.82, 0.5]], turf: ['turf', [0.46, 0.72, 0.4]], clay: ['dirt', [0.95, 0.55, 0.38]], sand: ['sand', [1, 0.96, 0.88]],
+  grass: ['turf', [0.52, 0.72, 0.42]], turf: ['turf', [0.44, 0.68, 0.38]], clay: ['dirt', [0.95, 0.55, 0.38]], sand: ['sand', [1, 0.96, 0.88]],
   dirt: ['dirt', [0.85, 0.66, 0.5]], gravel: ['dirt', [0.82, 0.78, 0.72]], asphalt: ['roofFlat', [0.55, 0.55, 0.56]],
   concrete: ['smoothConcrete', [0.82, 0.82, 0.8]], hard: ['smoothConcrete', [0.36, 0.55, 0.42]], tartan: ['smoothConcrete', [0.66, 0.24, 0.18]],
 };
