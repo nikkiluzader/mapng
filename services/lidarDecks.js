@@ -150,7 +150,7 @@ export function pointGrid(clouds, toLocal, cell = 2) {
  * leaves the smaller spread. demAt(x, y): our ground (world z). Returns
  * { scale, offset, spread, n } or null with too few points.
  */
-export function fitDatum(grid, samples, demAt, { radius = 3, minPoints = 30 } = {}) {
+export function fitDatum(grid, samples, demAt, { radius = 3, minPoints = 20 } = {}) {
   const pairs = [];
   for (const [x, y] of samples) {
     const zs = [];
@@ -238,12 +238,14 @@ export function deckProfile(grid, line, half, datum, groundAt, { rank = 0, maxGr
  * compact dataset list; fetchImpl, lp (laz-perf instance). Returns
  * { dataset, grid, nodes, bytes } or null.
  */
-export async function fetchSurvey({ lines, toGeo, toLocal, zAbs, index, fetchImpl = fetch, lp, maxNodes = 400, onProgress = () => {} }) {
+export async function fetchSurvey({ lines, toGeo, toLocal, zAbs, index, fetchImpl = fetch, lp, maxNodes = 400, onProgress = () => {}, exclude = [] }) {
   if (!lines.length) return null;
   const mid = lines[0].pts[Math.floor(lines[0].pts.length / 2)];
   const [lat, lng] = toGeo(mid[0], mid[1]);
   const candidates = datasetsAt(index, lat, lng);
-  for (const ds of candidates.slice(0, 3)) {
+  // (the index holds bounding boxes: several surveys may claim a place only one covers; one with no octree
+  // nodes along the bridges costs a couple of small reads)
+  for (const ds of candidates.filter((d) => !exclude.includes(d.name)).slice(0, 12)) {
     const base = `${EPT_BASE}/${ds.name}`;
     const getJson = async (p) => { const r = await fetchImpl(`${base}/${p}`); return r.ok ? r.json() : null; };
     const ept = await getJson('ept.json');
@@ -253,6 +255,7 @@ export async function fetchSurvey({ lines, toGeo, toLocal, zAbs, index, fetchImp
     // (heights in the survey's units unknown before the fit: a band wide enough for metres or feet)
     const band = [Math.min(zAbs[0], zAbs[0] / FEET) - 30, Math.max(zAbs[1], zAbs[1] / FEET) + 30];
     const keys = (await nodesAlong(ept, getJson, merc, band)).slice(0, maxNodes);
+    if (!keys.length) continue;
     const clouds = []; let bytes = 0;
     for (let k = 0; k < keys.length; k++) {
       onProgress(k, keys.length);
@@ -306,12 +309,21 @@ export async function prepareSurvey({ bridgeLines, toGeo, toLocal, demAtAbs, zAb
   const mid = bridgeLines[0].pts[0];
   const [lat, lng] = toGeo(mid[0], mid[1]);
   if (!datasetsAt(provider.index, lat, lng).length) return { skipped: 'no survey here (USGS 3DEP covers the US)' };
-  const sv = await fetchSurvey({ lines: bridgeLines, toGeo, toLocal, zAbs, index: provider.index, fetchImpl: provider.fetchImpl, lp: provider.lp, onProgress });
-  if (!sv) return { skipped: 'no survey points along the bridges' };
+  // (a dataset's index entry is its bounding box: one that doesn't reach the bridges, or can't be tied to the
+  // terrain, gives way to the next)
   const samples = [];
-  for (const { pts } of bridgeLines) for (let i = 0; i < pts.length; i += 3) for (const [dx, dy] of [[15, 0], [-15, 0], [0, 15], [0, -15]]) samples.push([pts[i][0] + dx, pts[i][1] + dy]);
-  const datum = fitDatum(sv.grid, samples, demAtAbs);
-  if (!datum) return { skipped: `too few ground points to tie the survey to the terrain (${sv.dataset})` };
-  if (datum.spread > 0.5) return { skipped: `the survey disagrees with the terrain by ${datum.spread.toFixed(2)} m (${sv.dataset})` };
-  return { grid: sv.grid, datum, dataset: sv.dataset, nodes: sv.nodes, bytes: sv.bytes, points: sv.grid.count };
+  // (every station, 10 / 18 / 26 m off each way: a short bridge still finds its ground)
+  for (const { pts } of bridgeLines) for (const [x, y] of pts) for (const r of [10, 18, 26]) for (const [dx, dy] of [[r, 0], [-r, 0], [0, r], [0, -r]]) samples.push([x + dx, y + dy]);
+  const tried = []; let last = 'no survey points along the bridges';
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const sv = await fetchSurvey({ lines: bridgeLines, toGeo, toLocal, zAbs, index: provider.index, fetchImpl: provider.fetchImpl, lp: provider.lp, onProgress, exclude: tried });
+    if (!sv) break;
+    tried.push(sv.dataset);
+    const datum = fitDatum(sv.grid, samples, demAtAbs);
+    if (!datum) { last = `too few ground points to tie the survey to the terrain (${tried.join(', ')})`; continue; }
+    if (datum.spread > 0.5) { last = `the survey disagrees with the terrain by ${datum.spread.toFixed(2)} m (${sv.dataset})`; continue; }
+    return { grid: sv.grid, datum, dataset: sv.dataset, nodes: sv.nodes, bytes: sv.bytes, points: sv.grid.count, tried };
+  }
+  return { skipped: last };
 }
+
