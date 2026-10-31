@@ -8,7 +8,7 @@ const part = (x0, x1, y, z, extra = {}) => {
   return { xy, z: xy.map(() => z), half: 4, ...extra };
 };
 const flat = () => 0;
-const builder = () => ({ pos: [], uv: [], quad(a, b, c, d) { this.pos.push(...a, ...b, ...c, ...a, ...c, ...d); this.uv.push(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0); } });
+const builder = () => ({ pos: [], uv: [], tri(a, b, c) { this.pos.push(...a, ...b, ...c); this.uv.push(0, 0, 0, 0, 0, 0); }, quad(a, b, c, d) { this.tri(a, b, c); this.tri(a, c, d); } });
 
 test('paint and type from tags', () => {
   assert.equal(paintOf(''), 'grey');
@@ -72,4 +72,141 @@ test('stone arches under a low canal bridge: built, from the water up to just un
   const g = buildStyleGeometry(deck, { groundAt: flat, newBuilder: builder });
   assert.ok(g.stone.pos.length > 0, 'the vault and its spandrels');
   for (let i = 2; i < g.stone.pos.length; i += 3) assert.ok(g.stone.pos[i] <= 2.6 + 1e-6, 'nothing over the road');
+});
+
+test('a cable-stayed span: no pylon leg or stay low over the deck lanes (sampled along every member)', async () => {
+  const { linkCrossings } = await import('../services/bridgeStyles.js');
+  const p = part(0, 160, 0, 15, { structure: 'cable-stayed', half: 8 });
+  const deck = { parts: [p] };
+  styleDecks([deck], { groundAt: flat });
+  linkCrossings([deck]);
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const g = buildStyleGeometry(deck, { groundAt: flat, newBuilder: segBuilder });
+  assert.ok(g.cable.segments.length > 0 && g.concrete.segments.length > 0);
+  // the lanes: |y| under the half width, 0..6.5 m over the road (a member's own width counted)
+  for (const b of [g.cable, g.concrete]) {
+    for (const [a, c, w] of b.segments) {
+      for (let t = 0; t <= 1.0001; t += 0.02) {
+        const y = a[1] + (c[1] - a[1]) * t; const z = a[2] + (c[2] - a[2]) * t;
+        const inner = b === g.cable ? 8 - 1 : 8;   // a stay may cross the outermost metre (the edge strip) low
+        if (Math.abs(y) < inner + w / 2 && z > 15 && z < 15 + 6.5) assert.fail(`a member over the lanes at y ${y.toFixed(2)}, z ${z.toFixed(2)}`);
+      }
+    }
+  }
+});
+
+test('a crossing of two decks side by side: one pylon, nothing low over either deck\'s lanes', async () => {
+  const { linkCrossings } = await import('../services/bridgeStyles.js');
+  const main = { parts: [part(0, 200, 0, 15, { structure: 'cable-stayed', half: 8 })] };
+  const side = { parts: [part(20, 180, -14, 15, { structure: 'cable-stayed', half: 4 })] };
+  styleDecks([main, side], { groundAt: flat });
+  assert.equal(linkCrossings([main, side]), 1);
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const gs = [main, side].map((d) => buildStyleGeometry(d, { groundAt: flat, newBuilder: segBuilder }));
+  assert.equal(gs[1].concrete.segments.length + gs[1].cable.segments.length, 0, 'the side deck draws no pylon of its own');
+  const lanes = [[0, 8], [-14, 4]];
+  for (const b of [gs[0].cable, gs[0].concrete]) {
+    for (const [a, c, w] of b.segments) {
+      for (let t = 0; t <= 1.0001; t += 0.02) {
+        const y = a[1] + (c[1] - a[1]) * t; const z = a[2] + (c[2] - a[2]) * t;
+        for (const [cy, h] of lanes) if (Math.abs(y - cy) < h - (b === gs[0].cable ? 1 : 0) + w / 2 && z > 15 && z < 15 + 6.5) assert.fail(`over the lanes of the deck at y ${cy}: y ${y.toFixed(2)}, z ${z.toFixed(2)}`);
+      }
+    }
+  }
+});
+
+test('pylon legs keep out of a plain deck alongside (higher) and a road under the bridge', async () => {
+  const { linkCrossings } = await import('../services/bridgeStyles.js');
+  const main = { parts: [part(0, 200, 0, 15, { structure: 'cable-stayed', half: 8 })] };
+  const ramp = { parts: [part(0, 200, -20, 18, { half: 9 })] };          // a ramp 3 m higher, no type
+  const low = { parts: [part(0, 200, 13, 8, { half: 3 })] };             // a ramp lower down right beside: the east leg steps past it
+  const road = { xy: [[0, -40], [200, -40]], half: 4 };                   // a street under the west side
+  styleDecks([main, ramp, low], { groundAt: flat });
+  linkCrossings([main, ramp, low], { roads: [road] });
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const g = buildStyleGeometry(main, { groundAt: flat, newBuilder: segBuilder });
+  const lanes = [[0, 8, 15], [-20, 9, 18], [-40, 4, 0], [13, 3, 8]];   // centre, half, road height
+  for (const b of [g.cable, g.concrete]) {
+    for (const [a, c, w] of b.segments) {
+      for (let t = 0; t <= 1.0001; t += 0.02) {
+        const y = a[1] + (c[1] - a[1]) * t; const z = a[2] + (c[2] - a[2]) * t;
+        for (const [cy, h, zr] of lanes) {
+          const strip = b === g.cable && cy === 0 ? 1 : 0;
+          if (Math.abs(y - cy) < h - strip + w / 2 && z > zr - 1 && z < zr + 6.5) assert.fail(`in the lanes at y ${cy}: y ${y.toFixed(2)}, z ${z.toFixed(2)}`);
+        }
+      }
+    }
+  }
+});
+
+test('stays never land between two flush decks without a barrier: they land on one', async () => {
+  const { linkCrossings } = await import('../services/bridgeStyles.js');
+  const main = { parts: [part(0, 200, 0, 15, { structure: 'cable-stayed', half: 8 })] };
+  const flushDeck = { parts: [part(0, 200, -13, 15, { half: 4.2 })] };   // edge to edge with the main deck
+  styleDecks([main, flushDeck], { groundAt: flat });
+  linkCrossings([main, flushDeck]);
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const g = buildStyleGeometry(main, { groundAt: flat, newBuilder: segBuilder });
+  // the west stays' feet: on the barrier's top (1.1 m over the road), the barrier drawn under them
+  const feet = g.cable.segments.map(([a]) => a).filter((a) => a[1] < 0);
+  assert.ok(feet.length > 4);
+  for (const f of feet) assert.ok(Math.abs(f[2] - 16.1) < 1e-6, `a stay landing at z ${f[2]}`);
+  const barrier = g.concrete.segments.filter(([a, c, w, h]) => w === 0.45 && a[1] < 0);
+  assert.ok(barrier.length > 20, `a barrier along the west edge: ${barrier.length}`);
+  assert.equal(g.concrete.segments.filter(([a, c, w]) => w === 0.45 && a[1] > 0).length, 0, 'none on the open east edge');
+});
+
+test('a suspension span: towers clear of a ramp alongside, cables and hangers only over the deck edges', async () => {
+  const { linkCrossings } = await import('../services/bridgeStyles.js');
+  const main = { parts: [part(0, 400, 0, 20, { structure: 'suspension', half: 8 })] };
+  const ramp = { parts: [part(0, 400, -14, 20, { half: 4 })] };   // flush on the west edge
+  styleDecks([main, ramp], { groundAt: flat });
+  linkCrossings([main, ramp]);
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const g = buildStyleGeometry(main, { groundAt: flat, newBuilder: segBuilder });
+  assert.ok(g.cable.segments.length > 30);
+  const lanes = [[0, 8], [-14, 4]];
+  for (const b of [g.cable, g.concrete, g.steel]) {
+    for (const [a, c, w] of b.segments) {
+      for (let t = 0; t <= 1.0001; t += 0.05) {
+        const y = a[1] + (c[1] - a[1]) * t; const z = a[2] + (c[2] - a[2]) * t;
+        for (const [cy, h] of lanes) if (Math.abs(y - cy) < h + w / 2 - 0.01 && z > 20 && z < 26.5) assert.fail(`over the lanes at y ${cy}: y ${y.toFixed(2)} z ${z.toFixed(2)}`);
+      }
+    }
+  }
+});
+
+test('a higher deck overlapping the edge: the stays land where the main deck is open, never under it', async () => {
+  const { linkCrossings } = await import('../services/bridgeStyles.js');
+  const main = { parts: [part(0, 200, 0, 15, { structure: 'cable-stayed', half: 8 })] };
+  const over = { parts: [part(0, 200, -14, 16.8, { half: 7 })] };   // its surface from y -21.4 to -6.6, 1.8 m higher
+  styleDecks([main, over], { groundAt: flat });
+  linkCrossings([main, over]);
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const g = buildStyleGeometry(main, { groundAt: flat, newBuilder: segBuilder });
+  const feet = g.cable.segments.map(([a]) => a).filter((a) => a[1] < 0);
+  assert.ok(feet.length > 4);
+  for (const f of feet) assert.ok(f[1] > -6.6 && f[1] < -5, `a stay's foot at y ${f[1].toFixed(2)}`);
+  // and nothing in the higher deck's lanes
+  for (const b of [g.cable, g.concrete]) {
+    for (const [a, c, w] of b.segments) {
+      for (let t = 0; t <= 1.0001; t += 0.02) {
+        const y = a[1] + (c[1] - a[1]) * t; const z = a[2] + (c[2] - a[2]) * t;
+        if (Math.abs(y + 14) < 7 + w / 2 - 0.4 && z > 16.8 && z < 16.8 + 6.5) assert.fail(`in the higher deck's lanes: y ${y.toFixed(2)} z ${z.toFixed(2)}`);
+      }
+    }
+  }
+});
+
+test('a neighbour widened at a join (its drawn half widths, not its lanes\' half) still keeps the stays off it', async () => {
+  const { linkCrossings } = await import('../services/bridgeStyles.js');
+  const main = { parts: [part(0, 200, 0, 15, { structure: 'cable-stayed', half: 8 })] };
+  const over = part(0, 200, -14, 16.3, { half: 4 });
+  over.halfL = over.xy.map(() => 7); over.halfR = over.xy.map(() => 7);   // drawn out to y -6.6
+  styleDecks([main, { parts: [over] }], { groundAt: flat });
+  linkCrossings([main, { parts: [over] }]);
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const g = buildStyleGeometry(main, { groundAt: flat, newBuilder: segBuilder });
+  const feet = g.cable.segments.map(([a]) => a).filter((a) => a[1] < 0);
+  for (const f of feet) assert.ok(f[1] > -6.6, `a stay's foot under the widened deck at y ${f[1].toFixed(2)}`);
 });

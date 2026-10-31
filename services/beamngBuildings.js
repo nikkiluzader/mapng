@@ -842,6 +842,8 @@ function roofUnderside(m, P, { hl, hw, rl, rise, eaveDrop, hipped }) {
 const MESH_BATCH = 400;
 export const BUILDING_TILE_M = 256;
 const PARAPET_H = PARAPET.h;  // (a nave's roof sits on the parapet's height)
+const BRIDGE_PART_MAN_MADE = new Set(['pier', 'bridge']);
+const BRIDGE_PART_BUILDINGS = new Set(['bridge', 'bridge_structure']);
 const SKIRT_SLOPE_M = 1;       // ground falling more than this under a footprint: the walls carry on SKIRT_M under its lowest corner
 const SKIRT_M = 3;
 const SHOP_STREET_M = 20;      // a shop's wall this near a street gets its shopfronts
@@ -1301,6 +1303,10 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (area < 4) { stats.skipped.tiny++; continue; }
     const tags = f.tags || {};
     if (area > MAX_AREA_M2 && !INDUSTRIAL_CLASSES.has(tags.building) && !BIG_BOX_CLASSES.has(tags.building)) { stats.skipped.oversize++; continue; }
+    // a bridge's pier or tower mapped as a building (the Zakim's 98 m pylon:
+    // building=tower + man_made=pier stood as an office tower in the roadway):
+    // the bridge builder draws its piers and the bridge styles its towers
+    if (BRIDGE_PART_MAN_MADE.has(tags.man_made) || BRIDGE_PART_BUILDINGS.has(tags.building)) { stats.skipped.bridgeParts = (stats.skipped.bridgeParts || 0) + 1; continue; }
     const holes = (f.holes || []).map((h) => {
       let hr = cleanRing(h.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]));
       if (hr.length >= 3 && signedArea(hr) > 0) hr = hr.reverse();

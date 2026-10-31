@@ -93,8 +93,22 @@ function along(part, s, off = 0, sArr = arcs(part.xy)) {
   return [xy[j][0] + (xy[j + 1][0] - xy[j][0]) * f - uy * off, xy[j][1] + (xy[j + 1][1] - xy[j][1]) * f + ux * off, z[j] + (z[j + 1] - z[j]) * f];
 }
 
+/**
+ * A part's drawn half width on side k (0: its left, 1: its right) at arc length s: part.halfL / halfR per
+ * point when set (deckEdges: decks widen where they join and fork), else part.half.
+ */
+function sideHalf(part, sArr, s, k) {
+  const arr = k === 0 ? part.halfL : part.halfR;
+  if (!arr) return part.half;
+  let j = 0;
+  while (j < sArr.length - 2 && sArr[j + 1] < s) j++;
+  const f = Math.max(0, Math.min(1, (s - sArr[j]) / Math.max(1e-9, sArr[j + 1] - sArr[j])));
+  return arr[j] + (arr[j + 1] - arr[j]) * f;
+}
+
 /** A beam (box) between points p and q, `w` wide (horizontal, across) and `h` tall. */
-export function beam(b, p, q, w, h) {
+export function beam(b, p, q, w, h, across = null) {
+  if (b.segments) b.segments.push([p, q, w, h]);   // (for checks: members as segments)
   const d = [q[0] - p[0], q[1] - p[1], q[2] - p[2]];
   const L = Math.hypot(...d);
   if (L < 1e-6) return;
@@ -102,7 +116,8 @@ export function beam(b, p, q, w, h) {
   // across: horizontal, perpendicular to the beam (a vertical beam: along x)
   let a = [-u[1], u[0], 0];
   const al = Math.hypot(a[0], a[1]);
-  a = al < 1e-6 ? [1, 0, 0] : [a[0] / al, a[1] / al, 0];
+  // (a vertical beam faces `across` when given, else x: a leg turned like the leaning leg it meets)
+  a = al < 1e-6 ? (across ? [across[0], across[1], 0] : [1, 0, 0]) : [a[0] / al, a[1] / al, 0];
   // up: perpendicular to both
   const v = [u[1] * a[2] - u[2] * a[1], u[2] * a[0] - u[0] * a[2], u[0] * a[1] - u[1] * a[0]];
   const c = (pt, sa, sv) => [pt[0] + a[0] * sa * w / 2 + v[0] * sv * h / 2, pt[1] + a[1] * sa * w / 2 + v[1] * sv * h / 2, pt[2] + a[2] * sa * w / 2 + v[2] * sv * h / 2];
@@ -447,7 +462,7 @@ const CROSSING_M = 45;        // cable / suspension decks this close side by sid
  * leads (deck.style.crossing = { decks, lead }); the others draw nothing of their own (their piers still
  * left out). Call after styleDecks.
  */
-export function linkCrossings(decks) {
+export function linkCrossings(decks, { roads = [] } = {}) {
   const cs = decks.filter((d) => d.style && (d.style.type === 'cable' || d.style.type === 'suspension'));
   const longest = (d) => Math.max(...d.style.spans.map((sp) => sp.s1 - sp.s0));
   const near = (a, b) => a.parts.some((p) => p.xy.some(([x, y]) => b.parts.some((q) => q.xy.some(([u, v]) => Math.hypot(u - x, v - y) < CROSSING_M))));
@@ -458,7 +473,16 @@ export function linkCrossings(decks) {
   }
   for (const g of groups) {
     const lead = g.reduce((a, b) => (longest(b) > longest(a) ? b : a));
-    for (const d of g) d.style.crossing = { decks: g, lead };
+    // what a tower's legs must keep out of: every deck's lanes (styled or not: a ramp alongside) and the
+    // ground roads under the crossing
+    const obstacles = [
+      ...decks.filter((d) => d !== lead).flatMap((d) => d.parts.map((p) => ({
+        xy: p.xy, z: p.z, half: p.half,
+        halfs: p.halfL ? p.xy.map((_, i) => Math.max(p.halfL[i], p.halfR[i])) : null,
+      }))),
+      ...roads.map((r) => ({ xy: r.xy, z: null, half: r.half, halfs: null })),
+    ];
+    for (const d of g) d.style.crossing = { decks: g, lead, obstacles };
   }
   return groups.length;
 }
@@ -484,80 +508,216 @@ function nearestS(part, sArr, x, y) {
 }
 
 /**
- * At station s of the lead's span: the crossing's two outer deck edges, [{ deck span, s on it, off (its
- * outer edge's offset on its own part: + left / - right) }, ...] (left, right), and the legs' points.
+ * The lead deck's two edges at station s of its span, with the legs' feet just outside them, stepped out
+ * past any other deck of the crossing right beside (a leg never stands in a lane). Returns { P, n, feet:
+ * [left, right] ground points, edges: [left, right] offsets on the lead's part, zDeck }.
  */
-function crossingEdges(crossing, lead, s) {
+function leadEdges(crossing, lead, s) {
   const P = along(lead.part, s, 0, lead.sArr);
   const Q = along(lead.part, Math.min(lead.sArr.at(-1), s + 1), 0, lead.sArr);
   const ul = Math.hypot(Q[0] - P[0], Q[1] - P[1]) || 1;
   const n = [-(Q[1] - P[1]) / ul, (Q[0] - P[0]) / ul];
-  let left = null; let right = null;
-  for (const d of crossing.decks) {
-    const m = d === lead.deck ? lead : { ...mainSpan(d), deck: d };
-    const sd = nearestS(m.part, m.sArr, P[0], P[1]);
-    const c = along(m.part, sd, 0, m.sArr);
-    const lat = (c[0] - P[0]) * n[0] + (c[1] - P[1]) * n[1];
-    // which of this deck's edges faces out (its own left may be the crossing's right)
-    const c2 = along(m.part, Math.min(m.sArr.at(-1), sd + 1), 0, m.sArr);
-    const same = ((c2[0] - c[0]) * (Q[0] - P[0]) + (c2[1] - c[1]) * (Q[1] - P[1])) >= 0 ? 1 : -1;
-    const edge = m.part.half + PARAPET_W_M + SIDE_GAP_M;
-    if (!left || lat + edge > left.lat) left = { m, sd, off: same * edge, lat: lat + edge, dirSign: same };
-    if (!right || lat - edge < right.lat) right = { m, sd, off: -same * edge, lat: lat - edge, dirSign: same };
+  const edgeOf = (side) => sideHalf(lead.part, lead.sArr, s, side > 0 ? 0 : 1) + PARAPET_W_M;
+  // along the line across the lead deck here: where another deck or a ground road lies (with its height,
+  // null for the ground's), sampled every half metre out to REACH_M each side
+  const REACH_M = 70; const STEP = 0.5;
+  const blockedAt = (lat) => obstacleAt(crossing.obstacles || [], P[0] + n[0] * lat, P[1] + n[1] * lat);
+  const feet = []; const knees = [];
+  for (const side of [1, -1]) {
+    // the foot: the first spot out from the deck's edge where a whole leg stands clear of everything
+    const edge = edgeOf(side);
+    const first = edge + LEG[0] / 2 + 0.4;
+    let lat = first; let zOver = P[2];
+    const clear = (l) => [-1, 0, 1].every((k) => !blockedAt(side * (l + (k * LEG[0]) / 2)));
+    while (lat < edge + REACH_M && !clear(lat)) lat += STEP;
+    if (lat >= edge + REACH_M) lat = first;   // (nowhere clear: at the edge, as a single deck's)
+    // the decks the leaning leg passes over on its way in: its knee over the highest one's headroom
+    for (let l = edge; l < lat; l += STEP) { const h = blockedAt(side * l); if (h?.z != null) zOver = Math.max(zOver, h.z); }
+    feet.push([P[0] + n[0] * side * lat, P[1] + n[1] * side * lat]);
+    knees.push(zOver + ARCH_HEADROOM_M + 0.5);
   }
-  const leg = (lat) => [P[0] + n[0] * (lat + Math.sign(lat || 1) * 0.8), P[1] + n[1] * (lat + Math.sign(lat || 1) * 0.8), P[2]];
-  return { left, right, legs: [leg(left.lat), leg(right.lat)], zDeck: P[2] };
+  // whether a strut between the feet at height z leaves headroom over everything under it (a ramp or a
+  // street beneath the deck)
+  const strutClear = (z, groundAt) => {
+    const lats = feet.map((f) => (f[0] - P[0]) * n[0] + (f[1] - P[1]) * n[1]);
+    for (let l = Math.min(...lats); l <= Math.max(...lats); l += STEP) {
+      if (Math.abs(l) < edgeOf(l)) continue;   // (under the lead deck itself)
+      const h = blockedAt(l);
+      if (!h) continue;
+      const zr = h.z ?? groundAt(P[0] + n[0] * l, P[1] + n[1] * l);
+      if (zr > z - 1 - ARCH_HEADROOM_M) return false;
+    }
+    return true;
+  };
+  return { P, n, feet, knees, strutClear, edges: [edgeOf(1), -edgeOf(-1)], zDeck: P[2] };
 }
 
-/** A tower at a crossing station: two legs from the ground to `top` outside the outer decks, cross beams. */
-function crossingTower(b, legs, zDeck, top, groundAt) {
-  const mid = [(legs[0][0] + legs[1][0]) / 2, (legs[0][1] + legs[1][1]) / 2];
-  const tops = legs.map((p) => {
-    const g = groundAt(p[0], p[1]);
-    const L = Math.hypot(mid[0] - p[0], mid[1] - p[1]) || 1;
-    const lean = Math.min(1.5, L * 0.12);
-    const t = [p[0] + ((mid[0] - p[0]) / L) * lean, p[1] + ((mid[1] - p[1]) / L) * lean, top];
-    beam(b, [p[0], p[1], g - 1], t, LEG[0], LEG[1]);
-    return t;
-  });
-  for (const z of [Math.max(zDeck + ARCH_HEADROOM_M + 2.5, zDeck + (top - zDeck) * 0.55), top - 1.5]) {
-    const f = (z - (groundAt(legs[0][0], legs[0][1]) - 1)) / (top - (groundAt(legs[0][0], legs[0][1]) - 1));
-    const at = (k) => [legs[k][0] + (tops[k][0] - legs[k][0]) * f, legs[k][1] + (tops[k][1] - legs[k][1]) * f, z];
-    beam(b, at(0), at(1), XBEAM[0], XBEAM[1]);
+const EDGE_STRIP_M = 1;       // a stay may pass low over a lane's outermost metre (the edge line's strip), no further in
+
+/**
+ * The lowest height over the deck a stay from the deck's edge (edgeLat out from the centre) may leave the
+ * pylon at its centre line and still pass over the lanes (half wide) only above their headroom or over
+ * their outermost metre.
+ */
+export const stayAnchorMin = (half, edgeLat) => ARCH_HEADROOM_M * edgeLat / Math.max(0.3, edgeLat - (half - EDGE_STRIP_M));
+
+/**
+ * An inverted-Y pylon (the Zakim's): each leg rises plumb from the ground outside the deck's edge past the
+ * lanes' headroom (never over a lane below it), then leans in to a junction high over the lanes; one
+ * column on to the top. Returns { anchor(k, z): where leg k's plane of stays meets the pylon at height z
+ * (its upper leg under the junction, beside the column over it), zJ, top }.
+ */
+function invertedY(b, feet, kneeZ, P, n, zDeck, H, groundAt, strutClear = () => true) {
+  const top = zDeck + H;
+  const zJ = Math.max(Math.max(...kneeZ) + 10, zDeck + H * 0.6);
+  const J = [P[0], P[1], zJ];
+  const knees = feet.map((f, k) => [f[0], f[1], kneeZ[k]]);
+  const ac = [-n[1], n[0]];   // across a leg: along the bridge
+  feet.forEach((f, k) => beam(b, [f[0], f[1], groundAt(f[0], f[1]) - 1], [f[0], f[1], kneeZ[k] + 0.8], LEG[0], LEG[1], ac));
+  for (const k of knees) {
+    // the leaning leg starts inside a collar at the knee (two beams meeting at an angle leave a step)
+    const d = [J[0] - k[0], J[1] - k[1], J[2] - k[2]]; const L = Math.hypot(...d);
+    beam(b, [k[0] - (d[0] / L) * 0.8, k[1] - (d[1] / L) * 0.8, k[2] - (d[2] / L) * 0.8], J, LEG[0], LEG[1]);
+    beam(b, [k[0], k[1], k[2] - 1.4], [k[0], k[1], k[2] + 1.6], LEG[0] * 1.35, LEG[1] * 1.25, ac);
   }
-  return tops;
+  beam(b, J, [P[0], P[1], top], LEG[0] * 1.1, LEG[1] * 1.1, ac);
+  // a pointed cap (a flat-cut column top looked unfinished)
+  {
+    const hw = (LEG[0] * 1.1) / 2; const hh = (LEG[1] * 1.1) / 2;
+    const c = (sa, sv) => [P[0] + ac[0] * sa * hw + n[0] * sv * hh, P[1] + ac[1] * sa * hw + n[1] * sv * hh, top];
+    const apex = [P[0], P[1], top + 5];
+    const ring = [c(-1, -1), c(1, -1), c(1, 1), c(-1, 1)];
+    for (let i = 0; i < 4; i++) {
+      const p0 = ring[i]; const p1 = ring[(i + 1) % 4];
+      const mx = (p0[0] + p1[0]) / 2 - P[0]; const my = (p0[1] + p1[1]) / 2 - P[1]; const ml = Math.hypot(mx, my) || 1;
+      b.tri(p0, p1, apex, [mx / ml, my / ml, 0.5]);
+    }
+  }
+  // a strut under the deck between the plumb legs, where the ground leaves room
+  const fz = zDeck - 2.6;
+  if (fz - Math.max(...feet.map((f) => groundAt(f[0], f[1]))) > 3 && strutClear(fz, groundAt)) beam(b, [feet[0][0], feet[0][1], fz], [feet[1][0], feet[1][1], fz], XBEAM[0], XBEAM[1]);
+  const anchor = (k, z) => {
+    if (z < zJ) { const f = Math.max(0, (z - kneeZ[k]) / (zJ - kneeZ[k])); return [knees[k][0] + (J[0] - knees[k][0]) * f, knees[k][1] + (J[1] - knees[k][1]) * f, z]; }
+    const o = k === 0 ? 0.6 : -0.6;
+    return [P[0] + n[0] * o, P[1] + n[1] * o, z];
+  };
+  // the height where leg k has come in over a lateral `lat` from the centre (its stays leave it no lower:
+  // further out, over a neighbouring deck, they would cross its lanes)
+  const overLat = (k, lat) => {
+    const footLat = Math.hypot(feet[k][0] - P[0], feet[k][1] - P[1]);
+    return footLat <= lat ? kneeZ[k] : kneeZ[k] + (1 - lat / footLat) * (zJ - kneeZ[k]);
+  };
+  return { anchor, overLat, zJ, top };
+}
+
+/** The highest obstacle (deck: its height; ground road: z null) at (x, y), or null. */
+function obstacleAt(obstacles, x, y) {
+  let hit = null;
+  for (const o of obstacles) {
+    if (!o.box) {
+      o.box = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const [px, py] of o.xy) { o.box[0] = Math.min(o.box[0], px); o.box[1] = Math.min(o.box[1], py); o.box[2] = Math.max(o.box[2], px); o.box[3] = Math.max(o.box[3], py); }
+    }
+    if (o.maxHalf === undefined) o.maxHalf = o.halfs ? Math.max(...o.halfs) : o.half;
+    const rMax = o.maxHalf + PARAPET_W_M + 0.3;
+    if (x < o.box[0] - rMax || x > o.box[2] + rMax || y < o.box[1] - rMax || y > o.box[3] + rMax) continue;
+    for (let i = 0; i + 1 < o.xy.length; i++) {
+      const [ax, ay] = o.xy[i]; const [bx, by] = o.xy[i + 1];
+      const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / L2));
+      const r = (o.halfs ? o.halfs[i] + (o.halfs[i + 1] - o.halfs[i]) * t : o.half) + PARAPET_W_M + 0.3;
+      if (Math.hypot(ax + vx * t - x, ay + vy * t - y) > r) continue;
+      const z = o.z ? o.z[i] + (o.z[i + 1] - o.z[i]) * t : null;
+      if (!hit || (z ?? -Infinity) > (hit.z ?? -Infinity)) hit = { z };
+    }
+  }
+  return hit;
+}
+
+const ANCHOR_BARRIER = [0.45, 1.1];   // a concrete barrier on the deck's edge for the stays (width, height)
+
+/**
+ * Edge k of the lead deck over [a0, a1]: where another deck is flush against it (the decks one surface: a
+ * stay or hanger would land between lanes) a concrete barrier along it, as on the real thing. Returns
+ * foot(sd): where a stay or hanger lands at sd (on the barrier's top, else the edge).
+ */
+function edgeFeet(b, crossing, lead, E, k, a0, a1) {
+  const side = k === 0 ? 1 : -1;
+  const obstacles = crossing.obstacles || [];
+  // the edge as it stands at sd: the lead's own edge, or where another deck overlapping it (two OSM lines
+  // closer than their widths: the higher one covers the lower's edge) leaves its surface open (a foot
+  // under it would bring the stay up through that deck's lanes)
+  const edgeAt = (sd) => {
+    let lat = side * (sideHalf(lead.part, lead.sArr, sd, k) + PARAPET_W_M);
+    for (let guard = 0; guard < 80; guard++) {
+      const p = along(lead.part, sd, lat, lead.sArr);
+      const h = obstacleAt(obstacles, p[0], p[1]);
+      if (!h || h.z == null || h.z < p[2] - 0.5 || Math.abs(lat) < lead.part.half * 0.4) break;
+      lat -= side * 0.25;
+    }
+    return lat;
+  };
+  const flushAt = (sd, lat) => {
+    const d = along(lead.part, sd, lat, lead.sArr);
+    const o = along(lead.part, sd, lat + side * 1.0, lead.sArr);
+    const h = obstacleAt(obstacles, o[0], o[1]);
+    return h?.z != null && Math.abs(h.z - d[2]) < 1.5;
+  };
+  // where another deck is flush against the edge (the decks one surface: a stay or hanger would land
+  // between lanes) a concrete barrier along it, as on the real thing
+  for (let sd = a0; sd + 2 <= a1; sd += 2) {
+    const l0 = edgeAt(sd); const l1 = edgeAt(sd + 2);
+    if (!flushAt(sd, l0) && !flushAt(sd + 2, l1)) continue;
+    beam(b, along(lead.part, sd, l0 - side * 0.05, lead.sArr), along(lead.part, sd + 2, l1 - side * 0.05, lead.sArr), ANCHOR_BARRIER[0], ANCHOR_BARRIER[1] * 2);
+  }
+  return (sd) => {
+    const lat = edgeAt(sd);
+    const flush = flushAt(sd, lat);
+    // (on the very edge: a main cable over it clears the lanes)
+    const d = along(lead.part, sd, flush ? lat - side * 0.05 : lat, lead.sArr);
+    return [d[0], d[1], d[2] + (flush ? ANCHOR_BARRIER[1] : 0.3)];
+  };
 }
 
 function suspensionCrossing(towerB, cableB, deck, groundAt) {
   const crossing = deck.style.crossing || { decks: [deck], lead: deck };
   const lead = { ...mainSpan(deck), deck };
   const { sp, L } = lead;
-  const side = L >= 300 ? 0.18 : 0.02;
-  const t0 = sp.s0 + L * side; const t1 = sp.s1 - L * side;
+  const sideFrac = L >= 300 ? 0.18 : 0.02;
+  const t0 = sp.s0 + L * sideFrac; const t1 = sp.s1 - L * sideFrac;
   const main = t1 - t0;
-  const A = crossingEdges(crossing, lead, t0); const B = crossingEdges(crossing, lead, t1);
   const H = Math.max(22, main / 8.5);
-  const topsA = crossingTower(towerB, A.legs, A.zDeck, A.zDeck + H, groundAt);
-  const topsB = crossingTower(towerB, B.legs, B.zDeck, B.zDeck + H, groundAt);
-  // each side: the main cable from tower top to tower top over the outer deck's edge, hangers down to it
+  // the towers: two plumb legs where they stand clear of every deck and road (leadEdges), cross beams
+  // over the highest deck's headroom between them and at the top; the main cables' saddles on the top
+  // beam over the lead deck's edges
+  const towers = [t0, t1].map((ts) => {
+    const E = leadEdges(crossing, lead, ts);
+    const top = Math.max(E.zDeck + H, Math.max(...E.knees) + 12);
+    const ac = [-E.n[1], E.n[0]];
+    E.feet.forEach((f) => beam(towerB, [f[0], f[1], groundAt(f[0], f[1]) - 1], [f[0], f[1], top], LEG[0], LEG[1], ac));
+    for (const z of [Math.max(...E.knees) + 1, top - 1.5]) beam(towerB, [E.feet[0][0], E.feet[0][1], z], [E.feet[1][0], E.feet[1][1], z], XBEAM[0], XBEAM[1]);
+    const fz = E.zDeck - 2.6;
+    if (fz - Math.max(...E.feet.map((f) => groundAt(f[0], f[1]))) > 3 && E.strutClear(fz, groundAt)) beam(towerB, [E.feet[0][0], E.feet[0][1], fz], [E.feet[1][0], E.feet[1][1], fz], XBEAM[0], XBEAM[1]);
+    return { E, saddles: E.edges.map((e) => { const p = along(lead.part, ts, e, lead.sArr); return [p[0], p[1], top - 0.3]; }) };
+  });
+  // each side: the main cable from saddle to saddle in the plane over the lead deck's edge, 2 m over it at
+  // its lowest, hangers down to the edge (or the barrier on it); side spans down to the run's ends
   for (const k of [0, 1]) {
-    const edgeA = k === 0 ? A.left : A.right;
-    const m = edgeA.m;
-    const sA = edgeA.sd; const sB = nearestS(m.part, m.sArr, B.legs[k][0], B.legs[k][1]);
+    const foot = edgeFeet(towerB, crossing, lead, towers[0].E, k, sp.s0, sp.s1);
+    const [A, B] = [towers[0].saddles[k], towers[1].saddles[k]];
     const n = Math.max(16, Math.round(main / 10));
     const pts = [];
     for (let i = 0; i <= n; i++) {
-      const t = i / n; const sd = sA + (sB - sA) * t;
-      const d = along(m.part, sd, edgeA.off, m.sArr);
-      const chord = topsA[k][2] + (topsB[k][2] - topsA[k][2]) * t; const low = d[2] + 2;
-      pts.push([topsA[k][0] + (topsB[k][0] - topsA[k][0]) * t, topsA[k][1] + (topsB[k][1] - topsA[k][1]) * t, chord - (chord - low) * 4 * t * (1 - t)]);
-      if (i > 0 && i < n && pts[i][2] - d[2] > 1.2) beam(cableB, [d[0], d[1], d[2] + 0.2], pts[i], STAY[0], STAY[1]);
+      const t = i / n; const d = foot(t0 + main * t);
+      const chord = A[2] + (B[2] - A[2]) * t; const low = d[2] + 2;
+      pts.push([d[0], d[1], chord - (chord - low) * 4 * t * (1 - t)]);
+      if (i > 0 && i < n && pts[i][2] - d[2] > 1.2) beam(cableB, d, pts[i], STAY[0], STAY[1]);
     }
+    pts[0] = A; pts[n] = B;
     for (let i = 0; i < n; i++) beam(cableB, pts[i], pts[i + 1], CABLE[0], CABLE[1]);
-    // side spans down to the anchorages at the run's ends
-    for (const [top, sEnd] of [[topsA[k], sp.s0], [topsB[k], sp.s1]]) {
-      const e = along(lead.part, sEnd, k === 0 ? lead.part.half + PARAPET_W_M + SIDE_GAP_M : -(lead.part.half + PARAPET_W_M + SIDE_GAP_M), lead.sArr);
-      if (Math.hypot(e[0] - top[0], e[1] - top[1]) > 6) beam(cableB, top, [e[0], e[1], e[2] + 0.5], CABLE[0], CABLE[1]);
+    for (const [top, sEnd] of [[A, sp.s0], [B, sp.s1]]) {
+      const e = foot(sEnd);
+      if (Math.hypot(e[0] - top[0], e[1] - top[1]) > 6) beam(cableB, top, e, CABLE[0], CABLE[1]);
     }
   }
 }
@@ -569,21 +729,24 @@ function cableStayedCrossing(pylonB, cableB, deck, groundAt) {
   const stations = L >= 220 ? [sp.s0 + L * 0.27, sp.s1 - L * 0.27] : [sp.s0 + L / 2];
   const reach = stations.length === 2 ? L * 0.26 : L * 0.48;
   for (const ps of stations) {
-    const C = crossingEdges(crossing, lead, ps);
-    const H = Math.max(25, reach * 0.42);
-    const tops = crossingTower(pylonB, C.legs, C.zDeck, C.zDeck + H, groundAt);
+    const E = leadEdges(crossing, lead, ps);
+    const edgeMax = Math.max(E.edges[0], -E.edges[1]);
+    const zMin = stayAnchorMin(edgeMax - PARAPET_W_M, edgeMax);
+    const H = Math.max(35, reach * 0.45, zMin + 12);
+    const py = invertedY(pylonB, E.feet, E.knees, E.P, E.n, E.zDeck, Math.max(H, Math.max(...E.knees) - E.zDeck + 22), groundAt, E.strutClear);
+    const lo = E.zDeck + zMin + 0.5; const hi = py.top - 1.5;
     const nStay = Math.max(4, Math.round(reach / 12));
-    // each leg's stays to the outer deck on its side only (none across another deck's lanes)
+    // two planes of stays: each leg's upper part to the lead deck's own edge on that side (the farther the
+    // anchorage, the higher on the leg); none to other decks: they would cross their lanes
     for (const k of [0, 1]) {
-      const edge = k === 0 ? C.left : C.right;
-      const m = edge.m;
+      const loK = Math.min(hi - 2, Math.max(lo, py.overLat(k, Math.abs(E.edges[k]))));
+      const foot = edgeFeet(pylonB, crossing, lead, E, k, Math.max(sp.s0, ps - reach - 4), Math.min(sp.s1, ps + reach + 4));
       for (const dir of [-1, 1]) {
         for (let j = 1; j <= nStay; j++) {
-          const sd = edge.sd + dir * edge.dirSign * (reach * j) / nStay;
-          if (sd < m.sp.s0 || sd > m.sp.s1) continue;
-          const d = along(m.part, sd, edge.off, m.sArr);
-          const zHead = tops[k][2] - 1 - (H * 0.3) * (1 - j / nStay);
-          beam(cableB, [d[0], d[1], d[2] + 0.3], [tops[k][0], tops[k][1], zHead], STAY[0], STAY[1]);
+          const sd = ps + dir * (reach * j) / nStay;
+          if (sd < sp.s0 || sd > sp.s1) continue;
+          const zHead = loK + (hi - loK) * (j / nStay);
+          beam(cableB, foot(sd), py.anchor(k, zHead), STAY[0], STAY[1]);
         }
       }
     }

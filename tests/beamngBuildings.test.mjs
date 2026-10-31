@@ -166,3 +166,17 @@ test('unmapped heights follow the tagged buildings of their kind nearby', async 
   assert.equal(plan.heightSource, 'neighbours');
   assert.equal(planBuilding({ building: 'apartments', 'building:levels': '9' }, { area: 400, seed: 'x', lat: 0, lon: 0, rectFill: 1, levelsHint: 6 }).floors, 9);
 });
+
+test('a bridge pier or tower mapped as a building is left to the bridges', async () => {
+  const { buildTexturedBuildings } = await import('../services/beamngBuildings.js');
+  const P = (x, y) => ({ lat: y / 1e5, lng: x / 1e5 });
+  const sq = (id, x, tags) => ({ id, type: 'building', tags, geometry: [P(x, 0), P(x + 10, 0), P(x + 10, 10), P(x, 10)] });
+  const project = (lat, lng) => [lng * 1e5, lat * 1e5, 0];
+  const { count, stats } = buildTexturedBuildings([
+    sq('pylon', 0, { building: 'tower', man_made: 'pier', height: '98' }),
+    sq('frame', 40, { building: 'bridge_structure' }),
+    sq('house', 80, { building: 'house' }),
+  ], project);
+  assert.equal(count, 1);
+  assert.equal(stats.skipped.bridgeParts, 2);
+});

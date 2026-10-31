@@ -51,7 +51,7 @@ import { buildSidewalkMeshes, checkSidewalkGround, gradeSidewalkGround, getSidew
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
-  solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck, alongDeck, newBridgeBuilder, deckDepthOf,
+  solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck, alongDeck, newBridgeBuilder, deckDepthOf, deckEdges,
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
 } from './beamngBridges.js';
 import {
@@ -10190,8 +10190,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const bridgeOutlines = (exportTerrainData.osmFeatures || [])
     .filter((f) => f.type === 'bridge_infra' && f.geometry?.length > 2)
     .map((f) => ({ ring: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), tags: f.tags || {} }));
+  // (each part's drawn half widths per point: decks widen where they join and fork)
+  for (const d of bridgeDecks) deckEdges(d).forEach((e, i) => { d.parts[i].halfL = e.hl; d.parts[i].halfR = e.hr; });
   const styledBridges = styleDecks(bridgeDecks, { outlines: bridgeOutlines, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
-  linkCrossings(bridgeDecks);
+  linkCrossings(bridgeDecks, { roads: groundCarriageways.map((cw) => ({ xy: cw.nodes, half: cw.half })) });
   if (styledBridges) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge styles: ${bridgeDecks.filter((d) => d.style).map((d) => d.style.type).join(', ')}.`);
   const bridgeDaes = generateBridgeDAEs(
     bridgeDecks,
