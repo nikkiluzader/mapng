@@ -296,6 +296,8 @@
     "shapeTunnelsHint": "Wykopy, zasypka, przykrycie",
     "shapeExtras": "Chodniki i jeziora",
     "shapeExtrasHint": "Krawężniki, dna, parkingi",
+    "lidarDecks": "Zmierzone wysokości mostów",
+    "lidarDecksHint": "Lidar USA, kilka MB",
     "shapingNote": "Wyłączone zostawia te wysokości dokładnie tak, jak wygenerowano. Mosty stają się wtedy prostymi pomostami z końcami na gruncie; tunele powstają tylko tam, gdzie już pasują do terenu (otwory portali nadal są otwarte). Bez kształtowania nie ma też fundamentów. Wszystko jest w export_report.txt.",
     "treesBushes": "Drzewa/Krzewy",
     "nativeForest": "Elementy rodzimego lasu",

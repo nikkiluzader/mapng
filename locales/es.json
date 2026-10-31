@@ -296,6 +296,8 @@
     "shapeTunnelsHint": "Trincheras, relleno, cubierta",
     "shapeExtras": "Aceras y lagos",
     "shapeExtrasHint": "Bordillos, lechos, aparcamientos",
+    "lidarDecks": "Alturas de puentes medidas",
+    "lidarDecksHint": "Lidar de EE. UU., unos MB",
     "shapingNote": "Desactivado deja esas alturas tal como se generaron. Los puentes pasan a ser tableros simples con los extremos en el suelo; los túneles solo se crean donde ya encajan en el terreno (los huecos de los portales siguen abiertos). Sin modelar terreno tampoco hay cimientos. Todo aparece en export_report.txt.",
     "treesBushes": "Arboles/arbustos",
     "nativeForest": "Items de bosque nativos",

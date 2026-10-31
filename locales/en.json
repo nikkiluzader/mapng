@@ -325,6 +325,8 @@
     "shapeTunnelsHint": "Cuttings, backfill, cover",
     "shapeExtras": "Sidewalks & lakes",
     "shapeExtrasHint": "Curbs, lake beds, car parks",
+    "lidarDecks": "Measured bridge heights",
+    "lidarDecksHint": "US lidar survey, a few MB",
     "shapingNote": "Off leaves those heights exactly as generated. Bridges then become plain decks with their ends on the ground; tunnels are built only where they already fit the ground (portal holes still open). Shape terrain off also turns off foundations. Everything is listed in export_report.txt.",
     "seaLevelOffset": "Sea Level Offset",
     "treesBushes": "Trees/Bushes",

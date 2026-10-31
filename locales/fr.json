@@ -296,6 +296,8 @@
     "shapeTunnelsHint": "Tranchées, remblai, couverture",
     "shapeExtras": "Trottoirs et lacs",
     "shapeExtrasHint": "Bordures, fonds de lac, parkings",
+    "lidarDecks": "Hauteurs de ponts mesurées",
+    "lidarDecksHint": "Lidar américain, quelques Mo",
     "shapingNote": "Désactivé laisse ces hauteurs telles que générées. Les ponts deviennent alors de simples tabliers aux extrémités posées au sol ; les tunnels ne sont construits que là où ils s'accordent déjà au terrain (les trous des portails restent ouverts). Sans modelage, pas de fondations non plus. Tout figure dans export_report.txt.",
     "treesBushes": "Arbres/Buissons",
     "nativeForest": "Elements forestiers natifs",

@@ -220,6 +220,13 @@
                 <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeExtrasHint') }}</span>
               </label>
             </div>
+            <div class="flex items-center justify-between gap-2 px-0.5">
+              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.lidarDecks') }}</span>
+              <label class="flex items-center gap-1.5" :class="!beamNGIncludeBridges ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
+                <input type="checkbox" v-model="beamNGLidarDecks" :disabled="!beamNGIncludeBridges" :class="CHECKBOX" />
+                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.lidarDecksHint') }}</span>
+              </label>
+            </div>
             <p class="text-[9px] leading-snug text-gray-500 dark:text-gray-400 px-0.5">{{ t('exportPanel.shapingNote') }}</p>
           </div>
           </template>
@@ -714,6 +721,7 @@ const beamNGShapeBridges = ref(storedOn('mapng_beamNGShapeBridges'));
 const beamNGShapeOverpasses = ref(storedOn('mapng_beamNGShapeOverpasses'));
 const beamNGShapeTunnels = ref(storedOn('mapng_beamNGShapeTunnels'));
 const beamNGShapeExtras = ref(storedOn('mapng_beamNGShapeExtras'));
+const beamNGLidarDecks = ref(storedOn('mapng_beamNGLidarDecks'));
 const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') !== 'false');
@@ -957,6 +965,7 @@ watch(beamNGShapeBridges, (v) => localStorage.setItem('mapng_beamNGShapeBridges'
 watch(beamNGShapeOverpasses, (v) => localStorage.setItem('mapng_beamNGShapeOverpasses', String(v)));
 watch(beamNGShapeTunnels, (v) => localStorage.setItem('mapng_beamNGShapeTunnels', String(v)));
 watch(beamNGShapeExtras, (v) => localStorage.setItem('mapng_beamNGShapeExtras', String(v)));
+watch(beamNGLidarDecks, (v) => localStorage.setItem('mapng_beamNGLidarDecks', String(v)));
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGSeaLevelOffset, (v) => {
   const normalized = normalizeBeamNGSeaLevelOffset(v);
@@ -1749,6 +1758,8 @@ const handleBeamNGLevelExport = async () => {
       shapeOverpasses: !advanced || beamNGShapeOverpasses.value,
       shapeTunnels: !advanced || beamNGShapeTunnels.value,
       shapeExtras: !advanced || beamNGShapeExtras.value,
+      // measured bridge heights from the US lidar survey where it covers the map
+      lidarDecks: !advanced || beamNGLidarDecks.value,
     };
     const effectiveBackdropGpxzApiKey = effectiveBackdropSource === 'gpxz' ? String(props.gpxzApiKey || '') : '';
 

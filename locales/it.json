@@ -296,6 +296,8 @@
     "shapeTunnelsHint": "Trincee, riempimento, copertura",
     "shapeExtras": "Marciapiedi e laghi",
     "shapeExtrasHint": "Cordoli, fondali, parcheggi",
+    "lidarDecks": "Altezze dei ponti misurate",
+    "lidarDecksHint": "Lidar USA, pochi MB",
     "shapingNote": "Disattivo lascia quelle altezze esattamente come generate. I ponti diventano semplici impalcati con le estremità a terra; le gallerie vengono create solo dove si adattano già al terreno (i fori dei portali restano aperti). Senza modellazione niente fondazioni. Tutto è riportato in export_report.txt.",
     "treesBushes": "Alberi/Cespugli",
     "nativeForest": "Elementi foresta nativa",

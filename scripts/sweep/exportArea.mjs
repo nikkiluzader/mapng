@@ -19,7 +19,7 @@ import { isGroundLevelRoad, smoothRoadsInHeightmap } from '../../services/roadSm
 import { snapRoadsToTerrain } from '../../services/roadSnap.js';
 import { measureStreetWidths } from '../../services/streetWidths.js';
 import { installCanvasPolyfill } from './polyfill.mjs';
-import { AREAS_DIR, OUT_DIR } from './env.mjs';
+import { AREAS_DIR, OUT_DIR, REPO } from './env.mjs';
 
 const args = process.argv.slice(2);
 const pos = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--out');
@@ -55,6 +55,24 @@ const { blob, structureChecks } = await exportBeamNGLevel(terrainData, meta.cent
   includeBuildings: true, applyFoundations: false, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,
   ...(process.env.STRUCT ? { structureSolver: process.env.STRUCT } : {}),
+  // measured bridge heights (US lidar): LIDAR=1 (off by default: the sweep stays offline and repeatable);
+  // survey downloads cached under the sweep output's ept-cache
+  lidarDecks: process.env.LIDAR === '1',
+  ...(process.env.LIDAR === '1' ? { lidarProvider: async () => {
+    const { createLazPerf } = await import('laz-perf');
+    const cache = path.join(OUT_DIR, 'ept-cache');
+    const fetchImpl = async (url) => {
+      const file = path.join(cache, String(url).replace(/^https?:\/\//, '').replace(/[^\w.\-/]/g, '_'));
+      if (fs.existsSync(file)) { const b = fs.readFileSync(file); return { ok: true, json: async () => JSON.parse(b), arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length) }; }
+      const r = await fetch(url);
+      if (!r.ok) return r;
+      const b = Buffer.from(await r.arrayBuffer());
+      fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, b);
+      return { ok: true, json: async () => JSON.parse(b), arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length) };
+    };
+    const index = JSON.parse(fs.readFileSync(path.join(REPO, 'public/ept-index.json'))).datasets;
+    return { index, lp: await createLazPerf(), fetchImpl };
+  } } : {}),
   // extra export options as JSON, e.g. EXPORT_OPTS='{"shapeTerrain":false}'
   ...(process.env.EXPORT_OPTS ? JSON.parse(process.env.EXPORT_OPTS) : {}),
   levelName, elevationSource: 'upload', requestedResolution: meta.size, requestedProcessingMetersPerPixel: meta.mpp,

@@ -296,6 +296,8 @@
     "shapeTunnelsHint": "Einschnitte, Hinterfüllung, Überdeckung",
     "shapeExtras": "Gehwege & Seen",
     "shapeExtrasHint": "Bordsteine, Seebetten, Parkhäuser",
+    "lidarDecks": "Gemessene Brückenhöhen",
+    "lidarDecksHint": "US-Lidar-Vermessung, einige MB",
     "shapingNote": "Aus lässt diese Höhen genau wie erzeugt. Brücken werden dann einfache Decks mit den Enden auf dem Boden; Tunnel nur dort, wo sie bereits zum Gelände passen (Portallöcher bleiben offen). Gelände formen aus schaltet auch Fundamente ab. Alles steht in export_report.txt.",
     "treesBushes": "Bäume/Büsche",
     "nativeForest": "Native Waldobjekte",

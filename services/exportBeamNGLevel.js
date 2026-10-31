@@ -26,6 +26,7 @@ import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { styleDecks, linkCrossings, thinArchDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
+import { prepareSurvey, lidarPins } from './lidarDecks.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
 import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
@@ -4837,6 +4838,14 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         e.external = true;
         for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i])]);
       });
+      // measured deck heights (US lidar): each bridge measured along most of
+      // it pinned where the survey found its surface
+      if (opts.lidar?.grid && opts.structureSolver === 'v2') {
+        const minH = Number(terrainData.minHeight) || 0;
+        const measured = lidarPins(structureGraph, opts.lidar, (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) + minH, minH);
+        structureGraph.pins.push(...measured.pins);
+        opts.lidar.result = measured;
+      }
       // terrain shaping switched off somewhere: the stations held on their
       // ground, the bridges built as decks wherever they leave it
       if (!allShaping(shaping)) {
@@ -6065,6 +6074,14 @@ function shapingReportLines(sh, section) {
   }
   lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
   if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}`);
+  if (sh.lidar === null || sh.lidar === undefined) lines.push('- Measured bridge heights (US lidar): off');
+  else if (sh.lidar.skipped) lines.push(`- Measured bridge heights (US lidar): not used, ${sh.lidar.skipped}`);
+  else {
+    const d = sh.lidar.datum;
+    lines.push(`- Measured bridge heights (US lidar, USGS 3DEP ${sh.lidar.dataset}): ${sh.lidar.pinned} of ${sh.lidar.bridges} bridge stretches pinned at ${sh.lidar.stations} measured stations; the rest kept the inferred profile (measured along under 60% of their length, or movable)`);
+    lines.push(`  - Survey: ${sh.lidar.nodes} octree nodes, ${(sh.lidar.bytes / 1e6).toFixed(1)} MB, ${sh.lidar.points} points; tied to the terrain from its ground points: ${d.scale === 1 ? 'metres' : 'feet'}, ${d.offset >= 0 ? '+' : ''}${d.offset.toFixed(2)} m, spread ${d.spread.toFixed(2)} m over ${d.n} samples`);
+    if (sh.lidar.partial.length) lines.push(`  - Not pinned (OSM way, stations measured/total): ${sh.lidar.partial.slice(0, 20).join(', ')}${sh.lidar.partial.length > 20 ? ', …' : ''}`);
+  }
   if (sh.levelledUnderDecks) lines.push(`- Ground under bridge decks levelled to the ground beside them (the elevation data held the deck's own shape): ${sh.levelledUnderDecks} grid points`);
   if (sh.underDeckBedPixels) lines.push(`- Hidden water beds dug (under bridge decks, where the elevation data held the deck: a dam; along outlined rivers where the ground stood over the water): ${sh.underDeckBedPixels} grid points`);
   if (p && sh.residual) {
@@ -6571,6 +6588,7 @@ function buildBeamNGExportReport({
     `- PBR source requested: ${options?.requestedPbrSource ?? 'n/a'}`,
     `- PBR source used: ${effectivePbrSource}`,
     `- Include water: ${formatBool(options?.includeWater)}`,
+    `- Measured bridge heights (US lidar): ${formatBool(options?.lidarDecks !== false)}`,
     `- Include native barriers: ${formatBool(options?.includeNativeBarriers)}`,
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
@@ -6796,6 +6814,54 @@ function getTerrainHeightWorld(lat, lng, terrainData) {
 /**
  * Convert a geographic point to BeamNG world-space coordinates.
  */
+/**
+ * The laz decoder and the survey index in the browser (the WASM and the index
+ * are served by the app); a script passes its own (options.lidarProvider).
+ */
+export async function defaultLidarProvider() {
+  const { createLazPerf } = await import('laz-perf/lib/web');
+  const lp = await createLazPerf({ locateFile: (path) => (path.endsWith('.wasm') ? '/laz-perf.wasm' : path) });
+  const index = (await (await fetch('/ept-index.json')).json()).datasets;
+  return { index, lp, fetchImpl: (...a) => fetch(...a) };
+}
+
+const isMovableBridge = (tags = {}) => tags.bridge === 'movable' || !!tags['bridge:movable'];
+
+/**
+ * Measured bridge heights (US lidar, lidarDecks.js): the survey along the
+ * export's bridge ways, read before the roads are laid out (the solver takes
+ * it as pins). Returns prepareSurvey's lookups or { skipped }.
+ */
+async function prefetchLidarDecks(terrainData, squareSize, options, onProgress) {
+  const { bounds, width } = terrainData; const ws = width * squareSize;
+  const toLocal = (lat, lng) => [((lng - bounds.west) / (bounds.east - bounds.west) - 0.5) * ws, (0.5 - (bounds.north - lat) / (bounds.north - bounds.south)) * ws];
+  const toGeo = (x, y) => [bounds.north - (0.5 - y / ws) * (bounds.north - bounds.south), bounds.west + (x / ws + 0.5) * (bounds.east - bounds.west)];
+  const bridgeLines = [];
+  for (const f of terrainData.osmFeatures || []) {
+    const t = f.tags || {};
+    if (f.type !== 'road' || !t.bridge || t.bridge === 'no' || isMovableBridge(t) || !(f.geometry?.length > 1)) continue;
+    const raw = f.geometry.map((p) => toLocal(p.lat, p.lng));
+    if (!raw.some(([x, y]) => Math.abs(x) < ws / 2 && Math.abs(y) < ws / 2)) continue;
+    const pts = [];
+    for (let i = 0; i + 1 < raw.length; i++) {
+      const [ax, ay] = raw[i]; const [bx, by] = raw[i + 1];
+      const n = Math.max(1, Math.round(Math.hypot(bx - ax, by - ay) / 4));
+      for (let k = 0; k < n; k++) pts.push([ax + ((bx - ax) * k) / n, ay + ((by - ay) * k) / n]);
+    }
+    pts.push(raw.at(-1));
+    bridgeLines.push({ pts });
+  }
+  if (!bridgeLines.length) return { skipped: 'no bridges' };
+  const provider = options.lidarProvider ? await options.lidarProvider() : await defaultLidarProvider();
+  const minHeight = Number(terrainData.minHeight) || 0;
+  const maxHeight = Number(terrainData.maxHeight) || minHeight + 100;
+  return prepareSurvey({
+    bridgeLines, toGeo, toLocal, provider, onProgress,
+    demAtAbs: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) + minHeight,
+    zAbs: [minHeight, maxHeight + 60],
+  });
+}
+
 function geoToWorldPoint(lat, lng, terrainData, squareSize, zOffset = 0) {
   const { bounds, width } = terrainData;
   const worldSize = width * squareSize;
@@ -10167,8 +10233,19 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // the ground before any grading: where the sea really is (a cut below sea
   // level is no sea)
   const sourceHeightMap = exportTerrainData.heightMap;
+  // measured bridge heights (US lidar), read before the roads are laid out
+  let lidar = null;
+  if (includeRoads && includeBridges && options.lidarDecks !== false && (options.structureSolver ?? 'v2') === 'v2') {
+    beginStep('lidar', 'Reading measured bridge heights (US lidar survey)…');
+    try {
+      lidar = await prefetchLidarDecks(exportTerrainData, squareSize, options, (k, n) => report(`Reading measured bridge heights (US lidar survey): node ${k + 1} of ${n}…`, n ? k / n : 0));
+    } catch (err) {
+      lidar = { skipped: `the survey could not be read (${err?.message || err})` };
+    }
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Lidar decks: ${lidar.skipped ? `skipped: ${lidar.skipped}` : `${lidar.dataset}, ${lidar.nodes} nodes, ${(lidar.bytes / 1e6).toFixed(1)} MB, ${lidar.points} points; datum ${lidar.datum.scale === 1 ? 'm' : 'ft'} ${lidar.datum.offset >= 0 ? '+' : ''}${lidar.datum.offset.toFixed(2)} m (spread ${lidar.datum.spread.toFixed(2)} m)`}`);
+  }
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { structureSolver: options.structureSolver, includeBridges, includeTunnels, shaping: shapingOptions })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { structureSolver: options.structureSolver, includeBridges, includeTunnels, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
@@ -11387,6 +11464,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         lakeBedPixels: lakePlan?.stats?.bedPixels ?? null,
         underDeckBedPixels: underDeckBeds,
         levelledUnderDecks,
+        lidar: lidar ? (lidar.skipped ? { skipped: lidar.skipped } : {
+          dataset: lidar.dataset, nodes: lidar.nodes, bytes: lidar.bytes, points: lidar.points, datum: lidar.datum,
+          bridges: lidar.result?.bridges?.length ?? 0, pinned: lidar.result?.bridges?.filter((b) => b.pinned).length ?? 0,
+          stations: lidar.result?.pins?.length ?? 0,
+          partial: (lidar.result?.bridges || []).filter((b) => !b.pinned).map((b) => `${b.wayId ?? '?'} ${b.measured}/${b.stations}`),
+        }) : null,
         residual: sg?.profile?.residual || null,
       },
       bridges: decalRoads.bridges,
