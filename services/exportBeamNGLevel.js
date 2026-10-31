@@ -4392,7 +4392,10 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
         for (let r = br; r < Math.min(r1 + 1, br + BLOCK); r++) {
           for (let c = bc; c < Math.min(cEnd, bc + BLOCK); c++) {
             const corners = [hm.at(r * width + c), hm.at(r * width + c + 1), hm.at((r - 1) * width + c), hm.at((r - 1) * width + c + 1)];
-            const [x, y] = toWorld(c + 0.5, r - 0.5);
+            // (the square's middle on the terrain's own grid: samples squareSize
+            // apart from minus half its extent, the heightmap's rows flipped;
+            // the heightmap's (W - 1)-span grid drifted a square across the map)
+            const x = (c + 0.5 - width / 2) * squareSize; const y = (height / 2 - r - 0.5) * squareSize;
             if (tunnelHoleAt(t, x, y, Math.min(...corners) - minHeight, Math.max(...corners) - minHeight)) { holes.add((height - 1 - r) * width + c); opened++; }
           }
         }
