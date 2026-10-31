@@ -11,6 +11,7 @@
 //
 // Pure: callers pass world-space geometry and ground / water lookups.
 
+import { inStyledSpan } from './bridgeStyles.js';
 export const DECK_STEP_M = 4;          // m between deck profile points
 export const DECK_CLEAR_M = 0.05;      // a deck stays this far above the ground under it
 export const DECK_ROAD_CLEAR_M = 6.5;  // its top over a road crossing under it (5 m headroom + the structure)
@@ -592,6 +593,11 @@ const PIER_ROAD_M = 7;                 // a pier keeps this far from a road's ce
 const UV_M = 4;                        // concrete texture repeat
 const WALL_GAP_M = 2.5;                // under the structure less than this to the ground: walls down into it
 
+/** A fresh geometry builder (the deck's own kind) for the bridge styles. */
+export const newBridgeBuilder = () => new Builder();
+/** A part's structure depth under its road surface (the deck slab and its girders). */
+export const deckDepthOf = (part) => part.depth ?? DECK_DEPTH_M + GIRDER_D_M;
+
 class Builder {
   constructor() { this.pos = []; this.uv = []; }
   // Triangle a-b-c turned to face `want`; uv from the face's orientation.
@@ -1048,6 +1054,8 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
     }
     // piers
     for (const p of pierSites(part, { groundAt, roadLines, decks: [...deck.parts.filter((q) => q !== part), ...neighbours] })) {
+      // (a truss or arch spans its span: no pier inside it)
+      if (inStyledSpan(deck, pi, p.x, p.y)) continue;
       const deckW = p.width;
       if (deckW > PIER_BENT_W_M) {
         const cols = Math.max(2, Math.round(deckW / 8));

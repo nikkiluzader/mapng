@@ -25,6 +25,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
+import { styleDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
 import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
@@ -50,7 +51,7 @@ import { buildSidewalkMeshes, checkSidewalkGround, gradeSidewalkGround, getSidew
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
-  solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck, alongDeck,
+  solveBridgeDecks, deckHeightAt, buildDeckGeometry, hitsDeck, alongDeck, newBridgeBuilder, deckDepthOf,
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
 } from './beamngBridges.js';
 import {
@@ -811,6 +812,8 @@ function generatePowerWireDAEs(wires) {
 }
 
 export const BRIDGE_MATERIAL = 'mapng_bridge_concrete';
+export const BRIDGE_STONE_MATERIAL = 'mapng_bridge_stone';
+const steelMaterial = (paint) => `mapng_bridge_steel_${paint || 'grey'}`;
 
 /** Bridge concrete material (BeamNG's shared plain concrete). */
 function getBridgeMaterialDefs() {
@@ -832,6 +835,30 @@ function getBridgeMaterialDefs() {
       }, {}, {}, {}],
       translucentBlendOp: 'None',
     },
+    // dressed stone (stone deck arches, their piers)
+    [BRIDGE_STONE_MATERIAL]: {
+      name: BRIDGE_STONE_MATERIAL, mapTo: BRIDGE_STONE_MATERIAL, class: 'Material', version: 1.5, annotation: 'CONCRETE', groundType: 'CONCRETE',
+      Stages: [{
+        baseColorMap: '/assets/materials/tileable/brick/stone_brick_irregular/t_stone_brick_irregular_b.color.png',
+        normalMap: '/assets/materials/tileable/brick/stone_brick_irregular/t_stone_brick_irregular_nm.normal.png',
+        roughnessMap: '/assets/materials/tileable/brick/stone_brick_irregular/t_stone_brick_irregular_r.data.png',
+        ambientOcclusionMap: '/assets/materials/tileable/brick/stone_brick_irregular/t_stone_brick_irregular_ao.data.png',
+        diffuseColor: [0.95, 0.9, 0.82, 1],
+      }, {}, {}, {}],
+      translucentBlendOp: 'None',
+    },
+    // painted steel (trusses, arch ribs), one per paint
+    ...Object.fromEntries(Object.entries(BRIDGE_PAINTS).map(([paint, rgb]) => [steelMaterial(paint), {
+      name: steelMaterial(paint), mapTo: steelMaterial(paint), class: 'Material', version: 1.5, annotation: 'METAL', groundType: 'METAL',
+      Stages: [{
+        baseColorMap: '/assets/materials/tileable/metal/metal_paint/t_metal_paint_b.color.png',
+        normalMap: '/assets/materials/tileable/metal/metal_paint/t_metal_paint_nm.normal.png',
+        roughnessMap: '/assets/materials/tileable/metal/metal_paint/t_metal_paint_r.data.png',
+        diffuseColor: [...rgb, 1],
+        metallicFactor: 0.4,
+      }, {}, {}, {}],
+      translucentBlendOp: 'None',
+    }])),
   };
 }
 
@@ -844,19 +871,19 @@ function getBridgeMaterialDefs() {
 function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = []) {
   const out = [];
   // one Collada shape (visual mesh + a Colmesh-1 collision copy), origin-relative
-  const toDae = ({ positions: pos, uvs }, origin) => {
+  const toDae = ({ positions: pos, uvs }, origin, material = BRIDGE_MATERIAL) => {
     if (!pos.length) return null;
     const positions = Float32Array.from(pos, (v, k) => v - origin[k % 3]);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: BRIDGE_MATERIAL }));
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: material }));
     mesh.name = 'bridge_deck';
     const colGeo = new THREE.BufferGeometry();
     colGeo.setAttribute('position', new THREE.BufferAttribute(positions.slice(), 3));
     colGeo.name = 'Colmesh-1';
-    const collision = new THREE.Mesh(colGeo, new THREE.MeshBasicMaterial({ name: BRIDGE_MATERIAL }));
+    const collision = new THREE.Mesh(colGeo, new THREE.MeshBasicMaterial({ name: material }));
     collision.name = 'Colmesh-1';
     const base00 = new THREE.Group();
     base00.name = 'base00';
@@ -874,6 +901,8 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = []) {
   decks.forEach((deck, i) => {
     const g = buildDeckGeometry(deck, { groundAt, roadLines, groundRoads, neighbours: decks.filter((d) => d !== deck).flatMap((d) => d.parts) });
     if (!g.positions.length) return;
+    // its style (bridgeStyles.js): steel, concrete and stone apart
+    const style = deck.style ? buildStyleGeometry(deck, { groundAt, newBuilder: newBridgeBuilder, depthOf: deckDepthOf }) : null;
     const pts = deck.parts.flatMap((p) => p.xy.map(([x, y], k) => [x, y, p.z[k]]));
     const origin = [
       Math.round(pts.reduce((n, p) => n + p[0], 0) / pts.length * 100) / 100,
@@ -884,7 +913,15 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = []) {
     // decals clip onto the first only
     const data = toDae(g.sides, origin);
     const deckData = toDae(g.top, origin);
-    if (data || deckData) out.push({ key: `b${String(i + 1).padStart(3, '0')}`, origin, data, deckData, triangles: g.positions.length / 9 });
+    const extras = [];
+    if (style) {
+      for (const [kind, b, material] of [['steel', style.steel, steelMaterial(deck.style.paint)], ['struct', style.concrete, BRIDGE_MATERIAL], ['stone', style.stone, BRIDGE_STONE_MATERIAL]]) {
+        if (!b.pos.length) continue;
+        const d = toDae({ positions: b.pos, uvs: b.uv }, origin, material);
+        if (d) extras.push({ kind, data: d, triangles: b.pos.length / 9 });
+      }
+    }
+    if (data || deckData) out.push({ key: `b${String(i + 1).padStart(3, '0')}`, origin, data, deckData, extras, style: deck.style || null, triangles: g.positions.length / 9 + extras.reduce((n, e) => n + e.triangles, 0) });
   });
   return out;
 }
@@ -6274,7 +6311,9 @@ function buildDetailedReportSections(d) {
     });
     lines.push(`  - Deck over ground: max ${formatNumber(maxGap, 2)} m, mean ${formatNumber(sumGap / Math.max(1, nGap), 2)} m, min ${formatNumber(minGap, 2)} m`);
     lines.push(`  - Lowest clearance over a crossed road: ${Number.isFinite(minRoadGap) ? `${formatNumber(minRoadGap, 2)} m` : 'n/a'}; clearance shortfall over roads: ${formatNumber(deck.roadShortfall ?? 0, 2)} m, overall (water too): ${formatNumber(deck.shortfall ?? 0, 2)} m`);
-    lines.push(`  - Objects: bridge_${key}.dae + bridge_${key}_deck.dae (the road surface)${dae ? `, ${Math.round(dae.triangles)} triangles, origin (${dae.origin.map((v) => formatNumber(v, 1)).join(', ')})` : ' (not written: no geometry)'}`);
+    lines.push(`  - Objects: bridge_${key}.dae + bridge_${key}_deck.dae (the road surface)${(dae?.extras || []).map((e) => ` + bridge_${key}_${e.kind}.dae`).join('')}${dae ? `, ${Math.round(dae.triangles)} triangles, origin (${dae.origin.map((v) => formatNumber(v, 1)).join(', ')})` : ' (not written: no geometry)'}`);
+    if (dae?.style) lines.push(`  - Style: ${dae.style.type}${dae.style.type === 'arch' ? ' (a steel arch over the deck from 250 m in one span, else deck arches)' : ''}, ${dae.style.paint} paint${dae.style.material ? `, ${dae.style.material}` : ''}; from its ${dae.style.source}${dae.style.corridor > 1 ? `, shared by the ${dae.style.corridor} decks side by side` : ''}; ${dae.style.spans.length} span(s): ${dae.style.spans.map((sp) => `${formatNumber(sp.s1 - sp.s0, 0)} m`).join(', ')}`);
+    else if (dae) lines.push('  - Style: a plain deck (no bridge type in the map: its road or outline)');
   });
 
   // ── Tunnels ────────────────────────────────────────────────────────────────
@@ -10147,6 +10186,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const roadSpawn = findRoadSpawn(groundCarriageways, (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize), underDeck, { leftHandTraffic: resolvedRightHandDrive });
   if (roadSpawn) ({ position: spawnPosition, rotationMatrix: spawnRotationMatrix } = roadSpawn);
   await yield_();
+  // what each bridge is (bridgeStyles.js): from its road's tags or its outline's
+  const bridgeOutlines = (exportTerrainData.osmFeatures || [])
+    .filter((f) => f.type === 'bridge_infra' && f.geometry?.length > 2)
+    .map((f) => ({ ring: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), tags: f.tags || {} }));
+  const styledBridges = styleDecks(bridgeDecks, { outlines: bridgeOutlines, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
+  if (styledBridges) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge styles: ${bridgeDecks.filter((d) => d.style).map((d) => d.style.type).join(', ')}.`);
   const bridgeDaes = generateBridgeDAEs(
     bridgeDecks,
     (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
@@ -11046,9 +11091,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalksDaeData = await toZipBinary(sidewalksDae);
   if (bridgeDaes.length > 0) {
     zip.folder(`${base}/map_assets/custom_assets/bridges`);
-    for (const { key, data, deckData } of bridgeDaes) {
+    for (const { key, data, deckData, extras } of bridgeDaes) {
       if (data) zip.file(`${base}/map_assets/custom_assets/bridges/bridge_${key}.dae`, await toZipBinary(data));
       if (deckData) zip.file(`${base}/map_assets/custom_assets/bridges/bridge_${key}_deck.dae`, await toZipBinary(deckData));
+      for (const e of extras || []) zip.file(`${base}/map_assets/custom_assets/bridges/bridge_${key}_${e.kind}.dae`, await toZipBinary(e.data));
     }
     zip.file(`${base}/map_assets/custom_assets/bridges/main.materials.json`, JSON.stringify(getBridgeMaterialDefs(), null, 2));
   }
@@ -11721,7 +11767,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // Bridge decks, two objects per bridge, both colliding: the road surface,
   // which the road decals project onto, and the rest (parapets, sides,
   // girders, piers), which they must not smear down (decalType: None).
-  for (const { key, origin, data, deckData } of bridgeDaes) {
+  for (const { key, origin, data, deckData, extras } of bridgeDaes) {
     if (data) {
       levelObjectItems.push({
         __parent: 'level_objects',
@@ -11734,6 +11780,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         decalType: 'None',
         prebuildCollisionData: 0,
         useInstanceRenderData: true,
+      });
+    }
+    for (const e of extras || []) {
+      levelObjectItems.push({
+        __parent: 'level_objects', class: 'TSStatic', name: `bridge_${key}_${e.kind}`, persistentId: generatePersistentId(), position: origin,
+        shapeName: `/levels/${levelName}/map_assets/custom_assets/bridges/bridge_${key}_${e.kind}.dae`,
+        collisionType: 'Collision Mesh', decalType: 'None', prebuildCollisionData: 0, useInstanceRenderData: true,
       });
     }
     if (deckData) {

@@ -141,6 +141,10 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
       half: halfOf(seg),
       ...structureOf(tags),
       structure: tags['bridge:structure'] || '',
+      // (the bridge's look, bridgeStyles.js: its paint, OSM bridge=* kind and wikidata)
+      paint: tags.colour || tags['bridge:colour'] || '',
+      bridgeKind: tags.bridge || '',
+      wikidata: tags.wikidata || tags['bridge:wikidata'] || '',
       length: st.s[st.s.length - 1],
       ...st,
       g,

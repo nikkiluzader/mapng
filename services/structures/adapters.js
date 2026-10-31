@@ -33,6 +33,7 @@ export function decksFromSolver(graph) {
     for (let i = s.i0; i <= s.i1; i++) { xy.push([e.x[i], e.y[i]]); zz.push(z[s.edge][i]); }
     const part = {
       xy, z: zz, half: e.half, layer: Math.max(1, e.layer || 0), structure: e.structure || undefined,
+      paint: e.paint || undefined, bridgeKind: e.bridgeKind || undefined, movable: e.movable || undefined, wikidata: e.wikidata || undefined,
       osm: { id: e.wayId ?? null, name: null, highway: e.highway || null },
       edge: s.edge, s0: s.s0, s1: s.s1,
     };
