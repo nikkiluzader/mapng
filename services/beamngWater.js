@@ -6,7 +6,8 @@
 // washes: intermittent / seasonal ones are left out, the desert's arroyos),
 // never where they pass under a road (culverts), and lakes, ponds and
 // reservoirs that hold water. Riverbank outlines (natural=water +
-// water=river) are no water body of their own: they give the river its width.
+// water=river) give the river its width; a wide or tidal one whose ground is
+// flat is area water instead, as tiles like a lake (see WIDE_RIVER_M).
 //
 // Rivers: ways that continue one another are chained (OSM draws waterways in
 // the direction of flow), resampled, and each node's surface is the lowest
@@ -15,8 +16,8 @@
 // is one, else by kind; a River never reaches within ROAD_MARGIN_M of a road
 // and is cut where a road crosses it at grade.
 //
-// Lakes: WaterBlock rectangles covering a grid over the outline (cells mostly
-// inside it), at the lake's level (the median ground inside: elevation models
+// Lakes: WaterBlock rectangles covering the outline (big ones inside, small
+// ones along the shore reaching just past it), at the lake's level (the median ground inside: elevation models
 // flatten water to its surface).
 // Pure: callers pass world-space lookups.
 
@@ -43,7 +44,18 @@ const MIN_PIECE_M = 15;
 const LAKE_WATER = new Set(['lake', 'pond', 'reservoir', 'oxbow', 'lagoon', 'basin', 'stream_pool', 'moat', 'pool', 'yes']);
 const RIVERBANK_WATER = new Set(['river', 'stream', 'canal', 'riverbank']);
 const LAKE_CELL_M = [2, 32];
+// A river outline drawn as area water (WaterBlock tiles, like a lake) and no
+// River ribbon, after BeamNG.Earth (seacarve.py): a tidal one, or one at
+// least WIDE_RIVER_M across somewhere (a ribbon that wide folds over itself
+// at bends and islands), whose ground the elevation data flattened (its
+// middle 80 % within AREA_FLAT_M). A sloping one stays a ribbon.
+const WIDE_RIVER_M = 120;
+const AREA_FLAT_M = 1;
 const LAKE_TILE_OVERLAP_M = 0.5;
+// Lake tile cells (m): a quarter of the old coarse cell within these, and
+// coarser where the outline is so big the grid would pass SHORE_GRID_MAX.
+const SHORE_CELL_M = [2, 4];
+const SHORE_GRID_MAX = 2048;
 
 const norm = (v) => String(v ?? '').trim().toLowerCase();
 const isDry = (tags = {}) => ['yes', 'true', 'dry'].includes(norm(tags.intermittent)) || ['yes', 'true'].includes(norm(tags.seasonal))
@@ -74,6 +86,36 @@ const makePolygon = (outer, holes = []) => {
       && pointInRing(x, y, outer) && !holes.some((h) => pointInRing(x, y, h)),
   };
 };
+
+// Ground samples inside a polygon, sorted (its outline's when it is too thin).
+function groundInside(poly, heightAt) {
+  const [x0, y0, x1, y1] = poly.box;
+  const step = Math.max(1, Math.max(x1 - x0, y1 - y0, 1) / 24);
+  const inside = [];
+  for (let x = x0 + step / 2; x < x1; x += step) for (let y = y0 + step / 2; y < y1; y += step) if (poly.contains(x, y)) inside.push(heightAt(x, y));
+  if (!inside.length) for (const [x, y] of poly.outer) inside.push(heightAt(x, y));
+  return inside.sort((a, b) => a - b);
+}
+const isRiverbank = (t = {}) => RIVERBANK_WATER.has(norm(t.water)) || norm(t.waterway) === 'riverbank';
+// Some point inside at least r from every shore (holes included).
+function hasRoom(poly, r) {
+  const [x0, y0, x1, y1] = poly.box;
+  if (x1 - x0 < 2 * r || y1 - y0 < 2 * r) return false;
+  const step = Math.max(4, r / 3);
+  const rings = [poly.outer, ...poly.holes];
+  for (let x = x0 + r; x <= x1 - r; x += step) {
+    for (let y = y0 + r; y <= y1 - r; y += step) {
+      if (poly.contains(x, y) && rings.every((ring) => distToRing(x, y, ring) >= r)) return true;
+    }
+  }
+  return false;
+}
+/** A riverbank outline drawn as area water: tidal or wide, and flat (see WIDE_RIVER_M). */
+function isRiverArea(tags, poly, heightAt) {
+  const g = groundInside(poly, heightAt);
+  const flat = g[Math.floor(g.length * 0.9)] - g[Math.floor(g.length * 0.1)] <= AREA_FLAT_M;
+  return flat && (norm(tags.tidal) === 'yes' || hasRoom(poly, WIDE_RIVER_M / 2));
+}
 
 // Windows shrink symmetrically at the ends, so a line's ends stay put.
 const windowAt = (v, i, n) => { const h = Math.min(n >> 1, i, v.length - 1 - i); return v.slice(i - h, i + h + 1); };
@@ -140,7 +182,7 @@ function buildRoadEdgeDistance(roads, cell = 32) {
  * @param {Array} [p.roads]      ground roads [{ points: [[x, y]...], half }]
  */
 export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
-  const stats = { dry: 0, underground: 0, otherKinds: 0, chains: 0, pieces: 0, cutAtRoads: 0, widthFromOutline: 0 };
+  const stats = { dry: 0, underground: 0, otherKinds: 0, chains: 0, pieces: 0, cutAtRoads: 0, widthFromOutline: 0, nodesInAreaWater: 0 };
   const ways = [];
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 1) || isClosed(f.geometry)) continue;
@@ -152,12 +194,16 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
     ways.push({ kind, tags: f.tags || {}, pts: f.geometry.map((p) => toWorld(p.lat, p.lng)) });
   }
   // riverbank outlines for the widths
+  // (and the wide or tidal ones, area water: no ribbon in them)
   const outlines = [];
+  const areas = [];
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 3) || !isClosed(f.geometry)) continue;
     const t = f.tags || {};
-    if (!(RIVERBANK_WATER.has(norm(t.water)) || norm(t.waterway) === 'riverbank')) continue;
-    outlines.push(makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng)))));
+    if (!isRiverbank(t)) continue;
+    const poly = makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng))));
+    outlines.push(poly);
+    if (!isDry(t) && isRiverArea(t, poly, heightAt)) areas.push(poly);
   }
 
   // chain: a way's end is the next one's start, and only those two meet there
@@ -271,6 +317,7 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
       piece = []; pieceOutline = [];
     };
     centres.forEach(([x, y], i) => {
+      if (areas.some((a) => a.contains(x, y))) { stats.nodesInAreaWater++; flush(); return; }
       let edge = edgeDistance(x, y);
       if (i > 0) { // a road crossing between this node and the last
         const [px, py] = centres[i - 1];
@@ -288,6 +335,62 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
   return { rivers, stats };
 }
 
+// x ranges inside the polygon along the line at y (even-odd over every ring).
+function spansAt(poly, y) {
+  const xs = [];
+  for (const ring of [poly.outer, ...poly.holes]) {
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+      if ((yi > y) !== (yj > y)) xs.push(xi + ((y - yi) * (xj - xi)) / (yj - yi));
+    }
+  }
+  xs.sort((a, b) => a - b);
+  const spans = [];
+  for (let k = 0; k + 1 < xs.length; k += 2) spans.push([xs[k], xs[k + 1]]);
+  return spans;
+}
+// Greedy rectangles over a mask (row-major, widest first, then as tall as rows allow).
+function mergeMask(wet, nx, ny, x0, y0, cell, out) {
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    if (!wet[j * nx + i]) continue;
+    let w = 1;
+    while (i + w < nx && wet[j * nx + i + w]) w++;
+    let h = 1;
+    while (j + h < ny) {
+      let full = true;
+      for (let k = 0; k < w && full; k++) full = wet[(j + h) * nx + i + k] === 1;
+      if (!full) break;
+      h++;
+    }
+    for (let jj = j; jj < j + h; jj++) for (let k = 0; k < w; k++) wet[jj * nx + i + k] = 0;
+    out.push({ cx: x0 + (i + w / 2) * cell, cy: y0 + (j + h / 2) * cell, sx: w * cell, sy: h * cell });
+  }
+  return out;
+}
+/**
+ * Rectangles covering a polygon: a grid of cells (a quarter of `cell` within
+ * SHORE_CELL_M, coarser where the grid would pass SHORE_GRID_MAX across),
+ * every one the outline touches kept, merged greedily. The water reaches the
+ * shore everywhere, past it by at most one cell. Exported for tests.
+ */
+export function tileOutline(poly, cell) {
+  const [x0, y0, x1, y1] = poly.box;
+  const c = Math.min(cell, Math.max(SHORE_CELL_M[0], Math.min(SHORE_CELL_M[1], cell / 4), Math.max(x1 - x0, y1 - y0) / SHORE_GRID_MAX));
+  const nx = Math.max(1, Math.ceil((x1 - x0) / c)); const ny = Math.max(1, Math.ceil((y1 - y0) / c));
+  // a cell is touched when a span at its bottom, middle or top crosses it
+  const wet = new Uint8Array(nx * ny);
+  const eps = 1e-6;
+  for (let j = 0; j < ny; j++) {
+    for (const f of [eps, 0.5, 1 - eps]) {
+      for (const [a, b] of spansAt(poly, y0 + (j + f) * c)) {
+        const i0 = Math.max(0, Math.floor((a - x0) / c + eps)); const i1 = Math.min(nx - 1, Math.ceil((b - x0) / c - eps) - 1);
+        for (let i = i0; i <= i1; i++) wet[j * nx + i] = 1;
+      }
+    }
+  }
+  return mergeMask(wet, nx, ny, x0, y0, c, []);
+}
+
 /**
  * Lake tiles: [{ cx, cy, sx, sy, z, lake }] (WaterBlock rectangles, z the
  * water surface), plus stats and lakes [{ poly, level }] (carveLakeBeds).
@@ -295,52 +398,29 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
 export function planLakes({ features = [], toWorld, heightAt }) {
   const tiles = [];
   const lakes = [];   // { poly, level } for carveLakeBeds
-  const stats = { lakes: 0, dry: 0, tiles: 0 };
+  const stats = { lakes: 0, dry: 0, tiles: 0, riverAreas: 0 };
   let lakeIndex = 0;
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 3) || !isClosed(f.geometry)) continue;
     const t = f.tags || {};
-    if (t.waterway || RIVERBANK_WATER.has(norm(t.water))) continue;
+    const river = isRiverbank(t);
+    if (t.waterway && !river) continue;
     if (['sea', 'ocean'].includes(norm(t.place)) || norm(t.natural) === 'bay' || ['dock', 'harbour'].includes(norm(t.water)) || norm(t.leisure) === 'marina') continue;
-    const isLake = norm(t.natural) === 'water' ? (!t.water || LAKE_WATER.has(norm(t.water))) : ['reservoir', 'basin'].includes(norm(t.landuse));
+    const isLake = river || (norm(t.natural) === 'water' ? (!t.water || LAKE_WATER.has(norm(t.water))) : ['reservoir', 'basin'].includes(norm(t.landuse)));
     if (!isLake) continue;
+    if (river && isDry(t)) continue;
     if (isDry(t)) { stats.dry++; continue; }
     const poly = makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng))));
-    const [x0, y0, x1, y1] = poly.box;
-    const side = Math.max(x1 - x0, y1 - y0, 1);
+    // (a river's outline only where it is area water; the rest are Rivers)
+    if (river && !isRiverArea(t, poly, heightAt)) continue;
+    if (river) stats.riverAreas++;
     // the lake's level: the median ground inside it
-    const inside = [];
-    const step = Math.max(1, side / 24);
-    for (let x = x0 + step / 2; x < x1; x += step) for (let y = y0 + step / 2; y < y1; y += step) if (poly.contains(x, y)) inside.push(heightAt(x, y));
-    if (!inside.length) for (const [x, y] of poly.outer) inside.push(heightAt(x, y));
-    inside.sort((a, b) => a - b);
+    const inside = groundInside(poly, heightAt);
     const level = inside[inside.length >> 1] + 0.05;
-    // a grid over the outline, cells mostly inside it kept, merged greedily
-    // into as few rectangles as possible
+    // tiles: every small cell the outline touches, merged (the water reaches
+    // the shore, over the bank by at most one cell: the bank hides it)
     const area = Math.abs(poly.outer.reduce((a, p, i) => { const q = poly.outer[(i + 1) % poly.outer.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
-    const cell = Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16));
-    const nx = Math.max(1, Math.ceil((x1 - x0) / cell)); const ny = Math.max(1, Math.ceil((y1 - y0) / cell));
-    const wet = new Uint8Array(nx * ny);
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-      let hits = 0;
-      for (const fx of [0.2, 0.5, 0.8]) for (const fy of [0.2, 0.5, 0.8]) if (poly.contains(x0 + (i + fx) * cell, y0 + (j + fy) * cell)) hits++;
-      wet[j * nx + i] = hits >= 5 ? 1 : 0;
-    }
-    const lakeTiles = [];
-    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
-      if (!wet[j * nx + i]) continue;
-      let w = 1;
-      while (i + w < nx && wet[j * nx + i + w]) w++;
-      let h = 1;
-      while (j + h < ny) {
-        let full = true;
-        for (let k = 0; k < w && full; k++) full = wet[(j + h) * nx + i + k] === 1;
-        if (!full) break;
-        h++;
-      }
-      for (let jj = j; jj < j + h; jj++) for (let k = 0; k < w; k++) wet[jj * nx + i + k] = 0;
-      lakeTiles.push({ cx: x0 + (i + w / 2) * cell, cy: y0 + (j + h / 2) * cell, sx: w * cell, sy: h * cell });
-    }
+    const lakeTiles = tileOutline(poly, Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16)));
     if (!lakeTiles.length) continue;
     stats.lakes++;
     for (const tile of lakeTiles) tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: lakeIndex, name: t.name || null });

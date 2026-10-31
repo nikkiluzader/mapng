@@ -149,3 +149,65 @@ test('lake beds: no bed under ground a road keeps (its sidewalk, the quay)', asy
   assert.equal(at(-3, 0), 5, 'kept beside the road');
   assert.ok(at(-20, 0) < 4, 'carved in the middle');
 });
+
+test('a wide or tidal flat river outline is area water with no ribbon; narrow or sloping ones stay Rivers', () => {
+  // a 400 m wide river along y = 0..400, its ground flattened at 0.2 m, the banks at 3 m
+  const wide = [
+    ring(box(0, 0, 1000, 400), { natural: 'water', water: 'river' }),
+    line([[0, 200], [1000, 200]], { waterway: 'river', name: 'Wide' }),
+  ];
+  const flat = (x, y) => (y >= 0 && y <= 400 ? 0.2 : 3);
+  const lakes = planLakes({ features: wide, toWorld, heightAt: flat });
+  assert.equal(lakes.stats.riverAreas, 1);
+  assert.ok(lakes.tiles.length > 0 && lakes.tiles.every((t) => Math.abs(t.z - 0.25) < 0.01), 'tiles at the flattened level');
+  const covered = lakes.tiles.reduce((a, t) => a + t.sx * t.sy, 0);
+  assert.ok(covered > 1000 * 400 * 0.9, `tiles reach the banks: ${covered.toFixed(0)} m²`);
+  const { rivers, stats } = planRivers({ features: wide, toWorld, heightAt: flat });
+  assert.equal(rivers.length, 0, 'no ribbon inside area water');
+  assert.ok(stats.nodesInAreaWater > 40);
+
+  // narrow (60 m) and not tidal: a River as wide as its outline, no tiles
+  const narrow = [
+    ring(box(0, 0, 1000, 60), { natural: 'water', water: 'river' }),
+    line([[0, 30], [1000, 30]], { waterway: 'river' }),
+  ];
+  const flatN = (x, y) => (y >= 0 && y <= 60 ? 0.2 : 3);
+  assert.equal(planLakes({ features: narrow, toWorld, heightAt: flatN }).stats.riverAreas, 0);
+  const rn = planRivers({ features: narrow, toWorld, heightAt: flatN }).rivers;
+  assert.equal(rn.length, 1);
+  assert.ok(rn[0].nodes[10][3] > 55, `width from the outline: ${rn[0].nodes[10][3]}`);
+  // the same narrow one tagged tidal: area water
+  narrow[0].tags.tidal = 'yes';
+  assert.equal(planLakes({ features: narrow, toWorld, heightAt: flatN }).stats.riverAreas, 1);
+
+  // wide but falling 10 m along its length: stays a ribbon (one flat level would flood or float)
+  const sloped = (x, y) => (y >= 0 && y <= 400 ? 10 - x * 0.01 : 13 - x * 0.01);
+  assert.equal(planLakes({ features: wide, toWorld, heightAt: sloped }).stats.riverAreas, 0);
+  assert.equal(planRivers({ features: wide, toWorld, heightAt: sloped }).rivers.length, 1);
+});
+
+test('lake tiles reach a diagonal shore everywhere and pass it by at most one small cell', () => {
+  // a 600 m square turned 30 degrees: every shore diagonal to the grid
+  const c = Math.cos(Math.PI / 6); const s = Math.sin(Math.PI / 6);
+  const pts = box(-300, -300, 300, 300).map(([x, y]) => [x * c - y * s, x * s + y * c]);
+  const feat = ring(pts, { natural: 'water', water: 'lake' });
+  const { tiles, lakes } = planLakes({ features: [feat], toWorld, heightAt: () => 1 });
+  const poly = lakes[0].poly;
+  const under = (x, y) => tiles.some((t) => Math.abs(x - t.cx) <= t.sx / 2 && Math.abs(y - t.cy) <= t.sy / 2);
+  let missed = 0;
+  for (let x = -420; x <= 420; x += 3) for (let y = -420; y <= 420; y += 3) if (poly.contains(x, y) && !under(x, y)) missed++;
+  assert.equal(missed, 0, 'no gap between the water and the shore');
+  // the farthest a tile corner reaches past the shore
+  const dist = (x, y) => Math.min(...pts.map((a, i) => {
+    const b = pts[(i + 1) % pts.length]; const vx = b[0] - a[0]; const vy = b[1] - a[1];
+    const f = Math.max(0, Math.min(1, ((x - a[0]) * vx + (y - a[1]) * vy) / (vx * vx + vy * vy)));
+    return Math.hypot(a[0] + vx * f - x, a[1] + vy * f - y);
+  }));
+  let past = 0;
+  for (const t of tiles) for (const [dx, dy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+    const x = t.cx + (dx * t.sx) / 2; const y = t.cy + (dy * t.sy) / 2;
+    if (!poly.contains(x, y)) past = Math.max(past, dist(x, y));
+  }
+  assert.ok(past <= 4 * Math.SQRT2 + 0.5, `at most one 4 m cell past the shore: ${past.toFixed(1)} m`);
+  assert.ok(tiles.length < 600, `tiles: ${tiles.length}`);
+});

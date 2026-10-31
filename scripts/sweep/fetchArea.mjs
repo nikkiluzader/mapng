@@ -6,6 +6,7 @@
 //
 //   node scripts/sweep/fetchArea.mjs <name> <lat> <lng> [size=1024]   (MPP=1)
 //   node scripts/sweep/fetchArea.mjs --catalog [name...]   areas.json entries not yet fetched
+//   OSM_ONLY=1 node scripts/sweep/fetchArea.mjs <name> <lat> <lng> [size]   osm.json again, elevation kept
 //
 // Writes <MAPNG_AREAS>/<name>/{gpxz.tif, gpxz.f32, t30.f32, osm.json, meta.json}.
 // An area whose OSM came back near empty (an outage) is refused, not saved.
@@ -49,6 +50,8 @@ async function fetchOne({ name, lat, lng, size }) {
     east: Math.max(...corners.map((c) => c[0])), west: Math.min(...corners.map((c) => c[0])),
   };
 
+  // (OSM_ONLY=1: the elevation already fetched kept, only osm.json fetched again)
+  if (!process.env.OSM_ONLY) {
   // ── GPXZ ──
   let gpxzSmooth = false, resolutions = [];
   {
@@ -102,6 +105,7 @@ async function fetchOne({ name, lat, lng, size }) {
 
   fs.writeFileSync(`${OUT}/meta.json`, JSON.stringify({ name, center, size: SIZE, mpp: MPP, fetchBounds: bounds, bounds: gpxz.bounds, gpxzSmooth, resolutions, rasterRes, rasterSize: [image.getWidth(), image.getHeight()] }, null, 1));
   console.log(name, 'gpxz res', resolutions.map((r) => `${r.res}m ${r.src}`).join(', '), 'smooth', gpxzSmooth, 'raster', rasterRes, image.getWidth(), image.getHeight());
+  }
 
   // ── OSM ──
   const url = key('TRACESTRACK_API_URL');

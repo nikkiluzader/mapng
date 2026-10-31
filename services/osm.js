@@ -94,6 +94,10 @@ const clipPolygon = (points, bounds) => {
       S = E;
     }
   }
+  // a ring stays closed (the map edge cutting its closing edge dropped the
+  // repeated first point: a riverbank that crosses the edge was no outline)
+  const a = output[0]; const z = output[output.length - 1];
+  if (output.length > 2 && isClosedRing(points) && (a.lat !== z.lat || a.lng !== z.lng)) output.push({ ...a });
   return output;
 };
 

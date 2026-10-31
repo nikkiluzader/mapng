@@ -6466,6 +6466,7 @@ function buildDetailedReportSections(d) {
   listCounts(countBy(d.waterObjects || [], (o) => o.class));
   const ws = d.waterObjects?.stats;
   if (ws?.sea?.blocks != null) lines.push(`- Sea: ${ws.sea.blocks} WaterBlocks in place of the sea-level plane (a tunnel reaches under sea level: no water in its trenches, none deeper than its roof over the tube)`);
+  if (ws?.lakes?.riverAreas) lines.push(`- Wide or tidal rivers as area water (WaterBlocks at the river's level, no River ribbon in them): ${ws.lakes.riverAreas}`);
   if (ws?.lakes?.clippedOverTunnels) lines.push(`- Lake tiles held over a tunnel's roof: ${ws.lakes.clippedOverTunnels}`);
   if (ws?.rivers?.nodesClippedOverTunnels) lines.push(`- River nodes held over a tunnel's roof (or left out over its trench): ${ws.rivers.nodesClippedOverTunnels}`);
 
@@ -10854,7 +10855,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   ];
   Object.defineProperty(waterObjects, 'stats', { value: waterStats, enumerable: false });
   if (includeWater) {
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water: ${waterStats.lakes.tiles ?? 0} lake tiles in ${waterStats.lakes.lakes ?? 0} lakes, ${waterStats.rivers.pieces ?? 0} rivers; left out ${waterStats.rivers.dry ?? 0} dry washes, ${waterStats.rivers.underground ?? 0} culverts, ${waterStats.rivers.otherKinds ?? 0} drains/ditches, ${waterStats.lakes.dry ?? 0} dry lakes; ${waterStats.rivers.cutAtRoads ?? 0} cut at roads.`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water: ${waterStats.lakes.tiles ?? 0} lake tiles in ${waterStats.lakes.lakes ?? 0} lakes (${waterStats.lakes.riverAreas ?? 0} of them wide or tidal rivers), ${waterStats.rivers.pieces ?? 0} rivers; left out ${waterStats.rivers.dry ?? 0} dry washes, ${waterStats.rivers.underground ?? 0} culverts, ${waterStats.rivers.otherKinds ?? 0} drains/ditches, ${waterStats.lakes.dry ?? 0} dry lakes; ${waterStats.rivers.cutAtRoads ?? 0} cut at roads.`);
   }
   const cloudObjects = buildCloudObjects(biome);
 
