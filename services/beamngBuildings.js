@@ -1643,7 +1643,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   }
   if (Object.keys(pitchKinds).length) stats.details.pitches = pitchKinds;
   const seatKinds = {};
-  for (const st of planSeating(features, project, pitches)) {
+  for (const st of planSeating(features, project, pitches, { groundAt })) {
     const tile = tileFor(st.ring);
     bump(seatKinds, buildSeating(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, st));
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);

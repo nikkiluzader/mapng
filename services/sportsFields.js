@@ -53,7 +53,7 @@ const SURFACE_OF = {
 // surfaces that lie on the ground (the rest are a flat slab)
 const ON_GROUND = new Set(['grass', 'turf', 'sand', 'dirt', 'gravel', 'tartan']);   // (a track is graded to the ground's lie, not a raised slab)
 const LOOK = {
-  grass: ['turf', [0.62, 0.82, 0.5]], turf: ['turf', [0.45, 0.85, 0.4]], clay: ['dirt', [0.95, 0.55, 0.38]], sand: ['sand', [1, 0.96, 0.88]],
+  grass: ['turf', [0.62, 0.82, 0.5]], turf: ['turf', [0.46, 0.72, 0.4]], clay: ['dirt', [0.95, 0.55, 0.38]], sand: ['sand', [1, 0.96, 0.88]],
   dirt: ['dirt', [0.85, 0.66, 0.5]], gravel: ['dirt', [0.82, 0.78, 0.72]], asphalt: ['roofFlat', [0.55, 0.55, 0.56]],
   concrete: ['smoothConcrete', [0.82, 0.82, 0.8]], hard: ['smoothConcrete', [0.36, 0.55, 0.42]], tartan: ['smoothConcrete', [0.66, 0.24, 0.18]],
 };
@@ -67,7 +67,7 @@ const DARK_NET = [0.18, 0.2, 0.2];
 const POST_YELLOW = [1, 0.82, 0.12];
 const LINE_W = 0.08;
 const SLAB_H = 0.12;
-const ON_GROUND_H = 0.05;     // a lying surface over the ground's bumps (sampled finely)
+const ON_GROUND_H = 0.06;     // a lying surface over the ground's bumps (sampled finely)
 const MIN_AREA_M2 = 30;
 const MAX_AREA_M2 = 40000;
 
@@ -146,7 +146,9 @@ export function planPitches(features, project, { groundAt = null } = {}) {
     if (sport === 'track' && !hole) hole = insetPts(ring, Math.max(4, Math.min(10, Number.parseInt(t.lanes, 10) || 6)) * 1.22 + 0.3);
     const bx = orientedBox(ring);
     if (!bx) continue;
-    const surface = SURFACE_OF[String(t.surface || '').toLowerCase()] || SURFACE_OF[USUAL_SURFACE[sport]] || 'grass';
+    // (an untagged field: a hard court when small, else a grass field)
+    const usual = sport === 'multi' && area > 1000 ? 'grass' : USUAL_SURFACE[sport];
+    const surface = SURFACE_OF[String(t.surface || '').toLowerCase()] || SURFACE_OF[usual] || 'grass';
     const grounds = pts.map((p) => p[2]).filter(Number.isFinite);
     pending.push({ id: f.id, sport, surface, ring, hole, box: bx, area, seed: String(f.id), tags: t, z0: Math.min(...grounds), z1: Math.max(...grounds) });
   }
@@ -164,7 +166,9 @@ export function planPitches(features, project, { groundAt = null } = {}) {
     for (let i = 0; i < ns; i++) for (let j = 0; j < nt; j++) {
       const s = bx.s0 + Math.min(L, i * step); const tt = bx.t0 + Math.min(W, j * step);
       let z = -Infinity;
-      for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) z = Math.max(z, ground(...frameAt(bx, s + a * 0.5 * step, tt + b * 0.5 * step)));
+      // (the highest within a metre: a raw survey's sharp bumps between
+      // samples poked through)
+      for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) z = Math.max(z, ground(...frameAt(bx, s + a * 0.5, tt + b * 0.5)));
       grid[i * nt + j] = z;
       top = Math.max(top, z);
     }
@@ -588,6 +592,9 @@ function baseball(stone, full, p, softball) {
       for (let i = 0; i < n; i++) {
         const b0 = a0 + ((a1 - a0) * i) / n; const b1 = a0 + ((a1 - a0) * (i + 1)) / n;
         const q = [pnt(ra, b0), pnt(rb, b0), pnt(rb, b1), pnt(ra, b1)].map((xy) => [xy[0], xy[1], fz(xy) + lift]);
+        // (inside the field only: on a small field the skin's arc ran past its edge)
+        const mid = pnt((ra + rb) / 2, (b0 + b1) / 2);
+        if (!inRing(mid[0], mid[1], p.ring)) continue;
         full.quad('dirt', q[0], q[1], q[2], q[3], [q[0][0] / 4, q[0][1] / 4], [q[1][0] / 4, q[1][1] / 4], [q[2][0] / 4, q[2][1] / 4], [q[3][0] / 4, q[3][1] / 4], col);
       }
     }
@@ -818,8 +825,21 @@ function skatepark(stone, full, p) {
       const [d0, h0] = [r * (1 - Math.sin((Math.PI / 2) * (i / 6))), r * (1 - Math.cos((Math.PI / 2) * (i / 6)))];
       const [d1, h1] = [r * (1 - Math.sin((Math.PI / 2) * ((i + 1) / 6))), r * (1 - Math.cos((Math.PI / 2) * ((i + 1) / 6)))];
       const q = [onField(p, e + dir * d0, tc - w / 2, h0), onField(p, e + dir * d0, tc + w / 2, h0), onField(p, e + dir * d1, tc + w / 2, h1), onField(p, e + dir * d1, tc - w / 2, h1)];
-      const [a, b, c, d] = dir > 0 ? [q[1], q[0], q[3], q[2]] : q;
+      // (facing into the park: the right of +t is +s)
+      const [a, b, c, d] = dir > 0 ? q : [q[1], q[0], q[3], q[2]];
       stone.quad('smoothConcrete', a, b, c, d, [0, 0], [1, 0], [1, 1], [0, 1], C);
+    }
+    // its sides closed: the curve's profile down to the slab
+    for (const sg of [-1, 1]) {
+      const tt = tc + (sg * w) / 2;
+      const prof = Array.from({ length: 7 }, (_, i) => [r * (1 - Math.sin((Math.PI / 2) * (i / 6))), r * (1 - Math.cos((Math.PI / 2) * (i / 6)))]);
+      const o = onField(p, e, tt, 0);
+      for (let i = 0; i < 6; i++) {
+        const a = onField(p, e + dir * prof[i][0], tt, prof[i][1]); const b = onField(p, e + dir * prof[i + 1][0], tt, prof[i + 1][1]);
+        // (facing out of the ramp's side: away from its middle)
+        if ((sg > 0) === (dir > 0)) stone.tri('smoothConcrete', o, b, a, [0, 0], [1, 0], [0, 1], C);
+        else stone.tri('smoothConcrete', o, a, b, [0, 0], [1, 0], [0, 1], C);
+      }
     }
     box(stone, 'smoothConcrete', F(p, e - dir * 0.0, (t0 + t1) / 2), p.box.u, 0.25, w / 2, z, z + r, C);
     bar(stone, 'metalWhite', onField(p, e + dir * 0.02, tc - w / 2, r + 0.02), onField(p, e + dir * 0.02, tc + w / 2, r + 0.02), 0.03, STEEL);
@@ -868,7 +888,7 @@ export function buildPitch(stone, full, p) {
 // ── Seating ──────────────────────────────────────────────────────────────────
 
 /** Bleachers and grandstands: [{ id, ring, box, face (unit, toward the field), z0, z1, roof }]. */
-export function planSeating(features, project, pitches = []) {
+export function planSeating(features, project, pitches = [], { groundAt = null } = {}) {
   const out = [];
   for (const f of features || []) {
     const t = f?.tags || {};
@@ -894,7 +914,7 @@ export function planSeating(features, project, pitches = []) {
     const toward = near ? [near.pc[0] - c[0], near.pc[1] - c[1]] : v;
     const face = toward[0] * v[0] + toward[1] * v[1] >= 0 ? v : [-v[0], -v[1]];
     const grounds = pts.map((q) => q[2]).filter(Number.isFinite);
-    out.push({ id: f.id, ring, box: bx, face, z0: Math.min(...grounds), z1: Math.max(...grounds), area,
+    out.push({ id: f.id, ring, box: bx, face, z0: Math.min(...grounds), z1: Math.max(...grounds), area, ground: groundAt,
       roof: t.building === 'grandstand' && (area > 250 || Number.parseFloat(t['building:levels']) >= 2 || /roof|covered/.test(String(t.covered || t['roof:shape'] || ''))), tags: t, seed: String(f.id) });
   }
   return out;
@@ -909,23 +929,45 @@ export function buildSeating(stone, full, st) {
   const front = (f[0] * -bx.u[1] + f[1] * bx.u[0]) > 0 ? bx.t1 : bx.t0;
   const back = front === bx.t1 ? bx.t0 : bx.t1;
   const dirT = back > front ? 1 : -1;
-  const rows = Math.max(2, Math.min(30, Math.floor(D / 0.75)));
-  const rowD = D / rows; const rise = Math.min(0.42, rowD * 0.55);
+  // rows a fixed depth and rise from the front (a deep outline: more rows, up to 20)
+  const rowD = 0.75; const rise = 0.4;
+  const rows = Math.max(2, Math.min(20, Math.floor(D / rowD)));
   const g = st.z1;
   const at = (s, t) => frameAt(bx, s, t);
   const seat = [0.78, 0.8, 0.82];
   const frame = [0.5, 0.52, 0.55];
   const concrete = st.tags.building === 'grandstand';
+  const sMid = (bx.s0 + bx.s1) / 2;
   for (let k = 0; k < rows; k++) {
     const t0 = front + dirT * k * rowD; const t1 = t0 + dirT * rowD;
-    const z = g + 0.45 + k * rise;
-    const c = at((bx.s0 + bx.s1) / 2, (t0 + t1) / 2);
-    if (concrete) box(stone, 'smoothConcrete', c, along, L / 2, rowD / 2, st.z0 - 0.3, z - 0.05, [0.8, 0.8, 0.78]);
-    else box(stone, 'metalWhite', at((bx.s0 + bx.s1) / 2, t0 + dirT * rowD * 0.3), along, L / 2, rowD * 0.3, z - 0.42, z - 0.38, seat);   // footboard
+    const z = g + 0.45 + k * rise;          // the seat's top
+    const zf = z - 0.42;                     // the footboard's
+    if (concrete) box(stone, 'smoothConcrete', at(sMid, (t0 + t1) / 2), along, L / 2, rowD / 2, st.z0 - 0.3, zf, [0.8, 0.8, 0.78]);
+    else {
+      // footboard, the closed riser up to the next row's footboard
+      box(stone, 'metalWhite', at(sMid, t0 + dirT * rowD * 0.5), along, L / 2, rowD * 0.5, zf - 0.04, zf, seat);
+      const r0 = at(bx.s0, t1); const r1 = at(bx.s1, t1);
+      const q = [[...r0, zf], [...r1, zf], [...r1, zf + rise], [...r0, zf + rise]];
+      // (facing the field: the right of s0 -> s1 is -t)
+      const [a, b, c, d] = dirT > 0 ? q : [q[1], q[0], q[3], q[2]];
+      stone.quad('metalWhite', a, b, c, d, [0, 0], [L, 0], [L, rise], [0, rise], [0.66, 0.68, 0.7]);
+    }
     // the seat plank toward the back of the row
-    box(stone, 'metalWhite', at((bx.s0 + bx.s1) / 2, t0 + dirT * rowD * 0.72), along, L / 2 - 0.05, rowD * 0.2, z - 0.04, z, concrete ? [0.15, 0.3, 0.6] : seat);
+    box(stone, 'metalWhite', at(sMid, t0 + dirT * rowD * 0.72), along, L / 2 - 0.05, rowD * 0.18, z - 0.05, z, concrete ? [0.15, 0.3, 0.6] : seat);
   }
   const top = g + 0.45 + (rows - 1) * rise;
+  // the front closed down to the ground (on a slope the first row stood on stilts)
+  {
+    const n = Math.max(1, Math.ceil(L / 2));
+    for (let i = 0; i < n; i++) {
+      const sa = bx.s0 + (L * i) / n; const sb = bx.s0 + (L * (i + 1)) / n;
+      const a = at(sa, front); const b = at(sb, front);
+      const ga = st.ground ? st.ground(...a) : st.z0; const gb = st.ground ? st.ground(...b) : st.z0;
+      const q = [[...a, ga - 0.2], [...b, gb - 0.2], [...b, g + 0.03], [...a, g + 0.03]];
+      const [qa, qb, qc, qd] = dirT > 0 ? q : [q[1], q[0], q[3], q[2]];
+      stone.quad(concrete ? 'smoothConcrete' : 'metalWhite', qa, qb, qc, qd, [0, 0], [1, 0], [1, 1], [0, 1], concrete ? [0.8, 0.8, 0.78] : [0.66, 0.68, 0.7]);
+    }
+  }
   // the frame under aluminium bleachers, a rail along the back
   if (!concrete) {
     for (let s = bx.s0 + 0.2; s <= bx.s1 - 0.1; s += Math.max(1.8, L / Math.ceil(L / 2.4))) {

@@ -1047,7 +1047,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
     // (carports are open roofs on posts: native carport models, not walls)
     terrainData.osmFeatures.filter((f) => !isCarportFeature(f)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
-    { tileM: buildingTileSize(worldSize), squareSize, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) },
+    { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize) },
   );
   if (reportStats) {
     reportStats.built = buildingCount;
@@ -6827,6 +6827,27 @@ function getTerrainHeightWorld(lat, lng, terrainData) {
 }
 
 /**
+ * The ground as the game draws it at world (x, y): the heightmap sampled on
+ * the terrain's own grid (samples squareSize apart from minus half its
+ * extent, rows from the south). The (W - 1)-span lookups drift up to a
+ * square from it across the map, centimetres of height on a slope: the
+ * fields and pool decks that lie on the ground use this one.
+ */
+function terrainGroundAt(terrainData, squareSize) {
+  const { width, height, heightMap, minHeight } = terrainData;
+  const ok = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
+  return (x, y) => {
+    const fx = Math.max(0, Math.min(width - 1.001, x / squareSize + width / 2));
+    const fj = Math.max(0, Math.min(height - 1.001, y / squareSize + height / 2));
+    const fy = height - 1 - fj;
+    const c0 = Math.floor(fx); const r0 = Math.floor(fy); const c1 = Math.min(width - 1, c0 + 1); const r1 = Math.min(height - 1, r0 + 1);
+    const tx = fx - c0; const ty = fy - r0;
+    return ok(heightMap[r0 * width + c0]) * (1 - tx) * (1 - ty) + ok(heightMap[r0 * width + c1]) * tx * (1 - ty)
+      + ok(heightMap[r1 * width + c0]) * (1 - tx) * ty + ok(heightMap[r1 * width + c1]) * tx * ty - minHeight;
+  };
+}
+
+/**
  * Convert a geographic point to BeamNG world-space coordinates.
  */
 /**
@@ -8263,7 +8284,7 @@ function buildPoolWaterObjects(terrainData, squareSize, biome, stats = {}) {
   const waterProfile = getWaterProfile(biome);
   const features = terrainData.osmFeatures || [];
   const project = (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
-  const pools = planPools(features, project, { squareSize, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) });
+  const pools = planPools(features, project, { squareSize, groundAt: terrainGroundAt(terrainData, squareSize) });
   const fountains = planFountains(features, project);
   const streets = fountains.some((f) => f.kind === 'wall') ? streetIndex(features, project) : null;
   const { rippleSpeeds, ...look } = POOL_WATER_BLOCK;
@@ -10860,9 +10881,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (includeBuildings) try {
     const feats = exportTerrainData.osmFeatures || [];
     const project = (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0);
-    const { holes: poolHoles, paved } = poolFootprints(planPools(feats, project, { squareSize, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) }));
+    const { holes: poolHoles, paved } = poolFootprints(planPools(feats, project, { squareSize, groundAt: terrainGroundAt(exportTerrainData, squareSize) }));
     paved.push(...fountainFootprints(planFountains(feats, project)));
-    paved.push(...pitchFootprints(planPitches(feats, project, { groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) })));
+    paved.push(...pitchFootprints(planPitches(feats, project, { groundAt: terrainGroundAt(exportTerrainData, squareSize) })));
     if (poolHoles.length || paved.length) {
       if (!terLayerMap) terLayerMap = new Uint8Array(exportTerrainData.width * exportTerrainData.height);
       // the terrain's own grid: sample (i, j), counted from the south-west
