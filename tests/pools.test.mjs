@@ -163,14 +163,19 @@ test('pool shapes drawn as mapped: rectangles, L shapes, octagons, clipped corne
   assert.equal(poolShape([[0, 0], [5, -1], [9, 1], [10, 4], [7, 6], [4, 4.5], [1, 5]]), 'freeform');
 });
 
-test('pool holes: a smoothed kidney opens every square its curved wall crosses', () => {
+test('pool holes: a smoothed kidney opens every square its curved wall crosses, on fine and coarse terrain', () => {
   const kidney = [[0.3, 0.2], [5.1, -1.1], [9.2, 0.9], [10.4, 4.2], [7.3, 6.1], [4.2, 4.4], [1.1, 5.3]];
-  const [k] = planPools([area('k', kidney, { leisure: 'swimming_pool' })], project);
-  const { holes } = poolFootprints([k]);
-  for (let c = -4; c < 15; c++) for (let r = -5; r < 11; r++) {
-    const sq = [[c, r], [c + 1, r], [c + 1, r + 1], [c, r + 1]];
-    let touches = false;
-    for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) if (inRing(c + i / 8, r + j / 8, k.ring)) touches = true;
-    if (touches) assert.ok(squareOpens(sq, holes[0]), `square (${c}, ${r}) under the curved wall left closed`);
+  for (const sq of [0.5, 1, 2]) {
+    const [k] = planPools([area('k', kidney, { leisure: 'swimming_pool' })], project, { squareSize: sq });
+    const { holes } = poolFootprints([k]);
+    for (let c = Math.floor(-6 / sq); c < 16 / sq; c++) for (let r = Math.floor(-7 / sq); r < 13 / sq; r++) {
+      const x0 = c * sq; const y0 = r * sq;
+      const cell = [[x0, y0], [x0 + sq, y0], [x0 + sq, y0 + sq], [x0, y0 + sq]];
+      let touches = false;
+      for (let i = 0; i <= 8; i++) for (let j = 0; j <= 8; j++) if (inRing(x0 + (i * sq) / 8, y0 + (j * sq) / 8, k.ring)) touches = true;
+      const opens = squareOpens(cell, holes[0]);
+      if (touches) assert.ok(opens, `${sq} m squares: (${c}, ${r}) under the curved wall left closed`);
+      if (opens) assert.ok(cell.every(([x, y]) => inRing(x, y, holes[0].cover)), `${sq} m squares: (${c}, ${r}) opened past the deck`);
+    }
   }
 });

@@ -29,8 +29,14 @@ import { hash01, signedArea, cleanRing, inRing, flat, buildingTest } from './fou
 import { orientedBox, frameAt, coverRing } from './waterCover.js';
 
 const DECK_MIN_M = 1.2;          // the paved deck round a sunk pool
-const DECK_PER_SQUARE = 1.62;    // ... at least this many terrain squares wide (a square touching the pool lies under it: its diagonal and the margin)
-const HOLE_MARGIN_M = 0.15;      // squares opened this far past the pool's wall
+// The opening: terrain squares (squareSize each: the processing resolution)
+// touching the pool grown by HOLE_MARGIN squares (at least HOLE_MARGIN_MIN_M),
+// then one square more all round (the exporter); the deck at least that
+// margin plus DECK_PER_SQUARE squares wide, so it covers the whole opening.
+const HOLE_MARGIN = 0.6;
+const HOLE_MARGIN_MIN_M = 0.3;
+const DECK_PER_SQUARE = 2.2;
+const holeMargin = (squareSize) => Math.max(HOLE_MARGIN_MIN_M, HOLE_MARGIN * squareSize);
 const COPING_M = 0.35;
 // The deck: a rectangle round the pool (its own frame), DECK_SIZE * sqrt(the
 // pool's area) past it within DECK_MARGIN_M, pulled back from roads (their
@@ -118,7 +124,10 @@ export function smoothRing(ring) {
 }
 
 /** The deck's width for terrain squares of this size (every opened square lies under the pool or its deck). */
-export const deckWidth = (squareSize = 1) => Math.max(DECK_MIN_M, DECK_PER_SQUARE * squareSize);
+export const deckWidth = (squareSize = 1) => Math.max(DECK_MIN_M, holeMargin(squareSize) + DECK_PER_SQUARE * squareSize);
+// (a road beside the pool may pull the deck back to this: still over every
+// square the pool touches, the extra ring then opened only where it is over)
+const deckFloor = (squareSize = 1) => Math.max(DECK_MIN_M, holeMargin(squareSize) + 1.5 * squareSize);
 
 /**
  * Pools to build: [{ id, kind, ring (counter-clockwise), z0, z1, box, lanes,
@@ -164,7 +173,7 @@ export function planPools(features, project, { squareSize = 1, groundAt = null }
     const long = bx.s1 - bx.s0; const short = bx.t1 - bx.t0;
     const rect = area / Math.max(1, long * short);
     const lanes = kind === 'inground' && !priv && rect > 0.92 && long >= LANES_MIN.long && short >= LANES_MIN.short ? Math.min(10, Math.floor(short / LANE_W)) : 0;
-    const p = { id: f.id, kind, shape, ring, z0: Math.min(...grounds), z1: Math.max(...grounds), box: bx, lanes, private: priv, deck: deckWidth(squareSize), seed: String(f.id), tags: t };
+    const p = { id: f.id, kind, shape, square: squareSize, ring, z0: Math.min(...grounds), z1: Math.max(...grounds), box: bx, lanes, private: priv, deck: deckWidth(squareSize), seed: String(f.id), tags: t };
     if (kind !== 'above') planDeck(p, area, roads, groundAt);
     out.push(p);
   }
@@ -188,8 +197,9 @@ function planDeck(p, area, roads, groundAt) {
       const ds = s < bx.s0 ? bx.s0 - s : s > bx.s1 ? s - bx.s1 : 0;
       const dt = t < bx.t0 ? bx.t0 - t : t > bx.t1 ? t - bx.t1 : 0;
       if (ds > M + clear || dt > M + clear) continue;
-      if (ds >= dt) { const k2 = s < bx.s0 ? 's0' : 's1'; m[k2] = Math.max(p.deck, Math.min(m[k2], ds - clear)); }
-      else { const k2 = t < bx.t0 ? 't0' : 't1'; m[k2] = Math.max(p.deck, Math.min(m[k2], dt - clear)); }
+      const floor = deckFloor(p.square ?? 1);
+      if (ds >= dt) { const k2 = s < bx.s0 ? 's0' : 's1'; m[k2] = Math.max(floor, Math.min(m[k2], ds - clear)); }
+      else { const k2 = t < bx.t0 ? 't0' : 't1'; m[k2] = Math.max(floor, Math.min(m[k2], dt - clear)); }
     }
   }
   const S0 = bx.s0 - m.s0; const S1 = bx.s1 + m.s1; const T0 = bx.t0 - m.t0; const T1 = bx.t1 + m.t1;
@@ -239,7 +249,7 @@ export function poolFootprints(pools) {
     if (p.kind === 'above') { paved.push(p.ring); continue; }
     const cover = p.deckRect || insetRing(p.ring, -p.deck);
     // (open: every square the pool touches, a margin past its wall; cover: the deck over the opening's edge)
-    holes.push({ open: insetRing(p.ring, -HOLE_MARGIN_M), cover });
+    holes.push({ open: insetRing(p.ring, -holeMargin(p.square ?? 1)), cover });
     paved.push(cover);
   }
   return { holes, paved };

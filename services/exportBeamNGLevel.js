@@ -10850,40 +10850,50 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     paved.push(...fountainFootprints(planFountains(feats, project)));
     if (poolHoles.length || paved.length) {
       if (!terLayerMap) terLayerMap = new Uint8Array(exportTerrainData.width * exportTerrainData.height);
-      const W = exportTerrainData.width; const H = exportTerrainData.height; const worldSize = W * squareSize;
-      const toWorld = (c, r) => [((c / (W - 1)) - 0.5) * worldSize, (0.5 - r / (H - 1)) * worldSize];
-      const pixelBox = (ring) => {
+      // the terrain's own grid: sample (i, j), counted from the south-west
+      // corner, at ((i - W/2), (j - W/2)) squares (the TerrainBlock sits at
+      // minus half its extent); its layer index j * W + i; a hole flag on it
+      // opens the square to its north-east (Terrain-Files.md). (A grid of
+      // (W - 1) spans, the heightmap's, drifted a square across the map:
+      // ground left along the pools' walls, an opening past a deck.)
+      const W = exportTerrainData.width; const H = exportTerrainData.height; const sq = squareSize;
+      const at = (i, j) => [(i - W / 2) * sq, (j - H / 2) * sq];
+      const box = (ring) => {
         let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
         for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
-        const c = (x) => Math.round((x / worldSize + 0.5) * (W - 1)); const r = (y) => Math.round((0.5 - y / worldSize) * (H - 1));
-        return [Math.max(1, c(x0) - 1), Math.max(1, r(y1) - 1), Math.min(W - 2, c(x1) + 1), Math.min(H - 2, r(y0) + 1)];
+        return [Math.max(0, Math.floor(x0 / sq + W / 2) - 1), Math.max(0, Math.floor(y0 / sq + H / 2) - 1),
+          Math.min(W - 2, Math.ceil(x1 / sq + W / 2) + 1), Math.min(H - 2, Math.ceil(y1 / sq + H / 2) + 1)];
       };
       const names = pbrResult?.materialNames || [];
       const bare = [names.indexOf('asphalt'), names.indexOf('ROCK')].find((i) => i >= 0);
       let barePixels = 0;
       if (bare !== undefined) {
         for (const ring of paved) {
-          const [c0, r0, c1, r1] = pixelBox(ring);
-          for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
-            const [x, y] = toWorld(c, r);
-            const k = (H - 1 - r) * W + c;
-            if (terLayerMap[k] !== 255 && inRingXY(x, y, ring)) { terLayerMap[k] = bare; barePixels++; }
+          const [i0, j0, i1, j1] = box(ring);
+          for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+            const k = j * W + i;
+            if (terLayerMap[k] !== 255 && inRingXY(...at(i, j), ring)) { terLayerMap[k] = bare; barePixels++; }
           }
         }
       }
-      // square (c, r) spans pixels c..c+1 and r-1..r: open when it touches the
-      // pool (and lies under its deck, services/pools.js squareOpens)
+      // a square opens when it touches the pool (services/pools.js
+      // squareOpens), then one square more all round, all under the deck
       let opened = 0;
+      const corners = (i, j) => [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
       for (const hole of poolHoles) {
-        const [c0, r0, c1, r1] = pixelBox(hole.open);
-        for (let r = r0; r <= r1; r++) for (let c = c0; c < c1; c++) {
-          if (squareOpens([[c, r], [c + 1, r], [c, r - 1], [c + 1, r - 1]].map(([cc, rr]) => toWorld(cc, rr)), hole)) {
-            // (the flag on the sample at its north-west corner, heightmap row
-            // r - 1: on its south-west one, row r, the opening came out a row
-            // south of the pool, ground left along its north wall; measured in game)
-            terLayerMap[(H - r) * W + c] = 255; opened++;
+        const [i0, j0, i1, j1] = box(hole.open);
+        const open = new Set();
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) if (squareOpens(corners(i, j), hole)) open.add(j * W + i);
+        const grown = new Set(open);
+        for (const k of open) {
+          const j = Math.floor(k / W); const i = k % W;
+          for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+            const ii = i + di; const jj = j + dj;
+            if (ii < 0 || ii >= W - 1 || jj < 0 || jj >= H - 1 || grown.has(jj * W + ii)) continue;
+            if (corners(ii, jj).every(([x, y]) => inRingXY(x, y, hole.cover))) grown.add(jj * W + ii);
           }
         }
+        for (const k of grown) { terLayerMap[k] = 255; opened++; }
       }
       if (pbrResult) { pbrResult.poolHoleSquares = opened; pbrResult.pavedBarePixels = barePixels; }
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Pools: ${poolHoles.length} sunk (${opened} terrain squares opened); ${barePixels} px bare under decks / basins.`);
