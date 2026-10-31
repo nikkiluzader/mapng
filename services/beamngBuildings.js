@@ -28,7 +28,7 @@
  * (metres, Z up) with one geometry group per material; their material names
  * match getBuildingMaterialDefs().
  */
-import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, chimney, roofPlant, churchTower, mosque, silo } from './buildingDetails.js';
+import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET } from './buildingDetails.js';
 import * as THREE from 'three';
 
 // ── Materials ───────────────────────────────────────────────────────────────
@@ -559,8 +559,13 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
     const mosqueLike = cls === 'mosque' || String(tags.religion || '').toLowerCase() === 'muslim';
     band = null; office = false;
     // (unmistakably stone: the smooth ECA ashlar read as white boards from a street away)
-    wall = material === 'brick' ? 'brick' : pick(['stone', 'stoneMixed', 'stoneFacade'], r('worshipWall'));
-    if (!Number.isFinite(levels) && !Number.isFinite(explicitH)) { floors = 1; eaveH = Math.max(6.5, Math.min(12, 5 + Math.sqrt(area) / 6)); }
+    // (the lighter stones: the dark mixed stone on long low walls read as a castle's ramparts)
+    wall = material === 'brick' ? 'brick' : pick(['stone', 'stoneFacade', 'stone'], r('worshipWall'));
+    const guessed = !Number.isFinite(levels) && !Number.isFinite(explicitH);
+    if (guessed) { floors = 1; eaveH = Math.max(6.5, Math.min(12, 5 + Math.sqrt(area) / 6)); }
+    // a church's walls stand tall: an ML height (Overture's mean over a church
+    // and its halls: Headingley St Columba 5.3 m) no lower than 7 m
+    else if (tags['mapng:height_source'] === 'overture' || tags['mapng:source'] === 'overture') eaveH = Math.max(eaveH, 7);
     if (!mosqueLike && rectFill >= 0.72 && !['flat', 'hipped'].includes(String(tags['roof:shape'] || '').toLowerCase())) roof = 'gabled';
     else if (mosqueLike) roof = 'flat';
     if (roof === 'gabled') {
@@ -569,7 +574,7 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
     }
   }
   const worshipPitch = worship && roof === 'gabled' ? 45 : null;
-  const worshipTint = worship ? (tagged || pick(WALL_TINTS.stone, r('worshipTint'))) : null;
+  const worshipTint = worship ? (tagged || pick([[1, 0.96, 0.9], [0.96, 0.92, 0.84], [0.92, 0.9, 0.86]], r('worshipTint'))) : null;
   const jitter = 1 + JITTER * (2 * r('jit') - 1);
   const shade = (c) => c.map((v) => Math.max(0, Math.min(1, v * jitter)));
   return {
@@ -836,6 +841,7 @@ function roofUnderside(m, P, { hl, hw, rl, rise, eaveDrop, hipped }) {
  */
 const MESH_BATCH = 400;
 export const BUILDING_TILE_M = 256;
+const PARAPET_H = PARAPET.h;  // (a nave's roof sits on the parapet's height)
 const SKIRT_SLOPE_M = 1;       // ground falling more than this under a footprint: the walls carry on SKIRT_M under its lowest corner
 const SKIRT_M = 3;
 const SHOP_STREET_M = 20;      // a shop's wall this near a street gets its shopfronts
@@ -1400,8 +1406,17 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     }
 
     const flat = plan.roof === 'flat' || !box;
+    // a church whose footprint takes no gable whole: a gabled nave over its
+    // largest rectangle, the aisles and halls round it flat (a flat-roofed
+    // church read as a castle)
+    const churchLike = (tags.amenity === 'place_of_worship' || WORSHIP_CLASSES.has(plan.cls)) && plan.cls !== 'mosque' && !['muslim'].includes(String(tags.religion || '').toLowerCase());
+    const nave = flat && box && churchLike ? naveRect(ring, box) : null;
     if (flat) {
       flatRoof(builder, ring, holes, eave, plan.roofMat, plan.roofTint);
+      if (nave) {
+        pitchedRoof(builder, nave, eave + PARAPET_H, { ...plan, roof: 'gabled', pitch: 45, roofMat: 'roofSlate', roofTint: ROOF_TINTS.roofSlate[8] }, plan.wall || 'stone', SIDING_UV_M, detailB);
+        stats.details.naves = (stats.details.naves || 0) + 1;
+      }
     } else {
       const wallMat = plan.wall || 'stucco';
       pitchedRoof(builder, box, eave, plan, wallMat, SIDING_UV_M, detailB);
@@ -1414,7 +1429,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const crownMat = plan.band === BAND_BRICK ? 'brick' : (plan.wall || 'rendered');
     // a parapet with its coping on flat-roofed blocks (the facade carried up),
     // a string course under it near the camera
-    const parapeted = flat && plan.kind === 'block' && plan.floors >= 2 && !plan.office && !holes.length && !worship;
+    const parapeted = flat && (plan.kind === 'block' || worship) && (plan.floors >= 2 || worship) && !plan.office && !holes.length;
     if (parapeted) {
       parapet(builder, ring, eave, crownMat, plan.wallTint);
       stringCourse(detailB, ring, eave, crownMat, plan.wallTint.map((v) => Math.min(1, v * 1.08)));
@@ -1457,7 +1472,11 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     // places of worship: their tower or dome, seen from afar
     if (worship && box) {
       if (religion === 'muslim' || plan.cls === 'mosque') { mosque(builder, ring, box, eave, plan.wall || 'stucco', plan.wallTint, (...k) => rnd('mosque', ...k)); stats.details.domes = (stats.details.domes || 0) + 1; }
-      else if (!religion || religion === 'christian') { churchTower(builder, box, eave, rise, plan.wall || 'stone', plan.wallTint, plan.roofMat === 'roofFlat' ? 'roofSlate' : plan.roofMat, plan.roofTint, (...k) => rnd('tower', ...k)); stats.details.towers = (stats.details.towers || 0) + 1; }
+      else if (!religion || religion === 'christian') {
+        churchTower(builder, nave || box, eave, nave ? Math.tan(Math.PI / 4) * nave.width / 2 : rise, plan.wall || 'stone', plan.wallTint, plan.roofMat === 'roofFlat' ? 'roofSlate' : plan.roofMat, plan.roofTint, (...k) => rnd('tower', ...k), ring, { atBoxEnd: !!nave });
+        stats.details.towers = (stats.details.towers || 0) + 1;
+        if (globalThis.__MAPNG_BLD_DEBUG) globalThis.__MAPNG_BLD_DEBUG({ kind: 'tower', at: [box.cx, box.cy], out: [0, 0], id: f.id, tags });
+      }
     }
 
     count++;

@@ -402,20 +402,33 @@ function waterTank(m, c, z) {
 
 // ── Places of worship ────────────────────────────────────────────────────────
 
-/** A bell tower with a dark belfry band and a spire, at one end of the nave. Returns the tower's top. */
-export function churchTower(m, boxInfo, eave, rise, wallMat, wallTint, roofMat, roofTint, rnd) {
+/**
+ * A bell tower with a dark belfry band and a spire at one end of the nave: on the footprint's corner nearest
+ * that end (set in by half the tower, inside the walls: on an irregular church the box's end was a thin
+ * arm's tip). Returns the tower's top.
+ */
+export function churchTower(m, boxInfo, eave, rise, wallMat, wallTint, roofMat, roofTint, rnd, ring = null, { atBoxEnd = false } = {}) {
   const { cx, cy, ux, uy, length, width } = boxInfo;
   const end = rnd('tower') < 0.5 ? -1 : 1;
-  const side = Math.max(3, Math.min(6.5, width * 0.55));
-  const along = end * (length / 2 - side / 2);
-  const c = [cx + ux * along, cy + uy * along];
+  const side = Math.max(3.5, Math.min(atBoxEnd ? 5 : 6, width * (atBoxEnd ? 0.4 : 0.45)));
+  let c = [cx + ux * end * (length / 2 - side / 2), cy + uy * end * (length / 2 - side / 2)];
+  // (a nave's own end: the tower stands against its gable, inside the walls)
+  if (ring && !(atBoxEnd && inRing(c, ring))) {
+    let best = -Infinity; let pick = null;
+    for (const p of insetRing(ring, side / 2 + 0.3)) {
+      if (!inRing(p, ring)) continue;
+      const score = ((p[0] - cx) * ux + (p[1] - cy) * uy) * end;
+      if (score > best) { best = score; pick = p; }
+    }
+    if (pick) c = pick;
+  }
   const shaftTop = eave + rise + Math.max(6, side * 1.6);
   box(m, wallMat, c, [ux, uy], side / 2, side / 2, eave - 0.5, shaftTop, wallTint, { uvM: 3 });
   // the belfry: a darker band near the top, and a slim cornice
   box(m, wallMat, c, [ux, uy], side / 2 + 0.02, side / 2 + 0.02, shaftTop - 2.4, shaftTop - 0.6, wallTint.map((v) => v * 0.45), { uvM: 3 });
   box(m, 'concrete', c, [ux, uy], side / 2 + 0.18, side / 2 + 0.18, shaftTop, shaftTop + 0.3, PARAPET.coping);
-  // a four-sided spire
-  const s = side / 2 + 0.05; const top = shaftTop + 0.3 + side * 2.2;
+  // a four-sided spire, about as tall as the shaft over the roof (not a needle)
+  const s = side / 2 + 0.05; const top = shaftTop + 0.3 + side * 1.7;
   const v = [-uy, ux];
   const k = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [c[0] + ux * a * s + v[0] * b * s, c[1] + uy * a * s + v[1] * b * s, shaftTop + 0.3]);
   for (let i = 0; i < 4; i++) m.tri(roofMat, k[i], k[(i + 1) % 4], [c[0], c[1], top], [0, 0], [1, 0], [0.5, 2], roofTint);
@@ -540,4 +553,46 @@ export function passageCrossings(ring, passages) {
     for (let k = 0; k + 1 < hits.length; k += 2) out.push({ p: hits[k].pt, q: hits[k + 1].pt, half });
   }
   return out;
+}
+
+/**
+ * A church's nave on an irregular footprint: the largest rectangle along its box's long axis that the
+ * footprint holds (at each metre along the axis, the footprint's span across it through the middle line;
+ * the longest run's common span, by area). As orientedBox: { cx, cy, ux, uy, length, width, area }, or
+ * null when nothing of a nave's size (8 x 5 m) fits.
+ */
+export function naveRect(ring, boxInfo) {
+  const { cx, cy, ux, uy, length } = boxInfo;
+  const vx = -uy; const vy = ux;
+  // the footprint in the box's frame (s along, t across)
+  const loc = ring.map(([x, y]) => [(x - cx) * ux + (y - cy) * uy, (x - cx) * vx + (y - cy) * vy]);
+  const n = Math.max(2, Math.floor(length));
+  const spans = [];
+  for (let k = 0; k <= n; k++) {
+    const s = -length / 2 + (k / n) * length;
+    const ts = [];
+    for (let i = 0; i < loc.length; i++) {
+      const a = loc[i]; const b = loc[(i + 1) % loc.length];
+      if ((a[0] > s) === (b[0] > s)) continue;
+      ts.push(a[1] + ((s - a[0]) / (b[0] - a[0])) * (b[1] - a[1]));
+    }
+    ts.sort((p, q) => p - q);
+    let span = null;
+    for (let i = 0; i + 1 < ts.length; i += 2) if (ts[i] <= 0 && ts[i + 1] >= 0) span = [ts[i], ts[i + 1]];
+    spans.push({ s, span });
+  }
+  let best = null;
+  for (let i = 0; i < spans.length; i++) {
+    let lo = -Infinity; let hi = Infinity;
+    for (let j = i; j < spans.length; j++) {
+      if (!spans[j].span) break;
+      lo = Math.max(lo, spans[j].span[0]); hi = Math.min(hi, spans[j].span[1]);
+      const w = hi - lo; const L = spans[j].s - spans[i].s;
+      if (w < 5) break;
+      if (L >= 8 && (!best || L * w > best.L * best.w)) best = { s0: spans[i].s, s1: spans[j].s, lo, hi, L, w };
+    }
+  }
+  if (!best) return null;
+  const sm = (best.s0 + best.s1) / 2; const tm = (best.lo + best.hi) / 2;
+  return { cx: cx + ux * sm + vx * tm, cy: cy + uy * sm + vy * tm, ux, uy, length: best.L, width: best.w, area: best.L * best.w };
 }
