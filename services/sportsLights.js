@@ -6,7 +6,8 @@
 //   courts           4 poles of 9-12 m along the long sides, outside the fence;
 //                    neighbouring courts share them
 //   grandstands      downlights along a roof
-//   ovals            24 m poles round the outside of the wall every 55 m
+//   ovals            24 m poles round the outside of the wall every 45 m,
+//                    behind a grandstand where one stands against it
 //   drag strips      14 m poles down both sides of the first 700 m
 //   kart tracks      10 m poles every 35 m beside the track
 //   anything else    (road courses, motocross, BMX) only where OSM says lit=yes
@@ -38,16 +39,16 @@ const MERGE_M = 7;          // poles this close are one (courts side by side)
 const SETBACK_STEP_M = 2;
 const SETBACK_MAX_M = 20;
 
-const OVAL = { h: 24, cd: 370000, every: 55 };
-const DRAG = { h: 14, cd: 140000, every: 50, reach: 700 };
+const OVAL = { h: 24, cd: 190000, every: 45, beam: 105 };
+const DRAG = { h: 14, cd: 140000, every: 50, reach: 700, beam: 85 };
 const KART = { h: 10, cd: 68000, every: 35 };
 const LIT_TRACK = { h: 14, cd: 140000, every: 60 };
 
 const midOf = (p) => frameAt(p.box, (p.box.s0 + p.box.s1) / 2, (p.box.t0 + p.box.t1) / 2);
 
 /** A place free of the rings and of what blocked(x, y) says: from (x, y) out along dir, or null. */
-function clearSpot(x, y, dir, free) {
-  for (let d = 0; d <= SETBACK_MAX_M; d += SETBACK_STEP_M) {
+function clearSpot(x, y, dir, free, reach = SETBACK_MAX_M) {
+  for (let d = 0; d <= reach; d += SETBACK_STEP_M) {
     const q = [x + dir[0] * d, y + dir[1] * d];
     if (free(q[0], q[1])) return q;
   }
@@ -149,7 +150,7 @@ export function planTrackPoles(raceways, free, { startFirst = (rw) => rw.nodes }
   const put = (x, y, spec, aim, kind) => {
     if (!free(x, y)) return;
     if (poles.some((o) => Math.hypot(o.x - x, o.y - y) < MERGE_M)) return;
-    poles.push({ x, y, h: spec.h, cd: spec.cd, aim, kind });
+    poles.push({ x, y, h: spec.h, cd: spec.cd, aim, kind, beam: spec.beam });
   };
   for (const rw of raceways || []) {
     const lit = String(rw.tags?.lit || '').toLowerCase();
@@ -160,8 +161,9 @@ export function planTrackPoles(raceways, free, { startFirst = (rw) => rw.nodes }
         // the side away from the oval's middle
         let n = [-st.t[1], st.t[0]];
         if ((rw.oval.c[0] - st.x) * n[0] + (rw.oval.c[1] - st.y) * n[1] > 0) n = [-n[0], -n[1]];
-        const d = rw.half + 4;
-        put(st.x + n[0] * d, st.y + n[1] * d, OVAL, [st.x - n[0] * rw.half * 0.3, st.y - n[1] * rw.half * 0.3], 'oval');
+        // (behind a grandstand where one stands against the wall)
+        const q = clearSpot(st.x + n[0] * (rw.half + 4), st.y + n[1] * (rw.half + 4), n, free, 60);
+        if (q) put(q[0], q[1], OVAL, [st.x - n[0] * rw.half * 0.5, st.y - n[1] * rw.half * 0.5], 'oval');
       }
     } else if (rw.kind === 'drag') {
       for (const st of stops(startFirst(rw), DRAG.every, DRAG.reach)) {

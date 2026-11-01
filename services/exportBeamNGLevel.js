@@ -7983,7 +7983,7 @@ export function lampSpotLight(name, parent, position, lightHeight = 8) {
 // dusk-to-dawn light aimed into it (cool LED white; no shadows, as street lamps)
 const FLOOD_HEAD_YAW = Math.PI / 2;   // (the mesh's bar of heads runs along local X: side-on to the venue)
 const FLOOD_COLOUR = [0.93, 0.96, 1, 1];
-const STAND_LIGHT_CD = 2600;
+const STAND_LIGHT_CD = 18000;
 export function sportsLightObjects(plan, groundAt) {
   const objects = []; const counts = {}; const glows = [];
   (plan?.poles || []).forEach((p, i) => {
@@ -8002,7 +8002,7 @@ export function sportsLightObjects(plan, groundAt) {
     objects.push({
       __parent: 'street_furniture', class: 'SpotLight', name: `${name}_light`, persistentId: generatePersistentId(),
       position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(head, 3)], rotationMatrix: beamRotation(to),
-      castShadows: false, color: FLOOD_COLOUR, innerAngle: 50, outerAngle: 120, intensityUnit: 'cd', intensity: p.cd,
+      castShadows: false, color: FLOOD_COLOUR, innerAngle: Math.round((p.beam || 120) * 0.45), outerAngle: p.beam || 120, intensityUnit: 'cd', intensity: p.cd,
       isEnabled: false, nightLight: '1', range: roundTo(Math.max(p.h * 4, dist * 3), 2), useColorTemperature: 'false',
     });
     glows.push({ x: p.x, y: p.y, z: g + p.h * (29.9 / POLE_SHAPE_HEIGHT_M), scale: Math.max(0.5, p.h / POLE_SHAPE_HEIGHT_M), yaw: Math.atan2(to[1], to[0]) + FLOOD_HEAD_YAW, i: i + 1 });
