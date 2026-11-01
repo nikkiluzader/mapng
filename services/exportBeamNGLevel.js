@@ -3902,6 +3902,64 @@ function heightMapEditor(terrainData) {
 }
 
 /**
+ * The ground under sports fields to each one's best-fit plane (least squares
+ * over its samples), blended back to the ground round it over FIELD_BLEND_M;
+ * roads' ground left. The heightmap's pixels on the terrain's own grid.
+ */
+const FIELD_BLEND_M = 4;
+function gradePitchGround(terrainData, squareSize, pitches) {
+  const { width: W, height: H } = terrainData;
+  const hm = heightMapEditor(terrainData);
+  const sq = squareSize;
+  const pos = (c, r) => [(c - W / 2) * sq, (H - 1 - r - H / 2) * sq];
+  let fields = 0; let pixels = 0;
+  for (const p of pitches) {
+    if (p.area > 40000) continue;
+    const ring = p.ring;
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const [x, y] of ring) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+    const c0 = Math.max(0, Math.floor((x0 - FIELD_BLEND_M) / sq + W / 2)); const c1 = Math.min(W - 1, Math.ceil((x1 + FIELD_BLEND_M) / sq + W / 2));
+    const r0 = Math.max(0, Math.floor(H - 1 - ((y1 + FIELD_BLEND_M) / sq + H / 2))); const r1 = Math.min(H - 1, Math.ceil(H - 1 - ((y0 - FIELD_BLEND_M) / sq + H / 2)));
+    // the plane: least squares over the field's own pixels (off the roads)
+    let n = 0; let sx = 0; let sy = 0; let sz = 0; let sxx = 0; let syy = 0; let sxy = 0; let sxz = 0; let syz = 0;
+    const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2;
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      const [x, y] = pos(c, r);
+      if (!inRingXY(x, y, ring) || (p.onRoad && p.onRoad(x, y))) continue;
+      const z = hm.at(r * W + c); const X = x - cx; const Y = y - cy;
+      n++; sx += X; sy += Y; sz += z; sxx += X * X; syy += Y * Y; sxy += X * Y; sxz += X * z; syz += Y * z;
+    }
+    if (n < 20) continue;
+    // solve [n sx sy; sx sxx sxy; sy sxy syy] [a b c] = [sz sxz syz]
+    const M = [[n, sx, sy, sz], [sx, sxx, sxy, sxz], [sy, sxy, syy, syz]];
+    for (let i = 0; i < 3; i++) {
+      let piv = i; for (let k = i + 1; k < 3; k++) if (Math.abs(M[k][i]) > Math.abs(M[piv][i])) piv = k;
+      [M[i], M[piv]] = [M[piv], M[i]];
+      if (Math.abs(M[i][i]) < 1e-9) break;
+      for (let k = 0; k < 3; k++) if (k !== i) { const f = M[k][i] / M[i][i]; for (let j = i; j < 4; j++) M[k][j] -= f * M[i][j]; }
+    }
+    const a = M[0][3] / M[0][0]; const b = M[1][3] / M[1][1]; const cc = M[2][3] / M[2][2];
+    if (![a, b, cc].every(Number.isFinite)) continue;
+    // (a field steeper than a ramp is not graded: it was mapped on a hillside as it is)
+    if (Math.hypot(b, cc) > 0.04) continue;
+    const plane = (x, y) => a + b * (x - cx) + cc * (y - cy);
+    const distOut = (x, y) => { let best = Infinity; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [ax, ay] = ring[j]; const [bx, by] = ring[i]; const dx = bx - ax; const dy = by - ay; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / ((dx * dx + dy * dy) || 1e-9))); best = Math.min(best, Math.hypot(ax + dx * t - x, ay + dy * t - y)); } return best; };
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      const [x, y] = pos(c, r);
+      if (p.onRoad && p.onRoad(x, y)) continue;
+      const inside = inRingXY(x, y, ring);
+      const d = inside ? 0 : distOut(x, y);
+      if (d > FIELD_BLEND_M) continue;
+      const idx = r * W + c; const g = hm.at(idx);
+      const f = d / FIELD_BLEND_M; const w = 1 - f * f * (3 - 2 * f);   // (smooth falloff)
+      hm.set(idx, g + (plane(x, y) - g) * w); pixels++;
+    }
+    fields++;
+  }
+  return { fields, pixels };
+}
+
+/**
  * Shape the ground at every abutment of the solved decks (replaces
  * terrainData.heightMap with a graded copy; the app's own terrain is shared).
  */
@@ -10828,6 +10886,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds skipped: ${err?.message || err}`);
       lakePlan = null;
     }
+  }
+
+  // Sports fields graded (terrain shaping on): the ground under each field to
+  // its best-fit plane, blended back over FIELD_BLEND_M round it, the roads'
+  // ground left (a field on a raw survey's undulations, or a survey older
+  // than the field: the turf rolled over the bumps); off, the fields drape
+  // on the ground as it is
+  if (includeBuildings && shapeExtras) try {
+    const feats = exportTerrainData.osmFeatures || [];
+    const project = (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0);
+    const pitches = planPitches(feats, project, { groundAt: terrainGroundAt(exportTerrainData, squareSize) });
+    const graded = gradePitchGround(exportTerrainData, squareSize, pitches);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sports fields: ${graded.fields} graded flat (${graded.pixels} px).`);
+  } catch (err) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Field grading skipped: ${err?.message || err}`);
   }
 
   beginStep('ter', `Writing the terrain binary (terrain.ter, ${size}×${size} heights + material layers)…`);

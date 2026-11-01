@@ -200,3 +200,13 @@ test('a track drawn in its tagged colour (colour=blue), else red tartan', () => 
   const red = colourOf({});
   assert.ok(red[0] > red[2], `red by default: ${red}`);
 });
+
+test('a field mapped over a road leaves the road clear', () => {
+  const road = { id: 'r', type: 'road', tags: { highway: 'residential' }, geometry: [[-20, 10], [200, 10]].map(([x, y]) => ({ lat: y, lng: x })) };
+  const [p] = planPitches([area('t', [[0, 0], [160, 0], [160, 80], [0, 80]], { leisure: 'track', sport: 'athletics' }), road], project, { groundAt, drape: { drapeAt: () => 3, grid: { sq: 1, ox: -1024, oy: -1024 } } });
+  const full = recorder();
+  buildPitch(full, full, p);
+  const onRoad = full.tris.filter((t) => { const cy = (t.pts[0][1] + t.pts[1][1] + t.pts[2][1]) / 3; return Math.abs(cy - 10) < 4; });
+  assert.equal(onRoad.length, 0, 'nothing on the road');
+  assert.ok(full.tris.some((t) => t.pts.every((q) => q[1] > 20)), 'the rest of the track built');
+});

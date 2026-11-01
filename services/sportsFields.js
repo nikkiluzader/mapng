@@ -120,9 +120,39 @@ function runOff(list) {
   }
 }
 
+// a field never lies over a road (a track mapped over the street's edge):
+// road centre lines by class half-width, in 32 m cells
+const ROAD_HALF = { motorway: 7, trunk: 6, primary: 5.5, secondary: 5, tertiary: 4.5, residential: 4, unclassified: 3.5, service: 3, living_street: 3,
+  motorway_link: 4, trunk_link: 4, primary_link: 4, secondary_link: 4, tertiary_link: 4 };
+function roadIndex(features, project) {
+  const cells = new Map(); const C = 32;
+  for (const f of features || []) {
+    const hw = f?.tags?.highway;
+    if (f?.type !== 'road' || !ROAD_HALF[hw] || !(f.geometry?.length > 1)) continue;
+    if ((f.tags.tunnel && f.tags.tunnel !== 'no') || (f.tags.bridge && f.tags.bridge !== 'no')) continue;
+    const half = (Number.parseFloat(f.tags.width) / 2) || ROAD_HALF[hw];
+    const line = f.geometry.map((q) => project(q.lat, q.lng));
+    for (let i = 0; i + 1 < line.length; i++) {
+      const seg = [line[i], line[i + 1], half];
+      const [a, b] = seg;
+      for (let gx = Math.floor((Math.min(a[0], b[0]) - half) / C); gx <= Math.floor((Math.max(a[0], b[0]) + half) / C); gx++) {
+        for (let gy = Math.floor((Math.min(a[1], b[1]) - half) / C); gy <= Math.floor((Math.max(a[1], b[1]) + half) / C); gy++) {
+          const k = `${gx},${gy}`; if (!cells.has(k)) cells.set(k, []); cells.get(k).push(seg);
+        }
+      }
+    }
+  }
+  return (x, y) => (cells.get(`${Math.floor(x / C)},${Math.floor(y / C)}`) || []).some(([a, b, half]) => {
+    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1e-9;
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
+    return Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y) < half + 0.3;
+  });
+}
+
 export function planPitches(features, project, { groundAt = null, drape = null } = {}) {
   const out = [];
   const pending = [];
+  const onRoad = roadIndex(features, project);
   for (const f of features || []) {
     const t = f?.tags || {};
     if (!(t.leisure === 'pitch' || t.leisure === 'track') || !Array.isArray(f.geometry) || f.geometry.length < 4) continue;
@@ -135,24 +165,27 @@ export function planPitches(features, project, { groundAt = null, drape = null }
     let area = signedArea(ring);
     if (area < 0) { ring = ring.reverse(); area = -area; }
     if (area < MIN_AREA_M2 || area > MAX_AREA_M2) continue;
-    // an oval drawn with a few points (a track, a cricket ground): smoothed
-    if (poolShape(ring) === 'freeform' && ['track', 'cricket'].includes(sport)) ring = smoothRing(ring);
+    // a track shaped like the usual oval (straights and semicircles): that
+    // exact oval, fitted to the mapped outline's box (smoothing first bulged
+    // a few-pointed outline 20 m wide, over the street beside it); else an
+    // oval drawn with a few points smoothed, where that keeps to its size
+    let stadium = false;
+    if (sport === 'track') {
+      const b0 = orientedBox(ring);
+      const ideal = b0 && (b0.s1 - b0.s0) > (b0.t1 - b0.t0) ? stadiumRing(b0, 0) : null;
+      if (ideal && Math.abs(signedArea(ideal) - area) / area < 0.08) { ring = ideal; stadium = true; area = signedArea(ideal); }
+    }
+    if (!stadium && poolShape(ring) === 'freeform' && ['track', 'cricket'].includes(sport)) {
+      const sm = smoothRing(ring);
+      if (Math.abs(signedArea(sm)) < area * 1.05) ring = sm;
+    }
     let hole = null;
     if (f.holes?.length) {
       const h = cleanRing(f.holes[0].map((q) => project(q.lat, q.lng)));
       if (h.length >= 3) hole = poolShape(h) === 'freeform' ? smoothRing(h) : h;
     }
-    let bx = orientedBox(ring);
+    const bx = orientedBox(ring);
     if (!bx) continue;
-    // a track shaped like the usual oval (straights and semicircles): drawn as
-    // that exact oval, its lanes exact offsets of it (offsetting the mapped
-    // outline crossed lane lines where it was noisy)
-    let stadium = false;
-    if (sport === 'track') {
-      const ideal = stadiumRing(bx, 0);
-      const now = Math.abs(signedArea(ring));
-      if (Math.abs(signedArea(ideal) - now) / now < 0.08 && (bx.s1 - bx.s0) > (bx.t1 - bx.t0)) { ring = ideal; stadium = true; area = signedArea(ideal); }
-    }
     // a track's infield: its mapped inner ring, else the lanes' width in from its edge
     if (sport === 'track' && (!hole || stadium)) {
       const lanes = Math.max(4, Math.min(10, Number.parseInt(t.lanes, 10) || 6));
@@ -207,6 +240,7 @@ export function planPitches(features, project, { groundAt = null, drape = null }
       p.fieldZ = (x, y) => drape.drapeAt(x, y) + hair;
     }
     p.ground = ground;
+    p.onRoad = onRoad;
     out.push(p);
   }
   // fences round tennis courts: an edge shared with the next court has none
@@ -246,6 +280,7 @@ function strip(m, mat, p, a, b, w, col, lift = 0.012) {
   for (let i = 0; i < k; i++) {
     const q0 = [a[0] + (b[0] - a[0]) * (i / k), a[1] + (b[1] - a[1]) * (i / k)];
     const q1 = [a[0] + (b[0] - a[0]) * ((i + 1) / k), a[1] + (b[1] - a[1]) * ((i + 1) / k)];
+    if (p.onRoad && p.onRoad((q0[0] + q1[0]) / 2, (q0[1] + q1[1]) / 2)) continue;
     const z0 = p.fieldZ(...q0) + lift; const z1 = p.fieldZ(...q1) + lift;
     m.quad(mat, [q0[0] - n[0], q0[1] - n[1], z0], [q1[0] - n[0], q1[1] - n[1], z1], [q1[0] + n[0], q1[1] + n[1], z1], [q0[0] + n[0], q0[1] + n[1], z0],
       [0, 0], [1, 0], [1, 1], [0, 1], col);
@@ -352,7 +387,7 @@ function cutAlong(pieces, n, c0, step) {
  * piece fanned from its middle at z(x, y) (the drape: on the ground's own
  * triangles). colOf(x, y) colours a piece by its middle.
  */
-function drapedMesh(m, mat, outer, holes, z, colOf, grid, extra = []) {
+function drapedMesh(m, mat, outer, holes, z, colOf, grid, extra = [], skip = null) {
   const tri = THREE.ShapeUtils.triangulateShape(outer.map(([x, y]) => new THREE.Vector2(x, y)), holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))));
   const all = [...outer, ...holes.flat()];
   const uv = (q) => [q[0] / 4, q[1] / 4];
@@ -366,6 +401,7 @@ function drapedMesh(m, mat, outer, holes, z, colOf, grid, extra = []) {
       for (let i = 0; i < poly.length; i++) { const a = poly[i]; const b = poly[(i + 1) % poly.length]; const cr = a[0] * b[1] - b[0] * a[1]; a2 += cr; cx += (a[0] + b[0]) * cr; cy += (a[1] + b[1]) * cr; }
       if (Math.abs(a2) < 1e-6) continue;
       cx /= 3 * a2; cy /= 3 * a2;
+      if (skip && skip(cx, cy)) continue;
       const ccw = a2 > 0;
       const col = colOf(cx, cy);
       const c = [cx, cy, z(cx, cy)];
@@ -397,7 +433,7 @@ function surfaceMesh(stone, full, p) {
     const stripes = (p.surface === 'grass' || p.surface === 'turf') && rect;
     const sw = Math.max(4, L / 20);
     const colOf = stripes ? (x, y) => { const s2 = x * bx.u[0] + y * bx.u[1]; return Math.floor((s2 - bx.s0) / sw) % 2 ? col : col.map((v) => v * 0.86); } : () => col;
-    drapedMesh(target, mat, p.ring, p.hole ? [p.hole] : [], p.fieldZ, colOf, p.drape.grid, stripes ? [{ n: bx.u, c0: bx.s0, step: sw }] : []);
+    drapedMesh(target, mat, p.ring, p.hole ? [p.hole] : [], p.fieldZ, colOf, p.drape.grid, stripes ? [{ n: bx.u, c0: bx.s0, step: sw }] : [], p.onRoad);
   } else if (rect) {
     // a grid in the frame: mown stripes across the length on grass
     const stripes = p.surface === 'grass' || p.surface === 'turf';
@@ -542,7 +578,7 @@ function fence(stone, full, p, h, edges = null) {
       if (!inNeighbour(p, q[0], q[1])) cylinder(stone, 'metalWhite', q[0], q[1], 0.04, g - 0.3, g + h, STEEL, { n: 6 });
       if (k < n) {
         const q2 = [a[0] + ((b[0] - a[0]) * (k + 1)) / n, a[1] + ((b[1] - a[1]) * (k + 1)) / n];
-        if (inNeighbour(p, (q[0] + q2[0]) / 2, (q[1] + q2[1]) / 2)) continue;
+        if (inNeighbour(p, (q[0] + q2[0]) / 2, (q[1] + q2[1]) / 2) || (p.onRoad && p.onRoad((q[0] + q2[0]) / 2, (q[1] + q2[1]) / 2))) continue;
         const g2 = p.ground(...q2);
         const seg = Math.hypot(q2[0] - q[0], q2[1] - q[1]);
         full.quad('chainlink', [q[0], q[1], g], [q2[0], q2[1], g2], [q2[0], q2[1], g2 + h], [q[0], q[1], g + h], [0, 0], [seg / 1.5, 0], [seg / 1.5, h / 1.5], [0, h / 1.5], STEEL);
@@ -981,7 +1017,7 @@ function stadiumRing(bx, d) {
 function track(stone, full, p) {
   // the infield grassed (a field inside it lies over this, a few cm higher)
   if (p.hole && p.slab === null && p.drape) {
-    drapedMesh(full, 'turf', p.hole, [], (x, y) => p.fieldZ(x, y) - 0.004, () => LOOK.grass[1], p.drape.grid);
+    drapedMesh(full, 'turf', p.hole, [], (x, y) => p.fieldZ(x, y) - 0.004, () => LOOK.grass[1], p.drape.grid, [], p.onRoad);
   } else if (p.hole && p.slab === null) {
     const inner = p.hole;
     const tri = THREE.ShapeUtils.triangulateShape(inner.map(([x, y]) => new THREE.Vector2(x, y)), []);
