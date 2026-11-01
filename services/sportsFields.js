@@ -201,7 +201,8 @@ export function planPitches(features, project, { groundAt = null, drape = null }
     };
     // lying on the ground with the terrain at hand: draped on its own triangles, a hair over them
     if (p.slab === null && drape) {
-      const hair = sport === 'track' ? 0.008 : 0.015;
+      // (a hair: under 1 cm the ground won the depth test a few dozen metres off)
+      const hair = sport === 'track' ? 0.025 : 0.035;
       p.drape = drape;
       p.fieldZ = (x, y) => drape.drapeAt(x, y) + hair;
     }
@@ -688,7 +689,7 @@ export function homePlate(p) {
     const near = Math.min(...r.map((q) => Math.hypot(q[0] - h[0], q[1] - h[1])));
     if (near > 0.15 * Math.sqrt(p.area)) continue;
     const L = Math.hypot(cx - h[0], cy - h[1]) || 1;
-    return { home: h, dir: [(cx - h[0]) / L, (cy - h[1]) / L] };
+    return { home: h, dir: [(cx - h[0]) / L, (cy - h[1]) / L], half: (ang * Math.PI) / 360 };   // (half the angle between the foul lines)
   }
   // else: the square-ish corner farthest from the middle
   let best = null;
@@ -702,13 +703,14 @@ export function homePlate(p) {
   }
   const h = best ? best.p : r[0];
   const L = Math.hypot(cx - h[0], cy - h[1]) || 1;
-  return { home: h, dir: [(cx - h[0]) / L, (cy - h[1]) / L] };
+  return { home: h, dir: [(cx - h[0]) / L, (cy - h[1]) / L], half: Math.PI / 4 };
 }
 
 function baseball(stone, full, p, softball) {
   // a long thin outline (a bullpen, a warning track): no room for a diamond
   if ((p.box.s1 - p.box.s0) > 2.2 * (p.box.t1 - p.box.t0)) return;
-  const { home, dir } = homePlate(p);
+  const hp = homePlate(p);
+  let home = hp.home; const { dir } = hp;
   // the distance to the outfield edge along centre field sets baseball or softball
   let reach = 10;
   while (reach < 200 && inRing(home[0] + dir[0] * reach, home[1] + dir[1] * reach, p.ring)) reach += 2;
@@ -717,9 +719,14 @@ function baseball(stone, full, p, softball) {
   const little = !softball && reach < 70;
   const soft = softball || reach < 85;
   const base = soft ? 18.29 : 27.43; const mound = little ? 14.02 : soft ? 13.1 : 18.44; const skin = little ? 15.24 : soft ? 18.3 : 29;
-  // the infield's dirt may run into foul territory past the outline (it is
-  // drawn along the foul lines), not into a neighbouring field
-  const room = insetPts(p.ring, -4);
+  // home plate in from the outline's corner, far enough that the home circle
+  // and the infield's arc fit inside (an outline drawn along the foul lines
+  // put first and third base on its edges, the infield hanging out of it)
+  const sinH = Math.sin(hp.half || Math.PI / 4);
+  const inset = Math.max(3.96 + 1, skin - mound * sinH + 1) / Math.max(0.3, sinH);
+  home = [home[0] + dir[0] * inset, home[1] + dir[1] * inset];
+  // (the dirt kept within a metre past the outline, never in a neighbour)
+  const room = insetPts(p.ring, -1);
   const side = [-dir[1], dir[0]];
   const at = (f, sd) => [home[0] + dir[0] * f + side[0] * sd, home[1] + dir[1] * f + side[1] * sd];
   const fz = (q) => p.fieldZ(...q) + lifted(p, 0) ;
@@ -781,16 +788,17 @@ function baseball(stone, full, p, softball) {
       const P = (q) => [bc[0] + dir[0] * q[0] + side[0] * q[1], bc[1] + dir[1] * q[0] + side[1] * q[1]];
       strip(full, PAINT_MAT, p, P(a), P(b), 0.06, PAINT, 0.03);
     }
-    // a dugout bench beside each base line
-    const bpos = at(soft ? 9 : 14, sg * (soft ? 12 : 17));
+    // a dugout beside each foul line, in foul territory: along the line, a few metres out from it
+    const nOut = [-u[1] * sg, u[0] * sg];      // (away from fair territory: u is the centre line turned by sg * 45 degrees)
+    const along = soft ? 11 : 16; const off = soft ? 5 : 7;
+    const bpos = [home[0] + u[0] * along + nOut[0] * off, home[1] + u[1] * along + nOut[1] * off];
     const g = p.ground(...bpos);
-    const foot = [-6.2, 6.2].flatMap((e) => [-1.5, 1.5].map((w) => [bpos[0] + dir[0] * e + side[0] * w, bpos[1] + dir[1] * e + side[1] * w]));
-    // (only where the field's outline has room for it: beside it was a neighbour's court)
-    if (foot.every((q) => inRing(q[0], q[1], p.ring)))
-    {
-      box(stone, 'blockwall', bpos, dir, 6, 1.2, g - 0.2, g + 0.9, [0.85, 0.85, 0.82]);
-      box(stone, 'metalWhite', bpos, dir, 6.2, 1.5, g + 2.3, g + 2.4, [0.3, 0.33, 0.36]);
-      for (const e of [-6, 6]) cylinder(stone, 'metalWhite', bpos[0] + dir[0] * e + side[0] * sg * 1.3, bpos[1] + dir[1] * e + side[1] * sg * 1.3, 0.05, g, g + 2.35, STEEL, { n: 6 });
+    const foot = [-6.2, 6.2].flatMap((e) => [-1.5, 1.5].map((w) => [bpos[0] + u[0] * e + nOut[0] * w, bpos[1] + u[1] * e + nOut[1] * w]));
+    // (only where there is room: the outline's edge, or a neighbour's court)
+    if (foot.every((q) => inRing(q[0], q[1], insetPts(p.ring, -2)) && !inNeighbour(p, q[0], q[1]))) {
+      box(stone, 'blockwall', bpos, u, 6, 1.2, g - 0.2, g + 0.9, [0.85, 0.85, 0.82]);
+      box(stone, 'metalWhite', bpos, u, 6.2, 1.5, g + 2.3, g + 2.4, [0.3, 0.33, 0.36]);
+      for (const e of [-6, 6]) cylinder(stone, 'metalWhite', bpos[0] + u[0] * e + nOut[0] * 1.3, bpos[1] + u[1] * e + nOut[1] * 1.3, 0.05, g, g + 2.35, STEEL, { n: 6 });
     }
   }
   // the backstop behind home: a curved chain-link screen

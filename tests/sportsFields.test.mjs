@@ -133,3 +133,32 @@ test("home plate where the foul lines meet, even at a rounded corner; the outfie
   const foul = fencePts.filter((q) => (Math.abs(q[1]) < 0.5 && q[0] > 40) || (Math.abs(q[0]) < 0.5 && q[1] > 40));
   assert.equal(foul.length, 0, 'no fence down the foul lines');
 });
+
+test('the infield fits inside a field drawn along its foul lines', () => {
+  // a Little League fan: foul lines along the axes, the fence 60 m out
+  const fan = [[0, 0], [60, 0], ...Array.from({ length: 9 }, (_, i) => [60 * Math.cos((Math.PI / 2) * ((i + 1) / 10)), 60 * Math.sin((Math.PI / 2) * ((i + 1) / 10))]), [0, 60]];
+  const [p] = planPitches([area('ll', fan, { leisure: 'pitch', sport: 'baseball' })], project, { groundAt });
+  const stone = recorder(); const full = recorder();
+  const tee = { tri: (...a) => { stone.tri(...a); full.tri(...a); }, quad: (...a) => { stone.quad(...a); full.quad(...a); } };
+  buildPitch(tee, full, p);
+  const dirt = full.tris.filter((t) => t.mat === 'dirt').flatMap((t) => t.pts);
+  assert.ok(dirt.length > 0);
+  // every bit of the infield within a metre of the outline: above both foul lines, inside the fence
+  for (const q of dirt) assert.ok(q[0] > -1.01 && q[1] > -1.01 && Math.hypot(q[0], q[1]) < 61, `dirt at (${q[0].toFixed(1)}, ${q[1].toFixed(1)})`);
+  const bases = stone.tris.filter((t) => t.mat === 'smoothConcrete').flatMap((t) => t.pts).filter((q) => q[2] > 3.05);
+  assert.ok(bases.every((q) => q[0] > 0 && q[1] > 0), 'the bases inside the foul lines');
+});
+
+test('dugouts stand in foul territory beside the foul lines', () => {
+  const fan = [[0, 0], [100, 0], ...Array.from({ length: 9 }, (_, i) => [100 * Math.cos((Math.PI / 2) * ((i + 1) / 10)), 100 * Math.sin((Math.PI / 2) * ((i + 1) / 10))]), [0, 100]];
+  // room for them: the outline's own foul territory, 12 m either side of the foul lines
+  const big = [[-12, -12], [100, -12], ...fan.slice(2, -1), [-12, 100]];
+  const [p] = planPitches([area('bb', big, { leisure: 'pitch', sport: 'baseball' })], project, { groundAt });
+  const stone = recorder(); const full = recorder();
+  const tee = { tri: (...a) => { stone.tri(...a); full.tri(...a); }, quad: (...a) => { stone.quad(...a); full.quad(...a); } };
+  buildPitch(tee, full, p);
+  const walls = stone.tris.filter((t) => t.mat === 'blockwall').flatMap((t) => t.pts);
+  assert.ok(walls.length > 0, 'dugouts built');
+  // in foul territory: beyond a foul line (the field opens to +x +y from about the corner)
+  assert.ok(walls.every((q) => q[0] < 1 || q[1] < 1), `dugout walls in foul territory`);
+});
