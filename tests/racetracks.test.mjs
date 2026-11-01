@@ -166,3 +166,21 @@ test('a drag strip mapped with a wobble is laid dead straight; a road joining it
   assert.ok(strip.geometry.every((q) => Math.abs(q.lat) < 1e-9), 'every point on the straight line');
   assert.deepEqual([lane.geometry[0].lat, lane.geometry[0].lng], [strip.geometry[1].lat, strip.geometry[1].lng], 'the lane still meets the strip');
 });
+
+test('a drag strip graded smooth: the bumps gone, its grade kept, the ground beside it untouched', async () => {
+  const { gradeDragStrips } = await import('../services/exportBeamNGLevel.js');
+  const W = 256; const H = 256;
+  // a 0.5 % grade along x with 3 cm noise everywhere
+  let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
+  const heightMap = new Float32Array(W * H);
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) heightMap[r * W + c] = 60 + 0.005 * (c - W / 2) + 0.06 * rnd();
+  const td = { width: W, height: H, heightMap, minHeight: 50, maxHeight: 70 };
+  const strip = { highway: 'raceway', half: 6, tags: { 'mapng:raceway': 'drag' }, nodes: [[-100, 0, 10, 12], [100, 0, 10, 12]] };
+  const res = gradeDragStrips(td, 1, [strip]);
+  assert.equal(res.strips, 1);
+  assert.ok(res.before > 0.004 && res.after < 0.001, `bumps ${res.before} -> ${res.after}`);
+  const at = (x, y) => td.heightMap[(H - 1 - (y + H / 2)) * W + (x + W / 2)];
+  assert.ok(Math.abs((at(80, 0) - at(-80, 0)) / 160 - 0.005) < 0.001, 'the grade kept');
+  assert.ok(Math.abs(at(0, 0) - 60) < 0.05, 'the strip at its own height (heightmap absolute, not over minHeight)');
+  const far = at(0, 60); assert.ok(Math.abs(far - 60) < 0.05, 'the ground 60 m off untouched');
+});

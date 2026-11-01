@@ -83,6 +83,7 @@ import {
   SIGNAL_HEAD_SHAPE,
   SIGNAL_POLE_SHAPE,
 } from './beamngSignals.js';
+import { planRaceways } from './racetracks.js';
 import {
   buildUrbanRoadClassifier,
   estimateRoadCrossSection,
@@ -3975,6 +3976,69 @@ function gradePitchGround(terrainData, squareSize, pitches) {
 }
 
 /**
+ * Drag strips graded smooth, whatever the shaping switches say: a real strip
+ * is laser-graded to millimetres, the survey under one carries centimetres of
+ * noise (VMP: 2.2 cm rms, 123 kinks over 2 cm, 14 cm at the shutdown end) that
+ * throw a car about at 150 mph. Along the strip the ground's own profile
+ * smoothed over +-DRAG_PROFILE_M (its real grade kept), level across its width
+ * and walls, blended back over DRAG_BLEND_M beside and past its ends.
+ */
+const DRAG_PROFILE_M = 100;
+const DRAG_BLEND_M = 6;
+export function gradeDragStrips(terrainData, squareSize, carriageways) {
+  const strips = planRaceways(carriageways || []).filter((r) => r.kind === 'drag');
+  if (!strips.length) return { strips: 0, pixels: 0, before: 0, after: 0 };
+  const { width: W, height: H } = terrainData;
+  const hm = heightMapEditor(terrainData);
+  const sq = squareSize;
+  const ground = terrainGroundAt(terrainData, sq);
+  const base = Number.isFinite(terrainData.minHeight) ? terrainData.minHeight : 0;
+  const pos = (c, r) => [(c - W / 2) * sq, (H - 1 - r - H / 2) * sq];
+  let pixels = 0; let before = 0; let after = 0;
+  for (const rw of strips) {
+    const a = rw.nodes[0]; const b = rw.nodes[rw.nodes.length - 1];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 50) continue;
+    const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const v = [-u[1], u[0]];
+    const core = rw.half + 1.2;   // (the strip and its walls)
+    // the ground's profile along the strip: the mean across its width every metre
+    const n = Math.floor(L) + 1;
+    const raw = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+      let sum = 0; let k = 0;
+      for (let t = -rw.half; t <= rw.half + 1e-6; t += rw.half / 3) { const x = a[0] + u[0] * i + v[0] * t; const y = a[1] + u[1] * i + v[1] * t; const g = ground(x, y); if (Number.isFinite(g)) { sum += g; k++; } }
+      raw[i] = k ? sum / k : NaN;
+    }
+    for (let i = 0; i < n; i++) if (!Number.isFinite(raw[i])) raw[i] = i ? raw[i - 1] : raw.find(Number.isFinite) ?? 0;
+    // smoothed twice over +-DRAG_PROFILE_M (the window shrinks at the ends)
+    const box = (src) => { const pre = new Float64Array(n + 1); for (let i = 0; i < n; i++) pre[i + 1] = pre[i] + src[i]; const out = new Float64Array(n); for (let i = 0; i < n; i++) { const w = Math.min(DRAG_PROFILE_M, i, n - 1 - i); out[i] = (pre[i + w + 1] - pre[i - w]) / (2 * w + 1); } return out; };
+    const prof = box(box(raw));
+    const profAt = (s) => { const t = Math.max(0, Math.min(n - 1, s)); const i = Math.min(n - 2, Math.floor(t)); const f = t - i; return prof[i] + (prof[i + 1] - prof[i]) * f; };
+    let b0 = 0; for (let i = 0; i < n; i++) b0 += (raw[i] - prof[i]) ** 2;
+    const reach = core + DRAG_BLEND_M;
+    const xs = [a[0], b[0]].flatMap((x) => [x - reach, x + reach]); const ys = [a[1], b[1]].flatMap((y) => [y - reach, y + reach]);
+    const c0 = Math.max(0, Math.floor(Math.min(...xs) / sq + W / 2)); const c1 = Math.min(W - 1, Math.ceil(Math.max(...xs) / sq + W / 2));
+    const r0 = Math.max(0, Math.floor(H - 1 - (Math.max(...ys) / sq + H / 2))); const r1 = Math.min(H - 1, Math.ceil(H - 1 - (Math.min(...ys) / sq + H / 2)));
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+      const [x, y] = pos(c, r);
+      const s = (x - a[0]) * u[0] + (y - a[1]) * u[1]; const t = Math.abs((x - a[0]) * v[0] + (y - a[1]) * v[1]);
+      // how far outside the graded box (beside it, past its ends)
+      const d = Math.hypot(Math.max(0, t - core), Math.max(0, -s, s - L));
+      if (d > DRAG_BLEND_M) continue;
+      const idx = r * W + c; const g = hm.at(idx);
+      const f = d / DRAG_BLEND_M; const w = 1 - f * f * (3 - 2 * f);
+      // (the profile is in ground heights, over minHeight; the heightmap absolute)
+      hm.set(idx, g + (profAt(s) + base - g) * w); pixels++;
+    }
+    // (the bumps along its centre line before and after, the worst strip's)
+    const g2 = terrainGroundAt(terrainData, sq);
+    let a0 = 0; for (let i = 0; i < n; i++) a0 += (g2(a[0] + u[0] * i, a[1] + u[1] * i) - prof[i]) ** 2;
+    before = Math.max(before, Math.sqrt(b0 / n)); after = Math.max(after, Math.sqrt(a0 / n));
+  }
+  return { strips: strips.length, pixels, before, after };
+}
+
+/**
  * Shape the ground at every abutment of the solved decks (replaces
  * terrainData.heightMap with a graded copy; the app's own terrain is shared).
  */
@@ -6523,7 +6587,8 @@ function buildDetailedReportSections(d) {
     lines.push(`- Shop fronts: ${st.shopFronts}, offices: ${st.offices}, courtyards (inner rings): ${st.withHoles}`);
     const dt = st.details || {};
     lines.push(`- Details: parapets ${dt.parapets || 0}, shop awnings / fascias ${dt.shopfronts || 0}, verandas ${dt.veranda || 0}, door hoods ${dt.hood || 0}, front steps ${dt.steps || 0}, chimneys ${dt.chimneys || 0}, roof plant pieces ${dt.roofPlant || 0}, church towers ${dt.towers || 0}, domes ${dt.domes || 0}, silos / tanks ${dt.silos || 0}, passage openings ${dt.passages || 0}, castles / forts ${dt.forts || 0} (merlons ${dt.merlons || 0}, sentry boxes ${dt.sentryBoxes || 0}, corner towers ${dt.cornerTowers || 0}, gates ${dt.gates || 0})`);
-    if (dt.racing) lines.push(`- Racetracks (highway=raceway by kind: kerbs round paved bends, kart tyre walls, a dirt oval's wall and catch fence, a drag strip's launch pad, light tree and walls; area=yes raceways as surfaces): ${Object.entries(dt.racing).map(([k, v]) => `${k} ${v}`).join(', ')}`);
+    if (br.dragGrade?.strips) lines.push(`- Drag strips graded smooth (always, whatever the shaping switches: a real strip is laser-graded): ${br.dragGrade.strips}, ${br.dragGrade.pixels} terrain points; bumps along the centre line ${formatNumber(br.dragGrade.before * 100, 1)} cm rms before, ${formatNumber(br.dragGrade.after * 100, 1)} cm after (the strip's own grade kept, smoothed over ±${DRAG_PROFILE_M} m)`);
+    if (dt.racing) lines.push(`- Racetracks (highway=raceway by kind: kerbs round paved bends, kart tyre walls, a dirt oval's wall and catch fence, a drag strip's light tree and walls; area=yes raceways as surfaces): ${Object.entries(dt.racing).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.pitches) lines.push(`- Sports fields (OSM leisure=pitch / track by sport=*: surface by surface=* or the sport's usual one, regulation markings scaled to the mapped size, goals, posts, hoops, nets, fences): ${Object.entries(dt.pitches).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.seating) lines.push(`- Seating (building=grandstand, leisure=bleachers: tiered seats facing the nearest field): ${Object.entries(dt.seating).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.pools) lines.push(`- Swimming pools (OSM leisure=swimming_pool, outdoors: sunk in the ground with a deck, its terrain squares opened; lane pools, wading pools, above-ground pools): ${Object.entries(dt.pools).map(([k, v]) => `${k} ${v}`).join(', ')}; shapes (free-form outlines smoothed, the rest as mapped): ${Object.entries(dt.poolShapes || {}).map(([k, v]) => `${k} ${v}`).join(', ')}`);
@@ -10986,6 +11051,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Field grading skipped: ${err?.message || err}`);
   }
 
+  // Drag strips graded smooth: always, the shaping switches notwithstanding
+  // (a laser-graded strip; the survey's centimetres of noise under one)
+  let dragGrade = null;
+  try {
+    dragGrade = gradeDragStrips(exportTerrainData, squareSize, groundCarriageways.filter((cw) => cw.highway === 'raceway'));
+    if (dragGrade.strips) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Drag strips: ${dragGrade.strips} graded smooth (${dragGrade.pixels} px; bumps ${(dragGrade.before * 100).toFixed(1)} -> ${(dragGrade.after * 100).toFixed(1)} cm rms).`);
+  } catch (err) {
+    console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Drag strip grading skipped: ${err?.message || err}`);
+  }
+
   beginStep('ter', `Writing the terrain binary (terrain.ter, ${size}×${size} heights + material layers)…`);
   await yield_();
   // Tunnel portals: their terrain squares open (layer 255, Terrain-Files.md
@@ -11144,7 +11219,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   let osmDaeBlob = null;
   let buildingTileDaes = [];
-  const buildingReport = {};
+  const buildingReport = { dragGrade };
   if (includeBuildings) {
     beginStep('buildings', `Building textured 3D buildings (${(exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building').length} OSM footprints)…`);
     await yield_();
