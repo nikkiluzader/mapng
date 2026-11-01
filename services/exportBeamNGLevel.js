@@ -7448,6 +7448,9 @@ const RETAINING_TOP_M = 0.3;    // a retaining wall stands this far over the gro
 const RETAINING_FOOT_M = 0.5;   // ... and reaches this far under the ground at its foot
 
 const GATE_UNDRAWN_HALF_M = { service: 2.5, track: 1.8 };
+const GATE_MAP_PAD_M = 20;
+const GATE_WAY_PIECE_M = 16;
+const GATE_WAY_MAX_PIECES = 4096;
 
 /** What can pass through a gate: the drawn roads, and OSM's other ways on the ground (a service road may only be painted on the terrain, a footpath not drawn at all). */
 function gateWaysOf(terrainData, carriageways, squareSize) {
@@ -7457,9 +7460,29 @@ function gateWaysOf(terrainData, carriageways, squareSize) {
     const h = f.type === 'road' ? f.tags?.highway : null;
     if (!h || h === 'raceway' || drawn.has(f.id) || f.tags.bridge || f.tags.tunnel || f.tags.area === 'yes' || !(f.geometry?.length >= 2)) continue;
     const half = FOOTPATH_WIDTH_M[h] ? FOOTPATH_WIDTH_M[h] / 2 : GATE_UNDRAWN_HALF_M[h] ?? 3;
-    ways.push({ pts: f.geometry.map((q) => geoToWorldPoint(q.lat, q.lng, terrainData, squareSize, 0).slice(0, 2)), half, highway: h });
+    const pts = f.geometry.map((q) => geoToWorldPoint(q.lat, q.lng, terrainData, squareSize, 0).slice(0, 2));
+    for (const run of runsOnMap(pts, (terrainData.width * squareSize) / 2 + GATE_MAP_PAD_M, (terrainData.height * squareSize) / 2 + GATE_MAP_PAD_M)) ways.push({ pts: run, half, highway: h });
   }
   return ways;
+}
+
+// a way's stretches on the map, in short pieces (OSM's ways run on past its
+// edge: one long segment's bounding box filled a clearance grid until it overflowed)
+function runsOnMap(pts, maxX, maxY) {
+  const runs = []; let run = [];
+  const add = (q) => {
+    if (Math.abs(q[0]) <= maxX && Math.abs(q[1]) <= maxY) { run.push(q); return; }
+    if (run.length >= 2) runs.push(run);
+    run = [];
+  };
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i]; const b = pts[i + 1];
+    const n = Math.min(GATE_WAY_MAX_PIECES, Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / GATE_WAY_PIECE_M)));
+    for (let k = 0; k < n; k++) add([a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+  }
+  if (pts.length) add(pts[pts.length - 1]);
+  if (run.length >= 2) runs.push(run);
+  return runs;
 }
 
 // the steepest a gate's leaf leans to reach the ground at its free end
