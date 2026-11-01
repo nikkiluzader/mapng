@@ -19,7 +19,7 @@
 
 import { frameAt } from './waterCover.js';
 import { inRing } from './fountains.js';
-import { homePlate } from './sportsFields.js';
+import { homePlate, seatRows } from './sportsFields.js';
 
 export const POLE_SHAPE = '/levels/driver_training/art/shapes/buildings/hr_stadium_lights.dae';
 export const POLE_SHAPE_HEIGHT_M = 30.36;
@@ -117,8 +117,8 @@ export function planStandLights(seating) {
   const out = [];
   for (const st of seating || []) {
     if (!st.roof || String(st.tags?.lit || '').toLowerCase() === 'no') continue;
-    const bx = st.box; const L = bx.s1 - bx.s0; const D = bx.t1 - bx.t0;
-    const rows = Math.max(2, Math.min(20, Math.floor(D / 0.75)));
+    const bx = st.box; const L = bx.s1 - bx.s0;
+    const rows = seatRows(st);
     const z = st.z1 + 0.45 + (rows - 1) * 0.4 + 2.9;
     const n = Math.max(2, Math.round(L / 14));
     for (let i = 0; i < n; i++) {

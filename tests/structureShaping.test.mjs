@@ -175,3 +175,22 @@ test('a plain deck with measured heights: rim to rim through them, no dip to the
   for (let j = 1; j < tail.length; j++) assert.ok(tail[j][2] <= tail[j - 1][2] + 1e-9, 'falls steadily onto the abutment');
   assert.ok(tail.every(([, , z]) => z >= 4.5), `stays on the abutment top: ${tail.map((p) => p[2].toFixed(2)).join(' ')}`);
 });
+
+test('a plain deck over a road: a ditch beside the road does not hold it down on the road', async () => {
+  const { simpleSpans } = await import('../services/structures/shaping.js');
+  // flat at 10 m with a 1 m dip from y -22 to 22; a road crosses under at y 0
+  const ground = (y) => (Math.abs(y) < 22 ? 9 : 10);
+  const edge = (from, to, y0, y1, extra = {}) => {
+    const ys = []; for (let y = y0; y <= y1 + 1e-9; y += 2) ys.push(y);
+    return { from, to, s: Float64Array.from(ys, (y) => y - y0), x: new Float64Array(ys.length), y: Float64Array.from(ys), g: Float64Array.from(ys, ground), highway: 'service', ...extra };
+  };
+  const bridge = edge('b', 'c', -24, 24, { bridge: true, layer: 1 });
+  const under = { from: 'x', to: 'y', s: Float64Array.from([0, 100]), x: Float64Array.from([-50, 50]), y: new Float64Array(2), g: Float64Array.from([9, 9]), highway: 'raceway' };
+  const graph = { edges: [edge('a', 'b', -100, -24), bridge, edge('c', 'd', 24, 100), under] };
+  graph.crossings = { crossings: [{ a: { edge: 1, i: 12, f: 0, s: 24 }, b: { edge: 3, i: 0, f: 0.5, s: 50 }, x: 0, y: 0, upper: 'a', rule: 'layer', sep: 6.5 }] };
+  const { pins } = simpleSpans(graph, new Set([1]));
+  const atRoad = pins.find(([k, i]) => k === 1 && i === 12);
+  assert.ok(atRoad[2] - 9 >= 3.8, `over the road: ${(atRoad[2] - 9).toFixed(2)} m`);
+  const noCross = simpleSpans({ edges: graph.edges }, new Set([1])).pins.find(([k, i]) => k === 1 && i === 12);
+  assert.ok(noCross[2] - 9 < 1.5, 'with nothing under it, the straight line from rim to rim');
+});

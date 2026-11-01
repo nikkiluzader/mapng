@@ -1166,8 +1166,69 @@ export function buildPitch(stone, full, p) {
 
 // ── Seating ──────────────────────────────────────────────────────────────────
 
-/** Bleachers and grandstands: [{ id, ring, box, face (unit, toward the field), z0, z1, roof }]. */
-export function planSeating(features, project, pitches = [], { groundAt = null, faceTo = null } = {}) {
+// A stand's outline rarely fills one rectangle (it follows a bend, wraps a
+// corner): split along its length until each piece does, each piece a section
+// of the stand. A rectangle round the whole outline stood across the track.
+const STAND_FILL = 0.8;
+const STAND_PIECE_MIN_M = 16;
+const STAND_SPLIT_DEPTH = 6;
+const STAND_MAX_M2 = 120000;      // (more: the outline of a whole venue, not a stand)
+const STAND_MIN_DEPTH_M = 3;
+const ROW_D_M = 0.75;
+const ROW_RISE_M = 0.4;
+const MAX_ROWS = 60;
+
+// the ring's side of the line s = at along unit u (keep: +1 over it, -1 under)
+function clipRing(ring, u, at, keep) {
+  const out = [];
+  const side = (p) => keep * (p[0] * u[0] + p[1] * u[1] - at);
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length]; const sa = side(a); const sb = side(b);
+    if (sa >= 0) out.push(a);
+    if ((sa >= 0) !== (sb >= 0)) { const f = sa / (sa - sb); out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]); }
+  });
+  return out;
+}
+
+/** The sections of a stand's outline: rings that each about fill their box. */
+export function standPieces(ring, depth = 0) {
+  if (ring.length < 3) return [];
+  const bx = orientedBox(ring);
+  if (!bx) return [];
+  const L = bx.s1 - bx.s0; const area = Math.abs(signedArea(ring));
+  if (depth >= STAND_SPLIT_DEPTH || L < STAND_PIECE_MIN_M || area >= STAND_FILL * L * (bx.t1 - bx.t0)) return [ring];
+  const at = (bx.s0 + bx.s1) / 2;
+  return [...standPieces(clipRing(ring, bx.u, at, -1), depth + 1), ...standPieces(clipRing(ring, bx.u, at, 1), depth + 1)];
+}
+
+// The widest band of a box across its depth clear of keepOff(x, y): the box cut to it, or null.
+function clearBand(bx, keepOff) {
+  const rowClear = (t) => { for (let s = bx.s0; ; s += 4) { const q = Math.min(s, bx.s1); if (keepOff(...frameAt(bx, q, t))) return false; if (q >= bx.s1) return true; } };
+  let best = null; let from = null;
+  const end = Math.ceil(bx.t1 - bx.t0);
+  for (let k = 0; k <= end; k++) {
+    const t = Math.min(bx.t0 + k, bx.t1); const clear = rowClear(t);
+    if (clear && from === null) from = t;
+    if (from !== null && (!clear || k === end)) { const to = clear ? t : t - 1; if (!best || to - from > best[1] - best[0]) best = [from, to]; from = null; }
+  }
+  return best && best[1] - best[0] >= STAND_MIN_DEPTH_M ? { ...bx, t0: best[0], t1: best[1] } : null;
+}
+
+const boxRing = (bx) => [[bx.s0, bx.t0], [bx.s1, bx.t0], [bx.s1, bx.t1], [bx.s0, bx.t1]].map(([s, t]) => frameAt(bx, s, t));
+
+/** Rows of seats in a stand: its depth's worth, as many as its height allows (20 untagged). */
+export function seatRows(st) {
+  const h = Number.parseFloat(st.tags?.height);
+  const cap = Number.isFinite(h) ? Math.max(20, Math.min(MAX_ROWS, Math.floor(h / ROW_RISE_M))) : 20;
+  return Math.max(2, Math.min(cap, Math.floor((st.box.t1 - st.box.t0) / ROW_D_M)));
+}
+
+/**
+ * Bleachers and grandstands, a section to each entry: [{ id, ring, box, face
+ * (unit, toward the field), z0, z1, roof }]. keepOff(x, y): true where no stand
+ * may stand (a racing surface).
+ */
+export function planSeating(features, project, pitches = [], { groundAt = null, faceTo = null, keepOff = null } = {}) {
   const out = [];
   for (const f of features || []) {
     const t = f?.tags || {};
@@ -1176,28 +1237,33 @@ export function planSeating(features, project, pitches = [], { groundAt = null, 
     const pts = f.geometry.map((q) => project(q.lat, q.lng));
     let ring = cleanRing(pts);
     if (ring.length < 3) continue;
-    let area = signedArea(ring);
-    if (area < 0) { ring = ring.reverse(); area = -area; }
-    if (area < 6 || area > 20000) continue;
-    const bx = orientedBox(ring);
-    if (!bx) continue;
-    const c = frameAt(bx, (bx.s0 + bx.s1) / 2, (bx.t0 + bx.t1) / 2);
-    // toward the nearest field's middle (else one long side)
-    let near = null;
-    for (const p of pitches) {
-      const pc = frameAt(p.box, (p.box.s0 + p.box.s1) / 2, (p.box.t0 + p.box.t1) / 2);
-      const d = Math.hypot(pc[0] - c[0], pc[1] - c[1]);
-      if (d < 250 && (!near || d < near.d)) near = { d, pc };
-    }
-    // (or what else the stand watches nearer: a racetrack, faceTo(x, y) -> its nearest point)
-    const other = faceTo?.(c[0], c[1]);
-    if (other) { const d = Math.hypot(other[0] - c[0], other[1] - c[1]); if (d < 250 && (!near || d < near.d)) near = { d, pc: other }; }
-    const v = [-bx.u[1], bx.u[0]];
-    const toward = near ? [near.pc[0] - c[0], near.pc[1] - c[1]] : v;
-    const face = toward[0] * v[0] + toward[1] * v[1] >= 0 ? v : [-v[0], -v[1]];
+    const whole = Math.abs(signedArea(ring));
+    if (whole < 6 || whole > STAND_MAX_M2) continue;
+    if (signedArea(ring) < 0) ring = ring.reverse();
     const grounds = pts.map((q) => q[2]).filter(Number.isFinite);
-    out.push({ id: f.id, ring, box: bx, face, z0: Math.min(...grounds), z1: Math.max(...grounds), area, ground: groundAt,
-      roof: t.building === 'grandstand' && (area > 250 || Number.parseFloat(t['building:levels']) >= 2 || /roof|covered/.test(String(t.covered || t['roof:shape'] || ''))), tags: t, seed: String(f.id) });
+    const roof = t.building === 'grandstand' && (whole > 250 || Number.parseFloat(t['building:levels']) >= 2 || /roof|covered/.test(String(t.covered || t['roof:shape'] || '')));
+    standPieces(ring).forEach((piece, k) => {
+      const area = Math.abs(signedArea(piece));
+      if (area < 6) return;
+      let bx = orientedBox(piece);
+      if (!bx) return;
+      if (keepOff) { bx = clearBand(bx, keepOff); if (!bx) return; }
+      const c = frameAt(bx, (bx.s0 + bx.s1) / 2, (bx.t0 + bx.t1) / 2);
+      // toward the nearest field's middle (else one long side)
+      let near = null;
+      for (const p of pitches) {
+        const pc = frameAt(p.box, (p.box.s0 + p.box.s1) / 2, (p.box.t0 + p.box.t1) / 2);
+        const d = Math.hypot(pc[0] - c[0], pc[1] - c[1]);
+        if (d < 250 && (!near || d < near.d)) near = { d, pc };
+      }
+      // (or what else the stand watches nearer: a racetrack, faceTo(x, y) -> its nearest point)
+      const other = faceTo?.(c[0], c[1]);
+      if (other) { const d = Math.hypot(other[0] - c[0], other[1] - c[1]); if (d < 250 && (!near || d < near.d)) near = { d, pc: other }; }
+      const v = [-bx.u[1], bx.u[0]];
+      const toward = near ? [near.pc[0] - c[0], near.pc[1] - c[1]] : v;
+      const face = toward[0] * v[0] + toward[1] * v[1] >= 0 ? v : [-v[0], -v[1]];
+      out.push({ id: k ? `${f.id}_${k}` : f.id, ring: keepOff ? boxRing(bx) : piece, box: bx, face, z0: Math.min(...grounds), z1: Math.max(...grounds), area, ground: groundAt, roof, tags: t, seed: `${f.id}${k || ''}` });
+    });
   }
   return out;
 }
@@ -1211,9 +1277,9 @@ export function buildSeating(stone, full, st) {
   const front = (f[0] * -bx.u[1] + f[1] * bx.u[0]) > 0 ? bx.t1 : bx.t0;
   const back = front === bx.t1 ? bx.t0 : bx.t1;
   const dirT = back > front ? 1 : -1;
-  // rows a fixed depth and rise from the front (a deep outline: more rows, up to 20)
-  const rowD = 0.75; const rise = 0.4;
-  const rows = Math.max(2, Math.min(20, Math.floor(D / rowD)));
+  // rows a fixed depth and rise from the front (a deep outline: more rows)
+  const rowD = ROW_D_M; const rise = ROW_RISE_M;
+  const rows = seatRows(st);
   const g = st.z1;
   const at = (s, t) => frameAt(bx, s, t);
   const seat = [0.78, 0.8, 0.82];

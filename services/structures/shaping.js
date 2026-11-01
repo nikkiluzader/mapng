@@ -23,6 +23,7 @@ const DIP_REACH_M = 15;   // the dip's floor: the lowest ground within this of t
 const DIP_MIN_M = 0.5;    // shallower than this under the rims: no dip, the bridge's own ends
 const RIM_FLAT_M = 8;     // the ground flatter than the class grade this far: the rim
 const RIM_DROP_M = 0.5;   // ... or fallen this far from its best: over the crest
+const CROSSING_MIN_TOP_M = 3.8;   // a deck's top over a road under it, whatever the grade (3.4 m clear under a thin slab)
 
 /**
  * Normalised shaping switches: { roads, bridges, overpasses, tunnels } from
@@ -143,7 +144,10 @@ export function shapingPlan(graph, sw, { measured = [] } = {}) {
  * steeper than the class grade, or passes a crest (flat ground on the
  * floor, a wide river, is no rim). The deck runs straight from rim to rim
  * (never under the ground between), through the stations already pinned in
- * `measured` ([[k, i, z]]: lidar heights) where it has them; a bridge with no dip
+ * `measured` ([[k, i, z]]: lidar heights) where it has them, and up over any
+ * road crossing under it (a ditch beside a road is a dip, but the road under
+ * the bridge still has to fit), as far as twice the class grade allows and
+ * never so low a car can't pass; a bridge with no dip
  * under it is left to the profile solve. OSM often ends a
  * bridge short of the far wall, or on a slope; the rims are where the road
  * really leaves the ground. Returns { pins: [[k, i, z]], span: per edge
@@ -154,6 +158,16 @@ export function simpleSpans(graph, rawDeck, measured = []) {
   // (stations already pinned, the bridge's measured heights: the line from rim to rim runs through them)
   const known = new Map(measured.map(([k, i, z]) => [`${k}:${i}`, z]));
   const pins = []; const span = edges.map(() => null); const list = [];
+  // the roads crossing under each station: its height for the crossing's separation, and its ground
+  const under = new Map();
+  for (const c of graph.crossings?.crossings || []) {
+    const up = c[c.upper]; const low = c[c.upper === 'a' ? 'b' : 'a'];
+    const e = edges[low.edge]; const g0 = e.g[low.i]; const g1 = e.g[Math.min(low.i + 1, e.g.length - 1)];
+    if (!Number.isFinite(g0) || !Number.isFinite(g1)) continue;
+    const road = g0 + (g1 - g0) * low.f;
+    const key = `${up.edge}:${Math.round(up.i + up.f)}`; const was = under.get(key);
+    under.set(key, { sep: Math.max(c.sep, was?.sep ?? 0), road: Math.max(road, was?.road ?? -Infinity) });
+  }
   const ends = new Map();   // node -> [{ k, end }]
   edges.forEach((e, k) => {
     for (const [id, end] of [[e.from, 0], [e.to, 1]]) {
@@ -269,7 +283,15 @@ export function simpleSpans(graph, rawDeck, measured = []) {
     const zA = g[A]; const zB = g[B]; const L = s[B] - s[A] || 1;
     // the rims and every measured station between them, in order along the span
     const anchors = [[s[A], zA]];
-    for (let j = A + 1; j < B; j++) { const z = known.get(`${path[j][0]}:${path[j][1]}`); if (Number.isFinite(z)) anchors.push([s[j], z]); }
+    for (let j = A + 1; j < B; j++) {
+      const key = `${path[j][0]}:${path[j][1]}`; const z = known.get(key); const low = under.get(key);
+      if (Number.isFinite(z)) { anchors.push([s[j], z]); continue; }
+      if (!low) continue;
+      const rimLine = zA + ((zB - zA) * (s[j] - s[A])) / L;
+      const reach = rimLine + 2 * lim * Math.min(s[j] - s[A], s[B] - s[j]);
+      const top = Math.max(Math.min(low.road + low.sep, reach), low.road + CROSSING_MIN_TOP_M);
+      if (top > rimLine) anchors.push([s[j], top]);
+    }
     anchors.push([s[B], zB]);
     let at = 0;
     const lineAt = (sj) => {

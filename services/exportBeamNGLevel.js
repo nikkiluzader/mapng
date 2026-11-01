@@ -7722,7 +7722,8 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       for (let i = 0; i < jointCount; i++) {
         if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
         const sample = { ...sampleAtDistance(joints[i]), terrainZ: jointZ[i] };
-        if (skipLineAt(sample.x, sample.y, sample.terrainZ, sample.yaw)) continue;
+        // (as its rails: a post on a drawn road stood alone in the lane)
+        if (skipLineAt(sample.x, sample.y, sample.terrainZ, sample.yaw) || skipAt(sample.x, sample.y, sample.terrainZ)) continue;
         const rotationYaw = sample.yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
         objects.push({
           __parent: 'Barriers',

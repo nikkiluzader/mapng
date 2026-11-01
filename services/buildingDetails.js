@@ -87,6 +87,8 @@ const STREET_CLASSES = new Set(['motorway', 'trunk', 'primary', 'secondary', 'te
 const FACE_REACH_M = 30;
 const CELL = 32;
 
+const RACE_PASSAGE_HALF_M = 8.5;   // (a raceway is drawn 14 m wide unless tagged)
+
 /**
  * An index of the street centre lines (and the passage roads, apart) for the buildings: facing(a, b)
  * -> the distance from wall a-b's middle to the nearest street in front of it (within FACE_REACH_M), or
@@ -104,6 +106,12 @@ export function streetIndex(features, project) {
     if (t.tunnel === 'building_passage' || (t.covered === 'yes' && t.tunnel !== 'yes')) {
       const half = STREET_CLASSES.has(hw) && hw !== 'pedestrian' ? Math.max(1.8, (Number.parseFloat(t.width) || 0) / 2 || 2.2) : 1.4;
       passages.push({ line, half });
+      continue;
+    }
+    // a racing line never stops at a building: one mapped across a track
+    // (hospitality over the straight, level=1 and the like) has it pass under
+    if (hw === 'raceway' && t.area !== 'yes' && (!t.tunnel || t.tunnel === 'no') && (!t.bridge || t.bridge === 'no')) {
+      passages.push({ line, half: Math.max(RACE_PASSAGE_HALF_M, (Number.parseFloat(t.width) || 0) / 2) });
       continue;
     }
     if (!STREET_CLASSES.has(hw) || (t.tunnel && t.tunnel !== 'no') || t.service === 'parking_aisle' || t.service === 'driveway') continue;

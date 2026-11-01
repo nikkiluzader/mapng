@@ -363,3 +363,20 @@ test('a road node too tight for its width is eased, the ends staying put', async
   assert.deepEqual([out.at(-1).lat, out.at(-1).lng], [pts.at(-1).lat, pts.at(-1).lng]);
   assert.equal(easeTightNodes(pts.slice(0, 20), 5)[10], pts.slice(0, 20)[10], 'a straight road untouched');
 });
+
+test('lit= goes by length when a lap joins: one lit pit entry does not light the lap', () => {
+  const a = cw([[0, 0], [1000, 0]], { sport: 'motor', name: 'Lap' }, 6);
+  const b = cw([[1000, 0], [1100, 0]], { sport: 'motor', lit: 'yes' }, 6);
+  const [r] = planRaceways([a, b]);
+  assert.ok(!r.tags.lit, `not lit: ${r.tags.lit}`);
+  const [l] = planRaceways([cw([[0, 0], [1000, 0]], { sport: 'motor', lit: 'yes' }, 6), cw([[1000, 0], [1100, 0]], { sport: 'motor' }, 6)]);
+  assert.equal(l.tags.lit, 'yes');
+});
+
+test('an unnamed piece touching a named circuit counts as known (kerbs), an isolated one does not', () => {
+  const named = cw([[0, 0], [250, 0], [500, 0]], { sport: 'motor', name: 'Lap' }, 6);
+  const fork = cw([[250, 0], [250, 400]], { sport: 'motor' }, 6);
+  const alone = cw([[0, 900], [500, 900]], { sport: 'motor' }, 6);
+  const rws = planRaceways([named, fork, alone]);
+  assert.equal(rws.filter((r) => r.known).length, 2);
+});

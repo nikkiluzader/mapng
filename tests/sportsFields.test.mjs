@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pitchSport, planPitches, buildPitch, planSeating, buildSeating } from '../services/sportsFields.js';
+import { pitchSport, planPitches, buildPitch, planSeating, buildSeating, standPieces, seatRows } from '../services/sportsFields.js';
 
 // world metres = (lng, lat); ground 3 m everywhere
 const project = (lat, lng) => [lng, lat, 3];
@@ -87,6 +87,37 @@ test('bleachers face the field beside them; a large grandstand gets a roof', () 
   const nearY = Math.max(...seatTops.map((q) => q[1])); const farY = Math.min(...seatTops.map((q) => q[1]));
   const zAt = (y) => Math.max(...seatTops.filter((q) => Math.abs(q[1] - y) < 0.8).map((q) => q[2]));
   assert.ok(zAt(farY) > zAt(nearY), 'higher at the back');
+});
+
+test('a stand bending round a corner is built in sections inside its outline, not one rectangle', () => {
+  // an L: 120 m along the south, 120 m up the east, 20 m deep
+  const L = [[0, 0], [120, 0], [120, 120], [100, 120], [100, 20], [0, 20]];
+  const seats = planSeating([area('l', L, { building: 'grandstand' }, 'building')], project, []);
+  assert.ok(seats.length >= 3, `sections: ${seats.length}`);
+  for (const st of seats) {
+    const fill = st.area / ((st.box.s1 - st.box.s0) * (st.box.t1 - st.box.t0));
+    assert.ok(fill > 0.75, `a section fills its box: ${fill.toFixed(2)}`);
+    const c = [(st.ring.reduce((a, q) => a + q[0], 0)) / st.ring.length, (st.ring.reduce((a, q) => a + q[1], 0)) / st.ring.length];
+    assert.ok(!(c[0] < 95 && c[1] > 25), `none in the corner the L leaves empty: ${c}`);
+  }
+  assert.ok(standPieces([[0, 0], [50, 0], [50, 10], [0, 10]]).length === 1, 'a rectangle stays one piece');
+});
+
+test('a stand stays off what it must keep off, cut to the clear band of its depth', () => {
+  const gs = area('g', rect(0, 0, 60, 30), { building: 'grandstand' }, 'building');
+  const seats = planSeating([gs], project, [], { keepOff: (x, y) => y > 10 && y < 14 });
+  assert.equal(seats.length, 1);
+  const ys = seats[0].ring.map((q) => q[1]);
+  assert.ok(Math.min(...ys) >= 14 || Math.max(...ys) <= 10, `clear: ${Math.min(...ys)}..${Math.max(...ys)}`);
+  assert.equal(planSeating([gs], project, [], { keepOff: () => true }).length, 0, 'nothing clear: no stand');
+});
+
+test('a giant stand is built, with rows up to its tagged height', () => {
+  const big = area('g', rect(0, 0, 900, 90), { building: 'grandstand', height: '30' }, 'building');
+  const seats = planSeating([big], project, []);
+  assert.ok(seats.length >= 1);
+  assert.equal(seatRows(seats[0]), 60, 'capped at sixty rows');
+  assert.equal(planSeating([area('v', rect(0, 0, 900, 900), { building: 'grandstand' }, 'building')], project, []).length, 0, 'a whole venue\'s outline is no stand');
 });
 
 test('a track shaped like the usual oval is drawn as that oval: lanes exact offsets, never crossing', async () => {

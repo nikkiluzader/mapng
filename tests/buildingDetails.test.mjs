@@ -126,3 +126,11 @@ test('castles and forts: stone and battlements, no windows; sentry boxes on a st
   const castle = buildTexturedBuildings([{ id: 'c', type: 'building', tags: { building: 'castle', historic: 'castle', castle_type: 'defensive' }, geometry: ring.map(([x, y]) => P(x, y)) }], project);
   assert.equal(castle.stats.details.cornerTowers, 4);
 });
+
+test('a racing line is a passage through a building mapped across it', () => {
+  const s = streetIndex([road('r', [[-50, 5], [50, 5]], { highway: 'raceway', name: 'Lap' })], project);
+  assert.equal(s.passages.length, 1);
+  assert.ok(s.passages[0].half >= 6, 'the track\'s width, not a footway\'s');
+  const crossing = passageCrossings([[0, 0], [10, 0], [10, 10], [0, 10]], s.passages);
+  assert.ok(crossing.length >= 1);
+});

@@ -37,7 +37,9 @@ const realFetchBase = globalThis.fetch;
 globalThis.fetch = (url, init = {}) => realFetchBase(url, { ...init, headers: { 'User-Agent': 'MapNG-sweep/1.0 (local diagnostics)', ...(init.headers || {}) } });
 
 async function fetchOne({ name, lat, lng, size }) {
-  const center = { lat, lng }; const SIZE = size || 1024; const MPP = +(process.env.MPP || 1); const NO_DATA = -99999;
+  const center = { lat, lng }; const SIZE = size || 1024;
+  // (a level's terrain is a power of two: 1536 quietly came out cut to 1024)
+  if (Math.log2(SIZE) % 1) throw new Error(`size ${SIZE} is no power of two`); const MPP = +(process.env.MPP || 1); const NO_DATA = -99999;
   const OUT = path.join(AREAS_DIR, name);
   fs.mkdirSync(OUT, { recursive: true });
 

@@ -1448,7 +1448,10 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     // passages through the building: the walls open over the road for the
     // ground floor's height
     const zOpen = base + Math.max(3.2, plan.floorH);
-    const crossings = streets.passages.length ? passageCrossings(ring, streets.passages) : [];
+    // (a passage's road near this building: a whole lap's racing lines are many to test wall by wall)
+    const ringBox = [Math.min(...ring.map((q) => q[0])), Math.max(...ring.map((q) => q[0])), Math.min(...ring.map((q) => q[1])), Math.max(...ring.map((q) => q[1]))];
+    const passages = streets.passages.filter((p) => p.line.some((q) => q[0] > ringBox[0] - 300 && q[0] < ringBox[1] + 300 && q[1] > ringBox[2] - 300 && q[1] < ringBox[3] + 300));
+    const crossings = passages.length ? passageCrossings(ring, passages) : [];
 
     // one wall piece p..q (fractions t0..t1 of edge i), open below zOpen if `open`
     const wallPiece = (a, b, i, open) => {
@@ -1471,7 +1474,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i]; const b = ring[(i + 1) % ring.length];
       if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
-      const openings = crossings.length ? passageOpenings(a, b, streets.passages) : [];
+      const openings = crossings.length ? passageOpenings(a, b, passages) : [];
       if (!openings.length) { wallPiece(a, b, i, false); continue; }
       const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
       let t = 0;
@@ -1526,7 +1529,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
         const a = ring[i]; const b = ring[(i + 1) % ring.length];
         const d = streets.facing(a, b);
         if (d === null || d > SHOP_STREET_M) continue;
-        if (crossings.length && passageOpenings(a, b, streets.passages).length) continue;
+        if (crossings.length && passageOpenings(a, b, passages).length) continue;
         stats.details.shopfronts = (stats.details.shopfronts || 0) + shopfronts(detailB, a, b, base + plan.floorH, (k1, k2) => rnd('shop', i, k1, k2));
       }
     }
@@ -1663,7 +1666,27 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     }
     return best?.q || null;
   } : null;
-  const seating = planSeating(features, project, pitches, { groundAt, faceTo });
+  // (no stand on a racing surface, or close enough to shut a car in)
+  const raceCells = new Map(); const RACE_CELL_M = 16; const RACE_CLEAR_M = 2.5;
+  for (const c of trackLines) {
+    const pad = (c.half || 6) + RACE_CLEAR_M;
+    for (let i = 0; i + 1 < c.nodes.length; i++) {
+      const a = c.nodes[i]; const b = c.nodes[i + 1]; const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / RACE_CELL_M) + 1;
+      for (let k = 0; k <= n; k++) {
+        const x = a[0] + ((b[0] - a[0]) * k) / n; const y = a[1] + ((b[1] - a[1]) * k) / n;
+        for (let cx = Math.floor((x - pad) / RACE_CELL_M); cx <= Math.floor((x + pad) / RACE_CELL_M); cx++) for (let cy = Math.floor((y - pad) / RACE_CELL_M); cy <= Math.floor((y + pad) / RACE_CELL_M); cy++) {
+          const key = `${cx},${cy}`; const list = raceCells.get(key);
+          if (!list) raceCells.set(key, [[a, b, pad]]); else if (list[list.length - 1][0] !== a) list.push([a, b, pad]);
+        }
+      }
+    }
+  }
+  const onRacing = raceCells.size ? (x, y) => (raceCells.get(`${Math.floor(x / RACE_CELL_M)},${Math.floor(y / RACE_CELL_M)}`) || []).some(([a, b, pad]) => {
+    const dx = b[0] - a[0]; const dy = b[1] - a[1];
+    const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(a[0] + dx * u - x, a[1] + dy * u - y) < pad;
+  }) : null;
+  const seating = planSeating(features, project, pitches, { groundAt, faceTo, keepOff: onRacing });
   for (const st of seating) {
     const tile = tileFor(st.ring);
     bump(seatKinds, buildSeating(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, st));

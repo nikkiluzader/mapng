@@ -65,6 +65,12 @@ const JOIN_HEADING_COS = Math.cos((25 * Math.PI) / 180);
 function joinCircuitPieces(rws) {
   const dirAt = (nodes, atEnd) => { const n = nodes.length; const a = atEnd ? nodes[n - 2] : nodes[0]; const b = atEnd ? nodes[n - 1] : nodes[1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
   const lines = rws.filter((r) => r.kind === 'circuit' || r.kind === 'kart' || r.kind === 'dirt');
+  // (lit= by length: one lit piece, a pit entry, doesn't light the whole lap)
+  for (const r of lines) {
+    const L = r.nodes.slice(1).reduce((s, q, i) => s + Math.hypot(q[0] - r.nodes[i][0], q[1] - r.nodes[i][1]), 0);
+    const lit = String(r.tags.lit || '').toLowerCase();
+    r.lengths = { all: L, yes: lit === 'yes' ? L : 0, no: lit === 'no' ? L : 0 };
+  }
   for (let merged = true; merged;) {
     merged = false;
     for (const a of lines) {
@@ -82,9 +88,31 @@ function joinCircuitPieces(rws) {
       if (!best) continue;
       a.nodes = [...a.nodes, ...best.nb.slice(1)];
       a.tags = { ...best.b.tags, ...a.tags }; a.oneWay = a.oneWay && best.b.oneWay; best.b.gone = true; merged = true;
+      for (const k of ['all', 'yes', 'no']) a.lengths[k] += best.b.lengths[k];
     }
   }
+  for (const r of lines) {
+    if (r.gone) continue;
+    const { all, yes, no } = r.lengths;
+    const { lit: _, ...tags } = r.tags;
+    r.tags = yes >= all / 2 ? { ...tags, lit: 'yes' } : no >= all / 2 ? { ...tags, lit: 'no' } : tags;
+  }
   for (let i = rws.length - 1; i >= 0; i--) if (rws[i].gone) rws.splice(i, 1);
+}
+
+// A circuit's unnamed, untagged pieces are as known as the named ones they
+// touch (at a fork they don't join them as a line)
+function markKnownCircuits(rws) {
+  const lines = rws.filter((r) => r.kind === 'circuit' || r.kind === 'kart');
+  const cell = (q) => `${Math.round(q[0] / 2)},${Math.round(q[1] / 2)}`;
+  const at = new Map();
+  for (const r of lines) for (const q of r.nodes) { const k = cell(q); if (!at.has(k)) at.set(k, []); if (!at.get(k).includes(r)) at.get(k).push(r); }
+  const stack = lines.filter((r) => r.tags.surface || r.tags.name);
+  for (const r of stack) r.known = true;
+  while (stack.length) {
+    const r = stack.pop();
+    for (const q of r.nodes) for (const o of at.get(cell(q)) || []) if (!o.known && o.kind === r.kind) { o.known = true; stack.push(o); }
+  }
 }
 
 // The corners of a line: [{ i, j, side }] (nodes i..j, side +1 turning left).
@@ -122,6 +150,7 @@ export function planRaceways(carriageways = []) {
   // a circuit or oval in pieces (its ways, the road system's chunks) is one
   // line: a corner cut at a piece's end lost its kerb there, a wall its join
   joinCircuitPieces(rws);
+  markKnownCircuits(rws);
   // a drag strip in pieces (split at the timing lights, the shut-down area):
   // the pieces that meet end to end in line are one strip, one start
   const drags = rws.filter((r) => r.kind === 'drag');
@@ -323,7 +352,7 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
   // training course or a test track, has none)
   // (and known to be paved: a surface tag, or a track someone named; an
   // unnamed untagged raceway may be gravel, a rally school's stage)
-  const known = !!rw.tags.surface || !!rw.tags.name;
+  const known = rw.known || !!rw.tags.surface || !!rw.tags.name;
   const racing = known && (rw.kind === 'kart' || /motor|racing|kart|circuit|gp|formula|touring|endurance/.test(String(rw.tags.sport || '').toLowerCase()));
   if ((rw.kind === 'circuit' || rw.kind === 'kart') && paved && racing && !rw.oval) {
     // a kerb to a corner, unbroken: on the inside from turn-in through the
