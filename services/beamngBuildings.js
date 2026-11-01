@@ -569,6 +569,9 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
   else if (kind === 'industrial') wall = r('ind') < 0.6 ? 'metalwall' : 'panel';
   else if (kind === 'house') {
     wall = pickShare(style.walls, r('wall'));
+    // (timber siding is a low house's: three floors and up is masonry, an
+    // Upper East Side walk-up stood in clapboard)
+    if (wall === 'siding' && floors >= 3) wall = r('masonry') < Math.max(0.6, style.brick) ? 'brick' : 'stucco';
     if (material === 'brick') wall = 'brick';
     else if (material === 'wood') wall = 'siding';
     else if (['plaster', 'stucco', 'concrete'].includes(material)) wall = 'stucco';
