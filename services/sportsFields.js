@@ -35,14 +35,14 @@ const SPORT_ALIASES = {
   baseball: 'baseball', softball: 'softball', cricket: 'cricket', field_hockey: 'field_hockey', hockey: 'field_hockey', lacrosse: 'soccer',
   basketball: 'basketball', tennis: 'tennis', padel: 'padel', pickleball: 'pickleball', badminton: 'pickleball', platform_tennis: 'pickleball',
   volleyball: 'volleyball', beachvolleyball: 'beach_volleyball', beach_volleyball: 'beach_volleyball', netball: 'netball', korfball: 'netball',
-  handball: 'handball', american_handball: 'handball', skateboard: 'skateboard', bmx: 'skateboard', athletics: 'track', running: 'track',
+  handball: 'handball', american_handball: 'wallball', skateboard: 'skateboard', bmx: 'skateboard', athletics: 'track', running: 'track',
   multi: 'multi', bowls: 'bowls', boules: 'boules', petanque: 'boules', croquet: 'bowls', equestrian: 'equestrian', four_square: 'multi',
 };
 // the usual surface of each
 const USUAL_SURFACE = {
   soccer: 'grass', futsal: 'hard', american_football: 'grass', rugby: 'grass', baseball: 'grass', softball: 'grass', cricket: 'grass',
   field_hockey: 'artificial_turf', basketball: 'concrete', tennis: 'hard', padel: 'artificial_turf', pickleball: 'hard', volleyball: 'sand',
-  beach_volleyball: 'sand', netball: 'hard', handball: 'hard', skateboard: 'concrete', track: 'tartan', multi: 'hard', bowls: 'grass',
+  beach_volleyball: 'sand', netball: 'hard', handball: 'hard', wallball: 'hard', skateboard: 'concrete', track: 'tartan', multi: 'hard', bowls: 'grass',
   boules: 'gravel', equestrian: 'sand',
 };
 const SURFACE_OF = {
@@ -985,6 +985,34 @@ function netball(stone, full, p) {
   }
 }
 
+// American handball, one wall: courts 6.1 m wide, 10.36 m long off a wall
+// 4.88 m tall, the short line 4.88 m out, service markers past it. As many as
+// fit in the mapped area, in a row along its long side; back to back on one
+// wall line where it is deep enough for two rows (New York's park courts).
+const WALL_W = 6.1; const WALL_L = 10.36; const WALL_H = 4.88; const WALL_GAP = 1.5;
+function wallball(stone, full, p) {
+  const { s0, s1, t0, t1 } = p.box; const L = s1 - s0; const W = t1 - t0;
+  const n = Math.max(1, Math.floor((L - 1 + WALL_GAP) / (WALL_W + WALL_GAP)));
+  const double = W >= 2 * WALL_L + 1.5;
+  const wallT = double ? (t0 + t1) / 2 : t0 + 0.4;
+  const lim = Math.min(WALL_L, (double ? W / 2 : W) - 0.8);
+  const total = n * WALL_W + (n - 1) * WALL_GAP;
+  const z = (s, t) => onField(p, s, t, 0)[2];
+  for (let i = 0; i < n; i++) {
+    const a = (s0 + s1) / 2 - total / 2 + i * (WALL_W + WALL_GAP); const b = a + WALL_W; const m = (a + b) / 2;
+    const g = Math.min(z(a, wallT), z(b, wallT));
+    box(stone, 'smoothConcrete', F(p, m, wallT), p.box.u, WALL_W / 2, 0.2, g - 0.2, g + WALL_H, [0.8, 0.8, 0.77]);
+    for (const dir of double ? [1, -1] : [1]) {
+      const e = wallT + dir * 0.2;
+      rectST(full, p, a, Math.min(e, e + dir * lim), b, Math.max(e, e + dir * lim));
+      const sh = e + dir * Math.min(WALL_H, lim * 0.47);
+      lineST(full, p, a, sh, b, sh);
+      const sv = e + dir * Math.min(WALL_H + 2.74, lim * 0.73);
+      for (const [x0, x1] of [[a, a + 0.6], [b - 0.6, b]]) lineST(full, p, x0, sv, x1, sv);
+    }
+  }
+}
+
 function handball(stone, full, p, futsal) {
   const { s0, s1, t0, t1 } = p.box; const L = s1 - s0; const W = t1 - t0;
   const sx = Math.min(1, (L - 1) / 40); const sy = Math.min(1, (W - 1) / 20); const k = Math.min(sx, sy);
@@ -1124,6 +1152,7 @@ export function buildPitch(stone, full, p) {
     case 'volleyball': case 'beach_volleyball': volleyball(stone, full, p); break;
     case 'netball': netball(stone, full, p); break;
     case 'handball': handball(stone, full, p, false); break;
+    case 'wallball': wallball(stone, full, p); break;
     case 'track': track(stone, full, p); break;
     case 'skateboard': if (p.slab !== null) skatepark(stone, full, p); break;
     default: {

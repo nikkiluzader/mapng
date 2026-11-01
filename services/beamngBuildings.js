@@ -1694,7 +1694,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (pitches.length || rws.length) {
       const boxed = (ring) => { let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity; for (const q of ring) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); } return { ring, x0, y0, x1, y1 }; };
       const solid = [...pitches.map((p) => boxed(p.ring)), ...seating.map((st) => boxed(st.ring))];
-      for (const f of features) if (f?.type === 'building' && f.geometry?.length >= 3) solid.push(boxed(f.geometry.map((q) => project(q.lat, q.lng))));
+      // (a stadium's outline wraps the whole venue, and isn't drawn)
+      for (const f of features) if (f?.type === 'building' && f.tags?.building !== 'stadium' && f.geometry?.length >= 3) solid.push(boxed(f.geometry.map((q) => project(q.lat, q.lng))));
       const onRoad = pitches.find((p) => p.onRoad)?.onRoad;
       const margin = 1.5;
       const free = (x, y) => !blocked(x, y, { nodes: null }, 0) && !onRoad?.(x, y)

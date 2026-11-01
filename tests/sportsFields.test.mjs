@@ -210,3 +210,8 @@ test('a field mapped over a road leaves the road clear', () => {
   assert.equal(onRoad.length, 0, 'nothing on the road');
   assert.ok(full.tris.some((t) => t.pts.every((q) => q[1] > 20)), 'the rest of the track built');
 });
+
+test('American handball is one-wall courts, no goals', async () => {
+  const { pitchSport } = await import('../services/sportsFields.js');
+  assert.equal(pitchSport({ leisure: 'pitch', sport: 'american_handball' }, { lat: 40.7, lon: -74 }), 'wallball');
+});

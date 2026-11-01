@@ -25,14 +25,14 @@ export const POLE_SHAPE_HEIGHT_M = 30.36;
 
 // height (m), side poles per long side, setback from the outline (m), brightness (cd)
 const STADIUM = { h: 27, cd: 650000 };
-const COURT = { h: 11, cd: 90000 };
-const LOW_COURT = { h: 9, cd: 60000 };
+const COURT = { h: 11, cd: 70000 };
+const LOW_COURT = { h: 9, cd: 45000 };
 const FIELD_LIGHTS = {
   american_football: STADIUM, soccer: STADIUM, track: STADIUM, rugby: STADIUM, field_hockey: STADIUM, cricket: STADIUM,
   tennis: COURT, padel: LOW_COURT, pickleball: LOW_COURT, basketball: LOW_COURT, volleyball: LOW_COURT, netball: LOW_COURT,
-  handball: LOW_COURT, futsal: LOW_COURT, skateboard: LOW_COURT, bowls: LOW_COURT,
+  handball: LOW_COURT, wallball: LOW_COURT, futsal: LOW_COURT, skateboard: LOW_COURT, bowls: LOW_COURT,
 };
-const USUALLY_LIT = new Set(['american_football', 'soccer', 'track', 'baseball', 'softball', 'tennis', 'padel', 'pickleball', 'basketball', 'volleyball', 'netball', 'handball', 'futsal', 'skateboard']);
+const USUALLY_LIT = new Set(['american_football', 'soccer', 'track', 'baseball', 'softball', 'tennis', 'padel', 'pickleball', 'basketball', 'volleyball', 'netball', 'handball', 'wallball', 'futsal', 'skateboard']);
 const SEATED_M = 90;
 const MERGE_M = 7;          // poles this close are one (courts side by side)
 const SETBACK_STEP_M = 2;
