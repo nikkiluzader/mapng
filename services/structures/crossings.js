@@ -30,11 +30,15 @@ const OVERLAP_RUN_M = 20;
 const PATH_CLASSES = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway', 'track']);
 const PATH_UNDER_M = 2.5 + 2.2;       // headroom over a path + a road deck
 const ROAD_UNDER_PATH_DECK_M = 4.5 + 0.6;  // headroom over a road + a footbridge deck
+// a raceway over a raceway (a circuit's crossover, a fun park's kart helix):
+// racing cars and karts under a light deck, not trucks under a road bridge
+const RACEWAY_OVER_RACEWAY_M = 3 + 0.6;
 
 /** Vertical separation an `upper` edge needs over a `lower` one (deck top over road surface). */
 export function requiredSeparation(upper, lower) {
   if (PATH_CLASSES.has(lower.highway)) return PATH_UNDER_M;
   if (PATH_CLASSES.has(upper.highway)) return ROAD_UNDER_PATH_DECK_M;
+  if (upper.highway === 'raceway' && lower.highway === 'raceway') return RACEWAY_OVER_RACEWAY_M;
   return DECK_ROAD_CLEAR_M;
 }
 

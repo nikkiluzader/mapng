@@ -103,8 +103,29 @@ export function getRoadHalfWidthClamp(highway) {
   if (['service', 'track'].includes(highway)) {
     return { min: 1.8, max: 3.5 };
   }
+  if (highway === 'raceway') return { min: 1.5, max: 12 };
   return { min: 2.2, max: 5.0 };
 }
+
+// Racing: highway=raceway by kind (racewayKind), their usual paved widths.
+// mapng:raceway is set by the exporter where the geometry says more than the
+// tags (a long dead-straight raceway: a drag strip).
+const UNPAVED_RACE = new Set(['dirt', 'clay', 'ground', 'earth', 'unpaved', 'gravel', 'sand', 'mud', 'compacted', 'grass']);
+const RACEWAY_HALF_M = { drag: 6, dirt: 8, kart: 4, moto: 2.5, pit: 3.5, circuit: 6 };
+/** The kind of a raceway: drag | dirt | kart | moto | pit | circuit. */
+export function racewayKind(tags = {}) {
+  const k = String(tags['mapng:raceway'] || '').toLowerCase();
+  if (RACEWAY_HALF_M[k]) return k;
+  const sport = String(tags.sport || '').toLowerCase(); const raceway = String(tags.raceway || '').toLowerCase();
+  const name = String(tags.name || '').toLowerCase();
+  if (/drag/.test(raceway) || /drag/.test(sport) || /drag ?strip|dragway/.test(name)) return 'drag';
+  if (/pit/.test(raceway) || /\bpit\b|pit lane|pitlane/.test(name)) return 'pit';
+  if (/motocross|mx|enduro|supercross|bmx/.test(sport) || raceway === 'motocross') return 'moto';
+  if (/kart/.test(sport) || /kart/.test(raceway)) return 'kart';
+  if (UNPAVED_RACE.has(String(tags.surface || '').toLowerCase())) return 'dirt';
+  return 'circuit';
+}
+export const racewayHalfWidth = (tags = {}) => RACEWAY_HALF_M[racewayKind(tags)];
 
 /**
  * Estimate road half-width in meters from OSM tags and roadway class.
@@ -118,6 +139,8 @@ export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fall
   if (Number.isFinite(explicitWidth) && explicitWidth > 0) {
     return clamp(explicitWidth / 2, limits.min, limits.max);
   }
+  // a raceway by its kind (a circuit 12 m, a dirt oval 16, a kart track 8), not by lanes
+  if (highway === 'raceway') return clamp(racewayHalfWidth(tags), limits.min, limits.max);
 
   const lanesFromTotal = parsePositiveInt(tags.lanes);
   const lanesFromDir = parsePositiveInt(tags['lanes:forward']) + parsePositiveInt(tags['lanes:backward']);

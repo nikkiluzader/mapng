@@ -12,6 +12,7 @@
 const TILE = 64;
 const SHOULDER_M = 1;          // flat past the paved half width before the slope
 const GROUND_BLEND_M = 4;      // a road at ground level blends back over this far
+const RACEWAY_BANK_MAX = 0.62;  // steepest banking kept (32 degrees: past any real oval's)
 const FILL_RUN = 2;            // embankment side slope: 1 m up per 2 m out
 const CUT_RUN = 1.5;           // cutting side slope
 const SLOPE_MIN_M = 2;
@@ -137,6 +138,17 @@ export function composeTerrain(graph, grid) {
       const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy;
       if (L2 < 1e-9) continue;
       const core = e.half + SHOULDER_M;
+      // a raceway keeps its ground's banking (an oval's turns, 20-30 degrees
+      // in the elevation data): across its core the surface tilts as the
+      // terrain does there, not levelled into a shelf with a cliff each side
+      let bank = 0;
+      if (e.highway === 'raceway' && !deck) {
+        const L = Math.sqrt(L2); const nx = -vy / L; const ny = vx / L;
+        const mx = (ax + bx) / 2; const my = (ay + by) / 2; const o = e.half * 0.7;
+        const hAt = (x, y) => { const [pc, pr] = toPixel(x, y); const cc = Math.max(0, Math.min(width - 1, Math.round(pc))); const rr = Math.max(0, Math.min(height - 1, Math.round(pr))); return raw(cc, rr); };
+        const hl = hAt(mx + nx * o, my + ny * o); const hr = hAt(mx - nx * o, my - ny * o);
+        if (Number.isFinite(hl) && Number.isFinite(hr)) bank = Math.max(-RACEWAY_BANK_MAX, Math.min(RACEWAY_BANK_MAX, (hl - hr) / (2 * o)));
+      }
       // the side slope only reaches as far as this piece's height difference
       // from the terrain needs (most roads sit at ground level: 4 m)
       const offAt = (j) => {
@@ -157,7 +169,9 @@ export function composeTerrain(graph, grid) {
           const u = Math.max(0, Math.min(1, uRaw));
           const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
           if (d > reach) continue;
-          const zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0);
+          let zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0);
+          // (banked: the left of the line higher by bank per metre, out to the core's edge)
+          if (bank) zc += bank * Math.max(-core, Math.min(core, (-(x - ax) * vy + (y - ay) * vx) / Math.sqrt(L2)));
           const t = tileFor(c, r); const j = (r % TILE) * TILE + (c % TILE);
           if (deck) {
             // under the deck only, not round its ends

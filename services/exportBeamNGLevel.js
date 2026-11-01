@@ -91,6 +91,7 @@ import {
   getDefaultLaneWidthMeters,
   isOneWayRoad,
   NON_DRIVEABLE_HIGHWAYS,
+  racewayKind,
   streetParkingSide,
 } from './roadWidth.js';
 import {
@@ -1037,7 +1038,7 @@ function buildTunnelGroups(tunnels, daes, levelName) {
   return { items, lightCount, zoneCount, lightSpacing };
 }
 
-async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null) {
+async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [] } = {}) {
   if (!terrainData.osmFeatures?.length) return null;
 
   // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
@@ -1047,7 +1048,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
     // (carports are open roofs on posts: native carport models, not walls)
     terrainData.osmFeatures.filter((f) => !isCarportFeature(f)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
-    { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize) },
+    { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways },
   );
   if (reportStats) {
     reportStats.built = buildingCount;
@@ -1602,7 +1603,15 @@ function clipGeometryToMargin(geometry, bounds) {
 // 250 nodes (~500 m at ROAD_NODE_SPACING_M): official roads run to 170-429
 // nodes (West Coast USA, Italy), and at DECAL_ROAD_DETAIL a piece samples as
 // many points as the old 50-node pieces did at the engine's 0.1.
-function chunkPolyline(points, maxNodes = 250) {
+//
+// A wide road is cut shorter still: the engine captures the terrain triangles
+// under each piece and caps what one piece holds, so past it the rest of a
+// long wide piece silently drew nothing (a 12 m drag strip in 500 m pieces
+// on 1 m terrain lost its asphalt midway while its narrow lines drew; the
+// DecalRoad docs: split long, wide roads). DECAL_PIECE_AREA_M2 a piece.
+const DECAL_PIECE_AREA_M2 = 2400;
+function chunkPolyline(points, maxNodes = 250, { widthM = 0, spacingM = 0 } = {}) {
+  if (widthM > 0 && spacingM > 0) maxNodes = Math.max(20, Math.min(maxNodes, Math.floor(DECAL_PIECE_AREA_M2 / (widthM * spacingM)) + 1));
   if (points.length <= maxNodes) return [points];
   const chunks = [];
   for (let i = 0; i < points.length - 1; i += maxNodes - 1) {
@@ -2673,6 +2682,12 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
     layers.push({
       ...AI_PATH_LAYER, width: 2 * drivingHalfWidth, offset: laneShift,
     });
+  }
+  // a paved raceway: white edge lines, a drag strip's centre line between its two lanes
+  if (!isUnpaved && highway === 'raceway') {
+    const e = Math.max(0.5, drivingHalfWidth - 0.35);
+    for (const [name, off] of [['line_left', -e], ['line_right', e]]) layers.push({ name, material: GLOBAL_DECAL_MATERIALS.lineWhite, width: 0.2, offset: off + laneShift, renderPriority: 1, ...LINE_LAYER_BASE });
+    if (racewayKind(tags) === 'drag') layers.push({ name: 'line_center', material: GLOBAL_DECAL_MATERIALS.lineWhite, width: 0.15, offset: laneShift, renderPriority: 2, ...LINE_LAYER_BASE });
   }
   if (!isUnpaved && laneMarkingsEnabled) {
     layers.push(...buildLineMarkingLayers(highway, tags, drivingHalfWidth, {
@@ -4639,7 +4654,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
     const street = sanitizeBeamNGObjectName(tags.name || `${footpath ? tags.highway : service ? `service_${kind || 'road'}` : 'pedestrian'}_${feature.id}`, `pedestrian_${feature.id || 'x'}`);
     const pieces = clipGeometryToMargin(feature.geometry, terrainData.bounds)
       .map((s) => resampleGeometryToSpacing(s, roadNodeSpacingM))
-      .flatMap((s) => chunkPolyline(s));
+      .flatMap((s) => chunkPolyline(s, 250, { widthM: fullWidth, spacingM: roadNodeSpacingM }));
     for (const piece of pieces) {
       const world = [];
       for (const pt of piece) {
@@ -4805,6 +4820,25 @@ export async function generateDecalRoadsYielding(terrainData, squareSize, yieldF
 }
 
 // The road layout, pausing (yield) between its phases and every 200 roads.
+// A raceway at least DRAG_MIN_M long and dead straight (within DRAG_STRAIGHT_M
+// of its chord): a drag strip, whatever its tags say (they rarely do); a
+// shorter straight is a connecting lane, a circuit's straight is not dead
+// straight that long in one way.
+const DRAG_MIN_M = 380;   // (a quarter mile and some: a 233 m straight inside a training course was no drag strip)
+const DRAG_STRAIGHT_M = 2;
+function markDragStrips(features, project) {
+  for (const f of features) {
+    const t = f?.tags;
+    if (f?.type !== 'road' || t?.highway !== 'raceway' || t['mapng:raceway'] || !(f.geometry?.length >= 2)) continue;
+    const pts = f.geometry.map((q) => project(q.lat, q.lng));
+    const a = pts[0]; const b = pts[pts.length - 1];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < DRAG_MIN_M) continue;
+    const dev = Math.max(...pts.map((q) => Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / L));
+    if (dev <= DRAG_STRAIGHT_M) t['mapng:raceway'] = 'drag';
+  }
+}
+
 function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const includeBridges = opts.includeBridges !== false;
   const includeTunnels = opts.includeTunnels !== false;
@@ -4814,10 +4848,13 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road nodes every ${budget.spacing.toFixed(2)} m (not ${ROAD_NODE_SPACING_M} m): ${budget.lengthKm.toFixed(0)} km of roads would make ~${budget.estimatedNodes} DecalRoad nodes, past what BeamNG draws at load.`);
   }
   if (!terrainData.osmFeatures?.length) return [];
+  markDragStrips(terrainData.osmFeatures, (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0));
 
   const sourceRoadFeatures = bridgeOverShortGaps(terrainData.osmFeatures.filter((feature) => {
     if (feature?.type !== 'road' || !feature.geometry?.length) return false;
     const highway = feature.tags?.highway;
+    // (a raceway's area=yes outline is its surface, drawn as one (racetracks.js), not a road round it)
+    if (highway === 'raceway' && feature.tags?.area === 'yes') return false;
     return !!highway && !ROAD_SKIP.has(highway);
   }));
   const roadNetwork = buildRoadNetwork(sourceRoadFeatures);
@@ -5054,7 +5091,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // Then further chunk each segment so no single DecalRoad is too long.
     const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
       .map(s => resampleGeometryToSpacing(s, roadNodeSpacingM))
-      .flatMap(s => chunkPolyline(s));
+      .flatMap(s => chunkPolyline(s, 250, { widthM: 2 * styleHalfWidth, spacingM: roadNodeSpacingM }));
 
     if (clippedSegments.length === 0) continue;
 
@@ -6469,6 +6506,7 @@ function buildDetailedReportSections(d) {
     lines.push(`- Shop fronts: ${st.shopFronts}, offices: ${st.offices}, courtyards (inner rings): ${st.withHoles}`);
     const dt = st.details || {};
     lines.push(`- Details: parapets ${dt.parapets || 0}, shop awnings / fascias ${dt.shopfronts || 0}, verandas ${dt.veranda || 0}, door hoods ${dt.hood || 0}, front steps ${dt.steps || 0}, chimneys ${dt.chimneys || 0}, roof plant pieces ${dt.roofPlant || 0}, church towers ${dt.towers || 0}, domes ${dt.domes || 0}, silos / tanks ${dt.silos || 0}, passage openings ${dt.passages || 0}, castles / forts ${dt.forts || 0} (merlons ${dt.merlons || 0}, sentry boxes ${dt.sentryBoxes || 0}, corner towers ${dt.cornerTowers || 0}, gates ${dt.gates || 0})`);
+    if (dt.racing) lines.push(`- Racetracks (highway=raceway by kind: kerbs round paved bends, kart tyre walls, a dirt oval's wall and catch fence, a drag strip's launch pad, light tree and walls; area=yes raceways as surfaces): ${Object.entries(dt.racing).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.pitches) lines.push(`- Sports fields (OSM leisure=pitch / track by sport=*: surface by surface=* or the sport's usual one, regulation markings scaled to the mapped size, goals, posts, hoops, nets, fences): ${Object.entries(dt.pitches).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.seating) lines.push(`- Seating (building=grandstand, leisure=bleachers: tiered seats facing the nearest field): ${Object.entries(dt.seating).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.pools) lines.push(`- Swimming pools (OSM leisure=swimming_pool, outdoors: sunk in the ground with a deck, its terrain squares opened; lane pools, wading pools, above-ground pools): ${Object.entries(dt.pools).map(([k, v]) => `${k} ${v}`).join(', ')}; shapes (free-form outlines smoothed, the rest as mapped): ${Object.entries(dt.poolShapes || {}).map(([k, v]) => `${k} ${v}`).join(', ')}`);
@@ -7148,6 +7186,31 @@ function buildCloudObjects(biome) {
 // 2 km: at the old 8,000 more than half were left out.
 const MAX_NATIVE_BARRIER_OBJECTS = 50000;
 
+// Walls along a racetrack: most of their length within RACESIDE_M of a raceway.
+const RACESIDE_M = 30;
+function racesideWalls(osmFeatures, barriers) {
+  const out = new Set();
+  const segs = [];
+  for (const f of osmFeatures) {
+    if (f?.tags?.highway !== 'raceway' || !(f.geometry?.length >= 2)) continue;
+    for (let i = 0; i + 1 < f.geometry.length; i++) segs.push([f.geometry[i], f.geometry[i + 1]]);
+  }
+  if (!segs.length) return out;
+  // (metres per degree near the track)
+  const lat0 = segs[0][0].lat; const kx = 111320 * Math.cos((lat0 * Math.PI) / 180); const ky = 110540;
+  const near = (p) => segs.some(([a, b]) => {
+    const ax = (a.lng - p.lng) * kx; const ay = (a.lat - p.lat) * ky; const bx = (b.lng - p.lng) * kx; const by = (b.lat - p.lat) * ky;
+    const dx = bx - ax; const dy = by - ay; const t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(ax + dx * t, ay + dy * t) < RACESIDE_M;
+  });
+  for (const f of barriers) {
+    if (!['wall', 'retaining_wall'].includes(f?.tags?.barrier) || !(f.geometry?.length >= 2)) continue;
+    const pts = f.geometry;
+    if (pts.filter(near).length >= pts.length * 0.6) out.add(f);
+  }
+  return out;
+}
+
 /**
  * Resolve OSM barrier tags to one of the native BeamNG barrier asset presets.
  */
@@ -7177,6 +7240,8 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
       return NATIVE_BARRIER_ASSETS.concreteWall;
     }
     if (material === 'brick' && Number.isFinite(height) && height >= 2) return NATIVE_BARRIER_ASSETS.brickWall;
+    // (beside a racetrack, unmapped material: a concrete circuit wall, not a garden's stone)
+    if (tags['mapng:trackside'] === 'yes' && !material) return NATIVE_BARRIER_ASSETS.concreteWall;
     // (retaining walls are concrete unless mapped as stone or brick)
     if (barrierType === 'retaining_wall' && !['stone', 'brick', 'sandstone', 'limestone', 'granite'].includes(material)) {
       return NATIVE_BARRIER_ASSETS.retainingWall;
@@ -7519,10 +7584,11 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     }
   };
 
+  const trackside = racesideWalls(terrainData.osmFeatures || [], features);
   for (let featureIndex = 0; featureIndex < features.length; featureIndex++) {
     if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) break;
     const feature = features[featureIndex];
-    const asset = resolveNativeBarrierAsset(feature.tags || {}, biome);
+    const asset = resolveNativeBarrierAsset(trackside.has(feature) ? { ...feature.tags, 'mapng:trackside': 'yes' } : (feature.tags || {}), biome);
     if (!asset) continue;
 
     pushFeatureInstances(feature, asset, `barrier_${featureIndex}`);
@@ -11065,7 +11131,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (includeBuildings) {
     beginStep('buildings', `Building textured 3D buildings (${(exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building').length} OSM footprints)…`);
     await yield_();
-    const osm = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport);
+    const osm = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport, { raceways: groundCarriageways.filter((cw) => cw.highway === 'raceway') });
     osmDaeBlob = osm?.data || null;
     buildingTileDaes = osm?.tiles || [];
     buildingReport.tiles = buildingTileDaes.length;

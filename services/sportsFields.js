@@ -73,6 +73,8 @@ const MAX_AREA_M2 = 40000;
 
 /** The field's sport (one of the layouts), from sport=* (the first one known) and where it is. */
 export function pitchSport(tags = {}, { lat = 0, lon = 0 } = {}) {
+  // a motorsport track (cars, karts, motocross, horses) is no athletics track: its raceways are drawn as roads (racetracks.js)
+  if (tags.leisure === 'track' && /motor|kart|cross|speedway|sprint|stock|drag|horse|bmx|cycling/.test(String(tags.sport || '').toLowerCase())) return 'racing';
   if (tags.leisure === 'track') return 'track';
   // (the first one known; a named sport before 'multi')
   const known = String(tags.sport || '').toLowerCase().split(/[;,]/).map((x) => x.trim())
@@ -159,6 +161,7 @@ export function planPitches(features, project, { groundAt = null, drape = null }
     if (t.indoor === 'yes' || t.covered === 'yes' || (Number.parseFloat(t.level) || 0) > 0 || t.building) continue;
     const g0 = f.geometry[0];
     const sport = pitchSport(t, { lat: g0.lat, lon: g0.lng });
+    if (sport === 'racing') continue;
     const pts = f.geometry.map((p) => project(p.lat, p.lng));
     let ring = cleanRing(pts);
     if (ring.length < 3) continue;
@@ -387,7 +390,7 @@ function cutAlong(pieces, n, c0, step) {
  * piece fanned from its middle at z(x, y) (the drape: on the ground's own
  * triangles). colOf(x, y) colours a piece by its middle.
  */
-function drapedMesh(m, mat, outer, holes, z, colOf, grid, extra = [], skip = null) {
+export function drapedMesh(m, mat, outer, holes, z, colOf, grid, extra = [], skip = null) {
   const tri = THREE.ShapeUtils.triangulateShape(outer.map(([x, y]) => new THREE.Vector2(x, y)), holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))));
   const all = [...outer, ...holes.flat()];
   const uv = (q) => [q[0] / 4, q[1] / 4];
@@ -1135,7 +1138,7 @@ export function buildPitch(stone, full, p) {
 // ── Seating ──────────────────────────────────────────────────────────────────
 
 /** Bleachers and grandstands: [{ id, ring, box, face (unit, toward the field), z0, z1, roof }]. */
-export function planSeating(features, project, pitches = [], { groundAt = null } = {}) {
+export function planSeating(features, project, pitches = [], { groundAt = null, faceTo = null } = {}) {
   const out = [];
   for (const f of features || []) {
     const t = f?.tags || {};
@@ -1157,6 +1160,9 @@ export function planSeating(features, project, pitches = [], { groundAt = null }
       const d = Math.hypot(pc[0] - c[0], pc[1] - c[1]);
       if (d < 250 && (!near || d < near.d)) near = { d, pc };
     }
+    // (or what else the stand watches nearer: a racetrack, faceTo(x, y) -> its nearest point)
+    const other = faceTo?.(c[0], c[1]);
+    if (other) { const d = Math.hypot(other[0] - c[0], other[1] - c[1]); if (d < 250 && (!near || d < near.d)) near = { d, pc: other }; }
     const v = [-bx.u[1], bx.u[0]];
     const toward = near ? [near.pc[0] - c[0], near.pc[1] - c[1]] : v;
     const face = toward[0] * v[0] + toward[1] * v[1] >= 0 ? v : [-v[0], -v[1]];

@@ -32,7 +32,8 @@ import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet,
 import * as THREE from 'three';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
 import { planPools, buildPool, POOL_MATERIAL_STAGES } from './pools.js';
-import { planPitches, buildPitch, planSeating, buildSeating, SPORTS_MATERIAL_STAGES, SPORTS_MATERIAL_FLAGS } from './sportsFields.js';
+import { planPitches, buildPitch, planSeating, buildSeating, drapedMesh, SPORTS_MATERIAL_STAGES, SPORTS_MATERIAL_FLAGS } from './sportsFields.js';
+import { planRaceways, buildRaceway, planRacewayAreas, carriagewayTest, tracksideStands } from './racetracks.js';
 
 // ── Materials ───────────────────────────────────────────────────────────────
 
@@ -1315,7 +1316,10 @@ export function neighbourLevels(features, project) {
   return out;
 }
 
-export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null } = {}) {
+export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [] } = {}) {
+  // a racetrack's untagged stands (long, narrow, along the raceway) built as grandstands
+  const stands = tracksideStands(features, project, raceways);
+  if (stands.size) features = features.map((f) => (stands.has(f) ? { ...f, tags: { ...f.tags, building: 'grandstand' } } : f));
   const meshes = [];
   let count = 0;
   // buildings grouped by tile (their footprint's centre): one shape per tile
@@ -1643,12 +1647,47 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   }
   if (Object.keys(pitchKinds).length) stats.details.pitches = pitchKinds;
   const seatKinds = {};
-  for (const st of planSeating(features, project, pitches, { groundAt })) {
+  // (a stand by a racetrack faces the track: its nearest raceway point)
+  const trackLines = raceways.filter((c) => c.highway === 'raceway' && c.nodes?.length >= 2);
+  const faceTo = trackLines.length ? (x, y) => {
+    let best = null;
+    for (const r of trackLines) for (let i = 0; i + 1 < r.nodes.length; i++) {
+      const a = r.nodes[i]; const b = r.nodes[i + 1]; const dx = b[0] - a[0]; const dy = b[1] - a[1];
+      const u = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+      const q = [a[0] + dx * u, a[1] + dy * u]; const d = Math.hypot(q[0] - x, q[1] - y);
+      if (!best || d < best.d) best = { d, q };
+    }
+    return best?.q || null;
+  } : null;
+  for (const st of planSeating(features, project, pitches, { groundAt, faceTo })) {
     const tile = tileFor(st.ring);
     bump(seatKinds, buildSeating(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, st));
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
   if (Object.keys(seatKinds).length) stats.details.seating = seatKinds;
+  // racetracks: the fittings along the drawn raceways, their surface outlines (services/racetracks.js)
+  if (drape) {
+    const racing = {};
+    const rws = planRaceways(raceways);
+    const blocked = carriagewayTest(rws);
+    // (the stands' middles: a drag strip starts at the end nearer them)
+    const spectators = features.filter((f) => ['grandstand', 'bleachers'].includes(f.tags?.building) && f.geometry?.length)
+      .map((f) => { const r = f.geometry.map((q) => project(q.lat, q.lng)); return [r.reduce((a, q) => a + q[0], 0) / r.length, r.reduce((a, q) => a + q[1], 0) / r.length]; });
+    for (const rw of rws) {
+      const tile = tileFor(rw.nodes.map((q) => [q[0], q[1]]));
+      const st = buildRaceway(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, rw, { drapeAt: drape.drapeAt, others: rws.filter((o) => o !== rw), blocked, spectators });
+      bump(racing, rw.kind);
+      for (const [k, v] of Object.entries(st)) if (v) racing[`${k}`] = (racing[k] || 0) + v;
+      if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+    }
+    for (const a of planRacewayAreas(features, project)) {
+      const tile = tileFor(a.ring);
+      drapedMesh(tile.fullB, a.surface === 'dirt' ? 'dirt' : 'roofFlat', a.ring, [], (x, y) => drape.drapeAt(x, y) + 0.02, () => (a.surface === 'dirt' ? [0.72, 0.52, 0.38] : [0.45, 0.45, 0.46]), drape.grid);
+      bump(racing, 'surfaceAreas');
+      if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+    }
+    if (Object.keys(racing).length) stats.details.racing = racing;
+  }
   for (const t of tiles.values()) if (t.inBatch) flushTile(t);
   const tileList = [...tiles.values()].filter((t) => t.full.length).map(({ key, origin, full, lite }) => ({ key, origin, full, lite }));
   stats.tiles = tileList.length;

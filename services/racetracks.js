@@ -1,0 +1,352 @@
+// Racetracks for BeamNG exports: the fittings along the drawn raceways
+// (highway=raceway carriageways, after the road system has laid them out),
+// built into the building tiles (beamngBuildings.js).
+//
+//   circuit, kart   red-and-white kerbs on both edges round the bends (a
+//                   radius under KERB_RADIUS_M), a kart track's tyre walls
+//                   round the outside of its bends
+//   dirt            a dirt oval's concrete wall round its outside with a catch
+//                   fence on it; a line of tyres round its infield
+//   drag            the light tree on the centre line at the start (the end
+//                   nearer the grandstands, else the other raceways),
+//                   concrete walls along both sides
+//   area=yes        a raceway's surface outline (dirt or asphalt) lying on
+//                   the ground
+//
+// The kind of each raceway: roadWidth.js racewayKind (tags, and the exporter
+// marks a long dead-straight raceway a drag strip). Everything lies on the
+// terrain's own triangles (drape) or stands on it. Pure geometry.
+
+import { box, cylinder } from './buildingDetails.js';
+import { cleanRing, signedArea } from './fountains.js';
+import { bar } from './pools.js';
+import { racewayKind } from './roadWidth.js';
+import { orientedBox } from './waterCover.js';
+
+const KERB_RADIUS_M = { circuit: 150, kart: 30 };
+const KERB_W = { circuit: 1.0, kart: 0.6 };
+const KERB_STRIPE = { circuit: 1.0, kart: 0.5 };
+const RED = [0.8, 0.1, 0.08];
+const WHITE = [0.95, 0.95, 0.93];
+const CONCRETE = [0.78, 0.78, 0.76];
+const STEEL = [0.72, 0.74, 0.76];
+const TYRE = [0.08, 0.08, 0.09];
+
+const UNPAVED = new Set(['dirt', 'clay', 'ground', 'earth', 'unpaved', 'gravel', 'sand', 'mud', 'compacted', 'grass']);
+
+// per node: the unit tangent and the turn's radius over a few metres either side
+function bends(nodes, window = 6) {
+  const n = nodes.length;
+  const s = [0];
+  for (let i = 1; i < n; i++) s.push(s[i - 1] + Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
+  const at = (target) => { let j = 0; while (j < n - 1 && s[j + 1] < target) j++; const f = (target - s[j]) / ((s[j + 1] - s[j]) || 1); const a = nodes[j]; const b = nodes[Math.min(n - 1, j + 1)]; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; };
+  return nodes.map((q, i) => {
+    const a = at(Math.max(0, s[i] - window)); const b = at(Math.min(s[n - 1], s[i] + window));
+    const u = [b[0] - a[0], b[1] - a[1]]; const L = Math.hypot(...u) || 1;
+    const p0 = [q[0] - a[0], q[1] - a[1]]; const p1 = [b[0] - q[0], b[1] - q[1]];
+    const turn = Math.atan2(p0[0] * p1[1] - p0[1] * p1[0], p0[0] * p1[0] + p0[1] * p1[1]);
+    const radius = Math.abs(turn) > 1e-4 ? (Math.hypot(...p0) + Math.hypot(...p1)) / 2 / Math.abs(turn) : Infinity;
+    return { t: [u[0] / L, u[1] / L], radius, turn, s: s[i] };
+  });
+}
+
+// an offset line along the carriageway: d to the left (negative: right)
+const offsetAt = (q, t, d) => [q[0] - t[1] * d, q[1] + t[0] * d];
+
+/**
+ * The raceways to fit: [{ kind, nodes, half, closed, tags }] from the drawn
+ * carriageways (nodes [x, y, z, w]).
+ */
+export function planRaceways(carriageways = []) {
+  const rws = carriageways.filter((cw) => cw.highway === 'raceway' && cw.nodes?.length >= 2).map((cw) => {
+    const a = cw.nodes[0]; const b = cw.nodes[cw.nodes.length - 1];
+    return { kind: racewayKind(cw.tags || {}), nodes: cw.nodes, half: cw.half, closed: Math.hypot(b[0] - a[0], b[1] - a[1]) < 1, tags: cw.tags || {}, id: cw.wayId };
+  });
+  // a drag strip in pieces (split at the timing lights, the shut-down area):
+  // the pieces that meet end to end in line are one strip, one start
+  const drags = rws.filter((r) => r.kind === 'drag');
+  const dirOf = (nodes, atEnd) => { const n = nodes.length; const a = atEnd ? nodes[n - 2] : nodes[1]; const b = atEnd ? nodes[n - 1] : nodes[0]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+  for (let merged = true; merged;) {
+    merged = false;
+    outer: for (const a of drags) for (const b of drags) {
+      if (a === b || a.gone || b.gone) continue;
+      for (const [na, nb] of [[a.nodes, b.nodes], [a.nodes, b.nodes.slice().reverse()]]) {
+        const e = na[na.length - 1]; const f = nb[0];
+        if (Math.hypot(e[0] - f[0], e[1] - f[1]) > 3) continue;
+        const da = dirOf(na, true); const db = dirOf(nb, false);
+        // (the end's heading going on into the next piece's)
+        if (-(da[0] * db[0] + da[1] * db[1]) < 0.95) continue;
+        a.nodes = [...na, ...nb.slice(1)]; a.half = Math.max(a.half, b.half); b.gone = true; merged = true;
+        break outer;
+      }
+    }
+  }
+  for (let i = rws.length - 1; i >= 0; i--) if (rws[i].gone) rws.splice(i, 1);
+  // dirt ovals come in pieces (split where the infield crossings meet them):
+  // the pieces that touch form one track; its outer ring is where a node lies
+  // (nearly) as far from the track's middle as anything in that direction
+  // (paved ovals too: a loop that only ever bends round its own middle)
+  const dirt = rws.filter((r) => r.kind === 'dirt' || r.kind === 'circuit');
+  const ends = (r) => [r.nodes[0], r.nodes[r.nodes.length - 1]];
+  const touch = (r, o) => ends(r).some((p) => o.nodes.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 3));
+  const seen = new Set();
+  for (const r of dirt) {
+    if (seen.has(r)) continue;
+    const group = [r]; seen.add(r);
+    for (let k = 0; k < group.length; k++) for (const o of dirt) if (!seen.has(o) && (touch(group[k], o) || touch(o, group[k]))) { seen.add(o); group.push(o); }
+    const pts = group.flatMap((g) => g.nodes);
+    const c = [pts.reduce((a, q) => a + q[0], 0) / pts.length, pts.reduce((a, q) => a + q[1], 0) / pts.length];
+    const BINS = 48; const far = new Array(BINS).fill(0);
+    const bin = (q) => Math.floor(((Math.atan2(q[1] - c[1], q[0] - c[0]) + Math.PI) / (2 * Math.PI)) * BINS) % BINS;
+    for (const q of pts) { const b = bin(q); far[b] = Math.max(far[b], Math.hypot(q[0] - c[0], q[1] - c[1])); }
+    let loop = far.every((v) => v > 0);   // the pieces go all the way round
+    const outerOf = (g, q) => Math.hypot(q[0] - c[0], q[1] - c[1]) >= far[bin(q)] - (g.half + 3);
+    if (loop && group.some((g) => g.kind === 'circuit')) {
+      // an oval: its outer ring bends round the middle all the way (a road
+      // course turns both ways: its kerbs, not an oval's wall)
+      let inward = 0; let outward = 0;
+      for (const g of group) {
+        const inf = bends(g.nodes, 15);
+        g.nodes.forEach((q, i) => {
+          if (!outerOf(g, q) || !Number.isFinite(inf[i].radius)) return;
+          const nL = [-inf[i].t[1], inf[i].t[0]];
+          const left = (c[0] - q[0]) * nL[0] + (c[1] - q[1]) * nL[1] > 0;
+          if ((inf[i].turn > 0) === left) inward += Math.abs(inf[i].turn); else outward += Math.abs(inf[i].turn);
+        });
+      }
+      loop = inward > 0 && outward / (inward + outward) < 0.1;
+    }
+    for (const g of group) {
+      g.oval = loop ? { c, outer: g.nodes.map((q) => outerOf(g, q)) } : null;
+    }
+  }
+  return rws;
+}
+
+// (x, y, rw, i) -> true where a point lies on a raceway's carriageway: another
+// one, or this one's own other side of a hairpin (more than SELF_GAP_M along it)
+const SELF_GAP_M = 12;
+export function carriagewayTest(rws, cell = 20) {
+  const grid = new Map();
+  const key = (cx, cy) => `${cx},${cy}`;
+  for (const r of rws) {
+    const inf = bends(r.nodes, 1);
+    for (let i = 0; i < r.nodes.length - 1; i++) {
+      const a = r.nodes[i]; const b = r.nodes[i + 1];
+      const pad = r.half + 1;
+      const x0 = Math.floor((Math.min(a[0], b[0]) - pad) / cell); const x1 = Math.floor((Math.max(a[0], b[0]) + pad) / cell);
+      const y0 = Math.floor((Math.min(a[1], b[1]) - pad) / cell); const y1 = Math.floor((Math.max(a[1], b[1]) + pad) / cell);
+      const seg = { r, a, b, s: inf[i].s };
+      for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) { const k = key(cx, cy); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(seg); }
+    }
+  }
+  return (x, y, rw, s) => {
+    for (const g of grid.get(key(Math.floor(x / cell), Math.floor(y / cell))) || []) {
+      if (g.r.nodes === rw.nodes && Math.abs(g.s - s) < SELF_GAP_M) continue;
+      const dx = g.b[0] - g.a[0]; const dy = g.b[1] - g.a[1]; const L2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((x - g.a[0]) * dx + (y - g.a[1]) * dy) / L2));
+      if (Math.hypot(x - g.a[0] - dx * t, y - g.a[1] - dy * t) < g.r.half + 0.3) return true;
+    }
+    return false;
+  };
+}
+
+// a strip between two offset lines along the nodes i0..i1, coloured in stripes along it
+function edgeStrip(m, mat, rw, info, i0, i1, d0, d1, z, stripe, colours, lift) {
+  let acc = 0;
+  for (let i = i0; i < i1; i++) {
+    if (rw.lifted?.[i] || rw.lifted?.[i + 1]) continue;
+    const qa = rw.nodes[i]; const qb = rw.nodes[i + 1];
+    const a0 = offsetAt(qa, info[i].t, d0); const a1 = offsetAt(qa, info[i].t, d1);
+    const b0 = offsetAt(qb, info[i + 1].t, d0); const b1 = offsetAt(qb, info[i + 1].t, d1);
+    if (rw.blocked && [a1, b1].some((q, k) => rw.blocked(q[0], q[1], rw, info[i + k].s))) continue;
+    const L = Math.hypot(qb[0] - qa[0], qb[1] - qa[1]);
+    const P = (xy, dz) => [xy[0], xy[1], z(xy[0], xy[1]) + dz];
+    const lerp = (p, q, f) => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+    // (in pieces no longer than a stripe, each its own colour: a kerb's red and white)
+    const k = Math.max(1, Math.ceil(L / Math.min(stripe, 2)));
+    for (let h = 0; h < k; h++) {
+      const f0 = h / k; const f1 = (h + 1) / k;
+      const col = colours[Math.floor((acc + L * (f0 + f1) / 2) / stripe) % colours.length];
+      const q = [P(lerp(a0, b0, f0), lift[0]), P(lerp(a0, b0, f1), lift[0]), P(lerp(a1, b1, f1), lift[1]), P(lerp(a1, b1, f0), lift[1])];
+      const ccw = (q[1][0] - q[0][0]) * (q[2][1] - q[0][1]) - (q[1][1] - q[0][1]) * (q[2][0] - q[0][0]) > 0;
+      const [qa2, qb2, qc2, qd2] = ccw ? q : [q[0], q[3], q[2], q[1]];
+      const l = L / k;
+      m.quad(mat, qa2, qb2, qc2, qd2, [0, 0], [l, 0], [l, 1], [0, 1], col);
+    }
+    acc += L;
+  }
+}
+
+// a wall (a box per segment) along an offset line
+function wallAlong(m, mat, rw, info, i0, i1, d, thick, h, ground, col, colours = null, stripe = 1.2) {
+  let acc = 0;
+  for (let i = i0; i < i1; i++) {
+    if (rw.lifted?.[i] || rw.lifted?.[i + 1]) continue;
+    const a = offsetAt(rw.nodes[i], info[i].t, d); const b = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
+    if (rw.blocked) {
+      const off = thick / 2 + 0.2; const sg = Math.sign(d) || 1;
+      const near = (q, t, k) => [offsetAt(q, t, -sg * off), offsetAt(q, t, sg * off)].some((p) => rw.blocked(p[0], p[1], rw, info[i + k].s));
+      if (near(a, info[i].t, 0) || near(b, info[i + 1].t, 1)) continue;
+    }
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 0.05) continue;
+    const c = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+    const g = Math.min(ground(...a), ground(...b));
+    box(m, mat, c, u, L / 2 + 0.02, thick / 2, g - 0.3, g + h, colours ? colours[Math.floor(acc / stripe) % colours.length] : col);
+    acc += L;
+  }
+}
+
+/** Fit one raceway: kerbs, walls, fences, tyres, a drag strip's start. drape: { drapeAt }. */
+export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = null, spectators = [] } = {}) {
+  // (stretches on a bridge, a ramp or in a tunnel: the fittings stand on the
+  // terrain, so none there)
+  rw = { ...rw, blocked, lifted: rw.nodes.map((q) => !Number.isFinite(q[2]) ? false : Math.abs(q[2] - drapeAt(q[0], q[1])) > 1) };
+  const info = bends(rw.nodes);
+  const n = rw.nodes.length;
+  const z = drapeAt;
+  const stats = { kerbs: 0, walls: 0, tyres: 0, trees: 0 };
+  const paved = !UNPAVED.has(String(rw.tags.surface || '').toLowerCase());
+  // (kerbs on a racing circuit or kart track only: an untagged raceway, a
+  // training course or a test track, has none)
+  const racing = rw.kind === 'kart' || /motor|racing|kart|circuit|gp|formula|touring|endurance/.test(String(rw.tags.sport || '').toLowerCase());
+  if ((rw.kind === 'circuit' || rw.kind === 'kart') && paved && racing && !rw.oval) {
+    // kerbs on both edges where the line bends tighter than KERB_RADIUS_M
+    const lim = KERB_RADIUS_M[rw.kind]; const w = KERB_W[rw.kind];
+    let i = 0;
+    while (i < n - 1) {
+      if (info[i].radius >= lim) { i++; continue; }
+      let j = i; while (j < n - 1 && info[j].radius < lim) j++;
+      const len = info[j].s - info[i].s;
+      if (len >= 4) {
+        for (const sg of [-1, 1]) {
+          const d0 = sg * (rw.half - 0.15); const d1 = sg * (rw.half + w - 0.15);
+          // (a kerb rises a little toward its outer edge)
+          edgeStrip(full, 'smoothConcrete', rw, info, i, j, d0, d1, z, KERB_STRIPE[rw.kind], [RED, WHITE], [0.025, 0.06]);
+        }
+        stats.kerbs++;
+        // a kart track: a tyre wall round the outside of the bend
+        if (rw.kind === 'kart') {
+          const outside = info[Math.floor((i + j) / 2)].turn > 0 ? -1 : 1;
+          wallAlong(stone, 'smoothConcrete', rw, info, i, j, outside * (rw.half + w + 1.2), 0.7, 0.75, z, TYRE, [TYRE, TYRE, RED, TYRE, TYRE, WHITE], 0.7);
+          stats.tyres++;
+        }
+      }
+      i = j + 1;
+    }
+  }
+  if ((rw.kind === 'dirt' || rw.kind === 'circuit') && rw.oval) {
+    // a concrete wall round the outside of the oval (away from its middle), a
+    // catch fence on it: posts, chain link, a top rail; none along the infield
+    // crossings
+    const { c, outer } = rw.oval;
+    const side = (i) => { const q = rw.nodes[i]; const t = info[i].t; return ((c[0] - q[0]) * -t[1] + (c[1] - q[1]) * t[0]) > 0 ? -1 : 1; };
+    let runs = 0;
+    for (let i = 0; i < n - 1; i++) {
+      if (!outer[i] || !outer[i + 1] || rw.lifted[i] || rw.lifted[i + 1]) continue;
+      // (running round the ring, not out to it: a crossing meeting the oval)
+      { const q = rw.nodes[i]; const r = [q[0] - c[0], q[1] - c[1]]; const rl = Math.hypot(...r) || 1; if (Math.abs((r[0] * info[i].t[0] + r[1] * info[i].t[1]) / rl) > 0.6) continue; }
+      const sg = side(i);
+      const d = sg * (rw.half + 1.2);
+      const a = offsetAt(rw.nodes[i], info[i].t, d); const b = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (L < 0.05) continue;
+      const ga = z(...a); const gb = z(...b);
+      box(stone, 'smoothConcrete', [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], [(b[0] - a[0]) / L, (b[1] - a[1]) / L], L / 2 + 0.02, 0.175, Math.min(ga, gb) - 0.3, Math.min(ga, gb) + 1.2, CONCRETE);
+      const fa = ga + 1.2; const fb = gb + 1.2;
+      if (i % 3 === 0) cylinder(stone, 'metalWhite', a[0], a[1], 0.06, fa, fa + 4, STEEL, { n: 6 });
+      full.quad('chainlink', [a[0], a[1], fa], [b[0], b[1], fb], [b[0], b[1], fb + 4], [a[0], a[1], fa + 4], [0, 0], [L / 1.5, 0], [L / 1.5, 4 / 1.5], [0, 4 / 1.5], STEEL);
+      bar(stone, 'metalWhite', [a[0], a[1], fa + 4], [b[0], b[1], fb + 4], 0.04, STEEL);
+      runs++;
+    }
+    if (runs) stats.walls++;
+  }
+  if (rw.kind === 'drag') {
+    // the start: the end nearer the rest of the raceways (the staging lanes, the return road)
+    // (the grandstands line the quarter mile: the end nearer their middle;
+    // without any, the end nearer the rest of the raceways)
+    const d = (q, p) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+    const near = (q) => others.reduce((c, o) => c + o.nodes.filter((p) => d(q, p) < 80).length, 0);
+    const toStands = (q) => Math.min(...spectators.map((p) => d(q, p)));
+    const a0 = rw.nodes[0]; const a1 = rw.nodes[n - 1];
+    const fwd = spectators.length ? toStands(a0) <= toStands(a1) : near(a0) >= near(a1);
+    const nodes = fwd ? rw.nodes : rw.nodes.slice().reverse();
+    const r2 = { ...rw, nodes };
+    const inf = bends(nodes);
+    // (no launch pad or start line meshes: the strip's DecalRoad projects
+    // over anything under it, a pad showed through it in patches)
+    const s0 = nodes[0]; const t0 = inf[0].t;
+    const st = [s0[0] + t0[0] * 10, s0[1] + t0[1] * 10];
+    // the light tree on the centre line just past the start
+    const tp = [st[0] + t0[0] * 5, st[1] + t0[1] * 5]; const g = z(...tp);
+    cylinder(stone, 'metalWhite', tp[0], tp[1], 0.08, g - 0.3, g + 2.4, STEEL, { n: 8 });
+    box(stone, 'metalWhite', tp, t0, 0.15, 0.35, g + 2.4, g + 4.2, [0.1, 0.1, 0.1]);
+    const v = [-t0[1], t0[0]];
+    const lamps = [[1, 0.85, 0.2], [1, 0.75, 0.15], [1, 0.75, 0.15], [1, 0.75, 0.15], [0.2, 0.9, 0.25], [0.9, 0.12, 0.08]];
+    lamps.forEach((col, li) => {
+      for (const sg of [-1, 1]) {
+        const c = [tp[0] - t0[0] * 0.17 + v[0] * sg * 0.17, tp[1] - t0[1] * 0.17 + v[1] * sg * 0.17];
+        box(full, 'linePaint', c, t0, 0.03, 0.08, g + 4.05 - li * 0.28, g + 4.17 - li * 0.28, col);
+      }
+    });
+    stats.trees++;
+    // concrete walls along both sides, the whole strip
+    for (const sg of [-1, 1]) wallAlong(stone, 'smoothConcrete', r2, inf, 0, n - 1, sg * (rw.half + 0.6), 0.6, 0.9, z, CONCRETE);
+    stats.walls += 2;
+  }
+  return stats;
+}
+
+/** Raceway surfaces mapped as outlines (highway=raceway + area=yes): [{ ring, surface }]. */
+export function planRacewayAreas(features, project) {
+  const out = [];
+  for (const f of features || []) {
+    const t = f?.tags || {};
+    // (a raceway's own outline; a motorsport track mapped as an area:
+    // motocross, BMX, a tractor pull, a speedway: its dirt unless paved)
+    const g = f.geometry || [];
+    const closed = g.length >= 4 && Math.hypot(g[0].lat - g[g.length - 1].lat, g[0].lng - g[g.length - 1].lng) < 1e-7;
+    const motor = t.leisure === 'track' && t.area !== 'no' && closed && /motor|kart|cross|speedway|bmx|tractor|dirt|stock|drag/.test(String(t.sport || '').toLowerCase());
+    if (!motor && (t.highway !== 'raceway' || t.area !== 'yes' || g.length < 4)) continue;
+    let ring = cleanRing(f.geometry.map((q) => project(q.lat, q.lng)));
+    if (ring.length < 3) continue;
+    if (signedArea(ring) < 0) ring = ring.reverse();
+    const surf = String(t.surface || '').toLowerCase();
+    out.push({ ring, surface: UNPAVED.has(surf) || (motor && !surf) ? 'dirt' : 'asphalt', id: f.id });
+  }
+  return out;
+}
+
+/**
+ * Untagged buildings that are a racetrack's stands: long and narrow (over
+ * STAND_ASPECT : 1, under STAND_DEPTH_M deep), lying along a raceway (its
+ * long side parallel to it within STAND_REACH_M), no height or levels mapped.
+ * Returns the set of those features (to be built as grandstands).
+ */
+const STAND_ASPECT = 4; const STAND_DEPTH_M = 35; const STAND_REACH_M = 40;
+export function tracksideStands(features, project, carriageways = []) {
+  const out = new Set();
+  const rws = carriageways.filter((c) => c.highway === 'raceway' && c.nodes?.length >= 2);
+  if (!rws.length) return out;
+  for (const f of features || []) {
+    const t = f?.tags || {};
+    if (t.building !== 'yes' || t['building:levels'] || t.height || t.name && /\b(garage|shop|office|tower|hall)\b/i.test(t.name)) continue;
+    if (!(f.geometry?.length >= 4)) continue;
+    const ring = f.geometry.map((q) => project(q.lat, q.lng));
+    const bx = orientedBox(ring);
+    if (!bx) continue;
+    const L = bx.s1 - bx.s0; const D = bx.t1 - bx.t0;
+    if (D > STAND_DEPTH_M || L < STAND_ASPECT * D || L < 30) continue;
+    const c = [ring.reduce((a, q) => a + q[0], 0) / ring.length, ring.reduce((a, q) => a + q[1], 0) / ring.length];
+    const along = rws.some((r) => r.nodes.some((q, i) => {
+      if (i + 1 >= r.nodes.length) return false;
+      const b = r.nodes[i + 1]; const dx = b[0] - q[0]; const dy = b[1] - q[1]; const sl = Math.hypot(dx, dy) || 1;
+      const u = Math.max(0, Math.min(1, ((c[0] - q[0]) * dx + (c[1] - q[1]) * dy) / (sl * sl)));
+      if (Math.hypot(q[0] + dx * u - c[0], q[1] + dy * u - c[1]) > STAND_REACH_M + D / 2) return false;
+      return Math.abs((dx * bx.u[0] + dy * bx.u[1]) / sl) > 0.9;   // parallel
+    }));
+    if (along) out.add(f);
+  }
+  return out;
+}
