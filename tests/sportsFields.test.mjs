@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { pitchSport, planPitches, buildPitch, planSeating, buildSeating, standPieces, seatRows } from '../services/sportsFields.js';
+import { pitchSport, planPitches, buildPitch, planSeating, buildSeating, standPieces, seatRows, drapeCutStep, drapedMesh } from '../services/sportsFields.js';
 
 // world metres = (lng, lat); ground 3 m everywhere
 const project = (lat, lng) => [lng, lat, 3];
@@ -118,6 +118,19 @@ test('a giant stand is built, with rows up to its tagged height', () => {
   assert.ok(seats.length >= 1);
   assert.equal(seatRows(seats[0]), 60, 'capped at sixty rows');
   assert.equal(planSeating([area('v', rect(0, 0, 900, 900), { building: 'grandstand' }, 'building')], project, []).length, 0, 'a whole venue\'s outline is no stand');
+});
+
+test('a draped surface stays a sane size however fine the terrain, its cuts on the terrain lines', () => {
+  const square = (side) => [[0, 0], [side, 0], [side, side], [0, side]];
+  assert.equal(drapeCutStep(square(50), 0.25), 1);
+  assert.equal(drapeCutStep(square(50), 0.5), 1);
+  assert.equal(drapeCutStep(square(50), 1), 1);
+  assert.equal(drapeCutStep(square(50), 2), 2);
+  // (an outline too large for 1 m cuts coarsens by whole terrain squares)
+  assert.equal(drapeCutStep(square(1000), 0.25), 8);
+  const triangles = (sq) => { let n = 0; drapedMesh({ tri: () => { n++; } }, 'dirt', square(180), [], () => 0, () => [1, 1, 1], { sq, ox: -1024, oy: -1024 }); return n; };
+  assert.equal(triangles(0.25), triangles(1));
+  assert.ok(triangles(0.25) < 200000);
 });
 
 test('a track shaped like the usual oval is drawn as that oval: lanes exact offsets, never crossing', async () => {

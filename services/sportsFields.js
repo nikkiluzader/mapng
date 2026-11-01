@@ -384,20 +384,39 @@ function cutAlong(pieces, n, c0, step) {
   }
   return out;
 }
+// A draped surface follows the terrain to 1 m at the finest: at 0.25 m one
+// motocross outline came to 2 million triangles, and a shape that size reaches
+// the game as garbage (every building in its tile with it). A huge outline
+// coarsens further, to stay near this many triangles.
+const DRAPE_MIN_CUT_M = 1;
+const DRAPE_MAX_TRIS = 150000;
+const TRIS_PER_CUT_SQUARE = 4;
+
+/** The spacing of a draped surface's cuts: a whole number of terrain squares, so they stay on the terrain's lines. */
+export function drapeCutStep(ring, sq) {
+  let a2 = 0;
+  for (let i = 0; i < ring.length; i++) { const a = ring[i]; const b = ring[(i + 1) % ring.length]; a2 += a[0] * b[1] - b[0] * a[1]; }
+  const area = Math.abs(a2) / 2;
+  let step = sq;
+  while (step < DRAPE_MIN_CUT_M - 1e-9 || (area * TRIS_PER_CUT_SQUARE) / (step * step) > DRAPE_MAX_TRIS) step *= 2;
+  return step;
+}
+
 /**
  * A surface lying on the terrain: the outline (holes allowed) triangulated,
- * cut along the terrain's squares (and any extra lines: mown stripes), each
- * piece fanned from its middle at z(x, y) (the drape: on the ground's own
- * triangles). colOf(x, y) colours a piece by its middle.
+ * cut along the terrain's lines (drapeCutStep; and any extra lines: mown
+ * stripes), each piece fanned from its middle at z(x, y) (the drape: on the
+ * ground's own triangles). colOf(x, y) colours a piece by its middle.
  */
 export function drapedMesh(m, mat, outer, holes, z, colOf, grid, extra = [], skip = null) {
   const tri = THREE.ShapeUtils.triangulateShape(outer.map(([x, y]) => new THREE.Vector2(x, y)), holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))));
   const all = [...outer, ...holes.flat()];
   const uv = (q) => [q[0] / 4, q[1] / 4];
+  const step = drapeCutStep(outer, grid.sq);
   for (const [ia, ib, ic] of tri) {
     let pieces = [[all[ia], all[ib], all[ic]]];
-    pieces = cutAlong(pieces, [1, 0], grid.ox, grid.sq);
-    pieces = cutAlong(pieces, [0, 1], grid.oy, grid.sq);
+    pieces = cutAlong(pieces, [1, 0], grid.ox, step);
+    pieces = cutAlong(pieces, [0, 1], grid.oy, step);
     for (const e of extra) pieces = cutAlong(pieces, e.n, e.c0, e.step);
     for (const poly of pieces) {
       let a2 = 0; let cx = 0; let cy = 0;
