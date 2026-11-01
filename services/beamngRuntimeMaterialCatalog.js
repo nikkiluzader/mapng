@@ -795,6 +795,71 @@ const SHARED_BARRIER_MATERIAL_DEFS = {
     cubemap: 'global_cubemap_metalblurred',
     translucentBlendOp: 'None',
   },
+  // Gates (services/gates.js): vanilla defines these in the levels the gates
+  // come from, which aren't loaded in ours.
+  eca_bld_wood: {
+    name: 'eca_bld_wood',
+    mapTo: 'eca_bld_wood',
+    class: 'Material',
+    annotation: 'BUILDINGS',
+    groundType: 'WOOD',
+    Stages: [{
+      colorMap: '/assets/materials/tileable/wood/hr_eca_bld_wood/eca_bld_wood_d.dds',
+      normalMap: '/assets/materials/tileable/wood/hr_eca_bld_wood/eca_bld_wood_n.dds',
+      specularMap: '/assets/materials/tileable/wood/hr_eca_bld_wood/eca_bld_wood_s.dds',
+      specularPower: 11,
+      useAnisotropic: true,
+      vertColor: true,
+    }],
+    translucentBlendOp: 'None',
+  },
+  wood_rough: {
+    name: 'wood_rough',
+    mapTo: 'wood_rough',
+    class: 'Material',
+    annotation: 'BUILDINGS',
+    groundType: 'WOOD',
+    Stages: [{
+      colorMap: '/assets/materials/tileable/wood/race_wood/wood_rough_d.dds',
+      normalMap: '/assets/materials/tileable/wood/wood_planks/wood_rough_n.dds',
+      specularMap: '/assets/materials/tileable/wood/race_wood/wood_rough_s.dds',
+      specularPower: 26,
+      useAnisotropic: true,
+      vertColor: true,
+    }],
+  },
+  italy_mesh_fence: {
+    name: 'italy_mesh_fence',
+    mapTo: 'italy_mesh_fence',
+    class: 'Material',
+    annotation: 'OBSTACLES',
+    groundType: 'METAL',
+    Stages: [{
+      colorMap: '/assets/materials/tileable/metal/italy_mesh_fence/italy_mesh_fence_d.dds',
+      normalMap: '/assets/materials/tileable/metal/italy_mesh_fence/italy_mesh_fence_n.dds',
+      specularMap: '/assets/materials/tileable/metal/ind_italy_mesh_fence/italy_mesh_fence_s.dds',
+      useAnisotropic: true,
+    }],
+    alphaRef: 63,
+    alphaTest: true,
+    doubleSided: true,
+    invertBackFaceNormals: true,
+  },
+  italy_curb_concrete: {
+    name: 'italy_curb_concrete',
+    mapTo: 'italy_curb_concrete',
+    class: 'Material',
+    annotation: 'SIDEWALK',
+    groundType: 'ASPHALT_OLD',
+    Stages: [{
+      colorMap: '/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_d.dds',
+      normalMap: '/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_n.dds',
+      specularMap: '/assets/materials/trim/concrete/italy_curb_concrete/italy_curb_concrete_s.dds',
+      useAnisotropic: true,
+      vertColor: true,
+    }],
+    translucentBlendOp: 'None',
+  },
 };
 
 const AUTOMATION_TEST_TRACK_RUNTIME_MATERIAL_DEFS = {

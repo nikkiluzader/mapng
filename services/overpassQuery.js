@@ -53,6 +53,12 @@ export const snapOsmBounds = (bounds, step = OSM_CACHE_GRID_DEG) => {
 // (scripts/build-osm-tiles.py), so tiles and Overpass return the same data.
 // Trimmed: seamark, tidal, harbour subtypes, vegetation, crop, orchard,
 // vineyard, material overlap natural/landuse and add weight for little value.
+// Gates, as nodes on a road or a fence (services/gates.js).
+export const GATE_BARRIERS = [
+  'gate', 'swing_gate', 'lift_gate', 'sliding_gate', 'hampshire_gate', 'wicket_gate', 'kissing_gate', 'bump_gate',
+  'stile', 'entrance', 'cattle_grid', 'turnstile', 'full-height_turnstile',
+];
+
 export const OSM_FILTER = {
   wayKeys: [
     'highway', 'building', 'waterway', 'barrier', 'aeroway', 'man_made', 'public_transport',
@@ -72,6 +78,7 @@ export const OSM_FILTER = {
     ['emergency', 'fire_hydrant'], ['amenity', 'waste_basket'], ['power', 'pole'],
     ['traffic_calming', 'bump'], ['traffic_calming', 'hump'], ['traffic_calming', 'table'], ['traffic_calming', 'cushion'],
     ['amenity', 'fountain'], ['amenity', 'drinking_water'],
+    ...GATE_BARRIERS.map((v) => ['barrier', v]),
   ],
 };
 

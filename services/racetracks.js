@@ -18,6 +18,7 @@
 // marks a long dead-straight raceway a drag strip). Everything lies on the
 // terrain's own triangles (drape) or stands on it. Pure geometry.
 
+import { wallOpenings, clearOf } from './gates.js';
 import { box, cylinder } from './buildingDetails.js';
 import { cleanRing, signedArea, inRing } from './fountains.js';
 import { bar } from './pools.js';
@@ -258,9 +259,12 @@ function edgeStrip(m, mat, rw, info, i0, i1, d0, d1, z, stripe, colours, lift) {
 // a wall (a box per segment) along an offset line
 function wallAlong(m, mat, rw, info, i0, i1, d, thick, h, ground, col, colours = null, stripe = 1.2) {
   let acc = 0;
+  const openings = openWall(rw, rw.nodes.slice(i0, i1 + 1).map((q, k) => offsetAt(q, info[i0 + k].t, d)), d, colours ? 'gap' : 'mesh');
   for (let i = i0; i < i1; i++) {
     if (rw.lifted?.[i] || rw.lifted?.[i + 1]) continue;
-    const a = offsetAt(rw.nodes[i], info[i].t, d); const b = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
+    const a0 = offsetAt(rw.nodes[i], info[i].t, d); const b0 = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
+    for (const [u0, u1] of clearOf(a0, b0, openings)) {
+    const a = lerpXY(a0, b0, u0); const b = lerpXY(a0, b0, u1);
     if (rw.blocked) {
       const off = thick / 2 + 0.2; const sg = Math.sign(d) || 1;
       const near = (q, t, k) => [offsetAt(q, t, -sg * off), offsetAt(q, t, sg * off)].some((p) => rw.blocked(p[0], p[1], rw, info[i + k].s));
@@ -272,7 +276,17 @@ function wallAlong(m, mat, rw, info, i0, i1, d, thick, h, ground, col, colours =
     const g = Math.min(ground(...a), ground(...b));
     box(m, mat, c, u, L / 2 + 0.02, thick / 2, g - 0.3, g + h, colours ? colours[Math.floor(acc / stripe) % colours.length] : col);
     acc += L;
+    }
   }
+}
+
+const lerpXY = (a, b, u) => [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u];
+
+// the openings a wall along `line`, d off the track, leaves for the roads through it
+function openWall(rw, line, d, style) {
+  const openings = wallOpenings(line, rw.roads, { style });
+  for (const g of openings) rw.gates?.push({ ...g, prefer: Math.sign(d) || 1 });
+  return openings;
 }
 
 /** A drag strip's nodes, start first: the end nearer the grandstands' middle (they line the quarter mile), without any the end nearer the rest of the raceways. */
@@ -287,10 +301,11 @@ export function dragStartFirst(rw, others = [], spectators = []) {
 }
 
 /** Fit one raceway: kerbs, walls, fences, tyres, a drag strip's start. drape: { drapeAt }. */
-export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = null, spectators = [] } = {}) {
+export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = null, spectators = [], roads = [] } = {}) {
   // (stretches on a bridge, a ramp or in a tunnel: the fittings stand on the
   // terrain, so none there)
-  rw = { ...rw, blocked, lifted: rw.nodes.map((q) => !Number.isFinite(q[2]) ? false : Math.abs(q[2] - drapeAt(q[0], q[1])) > 1) };
+  const gates = [];
+  rw = { ...rw, blocked, roads, gates, lifted: rw.nodes.map((q) => !Number.isFinite(q[2]) ? false : Math.abs(q[2] - drapeAt(q[0], q[1])) > 1) };
   const info = bends(rw.nodes);
   const n = rw.nodes.length;
   // a closed lap: one direction where its ends meet, so its walls meet too
@@ -349,20 +364,37 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
       i = j + 1;
     }
     let runs = 0;
+    // (a road through the wall: an open gate, the track's crossing to the infield)
+    const openings = [];
+    for (let i = 0; i < n - 1; i++) {
+      if (!onRing[i] || !onRing[i + 1]) continue;
+      const d = side(i) * (rw.half + 1.2);
+      for (const g of wallOpenings([offsetAt(rw.nodes[i], info[i].t, d), offsetAt(rw.nodes[i + 1], info[i + 1].t, d)], rw.roads)) {
+        if (openings.some((o) => Math.hypot(o.x - g.x, o.y - g.y) < g.width)) continue;
+        openings.push(g);
+        rw.gates.push({ ...g, prefer: Math.sign(d) || 1 });
+      }
+    }
     for (let i = 0; i < n - 1; i++) {
       if (!onRing[i] || !onRing[i + 1]) continue;
       const sg = side(i);
       const d = sg * (rw.half + 1.2);
-      const a = offsetAt(rw.nodes[i], info[i].t, d); const b = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
-      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-      if (L < 0.05) continue;
-      const ga = z(...a); const gb = z(...b);
-      box(stone, 'smoothConcrete', [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], [(b[0] - a[0]) / L, (b[1] - a[1]) / L], L / 2 + 0.02, 0.175, Math.min(ga, gb) - 0.3, Math.min(ga, gb) + 1.2, CONCRETE);
-      const fa = ga + 1.2; const fb = gb + 1.2;
-      if (i % 3 === 0) cylinder(stone, 'metalWhite', a[0], a[1], 0.06, fa, fa + 4, STEEL, { n: 6 });
-      full.quad('chainlink', [a[0], a[1], fa], [b[0], b[1], fb], [b[0], b[1], fb + 4], [a[0], a[1], fa + 4], [0, 0], [L / 1.5, 0], [L / 1.5, 4 / 1.5], [0, 4 / 1.5], STEEL);
-      bar(stone, 'metalWhite', [a[0], a[1], fa + 4], [b[0], b[1], fb + 4], 0.04, STEEL);
-      runs++;
+      const a0 = offsetAt(rw.nodes[i], info[i].t, d); const b0 = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
+      for (const [u0, u1] of clearOf(a0, b0, openings)) {
+        const a = lerpXY(a0, b0, u0); const b = lerpXY(a0, b0, u1);
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (L < 0.05) continue;
+        const ga = z(...a); const gb = z(...b);
+        box(stone, 'smoothConcrete', [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], [(b[0] - a[0]) / L, (b[1] - a[1]) / L], L / 2 + 0.02, 0.175, Math.min(ga, gb) - 0.3, Math.min(ga, gb) + 1.2, CONCRETE);
+        const fa = ga + 1.2; const fb = gb + 1.2;
+        // (a post every few nodes, and one each side of an opening)
+        if (i % 3 === 0 && u0 === 0) cylinder(stone, 'metalWhite', a[0], a[1], 0.06, fa, fa + 4, STEEL, { n: 6 });
+        if (u0 > 0) cylinder(stone, 'metalWhite', a[0], a[1], 0.08, ga - 0.3, fa + 4, STEEL, { n: 6 });
+        if (u1 < 1) cylinder(stone, 'metalWhite', b[0], b[1], 0.08, gb - 0.3, fb + 4, STEEL, { n: 6 });
+        full.quad('chainlink', [a[0], a[1], fa], [b[0], b[1], fb], [b[0], b[1], fb + 4], [a[0], a[1], fa + 4], [0, 0], [L / 1.5, 0], [L / 1.5, 4 / 1.5], [0, 4 / 1.5], STEEL);
+        bar(stone, 'metalWhite', [a[0], a[1], fa + 4], [b[0], b[1], fb + 4], 0.04, STEEL);
+        runs++;
+      }
     }
     if (runs) stats.walls++;
   }
@@ -391,7 +423,7 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
     for (const sg of [-1, 1]) wallAlong(stone, 'smoothConcrete', r2, inf, 0, n - 1, sg * (rw.half + 0.6), 0.6, 0.9, z, CONCRETE);
     stats.walls += 2;
   }
-  return stats;
+  return { ...stats, gates };
 }
 
 /** Raceway surfaces mapped as outlines (highway=raceway + area=yes): [{ ring, surface }]. */

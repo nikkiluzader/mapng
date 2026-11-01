@@ -1320,7 +1320,7 @@ export function neighbourLevels(features, project) {
   return out;
 }
 
-export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [] } = {}) {
+export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [], gateRoads = [] } = {}) {
   // a racetrack's untagged stands (long, narrow, along the raceway) built as grandstands
   const stands = tracksideStands(features, project, raceways);
   if (stands.size) features = features.map((f) => (stands.has(f) ? { ...f, tags: { ...f.tags, building: 'grandstand' } } : f));
@@ -1680,8 +1680,10 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       .map((f) => { const r = f.geometry.map((q) => project(q.lat, q.lng)); return [r.reduce((a, q) => a + q[0], 0) / r.length, r.reduce((a, q) => a + q[1], 0) / r.length]; });
     for (const rw of rws) {
       const tile = tileFor(rw.nodes.map((q) => [q[0], q[1]]));
-      const st = buildRaceway(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, rw, { drapeAt: drape.drapeAt, others: rws.filter((o) => o !== rw), blocked, spectators });
+      const st = buildRaceway(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, rw, { drapeAt: drape.drapeAt, others: rws.filter((o) => o !== rw), blocked, spectators, roads: gateRoads });
       bump(racing, rw.kind);
+      (stats.trackGates ||= []).push(...st.gates);
+      delete st.gates;
       for (const [k, v] of Object.entries(st)) if (v) racing[`${k}`] = (racing[k] || 0) + v;
       if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
     }

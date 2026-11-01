@@ -14,6 +14,7 @@ import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarage
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
+import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
 import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
@@ -1040,7 +1041,7 @@ function buildTunnelGroups(tunnels, daes, levelName) {
   return { items, lightCount, zoneCount, lightSpacing };
 }
 
-async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [] } = {}) {
+async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [], gateRoads = [] } = {}) {
   if (!terrainData.osmFeatures?.length) return null;
 
   // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
@@ -1050,7 +1051,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
     // (carports are open roofs on posts: native carport models, not walls)
     terrainData.osmFeatures.filter((f) => !isCarportFeature(f)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
-    { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways },
+    { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads },
   );
   if (reportStats) {
     reportStats.built = buildingCount;
@@ -6696,6 +6697,7 @@ function buildDetailedReportSections(d) {
   lines.push(`- Lamps, benches and other furniture: ${(d.streetFurnitureObjects || []).length}`);
   listCounts(countBy(d.streetFurnitureObjects || [], shapeName), 15);
   lines.push(`- Fuel / charging station objects: ${(d.fuelStationObjects || []).length}`);
+  if (d.barrierObjects?.gateStats?.length) lines.push(`- Open gates and openings: ${d.barrierObjects.gateStats.map(([k, v]) => `${v} ${k}`).join(', ')}`);
   const bp = d.bollardPlacement;
   if (bp) lines.push(`- Bollards (OSM barrier=bollard): ${bp.bollards.length} placed (${bp.bollards.filter((b) => b.material === 'concrete').length} concrete), ${bp.skipped.onRoad} on drawn roads left out, ${bp.skipped.blocked} under bridges`);
   const cv = d.curveWarnings;
@@ -7445,7 +7447,52 @@ const BARRIER_FIT_MIN = 0.85;   // a panel this much shorter than its mesh is sc
 const RETAINING_TOP_M = 0.3;    // a retaining wall stands this far over the ground it holds
 const RETAINING_FOOT_M = 0.5;   // ... and reaches this far under the ground at its foot
 
-function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skipAt = () => false, skipLineAt = () => false } = {}) {
+const GATE_UNDRAWN_HALF_M = { service: 2.5, track: 1.8 };
+
+/** What can pass through a gate: the drawn roads, and OSM's other ways on the ground (a service road may only be painted on the terrain, a footpath not drawn at all). */
+function gateWaysOf(terrainData, carriageways, squareSize) {
+  const ways = carriageways.filter((cw) => cw.highway !== 'raceway').map((cw) => ({ pts: cw.nodes, half: cw.half, highway: cw.highway }));
+  const drawn = new Set(carriageways.map((cw) => cw.wayId));
+  for (const f of terrainData.osmFeatures || []) {
+    const h = f.type === 'road' ? f.tags?.highway : null;
+    if (!h || h === 'raceway' || drawn.has(f.id) || f.tags.bridge || f.tags.tunnel || f.tags.area === 'yes' || !(f.geometry?.length >= 2)) continue;
+    const half = FOOTPATH_WIDTH_M[h] ? FOOTPATH_WIDTH_M[h] / 2 : GATE_UNDRAWN_HALF_M[h] ?? 3;
+    ways.push({ pts: f.geometry.map((q) => geoToWorldPoint(q.lat, q.lng, terrainData, squareSize, 0).slice(0, 2)), half, highway: h });
+  }
+  return ways;
+}
+
+// the steepest a gate's leaf leans to reach the ground at its free end
+const GATE_MAX_PITCH = 0.3;
+
+/** A gate's leaves (services/gates.js) as TSStatics standing on the terrain. */
+function gateObjects(gates, ground, free, startIndex = 0) {
+  const objects = [];
+  gates.forEach((gate, i) => {
+    for (const [k, leaf] of gateLeaves(gate, free, { prefer: gate.prefer ?? 1 }).entries()) {
+      const g = ground(leaf.x, leaf.y); const tip = ground(leaf.tip[0], leaf.tip[1]);
+      if (!Number.isFinite(g)) continue;
+      const run = Math.hypot(leaf.tip[0] - leaf.x, leaf.tip[1] - leaf.y);
+      // (leaves hinged at their origin rise to the tip; a sliding gate's mesh runs the other way)
+      const rise = run > 0.1 && Number.isFinite(tip) ? Math.atan2(tip - g, run) : 0;
+      const pitch = leaf.level ? 0 : Math.max(-GATE_MAX_PITCH, Math.min(GATE_MAX_PITCH, rise));
+      objects.push({
+        __parent: 'Barriers',
+        class: 'TSStatic',
+        name: `gate_${startIndex + i}_${k}`,
+        persistentId: generatePersistentId(),
+        position: [roundTo(leaf.x, 3), roundTo(leaf.y, 3), roundTo(g + leaf.z, 3)],
+        rotationMatrix: rotationMatrixFromYawPitch(leaf.yaw, pitch),
+        ...(leaf.scale !== 1 ? { scale: [roundTo(leaf.scale, 3), 1, 1] } : {}),
+        shapeName: leaf.shapeName,
+        useInstanceRenderData: true,
+      });
+    }
+  });
+  return objects;
+}
+
+function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skipAt = () => false, skipLineAt = () => false, gateWays = [], trackGates = [], gateFree = () => true } = {}) {
   const features = terrainData.osmFeatures?.filter((feature) => (
     feature.type === 'barrier' && Array.isArray(feature.geometry) && feature.geometry.length >= 2
   )) ?? [];
@@ -7734,19 +7781,35 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
   };
 
   const trackside = racesideWalls(terrainData.osmFeatures || [], features);
+  const assets = features.map((f) => resolveNativeBarrierAsset(trackside.has(f) ? { ...f.tags, 'mapng:trackside': 'yes' } : (f.tags || {}), biome));
+  // gates and the openings they stand in (services/gates.js)
+  const toXY = (q) => { const w = geoToWorldPoint(q.lat, q.lng, terrainData, squareSize, 0); return [w[0], w[1]]; };
+  const barrierLines = features.map((f, i) => ({ pts: f.geometry.map(toXY), tags: f.tags || {}, chainLink: assets[i] === NATIVE_BARRIER_ASSETS.chainLinkFence }));
+  const gateNodes = (terrainData.osmFeatures || [])
+    .filter((f) => f.type === 'street_furniture' && f.geometry?.length === 1 && isGateBarrier(f.tags))
+    .map((f) => { const [x, y] = toXY(f.geometry[0]); return { x, y, tags: f.tags }; });
+  const gatePlan = planGates({ barriers: barrierLines, ways: gateWays, nodes: gateNodes });
+  const lerpGeo = (a, b, u) => ({ ...a, lat: a.lat + (b.lat - a.lat) * u, lng: a.lng + (b.lng - a.lng) * u });
+
   for (let featureIndex = 0; featureIndex < features.length; featureIndex++) {
     if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) break;
-    const feature = features[featureIndex];
-    const asset = resolveNativeBarrierAsset(trackside.has(feature) ? { ...feature.tags, 'mapng:trackside': 'yes' } : (feature.tags || {}), biome);
-    if (!asset) continue;
-
-    pushFeatureInstances(feature, asset, `barrier_${featureIndex}`);
-
-    if (asset.endShapeName && objects.length < MAX_NATIVE_BARRIER_OBJECTS) {
-      pushGuardrailEndcaps(feature, asset, featureIndex);
-    }
+    const asset = assets[featureIndex];
+    if (!asset || gatePlan.lines.has(featureIndex)) continue;
+    const pieces = splitAtCuts(features[featureIndex].geometry, barrierLines[featureIndex].pts, gatePlan.cuts[featureIndex], lerpGeo);
+    pieces.forEach((geometry, piece) => {
+      const feature = pieces.length > 1 ? { ...features[featureIndex], geometry } : features[featureIndex];
+      pushFeatureInstances(feature, asset, `barrier_${featureIndex}${piece ? `_${piece}` : ''}`);
+      if (asset.endShapeName && objects.length < MAX_NATIVE_BARRIER_OBJECTS) pushGuardrailEndcaps(feature, asset, featureIndex);
+    });
   }
 
+  const ground = terrainGroundAt(terrainData, squareSize);
+  const gates = [...gatePlan.gates, ...trackGates];
+  objects.push(...gateObjects(gates, ground, gateFree));
+  Object.defineProperty(objects, 'gateStats', {
+    value: Object.entries(gates.reduce((c, g) => { c[g.style] = (c[g.style] || 0) + 1; return c; }, {})),
+    enumerable: false,
+  });
   return objects;
 }
 
@@ -11326,7 +11389,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (includeBuildings) {
     beginStep('buildings', `Building textured 3D buildings (${(exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building').length} OSM footprints)…`);
     await yield_();
-    const osm = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport, { raceways: groundCarriageways.filter((cw) => cw.highway === 'raceway') });
+    const osm = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport, {
+      raceways: groundCarriageways.filter((cw) => cw.highway === 'raceway'),
+      gateRoads: gateWaysOf(exportTerrainData, groundCarriageways, squareSize),
+    });
     osmDaeBlob = osm?.data || null;
     buildingTileDaes = osm?.tiles || [];
     buildingReport.tiles = buildingTileDaes.length;
@@ -11377,12 +11443,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   beginStep('furniture', 'Placing barriers, fences, road signs, traffic lights, lamps, benches and fuel stations…');
   await yield_();
   const onDrawnRoad = buildClearanceIndex(groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })));
+  const gateWays = gateWaysOf(exportTerrainData, groundCarriageways, squareSize);
+  // (roads only painted on the terrain count too: a leaf stood in a divided entrance's other lane)
+  const onAnyWay = buildClearanceIndex(gateWays.map((w) => ({ points: w.pts, half: w.half })));
   const barrierObjects = includeNativeBarriers
     ? buildNativeBarrierObjects(exportTerrainData, squareSize, biome, {
       skipAt: (x, y, z) => onDrawnRoad(x, y, 0.3) || underDeck(x, y, z - 1, z + 2),
       // guardrail / fence runs: not under a deck they run along (OSM's railing
       // of the bridge, which has its own parapets, stood on the road under it)
       skipLineAt: (x, y, z, yaw) => bridgeDecks.length > 0 && alongDeck(bridgeDecks, x, y, z, yaw),
+      gateWays,
+      trackGates: buildingReport.stats?.trackGates || [],
+      gateFree: (x, y) => !onDrawnRoad(x, y, 0.15) && !onAnyWay(x, y, 0.15),
     })
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);

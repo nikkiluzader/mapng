@@ -980,6 +980,7 @@ export const createOSMGroup = (data, options = {}) => {
       });
     } else if (includeStreetFurniture && f.type === "street_furniture" && f.geometry.length === 1) {
       if (streetFurnitureList.length >= maxStreetFurniture) return;
+      if (f.tags.barrier && f.tags.barrier !== "bollard") return;   // gates: placed by the BeamNG export
       const v = latLngToScene(data, f.geometry[0].lat, f.geometry[0].lng);
       v.y = getHeightAtScenePos(data, v.x, v.z);
       let subtype = "generic";

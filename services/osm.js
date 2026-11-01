@@ -4,6 +4,7 @@ import {
 } from "./overpassQuery.js";
 import { fetchOsmFromTiles, resolveOsmTileArchiveUrl } from "./osmTiles.js";
 import { isRacingTrackLine } from "./roadWidth.js";
+import { isGateBarrier } from "./gates.js";
 import {
   OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture, fetchOvertureBuildingRecords, mergeOvertureBuildings,
 } from "./overtureTiles.js";
@@ -297,6 +298,7 @@ export const parseOverpassResponse = (data, bounds) => {
           el.tags.highway === "stop" ||
           el.tags.highway === "street_lamp" ||
           el.tags.barrier === "bollard" ||
+          isGateBarrier(el.tags) ||
           el.tags.amenity === "bench" ||
           el.tags.emergency === "fire_hydrant" ||
           el.tags.amenity === "waste_basket" ||
