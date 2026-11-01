@@ -966,8 +966,13 @@ const buildStableTextureWidthMap = (roads) => {
  * (#404040) over the much lighter parking fill (#8e8b87) turns every lot
  * into high-contrast spaghetti. Driveways stay road-like but softer.
  */
+const UNPAVED_ROAD = new Set(["unpaved", "dirt", "earth", "ground", "mud", "clay", "sand", "gravel", "fine_gravel", "compacted", "pebblestone", "grass"]);
 const getRoadPavementColor = (road) => {
   const tags = road?.tags || {};
+  // a dirt road or track is no asphalt (surface tag; off-road racing lines
+  // often carry none)
+  if (UNPAVED_ROAD.has(String(tags.surface ?? "").toLowerCase())) return COLORS.track;
+  if (tags.highway === "raceway" && !tags.surface && /motocross|supercross|enduro|bmx|speedway|autocross|rallycross/.test(String(tags.sport ?? "").toLowerCase())) return COLORS.track;
   if (tags.highway === 'service') {
     const subtype = String(tags.service ?? '').trim().toLowerCase();
     if (subtype === 'parking_aisle' || subtype === 'drive-through') return '#7f7c78';

@@ -35,7 +35,7 @@ test('raceway kinds and widths: circuits, dirt ovals, karts, motocross, pit lane
 });
 
 test('a kart track gets red-and-white kerbs round its bends, none on its straights, a tyre wall outside', () => {
-  const [rw] = planRaceways([cw(oval(40, 15), { sport: 'karting' }, 4)]);
+  const [rw] = planRaceways([cw(oval(40, 15), { sport: 'karting', name: 'Kart' }, 4)]);
   const stone = recorder(); const full = recorder();
   const tee = { tri: (...a) => { stone.tri(...a); full.tri(...a); }, quad: (...a) => { stone.quad(...a); full.quad(...a); } };
   const st = buildRaceway(tee, full, rw, { drapeAt });
@@ -94,7 +94,7 @@ test('raceway surfaces mapped as areas', () => {
 
 test('no kerbs or walls on a raised stretch (a deck, a ramp): they would lie on the ground under it', () => {
   const pts = oval(40, 15);
-  const c = cw(pts, { sport: 'karting' }, 4);
+  const c = cw(pts, { sport: 'karting', name: 'Kart' }, 4);
   c.nodes = c.nodes.map((q) => (q[0] > 0 ? [q[0], q[1], 8, q[3]] : q));   // the east half on a deck 6 m up
   const [rw] = planRaceways([c]);
   const stone = recorder(); const full = recorder();
@@ -106,7 +106,7 @@ test('no kerbs or walls on a raised stretch (a deck, a ramp): they would lie on 
 
 test('kerbs and tyre walls never stand on a neighbouring stretch of track', () => {
   // a kart oval, another track passing just outside its east bend (its carriageway x 59..67)
-  const a = cw(oval(40, 15), { sport: 'karting' }, 4);
+  const a = cw(oval(40, 15), { sport: 'karting', name: 'Kart' }, 4);
   const b = cw(Array.from({ length: 21 }, (_, i) => [63, -40 + 4 * i]), { sport: 'karting' }, 4);
   const rws = planRaceways([a, b]);
   const blocked = carriagewayTest(rws);
@@ -183,4 +183,47 @@ test('a drag strip graded smooth: the bumps gone, its grade kept, the ground bes
   assert.ok(Math.abs((at(80, 0) - at(-80, 0)) / 160 - 0.005) < 0.001, 'the grade kept');
   assert.ok(Math.abs(at(0, 0) - 60) < 0.05, 'the strip at its own height (heightmap absolute, not over minHeight)');
   const far = at(0, 60); assert.ok(Math.abs(far - 60) < 0.05, 'the ground 60 m off untouched');
+});
+
+test('a motocross raceway with no surface is dirt; racing lines mapped as leisure=track are recognised', async () => {
+  const { prepareRaceways } = await import('../services/exportBeamNGLevel.js');
+  const { isRacingTrackLine } = await import('../services/roadWidth.js');
+  const mx = { type: 'road', tags: { highway: 'raceway', sport: 'motocross' }, geometry: [{ lat: 0, lng: 0 }, { lat: 1, lng: 1 }] };
+  prepareRaceways([mx]);
+  assert.equal(mx.tags.surface, 'dirt');
+  assert.ok(isRacingTrackLine({ leisure: 'track', sport: 'bmx' }));
+  assert.ok(!isRacingTrackLine({ leisure: 'track', sport: 'athletics' }));
+  assert.ok(!isRacingTrackLine({ leisure: 'track', sport: 'bmx', area: 'yes' }));
+});
+
+test('a circuit straight is no drag strip; a lone strip and one with a return road are', async () => {
+  const { markDragStrips } = await import('../services/exportBeamNGLevel.js');
+  const proj = (lat, lng) => [lng, lat, 0];
+  const way = (pts) => ({ type: 'road', tags: { highway: 'raceway', sport: 'motor' }, geometry: pts.map(([x, y]) => ({ lat: y, lng: x })) });
+  const straight = way([[0, 0], [600, 0]]);
+  const lap = way([[600, 0], [900, 900], [0, 1400], [-300, 700], [0, 0]]);
+  markDragStrips([straight, lap], proj);
+  assert.equal(straight.tags['mapng:raceway'], undefined);
+  const strip = way([[0, 0], [600, 0]]); const back = way([[600, 0], [600, 40], [0, 40], [0, 0]]);
+  markDragStrips([strip, back], proj);
+  assert.equal(strip.tags['mapng:raceway'], 'drag');
+});
+
+test('kerbs only on a raceway known to be paved: tagged or named', () => {
+  const kerbs = (tags) => buildRaceway(recorder(), recorder(), planRaceways([cw(oval(40, 15).slice(0, 30), tags, 4)])[0], { drapeAt }).kerbs;
+  assert.equal(kerbs({ sport: 'motor' }), 0);
+  assert.ok(kerbs({ sport: 'motor', name: 'Climbing Turn' }) > 0);
+  assert.ok(kerbs({ sport: 'motor', surface: 'asphalt' }) > 0);
+});
+
+test('a raceway outline round a whole venue is no surface; one the lines fill, or with none inside, is', () => {
+  const proj = (lat, lng) => [lng, lat, 0];
+  const g = (pts) => pts.map(([x, y]) => ({ lat: y, lng: x }));
+  const box = (s) => g([[0, 0], [s, 0], [s, s], [0, s], [0, 0]]);
+  const area = (s) => ({ id: 'a', type: 'road', tags: { highway: 'raceway', area: 'yes', surface: 'dirt' }, geometry: box(s) });
+  const line = { id: 'l', type: 'road', tags: { highway: 'raceway', sport: 'motocross', surface: 'dirt' }, geometry: g([[5, 5], [95, 5]]) };
+  assert.equal(planRacewayAreas([area(400), line], proj).length, 0, 'the venue');
+  assert.equal(planRacewayAreas([area(100)], proj).length, 1, 'no lines: the outline is all we have');
+  const wide = { ...line, tags: { highway: 'raceway', sport: 'motor', surface: 'dirt' }, geometry: g([[5, 20], [95, 20], [95, 40], [5, 40], [5, 60], [95, 60], [95, 80], [5, 80]]) };
+  assert.equal(planRacewayAreas([area(100), wide], proj).length, 1, 'the lines fill it');
 });

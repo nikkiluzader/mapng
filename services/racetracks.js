@@ -18,9 +18,9 @@
 // terrain's own triangles (drape) or stands on it. Pure geometry.
 
 import { box, cylinder } from './buildingDetails.js';
-import { cleanRing, signedArea } from './fountains.js';
+import { cleanRing, signedArea, inRing } from './fountains.js';
 import { bar } from './pools.js';
-import { racewayKind } from './roadWidth.js';
+import { racewayKind, racewayHalfWidth } from './roadWidth.js';
 import { orientedBox } from './waterCover.js';
 
 const KERB_RADIUS_M = { circuit: 150, kart: 30 };
@@ -32,6 +32,7 @@ const CONCRETE = [0.78, 0.78, 0.76];
 const STEEL = [0.72, 0.74, 0.76];
 const TYRE = [0.08, 0.08, 0.09];
 
+const SURFACE_LINE_SHARE = 0.4;
 const UNPAVED = new Set(['dirt', 'clay', 'ground', 'earth', 'unpaved', 'gravel', 'sand', 'mud', 'compacted', 'grass']);
 
 // per node: the unit tangent and the turn's radius over a few metres either side
@@ -210,7 +211,10 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
   const paved = !UNPAVED.has(String(rw.tags.surface || '').toLowerCase());
   // (kerbs on a racing circuit or kart track only: an untagged raceway, a
   // training course or a test track, has none)
-  const racing = rw.kind === 'kart' || /motor|racing|kart|circuit|gp|formula|touring|endurance/.test(String(rw.tags.sport || '').toLowerCase());
+  // (and known to be paved: a surface tag, or a track someone named; an
+  // unnamed untagged raceway may be gravel, a rally school's stage)
+  const known = !!rw.tags.surface || !!rw.tags.name;
+  const racing = known && (rw.kind === 'kart' || /motor|racing|kart|circuit|gp|formula|touring|endurance/.test(String(rw.tags.sport || '').toLowerCase()));
   if ((rw.kind === 'circuit' || rw.kind === 'kart') && paved && racing && !rw.oval) {
     // kerbs on both edges where the line bends tighter than KERB_RADIUS_M
     const lim = KERB_RADIUS_M[rw.kind]; const w = KERB_W[rw.kind];
@@ -301,6 +305,16 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
 /** Raceway surfaces mapped as outlines (highway=raceway + area=yes): [{ ring, surface }]. */
 export function planRacewayAreas(features, project) {
   const out = [];
+  // the racing lines: an outline they fill little of is the venue's boundary,
+  // not a surface (RedBud's whole property mapped as a raceway: a sea of dirt,
+  // the track lost in it); under SURFACE_LINE_SHARE of it, the lines are the track
+  const lines = [];
+  for (const f of features || []) {
+    const t = f?.tags || {};
+    if (t.highway !== 'raceway' || t.area === 'yes' || !(f.geometry?.length >= 2)) continue;
+    const w = 2 * racewayHalfWidth(t); const p = f.geometry.map((q) => project(q.lat, q.lng));
+    for (let i = 0; i + 1 < p.length; i++) lines.push({ x: (p[i][0] + p[i + 1][0]) / 2, y: (p[i][1] + p[i + 1][1]) / 2, area: w * Math.hypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]) });
+  }
   for (const f of features || []) {
     const t = f?.tags || {};
     // (a raceway's own outline; a motorsport track mapped as an area:
@@ -312,6 +326,8 @@ export function planRacewayAreas(features, project) {
     let ring = cleanRing(f.geometry.map((q) => project(q.lat, q.lng)));
     if (ring.length < 3) continue;
     if (signedArea(ring) < 0) ring = ring.reverse();
+    const inside = lines.reduce((sum, l) => sum + (inRing(l.x, l.y, ring) ? l.area : 0), 0);
+    if (inside > 0 && inside < SURFACE_LINE_SHARE * signedArea(ring)) continue;
     const surf = String(t.surface || '').toLowerCase();
     out.push({ ring, surface: UNPAVED.has(surf) || (motor && !surf) ? 'dirt' : 'asphalt', id: f.id });
   }

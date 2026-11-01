@@ -3,6 +3,7 @@ import {
   buildOverpassQuery,
 } from "./overpassQuery.js";
 import { fetchOsmFromTiles, resolveOsmTileArchiveUrl } from "./osmTiles.js";
+import { isRacingTrackLine } from "./roadWidth.js";
 import {
   OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture, fetchOvertureBuildingRecords, mergeOvertureBuildings,
 } from "./overtureTiles.js";
@@ -416,6 +417,9 @@ export const parseOverpassResponse = (data, bounds) => {
       // Keep original way geometry. Aggressive signature-based joining can produce
       // long discontinuous polylines across intersections/branches.
       rawFeatures.push({ id: id.toString(), type: "road", geometry: w.nodes, tags });
+    } else if (isRacingTrackLine(tags) && !isClosedRing(w.nodes)) {
+      // a BMX or motocross line mapped as leisure=track drives as a raceway
+      rawFeatures.push({ id: id.toString(), type: "road", geometry: w.nodes, tags: { ...tags, highway: "raceway" } });
     } else if (tags.natural === "tree_row") {
       const nodes = w.nodes;
       for (let i = 0; i < nodes.length - 1; i++) {

@@ -125,6 +125,9 @@ export function racewayKind(tags = {}) {
   if (UNPAVED_RACE.has(String(tags.surface || '').toLowerCase())) return 'dirt';
   return 'circuit';
 }
+// a motorsport / BMX racing line mapped as leisure=track rather than a raceway
+const TRACK_LINE_SPORT = /motor|kart|motocross|supercross|enduro|bmx|speedway|autocross|rallycross|dirt/;
+export const isRacingTrackLine = (tags = {}) => tags.leisure === 'track' && !tags.highway && tags.area !== 'yes' && TRACK_LINE_SPORT.test(String(tags.sport || '').toLowerCase());
 export const racewayHalfWidth = (tags = {}) => RACEWAY_HALF_M[racewayKind(tags)];
 
 /**

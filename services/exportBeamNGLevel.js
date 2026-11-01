@@ -4885,12 +4885,37 @@ export async function generateDecalRoadsYielding(terrainData, squareSize, yieldF
 
 // The road layout, pausing (yield) between its phases and every 200 roads.
 // A raceway at least DRAG_MIN_M long and dead straight (within DRAG_STRAIGHT_M
-// of its chord): a drag strip, whatever its tags say (they rarely do); a
-// shorter straight is a connecting lane, a circuit's straight is not dead
-// straight that long in one way.
+// of its chord) that is most of the raceways it joins: a drag strip, whatever
+// its tags say (they rarely do); a shorter straight is a connecting lane, a
+// small share of a network is a circuit's straight.
 const DRAG_MIN_M = 380;   // (a quarter mile and some: a 233 m straight inside a training course was no drag strip)
 const DRAG_STRAIGHT_M = 2;
+const DRAG_NETWORK_SHARE = 1 / 3;
+// A motocross or BMX raceway without a surface tag is dirt, not asphalt.
+const OFFROAD_SPORT = /motocross|supercross|enduro|bmx|speedway|autocross|rallycross/;
+export function prepareRaceways(features) {
+  for (const f of features) {
+    const t = f?.tags;
+    if (t?.highway === 'raceway' && !t.surface && OFFROAD_SPORT.test(String(t.sport || '').toLowerCase())) f.tags = { ...t, surface: 'dirt' };
+  }
+}
+
 export function markDragStrips(features, project) {
+  // the raceways that touch, and their lengths: a dead-straight raceway is a
+  // strip only as DRAG_NETWORK_SHARE of them or more (Lime Rock's 597 m Sam
+  // Posey Straight is 13 % of its circuit; a strip and its return road, half)
+  const root = new Map();
+  const find = (k) => { let r = k; while (root.get(r) !== r) r = root.get(r); root.set(k, r); return r; };
+  const key = (q) => `${q.lat},${q.lng}`;
+  const lines = features.filter((f) => f?.type === 'road' && f.tags?.highway === 'raceway' && f.tags.area !== 'yes' && f.geometry?.length >= 2);
+  for (const f of lines) {
+    const k0 = key(f.geometry[0]);
+    if (!root.has(k0)) root.set(k0, k0);
+    for (const q of f.geometry) { const k = key(q); if (!root.has(k)) root.set(k, k); root.set(find(k), find(k0)); }
+  }
+  const lengthOf = (f) => { const p = f.geometry.map((q) => project(q.lat, q.lng)); let s = 0; for (let i = 1; i < p.length; i++) s += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]); return s; };
+  const networkM = new Map();
+  for (const f of lines) { const r = find(key(f.geometry[0])); networkM.set(r, (networkM.get(r) || 0) + lengthOf(f)); }
   for (const f of features) {
     const t = f?.tags;
     if (f?.type !== 'road' || t?.highway !== 'raceway' || t['mapng:raceway'] || !(f.geometry?.length >= 2)) continue;
@@ -4900,6 +4925,7 @@ export function markDragStrips(features, project) {
     if (L < DRAG_MIN_M) continue;
     const dev = Math.max(...pts.map((q) => Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / L));
     if (dev > DRAG_STRAIGHT_M) continue;
+    if (L < DRAG_NETWORK_SHARE * (networkM.get(find(key(f.geometry[0]))) || L)) continue;
     t['mapng:raceway'] = 'drag';
     // laid dead straight between its ends: the wobble left is mapping noise
     // (points clicked off aerial imagery, +-1.4 m every 50-140 m on a strip
@@ -4929,6 +4955,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Road nodes every ${budget.spacing.toFixed(2)} m (not ${ROAD_NODE_SPACING_M} m): ${budget.lengthKm.toFixed(0)} km of roads would make ~${budget.estimatedNodes} DecalRoad nodes, past what BeamNG draws at load.`);
   }
   if (!terrainData.osmFeatures?.length) return [];
+  prepareRaceways(terrainData.osmFeatures);
   markDragStrips(terrainData.osmFeatures, (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0));
 
   const sourceRoadFeatures = bridgeOverShortGaps(terrainData.osmFeatures.filter((feature) => {
@@ -7268,7 +7295,7 @@ function buildCloudObjects(biome) {
 // 2 km: at the old 8,000 more than half were left out.
 const MAX_NATIVE_BARRIER_OBJECTS = 50000;
 
-// Walls along a racetrack: most of their length within RACESIDE_M of a raceway.
+// Walls and fences along a racetrack: most of their length within RACESIDE_M of a raceway.
 const RACESIDE_M = 30;
 function racesideWalls(osmFeatures, barriers) {
   const out = new Set();
@@ -7286,7 +7313,7 @@ function racesideWalls(osmFeatures, barriers) {
     return Math.hypot(ax + dx * t, ay + dy * t) < RACESIDE_M;
   });
   for (const f of barriers) {
-    if (!['wall', 'retaining_wall'].includes(f?.tags?.barrier) || !(f.geometry?.length >= 2)) continue;
+    if (!['wall', 'retaining_wall', 'fence'].includes(f?.tags?.barrier) || !(f.geometry?.length >= 2)) continue;
     const pts = f.geometry;
     if (pts.filter(near).length >= pts.length * 0.6) out.add(f);
   }
@@ -7354,6 +7381,8 @@ function resolveNativeBarrierAsset(tags = {}, biome = null) {
     if (['chain_link', 'metal', 'wire', 'mesh'].includes(fenceType) || ['metal', 'steel', 'wire'].includes(material)) {
       return NATIVE_BARRIER_ASSETS.chainLinkFence;
     }
+    // (beside a racetrack: chain link, no garden's picket)
+    if (tags['mapng:trackside'] === 'yes') return NATIVE_BARRIER_ASSETS.chainLinkFence;
     if (levelName && levelName !== 'east_coast_usa') {
       return NATIVE_BARRIER_ASSETS.chainLinkFence;
     }
