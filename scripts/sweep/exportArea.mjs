@@ -18,6 +18,7 @@ import { exportBeamNGLevel } from '../../services/exportBeamNGLevel.js';
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from '../../services/roadSmoother.js';
 import { snapRoadsToTerrain } from '../../services/roadSnap.js';
 import { measureStreetWidths } from '../../services/streetWidths.js';
+import { roundRoadCorners } from '../../services/roadCurves.js';
 import { installCanvasPolyfill } from './polyfill.mjs';
 import { AREAS_DIR, OUT_DIR, REPO } from './env.mjs';
 
@@ -39,7 +40,10 @@ const heightMap = new Float32Array(fs.readFileSync(path.join(dir, `${dem}.f32`))
 const fine = dem === 'gpxz';
 const raw = !!process.env.RAW;
 // (as the app's data pull: street widths from the buildings along them)
-let osmRoads = process.env.NOWIDTH ? osmFeatures : measureStreetWidths(osmFeatures).features;
+// (corners rounded into arcs first, as terrain.js shapeRoads: without it wide
+// roads kinked at every OSM vertex and lost wedges of asphalt there)
+const rounded = roundRoadCorners(osmFeatures).features;
+let osmRoads = process.env.NOWIDTH ? rounded : measureStreetWidths(rounded).features;
 if (fine && !raw) osmRoads = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, isGroundLevelRoad).features;
 if (!raw) smoothRoadsInHeightmap(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, { skipTracks: fine, fine });
 let minHeight = Infinity; let maxHeight = -Infinity;

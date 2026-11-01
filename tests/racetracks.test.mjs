@@ -227,3 +227,57 @@ test('a raceway outline round a whole venue is no surface; one the lines fill, o
   const wide = { ...line, tags: { highway: 'raceway', sport: 'motor', surface: 'dirt' }, geometry: g([[5, 20], [95, 20], [95, 40], [5, 40], [5, 60], [95, 60], [95, 80], [5, 80]]) };
   assert.equal(planRacewayAreas([area(100), wide], proj).length, 1, 'the lines fill it');
 });
+
+test('one unbroken kerb to a corner: mapped wobble, piece ends and kinks do not chop it', () => {
+  // a straight, a 90 degree left of radius 40 in two pieces with noise, a straight
+  const pts = [];
+  for (let x = -100; x < 0; x += 2) pts.push([x, 0]);
+  for (let a = 0; a <= 45; a++) { const t = (a * 2 * Math.PI) / 180; const r = 40 + (a % 3) * 0.25; pts.push([r * Math.sin(t), 40 - r * Math.cos(t)]); }
+  for (let y = 40 + 2; y < 140; y += 2) pts.push([40, y]);
+  const h = Math.floor(pts.length / 2);
+  const tags = { sport: 'motor', name: 'Turn', surface: 'asphalt' };
+  const pieces = [cw(pts.slice(0, h + 1), tags, 6), cw(pts.slice(h), tags, 6)].map((c) => ({ ...c, oneWay: true }));
+  const rws = planRaceways(pieces);
+  assert.equal(rws.length, 1, 'one line');
+  const full = recorder();
+  const st = buildRaceway(recorder(), full, rws[0], { drapeAt });
+  assert.equal(st.kerbs, 1, 'one corner');
+  const kerb = full.tris.filter((k) => k.mat === 'smoothConcrete').flatMap((k) => k.pts);
+  assert.ok(kerb.every((q) => q[0] > -30 && q[1] < 80), 'not along the straights');
+  // the inside (toward the corner's centre 0,40) and the outside exit only
+  const r = (q) => Math.hypot(q[0], q[1] - 40);
+  assert.ok(kerb.some((q) => r(q) < 34.5), 'the inside');
+  const outer = kerb.filter((q) => r(q) > 45 && q[1] < 40);
+  assert.ok(outer.every((q) => q[1] > 12), 'the outside only from past the middle of the corner');
+});
+
+test('a kink is no corner: no kerb', () => {
+  const pts = [];
+  for (let x = 0; x <= 200; x += 2) pts.push([x, x > 100 ? (x - 100) * 0.2 : 0]);   // 11 degrees
+  const [rw] = planRaceways([cw(pts, { sport: 'motor', surface: 'asphalt' }, 6)]);
+  assert.equal(buildRaceway(recorder(), recorder(), rw, { drapeAt }).kerbs, 0);
+});
+
+test('a racing line flows: a corner in few points turns smoothly, and ways still meet', async () => {
+  const { roundRoadCorners } = await import('../services/roadCurves.js');
+  const K = 1 / 111320;
+  const way = (id, pts, tags = {}) => ({ id, type: 'road', tags: { highway: 'raceway', sport: 'motor', ...tags }, geometry: pts.map(([x, y]) => ({ lat: y * K, lng: x * K })) });
+  const a = way('a', [[0, 0], [100, 0], [130, 12], [150, 40]]);
+  const b = way('b', [[150, 40], [158, 80], [158, 200]]);
+  const side = { id: 's', type: 'road', tags: { highway: 'service' }, geometry: [{ lat: 40 * K, lng: 150 * K }, { lat: 40 * K, lng: 220 * K }] };
+  const out = roundRoadCorners([a, b, side]).features;
+  const [ga, gb, gs] = out.map((f) => f.geometry);
+  const near = (p, q) => Math.hypot((p.lat - q.lat) / K, (p.lng - q.lng) / K) < 0.05;
+  assert.ok(near(ga[ga.length - 1], gb[0]), 'the two ways still meet');
+  assert.ok(near(ga[ga.length - 1], gs[0]), 'a road ending on the lap stays joined');
+  assert.ok(near(ga[0], { lat: 0, lng: 0 }) && near(gb[gb.length - 1], { lat: 200 * K, lng: 158 * K }), 'the ends stay put');
+  // heading never jumps: at most a few degrees per 2 m step along both ways
+  const pts = [...ga, ...gb.slice(1)].map((p) => [p.lng / K, p.lat / K]);
+  let worst = 0;
+  for (let i = 1; i + 1 < pts.length; i++) {
+    const u = [pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]]; const v = [pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]];
+    if (Math.hypot(...u) < 0.2 || Math.hypot(...v) < 0.2) continue;
+    worst = Math.max(worst, Math.abs(Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1])));
+  }
+  assert.ok((worst * 180) / Math.PI < 8, `worst heading step ${(worst * 180 / Math.PI).toFixed(1)} deg`);
+});

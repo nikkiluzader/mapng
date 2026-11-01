@@ -2,9 +2,10 @@
 // (highway=raceway carriageways, after the road system has laid them out),
 // built into the building tiles (beamngBuildings.js).
 //
-//   circuit, kart   red-and-white kerbs on both edges round the bends (a
-//                   radius under KERB_RADIUS_M), a kart track's tyre walls
-//                   round the outside of its bends
+//   circuit, kart   a kerb to a corner (a radius under KERB_RADIUS_M, turning
+//                   25 degrees or more): the inside from turn-in to exit, the
+//                   outside at the exit; a kart track's tyre walls round the
+//                   outside of its corners
 //   dirt            a dirt oval's concrete wall round its outside with a catch
 //                   fence on it; a line of tyres round its infield
 //   drag            the light tree on the centre line at the start (the end
@@ -24,6 +25,7 @@ import { racewayKind, racewayHalfWidth } from './roadWidth.js';
 import { orientedBox } from './waterCover.js';
 
 const KERB_RADIUS_M = { circuit: 150, kart: 30 };
+const KERB_EXIT_M = 15;
 const KERB_W = { circuit: 1.0, kart: 0.6 };
 const KERB_STRIPE = { circuit: 1.0, kart: 0.5 };
 const RED = [0.8, 0.1, 0.08];
@@ -54,6 +56,58 @@ function bends(nodes, window = 6) {
 // an offset line along the carriageway: d to the left (negative: right)
 const offsetAt = (q, t, d) => [q[0] - t[1] * d, q[1] + t[0] * d];
 
+// pieces of a circuit or kart track running on from each other become one
+// line: end to start (either way round where it isn't one-way), the straightest
+// continuation at a fork (the lap, not the pit entry)
+const JOIN_HEADING_COS = Math.cos((25 * Math.PI) / 180);
+function joinCircuitPieces(rws) {
+  const dirAt = (nodes, atEnd) => { const n = nodes.length; const a = atEnd ? nodes[n - 2] : nodes[0]; const b = atEnd ? nodes[n - 1] : nodes[1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+  const lines = rws.filter((r) => r.kind === 'circuit' || r.kind === 'kart');
+  for (let merged = true; merged;) {
+    merged = false;
+    for (const a of lines) {
+      if (a.gone) continue;
+      const e = a.nodes[a.nodes.length - 1]; const da = dirAt(a.nodes, true);
+      let best = null;
+      for (const b of lines) {
+        if (b === a || b.gone || b.kind !== a.kind || Math.abs(b.half - a.half) > 1) continue;
+        for (const nb of b.oneWay ? [b.nodes] : [b.nodes, b.nodes.slice().reverse()]) {
+          if (Math.hypot(nb[0][0] - e[0], nb[0][1] - e[1]) > 1) continue;
+          const db = dirAt(nb, false); const c = da[0] * db[0] + da[1] * db[1];
+          if (c >= JOIN_HEADING_COS && (!best || c > best.c)) best = { c, b, nb };
+        }
+      }
+      if (!best) continue;
+      a.nodes = [...a.nodes, ...best.nb.slice(1)];
+      a.tags = { ...best.b.tags, ...a.tags }; a.oneWay = a.oneWay && best.b.oneWay; best.b.gone = true; merged = true;
+    }
+  }
+  for (let i = rws.length - 1; i >= 0; i--) if (rws[i].gone) rws.splice(i, 1);
+}
+
+// The corners of a line: [{ i, j, side }] (nodes i..j, side +1 turning left).
+// Measured over KERB_WINDOW_M, the same way round closes a gap under
+// KERB_GAP_M (one corner, whatever the mapped points do), and a bend turning
+// less than KERB_MIN_TURN is a kink, no corner.
+const KERB_WINDOW_M = 12;
+const KERB_GAP_M = 25;
+const KERB_MIN_TURN = (25 * Math.PI) / 180;
+function cornersOf(info, lim) {
+  const n = info.length; const runs = [];
+  for (let k = 0; k < n; k++) {
+    if (info[k].radius >= lim) continue;
+    const side = info[k].turn > 0 ? 1 : -1;
+    const last = runs[runs.length - 1];
+    if (last && last.side === side && info[k].s - info[last.j].s < KERB_GAP_M) last.j = k;
+    else runs.push({ i: k, j: k, side });
+  }
+  return runs.filter((r) => {
+    let turn = 0;
+    for (let k = r.i + 1; k <= r.j; k++) { let d = Math.atan2(info[k].t[1], info[k].t[0]) - Math.atan2(info[k - 1].t[1], info[k - 1].t[0]); d = Math.atan2(Math.sin(d), Math.cos(d)); turn += d; }
+    return Math.abs(turn) >= KERB_MIN_TURN;
+  });
+}
+
 /**
  * The raceways to fit: [{ kind, nodes, half, closed, tags }] from the drawn
  * carriageways (nodes [x, y, z, w]).
@@ -61,8 +115,11 @@ const offsetAt = (q, t, d) => [q[0] - t[1] * d, q[1] + t[0] * d];
 export function planRaceways(carriageways = []) {
   const rws = carriageways.filter((cw) => cw.highway === 'raceway' && cw.nodes?.length >= 2).map((cw) => {
     const a = cw.nodes[0]; const b = cw.nodes[cw.nodes.length - 1];
-    return { kind: racewayKind(cw.tags || {}), nodes: cw.nodes, half: cw.half, closed: Math.hypot(b[0] - a[0], b[1] - a[1]) < 1, tags: cw.tags || {}, id: cw.wayId };
+    return { kind: racewayKind(cw.tags || {}), nodes: cw.nodes, half: cw.half, closed: Math.hypot(b[0] - a[0], b[1] - a[1]) < 1, tags: cw.tags || {}, id: cw.wayId, oneWay: !!cw.oneWay };
   });
+  // a circuit in pieces (its ways, the road system's chunks) is one line: a
+  // corner cut at a piece's end lost its kerb there
+  joinCircuitPieces(rws);
   // a drag strip in pieces (split at the timing lights, the shut-down area):
   // the pieces that meet end to end in line are one strip, one start
   const drags = rws.filter((r) => r.kind === 'drag');
@@ -216,28 +273,27 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
   const known = !!rw.tags.surface || !!rw.tags.name;
   const racing = known && (rw.kind === 'kart' || /motor|racing|kart|circuit|gp|formula|touring|endurance/.test(String(rw.tags.sport || '').toLowerCase()));
   if ((rw.kind === 'circuit' || rw.kind === 'kart') && paved && racing && !rw.oval) {
-    // kerbs on both edges where the line bends tighter than KERB_RADIUS_M
+    // a kerb to a corner, unbroken: on the inside from turn-in through the
+    // apex to the exit; on the outside only where a car runs wide, the
+    // corner's exit and on past it (known only where the direction is)
     const lim = KERB_RADIUS_M[rw.kind]; const w = KERB_W[rw.kind];
-    let i = 0;
-    while (i < n - 1) {
-      if (info[i].radius >= lim) { i++; continue; }
-      let j = i; while (j < n - 1 && info[j].radius < lim) j++;
-      const len = info[j].s - info[i].s;
-      if (len >= 4) {
-        for (const sg of [-1, 1]) {
-          const d0 = sg * (rw.half - 0.15); const d1 = sg * (rw.half + w - 0.15);
-          // (a kerb rises a little toward its outer edge)
-          edgeStrip(full, 'smoothConcrete', rw, info, i, j, d0, d1, z, KERB_STRIPE[rw.kind], [RED, WHITE], [0.025, 0.06]);
-        }
-        stats.kerbs++;
-        // a kart track: a tyre wall round the outside of the bend
-        if (rw.kind === 'kart') {
-          const outside = info[Math.floor((i + j) / 2)].turn > 0 ? -1 : 1;
-          wallAlong(stone, 'smoothConcrete', rw, info, i, j, outside * (rw.half + w + 1.2), 0.7, 0.75, z, TYRE, [TYRE, TYRE, RED, TYRE, TYRE, WHITE], 0.7);
-          stats.tyres++;
-        }
+    const inf2 = bends(rw.nodes, KERB_WINDOW_M);
+    const strip = (i, j, sg) => edgeStrip(full, 'smoothConcrete', rw, info, i, j, sg * (rw.half - 0.15), sg * (rw.half + w - 0.15), z, KERB_STRIPE[rw.kind], [RED, WHITE], [0.025, 0.06]);
+    for (const c of cornersOf(inf2, lim)) {
+      strip(c.i, c.j, c.side);
+      if (rw.oneWay) {
+        const len = info[c.j].s - info[c.i].s;
+        const from = info[c.i].s + len * 0.6; const to = info[c.j].s + KERB_EXIT_M;
+        let i0 = c.i; while (i0 < n - 1 && info[i0].s < from) i0++;
+        let j0 = c.j; while (j0 < n - 1 && info[j0].s < to) j0++;
+        strip(i0, j0, -c.side);
       }
-      i = j + 1;
+      stats.kerbs++;
+      // a kart track: a tyre wall round the outside of the bend
+      if (rw.kind === 'kart') {
+        wallAlong(stone, 'smoothConcrete', rw, info, c.i, c.j, -c.side * (rw.half + w + 1.2), 0.7, 0.75, z, TYRE, [TYRE, TYRE, RED, TYRE, TYRE, WHITE], 0.7);
+        stats.tyres++;
+      }
     }
   }
   if ((rw.kind === 'dirt' || rw.kind === 'circuit') && rw.oval) {

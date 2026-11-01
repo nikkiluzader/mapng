@@ -1,5 +1,5 @@
 import { makeRoadNodeKey } from './roadNetwork.js';
-import { NON_DRIVEABLE_HIGHWAYS } from './roadWidth.js';
+import { NON_DRIVEABLE_HIGHWAYS, racewayHalfWidth } from './roadWidth.js';
 
 /**
  * Round the corners of OSM roads into tangent arcs.
@@ -254,5 +254,136 @@ export function roundRoadCorners(osmFeatures) {
             if (moved) out[i] = { ...f, geometry: [{ ...f.geometry[0], ...moved }] };
         }
     }
-    return { features: out, stats };
+    return { features: smoothRaceways(out), stats };
+}
+
+// Racing lines flow: a corner mapped in a few points, each rounded by itself,
+// stayed arc - straight - arc (Lime Rock: a point every 12.5 m turning 12 deg,
+// the sharpest 67). The ways of a lap chained through their ends, straightest
+// on at a fork, and each chain's line smoothed along its length (a Gaussian of
+// RACE_SIGMA_FACTOR half widths: a 12 m track's corner moves under a metre).
+// Longest chains first; where a shorter one meets a moved point it follows.
+const RACE_SIGMA_FACTOR = 1.2;
+const RACE_STEP_M = 2;
+const RACE_CHAIN_COS = Math.cos((40 * Math.PI) / 180);
+function smoothRaceways(features) {
+    const ways = [];
+    features.forEach((f, index) => {
+        if (f?.type === 'road' && f.tags?.highway === 'raceway' && f.tags.area !== 'yes' && Array.isArray(f.geometry) && f.geometry.length >= 2) ways.push({ f, index, g: f.geometry });
+    });
+    if (!ways.length) return features;
+    const ref = ways[0].g[0];
+    const mx = 111320 * Math.cos((ref.lat * Math.PI) / 180); const my = 111320;
+    const toXY = (p) => [(p.lng - ref.lng) * mx, (p.lat - ref.lat) * my];
+    const dirOut = (g, atEnd) => { const a = toXY(atEnd ? g[g.length - 2] : g[1]); const b = toXY(atEnd ? g[g.length - 1] : g[0]); const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
+    // the ends at each node; pair the straightest through it
+    const ends = new Map();
+    ways.forEach((w, wi) => [false, true].forEach((atEnd) => {
+        const k = makeRoadNodeKey(atEnd ? w.g[w.g.length - 1] : w.g[0]);
+        if (!ends.has(k)) ends.set(k, []);
+        ends.get(k).push({ wi, atEnd, d: dirOut(w.g, atEnd) });
+    }));
+    const link = new Map();   // "wi:atEnd" -> the end it carries on into
+    const id = (e) => `${e.wi}:${e.atEnd ? 1 : 0}`;
+    for (const list of ends.values()) {
+        const pairs = [];
+        for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) {
+            if (list[a].wi === list[b].wi) continue;
+            const c = -(list[a].d[0] * list[b].d[0] + list[a].d[1] * list[b].d[1]);
+            if (c >= RACE_CHAIN_COS) pairs.push({ a: list[a], b: list[b], c });
+        }
+        pairs.sort((p, q) => q.c - p.c);
+        for (const { a, b } of pairs) {
+            if (link.has(id(a)) || link.has(id(b))) continue;
+            link.set(id(a), b); link.set(id(b), a);
+        }
+    }
+    // chains: [{ wi, rev }] from an end with no link (or round a closed lap)
+    const seen = new Set(); const chains = [];
+    const walk = (wi, rev) => {
+        const chain = [];
+        for (let w = wi, r = rev; !seen.has(w);) {
+            seen.add(w); chain.push({ wi: w, rev: r });
+            const next = link.get(`${w}:${r ? 0 : 1}`);   // leaving by its far end
+            if (!next) break;
+            w = next.wi; r = next.atEnd;                  // entering by that end
+        }
+        return chain;
+    };
+    ways.forEach((w, wi) => { if (seen.has(wi)) return; if (!link.has(`${wi}:0`)) chains.push(walk(wi, false)); else if (!link.has(`${wi}:1`)) chains.push(walk(wi, true)); });
+    ways.forEach((w, wi) => { if (!seen.has(wi)) chains.push(walk(wi, false)); });   // closed laps
+    const lengthOf = (c) => c.reduce((sum, { wi }) => { const g = ways[wi].g; let L = 0; for (let i = 1; i < g.length; i++) { const a = toXY(g[i - 1]); const b = toXY(g[i]); L += Math.hypot(b[0] - a[0], b[1] - a[1]); } return sum + L; }, 0);
+    chains.sort((a, b) => lengthOf(b) - lengthOf(a));
+    const moved = new Map();   // node key -> its new { lat, lng }
+    const result = features.slice();
+    for (const chain of chains) {
+        // the line, with where each way's points fall along it
+        const pts = []; const marks = [];
+        for (const { wi, rev } of chain) {
+            const g = rev ? ways[wi].g.slice().reverse() : ways[wi].g;
+            const from = pts.length ? 1 : 0;
+            for (let i = from; i < g.length; i++) { marks.push({ wi, rev, src: g[i], first: i === 0 }); pts.push(toXY(moved.get(makeRoadNodeKey(g[i])) || g[i])); }
+        }
+        const s = [0];
+        for (let i = 1; i < pts.length; i++) s.push(s[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+        const L = s[s.length - 1];
+        if (L < 4 * RACE_STEP_M) continue;
+        const closed = Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 0.5;
+        const n = Math.round(L / RACE_STEP_M); const step = L / n;
+        const raw = [];
+        for (let k = 0, j = 0; k <= n; k++) {
+            const t = k * step; while (j < s.length - 2 && s[j + 1] < t) j++;
+            const f = (t - s[j]) / ((s[j + 1] - s[j]) || 1);
+            raw.push([pts[j][0] + (pts[j + 1][0] - pts[j][0]) * f, pts[j][1] + (pts[j + 1][1] - pts[j][1]) * f]);
+        }
+        const sigma = RACE_SIGMA_FACTOR * racewayHalfWidth(ways[chain[0].wi].f.tags);
+        const R = Math.ceil((3 * sigma) / step);
+        const kernel = []; let total = 0;
+        for (let k = -R; k <= R; k++) { const w = Math.exp(-0.5 * ((k * step) / sigma) ** 2); kernel.push(w); total += w; }
+        // past an end: mirrored through it (the end stays put), round a lap: wrapped
+        const at = (k) => {
+            if (closed) return raw[((k % n) + n) % n];
+            if (k < 0) return [2 * raw[0][0] - raw[Math.min(n, -k)][0], 2 * raw[0][1] - raw[Math.min(n, -k)][1]];
+            if (k > n) return [2 * raw[n][0] - raw[Math.max(0, 2 * n - k)][0], 2 * raw[n][1] - raw[Math.max(0, 2 * n - k)][1]];
+            return raw[k];
+        };
+        const smooth = raw.map((_, k) => { let x = 0; let y = 0; for (let m = -R; m <= R; m++) { const q = at(k + m); const w = kernel[m + R]; x += q[0] * w; y += q[1] * w; } return [x / total, y / total]; });
+        const posAt = (t) => { const u = Math.max(0, Math.min(n, t / step)); const i = Math.min(n - 1, Math.floor(u)); const f = u - i; return [smooth[i][0] + (smooth[i + 1][0] - smooth[i][0]) * f, smooth[i][1] + (smooth[i + 1][1] - smooth[i][1]) * f]; };
+        const toGeo = (q) => ({ lat: ref.lat + q[1] / my, lng: ref.lng + q[0] / mx });
+        // back into each way: its own points (junctions move with the line,
+        // kept in the moved map) and the smoothed samples between them
+        const perWay = new Map();
+        marks.forEach((m, i) => {
+            const geo = toGeo(posAt(s[i]));
+            const key = makeRoadNodeKey(m.src);
+            if (!moved.has(key)) moved.set(key, geo);
+            if (!perWay.has(m.wi)) perWay.set(m.wi, { rev: m.rev, s0: s[i], s1: s[i], src: [] });
+            const w = perWay.get(m.wi); w.s1 = s[i]; w.src.push({ s: s[i], p: { ...m.src, ...geo } });
+        });
+        // (a way's first point in the chain after the first way is the previous way's last)
+        chain.forEach(({ wi }, c) => {
+            if (c === 0) return;
+            const prev = perWay.get(chain[c - 1].wi); const w = perWay.get(wi);
+            if (!prev || !w) return;
+            const last = prev.src[prev.src.length - 1];
+            w.src.unshift(last); w.s0 = last.s;
+        });
+        for (const [wi, w] of perWay) {
+            const list = [...w.src];
+            for (let t = w.s0 + RACE_STEP_M; t < w.s1; t += RACE_STEP_M) list.push({ s: t, p: { ...w.src[0].p, ...toGeo(posAt(t)) } });
+            list.sort((a, b) => a.s - b.s);
+            const geometry = list.map((q) => q.p);
+            if (w.rev) geometry.reverse();
+            result[ways[wi].index] = { ...ways[wi].f, geometry };
+        }
+    }
+    // other roads ending on a moved point stay joined
+    if (moved.size) {
+        for (let i = 0; i < result.length; i++) {
+            const f = result[i];
+            if (f?.type !== 'road' || f.tags?.highway === 'raceway' || !Array.isArray(f.geometry)) continue;
+            if (f.geometry.some((p) => moved.has(makeRoadNodeKey(p)))) result[i] = { ...f, geometry: f.geometry.map((p) => { const m = moved.get(makeRoadNodeKey(p)); return m ? { ...p, ...m } : p; }) };
+        }
+    }
+    return result;
 }
