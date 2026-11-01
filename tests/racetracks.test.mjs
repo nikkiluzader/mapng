@@ -343,3 +343,23 @@ test('floodlights as real venues: a stadium field 6 poles outside it, tennis 4 l
   assert.equal(planStandLights([{ roof: false, box: box(60, 15), z1: 5, tags: {} }]).length, 0);
   assert.equal(planStandLights([{ roof: true, box: box(60, 15), z1: 5, tags: {} }]).length, 4);
 });
+
+test('a road node too tight for its width is eased, the ends staying put', async () => {
+  const { easeTightNodes } = await import('../services/exportBeamNGLevel.js');
+  const K = 1 / 111320;
+  const pts = [];
+  for (let x = 0; x <= 40; x += 2) pts.push({ lat: 0, lng: x * K });
+  for (let y = 2; y <= 40; y += 2) pts.push({ lat: y * K, lng: 40 * K });   // a right angle at one node
+  const out = easeTightNodes(pts, 5);
+  const xy = out.map((p) => [p.lng / K, p.lat / K]);
+  let tightest = Infinity;
+  for (let i = 1; i + 1 < xy.length; i++) {
+    const u = [xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]]; const v = [xy[i + 1][0] - xy[i][0], xy[i + 1][1] - xy[i][1]];
+    const a = Math.abs(Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]));
+    if (a > 1e-3) tightest = Math.min(tightest, (Math.hypot(...u) + Math.hypot(...v)) / 2 / a);
+  }
+  assert.ok(tightest >= 5, `tightest ${tightest.toFixed(1)} m on a road of half width 5`);
+  assert.deepEqual([out[0].lat, out[0].lng], [pts[0].lat, pts[0].lng]);
+  assert.deepEqual([out.at(-1).lat, out.at(-1).lng], [pts.at(-1).lat, pts.at(-1).lng]);
+  assert.equal(easeTightNodes(pts.slice(0, 20), 5)[10], pts.slice(0, 20)[10], 'a straight road untouched');
+});

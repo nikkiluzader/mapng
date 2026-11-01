@@ -1606,6 +1606,8 @@ function clipGeometryToMargin(geometry, bounds) {
 // nodes (West Coast USA, Italy), and at DECAL_ROAD_DETAIL a piece samples as
 // many points as the old 50-node pieces did at the engine's 0.1.
 //
+// (ease tight nodes below, before a road is cut into pieces)
+//
 // A wide road is cut shorter still: the engine captures the terrain triangles
 // under each piece and caps what one piece holds, so past it the rest of a
 // long wide piece silently drew nothing (a 12 m drag strip in 500 m pieces
@@ -1620,6 +1622,40 @@ function chunkPolyline(points, maxNodes = 250, { widthM = 0, spacingM = 0 } = {}
     chunks.push(points.slice(i, i + maxNodes));
   }
   return chunks;
+}
+
+// A road node bending tighter than its half width folds the strip's inner edge
+// and the engine drops those slices: wedges of missing road, widest on the
+// outside of the bend. Nodes bending under TIGHT_FACTOR half widths are pulled
+// toward their neighbours until they don't (the road's ends stay, it meets its
+// junctions as before). Measured on the node's own turn: over any longer span
+// a one-node kink hides.
+const TIGHT_FACTOR = 1.5;
+const TIGHT_PASSES = 40;
+export function easeTightNodes(points, halfWidthM) {
+  if (!(points?.length >= 3) || !(halfWidthM > 0)) return points;
+  const lat0 = points[0].lat; const mx = 111320 * Math.cos((lat0 * Math.PI) / 180); const my = 111320;
+  const xy = points.map((p) => [p.lng * mx, p.lat * my]);
+  const limit = TIGHT_FACTOR * halfWidthM;
+  const radiusAt = (i) => {
+    const a = xy[i - 1]; const b = xy[i]; const c = xy[i + 1];
+    const u = [b[0] - a[0], b[1] - a[1]]; const v = [c[0] - b[0], c[1] - b[1]];
+    const lu = Math.hypot(...u); const lv = Math.hypot(...v);
+    const turn = Math.abs(Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]));
+    return turn > 1e-3 ? (lu + lv) / 2 / turn : Infinity;
+  };
+  let moved = false;
+  for (let pass = 0; pass < TIGHT_PASSES; pass++) {
+    const tight = [];
+    for (let i = 1; i < xy.length - 1; i++) if (radiusAt(i) < limit) tight.push(i);
+    if (!tight.length) break;
+    moved = true;
+    // the node and its neighbours toward the mean of theirs (the ends pinned)
+    const next = new Map();
+    for (const t of tight) for (let i = Math.max(1, t - 2); i <= Math.min(xy.length - 2, t + 2); i++) next.set(i, [(xy[i - 1][0] + xy[i + 1][0]) / 2, (xy[i - 1][1] + xy[i + 1][1]) / 2]);
+    for (const [i, q] of next) xy[i] = [xy[i][0] * 0.5 + q[0] * 0.5, xy[i][1] * 0.5 + q[1] * 0.5];
+  }
+  return moved ? points.map((p, i) => ({ ...p, lat: xy[i][1] / my, lng: xy[i][0] / mx })) : points;
 }
 
 // Target spacing (metres) for road nodes.  OSM way geometry is irregular —
@@ -4718,7 +4754,7 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [])
     const layers = pedestrianSurfaceLayers(surface, fullWidth, { americas });
     const street = sanitizeBeamNGObjectName(tags.name || `${footpath ? tags.highway : service ? `service_${kind || 'road'}` : 'pedestrian'}_${feature.id}`, `pedestrian_${feature.id || 'x'}`);
     const pieces = clipGeometryToMargin(feature.geometry, terrainData.bounds)
-      .map((s) => resampleGeometryToSpacing(s, roadNodeSpacingM))
+      .map((s) => easeTightNodes(resampleGeometryToSpacing(s, roadNodeSpacingM), fullWidth / 2))
       .flatMap((s) => chunkPolyline(s, 250, { widthM: fullWidth, spacingM: roadNodeSpacingM }));
     for (const piece of pieces) {
       const world = [];
@@ -5199,7 +5235,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // Clip to the terrain's safe inner boundary, splitting at crossings.
     // Then further chunk each segment so no single DecalRoad is too long.
     const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
-      .map(s => resampleGeometryToSpacing(s, roadNodeSpacingM))
+      .map(s => easeTightNodes(resampleGeometryToSpacing(s, roadNodeSpacingM), styleHalfWidth))
       .flatMap(s => chunkPolyline(s, 250, { widthM: 2 * styleHalfWidth, spacingM: roadNodeSpacingM }));
 
     if (clippedSegments.length === 0) continue;
