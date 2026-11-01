@@ -31,7 +31,7 @@ import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { styleDecks, linkCrossings, thinArchDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
 import { prepareSurvey, lidarPins } from './lidarDecks.js';
-import { buildLampGlowDAE, lampGlowMaterialDef, LAMP_GLOW_SHAPE } from './lampGlow.js';
+import { buildLampGlowDAE, lampGlowMaterialDef, LAMP_GLOW_SHAPE, buildFloodGlowDAE, floodGlowMaterialDef, FLOOD_GLOW_SHAPE } from './lampGlow.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
 import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
@@ -84,6 +84,7 @@ import {
   SIGNAL_POLE_SHAPE,
 } from './beamngSignals.js';
 import { planRaceways } from './racetracks.js';
+import { POLE_SHAPE, POLE_SHAPE_HEIGHT_M, beamRotation } from './sportsLights.js';
 import {
   buildUrbanRoadClassifier,
   estimateRoadCrossSection,
@@ -6614,6 +6615,7 @@ function buildDetailedReportSections(d) {
     lines.push(`- Shop fronts: ${st.shopFronts}, offices: ${st.offices}, courtyards (inner rings): ${st.withHoles}`);
     const dt = st.details || {};
     lines.push(`- Details: parapets ${dt.parapets || 0}, shop awnings / fascias ${dt.shopfronts || 0}, verandas ${dt.veranda || 0}, door hoods ${dt.hood || 0}, front steps ${dt.steps || 0}, chimneys ${dt.chimneys || 0}, roof plant pieces ${dt.roofPlant || 0}, church towers ${dt.towers || 0}, domes ${dt.domes || 0}, silos / tanks ${dt.silos || 0}, passage openings ${dt.passages || 0}, castles / forts ${dt.forts || 0} (merlons ${dt.merlons || 0}, sentry boxes ${dt.sentryBoxes || 0}, corner towers ${dt.cornerTowers || 0}, gates ${dt.gates || 0})`);
+    if (br.sportsLights && Object.keys(br.sportsLights).length) lines.push(`- Floodlights (poles by kind of venue, grandstand downlights; OSM lit=no respected, road courses and off-road tracks only with lit=yes): ${Object.entries(br.sportsLights).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (br.dragGrade?.strips) lines.push(`- Drag strips graded smooth (always, whatever the shaping switches: a real strip is laser-graded): ${br.dragGrade.strips}, ${br.dragGrade.pixels} terrain points; bumps along the centre line ${formatNumber(br.dragGrade.before * 100, 1)} cm rms before, ${formatNumber(br.dragGrade.after * 100, 1)} cm after (the strip's own grade kept, smoothed over ±${DRAG_PROFILE_M} m)`);
     if (dt.racing) lines.push(`- Racetracks (highway=raceway by kind: kerbs round paved bends, kart tyre walls, a dirt oval's wall and catch fence, a drag strip's light tree and walls; area=yes raceways as surfaces): ${Object.entries(dt.racing).map(([k, v]) => `${k} ${v}`).join(', ')}`);
     if (dt.pitches) lines.push(`- Sports fields (OSM leisure=pitch / track by sport=*: surface by surface=* or the sport's usual one, regulation markings scaled to the mapped size, goals, posts, hoops, nets, fences): ${Object.entries(dt.pitches).map(([k, v]) => `${k} ${v}`).join(', ')}`);
@@ -7975,6 +7977,42 @@ export function lampSpotLight(name, parent, position, lightHeight = 8) {
     range: roundTo(Math.max(20, lightHeight * 3.6), 2),
     useColorTemperature: 'false',
   };
+}
+// Floodlight poles and grandstand downlights (services/sportsLights.js): the
+// game's stadium pole, its height by scale, turned to face the venue, with one
+// dusk-to-dawn light aimed into it (cool LED white; no shadows, as street lamps)
+const FLOOD_HEAD_YAW = Math.PI / 2;   // (the mesh's bar of heads runs along local X: side-on to the venue)
+const FLOOD_COLOUR = [0.93, 0.96, 1, 1];
+const STAND_LIGHT_CD = 2600;
+export function sportsLightObjects(plan, groundAt) {
+  const objects = []; const counts = {}; const glows = [];
+  (plan?.poles || []).forEach((p, i) => {
+    const g = groundAt(p.x, p.y);
+    if (!Number.isFinite(g)) return;
+    const name = `sports_pole_${i + 1}`; const head = g + p.h - 0.4;
+    const aimZ = groundAt(p.aim[0], p.aim[1]);
+    const to = [p.aim[0] - p.x, p.aim[1] - p.y, (Number.isFinite(aimZ) ? aimZ : g) - head];
+    const dist = Math.hypot(...to);
+    objects.push({
+      __parent: 'street_furniture', class: 'TSStatic', name, persistentId: generatePersistentId(),
+      shapeName: POLE_SHAPE, position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(g + 1.2 * (p.h / POLE_SHAPE_HEIGHT_M), 3)],
+      rotationMatrix: rotationMatrixFromYaw(Math.atan2(to[1], to[0]) + FLOOD_HEAD_YAW),
+      scale: Array(3).fill(roundTo(p.h / POLE_SHAPE_HEIGHT_M, 3)), useInstanceRenderData: true, ...lampLink(`${name}_light`),
+    });
+    objects.push({
+      __parent: 'street_furniture', class: 'SpotLight', name: `${name}_light`, persistentId: generatePersistentId(),
+      position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(head, 3)], rotationMatrix: beamRotation(to),
+      castShadows: false, color: FLOOD_COLOUR, innerAngle: 50, outerAngle: 120, intensityUnit: 'cd', intensity: p.cd,
+      isEnabled: false, nightLight: '1', range: roundTo(Math.max(p.h * 4, dist * 3), 2), useColorTemperature: 'false',
+    });
+    glows.push({ x: p.x, y: p.y, z: g + p.h * (29.9 / POLE_SHAPE_HEIGHT_M), scale: Math.max(0.5, p.h / POLE_SHAPE_HEIGHT_M), yaw: Math.atan2(to[1], to[0]) + FLOOD_HEAD_YAW, i: i + 1 });
+    counts[p.kind] = (counts[p.kind] || 0) + 1;
+  });
+  (plan?.stands || []).forEach((l, i) => {
+    objects.push({ ...lampSpotLight(`stand_light_${i + 1}`, 'street_furniture', [roundTo(l.x, 3), roundTo(l.y, 3), roundTo(l.z, 3)], 6), color: FLOOD_COLOUR, intensity: STAND_LIGHT_CD });
+  });
+  if (plan?.stands?.length) counts.grandstand = plan.stands.length;
+  return { objects, counts, glows };
 }
 // (a lamp TSStatic linked to its light)
 const lampLink = (lightName) => ({ child: lightName, instanceColor: [0, 0, 0, 1] });
@@ -11330,6 +11368,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     props: streetProps,
     underDeck,
   });
+  // floodlights over the sports fields and racetracks
+  const sportsLights = sportsLightObjects(buildingReport.stats?.lightPlan, terrainGroundAt(exportTerrainData, squareSize));
+  streetFurnitureObjects.push(...sportsLights.objects);
+  buildingReport.sportsLights = sportsLights.counts;
+  buildingReport.sportsGlows = sportsLights.glows;
   // OSM bollards as stock bollards (services/bollards.js), not on drawn roads.
   const bollardPlacement = placeBollards({
     features: exportTerrainData.osmFeatures || [],
@@ -12275,11 +12318,29 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         collisionType: 'None', decalType: 'None', nightEmissive: '1',
         nightEmissiveColor: [1, 0.86, 0.66, 1], instanceColor: [0, 0, 0, 1],
       }));
+    // a floodlight's bank of lamps, night only
+    const floodGlows = (buildingReport.sportsGlows || []).map((g) => ({
+      __parent: 'street_furniture', class: 'TSStatic', name: `flood_glow_${g.i}`, persistentId: generatePersistentId(),
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/lamp_glow/${FLOOD_GLOW_SHAPE}`,
+      position: [roundTo(g.x, 3), roundTo(g.y, 3), roundTo(g.z, 3)], rotationMatrix: rotationMatrixFromYaw(g.yaw), scale: [g.scale, g.scale, g.scale],
+      collisionType: 'None', decalType: 'None', nightEmissive: '1',
+      nightEmissiveColor: [0.9, 0.95, 1, 1], instanceColor: [0, 0, 0, 1],
+    }));
+    if (floodGlows.length) {
+      const dae = buildFloodGlowDAE();
+      if (dae) {
+        zip.file(`${base}/map_assets/custom_assets/lamp_glow/${FLOOD_GLOW_SHAPE}`, await toZipBinary(dae));
+        streetFurnitureObjects.push(...floodGlows);
+      }
+    }
+    if (glowObjects.length || floodGlows.length) {
+      const flood = floodGlowMaterialDef(); const lamp = lampGlowMaterialDef();
+      zip.file(`${base}/map_assets/custom_assets/lamp_glow/main.materials.json`, JSON.stringify({ [lamp.name]: lamp, [flood.name]: flood }, null, 2));
+    }
     if (glowObjects.length) {
       const glowDae = buildLampGlowDAE();
       if (glowDae) {
         zip.file(`${base}/map_assets/custom_assets/lamp_glow/${LAMP_GLOW_SHAPE}`, await toZipBinary(glowDae));
-        zip.file(`${base}/map_assets/custom_assets/lamp_glow/main.materials.json`, JSON.stringify({ [lampGlowMaterialDef().name]: lampGlowMaterialDef() }, null, 2));
         streetFurnitureObjects.push(...glowObjects);
         lampGlowCount = glowObjects.length;
         console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Lamp glows: ${lampGlowCount} (night only, seen from afar)`);

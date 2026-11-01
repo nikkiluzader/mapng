@@ -275,6 +275,17 @@ function wallAlong(m, mat, rw, info, i0, i1, d, thick, h, ground, col, colours =
   }
 }
 
+/** A drag strip's nodes, start first: the end nearer the grandstands' middle (they line the quarter mile), without any the end nearer the rest of the raceways. */
+export function dragStartFirst(rw, others = [], spectators = []) {
+  const n = rw.nodes.length;
+  const d = (q, p) => Math.hypot(p[0] - q[0], p[1] - q[1]);
+  const near = (q) => others.reduce((c, o) => c + o.nodes.filter((p) => d(q, p) < 80).length, 0);
+  const toStands = (q) => Math.min(...spectators.map((p) => d(q, p)));
+  const a0 = rw.nodes[0]; const a1 = rw.nodes[n - 1];
+  const fwd = spectators.length ? toStands(a0) <= toStands(a1) : near(a0) >= near(a1);
+  return fwd ? rw.nodes : rw.nodes.slice().reverse();
+}
+
 /** Fit one raceway: kerbs, walls, fences, tyres, a drag strip's start. drape: { drapeAt }. */
 export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = null, spectators = [] } = {}) {
   // (stretches on a bridge, a ramp or in a tunnel: the fittings stand on the
@@ -356,15 +367,7 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
     if (runs) stats.walls++;
   }
   if (rw.kind === 'drag') {
-    // the start: the end nearer the rest of the raceways (the staging lanes, the return road)
-    // (the grandstands line the quarter mile: the end nearer their middle;
-    // without any, the end nearer the rest of the raceways)
-    const d = (q, p) => Math.hypot(p[0] - q[0], p[1] - q[1]);
-    const near = (q) => others.reduce((c, o) => c + o.nodes.filter((p) => d(q, p) < 80).length, 0);
-    const toStands = (q) => Math.min(...spectators.map((p) => d(q, p)));
-    const a0 = rw.nodes[0]; const a1 = rw.nodes[n - 1];
-    const fwd = spectators.length ? toStands(a0) <= toStands(a1) : near(a0) >= near(a1);
-    const nodes = fwd ? rw.nodes : rw.nodes.slice().reverse();
+    const nodes = dragStartFirst(rw, others, spectators);
     const r2 = { ...rw, nodes };
     const inf = bends(nodes);
     // (no launch pad or start line meshes: the strip's DecalRoad projects

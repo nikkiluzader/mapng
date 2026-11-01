@@ -305,3 +305,41 @@ test('an oval in several pieces has an unbroken wall, joints and the lap closing
   for (let i = 0; i < seg.length; i++) { const nx = seg[(i + 1) % seg.length]; worst = Math.max(worst, Math.hypot(seg[i][1][0] - nx[0][0], seg[i][1][1] - nx[0][1])); }
   assert.ok(worst < 0.5, `largest gap ${worst.toFixed(2)} m`);
 });
+
+test('floodlights as real venues: a stadium field 6 poles outside it, tennis 4 low ones, lit=no none; poles stand clear', async () => {
+  const { planFieldPoles, planTrackPoles, planStandLights, beamRotation } = await import('../services/sportsLights.js');
+  const box = (L, W) => ({ u: [1, 0], s0: -L / 2, s1: L / 2, t0: -W / 2, t1: W / 2 });
+  const ring = (L, W) => [[-L / 2, -W / 2], [L / 2, -W / 2], [L / 2, W / 2], [-L / 2, W / 2]];
+  const inside = (q, L, W) => Math.abs(q.x) < L / 2 && Math.abs(q.y) < W / 2;
+  const free = () => true;
+  const foot = { sport: 'american_football', box: box(110, 50), ring: ring(110, 50), tags: {} };
+  const poles = planFieldPoles([foot], [], free);
+  assert.equal(poles.length, 6);
+  assert.ok(poles.every((p) => p.h >= 24 && !inside(p, 110, 50)), 'tall, outside the field');
+  const tennis = { sport: 'tennis', box: box(36, 18), ring: ring(36, 18), tags: {} };
+  const tp = planFieldPoles([tennis], [], free);
+  assert.equal(tp.length, 4);
+  assert.ok(tp.every((p) => p.h <= 12 && !inside(p, 36, 18)));
+  assert.equal(planFieldPoles([{ ...foot, tags: { lit: 'no' } }], [], free).length, 0);
+  assert.equal(planFieldPoles([{ ...foot, sport: 'cricket' }], [], free).length, 0, 'cricket: usually unlit');
+  assert.equal(planFieldPoles([{ ...foot, sport: 'cricket', tags: { lit: 'yes' } }], [], free).length, 6);
+  // a pole that cannot stand is dropped
+  assert.equal(planFieldPoles([foot], [], () => false).length, 0);
+  // a field inside a running track shares the track's poles
+  const track = { sport: 'track', box: box(170, 80), ring: ring(170, 80), tags: {} };
+  const both = planFieldPoles([track, foot], [], free);
+  assert.equal(both.length, 6);
+  assert.ok(both.every((p) => !inside(p, 170, 80)), 'outside the track');
+  // road courses stay dark unless tagged; a drag strip's poles line both sides of the racing distance
+  const lap = { kind: 'circuit', half: 6, tags: {}, nodes: [[0, 0, 0], [500, 0, 0]] };
+  assert.equal(planTrackPoles([lap], free).length, 0);
+  assert.ok(planTrackPoles([{ ...lap, tags: { lit: 'yes' } }], free).length > 4);
+  const strip = { kind: 'drag', half: 6, tags: {}, nodes: [[0, 0, 0], [1300, 0, 0]] };
+  const dp = planTrackPoles([strip], free);
+  assert.ok(dp.some((p) => p.y > 6) && dp.some((p) => p.y < -6) && dp.every((p) => p.x <= 701));
+  // a downward-tilted beam comes out as the engine's matrix (the beam its second column)
+  const r = beamRotation([0, 0, -1]);
+  assert.deepEqual(r.slice(3, 6), [0, 0, -1]);
+  assert.equal(planStandLights([{ roof: false, box: box(60, 15), z1: 5, tags: {} }]).length, 0);
+  assert.equal(planStandLights([{ roof: true, box: box(60, 15), z1: 5, tags: {} }]).length, 4);
+});

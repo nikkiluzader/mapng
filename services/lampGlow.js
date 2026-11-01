@@ -49,6 +49,31 @@ export function buildLampGlowDAE() {
   return new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' })?.data ?? null;
 }
 
+// A floodlight's bank of lamps: a blinding bar across the head near the camera,
+// balls past it, so a lit stadium reads across the map.
+export const FLOOD_GLOW_MATERIAL = 'mapng_flood_glow';
+export const FLOOD_GLOW_SHAPE = 'mapng_flood_glow.dae';
+export function buildFloodGlowDAE() {
+  const sizes = glowDetailSizes();
+  const base00 = new THREE.Group(); base00.name = 'base00';
+  const start01 = new THREE.Group(); start01.name = 'start01';
+  const mat = new THREE.MeshStandardMaterial({ name: FLOOD_GLOW_MATERIAL });
+  const bar = new THREE.BoxGeometry(1.6, 0.34, 0.34);
+  [bar, ...RADII.map((r) => ball(r * 1.5))].forEach((g, i) => {
+    const m = new THREE.Mesh(g, mat);
+    m.name = `glow${String.fromCharCode(97 + i)}${sizes[i]}`;
+    start01.add(m);
+  });
+  base00.add(start01);
+  base00.updateMatrixWorld(true);
+  return new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' })?.data ?? null;
+}
+export function floodGlowMaterialDef() {
+  const def = lampGlowMaterialDef([0.85, 0.92, 1]);
+  def.Stages[0].emissiveIntensityNits = 900;
+  return { ...def, name: FLOOD_GLOW_MATERIAL, mapTo: FLOOD_GLOW_MATERIAL };
+}
+
 /** The glow's material: adds its colour only, black by day (the night emissive lights it). */
 export function lampGlowMaterialDef(color = [1, 0.8, 0.55]) {
   return {

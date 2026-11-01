@@ -33,7 +33,8 @@ import * as THREE from 'three';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
 import { planPools, buildPool, POOL_MATERIAL_STAGES } from './pools.js';
 import { planPitches, buildPitch, planSeating, buildSeating, drapedMesh, SPORTS_MATERIAL_STAGES, SPORTS_MATERIAL_FLAGS } from './sportsFields.js';
-import { planRaceways, buildRaceway, planRacewayAreas, carriagewayTest, tracksideStands } from './racetracks.js';
+import { planRaceways, buildRaceway, planRacewayAreas, carriagewayTest, tracksideStands, dragStartFirst } from './racetracks.js';
+import { planFieldPoles, planStandLights, planTrackPoles } from './sportsLights.js';
 
 // ── Materials ───────────────────────────────────────────────────────────────
 
@@ -1659,7 +1660,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     }
     return best?.q || null;
   } : null;
-  for (const st of planSeating(features, project, pitches, { groundAt, faceTo })) {
+  const seating = planSeating(features, project, pitches, { groundAt, faceTo });
+  for (const st of seating) {
     const tile = tileFor(st.ring);
     bump(seatKinds, buildSeating(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, st));
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
@@ -1687,6 +1689,21 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
     }
     if (Object.keys(racing).length) stats.details.racing = racing;
+    // floodlights (services/sportsLights.js): poles stand clear of fields,
+    // stands, buildings, the track and the roads
+    if (pitches.length || rws.length) {
+      const boxed = (ring) => { let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity; for (const q of ring) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); } return { ring, x0, y0, x1, y1 }; };
+      const solid = [...pitches.map((p) => boxed(p.ring)), ...seating.map((st) => boxed(st.ring))];
+      for (const f of features) if (f?.type === 'building' && f.geometry?.length >= 3) solid.push(boxed(f.geometry.map((q) => project(q.lat, q.lng))));
+      const onRoad = pitches.find((p) => p.onRoad)?.onRoad;
+      const margin = 1.5;
+      const free = (x, y) => !blocked(x, y, { nodes: null }, 0) && !onRoad?.(x, y)
+        && !solid.some((b) => x > b.x0 - margin && x < b.x1 + margin && y > b.y0 - margin && y < b.y1 + margin && inRingXY(x, y, b.ring));
+      stats.lightPlan = {
+        poles: [...planFieldPoles(pitches, seating, free), ...planTrackPoles(rws, free, { startFirst: (rw) => dragStartFirst(rw, rws.filter((o) => o !== rw), spectators) })],
+        stands: planStandLights(seating),
+      };
+    }
   }
   for (const t of tiles.values()) if (t.inBatch) flushTile(t);
   const tileList = [...tiles.values()].filter((t) => t.full.length).map(({ key, origin, full, lite }) => ({ key, origin, full, lite }));
