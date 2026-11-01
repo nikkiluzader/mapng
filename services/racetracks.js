@@ -429,8 +429,12 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
   }
   if (rw.kind === 'drag') {
     const nodes = dragStartFirst(rw, others, spectators);
-    const r2 = { ...rw, nodes };
     const inf = bends(nodes);
+    // (walked from the far end: what the track's own nodes know, turned round,
+    // or every wall stood on "another" track, this one)
+    const turned = nodes !== rw.nodes;
+    const total = inf[inf.length - 1].s;
+    const r2 = { ...rw, nodes, lifted: turned ? [...rw.lifted].reverse() : rw.lifted, blocked: turned && rw.blocked ? (x, y, _, s) => rw.blocked(x, y, rw, total - s) : rw.blocked };
     // (no launch pad or start line meshes: the strip's DecalRoad projects
     // over anything under it, a pad showed through it in patches)
     const s0 = nodes[0]; const t0 = inf[0].t;
@@ -500,7 +504,9 @@ export function tracksideStands(features, project, carriageways = []) {
   if (!rws.length) return out;
   for (const f of features || []) {
     const t = f?.tags || {};
-    if (t.building !== 'yes' || t['building:levels'] || t.height || t.name && /\b(garage|shop|office|tower|hall)\b/i.test(t.name)) continue;
+    // (a height Overture's outlines guessed says nothing: a mapped one does)
+    const mappedHeight = t['mapng:height_source'] !== 'overture' && (t['building:levels'] || t.height);
+    if (t.building !== 'yes' || mappedHeight || t.name && /\b(garage|shop|office|tower|hall)\b/i.test(t.name)) continue;
     if (!(f.geometry?.length >= 4)) continue;
     const ring = f.geometry.map((q) => project(q.lat, q.lng));
     const bx = orientedBox(ring);

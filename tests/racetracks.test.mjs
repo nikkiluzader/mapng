@@ -158,6 +158,32 @@ test('an untagged long narrow building along a raceway is its grandstand; a drag
   assert.ok(tree.length && tree.every((q) => q[0] > 470), 'the light tree at the east end');
 });
 
+test('a drag strip walked from its far end keeps its walls: the track is no obstacle to itself', () => {
+  const tags = { 'mapng:raceway': 'drag' };
+  const walls = (spectators) => {
+    const strip = cw(Array.from({ length: 101 }, (_, i) => [i * 4, 0]), tags, 6);
+    const rws = planRaceways([strip]);
+    const r = recorder();
+    buildRaceway(r, r, rws[0], { drapeAt, blocked: carriagewayTest(rws), spectators });
+    const concrete = r.tris.filter((t) => t.mat === 'smoothConcrete');
+    return [Math.max(...concrete.flatMap((t) => t.pts.map((q) => q[0]))) - Math.min(...concrete.flatMap((t) => t.pts.map((q) => q[0]))), concrete.length];
+  };
+  const [lengthForward, trisForward] = walls([[0, 30]]);
+  const [lengthTurned, trisTurned] = walls([[400, 30]]);
+  assert.ok(lengthForward > 390);
+  assert.ok(lengthTurned > 390);
+  assert.equal(trisTurned, trisForward);
+});
+
+test('a height only Overture guessed leaves a stand a stand; a mapped height makes it a building', () => {
+  const proj = (lat, lng) => [lng, lat];
+  const strip = cw([[0, 0], [500, 0]], { 'mapng:raceway': 'drag' }, 6);
+  const footprint = (tags) => ({ type: 'building', id: 1, tags: { building: 'yes', ...tags }, geometry: [[20, 100], [20, 200], [32, 200], [32, 100], [20, 100]].map(([lat, lng]) => ({ lat, lng })) });
+  assert.equal(tracksideStands([footprint({})], proj, [strip]).size, 1);
+  assert.equal(tracksideStands([footprint({ height: '9.5', 'mapng:height_source': 'overture' })], proj, [strip]).size, 1);
+  assert.equal(tracksideStands([footprint({ height: '9.5' })], proj, [strip]).size, 0);
+});
+
 test('a drag strip mapped with a wobble is laid dead straight; a road joining it mid-strip stays joined', async () => {
   const { markDragStrips: markDragStripsForTest } = await import('../services/exportBeamNGLevel.js');
   const strip = { type: 'road', tags: { highway: 'raceway' }, geometry: [[0, 0], [300, 1.4], [600, -0.3], [900, 1.1], [1000, 0]].map(([x, y]) => ({ lat: y, lng: x })) };
