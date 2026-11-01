@@ -754,8 +754,28 @@ function baseball(stone, full, p, softball) {
   };
   // (the skin's arc round the mound from foul line to foul line, about 110 degrees each way)
   fan(mound, skin, -1.92, 1.92, 0, dirtCol, 0.006);
-  // the grass inside the diamond over it, on a grid following the ground
+  // the base paths from home to first and third: dirt strips along the base
+  // lines (the infield's arc lies round the mound; without these the grass
+  // ran from home to the bases)
   const d = base / Math.SQRT2;
+  for (const sg of [-1, 1]) {
+    const b0 = at(0, 0); const b1 = at(d, sg * d);
+    const L = Math.hypot(b1[0] - b0[0], b1[1] - b0[1]);
+    const uB = [(b1[0] - b0[0]) / L, (b1[1] - b0[1]) / L];
+    // (out of the field by 0.9 m, in under the grass diamond's edge)
+    const nIn = [dir[0] - uB[0] * (dir[0] * uB[0] + dir[1] * uB[1]), dir[1] - uB[1] * (dir[0] * uB[0] + dir[1] * uB[1])];
+    const nl = Math.hypot(...nIn) || 1; nIn[0] /= nl; nIn[1] /= nl;
+    const k = Math.max(1, Math.ceil((L + 1) / (p.drape ? 1 : 2)));
+    for (let i = 0; i < k; i++) {
+      const sA = -0.5 + ((L + 1) * i) / k; const sB = -0.5 + ((L + 1) * (i + 1)) / k;
+      const P = (sAl, off) => { const xy = [b0[0] + uB[0] * sAl + nIn[0] * off, b0[1] + uB[1] * sAl + nIn[1] * off]; return [xy[0], xy[1], fz(xy) + 0.006]; };
+      const q = [P(sA, -0.9), P(sB, -0.9), P(sB, 1.4), P(sA, 1.4)];
+      const ccw = (q[1][0] - q[0][0]) * (q[2][1] - q[0][1]) - (q[1][1] - q[0][1]) * (q[2][0] - q[0][0]) > 0;
+      const [qa, qb, qc, qd] = ccw ? q : [q[0], q[3], q[2], q[1]];
+      full.quad('dirt', qa, qb, qc, qd, [qa[0] / 4, qa[1] / 4], [qb[0] / 4, qb[1] / 4], [qc[0] / 4, qc[1] / 4], [qd[0] / 4, qd[1] / 4], dirtCol);
+    }
+  }
+  // the grass inside the diamond over it, on a grid following the ground
   const corner = [at(1.5, 0), at(d, -d + 1.5), at(2 * d - 1.5, 0), at(d, d - 1.5)];
   const ng = Math.max(1, Math.ceil(base / (p.drape ? 1 : 2)));
   const lerp2 = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
@@ -790,7 +810,7 @@ function baseball(stone, full, p, softball) {
     }
     // a dugout beside each foul line, in foul territory: along the line, a few metres out from it
     const nOut = [-u[1] * sg, u[0] * sg];      // (away from fair territory: u is the centre line turned by sg * 45 degrees)
-    const along = soft ? 11 : 16; const off = soft ? 5 : 7;
+    const along = soft ? 11 : 16; const off = soft ? 6.5 : 8.5;
     const bpos = [home[0] + u[0] * along + nOut[0] * off, home[1] + u[1] * along + nOut[1] * off];
     const g = p.ground(...bpos);
     const foot = [-6.2, 6.2].flatMap((e) => [-1.5, 1.5].map((w) => [bpos[0] + u[0] * e + nOut[0] * w, bpos[1] + u[1] * e + nOut[1] * w]));

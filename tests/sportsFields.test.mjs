@@ -162,3 +162,24 @@ test('dugouts stand in foul territory beside the foul lines', () => {
   // in foul territory: beyond a foul line (the field opens to +x +y from about the corner)
   assert.ok(walls.every((q) => q[0] < 1 || q[1] < 1), `dugout walls in foul territory`);
 });
+
+test('the base paths from home to first and third are dirt', () => {
+  // foul lines along +x and +y: home sits in on the diagonal, the base lines run along +x and +y from it
+  const fan = [[0, 0], [100, 0], ...Array.from({ length: 9 }, (_, i) => [100 * Math.cos((Math.PI / 2) * ((i + 1) / 10)), 100 * Math.sin((Math.PI / 2) * ((i + 1) / 10))]), [0, 100]];
+  const [p] = planPitches([area('bb', fan, { leisure: 'pitch', sport: 'baseball' })], project, { groundAt });
+  const full = recorder();
+  buildPitch(full, full, p);
+  const dirt = full.tris.filter((t) => t.mat === 'dirt');
+  const inTri = (x, y, [a, b, c]) => { const s = (p1, p2) => (p2[0] - p1[0]) * (y - p1[1]) - (p2[1] - p1[1]) * (x - p1[0]); const d1 = s(a, b); const d2 = s(b, c); const d3 = s(c, a); return !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)); };
+  const covered = (x, y) => dirt.some((t) => inTri(x, y, t.pts));
+  // home plate: the painted pad nearest the corner on the diagonal
+  const pads = full.tris.filter((t) => t.mat === 'smoothConcrete').flatMap((t) => t.pts).filter((q) => Math.abs(q[0] - q[1]) < 0.5);
+  const h = Math.min(...pads.map((q) => (q[0] + q[1]) / 2));
+  const base = 27.43;   // 100 m out: baseball
+  for (const [ux, uy] of [[1, 0], [0, 1]]) {
+    for (const f of [0.3, 0.5, 0.7]) {
+      const x = h + ux * base * f; const y = h + uy * base * f;
+      assert.ok(covered(x, y), `dirt on the base line ${ux ? 'to first' : 'to third'} at ${Math.round(f * 100)}%`);
+    }
+  }
+});
