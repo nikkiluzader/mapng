@@ -111,3 +111,25 @@ test('a track shaped like the usual oval is drawn as that oval: lanes exact offs
     assert.ok(Math.abs(d - k * 1.22) < 0.35 || Math.abs(d - (8 * 1.22 + 0.3)) < 0.35, `paint ${d.toFixed(2)} m in: not on a lane line`);
   }
 });
+
+test("home plate where the foul lines meet, even at a rounded corner; the outfield fence on the arc only, none inside a neighbour", async () => {
+  const { homePlate } = await import('../services/sportsFields.js');
+  // foul lines along +x and +y from a corner rounded by two short edges, the outfield arc 70 m out
+  const fan = [[3, 0], [70, 0], ...Array.from({ length: 10 }, (_, i) => [70 * Math.cos((Math.PI / 2) * ((i + 1) / 11)), 70 * Math.sin((Math.PI / 2) * ((i + 1) / 11))]), [0, 70], [0, 3], [1, 1]];
+  const tennis = area('tn', rect(-40, 40, 23.77, 10.97), { leisure: 'pitch', sport: 'tennis' });
+  const ps = planPitches([area('bb', fan, { leisure: 'pitch', sport: 'baseball' }), tennis], project, { groundAt });
+  const p = ps.find((q) => q.id === 'bb');
+  const { home, dir } = homePlate(p);
+  assert.ok(Math.hypot(home[0], home[1]) < 1.5, `home at the rounded corner: ${home.map((v) => v.toFixed(1))}`);
+  assert.ok(dir[0] > 0.5 && dir[1] > 0.5, 'facing the outfield');
+  const stone = recorder(); const full = recorder();
+  const tee = { tri: (...a) => { stone.tri(...a); full.tri(...a); }, quad: (...a) => { stone.quad(...a); full.quad(...a); } };
+  buildPitch(tee, full, p);
+  const fencePts = full.tris.filter((t) => t.mat === 'chainlink').flatMap((t) => t.pts);
+  const t = ps.find((q) => q.id === 'tn');
+  const inR = (x, y, r) => { let o = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) { const [xi, yi] = r[i]; const [xj, yj] = r[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) o = !o; } return o; };
+  assert.ok(!fencePts.some((q) => inR(q[0], q[1], t.ring)), 'no fence inside the tennis court');
+  // outfield fence: points on the arc, none along the foul lines beyond the infield
+  const foul = fencePts.filter((q) => (Math.abs(q[1]) < 0.5 && q[0] > 40) || (Math.abs(q[0]) < 0.5 && q[1] > 40));
+  assert.equal(foul.length, 0, 'no fence down the foul lines');
+});

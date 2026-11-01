@@ -165,6 +165,11 @@ export function planPitches(features, project, { groundAt = null } = {}) {
     pending.push({ id: f.id, sport, surface, ring, hole, box: bx, area, stadium, seed: String(f.id), tags: t, z0: Math.min(...grounds), z1: Math.max(...grounds) });
   }
   runOff(pending);
+  // each field's neighbours (their outlines after the run-off): its fences keep out of them
+  for (const p of pending) {
+    const [x0, y0, x1, y1] = ringBox(p.ring);
+    p.neighbours = pending.filter((o) => o !== p).map((o) => o.ring).filter((r) => { const [a, b, c, d] = ringBox(r); return a < x1 + 10 && c > x0 - 10 && b < y1 + 10 && d > y0 - 10; });
+  }
   for (const p of pending) {
     const { box: bx, area, surface, sport } = p;
     const ground = groundAt || (() => p.z1);
@@ -209,6 +214,10 @@ export function planPitches(features, project, { groundAt = null } = {}) {
   }
   return out;
 }
+
+const ringBox = (r) => [Math.min(...r.map((q) => q[0])), Math.min(...r.map((q) => q[1])), Math.max(...r.map((q) => q[0])), Math.max(...r.map((q) => q[1]))];
+// (a point inside a neighbouring field: no fence there)
+const inNeighbour = (p, x, y) => (p.neighbours || []).some((r) => inRing(x, y, r));
 
 /** Ground each field covers (no ground cover grows through it). */
 export function pitchFootprints(pitches) {
@@ -443,9 +452,10 @@ function fence(stone, full, p, h, edges = null) {
     for (let k = 0; k <= n; k++) {
       const q = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
       const g = p.ground(...q);
-      cylinder(stone, 'metalWhite', q[0], q[1], 0.04, g - 0.3, g + h, STEEL, { n: 6 });
+      if (!inNeighbour(p, q[0], q[1])) cylinder(stone, 'metalWhite', q[0], q[1], 0.04, g - 0.3, g + h, STEEL, { n: 6 });
       if (k < n) {
         const q2 = [a[0] + ((b[0] - a[0]) * (k + 1)) / n, a[1] + ((b[1] - a[1]) * (k + 1)) / n];
+        if (inNeighbour(p, (q[0] + q2[0]) / 2, (q[1] + q2[1]) / 2)) continue;
         const g2 = p.ground(...q2);
         const seg = Math.hypot(q2[0] - q[0], q2[1] - q[1]);
         full.quad('chainlink', [q[0], q[1], g], [q2[0], q2[1], g2], [q2[0], q2[1], g2 + h], [q[0], q[1], g + h], [0, 0], [seg / 1.5, 0], [seg / 1.5, h / 1.5], [0, h / 1.5], STEEL);
@@ -562,10 +572,52 @@ function cricket(stone, full, p) {
   }
 }
 
-// home plate: the outline's square-ish corner farthest from its middle; the field opens toward the middle
-function homePlate(p) {
+// Home plate: where the outline's two foul lines meet. They are its two
+// longest straight runs (edges turning under 12 degrees each, 20 in all; the
+// outfield's curve turns far more), at 60-120 degrees to each other; home is
+// where their lines cross (a rounded corner of a few short edges between
+// them is no matter). The field opens toward the outline's middle. (The
+// sharpest corner instead: a foul pole, the field drawn backward.)
+export function homePlate(p) {
   const r = p.ring; const n = r.length;
   const cx = r.reduce((a, q) => a + q[0], 0) / n; const cy = r.reduce((a, q) => a + q[1], 0) / n;
+  const turn = (i) => {
+    const a = r[(i - 1 + n) % n]; const b = r[i]; const c = r[(i + 1) % n];
+    const u = [b[0] - a[0], b[1] - a[1]]; const v = [c[0] - b[0], c[1] - b[1]];
+    return Math.abs(Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]));
+  };
+  // straight runs: from each corner, edges while they keep straight
+  const runs = [];
+  const sharp = [];
+  for (let i = 0; i < n; i++) if (turn(i) >= (12 * Math.PI) / 180) sharp.push(i);
+  if (sharp.length >= 2) {
+    for (let k = 0; k < sharp.length; k++) {
+      const i0 = sharp[k]; const i1 = sharp[(k + 1) % sharp.length];
+      let total = 0; let len = 0;
+      for (let i = i0; i !== i1; i = (i + 1) % n) {
+        const q = r[i]; const q2 = r[(i + 1) % n];
+        len += Math.hypot(q2[0] - q[0], q2[1] - q[1]);
+        if (i !== i0) total += turn(i);
+      }
+      if (total < (20 * Math.PI) / 180) runs.push({ a: r[i0], b: r[i1], len });
+    }
+  }
+  runs.sort((x, y) => y.len - x.len);
+  for (let i = 0; i < Math.min(4, runs.length); i++) for (let j = i + 1; j < Math.min(4, runs.length); j++) {
+    const A = runs[i]; const B = runs[j];
+    const u = [A.b[0] - A.a[0], A.b[1] - A.a[1]]; const v = [B.b[0] - B.a[0], B.b[1] - B.a[1]];
+    const den = u[0] * v[1] - u[1] * v[0];
+    const ang = Math.acos(Math.abs(u[0] * v[0] + u[1] * v[1]) / (Math.hypot(...u) * Math.hypot(...v))) * 180 / Math.PI;
+    if (Math.abs(den) < 1e-9 || ang < 60 || ang > 120 || B.len < 0.35 * A.len) continue;
+    const t = ((B.a[0] - A.a[0]) * v[1] - (B.a[1] - A.a[1]) * v[0]) / den;
+    const h = [A.a[0] + u[0] * t, A.a[1] + u[1] * t];
+    // (the crossing near the outline: a corner of it, not far outside)
+    const near = Math.min(...r.map((q) => Math.hypot(q[0] - h[0], q[1] - h[1])));
+    if (near > 0.15 * Math.sqrt(p.area)) continue;
+    const L = Math.hypot(cx - h[0], cy - h[1]) || 1;
+    return { home: h, dir: [(cx - h[0]) / L, (cy - h[1]) / L] };
+  }
+  // else: the square-ish corner farthest from the middle
   let best = null;
   for (let i = 0; i < n; i++) {
     const a = r[(i - 1 + n) % n]; const b = r[i]; const c = r[(i + 1) % n];
@@ -661,15 +713,22 @@ function baseball(stone, full, p, softball) {
   const pts = Array.from({ length: 9 }, (_, i) => { const a = Math.PI + (i - 4) * (Math.PI / 10); return [home[0] + (dir[0] * Math.cos(a) - dir[1] * Math.sin(a)) * back, home[1] + (dir[1] * Math.cos(a) + dir[0] * Math.sin(a)) * back]; });
   for (let i = 0; i < pts.length; i++) {
     const q = pts[i]; const g = p.ground(...q);
+    if (inNeighbour(p, q[0], q[1])) continue;
     cylinder(stone, 'metalWhite', q[0], q[1], 0.05, g - 0.3, g + hB, STEEL, { n: 6 });
     if (i + 1 < pts.length) {
       const q2 = pts[i + 1]; const g2 = p.ground(...q2); const L = Math.hypot(q2[0] - q[0], q2[1] - q[1]);
+      if (inNeighbour(p, q2[0], q2[1])) continue;
       full.quad('chainlink', [q[0], q[1], g], [q2[0], q2[1], g2], [q2[0], q2[1], g2 + hB], [q[0], q[1], g + hB], [0, 0], [L / 1.5, 0], [L / 1.5, hB / 1.5], [0, hB / 1.5], STEEL);
       bar(stone, 'metalWhite', [q[0], q[1], g + hB], [q2[0], q2[1], g2 + hB], 0.03, STEEL);
     }
   }
   // the outfield fence: the outline's edges well beyond the infield
-  const edges = p.ring.map((a, i) => { const b = p.ring[(i + 1) % p.ring.length]; const m2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; return Math.hypot(m2[0] - home[0], m2[1] - home[1]) > base * 1.9; });
+  // (the arc only: within 40 degrees of centre field; not down the foul lines)
+  const edges = p.ring.map((a, i) => {
+    const b = p.ring[(i + 1) % p.ring.length]; const m2 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const v = [m2[0] - home[0], m2[1] - home[1]]; const d = Math.hypot(...v) || 1;
+    return d > base * 1.9 && (v[0] * dir[0] + v[1] * dir[1]) / d > Math.cos((40 * Math.PI) / 180);
+  });
   fence(stone, full, p, soft ? 1.5 : 2.4, edges);
 }
 
