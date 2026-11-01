@@ -120,7 +120,7 @@ function runOff(list) {
   }
 }
 
-export function planPitches(features, project, { groundAt = null } = {}) {
+export function planPitches(features, project, { groundAt = null, drape = null } = {}) {
   const out = [];
   const pending = [];
   for (const f of features || []) {
@@ -199,6 +199,12 @@ export function planPitches(features, project, { groundAt = null } = {}) {
       const g = (a, b) => grid[(i + a) * nt + j + b];
       return (g(0, 0) * (1 - fs) + g(1, 0) * fs) * (1 - ft) + (g(0, 1) * (1 - fs) + g(1, 1) * fs) * ft + lie;
     };
+    // lying on the ground with the terrain at hand: draped on its own triangles, a hair over them
+    if (p.slab === null && drape) {
+      const hair = sport === 'track' ? 0.008 : 0.015;
+      p.drape = drape;
+      p.fieldZ = (x, y) => drape.drapeAt(x, y) + hair;
+    }
     p.ground = ground;
     out.push(p);
   }
@@ -229,13 +235,13 @@ export function pitchFootprints(pitches) {
 // a flat quad strip from a to b (world xy), w wide, at the surface z (+ lift), split every metre
 // (a surface lying on the ground is straight between its points, the heights
 // a curve: paint over it lifted a hand's breadth, over a flat slab a few mm)
-const lifted = (p, lift) => (p.slab !== null ? lift : lift + 0.035);
+const lifted = (p, lift) => (p.slab !== null ? lift : lift + (p.drape ? 0.012 : 0.035));
 function strip(m, mat, p, a, b, w, col, lift = 0.012) {
   lift = lifted(p, lift);
   const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
   if (L < 1e-3) return;
   const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const n = [-u[1] * w / 2, u[0] * w / 2];
-  const k = Math.max(1, Math.ceil(L / 1.5));
+  const k = Math.max(1, Math.ceil(L / (p.drape ? 0.5 : 1.5)));
   for (let i = 0; i < k; i++) {
     const q0 = [a[0] + (b[0] - a[0]) * (i / k), a[1] + (b[1] - a[1]) * (i / k)];
     const q1 = [a[0] + (b[0] - a[0]) * ((i + 1) / k), a[1] + (b[1] - a[1]) * ((i + 1) / k)];
@@ -300,6 +306,67 @@ function netPanel(m, p, a, b, z0, z1, col = NET, uv = 0.12) {
   m.quad('netting', [a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1], [0, z0 / uv], [L / uv, z0 / uv], [L / uv, z1 / uv], [0, z1 / uv], col);
 }
 
+// ── Draping ──────────────────────────────────────────────────────────────────
+
+// a convex polygon split by the line n.(x, y) = c: [the part below, the part above]
+function splitByLine(poly, n, c) {
+  const lo = []; const hi = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]; const b = poly[(i + 1) % poly.length];
+    const da = n[0] * a[0] + n[1] * a[1] - c; const db = n[0] * b[0] + n[1] * b[1] - c;
+    if (da <= 0) lo.push(a); if (da >= 0) hi.push(a);
+    if ((da < 0 && db > 0) || (da > 0 && db < 0)) { const t = da / (da - db); const q = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]; lo.push(q); hi.push(q); }
+  }
+  return [lo, hi];
+}
+// cut convex pieces along lines n.(x, y) = c0 + k * step (all of them crossing the pieces)
+function cutAlong(pieces, n, c0, step) {
+  const out = [];
+  for (const poly of pieces) {
+    const vals = poly.map((q) => n[0] * q[0] + n[1] * q[1]);
+    const k0 = Math.ceil((Math.min(...vals) - c0) / step); const k1 = Math.floor((Math.max(...vals) - c0) / step);
+    let rest = poly;
+    for (let k = k0; k <= k1 && rest.length >= 3; k++) {
+      const [lo, hi] = splitByLine(rest, n, c0 + k * step);
+      if (lo.length >= 3) out.push(lo);
+      rest = hi;
+    }
+    if (rest.length >= 3) out.push(rest);
+  }
+  return out;
+}
+/**
+ * A surface lying on the terrain: the outline (holes allowed) triangulated,
+ * cut along the terrain's squares (and any extra lines: mown stripes), each
+ * piece fanned from its middle at z(x, y) (the drape: on the ground's own
+ * triangles). colOf(x, y) colours a piece by its middle.
+ */
+function drapedMesh(m, mat, outer, holes, z, colOf, grid, extra = []) {
+  const tri = THREE.ShapeUtils.triangulateShape(outer.map(([x, y]) => new THREE.Vector2(x, y)), holes.map((h) => h.map(([x, y]) => new THREE.Vector2(x, y))));
+  const all = [...outer, ...holes.flat()];
+  const uv = (q) => [q[0] / 4, q[1] / 4];
+  for (const [ia, ib, ic] of tri) {
+    let pieces = [[all[ia], all[ib], all[ic]]];
+    pieces = cutAlong(pieces, [1, 0], grid.ox, grid.sq);
+    pieces = cutAlong(pieces, [0, 1], grid.oy, grid.sq);
+    for (const e of extra) pieces = cutAlong(pieces, e.n, e.c0, e.step);
+    for (const poly of pieces) {
+      let a2 = 0; let cx = 0; let cy = 0;
+      for (let i = 0; i < poly.length; i++) { const a = poly[i]; const b = poly[(i + 1) % poly.length]; const cr = a[0] * b[1] - b[0] * a[1]; a2 += cr; cx += (a[0] + b[0]) * cr; cy += (a[1] + b[1]) * cr; }
+      if (Math.abs(a2) < 1e-6) continue;
+      cx /= 3 * a2; cy /= 3 * a2;
+      const ccw = a2 > 0;
+      const col = colOf(cx, cy);
+      const c = [cx, cy, z(cx, cy)];
+      for (let i = 0; i < poly.length; i++) {
+        const a = poly[ccw ? i : (i + 1) % poly.length]; const b = poly[ccw ? (i + 1) % poly.length : i];
+        const A = [a[0], a[1], z(a[0], a[1])]; const B = [b[0], b[1], z(b[0], b[1])];
+        m.tri(mat, c, A, B, uv(c), uv(A), uv(B), col);
+      }
+    }
+  }
+}
+
 // ── Surfaces ─────────────────────────────────────────────────────────────────
 
 function surfaceMesh(stone, full, p) {
@@ -311,7 +378,13 @@ function surfaceMesh(stone, full, p) {
   let col = tint;
   if (p.surface === 'hard') col = COURT_COLOURS[Math.floor(rnd('court') * COURT_COLOURS.length)][1];
   const target = p.slab !== null ? stone : full;
-  if (rect) {
+  if (p.slab === null && p.drape) {
+    // on the terrain's own triangles; grass mown in stripes across the length
+    const stripes = (p.surface === 'grass' || p.surface === 'turf') && rect;
+    const sw = Math.max(4, L / 20);
+    const colOf = stripes ? (x, y) => { const s2 = x * bx.u[0] + y * bx.u[1]; return Math.floor((s2 - bx.s0) / sw) % 2 ? col : col.map((v) => v * 0.86); } : () => col;
+    drapedMesh(target, mat, p.ring, p.hole ? [p.hole] : [], p.fieldZ, colOf, p.drape.grid, stripes ? [{ n: bx.u, c0: bx.s0, step: sw }] : []);
+  } else if (rect) {
     // a grid in the frame: mown stripes across the length on grass
     const stripes = p.surface === 'grass' || p.surface === 'turf';
     const ns = Math.max(1, Math.round(L / (stripes ? Math.max(4, L / 20) : 4)));
@@ -639,8 +712,14 @@ function baseball(stone, full, p, softball) {
   // the distance to the outfield edge along centre field sets baseball or softball
   let reach = 10;
   while (reach < 200 && inRing(home[0] + dir[0] * reach, home[1] + dir[1] * reach, p.ring)) reach += 2;
-  const soft = softball || reach < 75;
-  const base = soft ? 18.29 : 27.43; const mound = soft ? 13.1 : 18.44; const skin = soft ? 18.3 : 29;
+  // the size by how far the outfield reaches: Little League (fences ~60 m),
+  // softball, baseball (90-ft bases from 85 m)
+  const little = !softball && reach < 70;
+  const soft = softball || reach < 85;
+  const base = soft ? 18.29 : 27.43; const mound = little ? 14.02 : soft ? 13.1 : 18.44; const skin = little ? 15.24 : soft ? 18.3 : 29;
+  // the infield's dirt may run into foul territory past the outline (it is
+  // drawn along the foul lines), not into a neighbouring field
+  const room = insetPts(p.ring, -4);
   const side = [-dir[1], dir[0]];
   const at = (f, sd) => [home[0] + dir[0] * f + side[0] * sd, home[1] + dir[1] * f + side[1] * sd];
   const fz = (q) => p.fieldZ(...q) + lifted(p, 0) ;
@@ -650,16 +729,18 @@ function baseball(stone, full, p, softball) {
   const fan = (cxf, r, a0, a1, _z0, col, lift) => {
     const c = at(cxf, 0);
     const pnt = (rr, b) => [c[0] + (dir[0] * Math.cos(b) - dir[1] * Math.sin(b)) * rr, c[1] + (dir[1] * Math.cos(b) + dir[0] * Math.sin(b)) * rr];
-    const nr = Math.max(1, Math.ceil(r / 2));
+    const nr = Math.max(1, Math.ceil(r / (p.drape ? 1 : 2)));
+    // (the same slices in every ring: rings sliced differently met at
+    // T-junctions, hairline cracks with the ground showing through)
+    const n = Math.max(6, Math.ceil(((a1 - a0) * r) / (p.drape ? 1 : 1.5)));
     for (let k = 0; k < nr; k++) {
       const ra = (r * k) / nr; const rb = (r * (k + 1)) / nr;
-      const n = Math.max(6, Math.ceil(((a1 - a0) * rb) / 1.5));
       for (let i = 0; i < n; i++) {
         const b0 = a0 + ((a1 - a0) * i) / n; const b1 = a0 + ((a1 - a0) * (i + 1)) / n;
         const q = [pnt(ra, b0), pnt(rb, b0), pnt(rb, b1), pnt(ra, b1)].map((xy) => [xy[0], xy[1], fz(xy) + lift]);
-        // (inside the field only: on a small field the skin's arc ran past its edge)
+        // (within a few metres of the field, never in a neighbour: on a small field the skin's arc ran past its edge)
         const mid = pnt((ra + rb) / 2, (b0 + b1) / 2);
-        if (!inRing(mid[0], mid[1], p.ring)) continue;
+        if (!inRing(mid[0], mid[1], room) || inNeighbour(p, mid[0], mid[1])) continue;
         full.quad('dirt', q[0], q[1], q[2], q[3], [q[0][0] / 4, q[0][1] / 4], [q[1][0] / 4, q[1][1] / 4], [q[2][0] / 4, q[2][1] / 4], [q[3][0] / 4, q[3][1] / 4], col);
       }
     }
@@ -669,10 +750,10 @@ function baseball(stone, full, p, softball) {
   // the grass inside the diamond over it, on a grid following the ground
   const d = base / Math.SQRT2;
   const corner = [at(1.5, 0), at(d, -d + 1.5), at(2 * d - 1.5, 0), at(d, d - 1.5)];
-  const ng = Math.max(1, Math.ceil(base / 2));
+  const ng = Math.max(1, Math.ceil(base / (p.drape ? 1 : 2)));
   const lerp2 = (a, b, f) => [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
   for (let i = 0; i < ng; i++) for (let j = 0; j < ng; j++) {
-    const P = (u, v) => { const xy = lerp2(lerp2(corner[0], corner[1], u), lerp2(corner[3], corner[2], u), v); return [xy[0], xy[1], fz(xy) + 0.026]; };
+    const P = (u, v) => { const xy = lerp2(lerp2(corner[0], corner[1], u), lerp2(corner[3], corner[2], u), v); return [xy[0], xy[1], fz(xy) + 0.02]; };
     const q = [P(i / ng, j / ng), P((i + 1) / ng, j / ng), P((i + 1) / ng, (j + 1) / ng), P(i / ng, (j + 1) / ng)];
     full.quad('turf', q[0], q[1], q[2], q[3], [q[0][0] / 4, q[0][1] / 4], [q[1][0] / 4, q[1][1] / 4], [q[2][0] / 4, q[2][1] / 4], [q[3][0] / 4, q[3][1] / 4], LOOK.grass[1]);
   }
@@ -683,9 +764,13 @@ function baseball(stone, full, p, softball) {
     const c = at(f, sd); const q = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => { const x = c[0] + (dir[0] * a - dir[1] * b) * w; const y = c[1] + (dir[1] * a + dir[0] * b) * w; return [x, y, fz([x, y]) + lift]; });
     full.quad('smoothConcrete', q[0], q[1], q[2], q[3], [0, 0], [1, 0], [1, 1], [0, 1], col);
   };
-  pad(d, -d, 0.19, PAINT, 0.06); pad(2 * d, 0, 0.19, PAINT, 0.06); pad(d, d, 0.19, PAINT, 0.06);
-  pad(0, 0, 0.22, PAINT, 0.025);
-  pad(mound, 0, 0.3, PAINT, 0.03);
+  // the bases: low cushions standing on the dirt (a flat tile hovered over its shadow)
+  for (const [f, sd] of [[d, -d], [2 * d, 0], [d, d]]) {
+    const c = at(f, sd); const g0 = p.fieldZ(...c);
+    box(stone, 'smoothConcrete', c, [(dir[0] - dir[1]) * Math.SQRT1_2, (dir[1] + dir[0]) * Math.SQRT1_2], 0.19, 0.19, g0 - 0.02, g0 + 0.08, PAINT);
+  }
+  pad(0, 0, 0.22, PAINT, 0.04);
+  pad(mound, 0, 0.3, PAINT, 0.042);
   // foul lines to the outfield's edge, the batter's boxes
   for (const sg of [-1, 1]) {
     let far = 5; const u = [dir[0] * Math.SQRT1_2 - sg * dir[1] * Math.SQRT1_2, dir[1] * Math.SQRT1_2 + sg * dir[0] * Math.SQRT1_2];
@@ -709,7 +794,7 @@ function baseball(stone, full, p, softball) {
     }
   }
   // the backstop behind home: a curved chain-link screen
-  const back = 7; const hB = soft ? 4 : 6;
+  const back = little ? 6 : 7; const hB = soft ? 4 : 6;
   const pts = Array.from({ length: 9 }, (_, i) => { const a = Math.PI + (i - 4) * (Math.PI / 10); return [home[0] + (dir[0] * Math.cos(a) - dir[1] * Math.sin(a)) * back, home[1] + (dir[1] * Math.cos(a) + dir[0] * Math.sin(a)) * back]; });
   for (let i = 0; i < pts.length; i++) {
     const q = pts[i]; const g = p.ground(...q);
@@ -854,7 +939,9 @@ function stadiumRing(bx, d) {
 
 function track(stone, full, p) {
   // the infield grassed (a field inside it lies over this, a few cm higher)
-  if (p.hole && p.slab === null) {
+  if (p.hole && p.slab === null && p.drape) {
+    drapedMesh(full, 'turf', p.hole, [], (x, y) => p.fieldZ(x, y) - 0.004, () => LOOK.grass[1], p.drape.grid);
+  } else if (p.hole && p.slab === null) {
     const inner = p.hole;
     const tri = THREE.ShapeUtils.triangulateShape(inner.map(([x, y]) => new THREE.Vector2(x, y)), []);
     for (const [ia, ib, ic] of tri) {
@@ -1100,6 +1187,8 @@ export const SPORTS_MATERIAL_STAGES = {
 };
 /** Material flags beyond the stages: the see-through ones cut out by their opacity, both sides drawn. */
 export const SPORTS_MATERIAL_FLAGS = {
+  // (surfaces lying on the ground: their edges threw shadows on it, as if floating)
+  turf: { castShadows: false }, dirt: { castShadows: false }, sand: { castShadows: false }, linePaint: { castShadows: false },
   // (as the game's own chain link: translucent with no blending, cut at 40)
   chainlink: { alphaTest: true, alphaRef: 40, translucent: true, translucentBlendOp: 'None', doubleSided: true, castShadows: false },
   netting: { translucent: true, translucentBlendOp: 'LerpAlpha', translucentZWrite: false, doubleSided: true, castShadows: false },

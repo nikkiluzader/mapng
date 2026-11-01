@@ -1315,7 +1315,7 @@ export function neighbourLevels(features, project) {
   return out;
 }
 
-export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null } = {}) {
+export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null } = {}) {
   const meshes = [];
   let count = 0;
   // buildings grouped by tile (their footprint's centre): one shape per tile
@@ -1633,7 +1633,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   if (Object.keys(poolKinds).length) { stats.details.pools = poolKinds; stats.details.poolShapes = poolShapes; }
   // sports fields and the stands beside them (services/sportsFields.js)
   const pitchKinds = {};
-  const pitches = planPitches(features, project, { groundAt });
+  const pitches = planPitches(features, project, { groundAt, drape });
   for (const p of pitches) {
     const tile = tileFor(p.ring);
     const built = buildPitch(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, p);

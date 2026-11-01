@@ -1047,7 +1047,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null)
     // (carports are open roofs on posts: native carport models, not walls)
     terrainData.osmFeatures.filter((f) => !isCarportFeature(f)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
-    { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize) },
+    { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize) },
   );
   if (reportStats) {
     reportStats.built = buildingCount;
@@ -6845,6 +6845,30 @@ function terrainGroundAt(terrainData, squareSize) {
     return ok(heightMap[r0 * width + c0]) * (1 - tx) * (1 - ty) + ok(heightMap[r0 * width + c1]) * tx * (1 - ty)
       + ok(heightMap[r1 * width + c0]) * (1 - tx) * ty + ok(heightMap[r1 * width + c1]) * tx * ty - minHeight;
   };
+}
+
+/**
+ * The drawn terrain's height at world (x, y), at or just over it: the higher
+ * of the two triangles a terrain square may be split into (both agree on its
+ * edges). A mesh draped on this, cut along the terrain's squares, lies on the
+ * ground however the engine splits them. Also returns the grid: { sq, ox, oy }
+ * (sample i at ox + i * sq).
+ */
+function terrainDrape(terrainData, squareSize) {
+  const { width, height, heightMap, minHeight } = terrainData;
+  const ok = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
+  const at = (c, r) => ok(heightMap[Math.max(0, Math.min(height - 1, r)) * width + Math.max(0, Math.min(width - 1, c))]) - minHeight;
+  const drapeAt = (x, y) => {
+    const fx = Math.max(0, Math.min(width - 1.0001, x / squareSize + width / 2));
+    const fj = Math.max(0, Math.min(height - 1.0001, y / squareSize + height / 2));
+    const i = Math.floor(fx); const j = Math.floor(fj); const u = fx - i; const v = fj - j;
+    // corners by (i, j) from the south-west; heightmap rows from the north
+    const h00 = at(i, height - 1 - j); const h10 = at(i + 1, height - 1 - j); const h01 = at(i, height - 2 - j); const h11 = at(i + 1, height - 2 - j);
+    const a = u + v <= 1 ? h00 + (h10 - h00) * u + (h01 - h00) * v : h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
+    const b = u >= v ? h00 + (h10 - h00) * u + (h11 - h10) * v : h00 + (h01 - h00) * v + (h11 - h01) * u;
+    return Math.max(a, b);
+  };
+  return { drapeAt, grid: { sq: squareSize, ox: -(width / 2) * squareSize, oy: -(height / 2) * squareSize } };
 }
 
 /**
