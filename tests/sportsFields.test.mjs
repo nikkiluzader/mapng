@@ -183,3 +183,20 @@ test('the base paths from home to first and third are dirt', () => {
     }
   }
 });
+
+test('a track drawn in its tagged colour (colour=blue), else red tartan', () => {
+  const oval = (id, tags) => area(id, [[0, 0], [160, 0], [160, 80], [0, 80]], { leisure: 'track', sport: 'athletics', ...tags });
+  const colourOf = (tags) => {
+    const [p] = planPitches([oval('t', tags)], project, { groundAt });
+    const full = recorder();
+    // record colours too
+    const cols = [];
+    const m = { tri: (mat, a, b, c, ua, ub, uc, col) => { if (mat === 'smoothConcrete') cols.push(col); full.tri(mat, a, b, c); }, quad: (mat, a, b, c, d, ua, ub, uc, ud, col) => { if (mat === 'smoothConcrete') cols.push(col); full.quad(mat, a, b, c, d); } };
+    buildPitch(m, m, p);
+    return cols[0];
+  };
+  const blue = colourOf({ colour: 'blue' });
+  assert.ok(blue[2] > blue[0], `blue: ${blue}`);
+  const red = colourOf({});
+  assert.ok(red[0] > red[2], `red by default: ${red}`);
+});

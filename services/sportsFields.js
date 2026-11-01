@@ -307,6 +307,16 @@ function netPanel(m, p, a, b, z0, z1, col = NET, uv = 0.12) {
   m.quad('netting', [a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1], [0, z0 / uv], [L / uv, z0 / uv], [L / uv, z1 / uv], [0, z1 / uv], col);
 }
 
+// colour=* on a field's surface: named or #rrggbb, toned to read as a painted surface
+const NAMED_COLOURS = { red: [0.66, 0.24, 0.18], blue: [0.22, 0.42, 0.68], green: [0.3, 0.5, 0.36], grey: [0.5, 0.5, 0.5], gray: [0.5, 0.5, 0.5],
+  black: [0.2, 0.2, 0.22], orange: [0.85, 0.45, 0.2], yellow: [0.85, 0.75, 0.3], purple: [0.4, 0.3, 0.55], brown: [0.5, 0.35, 0.25], white: [0.9, 0.9, 0.88] };
+function surfaceColour(v) {
+  const c = String(v || '').trim().toLowerCase();
+  if (NAMED_COLOURS[c]) return NAMED_COLOURS[c];
+  const m = c.match(/^#?([0-9a-f]{6})$/);
+  return m ? [0, 2, 4].map((i) => Number.parseInt(m[1].slice(i, i + 2), 16) / 255) : null;
+}
+
 // ── Draping ──────────────────────────────────────────────────────────────────
 
 // a convex polygon split by the line n.(x, y) = c: [the part below, the part above]
@@ -378,6 +388,9 @@ function surfaceMesh(stone, full, p) {
   const rect = p.area / Math.max(1, L * W) > 0.93 && !p.hole;
   let col = tint;
   if (p.surface === 'hard') col = COURT_COLOURS[Math.floor(rnd('court') * COURT_COLOURS.length)][1];
+  // a colour tagged (colour=blue: a blue track, a green court)
+  const tagged = surfaceColour(p.tags.colour || p.tags['surface:colour']);
+  if (tagged) col = tagged;
   const target = p.slab !== null ? stone : full;
   if (p.slab === null && p.drape) {
     // on the terrain's own triangles; grass mown in stripes across the length
