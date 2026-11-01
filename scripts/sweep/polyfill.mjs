@@ -1,6 +1,7 @@
 // Canvas / image / fetch stand-ins so the exporter runs headless in Node
 // (images become 4-byte stubs; scripts/sweep/fixStubs.mjs replaces them).
 import { readFileSync } from 'node:fs';
+import sharp from 'sharp';
 export function installCanvasPolyfill() {
   const originalDocument = globalThis.document;
   const originalCreateImageBitmap = globalThis.createImageBitmap;
@@ -25,7 +26,8 @@ export function installCanvasPolyfill() {
       if (this._ctx) return this._ctx;
       this._ctx = {
         fillStyle: '#000000',
-        drawImage() {},
+        // (a real image drawn over the whole canvas: kept, resized by toBlob)
+        drawImage: (bmp) => { if (bmp?._buf) this._src = bmp._buf; },
         fillRect() {},
         putImageData() {},
         createImageData(w, h) {
@@ -40,6 +42,11 @@ export function installCanvasPolyfill() {
     }
 
     toBlob(callback, type = 'image/png') {
+      if (this._src) {
+        sharp(this._src).resize(this.width, this.height, { fit: 'fill' }).png().toBuffer()
+          .then((b) => callback(new Blob([b], { type: 'image/png' })));
+        return;
+      }
       const bytes = new Uint8Array([137, 80, 78, 71]);
       bytes.__type = type;
       bytes.__width = this.width;
@@ -57,11 +64,18 @@ export function installCanvasPolyfill() {
     },
   };
 
-  globalThis.createImageBitmap = async (blob) => ({
-    width: Number(blob?.__width) || 64,
-    height: Number(blob?.__height) || 64,
-    close() {},
-  });
+  // real images (the base texture handed in) decoded for their size, kept for
+  // drawImage; the exporter's own stubs as before
+  globalThis.createImageBitmap = async (blob) => {
+    if (typeof Blob !== 'undefined' && blob instanceof Blob) {
+      const buf = Buffer.from(await blob.arrayBuffer());
+      try {
+        const m = await sharp(buf).metadata();
+        return { width: m.width, height: m.height, _buf: buf, close() {} };
+      } catch { /* not an image */ }
+    }
+    return { width: Number(blob?.__width) || 64, height: Number(blob?.__height) || 64, close() {} };
+  };
 
   globalThis.fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : String(input?.url || '');

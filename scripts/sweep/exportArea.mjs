@@ -49,9 +49,20 @@ const terrainData = {
   processingMetersPerPixel: meta.mpp, raw,
 };
 
+// the base texture: the app's Game Texture (the recommended one users get),
+// painted in Node by the app's own generateGameTexture (gametexnode.mjs, a
+// real canvas: NAPI_CANVAS = @napi-rs/canvas) once per area, cached beside
+// the area's data; BASE=none for none
+const baseTexture = process.env.BASE || 'game';
+if (baseTexture === 'game') {
+  const png = path.join(dir, 'gametex.png');
+  if (!fs.existsSync(png)) execFileSync('node', [path.join(REPO, 'scratch/tunnelspike/gametexnode.mjs'), area, png], { stdio: 'inherit' });
+  terrainData.gameTextureBlob = new Blob([fs.readFileSync(png)], { type: 'image/png' });
+}
+
 const t0 = Date.now();
 const { blob, structureChecks } = await exportBeamNGLevel(terrainData, meta.center, {
-  baseTexture: 'none', pbrSource: 'osm', roadType: 'decal', includeBackdrop: false,
+  baseTexture, pbrSource: 'osm', roadType: 'decal', includeBackdrop: false,
   includeBuildings: true, applyFoundations: false, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,
   ...(process.env.STRUCT ? { structureSolver: process.env.STRUCT } : {}),
