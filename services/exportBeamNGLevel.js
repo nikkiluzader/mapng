@@ -4826,7 +4826,7 @@ export async function generateDecalRoadsYielding(terrainData, squareSize, yieldF
 // straight that long in one way.
 const DRAG_MIN_M = 380;   // (a quarter mile and some: a 233 m straight inside a training course was no drag strip)
 const DRAG_STRAIGHT_M = 2;
-function markDragStrips(features, project) {
+export function markDragStrips(features, project) {
   for (const f of features) {
     const t = f?.tags;
     if (f?.type !== 'road' || t?.highway !== 'raceway' || t['mapng:raceway'] || !(f.geometry?.length >= 2)) continue;
@@ -4835,7 +4835,24 @@ function markDragStrips(features, project) {
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
     if (L < DRAG_MIN_M) continue;
     const dev = Math.max(...pts.map((q) => Math.abs((b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0])) / L));
-    if (dev <= DRAG_STRAIGHT_M) t['mapng:raceway'] = 'drag';
+    if (dev > DRAG_STRAIGHT_M) continue;
+    t['mapng:raceway'] = 'drag';
+    // laid dead straight between its ends: the wobble left is mapping noise
+    // (points clicked off aerial imagery, +-1.4 m every 50-140 m on a strip
+    // lined with walls); a point other roads share moves with it in them too
+    const g0 = f.geometry[0]; const g1 = f.geometry[f.geometry.length - 1];
+    const moved = new Map();
+    f.geometry = f.geometry.map((q, i) => {
+      if (i === 0 || i === f.geometry.length - 1) return q;
+      const u = ((pts[i][0] - a[0]) * (b[0] - a[0]) + (pts[i][1] - a[1]) * (b[1] - a[1])) / (L * L);
+      const nq = { ...q, lat: g0.lat + (g1.lat - g0.lat) * u, lng: g0.lng + (g1.lng - g0.lng) * u };
+      moved.set(`${q.lat},${q.lng}`, nq);
+      return nq;
+    });
+    if (moved.size) for (const o of features) {
+      if (o === f || o?.type !== 'road' || !o.geometry?.length) continue;
+      if (o.geometry.some((q) => moved.has(`${q.lat},${q.lng}`))) o.geometry = o.geometry.map((q) => { const m = moved.get(`${q.lat},${q.lng}`); return m ? { ...q, lat: m.lat, lng: m.lng } : q; });
+    }
   }
 }
 

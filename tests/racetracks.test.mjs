@@ -156,3 +156,13 @@ test('an untagged long narrow building along a raceway is its grandstand; a drag
   const tree = stone.tris.filter((t) => t.pts.some((q) => q[2] > 2 + 3.5)).flatMap((t) => t.pts);
   assert.ok(tree.length && tree.every((q) => q[0] > 470), 'the light tree at the east end');
 });
+
+test('a drag strip mapped with a wobble is laid dead straight; a road joining it mid-strip stays joined', async () => {
+  const { markDragStrips: markDragStripsForTest } = await import('../services/exportBeamNGLevel.js');
+  const strip = { type: 'road', tags: { highway: 'raceway' }, geometry: [[0, 0], [300, 1.4], [600, -0.3], [900, 1.1], [1000, 0]].map(([x, y]) => ({ lat: y, lng: x })) };
+  const lane = { type: 'road', tags: { highway: 'service' }, geometry: [[300, 1.4], [300, 50]].map(([x, y]) => ({ lat: y, lng: x })) };
+  markDragStripsForTest([strip, lane], (lat, lng) => [lng, lat, 0]);
+  assert.equal(strip.tags['mapng:raceway'], 'drag');
+  assert.ok(strip.geometry.every((q) => Math.abs(q.lat) < 1e-9), 'every point on the straight line');
+  assert.deepEqual([lane.geometry[0].lat, lane.geometry[0].lng], [strip.geometry[1].lat, strip.geometry[1].lng], 'the lane still meets the strip');
+});
