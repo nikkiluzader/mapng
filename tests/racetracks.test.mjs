@@ -120,6 +120,7 @@ test('kerbs and tyre walls never stand on a neighbouring stretch of track', () =
 test('a paved oval: no kerbs, a wall and catch fence round the outside; a road course keeps its kerbs', () => {
   const [ov] = planRaceways([cw(oval(80, 50), { sport: 'motor', surface: 'asphalt' }, 8)]);
   assert.ok(ov.oval, 'recognised as an oval');
+  assert.ok(!planRaceways([cw(oval(80, 50), { sport: 'motor' }, 8)])[0].oval, 'an unnamed, untagged loop is no oval');
   const s1 = recorder(); const f1 = recorder();
   const st = buildRaceway(s1, f1, ov, { drapeAt });
   assert.equal(st.kerbs, 0);
@@ -280,4 +281,27 @@ test('a racing line flows: a corner in few points turns smoothly, and ways still
     worst = Math.max(worst, Math.abs(Math.atan2(u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1])));
   }
   assert.ok((worst * 180) / Math.PI < 8, `worst heading step ${(worst * 180 / Math.PI).toFixed(1)} deg`);
+});
+
+test('a long oval is walled down its straights too', () => {
+  const [rw] = planRaceways([cw(oval(200, 50), { sport: 'motor', surface: 'dirt' }, 8)]);
+  const full = recorder();
+  buildRaceway(recorder(), full, rw, { drapeAt });
+  const fence = full.tris.filter((k) => k.mat === 'chainlink').flatMap((k) => k.pts);
+  for (const x of [-180, -90, 0, 90, 180]) assert.ok(fence.some((q) => Math.abs(q[0] - x) < 10 && q[1] > 50), `the north straight at x=${x}`);
+});
+
+test('an oval in several pieces has an unbroken wall, joints and the lap closing included', () => {
+  const pts = oval(100, 50); const tags = { sport: 'motor', surface: 'dirt', name: 'Oval' };
+  const cuts = [0, 20, 45, 70, pts.length - 1];
+  const pieces = cuts.slice(1).map((c, i) => cw(pts.slice(cuts[i], c + 1), tags, 8));
+  const rws = planRaceways(pieces);
+  assert.equal(rws.length, 1, 'one line');
+  const full = recorder();
+  buildRaceway(recorder(), full, rws[0], { drapeAt });
+  // each fence panel's bottom edge: every end meets the next panel's start
+  const seg = full.tris.filter((k) => k.mat === 'chainlink').filter((_, i) => i % 2 === 0).map((k) => [k.pts[0], k.pts[1]]);
+  let worst = 0;
+  for (let i = 0; i < seg.length; i++) { const nx = seg[(i + 1) % seg.length]; worst = Math.max(worst, Math.hypot(seg[i][1][0] - nx[0][0], seg[i][1][1] - nx[0][1])); }
+  assert.ok(worst < 0.5, `largest gap ${worst.toFixed(2)} m`);
 });

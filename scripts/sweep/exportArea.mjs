@@ -60,7 +60,7 @@ const terrainData = {
 const baseTexture = process.env.BASE || 'game';
 if (baseTexture === 'game') {
   const png = path.join(dir, 'gametex.png');
-  if (!fs.existsSync(png)) execFileSync('node', [path.join(REPO, 'scratch/tunnelspike/gametexnode.mjs'), area, png], { stdio: 'inherit' });
+  if (!fs.existsSync(png)) execFileSync('node', [path.join(REPO, 'scripts/sweep/gametexnode.mjs'), area, png], { stdio: 'inherit' });
   terrainData.gameTextureBlob = new Blob([fs.readFileSync(png)], { type: 'image/png' });
 }
 

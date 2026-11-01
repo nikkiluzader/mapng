@@ -1,4 +1,5 @@
 import { buildRoadNetwork, getEffectiveRoadLayer, mergeLinearRoadSegments } from "./roadNetwork.js";
+import { racewayHalfWidth } from "./roadWidth.js";
 
 // Colors aligned to OSM Carto style definitions
 // Source: https://github.com/gravitystorm/openstreetmap-carto (landcover.mss / water.mss)
@@ -796,7 +797,9 @@ const getLaneLayout = (tags) => {
 
   // Width estimation (following OSM2World's defaults)
   if (layout.totalWidth === 0) {
-    if (highway === "service") {
+    // (a racetrack is no one-lane road: its width by kind, as the export's)
+    if (highway === "raceway") layout.totalWidth = 2 * racewayHalfWidth(tags);
+    else if (highway === "service") {
       const subtype = String(tags.service ?? "").trim().toLowerCase();
       // Driveways and drive-throughs are single-car paths, not streets.
       const minWidth = subtype === "driveway" || subtype === "drive-through" ? 3.0 : 4.0;

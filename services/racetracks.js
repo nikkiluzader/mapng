@@ -35,6 +35,7 @@ const STEEL = [0.72, 0.74, 0.76];
 const TYRE = [0.08, 0.08, 0.09];
 
 const SURFACE_LINE_SHARE = 0.4;
+const OVAL_RING_RUN_M = 30;
 const UNPAVED = new Set(['dirt', 'clay', 'ground', 'earth', 'unpaved', 'gravel', 'sand', 'mud', 'compacted', 'grass']);
 
 // per node: the unit tangent and the turn's radius over a few metres either side
@@ -62,7 +63,7 @@ const offsetAt = (q, t, d) => [q[0] - t[1] * d, q[1] + t[0] * d];
 const JOIN_HEADING_COS = Math.cos((25 * Math.PI) / 180);
 function joinCircuitPieces(rws) {
   const dirAt = (nodes, atEnd) => { const n = nodes.length; const a = atEnd ? nodes[n - 2] : nodes[0]; const b = atEnd ? nodes[n - 1] : nodes[1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
-  const lines = rws.filter((r) => r.kind === 'circuit' || r.kind === 'kart');
+  const lines = rws.filter((r) => r.kind === 'circuit' || r.kind === 'kart' || r.kind === 'dirt');
   for (let merged = true; merged;) {
     merged = false;
     for (const a of lines) {
@@ -117,8 +118,8 @@ export function planRaceways(carriageways = []) {
     const a = cw.nodes[0]; const b = cw.nodes[cw.nodes.length - 1];
     return { kind: racewayKind(cw.tags || {}), nodes: cw.nodes, half: cw.half, closed: Math.hypot(b[0] - a[0], b[1] - a[1]) < 1, tags: cw.tags || {}, id: cw.wayId, oneWay: !!cw.oneWay };
   });
-  // a circuit in pieces (its ways, the road system's chunks) is one line: a
-  // corner cut at a piece's end lost its kerb there
+  // a circuit or oval in pieces (its ways, the road system's chunks) is one
+  // line: a corner cut at a piece's end lost its kerb there, a wall its join
   joinCircuitPieces(rws);
   // a drag strip in pieces (split at the timing lights, the shut-down area):
   // the pieces that meet end to end in line are one strip, one start
@@ -158,7 +159,22 @@ export function planRaceways(carriageways = []) {
     const bin = (q) => Math.floor(((Math.atan2(q[1] - c[1], q[0] - c[0]) + Math.PI) / (2 * Math.PI)) * BINS) % BINS;
     for (const q of pts) { const b = bin(q); far[b] = Math.max(far[b], Math.hypot(q[0] - c[0], q[1] - c[1])); }
     let loop = far.every((v) => v > 0);   // the pieces go all the way round
-    const outerOf = (g, q) => Math.hypot(q[0] - c[0], q[1] - c[1]) >= far[bin(q)] - (g.half + 3);
+    // on the outer ring: a line straight out from it, away from the middle,
+    // meets no other piece of the track (a crossing has the ring beyond it)
+    const segs = group.flatMap((g) => g.nodes.filter((_, i) => i % 3 === 0 || i === g.nodes.length - 1).map((q, i, a) => (i ? [a[i - 1], q] : null)).filter(Boolean));
+    const outerOf = (g, q, i) => {
+      const a = g.nodes[Math.max(0, i - 1)]; const b = g.nodes[Math.min(g.nodes.length - 1, i + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; let nx = -(b[1] - a[1]) / L; let ny = (b[0] - a[0]) / L;
+      if ((c[0] - q[0]) * nx + (c[1] - q[1]) * ny > 0) { nx = -nx; ny = -ny; }
+      for (const [p0, p1] of segs) {
+        const dx = p1[0] - p0[0]; const dy = p1[1] - p0[1]; const den = nx * dy - ny * dx;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((p0[0] - q[0]) * dy - (p0[1] - q[1]) * dx) / den; const u = ((p0[0] - q[0]) * ny - (p0[1] - q[1]) * nx) / den;
+        if (t > 4 && u >= 0 && u <= 1) return false;
+      }
+      return true;
+    };
+    if (loop && group.some((g) => g.kind === 'circuit') && !group.some((g) => g.tags.name || g.tags.surface)) loop = false;
     if (loop && group.some((g) => g.kind === 'circuit')) {
       // an oval: its outer ring bends round the middle all the way (a road
       // course turns both ways: its kerbs, not an oval's wall)
@@ -166,16 +182,19 @@ export function planRaceways(carriageways = []) {
       for (const g of group) {
         const inf = bends(g.nodes, 15);
         g.nodes.forEach((q, i) => {
-          if (!outerOf(g, q) || !Number.isFinite(inf[i].radius)) return;
+          if (!outerOf(g, q, i) || !Number.isFinite(inf[i].radius)) return;
           const nL = [-inf[i].t[1], inf[i].t[0]];
           const left = (c[0] - q[0]) * nL[0] + (c[1] - q[1]) * nL[1] > 0;
           if ((inf[i].turn > 0) === left) inward += Math.abs(inf[i].turn); else outward += Math.abs(inf[i].turn);
         });
       }
-      loop = inward > 0 && outward / (inward + outward) < 0.1;
+      // (known to be a racetrack: named or surfaced; an untagged loop may be a
+      // rally school's stage, no place for a wall and catch fence)
+      const known = group.some((g) => g.tags.name || g.tags.surface);
+      loop = known && inward > 0 && outward / (inward + outward) < 0.1;
     }
     for (const g of group) {
-      g.oval = loop ? { c, outer: g.nodes.map((q) => outerOf(g, q)) } : null;
+      g.oval = loop ? { c, outer: g.nodes.map((q, i) => outerOf(g, q, i)) } : null;
     }
   }
   return rws;
@@ -263,6 +282,14 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
   rw = { ...rw, blocked, lifted: rw.nodes.map((q) => !Number.isFinite(q[2]) ? false : Math.abs(q[2] - drapeAt(q[0], q[1])) > 1) };
   const info = bends(rw.nodes);
   const n = rw.nodes.length;
+  // a closed lap: one direction where its ends meet, so its walls meet too
+  {
+    const a = rw.nodes[0]; const b = rw.nodes[n - 1];
+    if (n > 3 && Math.hypot(b[0] - a[0], b[1] - a[1]) < 1) {
+      const t = [info[0].t[0] + info[n - 1].t[0], info[0].t[1] + info[n - 1].t[1]]; const L = Math.hypot(...t) || 1;
+      info[0].t = [t[0] / L, t[1] / L]; info[n - 1].t = info[0].t;
+    }
+  }
   const z = drapeAt;
   const stats = { kerbs: 0, walls: 0, tyres: 0, trees: 0 };
   const paved = !UNPAVED.has(String(rw.tags.surface || '').toLowerCase());
@@ -302,11 +329,17 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
     // crossings
     const { c, outer } = rw.oval;
     const side = (i) => { const q = rw.nodes[i]; const t = info[i].t; return ((c[0] - q[0]) * -t[1] + (c[1] - q[1]) * t[0]) > 0 ? -1 : 1; };
+    // (an unbroken stretch of the outer ring: a crossing only touches it)
+    const onRing = new Array(n).fill(false);
+    for (let i = 0; i < n;) {
+      if (!outer[i] || rw.lifted[i]) { i++; continue; }
+      let j = i; while (j + 1 < n && outer[j + 1] && !rw.lifted[j + 1]) j++;
+      if (info[j].s - info[i].s >= OVAL_RING_RUN_M) for (let k = i; k <= j; k++) onRing[k] = true;
+      i = j + 1;
+    }
     let runs = 0;
     for (let i = 0; i < n - 1; i++) {
-      if (!outer[i] || !outer[i + 1] || rw.lifted[i] || rw.lifted[i + 1]) continue;
-      // (running round the ring, not out to it: a crossing meeting the oval)
-      { const q = rw.nodes[i]; const r = [q[0] - c[0], q[1] - c[1]]; const rl = Math.hypot(...r) || 1; if (Math.abs((r[0] * info[i].t[0] + r[1] * info[i].t[1]) / rl) > 0.6) continue; }
+      if (!onRing[i] || !onRing[i + 1]) continue;
       const sg = side(i);
       const d = sg * (rw.half + 1.2);
       const a = offsetAt(rw.nodes[i], info[i].t, d); const b = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
