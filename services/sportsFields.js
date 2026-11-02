@@ -1196,6 +1196,14 @@ const STAND_MIN_DEPTH_M = 3;
 const ROW_D_M = 0.75;
 const ROW_RISE_M = 0.4;
 const MAX_ROWS = 60;
+// a stand no box fits: rows follow its front
+const FRONT_FACING = 0.35;        // (cosine: an edge this square to the action is the front)
+const FRONT_GAP_M = 14;           // (a jog in the front this long is not its end)
+const SWEEP_MIN_M = 30;
+const SWEEP_STEP_M = 6;
+const CUTOUT_M = 40;              // (half the width of the widest cutout a stand's outline may ignore)
+const CUTOUT_DEEP_M = 25;         // (the front comes this far forward at the most)
+const SWEEP_SECTION = 20;         // stations to a section: one object each, so the game can cull them
 
 // the ring's side of the line s = at along unit u (keep: +1 over it, -1 under)
 function clipRing(ring, u, at, keep) {
@@ -1237,9 +1245,139 @@ const boxRing = (bx) => [[bx.s0, bx.t0], [bx.s1, bx.t0], [bx.s1, bx.t1], [bx.s0,
 
 /** Rows of seats in a stand: its depth's worth, as many as its height allows (20 untagged). */
 export function seatRows(st) {
-  const h = Number.parseFloat(st.tags?.height);
-  const cap = Number.isFinite(h) ? Math.max(20, Math.min(MAX_ROWS, Math.floor(h / ROW_RISE_M))) : 20;
-  return Math.max(2, Math.min(cap, Math.floor((st.box.t1 - st.box.t0) / ROW_D_M)));
+  return Math.max(2, Math.min(rowCap(st.tags), Math.floor((st.box.t1 - st.box.t0) / ROW_D_M)));
+}
+
+function rowCap(tags) {
+  const h = Number.parseFloat(tags?.height);
+  return Number.isFinite(h) ? Math.max(20, Math.min(MAX_ROWS, Math.floor(h / ROW_RISE_M))) : 20;
+}
+
+// The longest run of a ring's edges facing what the stand watches: points in order, or null.
+function frontChain(ring, watch) {
+  const n = ring.length;
+  const edges = ring.map((a, i) => {
+    const b = ring[(i + 1) % n]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-6;
+    const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; const to = watch(mid[0], mid[1]);
+    if (!to) return { L, facing: false };
+    const d = Math.hypot(to[0] - mid[0], to[1] - mid[1]) || 1e-6;
+    return { L, facing: ((b[1] - a[1]) * (to[0] - mid[0]) - (b[0] - a[0]) * (to[1] - mid[1])) / (L * d) > FRONT_FACING };
+  });
+  const start = edges.findIndex((e) => !e.facing);
+  if (start < 0) return null;
+  let best = null; let run = null; let gap = 0;
+  for (let k = 1; k <= n; k++) {
+    const i = (start + k) % n; const e = edges[i];
+    if (e.facing) {
+      if (!run) run = { from: i, to: i, len: 0 };
+      run.to = i; run.len += e.L + gap; gap = 0;
+    } else if (run) {
+      gap += e.L;
+      if (gap > FRONT_GAP_M) { if (!best || run.len > best.len) best = run; run = null; gap = 0; }
+    }
+  }
+  if (run && (!best || run.len > best.len)) best = run;
+  if (!best || best.len < SWEEP_MIN_M) return null;
+  const out = [ring[best.from]];
+  for (let i = best.from; ; i = (i + 1) % n) { out.push(ring[(i + 1) % n]); if (i === best.to) break; }
+  return out;
+}
+
+// A line resampled to about `step` apart, with its small jogs smoothed away.
+function evenLine(line, step) {
+  const lens = [0];
+  for (let i = 1; i < line.length; i++) lens.push(lens[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+  const L = lens[lens.length - 1]; const n = Math.max(2, Math.round(L / step));
+  let pts = []; let j = 0;
+  for (let i = 0; i <= n; i++) {
+    const s = (L * i) / n;
+    while (j + 2 < line.length && lens[j + 1] < s) j++;
+    const f = (s - lens[j]) / ((lens[j + 1] - lens[j]) || 1);
+    pts.push([line[j][0] + (line[j + 1][0] - line[j][0]) * f, line[j][1] + (line[j + 1][1] - line[j][1]) * f]);
+  }
+  for (let pass = 0; pass < 3; pass++) {
+    pts = pts.map((q, i) => (i === 0 || i === n ? q : [(pts[i - 1][0] + 2 * q[0] + pts[i + 1][0]) / 4, (pts[i - 1][1] + 2 * q[1] + pts[i + 1][1]) / 4]));
+  }
+  return pts;
+}
+
+// How far a ray from p along n stays inside the ring (0: it never enters).
+function depthInside(ring, p, n) {
+  const hits = [];
+  ring.forEach((a, i) => {
+    const b = ring[(i + 1) % ring.length]; const ex = b[0] - a[0]; const ey = b[1] - a[1];
+    const det = n[0] * ey - n[1] * ex;
+    if (Math.abs(det) < 1e-9) return;
+    const t = ((a[0] - p[0]) * ey - (a[1] - p[1]) * ex) / det; const u = ((a[0] - p[0]) * n[1] - (a[1] - p[1]) * n[0]) / det;
+    if (t > 0 && u >= 0 && u < 1) hits.push(t);
+  });
+  hits.sort((x, y) => x - y);
+  // (outside the ring at the start, the first crossing is the way in)
+  return hits.length % 2 ? hits[0] : (hits[1] || 0);
+}
+
+const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+
+// xs with every dip narrower than 2w + 1 filled, and all else as it was
+function fillDips(xs, w) {
+  const pad = new Array(2 * w + 1).fill(Math.min(...xs));
+  const v = [...pad, ...xs, ...pad];
+  const roll = (a, f) => a.map((_, i) => f(...a.slice(Math.max(0, i - w), i + w + 1)));
+  return roll(roll(v, Math.max), Math.min).slice(pad.length, pad.length + xs.length);
+}
+
+// The front with its cutouts ignored: each point forward to where the front on either side of it runs.
+function fillFront(pts, watch) {
+  const w = Math.round(CUTOUT_M / SWEEP_STEP_M);
+  const to = pts.map((p) => watch(p[0], p[1]));
+  if (to.some((q) => !q)) return pts;
+  const dist = pts.map((p, i) => Math.hypot(to[i][0] - p[0], to[i][1] - p[1]) || 1e-6);
+  const near = fillDips(dist.map((d) => -d), w).map((d) => -d);
+  let out = pts.map((p, i) => {
+    const f = Math.min(CUTOUT_DEEP_M, dist[i] - near[i]) / dist[i];
+    return [p[0] + (to[i][0] - p[0]) * f, p[1] + (to[i][1] - p[1]) * f];
+  });
+  for (let pass = 0; pass < 3; pass++) {
+    out = out.map((q, i) => (i === 0 || i === out.length - 1 ? q : [(out[i - 1][0] + 2 * q[0] + out[i + 1][0]) / 4, (out[i - 1][1] + 2 * q[1] + out[i + 1][1]) / 4]));
+  }
+  return out;
+}
+
+/**
+ * A curved stand: stations along the edge facing the action, each with the way
+ * back and the rows the outline has room for. Sections of [{ p, n, rows }], or null.
+ */
+function sweepStand(ring, tags, watch, keepOff) {
+  const chain = frontChain(ring, watch);
+  if (!chain) return null;
+  const pts = fillFront(evenLine(chain, SWEEP_STEP_M), watch);
+  const raw = pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    let n = [-(b[1] - a[1]) / L, (b[0] - a[0]) / L];
+    const to = watch(p[0], p[1]);
+    if (to && (to[0] - p[0]) * n[0] + (to[1] - p[1]) * n[1] > 0) n = [-n[0], -n[1]];
+    let d = depthInside(ring, p, n); let q = p;
+    if (keepOff) {
+      let o = 0;
+      while (o < d && keepOff(p[0] + n[0] * o, p[1] + n[1] * o)) o += 1;
+      q = [p[0] + n[0] * o, p[1] + n[1] * o]; d -= o;
+    }
+    return { p: q, n, d };
+  });
+  const cap = rowCap(tags);
+  // (cutouts in the back are ignored as in the front)
+  const depth = fillDips(raw.map((_, i) => median(raw.slice(Math.max(0, i - 2), i + 3).map((o) => o.d))), Math.round(CUTOUT_M / SWEEP_STEP_M));
+  const st = raw.map((q, i) => ({ p: q.p, n: q.n, rows: depth[i] < STAND_MIN_DEPTH_M ? 0 : Math.max(2, Math.min(cap, Math.floor(depth[i] / ROW_D_M))) }));
+  const sections = []; let cur = [];
+  const flush = () => { if (cur.length >= 2) sections.push(cur); cur = []; };
+  st.forEach((q, i) => {
+    if (!q.rows) { flush(); return; }
+    cur.push(q);
+    if (cur.length > SWEEP_SECTION && i + 1 < st.length) { const last = cur[cur.length - 1]; flush(); cur = [last]; }
+  });
+  flush();
+  return sections.length ? sections : null;
 }
 
 /**
@@ -1249,6 +1387,19 @@ export function seatRows(st) {
  */
 export function planSeating(features, project, pitches = [], { groundAt = null, faceTo = null, keepOff = null } = {}) {
   const out = [];
+  // what a stand at (x, y) watches: the nearest field's middle, or a racetrack if
+  // nearer (faceTo(x, y) -> its nearest point), or null
+  const watched = (x, y) => {
+    let near = null;
+    for (const p of pitches) {
+      const pc = frameAt(p.box, (p.box.s0 + p.box.s1) / 2, (p.box.t0 + p.box.t1) / 2);
+      const d = Math.hypot(pc[0] - x, pc[1] - y);
+      if (d < 250 && (!near || d < near.d)) near = { d, pc };
+    }
+    const other = faceTo?.(x, y);
+    if (other) { const d = Math.hypot(other[0] - x, other[1] - y); if (d < 250 && (!near || d < near.d)) near = { d, pc: other }; }
+    return near ? near.pc : null;
+  };
   for (const f of features || []) {
     const t = f?.tags || {};
     if (!(t.building === 'grandstand' || t.leisure === 'bleachers' || t.building === 'bleachers' || t['building:part'] === 'grandstand')) continue;
@@ -1261,25 +1412,33 @@ export function planSeating(features, project, pitches = [], { groundAt = null, 
     if (signedArea(ring) < 0) ring = ring.reverse();
     const grounds = pts.map((q) => q[2]).filter(Number.isFinite);
     const roof = t.building === 'grandstand' && (whole > 250 || Number.parseFloat(t['building:levels']) >= 2 || /roof|covered/.test(String(t.covered || t['roof:shape'] || '')));
-    standPieces(ring).forEach((piece, k) => {
+    const pieces = standPieces(ring);
+    const sections = pieces.length > 1 ? sweepStand(ring, t, watched, keepOff) : null;
+    if (sections) {
+      const topRows = Math.max(...sections.flat().map((q) => q.rows));
+      sections.forEach((pts, k) => {
+        const part = [...pts.map((q) => q.p), ...[...pts].reverse().map((q) => [q.p[0] + q.n[0] * q.rows * ROW_D_M, q.p[1] + q.n[1] * q.rows * ROW_D_M])];
+        const bx = orientedBox(part);
+        if (!bx) return;
+        const mid = pts[pts.length >> 1];
+        const prev = sections[k - 1]; const next = sections[k + 1];
+        // (a section's ends close only where its neighbour doesn't join it)
+        const joined = (o, q) => o && o.some((x) => x.p === q.p);
+        const before = joined(prev, pts[0]) ? pts[0].rows : 0; const after = joined(next, pts[pts.length - 1]) ? pts[pts.length - 1].rows : 0;
+        out.push({ id: k ? `${f.id}_${k}` : f.id, ring: part, box: bx, face: [-mid.n[0], -mid.n[1]], z0: Math.min(...grounds), z1: Math.max(...grounds), area: Math.abs(signedArea(part)), ground: groundAt, roof, tags: t, seed: `${f.id}_${k}`, sweep: { pts, before, after, topRows } });
+      });
+      continue;
+    }
+    pieces.forEach((piece, k) => {
       const area = Math.abs(signedArea(piece));
       if (area < 6) return;
       let bx = orientedBox(piece);
       if (!bx) return;
       if (keepOff) { bx = clearBand(bx, keepOff); if (!bx) return; }
       const c = frameAt(bx, (bx.s0 + bx.s1) / 2, (bx.t0 + bx.t1) / 2);
-      // toward the nearest field's middle (else one long side)
-      let near = null;
-      for (const p of pitches) {
-        const pc = frameAt(p.box, (p.box.s0 + p.box.s1) / 2, (p.box.t0 + p.box.t1) / 2);
-        const d = Math.hypot(pc[0] - c[0], pc[1] - c[1]);
-        if (d < 250 && (!near || d < near.d)) near = { d, pc };
-      }
-      // (or what else the stand watches nearer: a racetrack, faceTo(x, y) -> its nearest point)
-      const other = faceTo?.(c[0], c[1]);
-      if (other) { const d = Math.hypot(other[0] - c[0], other[1] - c[1]); if (d < 250 && (!near || d < near.d)) near = { d, pc: other }; }
+      const near = watched(c[0], c[1]);
       const v = [-bx.u[1], bx.u[0]];
-      const toward = near ? [near.pc[0] - c[0], near.pc[1] - c[1]] : v;
+      const toward = near ? [near[0] - c[0], near[1] - c[1]] : v;
       const face = toward[0] * v[0] + toward[1] * v[1] >= 0 ? v : [-v[0], -v[1]];
       out.push({ id: k ? `${f.id}_${k}` : f.id, ring: keepOff ? boxRing(bx) : piece, box: bx, face, z0: Math.min(...grounds), z1: Math.max(...grounds), area, ground: groundAt, roof, tags: t, seed: `${f.id}${k || ''}` });
     });
@@ -1287,8 +1446,85 @@ export function planSeating(features, project, pitches = [], { groundAt = null, 
   return out;
 }
 
+// A stand swept along its front: each row a band of quads between two stations.
+function buildSwept(stone, st) {
+  const { pts, before, after, topRows } = st.sweep;
+  const g = st.z1; const rowD = ROW_D_M; const rise = ROW_RISE_M;
+  const concrete = st.tags.building === 'grandstand';
+  const mat = concrete ? 'smoothConcrete' : 'metalWhite';
+  const body = concrete ? [0.8, 0.8, 0.78] : [0.66, 0.68, 0.7];
+  const seat = concrete ? [0.15, 0.3, 0.6] : [0.78, 0.8, 0.82];
+  const at = (q, o) => [q.p[0] + q.n[0] * o, q.p[1] + q.n[1] * o];
+  const foot = (k) => g + 0.03 + k * rise;             // row k's footboard (as the seat's top less 0.42)
+  // a wall from a to b facing `out`, and a flat quad facing up
+  const wall = (m, a, b, za0, zb0, za1, zb1, out, col) => {
+    const [p, q, p0, q0, p1, q1] = (b[1] - a[1]) * out[0] - (b[0] - a[0]) * out[1] >= 0 ? [a, b, za0, zb0, za1, zb1] : [b, a, zb0, za0, zb1, za1];
+    const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    stone.quad(m, [...p, p0], [...q, q0], [...q, q1], [...p, p1], [0, 0], [L, 0], [L, 1], [0, 1], col);
+  };
+  const flat = (m, a, b, c, d, z, col) => {
+    const q = [a, b, c, d].map((o) => [o[0], o[1], z]);
+    const ccw = (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]) > 0;
+    const [w, x, y, v] = ccw ? q : [q[1], q[0], q[3], q[2]];
+    stone.quad(m, w, x, y, v, [0, 0], [1, 0], [1, 1], [0, 1], col);
+  };
+  const groundOf = (q) => (st.ground ? st.ground(q[0], q[1]) : st.z0);
+  const tan = (a, b) => { const L = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1]) || 1; return [(b.p[0] - a.p[0]) / L, (b.p[1] - a.p[1]) / L]; };
+  // the side of a stretch of rows where it stands taller than what is next to it
+  const end = (q, from, to, out) => {
+    for (let k = from; k < to; k++) wall(mat, at(q, k * rowD), at(q, (k + 1) * rowD), st.z0 - 0.3, st.z0 - 0.3, foot(k) + rise, foot(k) + rise, out, body);
+  };
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const a = pts[i]; const b = pts[i + 1];
+    const m = Math.min(a.rows, b.rows);
+    const back = [(a.n[0] + b.n[0]) / 2, (a.n[1] + b.n[1]) / 2];
+    const fore = [-back[0], -back[1]];
+    for (let k = 0; k < m; k++) {
+      const o0 = k * rowD; const o1 = o0 + rowD; const z = foot(k);
+      flat(mat, at(a, o0), at(b, o0), at(b, o1), at(a, o1), z, body);
+      if (k + 1 < m) wall(mat, at(a, o1), at(b, o1), z, z, z + rise, z + rise, fore, body);
+      // the bench, closed to the footboard
+      const s0 = o0 + rowD * 0.54; const s1 = o0 + rowD * 0.9;
+      flat('metalWhite', at(a, s0), at(b, s0), at(b, s1), at(a, s1), z + 0.42, seat);
+      wall('metalWhite', at(a, s0), at(b, s0), z, z, z + 0.42, z + 0.42, fore, seat);
+    }
+    // the front down to the ground
+    wall(mat, at(a, 0), at(b, 0), groundOf(at(a, 0)) - 0.2, groundOf(at(b, 0)) - 0.2, g + 0.03, g + 0.03, fore, body);
+    // the back, a rail on it
+    const top = foot(m);
+    wall(mat, at(a, m * rowD), at(b, m * rowD), st.z0 - 0.3, st.z0 - 0.3, top + (concrete ? 1.2 : 0.1), top + (concrete ? 1.2 : 0.1), back, [0.82, 0.82, 0.8]);
+    bar(stone, 'metalWhite', [...at(a, m * rowD - 0.1), top + 1], [...at(b, m * rowD - 0.1), top + 1], 0.03, STEEL);
+    const t = tan(a, b);
+    if (a.rows > m) end(a, m, a.rows, t);
+    if (b.rows > m) end(b, m, b.rows, [-t[0], -t[1]]);
+  }
+  const first = pts[0]; const last = pts[pts.length - 1];
+  end(first, before, first.rows, [-tan(first, pts[1])[0], -tan(first, pts[1])[1]]);
+  end(last, after, last.rows, tan(pts[pts.length - 2], last));
+  if (st.roof) {
+    // sloping down toward the action from posts at the back; level along the whole stand
+    const zr = foot(topRows) + 3.2; const frame = [0.5, 0.52, 0.55];
+    const inner = (q) => at(q, q.rows * rowD + 0.3); const outer = (q) => at(q, -1.2);
+    pts.forEach((q, i) => {
+      if (i % 2) return;
+      const [x, y] = at(q, q.rows * rowD - 0.3);
+      cylinder(stone, 'metalWhite', x, y, 0.15, st.z0 - 0.3, zr + 0.4, frame, { n: 8 });
+      bar(stone, 'metalWhite', [x, y, zr + 0.4], [...at(q, -1), zr - 0.4], 0.1, frame);
+    });
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i]; const b = pts[i + 1];
+      const q = [[...inner(a), zr + 0.5], [...inner(b), zr + 0.5], [...outer(b), zr - 0.3], [...outer(a), zr - 0.3]];
+      const L = Math.hypot(b.p[0] - a.p[0], b.p[1] - a.p[1]) / 3; const D = (a.rows * rowD + 1.5) / 3;
+      stone.quad('roofMetal', q[1], q[0], q[3], q[2], [0, 0], [L, 0], [L, D], [0, D], [0.85, 0.86, 0.88]);
+      stone.quad('roofMetal', q[0], q[1], q[2], q[3], [0, 0], [L, 0], [L, D], [0, D], [0.6, 0.62, 0.65]);
+    }
+  }
+  return st.roof ? 'grandstand' : 'bleachers';
+}
+
 /** Tiered seating stepping up away from the field; a grandstand's roof over it on posts. */
 export function buildSeating(stone, full, st) {
+  if (st.sweep) return buildSwept(stone, st);
   const bx = st.box; const f = st.face;
   const along = bx.u;
   const L = bx.s1 - bx.s0; const D = bx.t1 - bx.t0;

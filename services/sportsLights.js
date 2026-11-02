@@ -117,6 +117,15 @@ export function planStandLights(seating) {
   const out = [];
   for (const st of seating || []) {
     if (!st.roof || String(st.tags?.lit || '').toLowerCase() === 'no') continue;
+    if (st.sweep) {
+      const { pts, topRows } = st.sweep;
+      const z = st.z1 + 0.45 + (topRows - 1) * 0.4 + 2.9;
+      for (let i = 1; i < pts.length; i += 2) {
+        const q = pts[i]; const o = (q.rows * 0.75) / 2;
+        out.push({ x: q.p[0] + q.n[0] * o, y: q.p[1] + q.n[1] * o, z });
+      }
+      continue;
+    }
     const bx = st.box; const L = bx.s1 - bx.s0;
     const rows = seatRows(st);
     const z = st.z1 + 0.45 + (rows - 1) * 0.4 + 2.9;

@@ -259,3 +259,68 @@ test('American handball is one-wall courts, no goals', async () => {
   const { pitchSport } = await import('../services/sportsFields.js');
   assert.equal(pitchSport({ leisure: 'pitch', sport: 'american_handball' }, { lat: 40.7, lon: -74 }), 'wallball');
 });
+
+test('a curved stand sweeps its rows along its front, none turned sideways', () => {
+  // a quarter ring round (0, 0), 300 to 370 m out, the track on the inside at 280 m
+  const arc = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+  const out = []; const inn = [];
+  for (let i = 0; i <= 40; i++) { const a = (Math.PI / 2) * (i / 40); out.push(arc(370, a)); inn.push(arc(300, a)); }
+  const ring = [...inn, ...out.reverse()];
+  const gs = area('c', ring, { building: 'grandstand' }, 'building');
+  const faceTo = (x, y) => { const L = Math.hypot(x, y) || 1; return [(x / L) * 280, (y / L) * 280]; };
+  const seats = planSeating([gs], project, [], { faceTo });
+  assert.ok(seats.length >= 3, `one object to each section: ${seats.length}`);
+  for (const st of seats) {
+    assert.ok(st.sweep, 'swept');
+    for (const q of st.sweep.pts) {
+      const r = Math.hypot(...q.p); const out = (q.p[0] * q.n[0] + q.p[1] * q.n[1]) / r;
+      assert.ok(Math.abs(r - 300) < 3, `the rows start at the front: ${r.toFixed(1)}`);
+      assert.ok(out > 0.97, `every row runs along the curve, its back away from the track: ${out.toFixed(2)}`);
+      assert.ok(q.rows * 0.75 <= 71, `the rows stay inside the outline: ${q.rows}`);
+    }
+  }
+  const stone = recorder();
+  assert.equal(buildSeating(stone, recorder(), seats[0]), 'grandstand');
+  assert.ok(stone.tris.length > 500, `seats built: ${stone.tris.length}`);
+  for (let i = 0; i + 1 < seats.length; i++) {
+    assert.equal(seats[i].sweep.pts.at(-1), seats[i + 1].sweep.pts[0], 'the sections join');
+    assert.ok(seats[i].sweep.after > 0 && seats[i + 1].sweep.before > 0, 'no wall where they join');
+  }
+  assert.equal(seats[0].sweep.before, 0, 'the stand\'s ends are closed');
+  assert.equal(seats.at(-1).sweep.after, 0);
+});
+
+test('a plain stand keeps its box, and a stand with nothing to watch keeps its pieces', () => {
+  const faceTo = (x, y) => [x, y - 30];
+  assert.ok(!planSeating([area('r', rect(0, 0, 80, 12), { building: 'grandstand' }, 'building')], project, [], { faceTo })[0].sweep);
+  const L = [[0, 0], [120, 0], [120, 20], [20, 20], [20, 100], [0, 100]];
+  assert.ok(planSeating([area('l', L, { building: 'grandstand' }, 'building')], project, []).every((st) => !st.sweep));
+});
+
+test('a curved stand ignores cutouts in its outline, not real gaps', () => {
+  const arc = (r, a) => [r * Math.cos(a), r * Math.sin(a)];
+  const faceTo = (x, y) => { const L = Math.hypot(x, y) || 1; return [(x / L) * 280, (y / L) * 280]; };
+  const R0 = 300; const R1 = 370;
+  const span = Math.PI / 2; const Lm = R0 * span;
+  // radius of the front and back at each angle; a notch `wide` metres across, 12 deep, in the middle of each
+  const outline = (wide) => {
+    const inn = []; const out = [];
+    for (let i = 0; i <= 200; i++) {
+      const a = span * (i / 200); const off = Math.abs(a / span - 0.5) * Lm < wide / 2;
+      inn.push(arc(R0 + (off ? 12 : 0), a)); out.push(arc(R1 - (off ? 12 : 0), a));
+    }
+    return [...inn, ...out.reverse()];
+  };
+  const plan = (wide) => planSeating([area('c', outline(wide), { building: 'grandstand', height: '30' }, 'building')], project, [], { faceTo }).flatMap((st) => st.sweep.pts);
+  const small = plan(50);
+  assert.ok(small.every((q) => Math.abs(Math.hypot(...q.p) - 300) < 2), `the front runs straight over a 50 m cutout: ${Math.max(...small.map((q) => Math.hypot(...q.p))).toFixed(1)}`);
+  const rows = small.map((q) => q.rows);
+  assert.ok(Math.max(...rows) - Math.min(...rows) <= 3, `and the rows with it: ${Math.min(...rows)}..${Math.max(...rows)}`);
+  const big = plan(200);
+  assert.ok(Math.max(...big.map((q) => Math.hypot(...q.p))) > 308, 'a 200 m bay is part of the shape');
+  // a stand that tapers keeps its taper
+  const inn = []; const out = [];
+  for (let i = 0; i <= 80; i++) { const a = span * (i / 80); inn.push(arc(300, a)); out.push(arc(325 + 60 * (i / 80), a)); }
+  const taper = planSeating([area('t', [...inn, ...out.reverse()], { building: 'grandstand', height: '30' }, 'building')], project, [], { faceTo }).flatMap((st) => st.sweep.pts);
+  assert.ok(Math.abs(taper[0].rows - taper[taper.length - 1].rows) > 10, `${taper[0].rows} to ${taper[taper.length - 1].rows}`);
+});
