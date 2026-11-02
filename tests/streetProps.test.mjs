@@ -15,28 +15,14 @@ const road = (owner, { y0 = 0, len = 600, half = 4, highway = 'residential', urb
   tags,
 });
 
-test('town streets: hydrants, and bins + benches on major ones, on the sidewalk', () => {
-  const cws = [road(1, { highway: 'tertiary', tags: { lit: 'yes' } })];
+test('town streets: benches on major ones; no hydrants or bins OSM does not map', () => {
+  const cws = [road(1, { highway: 'tertiary', tags: { lit: 'yes', sidewalk: 'both' } })];
   const runs = buildSidewalkRuns(cws);
   const { hydrants, bins, benches, poles } = placeStreetProps({ carriageways: cws, runs, heightAt: () => 10 });
-  // 600 m, both sides, 120 m apart per side
-  assert.ok(hydrants.length >= 6 && hydrants.length <= 10, `${hydrants.length} hydrants`);
-  assert.ok(bins.length >= 8, `${bins.length} bins`);
+  assert.equal(hydrants.length, 0, 'hydrants only where mapped');
+  assert.equal(bins.length, 0, 'bins only where mapped');
   assert.ok(benches.length >= 4, `${benches.length} benches`);
-  for (const h of hydrants) {
-    assert.ok(Math.abs(Math.abs(h.y) - 4.45) < 0.01, `hydrant 0.45 m past the curb (y ${h.y})`);
-    assert.ok(Math.abs(h.z - 10.15) < 1e-6, 'standing on the sidewalk top');
-  }
   assert.equal(poles.length, 0, 'a lit main street gets lamps, not wooden poles');
-});
-
-test('mapped hydrants keep generated ones away', () => {
-  const cws = [road(1)];
-  const runs = buildSidewalkRuns(cws);
-  const free = placeStreetProps({ carriageways: cws, runs }).hydrants.length;
-  const mapped = { hydrants: Array.from({ length: 7 }, (_, i) => [i * 100, 5]) };
-  const withMapped = placeStreetProps({ carriageways: cws, runs, mapped }).hydrants.length;
-  assert.ok(withMapped < free / 2, `${withMapped} generated next to mapped ones (${free} without)`);
 });
 
 test('country roads: a wired run of poles off one side', () => {

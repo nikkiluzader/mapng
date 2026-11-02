@@ -9,6 +9,7 @@
 
 const CELL_M = 16;
 const SAMPLE_STEP_M = 0.5;
+const SIDE_SLACK = 0.02;
 
 /**
  * Spatial index of carriageways: [{ owner, nodes: [[x,y,z,w]...], half }].
@@ -46,7 +47,7 @@ export function buildCarriagewayIndex(carriageways) {
  * The carriageways under (x, y), widened by `margin`: [{ owner, z }] with
  * each one's road height there.
  */
-export function carriagewaysAt(index, x, y, margin) {
+export function carriagewaysAt(index, x, y, margin, { sides = false } = {}) {
   const out = [];
   const cell = index.grid.get(`${Math.floor(x / CELL_M)},${Math.floor(y / CELL_M)}`);
   if (!cell) return out;
@@ -54,7 +55,11 @@ export function carriagewaysAt(index, x, y, margin) {
     const s = index.segments[idx];
     const dx = s.bx - s.ax; const dy = s.by - s.ay;
     const len = dx * dx + dy * dy;
-    const t = len > 0 ? Math.max(0, Math.min(1, ((x - s.ax) * dx + (y - s.ay) * dy) / len)) : 0;
+    const raw = len > 0 ? ((x - s.ax) * dx + (y - s.ay) * dy) / len : 0;
+    // (sides: beside a segment, not round the end of the way: a side street's
+    // end reaches across the road it meets)
+    if (sides && (raw < -SIDE_SLACK || raw > 1 + SIDE_SLACK)) continue;
+    const t = Math.max(0, Math.min(1, raw));
     const ex = s.ax + t * dx - x; const ey = s.ay + t * dy - y;
     const reach = s.half + margin;
     if (ex * ex + ey * ey < reach * reach) out.push({ owner: s.owner, z: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * t });

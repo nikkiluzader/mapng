@@ -6,6 +6,7 @@
 //
 //   node scripts/ingame/streetCompare.mjs <levelName> [--load] [--spots 20]
 //        [--tests ingame.json] [--source google|mapillary|both] [--out dir] [--min-year 2020]
+//        [--spot-file spots.json]
 //
 // Google Street View is the default reference: it renders the exact heading,
 // field of view and frame asked for, so the game view lines up. Mapillary
@@ -382,7 +383,9 @@ async function main() {
   const probe = jpegSize(await grab());
   const screenAspect = probe ? probe.w / probe.h : 16 / 9;
   const rows = [];
-  for (const spot of pickSpots(data.probes, failures)) {
+  // (--spot-file: chosen spots instead, as [{ x, y, z, h, k, road, category }])
+  const chosen = opt('--spot-file', null);
+  for (const spot of chosen ? JSON.parse(fs.readFileSync(chosen, 'utf8')) : pickSpots(data.probes, failures)) {
     if (rows.length >= SPOTS) break;
     const mly = SOURCE !== 'google' ? await mapillaryNear(spot.x, spot.y, spot.h) : null;
     const goo = SOURCE !== 'mapillary' ? await googleNear(spot.x, spot.y, spot.h) : null;

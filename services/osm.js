@@ -1,4 +1,5 @@
 import {
+  BUSINESS_NODES,
   OVERPASS_ENDPOINTS,
   buildOverpassQuery,
 } from "./overpassQuery.js";
@@ -10,6 +11,9 @@ import {
 } from "./overtureTiles.js";
 
 const OVERTURE_ENDPOINT = "overture-maps";
+
+const BUSINESS_NODE_KEYS = new Set(BUSINESS_NODES.map(([k, v]) => `${k}=${v}`));
+const isBusinessNode = (tags = {}) => BUSINESS_NODE_KEYS.has(`amenity=${tags.amenity}`) || BUSINESS_NODE_KEYS.has(`tourism=${tags.tourism}`);
 
 // "Add missing buildings and heights from Overture" (on unless turned off):
 // live OSM buildings get Overture's heights and the footprints OSM lacks.
@@ -321,6 +325,12 @@ export const parseOverpassResponse = (data, bounds) => {
             id: el.id.toString(), type: "fuel_station",
             geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
           });
+        } else if (isBusinessNode(el.tags)) {
+          // a restaurant, bar or hotel mapped as a point: its building's use
+          rawFeatures.push({
+            id: el.id.toString(), type: "business",
+            geometry: [{ lat: el.lat, lng: el.lon }], tags: el.tags,
+          });
         } else if (el.tags.man_made === "fuel_pump") {
           rawFeatures.push({
             id: el.id.toString(), type: "fuel_pump",
@@ -442,6 +452,9 @@ export const parseOverpassResponse = (data, bounds) => {
     } else if (!consumedWayIds.has(id) && (tags.power === "minor_line" || tags.power === "line") && !isClosedRing(w.nodes)) {
       // Overhead power lines: a pole (or tower) at every vertex (streetProps.js).
       rawFeatures.push({ id: id.toString(), type: "power_line", geometry: w.nodes, tags });
+    } else if (!consumedWayIds.has(id) && tags.man_made === "pier" && !tags.building && !isClosedRing(w.nodes)) {
+      // A pier mapped as a line (an area stays land use): a deck over the water.
+      rawFeatures.push({ id: id.toString(), type: "pier", geometry: w.nodes, tags });
     } else if (!consumedWayIds.has(id)) {
       const type = getFeatureType(tags);
       if (type) {

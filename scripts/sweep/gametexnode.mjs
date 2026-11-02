@@ -15,6 +15,7 @@ if (!proto.toBlob) proto.toBlob = function (cb, type = 'image/png') { cb(new Blo
 
 const { generateGameTexture } = await import('../../services/osmTexture.js');
 const { roundRoadCorners } = await import('../../services/roadCurves.js');
+const { measureStreetWidths } = await import('../../services/streetWidths.js');
 const [area, pngOut] = process.argv.slice(2);
 const dir = `${AREAS_DIR}/${area}/`;
 const meta = JSON.parse(fs.readFileSync(dir + 'meta.json'));
@@ -24,7 +25,7 @@ if (!fs.existsSync(satPng)) execFileSync('node', [`${REPO}/scripts/sweep/satelli
 const img = await loadImage(fs.readFileSync(satPng));
 const satelliteCanvas = createCanvas(img.width, img.height);
 satelliteCanvas.getContext('2d').drawImage(img, 0, 0);
-const terrainData = { width: meta.size, height: meta.size, bounds: meta.bounds, osmFeatures: roundRoadCorners(osm).features, processingMetersPerPixel: meta.mpp };
+const terrainData = { width: meta.size, height: meta.size, bounds: meta.bounds, osmFeatures: measureStreetWidths(roundRoadCorners(osm).features).features, processingMetersPerPixel: meta.mpp };
 const { blob } = await generateGameTexture(terrainData, { Roads: true, satelliteCanvas });
 fs.writeFileSync(pngOut, Buffer.from(await blob.arrayBuffer()));
 console.log(`game texture ${fs.statSync(pngOut).size} bytes -> ${pngOut}`);

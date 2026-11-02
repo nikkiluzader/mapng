@@ -153,7 +153,190 @@ export function streetIndex(features, project) {
     }
     return best;
   };
+  passages.push(...courtyardPassages(features, project, passages, facing));
   return { facing, passages };
+}
+
+// An enclosed courtyard (a building's inner ring) is reached through an
+// archway: OSM rarely maps the passage itself, only the paths inside and the
+// walk or square outside. The arch goes where a way outside ends at the wall
+// (or a square meets it) nearest the courtyard, else through the wall facing
+// the nearest street; straight to the courtyard's wall the shortest way, or
+// to a courtyard path's end there if that is little further.
+const COURTYARD_MIN_M2 = 40;
+const ARCH_HALF_M = 1.5;
+const ARCH_MAX_DEPTH_M = 30;     // the deepest wing an arch is cut through
+const ARCH_REACH_M = 4;          // a way's end this near a wall: it leads there
+const ARCH_PAST_M = 1;           // the passage's line runs on past each wall
+const ARCH_SKEW_SIN = Math.sin((15 * Math.PI) / 180);   // to a courtyard path's end: at most this far off square
+
+const ringArea = (r) => { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i]; const q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; } return Math.abs(a) / 2; };
+// the nearest point on a ring's edges to p: [x, y, distance]
+function nearestOnRing(p, ring) {
+  let best = null;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length]; const e = v2(a, b); const L2 = e[0] * e[0] + e[1] * e[1];
+    const t = L2 > 1e-9 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * e[0] + (p[1] - a[1]) * e[1]) / L2)) : 0;
+    const c = [a[0] + e[0] * t, a[1] + e[1] * t]; const d = Math.hypot(c[0] - p[0], c[1] - p[1]);
+    if (!best || d < best[2]) best = [c[0], c[1], d];
+  }
+  return best;
+}
+// the unit direction of a ring's edge nearest p
+function wallDirAt(p, ring) {
+  let best = null; let bd = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length]; const e = v2(a, b); const L = len2(e);
+    if (L < 1e-6) continue;
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * e[0] + (p[1] - a[1]) * e[1]) / (L * L)));
+    const d = Math.hypot(a[0] + e[0] * t - p[0], a[1] + e[1] * t - p[1]);
+    if (d < bd) { bd = d; best = [e[0] / L, e[1] / L]; }
+  }
+  return best;
+}
+// where a ray from p along unit d first meets a ring (within ARCH_MAX_DEPTH_M), or null
+function rayToRing(p, d, ring) {
+  let best = null;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length]; const e = v2(a, b);
+    const den = e[0] * d[1] - e[1] * d[0];
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((p[0] - a[0]) * d[1] - (p[1] - a[1]) * d[0]) / den;     // along the edge
+    const u = ((p[0] - a[0]) * e[1] - (p[1] - a[1]) * e[0]) / den;     // along the ray
+    if (t < 0 || t > 1 || u <= 0.1 || u > ARCH_MAX_DEPTH_M) continue;
+    if (best === null || u < best) best = u;
+  }
+  return best === null ? null : [p[0] + d[0] * best, p[1] + d[1] * best];
+}
+// how many times segment p-q crosses a ring's edges
+function crossingsOf(p, q, ring) {
+  let n = 0; const s = v2(p, q);
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length]; const e = v2(a, b);
+    const den = e[0] * s[1] - e[1] * s[0];
+    if (Math.abs(den) < 1e-9) continue;
+    const t = ((p[0] - a[0]) * s[1] - (p[1] - a[1]) * s[0]) / den;
+    const u = ((p[0] - a[0]) * e[1] - (p[1] - a[1]) * e[0]) / den;
+    if (t >= 0 && t <= 1 && u >= 0 && u <= 1) n++;
+  }
+  return n;
+}
+
+// The middle of where a square meets a building's outer wall (its edge
+// sampled every half metre; the longest run of samples on the wall, or else
+// within reach of it, halfway along it), or null.
+function squareFront(sq, outer) {
+  // (where it lies along the wall itself; failing that, where it comes near)
+  return squareFrontWithin(sq, outer, 0.15) ?? squareFrontWithin(sq, outer, ARCH_REACH_M);
+}
+function squareFrontWithin(sq, outer, reach) {
+  const runs = [];
+  let run = null;
+  for (let i = 0; i + 1 < sq.length; i++) {
+    const a = sq[i]; const b = sq[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const n = Math.max(1, Math.ceil(L / 0.5));
+    for (let k = 0; k < n; k++) {
+      const p = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
+      const near = nearestOnRing(p, outer)[2] < reach && (reach < 1 || !inRing(p, outer));
+      if (near) { if (!run) runs.push(run = { pts: [], len: 0 }); else run.len += Math.hypot(p[0] - run.pts[run.pts.length - 1][0], p[1] - run.pts[run.pts.length - 1][1]); run.pts.push(p); } else run = null;
+    }
+  }
+  // (a ring's run may wrap round its first vertex)
+  if (runs.length > 1 && runs[0].pts[0] && sq.length > 2) {
+    const first = runs[0]; const last = runs[runs.length - 1];
+    const lp = last.pts[last.pts.length - 1]; const fp = first.pts[0];
+    if (Math.hypot(lp[0] - fp[0], lp[1] - fp[1]) < 0.75) { last.len += first.len + Math.hypot(lp[0] - fp[0], lp[1] - fp[1]); last.pts.push(...first.pts); runs.shift(); }
+  }
+  const best = runs.sort((x, y) => y.len - x.len)[0];
+  if (!best || best.len < ARCH_HALF_M * 2) return null;
+  let walked = 0;
+  for (let i = 1; i < best.pts.length; i++) {
+    walked += Math.hypot(best.pts[i][0] - best.pts[i - 1][0], best.pts[i][1] - best.pts[i - 1][1]);
+    if (walked >= best.len / 2) return best.pts[i];
+  }
+  return best.pts[best.pts.length - 1];
+}
+
+/**
+ * Archways into enclosed courtyards: [{ line: [[x, y], [x, y]], half, courtyard: true }],
+ * one per courtyard no mapped passage reaches. facing(a, b): the street in front of a wall (streetIndex).
+ */
+export function courtyardPassages(features, project, mapped = [], facing = () => null) {
+  const out = [];
+  const ways = [];
+  const squares = [];
+  for (const f of features || []) {
+    const t = f?.tags || {};
+    if (f?.type !== 'road' || !t.highway || !(f.geometry?.length >= 2)) continue;
+    if (t.area === 'yes' && t.highway === 'pedestrian') { squares.push(f.geometry.map((p) => project(p.lat, p.lng))); continue; }
+    if ((t.tunnel && t.tunnel !== 'no') || (t.bridge && t.bridge !== 'no') || t.indoor === 'yes') continue;
+    const line = f.geometry.map((p) => project(p.lat, p.lng));
+    ways.push([line[0], line[line.length - 1]]);
+  }
+  for (const f of features || []) {
+    if (f?.type !== 'building' || !f.holes?.length || !(f.geometry?.length >= 4)) continue;
+    const t = f.tags || {};
+    // (a fort's or castle's gate is its own: buildingDetails fortGate)
+    if (t.historic === 'fort' || t.historic === 'castle' || t.building === 'castle' || t.military) continue;
+    const outer = f.geometry.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]);
+    for (const h of f.holes) {
+      const hole = h.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]);
+      if (hole.length < 3 || ringArea(hole) < COURTYARD_MIN_M2) continue;
+      // a mapped passage already into it
+      if (mapped.some(({ line }) => line.some((q, i) => i > 0 && crossingsOf(line[i - 1], q, hole) > 0))) continue;
+      // where the courtyard's paths end at its wall
+      const inner = [];
+      for (const [a, b] of ways) for (const e of [a, b]) if (inRing(e, hole) && nearestOnRing(e, hole)[2] < ARCH_REACH_M) inner.push(e);
+      // where the walks outside end at the building, and where squares meet it
+      const doors = [];
+      for (const [a, b] of ways) for (const e of [a, b]) if (!inRing(e, outer) && nearestOnRing(e, outer)[2] < ARCH_REACH_M) doors.push(e);
+      // (a square fronting the building: the arch in the middle of its frontage,
+      // the main entrance, before any side walk's end)
+      const fronts = squares.map((sq) => squareFront(sq, outer)).filter(Boolean);
+      if (fronts.length) doors.splice(0, doors.length, ...fronts);
+      if (!doors.length) {
+        // no way to the building: through the wall facing the nearest street
+        let best = null;
+        for (let i = 0; i < outer.length; i++) {
+          const a = outer[i]; const b = outer[(i + 1) % outer.length];
+          const d = facing(a, b) ?? facing(b, a);
+          if (d === null || len2(v2(a, b)) < ARCH_HALF_M * 3) continue;
+          if (!best || d < best.d) best = { d, mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], a, b };
+        }
+        if (best) {
+          // a step out from the wall's middle (outward: away from the hole's side)
+          const e = v2(best.a, best.b); const L = len2(e); const n = [-e[1] / L, e[0] / L];
+          const o = [best.mid[0] + n[0] * 0.5, best.mid[1] + n[1] * 0.5];
+          doors.push(inRing(o, outer) ? [best.mid[0] - n[0] * 0.5, best.mid[1] - n[1] * 0.5] : o);
+        }
+      }
+      let pick = null;
+      for (const o of doors) {
+        const w = nearestOnRing(o, outer);
+        // the outer wall's direction there (an arch cuts square through it)
+        const wall = wallDirAt(w, outer);
+        // straight in, square to the wall, first; the courtyard's nearest point
+        const ahead = wall ? rayToRing(w, [-wall[1], wall[0]], hole) ?? rayToRing(w, [wall[1], -wall[0]], hole) : null;
+        const targets = [ahead ?? nearestOnRing(w, hole).slice(0, 2), ...inner];
+        targets.forEach((c, k) => {
+          const L = Math.hypot(c[0] - w[0], c[1] - w[1]);
+          if (L > ARCH_MAX_DEPTH_M || L < 0.5) return;
+          // a courtyard path's end only if little further than the shortest way
+          const score = k === 0 ? L : L * 0.8 + 2;
+          // the line straight through the wing: past the outer wall once, the courtyard's once
+          const d = [(c[0] - w[0]) / L, (c[1] - w[1]) / L];
+          if (k > 0 && wall && Math.abs(d[0] * wall[0] + d[1] * wall[1]) > ARCH_SKEW_SIN) return;
+          const p = [w[0] - d[0] * ARCH_PAST_M, w[1] - d[1] * ARCH_PAST_M];
+          const q = [c[0] + d[0] * ARCH_PAST_M, c[1] + d[1] * ARCH_PAST_M];
+          if (crossingsOf(p, q, outer) !== 1 || crossingsOf(p, q, hole) !== 1) return;
+          if (f.holes.length > 1 && crossingsOf(p, q, outer) + crossingsOf(p, q, hole) !== 2) return;
+          if (!pick || score < pick.score) pick = { score, line: [p, q] };
+        });
+      }
+      if (pick) out.push({ line: pick.line, half: ARCH_HALF_M, courtyard: true });
+    }
+  }
+  return out;
 }
 
 // ── Flat-roofed blocks: parapet, coping, string course ────────────────────────
@@ -223,25 +406,84 @@ const FASCIA_COLOURS = [[0.12, 0.12, 0.13], [0.18, 0.12, 0.08], [0.1, 0.16, 0.12
 const SHOP_BAY_M = [4.5, 9];
 const AWNING_SHARE = 0.65;
 
-/** Shop by shop along the street wall a-b at the ground floor's top zTop: an awning or a fascia. */
-export function shopfronts(m, a, b, zTop, rnd) {
+/**
+ * Shop by shop along the street wall a-b at the ground floor's top zTop: an awning or a fascia.
+ * look: { awningShare, awnings, fascias, bay: [min, max] m, one: one colour along the wall } (a
+ * restaurant's own awnings, a pub's painted fascia).
+ */
+export function shopfronts(m, a, b, zTop, rnd, look = {}) {
   const e = v2(a, b); const L = len2(e);
   if (L < 3) return 0;
   const d = [e[0] / L, e[1] / L]; const out = [d[1], -d[0]];
+  const share = look.awningShare ?? AWNING_SHARE;
+  const awnings = look.awnings || AWNING_COLOURS; const fascias = look.fascias || FASCIA_COLOURS;
+  const bay = look.bay || SHOP_BAY_M;
   let s = 0.3; let k = 0; let n = 0;
   while (s < L - 1.5) {
-    let w = SHOP_BAY_M[0] + (SHOP_BAY_M[1] - SHOP_BAY_M[0]) * rnd('w', k);
+    let w = bay[0] + (bay[1] - bay[0]) * rnd('w', k);
     if (L - 0.3 - (s + w) < 2.5) w = L - 0.3 - s;
     const p = [a[0] + d[0] * (s + 0.15), a[1] + d[1] * (s + 0.15)];
     const q = [a[0] + d[0] * (s + w - 0.15), a[1] + d[1] * (s + w - 0.15)];
-    if (rnd('awn', k) < AWNING_SHARE) awning(m, p, q, out, zTop - 0.35, AWNING_COLOURS[Math.floor(rnd('ac', k) * AWNING_COLOURS.length)]);
+    const kk = look.one ? 0 : k;
+    if (rnd('awn', k) < share) awning(m, p, q, out, zTop - 0.35, awnings[Math.floor(rnd('ac', kk) * awnings.length)]);
     else {
       const c = [(p[0] + q[0]) / 2 + out[0] * 0.08, (p[1] + q[1]) / 2 + out[1] * 0.08];
-      box(m, 'metalWhite', c, d, len2(v2(p, q)) / 2, 0.08, zTop - 1.05, zTop - 0.3, FASCIA_COLOURS[Math.floor(rnd('fc', k) * FASCIA_COLOURS.length)]);
+      box(m, 'metalWhite', c, d, len2(v2(p, q)) / 2, 0.08, zTop - 1.05, zTop - 0.3, fascias[Math.floor(rnd('fc', kk) * fascias.length)]);
     }
     s += w; k++; n++;
   }
   return n;
+}
+
+// ── Hotels and pubs ──────────────────────────────────────────────────────────
+
+// a hotel's entrance canopy: burgundy, navy, forest green, bronze, black
+export const CANOPY_COLOURS = [[0.42, 0.08, 0.1], [0.08, 0.12, 0.26], [0.1, 0.24, 0.15], [0.42, 0.3, 0.16], [0.1, 0.1, 0.11]];
+const BRASS = [0.72, 0.58, 0.3];
+const GLASS_DOOR = [0.16, 0.2, 0.24];
+const CANOPY_OUT_M = 3.2;
+
+/**
+ * A hotel's entrance on wall a-b (at its middle): glass doors under a flat canopy reaching
+ * CANOPY_OUT_M out over the sidewalk on two brass posts, its deep edge in the hotel's colour.
+ * Returns the canopy's middle front point (for a sign or flags), or null on a short wall.
+ */
+export function hotelCanopy(m, a, b, base, col) {
+  const e = v2(a, b); const L = len2(e);
+  if (L < 6) return null;
+  const d = [e[0] / L, e[1] / L]; const out = [d[1], -d[0]];
+  const half = Math.min(4.5, L * 0.3);
+  const mid = [a[0] + d[0] * L / 2, a[1] + d[1] * L / 2];
+  const at = (k) => [mid[0] + out[0] * k, mid[1] + out[1] * k];
+  const zc = base + 3.3;
+  // the canopy slab and its deep fascia
+  box(m, 'metalWhite', at(CANOPY_OUT_M / 2), d, half, CANOPY_OUT_M / 2, zc, zc + 0.18, col.map((c) => c * 0.8), { bottom: true });
+  box(m, 'metalWhite', at(CANOPY_OUT_M - 0.06), d, half + 0.05, 0.08, zc - 0.25, zc + 0.45, col);
+  for (const sgn of [-1, 1]) {
+    box(m, 'metalWhite', at(CANOPY_OUT_M / 2).map((v, i) => v + d[i] * sgn * (half + 0.0)), out, CANOPY_OUT_M / 2, 0.06, zc - 0.25, zc + 0.45, col);   // sides
+    const post = [mid[0] + out[0] * (CANOPY_OUT_M - 0.25) + d[0] * sgn * (half - 0.25), mid[1] + out[1] * (CANOPY_OUT_M - 0.25) + d[1] * sgn * (half - 0.25)];
+    cylinder(m, 'metalWhite', post[0], post[1], 0.09, base - 0.2, zc, BRASS, { n: 10 });
+  }
+  // glass doors in a brass frame
+  box(m, 'metalWhite', at(0.05), d, Math.min(1.8, half - 0.5) + 0.12, 0.05, base, base + 2.75, BRASS);
+  box(m, 'metalWhite', at(0.09), d, Math.min(1.8, half - 0.5), 0.05, base, base + 2.6, GLASS_DOOR);
+  return { front: at(CANOPY_OUT_M), mid, d, out, half, zTop: zc + 0.45 };
+}
+
+// a pub's sign board: oxblood, bottle green, black, navy, cream
+export const PUB_SIGN_COLOURS = [[0.38, 0.08, 0.07], [0.08, 0.22, 0.12], [0.08, 0.08, 0.09], [0.08, 0.12, 0.24], [0.88, 0.84, 0.72]];
+// a pub's painted front: the same, darker
+export const PUB_FASCIAS = [[0.3, 0.06, 0.05], [0.06, 0.17, 0.09], [0.06, 0.06, 0.07], [0.06, 0.09, 0.19]];
+
+/** A pub's sign hanging from an iron bracket at wall point c (out: away from the wall), its top at z. */
+export function hangingSign(m, c, along, out, z, col) {
+  const iron = [0.08, 0.08, 0.08];
+  box(m, 'metalWhite', [c[0] + out[0] * 0.55, c[1] + out[1] * 0.55], out, 0.6, 0.03, z - 0.05, z + 0.03, iron);   // the arm
+  box(m, 'metalWhite', [c[0] + out[0] * 0.04, c[1] + out[1] * 0.04], along, 0.08, 0.04, z - 0.35, z + 0.1, iron);   // its wall plate
+  // the board, across the arm, in a gold frame
+  const bc = [c[0] + out[0] * 0.7, c[1] + out[1] * 0.7];
+  box(m, 'metalWhite', bc, out, 0.42, 0.035, z - 1.05, z - 0.12, BRASS);
+  box(m, 'metalWhite', bc, out, 0.37, 0.045, z - 1.0, z - 0.17, col);
 }
 
 const AWNING_OUT_M = 1.3;
@@ -539,15 +781,16 @@ export function passageInside(m, p, q, half, zFloor, zTop, mat, tint) {
 }
 
 /** Each passage road's stretch through the footprint: [{ p, q, half }] between its crossings of the ring. */
-export function passageCrossings(ring, passages) {
+export function passageCrossings(ring, passages, holes = []) {
   const out = [];
+  const rings = [ring, ...holes];
   for (const { line, half } of passages || []) {
     const hits = [];
     let s0 = 0;
     for (let i = 0; i + 1 < line.length; i++) {
       const p = line[i]; const q = line[i + 1]; const s = v2(p, q); const sl = len2(s);
-      for (let j = 0; j < ring.length; j++) {
-        const a = ring[j]; const b = ring[(j + 1) % ring.length]; const e = v2(a, b);
+      for (const r of rings) for (let j = 0; j < r.length; j++) {
+        const a = r[j]; const b = r[(j + 1) % r.length]; const e = v2(a, b);
         const den = e[0] * s[1] - e[1] * s[0];
         if (Math.abs(den) < 1e-9) continue;
         const t = ((p[0] - a[0]) * s[1] - (p[1] - a[1]) * s[0]) / den;

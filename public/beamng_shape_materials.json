@@ -5107,6 +5107,20 @@
     }
   },
   "prop_library": {
+    "SOFT_COLLISION_GENERAL": {
+      "Stages": [
+        {},
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "groundDepth": 1,
+      "groundType": "SOFT_COLLISION_GENERAL",
+      "mapTo": "SOFT_COLLISION_GENERAL",
+      "name": "SOFT_COLLISION_GENERAL",
+      "persistentId": "395e88fc-6f2b-4624-88fa-fb4b0f8a4163"
+    },
     "bld_glass_transparent": {
       "Stages": [
         {
@@ -5280,6 +5294,62 @@
       "name": "concrete_plain",
       "persistentId": "0affa924-0c54-48c6-b635-e529d390a043",
       "translucent": true,
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "cypress": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tree/cypress/t_cypress_leaves/t_cypress_leaves_ao.data.png",
+          "baseColorFactor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tree/cypress/t_cypress_leaves/t_cypress_leaves_b.color.png",
+          "normalMap": "/assets/materials/tree/cypress/t_cypress_leaves/t_cypress_leaves_nm.normal.png",
+          "opacityMap": "/assets/materials/tree/cypress/t_cypress_leaves/t_cypress_leaves_o.data.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tree/cypress/t_cypress_leaves/t_cypress_leaves_r.data.png",
+          "specular": [
+            0.992156982,
+            0.992156982,
+            0.992156982,
+            1
+          ]
+        },
+        {
+          "baseColorFactor": null,
+          "pixelSpecular": null,
+          "specular": null
+        },
+        {
+          "baseColorFactor": null,
+          "pixelSpecular": null,
+          "specular": null
+        },
+        {
+          "baseColorFactor": null,
+          "pixelSpecular": null,
+          "specular": null
+        }
+      ],
+      "alphaRef": 100,
+      "alphaTest": true,
+      "annotation": "NATURE",
+      "class": "Material",
+      "doubleSided": true,
+      "invertBackFaceNormals": true,
+      "mapTo": "cypress",
+      "materialTag0": "beamng",
+      "materialTag1": "vegetation",
+      "materialTag2": "Natural",
+      "materialTag3": "vegetation",
+      "name": "cypress",
+      "persistentId": "9db1e299-b9ca-4e8e-9e86-1dd51386c157",
+      "subSurface": true,
+      "subSurfaceIntensity": 1,
       "translucentBlendOp": "None",
       "version": 1.5
     },
@@ -5459,6 +5529,28 @@
       "specularStrength0": "0.588235",
       "translucentBlendOp": "None"
     },
+    "eca_bld_shop_opaque_decoration": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/baked_props/eca_bld_shop_opaque_decoration/eca_bld_shop_opaque_decoration_d.dds",
+          "specularPower": 1,
+          "useAnisotropic": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "WOOD",
+      "mapTo": "eca_bld_shop_opaque_decoration",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "east_coast_usa",
+      "name": "eca_bld_shop_opaque_decoration",
+      "persistentId": "a93d21a1-62eb-4ea5-9928-eee9739aa887",
+      "translucentBlendOp": "None"
+    },
     "garbage": {
       "Stages": [
         {
@@ -5583,6 +5675,142 @@
       "name": "it_concrete_roadside_walls",
       "persistentId": "eff15c8f-7476-4094-842a-817fceb2d6bd",
       "translucentBlendOp": "None"
+    },
+    "italy_billboards": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/billboard_label/italy_billboards/italy_billboards_d.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "PLASTIC",
+      "mapTo": "italy_billboards",
+      "materialTag0": "beamng",
+      "materialTag1": "sign",
+      "materialTag2": "italy",
+      "name": "italy_billboards",
+      "order_simset": 0,
+      "persistentId": "0beeff77-4ad5-4ed2-bda0-a6b98fd5fc26",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None"
+    },
+    "italy_bld_commercial_clutter": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/baked_props/Italy_bld_commercial_clutter/Italy_bld_commercial_clutter.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            3,
+            3
+          ],
+          "diffuseColor": [
+            0.99607801437378,
+            0.99607801437378,
+            0.99607801437378,
+            0.867999971
+          ],
+          "specular": [
+            0.99607801437378,
+            0.99607801437378,
+            0.99607801437378,
+            1
+          ],
+          "specularPower": 66,
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 205,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "METAL",
+      "mapTo": "italy_bld_commercial_clutter",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_bld_commercial_clutter",
+      "persistentId": "146c9a88-029b-418d-829c-fbc80ca541ae",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "Sub"
+    },
+    "italy_bld_decals": {
+      "Stages": [
+        {
+          "baseColorFactor": [
+            0.901961029,
+            0.901961029,
+            0.901961029,
+            1
+          ],
+          "baseColorMap": "/assets/materials/decal/dirt/italy_bld_decals/t_italy_bld_decals_b.color.png",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            8,
+            8
+          ],
+          "normalMap": "/assets/materials/decal/dirt/italy_bld_decals/t_italy_bld_decals_nm.normal.png",
+          "opacityMap": "/assets/materials/decal/dirt/italy_bld_decals/t_italy_bld_decals_o.data.png",
+          "pixelSpecular": true,
+          "roughnessFactor": 0.638332963,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "pixelSpecular": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 0,
+      "alphaTest": true,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "SOFT_COLLISION_GENERAL",
+      "mapTo": "italy_bld_decals",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_bld_decals",
+      "persistentId": "99a4e03f-efbb-42a2-b9f9-208454c89c0b",
+      "specularStrength0": "0.490196",
+      "translucent": true,
+      "translucentZWrite": true,
+      "version": 1.5
     },
     "italy_bld_metal": {
       "Stages": [
@@ -5789,6 +6017,73 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "italy_plastic": {
+      "Stages": [
+        {
+          "baseColorFactor": [
+            1,
+            0.999989986,
+            0.999989986,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/plastic/italy_plastic/t_italy_plastic_b.color.png",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "instanceDiffuse": true,
+          "normalMap": "/assets/materials/tileable/plastic/italy_plastic/t_italy_plastic_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/plastic/italy_plastic/t_italy_plastic_r.data.png",
+          "specular": [
+            0.382995993,
+            0.382991999,
+            0.382991999,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "pixelSpecular": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "PLASTIC",
+      "mapTo": "italy_plastic",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_plastic",
+      "persistentId": "b99d83b8-4e4d-489d-a81c-fcd610d76b40",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "italy_rock_wall_tiling": {
       "Stages": [
         {
@@ -5841,6 +6136,21 @@
       "persistentId": "2f1a78ae-69d1-4b6c-be38-6d39fdfead0b",
       "translucentBlendOp": "None"
     },
+    "leaves_strong": {
+      "Stages": [
+        {},
+        {},
+        {},
+        {}
+      ],
+      "annotation": "NATURE",
+      "class": "Material",
+      "groundDepth": 0.600000024,
+      "groundType": "leaves_strong",
+      "mapTo": "leaves_strong",
+      "name": "leaves_strong",
+      "persistentId": "7e8157dc-940e-4435-937b-e934d4e42892"
+    },
     "lod_vertcol": {
       "Stages": [
         {
@@ -5864,6 +6174,31 @@
       "name": "lod_vertcol",
       "persistentId": "3122f280-003f-419e-ba18-ba85683d01ed",
       "translucentBlendOp": "None"
+    },
+    "m_cypress_distant": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tree/cypress/t_cypress_leaves_distant/t_cypress_leaves_distant_ao.data.png",
+          "baseColorMap": "/assets/materials/tree/cypress/t_cypress_leaves_distant/t_cypress_leaves_distant_b.color.png",
+          "normalMap": "/assets/materials/tree/cypress/t_cypress_leaves_distant/t_cypress_leaves_distant_nm.normal.png",
+          "opacityMap": "/assets/materials/tree/cypress/t_cypress_leaves_distant/t_cypress_leaves_distant_o.data.png",
+          "roughnessMap": "/assets/materials/tree/cypress/t_cypress_leaves_distant/t_cypress_leaves_distant_r.data.png"
+        },
+        {},
+        {},
+        {}
+      ],
+      "alphaRef": 75,
+      "alphaTest": true,
+      "class": "Material",
+      "doubleSided": true,
+      "dynamicCubemap": true,
+      "invertBackFaceNormals": true,
+      "mapTo": "m_cypress_distant",
+      "name": "m_cypress_distant",
+      "subSurface": true,
+      "subSurfaceIntensity": 1,
+      "version": 1.5
     },
     "m_gm_concrete_edges": {
       "Stages": [

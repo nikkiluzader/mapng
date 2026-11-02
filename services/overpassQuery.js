@@ -6,7 +6,7 @@
  * Bump OVERPASS_QUERY_VERSION whenever the query changes: it is part of the
  * Worker's cache key, so stale answers to an old query are never served.
  */
-export const OVERPASS_QUERY_VERSION = 2;   // 2: traffic_calming nodes
+export const OVERPASS_QUERY_VERSION = 3;   // 2: traffic_calming nodes; 3: food, drink and lodging nodes
 
 // Public Overpass mirrors (volunteer-run; any of them may be down).
 export const OVERPASS_ENDPOINTS = [
@@ -59,6 +59,13 @@ export const GATE_BARRIERS = [
   'stile', 'entrance', 'cattle_grid', 'turnstile', 'full-height_turnstile',
 ];
 
+// Food, drink and lodging, often mapped as a point inside the building
+// rather than on its outline.
+export const BUSINESS_NODES = [
+  ...['restaurant', 'cafe', 'bar', 'pub', 'fast_food', 'biergarten', 'nightclub', 'ice_cream'].map((v) => ['amenity', v]),
+  ...['hotel', 'motel', 'guest_house', 'hostel'].map((v) => ['tourism', v]),
+];
+
 export const OSM_FILTER = {
   wayKeys: [
     'highway', 'building', 'waterway', 'barrier', 'aeroway', 'man_made', 'public_transport',
@@ -79,6 +86,8 @@ export const OSM_FILTER = {
     ['traffic_calming', 'bump'], ['traffic_calming', 'hump'], ['traffic_calming', 'table'], ['traffic_calming', 'cushion'],
     ['amenity', 'fountain'], ['amenity', 'drinking_water'],
     ...GATE_BARRIERS.map((v) => ['barrier', v]),
+    // what a building is used for, mapped as a point inside it (beamngBuildings: its look)
+    ...BUSINESS_NODES,
   ],
 };
 

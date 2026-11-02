@@ -1,8 +1,10 @@
 // Street props along the drawn roads: fire hydrants, trash bins, benches and
 // wooden utility poles with their wires (after BeamNG.Earth server/furniture.py).
-// OSM maps few hydrants, bins or distribution poles, so the streets get them at
-// real-world spacings; mapped ones are used where they exist and keep the
-// generated ones of the same kind away.
+// Hydrants and bins only where OSM maps them (placed with the mapped street
+// furniture, not here: generated every hundred metres along every sidewalk
+// they were far too many); benches and distribution poles, which OSM maps
+// few of, at real-world spacings, the mapped ones keeping generated ones of
+// the same kind away.
 //
 // Works in world space on generateDecalRoads' carriageways (nodes [x, y, z, w],
 // `half` = half the paved width) and buildSidewalkRuns' curb runs (points on the
@@ -13,11 +15,7 @@ import { buildCarriagewayIndex, isOnCrossingCarriageway, isOnOtherCarriageway } 
 import { isLitRoad } from './streetLamps.js';
 
 // Spacings (m) and offsets, BeamNG.Earth's (US practice).
-const HYDRANT_SPACING_M = 120;
-const BIN_SPACING_M = 90;
 const BENCH_SPACING_M = 140;
-const HYDRANT_CURB_M = 0.45;       // from the curb onto the sidewalk
-const BIN_CURB_M = 0.7;
 const BENCH_BACK_M = 0.45;         // from the back of the sidewalk
 const END_CLEAR_M = 4;             // kept clear of a run's ends (corners, ramps)
 const MAPPED_CLEAR_M = { hydrant: 60, bin: 45, bench: 70 };
@@ -339,7 +337,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   for (const [x, y] of mapped.bins || []) taken.bin.add(x, y);
   for (const [x, y] of mapped.benches || []) taken.bench.add(x, y);
 
-  // ── On the sidewalks: hydrants (all town streets), bins and benches (major ones)
+  // ── On the sidewalks: benches (major streets)
   for (const run of runs) {
     const cw = byOwner.get(run.owner);
     if (!cw?.urban) continue;
@@ -353,12 +351,8 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
         list.push({ x, y, z: st.z + CURB_H, yaw: yawFn(out, x, y) });
       }
     };
-    put(hydrants, 'hydrant', HYDRANT_SPACING_M,
-      hash01(id, 'hyd') * HYDRANT_SPACING_M + (run.side < 0 ? HYDRANT_SPACING_M / 2 : 0),
-      HYDRANT_CURB_M, (o, x, y) => hash01(x.toFixed(1), y.toFixed(1)) * Math.PI * 2);
-    if (MAJOR.has(String(cw.highway ?? '').replace(/_link$/, ''))) {
-      put(bins, 'bin', BIN_SPACING_M, hash01(id, run.side, 'bin') * BIN_SPACING_M, BIN_CURB_M,
-        (o) => Math.atan2(-o[1], -o[0]));
+    // (benches stand on a sidewalk, not behind a bare curb)
+    if (run.width > 0.5 && MAJOR.has(String(cw.highway ?? '').replace(/_link$/, ''))) {
       // Benches at the back of the sidewalk, facing the street.
       put(benches, 'bench', BENCH_SPACING_M, hash01(id, run.side, 'bench') * BENCH_SPACING_M,
         Math.max(0.6, run.width - BENCH_BACK_M), (o) => Math.atan2(-o[1], -o[0]));

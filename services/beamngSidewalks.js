@@ -15,8 +15,11 @@
 // BeamNG.Earth's (server/sidewalks.py), measured on official US curbs.
 
 import * as THREE from 'three';
+import polygonClipping from 'polygon-clipping';
 import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
+import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
+import { smoothLine } from './lineSmoothing.js';
 
 const CURB_H = 0.15;          // m above the road
 const SINK = 0.10;            // m the faces reach below the road
@@ -27,11 +30,78 @@ const CURB_W = 0.15;          // m of curb top band
 const CROSS_SLOPE = 0.015;    // slab rises away from the road
 const BACK_SLOPE_RUN = 2.0;   // back falls to the ground at 1:2, no wheel-catching ledge
 const CURB_REPEAT_M = 9.0;    // m of curb per texture width
-const SLAB_REPEAT_M = 45.0;   // m of sidewalk per texture width
+const SLAB_TILE_M = 10;        // m of sidewalk to one repeat of its texture, along and across alike
 const DEFAULT_WIDTH_M = 2.0;
 const MAX_WIDTH_M = 6.0;
 const CUT_MARGIN_M = 0.5;     // runs stop this far outside other carriageways
 const MIN_RUN_M = 8;
+const WALK_H = 0.1;           // a walkway away from the curb, over the ground
+const WALK_RAMP_UP_M = 0.35;  // a walkway's end climbs to a road no more than this
+const WALK_MIN_M = 3;
+const WALK_LANDING_M = 0.8;
+const WALK_DIP_NODES = 3;     // a dip this many points across is not the ground's shape
+const WALK_SHORE_M = 0.2;     // a walkway stops at the water's edge
+const DECK_CLEAR_M = 1.2;     // a deck over the water
+const DECK_SHORE_M = 0.8;     // ground this far over the deck level is land, not a shallow
+const DECK_LAND_NODES = 4;    // ... along this many of a deck's 2 m points together
+const DECK_ROAD_M = 3.5;      // a footway this near a bridge's road is on that bridge
+const DECK_POST_M = 4;
+const WALL_WATER_M = 0.5;      // ground this little over the water is the water's side
+const WALL_INNER_LIFT_M = 0.5; // the deck's land edge over the highest ground along it
+const WALL_SLOPE_DROP_M = 1;  // down to the water's edge
+const WALL_LOOK_M = 2.5;      // how far past its edge a wall looks for the water
+const WALL_GROUND_UNDER_M = 0.25;
+const WALL_POINT_M = 3;       // the outline's points, a panel of wall apart
+const WALL_TOP_REACH_M = 2.5; // a wall this near an edge carries it
+const WALL_SHARE = 0.6;       // walls along this much of the outline: they are its sides
+const GANGWAY_REACH_M = 8;    // a deck's end looks this far on for the shore
+const GANGWAY_MIN_DROP_M = 0.4;
+const GANGWAY_SLOPE = 0.27;   // a gangway's usual slope (15 degrees)
+const GANGWAY_MAX_SLOPE = 0.4; // steeper is stairs
+const GANGWAY_MAX_RUN_M = 14;
+const GANGWAY_HALF_M = 0.6;
+const GANGWAY_RAIL_M = 1.05;
+const GANGWAY_POST_M = 1.6;
+const STAIR_RISE_M = 0.18;
+const STAIR_SLOPE = 0.7;
+const APRON_MAX_M = 3;        // a walkway this near a wall is decked out to it
+const APRON_MIN_M = 0.15;
+const SEAWALL_APRON_MAX_M = 12; // further out where the wall holds back the water (a promenade)
+const SEAWALL_LOOK_M = 2;       // water this far past the wall makes it a seawall
+const SEAWALL_ACROSS = 0.35;    // and it runs alongside the walk (within about 20°)
+const SEAWALL_RISE_M = 0.1;     // over ground about level with the walk
+const SEAWALL_MIN_LEN_M = 15;   // along a stretch of wall this long at least
+const POCKET_CLOSE_M = 0.6;     // gaps this narrow between walks, roads and walls still close a pocket
+const POCKET_MAX_M2 = 1500;     // land shut in by walks and a seawall, up to this big, is paved
+const POCKET_MIN_M2 = 2;
+const POCKET_WALL_SHARE = 0.25; // with a seawall along this much of its edge at least
+const POCKET_REACH_M = 40;      // (looked for this near a seawall)
+const POCKET_CELL_M = 3;        // its top cut in cells this size, to follow the walks' heights
+const APRON_STEP_M = 1;
+const APRON_RISE_M = 0.5;       // a deck rises over ground up to this far above the walk, no more
+const APRON_COVER_M = 0.05;
+const WALK_EDGE_M = 1.5;      // an end this short of a road's edge is carried on to it
+const WALK_TOUCH_M = 1;       // an end this near another walkway's line is on it (a short stub's far end is not)
+const WALK_SNAP_M = 1;        // a footway this near a curb is closed up to it
+const WALK_PUSH_SPREAD = 3;
+const WALK_INSIDE_MAX_M = 3;
+const WALK_STUB_M = 1.5;
+const WALK_DUP_M = 0.05;      // a walk's points this close together are one       // a walk piece this short ramping to a road: left out  // a walk this far inside a road's drawn edge is pushed out past it   // a walk's push off a curb, spread this many points either way
+const WALK_STREET_LEVEL_M = 5; // and this near a street takes its height from it (a sidewalk along the shop fronts too: on the ground raised to their foundations it stood a step over the walks it met)
+const WALK_UNDER_M = 0.14;    // the ground under a walkway's top (it can't follow the slab closely on a 1 m grid)
+const WALK_SINK_M = 0.3;      // and how far its edges reach down
+const WALK_REACH_M = 3.5;     // an end this short of a road is carried on to it
+const WALK_JOIN_M = 2.5;      // walkway ends this near another walkway meet it
+const WALK_ROAD_M = -0.3;     // a walkway's sides may lie this far over a road's edge (its curb), never further
+const WALK_CURB_M = 0.6;      // an end this near a road comes out to it
+const WALK_RAMP_M = 3;        // ... over this much of its length
+const WALK_STREET_M = 14;     // a footway this near a street, most of its length, is its sidewalk
+const WALK_STREET_SHARE = 0.6;
+// a mapped footway is a street's sidewalk along this much of the way
+const FOOTWAY_SETBACK_M = 14;  // a footway this far off is still the street's sidewalk, set back
+const FOOTWAY_SHARE = 0.4;
+const FOOTWAY_ALONG_COS = 0.85;
+const FOOTWAY_CELL_M = 24;
 const RAMP_M = 1.8;           // a loose end's curb ramp: down to the road over this (1:12)
 // Curb return radius by the larger road's class (BeamNG.Earth's survey of
 // city corners), tried smaller until the corner clears every carriageway.
@@ -55,9 +125,13 @@ const DUAL_GAP_M = [4, 45];
 const DUAL_ANGLE_COS = Math.cos((25 * Math.PI) / 180);
 const MEDIAN_MIN_M = 0.8;
 const MEDIAN_MAX_M = 16;
-const MEDIAN_SLAB_M = 6;
+const MEDIAN_SLAB_M = 1.5;     // narrower: a concrete island; wider: two curbs, the ground between
+const MEDIAN_BARRIER_M = 4;    // a fast road's median narrower than this: a jersey barrier
+const FAST_CLASSES = new Set(['motorway', 'trunk']);
+const BARRIER_PIECE_M = 3;
 const MEDIAN_CURB_W = 0.6;
 const MEDIAN_MIN_RUN_M = 20;
+const MEDIAN_FILL_M = 4;
 const MEDIAN_SIDE_SHARE = 0.3;   // a carriageway whose side faces a median this much of its length: no sidewalk there
 
 // curbs sheet (1024 × 512, 8 bands of 64 px, v up): band 0, light rows 0–40.
@@ -65,10 +139,16 @@ const V_BAND_TOP = 1 - 1 / 512;
 const V_LIGHT_LOW = 1 - 40 / 512;
 const V_BAND_LOW = 1 - 63 / 512;
 // sidewalk1 sheet: its top strip across the slab.
-const V_SLAB_IN = 1 - 0.195;
-const V_SLAB_OUT = 1 - 0.005;
 
-export const SIDEWALK_MATERIALS = { curb: 'mapng_curbs', slab: 'mapng_sidewalk' };
+// (bricks, pavers, sett, cobble: walks mapped in stone or brick, with the
+// squares' materials, plazas.js)
+const PAVED_SETS = ['bricks', 'pavers', 'sett', 'cobble'];
+export const SIDEWALK_MATERIALS = {
+  curb: 'mapng_curbs', slab: 'mapng_sidewalk', paved: 'mapng_corner_asphalt', wood: 'mapng_pier_wood', metal: 'mapng_gangway_aluminium',
+  ...Object.fromEntries(PAVED_SETS.map((set) => [set, PLAZA_MATERIAL(set)])),
+};
+/** The game's own crosswalk paint with square bars, Italy's (its definition lives with that level). */
+export const ZEBRA_CROSSING_MATERIAL = 'italy_road_markings_zebra';
 
 /** Material definitions (shared /assets textures; West Coast USA's settings). */
 export function getSidewalkMaterialDefs() {
@@ -78,7 +158,42 @@ export function getSidewalkMaterialDefs() {
     name, mapTo: name, class: 'Material', version: 1.5, annotation: 'SIDEWALK',
     groundType: 'CONCRETE', Stages: [stage, {}, {}, {}], translucentBlendOp: 'None',
   });
+  const ZEBRA = '/assets/materials/decalroad/lines';
   return {
+    [ZEBRA_CROSSING_MATERIAL]: {
+      name: ZEBRA_CROSSING_MATERIAL, mapTo: ZEBRA_CROSSING_MATERIAL, class: 'Material', version: 1.5, annotation: 'SOLID_LINE',
+      Stages: [{
+        baseColorMap: `${ZEBRA}/italy_road_markings_zebra/t_line_crossing_white_b.color.png`,
+        normalMap: `${ZEBRA}/italy_road_markings_zebra/t_line_crossing_white_nm.normal.png`,
+        opacityFactor: 0.75,
+        opacityMap: `${ZEBRA}/italy_road_markings_zebra/t_line_crossing_white_o.data.png`,
+        roughnessMap: `${ZEBRA}/m_marking_zebra/t_line_crossing_white_r.data.png`,
+      }, {}, {}, {}],
+      alphaRef: 32, alphaTest: true, castShadows: false, groundType: 'ASPHALT', materialTag0: 'RoadAndPath', materialTag1: 'beamng',
+      specularStrength0: '0', translucent: true, translucentZWrite: true,
+    },
+    [SIDEWALK_MATERIALS.paved]: {
+      ...def(SIDEWALK_MATERIALS.paved, {
+        ambientOcclusionMap: '/assets/materials/tileable/road/road_asphalt_light/t_road_asphalt1_ao.data.png',
+        baseColorMap: '/assets/materials/decalroad/asphalt/road_rubber_sticky/t_road_asphalt1_b.color.png',
+        normalMap: '/assets/materials/tileable/road/road_asphalt_light/t_road_asphalt1_nm.normal.png',
+        roughnessMap: '/assets/materials/decalroad/asphalt/road_rubber_sticky/t_asphalt1_r.data.png',
+      }),
+      annotation: 'ASPHALT',
+      groundType: 'ASPHALT',
+    },
+    [SIDEWALK_MATERIALS.wood]: {
+      ...def(SIDEWALK_MATERIALS.wood, {
+        baseColorFactor: [0.5, 0.42, 0.34, 1],
+        baseColorMap: '/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_d.dds',
+        normalMap: '/assets/materials/tileable/wood/eca_bld_wood/eca_bld_wood_n.dds',
+      }),
+      annotation: 'WOOD', groundType: 'WOOD',
+    },
+    [SIDEWALK_MATERIALS.metal]: {
+      ...def(SIDEWALK_MATERIALS.metal, { baseColorFactor: [0.68, 0.7, 0.72, 1], metallicFactor: 0.85, roughnessFactor: 0.45 }),
+      annotation: 'METAL', groundType: 'METAL',
+    },
     [SIDEWALK_MATERIALS.curb]: def(SIDEWALK_MATERIALS.curb, {
       ambientOcclusionMap: `${CURBS}/t_curbs_ao.data.png`,
       baseColorMap: `${CURBS}/t_curbs_b.color.png`,
@@ -110,13 +225,19 @@ const parseWidth = (value) => {
   return Number.isFinite(w) && w > 0.5 ? Math.min(w, MAX_WIDTH_M) : null;
 };
 
+/** Road classes curbed in town. */
+export const isCurbedClass = (highway) => SIDEWALK_CLASSES.has(String(highway ?? ''));
+
+/** The width of a side with a curb and no sidewalk: the curb's own top. */
+export const CURB_ONLY_M = CURB_W;
+
 /**
- * Sidewalk width on each side of a carriageway (left/right of node order),
- * 0 for none. OSM sidewalk tags first; untagged urban streets of the usual
- * classes get both sides (BeamNG.Earth). `separate` means it is mapped as its
- * own footway (drawn on the terrain), so no raised sidewalk here.
+ * What stands on each side of a carriageway (left/right of node order): a
+ * sidewalk's width, CURB_ONLY_M for a bare curb, 0 for an open edge. A sidewalk
+ * only where OSM has one (a missing tag says nothing, and streetSides adds the
+ * ones mapped as footways); a town street has its curb either way.
  */
-export function sidewalkSides({ tags = {}, highway, urban }) {
+export function sidewalkSides({ tags = {}, highway, urban, curbed }) {
   const width = (side) => parseWidth(tags[`sidewalk:${side}:width`]) ?? parseWidth(tags['sidewalk:both:width'])
     ?? parseWidth(tags['sidewalk:width']) ?? DEFAULT_WIDTH_M;
   const general = norm(tags.sidewalk);
@@ -131,9 +252,10 @@ export function sidewalkSides({ tags = {}, highway, urban }) {
     if (general === 'both' || general === 'yes') return true;
     if (general === side) return true;
     if (general === 'left' || general === 'right' || ABSENT.has(general)) return false;
-    return !!urban && SIDEWALK_CLASSES.has(String(highway ?? ''));
+    return false;
   };
-  return { left: has('left') ? width('left') : 0, right: has('right') ? width('right') : 0 };
+  const edge = (urban || curbed) && SIDEWALK_CLASSES.has(String(highway ?? '')) ? CURB_ONLY_M : 0;
+  return { left: has('left') ? width('left') : edge, right: has('right') ? width('right') : edge };
 }
 
 // Curb line `offset` m to the left of the centreline (mitred, z kept).
@@ -148,6 +270,171 @@ function offsetLine(nodes, offset) {
   return out;
 }
 
+// A crossing mapped to a street's side where no way meets it: the walk it
+// lands on is there, unmapped (OSM maps the crossing and not the sidewalk
+// along a street with no sidewalk tags). Such an end this far from the
+// street's centre line (past the lanes, short of the next block) is taken
+// for a sidewalk on that side along the whole street way.
+const CROSSING_END_M = [1.5, 10];
+
+/**
+ * The features with sidewalks inferred from crossings that end beside a street
+ * with no sidewalk tags (copies, sidewalk=left/right/both, mapng:sidewalk=crossing;
+ * the rest as they were). project(p) -> [x, y] in metres.
+ */
+export function inferCrossingSidewalks(features, project) {
+  const key = (p) => `${p.lat.toFixed(7)},${p.lng.toFixed(7)}`;
+  const nodeUse = new Map();
+  for (const f of features || []) {
+    if (f?.type !== 'road' || !f.tags?.highway || !(f.geometry?.length >= 2)) continue;
+    for (const k of new Set(f.geometry.map(key))) nodeUse.set(k, (nodeUse.get(k) || 0) + 1);
+  }
+  const ends = [];
+  for (const f of features || []) {
+    const t = f?.tags || {};
+    if (f?.type !== 'road' || !(f.geometry?.length >= 2)) continue;
+    if (t.footway !== 'crossing' && t.cycleway !== 'crossing' && t.path !== 'crossing') continue;
+    for (const e of [f.geometry[0], f.geometry[f.geometry.length - 1]]) if ((nodeUse.get(key(e)) || 0) <= 1) ends.push(project(e));
+  }
+  if (!ends.length) return features;
+  const CELL = 32;
+  const grid = new Map();
+  ends.forEach((p, i) => { const k = `${Math.floor(p[0] / CELL)},${Math.floor(p[1] / CELL)}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i); });
+  const sides = new Map();
+  for (const f of features) {
+    const t = f?.tags || {};
+    if (f?.type !== 'road' || !SIDEWALK_CLASSES.has(t.highway) || !(f.geometry?.length >= 2) || t.area === 'yes') continue;
+    if (Object.keys(t).some((k) => k.startsWith('sidewalk'))) continue;
+    if ((t.bridge && t.bridge !== 'no') || (t.tunnel && t.tunnel !== 'no')) continue;
+    const pts = f.geometry.map(project);
+    const got = new Set();
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i]; const b = pts[i + 1]; const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy;
+      if (L2 < 1e-6) continue;
+      const seen = new Set();
+      for (let gx = Math.floor((Math.min(a[0], b[0]) - CROSSING_END_M[1]) / CELL); gx <= Math.floor((Math.max(a[0], b[0]) + CROSSING_END_M[1]) / CELL); gx++) {
+        for (let gy = Math.floor((Math.min(a[1], b[1]) - CROSSING_END_M[1]) / CELL); gy <= Math.floor((Math.max(a[1], b[1]) + CROSSING_END_M[1]) / CELL); gy++) {
+          for (const j of grid.get(`${gx},${gy}`) || []) {
+            if (seen.has(j)) continue;
+            seen.add(j);
+            const p = ends[j];
+            const u = ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2;
+            if (u < 0 || u > 1) continue;     // (beside this stretch, not past its end round a corner)
+            const across = (dx * (p[1] - a[1]) - dy * (p[0] - a[0])) / Math.sqrt(L2);
+            if (Math.abs(across) < CROSSING_END_M[0] || Math.abs(across) > CROSSING_END_M[1]) continue;
+            got.add(across > 0 ? 'left' : 'right');
+          }
+        }
+      }
+    }
+    if (got.size) sides.set(f, got.size === 2 ? 'both' : [...got][0]);
+  }
+  if (!sides.size) return features;
+  return features.map((f) => (sides.has(f) ? { ...f, tags: { ...f.tags, sidewalk: sides.get(f), 'mapng:sidewalk': 'crossing' } } : f));
+}
+
+const PAVE_CELL_M = 16;
+/**
+ * Where walks are mapped in stone or brick: paveAt(x, y) -> 'bricks' |
+ * 'pavers' | 'sett' | 'cobble' | null. From the streets' sidewalk surface tags
+ * (sidewalk:left|right|both:surface, sidewalk:surface: the strip from the
+ * carriageway's edge out past the sidewalk) and the walks mapped as their own
+ * ways with a surface (walks: [{ nodes, half, surface }], their width and a
+ * little), or null when there are none.
+ */
+export function pavedWalkZones(carriageways = [], walks = [], { americas = false } = {}) {
+  const strips = [];   // { a, b, h0, h1, set }: from h0 to h1 off segment a-b, + left
+  const add = (nodes, set, h0, h1) => {
+    for (let i = 0; i + 1 < nodes.length; i++) if (Math.hypot(nodes[i + 1][0] - nodes[i][0], nodes[i + 1][1] - nodes[i][1]) > 0.01) strips.push({ a: nodes[i], b: nodes[i + 1], h0, h1, set });
+  };
+  for (const cw of carriageways) {
+    const t = cw.tags || {};
+    for (const [side, sign] of [['left', 1], ['right', -1]]) {
+      const set = pavedWalkSurface(t[`sidewalk:${side}:surface`] ?? t['sidewalk:both:surface'] ?? t['sidewalk:surface'], { americas });
+      if (!set) continue;
+      const w = parseWidth(t[`sidewalk:${side}:width`]) ?? parseWidth(t['sidewalk:both:width']) ?? parseWidth(t['sidewalk:width']) ?? DEFAULT_WIDTH_M;
+      add(cw.nodes, set, sign * (cw.half - 0.2), sign * (cw.half + w + 1));
+    }
+  }
+  for (const w of walks || []) {
+    const set = pavedWalkSurface(w.surface, { americas });
+    if (set && w.nodes?.length > 1) add(w.nodes, set, -(w.half + 0.4), w.half + 0.4);
+  }
+  if (!strips.length) return null;
+  const grid = new Map();
+  strips.forEach((st, k) => {
+    const r = Math.max(Math.abs(st.h0), Math.abs(st.h1));
+    for (let gx = Math.floor((Math.min(st.a[0], st.b[0]) - r) / PAVE_CELL_M); gx <= Math.floor((Math.max(st.a[0], st.b[0]) + r) / PAVE_CELL_M); gx++) {
+      for (let gy = Math.floor((Math.min(st.a[1], st.b[1]) - r) / PAVE_CELL_M); gy <= Math.floor((Math.max(st.a[1], st.b[1]) + r) / PAVE_CELL_M); gy++) {
+        const key = `${gx},${gy}`;
+        if (!grid.has(key)) grid.set(key, []);
+        grid.get(key).push(k);
+      }
+    }
+  });
+  return (x, y) => {
+    for (const k of grid.get(`${Math.floor(x / PAVE_CELL_M)},${Math.floor(y / PAVE_CELL_M)}`) || []) {
+      const { a, b, h0, h1, set } = strips[k];
+      const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy);
+      const u = ((x - a[0]) * dx + (y - a[1]) * dy) / (L * L);
+      if (u < -0.02 || u > 1.02) continue;
+      const across = (dx * (y - a[1]) - dy * (x - a[0])) / L;
+      if (across >= Math.min(h0, h1) && across <= Math.max(h0, h1)) return set;
+    }
+    return null;
+  };
+}
+
+/** Sidewalks mapped as their own ways: [{ nodes, width }]. */
+export function sidewalkFootways(features, project) {
+  return (features || []).filter((f) => f.tags?.footway === 'sidewalk' && f.geometry?.length > 1)
+    .map((f) => ({ nodes: f.geometry.map((p) => project(p)), width: parseWidth(f.tags.width) ?? DEFAULT_WIDTH_M }));
+}
+
+// Which sides of a carriageway have a mapped footway running along them: { left, right }.
+function footwaySides(index, cw) {
+  const hits = { 1: 0, '-1': 0 };
+  const n = cw.nodes;
+  n.forEach((p, i) => {
+    const a = n[Math.max(0, i - 1)]; const b = n[Math.min(n.length - 1, i + 1)];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+    const seen = new Set();
+    for (const { q, r } of index.get(`${Math.floor(p[0] / FOOTWAY_CELL_M)},${Math.floor(p[1] / FOOTWAY_CELL_M)}`) || []) {
+      const dx = r[0] - q[0]; const dy = r[1] - q[1]; const l = Math.hypot(dx, dy) || 1;
+      if (Math.abs((dx * t[0] + dy * t[1]) / l) < FOOTWAY_ALONG_COS) continue;
+      const u = Math.max(0, Math.min(1, ((p[0] - q[0]) * dx + (p[1] - q[1]) * dy) / (l * l)));
+      const ox = q[0] + dx * u - p[0]; const oy = q[1] + dy * u - p[1];
+      if (Math.hypot(ox, oy) > cw.half + FOOTWAY_SETBACK_M) continue;
+      const across = t[0] * oy - t[1] * ox;
+      if (Math.abs(across) < cw.half - 1) continue;
+      const side = across > 0 ? 1 : -1;
+      if (seen.has(side)) continue;
+      seen.add(side);
+      hits[side]++;
+    }
+  });
+  return { left: hits[1] >= FOOTWAY_SHARE * n.length, right: hits[-1] >= FOOTWAY_SHARE * n.length };
+}
+
+function footwayIndex(footways) {
+  const index = new Map();
+  for (const { nodes, width } of footways) {
+    for (let i = 0; i + 1 < nodes.length; i++) {
+      const q = nodes[i]; const r = nodes[i + 1]; const R = FOOTWAY_CELL_M;
+      const cell = (v) => Math.floor(v / R);
+      for (let cx = cell(Math.min(q[0], r[0]) - R); cx <= cell(Math.max(q[0], r[0]) + R); cx++) {
+        for (let cy = cell(Math.min(q[1], r[1]) - R); cy <= cell(Math.max(q[1], r[1]) + R); cy++) {
+          const key = `${cx},${cy}`;
+          if (!index.has(key)) index.set(key, []);
+          index.get(key).push({ q, r, width });
+        }
+      }
+    }
+  }
+  return index;
+}
+
 const hasSidewalkTags = (tags = {}) => Object.keys(tags).some((k) => k === 'sidewalk' || k.startsWith('sidewalk:'));
 
 /**
@@ -155,9 +442,11 @@ const hasSidewalkTags = (tags = {}) => Object.keys(tags).some((k) => k === 'side
  * with no sidewalk tags of its own takes them from the tagged carriageways it
  * plainly continues (same name; left and right swapped where it runs the
  * other way), carried on along the street. OSM often tags only some ways of
- * a street, which left sidewalks stopping mid-block and short stubs.
+ * a street, which left sidewalks stopping mid-block and short stubs. A side with
+ * a footway mapped along it has only its curb here: buildWalkRuns builds that
+ * slab along the footway, so it never jumps from curb to footway at a driveway.
  */
-export function streetSides(carriageways) {
+export function streetSides(carriageways, footways = []) {
   const sides = new Map(carriageways.map((cw) => [cw, sidewalkSides(cw)]));
   const known = new Set(carriageways.filter((cw) => hasSidewalkTags(cw.tags)));
   const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1;
@@ -175,13 +464,25 @@ export function streetSides(carriageways) {
         const along = near(fe, cs) || near(ce, fs);
         const against = near(fs, cs) || near(fe, ce);
         if (!along && !against) continue;
-        const s = sides.get(from);
-        sides.set(cw, along ? { ...s } : { left: s.right, right: s.left });
+        const s = sides.get(from); const own = sides.get(cw);
+        // (a sidewalk carries on along the street; a curb is the town's, not the street's)
+        const pick = (theirs, mine) => (theirs > CURB_ONLY_M || !mine ? (theirs > CURB_ONLY_M ? theirs : 0) : mine);
+        sides.set(cw, along ? { left: pick(s.left, own.left), right: pick(s.right, own.right) } : { left: pick(s.right, own.left), right: pick(s.left, own.right) });
         known.add(cw);
         next.push(cw);
       }
     }
     queue = next;
+  }
+  if (footways.length) {
+    const index = footwayIndex(footways);
+    for (const cw of carriageways) {
+      if (!cw.nodes?.length) continue;
+      // (the slab is built along the footway itself: only the curb stays here)
+      const mapped = footwaySides(index, cw); const s = sides.get(cw);
+      const edge = sidewalkSides({ ...cw, tags: {} }).left;
+      sides.set(cw, { left: mapped.left ? edge : s.left, right: mapped.right ? edge : s.right });
+    }
   }
   return sides;
 }
@@ -255,7 +556,7 @@ export function findMedians(carriageways) {
         }
         if (!best) continue;
         const mw = best.d - cw.half - best.half;
-        if (mw < MEDIAN_MIN_M || mw > MEDIAN_MAX_M) continue;
+        if (mw <= 0 || mw > MEDIAN_MAX_M) continue;
         side[i] = best.s;
         width[i] = mw;
         any = true;
@@ -280,9 +581,22 @@ const medianShare = (median, side) => {
  * their slab width as a 4th value. Cut where they would cross another road
  * or a crosswalk.
  */
+// Points along a line every `step` m.
+function everyMetres(line, step) {
+  const out = [line[0]]; let left = step;
+  for (let i = 0; i + 1 < line.length; i++) {
+    const a = line[i]; const b = line[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    let d = left;
+    while (d <= L) { const f = d / L; out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f]); d += step; }
+    left = d - L;
+  }
+  return out;
+}
+
 export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const pieces = [];
+  const jersey = [];
   for (const cw of carriageways) {
     const median = medians.get(cw);
     if (!median) continue;
@@ -297,13 +611,28 @@ export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
         const widths = Array.from(median.width.slice(i, j + 1));
         const sorted = [...widths].sort((x, y) => x - y);
         // one island (slab to the middle) or two curbs, by the stretch's typical width
-        const slab = sorted[sorted.length >> 1] <= MEDIAN_SLAB_M;
+        const typical = sorted[sorted.length >> 1];
+        const thin = typical < MEDIAN_MIN_M;
+        // OSM doesn't say what a median is: a fast road's narrow one a barrier,
+        // a town street's raised, a country road's open ground
+        if (!thin && FAST_CLASSES.has(String(cw.highway)) && typical < MEDIAN_BARRIER_M) {
+          if (side > 0) {
+            const mid = offsetLine(cw.nodes.slice(i, j + 1), side * (cw.half + typical / 2));
+            jersey.push(everyMetres(mid, BARRIER_PIECE_M));
+          }
+          i = j + 1;
+          continue;
+        }
+        if (!thin && !cw.urban && !cw.curbed) { i = j + 1; continue; }
+        const slab = typical <= MEDIAN_SLAB_M;
         const nodes = offsetLine(cw.nodes.slice(i, j + 1), side * cw.half)
           .map((pt, k) => [pt[0], pt[1], pt[2], slab ? Math.max(0.3, widths[k] / 2) : MEDIAN_CURB_W]);
         const ignore = new Set([cw.owner, ...(cw.continuations || [])]);
-        const blocked = (x, y) => isOnOtherCarriageway(index, x, y, CUT_MARGIN_M, (o) => ignore.has(o)) || isInZone(zones, x, y);
+        // (a thin gap has its other carriageway right beside it)
+        const margin = typical < MEDIAN_MIN_M ? -0.1 : CUT_MARGIN_M;
+        const blocked = (x, y) => isOnOtherCarriageway(index, x, y, margin, (o) => ignore.has(o)) || isInZone(zones, x, y);
         for (const piece of cutNodes(nodes, blocked, { minPieceM: 0.5 })) {
-          pieces.push({ points: piece, side, width: 0, owner: cw.owner, highway: cw.highway, median: true });
+          pieces.push({ points: piece, side, width: 0, owner: cw.owner, highway: cw.highway, median: true, thin: typical < MEDIAN_MIN_M });
         }
         i = j + 1;
       }
@@ -311,9 +640,13 @@ export function buildMedianRuns(carriageways, medians, { zones = [] } = {}) {
   }
   // OSM splits a carriageway into many short ways: join their pieces end to
   // end first (each point keeps its own width), then drop the short ones
-  return mergeRuns(pieces, { matchWidth: false })
-    .filter((run) => runLength(run.points) >= MEDIAN_MIN_RUN_M)
+  const merged = mergeRuns(pieces.filter((p) => !p.thin), { matchWidth: false });
+  const raised = merged.filter((run) => runLength(run.points) >= MEDIAN_MIN_RUN_M)
     .map((run) => ({ ...run, width: Math.max(...run.points.map((pt) => pt[3])) }));
+  // what's too thin or short for an island: the road paved across it (grass showed in stripes)
+  raised.gaps = [...pieces.filter((p) => p.thin), ...merged.filter((run) => runLength(run.points) < MEDIAN_MIN_RUN_M)];
+  raised.jersey = jersey;
+  return raised;
 }
 
 /**
@@ -362,7 +695,7 @@ function splitRunsWhereBlocked(runs, blocked) {
   const STEP = 1;
   const out = [];
   for (const run of runs) {
-    const widths = [run.width, run.width * 0.75, run.width * 0.5, MIN_FIT_M].filter((w, i, a) => w >= MIN_FIT_M - 1e-6 && a.indexOf(w) === i && w <= run.width + 1e-6);
+    const widths = run.width <= CURB_ONLY_M ? [run.width] : [run.width, run.width * 0.75, run.width * 0.5, MIN_FIT_M].filter((w, i, a) => w >= MIN_FIT_M - 1e-6 && a.indexOf(w) === i && w <= run.width + 1e-6);
     const p = run.points;
     let piece = []; let pieceW = null; let last = null;
     const flush = () => { if (piece.length >= 2 && runLength(piece) >= MIN_RUN_M) out.push({ ...run, width: pieceW, points: piece }); piece = []; };
@@ -396,22 +729,40 @@ function splitRunsWhereBlocked(runs, blocked) {
   return out;
 }
 
-export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map(), buildings = [] } = {}) {
+export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], medians = new Map(), buildings = [], footways = [], parking = [], walkEnds = [], openGround = [], houses = [] } = {}) {
   const index = buildCarriagewayIndex(carriageways);
-  const sidesOf = streetSides(carriageways);
+  const sidesOf = streetSides(carriageways, footways);
   // Driveways and parking aisles (OSM service roads, not carriageways of
   // their own) cross a sidewalk with its curb lowered: a dip, not a cut.
   const nearDriveway = buildLineIndex(driveways);
   const pieces = [];
+  // the pieces of one street meeting end to end (a T-junction splits it: its
+  // far curb was cut by its own next piece)
+  const sameStreet = new Map(carriageways.map((cw) => [cw.owner, new Set([cw.owner, ...(cw.continuations || [])])]));
+  {
+    const ends = new Map();
+    const key = (p) => `${Math.round(p[0])},${Math.round(p[1])}`;
+    for (const cw of carriageways) {
+      if (!cw.nodes?.length) continue;
+      for (const p of [cw.nodes[0], cw.nodes[cw.nodes.length - 1]]) {
+        if (!ends.has(key(p))) ends.set(key(p), []);
+        ends.get(key(p)).push(cw);
+      }
+    }
+    const street = (cw) => cw.tags?.name || cw.wayId;
+    for (const list of ends.values()) {
+      for (const a of list) for (const b of list) if (a !== b && street(a) && street(a) === street(b)) sameStreet.get(a.owner).add(b.owner);
+    }
+  }
   for (const cw of carriageways) {
     const sides = sidesOf.get(cw);
-    const ignore = new Set([cw.owner, ...(cw.continuations || [])]);
-    const blocked = (x, y) => isOnOtherCarriageway(index, x, y, CUT_MARGIN_M, (o) => ignore.has(o)) || isInZone(zones, x, y);
+    const ignore = sameStreet.get(cw.owner);
+    const blocked = (x, y) => carriagewaysAt(index, x, y, CUT_MARGIN_M, { sides: true }).some((c) => !ignore.has(c.owner));
     for (const [side, width] of [[1, sides.left], [-1, sides.right]]) {
       // a divided road's median side has the median, not a sidewalk
       if (!width || medianShare(medians.get(cw), side) >= MEDIAN_SIDE_SHARE) continue;
       for (const piece of cutNodes(offsetLine(cw.nodes, side * cw.half), blocked, { minPieceM: 0.5 })) {
-        pieces.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width, owner: cw.owner, highway: cw.highway });
+        pieces.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width, owner: cw.owner, highway: cw.highway, surface: cw.tags?.surface });
       }
     }
   }
@@ -420,15 +771,163 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
   // out over another carriageway (a sunken centre road beside a side road)
   {
     const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
-    const continues = new Map(carriageways.map((cw) => [cw.owner, new Set(cw.continuations || [])]));
+    // (a merged run has many owners: what matters is its street, not its first)
+    const streetOf = new Map(carriageways.map((cw) => [cw.owner, cw.tags?.name || cw.wayId || cw.owner]));
     // (the street's own continuation counts too where it is on another
     // level: a garage ramp leaving the street beside it)
     runs = splitRunsWhereBlocked(runs, (run, x, y, z) => inBuilding(x, y)
-      || carriagewaysAt(index, x, y, GROUND_ROAD_MARGIN_M).some((c) => c.owner !== run.owner
-        && (!continues.get(run.owner)?.has(c.owner) || Math.abs(c.z - z) > 1)));
+      || carriagewaysAt(index, x, y, GROUND_ROAD_MARGIN_M, { sides: true }).some((c) => c.owner !== run.owner
+        && (streetOf.get(c.owner) !== streetOf.get(run.owner) || Math.abs(c.z - z) > 1)));
   }
-  if (nearDriveway) for (const run of runs) run.dips = dipsAlong(run.points, (x, y) => nearDriveway(x, y, DRIVEWAY_HALF_M));
+  // a town street's bare curb with building fronts close behind it: the
+  // sidewalk the buildings stand on, curb to wall (downtown streets with no
+  // sidewalk mapped came out a curb and a strip of painted ground)
+  // (and unmapped ground behind a town curb, no front lawn's house behind it:
+  // a sidewalk of the usual width)
+  // (only where OSM says nothing: a side tagged sidewalk=yes/no/separate, or
+  // one with its sidewalk mapped as its own way, is as mapped)
+  if (buildings?.length || openGround.length) {
+    const tagsOf = new Map(carriageways.map((cw) => [cw.owner, cw.tags || {}]));
+    const saysSide = (run) => {
+      const t = tagsOf.get(run.owner) || {};
+      const side = run.side > 0 ? 'left' : 'right';
+      return [t.sidewalk, t['sidewalk:both'], t[`sidewalk:${side}`]].some((v) => v !== undefined && v !== '');
+    };
+    const nearWalk = buildLineIndex((footways || []).map((w) => w.nodes));
+    runs = fillToBuildingFronts(runs, buildings || [], parking, {
+      openGround, houses,
+      roadAt: (x, y) => carriagewaysAt(index, x, y, 0).length > 0,
+      skipRun: saysSide,
+      mappedWalkAt: nearWalk ? (x, y) => nearWalk(x, y, FRONT_WALK_NEAR_M) : () => false,
+    });
+  }
+  // a car park right at the street is open along it: a bare curb lowered
+  // all the way (one behind a verge keeps its curb)
+  const inParking = parking.length ? buildingIndex(parking) : null;
+  for (const run of runs) {
+    const p = run.points; const edge = run.width <= CURB_ONLY_M;
+    const on = (x, y, i) => (nearDriveway && nearDriveway(x, y, DRIVEWAY_HALF_M)) || (edge && inParking && (() => {
+      const a = p[Math.max(0, i)]; const b = p[Math.min(p.length - 1, i + 1)]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      return inParking(x + (-(b[1] - a[1]) / L) * run.side * PARKING_OPEN_M, y + ((b[0] - a[0]) / L) * run.side * PARKING_OPEN_M);
+    })());
+    // (at a crosswalk too: the curb carries on through it, lowered)
+    if (nearDriveway || inParking || zones.length) run.dips = dipsAlong(p, (x, y, i) => on(x, y, i) || isInZone(zones, x, y));
+    // a walkway coming out to the street: the curb lowered to meet it
+    if (walkEnds.length) {
+      const atWalk = dipsAlong(p, (x, y) => walkEnds.some(([ex, ey, half]) => Math.hypot(ex - x, ey - y) < half + WALK_CURB_M));
+      if (atWalk.length) run.dips = [...(run.dips || []), ...atWalk];
+    }
+  }
   return runs;
+}
+
+const FRONT_GAP_M = [1, 6];      // walls this far behind a bare curb: paved up to them
+const FRONT_MIN_RUN_M = 8;       // along at least this much of the curb
+const FRONT_WALL_CLEAR_M = 0.05;
+const FRONT_CELL_M = 16;
+const FRONT_WALK_NEAR_M = 3;     // a mapped sidewalk this near behind a curb: no sidewalk laid over it
+const FRONT_ABSORB_M = 6;        // a bare-curb end shorter than this beside a new sidewalk: taken into it
+const UNMAPPED_WALK_M = 2;       // a sidewalk over unmapped town ground behind a curb
+const LAWN_HOUSE_M = 12;         // a house this near behind the curb: its front lawn, kept
+
+/**
+ * Bare-curb runs (width CURB_ONLY_M) with building walls FRONT_GAP_M behind
+ * them along FRONT_MIN_RUN_M or more: those stretches split off as sidewalks
+ * reaching the walls (the narrowest gap along the stretch, less a hair). A
+ * car park between the curb and the wall keeps its curb.
+ */
+function fillToBuildingFronts(runs, buildings, parking = [], { openGround = [], houses = [], roadAt = () => false, skipRun = () => false, mappedWalkAt = () => false } = {}) {
+  const grid = new Map();
+  const houseGrid = new Map();
+  const addTo = (g, ring) => {
+    for (let i = 0; i + 1 < ring.length; i++) {
+      const a = ring[i]; const b = ring[i + 1];
+      for (let gx = Math.floor(Math.min(a[0], b[0]) / FRONT_CELL_M); gx <= Math.floor(Math.max(a[0], b[0]) / FRONT_CELL_M); gx++) {
+        for (let gy = Math.floor(Math.min(a[1], b[1]) / FRONT_CELL_M); gy <= Math.floor(Math.max(a[1], b[1]) / FRONT_CELL_M); gy++) {
+          const k = `${gx},${gy}`;
+          if (!g.has(k)) g.set(k, []);
+          g.get(k).push([a, b]);
+        }
+      }
+    }
+  };
+  for (const ring of houses) addTo(houseGrid, ring);
+  const inOpen = openGround.length ? buildingIndex(openGround) : () => false;
+  for (const ring of buildings) addTo(grid, ring);
+  const inParking = parking.length ? buildingIndex(parking) : () => false;
+  // the distance along (ux, uy) from p to the first wall, or Infinity
+  const wallAhead = (p, ux, uy, reach, g = grid) => {
+    let best = Infinity;
+    const seen = new Set();
+    for (let s = 0; s <= reach + FRONT_CELL_M; s += FRONT_CELL_M / 2) {
+      const k = `${Math.floor((p[0] + ux * Math.min(s, reach)) / FRONT_CELL_M)},${Math.floor((p[1] + uy * Math.min(s, reach)) / FRONT_CELL_M)}`;
+      for (const seg of g.get(k) || []) {
+        if (seen.has(seg)) continue;
+        seen.add(seg);
+        const [a, b] = seg; const ex = b[0] - a[0]; const ey = b[1] - a[1];
+        const den = ex * uy - ey * ux;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((p[0] - a[0]) * uy - (p[1] - a[1]) * ux) / den;           // along the wall
+        const u = ((p[0] - a[0]) * ey - (p[1] - a[1]) * ex) / den;           // along the ray
+        if (t >= 0 && t <= 1 && u > 0 && u < best) best = u;
+      }
+    }
+    return best;
+  };
+  const out = [];
+  for (const run of runs) {
+    if (run.width > CURB_ONLY_M || run.points.length < 2 || skipRun(run)) { out.push(run); continue; }
+    const pts = run.points;
+    const gaps = pts.map((p, i) => {
+      const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const ux = (-(b[1] - a[1]) / L) * run.side; const uy = ((b[0] - a[0]) / L) * run.side;
+      // (a mapped sidewalk just behind the curb: it is the sidewalk)
+      if (mappedWalkAt(p[0] + ux * 1.5, p[1] + uy * 1.5)) return null;
+      const g = wallAhead(p, ux, uy, FRONT_GAP_M[1]);
+      if (g >= FRONT_GAP_M[0] && g <= FRONT_GAP_M[1]) {
+        // (a car park between the curb and the wall: no sidewalk across it)
+        if (inParking(p[0] + ux * g / 2, p[1] + uy * g / 2)) return null;
+        return { g, wall: true };
+      }
+      // unmapped ground behind the curb: the usual sidewalk, where nothing
+      // says otherwise (a park, a car park, water, a road; a house's front
+      // lawn)
+      const free = [0.5, 1.2, UNMAPPED_WALK_M].every((d) => {
+        const x = p[0] + ux * d; const y = p[1] + uy * d;
+        return !inOpen(x, y) && !inParking(x, y) && !roadAt(x, y);
+      });
+      if (!free || g < UNMAPPED_WALK_M + FRONT_WALL_CLEAR_M) return null;
+      if (wallAhead(p, ux, uy, LAWN_HOUSE_M, houseGrid) <= LAWN_HOUSE_M) return null;
+      return { g: UNMAPPED_WALK_M + FRONT_WALL_CLEAR_M, wall: false };
+    });
+    // stretches of fronting walls long enough
+    let i = 0; let cut = 0; const pieces = [];
+    while (i < pts.length) {
+      if (gaps[i] === null) { i++; continue; }
+      // (a stretch of building fronts and one of open ground apart: each its own width)
+      let j = i;
+      while (j + 1 < pts.length && gaps[j + 1] !== null && gaps[j + 1].wall === gaps[i].wall) j++;
+      // (meeting the stretch before it end to end: no bare curb between)
+      const from = pieces.length && pieces[pieces.length - 1][1] === i - 1 ? i - 1 : i;
+      if (j > from && runLength(pts.slice(from, j + 1)) >= FRONT_MIN_RUN_M) pieces.push([from, j, i]);
+      i = j + 1;
+    }
+    if (!pieces.length) { out.push(run); continue; }
+    // (a bare-curb end too short to stand alone, between the sidewalk and the
+    // run's end, taken into the sidewalk: no stub of curb left by a corner)
+    if (pieces.length && pieces[0][0] > 0 && runLength(pts.slice(0, pieces[0][0] + 1)) < FRONT_ABSORB_M) pieces[0][0] = 0;
+    const last = pieces[pieces.length - 1];
+    if (last && last[1] < pts.length - 1 && runLength(pts.slice(last[1])) < FRONT_ABSORB_M) last[1] = pts.length - 1;
+    for (const [a, b, own] of pieces) {
+      if (a > cut) out.push({ ...run, points: pts.slice(cut, a + 1) });
+      const width = Math.max(CURB_W + 0.5, Math.min(...gaps.slice(own, b + 1).filter(Boolean).map((q) => q.g)) - FRONT_WALL_CLEAR_M);
+      out.push({ ...run, points: pts.slice(a, b + 1), width, front: true });
+      cut = b;
+    }
+    if (cut < pts.length - 1) out.push({ ...run, points: pts.slice(cut) });
+  }
+  return out.filter((r) => r.points.length >= 2);
 }
 
 const DRIVEWAY_HALF_M = 2.5;
@@ -525,7 +1024,7 @@ function dipsAlong(points, on) {
     const [bx, by] = points[i + 1];
     const len = Math.hypot(bx - ax, by - ay);
     for (let d = 0; d < len; d += DIP_STEP_M) {
-      const hit = on(ax + ((bx - ax) * d) / len, ay + ((by - ay) * d) / len);
+      const hit = on(ax + ((bx - ax) * d) / len, ay + ((by - ay) * d) / len, i);
       if (hit && open === null) open = s + d;
       if (!hit && open !== null) { spans.push([open, s + d]); open = null; }
     }
@@ -536,9 +1035,32 @@ function dipsAlong(points, on) {
 }
 
 // Profile across from the curb line: [outward offset, height] and material.
-function profileFor(width) {
+function profileFor(width, walk = false) {
+  // a walkway on its own: a slab just proud of the ground, both edges down into it
+  if (walk) {
+    return {
+      points: [[0, -WALK_SINK_M], [BATTER, WALK_H], [width - BATTER, WALK_H], [width, -WALK_SINK_M]],
+      segments: [
+        { mat: 'curb', v: [V_BAND_LOW, V_LIGHT_LOW] },
+        { mat: 'slab', v: [0, width / SLAB_TILE_M] },
+        { mat: 'curb', v: [V_BAND_LOW, V_LIGHT_LOW] },
+      ],
+    };
+  }
   const slabOut = CURB_H + width * CROSS_SLOPE;
   const back = width + BACK_SLOPE_RUN * (slabOut + SINK);
+  // a bare curb: no slab, a square back, the ground behind it up to its top
+  if (width <= CURB_ONLY_M) {
+    return {
+      points: [[0, -SINK], [BATTER, CURB_H - NOSE], [NOSE_W, CURB_H], [CURB_W, CURB_H], [CURB_W + BATTER, -SINK]],
+      segments: [
+        { mat: 'curb', v: [V_BAND_LOW, V_LIGHT_LOW] },
+        { mat: 'curb', v: [V_LIGHT_LOW, V_BAND_TOP] },
+        { mat: 'curb', v: [V_LIGHT_LOW, V_BAND_TOP] },
+        { mat: 'curb', v: [V_BAND_LOW, V_LIGHT_LOW] },
+      ],
+    };
+  }
   return {
     points: [[0, -SINK], [BATTER, CURB_H - NOSE], [NOSE_W, CURB_H], [CURB_W, CURB_H], [width, slabOut], [back, -SINK]],
     // segment k joins points k and k+1
@@ -546,17 +1068,30 @@ function profileFor(width) {
       { mat: 'curb', v: [V_BAND_LOW, V_LIGHT_LOW] },   // face
       { mat: 'curb', v: [V_LIGHT_LOW, V_BAND_TOP] },   // nose
       { mat: 'curb', v: [V_LIGHT_LOW, V_BAND_TOP] },   // top
-      { mat: 'slab', v: [V_SLAB_IN, V_SLAB_OUT] },     // slab
+      { mat: 'slab', v: [0, (width - CURB_W) / SLAB_TILE_M] },     // slab
       { mat: 'curb', v: [V_BAND_LOW, V_LIGHT_LOW] },   // back
     ],
   };
 }
 
 class PartBuilder {
-  constructor() { this.parts = { curb: { pos: [], uv: [] }, slab: { pos: [], uv: [] } }; this.triangles = 0; }
+  // paveAt(x, y): the stone or brick a walk's slab is laid in there, or null
+  constructor(paveAt = null) {
+    this.parts = Object.fromEntries(Object.keys(SIDEWALK_MATERIALS).map((k) => [k, { pos: [], uv: [] }]));
+    this.triangles = 0;
+    this.paveAt = paveAt;
+  }
 
   // Triangle a-b-c turned so its normal points along `want`.
   tri(mat, a, b, c, ua, ub, uc, want) {
+    // a slab's top in a stone or brick walk: those, tiled in world metres
+    if (mat === 'slab' && this.paveAt) {
+      const set = this.paveAt((a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3);
+      if (set) {
+        const t = plazaTileM(set);
+        mat = set; ua = [a[0] / t, a[1] / t]; ub = [b[0] / t, b[1] / t]; uc = [c[0] / t, c[1] / t];
+      }
+    }
     const n = [
       (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
       (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
@@ -571,7 +1106,7 @@ class PartBuilder {
     this.triangles++;
   }
 
-  toMesh(name) {
+  toMesh(name, { smooth = false } = {}) {
     let total = 0;
     for (const p of Object.values(this.parts)) total += p.pos.length / 3;
     if (total === 0) return null;
@@ -592,6 +1127,17 @@ class PartBuilder {
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.computeVertexNormals();
+    // (a sloped deck cut in triangles showed them, each shaded alone)
+    if (smooth) {
+      const nrm = geo.getAttribute('normal').array; const sums = new Map();
+      const key = (i) => `${Math.round(pos[i * 3] * 100)},${Math.round(pos[i * 3 + 1] * 100)},${Math.round(pos[i * 3 + 2] * 100)}`;
+      for (let i = 0; i < total; i++) {
+        const k = key(i); const v = sums.get(k) ?? [0, 0, 0];
+        v[0] += nrm[i * 3]; v[1] += nrm[i * 3 + 1]; v[2] += nrm[i * 3 + 2];
+        sums.set(k, v);
+      }
+      for (let i = 0; i < total; i++) { const u = unit3(sums.get(key(i))); nrm.set(u, i * 3); }
+    }
     const mesh = new THREE.Mesh(geo, materials);
     mesh.name = name;
     return mesh;
@@ -603,16 +1149,22 @@ const DIP_RAMP_M = 1.0;        // the curb's slope down into a driveway dip
 // A run's stations (its points, with more where the curb height changes) and
 // each one's curb-height share: 0 at a ramped end and across a driveway dip,
 // back to 1 over RAMP_M / DIP_RAMP_M.
+// The share of a run's height left d m along it (0 at a loose end or in a driveway dip).
+function heightShare(total, ramps, dips) {
+  const ramp = Math.min(RAMP_M, total / 2.5);
+  return (d) => {
+    let f = Math.min(1, ramps[0] ? d / ramp : 1, ramps[1] ? (total - d) / ramp : 1);
+    for (const [a, b] of dips) f = Math.min(f, Math.max(0, Math.max(a - d, d - b) / DIP_RAMP_M));
+    return Math.max(0, f);
+  };
+}
+
 function rampStations(points, ramps, dips = []) {
   const s = [0];
   for (let i = 1; i < points.length; i++) s.push(s[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
   const total = s[s.length - 1];
   const ramp = Math.min(RAMP_M, total / 2.5);
-  const shareAt = (d) => {
-    let f = Math.min(1, ramps[0] ? d / ramp : 1, ramps[1] ? (total - d) / ramp : 1);
-    for (const [a, b] of dips) f = Math.min(f, Math.max(0, Math.max(a - d, d - b) / DIP_RAMP_M));
-    return Math.max(0, f);
-  };
+  const shareAt = heightShare(total, ramps, dips);
   const cuts = [];
   if (ramps[0]) cuts.push(ramp);
   if (ramps[1]) cuts.push(total - ramp);
@@ -636,13 +1188,32 @@ function rampStations(points, ramps, dips = []) {
   return { points: out, share: at.map(shareAt) };
 }
 
+// A strip of road paving out from a line, each point's own width (half a gap: its other side does the rest).
+function paveGap(builder, run) {
+  const p = run.points; let s = 0;
+  const out = p.map((q, i) => {
+    const a = p[Math.max(0, i - 1)]; const b = p[Math.min(p.length - 1, i + 1)];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const w = (q[3] || 0.3) + 0.15;
+    return [q[0] + (-(b[1] - a[1]) / L) * run.side * w, q[1] + ((b[0] - a[0]) / L) * run.side * w, q[2]];
+  });
+  for (let i = 0; i + 1 < p.length; i++) {
+    const L = Math.hypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]);
+    const uv = (o, v) => [o / PAVED_TILE_M, v / PAVED_TILE_M];
+    const q = [p[i], p[i + 1], out[i + 1], out[i]].map(([x, y, z]) => [x, y, z + FILLET_LIFT_M]);
+    builder.tri('paved', q[0], q[1], q[2], uv(s, 0), uv(s + L, 0), uv(s + L, 1), [0, 0, 1]);
+    builder.tri('paved', q[0], q[2], q[3], uv(s, 0), uv(s + L, 1), uv(s, 1), [0, 0, 1]);
+    s += L;
+  }
+}
+
 function sweepRun(builder, run) {
   const { side, width } = run;
   const caps = run.caps ?? [true, true];
   const { points, share } = rampStations(run.points, run.ramps ?? [false, false], run.dips);
   // a median island's points carry their own slab width (4th value)
   const profiles = run.median ? points.map((p) => profileFor(p[3] || width)) : null;
-  const profile = profileFor(width);
+  const profile = profileFor(width, run.walk);
   // Outward unit normal at each station (mitred, the sidewalk's side).
   const outward = points.map((p, i) => {
     const a = points[Math.max(0, i - 1)];
@@ -663,7 +1234,7 @@ function sweepRun(builder, run) {
       const [o1, h1] = (profiles ? profiles[i] : profile).points[k + 1];
       // Front of this profile segment: (−dh)·outward + (do)·up.
       const want = [-(h1 - h0) * out[0], -(h1 - h0) * out[1], o1 - o0];
-      const repeat = seg.mat === 'slab' ? SLAB_REPEAT_M : CURB_REPEAT_M;
+      const repeat = seg.mat === 'slab' ? SLAB_TILE_M : CURB_REPEAT_M;
       const u0 = s0 / repeat;
       const u1 = s1 / repeat;
       const a0 = stations[i][k]; const b0 = stations[i][k + 1];
@@ -740,7 +1311,7 @@ function moveEnd(end, t) {
  * [{ arc: [[x, y, z]...], centre, outer: [x, y], a: end, b: end }]. Ends
  * left over get curb ramps.
  */
-function joinCorners(runs, index) {
+function joinCorners(runs, index, walkRuns = []) {
   const ends = runs.flatMap((run) => [runEnd(run, true), runEnd(run, false)]);
   const pairs = [];
   for (let i = 0; i < ends.length; i++) {
@@ -799,21 +1370,167 @@ function joinCorners(runs, index) {
       break;
     }
   }
+  // a mapped walk carrying on from a sidewalk's end (one leaving the street
+  // round a fountain or into a park): the slab stays up and meets it, not a
+  // ramp down to the road beside the walk
+  const walkPts = [];
+  for (const w of walkRuns) for (const q of w.centre || []) walkPts.push([q[0], q[1], w.half]);
+  const WALK_CELL = 8;
+  const walkGrid = new Map();
+  for (const q of walkPts) {
+    const key = `${Math.floor(q[0] / WALK_CELL)},${Math.floor(q[1] / WALK_CELL)}`;
+    if (!walkGrid.has(key)) walkGrid.set(key, []);
+    walkGrid.get(key).push(q);
+  }
+  const walkGoesOn = (end) => {
+    const w = end.run.width;
+    const c = [end.p[0] + end.n[0] * w / 2, end.p[1] + end.n[1] * w / 2];
+    const gx = Math.floor(c[0] / WALK_CELL); const gy = Math.floor(c[1] / WALK_CELL);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      for (const q of walkGrid.get(`${gx + i},${gy + j}`) || []) if (Math.hypot(q[0] - c[0], q[1] - c[1]) < q[2] + w / 2 + SIDEWALK_WALK_JOIN_M) return true;
+    }
+    return false;
+  };
   for (const end of ends) {
     const { run } = end;
     run.caps ??= [true, true];
     run.ramps ??= [false, false];
     const k = end.atStart ? 0 : 1;
     if (used.has(end)) run.caps[k] = false;
+    else if (run.width > CURB_ONLY_M && walkGoesOn(end)) continue;
     else run.ramps[k] = true;
   }
   return corners;
 }
+const SIDEWALK_WALK_JOIN_M = 0.6;
+const CUT_SLIVER_M2 = 0.25;     // a piece of walk this small left by a corner's cut: dropped
+
+// A walkway ending on a street's sidewalk (a walk leaving the street round a
+// fountain: its end by the curb) meets the slab at its top, not ramped down
+// to the road beside it.
+function levelWalkEndsOnSidewalks(walkRuns, streetRuns, corners = []) {
+  const slabs = [];
+  // (and on a rounded curb: a ramp down from the walk's end rose over the
+  // curb there, standing up as a wedge)
+  for (const { arc } of corners) for (let i = 0; i + 1 < arc.length; i++) slabs.push({ a: arc[i], b: arc[i + 1], half: 0.4 });
+  for (const run of streetRuns) {
+    if (run.points.length < 2 || !(run.width > CURB_ONLY_M)) continue;
+    const mid = offsetLine(run.points, (run.width / 2) * (run.side ?? 1));
+    for (let i = 0; i + 1 < mid.length; i++) slabs.push({ a: mid[i], b: mid[i + 1], half: run.width / 2 });
+  }
+  if (!slabs.length) return;
+  const onSlab = (p, half) => slabs.some(({ a, b, half: h }) => {
+    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1;
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy) < h + half * 0.5 + 0.3;
+  });
+  for (const w of walkRuns) {
+    if (!w.ramps || !w.centre?.length) continue;
+    const ends = [w.centre[0], w.centre[w.centre.length - 1]];
+    ends.forEach((p, k) => {
+      if (!w.ramps[k] || !onSlab(p, w.half)) return;
+      w.ramps[k] = false;
+      // (the ramp's heights, set down toward the road when the walk was
+      // built, back up to the walk's own level: the flag alone left them low)
+      const n = w.centre.length;
+      const idx = (i) => (k ? n - 1 - i : i);
+      let d = 0; let level = null;
+      for (let i = 1; i < n; i++) {
+        d += Math.hypot(w.centre[idx(i)][0] - w.centre[idx(i - 1)][0], w.centre[idx(i)][1] - w.centre[idx(i - 1)][1]);
+        if (d >= WALK_RAMP_M) { level = w.centre[idx(i)][2]; break; }
+      }
+      if (level === null) return;
+      for (let i = 0; i < n; i++) {
+        const j = idx(i);
+        if (w.centre[j][2] >= level) break;
+        w.centre[j][2] = level;
+        if (w.points?.[j]) w.points[j][2] = level;
+      }
+    });
+  }
+}   // a walk this near a sidewalk's end carries it on
+
+/**
+ * The road inside each rounded curb, for a decal of the street's own surface
+ * (the two streets' decals leave the corner's triangle of ground bare): a
+ * tapering strip from the curbs' square corner to the middle of the curve,
+ * as wide there as the triangle (its edge on the curve's tangent: the road
+ * side only), and a band along the curve on its road side for the slivers
+ * the triangle's straight edges leave. [{ nodes: [[x, y, z, width]...], surface, band? }].
+ */
+export function cornerPatches(corners) {
+  const out = [];
+  for (const corner of corners) {
+    const { arc, centre, a, b } = corner;
+    const apex = cornerPoint(corner);
+    if (!apex || arc.length < 3) continue;
+    const mid = arc[Math.floor(arc.length / 2)];
+    const r = unit([mid[0] - centre[0], mid[1] - centre[1]]);
+    const t = [-r[1], r[0]];
+    const tangent = (p) => { const q = unit([p[0] - centre[0], p[1] - centre[1]]); return [-q[1], q[0]]; };
+    const e0 = lineX(mid, t, arc[0], tangent(arc[0]));
+    const e1 = lineX(mid, t, arc[arc.length - 1], tangent(arc[arc.length - 1]));
+    if (!e0 || !e1) continue;
+    const width = Math.hypot(e1[0] - e0[0], e1[1] - e0[1]) + CORNER_PATCH_PAD_M;
+    const length = Math.hypot(apex[0] - mid[0], apex[1] - mid[1]);
+    if (!(width > 0.3) || width > 25 || !(length > 0.3) || length > 15) continue;
+    // (a hair past the curve, under the curb's face: no seam of ground at it)
+    const back = [mid[0] - r[0] * 0.1, mid[1] - r[1] * 0.1];
+    const z = (a.z + b.z) / 2;
+    // (both streets: the corner takes the greater one's surface, exportBeamNGLevel)
+    const surface = a.run.surface ?? b.run.surface;
+    const streets = [{ surface: a.run.surface, highway: a.run.highway }, { surface: b.run.surface, highway: b.run.highway }];
+    out.push({ nodes: [[back[0], back[1], z, width], [apex[0] + r[0] * 0.3, apex[1] + r[1] * 0.3, z, CORNER_PATCH_PAD_M + 0.3]], surface, streets });
+    // and a band along the curve itself on its road side: the triangle's
+    // straight edges leave slivers of ground where the curb bends away from them
+    const band = arc.map((p) => {
+      const o = unit([p[0] - centre[0], p[1] - centre[1]]);
+      return [p[0] + o[0] * (CORNER_BAND_M / 2 - 0.1), p[1] + o[1] * (CORNER_BAND_M / 2 - 0.1), p[2], CORNER_BAND_M];
+    });
+    out.push({ nodes: band, surface, streets, band: true });
+  }
+  return out;
+}
+const CORNER_BAND_M = 1.2;
+const CORNER_PATCH_PAD_M = 0.4;
+
+// The road inside each rounded curb, to its curb's back: rings [[x, y]...]
+// (from the square corner the curb cuts off, along the arc set in by the curb)
+function cornerCuts(corners) {
+  const out = [];
+  for (const corner of corners) {
+    const { arc, centre } = corner;
+    const inner = arc.map((p) => { const u = unit([centre[0] - p[0], centre[1] - p[1]]); return [p[0] + u[0] * CURB_W, p[1] + u[1] * CURB_W]; });
+    // (the corner point a curb's width out past the curbs' faces: from their
+    // own corner, or their backs', a sliver along each straight curb was left
+    // uncut, and a walk's slab through it stood out past the rounded curb)
+    const tangent = (p) => { const r = unit([p[0] - centre[0], p[1] - centre[1]]); return [-r[1], r[0]]; };
+    const outer = (p) => { const r = unit([p[0] - centre[0], p[1] - centre[1]]); return [p[0] + r[0] * CURB_W, p[1] + r[1] * CURB_W]; };
+    const o0 = outer(arc[0]); const o1 = outer(arc[arc.length - 1]);
+    const apex = lineX(o0, tangent(arc[0]), o1, tangent(arc[arc.length - 1]));
+    if (!apex) continue;
+    // (out along the curbs' faces and across them at the curve's ends: the
+    // curb's whole width cut where it bends, no sliver left beside it)
+    out.push([[apex[0], apex[1]], o0, ...inner, o1]);
+  }
+  return out;
+}
 
 // A corner piece: the curb along the arc, the slab from the curb's top out to
 // the corner of the two sidewalks' outer edges, and the back faces along them.
+// The square corner a rounded curb cuts off: its road-side point, or null.
+function cornerPoint(corner) {
+  const { arc, centre } = corner;
+  const tangent = (p) => { const r = unit([p[0] - centre[0], p[1] - centre[1]]); return [-r[1], r[0]]; };
+  const p = arc[0]; const q = arc[arc.length - 1];
+  return lineX(p, tangent(p), q, tangent(q));
+}
+
 function sweepCorner(builder, corner) {
   const { arc, centre, outer, a, b } = corner;
+  // (nothing on the road side of the curve: the road's own decals pave it; a
+  // fill there floated over dips, stood grey in brick streets and, where the
+  // streets met at a wide angle, reached out into the junction)
   const prof = profileFor(Math.min(a.run.width, b.run.width));
   const curbPts = prof.points.slice(0, 4);     // face, nose, top
   const inward = arc.map(([x, y]) => unit([centre[0] - x, centre[1] - y]));   // away from the road
@@ -836,20 +1553,34 @@ function sweepCorner(builder, corner) {
       builder.tri('curb', a0, b1, b0, [u0, va], [u1, vb], [u0, vb], want);
     }
   }
+  // two bare curbs: no slab, the curb's back down into the filled ground
+  if (Math.max(a.run.width, b.run.width) <= CURB_ONLY_M) {
+    const [va, vb] = prof.segments[0].v;
+    const foot = arc.map((p, i) => [p[0] + inward[i][0] * (CURB_W + BATTER), p[1] + inward[i][1] * (CURB_W + BATTER), p[2] - SINK]);
+    for (let i = 0; i + 1 < arc.length; i++) {
+      const want = [inward[i][0], inward[i][1], 0];
+      builder.tri('curb', stations[i][3], stations[i + 1][3], foot[i + 1], [0, vb], [0.2, vb], [0.2, va], want);
+      builder.tri('curb', stations[i][3], foot[i + 1], foot[i], [0, vb], [0.2, va], [0, va], want);
+    }
+    return;
+  }
   // slab: a fan from the outer corner over the curb top's back edge, closed
   // by the two sidewalks' end sections
   const zMid = (a.z + b.z) / 2;
   const slabZ = (z, w) => z + CURB_H + w * CROSS_SLOPE;
   const aOut = [arc[0][0] + a.n[0] * a.run.width, arc[0][1] + a.n[1] * a.run.width, slabZ(a.z, a.run.width)];
   const bOut = [arc[arc.length - 1][0] + b.n[0] * b.run.width, arc[arc.length - 1][1] + b.n[1] * b.run.width, slabZ(b.z, b.run.width)];
-  const O = [outer[0], outer[1], slabZ(zMid, (a.run.width + b.run.width) / 2)];
+  // (the outer corner on the sidewalk side of the curve: with a bare curb
+  // on one side its two edges could meet out over the road, and the slab
+  // fanned out there stood as a wedge over the curb)
+  const mid = arc[Math.floor(arc.length / 2)]; const inMid = inward[Math.floor(arc.length / 2)];
+  const wMax = Math.max(a.run.width, b.run.width);
+  const onSidewalk = (outer[0] - mid[0]) * inMid[0] + (outer[1] - mid[1]) * inMid[1] > CURB_W;
+  const oxy = onSidewalk ? outer : [mid[0] + inMid[0] * wMax, mid[1] + inMid[1] * wMax];
+  const O = [oxy[0], oxy[1], slabZ(zMid, (a.run.width + b.run.width) / 2)];
   const rim = [aOut, ...stations.map((st) => st[3]), bOut];
-  const uvOf = (p, v) => [p[0] / SLAB_REPEAT_M, v];
-  for (let i = 0; i + 1 < rim.length; i++) {
-    const vi = i === 0 ? V_SLAB_OUT : V_SLAB_IN;
-    const vj = i + 1 === rim.length - 1 ? V_SLAB_OUT : V_SLAB_IN;
-    builder.tri('slab', O, rim[i], rim[i + 1], uvOf(O, V_SLAB_OUT), uvOf(rim[i], vi), uvOf(rim[i + 1], vj), [0, 0, 1]);
-  }
+  const uvOf = (p) => [p[0] / SLAB_TILE_M, p[1] / SLAB_TILE_M];
+  for (let i = 0; i + 1 < rim.length; i++) builder.tri('slab', O, rim[i], rim[i + 1], uvOf(O), uvOf(rim[i]), uvOf(rim[i + 1]), [0, 0, 1]);
   // back faces: from the slab's outer edge down to the ground behind it
   for (const [p, q] of [[aOut, O], [O, bOut]]) {
     const mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
@@ -866,13 +1597,1079 @@ function sweepCorner(builder, corner) {
  * runs, triangles }. Batches of RUNS_PER_MESH runs; names use letters (BeamNG
  * reads trailing digits of a Collada node name as a detail level).
  */
+function wallIndex(walls) {
+  const cells = new Map();
+  for (const wall of walls) {
+    for (let i = 0; i + 1 < wall.length; i++) {
+      const a = wall[i]; const b = wall[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      for (let s = 0; s <= L + 4; s += 4) {
+        const f = Math.min(1, L ? s / L : 0);
+        const key = `${Math.floor((a[0] + (b[0] - a[0]) * f) / 8)},${Math.floor((a[1] + (b[1] - a[1]) * f) / 8)}`;
+        if (!cells.has(key)) cells.set(key, new Set());
+        cells.get(key).add([a, b]);
+      }
+    }
+  }
+  return cells;
+}
+
+// The nearest point on a wall to (x, y) along (nx, ny), up to reach away, or null.
+// across: the most a wall may turn from square to (nx, ny), as |cos| (1: any wall).
+function wallAhead(cells, x, y, nx, ny, reach, across = 1) {
+  let best = null; let d = reach;
+  const cx = Math.floor(x / 8); const cy = Math.floor(y / 8); const r = Math.ceil(reach / 8);
+  for (let i = -r; i <= r; i++) {
+    for (let j = -r; j <= r; j++) {
+      for (const [a, b] of cells.get(`${cx + i},${cy + j}`) || []) {
+        const ex = b[0] - a[0]; const ey = b[1] - a[1];
+        const det = nx * ey - ny * ex;
+        if (Math.abs(det) < 1e-6) continue;
+        if (Math.abs(ex * nx + ey * ny) > across * Math.hypot(ex, ey)) continue;
+        const t = ((a[0] - x) * ey - (a[1] - y) * ex) / det; const u = ((a[0] - x) * ny - (a[1] - y) * nx) / det;
+        if (t > 0 && t < d && u >= 0 && u <= 1) { d = t; best = t; }
+      }
+    }
+  }
+  return best;
+}
+
+// Decks from a walkway's edges out to any wall just past them: [{ edge, out }] stretches of points.
+// A wall with water behind it (mapped, or ground at the sea) is decked out to from further, over ground no
+// higher than the walk and clear of anything else (clear(x, y)).
+function apronsOf(run, cells, { groundAt = null, seaZ = -Infinity, clear = () => true, wet = () => false } = {}) {
+  const c = run.centre; const out = [];
+  // the deck's height at the wall: the walk's, or over higher ground (null: too high, or in the way)
+  const deckZ = (ex, ey, nx, ny, gap, z, sea) => {
+    if (!groundAt) return sea ? null : z;
+    if (sea) {
+      const bx = ex + nx * (gap + SEAWALL_LOOK_M); const by = ey + ny * (gap + SEAWALL_LOOK_M);
+      if (!wet(bx, by) && groundAt(bx, by) >= seaZ + WALK_SHORE_M) return null;
+    }
+    let top = z;
+    for (let d = APRON_STEP_M; d < gap - 0.3; d += APRON_STEP_M) {
+      const x = ex + nx * d; const y = ey + ny * d;
+      if (sea && !clear(x, y)) return null;
+      top = Math.max(top, groundAt(x, y) + APRON_COVER_M);
+    }
+    return top - z > (sea ? SEAWALL_RISE_M : APRON_RISE_M) ? null : top;
+  };
+  for (const sg of [1, -1]) {
+    let cur = null;
+    // (a seawall deck is a promenade: one along a short stretch of wall is a jog in it, left as ground)
+    const flush = () => { if (cur && cur.edge.length >= 2 && (!cur.sea || cur.seaLen >= SEAWALL_MIN_LEN_M)) out.push(cur); cur = null; };
+    c.forEach((p, i) => {
+      const a = c[Math.max(0, i - 1)]; const b = c[Math.min(c.length - 1, i + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const nx = (-(b[1] - a[1]) / L) * sg; const ny = ((b[0] - a[0]) / L) * sg;
+      const ex = p[0] + nx * run.half; const ey = p[1] + ny * run.half;
+      const walkTop = (p[2] ?? 0) + WALK_H;
+      let gap = wallAhead(cells, ex, ey, nx, ny, APRON_MAX_M); let sea = false;
+      if (gap === null) { gap = wallAhead(cells, ex, ey, nx, ny, SEAWALL_APRON_MAX_M, SEAWALL_ACROSS); sea = true; }
+      const z = gap === null || gap < APRON_MIN_M ? null : deckZ(ex, ey, nx, ny, gap, walkTop, sea);
+      if (z === null) { flush(); return; }
+      const pt = { e: [ex - nx * 0.05, ey - ny * 0.05], o: [ex + nx * gap, ey + ny * gap], z };
+      const push = (o, q) => { o.edge.push(q.e); o.out.push(q.o); o.z.push(q.z); };
+      // a seawall stretch apart from a near wall's: it may be dropped (the step between belongs to it)
+      if (cur && cur.sea !== sea) {
+        const last = { e: cur.edge[cur.edge.length - 1], o: cur.out[cur.out.length - 1], z: cur.z[cur.z.length - 1] };
+        if (cur.sea) push(cur, pt);
+        flush();
+        cur = { edge: [], out: [], z: [], seaLen: 0, sea };
+        if (sea) push(cur, last);
+      }
+      cur ??= { edge: [], out: [], z: [], seaLen: 0, sea };
+      const last = cur.edge[cur.edge.length - 1];
+      if (sea && last) cur.seaLen += Math.hypot(pt.e[0] - last[0], pt.e[1] - last[1]);
+      push(cur, pt);
+    });
+    flush();
+  }
+  return out;
+}
+
+/**
+ * Sidewalks away from the curb, as raised slabs following the ground. paths:
+ * drawn footways [{ nodes, half, sidewalk }]: those tagged footway=sidewalk, and
+ * any other running along a street (a park's walks stay on the terrain).
+ */
+export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], zones = [], buildings = [], walls = [], parking = [], water = [], seaZ = -Infinity } = {}) {
+  if (!groundAt) return [];
+  const inWater = water?.length ? buildingIndex(water) : () => false;
+  const index = buildCarriagewayIndex(carriageways);
+  const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
+  const inParking = parking?.length ? buildingIndex(parking) : () => false;
+  const nearDriveway = buildLineIndex(driveways);
+  const chosen = (paths || []).filter((path) => {
+    if (path.nodes.length < 2) return false;
+    if (path.sidewalk) return true;
+    const near = path.nodes.filter((q) => carriagewaysAt(index, q[0], q[1], WALK_STREET_M).length).length;
+    return near >= WALK_STREET_SHARE * path.nodes.length;
+  });
+  // the walkways' nodes on a grid: where two meet their slabs run on level
+  const cells = new Map();
+  const cell = (x, y) => `${Math.floor(x / WALK_JOIN_M)},${Math.floor(y / WALK_JOIN_M)}`;
+  chosen.forEach((path, k) => {
+    for (const q of path.nodes) {
+      const key = cell(q[0], q[1]);
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push([k, q[0], q[1]]);
+    }
+  });
+  const joinsAnother = (x, y, k, reach) => {
+    const cx = Math.floor(x / WALK_JOIN_M); const cy = Math.floor(y / WALK_JOIN_M);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (const [o, qx, qy] of cells.get(`${cx + dx},${cy + dy}`) || []) if (o !== k && Math.hypot(qx - x, qy - y) < reach) return true;
+      }
+    }
+    return false;
+  };
+  // each walkway's final line first: only then are the ends of one where the next one is
+  const lines = chosen.map((path, k) => {
+    const { half } = path;
+    // an end pointing at a road just ahead of it goes on to the road
+    const reachRoad = (end, prev) => {
+      if (joinsAnother(end[0], end[1], k, WALK_TOUCH_M)) return [];
+      const L = Math.hypot(end[0] - prev[0], end[1] - prev[1]) || 1;
+      const ux = (end[0] - prev[0]) / L; const uy = (end[1] - prev[1]) / L;
+      if (carriagewaysAt(index, end[0], end[1], 0).length) return [];
+      for (let d = 0.5; d <= WALK_REACH_M; d += 0.5) {
+        const q = [end[0] + ux * d, end[1] + uy * d, 0];
+        if (carriagewaysAt(index, q[0], q[1], 0).length) {
+          const out = [];
+          for (let e = 0.5; e <= d + 1e-6; e += 0.5) out.push([end[0] + ux * e, end[1] + uy * e, 0]);
+          return out;
+        }
+      }
+      return [];
+    };
+    // (its mapped corners rounded where it curves: a walk round a fountain;
+    // repeated points dropped: a zero-length step threw its slab's edges out
+    // into a wedge where two walks joined)
+    const distinct = path.nodes.filter((q, i, a) => !i || Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > WALK_DUP_M);
+    const nodes = smoothLine(distinct.length >= 2 ? distinct : path.nodes);
+    const full = [...reachRoad(nodes[0], nodes[1]).reverse(), ...nodes, ...reachRoad(nodes[nodes.length - 1], nodes[nodes.length - 2])];
+    const smooth = (xs, passes) => {
+      let v = xs;
+      for (let p = 0; p < passes; p++) v = v.map((x, i) => (v[Math.max(0, i - 1)] + 2 * x + v[Math.min(v.length - 1, i + 1)]) / 4);
+      return v;
+    };
+    // a footway just off the curb is against it: the thin strip between closed
+    const normals = full.map((q, i) => {
+      const a = full[Math.max(0, i - 1)]; const b = full[Math.min(full.length - 1, i + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      return [-(b[1] - a[1]) / L, (b[0] - a[0]) / L];
+    });
+    // (from just off its line: a walk mapped partly over the drawn road's
+    // edge is pushed clear of it, not cut where it touches and ramped down
+    // to the road from both sides; its line itself on the road is a crossing)
+    const rawShift = full.map((q, i) => {
+      const [nx, ny] = normals[i];
+      if (carriagewaysAt(index, q[0], q[1], 0).length) {
+        // inside the road's edge (a mapped sidewalk where the street is drawn
+        // wider than it: out past the curb on the side the edge is near;
+        // crossings are built apart, footway=crossing)
+        for (let d = 0.25; d <= WALK_INSIDE_MAX_M; d += 0.25) {
+          for (const sg of [1, -1]) {
+            if (!carriagewaysAt(index, q[0] + nx * sg * d, q[1] + ny * sg * d, 0).length) return { v: sg * (d + half + CURB_W), push: true };
+          }
+        }
+        return { v: 0, push: false };
+      }
+      for (let d = 0.25; d <= half + WALK_SNAP_M; d += 0.25) {
+        for (const sg of [1, -1]) {
+          if (carriagewaysAt(index, q[0] + nx * sg * d, q[1] + ny * sg * d, 0).length) return { v: sg * (d - half - CURB_W), push: d < half + CURB_W };
+        }
+      }
+      return { v: 0, push: false };
+    });
+    // (each push spread to its neighbours, then smoothed: smoothed alone it
+    // pulled the walk back over the road where it came nearest; kept point
+    // by point, the walk's edge zig-zagged in the search's steps)
+    // (only a push off the road spread: the pull of a walk just off the curb
+    // up against it stays its own)
+    const spread = rawShift.map((r, i) => {
+      let best = null;
+      for (let k = Math.max(0, i - WALK_PUSH_SPREAD); k <= Math.min(rawShift.length - 1, i + WALK_PUSH_SPREAD); k++) {
+        if (rawShift[k].push && (!best || Math.abs(rawShift[k].v) > Math.abs(best))) best = rawShift[k].v;
+      }
+      return best ?? r.v;
+    });
+    const shift = smooth(spread, 4);
+    const pushed = full.map((q, i) => [q[0] + normals[i][0] * shift[i], q[1] + normals[i][1] * shift[i], 0]);
+    // then up against the curb where pushed past it (the push overshot by its
+    // search steps and its spread: a strip of ground showed between): a
+    // finer look, a pull only, the smallest of its neighbours'
+    const pull = pushed.map((q, i) => {
+      if (!shift[i] || carriagewaysAt(index, q[0], q[1], 0).length) return 0;
+      const [nx, ny] = normals[i];
+      for (let d = half; d <= half + WALK_SNAP_M; d += 0.05) {
+        for (const sg of [1, -1]) {
+          if (carriagewaysAt(index, q[0] + nx * sg * d, q[1] + ny * sg * d, 0).length) return Math.sign(shift[i]) === -sg ? sg * Math.max(0, d - half - CURB_W) : 0;
+        }
+      }
+      return 0;
+    });
+    const settle = pull.map((v, i) => {
+      let best = v;
+      for (let k = Math.max(0, i - 2); k <= Math.min(pull.length - 1, i + 2); k++) if (Math.abs(pull[k]) < Math.abs(best)) best = pull[k];
+      return best;
+    });
+    const snapped = pushed.map((q, i) => [q[0] + normals[i][0] * settle[i], q[1] + normals[i][1] * settle[i], 0]);
+    // beside a street it is as high as the curb; away from one, on the ground
+    // (a seawall's foot or a mapped end over the water isn't a dip in the walk)
+    const heights = snapped.map((q) => {
+      const road = carriagewaysAt(index, q[0], q[1], WALK_STREET_LEVEL_M)[0];
+      return road ? road.z + CURB_H - WALK_H : groundAt(q[0], q[1]);
+    });
+    // (points out over the water take the shore's height, or it drags the end down)
+    const wet = (v) => v < seaZ + WALK_SHORE_M;
+    for (let i = 1; i < heights.length; i++) if (wet(heights[i]) && !wet(heights[i - 1])) heights[i] = heights[i - 1];
+    for (let i = heights.length - 2; i >= 0; i--) if (wet(heights[i]) && !wet(heights[i + 1])) heights[i] = heights[i + 1];
+    const roll = (xs, f) => xs.map((_, i) => f(...xs.slice(Math.max(0, i - WALK_DIP_NODES), i + WALK_DIP_NODES + 1)));
+    const z = smooth(roll(roll(heights, Math.max), Math.min), 3);
+    return snapped.map((q, i) => [q[0], q[1], z[i], 0]);
+  });
+  // an end at another walkway goes on to that walkway's middle
+  const others = new Map();
+  lines.forEach((line, k) => {
+    for (let i = 0; i + 1 < line.length; i++) {
+      const key = cell((line[i][0] + line[i + 1][0]) / 2, (line[i][1] + line[i + 1][1]) / 2);
+      if (!others.has(key)) others.set(key, []);
+      others.get(key).push([k, line[i], line[i + 1]]);
+    }
+  });
+  const onAnother = (p, k) => {
+    let best = null; let d = WALK_JOIN_M;
+    const cx = Math.floor(p[0] / WALK_JOIN_M); const cy = Math.floor(p[1] / WALK_JOIN_M);
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -2; dy <= 2; dy++) {
+        for (const [o, a, b] of others.get(`${cx + dx},${cy + dy}`) || []) {
+          if (o === k) continue;
+          const ex = b[0] - a[0]; const ey = b[1] - a[1];
+          const u = Math.max(0, Math.min(1, ((p[0] - a[0]) * ex + (p[1] - a[1]) * ey) / (ex * ex + ey * ey || 1)));
+          const q = [a[0] + ex * u, a[1] + ey * u, a[2] + (b[2] - a[2]) * u, 0];
+          const e = Math.hypot(q[0] - p[0], q[1] - p[1]);
+          if (e < d) { d = e; best = q; }
+        }
+      }
+    }
+    return best;
+  };
+  let segments = null;
+  const wallSegments = () => (segments ??= wallIndex(walls));
+  const runs = [];
+  lines.forEach((drawn, k) => {
+    const { half } = chosen[k];
+    const head = onAnother(drawn[0], k); const tail = onAnother(drawn[drawn.length - 1], k);
+    const line = [...(head ? [head] : []), ...drawn, ...(tail ? [tail] : [])];
+    // the sides of the slab off the road: it may run up to a road, not along one
+    const sideOn = (x, y) => {
+      let best = line[0]; let at = 0; let d = Infinity;
+      line.forEach((q, i) => { const e = Math.hypot(q[0] - x, q[1] - y); if (e < d) { d = e; best = q; at = i; } });
+      const a = line[Math.max(0, at - 1)]; const b = line[Math.min(line.length - 1, at + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      const nx = -(b[1] - a[1]) / L * half; const ny = (b[0] - a[0]) / L * half;
+      return isOnOtherCarriageway(index, x + nx, y + ny, WALK_ROAD_M, () => false) && isOnOtherCarriageway(index, x - nx, y - ny, WALK_ROAD_M, () => false) && !!best;
+    };
+    const blocked = (x, y) => sideOn(x, y) || isOnOtherCarriageway(index, x, y, 0, () => false) || isInZone(zones, x, y) || inBuilding(x, y) || inParking(x, y) || groundAt(x, y) < seaZ + WALK_SHORE_M;
+    for (const piece of cutNodes(line, blocked, { minPieceM: 0.5 })) {
+      // (a crossing's landing between the sidewalk and the curb can be short)
+      if (runLength(piece) < (chosen[k].crossing ? WALK_LANDING_M : WALK_MIN_M)) continue;
+      const ends = [piece[0], piece[piece.length - 1]];
+      const joined = [piece[0] === line[0] || Math.hypot(ends[0][0] - line[0][0], ends[0][1] - line[0][1]) < 0.01 ? !!head : false,
+        Math.hypot(ends[1][0] - line[line.length - 1][0], ends[1][1] - line[line.length - 1][1]) < 0.01 ? !!tail : false];
+      // (the cut above is only as fine as its sampling: an end at a road goes on to its edge)
+      const toEdge = (q, prev) => {
+        const L = Math.hypot(q[0] - prev[0], q[1] - prev[1]) || 1;
+        for (let d = 0.1; d <= WALK_EDGE_M; d += 0.1) {
+          const x = q[0] + ((q[0] - prev[0]) / L) * d; const y = q[1] + ((q[1] - prev[1]) / L) * d;
+          if (carriagewaysAt(index, x, y, 0).length) return [x, y, q[2], q[3]];
+        }
+        return null;
+      };
+      if (!joined[0] && piece.length > 1) { const e = toEdge(piece[0], piece[1]); if (e) { piece.unshift(e); ends[0] = e; } }
+      if (!joined[1] && piece.length > 1) { const e = toEdge(piece[piece.length - 1], piece[piece.length - 2]); if (e) { piece.push(e); ends[1] = e; } }
+      // (not up to a road well above the walk, as one climbing on to a bridge: that stands up as a fin)
+      const onRoad = ends.map((q, i) => {
+        const road = joined[i] ? null : carriagewaysAt(index, q[0], q[1], WALK_CURB_M)[0] ?? null;
+        return road && road.z - q[2] > WALK_RAMP_UP_M ? null : road;
+      });
+      // an end at a road comes down to the road; any other stays up (one at a seawall folded)
+      const ramps = onRoad.map((road) => !!road);
+      const stations = piece.filter((q, i, a) => !i || Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > WALK_DUP_M).map((q) => [...q]);
+      if (stations.length < 2) continue;
+      const total = runLength(stations);
+      // (a stub that is all ramp, between where two walks join and the road:
+      // a steep wedge over the walk beside it)
+      if (total < WALK_STUB_M && ramps.some(Boolean)) continue;
+      let s = 0;
+      stations.forEach((q, i) => {
+        if (i) s += Math.hypot(q[0] - stations[i - 1][0], q[1] - stations[i - 1][1]);
+        for (const [road, d] of [[onRoad[0], s], [onRoad[1], total - s]]) {
+          if (road && d < WALK_RAMP_M) q[2] += (road.z - q[2]) * (1 - d / WALK_RAMP_M);
+        }
+      });
+      const points = offsetLine(stations, half).map((q) => [q[0], q[1], q[2]]);
+      const run = { points, centre: stations.map((q) => [q[0], q[1], q[2]]), half, side: -1, width: half * 2, walk: true, ramps, caps: [true, true], highway: 'footway', roadEnds: ends.filter((_, i) => onRoad[i]).map((q) => [q[0], q[1], half]) };
+      if (nearDriveway) run.dips = dipsAlong(points, (x, y) => nearDriveway(x, y, DRIVEWAY_HALF_M));
+      if (walls.length) run.aprons = apronsOf(run, wallSegments(), { groundAt, seaZ, wet: inWater, clear: (x, y) => !inBuilding(x, y) && !inParking(x, y) && !isOnOtherCarriageway(index, x, y, 0, () => false) });
+      runs.push(run);
+    }
+  });
+  return runs;
+}
+
+/**
+ * Walkable structures clear of the ground: piers and footbridges from end to
+ * end, over the water by DECK_CLEAR_M; a sidewalk mapped on a road bridge at
+ * that deck's height. paths: [{ nodes, half, wood }], roads: the bridge
+ * carriageways. Their posts stand wherever the deck is clear of the ground.
+ */
+export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
+  if (!groundAt) return [];
+  const index = bridges?.length ? buildCarriagewayIndex(bridges) : null;
+  const least = seaZ + DECK_CLEAR_M;
+  return (paths || []).filter((p) => p.nodes.length > 1).map((path) => {
+    const { nodes, half } = path;
+    // one level over the water, so piers that join meet; up only on to real ground
+    // (a real stretch of it: a point on a seawall's face isn't land to stand on)
+    const ground = nodes.map((q) => groundAt(q[0], q[1]));
+    const onLand = (i) => {
+      let run = 1;
+      for (const step of [-1, 1]) for (let k = i + step; k >= 0 && k < ground.length && ground[k] > least + DECK_SHORE_M; k += step) run++;
+      return ground[i] > least + DECK_SHORE_M && run >= DECK_LAND_NODES;
+    };
+    const raw = nodes.map((q, i) => {
+      const road = index ? carriagewaysAt(index, q[0], q[1], DECK_ROAD_M)[0] : null;
+      if (road) return road.z + CURB_H - WALK_H;
+      return onLand(i) ? ground[i] : least;
+    });
+    let z = raw;
+    for (let pass = 0; pass < 4; pass++) z = z.map((v, i) => (i === 0 || i === z.length - 1 ? v : (z[i - 1] + 2 * v + z[i + 1]) / 4));
+    const onBridge = nodes.some((q) => index && carriagewaysAt(index, q[0], q[1], DECK_ROAD_M).length);
+    const centre = nodes.map((q, i) => [q[0], q[1], z[i]]);
+    const flat = centre.map((q) => [q[0], q[1], q[2], 0]);
+    const points = offsetLine(flat, half).map((q) => [q[0], q[1], q[2]]);
+    return { points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood: !!path.wood, ramps: [false, false], caps: [true, true], highway: 'footway' };
+  });
+}
+
+/**
+ * Walls mapped as areas (a seawall, a rampart): their footprints, which edges
+ * look over water, and how low the ground goes under the deck to come.
+ * rings: closed outlines of points.
+ */
+function planWallDecks(rings, groundAt, seaZ = -Infinity) {
+  const decks = [];
+  for (const raw of rings || []) {
+    let ring = raw.map((q) => [q[0], q[1]]);
+    if (Math.hypot(ring[0][0] - ring[ring.length - 1][0], ring[0][1] - ring[ring.length - 1][1]) < 0.01) ring = ring.slice(0, -1);
+    if (ring.length < 3) continue;
+    // points along the outline, so the deck follows the walls' tops
+    const fine = ring.flatMap((a, i) => {
+      const b = ring[(i + 1) % ring.length]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const n = Math.max(1, Math.round(L / WALL_POINT_M));
+      return Array.from({ length: n }, (_, k) => [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n]);
+    });
+    const signed = fine.reduce((sum, p, i) => { const q = fine[(i + 1) % fine.length]; return sum + p[0] * q[1] - q[0] * p[1]; }, 0);
+    const sg = signed > 0 ? 1 : -1;
+    const heights = fine.map(([x, y]) => groundAt(x, y)).sort((x, y) => x - y);
+    const land = heights.filter((h) => h > seaZ + WALL_WATER_M);
+    const high = (land.length ? land[Math.floor(land.length * 0.95)] : heights[heights.length - 1]) + WALL_INNER_LIFT_M;
+    const wet = fine.map((p, i) => {
+      const a = fine[(i + fine.length - 1) % fine.length]; const b = fine[(i + 1) % fine.length];
+      const t = unit([b[0] - a[0], b[1] - a[1]]);
+      return groundAt(p[0] + t[1] * sg * WALL_LOOK_M, p[1] - t[0] * sg * WALL_LOOK_M) < seaZ + WALL_WATER_M;
+    });
+    decks.push({ ring: fine, wet, high, seaZ, signed, under: high - WALL_SLOPE_DROP_M - WALL_GROUND_UNDER_M });
+  }
+  return decks;
+}
+
+/**
+ * The decks across the walls' tops, built once the walls stand: each edge on
+ * the highest wall beside it (wallTops: [{ x, y, z }]), so the walls are its
+ * sides. With no wall there: a slope from the land to the water, faces round it.
+ */
+export function buildWallDeckMesh(decks, wallTops = []) {
+  if (!decks?.length) return null;
+  const builder = new PartBuilder();
+  const cells = new Map();
+  for (const t of wallTops) {
+    const key = `${Math.floor(t.x / 8)},${Math.floor(t.y / 8)}`;
+    if (!cells.has(key)) cells.set(key, []);
+    cells.get(key).push(t);
+  }
+  const topAt = (x, y) => {
+    let best = null;
+    const cx = Math.floor(x / 8); const cy = Math.floor(y / 8);
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        for (const t of cells.get(`${cx + i},${cy + j}`) || []) if (Math.hypot(t.x - x, t.y - y) < WALL_TOP_REACH_M && (best === null || t.z > best)) best = t.z;
+      }
+    }
+    return best;
+  };
+  for (const { ring, wet, high, signed } of decks) {
+    const tops = ring.map(([x, y]) => topAt(x, y));
+    const walled = tops.filter((z) => z !== null).length >= WALL_SHARE * ring.length;
+    const pts = ring.map(([x, y], i) => [x, y, (walled ? tops[i] : null) ?? (wet[i] ? high - WALL_SLOPE_DROP_M : high)]);
+    if (walled) {
+      for (let pass = 0; pass < 2; pass++) {
+        const z = pts.map((q) => q[2]);
+        pts.forEach((q, i) => {
+          if (wet[i] === wet[(i + 1) % pts.length] && wet[i] === wet[(i + pts.length - 1) % pts.length]) q[2] = (z[(i + pts.length - 1) % pts.length] + 2 * z[i] + z[(i + 1) % pts.length]) / 4;
+        });
+      }
+    }
+    const uv = (p) => [p[0] / SLAB_TILE_M, p[1] / SLAB_TILE_M];
+    for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(ring.map(([x, y]) => new THREE.Vector2(x, y)), [])) {
+      builder.tri('slab', pts[a], pts[b], pts[c], uv(pts[a]), uv(pts[b]), uv(pts[c]), [0, 0, 1]);
+    }
+    if (walled) continue;
+    const low = Math.min(...pts.map((q) => q[2])) - 3;
+    pts.forEach((a, i) => {
+      const b = pts[(i + 1) % pts.length]; const dx = b[0] - a[0]; const dy = b[1] - a[1];
+      const want = signed > 0 ? [dy, -dx, 0] : [-dy, dx, 0];
+      const fa = [a[0], a[1], low]; const fb = [b[0], b[1], low];
+      builder.tri('curb', a, b, fb, [0, V_LIGHT_LOW], [0.2, V_LIGHT_LOW], [0.2, V_BAND_LOW], want);
+      builder.tri('curb', a, fb, fa, [0, V_LIGHT_LOW], [0.2, V_BAND_LOW], [0, V_BAND_LOW], want);
+    });
+  }
+  return builder.toMesh('wall_decks', { smooth: true });
+}
+
+
+/**
+ * Gutters at the foot of the curbs, a road's width in from them: lines of
+ * [x, y, z], broken where a curb is lowered.
+ */
+export function gutterLines({ runs = [], corners = [] }) {
+  const lines = [];
+  const off = GUTTER_INSET_M;
+  for (const run of runs) {
+    const { points, share } = rampStations(run.points, run.ramps ?? [false, false], run.dips ?? []);
+    let cur = [];
+    const flush = () => { if (runLength(cur) >= GUTTER_MIN_M) lines.push(cur); cur = []; };
+    points.forEach((p, i) => {
+      if (share[i] < 0.99) { flush(); return; }
+      const a = points[Math.max(0, i - 1)]; const b = points[Math.min(points.length - 1, i + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      cur.push([p[0] + ((b[1] - a[1]) / L) * run.side * off, p[1] - ((b[0] - a[0]) / L) * run.side * off, p[2]]);
+    });
+    flush();
+  }
+  for (const { arc, centre } of corners) {
+    const line = arc.map((p) => { const u = unit([centre[0] - p[0], centre[1] - p[1]]); return [p[0] - u[0] * off, p[1] - u[1] * off, p[2]]; });
+    if (line.length > 1) lines.push(line);
+  }
+  return lines;
+}
+// (the game's gutter1 decal: its opacity map leaves a narrow concrete pan
+// at the curb, the rest clear)
+const GUTTER_INSET_M = 0.125;   // (its middle: the decal's edge at the curb)
+const GUTTER_MIN_M = 8;        // (shorter pieces only multiply objects)
+
+/** The ground inside each wall deck's outline, down under it. */
+export function lowerUnderWallDecks(decks, grid, set) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  let pixels = 0;
+  for (const { ring, under } of decks || []) {
+    const xs = ring.map((q) => q[0]); const ys = ring.map((q) => q[1]);
+    const col = (x) => (x / worldSize + 0.5) * (width - 1); const row = (y) => (0.5 - y / worldSize) * (height - 1);
+    for (let r = Math.max(0, Math.floor(row(Math.max(...ys)))); r <= Math.min(height - 1, Math.ceil(row(Math.min(...ys)))); r++) {
+      for (let c = Math.max(0, Math.floor(col(Math.min(...xs)))); c <= Math.min(width - 1, Math.ceil(col(Math.max(...xs)))); c++) {
+        const x = ((c / (width - 1)) - 0.5) * worldSize; const y = (0.5 - r / (height - 1)) * worldSize;
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const a = ring[i]; const b = ring[j];
+          if ((a[1] > y) !== (b[1] > y) && x < ((b[0] - a[0]) * (y - a[1])) / (b[1] - a[1]) + a[0]) inside = !inside;
+        }
+        const idx = r * width + c;
+        if (inside && heightMap[idx] - minHeight > under) { set(idx, under + minHeight); pixels++; }
+      }
+    }
+  }
+  return pixels;
+}
+
+// A square bar between two points.
+function metalBar(builder, a, b, r) {
+  const d = unit3([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
+  const side = unit3(Math.abs(d[2]) > 0.95 ? [1, 0, 0] : [d[1], -d[0], 0]);
+  const up = [side[1] * d[2] - side[2] * d[1], side[2] * d[0] - side[0] * d[2], side[0] * d[1] - side[1] * d[0]];
+  const at = (p, u, v) => [0, 1, 2].map((k) => p[k] + side[k] * u + up[k] * v);
+  const c = [[-r, -r], [r, -r], [r, r], [-r, r]];
+  c.forEach(([u, v], i) => {
+    const [u2, v2] = c[(i + 1) % 4];
+    const out = [0, 1, 2].map((k) => side[k] * (u + u2) + up[k] * (v + v2));
+    const q0 = at(a, u, v); const q1 = at(a, u2, v2); const q2 = at(b, u2, v2); const q3 = at(b, u, v);
+    builder.tri('metal', q0, q1, q2, [0, 0], [0.1, 0], [0.1, 1], out);
+    builder.tri('metal', q0, q2, q3, [0, 0], [0.1, 1], [0, 1], out);
+  });
+}
+const unit3 = (v) => { const L = Math.hypot(...v) || 1; return v.map((x) => x / L); };
+
+// A flat plate as a thin quad, both faces.
+function metalPlate(builder, a, b, c, d) {
+  for (const want of [[0, 0, 1], [0, 0, -1]]) {
+    builder.tri('metal', a, b, c, [0, 0], [1, 0], [1, 1], want);
+    builder.tri('metal', a, c, d, [0, 0], [1, 1], [0, 1], want);
+  }
+}
+
+// Handrails both sides from `a` to `b`, the walking line, posted every so often.
+function handrails(builder, a, b, hw) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) || 1;
+  const nx = -(b[1] - a[1]) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1); const ny = (b[0] - a[0]) / (Math.hypot(b[0] - a[0], b[1] - a[1]) || 1);
+  const n = Math.max(2, Math.round(L / GANGWAY_POST_M));
+  for (const sg of [1, -1]) {
+    const off = (p, h) => [p[0] + nx * sg * hw, p[1] + ny * sg * hw, p[2] + h];
+    for (const h of [GANGWAY_RAIL_M, GANGWAY_RAIL_M / 2]) metalBar(builder, off(a, h), off(b, h), h === GANGWAY_RAIL_M ? 0.025 : 0.015);
+    for (let i = 0; i <= n; i++) {
+      const p = a.map((v, k) => v + (b[k] - v) * (i / n));
+      metalBar(builder, off(p, -0.05), off(p, GANGWAY_RAIL_M), 0.02);
+    }
+  }
+}
+
+/**
+ * The way from the shore down to a deck: from its top [x, y, z] to its foot on
+ * the deck, along the deck's line. A ramp if there is room for a gentle one,
+ * else stairs. Returns the kind built.
+ */
+function buildGangway(builder, top, foot) {
+  const run = Math.hypot(top[0] - foot[0], top[1] - foot[1]) || 1;
+  const drop = top[2] - foot[2];
+  const stairs = drop / run > GANGWAY_MAX_SLOPE;
+  const nx = -(foot[1] - top[1]) / run; const ny = (foot[0] - top[0]) / run;
+  const side = (p, sg) => [p[0] + nx * sg * GANGWAY_HALF_M, p[1] + ny * sg * GANGWAY_HALF_M, p[2]];
+  for (const sg of [1, -1]) metalBar(builder, side([top[0], top[1], top[2] - 0.08], sg), side([foot[0], foot[1], foot[2] + 0.03], sg), 0.05);
+  if (stairs) {
+    const steps = Math.max(2, Math.round(drop / STAIR_RISE_M));
+    for (let i = 0; i < steps; i++) {
+      const f0 = i / steps; const f1 = (i + 1) / steps;
+      const z = top[2] - drop * f1 + 0.01;
+      const p = [top[0] + (foot[0] - top[0]) * f0, top[1] + (foot[1] - top[1]) * f0, z];
+      const q = [top[0] + (foot[0] - top[0]) * f1, top[1] + (foot[1] - top[1]) * f1, z];
+      metalPlate(builder, side(p, 1), side(p, -1), side(q, -1), side(q, 1));
+    }
+  } else {
+    metalPlate(builder, side(top, 1), side(top, -1), side(foot, -1), side(foot, 1));
+    const cleats = Math.round(Math.hypot(run, drop) / 0.4);
+    for (let i = 1; i < cleats; i++) {
+      const p = top.map((v, k) => v + (foot[k] - v) * (i / cleats));
+      metalBar(builder, side([p[0], p[1], p[2] + 0.012], 1), side([p[0], p[1], p[2] + 0.012], -1), 0.012);
+    }
+  }
+  handrails(builder, top, foot, GANGWAY_HALF_M);
+  return stairs ? 'stairs' : 'ramp';
+}
+
+// Where a deck's end looks at higher ground just past it: the height and place to come down from.
+function shoreAbove(end, prev, z, walkTop, groundAt) {
+  const L = Math.hypot(end[0] - prev[0], end[1] - prev[1]) || 1;
+  const ux = (end[0] - prev[0]) / L; const uy = (end[1] - prev[1]) / L;
+  let best = null;
+  for (let d = 0.5; d <= GANGWAY_REACH_M; d += 0.5) {
+    const x = end[0] + ux * d; const y = end[1] + uy * d;
+    const h = walkTop(x, y) ?? groundAt(x, y);
+    if (h > z + GANGWAY_MIN_DROP_M && (!best || h > best[2] + 0.1)) best = [x, y, h];
+    else if (best) break;
+  }
+  return best;
+}
+
+// Gangways at the ends of decks below the shore: the number of each kind.
+function buildGangways(builder, deckRuns, walkRuns, groundAt) {
+  const cells = new Map();
+  for (const run of walkRuns) {
+    for (const q of run.centre) {
+      const key = `${Math.floor(q[0] / 4)},${Math.floor(q[1] / 4)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push([q[0], q[1], q[2] + WALK_H, run.half + 0.3]);
+    }
+  }
+  const walkTop = (x, y) => {
+    const cx = Math.floor(x / 4); const cy = Math.floor(y / 4);
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const q of cells.get(`${cx + i},${cy + j}`) || []) if (Math.hypot(q[0] - x, q[1] - y) < q[3]) return q[2];
+    return null;
+  };
+  const counts = { ramp: 0, stairs: 0 };
+  for (const run of deckRuns) {
+    if (run.onBridge) continue;
+    const c = run.centre; const n = c.length;
+    for (const [e, step] of [[0, 1], [n - 1, -1]]) {
+      const end = c[e]; const deckTop = end[2] + WALK_H;
+      const top = shoreAbove(end, c[e + step], deckTop, walkTop, groundAt);
+      if (!top) continue;
+      const drop = top[2] - deckTop;
+      const walk = (want) => {
+        let left = want;
+        for (let i = e; i + step >= 0 && i + step < n; i += step) {
+          const a = c[i]; const b = c[i + step]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          if (left <= L) { const f = left / (L || 1); return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f + WALK_H]; }
+          left -= L;
+        }
+        return null;
+      };
+      const reach = Math.hypot(top[0] - end[0], top[1] - end[1]);
+      // the gentle ramp if the deck has room for its foot, else stairs
+      const foot = walk(Math.min(GANGWAY_MAX_RUN_M, drop / GANGWAY_SLOPE) - reach) ?? walk(Math.max(0.3, drop / STAIR_SLOPE - reach));
+      if (!foot) continue;
+      counts[buildGangway(builder, top, foot)]++;
+    }
+  }
+  return counts;
+}
+
+// Square posts under a deck, in pairs along it, where it stands clear of the ground.
+function deckPosts(builder, run, groundAt) {
+  const c = run.centre; let next = 0; let s = 0;
+  const mat = run.wood ? 'wood' : 'curb';
+  c.forEach((p, i) => {
+    if (i) s += Math.hypot(p[0] - c[i - 1][0], p[1] - c[i - 1][1]);
+    if (s < next) return;
+    next = s + DECK_POST_M;
+    const a = c[Math.max(0, i - 1)]; const b = c[Math.min(c.length - 1, i + 1)];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
+    for (const sg of [1, -1]) {
+      const x = p[0] + nx * sg * (run.half - 0.15); const y = p[1] + ny * sg * (run.half - 0.15);
+      const low = groundAt(x, y) - 0.5; const high = p[2] + WALK_H - 0.1;
+      if (high - low < 1) continue;
+      const r = 0.13;
+      const box = [[x - r, y - r], [x + r, y - r], [x + r, y + r], [x - r, y + r]];
+      box.forEach((q, k) => {
+        const w = box[(k + 1) % 4];
+        const out = [(q[0] + w[0]) / 2 - x, (q[1] + w[1]) / 2 - y, 0];
+        builder.tri(mat, [...q, low], [...w, low], [...w, high], [0, 0], [0.2, 0], [0.2, 1], out);
+        builder.tri(mat, [...q, low], [...w, high], [...q, high], [0, 0], [0.2, 1], [0, 1], out);
+      });
+    }
+  });
+}
+
+// A quad round segment a-b, `half` either side (and past its ends by `pad`).
+function segmentQuad(a, b, half, pad = 0) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (L < 1e-6) return null;
+  const ux = (b[0] - a[0]) / L; const uy = (b[1] - a[1]) / L;
+  const nx = -uy * half; const ny = ux * half;
+  const a0 = [a[0] - ux * pad, a[1] - uy * pad]; const b0 = [b[0] + ux * pad, b[1] + uy * pad];
+  const ring = [[a0[0] + nx, a0[1] + ny], [b0[0] + nx, b0[1] + ny], [b0[0] - nx, b0[1] - ny], [a0[0] - nx, a0[1] - ny]];
+  return [[...ring, ring[0]]];
+}
+
+const ringArea = (ring) => ring.reduce((sum, p, i) => { const q = ring[(i + 1) % ring.length]; return sum + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+
+/**
+ * Land shut in by walkways, roads and a seawall, paved level with the walks:
+ * the plaza in a jog of a seawall beside a bridge, the strip between a
+ * promenade and the wall. A hole in the union of everything that closes it,
+ * small, along a wall with water past it for a good share of its edge, dry and
+ * clear of buildings. Returns polygons (rings, closed) clear of the roads and
+ * the curbside sidewalks.
+ */
+export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = [], wallAreas = [], groundAt = null, seaZ = -Infinity, water = [], buildings = [] } = {}) {
+  if (!walls?.length || !groundAt) return [];
+  const inWater = water?.length ? buildingIndex(water) : () => false;
+  const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
+  const wet = (x, y) => inWater(x, y) || groundAt(x, y) < seaZ + WALK_SHORE_M;
+  // seawall segments: water just past one side
+  const sea = [];
+  for (const wall of walls) {
+    for (let i = 0; i + 1 < wall.length; i++) {
+      const a = wall[i]; const b = wall[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (L < 0.3) continue;
+      const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
+      let hits = 0; let n = 0;
+      for (let s = 0.5; s < L; s += 2) {
+        const x = a[0] + ((b[0] - a[0]) * s) / L; const y = a[1] + ((b[1] - a[1]) * s) / L;
+        n++; if (wet(x + nx * 2.5, y + ny * 2.5) || wet(x - nx * 2.5, y - ny * 2.5)) hits++;
+      }
+      if (n && hits >= n / 2) sea.push([a, b]);
+    }
+  }
+  if (!sea.length) return [];
+  const near = (box) => sea.some(([a, b]) => Math.min(a[0], b[0]) - POCKET_REACH_M <= box[2] && Math.max(a[0], b[0]) + POCKET_REACH_M >= box[0] && Math.min(a[1], b[1]) - POCKET_REACH_M <= box[3] && Math.max(a[1], b[1]) + POCKET_REACH_M >= box[1]);
+  const boxOf = (pts) => [Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1])), Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1]))];
+  const closers = []; const cuts = [];
+  const C = POCKET_CLOSE_M / 2;
+  for (const run of walkRuns) {
+    if (!near(boxOf(run.centre))) continue;
+    for (let i = 0; i + 1 < run.centre.length; i++) { const q = segmentQuad(run.centre[i], run.centre[i + 1], run.half + C, C); if (q) closers.push(q); }
+    for (const { edge, out } of run.aprons ?? []) { const ring = [...edge, ...[...out].reverse()]; closers.push([[...ring, ring[0]]]); }
+  }
+  for (const run of streetRuns) {
+    if (run.points.length < 2 || !near(boxOf(run.points))) continue;
+    const off = (run.width || 0) / 2;
+    const mid = offsetLine(run.points, off * (run.side ?? 1));
+    for (let i = 0; i + 1 < mid.length; i++) {
+      const q = segmentQuad(mid[i], mid[i + 1], off + C, C); if (q) closers.push(q);
+      const e = segmentQuad(mid[i], mid[i + 1], off, 0.05); if (e) cuts.push(e);
+    }
+  }
+  for (const cw of carriageways) {
+    if (cw.nodes.length < 2 || !near(boxOf(cw.nodes))) continue;
+    for (let i = 0; i + 1 < cw.nodes.length; i++) {
+      const q = segmentQuad(cw.nodes[i], cw.nodes[i + 1], cw.half + C, C); if (q) closers.push(q);
+      const e = segmentQuad(cw.nodes[i], cw.nodes[i + 1], cw.half, 0.05); if (e) cuts.push(e);
+    }
+  }
+  for (const wall of walls) {
+    if (!near(boxOf(wall))) continue;
+    for (let i = 0; i + 1 < wall.length; i++) { const q = segmentQuad(wall[i], wall[i + 1], C, C); if (q) closers.push(q); }
+  }
+  // (a wall mapped as an area has its own deck across the top)
+  for (const ring of wallAreas || []) if (ring.length > 2 && near(boxOf(ring))) closers.push([[...ring.map((q) => [q[0], q[1]]), [ring[0][0], ring[0][1]]]]);
+  if (!closers.length) return [];
+  const levels = new Map();
+  for (const run of walkRuns) {
+    for (const q of run.centre) { const k = `${Math.floor(q[0] / 8)},${Math.floor(q[1] / 8)}`; if (!levels.has(k)) levels.set(k, []); levels.get(k).push(q); }
+  }
+  const walkLevel = (x, y) => {
+    let best = null; let d = Infinity;
+    for (let i = -2; i <= 2; i++) {
+      for (let j = -2; j <= 2; j++) {
+        for (const q of levels.get(`${Math.floor(x / 8) + i},${Math.floor(y / 8) + j}`) || []) { const e = (q[0] - x) ** 2 + (q[1] - y) ** 2; if (e < d) { d = e; best = q; } }
+      }
+    }
+    return best ? best[2] + WALK_H : null;
+  };
+  const onSea = (x, y) => sea.some(([a, b]) => {
+    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy)));
+    return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy) < C + 0.4;
+  });
+  // (a union per seawall's own surroundings, rounded to the centimetre: one over
+  // a whole town fails on near-touching edges more often than not)
+  const round = (shape) => shape.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
+  const holes = []; const seen = new Set();
+  for (const wall of walls) {
+    const [wx0, wy0, wx1, wy1] = boxOf(wall);
+    if (!sea.some(([a]) => a[0] >= wx0 && a[0] <= wx1 && a[1] >= wy0 && a[1] <= wy1)) continue;
+    const local = closers.filter((sh) => { const b = boxOf(sh[0]); return b[0] <= wx1 + POCKET_REACH_M && b[2] >= wx0 - POCKET_REACH_M && b[1] <= wy1 + POCKET_REACH_M && b[3] >= wy0 - POCKET_REACH_M; });
+    let union;
+    try { union = polygonClipping.union(...local.map(round)); } catch { continue; }
+    for (const polygon of union) {
+      for (const hole of polygon.slice(1)) {
+        const key = hole.slice(0, -1).map((q) => `${Math.round(q[0])},${Math.round(q[1])}`).sort()[0] + hole.length;
+        if (!seen.has(key)) { seen.add(key); holes.push(hole); }
+      }
+    }
+  }
+  const out = [];
+  for (const polygon of [[null, ...holes]]) {
+    for (const hole of polygon.slice(1)) {
+      const ring = hole.slice(0, -1);
+      const area = Math.abs(ringArea(ring));
+      if (area < POCKET_MIN_M2 || area > POCKET_MAX_M2) continue;
+      // along a seawall for a good share of its edge
+      let edge = 0; let walled = 0;
+      ring.forEach((p, i) => {
+        const q = ring[(i + 1) % ring.length]; const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        for (let t = 0.25; t < L; t += 0.5) { edge++; if (onSea(p[0] + ((q[0] - p[0]) * t) / L, p[1] + ((q[1] - p[1]) * t) / L)) walled++; }
+      });
+      if (!edge || walled < POCKET_WALL_SHARE * edge) continue;
+      // dry land, no building on it
+      const [x0, y0, x1, y1] = boxOf(ring);
+      let inside = 0; let bad = 0;
+      for (let x = x0 + 0.5; x < x1; x += 1) {
+        for (let y = y0 + 0.5; y < y1; y += 1) {
+          if (!pointInRing(x, y, ring)) continue;
+          inside++; if (wet(x, y) || inBuilding(x, y)) bad++;
+        }
+      }
+      if (!inside || bad > inside * 0.1) continue;
+      // out to the walks, roads and walls it was closed by
+      const signed = ringArea(ring) > 0 ? 1 : -1;
+      const grown = ring.map((p, i) => {
+        const a = ring[(i - 1 + ring.length) % ring.length]; const b = ring[(i + 1) % ring.length];
+        const n1 = [(p[1] - a[1]), -(p[0] - a[0])]; const n2 = [(b[1] - p[1]), -(b[0] - p[0])];
+        const l1 = Math.hypot(...n1) || 1; const l2 = Math.hypot(...n2) || 1;
+        const n = [n1[0] / l1 + n2[0] / l2, n1[1] / l1 + n2[1] / l2]; const ln = Math.hypot(...n) || 1;
+        const cos = Math.max(0.5, (n[0] / ln) * (n1[0] / l1) + (n[1] / ln) * (n1[1] / l1));
+        const d = (C + 0.1) / cos * signed;
+        return [p[0] + (n[0] / ln) * d, p[1] + (n[1] / ln) * d];
+      });
+      const shape = [[...grown, grown[0]]];
+      // ground well above the walks round it (a bridge's embankment) is left out, not climbed
+      const high = [];
+      for (let x = Math.floor(x0) - 1; x < x1 + 1; x += 1) {
+        for (let y = Math.floor(y0) - 1; y < y1 + 1; y += 1) {
+          const ref = walkLevel(x + 0.5, y + 0.5);
+          if (ref !== null && groundAt(x + 0.5, y + 0.5) > ref + APRON_RISE_M) high.push([[[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1], [x, y]]]);
+        }
+      }
+      let shapes = [shape];
+      if (high.length) {
+        try { shapes = polygonClipping.difference(round(shape), ...high); } catch { continue; }
+      }
+      const nearCuts = cuts.filter((cut) => { const b = boxOf(cut[0]); return b[0] <= x1 + 2 && b[2] >= x0 - 2 && b[1] <= y1 + 2 && b[3] >= y0 - 2; });
+      for (const one of shapes) {
+        let pieces;
+        try { pieces = nearCuts.length ? polygonClipping.difference(round(one), ...nearCuts.map(round)) : [round(one)]; } catch { continue; }
+        for (const piece of pieces) if (Math.abs(ringArea(piece[0].slice(0, -1))) >= POCKET_MIN_M2) out.push(piece);
+      }
+    }
+  }
+  return out;
+}
+
+function pointInRing(x, y, r) {
+  let inside = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    if ((r[i][1] > y) !== (r[j][1] > y) && x < ((r[j][0] - r[i][0]) * (y - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * The walkways as one surface: a single edge round their merged outline, so
+ * where they meet is one piece of concrete. The top is cut into a piece per
+ * walkway (the longest keeps a junction), each textured along its own line so
+ * the slab joints run across it. Top heights come from the nearest point on a
+ * walkway's line, ramps and dips included.
+ */
+function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], streetRuns = [], groundAt = null, cuts = [] } = {}) {
+  const stations = new Map();
+  const CELL = 4;
+  const strips = [];
+  const station = (q) => { const key = `${Math.floor(q[0] / CELL)},${Math.floor(q[1] / CELL)}`; if (!stations.has(key)) stations.set(key, []); stations.get(key).push(q); };
+  for (const run of runs) {
+    const { points, share } = rampStations(run.centre, run.ramps, run.dips ?? []);
+    const left = []; const right = []; const along = []; let s = 0;
+    points.forEach((p, i) => {
+      if (i) s += Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]);
+      const a = points[Math.max(0, i - 1)]; const b = points[Math.min(points.length - 1, i + 1)];
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+      // mitred at a bend (the averaged normal at the half width fell short on
+      // the outside of a sharp turn: a wedge cut out of the walk)
+      let miter = 1;
+      if (i > 0 && i < points.length - 1) {
+        const ux = p[0] - a[0]; const uy = p[1] - a[1]; const ul = Math.hypot(ux, uy) || 1;
+        const vx = b[0] - p[0]; const vy = b[1] - p[1]; const vl = Math.hypot(vx, vy) || 1;
+        const cosHalf = Math.sqrt(Math.max(0, (1 + (ux * vx + uy * vy) / (ul * vl)) / 2));
+        miter = 1 / Math.max(0.7, cosHalf);
+      }
+      const nx = -(b[1] - a[1]) / L * run.half * miter; const ny = (b[0] - a[0]) / L * run.half * miter;
+      left.push([p[0] + nx, p[1] + ny]); right.push([p[0] - nx, p[1] - ny]);
+      along.push({ x: p[0], y: p[1], s, tx: (b[0] - a[0]) / L, ty: (b[1] - a[1]) / L, z: p[2] + WALK_H * share[i] });
+      const key = `${Math.floor(p[0] / CELL)},${Math.floor(p[1] / CELL)}`;
+      if (!stations.has(key)) stations.set(key, []);
+      stations.get(key).push([p[0], p[1], p[2] + WALK_H * share[i], p[2]]);
+    });
+    const ring = [...left, ...[...right].reverse()];
+    strips.push({ shape: [[...ring, ring[0]]], left, right, along, half: run.half, length: s });
+    for (const { edge, out, z } of run.aprons ?? []) {
+      const deck = [...edge, ...[...out].reverse()];
+      // the deck's far side at its own height, rising over ground higher than the walk
+      if (z) out.forEach((q, k) => { const key = `${Math.floor(q[0] / CELL)},${Math.floor(q[1] / CELL)}`; if (!stations.has(key)) stations.set(key, []); stations.get(key).push([q[0], q[1], z[k], z[k] - WALK_H]); });
+      strips.push({ shape: [[...deck, deck[0]]], left: edge, right: out, along, half: run.half, length: 0 });
+    }
+  }
+  if (pockets.length) {
+    // a paved pocket meets the curbside sidewalks at their tops
+    for (const run of streetRuns) {
+      if (run.points.length < 2 || !(run.width > CURB_ONLY_M)) continue;
+      const outer = offsetLine(run.points, run.width * (run.side ?? 1));
+      run.points.forEach((p, i) => { const z = p[2] + CURB_H + run.width * CROSS_SLOPE; station([outer[i][0], outer[i][1], z, z - WALK_H]); });
+    }
+    for (const shape of pockets) strips.push({ shape, pocket: true, length: 0 });
+  }
+  // the road inside a rounded curb kept clear (cuts: [[x, y]...] rings): a
+  // walk mapped up to the corner reached over the curb onto it, its raised
+  // edge standing there as a wedge
+  const boxOfRing = (ring) => [Math.min(...ring.map((q) => q[0])), Math.min(...ring.map((q) => q[1])), Math.max(...ring.map((q) => q[0])), Math.max(...ring.map((q) => q[1]))];
+  const cutRings = cuts.map((ring) => ({ shape: [[...ring, ring[0]].map(([x, y]) => [x, y])], box: boxOfRing(ring) }));
+  if (cuts.length) {
+    const boxOf = boxOfRing;
+    const kept = [];
+    for (const strip of strips) {
+      const b = boxOf(strip.shape[0]);
+      const near = cutRings.filter((c) => c.box[0] <= b[2] && b[0] <= c.box[2] && c.box[1] <= b[3] && b[1] <= c.box[3]);
+      if (!near.length) { kept.push(strip); continue; }
+      let pieces;
+      try { pieces = polygonClipping.difference(strip.shape, ...near.map((c) => c.shape)); } catch { kept.push(strip); continue; }
+      // (slivers left between a straight curb's face and its back: dropped)
+      for (const shape of pieces) if (Math.abs(ringArea(shape[0])) - shape.slice(1).reduce((a, h) => a + Math.abs(ringArea(h)), 0) >= CUT_SLIVER_M2) kept.push({ ...strip, shape });
+    }
+    strips.length = 0;
+    strips.push(...kept);
+  }
+  if (!strips.length) return;
+  const levelAt = (x, y) => {
+    const cx = Math.floor(x / CELL); const cy = Math.floor(y / CELL);
+    let best = null; let d = Infinity;
+    for (let r = 2; r <= 8 && !best; r += 3) {
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          for (const q of stations.get(`${cx + dx},${cy + dy}`) || []) {
+            const e = (q[0] - x) ** 2 + (q[1] - y) ** 2;
+            if (e < d) { d = e; best = q; }
+          }
+        }
+      }
+    }
+    return best;
+  };
+  // texture coordinates on a strip, as a swept slab's: along its line, across its width
+  const stripUv = (strip, x, y) => {
+    let q = strip.along[0]; let d = Infinity;
+    for (const o of strip.along) {
+      const e = (o.x - x) ** 2 + (o.y - y) ** 2;
+      if (e < d) { d = e; q = o; }
+    }
+    const on = (x - q.x) * q.tx + (y - q.y) * q.ty;
+    const off = -(x - q.x) * q.ty + (y - q.y) * q.tx;
+    return [(q.s + on) / SLAB_TILE_M, (off + strip.half) / SLAB_TILE_M];
+  };
+  const box = (strip) => {
+    const ring = strip.shape[0]; const xs = ring.map((q) => q[0]); const ys = ring.map((q) => q[1]);
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  };
+  const order = [...strips].sort((a, b) => b.length - a.length);
+  order.forEach((strip) => { strip.box = box(strip); });
+  // on a walk's edge: that walk's height; inside: the walks round about, blended
+  const walks = strips.filter((o) => !o.pocket && o.length > 0);
+  const edgeDist = (o, x, y) => {
+    let d = Infinity;
+    for (const line of [o.left, o.right]) {
+      for (let k = 0; k + 1 < line.length; k++) {
+        const a = line[k]; const b = line[k + 1]; const dx = b[0] - a[0]; const dy = b[1] - a[1];
+        const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+        d = Math.min(d, Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy));
+      }
+    }
+    return d;
+  };
+  const blended = (x, y) => {
+    let w = 0; let sum = 0;
+    const cx = Math.floor(x / CELL); const cy = Math.floor(y / CELL);
+    for (let dx = -3; dx <= 3; dx++) {
+      for (let dy = -3; dy <= 3; dy++) {
+        for (const q of stations.get(`${cx + dx},${cy + dy}`) || []) {
+          const k = 1 / Math.max(0.25, (q[0] - x) ** 2 + (q[1] - y) ** 2) ** 2;
+          w += k; sum += k * q[2];
+        }
+      }
+    }
+    if (w) return sum / w;
+    const q = levelAt(x, y); return q ? q[2] : 0;
+  };
+  const pocketZ = (x, y) => {
+    let z = null;
+    for (const o of walks) {
+      if (x < o.box[0] - 0.2 || x > o.box[2] + 0.2 || y < o.box[1] - 0.2 || y > o.box[3] + 0.2 || edgeDist(o, x, y) > 0.15) continue;
+      let q = o.along[0]; let d = Infinity;
+      for (const a of o.along) { const e = (a.x - x) ** 2 + (a.y - y) ** 2; if (e < d) { d = e; q = a; } }
+      z = q.z; break;
+    }
+    z ??= blended(x, y);
+    return [x, y, groundAt ? Math.max(z, groundAt(x, y) + APRON_COVER_M) : z];
+  };
+  order.forEach((strip, i) => {
+    const before = order.slice(0, i).filter((o) => o.box[0] <= strip.box[2] && o.box[2] >= strip.box[0] && o.box[1] <= strip.box[3] && o.box[3] >= strip.box[1]);
+    const level = (x, y) => { const q = levelAt(x, y); return [x, y, q ? q[2] : 0]; };
+    const flatTri = (a, b, c) => builder.tri(top, a, b, c, stripUv(strip, ...a), stripUv(strip, ...b), stripUv(strip, ...c), [0, 0, 1]);
+    if (strip.pocket) {
+      // in cells, each corner at the nearest walk's height (and over the ground)
+      const uv = (q) => [q[0] / SLAB_TILE_M, q[1] / SLAB_TILE_M];
+      let own;
+      try { own = before.length ? polygonClipping.difference(strip.shape, ...before.map((o) => o.shape)) : [strip.shape]; } catch { own = [strip.shape]; }
+      const [bx0, by0, bx1, by1] = strip.box;
+      for (let x = Math.floor(bx0 / POCKET_CELL_M) * POCKET_CELL_M; x < bx1; x += POCKET_CELL_M) {
+        for (let y = Math.floor(by0 / POCKET_CELL_M) * POCKET_CELL_M; y < by1; y += POCKET_CELL_M) {
+          const cell = [[[x, y], [x + POCKET_CELL_M, y], [x + POCKET_CELL_M, y + POCKET_CELL_M], [x, y + POCKET_CELL_M], [x, y]]];
+          for (const piece of polygonClipping.intersection(cell, own)) {
+            const rings = piece.map((ring) => ring.slice(0, -1));
+            const flat = rings.map((ring) => ring.map(([px, py]) => new THREE.Vector2(px, py)));
+            const all = rings.flat().map(([px, py]) => pocketZ(px, py));
+            for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(flat[0], flat.slice(1))) builder.tri(top, all[a], all[b], all[c], uv(all[a]), uv(all[b]), uv(all[c]), [0, 0, 1]);
+          }
+        }
+      }
+      return;
+    }
+    // a row of panels down the strip, cut only where another strip has the ground:
+    // triangulating a whole long outline left slivers the game can't shade
+    for (let k = 0; k + 1 < strip.left.length; k++) {
+      const panel = [strip.left[k], strip.left[k + 1], strip.right[k + 1], strip.right[k]];
+      const xs = panel.map((q) => q[0]); const ys = panel.map((q) => q[1]);
+      const x0 = Math.min(...xs); const x1 = Math.max(...xs); const y0 = Math.min(...ys); const y1 = Math.max(...ys);
+      // (and the road inside a rounded curb kept clear: the cuts)
+      const near = [...before, ...cutRings].filter((o) => o.box[0] <= x1 && o.box[2] >= x0 && o.box[1] <= y1 && o.box[3] >= y0);
+      if (!near.length) {
+        const [a, b, c, d] = panel.map(([x, y]) => level(x, y));
+        flatTri(a, b, c); flatTri(a, c, d);
+        continue;
+      }
+      // (polygon-clipping fails now and then on near-touching edges: rounded to
+      // the centimetre, then without the corner cuts, then the whole panel;
+      // one failure dropped the merge for the whole town)
+      const r2 = (sh) => sh.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
+      const panelShape = [[...panel, panel[0]]];
+      let pieces = null;
+      for (const attempt of [() => polygonClipping.difference(panelShape, ...near.map((o) => o.shape)),
+        () => polygonClipping.difference(r2(panelShape), ...near.map((o) => r2(o.shape))),
+        () => polygonClipping.difference(r2(panelShape), ...near.filter((o) => !cutRings.includes(o)).map((o) => r2(o.shape)))]) {
+        try { pieces = attempt(); break; } catch { /* next */ }
+      }
+      if (!pieces) pieces = [panelShape];
+      pieces = pieces.filter((piece) => Math.abs(ringArea(piece[0])) >= CUT_SLIVER_M2 / 4);
+      for (const piece of pieces) {
+        const rings = piece.map((ring) => ring.slice(0, -1));
+        const flat = rings.map((ring) => ring.map(([x, y]) => new THREE.Vector2(x, y)));
+        const all = rings.flat().map(([x, y]) => level(x, y));
+        for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(flat[0], flat.slice(1))) flatTri(all[a], all[b], all[c]);
+      }
+    }
+  });
+  const pocketBoxes = strips.filter((o) => o.pocket).map((o) => o.box);
+  let merged;
+  try {
+    merged = polygonClipping.union(...strips.map((o) => o.shape));
+  } catch (err) {
+    // (rounded to the centimetre, then without the pockets, rather than no edge at all)
+    const r = (sh) => sh.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
+    try { merged = polygonClipping.union(...strips.map((o) => r(o.shape))); } catch { merged = polygonClipping.union(...strips.filter((o) => !o.pocket).map((o) => o.shape)); }
+  }
+  for (const polygon of merged) {
+    const rings = polygon.map((ring) => ring.slice(0, -1));
+    const inPocket = (x, y) => groundAt && pocketBoxes.some((b) => x >= b[0] - 0.5 && x <= b[2] + 0.5 && y >= b[1] - 0.5 && y <= b[3] + 0.5);
+    const all = rings.flat().map(([x, y]) => {
+      const q = levelAt(x, y);
+      return [x, y, inPocket(x, y) ? pocketZ(x, y)[2] : (q ? q[2] : 0), q ? q[3] : 0];
+    });
+    let at = 0;
+    rings.forEach((ring, r) => {
+      const area = ring.reduce((sum, p, i) => { const q = ring[(i + 1) % ring.length]; return sum + p[0] * q[1] - q[0] * p[1]; }, 0);
+      const right = (area > 0) === (r === 0);   // the outside lies to the right of an outer ring run anticlockwise
+      ring.forEach((_, i) => {
+        const a = all[at + i]; const b = all[at + ((i + 1) % ring.length)];
+        const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
+        const want = right ? [dy / L, -dx / L, 0] : [-dy / L, dx / L, 0];
+        const fa = [a[0], a[1], a[3] - WALK_SINK_M]; const fb = [b[0], b[1], b[3] - WALK_SINK_M];
+        // (the curb texture's clean band: its lower one is dark road grime)
+        builder.tri(edge, a, b, fb, [0, V_BAND_TOP], [0.2, V_BAND_TOP], [0.2, V_LIGHT_LOW], want);
+        builder.tri(edge, a, fb, fa, [0, V_BAND_TOP], [0.2, V_LIGHT_LOW], [0, V_LIGHT_LOW], want);
+      });
+      at += ring.length;
+    });
+  }
+}
+
 export function buildSidewalkMeshes(carriageways, options = {}) {
   const medians = findMedians(carriageways);
-  const runs = buildSidewalkRuns(carriageways, { ...options, medians });
+  const walkRuns = buildWalkRuns(options.walks, carriageways, options);
+  const runs = buildSidewalkRuns(carriageways, { ...options, medians, walkEnds: walkRuns.flatMap((r) => r.roadEnds) });
   const medianRuns = buildMedianRuns(carriageways, medians, options);
-  const corners = joinCorners(runs, buildCarriagewayIndex(carriageways));
+  const corners = joinCorners(runs, buildCarriagewayIndex(carriageways), walkRuns);
+  levelWalkEndsOnSidewalks(walkRuns, runs, corners);
+  const paveAt = pavedWalkZones(carriageways, options.walks, { americas: options.americas });
   const meshes = [];
-  let builder = new PartBuilder();
+  let builder = new PartBuilder(paveAt);
   let inBatch = 0;
   let triangles = 0;
   const letters = (n) => { let s = ''; let k = n; do { s = String.fromCharCode(97 + (k % 26)) + s; k = Math.floor(k / 26) - 1; } while (k >= 0); return s; };
@@ -880,7 +2677,7 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
     triangles += builder.triangles;
     const mesh = builder.toMesh(`sidewalks_${letters(meshes.length)}`);
     if (mesh) meshes.push(mesh);
-    builder = new PartBuilder();
+    builder = new PartBuilder(paveAt);
     inBatch = 0;
   };
   for (const run of runs) {
@@ -896,8 +2693,83 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
     sweepRun(builder, run);
     if (++inBatch >= RUNS_PER_MESH) flush();
   }
+  for (const run of medianRuns.gaps) paveGap(builder, run);
   flush();
-  return { meshes, runs, corners, medianRuns, triangles };
+  // (a union can fail on bad geometry: strips that overlap beat no sidewalks)
+  let pockets = [];
+  try {
+    pockets = findWallPockets(walkRuns, runs, carriageways, options);
+  } catch (err) {
+    console.warn('Sidewalks: could not find the paved pockets by the seawalls:', err?.message);
+  }
+  try {
+    mergeWalks(builder, walkRuns, { pockets, streetRuns: runs, groundAt: options.groundAt, cuts: cornerCuts(corners) });
+  } catch (err) {
+    console.warn('Sidewalks: could not merge the walkways, drawing them apart:', err?.message);
+    builder = new PartBuilder(paveAt);
+    for (const run of walkRuns) sweepRun(builder, run);
+  }
+  flush();
+  const deckRuns = buildDeckRuns(options.decks, options.bridgeRoads, options);
+  for (const wood of [true, false]) {
+    const set = deckRuns.filter((r) => r.wood === wood);
+    try {
+      mergeWalks(builder, set, wood ? { top: 'wood', edge: 'wood' } : {});
+    } catch (err) {
+      console.warn('Sidewalks: could not merge the decks, drawing them apart:', err?.message);
+      for (const run of set) sweepRun(builder, run);
+    }
+    // (a sidewalk on a road bridge hangs from its deck)
+    for (const run of set) if (!run.onBridge) deckPosts(builder, run, options.groundAt);
+  }
+  const wallDecks = options.groundAt ? planWallDecks(options.wallAreas, options.groundAt, options.seaZ) : [];
+  const gangways = options.groundAt ? buildGangways(builder, deckRuns, walkRuns, options.groundAt) : { ramp: 0, stairs: 0 };
+  flush();
+  // the deck's top under (x, y), for what stands on it, or null
+  const deckCells = new Map();
+  for (const run of deckRuns) {
+    for (const q of run.centre) {
+      const key = `${Math.floor(q[0] / 4)},${Math.floor(q[1] / 4)}`;
+      if (!deckCells.has(key)) deckCells.set(key, []);
+      deckCells.get(key).push([q[0], q[1], q[2] + WALK_H, run.half]);
+    }
+  }
+  const deckAt = (x, y) => {
+    let best = null; let d = Infinity;
+    const cx = Math.floor(x / 4); const cy = Math.floor(y / 4);
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        for (const q of deckCells.get(`${cx + i},${cy + j}`) || []) {
+          const e = Math.hypot(q[0] - x, q[1] - y);
+          if (e < d && e < q[3] + 1.5) { d = e; best = q[2]; }
+        }
+      }
+    }
+    return best;
+  };
+  // (the ground behind a bare curb's corner is filled like that behind the curb)
+  const cornerRuns = corners.filter((c) => Math.max(c.a.run.width, c.b.run.width) <= CURB_ONLY_M && c.arc.length > 1).map((c) => {
+    const [p, q] = c.arc; const left = [-(q[1] - p[1]), q[0] - p[0]];
+    const side = left[0] * (c.centre[0] - p[0]) + left[1] * (c.centre[1] - p[1]) >= 0 ? 1 : -1;
+    return { points: c.arc.map((o) => [o[0], o[1], o[2]]), side, width: CURB_ONLY_M };
+  });
+  // (and level under the paving on the road side of every corner, and across a median's gap)
+  const cornerGround = [...medianRuns.filter((r) => r.width <= MEDIAN_CURB_W + 0.01).map((r) => ({
+    // (between a median's two curbs: its ground up to theirs)
+    points: r.points.map((q) => [q[0], q[1], q[2] + 0.1]), side: r.side, width: MEDIAN_FILL_M, walk: true,
+  })), ...medianRuns.gaps.map((r) => ({
+    points: r.points.map((q) => [q[0], q[1], q[2] - WALK_H]), side: r.side, width: Math.max(...r.points.map((q) => q[3] || 0.3)) + 0.5, walk: true,
+  })), ...corners.flatMap((c) => {
+    const apex = cornerPoint(c);
+    if (!apex) return [];
+    const [p, q] = c.arc; const left = [-(q[1] - p[1]), q[0] - p[0]];
+    const toApex = left[0] * (apex[0] - p[0]) + left[1] * (apex[1] - p[1]) >= 0 ? 1 : -1;
+    return [{ points: c.arc.map((o) => [o[0], o[1], o[2] - WALK_H]), side: toApex, width: Math.hypot(apex[0] - p[0], apex[1] - p[1]) + 1, walk: true }];
+  })];
+  const result = { meshes, runs, corners, cornerRuns, cornerGround, medianRuns, walkRuns, deckRuns, deckAt, gangways, wallDecks, pockets, triangles };
+  // (a test probe's look at what was built: scratch top-down plots)
+  if (typeof globalThis.__MAPNG_SIDEWALK_PROBE === 'function') globalThis.__MAPNG_SIDEWALK_PROBE({ ...result, carriageways, options });
+  return result;
 }
 
 // Ground under the sidewalks: a slab hangs at its road's height plus the
@@ -906,6 +2778,11 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
 // under each slab is set just under its top, then blends back to the terrain
 // past its back edge over a run sized to the height difference. No road's own
 // surface is touched (runs already stop short of other carriageways).
+const CURB_FILL_M = 1.5;
+const FILLET_LIFT_M = 0.02;      // the paving across a median's gap, over the road
+const PAVED_TILE_M = 11;        // (the road decals' texture length)
+const PARKING_OPEN_M = 1.5;
+const DIP_CLEAR_M = 0.05;        // the ground under a dipped slab, more than under a raised one
 const GROUND_UNDER_M = 0.04;     // the terrain this far under the slab's top
 const GROUND_BLEND_MIN_M = 1;
 const GROUND_BLEND_MAX_M = 10;
@@ -932,17 +2809,24 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
   const best = new Map();   // idx -> [key, sum, n]
   for (const run of runs || []) {
     const p = run.points;
-    const w = run.width + CURB_W;
+    // (behind a bare curb the ground itself is filled up to its top)
+    const w = run.walk ? run.width : run.width <= CURB_ONLY_M ? CURB_FILL_M : run.width + CURB_W;
+    const rise = run.walk ? WALK_H : CURB_H;
+    const inward = run.walk ? GROUND_BLEND_MIN_M * 3 : 0;   // (a walkway's ground blends away on both sides)
+    const total = runLength(p);
+    const shareAt = heightShare(total, run.ramps ?? [false, false], run.dips ?? []);
+    let along = 0;
     for (let i = 0; i + 1 < p.length; i++) {
       const [ax, ay, az] = p[i]; const [bx, by, bz] = p[i + 1];
       const dx = bx - ax; const dy = by - ay; const L2 = dx * dx + dy * dy;
       if (L2 < 1e-6) continue;
       const L = Math.sqrt(L2);
+      const s0 = along; along += L;
       // outward: left of travel for side 1, right for side -1
       const nx = (-dy / L) * run.side; const ny = (dx / L) * run.side;
       const zTop = (az + bz) / 2 + CURB_H + CROSS_SLOPE * w;
       const reach = w + GROUND_BLEND_MAX_M;
-      const xs = [ax, bx, ax + nx * reach, bx + nx * reach]; const ys = [ay, by, ay + ny * reach, by + ny * reach];
+      const xs = [ax - nx * inward, bx - nx * inward, ax + nx * reach, bx + nx * reach]; const ys = [ay - ny * inward, by - ny * inward, ay + ny * reach, by + ny * reach];
       const [c0, r0] = toPixel(Math.min(...xs), Math.max(...ys));
       const [c1, r1] = toPixel(Math.max(...xs), Math.min(...ys));
       for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
@@ -951,17 +2835,21 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
           const t = ((x - ax) * dx + (y - ay) * dy) / L2;
           if (t < 0 || t > 1) continue;
           const o = (x - ax) * nx + (y - ay) * ny;   // out from the curb line
-          if (o < 0 || o > reach) continue;
+          if (o < -inward || o > reach) continue;
           const idx = r * width + c;
           const ground = heightMap[idx] - minHeight;
           const zRoad = az + (bz - az) * t;
-          const top = zRoad + CURB_H + CROSS_SLOPE * Math.min(o, w) - GROUND_UNDER_M;
+          // (the ground goes down with the slab at a driveway or a loose end)
+          const share = shareAt(s0 + t * L);
+          const top = zRoad + (rise + (run.walk ? 0 : CROSS_SLOPE * Math.max(0, Math.min(o, w)))) * share - (run.walk ? WALK_UNDER_M : GROUND_UNDER_M) - DIP_CLEAR_M * (1 - share);
+          const past = o > w ? o - w : o < 0 ? -o : 0;
           let key; let target;
-          if (o <= w) { key = 0; target = top; } else {
+          // (a walkway's own ground comes first: a curb's fill beside it came up through the slab)
+          if (!past) { key = run.walk ? -1 : 0; target = top; } else {
             const blend = Math.min(GROUND_BLEND_MAX_M, Math.max(GROUND_BLEND_MIN_M, Math.abs(ground - top) * GROUND_BLEND_RUN));
-            const f = (o - w) / blend;
+            const f = past / blend;
             if (f >= 1) continue;
-            key = o - w; target = top + (ground - top) * smooth01(f);
+            key = past; target = top + (ground - top) * smooth01(f);
           }
           const prev = best.get(idx);
           if (!prev || key < prev[0] - 1e-6) best.set(idx, [key, target, 1]);

@@ -27,6 +27,7 @@
     "lucide-vue-next": "^0.460.0",
     "pinia": "^3.0.4",
     "pmtiles": "^4.5.0",
+    "polygon-clipping": "^0.15.7",
     "proj4": "^2.20.2",
     "three": "^0.162.0",
     "vue": "^3.5.0",

@@ -784,6 +784,7 @@ function collectCrossingPoints(osmFeatures) {
     const tags = feature?.tags || {};
     if (!Array.isArray(feature?.geometry)) continue;
     if (feature.geometry.length === 1 && tags.highway === 'crossing') points.push(feature.geometry[0]);
+    else if (tags['area:highway'] || tags.area === 'yes') continue;
     else if (tags.footway === 'crossing' || tags.cycleway === 'crossing' || tags.path === 'crossing') points.push(...feature.geometry);
   }
   return points.filter((pt) => Number.isFinite(pt?.lat) && Number.isFinite(pt?.lng));

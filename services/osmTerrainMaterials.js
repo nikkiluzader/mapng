@@ -16,7 +16,7 @@ import {
 import { TERRAIN_MATERIAL_LIBRARY } from './beamngTerrainMaterialLibrary.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
 import { getEffectiveRoadLayer } from './roadNetwork.js';
-import { sidewalkSides } from './beamngSidewalks.js';
+import { CURB_ONLY_M, sidewalkSides } from './beamngSidewalks.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–9 = BeamNG-referenced materials
@@ -796,12 +796,19 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
   const toPx = (lat, lng) => geoToTerrainPx(lat, lng, bounds, size);
   const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
   const roads = [];
+  const squares = [];
   for (const feature of osmFeatures) {
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
     const tags = feature.tags || {};
     const highway = tags.highway;
     const style = ROAD_STYLE[highway];
     if (!style) continue;
+    // a square (area=yes): its whole outline paved, not a street's width
+    // stroked round its edge
+    if (tags.area === 'yes') {
+      if (feature.geometry.length >= 3 && getEffectiveRoadLayer(tags) === 0) squares.push({ mat: style.mat, ring: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) });
+      continue;
+    }
     // Bridges and tunnels are not on the ground: no asphalt in the river
     // under a bridge or across the hill over a tunnel.
     const layer = getEffectiveRoadLayer(tags);
@@ -817,6 +824,7 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
       if (Number.isFinite(carriagewayHalfWidth)) halfWidthM = Math.max(halfWidthM, carriagewayHalfWidth);
       const sides = sidewalkSides({ tags, highway, urban });
       sidewalkM = Math.max(sides.left, sides.right);
+      if (sidewalkM <= CURB_ONLY_M) sidewalkM = 0;
     }
     roads.push({ style, halfWidthM, sidewalkM, pts: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) });
   }
@@ -827,6 +835,7 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
       rasterizeSegment(layerMap, size, pts[i].px, pts[i].py, pts[i + 1].px, pts[i + 1].py, halfPx, mat, onlyOver);
     }
   };
+  for (const sq of squares) rasterizePolygon(layerMap, size, sq.ring, sq.mat);
   for (const road of roads) paint(road, road.halfWidthM + road.sidewalkM + ROAD_VERGE_M, 6, GRASS_GROWING);
   for (const road of roads) if (road.sidewalkM > 0) paint(road, road.halfWidthM + road.sidewalkM, 7);
   for (const road of roads) paint(road, road.halfWidthM, road.style.mat);

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { generateJunctionMarkingDecals, generateTurnArrowDecals } from '../services/exportBeamNGLevel.js';
+import { buildCarriagewayIndex } from '../services/roadMarkingCuts.js';
 
 const W = 256;
 const SQUARE_SIZE = 2; // 512 m world
@@ -67,6 +68,25 @@ test('stop node paints a bar on the approach half; crossing paints two lines', (
   // straddle the crossing node 2.4 m apart along it.
   const xs = cw.map((d) => (d.nodes[0][0] + d.nodes[1][0]) / 2).sort((a, b) => a - b);
   assert.ok(Math.abs(xs[1] - xs[0] - 2.4) < 0.05, `lines 2.4 m apart (got ${(xs[1] - xs[0]).toFixed(2)})`);
+});
+
+test('a crossing mapped with its paved outline is painted once, in the line\'s style', () => {
+  // A road along x (y = 0, 8 m wide); a crossing line across it at x = 0
+  // tagged lines, and the same crossing's area:highway outline round it.
+  const td = makeTerrainData([]);
+  const m = (W * SQUARE_SIZE) / 2;
+  const ll = (x, y) => ({
+    lat: td.bounds.south + ((y + m) / (2 * m)) * (td.bounds.north - td.bounds.south),
+    lng: td.bounds.west + ((x + m) / (2 * m)) * (td.bounds.east - td.bounds.west),
+  });
+  const line = { id: 'w3', type: 'road', tags: { highway: 'footway', footway: 'crossing', 'crossing:markings': 'lines' }, geometry: [ll(0, -7), ll(0, 0), ll(0, 7)] };
+  const area = { id: 'w4', type: 'area', tags: { 'area:highway': 'footway', footway: 'crossing' }, geometry: [ll(-1.5, -7), ll(1.5, -7), ll(1.5, 7), ll(-1.5, 7), ll(-1.5, -7)] };
+  const road = { id: 'w5', type: 'road', tags: { highway: 'residential' }, geometry: [ll(-60, 0), ll(0, 0), ll(60, 0)] };
+  td.osmFeatures = [road, line, area];
+  const carriageways = buildCarriagewayIndex([{ owner: 'r', half: 4, nodes: [[-60, 0, 5, 8], [60, 0, 5, 8]] }]);
+  const decals = generateJunctionMarkingDecals(td, SQUARE_SIZE, { carriageways });
+  assert.equal(decals.filter((d) => d.name.startsWith('jm_zebra')).length, 0, 'no zebra from the outline');
+  assert.equal(decals.filter((d) => d.name.startsWith('jm_crosswalk')).length, 2);
 });
 
 test('a signal on the junction node paints a bar on every approach, outside the junction', () => {

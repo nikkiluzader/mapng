@@ -109,6 +109,7 @@ export function buildIngameProbes({ carriageways = [], sidewalkRuns = [], underS
   }
   for (const run of sidewalkRuns) {
     const w = run.width;
+    if (w <= 0.2) continue;   // (a bare curb: nothing to stand on)
     lines.push({ k: 'sidewalk', w: r2(w), side: run.side, p: thinLine(run.points).map((q) => [r2(q[0]), r2(q[1]), r2(q[2])]) });
     for (const p of along(run.points, SIDEWALK_STEP_M)) {
       const nx = -p.dy * run.side; const ny = p.dx * run.side;

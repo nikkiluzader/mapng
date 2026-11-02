@@ -360,6 +360,7 @@ const URBAN_SAMPLE_M = 25;
 const URBAN_RADIUS_M = 45;
 const URBAN_MIN_BUILDINGS = 3;
 const URBAN_SHARE = 0.5;
+const URBAN_OUTLINE_STEP_M = 10;
 const M_PER_DEG_LAT = 111320;
 
 /**
@@ -367,51 +368,129 @@ const M_PER_DEG_LAT = 111320;
  * road runs past at least URBAN_MIN_BUILDINGS buildings within
  * URBAN_RADIUS_M. Results are memoised per feature id.
  */
+// Land uses a town's streets run through, and the speed over which a road there is no street.
+const TOWN_LAND = new Set(['commercial', 'retail']);   // (residential land reaches far out along country lanes)
+const TOWN_MAX_KMH = 72;
+const LAND_CELL_DEG = 0.005;
+const STREET_TOWN_SHARE = 0.6;
+
+/**
+ * Is a road a curbed town street: built up, lit, or through town land at town
+ * speed. Wider than buildUrbanRoadClassifier, which counts buildings beside the
+ * road and so misses a street along a park, a car park or a vacant block.
+ */
+export function buildCurbedStreetClassifier(osmFeatures = []) {
+  const urban = buildUrbanRoadClassifier(osmFeatures);
+  const cells = new Map();
+  for (const f of osmFeatures) {
+    if (!TOWN_LAND.has(f?.tags?.landuse) || !(f.geometry?.length > 2)) continue;
+    const lats = f.geometry.map((p) => p.lat); const lngs = f.geometry.map((p) => p.lng);
+    const box = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)];
+    for (let i = Math.floor(box[0] / LAND_CELL_DEG); i <= Math.floor(box[1] / LAND_CELL_DEG); i++) {
+      for (let j = Math.floor(box[2] / LAND_CELL_DEG); j <= Math.floor(box[3] / LAND_CELL_DEG); j++) {
+        const key = `${i},${j}`;
+        if (!cells.has(key)) cells.set(key, []);
+        cells.get(key).push(f.geometry);
+      }
+    }
+  }
+  const inside = (ring, p) => {
+    let hit = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const a = ring[i]; const b = ring[j];
+      if ((a.lat > p.lat) !== (b.lat > p.lat) && p.lng < ((b.lng - a.lng) * (p.lat - a.lat)) / (b.lat - a.lat) + a.lng) hit = !hit;
+    }
+    return hit;
+  };
+  const speed = (tags) => {
+    const m = String(tags?.maxspeed ?? '').match(/(\d+(?:\.\d+)?)\s*(mph)?/i);
+    return m ? Number(m[1]) * (m[2] ? 1.609 : 1) : null;
+  };
+  const inTown = (feature) => {
+    if (urban(feature) || String(feature?.tags?.lit).toLowerCase() === 'yes') return true;
+    if ((speed(feature?.tags) ?? 0) > TOWN_MAX_KMH) return false;
+    const g = feature?.geometry || [];
+    if (!g.length) return false;
+    // (a few points along it: a short way's middle can fall just outside the land)
+    const stride = Math.max(1, Math.floor(g.length / 5));
+    for (let i = 0; i < g.length; i += stride) {
+      const p = g[i];
+      if ((cells.get(`${Math.floor(p.lat / LAND_CELL_DEG)},${Math.floor(p.lng / LAND_CELL_DEG)}`) || []).some((ring) => inside(ring, p))) return true;
+    }
+    return false;
+  };
+  // a named street is curbed as a whole: its stretch past a vacant lot too
+  const streets = new Map();
+  for (const f of osmFeatures) {
+    const name = f?.type === 'road' ? f.tags?.name : null;
+    if (!name || !(f.geometry?.length > 1)) continue;
+    const s = streets.get(name) ?? { town: 0, all: 0 };
+    const n = f.geometry.length; s.all += n; if (inTown(f)) s.town += n;
+    streets.set(name, s);
+  }
+  return (feature) => {
+    if (inTown(feature)) return true;
+    if ((speed(feature?.tags) ?? 0) > TOWN_MAX_KMH) return false;
+    const s = streets.get(feature?.tags?.name);
+    return !!s && s.town >= STREET_TOWN_SHARE * s.all;
+  };
+}
+
 export function buildUrbanRoadClassifier(osmFeatures = []) {
-  const buildings = [];
+  // each building by points along its outline (every URBAN_OUTLINE_STEP_M),
+  // so a block of big buildings counts as near the street it fronts (a hotel
+  // or a college hall filling a block had its centre over 45 m from it)
+  const outlines = [];
   let latSum = 0;
   for (const f of osmFeatures) {
     if (f?.type !== 'building' || !Array.isArray(f.geometry) || f.geometry.length < 3) continue;
-    let lat = 0;
-    let lng = 0;
-    for (const p of f.geometry) { lat += p.lat; lng += p.lng; }
-    lat /= f.geometry.length;
-    lng /= f.geometry.length;
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-    buildings.push([lat, lng]);
-    latSum += lat;
+    const ring = f.geometry.filter((p) => Number.isFinite(p?.lat) && Number.isFinite(p?.lng));
+    if (ring.length < 3) continue;
+    outlines.push(ring);
+    latSum += ring[0].lat;
   }
   const cache = new Map();
-  if (buildings.length === 0) return () => false;
+  if (outlines.length === 0) return () => false;
 
-  const cosLat = Math.cos((latSum / buildings.length) * Math.PI / 180) || 1;
+  const cosLat = Math.cos((latSum / outlines.length) * Math.PI / 180) || 1;
   const toXY = (lat, lng) => [lng * M_PER_DEG_LAT * cosLat, lat * M_PER_DEG_LAT];
   const grid = new Map();
-  for (const [lat, lng] of buildings) {
-    const [x, y] = toXY(lat, lng);
-    const key = `${Math.floor(x / URBAN_CELL_M)},${Math.floor(y / URBAN_CELL_M)}`;
-    const cell = grid.get(key);
-    if (cell) cell.push([x, y]); else grid.set(key, [[x, y]]);
-  }
+  outlines.forEach((ring, id) => {
+    const pts = ring.map((p) => toXY(p.lat, p.lng));
+    const seen = new Set();
+    const put = (x, y) => {
+      const key = `${Math.floor(x / URBAN_CELL_M)},${Math.floor(y / URBAN_CELL_M)}`;
+      const cell = grid.get(key);
+      if (cell) cell.push([x, y, id]); else grid.set(key, [[x, y, id]]);
+      seen.add(key);
+    };
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i]; const b = pts[(i + 1) % pts.length];
+      const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / URBAN_OUTLINE_STEP_M));
+      for (let k = 0; k < n; k++) put(a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n);
+    }
+  });
   const countNear = (x, y) => {
     const cx = Math.floor(x / URBAN_CELL_M);
     const cy = Math.floor(y / URBAN_CELL_M);
     const r2 = URBAN_RADIUS_M * URBAN_RADIUS_M;
-    let n = 0;
+    const found = new Set();
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
-        for (const [bx, by] of grid.get(`${cx + dx},${cy + dy}`) || []) {
-          if ((bx - x) ** 2 + (by - y) ** 2 <= r2 && ++n >= URBAN_MIN_BUILDINGS) return n;
+        for (const [bx, by, id] of grid.get(`${cx + dx},${cy + dy}`) || []) {
+          if (!found.has(id) && (bx - x) ** 2 + (by - y) ** 2 <= r2) {
+            found.add(id);
+            if (found.size >= URBAN_MIN_BUILDINGS) return found.size;
+          }
         }
       }
     }
-    return n;
+    return found.size;
   };
 
-  return (feature) => {
-    const id = feature?.id;
-    if (id !== undefined && cache.has(id)) return cache.get(id);
-    const pts = (feature?.geometry || []).map((p) => toXY(p.lat, p.lng));
+  // [samples, urban samples] along a way's line
+  const tally = (geometry) => {
+    const pts = (geometry || []).map((p) => toXY(p.lat, p.lng));
     let samples = 0;
     let urbanSamples = 0;
     const visit = (x, y) => {
@@ -429,6 +508,47 @@ export function buildUrbanRoadClassifier(osmFeatures = []) {
       }
     }
     if (pts.length > 0) visit(...pts[pts.length - 1]);
+    return [samples, urbanSamples];
+  };
+  // OSM cuts a street into pieces wherever a tag changes: a 15 m piece
+  // between a park and one big hotel judged alone read as countryside in a
+  // town centre. A way is judged with the pieces of the same street joined
+  // to its ends (same name, a shared end node), their samples pooled.
+  const nodeKey = (p) => `${p.lat.toFixed(7)},${p.lng.toFixed(7)}`;
+  const byEnd = new Map();
+  for (const f of osmFeatures) {
+    const name = f?.type === 'road' ? f.tags?.name : null;
+    if (!name || !(f.geometry?.length >= 2)) continue;
+    for (const e of [f.geometry[0], f.geometry[f.geometry.length - 1]]) {
+      const k = `${name}|${nodeKey(e)}`;
+      if (!byEnd.has(k)) byEnd.set(k, []);
+      byEnd.get(k).push(f);
+    }
+  }
+  const tallies = new Map();
+  const tallyOf = (f) => {
+    if (f.id === undefined) return tally(f.geometry);
+    if (!tallies.has(f.id)) tallies.set(f.id, tally(f.geometry));
+    return tallies.get(f.id);
+  };
+
+  return (feature) => {
+    const id = feature?.id;
+    if (id !== undefined && cache.has(id)) return cache.get(id);
+    let [samples, urbanSamples] = tallyOf(feature || {});
+    const name = feature?.tags?.name;
+    const g = feature?.geometry || [];
+    if (name && g.length >= 2) {
+      const seen = new Set([id]);
+      for (const e of [g[0], g[g.length - 1]]) {
+        for (const n of byEnd.get(`${name}|${nodeKey(e)}`) || []) {
+          if (seen.has(n.id)) continue;
+          seen.add(n.id);
+          const [a, b] = tallyOf(n);
+          samples += a; urbanSamples += b;
+        }
+      }
+    }
     const urban = samples > 0 && urbanSamples / samples >= URBAN_SHARE;
     if (id !== undefined) cache.set(id, urban);
     return urban;

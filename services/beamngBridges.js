@@ -736,6 +736,39 @@ const TAPER_MAX_M = 90;
  * Per-point half widths of a deck's parts: [{ hl, hr }] (left / right of
  * each part's own direction), from part.half widened at joins as above.
  */
+/**
+ * Sidewalks mapped along a deck widen it: part.walkL / walkR, the slab's half
+ * width each side (left of the part's line). footways: [{ nodes, half }].
+ */
+export function widenDecksForSidewalks(decks, footways) {
+  for (const deck of decks) {
+    for (const part of deck.parts) {
+      const reaches = { 1: [], '-1': [] };
+      part.xy.forEach((p, k) => {
+        const a = part.xy[Math.max(0, k - 1)]; const b = part.xy[Math.min(part.xy.length - 1, k + 1)];
+        const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; const t = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+        const best = {};
+        for (const { nodes, half } of footways) {
+          for (let i = 0; i + 1 < nodes.length; i++) {
+            const q = nodes[i]; const r = nodes[i + 1]; const dx = r[0] - q[0]; const dy = r[1] - q[1]; const l = Math.hypot(dx, dy) || 1;
+            if (Math.abs((dx * t[0] + dy * t[1]) / l) < 0.9) continue;
+            const u = ((p[0] - q[0]) * dx + (p[1] - q[1]) * dy) / (l * l);
+            if (u < 0 || u > 1) continue;
+            const ox = q[0] + dx * u - p[0]; const oy = q[1] + dy * u - p[1];
+            const across = t[0] * oy - t[1] * ox; const off = Math.abs(across);
+            if (off < part.half - 1 || off > part.half + 6) continue;
+            const side = across > 0 ? 1 : -1;
+            if (!best[side] || off + half < best[side]) best[side] = off + half;
+          }
+        }
+        for (const side of [1, -1]) if (best[side]) reaches[side].push(best[side]);
+      });
+      const take = (xs) => (xs.length >= 0.4 * part.xy.length ? [...xs].sort((x, y) => x - y)[xs.length >> 1] : 0);
+      part.walkL = take(reaches[1]); part.walkR = take(reaches[-1]);
+    }
+  }
+}
+
 export function deckEdges(deck) {
   const parts = deck.parts;
   const edges = parts.map((p) => ({ hl: p.xy.map(() => p.half), hr: p.xy.map(() => p.half) }));
@@ -926,8 +959,9 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
     // (OSM maps each as its own way): one slab across, no parapets facing
     // each other in the middle of the road (Deck Park's 7th Street).
     const median = medianAcross(deck, pi, xy, z, nrm, hl, hr, neighbours);
-    const hlM = hl.map((h, k) => (median.left[k] > 0 ? h + median.left[k] / 2 - PARAPET_W_M + 0.05 : h));
-    const hrM = hr.map((h, k) => (median.right[k] > 0 ? h + median.right[k] / 2 - PARAPET_W_M + 0.05 : h));
+    // (and out over its sidewalks, the parapets outside them)
+    const hlM = hl.map((h, k) => (median.left[k] > 0 ? h + median.left[k] / 2 - PARAPET_W_M + 0.05 : Math.max(h, part.walkL ?? 0)));
+    const hrM = hr.map((h, k) => (median.right[k] > 0 ? h + median.right[k] / 2 - PARAPET_W_M + 0.05 : Math.max(h, part.walkR ?? 0)));
     // offsets: metres left of the centreline, or a function of the point
     const at = (k, off, dz) => {
       const o = typeof off === 'function' ? off(k) : off;

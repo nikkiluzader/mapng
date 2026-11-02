@@ -28,8 +28,9 @@
  * (metres, Z up) with one geometry group per material; their material names
  * match getBuildingMaterialDefs().
  */
-import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
+import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, hotelCanopy, hangingSign, CANOPY_COLOURS, PUB_SIGN_COLOURS, PUB_FASCIAS, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
 import * as THREE from 'three';
+import { buildingUse, businessTagsByBuilding, isHistoricBuilding } from './buildingUses.js';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
 import { planPools, buildPool, POOL_MATERIAL_STAGES } from './pools.js';
 import { planPitches, buildPitch, planSeating, buildSeating, drapedMesh, SPORTS_MATERIAL_STAGES, SPORTS_MATERIAL_FLAGS } from './sportsFields.js';
@@ -222,7 +223,8 @@ const WIN_UV = [53 / 1024, 154 / 1024, 1 - (512 + 238) / 1024, 1 - (512 + 45) / 
 // The same sash window from band 2's bay 3, which the night map
 // (public/beamng_facade_e.png) leaves unlit: a house nobody is home in.
 const WIN_UV_DARK = [664 / 1024, 765 / 1024, WIN_UV[2], WIN_UV[3]];
-const HOUSE_LIT_SHARE = 0.4;   // (0.65 read as a street with every house awake; about four in ten at night)
+const HOUSE_LIT_SHARE = 0.4;
+const HOTEL_LIT_SHARE = 0.85;   // (a hotel's rooms: most lit at night)   // (0.65 read as a street with every house awake; about four in ten at night)
 const WIN_W = 1.05;
 const WIN_H = 1.75;
 const WIN_SILL = 0.85;
@@ -648,12 +650,162 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
   const worshipTint = worship ? (tagged || pick([[1, 0.96, 0.9], [0.96, 0.92, 0.84], [0.92, 0.9, 0.86]], r('worshipTint'))) : null;
   const jitter = 1 + JITTER * (2 * r('jit') - 1);
   const shade = (c) => c.map((v) => Math.max(0, Math.min(1, v * jitter)));
-  return {
+  const plan = {
     kind, cls, floors, floorH, eaveH, roof, pitch: worshipPitch ?? pitch, wall, wallFamily: worship || fort ? wall : wallFamily, band, office, shopFloor: shopFloor && !worship && !fort, heightSource, fort,
     entrance: style.entrance || 'steps', chimneyShare: style.chimney ?? 0.3, tanks: !!style.tanks,
     wallTint: shade(fortTint || worshipTint || wallTint), roofMat, roofTint: shade(roofTint),
     windows: kind === 'house' && !fort,
   };
+  if (worship || fort) return plan;
+  return useLook(plan, tags, { style, r, rectFill, area, tagged, taggedRoof, shade, guessedHeight: !Number.isFinite(levels) && !Number.isFinite(explicitH) });
+}
+
+// ── What a building is used for: its own look ────────────────────────────────
+
+const RESTAURANT_AWNINGS = [[0.55, 0.1, 0.09], [0.13, 0.3, 0.18], [0.1, 0.15, 0.32], [0.38, 0.07, 0.12], [0.12, 0.12, 0.13]];
+const CAFE_AWNINGS = [[0.72, 0.33, 0.2], [0.93, 0.88, 0.76], [0.08, 0.36, 0.38], [0.13, 0.3, 0.18], [0.55, 0.1, 0.09]];
+const FAST_FOOD_AWNINGS = [[0.7, 0.08, 0.06], [0.85, 0.55, 0.08], [0.1, 0.3, 0.55]];
+// (one business along its whole front: one colour, long bays)
+const USE_SHOPFRONTS = {
+  restaurant: { awningShare: 1, awnings: RESTAURANT_AWNINGS, bay: [6, 10], one: true },
+  cafe: { awningShare: 1, awnings: CAFE_AWNINGS, bay: [5, 8], one: true },
+  fast_food: { awningShare: 1, awnings: FAST_FOOD_AWNINGS, bay: [6, 10], one: true },
+  pub: { awningShare: 0, fascias: PUB_FASCIAS, bay: [8, 14], one: true },
+  bar: { awningShare: 0.25, awnings: RESTAURANT_AWNINGS, fascias: PUB_FASCIAS, bay: [8, 14], one: true },
+};
+const HOTEL_SIGN_MIN_FLOORS = 3;
+const HOTEL_ANNEX_M2 = 400;
+
+/**
+ * A used building's front (the wall facing the nearest street): a hotel's
+ * canopy, flags and rooftop sign, a pub's hanging sign, a café's sign; a
+ * string course over the ground floor of hotels and historic buildings.
+ * Returns { counts, props: [{ shape, x, y, z, yaw }] } (props: TSStatics,
+ * PROP_SHAPES keys, yaw facing the street).
+ */
+function useDetails(m, builder, { plan, ring, base, eave, flat, streets, crossings, passages, rnd, lat, lon, entranceHere = true }) {
+  const counts = {};
+  const props = [];
+  const bumpC = (k) => { counts[k] = (counts[k] || 0) + 1; };
+  // the front: the nearest street's wall, a longer one when about as near
+  let front = -1; let best = Infinity;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 4) continue;
+    const d = streets.facing(a, b);
+    if (d === null) continue;
+    if (crossings.length && passageOpenings(a, b, passages).length) continue;
+    const score = d - Math.min(L, 30) * 0.15;
+    if (score < best) { best = score; front = i; }
+  }
+  if ((plan.use === 'hotel' || plan.historic) && plan.floors >= 2) {
+    stringCourse(m, ring, base + plan.floorH, plan.wall || 'stucco', plan.wallTint.map((v) => Math.min(1, v * 1.08)));
+    bumpC('courses');
+  }
+  if (front < 0) return { counts, props };
+  const a = ring[front]; const b = ring[(front + 1) % ring.length];
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const d = [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; const out = [d[1], -d[0]];
+  const facingYaw = Math.atan2(out[1], out[0]);
+  const at = (t, k) => [a[0] + d[0] * t + out[0] * k, a[1] + d[1] * t + out[1] * k];
+  if ((plan.use === 'hotel' || plan.use === 'motel') && entranceHere) {
+    const canopy = plan.use === 'hotel' ? hotelCanopy(m, a, b, base, CANOPY_COLOURS[Math.floor(rnd('canopy') * CANOPY_COLOURS.length)]) : null;
+    if (canopy) bumpC('hotelCanopies');
+    // flags over the entrance (the US's, on its brackets) in the Americas
+    if (canopy && plan.floors >= 2 && lon < -30 && lon > -170 && lat > 15) {
+      for (const sgn of [-1, 1]) {
+        const p = at(L / 2 + sgn * (canopy.half + 1.2), 0.05);
+        props.push({ shape: 'flagWall', x: p[0], y: p[1], z: base + plan.floorH + 0.6, yaw: facingYaw });
+      }
+      bumpC('hotelFlags');
+    }
+    // a HOTEL sign standing on the roof's front edge
+    if (flat && plan.floors >= HOTEL_SIGN_MIN_FLOORS && L >= 8) {
+      const p = at(L / 2, -1.2);
+      props.push({ shape: 'hotelSign', x: p[0], y: p[1], z: eave + (plan.kind === 'block' && plan.floors >= 2 ? PARAPET.h : 0), yaw: facingYaw });
+      bumpC('hotelSigns');
+    }
+  } else if (plan.use === 'pub' || plan.use === 'bar') {
+    // the sign by the front's corner, over the shop floor
+    if (L >= 4) {
+      const t = Math.min(1.2, L * 0.2);
+      hangingSign(m, at(rnd('signEnd') < 0.5 ? t : L - t, 0), d, out, base + plan.floorH + 1.0, PUB_SIGN_COLOURS[Math.floor(rnd('pubSign') * PUB_SIGN_COLOURS.length)]);
+      bumpC('pubSigns');
+    }
+  } else if (plan.use === 'cafe' && L >= 4) {
+    const p = at(L / 2, 0.04);
+    props.push({ shape: 'cafeSign', x: p[0], y: p[1], z: base + plan.floorH + 0.45, yaw: facingYaw });
+    bumpC('cafeSigns');
+  }
+  return { counts, props };
+}
+
+// (the warm regions: stucco and clay tile, Florida's and California's Spanish revival)
+const WARM_STYLES = new Set([REGIONS.us_south, REGIONS.us_west, REGIONS.mediterranean, REGIONS.latin_america, REGIONS.warm]);
+const HOTEL_STUCCO = [[0.98, 0.94, 0.84], [0.96, 0.88, 0.74], [0.95, 0.84, 0.74], [1, 0.98, 0.94], [0.93, 0.78, 0.66]];
+const MOTEL_STUCCO = [[0.98, 0.92, 0.8], [0.86, 0.92, 0.9], [0.98, 0.86, 0.8], [0.94, 0.94, 0.86]];
+const HOTEL_FLOOR_M = 3.3;
+const HOTEL_MIN_FLOORS = 3;
+const HOTEL_ROOF_MAX_FLOORS = 6;
+
+/**
+ * Hotels, motels, pubs, bars, restaurants, cafés and historic buildings
+ * (buildingUses.js) set apart from the window-sheet blocks around them:
+ * masonry walls with windows laid over them, their own roofs, a shop floor
+ * for the bars and restaurants; their details (canopies, signs, awnings)
+ * come later from plan.use.
+ */
+function useLook(plan, tags, { style, r, rectFill, area, tagged, taggedRoof, shade, guessedHeight }) {
+  const use = buildingUse(tags);
+  const historic = isHistoricBuilding(tags);
+  if ((!use && !historic) || use === 'guest' || plan.office || plan.kind === 'industrial' || plan.kind === 'shed') return { ...plan, historic };
+  const warm = WARM_STYLES.has(style);
+  const p = { ...plan, use, historic };
+  // (a restaurant or hotel the size of a house is still no house)
+  if (p.kind === 'house' && use) p.kind = 'block';
+  const masonry = (family, tints) => {
+    p.band = null;
+    p.wallFamily = family;
+    p.wall = pickShare(WALL_VARIANTS[family] || [[family, 1]], r('useWall'));
+    p.windows = true;
+    p.wallTint = shade(tagged || pick(tints || WALL_TINTS[p.wall] || [[1, 1, 1]], r('useTint')));
+  };
+  if (use === 'hotel') {
+    if (historic) masonry(warm ? 'stucco' : 'stone', warm ? HOTEL_STUCCO : null);
+    else if (warm) masonry('stucco', HOTEL_STUCCO);
+    else masonry(r('hotelWall') < 0.5 ? 'brick' : 'stone');
+    // (stucco a hotel's tint reads on: the grey render sheet barely takes one)
+    if (p.wall === 'rendered') p.wall = 'stucco';
+    // a lobby behind its canopy, not shopfronts
+    p.shopFloor = false;
+    p.floorH = HOTEL_FLOOR_M;
+    if (guessedHeight && p.floors < HOTEL_MIN_FLOORS) p.floors = HOTEL_MIN_FLOORS;
+    if (guessedHeight) p.eaveH = p.floors * p.floorH;
+    // a clay-tiled hipped roof where the region builds them and the
+    // footprint takes one; a flat roof behind a parapet otherwise
+    if (warm && rectFill >= RECT_FILL && p.floors <= HOTEL_ROOF_MAX_FLOORS && area < 6000) {
+      p.roof = 'hipped';
+      const [mat, idx] = pick([CLAY_TILE, CLAY_ROUND, CLAY], r('hotelRoof'));
+      p.roofMat = mat;
+      p.roofTint = shade(taggedRoof || ROOF_TINTS[mat][pick(idx, r('hotelRoofTint'))]);
+    } else if (p.roof !== 'flat' && p.floors > HOTEL_ROOF_MAX_FLOORS) p.roof = 'flat';
+  } else if (use === 'motel') {
+    masonry('stucco', MOTEL_STUCCO);
+    if (guessedHeight) { p.floors = Math.min(p.floors, 2); p.eaveH = p.floors * p.floorH; }
+  } else if (use === 'pub' || use === 'bar') {
+    masonry(warm && r('pubWall') < 0.4 ? 'stucco' : 'brick');
+    if (p.wallFamily === 'brick' && r('pubDark') < 0.5) { p.wall = 'brickDark'; p.wallTint = shade(tagged || [1, 1, 1]); }
+    p.shopFloor = true;
+  } else if (use) {
+    // restaurants, cafés and takeaways: a painted or brick front over the shop floor
+    masonry(warm ? (r('foodWall') < 0.7 ? 'stucco' : 'brick') : (r('foodWall') < 0.5 ? 'brick' : 'stucco'), warm ? HOTEL_STUCCO : null);
+    p.shopFloor = true;
+  } else {
+    masonry(warm ? 'stucco' : (r('histWall') < 0.5 ? 'brick' : 'stone'), warm ? HOTEL_STUCCO : null);
+  }
+  if (p.kind === 'block') p.chimneyShare = 0;
+  return p;
 }
 
 // ── Mesh accumulation ────────────────────────────────────────────────────────
@@ -1357,6 +1509,20 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   };
   const streets = streetIndex(features, project);
   const levelsHints = neighbourLevels(features, project);
+  // restaurants, pubs and hotels mapped as points inside a building: its use
+  const businessTags = businessTagsByBuilding(features, project);
+  // a hotel of several buildings has one entrance: its biggest, per name
+  const hotelMain = new Map();
+  for (const f of features) {
+    if (f?.type !== 'building' || !(f.geometry?.length >= 3)) continue;
+    const t = businessTags.get(f) || f.tags || {};
+    if (!['hotel', 'motel'].includes(buildingUse(t)) || !t.name) continue;
+    const r = f.geometry.map((q) => project(q.lat, q.lng));
+    const a = Math.abs(signedArea(r));
+    if (!hotelMain.has(t.name) || a > hotelMain.get(t.name).a) hotelMain.set(t.name, { f, a });
+  }
+  const props = [];
+  stats.props = props;
   const bump = (map, key) => { map[key] = (map[key] || 0) + 1; };
 
   const flushTile = (t) => {
@@ -1378,7 +1544,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     let area = signedArea(ring);
     if (area < 0) { ring = ring.reverse(); area = -area; }
     if (area < 4) { stats.skipped.tiny++; continue; }
-    const tags = f.tags || {};
+    const tags = businessTags.get(f) || f.tags || {};
     if (area > MAX_AREA_M2 && !INDUSTRIAL_CLASSES.has(tags.building) && !BIG_BOX_CLASSES.has(tags.building)) { stats.skipped.oversize++; continue; }
     // a bridge's pier or tower mapped as a building (the Zakim's 98 m pylon:
     // building=tower + man_made=pier stood as an office tower in the roadway):
@@ -1451,7 +1617,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     // (a passage's road near this building: a whole lap's racing lines are many to test wall by wall)
     const ringBox = [Math.min(...ring.map((q) => q[0])), Math.max(...ring.map((q) => q[0])), Math.min(...ring.map((q) => q[1])), Math.max(...ring.map((q) => q[1]))];
     const passages = streets.passages.filter((p) => p.line.some((q) => q[0] > ringBox[0] - 300 && q[0] < ringBox[1] + 300 && q[1] > ringBox[2] - 300 && q[1] < ringBox[3] + 300));
-    const crossings = passages.length ? passageCrossings(ring, passages) : [];
+    // (an archway into a courtyard: from the outer wall to the courtyard's)
+    const crossings = passages.length ? passageCrossings(ring, passages, holes) : [];
 
     // one wall piece p..q (fractions t0..t1 of edge i), open below zOpen if `open`
     const wallPiece = (a, b, i, open) => {
@@ -1467,8 +1634,13 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
           else if (zb2 < zt) bandFloor(builder, sheetMat, plan.band, a, b, zb2, zt, plan.wallTint, seed, i, fl);
         }
       } else {
-        wallStrip(builder, plan.wall, a, b, open ? zOpen : base, eave, plan.wallTint);
-        if (plan.windows && !open) houseWindows(detailB, a, b, base, plan.floors, plan.floorH, eave, hash01(seed, 'lit') < HOUSE_LIT_SHARE ? WIN_UV : WIN_UV_DARK);
+        // (a pub's or restaurant's masonry over its shop floor's windows)
+        const shop = plan.shopFloor && !open && plan.kind === 'block';
+        if (shop) bandFloor(builder, 'shop', BAND_SHOP, a, b, base, base + plan.floorH, [1, 1, 1], seed, i, 0);
+        const wallFrom = open ? zOpen : shop ? base + plan.floorH : base;
+        wallStrip(builder, plan.wall, a, b, wallFrom, eave, plan.wallTint);
+        const lit = hash01(seed, 'lit') < (plan.use === 'hotel' || plan.use === 'motel' ? HOTEL_LIT_SHARE : HOUSE_LIT_SHARE);
+        if (plan.windows && !open) houseWindows(detailB, a, b, shop ? base + plan.floorH : base, shop ? plan.floors - 1 : plan.floors, plan.floorH, eave, lit ? WIN_UV : WIN_UV_DARK);
       }
     };
     for (let i = 0; i < ring.length; i++) {
@@ -1489,7 +1661,18 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     for (const c of crossings) passageInside(builder, c.p, c.q, c.half + 0.25, zMin, zOpen, 'concrete', [0.72, 0.71, 0.68]);
     for (const hole of holes) {
       for (let i = 0; i < hole.length; i++) {
-        wallStrip(builder, plinthMat, hole[i], hole[(i + 1) % hole.length], z0, eave, plinthTint);
+        const a = hole[i]; const b = hole[(i + 1) % hole.length];
+        const openings = crossings.length ? passageOpenings(a, b, passages) : [];
+        if (!openings.length) { wallStrip(builder, plinthMat, a, b, z0, eave, plinthTint); continue; }
+        // open below the passage's top where an archway comes through
+        const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+        let t = 0;
+        for (const [o0, o1] of openings) {
+          if (o0 > t + 1e-3) wallStrip(builder, plinthMat, at(t), at(o0), z0, eave, plinthTint);
+          wallStrip(builder, plinthMat, at(o0), at(o1), zOpen, eave, plinthTint);
+          t = o1;
+        }
+        if (t < 1 - 1e-3) wallStrip(builder, plinthMat, at(t), b, z0, eave, plinthTint);
       }
     }
 
@@ -1523,15 +1706,27 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       stringCourse(detailB, ring, eave, crownMat, plan.wallTint.map((v) => Math.min(1, v * 1.08)));
       stats.details.parapets = (stats.details.parapets || 0) + 1;
     }
-    // shopfronts along the walls that face a street
+    // shopfronts along the walls that face a street (a restaurant's own
+    // awnings, a pub's painted front)
+    const shopLook = USE_SHOPFRONTS[plan.use] || {};
     if (plan.shopFloor) {
       for (let i = 0; i < ring.length; i++) {
         const a = ring[i]; const b = ring[(i + 1) % ring.length];
         const d = streets.facing(a, b);
         if (d === null || d > SHOP_STREET_M) continue;
         if (crossings.length && passageOpenings(a, b, passages).length) continue;
-        stats.details.shopfronts = (stats.details.shopfronts || 0) + shopfronts(detailB, a, b, base + plan.floorH, (k1, k2) => rnd('shop', i, k1, k2));
+        stats.details.shopfronts = (stats.details.shopfronts || 0) + shopfronts(detailB, a, b, base + plan.floorH, (k1, k2) => rnd(plan.use ? 'useShop' : 'shop', plan.use ? 0 : i, k1, k2), shopLook);
       }
+    }
+    // hotels, pubs, restaurants and historic buildings: their front's details
+    if (plan.use || plan.historic) {
+      // (an unnamed small hotel building: a wing or an annex of one)
+      const entranceHere = tags.name ? hotelMain.get(tags.name)?.f === f : area >= HOTEL_ANNEX_M2;
+      const usage = useDetails(detailB, builder, { plan, ring, base, eave, flat, streets, crossings, passages, rnd, lat: c.lat, lon: c.lng, entranceHere });
+      for (const [k, v] of Object.entries(usage.counts)) stats.details[k] = (stats.details[k] || 0) + v;
+      props.push(...usage.props);
+      if (plan.use) bump(stats.uses || (stats.uses = {}), plan.use);
+      if (plan.historic) stats.details.historic = (stats.details.historic || 0) + 1;
     }
     if (plan.kind === 'house') {
       // the entrance on the wall facing the nearest street

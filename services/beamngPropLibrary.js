@@ -42,6 +42,17 @@ export const PROP_BINS = ['mapng_prop_bin_round', 'mapng_prop_bin_wcusa'];
 export const PROP_SHAPES = {
   pole: { shapeFile: '/levels/automation_test_track/art/shapes/objects/s_powerpole_3wire.dae' },
   poleLamp: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/electrical_pole_lamp.dae' },
+  // a clipped hedge piece (Italy's): 2.3 m along local X, centred, 0.85 m
+  // deep, 1.64 m tall; laid end to end along barrier=hedge
+  hedge: { shapeFile: '/levels/italy/art/shapes/trees/trees_italy/cypress_hedge_3m.dae' },
+  // what a building is used for (beamngBuildings.js useDetails): a rooftop
+  // HOTEL sign (6.2 m wide, its face in local XZ), the US flag on its wall
+  // bracket, a café's small wall sign (yawOffset: from the street-facing
+  // direction: the signs' faces lie along local X, facing local -Y; the
+  // flag's pole reaches out along local -X)
+  hotelSign: { shapeFile: '/levels/italy/art/shapes/buildings/italy_billboard_hotel_big.dae', yawOffset: -Math.PI / 2 },
+  flagWall: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_flag_usa.dae', yawOffset: Math.PI },
+  cafeSign: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_comsign_cafe.dae', yawOffset: -Math.PI / 2, scale: 1.6 },
 };
 
 // Street lights, their arms along local +X; the night light sits at the
