@@ -613,3 +613,141 @@ test('a walk cut in pieces draws each piece once: no triangle twice', () => {
   }
   assert.equal(twice, 0, `${twice} triangles drawn twice`);
 });
+
+test('a ring walk mapped as two ways is one closed line; a spur at its seam stays its own', async () => {
+  const { chainWalks } = await import('../services/beamngSidewalks.js');
+  const at = (deg) => [10 * Math.cos((deg * Math.PI) / 180), 10 * Math.sin((deg * Math.PI) / 180), 0];
+  const arc = (a0, a1) => Array.from({ length: 7 }, (_, i) => at(a0 + ((a1 - a0) * i) / 6));
+  const spur = { nodes: [[-30, 0, 0], [-20, 0, 0], at(180)], half: 1 };
+  const out = chainWalks([{ nodes: arc(180, 360), half: 1 }, { nodes: arc(0, 180), half: 1 }, spur]);
+  assert.equal(out.length, 2);
+  const ring = out.find((p) => p.nodes.length > 3);
+  const [f, l] = [ring.nodes[0], ring.nodes[ring.nodes.length - 1]];
+  assert.ok(Math.hypot(f[0] - l[0], f[1] - l[1]) < 1e-9, 'closed');
+  assert.ok(out.includes(spur) || out.some((p) => p.nodes.length === 3), 'the spur alone');
+  // different widths stay apart
+  assert.equal(chainWalks([{ nodes: arc(180, 360), half: 1 }, { nodes: arc(0, 180), half: 2 }]).length, 2);
+});
+
+test('walks crossing on uneven ground meet at one height', async () => {
+  const { buildWalkRuns } = await import('../services/beamngSidewalks.js');
+  const line = (x0, y0, x1, y1, n = 21) => Array.from({ length: n }, (_, i) => [x0 + ((x1 - x0) * i) / (n - 1), y0 + ((y1 - y0) * i) / (n - 1), 0]);
+  // a ridge along y = 0 and a dip along x = 0: each walk's own height disagrees where they cross
+  const groundAt = (x, y) => 5 + 0.3 * Math.exp(-(y * y) / 8) - 0.3 * Math.exp(-(x * x) / 8);
+  const runs = buildWalkRuns([{ nodes: line(-40, 0, 40, 0), half: 1, sidewalk: true }, { nodes: line(0, -40, 0, 40), half: 1, sidewalk: true }], [], { groundAt });
+  assert.equal(runs.length, 2);
+  const zNear = (r) => r.centre.reduce((best, q) => (Math.hypot(q[0], q[1]) < best.d ? { d: Math.hypot(q[0], q[1]), z: q[2] } : best), { d: Infinity }).z;
+  assert.ok(Math.abs(zNear(runs[0]) - zNear(runs[1])) < 0.01, `level where they cross: ${zNear(runs[0])} vs ${zNear(runs[1])}`);
+});
+
+test('a walk clipping a road\'s corner is joined again across it, one crossing the road is not', async () => {
+  const { buildWalkRuns } = await import('../services/beamngSidewalks.js');
+  const s = street({ tags: {}, nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 0, 5, 8]) });
+  // its corner node mapped deep in the road (past the 3 m push), then back out on the same side
+  const clip = { nodes: [[-20, 7, 0], [-6, 7, 0], [-1, 0.5, 0], [1, 0.5, 0], [6, 7, 0], [20, 7, 0]], half: 1, sidewalk: true };
+  assert.equal(buildWalkRuns([clip], [s], { groundAt: () => 5 }).length, 1, 'one walk');
+  const across = { nodes: [[0, -20, 0], [0, 20, 0]], half: 1, sidewalk: true };
+  assert.equal(buildWalkRuns([across], [s], { groundAt: () => 5 }).length, 2, 'cut at the road');
+});
+
+test('two branches of one street leaving a fork side by side: neither sidewalk over the other branch', () => {
+  const line = (x0, y0, x1, y1, n = 11) => Array.from({ length: n }, (_, i) => [x0 + ((x1 - x0) * i) / (n - 1), y0 + ((y1 - y0) * i) / (n - 1), 5, 8]);
+  const tags = { name: 'Fork Street', sidewalk: 'both' };
+  const cws = [
+    street({ owner: 1, tags, nodes: line(-60, 0, 0, 0) }),
+    street({ owner: 2, tags, nodes: line(0, 0, 60, 24) }),   // about 22° off
+    street({ owner: 3, tags, nodes: line(0, 0, 60, 0) }),
+  ];
+  const runs = buildSidewalkRuns(cws);
+  const distTo = (cw, x, y) => Math.min(...cw.nodes.slice(1).map((b, i) => {
+    const a = cw.nodes[i]; const ex = b[0] - a[0]; const ey = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / (ex * ex + ey * ey)));
+    return Math.hypot(x - a[0] - t * ex, y - a[1] - t * ey);
+  }));
+  for (const run of runs) {
+    const p = run.points;
+    for (let i = 0; i + 1 < p.length; i++) {
+      const L = Math.hypot(p[i + 1][0] - p[i][0], p[i + 1][1] - p[i][1]) || 1;
+      const nx = (-(p[i + 1][1] - p[i][1]) / L) * run.side; const ny = ((p[i + 1][0] - p[i][0]) / L) * run.side;
+      const bx = p[i][0] + nx * (run.width + 0.15); const by = p[i][1] + ny * (run.width + 0.15);
+      for (const cw of [cws[1], cws[2]]) {
+        if (cw.owner === run.owner) continue;
+        assert.ok(distTo(cw, bx, by) > cw.half - 0.05, `run of ${run.owner} at (${bx.toFixed(1)}, ${by.toFixed(1)}) over ${cw.owner}`);
+      }
+    }
+  }
+});
+
+test('no unmapped-ground sidewalk on the strip between two roads close side by side (a median missed)', () => {
+  // two one-way streets of different classes 3 m apart: not found as a divided road
+  const a = street({ owner: 1, tags: {}, highway: 'residential', nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 0, 5, 8]) });
+  const b = street({ owner: 2, tags: {}, highway: 'primary', half: 3, nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 10, 5, 6]) });
+  const runs = buildSidewalkRuns([a, b], { openGround: [] , buildings: [[[500, 500], [501, 500], [501, 501], [500, 500]]] });
+  assert.ok(!runs.some((r) => r.front && ((r.owner === 1 && r.side === 1) || (r.owner === 2 && r.side === -1))), 'the strip between stays bare');
+  assert.ok(runs.some((r) => r.front && r.owner === 1 && r.side === -1), 'the outer side still paved');
+});
+
+test('a closed walk whose last points nearly repeat stays a closed, round ring', async () => {
+  const { buildWalkRuns } = await import('../services/beamngSidewalks.js');
+  const ring = Array.from({ length: 9 }, (_, i) => [10 * Math.cos((i * Math.PI) / 4), 10 * Math.sin((i * Math.PI) / 4), 0]);
+  // (as resampled: one point 5 cm short of the start, then the start again)
+  ring.splice(8, 0, [ring[0][0] - 0.03, ring[0][1] - 0.04, 0]);
+  const runs = buildWalkRuns([{ nodes: ring, half: 1, sidewalk: true }], [], { groundAt: () => 5 });
+  assert.equal(runs.length, 1);
+  const r = Math.max(...runs[0].centre.map((q) => Math.abs(Math.hypot(q[0], q[1]) - 9.4)));
+  assert.ok(r < 0.7, `no straight chord across it (off the circle by ${r.toFixed(2)} m)`);
+});
+
+test('a sidewalk along the curb carries on past a crosswalk\'s zone', async () => {
+  const { buildWalkRuns } = await import('../services/beamngSidewalks.js');
+  const s = street({ tags: {}, nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 0, 5, 8]) });
+  const zone = { x: 0, y: 0, ux: 1, uy: 0, halfLength: 1.5, halfWidth: s.half + 1 };
+  const walk = { nodes: Array.from({ length: 21 }, (_, i) => [-20 + i * 2, 4.8, 0]), half: 0.5, sidewalk: true };
+  assert.equal(buildWalkRuns([walk], [s], { groundAt: () => 5, zones: [zone] }).length, 1, 'not cut at the crossing');
+});
+
+test('walks meeting at a point at slight angles leave no gap between their ends', () => {
+  const line = (x0, y0, x1, y1, n = 11) => Array.from({ length: n }, (_, i) => [x0 + ((x1 - x0) * i) / (n - 1), y0 + ((y1 - y0) * i) / (n - 1), 0]);
+  // from the south bending in at 14°, from the north straight, out to the east: one meeting
+  const walks = [
+    { nodes: [...line(2.5, -20, 0.25, -1, 10), [0, 0, 0]], half: 0.9, sidewalk: true },
+    { nodes: line(0, 20, 0, 0), half: 0.9, sidewalk: true, surface: 'asphalt' },   // (another kind of way: not chained on)
+    { nodes: line(0, 0, 20, 0), half: 0.9, sidewalk: true },
+  ];
+  const { meshes } = buildSidewalkMeshes([], { walks, groundAt: () => 5 });
+  const tris = [];
+  for (const mesh of meshes) {
+    const pos = mesh.geometry.getAttribute('position').array;
+    for (let v = 0; v + 8 < pos.length; v += 9) {
+      const t = [[pos[v], pos[v + 1]], [pos[v + 3], pos[v + 4]], [pos[v + 6], pos[v + 7]]];
+      if (Math.abs((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[2][0] - t[0][0]) * (t[1][1] - t[0][1])) > 1e-4) tris.push(t);
+    }
+  }
+  const covered = (x, y) => tris.some(([a, b, c]) => {
+    const s = (p, q) => (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0]);
+    const d1 = s(a, b); const d2 = s(b, c); const d3 = s(c, a);
+    return (d1 >= 0 && d2 >= 0 && d3 >= 0) || (d1 <= 0 && d2 <= 0 && d3 <= 0);
+  });
+  const holes = [];
+  // (inside a walk's own width: the corners between them are ground)
+  const onWalk = (x, y) => walks.some((w) => w.nodes.slice(1).some((b, i) => {
+    const a = w.nodes[i]; const ex = b[0] - a[0]; const ey = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / (ex * ex + ey * ey)));
+    return Math.hypot(x - a[0] - t * ex, y - a[1] - t * ey) < w.half - 0.05;
+  }));
+  for (let x = -1.2; x <= 1.2; x += 0.05) for (let y = -1.2; y <= 1.2; y += 0.05) if (onWalk(x, y) && !covered(x, y)) holes.push([x.toFixed(2), y.toFixed(2)]);
+  assert.equal(holes.length, 0, `holes at ${holes.slice(0, 5).join(' ')}`);
+});
+
+test('a spur mapped just past the walk it meets ends on it without doubling back', async () => {
+  const { buildWalkRuns } = await import('../services/beamngSidewalks.js');
+  const along = { nodes: Array.from({ length: 21 }, (_, i) => [-20 + i * 2, 0, 0]), half: 0.9, sidewalk: true };
+  const spur = { nodes: [...Array.from({ length: 10 }, (_, i) => [0, -20 + i * 2, 0]), [0, -1, 0], [0, 0.6, 0]], half: 0.9, sidewalk: true };
+  const runs = buildWalkRuns([along, spur], [], { groundAt: () => 5 });
+  const s = runs.find((r) => r.centre.some((q) => q[1] < -5));
+  const c = s.centre;
+  for (let i = 1; i + 1 < c.length; i++) {
+    const u = [c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]]; const v = [c[i + 1][0] - c[i][0], c[i + 1][1] - c[i][1]];
+    assert.ok(u[0] * v[0] + u[1] * v[1] > 0, `turns back at (${c[i][0].toFixed(2)}, ${c[i][1].toFixed(2)})`);
+  }
+});

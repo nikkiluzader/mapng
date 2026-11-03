@@ -30,7 +30,12 @@ const CURB_W = 0.15;          // m of curb top band
 const CROSS_SLOPE = 0.015;    // slab rises away from the road
 const BACK_SLOPE_RUN = 2.0;   // back falls to the ground at 1:2, no wheel-catching ledge
 const CURB_REPEAT_M = 9.0;    // m of curb per texture width
-const SLAB_TILE_M = 10;        // m of sidewalk to one repeat of its texture, along and across alike
+const SLAB_TILE_M = 10;        // m of sidewalk to one unit of texture space, along and across alike
+// sidewalk1 is a 4096 × 1024 sheet of 20 × 5 square panels: one repeat covers
+// 30 m along by 7.5 m across, panels of 1.5 m (mapped square it drew them as
+// 0.5 × 2 m strips, its stains stretched across the walk)
+const SLAB_SHEET_U = SLAB_TILE_M / 30;
+const SLAB_SHEET_V = SLAB_TILE_M / 7.5;
 const DEFAULT_WIDTH_M = 2.0;
 const MAX_WIDTH_M = 6.0;
 const CUT_MARGIN_M = 0.5;     // runs stop this far outside other carriageways
@@ -691,6 +696,7 @@ function buildingIndex(rings) {
 // fronts), down to MIN_FIT_M; narrower than that it is cut. A run splits
 // where its width changes. blocked(run, x, y, zRoad).
 const MIN_FIT_M = 1.0;
+const SAME_STREET_ON_COS = Math.cos((60 * Math.PI) / 180);   // a piece of one street runs on within this turn of the last
 function splitRunsWhereBlocked(runs, blocked) {
   const STEP = 1;
   const out = [];
@@ -711,7 +717,7 @@ function splitRunsWhereBlocked(runs, blocked) {
         // the widest slab whose middle and back edge stand on free ground
         const fits = widths.find((w) => {
           const mid = w / 2 + CURB_W; const back = w + CURB_W;
-          return !blocked(run, q[0] + nx * mid, q[1] + ny * mid, q[2]) && !blocked(run, q[0] + nx * back, q[1] + ny * back, q[2]);
+          return !blocked(run, q[0] + nx * mid, q[1] + ny * mid, q[2], q) && !blocked(run, q[0] + nx * back, q[1] + ny * back, q[2], q);
         }) ?? null;
         if (fits !== pieceW) {
           // (the last point at the old width ends its piece; a new width starts here)
@@ -743,15 +749,24 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
     const ends = new Map();
     const key = (p) => `${Math.round(p[0])},${Math.round(p[1])}`;
     for (const cw of carriageways) {
-      if (!cw.nodes?.length) continue;
-      for (const p of [cw.nodes[0], cw.nodes[cw.nodes.length - 1]]) {
+      if (!cw.nodes?.length || cw.nodes.length < 2) continue;
+      const n = cw.nodes;
+      for (const [p, q] of [[n[0], n[1]], [n[n.length - 1], n[n.length - 2]]]) {
         if (!ends.has(key(p))) ends.set(key(p), []);
-        ends.get(key(p)).push(cw);
+        const L = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+        ends.get(key(p)).push({ cw, out: [(q[0] - p[0]) / L, (q[1] - p[1]) / L] });
       }
     }
     const street = (cw) => cw.tags?.name || cw.wayId;
+    // (running on, not forking off: two branches of one street leaving a
+    // fork side by side each laid its sidewalk over the other)
     for (const list of ends.values()) {
-      for (const a of list) for (const b of list) if (a !== b && street(a) && street(a) === street(b)) sameStreet.get(a.owner).add(b.owner);
+      for (const a of list) {
+        for (const b of list) {
+          if (a.cw === b.cw || !street(a.cw) || street(a.cw) !== street(b.cw)) continue;
+          if (a.out[0] * b.out[0] + a.out[1] * b.out[1] < -SAME_STREET_ON_COS) sameStreet.get(a.cw.owner).add(b.cw.owner);
+        }
+      }
     }
   }
   for (const cw of carriageways) {
@@ -775,9 +790,30 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
     const streetOf = new Map(carriageways.map((cw) => [cw.owner, cw.tags?.name || cw.wayId || cw.owner]));
     // (the street's own continuation counts too where it is on another
     // level: a garage ramp leaving the street beside it)
-    runs = splitRunsWhereBlocked(runs, (run, x, y, z) => inBuilding(x, y)
-      || carriagewaysAt(index, x, y, GROUND_ROAD_MARGIN_M, { sides: true }).some((c) => c.owner !== run.owner
-        && (streetOf.get(c.owner) !== streetOf.get(run.owner) || Math.abs(c.z - z) > 1)));
+    // (whose curb it is there: the nearest of the run's own carriageways, a
+    // merged run running on from one piece into the next)
+    const byOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
+    const ownAt = (run, q) => {
+      if (!run.owners || run.owners.length < 2) return run.owner;
+      let best = run.owner; let d = Infinity;
+      for (const o of run.owners) {
+        const cw = byOwner.get(o); if (!cw) continue;
+        const n = cw.nodes;
+        for (let i = 0; i + 1 < n.length; i++) {
+          const ex = n[i + 1][0] - n[i][0]; const ey = n[i + 1][1] - n[i][1];
+          const t = Math.max(0, Math.min(1, ((q[0] - n[i][0]) * ex + (q[1] - n[i][1]) * ey) / (ex * ex + ey * ey || 1)));
+          const e = Math.abs(Math.hypot(q[0] - n[i][0] - t * ex, q[1] - n[i][1] - t * ey) - cw.half);
+          if (e < d) { d = e; best = o; }
+        }
+      }
+      return best;
+    };
+    runs = splitRunsWhereBlocked(runs, (run, x, y, z, q) => {
+      if (inBuilding(x, y)) return true;
+      const own = ownAt(run, q);
+      return carriagewaysAt(index, x, y, GROUND_ROAD_MARGIN_M, { sides: true }).some((c) => c.owner !== own
+        && (!(sameStreet.get(own)?.has(c.owner)) || streetOf.get(c.owner) !== streetOf.get(own) || Math.abs(c.z - z) > 1));
+    });
   }
   // a town street's bare curb with building fronts close behind it: the
   // sidewalk the buildings stand on, curb to wall (downtown streets with no
@@ -828,6 +864,7 @@ const FRONT_CELL_M = 16;
 const FRONT_WALK_NEAR_M = 3;     // a mapped sidewalk this near behind a curb: no sidewalk laid over it
 const FRONT_ABSORB_M = 6;        // a bare-curb end shorter than this beside a new sidewalk: taken into it
 const UNMAPPED_WALK_M = 2;       // a sidewalk over unmapped town ground behind a curb
+const UNMAPPED_ROAD_CLEAR_M = 4; // another road this near behind the curb: the strip between is no sidewalk
 const LAWN_HOUSE_M = 12;         // a house this near behind the curb: its front lawn, kept
 
 /**
@@ -898,6 +935,9 @@ function fillToBuildingFronts(runs, buildings, parking = [], { openGround = [], 
         return !inOpen(x, y) && !inParking(x, y) && !roadAt(x, y);
       });
       if (!free || g < UNMAPPED_WALK_M + FRONT_WALL_CLEAR_M) return null;
+      // (nor a strip with another road just past it: a median the divided
+      // road's finder missed where one side widens, paved as a sidewalk)
+      if ([UNMAPPED_WALK_M + 1, UNMAPPED_ROAD_CLEAR_M].some((d) => roadAt(p[0] + ux * d, p[1] + uy * d))) return null;
       if (wallAhead(p, ux, uy, LAWN_HOUSE_M, houseGrid) <= LAWN_HOUSE_M) return null;
       return { g: UNMAPPED_WALK_M + FRONT_WALL_CLEAR_M, wall: false };
     });
@@ -1003,6 +1043,7 @@ function mergeRuns(pieces, { matchWidth = true } = {}) {
         const db = dir(B[0], B[1]);
         if (da[0] * db[0] + da[1] * db[1] < Math.cos((35 * Math.PI) / 180)) continue;
         A.points = [...A.points, ...B.slice(1)];
+        A.owners = [...new Set([...(A.owners || [A.owner]), ...(cand.owners || [cand.owner])])];
         cand.alive = false;
         addEnds(A);
         extended = true;
@@ -1092,6 +1133,9 @@ class PartBuilder {
         mat = set; ua = [a[0] / t, a[1] / t]; ub = [b[0] / t, b[1] / t]; uc = [c[0] / t, c[1] / t];
       }
     }
+    if (mat === 'slab') {
+      ua = [ua[0] * SLAB_SHEET_U, ua[1] * SLAB_SHEET_V]; ub = [ub[0] * SLAB_SHEET_U, ub[1] * SLAB_SHEET_V]; uc = [uc[0] * SLAB_SHEET_U, uc[1] * SLAB_SHEET_V];
+    }
     const n = [
       (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
       (b[2] - a[2]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[2] - a[2]),
@@ -1150,24 +1194,23 @@ const DIP_RAMP_M = 1.0;        // the curb's slope down into a driveway dip
 // each one's curb-height share: 0 at a ramped end and across a driveway dip,
 // back to 1 over RAMP_M / DIP_RAMP_M.
 // The share of a run's height left d m along it (0 at a loose end or in a driveway dip).
-function heightShare(total, ramps, dips) {
-  const ramp = Math.min(RAMP_M, total / 2.5);
+function heightShare(total, ramps, dips, rampM = null) {
+  const ramp0 = Math.min(rampM?.[0] ?? RAMP_M, total / 2.5); const ramp1 = Math.min(rampM?.[1] ?? RAMP_M, total / 2.5);
   return (d) => {
-    let f = Math.min(1, ramps[0] ? d / ramp : 1, ramps[1] ? (total - d) / ramp : 1);
+    let f = Math.min(1, ramps[0] ? d / ramp0 : 1, ramps[1] ? (total - d) / ramp1 : 1);
     for (const [a, b] of dips) f = Math.min(f, Math.max(0, Math.max(a - d, d - b) / DIP_RAMP_M));
     return Math.max(0, f);
   };
 }
 
-function rampStations(points, ramps, dips = []) {
+function rampStations(points, ramps, dips = [], rampM = null) {
   const s = [0];
   for (let i = 1; i < points.length; i++) s.push(s[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
   const total = s[s.length - 1];
-  const ramp = Math.min(RAMP_M, total / 2.5);
-  const shareAt = heightShare(total, ramps, dips);
+  const shareAt = heightShare(total, ramps, dips, rampM);
   const cuts = [];
-  if (ramps[0]) cuts.push(ramp);
-  if (ramps[1]) cuts.push(total - ramp);
+  if (ramps[0]) cuts.push(Math.min(rampM?.[0] ?? RAMP_M, total / 2.5));
+  if (ramps[1]) cuts.push(total - Math.min(rampM?.[1] ?? RAMP_M, total / 2.5));
   for (const [a, b] of dips) cuts.push(a - DIP_RAMP_M, a, b, b + DIP_RAMP_M);
   const inner = cuts.filter((c) => c > 1e-6 && c < total - 1e-6).sort((x, y) => x - y);
   const out = [];
@@ -1403,6 +1446,7 @@ function joinCorners(runs, index, walkRuns = []) {
   return corners;
 }
 const SIDEWALK_WALK_JOIN_M = 0.6;
+const PANEL_SCRAP_M2 = 0.002;
 const CUT_SLIVER_W_M = 0.15;      // nor one thinner than this on average (twice its area over its outline)
 const CUT_SLIVER_M2 = 0.25;     // a piece of walk this small left by a corner's cut: dropped
 
@@ -1791,19 +1835,19 @@ function apronsOf(run, cells, { groundAt = null, seaZ = -Infinity, clear = () =>
  * drawn footways [{ nodes, half, sidewalk }]: those tagged footway=sidewalk, and
  * any other running along a street (a park's walks stay on the terrain).
  */
-export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], zones = [], buildings = [], walls = [], parking = [], water = [], seaZ = -Infinity } = {}) {
+export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], buildings = [], walls = [], parking = [], water = [], seaZ = -Infinity } = {}) {
   if (!groundAt) return [];
   const inWater = water?.length ? buildingIndex(water) : () => false;
   const index = buildCarriagewayIndex(carriageways);
   const inBuilding = buildings?.length ? buildingIndex(buildings) : () => false;
   const inParking = parking?.length ? buildingIndex(parking) : () => false;
   const nearDriveway = buildLineIndex(driveways);
-  const chosen = (paths || []).filter((path) => {
+  const chosen = chainWalks((paths || []).filter((path) => {
     if (path.nodes.length < 2) return false;
     if (path.sidewalk) return true;
     const near = path.nodes.filter((q) => carriagewaysAt(index, q[0], q[1], WALK_STREET_M).length).length;
     return near >= WALK_STREET_SHARE * path.nodes.length;
-  });
+  }));
   // the walkways' nodes on a grid: where two meet their slabs run on level
   const cells = new Map();
   const cell = (x, y) => `${Math.floor(x / WALK_JOIN_M)},${Math.floor(y / WALK_JOIN_M)}`;
@@ -1845,7 +1889,14 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], z
     // (its mapped corners rounded where it curves: a walk round a fountain;
     // repeated points dropped: a zero-length step threw its slab's edges out
     // into a wedge where two walks joined)
+    // (a closed walk stays closed: its last point a hair from the one before
+    // went as a repeat, and the ring, open now, kept a straight chord)
     const distinct = path.nodes.filter((q, i, a) => !i || Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > WALK_DUP_M);
+    const n0 = path.nodes[0]; const nl = path.nodes[path.nodes.length - 1];
+    if (path.nodes.length > 3 && Math.hypot(n0[0] - nl[0], n0[1] - nl[1]) < 1e-6) {
+      const dl = distinct[distinct.length - 1];
+      if (Math.hypot(dl[0] - n0[0], dl[1] - n0[1]) > 1e-6) distinct[distinct.length - 1] = n0;
+    }
     const nodes = smoothLine(distinct.length >= 2 ? distinct : path.nodes);
     const full = [...reachRoad(nodes[0], nodes[1]).reverse(), ...nodes, ...reachRoad(nodes[nodes.length - 1], nodes[nodes.length - 2])];
     const smooth = (xs, passes) => {
@@ -1961,7 +2012,13 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], z
   lines.forEach((drawn, k) => {
     const { half } = chosen[k];
     const head = onAnother(drawn[0], k); const tail = onAnother(drawn[drawn.length - 1], k);
-    const line = [...(head ? [head] : []), ...drawn, ...(tail ? [tail] : [])];
+    // (its own points about the meeting dropped: an end mapped just past the
+    // other walk's line, over the far half of its slab, doubled back to the
+    // point on that line and folded up as a wedge)
+    let body = drawn;
+    while (head && body.length > 2 && Math.hypot(body[0][0] - head[0], body[0][1] - head[1]) < half + WALK_ATTACH_CLEAR_M) body = body.slice(1);
+    while (tail && body.length > 2 && Math.hypot(body[body.length - 1][0] - tail[0], body[body.length - 1][1] - tail[1]) < half + WALK_ATTACH_CLEAR_M) body = body.slice(0, -1);
+    const line = [...(head ? [head] : []), ...body, ...(tail ? [tail] : [])];
     // the sides of the slab off the road: it may run up to a road, not along one
     const sideOn = (x, y) => {
       let best = line[0]; let at = 0; let d = Infinity;
@@ -1971,8 +2028,10 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], z
       const nx = -(b[1] - a[1]) / L * half; const ny = (b[0] - a[0]) / L * half;
       return isOnOtherCarriageway(index, x + nx, y + ny, WALK_ROAD_M, () => false) && isOnOtherCarriageway(index, x - nx, y - ny, WALK_ROAD_M, () => false) && !!best;
     };
-    const blocked = (x, y) => sideOn(x, y) || isOnOtherCarriageway(index, x, y, 0, () => false) || isInZone(zones, x, y) || inBuilding(x, y) || inParking(x, y) || groundAt(x, y) < seaZ + WALK_SHORE_M;
-    for (const piece of cutNodes(line, blocked, { minPieceM: 0.5 })) {
+    // (not a crosswalk's zone: it reaches a metre past the curb, and cut a
+    // sidewalk running along the curb past the crossing; on the road is enough)
+    const blocked = (x, y) => sideOn(x, y) || isOnOtherCarriageway(index, x, y, 0, () => false) || inBuilding(x, y) || inParking(x, y) || groundAt(x, y) < seaZ + WALK_SHORE_M;
+    for (const piece of bridgeCorners(cutNodes(line, blocked, { minPieceM: 0.5 }), (x, y) => blocked(x, y) || isOnOtherCarriageway(index, x, y, WALK_ROAD_M, () => false), half)) {
       // (a crossing's landing between the sidewalk and the curb can be short)
       if (runLength(piece) < (chosen[k].crossing ? WALK_LANDING_M : WALK_MIN_M)) continue;
       const ends = [piece[0], piece[piece.length - 1]];
@@ -2016,8 +2075,264 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], z
       runs.push(run);
     }
   });
+  levelWalkJunctions(runs);
   return runs;
 }
+
+// Walk ways that carry on from one another at a shared node, one line: each
+// was rounded on its own with its ends kept, so a ring mapped as two ways
+// came out a rounded arc and a straight chord, folded where they met. At a
+// node the two ends that run on straightest (within WALK_CHAIN_TURN) are
+// joined; a third way there (a spur off the ring) stays its own.
+const WALK_CHAIN_TURN = (60 * Math.PI) / 180;
+const WALK_CHAIN_KEY = 0.01;
+export function chainWalks(paths) {
+  const key = (q) => `${Math.round(q[0] / WALK_CHAIN_KEY)},${Math.round(q[1] / WALK_CHAIN_KEY)}`;
+  const same = (a, b) => Math.abs(a.half - b.half) < 0.05 && !!a.crossing === !!b.crossing && !!a.sidewalk === !!b.sidewalk && (a.surface || '') === (b.surface || '') && !!a.wood === !!b.wood;
+  const closedPath = (p) => p.nodes.length > 2 && key(p.nodes[0]) === key(p.nodes[p.nodes.length - 1]);
+  const ends = new Map();
+  paths.forEach((p, k) => {
+    if (closedPath(p)) return;
+    const n = p.nodes;
+    for (const atEnd of [false, true]) {
+      const q = atEnd ? n[n.length - 1] : n[0]; const r = atEnd ? n[n.length - 2] : n[1];
+      const L = Math.hypot(r[0] - q[0], r[1] - q[1]) || 1;
+      const kq = key(q);
+      if (!ends.has(kq)) ends.set(kq, []);
+      ends.get(kq).push({ k, atEnd, out: [(r[0] - q[0]) / L, (r[1] - q[1]) / L] });
+    }
+  });
+  const partner = new Map();   // `${k},${atEnd}` -> the end it joins
+  for (const list of ends.values()) {
+    if (list.length < 2) continue;
+    const pairs = [];
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i]; const b = list[j];
+        if (a.k === b.k || !same(paths[a.k], paths[b.k])) continue;
+        // (straight on: the two leave the node in opposite directions)
+        const turn = Math.PI - Math.acos(Math.max(-1, Math.min(1, a.out[0] * b.out[0] + a.out[1] * b.out[1])));
+        if (turn < WALK_CHAIN_TURN) pairs.push([turn, a, b]);
+      }
+    }
+    pairs.sort((x, y) => x[0] - y[0]);
+    for (const [, a, b] of pairs) {
+      const ka = `${a.k},${a.atEnd}`; const kb = `${b.k},${b.atEnd}`;
+      if (partner.has(ka) || partner.has(kb)) continue;
+      partner.set(ka, b); partner.set(kb, a);
+    }
+  }
+  if (!partner.size) return paths;
+  const used = new Set();
+  const out = [];
+  // from an end with no partner (or any end, for a loop), along the joins
+  const follow = (k0, fromEnd) => {
+    let nodes = []; let k = k0; let enter = fromEnd;
+    for (;;) {
+      used.add(k);
+      const n = enter ? [...paths[k].nodes].reverse() : paths[k].nodes;
+      nodes = nodes.length ? [...nodes, ...n.slice(1)] : [...n];
+      const next = partner.get(`${k},${!enter}`);
+      if (!next || used.has(next.k)) break;
+      k = next.k; enter = next.atEnd;
+    }
+    return nodes;
+  };
+  paths.forEach((p, k) => {
+    if (used.has(k)) return;
+    if (partner.has(`${k},false`) && partner.has(`${k},true`)) return;   // in the middle of a chain
+    out.push({ ...p, nodes: follow(k, partner.has(`${k},false`)) });
+  });
+  paths.forEach((p, k) => {
+    if (used.has(k)) return;
+    // what is left is loops: closed where they began
+    const nodes = follow(k, false);
+    if (key(nodes[0]) !== key(nodes[nodes.length - 1])) nodes.push(nodes[0]);
+    out.push({ ...p, nodes });
+  });
+  return out;
+}
+
+// A walk cut where it clips a road's corner (mapped across the rounded curb
+// it then carries on beside), joined again straight across, off the road:
+// two pieces less than WALK_BRIDGE_M apart whose chord is clear, slab and all.
+const WALK_BRIDGE_M = 10;
+function bridgeCorners(pieces, blockedAt, half) {
+  if (pieces.length < 2) return pieces;
+  const clear = (a, b) => {
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L > WALK_BRIDGE_M) return false;
+    const nx = -(b[1] - a[1]) / (L || 1) * half; const ny = (b[0] - a[0]) / (L || 1) * half;
+    for (let d = 0; d <= L + 1e-6; d += 0.25) {
+      const t = L ? d / L : 0; const x = a[0] + (b[0] - a[0]) * t; const y = a[1] + (b[1] - a[1]) * t;
+      if (blockedAt(x, y) || blockedAt(x + nx, y + ny) || blockedAt(x - nx, y - ny)) return false;
+    }
+    return true;
+  };
+  // (each end trimmed back up to WALK_BRIDGE_TRIM_M: they stop at the road's edge)
+  const backs = (line, fromEnd) => {
+    const out = []; let d = 0;
+    for (let k = 0; k < line.length && d <= WALK_BRIDGE_TRIM_M; k++) {
+      const i = fromEnd ? line.length - 1 - k : k;
+      if (k) { const j = fromEnd ? i + 1 : i - 1; d += Math.hypot(line[i][0] - line[j][0], line[i][1] - line[j][1]); }
+      if (line.length - k >= 2) out.push({ i, d });
+    }
+    return out;
+  };
+  const out = [pieces[0]];
+  for (let i = 1; i < pieces.length; i++) {
+    const prev = out[out.length - 1]; const next = pieces[i];
+    let best = null;
+    for (const a of backs(prev, true)) {
+      for (const b of backs(next, false)) {
+        if (best && a.d + b.d >= best.cost) continue;
+        if (clear(prev[a.i], next[b.i])) best = { cost: a.d + b.d, a: a.i, b: b.i };
+      }
+    }
+    if (best) out[out.length - 1] = [...prev.slice(0, best.a + 1), ...next.slice(best.b)];
+    else out.push(next);
+  }
+  return out;
+}
+const WALK_BRIDGE_TRIM_M = 5;
+
+// Where walks meet or cross, one height: each took its own from the ground
+// or the curb, and where neither ends at the meeting (two crossing) nothing
+// set them level: two slabs a few centimetres apart, one through the other.
+// A crossing's landing ramping down to the road through a walk it passes
+// ramped there too: a hole in the walk. Now each meeting is at the higher
+// top of the walks there, out to its widest walk's edge, blended back over
+// WALK_JUNCTION_BLEND_M; a ramp to the road starts past it.
+const WALK_JUNCTION_BLEND_M = 3;
+function levelWalkJunctions(runs) {
+  const walks = runs.filter((r) => r.centre?.length >= 2);
+  if (walks.length < 2) return;
+  const stationsOf = (r) => { const s = [0]; for (let i = 1; i < r.centre.length; i++) s.push(s[i - 1] + Math.hypot(r.centre[i][0] - r.centre[i - 1][0], r.centre[i][1] - r.centre[i - 1][1])); return s; };
+  for (const r of walks) r._s = stationsOf(r);
+  const zAt = (r, st) => {
+    const s = r._s; const c = r.centre;
+    for (let i = 1; i < s.length; i++) if (st <= s[i] + 1e-9) { const t = (st - s[i - 1]) / ((s[i] - s[i - 1]) || 1); return c[i - 1][2] + (c[i][2] - c[i - 1][2]) * t; }
+    return c[c.length - 1][2];
+  };
+  const topAt = (r, st) => zAt(r, st) + WALK_H * heightShare(r._s[r._s.length - 1], r.ramps, r.dips ?? [], r.rampM)(st);
+  // segments on a grid
+  const CELL = 8; const grid = new Map();
+  walks.forEach((r, k) => {
+    for (let i = 0; i + 1 < r.centre.length; i++) {
+      const a = r.centre[i]; const b = r.centre[i + 1];
+      for (let gx = Math.floor(Math.min(a[0], b[0]) / CELL); gx <= Math.floor(Math.max(a[0], b[0]) / CELL); gx++) {
+        for (let gy = Math.floor(Math.min(a[1], b[1]) / CELL); gy <= Math.floor(Math.max(a[1], b[1]) / CELL); gy++) {
+          const key = `${gx},${gy}`; if (!grid.has(key)) grid.set(key, []); grid.get(key).push([k, i]);
+        }
+      }
+    }
+  });
+  const near = (x, y) => { const out = []; const cx = Math.floor(x / CELL); const cy = Math.floor(y / CELL); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) out.push(...(grid.get(`${cx + dx},${cy + dy}`) || [])); return out; };
+  // meetings: [{ x, y, at: Map(k -> station) }]
+  const meetings = [];
+  const add = (x, y, k1, s1, k2, s2) => {
+    let m = meetings.find((o) => Math.hypot(o.x - x, o.y - y) < 1.5);
+    if (!m) { m = { x, y, at: new Map() }; meetings.push(m); }
+    if (!m.at.has(k1)) m.at.set(k1, s1);
+    if (!m.at.has(k2)) m.at.set(k2, s2);
+  };
+  walks.forEach((A, ka) => {
+    for (let i = 0; i + 1 < A.centre.length; i++) {
+      const a = A.centre[i]; const b = A.centre[i + 1];
+      for (const [kb, j] of near((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) {
+        if (kb <= ka) continue;
+        const B = walks[kb]; const c = B.centre[j]; const d = B.centre[j + 1];
+        const den = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0]);
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0])) / den;
+        const u = ((c[0] - a[0]) * (b[1] - a[1]) - (c[1] - a[1]) * (b[0] - a[0])) / den;
+        if (t < 0 || t > 1 || u < 0 || u > 1) continue;
+        add(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, ka, A._s[i] + (A._s[i + 1] - A._s[i]) * t, kb, B._s[j] + (B._s[j + 1] - B._s[j]) * u);
+      }
+    }
+    // an end on another walk's slab
+    for (const atEnd of [false, true]) {
+      const e = atEnd ? A.centre[A.centre.length - 1] : A.centre[0];
+      const se = atEnd ? A._s[A._s.length - 1] : 0;
+      for (const [kb, j] of near(e[0], e[1])) {
+        if (kb === ka) continue;
+        const B = walks[kb]; const c = B.centre[j]; const d = B.centre[j + 1];
+        const ex = d[0] - c[0]; const ey = d[1] - c[1];
+        const u = Math.max(0, Math.min(1, ((e[0] - c[0]) * ex + (e[1] - c[1]) * ey) / (ex * ex + ey * ey || 1)));
+        if (Math.hypot(c[0] + ex * u - e[0], c[1] + ey * u - e[1]) < B.half + 0.3) add(e[0], e[1], ka, se, kb, B._s[j] + (B._s[j + 1] - B._s[j]) * u);
+      }
+    }
+  });
+  if (!meetings.length) return;
+  // per walk: its meetings' stations, zones and level
+  const plans = new Map();
+  for (const m of meetings) {
+    const ks = [...m.at.keys()];
+    const H = Math.max(...ks.map((k) => topAt(walks[k], m.at.get(k))));
+    const R = Math.max(...ks.map((k) => walks[k].half)) + 0.3;
+    for (const k of ks) { if (!plans.has(k)) plans.set(k, []); plans.get(k).push({ st: m.at.get(k), H, R }); }
+  }
+  for (const [k, list] of plans) {
+    const r = walks[k]; const s = r._s; const total = s[s.length - 1];
+    const own = r.centre.map((q) => q[2]);
+    // a ramped end past a meeting: its ramp from the meeting's edge to the road
+    const rampFrom = [null, null];
+    if (r.ramps) {
+      for (const [e, end] of [[0, 0], [1, total]]) {
+        if (!r.ramps[e]) continue;
+        const m = list.reduce((best, o) => (Math.abs(o.st - end) < Math.abs((best?.st ?? Infinity) - end) ? o : best), null);
+        if (!m) continue;
+        const D = Math.abs(end - m.st) - m.R;
+        if (D < RAMP_M + WALK_JUNCTION_BLEND_M) {
+          rampFrom[e] = { edge: e ? m.st + m.R : m.st - m.R, D: Math.max(0.3, D), H: m.H, roadZ: own[e ? own.length - 1 : 0] };
+          r.rampM = r.rampM ?? [null, null];
+          r.rampM[e] = Math.max(0.3, D);
+        }
+      }
+    }
+    r.centre.forEach((q, i) => {
+      const st = s[i];
+      let z = own[i];
+      let best = Infinity;
+      for (const { st: ms, H, R } of list) {
+        const d = Math.abs(st - ms);
+        if (d >= R + WALK_JUNCTION_BLEND_M || d >= best) continue;
+        best = d;
+        const level = H - WALK_H;
+        z = d <= R ? level : level + (own[i] - level) * ((d - R) / WALK_JUNCTION_BLEND_M);
+      }
+      for (const [e, rf] of rampFrom.entries()) {
+        if (!rf) continue;
+        const d = e ? st - rf.edge : rf.edge - st;   // past the meeting's edge, toward the end
+        if (d > 0) z = (rf.H - WALK_H) + (rf.roadZ - (rf.H - WALK_H)) * Math.min(1, d / rf.D);
+      }
+      q[2] = z;
+      if (r.points?.[i]) r.points[i][2] = z;
+    });
+  }
+  // an end at a meeting runs on past it by half its width: two square ends
+  // meeting at a point at a slight angle left a wedge of ground between them
+  // (the overlap is cut away with the other walks')
+  for (const m of meetings) {
+    const ks = [...m.at.keys()];
+    const over = 0.5 * Math.min(...ks.map((k) => walks[k].half));
+    for (const k of ks) {
+      const r = walks[k]; const s = r._s; const total = s[s.length - 1]; const st = m.at.get(k);
+      const e = st < WALK_JOIN_END_M ? 0 : st > total - WALK_JOIN_END_M ? 1 : -1;
+      if (e < 0 || r.ramps?.[e] || r._over?.[e]) continue;
+      const c = r.centre; const n = c.length;
+      const [p, q] = e ? [c[n - 1], c[n - 2]] : [c[0], c[1]];
+      const L = Math.hypot(p[0] - q[0], p[1] - q[1]) || 1;
+      const tip = [p[0] + ((p[0] - q[0]) / L) * over, p[1] + ((p[1] - q[1]) / L) * over, p[2]];
+      if (e) c.push(tip); else { c.unshift(tip); if (r.dips) r.dips = r.dips.map(([a, b]) => [a + over, b + over]); }
+      r.points = offsetLine(c, r.half).map((o) => [o[0], o[1], o[2]]);
+      (r._over ??= [false, false])[e] = true;
+    }
+  }
+  for (const r of walks) { delete r._s; delete r._over; }
+}
+const WALK_JOIN_END_M = 0.05;
+const WALK_ATTACH_CLEAR_M = 0.3;
 
 /**
  * Walkable structures clear of the ground: piers and footbridges from end to
@@ -2537,7 +2852,7 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
   const strips = [];
   const station = (q) => { const key = `${Math.floor(q[0] / CELL)},${Math.floor(q[1] / CELL)}`; if (!stations.has(key)) stations.set(key, []); stations.get(key).push(q); };
   for (const run of runs) {
-    const { points, share } = rampStations(run.centre, run.ramps, run.dips ?? []);
+    const { points, share } = rampStations(run.centre, run.ramps, run.dips ?? [], run.rampM);
     const left = []; const right = []; const along = []; let s = 0;
     points.forEach((p, i) => {
       if (i) s += Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]);
@@ -2770,7 +3085,9 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
         try { pieces = attempt(); } catch { /* next */ }
       }
       if (!pieces) pieces = panelShape;
-      pieces = pieces.filter((piece) => Math.abs(ringArea(piece[0])) >= CUT_SLIVER_M2 / 4);
+      // (only scraps of nothing dropped: pieces under a sixteenth of a square
+      // metre went too, some 900 holes through the walks across a town)
+      pieces = pieces.filter((piece) => Math.abs(ringArea(piece[0])) >= PANEL_SCRAP_M2);
       for (const piece of pieces) {
         const rings = piece.map((ring) => ring.slice(0, -1));
         const flat = rings.map((ring) => ring.map(([x, y]) => new THREE.Vector2(x, y)));
