@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import JSZip from 'jszip';
+import { precompressZipEntries } from './zipCompress.js';
 import { chooseBaseTextureSize } from './baseTextureSize.js';
 import { encode } from 'fast-png';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -8438,7 +8439,63 @@ function getSignRuntimeMaterialDefs() {
  *
  * roads: [{ pts: [[x,y], …], halfWidth }]. Returns null if no road is near.
  */
+// (roads' segments in a grid, made once per roads array: only those within
+// maxSearch are measured, in road order, so ties resolve as a full scan did;
+// every sign and prop measured against every road in the map before)
+const NEAREST_ROAD_CELL_M = 32;
+const nearestRoadIndexes = new WeakMap();
+function nearestRoadIndex(roads) {
+  let index = nearestRoadIndexes.get(roads);
+  if (index) return index;
+  const cells = new Map();
+  roads.forEach((road, r) => {
+    const pts = road.pts || [];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const a = pts[i]; const b = pts[i + 1];
+      for (let gx = Math.floor(Math.min(a[0], b[0]) / NEAREST_ROAD_CELL_M); gx <= Math.floor(Math.max(a[0], b[0]) / NEAREST_ROAD_CELL_M); gx++) {
+        for (let gy = Math.floor(Math.min(a[1], b[1]) / NEAREST_ROAD_CELL_M); gy <= Math.floor(Math.max(a[1], b[1]) / NEAREST_ROAD_CELL_M); gy++) {
+          const k = gx * 1048576 + gy;
+          if (!cells.has(k)) cells.set(k, []);
+          cells.get(k).push(r * 1048576 + i);
+        }
+      }
+    }
+  });
+  index = { cells };
+  nearestRoadIndexes.set(roads, index);
+  return index;
+}
+
 function findNearestRoad(px, py, roads, maxSearch) {
+  // (a road or two: measured directly; many, with a finite reach: by the grid)
+  if (roads.length > 8 && Number.isFinite(maxSearch)) {
+    const { cells } = nearestRoadIndex(roads);
+    const found = new Set();
+    for (let gx = Math.floor((px - maxSearch) / NEAREST_ROAD_CELL_M); gx <= Math.floor((px + maxSearch) / NEAREST_ROAD_CELL_M); gx++) {
+      for (let gy = Math.floor((py - maxSearch) / NEAREST_ROAD_CELL_M); gy <= Math.floor((py + maxSearch) / NEAREST_ROAD_CELL_M); gy++) {
+        for (const id of cells.get(gx * 1048576 + gy) || []) found.add(id);
+      }
+    }
+    let best = null;
+    for (const id of [...found].sort((a, b) => a - b)) {
+      const road = roads[Math.floor(id / 1048576)]; const i = id % 1048576; const pts = road.pts;
+      const ax = pts[i][0], ay = pts[i][1];
+      const bx = pts[i + 1][0], by = pts[i + 1][1];
+      const dx = bx - ax, dy = by - ay;
+      const segLen2 = dx * dx + dy * dy;
+      if (segLen2 < 1e-9) continue;
+      let t = ((px - ax) * dx + (py - ay) * dy) / segLen2;
+      t = Math.max(0, Math.min(1, t));
+      const cx = ax + t * dx, cy = ay + t * dy;
+      const dist = Math.hypot(px - cx, py - cy);
+      if (!best || dist < best.dist) {
+        const len = Math.sqrt(segLen2);
+        best = { dist, cx, cy, tx: dx / len, ty: dy / len, halfWidth: road.halfWidth, highway: road.highway };
+      }
+    }
+    if (!best || best.dist > maxSearch) return null;
+    return best;
+  }
   let best = null;
   for (const road of roads) {
     const pts = road.pts;
@@ -13772,6 +13829,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let zipCostDone = 0;
   let zipCurrentFile = null;
   let lastZipReportAt = 0;
+  // the big entries compressed natively first (most of the work: the rest
+  // of the bar is JSZip writing the archive)
+  let zipShare = 0;
+  const precompressed = await precompressZipEntries(zip, JSZip, {
+    onProgress: (fraction, name) => {
+      const now = performance.now();
+      if (now - lastZipReportAt < 250) return;
+      lastZipReportAt = now;
+      report(`Compressing the level ZIP (${formatBytes(zipTotalBytes)}, ${zipEntries.length} files): ${name.replace(`levels/${levelName}/`, '')}…`, fraction * 0.9);
+    },
+  });
+  if (precompressed) {
+    zipShare = 0.9;
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} ZIP: ${precompressed} big entries compressed natively.`);
+  }
   const onZipPercent = (pct, currentFile) => {
     if (currentFile && currentFile !== zipCurrentFile) {
       if (zipCurrentFile) zipCostDone += entryCost(zipCurrentFile);
@@ -13780,7 +13852,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const now = performance.now();
     if (now - lastZipReportAt < 250) return;
     lastZipReportAt = now;
-    const fraction = zipTotalCost > 0 ? zipCostDone / zipTotalCost : (Number(pct) || 0) / 100;
+    const fraction = zipShare + (1 - zipShare) * (zipTotalCost > 0 ? zipCostDone / zipTotalCost : (Number(pct) || 0) / 100);
     const current = zipCurrentFile && !zipCurrentFile.endsWith('/')
       ? ` ${zipCurrentFile.replace(`levels/${levelName}/`, '')} (${formatBytes(zipEntryBytes.get(zipCurrentFile) || 0)})`
       : '';

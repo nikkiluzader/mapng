@@ -15,7 +15,7 @@
 // BeamNG.Earth's (server/sidewalks.py), measured on official US curbs.
 
 import * as THREE from 'three';
-import polygonClipping from './polyClip.js';
+import polygonClipping, { snapGeom } from './polyClip.js';
 import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
@@ -870,6 +870,7 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
   // a car park right at the street is open along it: a bare curb lowered
   // all the way (one behind a verge keeps its curb)
   const inParking = parking.length ? buildingIndex(parking) : null;
+  const nearWalkEnd = walkEnds.length ? endIndex(walkEnds, WALK_CURB_M) : null;
   for (const run of runs) {
     const p = run.points; const edge = run.width <= CURB_ONLY_M;
     const on = (x, y, i) => (nearDriveway && nearDriveway(x, y, DRIVEWAY_HALF_M)) || (edge && inParking && (() => {
@@ -880,7 +881,7 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
     if (nearDriveway || inParking || zones.length) run.dips = dipsAlong(p, (x, y, i) => on(x, y, i) || isInZone(zones, x, y));
     // a walkway coming out to the street: the curb lowered to meet it
     if (walkEnds.length) {
-      const atWalk = dipsAlong(p, (x, y) => walkEnds.some(([ex, ey, half]) => Math.hypot(ex - x, ey - y) < half + WALK_CURB_M));
+      const atWalk = dipsAlong(p, nearWalkEnd);
       if (atWalk.length) run.dips = [...(run.dips || []), ...atWalk];
     }
   }
@@ -1086,6 +1087,32 @@ function mergeRuns(pieces, { matchWidth = true } = {}) {
 
 const DIP_STEP_M = 0.5;
 // Arc-length spans [s0, s1] of a run where `on(x, y)` (a driveway crossing).
+// Whether (x, y) lies within an end's half width + pad of it (ends:
+// [x, y, half]): a grid of cells as wide as the farthest reach, so only the
+// 3×3 cells around a point are looked at (every end against every curb point
+// grew with the square of the map: minutes for a city).
+function endIndex(ends, pad) {
+  const cell = Math.max(1, ends.reduce((m, e) => Math.max(m, e[2]), 0) + pad);
+  const cells = new Map();
+  const keyOf = (cx, cy) => cx * 1048576 + cy;
+  for (const e of ends) {
+    const k = keyOf(Math.floor(e[0] / cell), Math.floor(e[1] / cell));
+    if (!cells.has(k)) cells.set(k, []);
+    cells.get(k).push(e);
+  }
+  return (x, y) => {
+    const cx = Math.floor(x / cell); const cy = Math.floor(y / cell);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (const [ex, ey, half] of cells.get(keyOf(cx + dx, cy + dy)) || []) {
+          if (Math.hypot(ex - x, ey - y) < half + pad) return true;
+        }
+      }
+    }
+    return false;
+  };
+}
+
 function dipsAlong(points, on) {
   const spans = [];
   let s = 0;
@@ -1496,11 +1523,18 @@ function levelWalkEndsOnSidewalks(walkRuns, streetRuns, corners = []) {
     for (let i = 0; i + 1 < mid.length; i++) slabs.push({ a: mid[i], b: mid[i + 1], half: run.width / 2 });
   }
   if (!slabs.length) return;
-  const onSlab = (p, half) => slabs.some(({ a, b, half: h }) => {
-    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1;
-    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
-    return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy) < h + half * 0.5 + 0.3;
-  });
+  // (slabs in a grid: every walk end tried against every slab in the map)
+  const maxH = slabs.reduce((m, s) => Math.max(m, s.half), 0);
+  const slabGrid = boxGrid(slabs.map(({ a, b }) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])]));
+  const onSlab = (p, half) => {
+    const r = maxH + half * 0.5 + 0.3;
+    return slabGrid.some([p[0] - r, p[1] - r, p[0] + r, p[1] + r], (k) => {
+      const { a, b, half: h } = slabs[k];
+      const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+      return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy) < h + half * 0.5 + 0.3;
+    });
+  };
   for (const w of walkRuns) {
     if (!w.ramps || !w.centre?.length) continue;
     const ends = [w.centre[0], w.centre[w.centre.length - 1]];
@@ -2397,9 +2431,25 @@ function levelWalkJunctions(runs) {
   const near = (x, y) => { const out = []; const cx = Math.floor(x / CELL); const cy = Math.floor(y / CELL); for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) out.push(...(grid.get(`${cx + dx},${cy + dy}`) || [])); return out; };
   // meetings: [{ x, y, at: Map(k -> station) }]
   const meetings = [];
+  // (meetings in a grid of 1.5 m cells: the first one made within 1.5 m, as
+  // a search of every meeting so far found it, which grew with the square)
+  const MEET_M = 1.5;
+  const meetCells = new Map();
   const add = (x, y, k1, s1, k2, s2) => {
-    let m = meetings.find((o) => Math.hypot(o.x - x, o.y - y) < 1.5);
-    if (!m) { m = { x, y, at: new Map() }; meetings.push(m); }
+    const cx = Math.floor(x / MEET_M); const cy = Math.floor(y / MEET_M);
+    let m = null;
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (const o of meetCells.get((cx + dx) * 1048576 + (cy + dy)) || []) if (Math.hypot(o.x - x, o.y - y) < MEET_M && (!m || o.n < m.n)) m = o;
+      }
+    }
+    if (!m) {
+      m = { x, y, at: new Map(), n: meetings.length };
+      meetings.push(m);
+      const key = cx * 1048576 + cy;
+      if (!meetCells.has(key)) meetCells.set(key, []);
+      meetCells.get(key).push(m);
+    }
     if (!m.at.has(k1)) m.at.set(k1, s1);
     if (!m.at.has(k2)) m.at.set(k2, s2);
   };
@@ -2874,8 +2924,16 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
     }
   }
   if (!sea.length) return [];
-  const near = (box) => sea.some(([a, b]) => Math.min(a[0], b[0]) - POCKET_REACH_M <= box[2] && Math.max(a[0], b[0]) + POCKET_REACH_M >= box[0] && Math.min(a[1], b[1]) - POCKET_REACH_M <= box[3] && Math.max(a[1], b[1]) + POCKET_REACH_M >= box[1]);
-  const boxOf = (pts) => [Math.min(...pts.map((q) => q[0])), Math.min(...pts.map((q) => q[1])), Math.max(...pts.map((q) => q[0])), Math.max(...pts.map((q) => q[1]))];
+  const boxOf = (pts) => {
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const q of pts) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+    return [x0, y0, x1, y1];
+  };
+  // (seawall segments, and below the closing shapes, in grids by their boxes:
+  // every run, road and wall tested against every segment, and every closer
+  // against every wall, grew with the square of the map)
+  const seaGrid = boxGrid(sea.map(([a, b]) => [Math.min(a[0], b[0]) - POCKET_REACH_M, Math.min(a[1], b[1]) - POCKET_REACH_M, Math.max(a[0], b[0]) + POCKET_REACH_M, Math.max(a[1], b[1]) + POCKET_REACH_M]));
+  const near = (box) => seaGrid.any(box);
   const closers = []; const cuts = [];
   const C = POCKET_CLOSE_M / 2;
   for (const run of walkRuns) {
@@ -2927,10 +2985,12 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
   // a whole town fails on near-touching edges more often than not)
   const round = (shape) => shape.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
   const holes = []; const seen = new Set();
+  const closerGrid = boxGrid(closers.map((sh) => boxOf(sh[0])));
+  const seaStarts = boxGrid(sea.map(([a]) => [a[0], a[1], a[0], a[1]]));
   for (const wall of walls) {
     const [wx0, wy0, wx1, wy1] = boxOf(wall);
-    if (!sea.some(([a]) => a[0] >= wx0 && a[0] <= wx1 && a[1] >= wy0 && a[1] <= wy1)) continue;
-    const local = closers.filter((sh) => { const b = boxOf(sh[0]); return b[0] <= wx1 + POCKET_REACH_M && b[2] >= wx0 - POCKET_REACH_M && b[1] <= wy1 + POCKET_REACH_M && b[3] >= wy0 - POCKET_REACH_M; });
+    if (!seaStarts.any([wx0, wy0, wx1, wy1])) continue;
+    const local = closerGrid.overlapping([wx0 - POCKET_REACH_M, wy0 - POCKET_REACH_M, wx1 + POCKET_REACH_M, wy1 + POCKET_REACH_M]).map((k) => closers[k]);
     let union;
     try { union = polygonClipping.union(...local.map(round)); } catch { continue; }
     for (const polygon of union) {
@@ -2941,6 +3001,7 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
     }
   }
   const out = [];
+  let cutGrid = null;
   for (const polygon of [[null, ...holes]]) {
     for (const hole of polygon.slice(1)) {
       const ring = hole.slice(0, -1);
@@ -2987,7 +3048,8 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
       if (high.length) {
         try { shapes = polygonClipping.difference(round(shape), ...high); } catch { continue; }
       }
-      const nearCuts = cuts.filter((cut) => { const b = boxOf(cut[0]); return b[0] <= x1 + 2 && b[2] >= x0 - 2 && b[1] <= y1 + 2 && b[3] >= y0 - 2; });
+      cutGrid ??= boxGrid(cuts.map((cut) => boxOf(cut[0])));
+      const nearCuts = cutGrid.overlapping([x0 - 2, y0 - 2, x1 + 2, y1 + 2]).map((k) => cuts[k]);
       for (const one of shapes) {
         let pieces;
         try { pieces = nearCuts.length ? polygonClipping.difference(round(one), ...nearCuts.map(round)) : [round(one)]; } catch { continue; }
@@ -2996,6 +3058,78 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
     }
   }
   return out;
+}
+
+function segmentsCross(a, b, c, d) {
+  const o = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  const d1 = o(c, d, a); const d2 = o(c, d, b); const d3 = o(a, b, c); const d4 = o(a, b, d);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+  // (touching or collinear counts: the clip decides those)
+  const on = (p, q, r) => Math.min(p[0], q[0]) <= r[0] && r[0] <= Math.max(p[0], q[0]) && Math.min(p[1], q[1]) <= r[1] && r[1] <= Math.max(p[1], q[1]);
+  return (d1 === 0 && on(c, d, a)) || (d2 === 0 && on(c, d, b)) || (d3 === 0 && on(a, b, c)) || (d4 === 0 && on(a, b, d));
+}
+
+// a quad whose opposite sides do not cross (a panel at a hairpin can twist)
+function quadIsSimple(q) {
+  return !segmentsCross(q[0], q[1], q[2], q[3]) && !segmentsCross(q[1], q[2], q[3], q[0]);
+}
+
+/**
+ * Whether a simple quad and a polygon or multipolygon could share any area:
+ * an edge of one crossing or touching an edge of the other, or one holding a
+ * corner of the other. False only when they are surely apart (then clipping
+ * the quad by it leaves the quad as it was).
+ */
+function quadTouches(quad, geom) {
+  const polys = typeof geom[0]?.[0]?.[0] === 'number' ? [geom] : geom;
+  let qx0 = Infinity; let qy0 = Infinity; let qx1 = -Infinity; let qy1 = -Infinity;
+  for (const p of quad) { qx0 = Math.min(qx0, p[0]); qx1 = Math.max(qx1, p[0]); qy0 = Math.min(qy0, p[1]); qy1 = Math.max(qy1, p[1]); }
+  const quadRing = [...quad, quad[0]];
+  for (const poly of polys) {
+    for (const ring of poly) {
+      if (!ring.length) continue;
+      if (pointInRing(quad[0][0], quad[0][1], ring) || pointInRing(ring[0][0], ring[0][1], quadRing)) return true;
+      for (let i = 0; i + 1 < ring.length; i++) {
+        const a = ring[i]; const b = ring[i + 1];
+        if (Math.max(a[0], b[0]) < qx0 || Math.min(a[0], b[0]) > qx1 || Math.max(a[1], b[1]) < qy0 || Math.min(a[1], b[1]) > qy1) continue;
+        for (let k = 0; k < 4; k++) if (segmentsCross(a, b, quad[k], quad[(k + 1) % 4])) return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Boxes [x0, y0, x1, y1] in a grid of cells: which overlap a query box (their
+// indices, in their order: callers keep the order a plain filter gave), or
+// whether any does.
+const BOX_GRID_CELL_M = 64;
+function boxGrid(boxes) {
+  const cells = new Map();
+  const key = (gx, gy) => gx * 1048576 + gy;
+  boxes.forEach((b, k) => {
+    for (let gx = Math.floor(b[0] / BOX_GRID_CELL_M); gx <= Math.floor(b[2] / BOX_GRID_CELL_M); gx++) {
+      for (let gy = Math.floor(b[1] / BOX_GRID_CELL_M); gy <= Math.floor(b[3] / BOX_GRID_CELL_M); gy++) {
+        const c = key(gx, gy);
+        if (!cells.has(c)) cells.set(c, []);
+        cells.get(c).push(k);
+      }
+    }
+  });
+  const hits = (q, k) => boxes[k][0] <= q[2] && boxes[k][2] >= q[0] && boxes[k][1] <= q[3] && boxes[k][3] >= q[1];
+  const visit = (q, fn) => {
+    for (let gx = Math.floor(q[0] / BOX_GRID_CELL_M); gx <= Math.floor(q[2] / BOX_GRID_CELL_M); gx++) {
+      for (let gy = Math.floor(q[1] / BOX_GRID_CELL_M); gy <= Math.floor(q[3] / BOX_GRID_CELL_M); gy++) {
+        for (const k of cells.get(key(gx, gy)) || []) if (hits(q, k) && fn(k)) return true;
+      }
+    }
+    return false;
+  };
+  return {
+    any: (q) => visit(q, () => true),
+    // whether test(k) holds for a box overlapping q
+    some: (q, test) => visit(q, test),
+    overlapping: (q) => { const found = new Set(); visit(q, (k) => { found.add(k); return false; }); return [...found].sort((a, b) => a - b); },
+  };
 }
 
 function pointInRing(x, y, r) {
@@ -3153,6 +3287,59 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
   };
   const order = [...strips].sort((a, b) => b.length - a.length);
   order.forEach((strip) => { strip.box = box(strip); });
+  // (strips in a grid by their boxes: a strip's earlier neighbours found
+  // there, not by testing every earlier strip, which grew with the square of
+  // the map)
+  const BOX_CELL = 64;
+  const cellKey = (cx, cy) => cx * 1048576 + cy;
+  const boxCells = new Map();
+  order.forEach((o, rank) => {
+    o.rank = rank;
+    for (let gx = Math.floor(o.box[0] / BOX_CELL); gx <= Math.floor(o.box[2] / BOX_CELL); gx++) {
+      for (let gy = Math.floor(o.box[1] / BOX_CELL); gy <= Math.floor(o.box[3] / BOX_CELL); gy++) {
+        const k = cellKey(gx, gy);
+        if (!boxCells.has(k)) boxCells.set(k, []);
+        boxCells.get(k).push(o);
+      }
+    }
+  });
+  const earlierOverlapping = (strip) => {
+    const found = new Set();
+    const b = strip.box;
+    for (let gx = Math.floor(b[0] / BOX_CELL); gx <= Math.floor(b[2] / BOX_CELL); gx++) {
+      for (let gy = Math.floor(b[1] / BOX_CELL); gy <= Math.floor(b[3] / BOX_CELL); gy++) {
+        for (const o of boxCells.get(cellKey(gx, gy)) || []) {
+          if (o.rank < strip.rank && o.box[0] <= b[2] && o.box[2] >= b[0] && o.box[1] <= b[3] && o.box[3] >= b[1]) found.add(o);
+        }
+      }
+    }
+    return [...found].sort((p, q) => p.rank - q.rank);
+  };
+  // A panel clipped against only the part of each other strip around it: the
+  // strips cut once into padded cells (cached). A panel inside its cell's
+  // padded box gets the same pieces either way; clipped against whole strips,
+  // hundreds of points each, a city's walks took minutes.
+  const CROP_CELL = 32;
+  const CROP_PAD = 8;
+  const crops = new Map();
+  const cropNear = (o, x0, y0, x1, y1) => {
+    const cx = Math.floor((x0 + x1) / 2 / CROP_CELL); const cy = Math.floor((y0 + y1) / 2 / CROP_CELL);
+    const bx0 = cx * CROP_CELL - CROP_PAD; const by0 = cy * CROP_CELL - CROP_PAD;
+    const bx1 = (cx + 1) * CROP_CELL + CROP_PAD; const by1 = (cy + 1) * CROP_CELL + CROP_PAD;
+    // (a panel too big for its cell, or a strip inside it: the whole strip)
+    if (x0 < bx0 || y0 < by0 || x1 > bx1 || y1 > by1) return o.shape;
+    if (o.box[0] >= bx0 && o.box[1] >= by0 && o.box[2] <= bx1 && o.box[3] <= by1) return o.shape;
+    let byCell = crops.get(o);
+    if (!byCell) crops.set(o, (byCell = new Map()));
+    const k = cellKey(cx, cy);
+    if (!byCell.has(k)) {
+      let piece;
+      try { piece = polygonClipping.intersection(o.shape, [[[bx0, by0], [bx1, by0], [bx1, by1], [bx0, by1], [bx0, by0]]]); } catch { piece = o.shape; }
+      byCell.set(k, piece);
+    }
+    return byCell.get(k);
+  };
+  const isEmpty = (geom) => !geom.length;
   // on a walk's edge: that walk's height; inside: the walks round about, blended
   const walks = strips.filter((o) => !o.pocket && o.length > 0);
   const edgeDist = (o, x, y) => {
@@ -3192,7 +3379,7 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
     return [x, y, groundAt ? Math.max(z, groundAt(x, y) + APRON_COVER_M) : z];
   };
   order.forEach((strip, i) => {
-    const before = order.slice(0, i).filter((o) => o.box[0] <= strip.box[2] && o.box[2] >= strip.box[0] && o.box[1] <= strip.box[3] && o.box[3] >= strip.box[1]);
+    const before = earlierOverlapping(strip);
     const level = (x, y) => { const q = levelAt(x, y); return [x, y, q ? q[2] : 0]; };
     const flatTri = (a, b, c) => {
       // (a cut can leave a piece with no area: nothing to draw)
@@ -3234,20 +3421,26 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
       // (polygon-clipping fails now and then on near-touching edges: rounded to
       // the centimetre, then without the corner cuts, then the whole panel;
       // one failure dropped the merge for the whole town)
-      const r2 = (mp) => mp.map((poly) => poly.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100])));
       let panelShape = [[[...panel, panel[0]]]];
       // (a piece of a cut strip: only its own part of each panel, or every
       // piece drew the whole strip again over the others)
       if (strip.piece) {
         let own = null;
-        try { own = polygonClipping.intersection(panelShape, strip.shape); } catch { try { own = polygonClipping.intersection(r2(panelShape), r2([strip.shape])); } catch { /* whole panel */ } }
+        const mine = cropNear(strip, x0, y0, x1, y1);
+        try { own = isEmpty(mine) ? [] : polygonClipping.intersection(panelShape, mine); } catch { try { own = polygonClipping.intersection(snapGeom(panelShape), snapGeom(strip.shape)); } catch { /* whole panel */ } }
         if (own && !own.length) continue;
         if (own) panelShape = own;
       }
-      let pieces = near.length ? null : panelShape;
-      for (const attempt of [() => polygonClipping.difference(panelShape, ...near.map((o) => o.shape)),
-        () => polygonClipping.difference(r2(panelShape), ...near.map((o) => r2([o.shape]))),
-        () => polygonClipping.difference(r2(panelShape), ...near.filter((o) => !o.cut).map((o) => r2([o.shape])))]) {
+      // (only shapes that really reach the panel: one near it by box alone
+      // leaves it as it was, and each clip made garbage that, held over a
+      // city's gigabytes, the collector spent most of its time on)
+      const simple = quadIsSimple(panel);
+      const nearShapes = near.map((o) => ({ cut: o.cut, geom: o.cut ? o.shape : cropNear(o, x0, y0, x1, y1) }))
+        .filter((n) => !isEmpty(n.geom) && (!simple || quadTouches(panel, n.geom)));
+      let pieces = nearShapes.length ? null : panelShape;
+      for (const attempt of [() => polygonClipping.difference(panelShape, ...nearShapes.map((n) => n.geom)),
+        () => polygonClipping.difference(snapGeom(panelShape), ...nearShapes.map((n) => snapGeom(n.geom))),
+        () => polygonClipping.difference(snapGeom(panelShape), ...nearShapes.filter((n) => !n.cut).map((n) => snapGeom(n.geom)))]) {
         if (pieces) break;
         try { pieces = attempt(); } catch { /* next */ }
       }

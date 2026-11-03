@@ -647,37 +647,74 @@ function leftNormals(xy) {
   });
 }
 
+// The road lines' segments in a grid of cells (built once per lines array):
+// a point's nearby segments looked up, not every segment of every road in the
+// map for every point along every deck (a city's bridges took 14 s).
+const SEGMENT_CELL_M = 32;
+const segmentIndexes = new WeakMap();
+function segmentIndex(lines) {
+  let index = segmentIndexes.get(lines);
+  if (index) return index;
+  const cells = new Map();
+  let maxHalf = 0;
+  for (const line of lines) {
+    if (line.half !== undefined) maxHalf = Math.max(maxHalf, line.half);
+    for (let j = 0; j + 1 < line.length; j++) {
+      const [ax, ay] = line[j]; const [bx, by] = line[j + 1];
+      for (let gx = Math.floor(Math.min(ax, bx) / SEGMENT_CELL_M); gx <= Math.floor(Math.max(ax, bx) / SEGMENT_CELL_M); gx++) {
+        for (let gy = Math.floor(Math.min(ay, by) / SEGMENT_CELL_M); gy <= Math.floor(Math.max(ay, by) / SEGMENT_CELL_M); gy++) {
+          const k = gx * 1048576 + gy;
+          if (!cells.has(k)) cells.set(k, []);
+          cells.get(k).push(line, j);
+        }
+      }
+    }
+  }
+  index = { cells, maxHalf: Math.max(maxHalf, 3) };
+  segmentIndexes.set(lines, index);
+  return index;
+}
+
+// whether test(line, j) holds for a segment with a cell within r of p
+function anySegmentNear(lines, p, r, test) {
+  const { cells } = segmentIndex(lines);
+  for (let gx = Math.floor((p[0] - r) / SEGMENT_CELL_M); gx <= Math.floor((p[0] + r) / SEGMENT_CELL_M); gx++) {
+    for (let gy = Math.floor((p[1] - r) / SEGMENT_CELL_M); gy <= Math.floor((p[1] + r) / SEGMENT_CELL_M); gy++) {
+      const list = cells.get(gx * 1048576 + gy);
+      if (!list) continue;
+      for (let i = 0; i < list.length; i += 2) if (test(list[i], list[i + 1])) return true;
+    }
+  }
+  return false;
+}
+
 // a road under a deck: a road line (heights [x, y, z]) within its half width
 // and the edge margin of p, lower than zUnder there
 const ROAD_UNDER_GAP_M = 1;
 function roadUnder(p, zUnder, lines) {
-  return lines.some((line) => {
+  if (!lines.length) return false;
+  const reach = segmentIndex(lines).maxHalf + PIER_ROAD_EDGE_M;
+  return anySegmentNear(lines, p, reach, (line, j) => {
     const r = (line.half ?? 3) + PIER_ROAD_EDGE_M;
-    for (let j = 0; j + 1 < line.length; j++) {
-      const [ax, ay, az] = line[j]; const [bx, by, bz] = line[j + 1];
-      if (!Number.isFinite(az) || !Number.isFinite(bz)) continue;
-      const vx = bx - ax; const vy = by - ay;
-      const L2 = vx * vx + vy * vy || 1e-9;
-      const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - ay) * vy) / L2));
-      if (Math.hypot(ax + vx * t - p[0], ay + vy * t - p[1]) < r && az + (bz - az) * t < zUnder) return true;
-    }
-    return false;
+    const [ax, ay, az] = line[j]; const [bx, by, bz] = line[j + 1];
+    if (!Number.isFinite(az) || !Number.isFinite(bz)) return false;
+    const vx = bx - ax; const vy = by - ay;
+    const L2 = vx * vx + vy * vy || 1e-9;
+    const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - ay) * vy) / L2));
+    return Math.hypot(ax + vx * t - p[0], ay + vy * t - p[1]) < r && az + (bz - az) * t < zUnder;
   });
 }
 
 // (a line carrying its road's half width keeps piers off all of its lanes)
 const PIER_ROAD_EDGE_M = 1.5;
-const nearAnySegment = (p, lines, r0) => lines.some((line) => {
+const nearAnySegment = (p, lines, r0) => lines.length > 0 && anySegmentNear(lines, p, Math.max(r0, segmentIndex(lines).maxHalf + PIER_ROAD_EDGE_M), (line, j) => {
   const r = line.half !== undefined ? Math.max(r0, line.half + PIER_ROAD_EDGE_M) : r0;
-  for (let j = 0; j + 1 < line.length; j++) {
-    const [ax, ay] = line[j];
-    const [bx, by] = line[j + 1];
-    const vx = bx - ax; const vy = by - ay;
-    const L2 = vx * vx + vy * vy || 1e-9;
-    const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - ay) * vy) / L2));
-    if (Math.hypot(ax + vx * t - p[0], ay + vy * t - p[1]) < r) return true;
-  }
-  return false;
+  const [ax, ay] = line[j];
+  const [bx, by] = line[j + 1];
+  const vx = bx - ax; const vy = by - ay;
+  const L2 = vx * vx + vy * vy || 1e-9;
+  const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - ay) * vy) / L2));
+  return Math.hypot(ax + vx * t - p[0], ay + vy * t - p[1]) < r;
 });
 
 /**

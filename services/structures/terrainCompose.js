@@ -27,6 +27,34 @@ const DECK_ABUT_CLEAR_M = 0.3;  // abutment fill stops this far under the deck's
 
 const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
+// The x extent where a row at y crosses the capsule within R of the piece
+// a–b (the disks round its ends and the band along it), or null: a corridor's
+// pixels row by row, not its whole axis-aligned box (most of a diagonal
+// piece's box lies outside its reach).
+function capsuleSpan(ax, ay, bx, by, R, y) {
+  let lo = Infinity; let hi = -Infinity;
+  for (const [px, py] of [[ax, ay], [bx, by]]) {
+    const dy = y - py;
+    if (Math.abs(dy) <= R) { const w = Math.sqrt(R * R - dy * dy); lo = Math.min(lo, px - w); hi = Math.max(hi, px + w); }
+  }
+  const vx = bx - ax; const vy = by - ay; const L = Math.sqrt(vx * vx + vy * vy);
+  if (L > 1e-9) {
+    const tx = vx / L; const ty = vy / L;
+    let sLo = -Infinity; let sHi = Infinity;
+    // min <= k·x + c0 <= max
+    const clip = (k, c0, min, max) => {
+      if (Math.abs(k) < 1e-12) { if (c0 < min || c0 > max) sLo = Infinity; return; }
+      let a = (min - c0) / k; let b = (max - c0) / k;
+      if (a > b) [a, b] = [b, a];
+      sLo = Math.max(sLo, a); sHi = Math.min(sHi, b);
+    };
+    clip(tx, -ax * tx + (y - ay) * ty, 0, L);
+    clip(-ty, ax * ty + (y - ay) * tx, -R, R);
+    if (sLo <= sHi) { lo = Math.min(lo, sLo); hi = Math.max(hi, sHi); }
+  }
+  return lo <= hi ? [lo, hi] : null;
+}
+
 /**
  * Compose the terrain edits for a solved, classified graph.
  *   grid: { heightMap, width, height, worldSize, minHeight, keep? } (raw
@@ -44,7 +72,6 @@ export function composeTerrain(graph, grid) {
   const z = graph.profile?.z;
   const segments = graph.classes?.segments || [];
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
   const raw = (c, r) => heightMap[r * width + c];
   const tiles = new Map();
   const tileFor = (c, r) => {
@@ -161,9 +188,22 @@ export function composeTerrain(graph, grid) {
       const [c0, r0] = toPixel(Math.min(ax, bx) - reach, Math.max(ay, by) + reach);
       const [c1, r1] = toPixel(Math.max(ax, bx) + reach, Math.min(ay, by) - reach);
       stats.corridors++;
+      const cBox0 = Math.max(0, Math.floor(c0)); const cBox1 = Math.min(width - 1, Math.ceil(c1));
       for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
-        for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
-          const [x, y] = toWorld(c, r);
+        const y = (0.5 - r / (height - 1)) * worldSize;
+        let cFrom = cBox0; let cTo = cBox1;
+        // (only the row's crossing of the corridor, a pixel either side; a
+        // piece at a portal keeps its whole box, whose pixels past the
+        // portal are all marked left)
+        if (!planes.length) {
+          const span = capsuleSpan(ax, ay, bx, by, reach, y);
+          if (!span) continue;
+          cFrom = Math.max(cBox0, Math.floor((span[0] / worldSize + 0.5) * (width - 1)) - 1);
+          cTo = Math.min(cBox1, Math.ceil((span[1] / worldSize + 0.5) * (width - 1)) + 1);
+        }
+        let tileKey = -1; let t = null;
+        for (let c = cFrom; c <= cTo; c++) {
+          const x = ((c / (width - 1)) - 0.5) * worldSize;
           const uRaw = ((x - ax) * vx + (y - ay) * vy) / L2;
           if (planes.length && planes.some(([px, py, dx, dy]) => (x - px) * dx + (y - py) * dy > 0 && Math.hypot(x - px, y - py) < PORTAL_PLANE_M)) { left.add(r * width + c); continue; }
           const u = Math.max(0, Math.min(1, uRaw));
@@ -172,7 +212,9 @@ export function composeTerrain(graph, grid) {
           let zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0);
           // (banked: the left of the line higher by bank per metre, out to the core's edge)
           if (bank) zc += bank * Math.max(-core, Math.min(core, (-(x - ax) * vy + (y - ay) * vx) / Math.sqrt(L2)));
-          const t = tileFor(c, r); const j = (r % TILE) * TILE + (c % TILE);
+          const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
+          if (key !== tileKey) { tileKey = key; t = tileFor(c, r); }
+          const j = (r % TILE) * TILE + (c % TILE);
           if (deck) {
             // under the deck only, not round its ends
             if (uRaw < 0 || uRaw > 1) continue;
@@ -227,10 +269,16 @@ export function composeTerrain(graph, grid) {
   // the edited value of a pixel in world z, or NaN if untouched (a despiked
   // pixel's value from `spiked`)
   const spiked = new Map();
+  // (the last tile looked up kept: neighbouring pixels nearly always share one)
+  let lastKey = -1; let lastTile;
   const edited = (c, r) => {
-    const sv = spiked.get(r * width + c);
-    if (sv !== undefined) return sv;
-    const t = tiles.get(Math.floor(c / TILE) * 65536 + Math.floor(r / TILE));
+    if (spiked.size) {
+      const sv = spiked.get(r * width + c);
+      if (sv !== undefined) return sv;
+    }
+    const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
+    if (key !== lastKey) { lastKey = key; lastTile = tiles.get(key); }
+    const t = lastTile;
     if (!t) return NaN;
     const j = (r % TILE) * TILE + (c % TILE);
     const base = Number.isFinite(t.w[j]) ? t.h[j] : raw(c, r) - minHeight;
@@ -258,21 +306,39 @@ export function composeTerrain(graph, grid) {
   // different heights left single pixels standing metres proud)
   const SPIKE_M = 2;
   const win = new Float64Array(9);
-  const value = (c, r) => { const e = edited(c, r); return Number.isFinite(e) ? e : raw(c, r) - minHeight; };
+  // a tile's edited values (NaN: untouched) and values (edited, else the
+  // grid's), a pixel round it included, gathered once per pass: every pixel
+  // looked itself and its eight neighbours up one by one before
+  const SPAN = TILE + 2;
+  const tileEdited = new Float64Array(SPAN * SPAN);
+  const tileValue = new Float64Array(SPAN * SPAN);
+  const gather = (tc, tr) => {
+    for (let rr = -1; rr <= TILE; rr++) {
+      for (let cc = -1; cc <= TILE; cc++) {
+        const c = tc * TILE + cc; const r = tr * TILE + rr; const at = (rr + 1) * SPAN + cc + 1;
+        if (c < 0 || r < 0 || c >= width || r >= height) { tileEdited[at] = NaN; tileValue[at] = NaN; continue; }
+        const e = edited(c, r);
+        tileEdited[at] = e;
+        tileValue[at] = Number.isFinite(e) ? e : raw(c, r) - minHeight;
+      }
+    }
+  };
   for (let pass = 0; pass < 2; pass++) {
     const fix = [];
     for (const key of tiles.keys()) {
       const tc = Math.floor(key / 65536); const tr = key - tc * 65536;
+      gather(tc, tr);
       for (let j = 0; j < TILE * TILE; j++) {
         const c = tc * TILE + (j % TILE); const r = tr * TILE + Math.floor(j / TILE);
         if (c < 1 || r < 1 || c + 1 >= width || r + 1 >= height) continue;
-        let h = edited(c, r);
+        const at = (Math.floor(j / TILE) + 1) * SPAN + (j % TILE) + 1;
+        let h = tileEdited[at];
         if (!Number.isFinite(h)) {
           if (!left.has(r * width + c)) continue;
           h = raw(c, r) - minHeight;
         }
         let n = 0;
-        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) win[n++] = value(c + dc, r + dr);
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) win[n++] = tileValue[at + dr * SPAN + dc];
         win.sort();
         if (Math.abs(h - win[4]) > SPIKE_M) fix.push([r * width + c, win[4]]);
       }
@@ -285,12 +351,14 @@ export function composeTerrain(graph, grid) {
   const WALL_STEP_M = 0.5;
   for (const key of tiles.keys()) {
     const tc = Math.floor(key / 65536); const tr = key - tc * 65536;
+    gather(tc, tr);
     for (let j = 0; j < TILE * TILE; j++) {
       const c = tc * TILE + (j % TILE); const r = tr * TILE + Math.floor(j / TILE);
       if (c + 1 >= width || r + 1 >= height) continue;
-      const h = edited(c, r);
+      const at = (Math.floor(j / TILE) + 1) * SPAN + (j % TILE) + 1;
+      const h = tileEdited[at];
       if (!Number.isFinite(h)) continue;
-      const hx = edited(c + 1, r); const hy = edited(c, r + 1);
+      const hx = tileEdited[at + 1]; const hy = tileEdited[at + SPAN];
       if ((Number.isFinite(hx) && Math.abs(hx - h) > WALL_STEP_M) || (Number.isFinite(hy) && Math.abs(hy - h) > WALL_STEP_M)) stats.wallPixels++;
     }
   }

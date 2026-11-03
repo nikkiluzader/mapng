@@ -215,6 +215,16 @@ const ARCH_SKEW_SIN = Math.sin((15 * Math.PI) / 180);   // to a courtyard path's
 
 const ringArea = (r) => { let a = 0; for (let i = 0; i < r.length; i++) { const p = r[i]; const q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; } return Math.abs(a) / 2; };
 // the nearest point on a ring's edges to p: [x, y, distance]
+// a ring's box grown by pad: [x0, y0, x1, y1]
+function ringBox(ring, pad) {
+  let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+  for (const q of ring) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+  return [x0 - pad, y0 - pad, x1 + pad, y1 + pad];
+}
+const segBox = (a, b) => [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[0], b[0]), Math.max(a[1], b[1])];
+const boxesMeet = (a, b) => a[0] <= b[2] && a[2] >= b[0] && a[1] <= b[3] && a[3] >= b[1];
+const inBox = (p, b) => p[0] >= b[0] && p[0] <= b[2] && p[1] >= b[1] && p[1] <= b[3];
+
 function nearestOnRing(p, ring) {
   let best = null;
   for (let i = 0; i < ring.length; i++) {
@@ -322,20 +332,24 @@ export function courtyardPassages(features, project, mapped = [], facing = () =>
     // (a fort's or castle's gate is its own: buildingDetails fortGate)
     if (t.historic === 'fort' || t.historic === 'castle' || t.building === 'castle' || t.military) continue;
     const outer = f.geometry.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]);
+    // (boxes first: every path end and square in the map was measured
+    // against every courtyard building's walls)
+    const ob = ringBox(outer, ARCH_REACH_M);
     for (const h of f.holes) {
       const hole = h.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]);
       if (hole.length < 3 || ringArea(hole) < COURTYARD_MIN_M2) continue;
+      const hb = ringBox(hole, 0);
       // a mapped passage already into it
-      if (mapped.some(({ line }) => line.some((q, i) => i > 0 && crossingsOf(line[i - 1], q, hole) > 0))) continue;
+      if (mapped.some(({ line }) => line.some((q, i) => i > 0 && boxesMeet(segBox(line[i - 1], q), hb) && crossingsOf(line[i - 1], q, hole) > 0))) continue;
       // where the courtyard's paths end at its wall
       const inner = [];
-      for (const [a, b] of ways) for (const e of [a, b]) if (inRing(e, hole) && nearestOnRing(e, hole)[2] < ARCH_REACH_M) inner.push(e);
+      for (const [a, b] of ways) for (const e of [a, b]) if (inBox(e, hb) && inRing(e, hole) && nearestOnRing(e, hole)[2] < ARCH_REACH_M) inner.push(e);
       // where the walks outside end at the building, and where squares meet it
       const doors = [];
-      for (const [a, b] of ways) for (const e of [a, b]) if (!inRing(e, outer) && nearestOnRing(e, outer)[2] < ARCH_REACH_M) doors.push(e);
+      for (const [a, b] of ways) for (const e of [a, b]) if (inBox(e, ob) && !inRing(e, outer) && nearestOnRing(e, outer)[2] < ARCH_REACH_M) doors.push(e);
       // (a square fronting the building: the arch in the middle of its frontage,
       // the main entrance, before any side walk's end)
-      const fronts = squares.map((sq) => squareFront(sq, outer)).filter(Boolean);
+      const fronts = squares.map((sq) => (boxesMeet(ringBox(sq, 0), ob) ? squareFront(sq, outer) : null)).filter(Boolean);
       if (fronts.length) doors.splice(0, doors.length, ...fronts);
       if (!doors.length) {
         // no way to the building: through the wall facing the nearest street

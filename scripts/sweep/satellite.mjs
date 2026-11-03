@@ -49,12 +49,13 @@ for (let i = 0; i < jobs.length; i += 16) {
     if (buf) tiles.push({ input: await sharp(buf).resize(256, 256).png().toBuffer(), left: (x - x0) * 256, top: (y - y0) * 256 });
   }));
 }
-const mosaic = await sharp({ create: { width: (x1 - x0 + 1) * 256, height: (y1 - y0 + 1) * 256, channels: 3, background: '#7a7a6a' } })
+// (limitInputPixels off throughout: a 16 km mosaic is past sharp's default 268 Mpx guard)
+const mosaic = await sharp({ create: { width: (x1 - x0 + 1) * 256, height: (y1 - y0 + 1) * 256, channels: 3, background: '#7a7a6a' }, limitInputPixels: false })
   .composite(tiles).png().toBuffer();
 // crop to the export's bounds (north up), then to the texture size
 const left = Math.round((tx(west) - x0) * 256); const top = Math.round((ty(north) - y0) * 256);
 const width = Math.round((tx(east) - tx(west)) * 256); const height = Math.round((ty(south) - ty(north)) * 256);
-const png = await sharp(mosaic).extract({ left, top, width, height }).resize(size, size, { fit: 'fill' }).png().toBuffer();
+const png = await sharp(mosaic, { limitInputPixels: false }).extract({ left, top, width, height }).resize(size, size, { fit: 'fill' }).png().toBuffer();
 if (pngOut) { fs.writeFileSync(pngOut, png); console.log(`satellite image saved to ${pngOut}`); }
 if (zip) {
   const terrainPng = Object.keys(zip.files).find((nm) => nm.endsWith('/art/terrains/terrain.png'));

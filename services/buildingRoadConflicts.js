@@ -169,7 +169,10 @@ export function resolveBuildingRoadConflicts(features, { project, unproject, urb
     const holes = (f.holes || []).map((h) => h.map((p) => project(p.lat, p.lng)));
     let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
     for (const [x, y] of ring) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
-    const near = nearSegs(x0, y0, x1, y1);
+    // (only segments whose lanes reach the footprint's box: the rest of the
+    // grid cells' segments can neither hold a sample nor run through it)
+    const near = nearSegs(x0, y0, x1, y1).filter((s) => Math.min(s.a[0], s.b[0]) - s.half <= x1 && Math.max(s.a[0], s.b[0]) + s.half >= x0
+      && Math.min(s.a[1], s.b[1]) - s.half <= y1 && Math.max(s.a[1], s.b[1]) + s.half >= y0);
     if (!near.length) { out.push(f); continue; }
     const area = Math.max(1e-6, ringArea(ring) - holes.reduce((n, h) => n + ringArea(h), 0));
     // share of the footprint on driving lanes (sampled), and by which segments

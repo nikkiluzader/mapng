@@ -67,6 +67,34 @@ function nearest(pts, x, y, s = lengths(pts)) {
   return best;
 }
 
+function boxOf(pts) {
+  let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+  for (const q of pts) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+  return [x0, y0, x1, y1];
+}
+
+// Boxes in a grid of cells: the indices of those overlapping a query box, in
+// order (callers keep the order a plain loop gave).
+const GRID_CELL_M = 64;
+function boxGrid(boxes) {
+  const cells = new Map();
+  const key = (gx, gy) => gx * 1048576 + gy;
+  const span = (b, fn) => {
+    for (let gx = Math.floor(b[0] / GRID_CELL_M); gx <= Math.floor(b[2] / GRID_CELL_M); gx++) {
+      for (let gy = Math.floor(b[1] / GRID_CELL_M); gy <= Math.floor(b[3] / GRID_CELL_M); gy++) fn(key(gx, gy));
+    }
+  };
+  boxes.forEach((b, k) => { if (b[0] <= b[2]) span(b, (c) => { if (!cells.has(c)) cells.set(c, []); cells.get(c).push(k); }); });
+  return {
+    overlapping: (q) => {
+      if (!(q[0] <= q[2])) return [];
+      const found = new Set();
+      span(q, (c) => { for (const k of cells.get(c) || []) { const b = boxes[k]; if (b[0] <= q[2] && b[2] >= q[0] && b[1] <= q[3] && b[3] >= q[1]) found.add(k); } });
+      return [...found].sort((a, b) => a - b);
+    },
+  };
+}
+
 /** Where two lines cross: [{ x, y, sa, ta, tb }] (sa a's station, ta/tb unit tangents). */
 export function crossings(a, b) {
   const out = []; const s = lengths(a);
@@ -175,10 +203,15 @@ export function planGates({ barriers = [], ways = [], nodes = [] }) {
   }
 
   // a way through a line no gate was mapped on
+  // (the ways sorted once and found by their boxes: every way's every segment
+  // tried against every fence grew with the square of the map)
+  const sortedWays = [...roadWays].sort((p, q) => p.walk - q.walk);
+  const wayGrid = boxGrid(sortedWays.map((w) => boxOf(w.pts)));
   barriers.forEach((b, i) => {
     if (lines.has(i) || !ENCLOSING.has(String(b.tags?.barrier || '').toLowerCase())) return;
     const leafed = LEAFED.has(String(b.tags?.barrier || '').toLowerCase());
-    for (const w of [...roadWays].sort((p, q) => p.walk - q.walk)) {
+    for (const k of wayGrid.overlapping(boxOf(b.pts))) {
+      const w = sortedWays[k];
       for (const c of crossings(b.pts, w.pts)) {
         if (gateNear(c.x, c.y)) continue;
         const width = w.walk ? walkedWidth(w) : drivenWidth(w) / Math.max(0.35, Math.abs(c.ta[0] * c.tb[1] - c.ta[1] * c.tb[0]));
@@ -227,8 +260,12 @@ export function splitAtCuts(geometry, pts, cuts, lerp) {
  */
 export function wallOpenings(line, roads, { reach = 2, style = 'mesh' } = {}) {
   const out = [];
+  const lb = boxOf(line);
   for (const w of roads || []) {
     if (!(w.pts?.length >= 2) || WALK_HIGHWAYS.has(w.highway)) continue;
+    // (a road whose box, reach and all, misses the wall's crosses nothing)
+    const wb = boxOf(w.pts);
+    if (wb[0] - reach > lb[2] || wb[2] + reach < lb[0] || wb[1] - reach > lb[3] || wb[3] + reach < lb[1]) continue;
     const p = w.pts; const n = p.length;
     const past = (a, b) => { const L = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1; return [a[0] + (a[0] - b[0]) / L * reach, a[1] + (a[1] - b[1]) / L * reach]; };
     for (const c of crossings(line, [past(p[0], p[1]), ...p, past(p[n - 1], p[n - 2])])) {
