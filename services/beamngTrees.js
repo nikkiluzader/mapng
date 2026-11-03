@@ -24,6 +24,7 @@
  * cypresses, the jungle's tropical trees) join the candidates.
  */
 import { TREE_GROUPS, TREE_ITEMS } from './beamngTreeLibrary.js';
+import { kindFromMix, speciesKind } from './treeSpecies.js';
 
 export const TREE_GROUP_NAMES = Object.keys(TREE_GROUPS);
 
@@ -104,7 +105,15 @@ export function understoryGroup(lat, lon) {
 
 // ── What OSM says about a tree ───────────────────────────────────────────────
 
+// (a scientific name's kind, treeSpecies.js, as a group hint)
+const KIND_HINT = { broadleaf: 'deciduous', mangrove: 'tropical' };
+
 export function treeHintFromTags(tags = {}) {
+  // the scientific name first: its genus says the kind (Quercus virginiana: a live oak)
+  for (const name of [tags.species, tags.taxon, tags.genus]) {
+    const kind = speciesKind(name);
+    if (kind) return KIND_HINT[kind] ?? kind;
+  }
   const species = `${tags.species || ''} ${tags['species:en'] || ''} ${tags.taxon || ''}`.toLowerCase();
   const genus = String(tags.genus || '').toLowerCase();
   const leafType = String(tags.leaf_type || '').toLowerCase();
@@ -134,7 +143,20 @@ function parseHeight(tags = {}) {
  * The tree group for one tree / bush.
  * kind: 'tree' | 'shrub'; area: true inside a mapped wood / forest polygon.
  */
-export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = false, area = false, height = null, seed = '' }) {
+// A kind (treeSpecies.js) as a library group, for the climate here.
+function groupOfKind(kind, c) {
+  if (kind === 'broadleaf') return c.tropics ? 'tropical' : 'deciduous';
+  if (kind === 'conifer') return c.westCoast || c.dryWest ? 'pine_west' : 'conifer';
+  if (kind === 'oak' && c.westCoast) return 'oak_west';
+  return kind;
+}
+
+/**
+ * The library group for one tree. mix: the kinds recorded growing around the
+ * export (treeSpecies.fetchTreeSpeciesMix), drawn from for a tree OSM says
+ * nothing about; without one, the climate rule.
+ */
+export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = false, area = false, height = null, seed = '', mix = null }) {
   const c = treeClimate(lat, lon);
   const u = hash01(seed, 'group');
   if (kind === 'shrub') {
@@ -144,6 +166,12 @@ export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = fa
     return 'shrub';
   }
   const hint = treeHintFromTags(tags);
+  if (hint && !['palm', 'conifer', 'deciduous'].includes(hint)) return groupOfKind(hint, c);
+  // (OSM silent: what grows here, as recorded)
+  if (!hint && mix) {
+    const drawn = kindFromMix(mix, hash01(seed, 'mix'));
+    if (drawn) return groupOfKind(drawn, c);
+  }
   let g;
   if (hint === 'palm') g = 'palm';
   else if (hint === 'conifer') g = 'conifer';
@@ -168,9 +196,21 @@ export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = fa
 
 // ── Model choice ─────────────────────────────────────────────────────────────
 
+// groups made from the library's own (live oaks: the West Coast's broad
+// oaks; the deciduous oaks alone; eucalyptus; a cypress or olive the biome
+// doesn't ship: junipers and broad oaks)
+const DERIVED_GROUPS = {
+  live_oak: () => TREE_GROUPS.oak_west.filter(([type]) => /oak_[a-d]$/.test(type)),
+  oak: () => TREE_GROUPS.deciduous.filter(([type]) => type.includes('_oak_')),
+  eucalyptus: () => TREE_GROUPS.oak_west.filter(([type]) => type.includes('eucalyptus')),
+  cypress: () => TREE_GROUPS.juniper.filter(([type]) => type.includes('tree')),
+  olive: () => TREE_GROUPS.oak_west.filter(([type]) => /oak_[a-d]$/.test(type)),
+};
+
 function candidates(group, { lat, lon, extra = [] }) {
   const c = treeClimate(lat, lon);
-  let list = (TREE_GROUPS[group] || TREE_GROUPS.deciduous).map(([type, height]) => ({ type, height }));
+  const source = TREE_GROUPS[group] || DERIVED_GROUPS[group]?.() || TREE_GROUPS.deciduous;
+  let list = (source.length ? source : TREE_GROUPS.deciduous).map(([type, height]) => ({ type, height }));
   // Redwoods only where they grow (Northern California's coast); firs stay out
   // of hot desert towns (their pines: the radiata / scots pine models).
   if (!c.norCal) list = list.filter(({ type }) => !type.includes('redwood'));

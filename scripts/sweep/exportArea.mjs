@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { exportBeamNGLevel } from '../../services/exportBeamNGLevel.js';
+import { fetchTreeSpeciesMix } from '../../services/treeSpecies.js';
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from '../../services/roadSmoother.js';
 import { snapRoadsToTerrain } from '../../services/roadSnap.js';
 import { measureStreetWidths } from '../../services/streetWidths.js';
@@ -64,8 +65,22 @@ if (baseTexture === 'game') {
   terrainData.gameTextureBlob = new Blob([fs.readFileSync(png)], { type: 'image/png' });
 }
 
+// the local tree mix (services/treeSpecies.js): asked of iNaturalist once
+// per area, cached beside its data (the sweep stays offline and repeatable;
+// TREEMIX=climate for the climate rule alone)
+let treeSpeciesMix = null;
+if (process.env.TREEMIX !== 'climate') {
+  const cache = path.join(dir, 'tree_mix.json');
+  if (fs.existsSync(cache)) treeSpeciesMix = JSON.parse(fs.readFileSync(cache, 'utf8'));
+  else {
+    treeSpeciesMix = await fetchTreeSpeciesMix(meta.bounds);
+    if (treeSpeciesMix) fs.writeFileSync(cache, JSON.stringify(treeSpeciesMix, null, 1));
+  }
+}
+
 const t0 = Date.now();
 const { blob, structureChecks } = await exportBeamNGLevel(terrainData, meta.center, {
+  treeSpeciesMix,
   baseTexture, pbrSource: 'osm', roadType: 'decal', includeBackdrop: false,
   includeBuildings: true, applyFoundations: false, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,

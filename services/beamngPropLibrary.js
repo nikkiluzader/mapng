@@ -40,7 +40,13 @@ export const PROP_BINS = ['mapng_prop_bin_round', 'mapng_prop_bin_wcusa'];
 
 // TSStatics.
 export const PROP_SHAPES = {
-  pole: { shapeFile: '/levels/automation_test_track/art/shapes/objects/s_powerpole_3wire.dae' },
+  // utility poles (streetProps POLE_TYPES), each with a Colmesh the game takes
+  poleWoodWide: { shapeFile: '/levels/automation_test_track/art/shapes/objects/powerpole.dae' },
+  poleWoodTown: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/electrical_pole.dae' },
+  poleWoodShort: { shapeFile: '/levels/johnson_valley/art/shapes/power_lines/electric_pole_02.dae' },
+  poleWoodArm: { shapeFile: '/levels/johnson_valley/art/shapes/power_lines/electric_pole_01.dae' },
+  poleWoodTall: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/powerpole4.dae' },
+  poleSteel: { shapeFile: '/levels/johnson_valley/art/shapes/power_lines/metal_pole.dae' },
   poleLamp: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/electrical_pole_lamp.dae' },
   // a clipped hedge piece (Italy's): 2.3 m along local X, centred, 0.85 m
   // deep, 1.64 m tall; laid end to end along barrier=hedge

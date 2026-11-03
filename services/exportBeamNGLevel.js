@@ -19,6 +19,7 @@ import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, pla
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
+import { fetchTreeSpeciesMix, TREE_MIX_CREDIT } from './treeSpecies.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
@@ -58,7 +59,7 @@ import { smoothLine } from './lineSmoothing.js';
 import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface } from './plazas.js';
 import { buildSidewalkMeshes, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
-import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
+import { placeStreetProps, POLE_LAMP_REACH_M, POLE_TYPES, hash01 as propHash } from './streetProps.js';
 import {
   solveBridgeDecks, widenDecksForSidewalks, deckHeightAt, buildDeckGeometry, hitsDeck, alongDeck, newBridgeBuilder, deckDepthOf, deckEdges,
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
@@ -8610,7 +8611,8 @@ function collectMappedStreetProps(terrainData, squareSize) {
     const tags = f.tags || {};
     if (f.type === 'power_line') {
       if (tags.power === 'minor_line' && Array.isArray(f.geometry) && f.geometry.length > 1) {
-        out.powerLines.push(f.geometry.map(toWorld));
+        // (its tags along: a line's material / height picks its poles)
+        out.powerLines.push(Object.assign(f.geometry.map(toWorld), { tags, id: f.id }));
       }
       continue;
     }
@@ -8619,7 +8621,7 @@ function collectMappedStreetProps(terrainData, squareSize) {
     if (tags.emergency === 'fire_hydrant') out.hydrants.push(p);
     else if (tags.amenity === 'waste_basket') out.bins.push(p);
     else if (tags.amenity === 'bench') out.benches.push(p);
-    else if (tags.power === 'pole') out.poles.push(p);
+    else if (tags.power === 'pole') out.poles.push(Object.assign(p, { tags, id: f.id }));
   }
   return out;
 }
@@ -8794,23 +8796,27 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   let poleLamps = 0;
   for (let i = 0; i < (props?.poles.length ?? 0); i++) {
     const p = props.poles[i];
+    const type = POLE_TYPES[p.type] || POLE_TYPES.wood_wide;
     objects.push({
       __parent: 'street_furniture',
       class: 'TSStatic',
       name: `utility_pole_${i}`,
       persistentId: generatePersistentId(),
       position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(p.z, 3)],
-      rotationMatrix: rotationMatrixFromYaw(p.yaw),
-      shapeName: PROP_SHAPES.pole.shapeFile,
+      rotationMatrix: rotationMatrixFromYaw(p.yaw + (type.yawOffset || 0)),
+      shapeName: PROP_SHAPES[type.shape].shapeFile,
+      // (cars stop at a pole: its collision mesh, said outright)
+      collisionType: 'Collision Mesh',
       useInstanceRenderData: true,
     });
-    if (!p.lamp || lampCount >= LAMP_LIMIT) continue;
+    if (!p.lamp || type.lampZ == null || lampCount >= LAMP_LIMIT) continue;
+    const lampZ = type.lampZ;
     objects.push({
       __parent: 'street_furniture',
       class: 'TSStatic',
       name: `pole_lamp_${i}`,
       persistentId: generatePersistentId(),
-      position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(p.z + POLE_LAMP_Z, 3)],
+      position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(p.z + lampZ, 3)],
       rotationMatrix: rotationMatrixFromYaw(p.yaw),
       shapeName: PROP_SHAPES.poleLamp.shapeFile,
       useInstanceRenderData: true,
@@ -8819,8 +8825,8 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     objects.push(lampSpotLight(`pole_lamp_${i}_light`, 'street_furniture', [
       roundTo(p.x - Math.cos(p.yaw) * POLE_LAMP_REACH_M, 3),
       roundTo(p.y - Math.sin(p.yaw) * POLE_LAMP_REACH_M, 3),
-      roundTo(p.z + POLE_LAMP_Z - 0.3, 3),
-    ], POLE_LAMP_Z));
+      roundTo(p.z + lampZ - 0.3, 3),
+    ], lampZ));
     lampCount++;
     poleLamps++;
   }
@@ -9932,7 +9938,7 @@ function canopyPatches(cls, w, h, covered, minCells) {
 const OPEN_GROUND_CLEAR_M = 4;
 const TREELESS_GOLF = new Set(['bunker', 'green', 'tee', 'fairway', 'driving_range', 'water_hazard', 'lateral_water_hazard']);
 
-async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks }, biome, tick = async () => {}) {
+async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null }, biome, tick = async () => {}) {
   // Buildings, water and open playing ground, for the scattered and canopy
   // trees (a yard's tree is not in the house or the pool): world rings
   // bucketed by 32 m cells
@@ -10038,7 +10044,12 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
         const type = getOwnVegetationSelector(biome, hint);
         if (type) return { type, scale: 0.85 + 0.3 * seededRandom(hashString(`${seed}:s`)) };
       }
-      const group = chooseTreeGroup({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed });
+      const group = chooseTreeGroup({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed, mix: treeMix });
+      // (an olive or cypress drawn from the local mix: the biome's own, if it ships one)
+      if (kind === 'tree' && (group === 'olive' || group === 'cypress')) {
+        const type = getOwnVegetationSelector(biome, group);
+        if (type) return { type, scale: 0.85 + 0.3 * seededRandom(hashString(`${seed}:s`)) };
+      }
       return chooseTreeItem(group, { tags, lat: point.lat, lon: point.lng, seed, extra: signature(group) });
     };
     const ground = terrainData.groundClasses?.cls?.length === terrainData.groundClasses?.w * terrainData.groundClasses?.h
@@ -10930,6 +10941,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     baseTexture = 'hybrid',
     includeBuildings = true,
     includeSidewalks = true,
+    // the local tree mix (treeSpecies.js) when already known; undefined: fetched
+    treeSpeciesMix: requestedTreeMix = undefined,
     // the slabs' concrete: a key of SIDEWALK_LOOKS (beamngSidewalks.js)
     sidewalkLook = DEFAULT_SIDEWALK_LOOK,
     applyFoundations: requestedFoundations = true,
@@ -11518,6 +11531,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       townPoles: center.lat > 24 && center.lng > -170 && center.lng < -50,
       isBlocked: underDeck,
+      lat: center.lat, lon: center.lng,
     })
     : { hydrants: [], bins: [], benches: [], poles: [], wires: [] };
   // A wire passing just under (or through) a deck is left out.
@@ -12150,8 +12164,19 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     lastYield = performance.now();
   };
   const vegT0 = performance.now();
+  // what grows around here, as recorded (treeSpecies.js): an option when
+  // given (tests, cached test levels), else asked of iNaturalist; null when
+  // offline or too few records (the climate rule then)
+  const treeMix = includeTrees
+    ? (requestedTreeMix !== undefined ? requestedTreeMix : await fetchTreeSpeciesMix(exportTerrainData.bounds))
+    : null;
+  if (includeTrees) {
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tree species: ${treeMix
+      ? `${Object.entries(treeMix.shares).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v * 100)}%`).join(', ')} (from ${treeMix.records} tree records nearby)`
+      : 'no local records, the regional climate rule decides'}.`);
+  }
   const forestPlacements = (includeTrees || includeRocks)
-    ? await buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks }, biome, tick)
+    ? await buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks, treeMix }, biome, tick)
     : new Map();
   // (where a slow planting step spends its time, in the report's console log)
   const vegLap = (what) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Vegetation timing: ${what} at ${((performance.now() - vegT0) / 1000).toFixed(1)} s.`);
@@ -12315,7 +12340,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     authors: 'mapng',
     biome: biome?.label || biome?.id || 'mapng',
     defaultSpawnPointName: 'spawn_default',
-    description: `Generated by mapng at ${lat}, ${lng}`,
+    description: `Generated by mapng at ${lat}, ${lng}${treeMix ? `. ${TREE_MIX_CREDIT}.` : ''}`,
     features: 'Procedural OSM-driven roads, vegetation, water, and terrain.',
     previews: ['preview.png'],
     roads: 'OSM-derived roads',

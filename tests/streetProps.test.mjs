@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { placeStreetProps, wireLines, WIRE_ARMS, WIRE_Z } from '../services/streetProps.js';
+import { choosePoleType, placeStreetProps, POLE_TYPES, wireLines } from '../services/streetProps.js';
 import { buildSidewalkRuns } from '../services/beamngSidewalks.js';
 
 // A straight road along +x at y = y0, nodes every 5 m, at height z.
@@ -33,7 +33,8 @@ test('country roads: a wired run of poles off one side', () => {
   const ys = new Set(poles.map((p) => Math.sign(p.y)));
   assert.equal(ys.size, 1, 'one side of the road');
   for (const p of poles) assert.ok(Math.abs(Math.abs(p.y) - 5.4) < 1e-6, '2.4 m past the edge');
-  assert.equal(wires.length, (poles.length - 1) * WIRE_ARMS.length, 'three wires per span');
+  assert.ok(poles.every((p) => p.type === poles[0].type), 'one pole type along the run');
+  assert.equal(wires.length, (poles.length - 1) * POLE_TYPES[poles[0].type].wires.length, 'a wire per fitting, every span');
   assert.ok(poles.every((p) => !p.lamp), 'no lamps in the country');
 });
 
@@ -52,18 +53,40 @@ test('a mapped power line gets poles at its vertices and no generated poles besi
   const line = Array.from({ length: 13 }, (_, i) => [i * 50, 6, 20]);
   const { poles, wires } = placeStreetProps({ carriageways: cws, mapped: { powerLines: [line] } });
   assert.equal(poles.length, 13, 'one pole per vertex, none generated along the road');
-  assert.equal(wires.length, 12 * 3);
+  assert.equal(wires.length, 12 * POLE_TYPES[poles[0].type].wires.length);
 });
 
-test('wires hang from the cross-arm ends and sag mid-span', () => {
-  const [a, b] = [{ x: 0, y: 0, z: 0, yaw: Math.PI / 2 }, { x: 40, y: 0, z: 0, yaw: Math.PI / 2 }];
+test('wires hang from the pole type\'s fittings and sag mid-span', () => {
+  const [a, b] = [{ x: 0, y: 0, z: 0, yaw: Math.PI / 2, type: 'wood_short' }, { x: 40, y: 0, z: 0, yaw: Math.PI / 2, type: 'wood_short' }];
   const lines = wireLines([a, b]);
-  assert.equal(lines.length, 3);
+  const fits = POLE_TYPES.wood_short.wires;
+  assert.equal(lines.length, fits.length);
   const outer = lines[0];
-  assert.ok(Math.abs(outer[0][1] - WIRE_ARMS[0]) < 1e-9, 'cross-arm along the pole yaw');
-  assert.equal(outer[0][2], WIRE_Z);
+  assert.ok(Math.abs(outer[0][1] - fits[0][0]) < 1e-9, 'cross-arm along the pole yaw');
+  assert.ok(Math.abs(outer[0][2] - fits[0][2]) < 1e-9);
   const mid = outer[Math.floor(outer.length / 2)];
-  assert.ok(mid[2] < WIRE_Z - 0.3, `sags (${mid[2].toFixed(2)})`);
+  assert.ok(mid[2] < fits[0][2] - 0.3, `sags (${mid[2].toFixed(2)})`);
+  // a pole turned a quarter (its bracket along local y): its fittings turn with it
+  const t = POLE_TYPES.wood_tall;
+  const [c] = wireLines([{ x: 0, y: 0, z: 0, yaw: 0, type: 'wood_tall' }, { x: 0, y: 40, z: 0, yaw: 0, type: 'wood_tall' }]);
+  const want = [-Math.sin(t.yawOffset) * t.wires[0][1], Math.cos(t.yawOffset) * t.wires[0][1]];
+  assert.ok(Math.abs(c[0][0] - want[0]) < 1e-9 && Math.abs(c[0][1] - want[1]) < 1e-9);
+});
+
+test('utility poles: the region\'s own, a steel or concrete one where mapped so, the nearest a mapped height', () => {
+  const east = new Set(); const west = new Set(); const world = new Set();
+  for (let i = 0; i < 200; i++) {
+    east.add(choosePoleType({ lat: 29.9, lon: -81.3, seed: `e${i}` }));
+    west.add(choosePoleType({ lat: 34, lon: -118, seed: `w${i}` }));
+    world.add(choosePoleType({ lat: 48.8, lon: 2.3, seed: `p${i}` }));
+  }
+  assert.deepEqual([...east].sort(), ['wood_short', 'wood_town', 'wood_wide']);
+  assert.ok(west.has('wood_tall') && west.has('wood_arm'));
+  assert.deepEqual([...world].sort(), ['steel', 'wood_short']);
+  assert.equal(choosePoleType({ lat: 29.9, lon: -81.3, tags: { material: 'concrete' } }), 'steel');
+  assert.equal(choosePoleType({ lat: 29.9, lon: -81.3, tags: { height: '8' } }), 'wood_short');
+  assert.equal(choosePoleType({ lat: 29.9, lon: -81.3, tags: { height: '11' } }), 'wood_wide');
+  for (const t of Object.values(POLE_TYPES)) assert.ok(t.wires.length >= 1 && t.wires.every(([, , z]) => z <= t.top), 'fittings on the pole');
 });
 
 test('poles run along a street through its junctions, wired across them', () => {
@@ -81,7 +104,7 @@ test('poles run along a street through its junctions, wired across them', () => 
   const { poles, wires } = placeStreetProps({ carriageways: cws, heightAt: () => 10 });
   assert.ok(poles.length >= 4, `${poles.length} poles along 234 m`);
   assert.equal(new Set(poles.map((p) => Math.sign(p.y))).size, 1, 'one side all along the street');
-  assert.equal(wires.length, (poles.length - 1) * 3, 'one continuous wired line, across both junctions');
+  assert.equal(wires.length, (poles.length - 1) * POLE_TYPES[poles[0].type].wires.length, 'one continuous wired line, across both junctions');
 });
 
 test('a street split into separate OSM ways at junctions still gets one line', () => {

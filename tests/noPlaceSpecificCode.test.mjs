@@ -46,6 +46,7 @@ const LATLNG_ALLOWED = new Map([
   ['geoUtils.js', 'UTM hemisphere and zone maths'],
   ['exportBeamNGLevel.js', 'North American town utility poles (region)'],
   ['terrain.js', 'elevation dataset coverage (CONUS / Alaska / Hawaii)'],
+  ['streetProps.js', 'utility pole regions (native poles by region)'],
 ]);
 const LATLNG = /(?:\b|\.)(?:lat|lng|lon)\s*[<>]=?\s*-?\d+(?:\.\d+)?\b|\b-?\d+(?:\.\d+)?\s*[<>]=?\s*(?:[\w.]*\.)?(?:lat|lng|lon)\b/;
 const OSM_ID = /\b(?:id|wayId|osmId)\s*===?\s*['"]?\d{5,}/;

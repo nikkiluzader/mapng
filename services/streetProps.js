@@ -32,19 +32,71 @@ const JUNCTION_CLEAR_M = 10;
 const ROAD_CLEAR_M = 1.5;
 const MAPPED_LINE_CLEAR_M = 12;    // a mapped power line this close: no generated poles
 
-// s_powerpole_3wire: cross-arm along its local x, wires at these x offsets and
-// this height above the pole's base (the model's top is 8.2 m).
-export const WIRE_ARMS = [-0.8, 0, 0.8];
-export const WIRE_Z = 7.9;
+// Utility poles: a variety of the game's own, by region and by what OSM says
+// (material=steel|metal|concrete: the steel pole; height=*: the nearest),
+// one model along a run so its wires meet the same fittings pole to pole.
+// Each: its shape (beamngPropLibrary PROP_SHAPES), its top, where its wires
+// hang ([x, y, z] in the model, its cross-arm along local x once turned by
+// yawOffset) and where the cobra-head lamp goes (lampZ, or none).
+// (Automation Test Track's s_powerpole_3wire, used before, names its
+// collision mesh Collmesh_… which the game doesn't take: cars drove through
+// it; each of these has a Colmesh)
+export const POLE_TYPES = {
+  // a classic wooden distribution pole, a wide cross-arm (Automation Test Track)
+  wood_wide: { shape: 'poleWoodWide', top: 11.2, wires: [[-1.45, 0, 11.1], [0.55, 0, 11.1], [1.45, 0, 11.1]], lampZ: 8.6 },
+  // a plain wooden town pole, one wire at the top (East Coast USA)
+  wood_town: { shape: 'poleWoodTown', top: 10.1, wires: [[0, 0, 9.9]], lampZ: 8.4 },
+  // a short wooden pole with a cross-arm and a pin on top (Johnson Valley)
+  wood_short: { shape: 'poleWoodShort', top: 7.9, wires: [[-0.7, 0, 7.2], [0, 0, 7.8], [0.7, 0, 7.2]], lampZ: 6.0 },
+  // a wooden pole with its arm low and a pin above (Johnson Valley; the arm's
+  // wires from the foot of its hanging insulators)
+  wood_arm: { shape: 'poleWoodArm', top: 10, wires: [[-0.72, 0, 7.5], [0.72, 0, 7.5], [-0.4, 0, 9.2]], lampZ: 6.4 },
+  // a tall wooden pole, three insulators stacked up one side (West Coast USA)
+  wood_tall: { shape: 'poleWoodTall', top: 13.5, wires: [[0, 0.75, 13.3], [0, 0.75, 12.57], [0, 0.75, 11.85]], yawOffset: Math.PI / 2, lampZ: 9.5 },
+  // a steel mast, brackets stepping down one side (Johnson Valley)
+  steel: { shape: 'poleSteel', top: 8.1, wires: [[0.25, 0.2, 6.7], [0.25, 0.2, 6.35], [0.25, 0.2, 6.0]], lampZ: 5.2 },
+};
+// [type, weight] by region
+const POLE_SETS = {
+  na_east: [['wood_wide', 0.5], ['wood_town', 0.3], ['wood_short', 0.2]],
+  na_west: [['wood_arm', 0.35], ['wood_short', 0.25], ['wood_tall', 0.25], ['wood_wide', 0.15]],
+  world: [['wood_short', 0.6], ['steel', 0.4]],
+};
+const STEEL_MATERIALS = new Set(['steel', 'metal', 'concrete', 'reinforced_concrete', 'iron']);
+
+/**
+ * The pole type for a run (or a lone pole): its tags first (a steel or
+ * concrete one: the steel pole; a height: the regional pole nearest it), else
+ * one of the region's own, by seed.
+ */
+export function choosePoleType({ lat = 0, lon = 0, tags = {}, seed = '' } = {}) {
+  const set = lat > 24 && lon > -170 && lon < -50 ? (lon < -100 ? POLE_SETS.na_west : POLE_SETS.na_east) : POLE_SETS.world;
+  if (STEEL_MATERIALS.has(String(tags.material || '').toLowerCase())) return 'steel';
+  const height = Number.parseFloat(tags.height);
+  if (Number.isFinite(height) && height > 3) {
+    let best = set[0][0];
+    for (const [type] of set) if (Math.abs(POLE_TYPES[type].top - height) < Math.abs(POLE_TYPES[best].top - height)) best = type;
+    return best;
+  }
+  let u = hash01(seed, 'poletype');
+  for (const [type, w] of set) { if (u < w) return type; u -= w; }
+  return set[set.length - 1][0];
+}
+
+// a fitting's place in the world on pole p (its type's fittings, turned by its yaw)
+function fittingAt(p, [fx, fy, fz]) {
+  const t = POLE_TYPES[p.type] || POLE_TYPES.wood_wide;
+  const yaw = p.yaw + (t.yawOffset || 0);
+  return [p.x + Math.cos(yaw) * fx - Math.sin(yaw) * fy, p.y + Math.sin(yaw) * fx + Math.cos(yaw) * fy, p.z + fz];
+}
 const WIRE_SAG = 0.012;            // per metre of span
 const WIRE_MIN_SPAN_M = 5;
 const WIRE_MAX_SPAN_M = 120;
-// electrical_pole_lamp: its arm reaches 2.9 m along local -x, mounted this high.
-export const POLE_LAMP_Z = 7.0;
+// electrical_pole_lamp: its arm reaches 2.9 m along local -x (mounted at its
+// pole type's lampZ).
 export const POLE_LAMP_REACH_M = 2.8;
 
 const MAX_POLES = 8000;
-const POLE_TOP_M = 9.3;
 
 const BUCKET_M = 8;
 
@@ -194,9 +246,12 @@ export function wireLines(poles) {
     const span = Math.hypot(b.x - a.x, b.y - a.y);
     if (span < WIRE_MIN_SPAN_M || span > WIRE_MAX_SPAN_M) continue;
     const segs = Math.max(2, Math.ceil(span / 12));
-    for (const off of WIRE_ARMS) {
-      const ax = a.x + Math.cos(a.yaw) * off; const ay = a.y + Math.sin(a.yaw) * off; const az = a.z + WIRE_Z;
-      const bx = b.x + Math.cos(b.yaw) * off; const by = b.y + Math.sin(b.yaw) * off; const bz = b.z + WIRE_Z;
+    // (one type along a run: fitting k of one pole to fitting k of the next)
+    const fits = (POLE_TYPES[a.type] || POLE_TYPES.wood_wide).wires;
+    const fitsB = (POLE_TYPES[b.type] || POLE_TYPES.wood_wide).wires;
+    for (let k = 0; k < Math.min(fits.length, fitsB.length); k++) {
+      const [ax, ay, az] = fittingAt(a, fits[k]);
+      const [bx, by, bz] = fittingAt(b, fitsB[k]);
       const line = [];
       for (let s = 0; s <= segs; s++) {
         const t = s / segs;
@@ -323,9 +378,10 @@ export function buildChains(carriageways) {
  *   heightAt(x, y): terrain height
  *   townPoles: wooden poles with cobra-head lamps along unlit town streets (North America)
  *   isBlocked(x, y, z, zTop): no pole there (under a bridge deck)
- * Returns { hydrants, bins, benches: [{ x, y, z, yaw }], poles: [{ x, y, z, yaw, lamp }], wires }.
+ *   lat, lon: the export's place (the region's poles, choosePoleType)
+ * Returns { hydrants, bins, benches: [{ x, y, z, yaw }], poles: [{ x, y, z, yaw, lamp, type }], wires }.
  */
-export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, heightAt = () => 0, townPoles = false, isBlocked = () => false } = {}) {
+export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, heightAt = () => 0, townPoles = false, isBlocked = () => false, lat = 0, lon = 0 } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const byOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
   const swZ = sidewalkHeightLookup(runs);
@@ -366,12 +422,13 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   // Mapped low-voltage lines: a pole at every vertex, cross-arm across the line.
   for (const line of mapped.powerLines || []) {
     const run = [];
+    const type = choosePoleType({ lat, lon, tags: line.tags || {}, seed: `line:${line.id ?? line[0]?.join(',')}` });
     for (let i = 0; i < line.length && poles.length < MAX_POLES; i++) {
       const a = line[Math.max(0, i - 1)];
       const b = line[Math.min(line.length - 1, i + 1)];
       const along = Math.atan2(b[1] - a[1], b[0] - a[0]);
       const [x, y, z] = line[i];
-      const pole = { x, y, z: z ?? heightAt(x, y), yaw: along + Math.PI / 2, lamp: false };
+      const pole = { x, y, z: z ?? heightAt(x, y), yaw: along + Math.PI / 2, lamp: false, type };
       poles.push(pole);
       run.push(pole);
     }
@@ -379,10 +436,12 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   }
   const poleTaken = new Taken();
   for (const p of poles) poleTaken.add(p.x, p.y);
-  for (const [x, y, z] of mapped.poles || []) {
+  for (const mp of mapped.poles || []) {
+    const [x, y, z] = mp;
     if (poleTaken.near(x, y, 1.5) || poles.length >= MAX_POLES) continue;
-    if (isBlocked(x, y, z ?? heightAt(x, y), (z ?? heightAt(x, y)) + POLE_TOP_M)) continue;
-    poles.push({ x, y, z: z ?? heightAt(x, y), yaw: 0, lamp: false });
+    const type = choosePoleType({ lat, lon, tags: mp.tags || {}, seed: `pole:${mp.id ?? `${x},${y}`}` });
+    if (isBlocked(x, y, z ?? heightAt(x, y), (z ?? heightAt(x, y)) + POLE_TYPES[type].top)) continue;
+    poles.push({ x, y, z: z ?? heightAt(x, y), yaw: 0, lamp: false, type });
     poleTaken.add(x, y);
   }
 
@@ -401,6 +460,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
     const id = chain.id;
     const side = hash01(id, 'pside') < 0.5 ? 1 : -1;
     const spacing = town ? TOWN_POLE_SPACING_M : POLE_SPACING_M;
+    const type = choosePoleType({ lat, lon, seed: `chain:${id}` });
     const ignore = new Set(chain.segments.map((cw) => cw.owner));
     const run = [];
     for (const st of stations(chain.points, spacing, hash01(id, 'pphase') * spacing, END_CLEAR_M)) {
@@ -414,10 +474,10 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
         || nearMappedLine(x, y, MAPPED_LINE_CLEAR_M)
         || poleTaken.near(x, y, spacing * 0.5)) continue;
       const z = (cw.urban ? swZ(x, y) : null) ?? heightAt(x, y);
-      if (isBlocked(x, y, z, z + POLE_TOP_M)) continue;
+      if (isBlocked(x, y, z, z + POLE_TYPES[type].top)) continue;
       // Cross-arm (local x) across the road, pointing away from it: the lamp's
       // arm (local -x) then reaches over the road.
-      const pole = { x, y, z, yaw: Math.atan2(out[1], out[0]), lamp: cw.urban && st.k % 2 === 0 };
+      const pole = { x, y, z, yaw: Math.atan2(out[1], out[0]), lamp: cw.urban && st.k % 2 === 0 && POLE_TYPES[type].lampZ != null, type };
       poles.push(pole);
       poleTaken.add(x, y);
       run.push(pole);
