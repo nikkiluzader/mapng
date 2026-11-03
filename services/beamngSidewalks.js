@@ -1403,6 +1403,7 @@ function joinCorners(runs, index, walkRuns = []) {
   return corners;
 }
 const SIDEWALK_WALK_JOIN_M = 0.6;
+const CUT_SLIVER_W_M = 0.15;      // nor one thinner than this on average (twice its area over its outline)
 const CUT_SLIVER_M2 = 0.25;     // a piece of walk this small left by a corner's cut: dropped
 
 // A walkway ending on a street's sidewalk (a walk leaving the street round a
@@ -1451,12 +1452,12 @@ function levelWalkEndsOnSidewalks(walkRuns, streetRuns, corners = []) {
 }   // a walk this near a sidewalk's end carries it on
 
 /**
- * The road inside each rounded curb, for a decal of the street's own surface
- * (the two streets' decals leave the corner's triangle of ground bare): a
- * tapering strip from the curbs' square corner to the middle of the curve,
- * as wide there as the triangle (its edge on the curve's tangent: the road
- * side only), and a band along the curve on its road side for the slivers
- * the triangle's straight edges leave. [{ nodes: [[x, y, z, width]...], surface, band? }].
+ * The road inside each rounded curb, for decals of the street's own surface
+ * (the two streets' decals leave the corner's triangle of ground bare): bands
+ * of one width laid along the curve, one beyond the other out to the curbs'
+ * square corner, each trimmed to the two curb lines (a tapered strip squeezed
+ * its texture to a pale sliver lying out on the road).
+ * [{ nodes: [[x, y, z, width]...], surface, streets, band: true }].
  */
 export function cornerPatches(corners) {
   const out = [];
@@ -1464,39 +1465,133 @@ export function cornerPatches(corners) {
     const { arc, centre, a, b } = corner;
     const apex = cornerPoint(corner);
     if (!apex || arc.length < 3) continue;
-    const mid = arc[Math.floor(arc.length / 2)];
-    const r = unit([mid[0] - centre[0], mid[1] - centre[1]]);
-    const t = [-r[1], r[0]];
-    const tangent = (p) => { const q = unit([p[0] - centre[0], p[1] - centre[1]]); return [-q[1], q[0]]; };
-    const e0 = lineX(mid, t, arc[0], tangent(arc[0]));
-    const e1 = lineX(mid, t, arc[arc.length - 1], tangent(arc[arc.length - 1]));
-    if (!e0 || !e1) continue;
-    const width = Math.hypot(e1[0] - e0[0], e1[1] - e0[1]) + CORNER_PATCH_PAD_M;
-    const length = Math.hypot(apex[0] - mid[0], apex[1] - mid[1]);
-    if (!(width > 0.3) || width > 25 || !(length > 0.3) || length > 15) continue;
-    // (a hair past the curve, under the curb's face: no seam of ground at it)
-    const back = [mid[0] - r[0] * 0.1, mid[1] - r[1] * 0.1];
+    const radius = Math.hypot(arc[0][0] - centre[0], arc[0][1] - centre[1]);
+    const depth = Math.hypot(apex[0] - centre[0], apex[1] - centre[1]) - radius;
+    if (!(depth > 0) || depth > 15) continue;
     const z = (a.z + b.z) / 2;
-    // (both streets: the corner takes the greater one's surface, exportBeamNGLevel)
+    // (both streets: the corner takes the junction's surface, exportBeamNGLevel)
     const surface = a.run.surface ?? b.run.surface;
     const streets = [{ surface: a.run.surface, highway: a.run.highway }, { surface: b.run.surface, highway: b.run.highway }];
-    out.push({ nodes: [[back[0], back[1], z, width], [apex[0] + r[0] * 0.3, apex[1] + r[1] * 0.3, z, CORNER_PATCH_PAD_M + 0.3]], surface, streets });
-    // and a band along the curve itself on its road side: the triangle's
-    // straight edges leave slivers of ground where the curb bends away from them
-    const band = arc.map((p) => {
-      const o = unit([p[0] - centre[0], p[1] - centre[1]]);
-      return [p[0] + o[0] * (CORNER_BAND_M / 2 - 0.1), p[1] + o[1] * (CORNER_BAND_M / 2 - 0.1), p[2], CORNER_BAND_M];
+    // the curb lines: each arc end's tangent; the corner lies on the arc's side
+    const tangent = (p) => { const q = unit([p[0] - centre[0], p[1] - centre[1]]); return [-q[1], q[0]]; };
+    const lines = [arc[0], arc[arc.length - 1]].map((p, k) => {
+      const t = tangent(p); const n = [-t[1], t[0]];
+      const other = arc[k ? 0 : arc.length - 1];
+      const sign = Math.sign((other[0] - p[0]) * n[0] + (other[1] - p[1]) * n[1]) || 1;
+      return (q) => ((q[0] - p[0]) * n[0] + (q[1] - p[1]) * n[1]) * sign;
     });
-    out.push({ nodes: band, surface, streets, band: true });
+    // (a little over each curb line: the street's own decal lies beyond it)
+    const inside = (q) => Math.min(lines[0](q), lines[1](q)) + CORNER_BAND_OVER_M;
+    // (densely along the curve: an outer band keeps only its middle)
+    const fine = [];
+    for (let i = 0; i + 1 < arc.length; i++) for (let k = 0; k < 4; k++) fine.push(lerp3(arc[i], arc[i + 1], k / 4));
+    fine.push(arc[arc.length - 1]);
+    for (let m = CORNER_BAND_M / 2 - 0.1; m - CORNER_BAND_M / 2 < depth; m += CORNER_BAND_M - CORNER_BAND_LAP_M) {
+      const pts = fine.map((p) => { const o = unit([p[0] - centre[0], p[1] - centre[1]]); return [p[0] + o[0] * m, p[1] + o[1] * m, z, CORNER_BAND_M]; });
+      // keep the stretch inside both curb lines, cut where it leaves them
+      const kept = [];
+      for (let i = 0; i < pts.length; i++) {
+        const fi = inside(pts[i]);
+        if (fi >= 0) {
+          if (!kept.length && i > 0) { const fp = inside(pts[i - 1]); kept.push(lerp3(pts[i - 1], pts[i], fp / (fp - fi))); }
+          kept.push(pts[i]);
+        } else if (kept.length) {
+          const fp = inside(pts[i - 1]); kept.push(lerp3(pts[i - 1], pts[i], fp / (fp - fi)));
+          break;
+        }
+      }
+      const length = kept.reduce((sum, q, i) => (i ? sum + Math.hypot(q[0] - kept[i - 1][0], q[1] - kept[i - 1][1]) : 0), 0);
+      if (kept.length < 2 || length < CORNER_BAND_MIN_M) continue;
+      // (evenly spaced: the game's spline through two nodes almost on top of
+      // each other, as the cut left them, overshot into spikes across the road)
+      out.push({ nodes: resampleEven(kept, Math.max(3, Math.round(length / CORNER_BAND_STEP_M) + 1)), surface, streets, band: true });
+    }
   }
   return out;
 }
+const lerp3 = (p, q, t) => p.map((v, i) => v + ((q[i] ?? v) - v) * t);
+// n points evenly along a polyline, its ends kept
+function resampleEven(pts, n) {
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+  const total = cum[cum.length - 1];
+  const out = [];
+  let j = 1;
+  for (let k = 0; k < n; k++) {
+    const d = (k / (n - 1)) * total;
+    while (j < pts.length - 1 && cum[j] < d) j++;
+    const span = cum[j] - cum[j - 1] || 1;
+    out.push(lerp3(pts[j - 1], pts[j], Math.max(0, Math.min(1, (d - cum[j - 1]) / span))));
+  }
+  return out;
+}
+const CORNER_BAND_STEP_M = 0.8;
+const CORNER_BAND_MIN_M = 1.0;
+const CORNER_BAND_OVER_M = 0.6;
+const CORNER_BAND_LAP_M = 0.1;
 const CORNER_BAND_M = 1.2;
-const CORNER_PATCH_PAD_M = 0.4;
+
+// The road beside each curb, from its face in toward the street's centre
+// line, and every street's carriageway: rings [[x, y]...]. A mapped walk is cut at the curb like at a rounded
+// one; pushed behind the curb, some still ran on past a curve's end, over the
+// next street's straight curb and out across its road.
+export function curbKeepOuts(runs, carriageways) {
+  const byOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
+  const centreDist = (cw, p) => {
+    let best = Infinity;
+    for (let i = 1; i < cw.nodes.length; i++) {
+      const a = cw.nodes[i - 1]; const b = cw.nodes[i];
+      const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+      best = Math.min(best, Math.hypot(a[0] + dx * t - p[0], a[1] + dy * t - p[1]));
+    }
+    return best;
+  };
+  const out = [];
+  for (const run of runs) {
+    const cw = byOwner.get(run.owner);
+    if (!cw || run.median || run.points.length < 2) continue;
+    const pts = run.points;
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const p = pts[i]; const q = pts[i + 1];
+      const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (L < 0.05) continue;
+      let n = [-(q[1] - p[1]) / L, (q[0] - p[0]) / L];
+      const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+      // (toward the road: the side nearer the street's centre line)
+      if (centreDist(cw, [m[0] + n[0] * 0.3, m[1] + n[1] * 0.3]) > centreDist(cw, [m[0] - n[0] * 0.3, m[1] - n[1] * 0.3])) n = [-n[0], -n[1]];
+      const depth = Math.min(CURB_KEEP_OUT_M, centreDist(cw, m));
+      if (depth < 0.5) continue;
+      const s0 = CURB_KEEP_OUT_SET_M;
+      out.push([
+        [p[0] + n[0] * s0, p[1] + n[1] * s0], [q[0] + n[0] * s0, q[1] + n[1] * s0],
+        [q[0] + n[0] * depth, q[1] + n[1] * depth], [p[0] + n[0] * depth, p[1] + n[1] * depth],
+      ]);
+    }
+  }
+  // and each street's own carriageway: a side street's mouth has no curb, and
+  // a walk carried on across it stood a hand's height proud of the road
+  // (driveways and service roads aside: the sidewalk runs on across them)
+  for (const cw of carriageways) {
+    if (cw.highway === 'service' || !(cw.half > 1) || cw.nodes.length < 2) continue;
+    const h = cw.half - CURB_KEEP_OUT_SET_M;
+    for (let i = 0; i + 1 < cw.nodes.length; i++) {
+      const p = cw.nodes[i]; const q = cw.nodes[i + 1];
+      const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      if (L < 0.05) continue;
+      const n = [-(q[1] - p[1]) / L * h, (q[0] - p[0]) / L * h];
+      out.push([[p[0] + n[0], p[1] + n[1]], [q[0] + n[0], q[1] + n[1]], [q[0] - n[0], q[1] - n[1]], [p[0] - n[0], p[1] - n[1]]]);
+    }
+  }
+  return out;
+}
+const CURB_KEEP_OUT_M = 6;
+const CORNER_CUT_REACH_M = 3;      // how far in from a curb's face a walk is cut away
+const CURB_KEEP_OUT_SET_M = 0.02;
 
 // The road inside each rounded curb, to its curb's back: rings [[x, y]...]
 // (from the square corner the curb cuts off, along the arc set in by the curb)
-function cornerCuts(corners) {
+export function cornerCuts(corners) {
   const out = [];
   for (const corner of corners) {
     const { arc, centre } = corner;
@@ -1511,7 +1606,11 @@ function cornerCuts(corners) {
     if (!apex) continue;
     // (out along the curbs' faces and across them at the curve's ends: the
     // curb's whole width cut where it bends, no sliver left beside it)
-    out.push([[apex[0], apex[1]], o0, ...inner, o1]);
+    // (and on past the corner point into the junction: between the curve's
+    // end and the next street's own curb, outside both roads' drawn width, a
+    // wedge of road was left where a walk's slab still stood)
+    const out_ = unit([apex[0] - centre[0], apex[1] - centre[1]]);
+    out.push([[apex[0] + out_[0] * CORNER_CUT_REACH_M, apex[1] + out_[1] * CORNER_CUT_REACH_M], o0, ...inner, o1]);
   }
   return out;
 }
@@ -2482,18 +2581,59 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
   // walk mapped up to the corner reached over the curb onto it, its raised
   // edge standing there as a wedge
   const boxOfRing = (ring) => [Math.min(...ring.map((q) => q[0])), Math.min(...ring.map((q) => q[1])), Math.max(...ring.map((q) => q[0])), Math.max(...ring.map((q) => q[1]))];
-  const cutRings = cuts.map((ring) => ({ shape: [[...ring, ring[0]].map(([x, y]) => [x, y])], box: boxOfRing(ring) }));
+  const cutRings = cuts.map((ring) => ({ shape: [[...ring, ring[0]].map(([x, y]) => [x, y])], box: boxOfRing(ring), cut: true }));
+  // (a grid of them: one keep-out per curb segment runs to thousands)
+  const CUT_CELL = 16;
+  const cutGrid = new Map();
+  for (const c of cutRings) {
+    for (let gx = Math.floor(c.box[0] / CUT_CELL); gx <= Math.floor(c.box[2] / CUT_CELL); gx++) {
+      for (let gy = Math.floor(c.box[1] / CUT_CELL); gy <= Math.floor(c.box[3] / CUT_CELL); gy++) {
+        const key = `${gx},${gy}`;
+        if (!cutGrid.has(key)) cutGrid.set(key, []);
+        cutGrid.get(key).push(c);
+      }
+    }
+  }
+  const cutsNear = (x0, y0, x1, y1) => {
+    const found = new Set();
+    for (let gx = Math.floor(x0 / CUT_CELL); gx <= Math.floor(x1 / CUT_CELL); gx++) {
+      for (let gy = Math.floor(y0 / CUT_CELL); gy <= Math.floor(y1 / CUT_CELL); gy++) {
+        for (const c of cutGrid.get(`${gx},${gy}`) || []) if (c.box[0] <= x1 && x0 <= c.box[2] && c.box[1] <= y1 && y0 <= c.box[3]) found.add(c);
+      }
+    }
+    return [...found];
+  };
   if (cuts.length) {
     const boxOf = boxOfRing;
     const kept = [];
     for (const strip of strips) {
       const b = boxOf(strip.shape[0]);
-      const near = cutRings.filter((c) => c.box[0] <= b[2] && b[0] <= c.box[2] && c.box[1] <= b[3] && b[1] <= c.box[3]);
+      const near = cutsNear(b[0], b[1], b[2], b[3]);
       if (!near.length) { kept.push(strip); continue; }
-      let pieces;
-      try { pieces = polygonClipping.difference(strip.shape, ...near.map((c) => c.shape)); } catch { kept.push(strip); continue; }
+      // (polygon-clipping fails now and then on near-touching edges: rounded to
+      // the centimetre, then cut by one ring at a time, skipping any that
+      // fail; kept whole, a strip's outline stood as bare walls on the road
+      // where its panels had been cut away)
+      const r2 = (sh) => sh.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
+      let pieces = null;
+      for (const attempt of [() => polygonClipping.difference(strip.shape, ...near.map((c) => c.shape)),
+        () => polygonClipping.difference(r2(strip.shape), ...near.map((c) => r2(c.shape)))]) {
+        try { pieces = attempt(); break; } catch { /* next */ }
+      }
+      if (!pieces) {
+        pieces = [r2(strip.shape)];
+        for (const c of near) {
+          try { pieces = polygonClipping.difference(pieces, r2(c.shape)); } catch { /* this ring skipped */ }
+        }
+      }
       // (slivers left between a straight curb's face and its back: dropped)
-      for (const shape of pieces) if (Math.abs(ringArea(shape[0])) - shape.slice(1).reduce((a, h) => a + Math.abs(ringArea(h)), 0) >= CUT_SLIVER_M2) kept.push({ ...strip, shape });
+      // (and long thin ones: by area alone a 5 cm sliver along a cut kept its
+      // outline while each panel's piece of it was dropped, bare walls left)
+      const perimeter = (ring) => ring.reduce((sum, q, i) => (i ? sum + Math.hypot(q[0] - ring[i - 1][0], q[1] - ring[i - 1][1]) : 0), 0);
+      for (const shape of pieces) {
+        const area = Math.abs(ringArea(shape[0])) - shape.slice(1).reduce((a, h) => a + Math.abs(ringArea(h)), 0);
+        if (area >= CUT_SLIVER_M2 && (2 * area) / (perimeter(shape[0]) || 1) >= CUT_SLIVER_W_M) kept.push({ ...strip, shape, piece: true });
+      }
     }
     strips.length = 0;
     strips.push(...kept);
@@ -2572,7 +2712,11 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
   order.forEach((strip, i) => {
     const before = order.slice(0, i).filter((o) => o.box[0] <= strip.box[2] && o.box[2] >= strip.box[0] && o.box[1] <= strip.box[3] && o.box[3] >= strip.box[1]);
     const level = (x, y) => { const q = levelAt(x, y); return [x, y, q ? q[2] : 0]; };
-    const flatTri = (a, b, c) => builder.tri(top, a, b, c, stripUv(strip, ...a), stripUv(strip, ...b), stripUv(strip, ...c), [0, 0, 1]);
+    const flatTri = (a, b, c) => {
+      // (a cut can leave a piece with no area: nothing to draw)
+      if (Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) < 1e-4) return;
+      builder.tri(top, a, b, c, stripUv(strip, ...a), stripUv(strip, ...b), stripUv(strip, ...c), [0, 0, 1]);
+    };
     if (strip.pocket) {
       // in cells, each corner at the nearest walk's height (and over the ground)
       const uv = (q) => [q[0] / SLAB_TILE_M, q[1] / SLAB_TILE_M];
@@ -2599,8 +2743,8 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
       const xs = panel.map((q) => q[0]); const ys = panel.map((q) => q[1]);
       const x0 = Math.min(...xs); const x1 = Math.max(...xs); const y0 = Math.min(...ys); const y1 = Math.max(...ys);
       // (and the road inside a rounded curb kept clear: the cuts)
-      const near = [...before, ...cutRings].filter((o) => o.box[0] <= x1 && o.box[2] >= x0 && o.box[1] <= y1 && o.box[3] >= y0);
-      if (!near.length) {
+      const near = [...before.filter((o) => o.box[0] <= x1 && o.box[2] >= x0 && o.box[1] <= y1 && o.box[3] >= y0), ...cutsNear(x0, y0, x1, y1)];
+      if (!near.length && !strip.piece) {
         const [a, b, c, d] = panel.map(([x, y]) => level(x, y));
         flatTri(a, b, c); flatTri(a, c, d);
         continue;
@@ -2608,15 +2752,24 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
       // (polygon-clipping fails now and then on near-touching edges: rounded to
       // the centimetre, then without the corner cuts, then the whole panel;
       // one failure dropped the merge for the whole town)
-      const r2 = (sh) => sh.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
-      const panelShape = [[...panel, panel[0]]];
-      let pieces = null;
-      for (const attempt of [() => polygonClipping.difference(panelShape, ...near.map((o) => o.shape)),
-        () => polygonClipping.difference(r2(panelShape), ...near.map((o) => r2(o.shape))),
-        () => polygonClipping.difference(r2(panelShape), ...near.filter((o) => !cutRings.includes(o)).map((o) => r2(o.shape)))]) {
-        try { pieces = attempt(); break; } catch { /* next */ }
+      const r2 = (mp) => mp.map((poly) => poly.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100])));
+      let panelShape = [[[...panel, panel[0]]]];
+      // (a piece of a cut strip: only its own part of each panel, or every
+      // piece drew the whole strip again over the others)
+      if (strip.piece) {
+        let own = null;
+        try { own = polygonClipping.intersection(panelShape, strip.shape); } catch { try { own = polygonClipping.intersection(r2(panelShape), r2([strip.shape])); } catch { /* whole panel */ } }
+        if (own && !own.length) continue;
+        if (own) panelShape = own;
       }
-      if (!pieces) pieces = [panelShape];
+      let pieces = near.length ? null : panelShape;
+      for (const attempt of [() => polygonClipping.difference(panelShape, ...near.map((o) => o.shape)),
+        () => polygonClipping.difference(r2(panelShape), ...near.map((o) => r2([o.shape]))),
+        () => polygonClipping.difference(r2(panelShape), ...near.filter((o) => !o.cut).map((o) => r2([o.shape])))]) {
+        if (pieces) break;
+        try { pieces = attempt(); } catch { /* next */ }
+      }
+      if (!pieces) pieces = panelShape;
       pieces = pieces.filter((piece) => Math.abs(ringArea(piece[0])) >= CUT_SLIVER_M2 / 4);
       for (const piece of pieces) {
         const rings = piece.map((ring) => ring.slice(0, -1));
@@ -2703,7 +2856,7 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
     console.warn('Sidewalks: could not find the paved pockets by the seawalls:', err?.message);
   }
   try {
-    mergeWalks(builder, walkRuns, { pockets, streetRuns: runs, groundAt: options.groundAt, cuts: cornerCuts(corners) });
+    mergeWalks(builder, walkRuns, { pockets, streetRuns: runs, groundAt: options.groundAt, cuts: [...cornerCuts(corners), ...curbKeepOuts(runs, carriageways)] });
   } catch (err) {
     console.warn('Sidewalks: could not merge the walkways, drawing them apart:', err?.message);
     builder = new PartBuilder(paveAt);

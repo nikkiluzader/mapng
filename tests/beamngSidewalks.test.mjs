@@ -528,28 +528,88 @@ test('a street whose sidewalks OSM tags or maps apart keeps its curb: no sidewal
   assert.ok(!runs.some((r) => r.front && r.side === 1 && r.points.some((p) => p[0] > -45 && p[0] < 45)), 'a mapped sidewalk behind the curb: none laid over it');
 });
 
-test('a rounded curb\'s corner is paved by a decal on the road side, none of it past the curve', async () => {
+test('a rounded curb\'s corner is paved by bands of one width along the curve, out to the curbs\' corner, none past the curve', async () => {
   const { cornerPatches } = await import('../services/beamngSidewalks.js');
   const ew = street({ owner: 1, tags: { surface: 'asphalt' }, nodes: Array.from({ length: 11 }, (_, i) => [i * 10, 0, 5, 8]) });
   const ns = street({ owner: 2, tags: {}, nodes: Array.from({ length: 11 }, (_, i) => [0, i * 10, 5, 8]) });
   const { corners } = buildSidewalkMeshes([ew, ns]);
   const all = cornerPatches(corners);
-  const patches = all.filter((p) => !p.band);
-  const bands = all.filter((p) => p.band);
-  assert.equal(patches.length, corners.length);
-  assert.equal(bands.length, corners.length, 'and a band along each curve');
-  for (const [c, band] of corners.map((c, i) => [c, bands[i]])) {
+  assert.ok(all.length >= corners.length && all.every((p) => p.band));
+  for (const c of corners) {
     const r = Math.hypot(c.arc[0][0] - c.centre[0], c.arc[0][1] - c.centre[1]);
-    for (const q of band.nodes) {
-      const d = Math.hypot(q[0] - c.centre[0], q[1] - c.centre[1]);
-      assert.ok(d - q[3] / 2 > r - 0.15 && d - q[3] / 2 < r, 'from just under the curb face out over the road');
+    const near = (q) => Math.hypot(q[0] - c.centre[0], q[1] - c.centre[1]) < r + 8;
+    const bands = all.filter((p) => p.nodes.every(near));
+    assert.ok(bands.length >= 2, 'more than the one band at the curb');
+    let reach = 0;
+    for (const band of bands) {
+      for (const q of band.nodes) {
+        assert.equal(q[3], bands[0].nodes[0][3], 'no taper: the texture is never squeezed');
+        const k = band.nodes.indexOf(q);
+        if (k) assert.ok(Math.hypot(q[0] - band.nodes[k - 1][0], q[1] - band.nodes[k - 1][1]) > 0.3, 'no two nodes on top of each other (the spline spikes)');
+        const d = Math.hypot(q[0] - c.centre[0], q[1] - c.centre[1]);
+        assert.ok(d - q[3] / 2 > r - 0.15, 'nothing past the curb face');
+        reach = Math.max(reach, d + q[3] / 2);
+      }
+    }
+    // a 90-degree corner of radius r: its square corner lies r(sqrt 2 - 1) out
+    assert.ok(reach > r * Math.SQRT2 - 0.2, `out to the curbs' corner (${reach.toFixed(2)} vs ${(r * Math.SQRT2).toFixed(2)})`);
+    assert.ok(reach < r * Math.SQRT2 + 1.5, 'and not far out over the road');
+  }
+});
+
+test('a mapped walk is cut at a straight curb\'s face: none of its slab out on the road', () => {
+  const s = street({ tags: {}, nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 0, 5, 8]) });
+  const line = (x0, y0, x1, y1, n) => Array.from({ length: n }, (_, i) => [x0 + ((x1 - x0) * i) / (n - 1), y0 + ((y1 - y0) * i) / (n - 1), 0]);
+  // along behind the curb, then slanting out across the road to the far side
+  const walk = { nodes: [...line(-40, 7, -10, 7, 31), ...line(-9, 6.6, 10, -7, 20).slice(1)], half: 1, sidewalk: true };
+  const { meshes } = buildSidewalkMeshes([s], { walks: [walk], groundAt: () => 5 });
+  let onRoad = 0;
+  for (const mesh of meshes) {
+    const pos = mesh.geometry.getAttribute('position').array;
+    for (let v = 0; v + 8 < pos.length; v += 9) {
+      const p = [0, 3, 6].map((k) => [pos[v + k], pos[v + k + 1], pos[v + k + 2]]);
+      const area = Math.abs((p[1][0] - p[0][0]) * (p[2][1] - p[0][1]) - (p[2][0] - p[0][0]) * (p[1][1] - p[0][1])) / 2;
+      const cy = (p[0][1] + p[1][1] + p[2][1]) / 3; const cz = (p[0][2] + p[1][2] + p[2][2]) / 3;
+      if (area > 0.02 && Math.abs(cy) < 3.7 && cz > 5.05) onRoad += area;
     }
   }
-  for (const [c, p] of corners.map((c, i) => [c, patches[i]])) {
-    const r = Math.hypot(c.arc[0][0] - c.centre[0], c.arc[0][1] - c.centre[1]);
-    const [a, b] = p.nodes;
-    assert.ok(a[3] > b[3], 'wide at the curve, narrow at the corner');
-    assert.ok(Math.hypot(b[0] - c.centre[0], b[1] - c.centre[1]) > r, 'its corner end out on the road side of the curve');
-    assert.ok(Math.abs(Math.hypot(a[0] - c.centre[0], a[1] - c.centre[1]) - r) < 0.2, 'its wide end at the curve');
+  assert.ok(onRoad < 0.05, `raised slab on the road: ${onRoad.toFixed(2)} m2`);
+});
+
+test('a walk carried across a side street\'s mouth is cut off its carriageway', () => {
+  const main = street({ tags: {}, nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 0, 5, 8]) });
+  const side = street({ owner: 2, tags: {}, nodes: Array.from({ length: 11 }, (_, i) => [0, -i * 10, 5, 8]) });
+  const line = (x0, y0, x1, y1, n) => Array.from({ length: n }, (_, i) => [x0 + ((x1 - x0) * i) / (n - 1), y0 + ((y1 - y0) * i) / (n - 1), 0]);
+  // a mapped sidewalk along the main street, carried straight over the side street
+  const walk = { nodes: line(-40, -9, 40, -9, 81), half: 1, sidewalk: true };
+  const { meshes } = buildSidewalkMeshes([main, side], { walks: [walk], groundAt: () => 5 });
+  let onRoad = 0;
+  for (const mesh of meshes) {
+    const pos = mesh.geometry.getAttribute('position').array;
+    for (let v = 0; v + 8 < pos.length; v += 9) {
+      const p = [0, 3, 6].map((k) => [pos[v + k], pos[v + k + 1], pos[v + k + 2]]);
+      const area = Math.abs((p[1][0] - p[0][0]) * (p[2][1] - p[0][1]) - (p[2][0] - p[0][0]) * (p[1][1] - p[0][1])) / 2;
+      const cx = (p[0][0] + p[1][0] + p[2][0]) / 3; const cy = (p[0][1] + p[1][1] + p[2][1]) / 3; const cz = (p[0][2] + p[1][2] + p[2][2]) / 3;
+      if (area > 0.02 && Math.abs(cx) < 3.7 && cy < -6 && cy > -12 && cz > 5.05) onRoad += area;
+    }
   }
+  assert.ok(onRoad < 0.05, `raised walk on the side street: ${onRoad.toFixed(2)} m2`);
+});
+
+test('a walk cut in pieces draws each piece once: no triangle twice', () => {
+  const main = street({ tags: {}, nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 0, 5, 8]) });
+  const side = street({ owner: 2, tags: {}, nodes: Array.from({ length: 11 }, (_, i) => [0, -i * 10, 5, 8]) });
+  const line = (x0, y0, x1, y1, n) => Array.from({ length: n }, (_, i) => [x0 + ((x1 - x0) * i) / (n - 1), y0 + ((y1 - y0) * i) / (n - 1), 0]);
+  const walk = { nodes: line(-40, -9, 40, -9, 81), half: 1, sidewalk: true };
+  const { meshes } = buildSidewalkMeshes([main, side], { walks: [walk], groundAt: () => 5 });
+  const seen = new Set();
+  let twice = 0;
+  for (const mesh of meshes) {
+    const pos = mesh.geometry.getAttribute('position').array;
+    for (let v = 0; v + 8 < pos.length; v += 9) {
+      const key = [0, 3, 6].map((k) => `${pos[v + k].toFixed(3)},${pos[v + k + 1].toFixed(3)},${pos[v + k + 2].toFixed(3)}`).sort().join('|');
+      if (seen.has(key)) twice++; else seen.add(key);
+    }
+  }
+  assert.equal(twice, 0, `${twice} triangles drawn twice`);
 });

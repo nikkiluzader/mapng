@@ -2930,7 +2930,13 @@ const surfaceLook = (key) => (PAVING_MATERIALS[key]
   : key === 'concrete' ? { material: GLOBAL_DECAL_MATERIALS.concrete, textureLength: SURFACE_TEXTURE_LENGTH.concrete }
     : { material: GLOBAL_DECAL_MATERIALS.asphalt, textureLength: SURFACE_TEXTURE_LENGTH.asphalt });
 
-function cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, index, { americas = false, groupOf = () => null } = {}) {
+// a corner's junction: the streets within this reach of its corner point
+const CORNER_JUNCTION_REACH_M = 7;
+// how finely a street's centre line is tested for where its surface stops
+const SURFACE_CUT_STEP_M = 0.25;
+const MOUTH_NODE_GAP_M = 0.6;
+
+export function cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, index, { americas = false, groupOf = () => null } = {}) {
   const byOwner = new Map(carriageways.map((cw) => [cw.owner, { cw, key: surfaceKeyOf(cw.tags, americas) }]));
   const rank = (cw) => (SURFACE_RANK[String(cw.highway).replace(/_link$/, '')] ?? 1) * 2 + (PAVING_MATERIALS[surfaceKeyOf(cw.tags, americas)] ? 0 : 1);
   // does (x, y) lie on (or within a corner radius of) a greater street of another surface?
@@ -2946,12 +2952,81 @@ function cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, index, { america
     }
     return best;
   };
+  // Each street is judged along its own centre line, and its side-by-side
+  // strips are cut where their stations leave it, so the paving ends in one
+  // straight edge square to the street rather than in steps.
+  const profiles = new Map();
+  const profileOf = (owner) => {
+    if (profiles.has(owner)) return profiles.get(owner);
+    const me = byOwner.get(owner);
+    let prof = null;
+    if (me && me.cw.nodes.length >= 2) {
+      const n = me.cw.nodes;
+      const cum = [0];
+      for (let i = 1; i < n.length; i++) cum.push(cum[i - 1] + Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]));
+      const length = cum[cum.length - 1];
+      const pointAt = (st) => {
+        let i = 1;
+        while (i < n.length - 1 && cum[i] < st) i++;
+        const span = cum[i] - cum[i - 1] || 1;
+        const t = Math.max(0, Math.min(1, (st - cum[i - 1]) / span));
+        const dx = n[i][0] - n[i - 1][0]; const dy = n[i][1] - n[i - 1][1]; const L = Math.hypot(dx, dy) || 1;
+        return { p: [n[i - 1][0] + dx * t, n[i - 1][1] + dy * t, n[i - 1][2] + (n[i][2] - n[i - 1][2]) * t], dir: [dx / L, dy / L] };
+      };
+      const steps = Math.max(1, Math.ceil(length / SURFACE_CUT_STEP_M));
+      const blocked = [];
+      for (let k = 0; k <= steps; k++) { const { p } = pointAt((k / steps) * length); blocked.push(crossAt(owner, p[0], p[1])); }
+      // the stretches on another street (at the ends, or where it crosses
+      // one midway) and the cut stations bounding them
+      const spans = [];
+      for (let k = 0; k <= steps; k++) {
+        if (!blocked[k]) continue;
+        let j = k; while (j < steps && blocked[j + 1]) j++;
+        spans.push({ a: k ? (k / steps) * length : -Infinity, b: j < steps ? (j / steps) * length : Infinity, other: blocked[k] });
+        k = j;
+      }
+      const cuts = spans.flatMap((sp) => [Number.isFinite(sp.a) ? sp.a : null, Number.isFinite(sp.b) ? sp.b : null]).filter((v) => v !== null).map((st) => ({ st }));
+      const stationOf = (x, y) => {
+        let best = Infinity; let st = 0;
+        for (let i = 1; i < n.length; i++) {
+          const ax = n[i - 1][0]; const ay = n[i - 1][1]; const dx = n[i][0] - ax; const dy = n[i][1] - ay; const L2 = dx * dx + dy * dy || 1;
+          const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / L2));
+          const d = Math.hypot(ax + dx * t - x, ay + dy * t - y);
+          if (d < best) { best = d; st = cum[i - 1] + t * Math.sqrt(L2); }
+        }
+        return st;
+      };
+      const isCut = (st) => spans.some((sp) => st > sp.a && st < sp.b);
+      prof = { n, length, pointAt, stationOf, isCut, cuts, spans, steps };
+    }
+    profiles.set(owner, prof);
+    return prof;
+  };
+  // move a cut strip end along its strip onto the line square to the street
+  // at the cut station
+  const squareEnd = (run, atStart, prof) => {
+    const e = atStart ? run[0] : run[run.length - 1];
+    const q = atStart ? run[1] : run[run.length - 2];
+    const st = prof.stationOf(e[0], e[1]);
+    const c = prof.cuts.reduce((m, k) => (Math.abs(k.st - st) < Math.abs((m?.st ?? Infinity) - st) ? k : m), null);
+    if (!c || Math.abs(c.st - st) > 1.5) return;
+    const { p, dir } = prof.pointAt(c.st);
+    const d = [e[0] - q[0], e[1] - q[1]]; const along = d[0] * dir[0] + d[1] * dir[1];
+    if (Math.abs(along) < 1e-6) return;
+    const t = -((e[0] - p[0]) * dir[0] + (e[1] - p[1]) * dir[1]) / along;
+    if (Math.abs(t * Math.hypot(d[0], d[1])) > 1.5) return;
+    const moved = [e[0] + d[0] * t, e[1] + d[1] * t, e[2] + (e[2] - q[2]) * t, ...e.slice(3)];
+    if (atStart) run[0] = moved; else run[run.length - 1] = moved;
+  };
   let cut = 0;
   for (const { decal, group, owner } of surfaceDecals) {
-    const runs = cutNodes(decal.nodes, (x, y) => !!crossAt(owner, x, y));
+    const prof = profileOf(owner);
+    if (!prof || !prof.cuts.length) continue;
+    const runs = cutNodes(decal.nodes, (x, y) => prof.isCut(prof.stationOf(x, y)));
     if (runs.length === 1 && runs[0].length === decal.nodes.length) continue;
     const at = group.__items.indexOf(decal);
     if (at < 0) continue;
+    for (const run of runs) { squareEnd(run, true, prof); squareEnd(run, false, prof); }
     const replacements = runs.map((nodes, k) => {
       const r = { ...decal, name: runs.length > 1 ? `${decal.name}_${k + 1}` : decal.name, persistentId: k === 0 ? decal.persistentId : generatePersistentId(), nodes, ...(decal.startEndFade ? { startEndFade: [0, 0] } : {}) };
       for (const key of ['__owner', '__layer']) if (decal[key] !== undefined) Object.defineProperty(r, key, { value: decal[key], enumerable: false });
@@ -2960,19 +3035,26 @@ function cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, index, { america
     group.__items.splice(at, 1, ...replacements);
     cut++;
   }
-  // the mouth: the street's own line from where it was cut on into the other
-  // street, at its full width, in the other street's surface
+  // the mouth: the street's own line from the cut on into the other street,
+  // at its full width, in the other street's surface
   const fills = [];
   for (const { cw, key } of byOwner.values()) {
-    const n = cw.nodes;
-    for (const fromEnd of [false, true]) {
-      const seq = fromEnd ? [...n].reverse() : n;
-      let k = 0; let other = null;
-      while (k < seq.length) { const o = crossAt(cw.owner, seq[k][0], seq[k][1]); if (!o) break; other = o; k++; }
-      if (!k || k >= seq.length || !other || other.key === key) continue;
-      const tail = seq.slice(0, k + 1).reverse().map(([x, y, z]) => [x, y, z, cw.half * 2]);
-      const look = surfaceLook(other.key);
-      const decal = makeRoadDecal(tail, sanitizeBeamNGObjectName(`mouth_${cw.owner}_${fromEnd ? 'e' : 's'}`), 'road_mouths', { material: look.material, renderPriority: 14, breakAngle: 2, textureLength: look.textureLength, distanceFade: [300, 100] });
+    const prof = profileOf(cw.owner);
+    if (!prof) continue;
+    for (const sp of prof.spans) {
+      if (!sp.other || sp.other.key === key) continue;
+      const s0 = Math.max(0, sp.a); const s1 = Math.min(prof.length, sp.b);
+      if (s1 - s0 < 0.5) continue;
+      const pts = [prof.pointAt(s0).p];
+      for (let i = 1; i < prof.n.length - 1; i++) {
+        const st = prof.stationOf(prof.n[i][0], prof.n[i][1]);
+        // (no node right beside the cut: the game's spline overshoots there)
+        if (st > s0 + MOUTH_NODE_GAP_M && st < s1 - MOUTH_NODE_GAP_M) pts.push(prof.n[i]);
+      }
+      pts.push(prof.pointAt(s1).p);
+      const nodes = pts.map(([x, y, z]) => [x, y, z, cw.half * 2]);
+      const look = surfaceLook(sp.other.key);
+      const decal = makeRoadDecal(nodes, sanitizeBeamNGObjectName(`mouth_${cw.owner}_${Math.round(s0)}`), 'road_mouths', { material: look.material, renderPriority: 14, breakAngle: 2, textureLength: look.textureLength, distanceFade: [300, 100] });
       if (decal) fills.push(decal);
     }
   }
@@ -11820,12 +11902,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // streets' decals leave the corner's triangle of ground bare)
   if (Array.isArray(decalRoads) && sidewalks.corners?.length) {
     const americas = getMarkingStyle(exportTerrainData.roadRules) === 'americas';
+    // A junction has one surface: the greatest street's of all that meet
+    // there (the one the others are cut back to, cutSurfaceAtOtherSurfaces),
+    // and every corner around it takes that surface, even a corner between
+    // two brick arms of an asphalt crossing.
+    const score = (st) => (SURFACE_RANK[String(st.highway ?? '').replace(/_link$/, '')] ?? 1) * 2 + (pavingOf(st.surface, { americas }) ? 0 : 1);
+    const junctionIndex = buildCarriagewayIndex(groundCarriageways);
+    const byOwner = new Map(groundCarriageways.map((cw) => [cw.owner, cw]));
+    const junctionStreets = (x, y) => carriagewaysAt(junctionIndex, x, y, CORNER_JUNCTION_REACH_M)
+      .map((h) => byOwner.get(h.owner)).filter((cw) => cw && surfaceKeyOf(cw.tags, americas) !== 'unpaved')
+      .map((cw) => ({ surface: cw.tags?.surface, highway: cw.highway }));
     const patches = cornerPatches(sidewalks.corners).flatMap((patch, i) => {
-      // (the greater street's surface, as the mouth between the corners:
-      // a brick lane's corners on an asphalt street are asphalt)
-      const [s0, s1] = patch.streets || [{ surface: patch.surface }, { surface: patch.surface }];
-      const score = (st) => (SURFACE_RANK[String(st.highway ?? '').replace(/_link$/, '')] ?? 1) * 2 + (pavingOf(st.surface, { americas }) ? 0 : 1);
-      const key = surfaceKeyOf({ surface: (score(s1) > score(s0) ? s1 : s0).surface }, americas);
+      // (the triangle's tip at the corner point; the band's middle)
+      const tip = patch.band ? patch.nodes[patch.nodes.length >> 1] : patch.nodes[patch.nodes.length - 1];
+      const streets = [...(patch.streets || [{ surface: patch.surface }]), ...junctionStreets(tip[0], tip[1])];
+      const key = surfaceKeyOf({ surface: streets.reduce((a, b) => (score(b) > score(a) ? b : a)).surface }, americas);
       const { material, textureLength } = surfaceLook(key === 'unpaved' ? 'asphalt' : key);
       const decal = makeRoadDecal(patch.nodes, `corner_paving_${i}`, 'corner_paving', { material, renderPriority: 14, breakAngle: 3, textureLength, distanceFade: [300, 100] });
       return decal ? [decal] : [];
