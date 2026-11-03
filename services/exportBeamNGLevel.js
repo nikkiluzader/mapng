@@ -55,7 +55,7 @@ import { buildRoadSignProps } from './roadSigns.js';
 import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
-import { buildPlazaMeshes, getPlazaMaterialDefs, isPlaza, plazaSurface } from './plazas.js';
+import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface } from './plazas.js';
 import { buildSidewalkMeshes, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
@@ -12040,6 +12040,24 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const toW = (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0);
     const squares = (exportTerrainData.osmFeatures || []).filter(isPlaza)
       .map((f) => ({ ring: f.geometry.map(toW), surface: plazaSurface(f.tags.surface) }));
+    // courtyards: flagstone, their footways laid as bordered brick paths
+    // (in grass with dirt paths a courtyard read as a park in a box)
+    const footways = (exportTerrainData.osmFeatures || [])
+      .filter((f) => f.type === 'road' && ['footway', 'path', 'pedestrian', 'steps'].includes(f.tags?.highway) && f.tags?.area !== 'yes' && f.geometry?.length >= 2)
+      .map((f) => ({ nodes: f.geometry.map(toW), half: courtyardPathHalf(f.tags) }));
+    // (an open one with trees or green mapped in it is a garden: its ground
+    // left as it is, only the paths laid; courtyardPaved)
+    const features = exportTerrainData.osmFeatures || [];
+    const trees = features.filter((f) => f.type === 'vegetation' && f.tags?.natural === 'tree' && f.tags.procedurally_generated !== 'yes' && f.geometry?.length).map((f) => toW(f.geometry[0]));
+    const greens = features.filter((f) => f.geometry?.length >= 4 && (['grass', 'meadow', 'village_green', 'flowerbed'].includes(f.tags?.landuse) || ['garden', 'park'].includes(f.tags?.leisure) || ['grassland', 'scrub', 'wood'].includes(f.tags?.natural)))
+      .map((f) => f.geometry.map(toW));
+    for (const f of features.filter(isCourtyard)) {
+      const ring = f.geometry.map(toW);
+      const inside = (q) => { let k = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) if (((ring[i][1] > q[1]) !== (ring[j][1] > q[1])) && (q[0] < ((ring[j][0] - ring[i][0]) * (q[1] - ring[i][1])) / (ring[j][1] - ring[i][1]) + ring[i][0])) k = !k; return k; };
+      const centroid = (r) => [r.reduce((a, q) => a + q[0], 0) / r.length, r.reduce((a, q) => a + q[1], 0) / r.length];
+      const green = trees.some(inside) || greens.some((g) => inside(centroid(g)));
+      squares.push({ ring, surface: f.tags.surface ? plazaSurface(f.tags.surface) : 'flagstone', paved: courtyardPaved(f.tags, green), paths: footways.filter((w) => w.nodes.some(inside)) });
+    }
     if (squares.length) {
       const plazas = buildPlazaMeshes(squares, {
         drape: terrainDrape(exportTerrainData, squareSize),
@@ -12049,7 +12067,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         roads: groundCarriageways.map((cw) => ({ nodes: cw.nodes, half: cw.half })),
       });
       sidewalks.meshes.push(...plazas.meshes);
-      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Plazas: ${plazas.count} of ${squares.length} pedestrian square(s) paved, ${plazas.triangles} triangles.`);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Plazas: ${plazas.count} of ${squares.length} pedestrian square(s) and courtyard(s) paved, ${plazas.triangles} triangles.`);
     }
   }
   const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);

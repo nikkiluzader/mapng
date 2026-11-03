@@ -847,3 +847,29 @@ test('a merged curb run keeps its keep-out on the road side all along, far from 
   // the sidewalk's middle along the east end, either side
   for (const x of [-40, -20, 0]) for (const y of [5.2, -5.2]) assert.ok(!quads.some((qd) => inQuad(x, y, qd)), `no keep-out over the sidewalk at (${x}, ${y})`);
 });
+
+test('a walk mapped along the curb and off it again has no wobble where it is pushed clear', async () => {
+  const { buildWalkRuns } = await import('../services/beamngSidewalks.js');
+  const s = street({ tags: {}, nodes: Array.from({ length: 21 }, (_, i) => [-100 + i * 10, 0, 5, 8]) });
+  // along the road's edge (over it by its half width), a few centimetres of zig-zag, then off to y = 8
+  const nodes = [];
+  for (let x = -30; x <= 0; x += 1) nodes.push([x, 4.2 + (Math.round(x) % 2 ? 0.08 : -0.08), 0]);
+  // (off it on a gentle mapped curve: a mapped corner stays a corner)
+  for (let x = 1; x <= 16; x += 1) { const t = Math.min(1, x / 16); nodes.push([x, 4.2 + t * t * (3 - 2 * t) * 3.8, 0]); }
+  const runs = buildWalkRuns([{ nodes, half: 0.9, sidewalk: true }], [s], { groundAt: () => 5 });
+  assert.equal(runs.length, 1);
+  const c = runs[0].centre;
+  assert.ok(c.every((q) => q[1] > 4 + 0.9 - 0.3), 'its slab clear of the road (to the curb)');
+  // each point off the straight line through the points a metre either side: no kinks
+  const st = [0]; for (let i = 1; i < c.length; i++) st.push(st[i - 1] + Math.hypot(c[i][0] - c[i - 1][0], c[i][1] - c[i - 1][1]));
+  let worst = 0;
+  for (let i = 0; i < c.length; i++) {
+    let a = i; let b = i;
+    while (a > 0 && st[i] - st[a] < 1) a--;
+    while (b + 1 < c.length && st[b] - st[i] < 1) b++;
+    if (st[i] - st[a] < 0.9 || st[b] - st[i] < 0.9) continue;
+    const ex = c[b][0] - c[a][0]; const ey = c[b][1] - c[a][1]; const L = Math.hypot(ex, ey) || 1;
+    worst = Math.max(worst, Math.abs(((c[i][0] - c[a][0]) * ey - (c[i][1] - c[a][1]) * ex) / L));
+  }
+  assert.ok(worst < 0.15, `at most 15 cm off over a metre either side (${worst.toFixed(3)} m)`);
+});

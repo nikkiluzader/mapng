@@ -1976,7 +1976,7 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
       const dl = distinct[distinct.length - 1];
       if (Math.hypot(dl[0] - n0[0], dl[1] - n0[1]) > 1e-6) distinct[distinct.length - 1] = n0;
     }
-    const nodes = smoothLine(distinct.length >= 2 ? distinct : path.nodes);
+    const nodes = thinLine(smoothLine(dewobble(distinct.length >= 2 ? distinct : path.nodes)));
     const full = [...reachRoad(nodes[0], nodes[1]).reverse(), ...nodes, ...reachRoad(nodes[nodes.length - 1], nodes[nodes.length - 2])];
     const smooth = (xs, passes) => {
       let v = xs;
@@ -2044,7 +2044,17 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
       for (let k = Math.max(0, i - 2); k <= Math.min(pull.length - 1, i + 2); k++) if (Math.abs(pull[k]) < Math.abs(best)) best = pull[k];
       return best;
     });
-    const snapped = pushed.map((q, i) => [q[0] + normals[i][0] * settle[i], q[1] + normals[i][1] * settle[i], 0]);
+    // (the whole sideways move, push and pull, smoothed as one: point by
+    // point it jittered a few centimetres, and where the push ended the walk
+    // jogged a metre over in four, wobbling; each side's move is spread to
+    // its neighbours within WALK_SHIFT_EASE_M, its largest, then averaged
+    // over the same: smooth, eased out, never less than it was, so never
+    // back over the curb)
+    // (held where it meets another walk: eased there, its end was carried
+    // off the junction it came out to)
+    const held = full.map((q, i) => (joinsAnother(q[0], q[1], k, WALK_TOUCH_M) ? i : -1)).filter((i) => i >= 0);
+    const lateral = easeShift(full, shift.map((v, i) => v + settle[i]), held);
+    const snapped = full.map((q, i) => [q[0] + normals[i][0] * lateral[i], q[1] + normals[i][1] * lateral[i], 0]);
     // beside a street it is as high as the curb; away from one, on the ground
     // (a seawall's foot or a mapped end over the water isn't a dip in the walk)
     const heights = snapped.map((q) => {
@@ -2156,6 +2166,84 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
   });
   levelWalkJunctions(runs);
   return runs;
+}
+
+// A walk's mapped line with its small zig-zags taken out: a point within
+// WOBBLE_M of the line through its neighbours eased onto it, a few passes
+// (a hand-traced walk wandering a few centimetres from one point to the
+// next came out with wobbly edges); a real corner stands off further and stays.
+const WOBBLE_M = 0.25;
+const WOBBLE_PASSES = 3;
+function dewobble(nodes) {
+  if (nodes.length < 3) return nodes;
+  const closed = nodes.length > 3 && Math.hypot(nodes[0][0] - nodes[nodes.length - 1][0], nodes[0][1] - nodes[nodes.length - 1][1]) < 1e-6;
+  let pts = nodes.map((q) => [...q]);
+  for (let pass = 0; pass < WOBBLE_PASSES; pass++) {
+    const next = pts.map((q) => [...q]);
+    for (let i = 1; i + 1 < pts.length; i++) {
+      const a = pts[i - 1]; const b = pts[i + 1]; const p = pts[i];
+      const mx = (a[0] + b[0]) / 2; const my = (a[1] + b[1]) / 2;
+      if (Math.hypot(p[0] - mx, p[1] - my) < WOBBLE_M) { next[i][0] = (p[0] + mx) / 2; next[i][1] = (p[1] + my) / 2; }
+    }
+    pts = next;
+  }
+  if (closed) pts[pts.length - 1] = [...pts[0]];
+  return pts;
+}
+
+// A line's points within THIN_M of the straight line through the ones kept
+// either side dropped, no stretch over THIN_MAX_M: rounding a bend spread
+// over three points cut three corners, ten percent more slab for nothing.
+const THIN_M = 0.01;
+const THIN_MAX_M = 1;   // (no coarser: a walk is cut at a road at its points, and 2.5 m apart its ends fell short of the junctions they met)
+function thinLine(pts) {
+  if (pts.length < 3) return pts;
+  const out = [pts[0]];
+  let last = 0;
+  for (let i = 1; i + 1 < pts.length; i++) {
+    const a = pts[last]; const p = pts[i]; const b = pts[i + 1];
+    const ex = b[0] - a[0]; const ey = b[1] - a[1]; const L = Math.hypot(ex, ey);
+    const off = L > 1e-9 ? Math.abs(((p[0] - a[0]) * ey - (p[1] - a[1]) * ex) / L) : 0;
+    // (the stretch from the last kept point to the next, every dropped point on it)
+    let keep = off >= THIN_M || L > THIN_MAX_M;
+    if (!keep) {
+      for (let k = last + 1; k < i && !keep; k++) {
+        const q = pts[k];
+        if (Math.abs(((q[0] - a[0]) * ey - (q[1] - a[1]) * ex) / L) >= THIN_M) keep = true;
+      }
+    }
+    if (keep) { out.push(p); last = i; }
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+
+// A sideways move along a line, smoothed (buildWalkRuns): each side's
+// (positive and negative apart) the largest within WALK_SHIFT_EASE_M, then
+// the mean over the same stretch, a smooth envelope never under the move.
+const WALK_SHIFT_EASE_M = 3;
+function easeShift(line, moves, held = []) {
+  if (!moves.some((v) => Math.abs(v) > 1e-6)) return moves;
+  const st = [0];
+  for (let i = 1; i < line.length; i++) st.push(st[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
+  const windowed = (vals, f) => vals.map((_, i) => {
+    let a = i; let b = i;
+    while (a > 0 && st[i] - st[a - 1] <= WALK_SHIFT_EASE_M) a--;
+    while (b + 1 < vals.length && st[b + 1] - st[i] <= WALK_SHIFT_EASE_M) b++;
+    return f(vals.slice(a, b + 1));
+  });
+  const envelope = (vals) => windowed(windowed(vals, (w) => Math.max(...w)), (w) => w.reduce((x, y) => x + y, 0) / w.length);
+  const pos = envelope(moves.map((v) => Math.max(0, v)));
+  const neg = envelope(moves.map((v) => Math.max(0, -v)));
+  // (back to its own move toward each end and each held point: eased there,
+  // an end coming out to a junction at the road was carried a metre and a
+  // half off it)
+  const total = st[st.length - 1];
+  const anchors = [0, total, ...held.map((i) => st[i])];
+  return pos.map((v, i) => {
+    const w = Math.max(0, Math.min(1, ...anchors.map((a) => Math.abs(st[i] - a) / WALK_SHIFT_EASE_M)));
+    return moves[i] + (v - neg[i] - moves[i]) * w;
+  });
 }
 
 // Walk ways that carry on from one another at a shared node, one line: each

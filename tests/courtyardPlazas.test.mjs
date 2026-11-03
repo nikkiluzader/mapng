@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { courtyardPassages, inRing } from '../services/buildingDetails.js';
-import { buildPlazaMeshes, isPlaza, plazaSurface } from '../services/plazas.js';
+import { buildPlazaMeshes, courtyardLayout, courtyardPathHalf, courtyardPaved, isCourtyard, isPlaza, plazaSurface } from '../services/plazas.js';
 
 // world metres as lat/lng: 1e-5 degrees = 1 m both ways (the projection below)
 const ll = (x, y) => ({ lat: y * 1e-5, lng: x * 1e-5 });
@@ -132,4 +132,60 @@ test('a short piece of a town street is judged with the street it is cut from', 
   assert.equal(urban(piece), true, 'the piece by the park is still the town street');
   const alone = buildUrbanRoadClassifier([...houses, { ...piece, tags: { highway: 'residential' } }]);
   assert.equal(alone({ ...piece, tags: { highway: 'residential' } }), false, 'judged alone it is not');
+});
+
+test('a courtyard is paved in flagstone inside its hall, its paths in bordered herringbone brick', () => {
+  assert.ok(isCourtyard({ tags: { man_made: 'courtyard' }, geometry: ring([[0, 0], [1, 0], [1, 1]]) }));
+  assert.ok(!isCourtyard({ tags: { man_made: 'courtyard', indoor: 'yes' }, geometry: ring([[0, 0], [1, 0], [1, 1]]) }));
+  assert.equal(courtyardPathHalf({}), 0.9);
+  assert.equal(courtyardPathHalf({ width: '3' }), 1.5);
+  // the hall's outline holds the courtyard (its hole): it isn't cut away
+  const hallRing = [[-20, -20], [20, -20], [20, 20], [-20, 20]];
+  const court = { ring: [[-10, -10], [10, -10], [10, 10], [-10, 10]], surface: 'flagstone',
+    paths: [{ nodes: [[-12, 0], [12, 0]], half: 0.9 }, { nodes: [[0, -12], [0, 12]], half: 0.9 }] };
+  const drape = { drapeAt: () => 2, grid: { sq: 1, ox: -512, oy: -512 } };
+  const { meshes, count } = buildPlazaMeshes([court], { drape, buildings: [hallRing] });
+  assert.equal(count, 1, 'paved, not cut away round the hall');
+  const byName = Object.fromEntries(meshes.map((m) => [m.material.name, m]));
+  assert.deepEqual(Object.keys(byName).sort(), ['mapng_plaza_border', 'mapng_plaza_flagstone', 'mapng_plaza_herringbone']);
+  const at = (name, x, y) => {
+    const pos = byName[name].geometry.getAttribute('position').array;
+    for (let i = 0; i < pos.length; i += 9) {
+      const t = [[pos[i], pos[i + 1]], [pos[i + 3], pos[i + 4]], [pos[i + 6], pos[i + 7]]];
+      if (inRing([x, y], t)) return true;
+    }
+    return false;
+  };
+  assert.ok(at('mapng_plaza_herringbone', 5, 0.2), 'brick down the path');
+  assert.ok(at('mapng_plaza_border', 5, 1.05), 'setts along its edge');
+  assert.ok(at('mapng_plaza_flagstone', 5, 5), 'flagstone between the paths');
+  assert.ok(!at('mapng_plaza_flagstone', 5, 0.2) && !at('mapng_plaza_border', 5, 0.2), 'nothing laid twice');
+  // the layout: the three fill the courtyard exactly
+  const area = (mp) => mp.reduce((s, poly) => s + poly.reduce((a, r, k) => { let v = 0; for (let i = 0; i + 1 < r.length; i++) v += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1]; return a + (k ? -Math.abs(v / 2) : Math.abs(v / 2)); }, 0), 0);
+  const layers = courtyardLayout([[[...court.ring, court.ring[0]]]], court.paths);
+  const total = layers.reduce((s, l) => s + area(l.shape), 0);
+  assert.ok(Math.abs(total - 400) < 0.5, `the courtyard covered once (${total.toFixed(2)} m²)`);
+});
+
+test('an open courtyard with trees is a garden: only its paths laid, in pale stone with setts', () => {
+  assert.equal(courtyardPaved({}, true), false, 'untagged, trees in it: a garden');
+  assert.equal(courtyardPaved({}, false), true, 'untagged, nothing green: a patio');
+  assert.equal(courtyardPaved({ surface: 'paving_stones' }, true), true, 'tagged paved');
+  assert.equal(courtyardPaved({ surface: 'grass' }, false), false, 'tagged grass');
+  const court = { ring: [[-10, -10], [10, -10], [10, 10], [-10, 10]], surface: 'flagstone', paved: false,
+    paths: [{ nodes: [[-12, 0], [12, 0]], half: 0.9 }] };
+  const drape = { drapeAt: () => 2, grid: { sq: 1, ox: -512, oy: -512 } };
+  const { meshes } = buildPlazaMeshes([court], { drape });
+  const byName = Object.fromEntries(meshes.map((m) => [m.material.name, m]));
+  assert.deepEqual(Object.keys(byName).sort(), ['mapng_plaza_border', 'mapng_plaza_flagstone']);
+  const at = (name, x, y) => {
+    const pos = byName[name].geometry.getAttribute('position').array;
+    for (let i = 0; i < pos.length; i += 9) if (inRing([x, y], [[pos[i], pos[i + 1]], [pos[i + 3], pos[i + 4]], [pos[i + 6], pos[i + 7]]])) return true;
+    return false;
+  };
+  assert.ok(at('mapng_plaza_flagstone', 5, 0.2), 'the path in stone');
+  assert.ok(!at('mapng_plaza_flagstone', 5, 5), 'the ground left as it is');
+  // a courtyard paved in brick: its paths in flagstone
+  const brick = courtyardLayout([[[...court.ring, court.ring[0]]]], court.paths, { groundSet: 'bricks' });
+  assert.deepEqual(brick.map((l) => l.set), ['bricks', 'border', 'flagstone']);
 });
