@@ -31,11 +31,48 @@ const CROSS_SLOPE = 0.015;    // slab rises away from the road
 const BACK_SLOPE_RUN = 2.0;   // back falls to the ground at 1:2, no wheel-catching ledge
 const CURB_REPEAT_M = 9.0;    // m of curb per texture width
 const SLAB_TILE_M = 10;        // m of sidewalk to one unit of texture space, along and across alike
-// sidewalk1 is a 4096 × 1024 sheet of 20 × 5 square panels: one repeat covers
-// 30 m along by 7.5 m across, panels of 1.5 m (mapped square it drew them as
-// 0.5 × 2 m strips, its stains stretched across the walk)
-const SLAB_SHEET_U = SLAB_TILE_M / 30;
-const SLAB_SHEET_V = SLAB_TILE_M / 7.5;
+// The slab's look: one of the game's own concrete sheets, each with its
+// repeat in metres (along, across) so its panels come out about 1.5 m square
+// (sidewalk1, a 4096 × 1024 sheet of 20 × 5 panels, mapped square drew them
+// as 0.5 × 2 m strips, its stains stretched across the walk).
+const ECA_SIDEWALKS = '/assets/materials/baked_props/eca_bld_sidewalks';
+const GM_TILES = '/assets/materials/tileable/concrete/m_gm_concrete_tiles_ground';
+const SLABS_LARGE = '/assets/materials/tileable/concrete/slabs_large';
+const SIDEWALK1 = '/assets/materials/tileable/concrete/sidewalk1';
+export const SIDEWALK_LOOKS = {
+  // West Coast USA's sidewalk: pale, a few manhole and drain covers
+  sidewalk1: {
+    repeat: [30, 7.5],
+    stage: {
+      ambientOcclusionMap: `${SIDEWALK1}/t_sidewalk1_ao.data.png`, baseColorFactor: [0.745, 0.745, 0.745, 1], baseColorMap: `${SIDEWALK1}/t_sidewalk1_b.color.png`,
+      metallicFactor: 0.7, metallicMap: `${SIDEWALK1}/t_sidewalk1_m.data.png`, normalMap: `${SIDEWALK1}/t_sidewalk1_nm.normal.png`, normalMapStrength: 1.2,
+      roughnessMap: `${SIDEWALK1}/t_sidewalk1_r.data.png`, pixelSpecular: true,
+    },
+  },
+  // East Coast USA's: weathered grey panels with cracks (4 × 2 panels)
+  eastcoast: {
+    repeat: [6, 3],
+    stage: { baseColorMap: `${ECA_SIDEWALKS}/eca_bld_sidewalks_d.dds`, normalMap: `${ECA_SIDEWALKS}/eca_bld_sidewalks_n.dds`, roughnessFactor: 0.85 },
+  },
+  // clean even squares (4 × 4 panels)
+  tiles: {
+    repeat: [6, 6],
+    stage: {
+      ambientOcclusionMap: `${GM_TILES}/t_gm_concrete_tiles_ground_ao.data.png`, baseColorMap: `${GM_TILES}/t_gm_concrete_tiles_ground_d.color.png`,
+      normalMap: `${GM_TILES}/t_gm_concrete_tiles_ground_nm.normal.png`, roughnessMap: `${GM_TILES}/t_gm_concrete_tiles_ground_r.data.png`,
+    },
+  },
+  // warmer, large slabs (4 × 2 panels)
+  slabs: {
+    repeat: [8, 4],
+    stage: {
+      ambientOcclusionMap: `${SLABS_LARGE}/t_slabs_large_ao.data.png`, baseColorMap: `${SLABS_LARGE}/t_slabs_large_b.color.png`,
+      normalMap: `${SLABS_LARGE}/t_slabs_large_nm.normal.png`, roughnessMap: `${SLABS_LARGE}/t_slabs_large_r.data.png`,
+    },
+  },
+};
+export const DEFAULT_SIDEWALK_LOOK = 'sidewalk1';
+const lookOf = (name) => SIDEWALK_LOOKS[name] || SIDEWALK_LOOKS[DEFAULT_SIDEWALK_LOOK];
 const DEFAULT_WIDTH_M = 2.0;
 const MAX_WIDTH_M = 6.0;
 const CUT_MARGIN_M = 0.5;     // runs stop this far outside other carriageways
@@ -156,9 +193,8 @@ export const SIDEWALK_MATERIALS = {
 export const ZEBRA_CROSSING_MATERIAL = 'italy_road_markings_zebra';
 
 /** Material definitions (shared /assets textures; West Coast USA's settings). */
-export function getSidewalkMaterialDefs() {
+export function getSidewalkMaterialDefs({ look = DEFAULT_SIDEWALK_LOOK } = {}) {
   const CURBS = '/assets/materials/trim/concrete/curbs';
-  const SLAB = '/assets/materials/tileable/concrete/sidewalk1';
   const def = (name, stage) => ({
     name, mapTo: name, class: 'Material', version: 1.5, annotation: 'SIDEWALK',
     groundType: 'CONCRETE', Stages: [stage, {}, {}, {}], translucentBlendOp: 'None',
@@ -206,17 +242,7 @@ export function getSidewalkMaterialDefs() {
       roughnessMap: `${CURBS}/t_curbs_r.data.png`,
       pixelSpecular: true,
     }),
-    [SIDEWALK_MATERIALS.slab]: def(SIDEWALK_MATERIALS.slab, {
-      ambientOcclusionMap: `${SLAB}/t_sidewalk1_ao.data.png`,
-      baseColorFactor: [0.745, 0.745, 0.745, 1],
-      baseColorMap: `${SLAB}/t_sidewalk1_b.color.png`,
-      metallicFactor: 0.7,
-      metallicMap: `${SLAB}/t_sidewalk1_m.data.png`,
-      normalMap: `${SLAB}/t_sidewalk1_nm.normal.png`,
-      normalMapStrength: 1.2,
-      roughnessMap: `${SLAB}/t_sidewalk1_r.data.png`,
-      pixelSpecular: true,
-    }),
+    [SIDEWALK_MATERIALS.slab]: def(SIDEWALK_MATERIALS.slab, { ...lookOf(look).stage }),
   };
 }
 
@@ -264,9 +290,12 @@ export function sidewalkSides({ tags = {}, highway, urban, curbed }) {
 }
 
 // Curb line `offset` m to the left of the centreline (mitred, z kept).
-function offsetLine(nodes, offset) {
+// (offset: one value, or each node's: (i) => value)
+function offsetLine(nodes, offsetArg) {
   const out = [];
+  const offsetOf = typeof offsetArg === 'function' ? offsetArg : () => offsetArg;
   for (let i = 0; i < nodes.length; i++) {
+    const offset = offsetOf(i);
     const a = nodes[Math.max(0, i - 1)];
     const b = nodes[Math.min(nodes.length - 1, i + 1)];
     const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
@@ -776,7 +805,8 @@ export function buildSidewalkRuns(carriageways, { zones = [], driveways = [], me
     for (const [side, width] of [[1, sides.left], [-1, sides.right]]) {
       // a divided road's median side has the median, not a sidewalk
       if (!width || medianShare(medians.get(cw), side) >= MEDIAN_SIDE_SHARE) continue;
-      for (const piece of cutNodes(offsetLine(cw.nodes, side * cw.half), blocked, { minPieceM: 0.5 })) {
+      // (each node's own half width where the way narrows to the next one)
+      for (const piece of cutNodes(offsetLine(cw.nodes, cw.halfAt ? (i) => side * cw.halfAt[i] : side * cw.half), blocked, { minPieceM: 0.5 })) {
         pieces.push({ points: piece.map((n) => [n[0], n[1], n[2]]), side, width, owner: cw.owner, highway: cw.highway, surface: cw.tags?.surface });
       }
     }
@@ -1117,10 +1147,12 @@ function profileFor(width, walk = false) {
 
 class PartBuilder {
   // paveAt(x, y): the stone or brick a walk's slab is laid in there, or null
-  constructor(paveAt = null) {
+  constructor(paveAt = null, look = DEFAULT_SIDEWALK_LOOK) {
     this.parts = Object.fromEntries(Object.keys(SIDEWALK_MATERIALS).map((k) => [k, { pos: [], uv: [] }]));
     this.triangles = 0;
     this.paveAt = paveAt;
+    const [u, v] = lookOf(look).repeat;
+    this.slabU = SLAB_TILE_M / u; this.slabV = SLAB_TILE_M / v;
   }
 
   // Triangle a-b-c turned so its normal points along `want`.
@@ -1134,7 +1166,7 @@ class PartBuilder {
       }
     }
     if (mat === 'slab') {
-      ua = [ua[0] * SLAB_SHEET_U, ua[1] * SLAB_SHEET_V]; ub = [ub[0] * SLAB_SHEET_U, ub[1] * SLAB_SHEET_V]; uc = [uc[0] * SLAB_SHEET_U, uc[1] * SLAB_SHEET_V];
+      ua = [ua[0] * this.slabU, ua[1] * this.slabV]; ub = [ub[0] * this.slabU, ub[1] * this.slabV]; uc = [uc[0] * this.slabU, uc[1] * this.slabV];
     }
     const n = [
       (b[1] - a[1]) * (c[2] - a[2]) - (b[2] - a[2]) * (c[1] - a[1]),
@@ -1593,8 +1625,12 @@ export function curbKeepOuts(runs, carriageways) {
   };
   const out = [];
   for (const run of runs) {
-    const cw = byOwner.get(run.owner);
-    if (!cw || run.median || run.points.length < 2) continue;
+    // (all the street's pieces a merged run runs along: by its first alone,
+    // a run's far end measured to a piece a hundred metres off, and its
+    // keep-out turned round over the sidewalk, cutting a walk there away)
+    const cws = (run.owners || [run.owner]).map((o) => byOwner.get(o)).filter(Boolean);
+    if (!cws.length || run.median || run.points.length < 2) continue;
+    const dist = (p) => Math.min(...cws.map((cw) => centreDist(cw, p)));
     const pts = run.points;
     for (let i = 0; i + 1 < pts.length; i++) {
       const p = pts[i]; const q = pts[i + 1];
@@ -1602,9 +1638,11 @@ export function curbKeepOuts(runs, carriageways) {
       if (L < 0.05) continue;
       let n = [-(q[1] - p[1]) / L, (q[0] - p[0]) / L];
       const m = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-      // (toward the road: the side nearer the street's centre line)
-      if (centreDist(cw, [m[0] + n[0] * 0.3, m[1] + n[1] * 0.3]) > centreDist(cw, [m[0] - n[0] * 0.3, m[1] - n[1] * 0.3])) n = [-n[0], -n[1]];
-      const depth = Math.min(CURB_KEEP_OUT_M, centreDist(cw, m));
+      // (toward the road: away from the run's side, the curb laid out from
+      // the centre line by side × half; else the side nearer the centre line)
+      if (run.side === 1 || run.side === -1) n = [-n[0] * run.side, -n[1] * run.side];
+      else if (dist([m[0] + n[0] * 0.3, m[1] + n[1] * 0.3]) > dist([m[0] - n[0] * 0.3, m[1] - n[1] * 0.3])) n = [-n[0], -n[1]];
+      const depth = Math.min(CURB_KEEP_OUT_M, dist(m));
       if (depth < 0.5) continue;
       const s0 = CURB_KEEP_OUT_SET_M;
       out.push([
@@ -1618,13 +1656,13 @@ export function curbKeepOuts(runs, carriageways) {
   // (driveways and service roads aside: the sidewalk runs on across them)
   for (const cw of carriageways) {
     if (cw.highway === 'service' || !(cw.half > 1) || cw.nodes.length < 2) continue;
-    const h = cw.half - CURB_KEEP_OUT_SET_M;
+    const h = (i) => (cw.halfAt ? cw.halfAt[i] : cw.half) - CURB_KEEP_OUT_SET_M;
     for (let i = 0; i + 1 < cw.nodes.length; i++) {
       const p = cw.nodes[i]; const q = cw.nodes[i + 1];
       const L = Math.hypot(q[0] - p[0], q[1] - p[1]);
       if (L < 0.05) continue;
-      const n = [-(q[1] - p[1]) / L * h, (q[0] - p[0]) / L * h];
-      out.push([[p[0] + n[0], p[1] + n[1]], [q[0] + n[0], q[1] + n[1]], [q[0] - n[0], q[1] - n[1]], [p[0] - n[0], p[1] - n[1]]]);
+      const ux = -(q[1] - p[1]) / L; const uy = (q[0] - p[0]) / L; const hp = h(i); const hq = h(i + 1);
+      out.push([[p[0] + ux * hp, p[1] + uy * hp], [q[0] + ux * hq, q[1] + uy * hq], [q[0] - ux * hq, q[1] - uy * hq], [p[0] - ux * hp, p[1] - uy * hp]]);
     }
   }
   return out;
@@ -1669,8 +1707,44 @@ function cornerPoint(corner) {
   return lineX(p, tangent(p), q, tangent(q));
 }
 
+// A rounded curb's slab, in plan: the band the sidewalks' width in from the
+// curve (inner: one point per arc point, set in as far as the curve's
+// centre allows), and the sidewalks' outer corner where it lies past that
+// band (fan), else null. outline: the slab's outer edge from street a's
+// side to street b's.
+function cornerSlabOutline({ arc, centre, outer, a, b }) {
+  const w = Math.max(a.run.width, b.run.width);
+  const inward = arc.map(([x, y]) => unit([centre[0] - x, centre[1] - y]));
+  const reach = arc.map(([x, y]) => Math.min(w, Math.hypot(centre[0] - x, centre[1] - y) - 0.1));
+  const inner = arc.map((p, i) => [p[0] + inward[i][0] * reach[i], p[1] + inward[i][1] * reach[i]]);
+  const k = Math.floor(arc.length / 2);
+  // (the outer corner on the sidewalk side of the curve and past the band:
+  // with a bare curb on one side its edges could meet out over the road)
+  const past = (outer[0] - arc[k][0]) * inward[k][0] + (outer[1] - arc[k][1]) * inward[k][1];
+  const fan = past > reach[k] + CORNER_FAN_PAST_M ? [outer[0], outer[1]] : null;
+  const outline = fan ? [inner[0], fan, inner[inner.length - 1]] : inner;
+  return { inner, outline, fan };
+}
+const CORNER_FAN_PAST_M = 0.05;
+
+/**
+ * The ground each rounded curb's slab paves, curb included: [[x, y]...]
+ * rings. A walk mapped across the corner (a crossing's landing turning
+ * behind the curb) lay over it on the slant, a triangle of grass between.
+ */
+export function cornerSlabRings(corners) {
+  const out = [];
+  for (const corner of corners) {
+    const { arc, a, b } = corner;
+    if (arc.length < 2 || Math.max(a.run.width, b.run.width) <= CURB_ONLY_M) continue;
+    const { outline } = cornerSlabOutline(corner);
+    out.push([...arc.map((q) => [q[0], q[1]]), ...[...outline].reverse()]);
+  }
+  return out;
+}
+
 function sweepCorner(builder, corner) {
-  const { arc, centre, outer, a, b } = corner;
+  const { arc, centre, a, b } = corner;
   // (nothing on the road side of the curve: the road's own decals pave it; a
   // fill there floated over dips, stood grey in brick streets and, where the
   // streets met at a wide angle, reached out into the junction)
@@ -1707,27 +1781,32 @@ function sweepCorner(builder, corner) {
     }
     return;
   }
-  // slab: a fan from the outer corner over the curb top's back edge, closed
-  // by the two sidewalks' end sections
-  const zMid = (a.z + b.z) / 2;
+  // slab: a band the sidewalks' width along the curve, from the curb top's
+  // back edge (and out to the sidewalks' outer corner where that lies
+  // further out). A fan from that corner alone came to a point where the
+  // streets met near square: a curb of 6 m left the slab 0.6 m wide at the
+  // middle, the ground showing behind it.
   const slabZ = (z, w) => z + CURB_H + w * CROSS_SLOPE;
-  const aOut = [arc[0][0] + a.n[0] * a.run.width, arc[0][1] + a.n[1] * a.run.width, slabZ(a.z, a.run.width)];
-  const bOut = [arc[arc.length - 1][0] + b.n[0] * b.run.width, arc[arc.length - 1][1] + b.n[1] * b.run.width, slabZ(b.z, b.run.width)];
-  // (the outer corner on the sidewalk side of the curve: with a bare curb
-  // on one side its two edges could meet out over the road, and the slab
-  // fanned out there stood as a wedge over the curb)
-  const mid = arc[Math.floor(arc.length / 2)]; const inMid = inward[Math.floor(arc.length / 2)];
-  const wMax = Math.max(a.run.width, b.run.width);
-  const onSidewalk = (outer[0] - mid[0]) * inMid[0] + (outer[1] - mid[1]) * inMid[1] > CURB_W;
-  const oxy = onSidewalk ? outer : [mid[0] + inMid[0] * wMax, mid[1] + inMid[1] * wMax];
-  const O = [oxy[0], oxy[1], slabZ(zMid, (a.run.width + b.run.width) / 2)];
-  const rim = [aOut, ...stations.map((st) => st[3]), bOut];
+  const { inner, fan } = cornerSlabOutline(corner);
+  const w = (a.run.width + b.run.width) / 2;
+  const zAt = (i) => arc[i][2];
+  const back = stations.map((st) => st[3]);
+  const innerZ = inner.map((q, i) => [q[0], q[1], slabZ(zAt(i), w)]);
   const uvOf = (p) => [p[0] / SLAB_TILE_M, p[1] / SLAB_TILE_M];
-  for (let i = 0; i + 1 < rim.length; i++) builder.tri('slab', O, rim[i], rim[i + 1], uvOf(O), uvOf(rim[i]), uvOf(rim[i + 1]), [0, 0, 1]);
+  for (let i = 0; i + 1 < arc.length; i++) {
+    builder.tri('slab', back[i], back[i + 1], innerZ[i + 1], uvOf(back[i]), uvOf(back[i + 1]), uvOf(innerZ[i + 1]), [0, 0, 1]);
+    builder.tri('slab', back[i], innerZ[i + 1], innerZ[i], uvOf(back[i]), uvOf(innerZ[i + 1]), uvOf(innerZ[i]), [0, 0, 1]);
+  }
+  const zMid = (a.z + b.z) / 2;
+  const O = fan ? [fan[0], fan[1], slabZ(zMid, w)] : null;
+  if (O) for (let i = 0; i + 1 < innerZ.length; i++) builder.tri('slab', O, innerZ[i], innerZ[i + 1], uvOf(O), uvOf(innerZ[i]), uvOf(innerZ[i + 1]), [0, 0, 1]);
   // back faces: from the slab's outer edge down to the ground behind it
-  for (const [p, q] of [[aOut, O], [O, bOut]]) {
+  const edge = O ? [innerZ[0], O, innerZ[innerZ.length - 1]] : innerZ;
+  const arcMid = arc[Math.floor(arc.length / 2)];
+  for (let i = 0; i + 1 < edge.length; i++) {
+    const p = edge[i]; const q = edge[i + 1];
     const mid = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-    const away = unit([mid[0] - centre[0], mid[1] - centre[1]]);
+    const away = unit([mid[0] - arcMid[0], mid[1] - arcMid[1]]);
     const drop = (v) => [v[0] + away[0] * BACK_SLOPE_RUN * (v[2] - zMid + SINK), v[1] + away[1] * BACK_SLOPE_RUN * (v[2] - zMid + SINK), zMid - SINK];
     const want = [away[0], away[1], 0.5];
     builder.tri('curb', p, q, drop(q), [0, V_LIGHT_LOW], [0.2, V_LIGHT_LOW], [0.2, V_BAND_LOW], want);
@@ -2406,9 +2485,9 @@ function planWallDecks(rings, groundAt, seaZ = -Infinity) {
  * the highest wall beside it (wallTops: [{ x, y, z }]), so the walls are its
  * sides. With no wall there: a slope from the land to the water, faces round it.
  */
-export function buildWallDeckMesh(decks, wallTops = []) {
+export function buildWallDeckMesh(decks, wallTops = [], { sidewalkLook } = {}) {
   if (!decks?.length) return null;
-  const builder = new PartBuilder();
+  const builder = new PartBuilder(null, sidewalkLook);
   const cells = new Map();
   for (const t of wallTops) {
     const key = `${Math.floor(t.x / 8)},${Math.floor(t.y / 8)}`;
@@ -3139,7 +3218,7 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
   levelWalkEndsOnSidewalks(walkRuns, runs, corners);
   const paveAt = pavedWalkZones(carriageways, options.walks, { americas: options.americas });
   const meshes = [];
-  let builder = new PartBuilder(paveAt);
+  let builder = new PartBuilder(paveAt, options.sidewalkLook);
   let inBatch = 0;
   let triangles = 0;
   const letters = (n) => { let s = ''; let k = n; do { s = String.fromCharCode(97 + (k % 26)) + s; k = Math.floor(k / 26) - 1; } while (k >= 0); return s; };
@@ -3147,7 +3226,7 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
     triangles += builder.triangles;
     const mesh = builder.toMesh(`sidewalks_${letters(meshes.length)}`);
     if (mesh) meshes.push(mesh);
-    builder = new PartBuilder(paveAt);
+    builder = new PartBuilder(paveAt, options.sidewalkLook);
     inBatch = 0;
   };
   for (const run of runs) {
@@ -3173,10 +3252,10 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
     console.warn('Sidewalks: could not find the paved pockets by the seawalls:', err?.message);
   }
   try {
-    mergeWalks(builder, walkRuns, { pockets, streetRuns: runs, groundAt: options.groundAt, cuts: [...cornerCuts(corners), ...curbKeepOuts(runs, carriageways)] });
+    mergeWalks(builder, walkRuns, { pockets, streetRuns: runs, groundAt: options.groundAt, cuts: [...cornerCuts(corners), ...cornerSlabRings(corners), ...curbKeepOuts(runs, carriageways)] });
   } catch (err) {
     console.warn('Sidewalks: could not merge the walkways, drawing them apart:', err?.message);
-    builder = new PartBuilder(paveAt);
+    builder = new PartBuilder(paveAt, options.sidewalkLook);
     for (const run of walkRuns) sweepRun(builder, run);
   }
   flush();

@@ -751,3 +751,99 @@ test('a spur mapped just past the walk it meets ends on it without doubling back
     assert.ok(u[0] * v[0] + u[1] * v[1] > 0, `turns back at (${c[i][0].toFixed(2)}, ${c[i][1].toFixed(2)})`);
   }
 });
+
+test('each sidewalk look sets the slab material and tiles its sheet at its own repeat', async () => {
+  const { getSidewalkMaterialDefs, SIDEWALK_LOOKS } = await import('../services/beamngSidewalks.js');
+  for (const [name, look] of Object.entries(SIDEWALK_LOOKS)) {
+    const slab = getSidewalkMaterialDefs({ look: name }).mapng_sidewalk;
+    assert.equal(slab.Stages[0].baseColorMap, look.stage.baseColorMap, name);
+    assert.ok(look.repeat[0] > 0 && look.repeat[1] > 0);
+  }
+  assert.match(getSidewalkMaterialDefs().mapng_sidewalk.Stages[0].baseColorMap, /sidewalk1/, 'the default');
+  // a 10 m walk's texture runs along it by 10 / repeat[0]
+  const walk = { nodes: [[0, 0, 0], [5, 0, 0], [10, 0, 0]], half: 1, sidewalk: true };
+  const uvSpan = (look) => {
+    const { meshes } = buildSidewalkMeshes([], { walks: [walk], groundAt: () => 5, sidewalkLook: look });
+    const g = meshes[0].geometry; const uv = g.getAttribute('uv').array;
+    const grp = g.groups[meshes[0].material.findIndex((m) => m.name === 'mapng_sidewalk')];
+    const us = []; for (let v = grp.start; v < grp.start + grp.count; v++) us.push(uv[v * 2]);
+    return Math.max(...us) - Math.min(...us);
+  };
+  assert.ok(Math.abs(uvSpan('eastcoast') / uvSpan('sidewalk1') - 30 / 6) < 0.3, 'five times as many repeats at a 6 m repeat as at 30 m');
+});
+
+test('a walk mapped across a rounded corner\'s slab is cut away there, not laid over it', async () => {
+  const { cornerSlabRings } = await import('../services/beamngSidewalks.js');
+  // secondary streets meeting square: a 6 m curb round (10, 10)
+  const tags = { sidewalk: 'both' };
+  const ew = street({ owner: 1, highway: 'secondary', tags, nodes: Array.from({ length: 11 }, (_, i) => [i * 10, 0, 5, 8]) });
+  const ns = street({ owner: 2, highway: 'secondary', tags, nodes: Array.from({ length: 11 }, (_, i) => [0, i * 10, 5, 8]) });
+  const bare = buildSidewalkMeshes([ew, ns]);
+  assert.ok(cornerSlabRings(bare.corners).some((r) => r.every((q) => q[0] > 0 && q[1] > 0)), 'a slab in the corner');
+  // a short walk on the slant behind the curve, 1.4 m in from its middle
+  const walk = { nodes: [[5.5, 7.99, 0], [6.75, 6.75, 0], [7.99, 5.5, 0]], half: 0.4, sidewalk: true, surface: 'asphalt' };
+  const built = buildSidewalkMeshes([ew, ns], { walks: [walk], groundAt: () => 5 });
+  const tops = (meshes) => {
+    const out = [];
+    for (const mesh of meshes) {
+      const pos = mesh.geometry.getAttribute('position').array;
+      for (let v = 0; v + 8 < pos.length; v += 9) {
+        const t = [[pos[v], pos[v + 1]], [pos[v + 3], pos[v + 4]], [pos[v + 6], pos[v + 7]]];
+        if (Math.abs((t[1][0] - t[0][0]) * (t[2][1] - t[0][1]) - (t[2][0] - t[0][0]) * (t[1][1] - t[0][1])) > 1e-3) out.push(t);
+      }
+    }
+    return out;
+  };
+  const count = (list, x, y) => list.filter(([a, b, c]) => {
+    const s = (p, q) => (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0]);
+    const d1 = s(a, b); const d2 = s(b, c); const d3 = s(c, a);
+    return (d1 > 0 && d2 > 0 && d3 > 0) || (d1 < 0 && d2 < 0 && d3 < 0);
+  }).length;
+  // (where the walk's line crosses the corner's slab)
+  const ring = cornerSlabRings(bare.corners).find((r) => r.every((q) => q[0] > 0 && q[1] > 0));
+  const inRing = (x, y) => { let k = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) if (((ring[i][1] > y) !== (ring[j][1] > y)) && (x < ((ring[j][0] - ring[i][0]) * (y - ring[i][1])) / (ring[j][1] - ring[i][1]) + ring[i][0])) k = !k; return k; };
+  // (along its built line: pushed off the curb, it isn't where it was mapped)
+  const c = built.walkRuns[0].centre; const probes = [];
+  for (let i = 0; i + 1 < c.length; i++) for (let t = 0; t < 1; t += 0.1) { const x = c[i][0] + (c[i + 1][0] - c[i][0]) * t; const y = c[i][1] + (c[i + 1][1] - c[i][1]) * t; if (inRing(x, y)) probes.push([x, y]); }
+  assert.ok(probes.length, 'the walk crosses the corner');
+  const builtTops = tops(built.meshes); const bareTops = tops(bare.meshes);
+  for (const [x, y] of probes) assert.equal(count(builtTops, x, y), count(bareTops, x, y), `nothing more over the corner at (${x.toFixed(1)}, ${y.toFixed(1)})`);
+});
+
+test('a rounded corner is paved the sidewalk\'s width in from the curve, not to a point', () => {
+  // secondary streets (6 m curbs) meeting square, 2 m sidewalks
+  const tags = { sidewalk: 'both' };
+  const ew = street({ owner: 1, highway: 'secondary', tags, nodes: Array.from({ length: 11 }, (_, i) => [i * 10, 0, 5, 8]) });
+  const ns = street({ owner: 2, highway: 'secondary', tags, nodes: Array.from({ length: 11 }, (_, i) => [0, i * 10, 5, 8]) });
+  const { corners, meshes } = buildSidewalkMeshes([ew, ns]);
+  const c = corners.find((k) => k.arc.every((q) => q[0] > 0 && q[1] > 0));
+  assert.ok(c);
+  const mid = c.arc[Math.floor(c.arc.length / 2)];
+  const inward = [c.centre[0] - mid[0], c.centre[1] - mid[1]]; const L = Math.hypot(...inward);
+  const [px, py] = [mid[0] + (inward[0] / L) * 1.5, mid[1] + (inward[1] / L) * 1.5];
+  let covered = false;
+  for (const mesh of meshes) {
+    const pos = mesh.geometry.getAttribute('position').array;
+    for (let v = 0; v + 8 < pos.length && !covered; v += 9) {
+      const a = [pos[v], pos[v + 1]]; const b = [pos[v + 3], pos[v + 4]]; const d = [pos[v + 6], pos[v + 7]];
+      const s = (p, q) => (q[0] - p[0]) * (py - p[1]) - (q[1] - p[1]) * (px - p[0]);
+      const d1 = s(a, b); const d2 = s(b, d); const d3 = s(d, a);
+      if ((d1 > 0 && d2 > 0 && d3 > 0) || (d1 < 0 && d2 < 0 && d3 < 0)) covered = true;
+    }
+  }
+  assert.ok(covered, `slab 1.5 m in from the middle of the curve (${px.toFixed(1)}, ${py.toFixed(1)})`);
+});
+
+test('a merged curb run keeps its keep-out on the road side all along, far from its first piece', async () => {
+  const { curbKeepOuts } = await import('../services/beamngSidewalks.js');
+  // the street's first piece lies to the north-west; its next bends down and runs east
+  const tags = { name: 'Long Street', sidewalk: 'both' };
+  const a = street({ owner: 1, tags, nodes: Array.from({ length: 6 }, (_, i) => [-200 + i * 10, 20, 5, 8]) });
+  const b = street({ owner: 2, tags, nodes: [[-150, 20, 5, 8], [-140, 19, 5, 8], [-130, 17, 5, 8], [-120, 14, 5, 8], [-110, 10, 5, 8], [-100, 6, 5, 8], [-90, 3, 5, 8], [-80, 1, 5, 8], ...Array.from({ length: 9 }, (_, i) => [-70 + i * 10, 0, 5, 8])] });
+  const runs = buildSidewalkRuns([a, b]);
+  assert.ok(runs.some((r) => (r.owners || []).length > 1), 'one run along both pieces');
+  const quads = curbKeepOuts(runs, [a, b]);
+  const inQuad = (x, y, qd) => { let k = false; for (let i = 0, j = qd.length - 1; i < qd.length; j = i++) if (((qd[i][1] > y) !== (qd[j][1] > y)) && (x < ((qd[j][0] - qd[i][0]) * (y - qd[i][1])) / (qd[j][1] - qd[i][1]) + qd[i][0])) k = !k; return k; };
+  // the sidewalk's middle along the east end, either side
+  for (const x of [-40, -20, 0]) for (const y of [5.2, -5.2]) assert.ok(!quads.some((qd) => inQuad(x, y, qd)), `no keep-out over the sidewalk at (${x}, ${y})`);
+});

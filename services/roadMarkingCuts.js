@@ -15,6 +15,8 @@ const SIDE_SLACK = 0.02;
  * Spatial index of carriageways: [{ owner, nodes: [[x,y,z,w]...], half }].
  * `half` is the half width of the paved surface.
  */
+const halfOfSegment = (s, t) => (s.halfA === undefined ? s.half : s.halfA + (s.halfB - s.halfA) * t);
+
 export function buildCarriagewayIndex(carriageways) {
   const segments = [];
   const grid = new Map();
@@ -34,6 +36,8 @@ export function buildCarriagewayIndex(carriageways) {
       const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       const idx = segments.push({
         ax: a[0], ay: a[1], bx: b[0], by: b[1], az: a[2], bz: b[2], half: cw.half, owner: cw.owner,
+        // (each end's own half width where the way narrows to the next)
+        ...(cw.halfAt ? { halfA: cw.halfAt[i], halfB: cw.halfAt[i + 1] } : {}),
         ux: (b[0] - a[0]) / len, uy: (b[1] - a[1]) / len,
       }) - 1;
       const pad = cw.half + 4;
@@ -61,7 +65,7 @@ export function carriagewaysAt(index, x, y, margin, { sides = false } = {}) {
     if (sides && (raw < -SIDE_SLACK || raw > 1 + SIDE_SLACK)) continue;
     const t = Math.max(0, Math.min(1, raw));
     const ex = s.ax + t * dx - x; const ey = s.ay + t * dy - y;
-    const reach = s.half + margin;
+    const reach = halfOfSegment(s, t) + margin;
     if (ex * ex + ey * ey < reach * reach) out.push({ owner: s.owner, z: (s.az ?? 0) + ((s.bz ?? 0) - (s.az ?? 0)) * t });
   }
   return out;
@@ -83,7 +87,7 @@ export function isOnOtherCarriageway(index, x, y, margin, ignore) {
     const t = len > 0 ? Math.max(0, Math.min(1, ((x - s.ax) * dx + (y - s.ay) * dy) / len)) : 0;
     const ex = s.ax + t * dx - x;
     const ey = s.ay + t * dy - y;
-    const reach = s.half + margin;
+    const reach = halfOfSegment(s, t) + margin;
     if (ex * ex + ey * ey < reach * reach) return true;
   }
   return false;

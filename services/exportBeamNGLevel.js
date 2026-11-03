@@ -56,7 +56,7 @@ import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
 import { buildPlazaMeshes, getPlazaMaterialDefs, isPlaza, plazaSurface } from './plazas.js';
-import { buildSidewalkMeshes, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides } from './beamngSidewalks.js';
+import { buildSidewalkMeshes, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_Z, POLE_LAMP_REACH_M, hash01 as propHash } from './streetProps.js';
 import {
@@ -2414,10 +2414,94 @@ function parsePositiveInt(value) {
  *
  * Input and output node format: [x, y, z, halfWidth].
  */
-function offsetNodes(nodes, offset, halfWidth) {
+// Width steps between two ways of one street. Where exactly two ways meet
+// end to end, nearly straight on, under one name, and one is drawn wider,
+// the wider one narrows to the other over its last WIDTH_TAPER_RUN metres per
+// metre of difference (a side), at most WIDTH_TAPER_SHARE of its length.
+// ways: [{ name, half, xy: [[x, y]...] } | null] by index.
+// Returns Map(index -> (x, y, half) => that way's half width at (x, y)).
+const WIDTH_TAPER_RUN = 8;
+const WIDTH_TAPER_MIN_M = 3;
+const WIDTH_TAPER_SHARE = 0.45;
+const WIDTH_TAPER_STEP_M = 0.2;
+const WIDTH_TAPER_MEET_M = 0.75;
+const WIDTH_TAPER_ON_COS = Math.cos((30 * Math.PI) / 180);
+export function findWidthTapers(ways) {
+  // (ends met by where they lie, not their node keys: two ways sharing an
+  // OSM node came out under different keys, and the step stayed)
+  const ends = [];
+  const grid = new Map();
+  const lengthOf = (xy) => xy.reduce((sum, q, i) => (i ? sum + Math.hypot(q[0] - xy[i - 1][0], q[1] - xy[i - 1][1]) : 0), 0);
+  ways.forEach((w, k) => {
+    if (!w || w.xy.length < 2) return;
+    const n = w.xy.length;
+    for (const [p, q, atStart] of [[w.xy[0], w.xy[1], true], [w.xy[n - 1], w.xy[n - 2], false]]) {
+      const L = Math.hypot(q[0] - p[0], q[1] - p[1]) || 1;
+      const end = { k, atStart, p, out: [(q[0] - p[0]) / L, (q[1] - p[1]) / L] };
+      const cx = Math.floor(p[0] / WIDTH_TAPER_MEET_M); const cy = Math.floor(p[1] / WIDTH_TAPER_MEET_M);
+      let joint = null;
+      for (let dx = -1; dx <= 1 && !joint; dx++) {
+        for (let dy = -1; dy <= 1 && !joint; dy++) {
+          joint = (grid.get(`${cx + dx},${cy + dy}`) || []).find((j) => Math.hypot(j[0].p[0] - p[0], j[0].p[1] - p[1]) < WIDTH_TAPER_MEET_M) || null;
+        }
+      }
+      if (joint) { joint.push(end); continue; }
+      joint = [end]; ends.push(joint);
+      const key = `${cx},${cy}`;
+      if (!grid.has(key)) grid.set(key, []);
+      grid.get(key).push(joint);
+    }
+  });
+  const plans = new Map();   // k -> [{ atStart, to, run }]
+  for (const list of ends) {
+    if (list.length !== 2) continue;
+    const [a, b] = list;
+    const wa = ways[a.k]; const wb = ways[b.k];
+    if (a.k === b.k || !wa.name || wa.name !== wb.name) continue;
+    if (a.out[0] * b.out[0] + a.out[1] * b.out[1] > -WIDTH_TAPER_ON_COS) continue;
+    const [wide, narrow] = wa.half > wb.half ? [a, b] : [b, a];
+    const step = ways[wide.k].half - ways[narrow.k].half;
+    if (step < WIDTH_TAPER_STEP_M) continue;
+    const run = Math.min(Math.max(WIDTH_TAPER_MIN_M, WIDTH_TAPER_RUN * step), WIDTH_TAPER_SHARE * lengthOf(ways[wide.k].xy));
+    if (!plans.has(wide.k)) plans.set(wide.k, []);
+    plans.get(wide.k).push({ atStart: wide.atStart, to: ways[narrow.k].half, run });
+  }
+  const out = new Map();
+  for (const [k, list] of plans) {
+    const xy = ways[k].xy; const total = lengthOf(xy);
+    const stationOf = (x, y) => {
+      let best = 0; let d = Infinity; let s = 0;
+      for (let i = 0; i + 1 < xy.length; i++) {
+        const ex = xy[i + 1][0] - xy[i][0]; const ey = xy[i + 1][1] - xy[i][1]; const L2 = ex * ex + ey * ey || 1;
+        const t = Math.max(0, Math.min(1, ((x - xy[i][0]) * ex + (y - xy[i][1]) * ey) / L2));
+        const e = Math.hypot(x - xy[i][0] - t * ex, y - xy[i][1] - t * ey);
+        if (e < d) { d = e; best = s + t * Math.sqrt(L2); }
+        s += Math.sqrt(L2);
+      }
+      return best;
+    };
+    out.set(k, (x, y, half) => {
+      const st = stationOf(x, y);
+      let h = half;
+      for (const { atStart, to, run } of list) {
+        const d = atStart ? st : total - st;
+        // (eased at both ends: no kink where the taper starts or meets the next way)
+        if (d < run) { const t = d / run; h = Math.min(h, to + (half - to) * (t * t * (3 - 2 * t))); }
+      }
+      return h;
+    });
+  }
+  return out;
+}
+
+function offsetNodes(nodes, offsetArg, halfWidthArg) {
   if (nodes.length < 2) return [];
   const out = [];
+  // (either one value, or each node's: (k) => value)
+  const offsetOf = typeof offsetArg === 'function' ? offsetArg : () => offsetArg;
+  const halfOf = typeof halfWidthArg === 'function' ? halfWidthArg : () => halfWidthArg;
   for (let i = 0; i < nodes.length; i++) {
+    const offset = offsetOf(i); const halfWidth = halfOf(i);
     const prev = nodes[Math.max(0, i - 1)];
     const next = nodes[Math.min(nodes.length - 1, i + 1)];
     const dx = next[0] - prev[0];
@@ -2765,7 +2849,13 @@ function getLayeredRoadDecals(centerNodes, highway, tags, styleHalfWidth, parent
       offset = layer.offset * (styleHalfWidth + (width / 2) - 0.15);
     }
 
-    const baseNodes = offsetNodes(centerNodes, offset, width);
+    // (where the way narrows to the next: the surface and its edges scaled
+    // node by node, the lanes kept where they are)
+    const scaled = !layer.width;
+    const edgeOffset = layer.isEdgeRelative || layer.isEdge;
+    const baseNodes = options.halfAt && (scaled || edgeOffset)
+      ? offsetNodes(centerNodes, (k) => (edgeOffset ? offset * (options.halfAt[k] / styleHalfWidth) : offset), (k) => (scaled ? width * (options.halfAt[k] / styleHalfWidth) : width))
+      : offsetNodes(centerNodes, offset, width);
     const shouldTrimAtJunction = layer.name.startsWith('line_') || layer.name.startsWith('edge_');
     let trimStartM = 0;
     let trimEndM = 0;
@@ -5362,6 +5452,31 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const paintDecals = [];
   const surfaceDecals = [];
 
+  // each way's widths (the cross section, the corridor's steady driving width)
+  const widthsOf = (segmentFeature) => {
+    const feature = segmentFeature.sourceFeature;
+    const highway = segmentFeature.highway;
+    const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
+    const isOneWay = isOneWayRoad(feature.tags || {});
+    const urbanRoad = isUrbanRoad(segmentFeature);
+    const crossSection = estimateRoadCrossSection(feature.tags || {}, highway, isOneWay, {
+      urban: urbanRoad,
+      fallbackHalfWidth: style.width,
+    });
+    // Untagged ways take the corridor's DRIVING width; parking / shoulders
+    // sit on top of it.
+    const stableHalfWidth = hasWidthTags(feature.tags || {}) ? null : stableHalfWidthMap.get(getDecalWidthCorridorKey(segmentFeature));
+    const drivingHalfWidth = Number.isFinite(stableHalfWidth) && stableHalfWidth > 0
+      ? stableHalfWidth
+      : crossSection.drivingHalfWidth;
+    const styleHalfWidth = drivingHalfWidth + (crossSection.leftExtra + crossSection.rightExtra) / 2;
+    return { style, isOneWay, urbanRoad, crossSection, drivingHalfWidth, styleHalfWidth };
+  };
+  // a street wider on one way than the next narrows to it over the wider
+  // one's last metres instead of stepping (its curbs jogged out a metre)
+  const widthTapers = findWidthTapers(drivableRoads.map((sf) => (shouldGenerateDecalRoads(sf.highway, sf.sourceFeature.tags || {})
+    ? { name: sf.sourceFeature.tags?.name || '', half: widthsOf(sf).styleHalfWidth, xy: sf.geometry.map((pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0).slice(0, 2)) }
+    : null)));
   for (let segIndex = 0; segIndex < drivableRoads.length; segIndex++) {
     if (segIndex % 200 === 199) yield;
     const segmentFeature = drivableRoads[segIndex];
@@ -5379,22 +5494,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     usedGroupNames.set(baseName, used + 1);
     const cleanName = used > 0 ? sanitizeBeamNGObjectName(`${baseName}_${used + 1}`) : baseName;
     
-    const style = HIGHWAY_STYLE[highway] ?? DEFAULT_ROAD_STYLE;
-    const isOneWay = isOneWayRoad(feature.tags || {});
     const renderTags = getMergedRoadRenderTags(segmentFeature);
-    const corridorKey = getDecalWidthCorridorKey(segmentFeature);
-    const urbanRoad = isUrbanRoad(segmentFeature);
-    const crossSection = estimateRoadCrossSection(feature.tags || {}, highway, isOneWay, {
-      urban: urbanRoad,
-      fallbackHalfWidth: style.width,
-    });
-    // Untagged ways take the corridor's DRIVING width; parking / shoulders
-    // sit on top of it.
-    const stableHalfWidth = hasWidthTags(feature.tags || {}) ? null : stableHalfWidthMap.get(corridorKey);
-    const drivingHalfWidth = Number.isFinite(stableHalfWidth) && stableHalfWidth > 0
-      ? stableHalfWidth
-      : crossSection.drivingHalfWidth;
-    const styleHalfWidth = drivingHalfWidth + (crossSection.leftExtra + crossSection.rightExtra) / 2;
+    const { style, isOneWay, urbanRoad, crossSection, drivingHalfWidth, styleHalfWidth } = widthsOf(segmentFeature);
+    const taper = widthTapers.get(segIndex);
     const startTrimProfile = getEndpointTrimProfile(
       segmentFeature,
       segmentFeature.startKey,
@@ -5453,13 +5555,16 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       // ROAD_NODE_SPACING_M before world conversion), so no decimation here.
       const centerNodes = rawNodes;
       if (centerNodes.length < 2) continue;
+      // (each node's own half width where the way narrows to the next one)
+      const halfAt = taper ? centerNodes.map((nd) => taper(nd[0], nd[1], styleHalfWidth)) : null;
+      if (halfAt) halfAt.forEach((h, k) => { centerNodes[k][3] = h; });
       const bridgePart = bridges.bySeg.get(segIndex);
       if (bridgePart) bridgePart.half = styleHalfWidth;
       // a deck carried on along this approach is as wide as the road on it
       const carriedPart = bridges.approaches?.get(segIndex);
       if (carriedPart) carriedPart.half = Math.max(carriedPart.half, styleHalfWidth);
       carriageways.push({
-        owner: segIndex, nodes: centerNodes, half: styleHalfWidth,
+        owner: segIndex, nodes: centerNodes, half: styleHalfWidth, ...(halfAt ? { halfAt } : {}),
         tags: renderTags, highway, urban: urbanRoad, curbed: isCurbedStreet(feature), wayId: feature.id, oneWay: isOneWay,
         bridge: !!bridgePart, carried: !!carriedPart, tunnel: tunnels.bySeg.has(segIndex),
         leftExtra: crossSection.leftExtra, rightExtra: crossSection.rightExtra,
@@ -5481,6 +5586,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
             givesWay: geometryHasGiveWay(segmentFeature.geometry, giveWayKeys),
           }),
           drivingHalfWidth,
+          halfAt,
           laneShift: crossSection.laneShift,
           markingStyle,
           urban: urbanRoad,
@@ -10824,6 +10930,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     baseTexture = 'hybrid',
     includeBuildings = true,
     includeSidewalks = true,
+    // the slabs' concrete: a key of SIDEWALK_LOOKS (beamngSidewalks.js)
+    sidewalkLook = DEFAULT_SIDEWALK_LOOK,
     applyFoundations: requestedFoundations = true,
     includeBackdrop = false,
     includeBridges = true,
@@ -11375,6 +11483,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),
       // the sidewalks away from the curb: raised over their decals
       walks: decalRoads.footpaths,
+      sidewalkLook,
       // (paving stones laid as the streets' decals lay them: red brick in the Americas)
       americas: getMarkingStyle(exportTerrainData.roadRules) === 'americas',
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
@@ -11924,7 +12033,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     if (patches.length) decalRoads.push({ class: 'SimGroup', name: 'corner_paving', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: patches });
   }
   // the sidewalks' shape, with the decks on the walls now the walls stand
-  const wallDeckMesh = buildWallDeckMesh(sidewalks.wallDecks, barrierObjects.wallTops);
+  const wallDeckMesh = buildWallDeckMesh(sidewalks.wallDecks, barrierObjects.wallTops, { sidewalkLook });
   if (wallDeckMesh) sidewalks.meshes.push(wallDeckMesh);
   // pedestrian squares, paved on the terrain as it now lies (plazas.js)
   if (includeRoads) {
@@ -12703,7 +12812,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       zip.file(`${base}/map_assets/custom_assets/sidewalks/sidewalks.dae`, sidewalksDaeData);
     }
     // (with the crosswalks' paint, wanted with or without sidewalks)
-    if (sidewalksDae || includeRoads) zip.file(`${base}/map_assets/custom_assets/sidewalks/main.materials.json`, JSON.stringify({ ...getSidewalkMaterialDefs(), ...getPlazaMaterialDefs() }, null, 2));
+    if (sidewalksDae || includeRoads) zip.file(`${base}/map_assets/custom_assets/sidewalks/main.materials.json`, JSON.stringify({ ...getSidewalkMaterialDefs({ look: sidewalkLook }), ...getPlazaMaterialDefs() }, null, 2));
     if (backdropDaeData) {
       zip.folder(`${base}/map_assets/custom_assets/terrain_backdrop`);
       zip.file(`${base}/map_assets/custom_assets/terrain_backdrop/terrain_backdrop.dae`, backdropDaeData);
