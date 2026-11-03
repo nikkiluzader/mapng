@@ -266,8 +266,10 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
             cumLenM[i] = cumLenM[i - 1] + Math.hypot(dx, dy) * metersPerPixel;
         }
         const baseKey = (key) => String(key).split('|')[0];
-        if (bridgeNodes.has(baseKey(corridor.startKey))) holdGradeToBridge(zOrig, cumLenM, false);
-        if (bridgeNodes.has(baseKey(corridor.endKey))) holdGradeToBridge(zOrig, cumLenM, true);
+        const bridgeAtStart = bridgeNodes.has(baseKey(corridor.startKey));
+        const bridgeAtEnd = bridgeNodes.has(baseKey(corridor.endKey));
+        if (bridgeAtStart) holdGradeToBridge(zOrig, cumLenM, false);
+        if (bridgeAtEnd) holdGradeToBridge(zOrig, cumLenM, true);
 
         liftOverCliffs(zOrig, cumLenM);
 
@@ -276,7 +278,7 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
             zSmooth = smooth1DArray(zSmooth, windowSamples);
         }
 
-        profiles.push({ corridor, points, zOrig, zSmooth, cumLenM });
+        profiles.push({ corridor, points, zOrig, zSmooth, cumLenM, bridgeAtStart, bridgeAtEnd });
     }
     return profiles;
 }
@@ -459,7 +461,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
     let hasRoads = false;
 
     for (const profile of profiles) {
-        const { corridor, points, zSmooth } = profile;
+        const { corridor, points, zSmooth, bridgeAtStart, bridgeAtEnd } = profile;
 
         const radiusMeters = corridorHalfWidthMeters(corridor, isUrbanRoad);
         // The core is flat. We add an extra margin for feathering back to the terrain.
@@ -496,6 +498,13 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
                 for (let x = minX; x <= maxX; x++) {
                     const { t, dist } = pointLineProjection(x, y, p1.x, p1.y, p2.x, p2.y);
                     if (dist > radiusPx) continue;
+                    // (a road meeting a bridge ends square there: its rounded
+                    // end reached on under the deck and lifted the road
+                    // passing below toward the approach's height)
+                    if ((bridgeAtStart && i === 0) || (bridgeAtEnd && i === points.length - 2)) {
+                        const along = ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / (((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2) || 1);
+                        if ((bridgeAtStart && i === 0 && along < 0) || (bridgeAtEnd && i === points.length - 2 && along > 1)) continue;
+                    }
 
                     let w = 1.0;
                     if (dist > coreRadiusPx) {

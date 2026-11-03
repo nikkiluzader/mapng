@@ -491,3 +491,18 @@ test('deck geometry: a part whose two ends meet (a loop) builds', async () => {
   const deck = { parts: [{ index: 0, xy: ring, z: ring.map(() => 10), half: 4 }] };
   assert.doesNotThrow(() => buildDeckGeometry(deck, { groundAt: () => 0 }));
 });
+
+test("a low deck's sides wall down to the ground, but never across a road passing under it", () => {
+  // a 20 m deck along x, 1.9 m over the ground; a track crosses under it at x = 0
+  const xy = Array.from({ length: 11 }, (_, k) => [-10 + 2 * k, 0]);
+  const deck = { parts: [{ xy, z: xy.map(() => 2.3), half: 6, depth: 0.4 }] };
+  const under = Object.assign([[0, -30, 0], [0, 30, 0]], { half: 4 });
+  const wallsAt = (roadLines) => {
+    const P = buildDeckGeometry(deck, { groundAt: () => 0, roadLines }).positions;
+    let n = 0;
+    for (let i = 0; i < P.length; i += 3) if (P[i + 2] < 0 && Math.abs(P[i]) < 4) n++;
+    return n;
+  };
+  assert.ok(wallsAt([]) > 0, 'walled down where nothing passes under');
+  assert.equal(wallsAt([under]), 0, 'open over the track');
+});

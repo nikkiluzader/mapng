@@ -93,3 +93,15 @@ test('a shared vertex nudged a few cm on one road still joins it', () => {
   assert.equal(g.stats.joints, 2, 'both deck ends are joints');
   assert.equal(g.stats.edges, 4);
 });
+
+test('roads passing over and under each other are no junction, though their vertices fall within a hand of each other', () => {
+  // the track under the bridge has a vertex 0.3 m from one of the bridge's
+  const g = buildStructureGraph([
+    seg([[-40, 0], [-10, 0]], { highway: 'raceway' }),
+    seg([[-10, 0], [0.2, 0.1], [10, 0]], { highway: 'raceway', bridge: 'yes', layer: '1' }),
+    seg([[10, 0], [40, 0]], { highway: 'raceway' }),
+    seg([[0, -40], [0, 0.3], [0, 40]], { highway: 'raceway' }),
+  ], { project });
+  assert.equal(g.stats.multiLevelJunctions, 0);
+  assert.equal(g.stats.joints, 2, 'the bridge still meets its approaches');
+});

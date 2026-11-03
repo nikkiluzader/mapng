@@ -80,26 +80,32 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
   // by exact position a bridge and its approach never met)
   const canon = new Map();     // key -> canonical key
   const cells = new Map();     // 1 m cell -> [{ key, x, y, seg }]
-  const keyOf = (p, segIndex) => {
+  // (across layers only where one of the two is a road's end: a bridge's end
+  // on its approach, a ramp onto a deck mid-way. Two interior vertices of
+  // roads passing over each other that happened to fall that close were one
+  // junction: the road under a kart track's bridge levelled up into the deck)
+  const layerOf = (seg) => (Number.isFinite(seg.layer) ? seg.layer : (Number.parseInt((seg.tags || seg.sourceFeature?.tags || {}).layer, 10) || 0));
+  const keyOf = (p, segIndex, end) => {
     const key = makeRoadNodeKey(p);
     const known = canon.get(key);
     if (known) return known;
     const [x, y] = project(p.lat, p.lng);
     const cx = Math.floor(x); const cy = Math.floor(y);
+    const layer = layerOf(segments[segIndex]);
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (const c of cells.get(`${cx + dx},${cy + dy}`) || []) {
-          if (c.seg !== segIndex && Math.hypot(c.x - x, c.y - y) <= JOIN_M) { canon.set(key, c.key); return c.key; }
+          if (c.seg !== segIndex && Math.hypot(c.x - x, c.y - y) <= JOIN_M && (c.layer === layer || c.end || end)) { canon.set(key, c.key); return c.key; }
         }
       }
     }
     canon.set(key, key);
     const cell = `${cx},${cy}`;
     if (!cells.has(cell)) cells.set(cell, []);
-    cells.get(cell).push({ key, x, y, seg: segIndex });
+    cells.get(cell).push({ key, x, y, seg: segIndex, layer, end });
     return key;
   };
-  segments.forEach((seg, segIndex) => { for (const p of seg.geometry || []) keyOf(p, segIndex); });
+  segments.forEach((seg, segIndex) => { const g = seg.geometry || []; g.forEach((p, i) => keyOf(p, segIndex, i === 0 || i === g.length - 1)); });
   const nodeAt = (pt, x, y) => {
     const key = canon.get(makeRoadNodeKey(pt)) || makeRoadNodeKey(pt);
     let node = nodes.get(key);

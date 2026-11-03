@@ -41,3 +41,17 @@ test('fine mode reshapes less terrain than coarse mode on a rolling road', () =>
   };
   assert.ok(changed(true) < changed(false), 'fine moves less ground');
 });
+
+test('an approach meeting its bridge ends square: its smoothing does not reach on under the deck onto the road below', () => {
+  // an approach embankment (ground 12 m) up to x = -4, a 30 m bridge on from
+  // there, a track crossing under the bridge at x = 0 in the dip (ground 10 m)
+  const h = (x) => (x < -4 || x > 26 ? 12 : 10);
+  const hm = grid(h);
+  const feats = [
+    { id: 'a', type: 'road', tags: { highway: 'raceway' }, geometry: [-120, -60, -4].map((x) => ll(x, 0)) },
+    { id: 'b', type: 'road', tags: { highway: 'raceway', bridge: 'yes', layer: '1' }, geometry: [-4, 26].map((x) => ll(x, 0)) },
+    { id: 'c', type: 'road', tags: { highway: 'raceway' }, geometry: [-100, 0, 100].map((y) => ll(0, y)) },
+  ];
+  smoothRoadsInHeightmap(hm, N, N, bounds, feats, 1, { fine: true });
+  assert.ok(at(hm, 0, 0) < 10.15, `the track under the bridge kept on its ground: ${at(hm, 0, 0).toFixed(2)}`);
+});

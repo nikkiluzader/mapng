@@ -647,6 +647,24 @@ function leftNormals(xy) {
   });
 }
 
+// a road under a deck: a road line (heights [x, y, z]) within its half width
+// and the edge margin of p, lower than zUnder there
+const ROAD_UNDER_GAP_M = 1;
+function roadUnder(p, zUnder, lines) {
+  return lines.some((line) => {
+    const r = (line.half ?? 3) + PIER_ROAD_EDGE_M;
+    for (let j = 0; j + 1 < line.length; j++) {
+      const [ax, ay, az] = line[j]; const [bx, by, bz] = line[j + 1];
+      if (!Number.isFinite(az) || !Number.isFinite(bz)) continue;
+      const vx = bx - ax; const vy = by - ay;
+      const L2 = vx * vx + vy * vy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - ay) * vy) / L2));
+      if (Math.hypot(ax + vx * t - p[0], ay + vy * t - p[1]) < r && az + (bz - az) * t < zUnder) return true;
+    }
+    return false;
+  });
+}
+
 // (a line carrying its road's half width keeps piers off all of its lanes)
 const PIER_ROAD_EDGE_M = 1.5;
 const nearAnySegment = (p, lines, r0) => lines.some((line) => {
@@ -1029,12 +1047,15 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
     b.strip(Lb, Rb, () => [0, 0, -1]);
     // Near the ground the sides go down into it, a retaining wall: no slab
     // floating over the ground by an abutment or along a walled ramp
+    // (never across a road passing under the deck: a kart track's low
+    // bridge walled its lower track off at both edges)
     for (const side of sides) {
       const ground = xy.map((_, k) => {
         const [x, y] = at(k, side.outer, 0);
         return groundAt ? groundAt(x, y) : -Infinity;
       });
-      const low = (k) => z[k] - depth - ground[k] < WALL_GAP_M && z[k] - slab > ground[k];
+      const roadBelow = xy.map((_, k) => { const [x, y] = at(k, side.outer, 0); return roadUnder([x, y], z[k] - depth - ROAD_UNDER_GAP_M, roadLines); });
+      const low = (k) => z[k] - depth - ground[k] < WALL_GAP_M && z[k] - slab > ground[k] && !roadBelow[k];
       const top = row(side.outer, -slab);
       const foot = xy.map((_, k) => at(k, side.outer, ground[k] - FOOTING_M / 2 - z[k]));
       runs(top, foot, side.shown.filter(([i]) => low(i) && low(i + 1)), side.faceOut);
