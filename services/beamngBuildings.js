@@ -28,7 +28,7 @@
  * (metres, Z up) with one geometry group per material; their material names
  * match getBuildingMaterialDefs().
  */
-import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, hotelCanopy, hangingSign, CANOPY_COLOURS, PUB_SIGN_COLOURS, PUB_FASCIAS, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
+import { streetIndex, passageOpenings, passageCrossings, passageInside, parapet, stringCourse, shopfronts, entrance, garageDoors, hotelCanopy, hangingSign, CANOPY_COLOURS, PUB_SIGN_COLOURS, PUB_FASCIAS, chimney, roofPlant, churchTower, mosque, silo, naveRect, PARAPET, BATTLEMENTS, battlements, salientCorners, sentryBox, cornerTower, fortGate, castleCorners, mappedTower } from './buildingDetails.js';
 import * as THREE from 'three';
 import { buildingUse, businessTagsByBuilding, isHistoricBuilding } from './buildingUses.js';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
@@ -92,6 +92,10 @@ export const BUILDING_MATERIALS = {
   blockwall: 'mapng_bld_blockwall',
   concrete: 'mapng_bld_concrete',
   metalWhite: 'mapng_bld_metal_white',
+  // the game's own doors: East Coast USA's door and window sheet (white,
+  // tinted per door), Italy's roll-up shutter for garages
+  doors: 'mapng_bld_doors',
+  rollupDoor: 'mapng_bld_rollup_door',
   roofRounded: 'mapng_bld_roof_rounded',
   roofItaly: 'mapng_bld_roof_italy',
   roofOchre: 'mapng_bld_roof_ochre',
@@ -163,6 +167,12 @@ const MATERIAL_STAGES = {
   blockwall: pbr(`${TILE}/brick/ind_blockwall`, 't_concrete_cinderblock_01'),
   concrete: legacy(`${TILE}/concrete/eca_bld_concrete`, 'eca_bld_concrete', 0.9),
   metalWhite: pbr(`${TILE}/metal/corrugated_modern`, 't_metal_corrugated_01', { metallic: true }),
+  doors: {
+    baseColorMap: '/assets/materials/atlas/eca_doors_windows/eca_doors_windows_b.color.png',
+    normalMap: '/assets/materials/atlas/eca_doors_windows/eca_doors_windows_nm.normal.png',
+    roughnessMap: '/assets/materials/atlas/eca_doors_windows/eca_doors_windows_r.data.png',
+  },
+  rollupDoor: pbrNoAo(`${TILE}/metal/t_italy_bld_rollupdoor`, 't_italy_bld_rollupdoor'),
   roofRounded: pbr(`${TILE}/roofing/m_roof_slates_rounded`, 't_roof_slates_rounded'),
   roofItaly: pbrNoAo(`${TILE}/roofing/t_italy_bld_roof_tiles`, 't_italy_bld_roof_tiles'),
   roofOchre: pbr(`${TILE}/roofing/m_roof_slates_ochre`, 't_roof_slates_ochre'),
@@ -1729,6 +1739,22 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       if (plan.use) bump(stats.uses || (stats.uses = {}), plan.use);
       if (plan.historic) stats.details.historic = (stats.details.historic || 0) + 1;
     }
+    // a garage's roll-up doors, on the wall facing the street (else its longest)
+    if (tags.building === 'garage' || tags.building === 'garages') {
+      let door = -1; let dmin = Infinity; let longest = -1; let lmax = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const p = ring[i]; const q = ring[(i + 1) % ring.length];
+        const wl = Math.hypot(q[0] - p[0], q[1] - p[1]);
+        if (wl > lmax) { lmax = wl; longest = i; }
+        const dd = streets.facing(p, q);
+        if (dd !== null && dd < dmin && wl >= 2.9) { dmin = dd; door = i; }
+      }
+      const wall = door >= 0 ? door : longest;
+      if (wall >= 0) {
+        const n = garageDoors(detailB, ring[wall], ring[(wall + 1) % ring.length], base, { row: tags.building === 'garages' });
+        if (n) stats.details.garageDoors = (stats.details.garageDoors || 0) + n;
+      }
+    }
     if (plan.kind === 'house') {
       // the entrance on the wall facing the nearest street
       let door = -1; let dmin = Infinity;
@@ -1754,7 +1780,11 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     // roof plant on big flat roofs; water tanks on mid-rises where they stand
     if (flat && box && area >= ROOF_PLANT_M2 && plan.kind !== 'house' && !worship && !plan.fort) {
       const tanks = plan.tanks && plan.floors >= 4 && plan.floors <= 20 && !plan.office && rnd('tank') < 0.3;
-      stats.details.roofPlant = (stats.details.roofPlant || 0) + roofPlant(detailB, ring, box, eave, area, crownMat, plan.wallTint, { tanks }, (...k) => rnd('plant', ...k));
+      stats.details.roofPlant = (stats.details.roofPlant || 0) + roofPlant(detailB, ring, box, eave, area, crownMat, plan.wallTint, {
+        tanks,
+        // (the water tank: Johnson Valley's, the game's own)
+        onTank: (c, z, yaw) => props.push({ shape: 'waterTank', x: c[0], y: c[1], z, yaw }),
+      }, (...k) => rnd('plant', ...k));
     }
     // castles and forts: battlements round the wall top, a fort's sentry
     // boxes on its bastions' points (and the cordon under its parapet), a

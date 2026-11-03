@@ -20,6 +20,7 @@ import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTi
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
 import { fetchTreeSpeciesMix, TREE_MIX_CREDIT } from './treeSpecies.js';
+import { placeBoats } from './boats.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
@@ -12175,6 +12176,34 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       shapeName: shape.shapeFile, useInstanceRenderData: true,
     });
   });
+  // a few boats moored at the piers and in the marinas (services/boats.js)
+  if (includeRoads) {
+    const toW = (p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0);
+    const feats = exportTerrainData.osmFeatures || [];
+    const deckLines = buildDeckPaths(exportTerrainData, squareSize);
+    const roadIndex = buildCarriagewayIndex([...groundCarriageways, ...deckLines.map((d, i) => ({ owner: `deck_${i}`, half: d.half, nodes: d.nodes }))]);
+    const bldRings = feats.filter((f) => f.type === 'building' && f.geometry?.length > 2).map((f) => f.geometry.map(toW));
+    const inBld = (x, y) => bldRings.some((r) => { let k = false; for (let i = 0, j = r.length - 1; i < r.length; j = i++) if (((r[i][1] > y) !== (r[j][1] > y)) && (x < ((r[j][0] - r[i][0]) * (y - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0])) k = !k; return k; });
+    const seaZ = -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0);
+    const boats = placeBoats({
+      piers: feats.filter((f) => f.type === 'pier' && f.geometry?.length > 1).map((f) => ({
+        nodes: f.geometry.map(toW), half: (Number.parseFloat(f.tags?.width) > 0 ? Math.min(12, Number.parseFloat(f.tags.width)) : 2.4) / 2,
+      })),
+      marinas: feats.filter((f) => (f.tags?.leisure === 'marina' || f.tags?.water === 'harbour') && f.geometry?.length > 3).map((f) => f.geometry.map(toW)),
+      groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+      seaZ,
+      blocked: (x, y) => carriagewaysAt(roadIndex, x, y, 0.5).length > 0 || underDeck(x, y, seaZ - 2, seaZ + 6) || inBld(x, y),
+    });
+    boats.forEach((b, i) => {
+      streetFurnitureObjects.push({
+        __parent: 'street_furniture', class: 'TSStatic', name: `boat_${i + 1}`, persistentId: generatePersistentId(),
+        position: [roundTo(b.x, 3), roundTo(b.y, 3), roundTo(b.z, 3)],
+        rotationMatrix: rotationMatrixFromYaw(b.yaw),
+        shapeName: PROP_SHAPES[b.shape].shapeFile, collisionType: 'Collision Mesh', useInstanceRenderData: true,
+      });
+    });
+    if (boats.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Boats: ${boats.length} moored at piers and in marinas.`);
+  }
   buildingReport.sportsLights = sportsLights.counts;
   buildingReport.sportsGlows = sportsLights.glows;
   // OSM bollards as stock bollards (services/bollards.js), not on drawn roads.

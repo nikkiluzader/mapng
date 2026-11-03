@@ -6205,6 +6205,138 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "italy_plastic_trim": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/plastic/italy_plastic_trim/italy_plastic_trim_d.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "instanceDiffuse": true,
+          "normalMap": "/assets/materials/trim/plastic/italy_plastic_trim/italy_plastic_trim_n.dds",
+          "roughnessFactor": 0.690170288,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "specularMap": "/assets/materials/trim/plastic/italy_plastic_trim/italy_plastic_trim_s.dds",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "instanceDiffuse": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "SOFT_COLLISION_GENERAL",
+      "mapTo": "italy_plastic_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "name": "italy_plastic_trim",
+      "persistentId": "4c6a614f-7f1b-4ca8-b129-4a53f00f0974",
+      "specularStrength0": "0.490196",
+      "translucentBlendOp": "None"
+    },
+    "italy_road_signs": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/signage/italy_road_signs/italy_road_signs.dds",
+          "detailNormalMapStrength": 0.5,
+          "detailScale": [
+            80,
+            80
+          ],
+          "diffuseColor": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            0.867999971
+          ],
+          "roughnessFactor": 0.638332963,
+          "specular": [
+            0.996078014,
+            0.996078014,
+            0.996078014,
+            1
+          ],
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        },
+        {
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseColor": null,
+          "roughnessFactor": null,
+          "specular": null,
+          "useAnisotropic": null,
+          "vertColor": null
+        }
+      ],
+      "alphaRef": 100,
+      "alphaTest": true,
+      "annotation": "TRAFFIC_SIGNS",
+      "castShadows": false,
+      "class": "Material",
+      "groundType": "METAL",
+      "mapTo": "italy_road_signs",
+      "materialTag0": "beamng",
+      "materialTag1": "italy",
+      "materialTag2": "east_coast_usa",
+      "name": "italy_road_signs",
+      "persistentId": "5a028931-65f2-4d6a-b378-62b56f89de67",
+      "specularColor0": "0.1 0.1 0.1 0.1",
+      "specularStrength0": "0.490196",
+      "translucent": true,
+      "translucentRecvShadows": true,
+      "translucentZWrite": true
+    },
     "italy_rock_wall_tiling": {
       "Stages": [
         {
@@ -6658,6 +6790,24 @@
       "name": "m_oldwood",
       "translucentBlendOp": "None",
       "version": 1.5
+    },
+    "m_wood_wall": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/wood/m_wood_wall/si_wood_wall_d.color.png",
+          "normalMap": "/assets/materials/tileable/wood/m_wood_wall/si_wood_wall_n.normal.png",
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "specularMap": "/assets/materials/tileable/wood/m_wood_wall/si_wood_wall_s.color.png",
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "mapTo": "m_wood_wall",
+      "name": "m_wood_wall",
+      "persistentId": "ab4cf29d-bcdb-461b-a225-0f985b54ea7b"
     },
     "metal_galvanized": {
       "Stages": [
@@ -7154,6 +7304,35 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "ut_bld_plastic": {
+      "Stages": [
+        {
+          "baseColorMap": "/assets/materials/tileable/plastic/ind_plastic/t_ind_plastic_b.color.png",
+          "normalMap": "/assets/materials/tileable/plastic/ind_plastic/t_ind_plastic_nm.normal.png",
+          "roughnessMap": "/assets/materials/tileable/plastic/ind_plastic/t_ind_plastic_r.data.png",
+          "vertColor": true
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        },
+        {
+          "vertColor": null
+        }
+      ],
+      "class": "Material",
+      "groundType": "PLASTIC",
+      "mapTo": "ut_bld_plastic",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_bld_plastic",
+      "persistentId": "ef96a782-fcb9-426d-aae7-b1c07b6c9666",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "ut_metal_trim": {
       "Stages": [
         {
@@ -7190,6 +7369,31 @@
       "persistentId": "23e33e13-be8b-46d7-9042-880eb6aef428",
       "translucentBlendOp": "None",
       "version": 1.5
+    },
+    "ut_plastic_trim": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/trim/plastic/ut_plastic_trim/ut_plastic_trim_d.color.png",
+          "normalMap": "/assets/materials/trim/plastic/ut_plastic_trim/ut_plastic_trim_nm.normal.png",
+          "overlayMap": "/assets/materials/breakup/utah_breakup/utah_breakup_texture.dds",
+          "specularMap": "/assets/materials/trim/plastic/ut_plastic_trim/ut_plastic_trim_s.color.png",
+          "useAnisotropic": true,
+          "vertColor": true
+        },
+        {},
+        {},
+        {}
+      ],
+      "class": "Material",
+      "groundType": "PLASTIC",
+      "mapTo": "ut_plastic_trim",
+      "materialTag0": "beamng",
+      "materialTag1": "building",
+      "materialTag2": "utah",
+      "name": "ut_plastic_trim",
+      "order_simset": -1125201513,
+      "persistentId": "9144b2ae-bdc5-4f50-bbea-ece11426f744",
+      "translucentBlendOp": "None"
     },
     "ut_roadsigns": {
       "Stages": [

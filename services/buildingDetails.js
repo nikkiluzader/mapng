@@ -483,7 +483,7 @@ export function shopfronts(m, a, b, zTop, rnd, look = {}) {
 // a hotel's entrance canopy: burgundy, navy, forest green, bronze, black
 export const CANOPY_COLOURS = [[0.42, 0.08, 0.1], [0.08, 0.12, 0.26], [0.1, 0.24, 0.15], [0.42, 0.3, 0.16], [0.1, 0.1, 0.11]];
 const BRASS = [0.72, 0.58, 0.3];
-const GLASS_DOOR = [0.16, 0.2, 0.24];
+const HOTEL_DOOR_TINT = [0.92, 0.89, 0.82];
 const CANOPY_OUT_M = 3.2;
 const CANOPY_ROAD_CLEAR_M = 0.5;   // short of the street's edge
 const CANOPY_MIN_M = 0.8;          // shallower: no canopy, the doors alone
@@ -517,9 +517,9 @@ export function hotelCanopy(m, a, b, base, col, { room = Infinity } = {}) {
       cylinder(m, 'metalWhite', post[0], post[1], 0.09, base - 0.2, zc, BRASS, { n: 10 });
     }
   }
-  // glass doors in a brass frame
-  box(m, 'metalWhite', at(0.05), d, Math.min(1.8, half - 0.5) + 0.12, 0.05, base, base + 2.75, BRASS);
-  box(m, 'metalWhite', at(0.09), d, Math.min(1.8, half - 0.5), 0.05, base, base + 2.6, GLASS_DOOR);
+  // the entrance: the sheet's shopfront glass doors, warm white
+  const dw = 2 * Math.min(1.8, half - 0.5) + 0.24;
+  doorQuad(m, mid, d, out, base, dw, Math.min(2.9, dw / 1.46), DOOR_UV.shopfront, HOTEL_DOOR_TINT);
   return built ? { front: at(depth), mid, d, out, half, zTop: zc + 0.45 } : null;
 }
 
@@ -566,14 +566,33 @@ const TRIM_WHITE = [0.94, 0.93, 0.9];
 // front doors: black, dark green, red, navy, off-white (a hood or a veranda with no door under it read as
 // a shelf on a blank wall)
 const DOOR_COLOURS = [[0.07, 0.07, 0.08], [0.09, 0.2, 0.13], [0.5, 0.09, 0.08], [0.09, 0.12, 0.25], [0.88, 0.87, 0.82]];
-const DOOR_W = 1.0;
-const DOOR_H = 2.1;
+const DOOR_W = 1.05;
+const DOOR_H = 2.45;     // (the sheet's door with its frame and top rail)
 
-/** A front door on the wall at c (plan point on the wall), facing out: a painted leaf in a white frame. */
-function frontDoor(m, c, along, out, base, col) {
-  const f = (k, w, z0, z1, tint) => box(m, 'metalWhite', [c[0] + out[0] * k, c[1] + out[1] * k], along, w / 2, k, z0, z1, tint);
-  f(0.06, DOOR_W + 0.24, base, base + DOOR_H + 0.14, TRIM_WHITE);       // frame
-  f(0.09, DOOR_W, base, base + DOOR_H, col);                           // leaf
+// The game's own doors: where each sits on East Coast USA's door and window
+// sheet ('doors' material; [u0, v0, u1, v1], v up), its frame included.
+export const DOOR_UV = {
+  glazed: [0.503, 0.507, 0.654, 0.888],
+  halfGlass: [0.659, 0.507, 0.825, 0.888],
+  panel: [0.830, 0.507, 0.996, 0.888],
+  steel: [0.503, 0.009, 0.737, 0.497],
+  shopfront: [0.005, 0.009, 0.498, 0.346],    // two glass doors and a glass panel between
+};
+const HOUSE_DOORS = ['glazed', 'halfGlass', 'panel'];
+const DOOR_OUT_M = 0.05;      // proud of the wall
+
+/** A door from the sheet on the wall at c (plan), w wide and h tall from z0, facing out. */
+export function doorQuad(m, c, along, out, z0, w, h, uv, col, mat = 'doors') {
+  const k = DOOR_OUT_M;
+  const a = [c[0] - along[0] * w / 2 + out[0] * k, c[1] - along[1] * w / 2 + out[1] * k];
+  const b = [c[0] + along[0] * w / 2 + out[0] * k, c[1] + along[1] * w / 2 + out[1] * k];
+  const [u0, v0, u1, v1] = uv;
+  m.quad(mat, [a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z0 + h], [a[0], a[1], z0 + h], [u0, v0], [u1, v0], [u1, v1], [u0, v1], col);
+}
+
+/** A front door on the wall at c (plan point on the wall), facing out: one of the sheet's wooden doors, in its colour. */
+function frontDoor(m, c, along, out, base, col, style = 'panel') {
+  doorQuad(m, c, along, out, base, DOOR_W, DOOR_H, DOOR_UV[style] || DOOR_UV.panel, col);
 }
 
 /**
@@ -596,7 +615,7 @@ export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd, { 
   const mid = L / 2;
   const rise = Math.max(0, base - gDoor);
   const doorAt = at(mid, 0, 0);
-  frontDoor(m, [doorAt[0], doorAt[1]], d, out, base, DOOR_COLOURS[Math.floor(rnd('doorCol') * DOOR_COLOURS.length)]);
+  frontDoor(m, [doorAt[0], doorAt[1]], d, out, base, DOOR_COLOURS[Math.floor(rnd('doorCol') * DOOR_COLOURS.length)], HOUSE_DOORS[Math.floor(rnd('doorStyle') * HOUSE_DOORS.length)]);
   if (style === 'veranda' && free < 2.1 + (rise > 0.2 ? stepsOut(rise) : 0)) style = 'hood';
   const stepsFit = (from) => rise > 0.2 && free >= from + stepsOut(rise);
   if (style === 'veranda' && L >= 6) {
@@ -620,7 +639,7 @@ export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd, { 
     return 'veranda';
   }
   if (style === 'hood') {
-    const w = 1.7; const top = base + 2.35; const depth = 0.85; const ridge = 0.45;
+    const w = 1.7; const top = base + 2.6; const depth = 0.85; const ridge = 0.45;   // (over the 2.45 m door)
     const c = at(mid, 0, 0);
     const P = (t, k, z) => [c[0] + d[0] * t + out[0] * k, c[1] + d[1] * t + out[1] * k, z];
     // two slopes meeting over the door, and their gable
@@ -638,6 +657,26 @@ export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd, { 
   }
   if (stepsFit(0.05)) { steps(m, at(mid, 0.05, 0), d, out, gDoor, base, 1.4); return 'steps'; }
   return null;
+}
+
+// A garage's roll-up doors (Italy's shutter): on the wall facing the
+// street (else its longest), one per GARAGE_BAY_M of it, a lone garage two
+// at most.
+const GARAGE_BAY_M = 3.2;
+const GARAGE_DOOR_W = 2.5;
+const GARAGE_DOOR_H = 2.2;
+const SHUTTER_TILE_M = 2.5;
+export function garageDoors(m, a, b, base, { row = false } = {}) {
+  const e = v2(a, b); const L = len2(e);
+  if (L < GARAGE_DOOR_W + 0.4) return 0;
+  const d = [e[0] / L, e[1] / L]; const out = [d[1], -d[0]];
+  const n = Math.max(1, Math.min(row ? 40 : 2, Math.floor(L / GARAGE_BAY_M)));
+  const step = L / n;
+  for (let i = 0; i < n; i++) {
+    const c = [a[0] + d[0] * step * (i + 0.5), a[1] + d[1] * step * (i + 0.5)];
+    doorQuad(m, c, d, out, base, GARAGE_DOOR_W, GARAGE_DOOR_H, [0, 0, GARAGE_DOOR_W / SHUTTER_TILE_M, GARAGE_DOOR_H / SHUTTER_TILE_M], [0.82, 0.82, 0.8], 'rollupDoor');
+  }
+  return n;
 }
 
 const STEP_RISE = 0.18;
@@ -678,7 +717,7 @@ export function chimney(m, boxInfo, eave, rise, wallMat, wallTint, rnd) {
 const PLANT_GREY = [0.66, 0.67, 0.68];
 
 /** Roof plant on a flat roof of `area` m2 inside ring (box: its oriented box), clear of the edge. */
-export function roofPlant(m, ring, boxInfo, z, area, wallMat, wallTint, { tanks = false } = {}, rnd) {
+export function roofPlant(m, ring, boxInfo, z, area, wallMat, wallTint, { tanks = false, onTank = null } = {}, rnd) {
   const { cx, cy, ux, uy, length, width } = boxInfo;
   const hl = length / 2 - 2; const hw = width / 2 - 2;
   if (hl < 1.5 || hw < 1.5) return 0;
@@ -698,7 +737,8 @@ export function roofPlant(m, ring, boxInfo, z, area, wallMat, wallTint, { tanks 
   }
   if (tanks) {
     const c = at((rnd('tkS') * 2 - 1) * hl * 0.5, (rnd('tkT') * 2 - 1) * hw * 0.5);
-    if (inRing(c, ring)) { waterTank(m, c, z); built++; }
+    // (the game's own tank where one is given: onTank(c, z, yaw))
+    if (inRing(c, ring)) { if (onTank) onTank(c, z, Math.atan2(boxInfo.uy, boxInfo.ux)); else waterTank(m, c, z); built++; }
   }
   return built;
 }

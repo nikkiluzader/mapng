@@ -61,6 +61,19 @@ export const PROP_SHAPES = {
   hotelSign: { shapeFile: '/levels/italy/art/shapes/buildings/italy_billboard_hotel_big.dae', yawOffset: -Math.PI / 2 },
   flagWall: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_flag_usa.dae', yawOffset: Math.PI },
   cafeSign: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_comsign_cafe.dae', yawOffset: -Math.PI / 2, scale: 1.6 },
+  // boats moored at piers and in marinas (services/boats.js): Italy's
+  // harbour boats (they bob on the water)
+  boatMotorSmall: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_small_a.DAE' },
+  boatSailB: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_small_b.DAE' },
+  boatSailC: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_small_c.DAE' },
+  boatSailD: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_small_d.DAE' },
+  boatSailE: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_small_e.DAE' },
+  boatMotorBig: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_big_b.DAE' },
+  boatBigA: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_big_a.DAE' },
+  boatBigC: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_big_c.DAE' },
+  boatBigD: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_big_d.DAE' },
+  // a rooftop water tank on its stand (Johnson Valley's, 3.5 x 3.75 m, 5.15 m tall)
+  waterTank: { shapeFile: '/levels/johnson_valley/art/shapes/building/s_watertank.dae' },
 };
 
 // Street lights, their arms along local +X; the night light sits at the
