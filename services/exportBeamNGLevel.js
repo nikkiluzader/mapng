@@ -43,6 +43,7 @@ import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRo
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
 import { getBiomeRuntimeMaterialDefs } from './beamngRuntimeMaterialCatalog.js';
 import { getFuelStationRuntimeMaterialDefs } from './beamngFuelStationMaterials.js';
+import { stationCanopies, islandsUnder, islandOrigin, islandBays, islandBesideRoad, inRing as inFuelRing } from './fuelStations.js';
 import { validateBeamNGZipStructure } from './beamngExportConformance.js';
 import {
   collectGiveWayNodeKeys,
@@ -1092,7 +1093,8 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
   const squareSize = worldSize / terrainData.width;
   const { meshes: buildingMeshes, count: buildingCount, stats: buildingStats, tiles: buildingTiles } = buildTexturedBuildings(
     // (carports are open roofs on posts: native carport models, not walls)
-    terrainData.osmFeatures.filter((f) => !isCarportFeature(f)),
+    // (a filling station's canopy: the game's pump island brings its own)
+    terrainData.osmFeatures.filter((f) => !isCarportFeature(f) && !fuelLayout(terrainData, squareSize).used.has(f.id)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
     { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads },
   );
@@ -8935,16 +8937,54 @@ function deriveEnergyTypes(tags = {}) {
  * Returns { objects, facilities } where `objects` are scene items parented to the
  * `gasStations` SimGroup and `facilities` are the gasStations entries.
  */
-function buildFuelStations(terrainData, squareSize) {
-  const features = terrainData.osmFeatures ?? [];
-  const stations = features.filter((f) => (
+// (a station mapped twice, as a point and as areas, the same brand within
+// FUEL_SAME_STATION_M: the areas only, a stray island beside the road else)
+const FUEL_SAME_STATION_M = 120;
+const fuelStationFeatures = (features) => {
+  const all = features.filter((f) => (
     f.type === 'fuel_station'
     && Array.isArray(f.geometry)
     && f.geometry.length === 1
     && Number.isFinite(f.geometry[0]?.lat)
     && Number.isFinite(f.geometry[0]?.lng)
   ));
+  const brand = (f) => String(f.tags?.brand || f.tags?.name || '').trim().toLowerCase();
+  const mapped = all.filter((f) => f.canopy || f.area);
+  const m = (a, b) => Math.hypot((a.lat - b.lat) * 111000, (a.lng - b.lng) * 111000 * Math.cos((a.lat * Math.PI) / 180));
+  return all.filter((f) => f.canopy || f.area || !brand(f)
+    || !mapped.some((o) => brand(o) === brand(f) && m(o.geometry[0], f.geometry[0]) <= FUEL_SAME_STATION_M));
+};
+
+// Each station's canopy (services/fuelStations.js), worked out once per
+// export: the building pass leaves the canopies out, the station pass puts
+// its pump islands under them.
+const fuelLayoutCache = new WeakMap();
+function fuelLayout(terrainData, squareSize) {
+  const hit = fuelLayoutCache.get(terrainData);
+  if (hit) return hit;
+  const features = terrainData.osmFeatures ?? [];
+  const toW = (q) => { const p = geoToWorldPoint(q.lat, q.lng, terrainData, squareSize, 0); return [p[0], p[1]]; };
+  const ring = (g) => (Array.isArray(g) && g.length >= 3 ? g.filter((q) => Number.isFinite(q?.lat)).map(toW) : null);
+  const stations = fuelStationFeatures(features).slice(0, MAX_FUEL_STATIONS)
+    .map((f) => ({ tags: f.tags || {}, pt: toW(f.geometry[0]), canopy: ring(f.canopy), area: ring(f.area) }));
+  const buildings = features.filter((f) => f.type === 'building' && f.geometry?.length >= 3 && ['roof', 'canopy'].includes(f.tags?.building))
+    .map((f) => ({ id: f.id, tags: f.tags, ring: ring(f.geometry) }));
+  // (any building, for a station's grounds round its shop not to be taken as its canopy)
+  const allRings = stations.some((st) => st.area) ? features.filter((f) => f.type === 'building' && f.geometry?.length >= 3 && !['roof', 'canopy'].includes(f.tags?.building)).map((f) => ring(f.geometry)) : [];
+  const buildingAt = (x, y) => allRings.some((r) => inFuelRing(r, x, y));
+  const out = stations.length ? stationCanopies(stations, buildings, { buildingAt }) : { canopies: [], used: new Set() };
+  fuelLayoutCache.set(terrainData, out);
+  return out;
+}
+
+function buildFuelStations(terrainData, squareSize) {
+  const features = terrainData.osmFeatures ?? [];
+  const stations = fuelStationFeatures(features);
   if (stations.length === 0) return { objects: [], facilities: [] };
+  const { canopies } = fuelLayout(terrainData, squareSize);
+  // (buildings, for a road-side island to stand clear of)
+  const buildingRings = features.filter((f) => f.type === 'building' && f.geometry?.length >= 3)
+    .map((f) => f.geometry.map((q) => { const p = geoToWorldPoint(q.lat, q.lng, terrainData, squareSize, 0); return [p[0], p[1]]; }));
 
   // Project stations and pumps to world space once.
   const stationPts = stations.map((f) => geoToWorldPoint(f.geometry[0].lat, f.geometry[0].lng, terrainData, squareSize, 0));
@@ -8983,7 +9023,7 @@ function buildFuelStations(terrainData, squareSize) {
     const pts = feature.geometry
       .filter((p) => Number.isFinite(p?.lat) && Number.isFinite(p?.lng))
       .map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
-    if (pts.length >= 2) roads.push({ pts, halfWidth });
+    if (pts.length >= 2) roads.push({ pts, halfWidth, service: highway === 'service' });
   }
 
   const objects = [];
@@ -9028,9 +9068,33 @@ function buildFuelStations(terrainData, squareSize) {
       ];
     }
 
+    // a fuel station's islands: under its canopy, at its mapped pumps, else
+    // beside the road clear of buildings; their bays where cars refuel
+    let islands = null;
+    let bays = null;
+    if (!isElectric) {
+      // (the drive lanes mapped under it: drivable ways, not the street)
+      if (canopies[si]) islands = islandsUnder(canopies[si], roads.filter((r) => r.service).map((r) => r.pts));
+      else if (pumpsByStation[si].length) {
+        const cx = pumpPositions.reduce((s2, p) => s2 + p[0], 0) / pumpPositions.length;
+        const cy = pumpPositions.reduce((s2, p) => s2 + p[1], 0) / pumpPositions.length;
+        islands = [{ c: [cx, cy], yaw: bayYaw }];
+      } else if (near) {
+        const nx = anchor[0] - near.cx; const ny = anchor[1] - near.cy; const nl = Math.hypot(nx, ny) || 1;
+        // (only the roads and buildings within reach of where it may go)
+        const R = 80;
+        const nearRoads = roads.filter((r) => r.pts.some((q) => Math.hypot(q[0] - anchor[0], q[1] - anchor[1]) < R + 200));
+        const nearRings = buildingRings.filter((r) => r.some((q) => Math.hypot(q[0] - anchor[0], q[1] - anchor[1]) < R));
+        const blocked = (x, y) => nearRings.some((r) => inFuelRing(r, x, y)) || nearRoads.some((r) => !!findNearestRoad(x, y, [r], r.halfWidth + 0.5));
+        islands = [islandBesideRoad(near, [nx / nl, ny / nl], blocked)];
+      } else islands = [{ c: [anchor[0], anchor[1]], yaw: 0 }];
+      if (!pumpsByStation[si].length) bays = islands.flatMap(islandBays);
+    }
+
     const pumpRefs = [];
-    for (let pi = 0; pi < pumpPositions.length; pi++) {
-      const [px, py] = pumpPositions[pi];
+    const bayList = bays || pumpPositions.map(([px, py]) => ({ c: [px, py], yaw: bayYaw, scale: [5, 7, 4] }));
+    for (let pi = 0; pi < bayList.length; pi++) {
+      const [px, py] = bayList[pi].c;
       const ground = getTerrainHeightAtWorldXY(px, py, terrainData, squareSize);
       const areaName = `${stationId}_pump_area_${pi + 1}`;
       const iconName = `${stationId}_pump_icon_${pi + 1}`;
@@ -9041,8 +9105,8 @@ function buildFuelStations(terrainData, squareSize) {
         name: areaName,
         persistentId: generatePersistentId(),
         position: [roundTo(px, 3), roundTo(py, 3), roundTo(ground + 1.5, 3)],
-        rotationMatrix: rotationMatrixFromYaw(bayYaw),
-        scale: [5, 7, 4],
+        rotationMatrix: rotationMatrixFromYaw(bayList[pi].yaw),
+        scale: bayList[pi].scale.map((v) => roundTo(v, 3)),
         area2D: false,
       });
       objects.push({
@@ -9076,18 +9140,22 @@ function buildFuelStations(terrainData, squareSize) {
         });
       }
     } else {
-      const cx = pumpPositions.reduce((s, p) => s + p[0], 0) / pumpPositions.length;
-      const cy = pumpPositions.reduce((s, p) => s + p[1], 0) / pumpPositions.length;
-      const g = getTerrainHeightAtWorldXY(cx, cy, terrainData, squareSize);
-      objects.push({
-        __parent: 'gasStations',
-        class: 'TSStatic',
-        name: `${stationId}_pumps`,
-        persistentId: generatePersistentId(),
-        position: [roundTo(cx, 3), roundTo(cy, 3), roundTo(g, 3)],
-        rotationMatrix: rotationMatrixFromYaw(bayYaw),
-        shapeName: FUEL_PUMP_SHAPE,
-        useInstanceRenderData: true,
+      // (the island's middle on its spot: its origin sits 7 m off to one side)
+      islands.forEach((isl, k) => {
+        const [ox, oy] = islandOrigin(isl);
+        const g = getTerrainHeightAtWorldXY(isl.c[0], isl.c[1], terrainData, squareSize);
+        const scaled = (isl.sx ?? 1) !== 1 || (isl.sy ?? 1) !== 1;
+        objects.push({
+          __parent: 'gasStations',
+          class: 'TSStatic',
+          name: `${stationId}_pumps${k ? `_${k + 1}` : ''}`,
+          persistentId: generatePersistentId(),
+          position: [roundTo(ox, 3), roundTo(oy, 3), roundTo(g, 3)],
+          rotationMatrix: rotationMatrixFromYaw(isl.yaw),
+          ...(scaled ? { scale: [roundTo(isl.sx ?? 1, 3), roundTo(isl.sy ?? 1, 3), 1] } : {}),
+          shapeName: FUEL_PUMP_SHAPE,
+          useInstanceRenderData: true,
+        });
       });
     }
 

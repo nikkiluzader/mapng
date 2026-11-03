@@ -589,10 +589,14 @@ export const parseOverpassResponse = (data, bounds) => {
     let sumLat = 0, sumLng = 0;
     for (const p of f.geometry) { sumLat += p.lat; sumLng += p.lng; }
     const n = f.geometry.length;
+    // (its outline kept: the canopy itself when the way is the canopy, the
+    // pumps' place; else the station's grounds, where to look for one)
+    const isCanopy = tags.building === "roof" || tags.building === "canopy";
     derivedFuelStations.push({
       id: `${f.id}_station`, type: "fuel_station",
       geometry: [{ lat: sumLat / n, lng: sumLng / n }],
       tags: { ...tags, source_feature: "area" },
+      ...(isCanopy ? { canopy: f.geometry } : { area: f.geometry }),
     });
   }
 
