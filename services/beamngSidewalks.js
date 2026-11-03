@@ -15,7 +15,7 @@
 // BeamNG.Earth's (server/sidewalks.py), measured on official US curbs.
 
 import * as THREE from 'three';
-import polygonClipping from 'polygon-clipping';
+import polygonClipping from './polyClip.js';
 import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';

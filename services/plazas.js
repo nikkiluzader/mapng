@@ -6,7 +6,7 @@
 // (sportsFields.drapedMesh) a few centimetres over it.
 
 import * as THREE from 'three';
-import polygonClipping from 'polygon-clipping';
+import polygonClipping from './polyClip.js';
 import { drapedMesh } from './sportsFields.js';
 
 const PLAZA_LIFT_M = 0.04;     // over the ground (the drape lies on its triangles)
