@@ -97,7 +97,15 @@ export const TREE_MIX_CREDIT = 'Tree species mix: iNaturalist research-grade obs
  */
 export async function fetchTreeSpeciesMix(bounds, { fetchImpl = globalThis.fetch, timeoutMs = MIX_TIMEOUT_MS } = {}) {
   if (!bounds || typeof fetchImpl !== 'function') return null;
-  const grow = (lo, hi) => { const span = hi - lo; const pad = Math.max(0, (MIX_MIN_SPAN_DEG - span) / 2); return [lo - pad, hi + pad]; };
+  // (too few records over ~3 km, a rural place: once more over ~11 km)
+  const near = await fetchMixOver(bounds, MIX_MIN_SPAN_DEG, fetchImpl, timeoutMs);
+  if (near) return near;
+  return fetchMixOver(bounds, MIX_WIDE_SPAN_DEG, fetchImpl, timeoutMs);
+}
+const MIX_WIDE_SPAN_DEG = 0.1;
+
+async function fetchMixOver(bounds, minSpan, fetchImpl, timeoutMs) {
+  const grow = (lo, hi) => { const span = hi - lo; const pad = Math.max(0, (minSpan - span) / 2); return [lo - pad, hi + pad]; };
   const [south, north] = grow(bounds.south, bounds.north);
   const [west, east] = grow(bounds.west, bounds.east);
   const params = new URLSearchParams({

@@ -5121,6 +5121,42 @@
       "name": "SOFT_COLLISION_GENERAL",
       "persistentId": "395e88fc-6f2b-4624-88fa-fb4b0f8a4163"
     },
+    "barrierfence1": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/metal/barrierfence1/t_barrierfence_01_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/metal/barrierfence1/t_barrierfence_01_b.color.png",
+          "metallicFactor": 1,
+          "metallicMap": "/assets/materials/trim/metal/barrierfence1/t_barrierfence_01_m.data.png",
+          "normalMap": "/assets/materials/trim/metal/barrierfence1/barrierfence1_n.dds",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/trim/metal/barrierfence1/t_barrierfence_01_r.data.png"
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null
+        },
+        {
+          "metallicFactor": null,
+          "pixelSpecular": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "GUARD_RAIL",
+      "class": "Material",
+      "dynamicCubemap": true,
+      "mapTo": "barrierfence1",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "barrierfence1",
+      "persistentId": "0f9cb4f2-e030-4267-9777-38684ce1a8e8",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "bld_glass_transparent": {
       "Stages": [
         {
@@ -6637,6 +6673,39 @@
       "specularStrength0": "0.490196",
       "version": 1.5
     },
+    "m_gm_metal_hotspotting": {
+      "Stages": [
+        {
+          "colorMap": "/assets/materials/tileable/metal/m_gm_metal_hotspotting/t_gm_metal_hotspotting_d.color.png",
+          "normalMap": "/assets/materials/tileable/metal/m_gm_metal_hotspotting/t_gm_metal_hotspotting_n.normal.png",
+          "reflectivityMapFactor": 0.0700000003,
+          "roughnessFactor": 0.349999994,
+          "specularMap": "/assets/materials/tileable/metal/m_gm_metal_hotspotting/t_gm_metal_hotspotting_s.color.png",
+          "useAnisotropic": true
+        },
+        {
+          "reflectivityMapFactor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null
+        },
+        {
+          "reflectivityMapFactor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null
+        },
+        {
+          "reflectivityMapFactor": null,
+          "roughnessFactor": null,
+          "useAnisotropic": null
+        }
+      ],
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "groundType": "METAL_TREAD",
+      "mapTo": "m_gm_metal_hotspotting",
+      "name": "m_gm_metal_hotspotting",
+      "persistentId": "67b22f0d-d18f-4918-8aff-16cbfb7259d9"
+    },
     "m_metal_trim_01": {
       "Stages": [
         {
@@ -7187,7 +7256,38 @@
       "persistentId": "5c352a12-eeeb-4e4a-a87a-21821fdc9c1b",
       "translucentBlendOp": "None"
     },
-    "trafficLight": {
+    "tirewall": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/trim/plastic/tirewall/t_tirewall_01_ao.data.png",
+          "baseColorMap": "/assets/materials/trim/plastic/tirewall/t_tirewall_01_b.color.png",
+          "normalMap": "/assets/materials/trim/plastic/tirewall/t_tirewall_01_nm.normal.png",
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/trim/plastic/tirewall/t_tirewall_01_r.data.png"
+        },
+        {
+          "pixelSpecular": null
+        },
+        {
+          "pixelSpecular": null
+        },
+        {
+          "pixelSpecular": null
+        }
+      ],
+      "alphaRef": 0,
+      "annotation": "OBSTACLES",
+      "class": "Material",
+      "groundType": "METAL",
+      "mapTo": "tirewall",
+      "materialTag0": "beamng",
+      "materialTag1": "vehicle",
+      "name": "tirewall",
+      "persistentId": "0de23ec5-8f6c-4ac8-9062-81ed2ede7965",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
+    "trafficlight": {
       "Stages": [
         {
           "animFlags": 16,

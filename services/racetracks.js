@@ -34,6 +34,11 @@ const WHITE = [0.95, 0.95, 0.93];
 const CONCRETE = [0.78, 0.78, 0.76];
 const STEEL = [0.72, 0.74, 0.76];
 const TYRE = [0.08, 0.08, 0.09];
+// the game's own pieces (beamngPropLibrary PROP_SHAPES): Automation Test
+// Track's tyre wall and concrete barrier, laid end to end
+const TYRE_WALL_M = 4.16;
+const CONCRETE_WALL_M = 4.0;
+const OVAL_WALL_H = 1.0;          // (the barrier piece's height: the catch fence on it)
 
 const SURFACE_LINE_SHARE = 0.4;
 const OVAL_RING_RUN_M = 30;
@@ -286,8 +291,11 @@ function edgeStrip(m, mat, rw, info, i0, i1, d0, d1, z, stripe, colours, lift) {
 }
 
 // a wall (a box per segment) along an offset line
-function wallAlong(m, mat, rw, info, i0, i1, d, thick, h, ground, col, colours = null, stripe = 1.2) {
+// (native: { shape, length, props }: the game's own wall pieces laid end to
+// end along it, each turned along its stretch, in place of drawn boxes)
+function wallAlong(m, mat, rw, info, i0, i1, d, thick, h, ground, col, colours = null, stripe = 1.2, native = null) {
   let acc = 0;
+  let next = native ? native.length / 2 : 0;   // the next piece's middle, along the wall
   const openings = openWall(rw, rw.nodes.slice(i0, i1 + 1).map((q, k) => offsetAt(q, info[i0 + k].t, d)), d, colours ? 'gap' : 'mesh');
   for (let i = i0; i < i1; i++) {
     if (rw.lifted?.[i] || rw.lifted?.[i + 1]) continue;
@@ -302,6 +310,18 @@ function wallAlong(m, mat, rw, info, i0, i1, d, thick, h, ground, col, colours =
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
     if (L < 0.05) continue;
     const c = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+    if (native) {
+      // (a gap or a blocked stretch starts the pieces afresh past it)
+      if (u0 > 0 || native.broke) { next = acc + native.length / 2; native.broke = false; }
+      while (next <= acc + L) {
+        const t = next - acc; const p = [a[0] + u[0] * t, a[1] + u[1] * t];
+        native.props.push({ shape: native.shape, x: p[0], y: p[1], z: ground(...p) - 0.03, yaw: Math.atan2(u[1], u[0]) });
+        next += native.length;
+      }
+      acc += L;
+      if (u1 < 1) native.broke = true;
+      continue;
+    }
     const g = Math.min(ground(...a), ground(...b));
     box(m, mat, c, u, L / 2 + 0.02, thick / 2, g - 0.3, g + h, colours ? colours[Math.floor(acc / stripe) % colours.length] : col);
     acc += L;
@@ -347,6 +367,7 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
   }
   const z = drapeAt;
   const stats = { kerbs: 0, walls: 0, tyres: 0, trees: 0 };
+  const props = [];
   const paved = !UNPAVED.has(String(rw.tags.surface || '').toLowerCase());
   // (kerbs on a racing circuit or kart track only: an untagged raceway, a
   // training course or a test track, has none)
@@ -373,7 +394,7 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
       stats.kerbs++;
       // a kart track: a tyre wall round the outside of the bend
       if (rw.kind === 'kart') {
-        wallAlong(stone, 'smoothConcrete', rw, info, c.i, c.j, -c.side * (rw.half + w + 1.2), 0.7, 0.75, z, TYRE, [TYRE, TYRE, RED, TYRE, TYRE, WHITE], 0.7);
+        wallAlong(stone, 'smoothConcrete', rw, info, c.i, c.j, -c.side * (rw.half + w + 1.2), 0.7, 0.75, z, TYRE, null, 0.7, { shape: 'raceTyreWall', length: TYRE_WALL_M, props });
         stats.tyres++;
       }
     }
@@ -404,8 +425,9 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
         rw.gates.push({ ...g, prefer: Math.sign(d) || 1 });
       }
     }
+    let ovalAcc = 0; let ovalNext = CONCRETE_WALL_M / 2; let ovalBroke = false;
     for (let i = 0; i < n - 1; i++) {
-      if (!onRing[i] || !onRing[i + 1]) continue;
+      if (!onRing[i] || !onRing[i + 1]) { ovalBroke = true; continue; }
       const sg = side(i);
       const d = sg * (rw.half + 1.2);
       const a0 = offsetAt(rw.nodes[i], info[i].t, d); const b0 = offsetAt(rw.nodes[i + 1], info[i + 1].t, d);
@@ -414,8 +436,17 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
         const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
         if (L < 0.05) continue;
         const ga = z(...a); const gb = z(...b);
-        box(stone, 'smoothConcrete', [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], [(b[0] - a[0]) / L, (b[1] - a[1]) / L], L / 2 + 0.02, 0.175, Math.min(ga, gb) - 0.3, Math.min(ga, gb) + 1.2, CONCRETE);
-        const fa = ga + 1.2; const fb = gb + 1.2;
+        // the game's barrier pieces end to end (a gap starts them afresh)
+        const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L];
+        if (u0 > 0 || ovalBroke) { ovalNext = ovalAcc + CONCRETE_WALL_M / 2; ovalBroke = false; }
+        while (ovalNext <= ovalAcc + L) {
+          const t = ovalNext - ovalAcc; const p = [a[0] + u[0] * t, a[1] + u[1] * t];
+          props.push({ shape: 'raceConcreteWall', x: p[0], y: p[1], z: z(...p) - 0.03, yaw: Math.atan2(u[1], u[0]) });
+          ovalNext += CONCRETE_WALL_M;
+        }
+        ovalAcc += L;
+        if (u1 < 1) ovalBroke = true;
+        const fa = ga + OVAL_WALL_H; const fb = gb + OVAL_WALL_H;
         // (a post every few nodes, and one each side of an opening)
         if (i % 3 === 0 && u0 === 0) cylinder(stone, 'metalWhite', a[0], a[1], 0.06, fa, fa + 4, STEEL, { n: 6 });
         if (u0 > 0) cylinder(stone, 'metalWhite', a[0], a[1], 0.08, ga - 0.3, fa + 4, STEEL, { n: 6 });
@@ -439,24 +470,17 @@ export function buildRaceway(stone, full, rw, { drapeAt, others = [], blocked = 
     // over anything under it, a pad showed through it in patches)
     const s0 = nodes[0]; const t0 = inf[0].t;
     const st = [s0[0] + t0[0] * 10, s0[1] + t0[1] * 10];
-    // the light tree on the centre line just past the start
+    // the light tree on the centre line just past the start (the game's own,
+    // its lights facing the start line)
     const tp = [st[0] + t0[0] * 5, st[1] + t0[1] * 5]; const g = z(...tp);
-    cylinder(stone, 'metalWhite', tp[0], tp[1], 0.08, g - 0.3, g + 2.4, STEEL, { n: 8 });
-    box(stone, 'metalWhite', tp, t0, 0.15, 0.35, g + 2.4, g + 4.2, [0.1, 0.1, 0.1]);
-    const v = [-t0[1], t0[0]];
-    const lamps = [[1, 0.85, 0.2], [1, 0.75, 0.15], [1, 0.75, 0.15], [1, 0.75, 0.15], [0.2, 0.9, 0.25], [0.9, 0.12, 0.08]];
-    lamps.forEach((col, li) => {
-      for (const sg of [-1, 1]) {
-        const c = [tp[0] - t0[0] * 0.17 + v[0] * sg * 0.17, tp[1] - t0[1] * 0.17 + v[1] * sg * 0.17];
-        box(full, 'linePaint', c, t0, 0.03, 0.08, g + 4.05 - li * 0.28, g + 4.17 - li * 0.28, col);
-      }
-    });
+    // (its lights face its local -y: that along the track toward the start)
+    props.push({ shape: 'dragTree', x: tp[0], y: tp[1], z: g, yaw: Math.atan2(t0[1], t0[0]) - Math.PI / 2 });
     stats.trees++;
-    // concrete walls along both sides, the whole strip
-    for (const sg of [-1, 1]) wallAlong(stone, 'smoothConcrete', r2, inf, 0, n - 1, sg * (rw.half + 0.6), 0.6, 0.9, z, CONCRETE);
+    // concrete walls along both sides, the whole strip (the game's barrier pieces)
+    for (const sg of [-1, 1]) wallAlong(stone, 'smoothConcrete', r2, inf, 0, n - 1, sg * (rw.half + 0.6), 0.6, 0.9, z, CONCRETE, null, 1.2, { shape: 'raceConcreteWall', length: CONCRETE_WALL_M, props });
     stats.walls += 2;
   }
-  return { ...stats, gates };
+  return { ...stats, gates, props };
 }
 
 /** Raceway surfaces mapped as outlines (highway=raceway + area=yes): [{ ring, surface }]. */

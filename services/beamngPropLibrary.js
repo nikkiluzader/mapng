@@ -61,6 +61,11 @@ export const PROP_SHAPES = {
   hotelSign: { shapeFile: '/levels/italy/art/shapes/buildings/italy_billboard_hotel_big.dae', yawOffset: -Math.PI / 2 },
   flagWall: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_flag_usa.dae', yawOffset: Math.PI },
   cafeSign: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_comsign_cafe.dae', yawOffset: -Math.PI / 2, scale: 1.6 },
+  // racetracks (services/racetracks.js): a drag strip's light tree, kart
+  // tyre walls and concrete barriers (4.16 m / 4.0 m along local x)
+  dragTree: { shapeFile: '/levels/gridmap_v2/art/shapes/grid/s_gm_dragstrip_tree.dae' },
+  raceTyreWall: { shapeFile: '/levels/automation_test_track/art/shapes/objects/tirewall.dae' },
+  raceConcreteWall: { shapeFile: '/levels/automation_test_track/art/shapes/objects/barrierfence_concrete.dae' },
   // boats moored at piers and in marinas (services/boats.js): Italy's
   // harbour boats (they bob on the water)
   boatMotorSmall: { shapeFile: '/levels/italy/art/shapes/buildings/italy_boat_small_a.DAE' },

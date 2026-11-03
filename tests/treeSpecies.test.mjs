@@ -47,6 +47,11 @@ test('the mix is asked for the export box (grown to ~3 km), and nothing breaks o
   assert.equal(asked.searchParams.get('quality_grade'), 'research');
   assert.equal(await fetchTreeSpeciesMix({ north: 1, south: 0, east: 1, west: 0 }, { fetchImpl: async () => { throw new Error('offline'); } }), null);
   assert.equal(await fetchTreeSpeciesMix({ north: 1, south: 0, east: 1, west: 0 }, { fetchImpl: async () => ({ ok: false }) }), null);
+  // too few records nearby: asked again over a wider box
+  const spans = [];
+  const sparse = async (url) => { const u = new URL(url); spans.push(Number(u.searchParams.get('nelat')) - Number(u.searchParams.get('swlat'))); return { ok: true, json: async () => ({ results: spans.length > 1 ? [{ taxon: { name: 'Pinus taeda' }, count: 40 }] : [{ taxon: { name: 'Pinus taeda' }, count: 3 }] }) }; };
+  const wide = await fetchTreeSpeciesMix({ north: 29.76, south: 29.75, east: -82.26, west: -82.27 }, { fetchImpl: sparse });
+  assert.equal(spans.length, 2); assert.ok(spans[1] > 0.09); assert.equal(Object.keys(wide.shares)[0], 'conifer');
 });
 
 test('untagged trees follow the local mix; a tagged one keeps its own kind', () => {
@@ -66,6 +71,8 @@ test('untagged trees follow the local mix; a tagged one keeps its own kind', () 
     assert.ok(item?.type, `${g} has a model`);
   }
   assert.match(chooseTreeItem('live_oak', { lat: 29.89, lon: -81.31, seed: 's' }).type, /oak_[a-d]$/);
-  // no mix: the climate rule as before
-  assert.ok(['palm', 'deciduous', 'conifer'].includes(chooseTreeGroup({ tags: {}, lat: 29.89, lon: -81.31, urban: true, seed: 'z' })));
+  // no mix: the climate rule; in the South-East its oaks and pines
+  const south = new Set(); for (let i = 0; i < 300; i++) south.add(chooseTreeGroup({ tags: {}, lat: 29.75, lon: -82.26, seed: `g${i}` }));
+  assert.ok(!south.has('deciduous') && !south.has('conifer') && south.has('oak') && south.has('live_oak'), [...south].join(','));
+  assert.ok(chooseTreeGroup({ tags: {}, lat: 47, lon: 8, seed: 'z' }) !== 'live_oak', 'not in Europe');
 });

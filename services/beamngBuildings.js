@@ -1936,6 +1936,9 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       bump(racing, rw.kind);
       (stats.trackGates ||= []).push(...st.gates);
       delete st.gates;
+      // (the game's own walls, tyre walls and light trees: placed objects)
+      props.push(...st.props);
+      delete st.props;
       for (const [k, v] of Object.entries(st)) if (v) racing[`${k}`] = (racing[k] || 0) + v;
       if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
     }

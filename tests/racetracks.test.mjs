@@ -79,10 +79,12 @@ test('a drag strip: launch pad and light tree at the end nearest the other racew
   const stone = recorder(); const full = recorder();
   const st = buildRaceway(stone, full, rws[0], { drapeAt, others: [rws[1]] });
   assert.equal(st.trees, 1);
-  const tree = stone.tris.filter((t) => t.pts.some((q) => q[2] > 2 + 3.5)).flatMap((t) => t.pts);
-  assert.ok(tree.every((q) => q[0] < 30), `the tree at the start (near x=0): ${Math.max(...tree.map((q) => q[0])).toFixed(0)}`);
-  const walls = stone.tris.filter((t) => t.mat === 'smoothConcrete').flatMap((t) => t.pts);
-  assert.ok(walls.some((q) => q[1] > 6) && walls.some((q) => q[1] < -6), 'walls on both sides');
+  // (the game's own light tree and barrier pieces, as placed props)
+  const tree = st.props.filter((p) => p.shape === 'dragTree');
+  assert.ok(tree.length === 1 && tree[0].x < 30, `the tree at the start (near x=0): ${tree[0]?.x.toFixed(0)}`);
+  const walls = st.props.filter((p) => p.shape === 'raceConcreteWall');
+  assert.ok(walls.some((q) => q.y > 6) && walls.some((q) => q.y < -6), 'walls on both sides');
+  assert.ok(walls.every((q) => Math.abs(Math.sin(q.yaw)) < 1e-6), 'each along the strip');
 });
 
 test('raceway surfaces mapped as areas', () => {
@@ -153,9 +155,9 @@ test('an untagged long narrow building along a raceway is its grandstand; a drag
   // the stand is near x=380: the start is the east end (x=500)
   const [rw] = planRaceways([strip]);
   const stone = recorder();
-  buildRaceway(stone, recorder(), rw, { drapeAt, spectators: [[380, 27]] });
-  const tree = stone.tris.filter((t) => t.pts.some((q) => q[2] > 2 + 3.5)).flatMap((t) => t.pts);
-  assert.ok(tree.length && tree.every((q) => q[0] > 470), 'the light tree at the east end');
+  const st = buildRaceway(stone, recorder(), rw, { drapeAt, spectators: [[380, 27]] });
+  const tree = st.props.filter((p) => p.shape === 'dragTree');
+  assert.ok(tree.length === 1 && tree[0].x > 470, 'the light tree at the east end');
 });
 
 test('a drag strip walked from its far end keeps its walls: the track is no obstacle to itself', () => {
@@ -164,14 +166,14 @@ test('a drag strip walked from its far end keeps its walls: the track is no obst
     const strip = cw(Array.from({ length: 101 }, (_, i) => [i * 4, 0]), tags, 6);
     const rws = planRaceways([strip]);
     const r = recorder();
-    buildRaceway(r, r, rws[0], { drapeAt, blocked: carriagewayTest(rws), spectators });
-    const concrete = r.tris.filter((t) => t.mat === 'smoothConcrete');
-    return [Math.max(...concrete.flatMap((t) => t.pts.map((q) => q[0]))) - Math.min(...concrete.flatMap((t) => t.pts.map((q) => q[0]))), concrete.length];
+    const st = buildRaceway(r, r, rws[0], { drapeAt, blocked: carriagewayTest(rws), spectators });
+    const concrete = st.props.filter((p) => p.shape === 'raceConcreteWall');
+    return [Math.max(...concrete.map((q) => q.x)) - Math.min(...concrete.map((q) => q.x)), concrete.length];
   };
   const [lengthForward, trisForward] = walls([[0, 30]]);
   const [lengthTurned, trisTurned] = walls([[400, 30]]);
-  assert.ok(lengthForward > 390);
-  assert.ok(lengthTurned > 390);
+  assert.ok(lengthForward > 385, `pieces the whole length (${lengthForward.toFixed(0)})`);
+  assert.ok(lengthTurned > 385);
   assert.equal(trisTurned, trisForward);
 });
 

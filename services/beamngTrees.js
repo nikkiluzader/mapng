@@ -57,7 +57,9 @@ export function treeClimate(lat, lon) {
   // (Los Angeles, Palm Springs) has its own, higher palm share.
   const hotDesert = dryWest && lat < 36.5 && !warmCoast;
   const norCal = westCoast && lat > 36.5;
-  return { westCoast, dryWest, tropics, warmCoast, hotDesert, norCal };
+  // the US South-East (Texas to the Carolinas): oak and pine country
+  const humidSouth = lat > 24 && lat < 36.5 && lon > -100 && lon < -75;
+  return { westCoast, dryWest, tropics, warmCoast, hotDesert, norCal, humidSouth };
 }
 
 /** Regional share of conifers among untagged trees (BeamNG.Earth _conifer_share). */
@@ -191,6 +193,12 @@ export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = fa
   const palmShare = c.hotDesert ? (urban ? 0.35 : 0.05) : (c.warmCoast || c.tropics) ? (urban ? 0.6 : 0.2) : 0;
   if (!hint && palmShare > 0 && hash01(seed, 'palm') < palmShare) return 'palm';
   if (c.tropics && g === 'deciduous' && (height == null || height >= 12) && !hint) g = 'tropical';
+  // the warm, humid South-East (no local records): oaks, live oaks near the
+  // coast, and pines, not aspens, beeches and Douglas firs
+  if (c.humidSouth && !hint) {
+    if (g === 'deciduous') g = (c.warmCoast ? hash01(seed, 'sel') < 0.6 : hash01(seed, 'sel') < 0.3) ? 'live_oak' : 'oak';
+    else if (g === 'conifer') g = 'pine_west';
+  }
   return g;
 }
 
