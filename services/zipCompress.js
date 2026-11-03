@@ -55,44 +55,73 @@ function crc32js(bytes) {
   return (crc ^ -1) | 0;
 }
 
-// (Node's zlib.crc32, native, where there is one; JavaScript otherwise)
-let nativeCrc32;
-async function crc32Of(bytes) {
-  if (nativeCrc32 === undefined) {
-    nativeCrc32 = null;
+// Node's zlib, where there is one (the desktop app's export runs in Node)
+let nodeZlib;
+async function zlibOf() {
+  if (nodeZlib === undefined) {
+    nodeZlib = null;
     if (typeof process !== 'undefined' && process.versions?.node) {
-      try {
-        const zlib = await import(/* @vite-ignore */ ['node', 'zlib'].join(':'));
-        if (typeof zlib.crc32 === 'function') nativeCrc32 = (b) => zlib.crc32(b) | 0;
-      } catch { /* the JavaScript one */ }
+      try { nodeZlib = await import(/* @vite-ignore */ ['node', 'zlib'].join(':')); } catch { /* none */ }
     }
   }
-  return nativeCrc32 ? nativeCrc32(bytes) : crc32js(bytes);
+  return nodeZlib;
+}
+
+// (zlib.crc32, native, where there is one; JavaScript otherwise)
+async function crc32Of(bytes) {
+  const zlib = await zlibOf();
+  return typeof zlib?.crc32 === 'function' ? zlib.crc32(bytes) | 0 : crc32js(bytes);
+}
+
+// A big entry in Node deflated in pieces on several threads at once, as pigz
+// does: each piece ends on a sync flush (byte-aligned, not final) and the
+// last finishes the stream, so joined they are one valid deflate stream. One
+// 1-3 GB sidewalk mesh on one thread held the whole zip up 20-60 s.
+const PARALLEL_FROM_BYTES = 32 * 2 ** 20;
+const PIECE_BYTES = 16 * 2 ** 20;
+async function deflateRawInPieces(zlib, bytes) {
+  const pieces = [];
+  for (let o = 0; o < bytes.length; o += PIECE_BYTES) {
+    const last = o + PIECE_BYTES >= bytes.length;
+    pieces.push(new Promise((resolve, reject) => zlib.deflateRaw(bytes.subarray(o, Math.min(o + PIECE_BYTES, bytes.length)),
+      { finishFlush: last ? zlib.constants.Z_FINISH : zlib.constants.Z_SYNC_FLUSH },
+      (err, out) => (err ? reject(err) : resolve(out)))));
+  }
+  const parts = await Promise.all(pieces);
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) { out.set(p, at); at += p.length; }
+  return out;
 }
 
 async function deflateRaw(bytes) {
+  const zlib = bytes.length >= PARALLEL_FROM_BYTES ? await zlibOf() : null;
+  if (zlib?.deflateRaw && zlib.constants) return deflateRawInPieces(zlib, bytes);
   const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
 /**
- * Compress the zip's big entries natively, in parallel, in place. Resolves
- * the number of entries done (0 when the platform has no CompressionStream or
- * JSZip's internals are not as expected: JSZip then compresses them all, as
- * before). onProgress(fraction, name) as entries finish.
+ * A compressor for a zip's entries: add(entry) queues one (each compressed
+ * as lanes and the byte budget allow, in place), drain() resolves when all
+ * queued are done. Resolves null when the platform has no CompressionStream
+ * or JSZip's internals are not as expected (JSZip then compresses them all,
+ * as before).
  */
-export async function precompressZipEntries(zip, JSZip, { onProgress, concurrency, inFlightBytes = IN_FLIGHT_BYTES } = {}) {
-  if (typeof CompressionStream === 'undefined') return 0;
-  try { new CompressionStream('deflate-raw'); } catch { return 0; }
+export async function createZipCompressor(JSZip, { concurrency, inFlightBytes = IN_FLIGHT_BYTES, onDone } = {}) {
+  if (typeof CompressionStream === 'undefined') return null;
+  try { new CompressionStream('deflate-raw'); } catch { return null; }
   const internals = await jszipInternals(JSZip).catch(() => null);
-  if (!internals) return 0;
+  if (!internals) return null;
   const { proto, DEFLATE, make } = internals;
   const isCompressed = (d) => d !== null && typeof d === 'object' && Object.getPrototypeOf(d) === proto;
-  const entries = Object.values(zip.files).filter((f) => !f.dir && !SKIP.test(f.name) && !isCompressed(f._data));
   const lanes = Math.max(1, concurrency || globalThis.navigator?.hardwareConcurrency || 4);
-  let next = 0; let done = 0; let count = 0;
-  let inFlight = 0; let waiting = [];
-  const release = () => { const w = waiting; waiting = []; w.forEach((resolve) => resolve()); };
+  const queue = [];
+  const queued = new Set();
+  let running = 0; let inFlight = 0; let count = 0;
+  let idle = null; let wakeIdle = null;
+  let hook = onDone;
+  const eligible = (entry) => entry && !entry.dir && !SKIP.test(entry.name) && !isCompressed(entry._data) && !queued.has(entry);
   const compress = async (entry) => {
     const raw = await entry.async('uint8array');
     if (raw.length < MIN_BYTES) return;
@@ -101,20 +130,66 @@ export async function precompressZipEntries(zip, JSZip, { onProgress, concurrenc
     entry._dataBinary = true;
     count++;
   };
-  const lane = async () => {
-    while (next < entries.length) {
-      // (past the byte budget: wait for a lane to finish, unless none is running)
-      while (inFlight > 0 && next < entries.length && inFlight + sizeOf(entries[next]._data) > inFlightBytes) {
-        await new Promise((resolve) => waiting.push(resolve));
-      }
-      if (next >= entries.length) break;
-      const entry = entries[next++];
+  // (past the byte budget nothing more starts until a lane finishes, unless none is running)
+  const pump = () => {
+    while (queue.length && running < lanes && (running === 0 || inFlight + sizeOf(queue[0]._data) <= inFlightBytes)) {
+      const entry = queue.shift();
       const size = sizeOf(entry._data);
-      inFlight += size;
-      try { await compress(entry); } finally { inFlight -= size; release(); }
-      onProgress?.(++done / entries.length, entry.name);
+      running++; inFlight += size;
+      compress(entry).catch(() => { /* left to JSZip */ }).finally(() => {
+        running--; inFlight -= size;
+        hook?.(entry);
+        pump();
+      });
     }
+    if (!queue.length && running === 0 && wakeIdle) { const w = wakeIdle; idle = null; wakeIdle = null; w(); }
   };
-  await Promise.all(Array.from({ length: Math.min(lanes, entries.length) }, lane));
-  return count;
+  return {
+    isCompressed,
+    eligible,
+    add(entry) {
+      if (!eligible(entry)) return;
+      queued.add(entry);
+      queue.push(entry);
+      pump();
+    },
+    drain() {
+      if (!queue.length && running === 0) return Promise.resolve();
+      idle ??= new Promise((resolve) => { wakeIdle = resolve; });
+      return idle;
+    },
+    get count() { return count; },
+    // (called with each entry as it finishes, done or left to JSZip)
+    get onDoneHook() { return hook; },
+    set onDoneHook(fn) { hook = fn; },
+  };
+}
+
+/**
+ * Compress the zip's big entries natively, in parallel, in place (those an
+ * eager compressor, if given, has not done already). Resolves the number of
+ * entries compressed natively in all (0: JSZip compresses them, as before).
+ * onProgress(fraction, name) as entries finish.
+ */
+export async function precompressZipEntries(zip, JSZip, { onProgress, concurrency, inFlightBytes, compressor = null } = {}) {
+  const c = compressor || await createZipCompressor(JSZip, { concurrency, inFlightBytes });
+  if (!c) return 0;
+  await c.drain();
+  const entries = Object.values(zip.files).filter((f) => c.eligible(f));
+  let done = 0;
+  const finished = new Promise((resolve) => {
+    if (!entries.length) { resolve(); return; }
+    const total = entries.length;
+    const prev = c.onDoneHook;
+    c.onDoneHook = (entry) => {
+      prev?.(entry);
+      done++;
+      onProgress?.(done / total, entry.name);
+      if (done === total) resolve();
+    };
+  });
+  entries.forEach((entry) => c.add(entry));
+  await finished;
+  await c.drain();
+  return c.count;
 }

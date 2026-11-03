@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import JSZip from 'jszip';
-import { precompressZipEntries } from './zipCompress.js';
+import { createZipCompressor, precompressZipEntries } from './zipCompress.js';
 import { chooseBaseTextureSize } from './baseTextureSize.js';
 import { encode } from 'fast-png';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -12520,13 +12520,22 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const zipEntryBytes = new Map();
   const addZipFile = zip.file.bind(zip);
   const entryDate = zipEntryDate();
+  // Big entries compressed as they come, natively and in the background: a
+  // city's model text (7 GB at 8 km) freed as the export goes on, not all
+  // held for the zip at the end (its memory peak) and compressed then.
+  const zipCompressor = await createZipCompressor(JSZip).catch(() => null);
+  const EAGER_ZIP_BYTES = 1024 * 1024;
   // (arguments passed on as given: zip.file(name) alone reads an entry)
   zip.file = (...args) => {
+    let bytes = 0;
     if (args.length > 1 && typeof args[0] === 'string') {
-      zipEntryBytes.set(args[0], byteSizeOf(args[1]));
+      bytes = byteSizeOf(args[1]);
+      zipEntryBytes.set(args[0], bytes);
       args[2] = { date: entryDate, ...(args[2] || {}) };
     }
-    return addZipFile(...args);
+    const out = addZipFile(...args);
+    if (zipCompressor && bytes >= EAGER_ZIP_BYTES) zipCompressor.add(zip.files[args[0]]);
+    return out;
   };
   const base = `levels/${levelName}`;
 
@@ -13833,6 +13842,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // of the bar is JSZip writing the archive)
   let zipShare = 0;
   const precompressed = await precompressZipEntries(zip, JSZip, {
+    compressor: zipCompressor,
     onProgress: (fraction, name) => {
       const now = performance.now();
       if (now - lastZipReportAt < 250) return;

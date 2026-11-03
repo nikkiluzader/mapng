@@ -3075,6 +3075,29 @@ function quadIsSimple(q) {
 }
 
 /**
+ * Whether a closed ring and a polygon or multipolygon could share any area:
+ * an edge of one crossing or touching an edge of the other, or one holding a
+ * corner of the other. False only when they are surely apart.
+ */
+function ringTouches(ring, geom) {
+  const polys = typeof geom[0]?.[0]?.[0] === 'number' ? [geom] : geom;
+  let rx0 = Infinity; let ry0 = Infinity; let rx1 = -Infinity; let ry1 = -Infinity;
+  for (const p of ring) { rx0 = Math.min(rx0, p[0]); rx1 = Math.max(rx1, p[0]); ry0 = Math.min(ry0, p[1]); ry1 = Math.max(ry1, p[1]); }
+  for (const poly of polys) {
+    for (const other of poly) {
+      if (!other.length) continue;
+      if (pointInRing(ring[0][0], ring[0][1], other) || pointInRing(other[0][0], other[0][1], ring)) return true;
+      for (let i = 0; i + 1 < other.length; i++) {
+        const a = other[i]; const b = other[i + 1];
+        if (Math.max(a[0], b[0]) < rx0 || Math.min(a[0], b[0]) > rx1 || Math.max(a[1], b[1]) < ry0 || Math.min(a[1], b[1]) > ry1) continue;
+        for (let k = 0; k + 1 < ring.length; k++) if (segmentsCross(a, b, ring[k], ring[k + 1])) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Whether a simple quad and a polygon or multipolygon could share any area:
  * an edge of one crossing or touching an edge of the other, or one holding a
  * corner of the other. False only when they are surely apart (then clipping
@@ -3224,8 +3247,13 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
     const kept = [];
     for (const strip of strips) {
       const b = boxOf(strip.shape[0]);
-      const near = cutsNear(b[0], b[1], b[2], b[3]);
-      if (!near.length) { kept.push(strip); continue; }
+      const nearBox = cutsNear(b[0], b[1], b[2], b[3]);
+      if (!nearBox.length) { kept.push(strip); continue; }
+      // (only the cuts that reach the strip itself: of those near it by box,
+      // about one in thirty does, and each other one made the clip dearer;
+      // with none it still goes through the clip, which tidies its outline
+      // into pieces as before)
+      const near = nearBox.filter((c) => ringTouches(c.shape[0], strip.shape));
       // (polygon-clipping fails now and then on near-touching edges: rounded to
       // the centimetre, then cut by one ring at a time, skipping any that
       // fail; kept whole, a strip's outline stood as bare walls on the road
@@ -3457,15 +3485,50 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
     }
   });
   const pocketBoxes = strips.filter((o) => o.pocket).map((o) => o.box);
-  let merged;
-  try {
-    merged = polygonClipping.union(...strips.map((o) => o.shape));
-  } catch (err) {
-    // (rounded to the centimetre, then without the pockets, rather than no edge at all)
-    const r = (sh) => sh.map((ring) => ring.map(([x, y]) => [Math.round(x * 100) / 100, Math.round(y * 100) / 100]));
-    try { merged = polygonClipping.union(...strips.map((o) => r(o.shape))); } catch { merged = polygonClipping.union(...strips.filter((o) => !o.pocket).map((o) => o.shape)); }
+  // The walks' outline (where the curb face stands), merged a tile at a
+  // time: one union of a whole city's strips took minutes and most of the
+  // memory churn. Edges along a tile's own sides are the cut's, not the
+  // walks', and get no face. (The grid is offset off round numbers: a real
+  // edge exactly on a tile line would lose its face.)
+  const OUTLINE_TILE_M = 256;
+  const OUTLINE_TILE_OFF_M = 0.37;
+  const tileIndex = (v) => Math.floor((v - OUTLINE_TILE_OFF_M) / OUTLINE_TILE_M);
+  const byTile = new Map();
+  for (const o of strips) {
+    o.box ??= box(o);
+    for (let tx = tileIndex(o.box[0]); tx <= tileIndex(o.box[2]); tx++) {
+      for (let ty = tileIndex(o.box[1]); ty <= tileIndex(o.box[3]); ty++) {
+        const k = cellKey(tx, ty);
+        if (!byTile.has(k)) byTile.set(k, { tx, ty, list: [] });
+        byTile.get(k).list.push(o);
+      }
+    }
   }
-  for (const polygon of merged) {
+  const merged = [];
+  for (const { tx, ty, list } of byTile.values()) {
+    const tb = [tx * OUTLINE_TILE_M + OUTLINE_TILE_OFF_M, ty * OUTLINE_TILE_M + OUTLINE_TILE_OFF_M];
+    tb.push(tb[0] + OUTLINE_TILE_M, tb[1] + OUTLINE_TILE_M);
+    const clip = [[[tb[0], tb[1]], [tb[2], tb[1]], [tb[2], tb[3]], [tb[0], tb[3]], [tb[0], tb[1]]]];
+    const inside = (o) => o.box[0] > tb[0] && o.box[1] > tb[1] && o.box[2] < tb[2] && o.box[3] < tb[3];
+    const crop = (o) => {
+      if (inside(o)) return o.shape;
+      try { return polygonClipping.intersection(o.shape, clip); } catch { return null; }
+    };
+    const unionOf = (picked) => {
+      const pieces = picked.map(crop).filter((g) => g && g.length);
+      return pieces.length ? polygonClipping.union(...pieces) : [];
+    };
+    let polys;
+    // (then without the pockets, rather than no edge at all)
+    try { polys = unionOf(list); } catch { try { polys = unionOf(list.filter((o) => !o.pocket)); } catch { continue; } }
+    for (const polygon of polys) merged.push({ polygon, tb });
+  }
+  const EDGE_ON_SIDE_M = 1e-3;
+  const onTileSide = (a, b, tb) => (Math.abs(a[0] - tb[0]) < EDGE_ON_SIDE_M && Math.abs(b[0] - tb[0]) < EDGE_ON_SIDE_M)
+    || (Math.abs(a[0] - tb[2]) < EDGE_ON_SIDE_M && Math.abs(b[0] - tb[2]) < EDGE_ON_SIDE_M)
+    || (Math.abs(a[1] - tb[1]) < EDGE_ON_SIDE_M && Math.abs(b[1] - tb[1]) < EDGE_ON_SIDE_M)
+    || (Math.abs(a[1] - tb[3]) < EDGE_ON_SIDE_M && Math.abs(b[1] - tb[3]) < EDGE_ON_SIDE_M);
+  for (const { polygon, tb } of merged) {
     const rings = polygon.map((ring) => ring.slice(0, -1));
     const inPocket = (x, y) => groundAt && pocketBoxes.some((b) => x >= b[0] - 0.5 && x <= b[2] + 0.5 && y >= b[1] - 0.5 && y <= b[3] + 0.5);
     const all = rings.flat().map(([x, y]) => {
@@ -3478,6 +3541,7 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
       const right = (area > 0) === (r === 0);   // the outside lies to the right of an outer ring run anticlockwise
       ring.forEach((_, i) => {
         const a = all[at + i]; const b = all[at + ((i + 1) % ring.length)];
+        if (onTileSide(a, b, tb)) return;
         const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L = Math.hypot(dx, dy) || 1;
         const want = right ? [dy / L, -dx / L, 0] : [-dy / L, dx / L, 0];
         const fa = [a[0], a[1], a[3] - WALK_SINK_M]; const fb = [b[0], b[1], b[3] - WALK_SINK_M];

@@ -86,6 +86,22 @@ function inRing(x, y, ring) {
 }
 const inFootprint = (x, y, ring, holes) => inRing(x, y, ring) && !holes.some((h) => inRing(x, y, h));
 
+// inRing a row at a time: where the ring's edges cross the row at y (worked
+// out as inRing does), then a point is in when an odd number lie past it
+function rowCrossings(ring, y) {
+  const xs = [];
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y)) xs.push(((xj - xi) * (y - yi)) / (yj - yi) + xi);
+  }
+  return xs;
+}
+function inRow(xs, x) {
+  let inside = false;
+  for (const xc of xs) if (x < xc) inside = !inside;
+  return inside;
+}
+
 // Sutherland-Hodgman: the part of `ring` on the side of the line through p
 // with normal n where (q - p) . n >= 0
 function clipHalfPlane(ring, p, n) {
@@ -180,10 +196,14 @@ export function resolveBuildingRoadConflicts(features, { project, unproject, urb
     let inside = 0; let onLanes = 0;
     const bySeg = new Map();
     for (let y = y0 + step / 2; y < y1; y += step) {
+      // (per row: the footprint's crossings, and only the segments whose
+      // lanes reach this row, in their order)
+      const xs = rowCrossings(ring, y); const holeXs = holes.map((h) => rowCrossings(h, y));
+      const rowNear = near.filter((s) => Math.min(s.a[1], s.b[1]) - s.half <= y && Math.max(s.a[1], s.b[1]) + s.half >= y);
       for (let x = x0 + step / 2; x < x1; x += step) {
-        if (!inFootprint(x, y, ring, holes)) continue;
+        if (!inRow(xs, x) || holeXs.some((h) => inRow(h, x))) continue;
         inside++;
-        const s = laneAt(x, y, near);
+        const s = rowNear.length ? laneAt(x, y, rowNear) : null;
         if (s) { onLanes++; bySeg.set(s, (bySeg.get(s) || 0) + 1); }
       }
     }
