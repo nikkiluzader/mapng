@@ -1723,6 +1723,18 @@ const DECAL_LAYERS_PER_ROAD = 2.3;   // surface, paint and AI layers per road me
 const MAX_ROAD_NODE_SPACING_M = 6;
 let roadNodeSpacingM = ROAD_NODE_SPACING_M;
 
+/**
+ * The time to stamp the level ZIP's entries with: the local clock, as ZIP
+ * times are read (by BeamNG too), written through JSZip, which stores a
+ * Date's UTC fields. Stamped with the UTC clock, west of Greenwich every mesh
+ * stood hours newer than the shape cache the game writes at load
+ * (temp/levels/<level>/…/*.cdae): until that wore off, all ~800 meshes were
+ * imported again on every load (an 8 km level: 134 s, not 51 s).
+ */
+export function zipEntryDate(now = new Date()) {
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+}
+
 /** The node spacing that keeps this export's road decals within budget (and sets it). */
 export function chooseRoadNodeSpacing(osmFeatures = []) {
   let lengthM = 0;
@@ -12429,9 +12441,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // Entry sizes for the compression progress (JSZip keeps none it exposes).
   const zipEntryBytes = new Map();
   const addZipFile = zip.file.bind(zip);
+  const entryDate = zipEntryDate();
   // (arguments passed on as given: zip.file(name) alone reads an entry)
   zip.file = (...args) => {
-    if (args.length > 1 && typeof args[0] === 'string') zipEntryBytes.set(args[0], byteSizeOf(args[1]));
+    if (args.length > 1 && typeof args[0] === 'string') {
+      zipEntryBytes.set(args[0], byteSizeOf(args[1]));
+      args[2] = { date: entryDate, ...(args[2] || {}) };
+    }
     return addZipFile(...args);
   };
   const base = `levels/${levelName}`;
