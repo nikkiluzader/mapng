@@ -10,8 +10,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import v8 from 'node:v8';
-import { pipeline } from 'node:stream/promises';
-import { Readable } from 'node:stream';
 import { installBrowserShims } from './browserShims.mjs';
 import { reviveJobValue } from './jobFormat.mjs';
 
@@ -50,9 +48,13 @@ async function main() {
   });
   fs.mkdirSync(job.outputDir, { recursive: true });
   const out = path.join(job.outputDir, filename);
-  // (written beside, then renamed: the game never sees half a zip)
+  // (written beside, then renamed: the game never sees half a zip; in 64 MB
+  // slices: Blob.stream() hands Node's web streams small chunks)
   const partial = `${out}.partial`;
-  await pipeline(Readable.fromWeb(blob.stream()), fs.createWriteStream(partial));
+  const fd = fs.openSync(partial, 'w');
+  try {
+    for (let o = 0; o < blob.size; o += 64 * 2 ** 20) fs.writeSync(fd, new Uint8Array(await blob.slice(o, o + 64 * 2 ** 20).arrayBuffer()));
+  } finally { fs.closeSync(fd); }
   fs.renameSync(partial, out);
   send({ type: 'done', path: out, filename, size: blob.size, seconds: (Date.now() - started) / 1000 });
 }

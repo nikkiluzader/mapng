@@ -15,7 +15,12 @@
 // BeamNG.Earth's (server/sidewalks.py), measured on official US curbs.
 
 import * as THREE from 'three';
-import polygonClipping, { snapGeom } from './polyClip.js';
+import polygonClipping from './polyClip.js';
+import { parallelMap, parallelThreads } from './parallel.js';
+import {
+  SLAB_TILE_M, PANEL_SCRAP_M2, PANEL_TRI_FLOATS, LEVEL_REACH_CELLS, ringArea, pointInRing, ringTouches,
+  stripUv, makeCropper, makeCutFinder, makeLevelFinder, stripPanels, panelsForItem,
+} from './sidewalkPanels.js';
 import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
 import { PLAZA_MATERIAL, plazaTileM, pavedWalkSurface } from './plazas.js';
@@ -30,7 +35,6 @@ const CURB_W = 0.15;          // m of curb top band
 const CROSS_SLOPE = 0.015;    // slab rises away from the road
 const BACK_SLOPE_RUN = 2.0;   // back falls to the ground at 1:2, no wheel-catching ledge
 const CURB_REPEAT_M = 9.0;    // m of curb per texture width
-const SLAB_TILE_M = 10;        // m of sidewalk to one unit of texture space, along and across alike
 // The slab's look: one of the game's own concrete sheets, each with its
 // repeat in metres (along, across) so its panels come out about 1.5 m square
 // (sidewalk1, a 4096 × 1024 sheet of 20 × 5 panels, mapped square drew them
@@ -1505,7 +1509,6 @@ function joinCorners(runs, index, walkRuns = []) {
   return corners;
 }
 const SIDEWALK_WALK_JOIN_M = 0.6;
-const PANEL_SCRAP_M2 = 0.002;
 const CUT_SLIVER_W_M = 0.15;      // nor one thinner than this on average (twice its area over its outline)
 const CUT_SLIVER_M2 = 0.25;     // a piece of walk this small left by a corner's cut: dropped
 
@@ -2893,7 +2896,6 @@ function segmentQuad(a, b, half, pad = 0) {
   return [[...ring, ring[0]]];
 }
 
-const ringArea = (ring) => ring.reduce((sum, p, i) => { const q = ring[(i + 1) % ring.length]; return sum + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
 
 /**
  * Land shut in by walkways, roads and a seawall, paved level with the walks:
@@ -3060,68 +3062,6 @@ export function findWallPockets(walkRuns, streetRuns, carriageways, { walls = []
   return out;
 }
 
-function segmentsCross(a, b, c, d) {
-  const o = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
-  const d1 = o(c, d, a); const d2 = o(c, d, b); const d3 = o(a, b, c); const d4 = o(a, b, d);
-  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
-  // (touching or collinear counts: the clip decides those)
-  const on = (p, q, r) => Math.min(p[0], q[0]) <= r[0] && r[0] <= Math.max(p[0], q[0]) && Math.min(p[1], q[1]) <= r[1] && r[1] <= Math.max(p[1], q[1]);
-  return (d1 === 0 && on(c, d, a)) || (d2 === 0 && on(c, d, b)) || (d3 === 0 && on(a, b, c)) || (d4 === 0 && on(a, b, d));
-}
-
-// a quad whose opposite sides do not cross (a panel at a hairpin can twist)
-function quadIsSimple(q) {
-  return !segmentsCross(q[0], q[1], q[2], q[3]) && !segmentsCross(q[1], q[2], q[3], q[0]);
-}
-
-/**
- * Whether a closed ring and a polygon or multipolygon could share any area:
- * an edge of one crossing or touching an edge of the other, or one holding a
- * corner of the other. False only when they are surely apart.
- */
-function ringTouches(ring, geom) {
-  const polys = typeof geom[0]?.[0]?.[0] === 'number' ? [geom] : geom;
-  let rx0 = Infinity; let ry0 = Infinity; let rx1 = -Infinity; let ry1 = -Infinity;
-  for (const p of ring) { rx0 = Math.min(rx0, p[0]); rx1 = Math.max(rx1, p[0]); ry0 = Math.min(ry0, p[1]); ry1 = Math.max(ry1, p[1]); }
-  for (const poly of polys) {
-    for (const other of poly) {
-      if (!other.length) continue;
-      if (pointInRing(ring[0][0], ring[0][1], other) || pointInRing(other[0][0], other[0][1], ring)) return true;
-      for (let i = 0; i + 1 < other.length; i++) {
-        const a = other[i]; const b = other[i + 1];
-        if (Math.max(a[0], b[0]) < rx0 || Math.min(a[0], b[0]) > rx1 || Math.max(a[1], b[1]) < ry0 || Math.min(a[1], b[1]) > ry1) continue;
-        for (let k = 0; k + 1 < ring.length; k++) if (segmentsCross(a, b, ring[k], ring[k + 1])) return true;
-      }
-    }
-  }
-  return false;
-}
-
-/**
- * Whether a simple quad and a polygon or multipolygon could share any area:
- * an edge of one crossing or touching an edge of the other, or one holding a
- * corner of the other. False only when they are surely apart (then clipping
- * the quad by it leaves the quad as it was).
- */
-function quadTouches(quad, geom) {
-  const polys = typeof geom[0]?.[0]?.[0] === 'number' ? [geom] : geom;
-  let qx0 = Infinity; let qy0 = Infinity; let qx1 = -Infinity; let qy1 = -Infinity;
-  for (const p of quad) { qx0 = Math.min(qx0, p[0]); qx1 = Math.max(qx1, p[0]); qy0 = Math.min(qy0, p[1]); qy1 = Math.max(qy1, p[1]); }
-  const quadRing = [...quad, quad[0]];
-  for (const poly of polys) {
-    for (const ring of poly) {
-      if (!ring.length) continue;
-      if (pointInRing(quad[0][0], quad[0][1], ring) || pointInRing(ring[0][0], ring[0][1], quadRing)) return true;
-      for (let i = 0; i + 1 < ring.length; i++) {
-        const a = ring[i]; const b = ring[i + 1];
-        if (Math.max(a[0], b[0]) < qx0 || Math.min(a[0], b[0]) > qx1 || Math.max(a[1], b[1]) < qy0 || Math.min(a[1], b[1]) > qy1) continue;
-        for (let k = 0; k < 4; k++) if (segmentsCross(a, b, quad[k], quad[(k + 1) % 4])) return true;
-      }
-    }
-  }
-  return false;
-}
-
 // Boxes [x0, y0, x1, y1] in a grid of cells: which overlap a query box (their
 // indices, in their order: callers keep the order a plain filter gave), or
 // whether any does.
@@ -3155,22 +3095,9 @@ function boxGrid(boxes) {
   };
 }
 
-function pointInRing(x, y, r) {
-  let inside = false;
-  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
-    if ((r[i][1] > y) !== (r[j][1] > y) && x < ((r[j][0] - r[i][0]) * (y - r[i][1])) / (r[j][1] - r[i][1]) + r[i][0]) inside = !inside;
-  }
-  return inside;
-}
-
-/**
- * The walkways as one surface: a single edge round their merged outline, so
- * where they meet is one piece of concrete. The top is cut into a piece per
- * walkway (the longest keeps a junction), each textured along its own line so
- * the slab joints run across it. Top heights come from the nearest point on a
- * walkway's line, ramps and dips included.
- */
-function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], streetRuns = [], groundAt = null, cuts = [] } = {}) {
+// (a generator: at the strips' tops it yields a request, answered with
+// their triangles worked out on other threads, or null to draw them here)
+function* mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], streetRuns = [], groundAt = null, cuts = [] } = {}) {
   const stations = new Map();
   const CELL = 4;
   const strips = [];
@@ -3222,26 +3149,7 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
   const boxOfRing = (ring) => [Math.min(...ring.map((q) => q[0])), Math.min(...ring.map((q) => q[1])), Math.max(...ring.map((q) => q[0])), Math.max(...ring.map((q) => q[1]))];
   const cutRings = cuts.map((ring) => ({ shape: [[...ring, ring[0]].map(([x, y]) => [x, y])], box: boxOfRing(ring), cut: true }));
   // (a grid of them: one keep-out per curb segment runs to thousands)
-  const CUT_CELL = 16;
-  const cutGrid = new Map();
-  for (const c of cutRings) {
-    for (let gx = Math.floor(c.box[0] / CUT_CELL); gx <= Math.floor(c.box[2] / CUT_CELL); gx++) {
-      for (let gy = Math.floor(c.box[1] / CUT_CELL); gy <= Math.floor(c.box[3] / CUT_CELL); gy++) {
-        const key = `${gx},${gy}`;
-        if (!cutGrid.has(key)) cutGrid.set(key, []);
-        cutGrid.get(key).push(c);
-      }
-    }
-  }
-  const cutsNear = (x0, y0, x1, y1) => {
-    const found = new Set();
-    for (let gx = Math.floor(x0 / CUT_CELL); gx <= Math.floor(x1 / CUT_CELL); gx++) {
-      for (let gy = Math.floor(y0 / CUT_CELL); gy <= Math.floor(y1 / CUT_CELL); gy++) {
-        for (const c of cutGrid.get(`${gx},${gy}`) || []) if (c.box[0] <= x1 && x0 <= c.box[2] && c.box[1] <= y1 && y0 <= c.box[3]) found.add(c);
-      }
-    }
-    return [...found];
-  };
+  const cutsNear = makeCutFinder(cutRings);
   if (cuts.length) {
     const boxOf = boxOfRing;
     const kept = [];
@@ -3283,32 +3191,7 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
     strips.push(...kept);
   }
   if (!strips.length) return;
-  const levelAt = (x, y) => {
-    const cx = Math.floor(x / CELL); const cy = Math.floor(y / CELL);
-    let best = null; let d = Infinity;
-    for (let r = 2; r <= 8 && !best; r += 3) {
-      for (let dx = -r; dx <= r; dx++) {
-        for (let dy = -r; dy <= r; dy++) {
-          for (const q of stations.get(`${cx + dx},${cy + dy}`) || []) {
-            const e = (q[0] - x) ** 2 + (q[1] - y) ** 2;
-            if (e < d) { d = e; best = q; }
-          }
-        }
-      }
-    }
-    return best;
-  };
-  // texture coordinates on a strip, as a swept slab's: along its line, across its width
-  const stripUv = (strip, x, y) => {
-    let q = strip.along[0]; let d = Infinity;
-    for (const o of strip.along) {
-      const e = (o.x - x) ** 2 + (o.y - y) ** 2;
-      if (e < d) { d = e; q = o; }
-    }
-    const on = (x - q.x) * q.tx + (y - q.y) * q.ty;
-    const off = -(x - q.x) * q.ty + (y - q.y) * q.tx;
-    return [(q.s + on) / SLAB_TILE_M, (off + strip.half) / SLAB_TILE_M];
-  };
+  const levelAt = makeLevelFinder(stations, CELL);
   const box = (strip) => {
     const ring = strip.shape[0]; const xs = ring.map((q) => q[0]); const ys = ring.map((q) => q[1]);
     return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
@@ -3343,31 +3226,8 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
     }
     return [...found].sort((p, q) => p.rank - q.rank);
   };
-  // A panel clipped against only the part of each other strip around it: the
-  // strips cut once into padded cells (cached). A panel inside its cell's
-  // padded box gets the same pieces either way; clipped against whole strips,
-  // hundreds of points each, a city's walks took minutes.
-  const CROP_CELL = 32;
-  const CROP_PAD = 8;
-  const crops = new Map();
-  const cropNear = (o, x0, y0, x1, y1) => {
-    const cx = Math.floor((x0 + x1) / 2 / CROP_CELL); const cy = Math.floor((y0 + y1) / 2 / CROP_CELL);
-    const bx0 = cx * CROP_CELL - CROP_PAD; const by0 = cy * CROP_CELL - CROP_PAD;
-    const bx1 = (cx + 1) * CROP_CELL + CROP_PAD; const by1 = (cy + 1) * CROP_CELL + CROP_PAD;
-    // (a panel too big for its cell, or a strip inside it: the whole strip)
-    if (x0 < bx0 || y0 < by0 || x1 > bx1 || y1 > by1) return o.shape;
-    if (o.box[0] >= bx0 && o.box[1] >= by0 && o.box[2] <= bx1 && o.box[3] <= by1) return o.shape;
-    let byCell = crops.get(o);
-    if (!byCell) crops.set(o, (byCell = new Map()));
-    const k = cellKey(cx, cy);
-    if (!byCell.has(k)) {
-      let piece;
-      try { piece = polygonClipping.intersection(o.shape, [[[bx0, by0], [bx1, by0], [bx1, by1], [bx0, by1], [bx0, by0]]]); } catch { piece = o.shape; }
-      byCell.set(k, piece);
-    }
-    return byCell.get(k);
-  };
-  const isEmpty = (geom) => !geom.length;
+  // (each strip's part around a panel, cut once per cell: sidewalkPanels.js)
+  const cropNear = makeCropper();
   // on a walk's edge: that walk's height; inside: the walks round about, blended
   const walks = strips.filter((o) => !o.pocket && o.length > 0);
   const edgeDist = (o, x, y) => {
@@ -3406,14 +3266,11 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
     z ??= blended(x, y);
     return [x, y, groundAt ? Math.max(z, groundAt(x, y) + APRON_COVER_M) : z];
   };
-  order.forEach((strip, i) => {
+  // the strips' tops: worked out on other threads if the driver can
+  // (buildSidewalkMeshesParallel), else drawn here, strip by strip
+  const panelTris = yield { order, earlierOverlapping, cutRings, stations, cell: CELL };
+  order.forEach((strip) => {
     const before = earlierOverlapping(strip);
-    const level = (x, y) => { const q = levelAt(x, y); return [x, y, q ? q[2] : 0]; };
-    const flatTri = (a, b, c) => {
-      // (a cut can leave a piece with no area: nothing to draw)
-      if (Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (b[1] - a[1])) < 1e-4) return;
-      builder.tri(top, a, b, c, stripUv(strip, ...a), stripUv(strip, ...b), stripUv(strip, ...c), [0, 0, 1]);
-    };
     if (strip.pocket) {
       // in cells, each corner at the nearest walk's height (and over the ground)
       const uv = (q) => [q[0] / SLAB_TILE_M, q[1] / SLAB_TILE_M];
@@ -3433,56 +3290,15 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
       }
       return;
     }
-    // a row of panels down the strip, cut only where another strip has the ground:
-    // triangulating a whole long outline left slivers the game can't shade
-    for (let k = 0; k + 1 < strip.left.length; k++) {
-      const panel = [strip.left[k], strip.left[k + 1], strip.right[k + 1], strip.right[k]];
-      const xs = panel.map((q) => q[0]); const ys = panel.map((q) => q[1]);
-      const x0 = Math.min(...xs); const x1 = Math.max(...xs); const y0 = Math.min(...ys); const y1 = Math.max(...ys);
-      // (and the road inside a rounded curb kept clear: the cuts)
-      const near = [...before.filter((o) => o.box[0] <= x1 && o.box[2] >= x0 && o.box[1] <= y1 && o.box[3] >= y0), ...cutsNear(x0, y0, x1, y1)];
-      if (!near.length && !strip.piece) {
-        const [a, b, c, d] = panel.map(([x, y]) => level(x, y));
-        flatTri(a, b, c); flatTri(a, c, d);
-        continue;
+    if (panelTris) {
+      const f = panelTris.get(strip.rank);
+      for (let i = 0; f && i < f.length; i += PANEL_TRI_FLOATS) {
+        builder.tri(top, [f[i], f[i + 1], f[i + 2]], [f[i + 3], f[i + 4], f[i + 5]], [f[i + 6], f[i + 7], f[i + 8]],
+          [f[i + 9], f[i + 10]], [f[i + 11], f[i + 12]], [f[i + 13], f[i + 14]], [0, 0, 1]);
       }
-      // (polygon-clipping fails now and then on near-touching edges: rounded to
-      // the centimetre, then without the corner cuts, then the whole panel;
-      // one failure dropped the merge for the whole town)
-      let panelShape = [[[...panel, panel[0]]]];
-      // (a piece of a cut strip: only its own part of each panel, or every
-      // piece drew the whole strip again over the others)
-      if (strip.piece) {
-        let own = null;
-        const mine = cropNear(strip, x0, y0, x1, y1);
-        try { own = isEmpty(mine) ? [] : polygonClipping.intersection(panelShape, mine); } catch { try { own = polygonClipping.intersection(snapGeom(panelShape), snapGeom(strip.shape)); } catch { /* whole panel */ } }
-        if (own && !own.length) continue;
-        if (own) panelShape = own;
-      }
-      // (only shapes that really reach the panel: one near it by box alone
-      // leaves it as it was, and each clip made garbage that, held over a
-      // city's gigabytes, the collector spent most of its time on)
-      const simple = quadIsSimple(panel);
-      const nearShapes = near.map((o) => ({ cut: o.cut, geom: o.cut ? o.shape : cropNear(o, x0, y0, x1, y1) }))
-        .filter((n) => !isEmpty(n.geom) && (!simple || quadTouches(panel, n.geom)));
-      let pieces = nearShapes.length ? null : panelShape;
-      for (const attempt of [() => polygonClipping.difference(panelShape, ...nearShapes.map((n) => n.geom)),
-        () => polygonClipping.difference(snapGeom(panelShape), ...nearShapes.map((n) => snapGeom(n.geom))),
-        () => polygonClipping.difference(snapGeom(panelShape), ...nearShapes.filter((n) => !n.cut).map((n) => snapGeom(n.geom)))]) {
-        if (pieces) break;
-        try { pieces = attempt(); } catch { /* next */ }
-      }
-      if (!pieces) pieces = panelShape;
-      // (only scraps of nothing dropped: pieces under a sixteenth of a square
-      // metre went too, some 900 holes through the walks across a town)
-      pieces = pieces.filter((piece) => Math.abs(ringArea(piece[0])) >= PANEL_SCRAP_M2);
-      for (const piece of pieces) {
-        const rings = piece.map((ring) => ring.slice(0, -1));
-        const flat = rings.map((ring) => ring.map(([x, y]) => new THREE.Vector2(x, y)));
-        const all = rings.flat().map(([x, y]) => level(x, y));
-        for (const [a, b, c] of THREE.ShapeUtils.triangulateShape(flat[0], flat.slice(1))) flatTri(all[a], all[b], all[c]);
-      }
+      return;
     }
+    stripPanels(strip, { before, cutsNear, cropNear, levelAt }, (a, b, c, ua, ub, uc) => builder.tri(top, a, b, c, ua, ub, uc, [0, 0, 1]));
   });
   const pocketBoxes = strips.filter((o) => o.pocket).map((o) => o.box);
   // The walks' outline (where the curb face stands), merged a tile at a
@@ -3554,7 +3370,76 @@ function mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [], 
   }
 }
 
+/**
+ * The sidewalks' meshes (see sidewalkMeshes). This one works on this thread
+ * alone; buildSidewalkMeshesParallel hands the walkway tops to worker threads
+ * where the platform has them, with the same result.
+ */
 export function buildSidewalkMeshes(carriageways, options = {}) {
+  const gen = sidewalkMeshes(carriageways, options);
+  let step = gen.next();
+  while (!step.done) step = gen.next(null);
+  return step.value;
+}
+
+export async function buildSidewalkMeshesParallel(carriageways, options = {}) {
+  const gen = sidewalkMeshes(carriageways, options);
+  let step = gen.next();
+  while (!step.done) step = gen.next(await panelsOnWorkers(step.value));
+  return step.value;
+}
+
+// Walkway tops on worker threads: the strips in 256 m tiles (by their boxes'
+// middles), each tile one work item with everything its strips need (their
+// earlier neighbours, the curb cuts and height stations in reach), the
+// triangles back by strip (sidewalkPanels.js panelsForItem). Null (drawn on
+// this thread) where there are no worker threads or too few strips to be
+// worth handing out.
+const PARALLEL_PANELS_FROM = 1500;
+const PANEL_TILE_M = 256;
+async function panelsOnWorkers({ order, earlierOverlapping, cutRings, stations, cell }) {
+  const own = order.filter((s) => !s.pocket);
+  if (own.length < PARALLEL_PANELS_FROM || (await parallelThreads()) <= 1) return null;
+  const plain = (s) => ({ rank: s.rank, shape: s.shape, left: s.left, right: s.right, along: s.along, half: s.half, box: s.box, piece: !!s.piece });
+  const tiles = new Map();
+  for (const s of own) {
+    const k = `${Math.floor((s.box[0] + s.box[2]) / 2 / PANEL_TILE_M)},${Math.floor((s.box[1] + s.box[3]) / 2 / PANEL_TILE_M)}`;
+    if (!tiles.has(k)) tiles.set(k, []);
+    tiles.get(k).push(s);
+  }
+  const reach = (LEVEL_REACH_CELLS + 1) * cell;
+  const items = [...tiles.values()].map((list) => {
+    const strips = new Map(); const before = {};
+    let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
+    for (const s of list) {
+      strips.set(s.rank, s);
+      before[s.rank] = earlierOverlapping(s).map((o) => { strips.set(o.rank, o); return o.rank; });
+      x0 = Math.min(x0, s.box[0]); y0 = Math.min(y0, s.box[1]); x1 = Math.max(x1, s.box[2]); y1 = Math.max(y1, s.box[3]);
+    }
+    // (the cuts any of its strips' panels could find, in their order)
+    const cuts = cutRings.filter((c) => list.some((s) => c.box[0] <= s.box[2] && s.box[0] <= c.box[2] && c.box[1] <= s.box[3] && s.box[1] <= c.box[3]));
+    const keys = new Set();
+    for (const s of list) {
+      for (let cx = Math.floor((s.box[0] - reach) / cell); cx <= Math.floor((s.box[2] + reach) / cell); cx++) {
+        for (let cy = Math.floor((s.box[1] - reach) / cell); cy <= Math.floor((s.box[3] + reach) / cell); cy++) keys.add(`${cx},${cy}`);
+      }
+    }
+    const near = [...keys].filter((k) => stations.has(k)).map((k) => [k, stations.get(k)]);
+    return { strips: [...strips.values()].map(plain), own: list.map((s) => s.rank), before, cuts, stations: near, cell };
+  });
+  const results = await parallelMap(items, {
+    local: panelsForItem,
+    // (spelled in two: a bundler must not take it for an asset of the page)
+    module: new URL(['./sidewalk', 'Panels.js'].join(''), import.meta.url).href,
+    fn: 'panelsForItem',
+  });
+  const out = new Map();
+  for (const list of results) for (const [rank, tris] of list) out.set(rank, tris);
+  return out;
+}
+
+// (a generator: mergeWalks yields at the walkway tops, answered by the driver)
+function* sidewalkMeshes(carriageways, options = {}) {
   const medians = findMedians(carriageways);
   const walkRuns = buildWalkRuns(options.walks, carriageways, options);
   const runs = buildSidewalkRuns(carriageways, { ...options, medians, walkEnds: walkRuns.flatMap((r) => r.roadEnds) });
@@ -3597,7 +3482,7 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
     console.warn('Sidewalks: could not find the paved pockets by the seawalls:', err?.message);
   }
   try {
-    mergeWalks(builder, walkRuns, { pockets, streetRuns: runs, groundAt: options.groundAt, cuts: [...cornerCuts(corners), ...cornerSlabRings(corners), ...curbKeepOuts(runs, carriageways)] });
+    yield* mergeWalks(builder, walkRuns, { pockets, streetRuns: runs, groundAt: options.groundAt, cuts: [...cornerCuts(corners), ...cornerSlabRings(corners), ...curbKeepOuts(runs, carriageways)] });
   } catch (err) {
     console.warn('Sidewalks: could not merge the walkways, drawing them apart:', err?.message);
     builder = new PartBuilder(paveAt, options.sidewalkLook);
@@ -3608,7 +3493,7 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
   for (const wood of [true, false]) {
     const set = deckRuns.filter((r) => r.wood === wood);
     try {
-      mergeWalks(builder, set, wood ? { top: 'wood', edge: 'wood' } : {});
+      yield* mergeWalks(builder, set, wood ? { top: 'wood', edge: 'wood' } : {});
     } catch (err) {
       console.warn('Sidewalks: could not merge the decks, drawing them apart:', err?.message);
       for (const run of set) sweepRun(builder, run);

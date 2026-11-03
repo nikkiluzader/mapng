@@ -33,6 +33,8 @@ const NODE_VERSION = 'v26.12.0';
 const CANVAS_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.json'), 'utf8')).devDependencies['@napi-rs/canvas'];
 // (left out of the bundle: native or loaded at run time)
 const RUNNER_EXTERNAL = ['@napi-rs/canvas', 'laz-perf'];
+// (work handed to worker threads: each is loaded by its own file name)
+const WORKER_MODULES = ['sidewalkPanels.js'];
 const LAZ_PERF_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, '..', 'package.json'), 'utf8')).dependencies['laz-perf'].replace(/^[\^~]/, '');
 
 async function stageRunner() {
@@ -50,6 +52,17 @@ async function stageRunner() {
     banner: { js: "import { createRequire as __mapngRequire } from 'node:module'; const require = __mapngRequire(import.meta.url);" },
     logLevel: 'warning',
   });
+  // the modules worker threads load (services/parallel.js), beside the bundle
+  // under the names the services ask for them by
+  for (const name of WORKER_MODULES) {
+    await build({
+      entryPoints: [path.join(DESKTOP, '..', 'services', name)],
+      outfile: path.join(out, name),
+      bundle: true, platform: 'node', format: 'esm', target: 'node26', external: RUNNER_EXTERNAL,
+      banner: { js: "import { createRequire as __mapngRequire } from 'node:module'; const require = __mapngRequire(import.meta.url);" },
+      logLevel: 'warning',
+    });
+  }
   fs.writeFileSync(path.join(out, 'package.json'), JSON.stringify({ name: 'mapng-export-runner', private: true, type: 'module' }, null, 1));
   // the native canvas for the target platform (npm picks its prebuilt binary by --os/--cpu)
   execFileSync('npm', ['install', '--no-save', '--no-package-lock', '--omit=dev', `--os=${platform}`, `--cpu=${arch}`,

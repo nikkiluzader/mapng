@@ -95,8 +95,14 @@ async function deflateRawInPieces(zlib, bytes) {
 }
 
 async function deflateRaw(bytes) {
-  const zlib = bytes.length >= PARALLEL_FROM_BYTES ? await zlibOf() : null;
-  if (zlib?.deflateRaw && zlib.constants) return deflateRawInPieces(zlib, bytes);
+  // (Node: zlib straight from the buffer, on its thread pool; through
+  // Blob.stream() and CompressionStream, Node's web streams spent a minute
+  // of an 8 km export shuffling small chunks in JavaScript)
+  const zlib = await zlibOf();
+  if (zlib?.deflateRaw && zlib.constants) {
+    if (bytes.length >= PARALLEL_FROM_BYTES) return deflateRawInPieces(zlib, bytes);
+    return new Promise((resolve, reject) => zlib.deflateRaw(bytes, (err, out) => (err ? reject(err) : resolve(out))));
+  }
   const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('deflate-raw'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }

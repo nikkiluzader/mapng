@@ -60,7 +60,7 @@ import { generateRoadLamps } from './streetLamps.js';
 import { buildIngameProbes } from './ingameProbes.js';
 import { smoothLine } from './lineSmoothing.js';
 import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface } from './plazas.js';
-import { buildSidewalkMeshes, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK } from './beamngSidewalks.js';
+import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
 import { placeStreetProps, POLE_LAMP_REACH_M, POLE_TYPES, hash01 as propHash } from './streetProps.js';
 import {
@@ -11651,8 +11651,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     beginStep('sidewalks', `Building sidewalks, curbs and ramps along ${groundCarriageways.length} carriageways${bridgeDecks.length ? ` (${bridgeDecks.length} bridge decks built)` : ''}…`);
     await yield_();
   }
+  // (the walkway tops on worker threads in the desktop app; here otherwise)
   const sidewalks = includeRoads && includeSidewalks
-    ? buildSidewalkMeshes(groundCarriageways, {
+    ? await buildSidewalkMeshesParallel(groundCarriageways, {
       zones: decalRoads.crosswalkZones || [],
       // building footprints at ground level: no slab into a wall
       buildings: (exportTerrainData.osmFeatures || [])
