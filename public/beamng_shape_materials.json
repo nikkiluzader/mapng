@@ -5774,6 +5774,94 @@
       "specularStrength0": "1.37255",
       "translucentBlendOp": "None"
     },
+    "ind_concrete_eroded": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/concrete/ind_concrete_eroded/t_ind_concrete_eroded_ao.data.png",
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": [
+            0.992156923,
+            0.992156923,
+            0.992156923,
+            1
+          ],
+          "baseColorMap": "/assets/materials/tileable/concrete/ind_concrete_eroded/t_ind_concrete_eroded_b.color.png",
+          "detailNormalMapStrength": 5,
+          "detailScale": [
+            0.200000003,
+            0.200000003
+          ],
+          "diffuseMapUseUV": null,
+          "normalMap": "/assets/materials/tileable/concrete/ind_concrete_eroded/t_ind_concrete_eroded_nm.normal.png",
+          "opacityMapUseUV": null,
+          "pixelSpecular": true,
+          "roughnessMap": "/assets/materials/tileable/concrete/ind_concrete_eroded/t_ind_concrete_eroded_r.data.png",
+          "roughnessMapUseUV": null,
+          "specular": [
+            0.254901975,
+            0.254901975,
+            0.254901975,
+            1
+          ],
+          "vertColor": true
+        },
+        {
+          "ambientOcclusionMapUseUV": 1,
+          "baseColorFactor": null,
+          "baseColorMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_b.color.png",
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": 1,
+          "opacityMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_o.data.png",
+          "opacityMapUseUV": 1,
+          "pixelSpecular": null,
+          "roughnessMap": "/assets/materials/breakup/t_breakup_general/t_breakup_general_r.data.png",
+          "roughnessMapUseUV": 1,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "specular": null,
+          "vertColor": null
+        },
+        {
+          "ambientOcclusionMapUseUV": null,
+          "baseColorFactor": null,
+          "detailNormalMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "pixelSpecular": null,
+          "roughnessMapUseUV": null,
+          "specular": null,
+          "vertColor": null
+        }
+      ],
+      "activeLayers": 2,
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "ASPHALT_OLD",
+      "mapTo": "ind_concrete_eroded",
+      "materialTag0": "beamng",
+      "materialTag1": "beamng",
+      "materialTag2": "Industrial",
+      "materialTag3": "vegetation",
+      "materialTag4": "east_coast_usa",
+      "name": "ind_concrete_eroded",
+      "persistentId": "2faa22b4-0122-4e79-895f-f199eab82c4a",
+      "specularStrength0": "0.3",
+      "specularStrength1": "0.2",
+      "translucentBlendOp": "None",
+      "version": 1.5
+    },
     "ind_metal_trim": {
       "Stages": [
         {
@@ -6949,6 +7037,61 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
+    "m_plaster_worn_01": {
+      "Stages": [
+        {
+          "ambientOcclusionMap": "/assets/materials/tileable/plaster/m_plaster_worn_01/t_plaster_worn_01_ao.data.png",
+          "baseColorMap": "/assets/materials/tileable/plaster/m_plaster_worn_01/t_plaster_worn_01_b.color.png",
+          "detailBaseColorMapStrength": 0.400000006,
+          "detailMap": "/assets/materials/trim/concrete/tunnel/t_tunnel_detail_b.data.png",
+          "detailScale": [
+            0.100000001,
+            0.0500000007
+          ],
+          "diffuseMapUseUV": null,
+          "normalMap": "/assets/materials/tileable/plaster/m_plaster_worn_01/t_plaster_worn_01_nm.normal.png",
+          "opacityMapUseUV": null,
+          "roughnessMap": "/assets/materials/tileable/plaster/m_plaster_worn_01/t_plaster_worn_01_r.data.png",
+          "roughnessMapUseUV": null,
+          "vertColor": true
+        },
+        {
+          "baseColorMap": "/assets/materials/breakup/m_wood_frame_trim_01/t_breakup_general_large_b.color.png",
+          "detailBaseColorMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": 1,
+          "opacityMap": "/assets/materials/breakup/m_wood_frame_trim_01/t_breakup_general_large_o.data.png",
+          "opacityMapUseUV": 1,
+          "roughnessMap": "/assets/materials/breakup/m_transparent_glass_window/t_breakup_general_large_r.data.png",
+          "roughnessMapUseUV": 1,
+          "vertColor": null
+        },
+        {
+          "detailBaseColorMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        },
+        {
+          "detailBaseColorMapStrength": null,
+          "detailScale": null,
+          "diffuseMapUseUV": null,
+          "opacityMapUseUV": null,
+          "roughnessMapUseUV": null,
+          "vertColor": null
+        }
+      ],
+      "annotation": "BUILDINGS",
+      "class": "Material",
+      "groundType": "CONCRETE",
+      "mapTo": "m_plaster_worn_01",
+      "materialTag0": "plaster",
+      "name": "m_plaster_worn_01",
+      "persistentId": "2d896300-72c6-4455-b9b6-9fdb7493d79b",
+      "version": 1.5
+    },
     "m_wood_wall": {
       "Stages": [
         {
@@ -7376,7 +7519,7 @@
       "translucentBlendOp": "None",
       "version": 1.5
     },
-    "trafficlight": {
+    "trafficLight": {
       "Stages": [
         {
           "animFlags": 16,

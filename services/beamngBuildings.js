@@ -1773,7 +1773,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
         const wallL = Math.hypot(b[0] - a[0], b[1] - a[1]);
         // (the ground before the street in front of the entrance's stretch)
         const room = streets.clearance(a, b, wallL * 0.2, wallL * 0.8);
-        const built = entrance(detailB, a, b, base, groundNear([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), style, flat ? 'roofFlat' : plan.roofMat, plan.roofTint, (...k) => rnd('ent', ...k), { room });
+        const built = entrance(detailB, a, b, base, groundNear([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), style, flat ? 'roofFlat' : plan.roofMat, plan.roofTint, (...k) => rnd('ent', ...k), { room, props });
         if (built) stats.details[built] = (stats.details[built] || 0) + 1;
         if (built && globalThis.__MAPNG_BLD_DEBUG) globalThis.__MAPNG_BLD_DEBUG({ kind: built, at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], out: [(b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]), -(b[0] - a[0]) / Math.hypot(b[0] - a[0], b[1] - a[1])], id: f.id });
       }

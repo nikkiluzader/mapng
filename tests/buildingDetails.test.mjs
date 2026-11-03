@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { passageOpenings, passageCrossings, streetIndex, insetRing, inRing } from '../services/buildingDetails.js';
+import { passageOpenings, passageCrossings, streetIndex, insetRing, inRing, steps } from '../services/buildingDetails.js';
 import { buildTexturedBuildings } from '../services/beamngBuildings.js';
 
 const K = 1 / 111320;
@@ -133,4 +133,23 @@ test('a racing line is a passage through a building mapped across it', () => {
   assert.ok(s.passages[0].half >= 6, 'the track\'s width, not a footway\'s');
   const crossing = passageCrossings([[0, 0], [10, 0], [10, 10], [0, 10]], s.passages);
   assert.ok(crossing.length >= 1);
+});
+
+test("front steps: the game's own flight for a rise it suits, facing out from the wall; drawn otherwise", () => {
+  const tris = []; const m = { tri: (...a) => tris.push(a), quad: (...a) => tris.push(a) };
+  const props = [];
+  // a wall along +x, out = -y: the flight runs down toward -y
+  assert.equal(steps(m, [5, 0], [1, 0], [0, -1], 10, 10.69, 1.4, props), 4);
+  assert.equal(tris.length, 0, 'nothing drawn');
+  assert.equal(props.length, 1);
+  const f = props[0];
+  assert.equal(f.shape, 'frontSteps');
+  assert.deepEqual([f.x, f.y, f.z], [5, 0, 10.69], 'its top edge at the door');
+  // (its local -x runs down the flight: out from the wall)
+  assert.ok(Math.abs(-Math.cos(f.yaw) - 0) < 1e-9 && Math.abs(-Math.sin(f.yaw) - -1) < 1e-9);
+  assert.ok(Math.abs(f.scale[0] - 1) < 1e-9 && Math.abs(f.scale[1] - 1.4 / 1.3) < 1e-9);
+  // one step, or a tall flight: drawn
+  steps(m, [5, 0], [1, 0], [0, -1], 10, 10.25, 1.4, props);
+  steps(m, [5, 0], [1, 0], [0, -1], 10, 11.6, 1.4, props);
+  assert.equal(props.length, 1); assert.ok(tris.length > 0);
 });

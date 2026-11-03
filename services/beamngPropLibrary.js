@@ -61,6 +61,9 @@ export const PROP_SHAPES = {
   hotelSign: { shapeFile: '/levels/italy/art/shapes/buildings/italy_billboard_hotel_big.dae', yawOffset: -Math.PI / 2 },
   flagWall: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_flag_usa.dae', yawOffset: Math.PI },
   cafeSign: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_comsign_cafe.dae', yawOffset: -Math.PI / 2, scale: 1.6 },
+  // front steps (services/buildingDetails.js steps): a four-step flight
+  // from the game's common assets, down along local -x from its top edge
+  frontSteps: { shapeFile: '/assets/meshes/architecture/modular/architectural_elements/stairs_platforms/R_HS_A_ST_01_130X60.dae' },
   // a court's chain-link fence (services/sportsFields.js): Hirochi's
   // pedestrian fence, a 2.16 m panel along local +y from its post (turned a
   // quarter so +y runs back along the fence)

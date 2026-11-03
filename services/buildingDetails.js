@@ -600,7 +600,7 @@ function frontDoor(m, c, along, out, base, col, style = 'panel') {
  * 'hood' (a small gabled canopy on brackets), with steps from the street's ground gDoor up to the floor
  * at base. Returns what was built.
  */
-export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd, { room = Infinity } = {}) {
+export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd, { room = Infinity, props = null } = {}) {
   const e = v2(a, b); const L = len2(e);
   if (L < 3.5) return null;
   // (the ground in front before the street, ENTRANCE_ROAD_CLEAR_M short of
@@ -635,7 +635,7 @@ export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd, { 
     m.quad(roofMat, p1, q1, q0, p0, [0, 0], [w / 3, 0], [w / 3, 1], [0, 1], roofTint);
     m.quad('metalWhite', p0, q0, q1, p1, [0, 0], [1, 0], [1, 1], [0, 1], TRIM_WHITE);
     wallQuad(m, 'metalWhite', [p1[0], p1[1]], [q1[0], q1[1]], top - 0.18, top, TRIM_WHITE, 1);
-    if (stepsFit(depth + 0.1)) steps(m, at(mid, depth + 0.1, 0), d, out, gDoor, base, 1.6);
+    if (stepsFit(depth + 0.1)) steps(m, at(mid, depth + 0.1, 0), d, out, gDoor, base, 1.6, props);
     return 'veranda';
   }
   if (style === 'hood') {
@@ -652,10 +652,10 @@ export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd, { 
       const bc = P((s * w) / 2 - s * 0.12, depth / 2, 0);
       box(m, 'metalWhite', [bc[0], bc[1]], out, depth / 2, 0.05, top - 0.35, top, TRIM_WHITE);
     }
-    if (stepsFit(0.05)) steps(m, P(0, 0.05, 0), d, out, gDoor, base, 1.3);
+    if (stepsFit(0.05)) steps(m, P(0, 0.05, 0), d, out, gDoor, base, 1.3, props);
     return 'hood';
   }
-  if (stepsFit(0.05)) { steps(m, at(mid, 0.05, 0), d, out, gDoor, base, 1.4); return 'steps'; }
+  if (stepsFit(0.05)) { steps(m, at(mid, 0.05, 0), d, out, gDoor, base, 1.4, props); return 'steps'; }
   return null;
 }
 
@@ -683,10 +683,26 @@ const STEP_RISE = 0.18;
 const STEP_TREAD = 0.3;
 const ENTRANCE_ROAD_CLEAR_M = 0.4;
 
-/** Concrete steps from the ground g up to the floor at `top`, out from the wall at p (front edge). */
-export function steps(m, p, along, out, g, top, width) {
+// the game's own flight of steps (/assets R_HS_A_ST_01: four steps, 1.3 m
+// wide, 0.69 m down over 1.27 m along its local -x from the top edge at its
+// origin): for a rise it fits, scaled to it (treads in proportion), in
+// place of the drawn blocks; one or two steps, or a tall flight, stay drawn
+const NATIVE_STEPS = { shape: 'frontSteps', rise: 0.69, width: 1.3 };
+const NATIVE_STEPS_RISE = [0.55, 1.0];   // (steps 14 to 25 cm high)
+
+/**
+ * Concrete steps from the ground g up to the floor at `top`, out from the
+ * wall at p (front edge). props: the game's own flight is placed there when
+ * the rise suits it. Returns the number of steps.
+ */
+export function steps(m, p, along, out, g, top, width, props = null) {
   const rise = top - g;
   if (rise < 0.15) return 0;
+  if (props && rise >= NATIVE_STEPS_RISE[0] && rise <= NATIVE_STEPS_RISE[1]) {
+    const k = rise / NATIVE_STEPS.rise;
+    props.push({ shape: NATIVE_STEPS.shape, x: p[0], y: p[1], z: top, yaw: Math.atan2(-out[1], -out[0]), scale: [k, width / NATIVE_STEPS.width, k] });
+    return 4;
+  }
   const n = Math.max(1, Math.min(10, Math.round(rise / STEP_RISE)));
   const h = rise / n;
   for (let k = 0; k < n; k++) {
