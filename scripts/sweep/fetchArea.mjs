@@ -55,7 +55,9 @@ async function fetchOne({ name, lat, lng, size }) {
   // (OSM_ONLY=1: the elevation already fetched kept, only osm.json fetched again)
   if (!process.env.OSM_ONLY) {
   // ── GPXZ ──
-  let gpxzSmooth = false, resolutions = [];
+  // (T30_ONLY=1: no GPXZ, whose raster stops at 10 km² an account; the global 30 m alone)
+  let gpxzSmooth = false, resolutions = [], gpxz = null, image = null, rasterRes = null;
+  if (!process.env.T30_ONLY) {
   {
     const latIn = (bounds.north - bounds.south) * 0.2, lngIn = (bounds.east - bounds.west) * 0.2;
     const cLat = (bounds.north + bounds.south) / 2, cLng = (bounds.east + bounds.west) / 2;
@@ -76,11 +78,12 @@ async function fetchOne({ name, lat, lng, size }) {
   const tiffBuf = await rr.arrayBuffer();
   fs.writeFileSync(`${OUT}/gpxz.tif`, Buffer.from(tiffBuf));
   const tiff = await GeoTIFF.fromArrayBuffer(tiffBuf);
-  const image = await tiff.getImage();
+  image = await tiff.getImage();
   const raster = (await image.readRasters())[0];
-  const rasterRes = image.getResolution();
-  const gpxz = await resampleToMeterGrid({ type: 'geotiff', data: [{ image, raster }] }, center, SIZE, SIZE, 'bilinear', gpxzSmooth, true, bounds, true);
+  rasterRes = image.getResolution();
+  gpxz = await resampleToMeterGrid({ type: 'geotiff', data: [{ image, raster }] }, center, SIZE, SIZE, 'bilinear', gpxzSmooth, true, bounds, true);
   fs.writeFileSync(`${OUT}/gpxz.f32`, Buffer.from(gpxz.heightMap.buffer));
+  }
 
   // ── global 30 m (Terrarium z15), as fetchTerrainData ──
   const Z = 15, TS = 256;
@@ -105,8 +108,8 @@ async function fetchOne({ name, lat, lng, size }) {
   const t30 = await resampleToMeterGrid({ type: 'sampler', sampler }, center, SIZE, SIZE, 'bilinear', smoothR >= 1 ? smoothR : false, true, bounds, true);
   fs.writeFileSync(`${OUT}/t30.f32`, Buffer.from(t30.heightMap.buffer));
 
-  fs.writeFileSync(`${OUT}/meta.json`, JSON.stringify({ name, center, size: SIZE, mpp: MPP, fetchBounds: bounds, bounds: gpxz.bounds, gpxzSmooth, resolutions, rasterRes, rasterSize: [image.getWidth(), image.getHeight()] }, null, 1));
-  console.log(name, 'gpxz res', resolutions.map((r) => `${r.res}m ${r.src}`).join(', '), 'smooth', gpxzSmooth, 'raster', rasterRes, image.getWidth(), image.getHeight());
+  fs.writeFileSync(`${OUT}/meta.json`, JSON.stringify({ name, center, size: SIZE, mpp: MPP, fetchBounds: bounds, bounds: (gpxz || t30).bounds, gpxzSmooth, resolutions, rasterRes, rasterSize: image ? [image.getWidth(), image.getHeight()] : null }, null, 1));
+  console.log(name, 'gpxz res', resolutions.map((r) => `${r.res}m ${r.src}`).join(', '), 'smooth', gpxzSmooth, 'raster', rasterRes, image?.getWidth(), image?.getHeight());
   }
 
   // ── OSM ──
