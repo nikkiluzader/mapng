@@ -61,6 +61,10 @@ export const PROP_SHAPES = {
   hotelSign: { shapeFile: '/levels/italy/art/shapes/buildings/italy_billboard_hotel_big.dae', yawOffset: -Math.PI / 2 },
   flagWall: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_flag_usa.dae', yawOffset: Math.PI },
   cafeSign: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/eca_comsign_cafe.dae', yawOffset: -Math.PI / 2, scale: 1.6 },
+  // a court's chain-link fence (services/sportsFields.js): Hirochi's
+  // pedestrian fence, a 2.16 m panel along local +y from its post (turned a
+  // quarter so +y runs back along the fence)
+  courtFence: { shapeFile: '/levels/hirochi_raceway/art/shapes/objects/fence_pedestrian.dae', yawOffset: Math.PI / 2 },
   // racetracks (services/racetracks.js): a drag strip's light tree, kart
   // tyre walls and concrete barriers (4.16 m / 4.0 m along local x)
   dragTree: { shapeFile: '/levels/gridmap_v2/art/shapes/grid/s_gm_dragstrip_tree.dae' },

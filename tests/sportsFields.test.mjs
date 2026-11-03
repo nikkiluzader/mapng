@@ -324,3 +324,25 @@ test('a curved stand ignores cutouts in its outline, not real gaps', () => {
   const taper = planSeating([area('t', [...inn, ...out.reverse()], { building: 'grandstand', height: '30' }, 'building')], project, [], { faceTo }).flatMap((st) => st.sweep.pts);
   assert.ok(Math.abs(taper[0].rows - taper[taper.length - 1].rows) > 10, `${taper[0].rows} to ${taper[taper.length - 1].rows}`);
 });
+
+test("a court's fence is the game's own chain-link pieces, end to end round it, none between courts side by side", () => {
+  const feats = [area('a', rect(0, 0, 23.77, 10.97), { leisure: 'pitch', sport: 'tennis' }), area('b', rect(0, 14.97, 23.77, 10.97), { leisure: 'pitch', sport: 'tennis' })];
+  const ps = planPitches(feats, project, { groundAt });
+  const props = [];
+  for (const p of ps) { p.props = props; buildPitch(recorder(), recorder(), p); }
+  assert.ok(props.length > 10 && props.every((q) => q.shape === 'courtFence'));
+  const len = (q) => 2.16 * q.scale[1];
+  assert.ok(props.every((q) => q.scale[1] > 0.7 && q.scale[1] < 1.4), 'stretched only a little');
+  assert.ok(props.every((q) => Math.abs(q.z - (3 + 1.7 * q.scale[2])) < 1e-9 && Math.abs(2.36 * q.scale[2] - 3) < 1e-9), 'standing on the ground, 3 m tall');
+  // the outer fence measured: each court's run-off ring, less the side the courts share
+  const total = props.reduce((s, q) => s + len(q), 0);
+  const ring = (p) => p.ring.reduce((s, a, i) => { const b = p.ring[(i + 1) % p.ring.length]; return s + Math.hypot(b[0] - a[0], b[1] - a[1]); }, 0);
+  assert.ok(total < ring(ps[0]) + ring(ps[1]) - 20, `the shared side left open (${total.toFixed(0)} m)`);
+  // (each placed at its far end post: its middle half a panel back)
+  const mid = (q) => q.y - Math.sin(q.yaw) * len(q) / 2;
+  assert.ok(props.every((q) => mid(q) < 12 || mid(q) > 13.5), 'no piece in the gap between them');
+  // a softball outfield's lower fence stays drawn
+  const sb = planPitches([area('s', [[0, 0], [70, 0], [70, 70], [0, 70]], { leisure: 'pitch', sport: 'softball' })], project, { groundAt });
+  const sprops = []; sb[0].props = sprops; buildPitch(recorder(), recorder(), sb[0]);
+  assert.equal(sprops.length, 0);
+});

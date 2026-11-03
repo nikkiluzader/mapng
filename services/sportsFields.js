@@ -587,13 +587,50 @@ function courtNet(stone, full, p, halfW, hPost, hMid, depth = 0.9, col = DARK_NE
   bar(full, 'metalWhite', [c[0], c[1], z + hMid - 0.03], [b[0], b[1], z + hPost - 0.03], 0.03, [0.97, 0.97, 0.97]);
 }
 // a chain-link fence along the ring's edges where `edges` says, h tall
+// the game's own chain-link fence (Hirochi's pedestrian fence, as OSM's
+// chain-link fence lines get: 2.16 m panels from a post at the origin, 2.36 m
+// tall, 1.7 m of it under the origin): for a court's 3 m fence, laid end to
+// end along each run, stretched a little to fill it and up to its height.
+// (Industrial's mesh fence is a security fence: barbed wire on top)
+const NATIVE_FENCE_MIN_H = 2.8;
+const NATIVE_FENCE = { shape: 'courtFence', length: 2.16, height: 2.36, under: 1.7 };
+const NATIVE_FENCE_MIN_RUN_M = 1;
+
+function nativeFenceRun(p, a, u, s0, s1, h) {
+  const R = s1 - s0;
+  if (R < NATIVE_FENCE_MIN_RUN_M) return;
+  const f = NATIVE_FENCE;
+  const n = Math.max(1, Math.round(R / f.length)); const l = R / n; const zs = h / f.height;
+  for (let k = 0; k < n; k++) {
+    // (placed at the panel's far end: it runs back from its post)
+    const e0 = [a[0] + u[0] * (s0 + l * k), a[1] + u[1] * (s0 + l * k)];
+    const e1 = [a[0] + u[0] * (s0 + l * (k + 1)), a[1] + u[1] * (s0 + l * (k + 1))];
+    const g = Math.min(p.ground(...e0), p.ground(...e1));
+    p.props.push({ shape: f.shape, x: e1[0], y: e1[1], z: g + f.under * zs, yaw: Math.atan2(u[1], u[0]), scale: [1, l / f.length, zs] });
+  }
+}
+
 function fence(stone, full, p, h, edges = null) {
   const ring = p.ring;
+  const native = h >= NATIVE_FENCE_MIN_H && Array.isArray(p.props);
   for (let i = 0; i < ring.length; i++) {
     if (edges && !edges[i]) continue;
     const a = ring[i]; const b = ring[(i + 1) % ring.length];
     const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
     const n = Math.max(1, Math.ceil(L / 3));
+    if (native) {
+      // (runs between the stretches a neighbouring court or a road takes)
+      const u = [(b[0] - a[0]) / (L || 1), (b[1] - a[1]) / (L || 1)];
+      let from = null;
+      for (let k = 0; k < n; k++) {
+        const m = [a[0] + ((b[0] - a[0]) * (k + 0.5)) / n, a[1] + ((b[1] - a[1]) * (k + 0.5)) / n];
+        const free = !inNeighbour(p, m[0], m[1]) && !(p.onRoad && p.onRoad(m[0], m[1]));
+        if (free && from === null) from = (L * k) / n;
+        if (!free && from !== null) { nativeFenceRun(p, a, u, from, (L * k) / n, h); from = null; }
+      }
+      if (from !== null) nativeFenceRun(p, a, u, from, L, h);
+      continue;
+    }
     for (let k = 0; k <= n; k++) {
       const q = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
       const g = p.ground(...q);

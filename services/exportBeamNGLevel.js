@@ -12172,7 +12172,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       __parent: 'street_furniture', class: 'TSStatic', name: `building_${p.shape}_${i + 1}`, persistentId: generatePersistentId(),
       position: [roundTo(p.x, 3), roundTo(p.y, 3), roundTo(p.z, 3)],
       rotationMatrix: rotationMatrixFromYaw(p.yaw + (shape.yawOffset ?? 0)),
-      ...(shape.scale ? { scale: [shape.scale, shape.scale, shape.scale] } : {}),
+      ...(p.scale ? { scale: p.scale.map((v) => roundTo(v * (shape.scale ?? 1), 4)) } : shape.scale ? { scale: [shape.scale, shape.scale, shape.scale] } : {}),
       shapeName: shape.shapeFile, useInstanceRenderData: true,
     });
   });

@@ -1881,6 +1881,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   const pitches = planPitches(features, project, { groundAt, drape });
   for (const p of pitches) {
     const tile = tileFor(p.ring);
+    p.props = props;   // (the game's own fence pieces round a court)
     const built = buildPitch(new TeeBuilder(tile.fullB, tile.liteB), tile.fullB, p);
     if (!built) continue;
     bump(pitchKinds, built);
