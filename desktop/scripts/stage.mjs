@@ -24,8 +24,12 @@ const arg = (name, fallback) => {
 const platform = arg('platform', process.platform);
 const arch = arg('arch', 'x64');
 
-// the Node release the export runs in (an LTS line, as development uses)
-const NODE_VERSION = 'v22.23.3';
+// the Node release the export runs in: the latest LTS line (26, "Lithium"),
+// pinned to a release at least two weeks old (26.12.0 is that line just
+// before its LTS label; move to 26.13.x once one is). Against Node 22 a
+// dense 2 km export ran 10% faster in a third less memory, and Node 22's V8
+// now and then crashed compiling an 8 km one ("unreachable code").
+const NODE_VERSION = 'v26.12.0';
 const CANVAS_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.json'), 'utf8')).devDependencies['@napi-rs/canvas'];
 // (left out of the bundle: native or loaded at run time)
 const RUNNER_EXTERNAL = ['@napi-rs/canvas', 'laz-perf'];
@@ -40,7 +44,7 @@ async function stageRunner() {
     bundle: true,
     platform: 'node',
     format: 'esm',
-    target: 'node22',
+    target: 'node26',
     external: RUNNER_EXTERNAL,
     // (bundled CommonJS calling require(): give the ESM bundle one)
     banner: { js: "import { createRequire as __mapngRequire } from 'node:module'; const require = __mapngRequire(import.meta.url);" },
