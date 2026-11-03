@@ -1632,7 +1632,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const crossings = passages.length ? passageCrossings(ring, passages, holes) : [];
 
     // one wall piece p..q (fractions t0..t1 of edge i), open below zOpen if `open`
-    const wallPiece = (a, b, i, open) => {
+    // (inner: a courtyard's wall, its windows as the street's, no shopfront)
+    const wallPiece = (a, b, i, open, inner = false) => {
       if (!open) wallStrip(builder, plinthMat, a, b, z0, base, plinthTint);
       if (plan.band || plan.office) {
         const sheetMat = plan.office ? 'office' : 'facade';
@@ -1641,12 +1642,12 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
           const zt = fl === plan.floors - 1 ? eave : base + (fl + 1) * plan.floorH;
           if (open && zt <= zOpen + 0.01) continue;
           const zb2 = open ? Math.max(zb, zOpen) : zb;
-          if (fl === 0 && plan.shopFloor && !open) bandFloor(builder, 'shop', BAND_SHOP, a, b, zb, zt, [1, 1, 1], seed, i, fl);
+          if (fl === 0 && plan.shopFloor && !open && !inner) bandFloor(builder, 'shop', BAND_SHOP, a, b, zb, zt, [1, 1, 1], seed, i, fl);
           else if (zb2 < zt) bandFloor(builder, sheetMat, plan.band, a, b, zb2, zt, plan.wallTint, seed, i, fl);
         }
       } else {
         // (a pub's or restaurant's masonry over its shop floor's windows)
-        const shop = plan.shopFloor && !open && plan.kind === 'block';
+        const shop = plan.shopFloor && !open && !inner && plan.kind === 'block';
         if (shop) bandFloor(builder, 'shop', BAND_SHOP, a, b, base, base + plan.floorH, [1, 1, 1], seed, i, 0);
         const wallFrom = open ? zOpen : shop ? base + plan.floorH : base;
         wallStrip(builder, plan.wall, a, b, wallFrom, eave, plan.wallTint);
@@ -1670,22 +1671,26 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       stats.details.passages = (stats.details.passages || 0) + openings.length;
     }
     for (const c of crossings) passageInside(builder, c.p, c.q, c.half + 0.25, zMin, zOpen, 'concrete', [0.72, 0.71, 0.68]);
-    for (const hole of holes) {
+    // the courtyard's walls as the street's (their windows; a blank wall all
+    // round read as a greenhouse's), open below a passage's top where an
+    // archway comes through
+    holes.forEach((hole, hi) => {
       for (let i = 0; i < hole.length; i++) {
         const a = hole[i]; const b = hole[(i + 1) % hole.length];
+        if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.05) continue;
+        const k = 1000 * (hi + 1) + i;
         const openings = crossings.length ? passageOpenings(a, b, passages) : [];
-        if (!openings.length) { wallStrip(builder, plinthMat, a, b, z0, eave, plinthTint); continue; }
-        // open below the passage's top where an archway comes through
+        if (!openings.length) { wallPiece(a, b, k, false, true); continue; }
         const at = (t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
         let t = 0;
         for (const [o0, o1] of openings) {
-          if (o0 > t + 1e-3) wallStrip(builder, plinthMat, at(t), at(o0), z0, eave, plinthTint);
-          wallStrip(builder, plinthMat, at(o0), at(o1), zOpen, eave, plinthTint);
+          if (o0 > t + 1e-3) wallPiece(at(t), at(o0), k, false, true);
+          wallPiece(at(o0), at(o1), k, true, true);
           t = o1;
         }
-        if (t < 1 - 1e-3) wallStrip(builder, plinthMat, at(t), b, z0, eave, plinthTint);
+        if (t < 1 - 1e-3) wallPiece(at(t), b, k, false, true);
       }
-    }
+    });
 
     const flat = plan.roof === 'flat' || !box;
     // a church whose footprint takes no gable whole: a gabled nave over its
