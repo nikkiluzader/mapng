@@ -331,15 +331,21 @@ test("a court's fence is the game's own chain-link pieces, end to end round it, 
   const props = [];
   for (const p of ps) { p.props = props; buildPitch(recorder(), recorder(), p); }
   assert.ok(props.length > 10 && props.every((q) => q.shape === 'courtFence'));
-  const len = (q) => 2.16 * q.scale[1];
+  // two rows of mesh, 1.5 m each: the lower one's foot just over the
+  // ground, the upper one on it
+  const zs = 1.5 / 1.02;
+  const low = props.filter((q) => Math.abs(q.z - (3.03 + 0.48 * zs)) < 1e-9);
+  const high = props.filter((q) => Math.abs(q.z - (3.03 + (1.02 + 0.48) * zs)) < 1e-9);
+  assert.ok(low.length && low.length === high.length && low.length * 2 === props.length, 'two rows');
+  assert.ok(props.every((q) => Math.abs(q.scale[2] - zs) < 1e-9));
+  const len = (q) => 1.99 * q.scale[1] / 2;   // (each panel counted once over both rows)
   assert.ok(props.every((q) => q.scale[1] > 0.7 && q.scale[1] < 1.4), 'stretched only a little');
-  assert.ok(props.every((q) => Math.abs(q.z - (3 + 1.7 * q.scale[2])) < 1e-9 && Math.abs(2.36 * q.scale[2] - 3) < 1e-9), 'standing on the ground, 3 m tall');
   // the outer fence measured: each court's run-off ring, less the side the courts share
   const total = props.reduce((s, q) => s + len(q), 0);
   const ring = (p) => p.ring.reduce((s, a, i) => { const b = p.ring[(i + 1) % p.ring.length]; return s + Math.hypot(b[0] - a[0], b[1] - a[1]); }, 0);
   assert.ok(total < ring(ps[0]) + ring(ps[1]) - 20, `the shared side left open (${total.toFixed(0)} m)`);
   // (each placed at its far end post: its middle half a panel back)
-  const mid = (q) => q.y - Math.sin(q.yaw) * len(q) / 2;
+  const mid = (q) => q.y - Math.sin(q.yaw) * 1.99 * q.scale[1] / 2;
   assert.ok(props.every((q) => mid(q) < 12 || mid(q) > 13.5), 'no piece in the gap between them');
   // a softball outfield's lower fence stays drawn
   const sb = planPitches([area('s', [[0, 0], [70, 0], [70, 70], [0, 70]], { leisure: 'pitch', sport: 'softball' })], project, { groundAt });

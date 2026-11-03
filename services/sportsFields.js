@@ -588,25 +588,31 @@ function courtNet(stone, full, p, halfW, hPost, hMid, depth = 0.9, col = DARK_NE
 }
 // a chain-link fence along the ring's edges where `edges` says, h tall
 // the game's own chain-link fence (Hirochi's pedestrian fence, as OSM's
-// chain-link fence lines get: 2.16 m panels from a post at the origin, 2.36 m
-// tall, 1.7 m of it under the origin): for a court's 3 m fence, laid end to
-// end along each run, stretched a little to fill it and up to its height.
-// (Industrial's mesh fence is a security fence: barbed wire on top)
+// chain-link fence lines get): a 1.99 m panel back along local +y from its
+// post at the origin, its mesh only 1.02 m tall (z -0.48 to 0.54; the posts
+// run on down to -1.7, made to stand on a wall). For a court's 3 m fence,
+// two rows stacked (rails at half height and the top), the mesh's foot just
+// over the ground, laid end to end along each run, stretched a little to
+// fill it. (Industrial's mesh fence is a security fence: barbed wire on top)
 const NATIVE_FENCE_MIN_H = 2.8;
-const NATIVE_FENCE = { shape: 'courtFence', length: 2.16, height: 2.36, under: 1.7 };
+const NATIVE_FENCE = { shape: 'courtFence', length: 1.99, meshLow: -0.48, meshH: 1.02, rowMaxH: 1.6 };
+const NATIVE_FENCE_FOOT_M = 0.03;
 const NATIVE_FENCE_MIN_RUN_M = 1;
 
 function nativeFenceRun(p, a, u, s0, s1, h) {
   const R = s1 - s0;
   if (R < NATIVE_FENCE_MIN_RUN_M) return;
   const f = NATIVE_FENCE;
-  const n = Math.max(1, Math.round(R / f.length)); const l = R / n; const zs = h / f.height;
+  const n = Math.max(1, Math.round(R / f.length)); const l = R / n;
+  const rows = Math.max(1, Math.ceil(h / f.rowMaxH)); const zs = h / rows / f.meshH;
   for (let k = 0; k < n; k++) {
     // (placed at the panel's far end: it runs back from its post)
     const e0 = [a[0] + u[0] * (s0 + l * k), a[1] + u[1] * (s0 + l * k)];
     const e1 = [a[0] + u[0] * (s0 + l * (k + 1)), a[1] + u[1] * (s0 + l * (k + 1))];
     const g = Math.min(p.ground(...e0), p.ground(...e1));
-    p.props.push({ shape: f.shape, x: e1[0], y: e1[1], z: g + f.under * zs, yaw: Math.atan2(u[1], u[0]), scale: [1, l / f.length, zs] });
+    for (let r = 0; r < rows; r++) {
+      p.props.push({ shape: f.shape, x: e1[0], y: e1[1], z: g + NATIVE_FENCE_FOOT_M + (r * f.meshH - f.meshLow) * zs, yaw: Math.atan2(u[1], u[0]), scale: [1, l / f.length, zs] });
+    }
   }
 }
 

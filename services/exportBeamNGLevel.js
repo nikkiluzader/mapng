@@ -7682,10 +7682,15 @@ const NATIVE_BARRIER_ASSETS = {
     // here and orient correctly, so match that. min Z ≈ -1.7. It runs 2.16 m
     // from a post at its origin along +Y (+90° turns +Y against the run):
     // placed at each piece's end (centred, every panel stood a metre on)
+    // (its mesh, though, is only 1.99 m long and 1.02 m tall, z -0.48 to
+    // 0.54: the posts run on down to -1.7, made to stand on a wall. Stretched
+    // to 1.8 m, the mesh's foot just over the ground, posts buried; at 2.16
+    // m and lifted 1.7 m every panel left a gap and floated a metre up)
     segmentLength: 2,
-    meshLength: 2.16,
+    meshLength: 1.99,
     fromEnd: true,
-    zOffset: 1.7,
+    scaleZ: 1.75,
+    zOffset: 0.03 + 0.48 * 1.75,
     yawOffset: Math.PI * 0.5,
   },
   // walls (beamngPropLibrary BARRIER_SHAPES): along local X, centred
