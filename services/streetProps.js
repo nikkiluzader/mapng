@@ -96,7 +96,7 @@ const WIRE_MAX_SPAN_M = 120;
 // pole type's lampZ).
 export const POLE_LAMP_REACH_M = 2.8;
 
-const MAX_POLES = 8000;
+const MAX_POLES = 8000;   // the default; exportBeamNGLevel passes its caps' (SAFE_CAPS.poles)
 
 const BUCKET_M = 8;
 
@@ -381,7 +381,7 @@ export function buildChains(carriageways) {
  *   lat, lon: the export's place (the region's poles, choosePoleType)
  * Returns { hydrants, bins, benches: [{ x, y, z, yaw }], poles: [{ x, y, z, yaw, lamp, type }], wires }.
  */
-export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, heightAt = () => 0, townPoles = false, isBlocked = () => false, lat = 0, lon = 0 } = {}) {
+export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, heightAt = () => 0, townPoles = false, isBlocked = () => false, lat = 0, lon = 0, maxPoles = MAX_POLES } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const byOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
   const swZ = sidewalkHeightLookup(runs);
@@ -423,7 +423,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   for (const line of mapped.powerLines || []) {
     const run = [];
     const type = choosePoleType({ lat, lon, tags: line.tags || {}, seed: `line:${line.id ?? line[0]?.join(',')}` });
-    for (let i = 0; i < line.length && poles.length < MAX_POLES; i++) {
+    for (let i = 0; i < line.length && poles.length < maxPoles; i++) {
       const a = line[Math.max(0, i - 1)];
       const b = line[Math.min(line.length - 1, i + 1)];
       const along = Math.atan2(b[1] - a[1], b[0] - a[0]);
@@ -438,7 +438,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
   for (const p of poles) poleTaken.add(p.x, p.y);
   for (const mp of mapped.poles || []) {
     const [x, y, z] = mp;
-    if (poleTaken.near(x, y, 1.5) || poles.length >= MAX_POLES) continue;
+    if (poleTaken.near(x, y, 1.5) || poles.length >= maxPoles) continue;
     const type = choosePoleType({ lat, lon, tags: mp.tags || {}, seed: `pole:${mp.id ?? `${x},${y}`}` });
     if (isBlocked(x, y, z ?? heightAt(x, y), (z ?? heightAt(x, y)) + POLE_TYPES[type].top)) continue;
     poles.push({ x, y, z: z ?? heightAt(x, y), yaw: 0, lamp: false, type });
@@ -455,7 +455,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
     return cw.urban ? townPoles && TOWN_POLE_CLASSES.has(cls) && !isLitRoad(cw) : POLE_CLASSES.has(cls);
   };
   for (const chain of buildChains(carriageways.filter(eligible))) {
-    if (poles.length >= MAX_POLES) break;
+    if (poles.length >= maxPoles) break;
     const town = chain.segments[0].urban;
     const id = chain.id;
     const side = hash01(id, 'pside') < 0.5 ? 1 : -1;
@@ -481,7 +481,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
       poles.push(pole);
       poleTaken.add(x, y);
       run.push(pole);
-      if (poles.length >= MAX_POLES) break;
+      if (poles.length >= maxPoles) break;
     }
     // wireLines leaves out spans too long to be one (a stretch with no poles).
     wires.push(...wireLines(run));

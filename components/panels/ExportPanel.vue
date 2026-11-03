@@ -154,6 +154,14 @@
             </label>
           </div>
 
+          <div class="flex items-center justify-between gap-2 px-0.5">
+            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.safeCaps') }}</span>
+            <label class="flex items-center gap-1.5 cursor-pointer" :title="t('exportPanel.safeCapsTitle')">
+              <input type="checkbox" v-model="beamNGSafeCaps" :class="CHECKBOX" />
+              <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ beamNGSafeCaps ? t('exportPanel.safeCapsOn') : t('exportPanel.safeCapsOff') }}</span>
+            </label>
+          </div>
+
           <!-- Structures and terrain shaping (advanced mode): what the export
                builds and which of its terrain edits it makes -->
           <div class="space-y-1.5 p-2 rounded border border-gray-200 dark:border-gray-600">
@@ -725,6 +733,8 @@ const beamNGLidarDecks = ref(storedOn('mapng_beamNGLidarDecks'));
 const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') !== 'false');
+// content caps (buildings, fences, lamps, trees ...): off builds everything the map has
+const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 // Migrate legacy boolean mesh road setting if it exists
 // DecalRoads are the only road system; earlier choices (Road Architect, Mesh
 // Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
@@ -977,6 +987,7 @@ watch(beamNGSeaLevelOffset, (v) => {
 });
 watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
 watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
+watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String(v)));
 watch(beamNGRoadType, (v) => localStorage.setItem('mapng_beamNGRoadType', v));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
@@ -1776,6 +1787,7 @@ const handleBeamNGLevelExport = async () => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       includeRocks: effectiveIncludeRocks,
+      safeCaps: !advanced || beamNGSafeCaps.value,
       ...structureOptions,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
@@ -1794,6 +1806,7 @@ const handleBeamNGLevelExport = async () => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       includeRocks: effectiveIncludeRocks,
+      safeCaps: !advanced || beamNGSafeCaps.value,
       ...structureOptions,
       roadType: effectiveRoadType,
       levelName: beamNGLevelName.value.trim(),

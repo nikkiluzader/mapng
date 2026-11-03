@@ -1039,7 +1039,6 @@ function generateTunnelDAEs(tunnels) {
 }
 
 // Tunnel lights over the whole level, at most (spaced out beyond it).
-const MAX_TUNNEL_LIGHTS = 4000;
 
 /**
  * The 'tunnels' MissionGroup tree: a SimGroup per tunnel holding its
@@ -1048,7 +1047,7 @@ const MAX_TUNNEL_LIGHTS = 4000;
  */
 function buildTunnelGroups(tunnels, daes, levelName) {
   const total = tunnels.reduce((n, t) => n + t.tubeLength, 0);
-  const lightSpacing = Math.max(LIGHT_SPACING_M, total / MAX_TUNNEL_LIGHTS);
+  const lightSpacing = Math.max(LIGHT_SPACING_M, total / caps.tunnelLights);
   const items = [];
   let lightCount = 0;
   let zoneCount = 0;
@@ -1096,7 +1095,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
     // (a filling station's canopy: the game's pump island brings its own)
     terrainData.osmFeatures.filter((f) => !isCarportFeature(f) && !fuelLayout(terrainData, squareSize).used.has(f.id)),
     (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
-    { tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads },
+    { maxBuildings: caps.buildings, tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads },
   );
   if (reportStats) {
     reportStats.built = buildingCount;
@@ -1712,6 +1711,30 @@ export function easeTightNodes(points, halfWidthM) {
 // the real terrain height at its own position (via geoToWorld) and the road hugs
 // the terrain instead of floating over valleys / cutting through crests.
 const ROAD_NODE_SPACING_M = 2.0;
+
+// Content caps: safety ceilings on how much of each kind an export builds.
+// None is a documented BeamNG limit (the docs give budgets, not numbers):
+// these are ours, from BeamNG's own levels and our tests. Safe caps off
+// (exportBeamNGLevel's `safeCaps: false`) builds everything the map has.
+// Kept either way, being where the game breaks rather than slows: the
+// DecalRoad node budget below, the Sites parking spots and GroundCover's
+// elements per cell.
+export const SAFE_CAPS = Object.freeze({
+  buildings: 20000,
+  barriers: 50000,         // fence / wall / hedge / guardrail pieces
+  streetLamps: 20000,
+  benches: 5000,
+  poles: 8000,             // utility poles (streetProps.js)
+  fuelStations: 200,
+  tunnelLights: 4000,
+  forestPerType: 75000,    // BeamNG's own levels: up to 72,936 of one item (Cliff)
+  forestTotal: 650000,     // Johnson Valley 663,057 forest items
+  forestPerArea: 250000,
+});
+const NO_CAPS = Object.freeze(Object.fromEntries(Object.keys(SAFE_CAPS).map((k) => [k, Infinity])));
+let caps = SAFE_CAPS;
+/** Safe caps on (the default) or off (everything built); returns the caps in force. */
+export function setSafeCaps(on = true) { caps = on ? SAFE_CAPS : NO_CAPS; return caps; }
 // BeamNG builds a level's DecalRoads in one pass at load, and past ~800k
 // nodes in all that pass draws nothing: a single-tile 8 km export at 8 m/px
 // (926k nodes over 1913 km of decal layers) loaded with every road
@@ -7269,6 +7292,7 @@ function buildBeamNGExportReport({
     `- Include water: ${formatBool(options?.includeWater)}`,
     `- Measured bridge heights (US lidar): ${formatBool(options?.lidarDecks !== false)}`,
     `- Include native barriers: ${formatBool(options?.includeNativeBarriers)}`,
+    `- Safe caps on content: ${options?.safeCaps === false ? 'No (everything in the map built)' : `Yes (at most ${Object.entries(SAFE_CAPS).map(([k, v]) => `${v} ${k}`).join(', ')})`}`,
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     '',
@@ -7776,7 +7800,6 @@ function buildCloudObjects(biome) {
 // (BeamNG's own levels place 22,256 TSStatics in West Coast USA, 18,679 in
 // Italy), and a suburb's garden fences and walls need ~18,000 pieces over
 // 2 km: at the old 8,000 more than half were left out.
-const MAX_NATIVE_BARRIER_OBJECTS = 50000;
 
 // Walls and fences along a racetrack: most of their length within RACESIDE_M of a raceway.
 const RACESIDE_M = 30;
@@ -7983,7 +8006,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
    * Add one TSStatic barrier instance at a geographic point with yaw.
    */
   const pushInstanceAtGeo = (pt, yaw, asset, name, zOffsetOverride) => {
-    if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
+    if (objects.length >= caps.barriers) return;
     const rotationYaw = yaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
     const world = geoToWorldPoint(
       pt.lat,
@@ -8152,7 +8175,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     }
 
     for (let i = 0; i < panelCount; i++) {
-      if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
+      if (objects.length >= caps.barriers) return;
       const panelSpacing = joints[i + 1] - joints[i];
       // each piece stretched or shrunk to reach the next joint (a mesh of
       // known length; others only shortened on a short stretch, not sticking
@@ -8218,7 +8241,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
 
     if (asset.postShapeName) {
       for (let i = 0; i < jointCount; i++) {
-        if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) return;
+        if (objects.length >= caps.barriers) return;
         const sample = { ...sampleAtDistance(joints[i]), terrainZ: jointZ[i] };
         // (as its rails: a post on a drawn road stood alone in the lane)
         if (skipLineAt(sample.x, sample.y, sample.terrainZ, sample.yaw) || skipAt(sample.x, sample.y, sample.terrainZ)) continue;
@@ -8261,7 +8284,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
     const rotationStartYaw = startYaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
     const rotationEndYaw = endYaw + (Number.isFinite(asset.yawOffset) ? asset.yawOffset : 0);
 
-    if (objects.length < MAX_NATIVE_BARRIER_OBJECTS) {
+    if (objects.length < caps.barriers) {
       const worldStart = geoToWorldPoint(
         startPt.lat,
         startPt.lng,
@@ -8281,7 +8304,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
       });
     }
 
-    if (objects.length < MAX_NATIVE_BARRIER_OBJECTS) {
+    if (objects.length < caps.barriers) {
       const worldEnd = geoToWorldPoint(
         endPt.lat,
         endPt.lng,
@@ -8314,14 +8337,14 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
   const lerpGeo = (a, b, u) => ({ ...a, lat: a.lat + (b.lat - a.lat) * u, lng: a.lng + (b.lng - a.lng) * u });
 
   for (let featureIndex = 0; featureIndex < features.length; featureIndex++) {
-    if (objects.length >= MAX_NATIVE_BARRIER_OBJECTS) break;
+    if (objects.length >= caps.barriers) break;
     const asset = assets[featureIndex];
     if (!asset || gatePlan.lines.has(featureIndex)) continue;
     const pieces = splitAtCuts(features[featureIndex].geometry, barrierLines[featureIndex].pts, gatePlan.cuts[featureIndex], lerpGeo);
     pieces.forEach((geometry, piece) => {
       const feature = pieces.length > 1 ? { ...features[featureIndex], geometry } : features[featureIndex];
       pushFeatureInstances(feature, asset, `barrier_${featureIndex}${piece ? `_${piece}` : ''}`);
-      if (asset.endShapeName && objects.length < MAX_NATIVE_BARRIER_OBJECTS) pushGuardrailEndcaps(feature, asset, featureIndex);
+      if (asset.endShapeName && objects.length < caps.barriers) pushGuardrailEndcaps(feature, asset, featureIndex);
     });
   }
 
@@ -8541,8 +8564,6 @@ function buildTrafficSignalObjects(props = []) {
 // Street furniture caps. BeamNG QA (Wonly): 25k+ lights per level are fine
 // even on Steam Deck; the constraints that matter are no shadow-casting point
 // lights and no heavy overlap — hence the min-spacing dedupe below.
-const MAX_STREET_LAMPS = 20000;
-const MAX_BENCHES = 5000;
 const LAMP_MIN_SPACING_M = 2;
 const ARTERIAL_LIGHTING = new Set(['motorway', 'trunk', 'primary', 'secondary', 'tertiary']);
 // a mapped lamp this far beyond the nearest carriageway's edge lights a path or square
@@ -8702,7 +8723,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   let lampCount = 0;
   let benchCount = 0;
   const lampCells = new Set();
-  const LAMP_LIMIT = MAX_STREET_LAMPS;
+  const LAMP_LIMIT = caps.streetLamps;
   const osmLampSpots = [];
   // Pole + dusk-to-dawn PointLight at the luminaire, arm toward `facing`.
   const addLamp = (posX, posY, facing, name, asset = profile.lamp) => {
@@ -8740,7 +8761,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
     const isLamp = tags.highway === 'street_lamp';
     const isBench = !isLamp && tags.amenity === 'bench';
     if (!isLamp && !isBench) continue;
-    if (isLamp && lampCount >= MAX_STREET_LAMPS) continue;
+    if (isLamp && lampCount >= LAMP_LIMIT) continue;
     // A lantern on a wall or hung on a wire over the street (old European
     // towns are lit almost only so: Bologna maps 743 wall and 676 wire lamps
     // to 71 on masts): no pole to place, but its light, where it hangs.
@@ -8761,7 +8782,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
       lampCount++;
       continue;
     }
-    if (isBench && benchCount >= MAX_BENCHES) continue;
+    if (isBench && benchCount >= caps.benches) continue;
 
     const pt = features[i].geometry[0];
     if (!Number.isFinite(pt?.lat) || !Number.isFinite(pt?.lng)) continue;
@@ -8832,7 +8853,7 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   }
 
   // Benches along major town streets (streetProps.js), facing the road.
-  for (let i = 0; i < (props?.benches.length ?? 0) && benchCount < MAX_BENCHES; i++) {
+  for (let i = 0; i < (props?.benches.length ?? 0) && benchCount < caps.benches; i++) {
     const b = props.benches[i];
     if (!profile.bench?.shapeFile) break;
     objects.push({
@@ -8896,7 +8917,6 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
 }
 
 // Cap to keep pathological inputs from exploding the scene file.
-const MAX_FUEL_STATIONS = 200;
 const MAX_PUMPS_PER_STATION = 8;
 // Real fuel_pump nodes are assigned to their nearest station within this radius.
 const PUMP_ASSOC_RADIUS_M = 60;
@@ -8977,7 +8997,7 @@ function fuelLayout(terrainData, squareSize) {
   const features = terrainData.osmFeatures ?? [];
   const toW = (q) => { const p = geoToWorldPoint(q.lat, q.lng, terrainData, squareSize, 0); return [p[0], p[1]]; };
   const ring = (g) => (Array.isArray(g) && g.length >= 3 ? g.filter((q) => Number.isFinite(q?.lat)).map(toW) : null);
-  const stations = fuelStationFeatures(features).slice(0, MAX_FUEL_STATIONS)
+  const stations = fuelStationFeatures(features).slice(0, caps.fuelStations)
     .map((f) => ({ tags: f.tags || {}, pt: toW(f.geometry[0]), canopy: ring(f.canopy), area: ring(f.area) }));
   const buildings = features.filter((f) => f.type === 'building' && f.geometry?.length >= 3 && ['roof', 'canopy'].includes(f.tags?.building))
     .map((f) => ({ id: f.id, tags: f.tags, ring: ring(f.geometry) }));
@@ -9041,7 +9061,7 @@ function buildFuelStations(terrainData, squareSize) {
   const objects = [];
   const facilities = [];
 
-  const limit = Math.min(stations.length, MAX_FUEL_STATIONS);
+  const limit = Math.min(stations.length, caps.fuelStations);
   for (let si = 0; si < limit; si++) {
     const feature = stations[si];
     const tags = feature.tags || {};
@@ -9516,12 +9536,8 @@ function makeForestPlacement(type, point, terrainData, squareSize, seed, scaleMi
 // GPU-bound. 1.5/1.0 keeps coverage convincing at a fraction of the cost.
 const BEAMNG_TREE_DENSITY_MULTIPLIER = 1.5;
 const BEAMNG_GRASS_DENSITY_MULTIPLIER = 1.0;
-// Ceilings only (BeamNG's own levels: Johnson Valley 663,057 forest items,
-// Cliff 604,718, Italy 206,042; up to 72,936 of a single item in Cliff). At
-// 12,000 per type and 3,600 per polygon, big forests came out thin.
-const BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE = 75000;
-const BEAMNG_MAX_FOREST_PLACEMENTS = 650000;
-const BEAMNG_MAX_PLACEMENTS_PER_AREA = 250000;
+// (the forest placement ceilings are in SAFE_CAPS: at 12,000 per type and
+// 3,600 per polygon, big forests came out thin)
 const BEAMNG_MAX_GROUNDCOVER_ELEMENTS = 650000;
 // Grass billboards are camera-relative: GroundCover generates elements out to
 // `radius` meters from the viewer. Official levels keep this around 80–160 m;
@@ -10141,11 +10157,11 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
   let placed = 0;
   const pushPlacement = (placement, { priority = false } = {}) => {
     if (!getManagedForestTemplate(biome, placement.type)) return;
-    if (placed >= BEAMNG_MAX_FOREST_PLACEMENTS) return;
+    if (placed >= caps.forestTotal) return;
     const target = priority ? priorityPlacementsByType : regularPlacementsByType;
     if (!target.has(placement.type)) target.set(placement.type, []);
     const list = target.get(placement.type);
-    if (list.length >= BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE) return;
+    if (list.length >= caps.forestPerType) return;
     list.push(placement);
     placed++;
   };
@@ -10248,7 +10264,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
           const centre = centroidOf(feature);
           const urban = isUrbanPlace({ id: `area:${feature.id}`, geometry: [centre] });
           const placements = sampleAreaPlacements(feature, terrainData, squareSize, 'area_tree', scatter * treeDensityMultiplier,
-            BEAMNG_MAX_PLACEMENTS_PER_AREA, 1, 1, hashString(`${feature.id}:scatter`));
+            caps.forestPerArea, 1, 1, hashString(`${feature.id}:scatter`));
           placements.forEach((placement, idx) => {
             if (inBuildingOrWater(placement.pos[0], placement.pos[1])) return;
             const choice = pickTree({ kind: 'tree', tags, point: centre, urban, area: true, seed: `${feature.id}:s${idx}` });
@@ -10271,7 +10287,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
             squareSize,
             'area_tree',
             (isOrchard ? 0.0028 : 0.0036) * treeDensityMultiplier,
-            BEAMNG_MAX_PLACEMENTS_PER_AREA,
+            caps.forestPerArea,
             1,
             1,
             hashString(`${feature.id}:tree_area`),
@@ -10288,7 +10304,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
           const floor = isOrchard ? null : understoryGroup(centre.lat, centre.lng);
           if (floor) {
             sampleAreaPlacements(feature, terrainData, squareSize, 'area_bush', UNDERSTORY_PER_M2 * bushDensityMultiplier,
-              BEAMNG_MAX_PLACEMENTS_PER_AREA, 1, 1, hashString(`${feature.id}:floor`)).forEach((placement, idx) => {
+              caps.forestPerArea, 1, 1, hashString(`${feature.id}:floor`)).forEach((placement, idx) => {
               const choice = chooseTreeItem(floor, { lat: centre.lat, lon: centre.lng, seed: `${feature.id}:f${idx}` });
               if (!choice) return;
               placement.type = choice.type;
@@ -10304,7 +10320,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
             squareSize,
             'area_bush',
             0.004 * bushDensityMultiplier,
-            BEAMNG_MAX_PLACEMENTS_PER_AREA,
+            caps.forestPerArea,
             1,
             1,
             hashString(feature.id),
@@ -10450,7 +10466,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
   for (const type of allTypes) {
     const priority = priorityPlacementsByType.get(type) || [];
     const regular = regularPlacementsByType.get(type) || [];
-    const merged = [...priority, ...regular].slice(0, BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE);
+    const merged = [...priority, ...regular].slice(0, caps.forestPerType);
     if (merged.length > 0) placementsByType.set(type, merged);
   }
 
@@ -11079,6 +11095,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     includeWater = true,
     seaLevelOffset = 0,
     includeNativeBarriers = true,
+    // off: no content caps (buildings, barriers, lamps, trees ...): SAFE_CAPS
+    safeCaps = true,
     includeTrees = true,
     includeRocks = false,
     backdropElevationSource = 'global30m',
@@ -11112,6 +11130,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     pbrSource = options.generatePbrMaterials === false ? 'none' : 'osm';
   }
 
+  setSafeCaps(safeCaps !== false);
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Start exportBeamNGLevel`);
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Input summary:`, {
     center,
@@ -11127,6 +11146,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       includeWater,
       seaLevelOffset,
       includeNativeBarriers,
+      safeCaps,
       includeTrees,
       includeRocks,
       backdropElevationSource,
@@ -11659,6 +11679,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       townPoles: center.lat > 24 && center.lng > -170 && center.lng < -50,
       isBlocked: underDeck,
       lat: center.lat, lon: center.lng,
+      maxPoles: caps.poles,
     })
     : { hydrants: [], bins: [], benches: [], poles: [], wires: [] };
   // A wire passing just under (or through) a deck is left out.
@@ -12380,7 +12401,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const addPropPlacement = (type, x, y, z, yaw) => {
     if (!forestPlacements.has(type)) forestPlacements.set(type, []);
     const list = forestPlacements.get(type);
-    if (list.length >= BEAMNG_MAX_FOREST_PLACEMENTS_PER_TYPE) return;
+    if (list.length >= caps.forestPerType) return;
     list.push({ ctxid: 0, pos: [roundTo(x, 3), roundTo(y, 3), roundTo(z, 3)], rotationMatrix: rotationMatrixFromYaw(yaw), scale: 1, type });
   };
   for (const [x, y, z] of mappedStreetProps.hydrants) addPropPlacement(PROP_HYDRANT, x, y, z, propHash(x, y) * Math.PI * 2);
@@ -12872,6 +12893,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       includeWater,
       seaLevelOffset,
       includeNativeBarriers,
+      safeCaps,
       includeTrees,
       includeRocks,
       requestedPbrSource: pbrSource,
