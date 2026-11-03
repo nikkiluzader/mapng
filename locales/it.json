@@ -313,6 +313,9 @@
     "meshRoads": "Geometria mesh 3D",
     "beamngLevelExport": "Esportazione Livello BeamNG",
     "generatePlayableZip": "Genera pacchetto .zip giocabile",
+    "desktopSaved": "Salvato nella cartella delle mod: {name}",
+    "desktopShowInFolder": "Mostra nella cartella",
+    "desktopChangeFolder": "Cambia cartella…",
     "satellite": "Satellite",
     "satelliteHybrid": "Ibrido Satellite",
     "touchedUp": "Ritoccata",
@@ -475,6 +478,11 @@
   },
   "memoryWidget": {
     "mem": "MEM",
+    "export": "EXPORT",
+    "cpu": "CPU",
+    "ram": "RAM",
+    "peakGb": "picco {value} GB",
+    "cores": "{value} di {total} core",
     "max": "{value} MB max",
     "peak": "picco {value} MB",
     "unavailable": "API memoria non disponibile"

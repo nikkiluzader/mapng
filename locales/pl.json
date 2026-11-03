@@ -313,6 +313,9 @@
     "meshRoads": "Geometria siatki 3D",
     "beamngLevelExport": "Eksport poziomu BeamNG",
     "generatePlayableZip": "Wygeneruj pakiet .zip do gry",
+    "desktopSaved": "Zapisano w folderze modów: {name}",
+    "desktopShowInFolder": "Pokaż w folderze",
+    "desktopChangeFolder": "Zmień folder…",
     "satellite": "Satelita",
     "satelliteHybrid": "Satelita hybrydowa",
     "touchedUp": "Poprawiona",
@@ -475,6 +478,11 @@
   },
   "memoryWidget": {
     "mem": "PAMIĘĆ",
+    "export": "EKSPORT",
+    "cpu": "CPU",
+    "ram": "RAM",
+    "peakGb": "szczyt {value} GB",
+    "cores": "{value} z {total} rdzeni",
     "max": "{value} MB maksimum",
     "peak": "szczyt {value} MB",
     "unavailable": "API pamięci niedostępne"

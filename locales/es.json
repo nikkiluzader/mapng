@@ -314,6 +314,9 @@
     "communityQualityNotice": "Las exportaciones de MapNG se disfrutan mejor como punto de partida. Para lanzamientos publicos, recomendamos dedicar trabajo adicional de world-building y pulido antes de publicarlas en hubs de mods.",
     "beamngLevelExport": "Exportacion de nivel BeamNG",
     "generatePlayableZip": "Generar paquete .zip jugable",
+    "desktopSaved": "Guardado en la carpeta de mods: {name}",
+    "desktopShowInFolder": "Mostrar en la carpeta",
+    "desktopChangeFolder": "Cambiar carpeta…",
     "satellite": "Satelite",
     "satelliteHybrid": "Hibrido satelital",
     "touchedUp": "Retocada",
@@ -476,6 +479,11 @@
   },
   "memoryWidget": {
     "mem": "MEM",
+    "export": "EXPORTACIÓN",
+    "cpu": "CPU",
+    "ram": "RAM",
+    "peakGb": "pico {value} GB",
+    "cores": "{value} de {total} núcleos",
     "max": "{value} MB max",
     "peak": "pico {value} MB",
     "unavailable": "API de memoria no disponible"

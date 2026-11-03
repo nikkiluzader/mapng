@@ -346,6 +346,9 @@
     "communityQualityNotice": "MapNG exports are best used as a starting point. For public releases, it is strongly recommended to do more additional world-building and polish before publishing to community mod hubs.",
     "beamngLevelExport": "BeamNG Level Export",
     "generatePlayableZip": "Generate playable .zip package",
+    "desktopSaved": "Saved to the mods folder: {name}",
+    "desktopShowInFolder": "Show in folder",
+    "desktopChangeFolder": "Change folder…",
     "satellite": "Satellite",
     "satelliteHybrid": "Satellite Hybrid",
     "touchedUp": "Touched up",
@@ -526,6 +529,11 @@
   },
   "memoryWidget": {
     "mem": "MEM",
+    "export": "EXPORT",
+    "cpu": "CPU",
+    "ram": "RAM",
+    "peakGb": "peak {value} GB",
+    "cores": "{value} of {total} cores",
     "max": "{value} MB max",
     "peak": "peak {value} MB",
     "unavailable": "memory API unavailable"

@@ -313,6 +313,9 @@
     "meshRoads": "3D-геометрия меша",
     "beamngLevelExport": "Экспорт уровня BeamNG",
     "generatePlayableZip": "Сгенерировать играбельный .zip",
+    "desktopSaved": "Сохранено в папку модов: {name}",
+    "desktopShowInFolder": "Показать в папке",
+    "desktopChangeFolder": "Изменить папку…",
     "satellite": "Спутник",
     "satelliteHybrid": "Спутниковый гибрид",
     "touchedUp": "Отредактированная",
@@ -475,6 +478,11 @@
   },
   "memoryWidget": {
     "mem": "ПАМ",
+    "export": "ЭКСПОРТ",
+    "cpu": "ЦП",
+    "ram": "ОЗУ",
+    "peakGb": "пик {value} ГБ",
+    "cores": "{value} из {total} ядер",
     "max": "{value} МБ макс",
     "peak": "пик {value} МБ",
     "unavailable": "API памяти недоступен"

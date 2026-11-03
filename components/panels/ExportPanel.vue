@@ -290,6 +290,17 @@
             <Download :size="14" />
             Download Ready: {{ beamNGPendingDownloadName || 'beamng_level.zip' }}
           </a>
+
+          <div
+            v-if="beamNGDesktopSaved"
+            class="w-full p-2 bg-emerald-600/15 border border-emerald-700 rounded text-[11px] space-y-1"
+          >
+            <div class="font-medium text-emerald-300 break-all">{{ t('exportPanel.desktopSaved', { name: beamNGDesktopSaved.filename }) }}</div>
+            <div class="flex gap-3">
+              <button type="button" class="underline text-emerald-200 hover:text-white" @click="showDesktopSavedLevel">{{ t('exportPanel.desktopShowInFolder') }}</button>
+              <button type="button" class="underline text-emerald-200/80 hover:text-white" @click="changeDesktopModsFolder">{{ t('exportPanel.desktopChangeFolder') }}</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -630,6 +641,7 @@ import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
 import { exportBeamNGLevel } from '../../services/exportBeamNGLevel';
+import { desktopApp, exportLevelOnDesktop } from '../../services/platform/desktop.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
 import { reverseLocationName } from '../../services/nominatim';
@@ -748,6 +760,10 @@ const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitA
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
 const beamNGPendingDownloadUrl = ref('');
 const beamNGPendingDownloadName = ref('');
+// (desktop app: the level written into the mods folder, { path, filename })
+const beamNGDesktopSaved = ref(null);
+const showDesktopSavedLevel = () => desktopApp?.showItem(beamNGDesktopSaved.value?.path);
+const changeDesktopModsFolder = () => desktopApp?.chooseModsFolder();
 
 // ─── Base texture touch-up painting ─────────────────────────────────
 const showTexturePaintModal = ref(false);
@@ -865,6 +881,7 @@ const clearPendingBeamNGDownload = () => {
   }
   beamNGPendingDownloadUrl.value = '';
   beamNGPendingDownloadName.value = '';
+  beamNGDesktopSaved.value = null;
 };
 
 const isAnyExporting = computed(() => (
@@ -1685,8 +1702,9 @@ const handleBeamNGLevelExport = async () => {
 
   // Keep users in-app: pre-acquire a save handle while click activation is
   // still present, then write the generated ZIP after export completes.
+  // (the desktop app writes into the mods folder instead)
   let beamNGSaveHandle = null;
-  const supportsSavePicker = typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
+  const supportsSavePicker = !desktopApp && typeof window !== 'undefined' && typeof window.showSaveFilePicker === 'function';
   if (supportsSavePicker) {
     const fallbackName = `mapng_${props.center.lat.toFixed(4)}_${props.center.lng.toFixed(4)}`
       .replace(/[^a-zA-Z0-9_-]+/g, '_');
@@ -1794,7 +1812,7 @@ const handleBeamNGLevelExport = async () => {
       requestedResolution: props.resolution,
     });
 
-    const { blob, filename } = await exportBeamNGLevel(td, props.center, {
+    const levelOptions = {
       baseTexture: effectiveBaseTexture,
       includeBackdrop: effectiveIncludeBackdrop,
       backdropElevationSource: effectiveBackdropSource,
@@ -1820,7 +1838,18 @@ const handleBeamNGLevelExport = async () => {
         if (completed) beamNGProgressDone.value = [...beamNGProgressDone.value, completed];
         console.log(`${BEAMNG_EXPORT_UI_LOG} Progress:`, { step, pct });
       },
-    });
+    };
+
+    if (desktopApp) {
+      const saved = await exportLevelOnDesktop(td, props.center, levelOptions);
+      if (saved?.cancelled) return;
+      console.log(`${BEAMNG_EXPORT_UI_LOG} Desktop export written:`, saved);
+      beamNGDesktopSaved.value = { path: saved.path, filename: saved.filename };
+      notifyExportSuccess('beamng_level_zip', saved.filename);
+      return;
+    }
+
+    const { blob, filename } = await exportBeamNGLevel(td, props.center, levelOptions);
 
     if (effectiveBackdropSource === 'gpxz' && !effectiveBackdropGpxzApiKey) {
       console.warn(`${BEAMNG_EXPORT_UI_LOG} GPXZ backdrop selected but no GPXZ key was passed to export.`);

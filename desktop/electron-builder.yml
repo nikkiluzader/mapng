@@ -1,0 +1,29 @@
+# MapNG desktop packaging. Run scripts/stage.mjs for the target platform
+# first (the export runner + Node runtime) and npm run build at the repo root
+# (the page): both ride outside the asar, where a separate Node can read them.
+appId: com.mapng.desktop
+productName: MapNG
+directories:
+  output: release
+files:
+  - main.js
+  - preload.cjs
+  - modsFolder.js
+  - package.json
+extraResources:
+  - from: ../dist
+    to: dist
+  - from: build/runner
+    to: runner
+  # (its node_modules on their own: a folder's node_modules is left out)
+  - from: build/runner/node_modules
+    to: runner/node_modules
+  - from: build/node
+    to: node
+win:
+  # (a folder for now; an installer and signing come with releases)
+  target: dir
+  signAndEditExecutable: false
+linux:
+  target: AppImage
+  category: Game

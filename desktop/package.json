@@ -1,0 +1,23 @@
+{
+  "name": "mapng-desktop",
+  "productName": "MapNG",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MapNG desktop: real-world maps for BeamNG.drive, run locally",
+  "author": "Nikki Luzader",
+  "license": "SEE LICENSE IN ../LICENSE",
+  "type": "module",
+  "main": "main.js",
+  "devDependencies": {
+    "@napi-rs/canvas": "1.0.11",
+    "electron": "44.9.0",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2"
+  },
+  "scripts": {
+    "start": "electron .",
+    "stage": "node scripts/stage.mjs",
+    "pack:win": "node scripts/stage.mjs --platform win32 && electron-builder --win --x64",
+    "pack:linux": "node scripts/stage.mjs --platform linux && electron-builder --linux --x64"
+  }
+}
