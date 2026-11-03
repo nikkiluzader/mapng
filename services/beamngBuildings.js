@@ -710,7 +710,8 @@ function useDetails(m, builder, { plan, ring, base, eave, flat, streets, crossin
   const facingYaw = Math.atan2(out[1], out[0]);
   const at = (t, k) => [a[0] + d[0] * t + out[0] * k, a[1] + d[1] * t + out[1] * k];
   if ((plan.use === 'hotel' || plan.use === 'motel') && entranceHere) {
-    const canopy = plan.use === 'hotel' ? hotelCanopy(m, a, b, base, CANOPY_COLOURS[Math.floor(rnd('canopy') * CANOPY_COLOURS.length)]) : null;
+    const room = streets.clearance ? streets.clearance(a, b, L / 2 - Math.min(4.5, L * 0.3), L / 2 + Math.min(4.5, L * 0.3)) : Infinity;
+    const canopy = plan.use === 'hotel' ? hotelCanopy(m, a, b, base, CANOPY_COLOURS[Math.floor(rnd('canopy') * CANOPY_COLOURS.length)], { room }) : null;
     if (canopy) bumpC('hotelCanopies');
     // flags over the entrance (the US's, on its brackets) in the Americas
     if (canopy && plan.floors >= 2 && lon < -30 && lon > -170 && lat > 15) {
@@ -1738,7 +1739,10 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       if (door >= 0) {
         const a = ring[door]; const b = ring[(door + 1) % ring.length];
         const style = rnd('entrance') < 0.65 ? plan.entrance : 'steps';
-        const built = entrance(detailB, a, b, base, groundNear([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), style, flat ? 'roofFlat' : plan.roofMat, plan.roofTint, (...k) => rnd('ent', ...k));
+        const wallL = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        // (the ground before the street in front of the entrance's stretch)
+        const room = streets.clearance(a, b, wallL * 0.2, wallL * 0.8);
+        const built = entrance(detailB, a, b, base, groundNear([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]), style, flat ? 'roofFlat' : plan.roofMat, plan.roofTint, (...k) => rnd('ent', ...k), { room });
         if (built) stats.details[built] = (stats.details[built] || 0) + 1;
         if (built && globalThis.__MAPNG_BLD_DEBUG) globalThis.__MAPNG_BLD_DEBUG({ kind: built, at: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], out: [(b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]), -(b[0] - a[0]) / Math.hypot(b[0] - a[0], b[1] - a[1])], id: f.id });
       }

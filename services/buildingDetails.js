@@ -86,6 +86,17 @@ const STREET_CLASSES = new Set(['motorway', 'trunk', 'primary', 'secondary', 'te
   'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link']);
 const FACE_REACH_M = 30;
 const CELL = 32;
+// a street's drawn half width for the ground in front of a wall (its width=*
+// or lanes, else its class's usual): a canopy or veranda stops short of it
+const CLASS_HALF_M = { motorway: 7, trunk: 6, primary: 5, secondary: 4.5, tertiary: 4, unclassified: 3.2, residential: 3.2,
+  living_street: 3, pedestrian: 3, service: 2.5 };
+function streetHalf(t = {}, hw = '') {
+  const w = Number.parseFloat(t.width);
+  if (Number.isFinite(w) && w > 1) return w / 2;
+  const lanes = Number.parseInt(t.lanes, 10);
+  if (lanes > 0) return lanes * 1.7;
+  return CLASS_HALF_M[String(hw).replace(/_link$/, '')] ?? 3;
+}
 
 const RACE_PASSAGE_HALF_M = 8.5;   // (a raceway is drawn 14 m wide unless tagged)
 
@@ -115,9 +126,10 @@ export function streetIndex(features, project) {
       continue;
     }
     if (!STREET_CLASSES.has(hw) || (t.tunnel && t.tunnel !== 'no') || t.service === 'parking_aisle' || t.service === 'driveway') continue;
+    const half = streetHalf(t, hw);
     for (let i = 0; i + 1 < line.length; i++) {
       const k = segs.length; const a = line[i]; const b = line[i + 1];
-      segs.push([a, b]);
+      segs.push([a, b, half]);
       for (let gx = Math.floor(Math.min(a[0], b[0]) / CELL); gx <= Math.floor(Math.max(a[0], b[0]) / CELL); gx++) {
         for (let gy = Math.floor(Math.min(a[1], b[1]) / CELL); gy <= Math.floor(Math.max(a[1], b[1]) / CELL); gy++) {
           const key = `${gx},${gy}`;
@@ -153,9 +165,40 @@ export function streetIndex(features, project) {
     }
     return best;
   };
+  // the ground in front of wall a-b's stretch t0..t1 (metres along it) before
+  // any street's drawn edge, sampled along it: Infinity with none near (a
+  // hotel's canopy reached its posts into the middle of a narrow street)
+  const clearance = (a, b, t0 = null, t1 = null) => {
+    const e = v2(a, b); const L = len2(e);
+    if (L < 0.5) return Infinity;
+    const d = [e[0] / L, e[1] / L]; const n = [d[1], -d[0]];
+    const from = t0 ?? 0; const to = t1 ?? L;
+    let best = Infinity;
+    for (let t = from; t <= to + 1e-6; t += Math.max(0.5, (to - from) / 8)) {
+      const o = [a[0] + d[0] * t, a[1] + d[1] * t];
+      for (let gx = Math.floor((o[0] - CLEAR_REACH_M) / CELL); gx <= Math.floor((o[0] + CLEAR_REACH_M) / CELL); gx++) {
+        for (let gy = Math.floor((o[1] - CLEAR_REACH_M) / CELL); gy <= Math.floor((o[1] + CLEAR_REACH_M) / CELL); gy++) {
+          for (const k of grid.get(`${gx},${gy}`) || []) {
+            const [p, q, half] = segs[k];
+            // straight out from the wall at o: where it meets the street's edge
+            for (let k2 = 0; k2 <= CLEAR_REACH_M * 4; k2++) {
+              const r = k2 / 4;
+              if (r >= best) break;
+              const x = o[0] + n[0] * r; const y = o[1] + n[1] * r;
+              const s = v2(p, q); const S2 = s[0] * s[0] + s[1] * s[1];
+              const u = S2 > 1e-9 ? Math.max(0, Math.min(1, ((x - p[0]) * s[0] + (y - p[1]) * s[1]) / S2)) : 0;
+              if (Math.hypot(p[0] + s[0] * u - x, p[1] + s[1] * u - y) < half) { best = Math.min(best, r); break; }
+            }
+          }
+        }
+      }
+    }
+    return best;
+  };
   passages.push(...courtyardPassages(features, project, passages, facing));
-  return { facing, passages };
+  return { facing, clearance, passages };
 }
+const CLEAR_REACH_M = 6;
 
 // An enclosed courtyard (a building's inner ring) is reached through an
 // archway: OSM rarely maps the passage itself, only the paths inside and the
@@ -442,13 +485,16 @@ export const CANOPY_COLOURS = [[0.42, 0.08, 0.1], [0.08, 0.12, 0.26], [0.1, 0.24
 const BRASS = [0.72, 0.58, 0.3];
 const GLASS_DOOR = [0.16, 0.2, 0.24];
 const CANOPY_OUT_M = 3.2;
+const CANOPY_ROAD_CLEAR_M = 0.5;   // short of the street's edge
+const CANOPY_MIN_M = 0.8;          // shallower: no canopy, the doors alone
+const CANOPY_POSTS_M = 2.2;        // shallower: held from the wall, no posts
 
 /**
  * A hotel's entrance on wall a-b (at its middle): glass doors under a flat canopy reaching
  * CANOPY_OUT_M out over the sidewalk on two brass posts, its deep edge in the hotel's colour.
  * Returns the canopy's middle front point (for a sign or flags), or null on a short wall.
  */
-export function hotelCanopy(m, a, b, base, col) {
+export function hotelCanopy(m, a, b, base, col, { room = Infinity } = {}) {
   const e = v2(a, b); const L = len2(e);
   if (L < 6) return null;
   const d = [e[0] / L, e[1] / L]; const out = [d[1], -d[0]];
@@ -456,18 +502,25 @@ export function hotelCanopy(m, a, b, base, col) {
   const mid = [a[0] + d[0] * L / 2, a[1] + d[1] * L / 2];
   const at = (k) => [mid[0] + out[0] * k, mid[1] + out[1] * k];
   const zc = base + 3.3;
-  // the canopy slab and its deep fascia
-  box(m, 'metalWhite', at(CANOPY_OUT_M / 2), d, half, CANOPY_OUT_M / 2, zc, zc + 0.18, col.map((c) => c * 0.8), { bottom: true });
-  box(m, 'metalWhite', at(CANOPY_OUT_M - 0.06), d, half + 0.05, 0.08, zc - 0.25, zc + 0.45, col);
-  for (const sgn of [-1, 1]) {
-    box(m, 'metalWhite', at(CANOPY_OUT_M / 2).map((v, i) => v + d[i] * sgn * (half + 0.0)), out, CANOPY_OUT_M / 2, 0.06, zc - 0.25, zc + 0.45, col);   // sides
-    const post = [mid[0] + out[0] * (CANOPY_OUT_M - 0.25) + d[0] * sgn * (half - 0.25), mid[1] + out[1] * (CANOPY_OUT_M - 0.25) + d[1] * sgn * (half - 0.25)];
-    cylinder(m, 'metalWhite', post[0], post[1], 0.09, base - 0.2, zc, BRASS, { n: 10 });
+  // (no further out than the ground before the street, CANOPY_ROAD_CLEAR_M
+  // short of it; its posts only on a deep one, else held from the wall)
+  const depth = Math.min(CANOPY_OUT_M, room - CANOPY_ROAD_CLEAR_M);
+  const built = depth >= CANOPY_MIN_M;
+  if (built) {
+    // the canopy slab and its deep fascia
+    box(m, 'metalWhite', at(depth / 2), d, half, depth / 2, zc, zc + 0.18, col.map((c) => c * 0.8), { bottom: true });
+    box(m, 'metalWhite', at(depth - 0.06), d, half + 0.05, 0.08, zc - 0.25, zc + 0.45, col);
+    for (const sgn of [-1, 1]) {
+      box(m, 'metalWhite', at(depth / 2).map((v, i) => v + d[i] * sgn * (half + 0.0)), out, depth / 2, 0.06, zc - 0.25, zc + 0.45, col);   // sides
+      if (depth < CANOPY_POSTS_M) continue;
+      const post = [mid[0] + out[0] * (depth - 0.25) + d[0] * sgn * (half - 0.25), mid[1] + out[1] * (depth - 0.25) + d[1] * sgn * (half - 0.25)];
+      cylinder(m, 'metalWhite', post[0], post[1], 0.09, base - 0.2, zc, BRASS, { n: 10 });
+    }
   }
   // glass doors in a brass frame
   box(m, 'metalWhite', at(0.05), d, Math.min(1.8, half - 0.5) + 0.12, 0.05, base, base + 2.75, BRASS);
   box(m, 'metalWhite', at(0.09), d, Math.min(1.8, half - 0.5), 0.05, base, base + 2.6, GLASS_DOOR);
-  return { front: at(CANOPY_OUT_M), mid, d, out, half, zTop: zc + 0.45 };
+  return built ? { front: at(depth), mid, d, out, half, zTop: zc + 0.45 } : null;
 }
 
 // a pub's sign board: oxblood, bottle green, black, navy, cream
@@ -528,9 +581,14 @@ function frontDoor(m, c, along, out, base, col) {
  * 'hood' (a small gabled canopy on brackets), with steps from the street's ground gDoor up to the floor
  * at base. Returns what was built.
  */
-export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd) {
+export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd, { room = Infinity } = {}) {
   const e = v2(a, b); const L = len2(e);
   if (L < 3.5) return null;
+  // (the ground in front before the street, ENTRANCE_ROAD_CLEAR_M short of
+  // it: a veranda only if it and its steps fit, else a hood; steps only if
+  // they fit: verandas stood out in the road where a house is close to it)
+  const free = room - ENTRANCE_ROAD_CLEAR_M;
+  const stepsOut = (r) => Math.max(1, Math.min(10, Math.round(r / STEP_RISE))) * STEP_TREAD;
   const d = [e[0] / L, e[1] / L]; const out = [d[1], -d[0]];
   const at = (t, k, z) => [a[0] + d[0] * t + out[0] * k, a[1] + d[1] * t + out[1] * k, z];
   // (the wall's middle: where the house's laid-over windows leave the door's
@@ -539,6 +597,8 @@ export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd) {
   const rise = Math.max(0, base - gDoor);
   const doorAt = at(mid, 0, 0);
   frontDoor(m, [doorAt[0], doorAt[1]], d, out, base, DOOR_COLOURS[Math.floor(rnd('doorCol') * DOOR_COLOURS.length)]);
+  if (style === 'veranda' && free < 2.1 + (rise > 0.2 ? stepsOut(rise) : 0)) style = 'hood';
+  const stepsFit = (from) => rise > 0.2 && free >= from + stepsOut(rise);
   if (style === 'veranda' && L >= 6) {
     const w = Math.min(L - 1, Math.max(4.5, L * 0.6));
     const t0 = Math.max(0.5, Math.min(L - 0.5 - w, mid - w / 2));
@@ -556,7 +616,7 @@ export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd) {
     m.quad(roofMat, p1, q1, q0, p0, [0, 0], [w / 3, 0], [w / 3, 1], [0, 1], roofTint);
     m.quad('metalWhite', p0, q0, q1, p1, [0, 0], [1, 0], [1, 1], [0, 1], TRIM_WHITE);
     wallQuad(m, 'metalWhite', [p1[0], p1[1]], [q1[0], q1[1]], top - 0.18, top, TRIM_WHITE, 1);
-    if (rise > 0.2) steps(m, at(mid, depth + 0.1, 0), d, out, gDoor, base, 1.6);
+    if (stepsFit(depth + 0.1)) steps(m, at(mid, depth + 0.1, 0), d, out, gDoor, base, 1.6);
     return 'veranda';
   }
   if (style === 'hood') {
@@ -573,15 +633,16 @@ export function entrance(m, a, b, base, gDoor, style, roofMat, roofTint, rnd) {
       const bc = P((s * w) / 2 - s * 0.12, depth / 2, 0);
       box(m, 'metalWhite', [bc[0], bc[1]], out, depth / 2, 0.05, top - 0.35, top, TRIM_WHITE);
     }
-    if (rise > 0.2) steps(m, P(0, 0.05, 0), d, out, gDoor, base, 1.3);
+    if (stepsFit(0.05)) steps(m, P(0, 0.05, 0), d, out, gDoor, base, 1.3);
     return 'hood';
   }
-  if (rise > 0.2) { steps(m, at(mid, 0.05, 0), d, out, gDoor, base, 1.4); return 'steps'; }
+  if (stepsFit(0.05)) { steps(m, at(mid, 0.05, 0), d, out, gDoor, base, 1.4); return 'steps'; }
   return null;
 }
 
 const STEP_RISE = 0.18;
 const STEP_TREAD = 0.3;
+const ENTRANCE_ROAD_CLEAR_M = 0.4;
 
 /** Concrete steps from the ground g up to the floor at `top`, out from the wall at p (front edge). */
 export function steps(m, p, along, out, g, top, width) {

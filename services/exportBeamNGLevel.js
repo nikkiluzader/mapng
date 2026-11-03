@@ -69,7 +69,7 @@ import {
   hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
 } from './beamngTunnels.js';
 import {
-  PROP_HYDRANT, PROP_BINS, PROP_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
+  PROP_HYDRANT, PROP_BINS, PROP_SHAPES, US_SIGN_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
   BARRIER_SHAPES, CARPORT_SHAPE,
 } from './beamngPropLibrary.js';
 import {
@@ -736,6 +736,44 @@ async function generateHeightmapPng(terrainData, maxSize = Number.POSITIVE_INFIN
  * Sidewalk meshes (beamngSidewalks.js) as one Collada shape: visual meshes
  * plus a Colmesh-1 collision copy, in BeamNG's base00 > start01 layout.
  */
+// Signs off the drawn roads: one standing on a carriageway (or within
+// SIGN_ROAD_CLEAR_M of its edge: the sign code steps out by OSM's estimated
+// width, the road drawn is often wider) goes straight away from the nearest
+// one until clear, up to SIGN_SHIFT_MAX_M, onto the verge, the sidewalk or the
+// median; no ground there, it's left out. Each on the finished ground.
+const SIGN_ROAD_CLEAR_M = 0.6;
+const SIGN_SHIFT_MAX_M = 6;
+export function settleSigns(signs, { index, groundAt }) {
+  let moved = 0; let dropped = 0;
+  const out = [];
+  for (const sign of signs) {
+    const [x, y] = sign.position;
+    let at = [x, y];
+    const hits = carriagewaysAt(index, x, y, SIGN_ROAD_CLEAR_M);
+    if (hits.length) {
+      // the way out: from the nearest road's centre line through the sign
+      let best = null;
+      for (const s of index.segments) {
+        const dx = s.bx - s.ax; const dy = s.by - s.ay; const L2 = dx * dx + dy * dy || 1;
+        const t = Math.max(0, Math.min(1, ((x - s.ax) * dx + (y - s.ay) * dy) / L2));
+        const cx = s.ax + dx * t; const cy = s.ay + dy * t; const d = Math.hypot(x - cx, y - cy);
+        if (!best || d < best.d) best = { d, cx, cy, nx: -dy, ny: dx };
+      }
+      let ox = x - best.cx; let oy = y - best.cy; let L = Math.hypot(ox, oy);
+      if (L < 0.05) { const nl = Math.hypot(best.nx, best.ny) || 1; ox = best.nx / nl; oy = best.ny / nl; L = 1; } else { ox /= L; oy /= L; }
+      at = null;
+      for (let r = 0.25; r <= SIGN_SHIFT_MAX_M; r += 0.25) {
+        const px = x + ox * r; const py = y + oy * r;
+        if (!carriagewaysAt(index, px, py, SIGN_ROAD_CLEAR_M).length) { at = [px, py]; break; }
+      }
+      if (!at) { dropped++; continue; }
+      moved++;
+    }
+    out.push({ ...sign, position: [at[0], at[1], groundAt(at[0], at[1])] });
+  }
+  return { signs: out, moved, dropped };
+}
+
 function generateSidewalksDAE(meshes) {
   if (!meshes.length) return null;
   const parts = meshes.map((mesh) => {
@@ -9604,6 +9642,9 @@ const STREET_DRIVEWAY_CLEAR_M = 2.5;
 export const SITES_MAX_PARKING_SPOTS = 3000;
 const SITES_SAMPLE_CELL_M = 64;
 
+/** A spot's rotation (our yaw quaternion) as city.sites.json takes it: the yaw turned the other way. */
+export const siteRotation = ([x, y, z, w]) => [x, y, z ? -z : 0, w];
+
 export function sampleSiteSpots(spots, max = SITES_MAX_PARKING_SPOTS) {
   if (spots.length <= max) return spots;
   // round-robin over 64 m cells: every neighbourhood keeps some
@@ -12085,18 +12126,32 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
   }
   const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);
-  const signObjects = [...buildRoadSignProps(exportTerrainData, squareSize, {
+  // signs off the drawn roads (onto the verge, the sidewalk or the median)
+  // and on the finished ground (settleSigns)
+  const settled = settleSigns([...buildRoadSignProps(exportTerrainData, squareSize, {
     style: getMarkingStyle(exportTerrainData.roadRules),
-  }).props, ...[...calming.signs, ...curveWarnings.props].map((sign) => ({ ...sign, position: sign.position.map((v) => roundTo(v, 3)) }))].map((sign, i) => ({
-    __parent: 'signs',
-    class: 'TSStatic',
-    name: `sign_${sign.kind}_${i}`,
-    persistentId: generatePersistentId(),
-    position: sign.position,
-    rotationMatrix: rotationMatrixFromYaw(sign.yaw),
-    shapeName: sign.shape,
-    useInstanceRenderData: true,
-  }));
+  }).props, ...calming.signs, ...curveWarnings.props], {
+    index: buildCarriagewayIndex(groundCarriageways),
+    groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+  });
+  const plateOf = new Map(Object.values(US_SIGN_SHAPES).filter((v) => v.post).map((v) => [v.shapeFile, v]));
+  const signObjects = settled.signs.flatMap((sign, i) => {
+    const plate = plateOf.get(sign.shape);
+    const base = sign.position.map((v) => roundTo(v, 3));
+    const obj = {
+      __parent: 'signs',
+      class: 'TSStatic',
+      name: `sign_${sign.kind}_${i}`,
+      persistentId: generatePersistentId(),
+      position: plate ? [base[0], base[1], roundTo(base[2] + plate.plateZ, 3)] : base,
+      rotationMatrix: rotationMatrixFromYaw(sign.yaw),
+      shapeName: sign.shape,
+      useInstanceRenderData: true,
+    };
+    // (a bare plate on its post)
+    return plate ? [obj, { ...obj, name: `sign_post_${i}`, persistentId: generatePersistentId(), position: base, shapeName: PROP_SHAPES[plate.post].shapeFile }] : [obj];
+  });
+  if (settled.moved || settled.dropped) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Signs: ${settled.moved} moved off the road, ${settled.dropped} left out (no ground beside it).`);
   const trafficSignalObjects = buildTrafficSignalObjects(signalProps);
   const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome, {
     carriageways: groundCarriageways,
@@ -12386,7 +12441,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     filename: 'city.sites.json',
     locations: {},
     name: 'city.sites.json',
-    parkingSpots: sampleSiteSpots(parkingSpots),
+    // (each spot's turn the other way round: the game reads a site's
+    // rotation mirrored from ours, its parked cars sat across their bays,
+    // our own stall lines being drawn from ours)
+    parkingSpots: sampleSiteSpots(parkingSpots).map((sp) => ({ ...sp, rot: siteRotation(sp.rot) })),
     zones: roadNameZones,
   }));
 

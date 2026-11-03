@@ -48,6 +48,8 @@ export const PROP_SHAPES = {
   poleWoodTall: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/powerpole4.dae' },
   poleSteel: { shapeFile: '/levels/johnson_valley/art/shapes/power_lines/metal_pole.dae' },
   poleLamp: { shapeFile: '/levels/east_coast_usa/art/shapes/buildings/electrical_pole_lamp.dae' },
+  // a sign's post (West Coast USA's, 2.4 m, 0.43 of it below ground)
+  signPost: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/pole_fence2.dae' },
   // a clipped hedge piece (Italy's): 2.3 m along local X, centred, 0.85 m
   // deep, 1.64 m tall; laid end to end along barrier=hedge
   hedge: { shapeFile: '/levels/italy/art/shapes/trees/trees_italy/cypress_hedge_3m.dae' },
@@ -142,8 +144,10 @@ export const BARRIER_SHAPES = {
 // local -Y, like East Coast USA's and the Vienna-convention set. (Paths
 // written out in full: the material generator reads quoted shapeFile lines.)
 export const US_SIGN_SHAPES = {
-  speed5: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/sign_speed5.dae' },
-  speed25: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/sign_speed25.dae' },
+  // (West Coast's 5 and 25 mph are bare plates, 1 m tall round their middle:
+  // on their post, as that level mounts them, the plate 1.4 m up it)
+  speed5: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/sign_speed5.dae', post: 'signPost', plateZ: 1.4 },
+  speed25: { shapeFile: '/levels/west_coast_usa/art/shapes/objects/sign_speed25.dae', post: 'signPost', plateZ: 1.4 },
   speed30: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_30_speed_limit.DAE' },
   speed60: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_60_speed_limit.DAE' },
   speed70: { shapeFile: '/levels/Utah/art/shapes/ut_roadsigns/ut_70_speed_limit.DAE' },
