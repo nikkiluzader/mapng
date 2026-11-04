@@ -9,7 +9,7 @@ Real-world maps for BeamNG.drive.
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.x-38bdf8?style=flat-square&logo=tailwindcss)](https://tailwindcss.com/)
 [![Cloudflare Workers](https://img.shields.io/badge/Deployed-Cloudflare%20Workers-f38020?style=flat-square&logo=cloudflare)](https://workers.cloudflare.com/)
 
-[mapng.com](https://mapng.com/)
+[mapng.com](https://mapng.com/) · [Download MapNG Desktop for Windows and Linux](https://github.com/nikkiluzader/mapng/releases/latest)
 
 </div>
 
@@ -18,6 +18,18 @@ Real-world maps for BeamNG.drive.
 MapNG turns any real-world location into a playable BeamNG.drive level. Pick a place, choose an elevation source, generate the terrain, check it in the 3D preview, and export a level ZIP with real terrain, textured buildings, roads with lane markings and traffic signals, sidewalks, bridges, regional trees and AI traffic. You can also export GeoTIFF and GeoJSON data, and batch mode processes whole grids of tiles.
 
 It is built for driving and modding, not survey-grade reconstruction. The result depends on the elevation source and on how well OpenStreetMap covers the area.
+
+## MapNG Desktop (Windows and Linux)
+
+The same MapNG, running on your own computer. Free, from [GitHub Releases](https://github.com/nikkiluzader/mapng/releases/latest): `MapNG-Setup-<version>.exe` for Windows, `MapNG-<version>-x86_64.AppImage` for Linux.
+
+- **Big and dense maps.** No browser memory limit: generating and exporting run in their own processes and use every CPU core. A dense 8 km Manhattan level that took 34 minutes at the start of the desktop work exports in under 5 minutes.
+- **Straight into the game.** Levels are saved directly into BeamNG.drive's `mods` folder (found automatically, or pick it), ready to drive.
+- **My Levels.** A sidebar lists the MapNG levels in your mods folder, with their size, date and MapNG version. **Rebuild** remakes a level with the current version from the terrain and OpenStreetMap data it was made from, offline and with the same settings, so it gets every fix since. Levels from before the desktop app are rebuilt by fetching their area again.
+- **Updates with your consent.** MapNG asks once whether to check for updates, and asks again before it downloads or installs one.
+- Cancel an export, see why one failed and open its log, taskbar progress, and a notification when a long export finishes.
+
+The Windows build isn't code-signed yet: on first run Windows SmartScreen may say it "protected your PC". Choose **More info**, then **Run anyway**.
 
 ## Highlights
 
@@ -28,14 +40,24 @@ It is built for driving and modding, not survey-grade reconstruction. The result
 - **Buildings** textured with BeamNG's own facades and roofs
 - **Roads:** DecalRoads with real surfaces, lane markings by country, crosswalks, stop bars, parking lanes and shoulders; roads on the 30 m source are smoothed and levelled automatically
 - **Street detail:** traffic signals per approach, road signs, street lamps that light up at night, raised sidewalks with curb returns and ramps, median islands on divided roads, hydrants, bins, benches, utility poles and power lines
-- **Bridges** with solved decks, piers and graded abutments
+- **Bridges and tunnels** solved as one network with the roads and terrain: styled bridges (trusses, arches, suspension), lidar deck heights in the US, tunnel portals and lights
+- **Venues:** racetracks with kerbs, walls and catch fences, sports grounds with surfaces, markings and seating, swimming pools and fountains, floodlights
 - **AI traffic** on the road network, road names on the minimap, fuel stations
 - **OpenStreetMap data** from MapNG's own copy for the regions it hosts (fast and independent of Overpass outages), health-ranked Overpass mirrors elsewhere, or your own Overpass server
 - **Batch mode** for tile grids up to 20×20, or a combined level stitched from a 2×2, 4×4 or 8×8 grid
 - Live progress with finished steps and timings, and a detailed `export_report.txt` in every level for troubleshooting
 - 7 languages, light and dark mode
 
-## What's New (October 2026)
+## What's New (November 2026)
+
+- **MapNG Desktop** for Windows and Linux (see above)
+- **Much faster dense exports:** buildings, sidewalk tops and outlines and the level's shape files are built on worker threads; shared vertices are written once (41% fewer in a dense city), and hot spots that compared everything with everything now use grids. Output is unchanged.
+- **Big cities load and draw properly:** dense 8 km levels ran out of BeamNG's GPU geometry pool, which showed as smeared "rainbow" slabs and black materials. Sidewalks are now split into tiles like the buildings, and every shape is lighter
+- **No more crash on load** when an area's trees reached past the map's edge (they piled up in one corner and crashed BeamNG's forest loader)
+- Every level now carries `mapng.json` (MapNG version, area, size and settings), so the desktop app can recognise and rebuild it
+- The website and the desktop app read MapNG's own OpenStreetMap tiles in hosted regions; trees scattered in woods come out the same on every export
+
+## What Was New (October 2026)
 
 - **BeamNG 0.40:** exports point at 0.40's asset locations
 - **Your own OSM data:** MapNG serves its own compact OpenStreetMap archive from Cloudflare R2 for hosted regions (Arizona, Utah and Florida so far), with a map toggle that outlines its coverage. Elsewhere, Overpass mirrors are health-ranked with an edge cache, you can plug in your own Overpass server, and a banner tells you when the public servers are down
@@ -54,7 +76,7 @@ It is built for driving and modding, not survey-grade reconstruction. The result
 
 ## Important Notes
 
-- Large exports (`8192` and `16384`) are heavy on browser memory; a desktop browser with plenty of RAM is recommended.
+- Large and dense exports (`4096` and up, or any big city) are heavy on browser memory: use [MapNG Desktop](https://github.com/nikkiluzader/mapng/releases/latest), which has no browser limit and uses every core.
 - OSM coverage varies by area: missing or mistagged OSM data shows up as missing or odd roads, buildings and features.
 - At very small processing scales (for example `0.25 m/px`), small geospatial alignment differences can become visible near tile edges.
 - MapNG outputs are a strong starting point. If you plan to publish to community mod sites, please do additional editing, world-building, optimization and QA first.
@@ -121,13 +143,27 @@ Open `http://localhost:5173`.
 npm run build
 ```
 
+### Desktop app (development)
+
+The desktop app lives in `desktop/` (Electron). It loads the built page, and runs Generate Data and the level export in a bundled Node runtime.
+
+```bash
+npm run build                 # the page (dist/)
+cd desktop
+npm install
+npm start                     # run it from the repo
+npm run pack:win              # or pack:linux: stage the runner and Node, then package
+```
+
+Releases are built by `.github/workflows/desktop-release.yml` when a `vX.Y.Z` tag matching `desktop/package.json` is pushed. They go to a draft GitHub Release, which is published by hand.
+
 ## Typical Workflow
 
 1. Pick a location on the map or search by name.
 2. Choose an output size, a processing scale (m/px) and an elevation source.
 3. Keep Include OSM Features on for roads, buildings, vegetation and everything built from them (turn on Show MapNG OSM coverage to see where MapNG has its own copy).
 4. Generate the terrain and check it in the 3D preview.
-5. Export the BeamNG level and unzip it into your BeamNG.drive `levels` folder.
+5. Export the BeamNG level and put the ZIP in your BeamNG.drive `mods` folder (the desktop app saves it there for you).
 6. For larger areas, switch to Batch Job mode and process a tile grid, or stitch one into a combined level.
 
 ## BeamNG Level Export
@@ -139,6 +175,7 @@ The level ZIP contains:
 - textured buildings, bridges, sidewalks with curbs, median islands and power lines as BeamNG shapes
 - DecalRoads with markings, crosswalks and stop bars, traffic signals, road signs, street lamps, hydrants, bins and benches
 - an AI road network, road names for the minimap, fuel stations and a surrounding backdrop
+- `mapng.json`: the MapNG version, area, size and settings it was made with
 - `export_report.txt`, a detailed diagnostics report (terrain, roads, every bridge, buildings, street furniture, vegetation, terrain materials and the export's console log), useful when asking for help
 
 ## License

@@ -12,11 +12,14 @@ directories:
   output: release
   buildResources: assets
 icon: assets/icon.png
+# (every module main.js imports: a missing one crashes the packaged app at
+# start, where development runs from the folder and never notices)
 files:
   - main.js
   - preload.cjs
   - modsFolder.js
   - updater.js
+  - levelLibrary.js
   - package.json
 extraResources:
   - from: ../dist

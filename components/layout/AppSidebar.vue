@@ -72,7 +72,7 @@
           <Moon v-else :size="14" />
         </BaseButton>
       </div>
-      <span v-if="desktopVersion" class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.desktopBuild', { version: desktopVersion }) }} · {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</span>
+      <span v-if="desktopVersion" class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.desktopBuild', { version: desktopVersion }) }} · {{ t('sidebar.build', { hash: ownBuild.hash, time: ownBuild.time }) }}</span>
       <span v-else-if="isProductionHost" class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Main: {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</span>
       <span v-else class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Dev: {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</span>
     </div>
@@ -94,6 +94,12 @@ const locales = computed(() => getSupportedLocales());
 
 // (the desktop app names its version instead of the site's build)
 const desktopVersion = ref(null);
+// (the build this app was made from, not the site's deployed branches)
+/* global __BUILD_HASH__, __BUILD_TIME__ */
+const ownBuild = {
+  hash: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : 'n/a',
+  time: typeof __BUILD_TIME__ !== 'undefined' ? new Date(__BUILD_TIME__).toLocaleString() : 'n/a',
+};
 onMounted(async () => {
   if (!desktopApp) return;
   try { desktopVersion.value = (await desktopApp.info())?.version || null; } catch { /* none */ }
