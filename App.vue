@@ -196,6 +196,7 @@
     <LevelsSidebar v-if="desktopApp" ref="levelsSidebar" @show-on-map="handleShowLevelOnMap" @modify="handleModifyLevel" />
     <DesktopWelcome v-if="desktopApp" />
     <HotspotsPrivacy />
+    <ReportDialog v-if="desktopApp" />
   </div>
   </div>
 
@@ -249,6 +250,8 @@ import AppSidebar from './components/layout/AppSidebar.vue';
 import LevelsSidebar from './components/layout/LevelsSidebar.vue';
 import DesktopWelcome from './components/modals/DesktopWelcome.vue';
 import HotspotsPrivacy from './components/modals/HotspotsPrivacy.vue';
+import ReportDialog from './components/modals/ReportDialog.vue';
+import { openReportDialog, logPathFrom } from './composables/useReportDialog.js';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import { createGenerationProgress } from './services/generationProgress.js';
@@ -533,12 +536,24 @@ const setBatchMode = (value) => {
 };
 
 // Attempt to get user location on load
-onMounted(() => {
+// (desktop app: after a crash, the offer to send its report; Help -> Report a
+// Problem opens the dialog with the current area)
+let stopReportMenu = null;
+onMounted(async () => {
   window.addEventListener('keydown', handleGlobalDevToggleKey);
-
+  if (desktopApp?.onOpenReport) {
+    stopReportMenu = desktopApp.onOpenReport(({ kind } = {}) => openReportDialog(kind || 'manual', {
+      area: { lat: center.value.lat, lng: center.value.lng, resolution: resolution.value, metersPerPixel: Number(processingMetersPerPixel.value || 1) },
+    }));
+  }
+  try {
+    const crashed = await desktopApp?.pendingCrash?.();
+    if (crashed) openReportDialog('crash', { error: crashed.error || '' });
+  } catch { /* none */ }
 });
 
 onUnmounted(() => {
+  stopReportMenu?.();
   window.removeEventListener('keydown', handleGlobalDevToggleKey);
 });
 
@@ -912,7 +927,15 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     }
     console.error("Failed to generate terrain:", error);
     const byodMessage = String(error?.message || '');
-    if (byodMessage) {
+    if (desktopApp?.prepareReport && !uploadedElevationFile.value) {
+      // (the desktop app: the reason, and the offer to send a report with the job's log)
+      const message = byodMessage.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') || t('app.error.fetchTerrain');
+      openReportDialog('generate', {
+        error: message,
+        logPath: logPathFrom(message),
+        area: { lat: center.value.lat, lng: center.value.lng, resolution: resolution.value, metersPerPixel: Number(processingMpp || 1) },
+      });
+    } else if (byodMessage) {
       alert(byodMessage);
     } else {
       alert(t('app.error.fetchTerrain'));

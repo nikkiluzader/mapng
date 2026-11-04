@@ -53,7 +53,7 @@ test('every worker module the services start is staged beside the runner', () =>
 test('the desktop main process and runners compile', async () => {
   const { spawnSync } = await import('node:child_process');
   const root = new URL('../desktop/', import.meta.url).pathname;
-  const files = ['main.js', 'updater.js', 'levelLibrary.js', 'modsFolder.js',
+  const files = ['main.js', 'updater.js', 'levelLibrary.js', 'modsFolder.js', 'crashReports.js', 'reportScrub.js',
     ...fs.readdirSync(path.join(root, 'runner')).filter((f) => f.endsWith('.mjs')).map((f) => `runner/${f}`)];
   for (const f of files) {
     const r = spawnSync(process.execPath, ['--check', path.join(root, f)], { encoding: 'utf8' });

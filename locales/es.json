@@ -972,5 +972,36 @@
       "close": "Entendido",
       "readMore": "Leer todos los detalles: datos exactos, proceso y código"
     }
+  },
+  "report": {
+    "title_crash": "MapNG se cerró inesperadamente",
+    "title_export": "La exportación falló",
+    "title_generate": "No se pudo generar el terreno",
+    "title_rebuild": "La actualización falló",
+    "title_manual": "Informar de un problema",
+    "intro": "¿Enviar un informe para ayudar a solucionarlo? Llega en privado al desarrollador de MapNG, y no se envía nada a menos que elijas Enviar.",
+    "describe": "¿Qué estabas haciendo? (opcional)",
+    "describeManual": "¿Qué salió mal?",
+    "includeArea": "Incluir la ubicación del mapa ({lat}, {lng}) para poder reproducir el problema",
+    "preparing": "Preparando el informe…",
+    "whatsIncluded": "Qué incluye",
+    "incApp": "MapNG {version}",
+    "incSystem": "Tu sistema: {os}, {ram} GB de memoria, {cpus} hilos de CPU",
+    "incError": "El mensaje de error",
+    "incLog": "El registro del trabajo ({kb} KB; su final aparece abajo)",
+    "incOptions": "Los ajustes de exportación",
+    "incDump": "Una instantánea del fallo ({kb} KB): parte de lo que MapNG tenía en memoria al fallar, que muestra dónde falló. Puede incluir cosas como rutas de archivos.",
+    "incArea": "La ubicación y el tamaño del mapa",
+    "incDescription": "Lo que escribiste",
+    "incNever": "Nunca se incluye: tu nombre o cuenta, tus archivos, el propio nivel ni nada más de tu ordenador.",
+    "privacy": "Cómo se guardan y usan los informes",
+    "send": "Enviar informe",
+    "dontSend": "No enviar",
+    "sent": "Informe enviado. ¡Gracias!",
+    "sentHint": "Menciona este ID en Discord o GitHub si quieres una respuesta.",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "done": "Listo",
+    "sendReport": "Enviar informe"
   }
 }

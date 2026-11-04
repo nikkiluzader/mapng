@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>MapNG Reports</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root { --bg:#f7f7f8; --surface:#fff; --border:#e3e3e8; --text:#1d1d22; --muted:#6e6e7a; --brand:#ff6600; --code:#f2f2f4; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#111114; --surface:#1a1a1f; --border:#2e2e36; --text:#ececf0; --muted:#9a9aa6; --brand:#ff7a1f; --code:#222229; } }
+  :root[data-theme="dark"] { --bg:#111114; --surface:#1a1a1f; --border:#2e2e36; --text:#ececf0; --muted:#9a9aa6; --brand:#ff7a1f; --code:#222229; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:1100px; margin:0 auto; padding:16px; }
+  h1 { font-size:20px; margin:8px 0 12px; }
+  .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  input { padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); min-width:240px; }
+  button { padding:6px 12px; border:0; border-radius:6px; background:var(--brand); color:#fff; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--brand); border:1px solid var(--border); }
+  .muted { color:var(--muted); }
+  .table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:8px; background:var(--surface); }
+  table { border-collapse:collapse; width:100%; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  tr.r { cursor:pointer; } tr.r:hover td { background:var(--code); }
+  tr.sel td { background:var(--code); }
+  td.err { max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  pre { background:var(--code); border-radius:8px; padding:12px; overflow:auto; max-height:420px; font-size:12px; }
+  .detail { margin-top:14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MapNG reports</h1>
+  <div class="bar">
+    <input id="token" type="password" placeholder="Admin token" autocomplete="off">
+    <button id="load">Load reports</button>
+    <span id="status" class="muted"></span>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Received</th><th>ID</th><th>Kind</th><th>Version</th><th>System</th><th>Error</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="6" class="muted">Enter the admin token (the CRASH_ADMIN_TOKEN secret) to see reports.</td></tr></tbody>
+  </table></div>
+  <div id="detail"></div>
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  try { $('token').value = localStorage.getItem('mapng_crash_token') || ''; } catch {}
+  const auth = () => ({ Authorization: `Bearer ${$('token').value.trim()}` });
+  let reports = [];
+  async function load() {
+    try { localStorage.setItem('mapng_crash_token', $('token').value.trim()); } catch {}
+    $('status').textContent = 'Loading…';
+    const r = await fetch('/api/crash/list?limit=200', { headers: auth() });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { $('status').textContent = d.error || `HTTP ${r.status}`; return; }
+    reports = d.reports || [];
+    $('status').textContent = `${reports.length} of ${d.total} report(s)`;
+    $('rows').innerHTML = reports.length ? reports.map((x, i) => `<tr class="r" data-i="${i}"><td>${esc(x.receivedAt?.replace('T', ' ').slice(0, 19))}</td><td>${esc(x.id)}</td><td>${esc(x.kind)}</td><td>${esc(x.appVersion)}</td><td>${esc(x.os || x.platform)}</td><td class="err" title="${esc(x.error)}">${esc(x.error || x.description)}</td></tr>`).join('') : '<tr><td colspan="6" class="muted">No reports yet.</td></tr>';
+    document.querySelectorAll('tr.r').forEach((tr) => tr.addEventListener('click', () => show(Number(tr.dataset.i))));
+    const wanted = location.hash.slice(1);
+    const i = reports.findIndex((x) => x.id === wanted);
+    if (i >= 0) show(i);
+  }
+  async function file(key, name) {
+    const r = await fetch(`/api/crash/file?key=${encodeURIComponent(key)}`, { headers: auth() });
+    if (!r.ok) { alert(`Could not load ${name}`); return null; }
+    return r;
+  }
+  async function show(i) {
+    const x = reports[i];
+    document.querySelectorAll('tr.r').forEach((tr) => tr.classList.toggle('sel', Number(tr.dataset.i) === i));
+    history.replaceState(null, '', `#${x.id}`);
+    $('detail').innerHTML = `<div class="detail"><h2 style="font-size:16px;margin:0 0 8px">${esc(x.id)} · ${esc(x.kind)} · MapNG ${esc(x.appVersion)}</h2>
+      <div class="bar">${x.hasLog ? '<button class="ghost" id="log">Show log</button>' : ''}${x.hasDump ? '<button class="ghost" id="dmp">Download crash dump</button>' : ''}</div>
+      <pre>${esc(JSON.stringify(x, null, 2))}</pre><pre id="logtext" hidden></pre></div>`;
+    $('log')?.addEventListener('click', async () => { const r = await file(`${x.key}log.txt`, 'the log'); if (r) { $('logtext').textContent = await r.text(); $('logtext').hidden = false; } });
+    $('dmp')?.addEventListener('click', async () => { const r = await file(`${x.key}crash.dmp`, 'the crash dump'); if (r) { const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = `${x.id}.dmp`; a.click(); } });
+  }
+  $('load').addEventListener('click', load);
+  $('token').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+  if ($('token').value) load();
+</script>
+</body>
+</html>

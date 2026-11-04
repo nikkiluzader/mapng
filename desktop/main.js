@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findModsFolder } from './modsFolder.js';
 import { listMapngLevels, readZipFile } from './levelLibrary.js';
 import { startUpdater } from './updater.js';
+import { pendingCrash, prepareReport, sendReport, startCrashReporter } from './crashReports.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const API_ORIGIN = process.env.MAPNG_API_ORIGIN || 'https://mapng.com';
@@ -112,6 +113,14 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) shell.openExternal(url);
     return { action: 'deny' };
+  });
+  // the page crashed or ran out of memory: reload it (at most once a minute,
+  // so a crash on load can't loop), and the reloaded page offers a report
+  let lastReload = 0;
+  win.webContents.on('render-process-gone', (_event, details) => {
+    if (details.reason === 'clean-exit' || details.reason === 'killed') return;
+    lastWindowCrash = { reason: details.reason, exitCode: details.exitCode, at: Date.now() };
+    if (Date.now() - lastReload > 60_000 && !win.isDestroyed()) { lastReload = Date.now(); win.loadURL('app://mapng/'); }
   });
   win.loadURL('app://mapng/');
   return win;
@@ -801,7 +810,9 @@ function buildMenu(updater) {
         { label: 'Check for Updates Automatically', type: 'checkbox', checked: updater.enabled(), click: (item) => updater.setEnabled(item.checked) },
         { type: 'separator' },
         { label: 'Export Logs Folder', click: () => { fs.mkdirSync(JOBS(), { recursive: true }); shell.openPath(JOBS()); } },
-        { label: 'Report a Problem', click: () => shell.openExternal(`${REPO}/issues`) },
+        // (the report dialog in the window: what's included is shown, nothing sent without Send)
+        { label: 'Report a Problem…', click: (_item, win) => (win || BrowserWindow.getAllWindows()[0])?.webContents.send('report:open', { kind: 'manual' }) },
+        { label: 'Open an Issue on GitHub', click: () => shell.openExternal(`${REPO}/issues`) },
         { label: 'Release Notes', click: () => shell.openExternal(`${REPO}/releases`) },
         { type: 'separator' },
         {
@@ -820,6 +831,28 @@ function buildMenu(updater) {
 
 // one window: a second launch brings the first one forward
 if (!app.requestSingleInstanceLock()) app.quit();
+// crash dumps kept on this computer (never uploaded by Electron itself): the
+// next start offers to send one, if the user agrees (crashReports.js)
+startCrashReporter();
+
+// ---- crash and problem reports: prepared, shown, sent only on Send ---------
+// (this run's window crash, if any: some crashes, like running out of memory, leave no dump)
+let lastWindowCrash = null;
+const windowCrashText = (c) => `The MapNG window stopped (${c.reason}, exit code ${c.exitCode}).`;
+ipcMain.handle('report:pending', () => {
+  const p = pendingCrash(readSettings());
+  if (p) return { count: p.count, at: new Date(p.latest.mtime).toISOString(), error: lastWindowCrash ? windowCrashText(lastWindowCrash) : '' };
+  return lastWindowCrash ? { count: 1, at: new Date(lastWindowCrash.at).toISOString(), error: windowCrashText(lastWindowCrash) } : null;
+});
+ipcMain.handle('report:prepare', (_event, kind, ctx = {}) => prepareReport(String(kind), ctx, { build: String(ctx.build || ''), settings: readSettings() }));
+ipcMain.handle('report:send', async (_event, token, choices = {}) => {
+  const result = await sendReport(String(token), choices, API_ORIGIN);
+  if (choices.kind === 'crash') { writeSettings({ crashSeenAt: Date.now() }); lastWindowCrash = null; }
+  return result;
+});
+// (the user chose not to send a crash report: not asked again for that crash)
+ipcMain.handle('report:dismiss', (_event, kind) => { if (kind === 'crash') { writeSettings({ crashSeenAt: Date.now() }); lastWindowCrash = null; } });
+
 // (the gaming GPU, not integrated graphics, on laptops that have both: the 3D
 // preview is drawn with WebGL; the preview also asks for it, Preview3D.vue)
 app.commandLine.appendSwitch('force_high_performance_gpu');

@@ -55,4 +55,15 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
     return ipcRenderer.invoke('levels:rebuild', zipName, levelName).finally(() => ipcRenderer.removeListener('levels:progress', listener));
   },
   cancelRebuild: (levelName) => ipcRenderer.invoke('levels:cancel', levelName),
+  // crash and problem reports (desktop/crashReports.js): pending crash on start,
+  // prepare (returns what would be sent), send (only on the user's Send), dismiss
+  pendingCrash: () => ipcRenderer.invoke('report:pending'),
+  prepareReport: (kind, ctx) => ipcRenderer.invoke('report:prepare', kind, ctx),
+  sendReport: (token, choices) => ipcRenderer.invoke('report:send', token, choices),
+  dismissReport: (kind) => ipcRenderer.invoke('report:dismiss', kind),
+  onOpenReport: (callback) => {
+    const listener = (_event, request) => callback(request);
+    ipcRenderer.on('report:open', listener);
+    return () => ipcRenderer.removeListener('report:open', listener);
+  },
 });

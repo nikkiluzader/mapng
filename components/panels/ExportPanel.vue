@@ -223,6 +223,10 @@
               <button v-if="beamNGDesktopFailed.logPath" type="button" class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="showDesktopExportLog">
                 <FileText :size="11" />{{ t('exportPanel.desktopShowLog') }}
               </button>
+              <!-- (a report with this export's log and settings, after the user sees what's in it) -->
+              <button type="button" class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="reportDesktopExportFailure">
+                <LifeBuoy :size="11" />{{ t('report.sendReport') }}
+              </button>
             </div>
           </div>
 
@@ -568,7 +572,7 @@ import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy
 } from 'lucide-vue-next';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
@@ -586,6 +590,7 @@ import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
+import { openReportDialog } from '../../composables/useReportDialog.js';
 import { estimateLevelWeight } from '../../services/levelWeight.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
@@ -746,6 +751,14 @@ const beamNGDesktopFailed = ref(null);   // { message, logPath }
 let desktopExportAbort = null;
 const cancelDesktopExport = () => desktopExportAbort?.abort();
 const showDesktopExportLog = () => desktopApp?.showItem(beamNGDesktopFailed.value?.logPath);
+// (the last export's options, for a report about it)
+let lastExportOptions = null;
+const reportDesktopExportFailure = () => openReportDialog('export', {
+  error: beamNGDesktopFailed.value?.message || '',
+  logPath: beamNGDesktopFailed.value?.logPath || null,
+  options: lastExportOptions,
+  area: { lat: props.center?.lat, lng: props.center?.lng, resolution: props.terrainData?.width, metersPerPixel: resolveProcessingMetersPerPixel(props.terrainData) },
+});
 const showDesktopSavedLevel = () => desktopApp?.showItem(beamNGDesktopSaved.value?.path);
 const changeDesktopModsFolder = () => desktopApp?.chooseModsFolder();
 
@@ -1841,6 +1854,7 @@ const handleBeamNGLevelExport = async () => {
     };
 
     if (desktopApp) {
+      lastExportOptions = Object.fromEntries(Object.entries(levelOptions).filter(([, v]) => typeof v !== 'function'));
       desktopExportAbort = new AbortController();
       const saved = await exportLevelOnDesktop(td, props.center, levelOptions, { signal: desktopExportAbort.signal });
       if (saved?.cancelled) return;

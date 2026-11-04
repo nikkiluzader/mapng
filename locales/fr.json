@@ -972,5 +972,36 @@
       "close": "Compris",
       "readMore": "Lire tous les détails : données exactes, fonctionnement et code"
     }
+  },
+  "report": {
+    "title_crash": "MapNG s'est fermé de façon inattendue",
+    "title_export": "L'export a échoué",
+    "title_generate": "La génération du terrain a échoué",
+    "title_rebuild": "La mise à jour a échoué",
+    "title_manual": "Signaler un problème",
+    "intro": "Envoyer un rapport pour aider à corriger cela ? Il est envoyé en privé au développeur de MapNG, et rien n'est envoyé tant que vous ne choisissez pas Envoyer.",
+    "describe": "Que faisiez-vous ? (facultatif)",
+    "describeManual": "Qu'est-ce qui n'a pas marché ?",
+    "includeArea": "Inclure l'emplacement de la carte ({lat}, {lng}) pour pouvoir reproduire le problème",
+    "preparing": "Préparation du rapport…",
+    "whatsIncluded": "Ce qui est inclus",
+    "incApp": "MapNG {version}",
+    "incSystem": "Votre système : {os}, {ram} Go de mémoire, {cpus} threads",
+    "incError": "Le message d'erreur",
+    "incLog": "Le journal de la tâche ({kb} Ko ; la fin est affichée ci-dessous)",
+    "incOptions": "Les réglages d'export",
+    "incDump": "Un instantané du plantage ({kb} Ko) : une partie de ce que MapNG avait en mémoire au moment du plantage, qui montre où il a échoué. Il peut contenir par exemple des chemins de fichiers.",
+    "incArea": "L'emplacement et la taille de la carte",
+    "incDescription": "Ce que vous avez écrit",
+    "incNever": "Jamais inclus : votre nom ou compte, vos fichiers, le niveau lui-même, ni rien d'autre sur votre ordinateur.",
+    "privacy": "Comment les rapports sont stockés et utilisés",
+    "send": "Envoyer le rapport",
+    "dontSend": "Ne pas envoyer",
+    "sent": "Rapport envoyé. Merci !",
+    "sentHint": "Mentionnez cet identifiant sur Discord ou GitHub si vous souhaitez une réponse.",
+    "copy": "Copier",
+    "copied": "Copié",
+    "done": "Terminé",
+    "sendReport": "Envoyer un rapport"
   }
 }

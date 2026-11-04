@@ -971,5 +971,36 @@
       "close": "Ho capito",
       "readMore": "Leggi tutti i dettagli: dati esatti, processo e codice"
     }
+  },
+  "report": {
+    "title_crash": "MapNG si è chiuso inaspettatamente",
+    "title_export": "L'esportazione non è riuscita",
+    "title_generate": "La generazione del terreno non è riuscita",
+    "title_rebuild": "L'aggiornamento non è riuscito",
+    "title_manual": "Segnala un problema",
+    "intro": "Inviare una segnalazione per aiutare a risolverlo? Arriva in privato allo sviluppatore di MapNG, e non viene inviato nulla finché non scegli Invia.",
+    "describe": "Cosa stavi facendo? (facoltativo)",
+    "describeManual": "Cosa è andato storto?",
+    "includeArea": "Includi la posizione della mappa ({lat}, {lng}) per poter riprodurre il problema",
+    "preparing": "Preparazione della segnalazione…",
+    "whatsIncluded": "Cosa è incluso",
+    "incApp": "MapNG {version}",
+    "incSystem": "Il tuo sistema: {os}, {ram} GB di memoria, {cpus} thread CPU",
+    "incError": "Il messaggio di errore",
+    "incLog": "Il log del lavoro ({kb} KB; la fine è mostrata sotto)",
+    "incOptions": "Le impostazioni di esportazione",
+    "incDump": "Un'istantanea del crash ({kb} KB): parte di ciò che MapNG aveva in memoria al momento del crash, che mostra dove si è bloccato. Può includere ad esempio percorsi di file.",
+    "incArea": "Posizione e dimensione della mappa",
+    "incDescription": "Ciò che hai scritto",
+    "incNever": "Mai inclusi: il tuo nome o account, i tuoi file, il livello stesso o altro sul tuo computer.",
+    "privacy": "Come vengono conservate e usate le segnalazioni",
+    "send": "Invia segnalazione",
+    "dontSend": "Non inviare",
+    "sent": "Segnalazione inviata. Grazie!",
+    "sentHint": "Cita questo ID su Discord o GitHub se vuoi una risposta.",
+    "copy": "Copia",
+    "copied": "Copiato",
+    "done": "Fatto",
+    "sendReport": "Invia segnalazione"
   }
 }

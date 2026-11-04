@@ -147,6 +147,12 @@
           <p v-if="messages[level.levelName]" class="text-[10px] leading-snug" :class="messages[level.levelName].error ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'">
             {{ messages[level.levelName].text }}
           </p>
+          <button
+            v-if="messages[level.levelName]?.error"
+            type="button"
+            class="text-[10px] text-[#FF6600] hover:underline"
+            @click="openReportDialog('rebuild', { error: messages[level.levelName].text, area: level.center ? { lat: level.center.lat, lng: level.center.lng, resolution: level.resolution, metersPerPixel: level.metersPerPixel } : null })"
+          >{{ t('report.sendReport') }}</button>
         </div>
       </div>
     </div>
@@ -158,6 +164,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { FolderOpen, Hammer, HardDrive, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
+import { openReportDialog } from '../../composables/useReportDialog.js';
 
 defineEmits(['show-on-map', 'modify']);
 const { t, locale } = useI18n();

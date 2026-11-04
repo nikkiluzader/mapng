@@ -971,5 +971,36 @@
       "close": "Verstanden",
       "readMore": "Alle Details lesen: genaue Daten, Ablauf und Code"
     }
+  },
+  "report": {
+    "title_crash": "MapNG wurde unerwartet beendet",
+    "title_export": "Der Export ist fehlgeschlagen",
+    "title_generate": "Das Gelände konnte nicht erzeugt werden",
+    "title_rebuild": "Die Aktualisierung ist fehlgeschlagen",
+    "title_manual": "Problem melden",
+    "intro": "Einen Bericht senden, um das zu beheben? Er geht privat an den MapNG-Entwickler, und es wird nichts gesendet, solange du nicht auf Senden klickst.",
+    "describe": "Was hast du gerade gemacht? (optional)",
+    "describeManual": "Was ist schiefgelaufen?",
+    "includeArea": "Den Ort der Karte ({lat}, {lng}) mitsenden, damit sich das Problem nachstellen lässt",
+    "preparing": "Bericht wird zusammengestellt…",
+    "whatsIncluded": "Was enthalten ist",
+    "incApp": "MapNG {version}",
+    "incSystem": "Dein System: {os}, {ram} GB Speicher, {cpus} CPU-Threads",
+    "incError": "Die Fehlermeldung",
+    "incLog": "Das Protokoll des Auftrags ({kb} KB; das Ende steht unten)",
+    "incOptions": "Die Export-Einstellungen",
+    "incDump": "Ein Absturz-Abbild ({kb} KB): ein Teil dessen, was MapNG beim Absturz im Speicher hatte; es zeigt, wo es fehlschlug. Es kann z. B. Dateipfade enthalten.",
+    "incArea": "Ort und Größe der Karte",
+    "incDescription": "Was du geschrieben hast",
+    "incNever": "Nie enthalten: dein Name oder Konto, deine Dateien, das Level selbst oder sonst etwas auf deinem Computer.",
+    "privacy": "Wie Berichte gespeichert und genutzt werden",
+    "send": "Bericht senden",
+    "dontSend": "Nicht senden",
+    "sent": "Bericht gesendet. Danke!",
+    "sentHint": "Nenne diese ID auf Discord oder GitHub, wenn du eine Antwort dazu möchtest.",
+    "copy": "Kopieren",
+    "copied": "Kopiert",
+    "done": "Fertig",
+    "sendReport": "Bericht senden"
   }
 }

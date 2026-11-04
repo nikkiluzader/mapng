@@ -1032,5 +1032,36 @@
       "close": "Got it",
       "readMore": "Read the full details: exact data, pipeline and code"
     }
+  },
+  "report": {
+    "title_crash": "MapNG closed unexpectedly",
+    "title_export": "The export failed",
+    "title_generate": "Generating the terrain failed",
+    "title_rebuild": "The update failed",
+    "title_manual": "Report a problem",
+    "intro": "Send a report to help fix it? It goes privately to the MapNG developer, and nothing is sent unless you choose Send.",
+    "describe": "What were you doing? (optional)",
+    "describeManual": "What went wrong?",
+    "includeArea": "Include the map's location ({lat}, {lng}) so the problem can be reproduced",
+    "preparing": "Putting the report together…",
+    "whatsIncluded": "What's included",
+    "incApp": "MapNG {version}",
+    "incSystem": "Your system: {os}, {ram} GB memory, {cpus} CPU threads",
+    "incError": "The error message",
+    "incLog": "The job's log ({kb} KB; its end is shown below)",
+    "incOptions": "The export settings",
+    "incDump": "A crash snapshot ({kb} KB): part of what MapNG had in memory when it crashed, which shows where it failed. It can include things like file paths.",
+    "incArea": "The map's location and size",
+    "incDescription": "What you wrote",
+    "incNever": "Never included: your name or account, your files, the level itself, or anything else on your computer.",
+    "privacy": "How reports are stored and used",
+    "send": "Send report",
+    "dontSend": "Don't send",
+    "sent": "Report sent. Thank you!",
+    "sentHint": "Mention this ID on Discord or GitHub if you'd like an answer about it.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "done": "Done",
+    "sendReport": "Send report"
   }
 }

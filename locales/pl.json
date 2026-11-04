@@ -971,5 +971,36 @@
       "close": "Rozumiem",
       "readMore": "Przeczytaj wszystkie szczegóły: dokładne dane, przepływ i kod"
     }
+  },
+  "report": {
+    "title_crash": "MapNG nieoczekiwanie się zamknął",
+    "title_export": "Eksport się nie powiódł",
+    "title_generate": "Nie udało się wygenerować terenu",
+    "title_rebuild": "Aktualizacja się nie powiodła",
+    "title_manual": "Zgłoś problem",
+    "intro": "Wysłać zgłoszenie, aby pomóc to naprawić? Trafia prywatnie do twórcy MapNG i nic nie zostanie wysłane, dopóki nie wybierzesz Wyślij.",
+    "describe": "Co robiłeś? (opcjonalnie)",
+    "describeManual": "Co poszło nie tak?",
+    "includeArea": "Dołącz lokalizację mapy ({lat}, {lng}), aby można było odtworzyć problem",
+    "preparing": "Przygotowywanie zgłoszenia…",
+    "whatsIncluded": "Co zawiera",
+    "incApp": "MapNG {version}",
+    "incSystem": "Twój system: {os}, {ram} GB pamięci, {cpus} wątków CPU",
+    "incError": "Komunikat o błędzie",
+    "incLog": "Dziennik zadania ({kb} KB; jego koniec poniżej)",
+    "incOptions": "Ustawienia eksportu",
+    "incDump": "Zrzut awarii ({kb} KB): część tego, co MapNG miał w pamięci w chwili awarii, pokazująca, gdzie się zepsuł. Może zawierać np. ścieżki plików.",
+    "incArea": "Lokalizacja i rozmiar mapy",
+    "incDescription": "To, co napisałeś",
+    "incNever": "Nigdy nie są dołączane: imię ani konto, Twoje pliki, sam poziom ani nic innego z Twojego komputera.",
+    "privacy": "Jak zgłoszenia są przechowywane i używane",
+    "send": "Wyślij zgłoszenie",
+    "dontSend": "Nie wysyłaj",
+    "sent": "Zgłoszenie wysłane. Dziękujemy!",
+    "sentHint": "Podaj ten identyfikator na Discordzie lub GitHubie, jeśli chcesz odpowiedzi.",
+    "copy": "Kopiuj",
+    "copied": "Skopiowano",
+    "done": "Gotowe",
+    "sendReport": "Wyślij zgłoszenie"
   }
 }

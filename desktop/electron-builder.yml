@@ -20,6 +20,8 @@ files:
   - modsFolder.js
   - updater.js
   - levelLibrary.js
+  - crashReports.js
+  - reportScrub.js
   - package.json
 extraResources:
   - from: ../dist

@@ -12,6 +12,9 @@
  * own OSM tile archives from the R2 bucket bound as OSM_TILES (see
  * handleOsmTiles; built by scripts/build-osm-tiles.py).
  *
+ * /api/crash takes the desktop app's crash and problem reports (sent only
+ * when the user agrees) into private storage (see crashReports.js).
+ *
  * /api/hotspots counts opt-in export locations (coarse cells) and serves
  * them for the 2D map's hotspot overlay (see hotspotsObject.js).
  *
@@ -25,6 +28,7 @@ import {
   snapOsmBounds,
 } from './services/overpassQuery.js';
 import { handleHotspots } from './hotspotsObject.js';
+import { handleCrashReports } from './crashReports.js';
 
 export { ExportHotspots } from './hotspotsObject.js';
 
@@ -191,6 +195,10 @@ export default {
 
     if (url.pathname === '/api/osm') {
       return handleOsm(request, url, ctx);
+    }
+
+    if (url.pathname === '/api/crash' || url.pathname.startsWith('/api/crash/')) {
+      return handleCrashReports(request, env, ctx, url, jsonResponse);
     }
 
     if (url.pathname === '/api/hotspots') {
