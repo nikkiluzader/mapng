@@ -27,34 +27,20 @@
     </button>
     
     <template v-if="showExports">
-      <!-- BeamNG Level -->
-      <div class="space-y-1.5">
-        <button
-          @click="showExportBeamNG = !showExportBeamNG"
-          class="w-full flex items-center justify-between group"
-        >
-          <div class="flex items-center gap-1.5">
-            <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">{{ t('exportPanel.beamngLevel') }}</h4>
-          </div>
-          <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExportBeamNG ? 'rotate-180' : '']" />
-        </button>
-        <div v-if="showExportBeamNG" class="space-y-1.5">
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.levelName') }}</span>
-            <input
-              v-model="beamNGLevelName"
-              @input="handleBeamNGLevelNameInput"
-              type="text"
-              maxlength="64"
-              :placeholder="t('exportPanel.levelNamePlaceholder')"
-              class="min-w-0 flex-1 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300"
-            />
-          </div>
-
-          <!-- Base texture selector -->
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.baseTexture') }}</span>
-            <div class="flex items-center gap-1 min-w-0">
+      <!-- BeamNG Level: cards of settings (components/base/Setting*.vue), then the export -->
+      <SettingSection v-model:open="showExportBeamNG" :title="t('exportPanel.beamngLevel')" :icon="PackageOpen">
+          <SettingCard :title="t('exportPanel.ui.cardLevel')">
+            <SettingRow :label="t('exportPanel.levelName')">
+              <input
+                v-model="beamNGLevelName"
+                @input="handleBeamNGLevelNameInput"
+                type="text"
+                maxlength="64"
+                :placeholder="t('exportPanel.levelNamePlaceholder')"
+                class="w-44 text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+              />
+            </SettingRow>
+            <SettingRow :label="t('exportPanel.baseTexture')">
               <select v-model="beamNGBaseTexture" :class="SELECT_XS" @change="handleBeamNGBaseTextureChange">
                 <option value="none">{{ t('exportPanel.none') }}</option>
                 <option value="hybrid" :disabled="!terrainData?.hybridTextureUrl && !terrainData?.hybridTextureCanvas">{{ t('exportPanel.satelliteHybrid') }}</option>
@@ -73,175 +59,20 @@
                     : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:text-[#FF6600] hover:border-[#FF6600]',
                   'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-500 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600']"
               >
-                <Loader2 v-if="isPreparingTexturePaint" :size="11" class="animate-spin" />
-                <Paintbrush v-else :size="11" />
+                <Loader2 v-if="isPreparingTexturePaint" :size="12" class="animate-spin" />
+                <Paintbrush v-else :size="12" />
               </button>
-            </div>
-          </div>
-
-          <!-- PBR terrain materials source selector -->
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.pbrMaterials') }}</span>
-            <input type="checkbox" v-model="beamNGPbrSource" true-value="osm" false-value="none" :disabled="!hasOsmData" :class="CHECKBOX" />
-          </div>
-
-          <!-- Road export mode selector -->
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
-            <input type="checkbox" v-model="beamNGRoadType" true-value="decal" false-value="none" :disabled="!hasOsmData" :class="CHECKBOX" />
-          </div>
-
-
-          <!-- Surrounding terrain backdrop source -->
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBackdrop') }}</span>
-            <select
-              v-model="beamNGBackdropSource"
-              :class="SELECT_XS"
-            >
-              <option value="off">Off</option>
-              <option value="global30m">30m Global</option>
-              <option value="usgs1m">USGS 1m</option>
-              <option value="gpxz" :disabled="!canUseGpxzBackdrop">GPXZ</option>
-            </select>
-          </div>
-          <div class="px-0.5 text-[9px] text-gray-500 dark:text-gray-400">
-            <span v-if="beamNGBackdropSource === 'global30m'">Uses global terrain tiles for surrounding backdrop.</span>
-            <span v-else-if="beamNGBackdropSource === 'usgs1m'">Uses USGS 1m elevation where available.</span>
-            <span v-else-if="beamNGBackdropSource === 'gpxz'">Uses GPXZ elevation tiles for surrounding backdrop.</span>
-            <span v-else>Surrounding backdrop disabled.</span>
-          </div>
-
-          <!-- Per-category options (advanced mode; basic always includes all, no foundations) -->
-          <template v-if="advancedMode">
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBuildings') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeBuildings" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.exportBuildings') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.applyFoundations') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGApplyFoundations" :disabled="!hasOsmData || !beamNGShapeTerrain" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.raiseUnderBuildings') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.treesBushes') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeTrees" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.nativeForest') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.rocks') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeRocks" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.quarryRock') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.water') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer">
-              <input type="checkbox" v-model="beamNGIncludeWater" :disabled="!hasOsmData" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.lakesRivers') }}</span>
-            </label>
-          </div>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.safeCaps') }}</span>
-            <label class="flex items-center gap-1.5 cursor-pointer" :title="t('exportPanel.safeCapsTitle')">
-              <input type="checkbox" v-model="beamNGSafeCaps" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ beamNGSafeCaps ? t('exportPanel.safeCapsOn') : t('exportPanel.safeCapsOff') }}</span>
-            </label>
-          </div>
-
-          <!-- Structures and terrain shaping (advanced mode): what the export
-               builds and which of its terrain edits it makes -->
-          <div class="space-y-1.5 p-2 rounded border border-gray-200 dark:border-gray-600">
-            <div class="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{{ t('exportPanel.structuresHeading') }}</div>
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBridges') }}</span>
-              <label class="flex items-center gap-1.5" :class="!hasOsmData ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
-                <input type="checkbox" v-model="beamNGIncludeBridges" :disabled="!hasOsmData" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.includeBridgesHint') }}</span>
-              </label>
-            </div>
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeTunnels') }}</span>
-              <label class="flex items-center gap-1.5" :class="!hasOsmData ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
-                <input type="checkbox" v-model="beamNGIncludeTunnels" :disabled="!hasOsmData" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.includeTunnelsHint') }}</span>
-              </label>
-            </div>
-          </div>
-
-          <div
-            class="space-y-1.5 p-2 rounded border transition-colors"
-            :class="beamNGShapeTerrain ? 'border-gray-200 dark:border-gray-600' : 'border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-900/20'"
-          >
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{{ t('exportPanel.shapingHeading') }}</span>
-              <label class="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" v-model="beamNGShapeTerrain" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.shapeTerrain') }}</span>
-              </label>
-            </div>
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeRoads') }}</span>
-              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
-                <input type="checkbox" v-model="beamNGShapeRoads" :disabled="!beamNGShapeTerrain" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeRoadsHint') }}</span>
-              </label>
-            </div>
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeBridges') }}</span>
-              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain || !beamNGIncludeBridges ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
-                <input type="checkbox" v-model="beamNGShapeBridges" :disabled="!beamNGShapeTerrain || !beamNGIncludeBridges" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeBridgesHint') }}</span>
-              </label>
-            </div>
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeOverpasses') }}</span>
-              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain || !beamNGIncludeBridges ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
-                <input type="checkbox" v-model="beamNGShapeOverpasses" :disabled="!beamNGShapeTerrain || !beamNGIncludeBridges" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeOverpassesHint') }}</span>
-              </label>
-            </div>
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeTunnels') }}</span>
-              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain || !beamNGIncludeTunnels ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
-                <input type="checkbox" v-model="beamNGShapeTunnels" :disabled="!beamNGShapeTerrain || !beamNGIncludeTunnels" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeTunnelsHint') }}</span>
-              </label>
-            </div>
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.shapeExtras') }}</span>
-              <label class="flex items-center gap-1.5" :class="!beamNGShapeTerrain ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
-                <input type="checkbox" v-model="beamNGShapeExtras" :disabled="!beamNGShapeTerrain" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.shapeExtrasHint') }}</span>
-              </label>
-            </div>
-            <div class="flex items-center justify-between gap-2 px-0.5">
-              <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.lidarDecks') }}</span>
-              <label class="flex items-center gap-1.5" :class="!beamNGIncludeBridges ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'">
-                <input type="checkbox" v-model="beamNGLidarDecks" :disabled="!beamNGIncludeBridges" :class="CHECKBOX" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400 text-right">{{ t('exportPanel.lidarDecksHint') }}</span>
-              </label>
-            </div>
-            <p class="text-[9px] leading-snug text-gray-500 dark:text-gray-400 px-0.5">{{ t('exportPanel.shapingNote') }}</p>
-          </div>
-          </template>
-
-          <div class="flex items-center justify-between gap-2 px-0.5">
-            <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('exportPanel.seaLevelOffset') }}</span>
-            <div class="flex items-center gap-1">
+            </SettingRow>
+            <SettingRow
+              check
+              :model-value="beamNGPbrSource === 'osm'"
+              @update:model-value="beamNGPbrSource = $event ? 'osm' : 'none'"
+              :label="t('exportPanel.pbrMaterials')"
+              :hint="t('exportPanel.ui.pbrHint')"
+              :disabled="!hasOsmData"
+              :disabled-reason="t('exportPanel.ui.needsOsm')"
+            />
+            <SettingRow :label="t('exportPanel.seaLevelOffset')" :hint="terrainData?.flat ? t('exportPanel.ui.seaLevelFlat') : t('exportPanel.ui.seaLevelHint')">
               <input
                 :value="terrainData?.flat ? -1 : beamNGSeaLevelOffset"
                 @input="beamNGSeaLevelOffset = Number($event.target.value)"
@@ -250,18 +81,99 @@
                 step="1"
                 min="-2000"
                 max="2000"
-                class="w-20 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-20 text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
               />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">m</span>
-            </div>
-          </div>
+              <span class="text-[11px] text-gray-500 dark:text-gray-400">m</span>
+            </SettingRow>
+          </SettingCard>
 
-          <div class="px-2 py-1.5 rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
-            <p class="text-[9px] text-amber-800 dark:text-amber-300 leading-snug">
-              {{ t('exportPanel.communityQualityNotice') }}
-            </p>
-          </div>
+          <!-- What the level contains (basic mode builds everything the map has) -->
+          <SettingCard
+            :title="t('exportPanel.ui.cardContent')"
+            :note="!hasOsmData ? t('exportPanel.ui.noOsmNote') : (!advancedMode ? t('exportPanel.ui.basicContentNote') : '')"
+            :note-tone="!hasOsmData ? 'warn' : 'muted'"
+          >
+            <SettingRow
+              check
+              :model-value="beamNGRoadType === 'decal'"
+              @update:model-value="beamNGRoadType = $event ? 'decal' : 'none'"
+              :label="t('exportPanel.roads')"
+              :hint="t('exportPanel.ui.roadsHint')"
+              :disabled="!hasOsmData"
+            />
+            <template v-if="advancedMode">
+              <SettingRow check v-model="beamNGIncludeBuildings" :label="t('exportPanel.ui.buildings')" :hint="t('exportPanel.exportBuildings')" :disabled="!hasOsmData" />
+              <SettingRow check v-model="beamNGIncludeTrees" :label="t('exportPanel.treesBushes')" :hint="t('exportPanel.nativeForest')" :disabled="!hasOsmData" />
+              <SettingRow check v-model="beamNGIncludeRocks" :label="t('exportPanel.rocks')" :hint="t('exportPanel.quarryRock')" :disabled="!hasOsmData" />
+              <SettingRow check v-model="beamNGIncludeWater" :label="t('exportPanel.water')" :hint="t('exportPanel.lakesRivers')" :disabled="!hasOsmData" />
+              <SettingRow
+                check
+                :model-value="!beamNGSafeCaps"
+                @update:model-value="beamNGSafeCaps = !$event"
+                :label="t('exportPanel.ui.buildEverything')"
+                :hint="t('exportPanel.ui.buildEverythingHint')"
+              />
+            </template>
+          </SettingCard>
 
+          <!-- Bridges and tunnels, and how bridge decks get their height -->
+          <SettingCard v-if="advancedMode" :title="t('exportPanel.structuresHeading')" :note="!hasOsmData ? t('exportPanel.ui.needsOsm') : ''" note-tone="warn">
+            <SettingRow check v-model="beamNGIncludeBridges" :label="t('exportPanel.includeBridges')" :hint="t('exportPanel.includeBridgesHint')" :disabled="!hasOsmData" />
+            <SettingRow
+              check
+              indent
+              v-model="beamNGLidarDecks"
+              :label="t('exportPanel.lidarDecks')"
+              :hint="t('exportPanel.ui.lidarDecksHint')"
+              :disabled="!hasOsmData || !beamNGIncludeBridges"
+              :disabled-reason="hasOsmData ? t('exportPanel.ui.needsBridges') : ''"
+            />
+            <SettingRow check v-model="beamNGIncludeTunnels" :label="t('exportPanel.includeTunnels')" :hint="t('exportPanel.includeTunnelsHint')" :disabled="!hasOsmData" />
+          </SettingCard>
+
+          <!-- How the export reshapes the ground (generation-time smoothing is "Raw terrain", before Generate Data) -->
+          <SettingCard v-if="advancedMode" :title="t('exportPanel.ui.cardTerrain')">
+            <SegmentedControl
+              v-model="beamNGShapeMode"
+              :options="[
+                { value: 'all', label: t('exportPanel.ui.shapeAll') },
+                { value: 'custom', label: t('exportPanel.ui.shapeCustom') },
+                { value: 'none', label: t('exportPanel.ui.shapeNone') },
+              ]"
+            />
+            <p class="text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.shapeHint_${beamNGShapeMode}`) }}</p>
+            <template v-if="beamNGShapeMode === 'custom'">
+              <SettingRow check v-model="beamNGShapeRoads" :label="t('exportPanel.shapeRoads')" :hint="t('exportPanel.shapeRoadsHint')" />
+              <SettingRow check v-model="beamNGShapeBridges" :label="t('exportPanel.shapeBridges')" :hint="t('exportPanel.shapeBridgesHint')" :disabled="!beamNGIncludeBridges" :disabled-reason="t('exportPanel.ui.needsBridges')" />
+              <SettingRow check v-model="beamNGShapeOverpasses" :label="t('exportPanel.shapeOverpasses')" :hint="t('exportPanel.shapeOverpassesHint')" :disabled="!beamNGIncludeBridges" :disabled-reason="t('exportPanel.ui.needsBridges')" />
+              <SettingRow check v-model="beamNGShapeTunnels" :label="t('exportPanel.shapeTunnels')" :hint="t('exportPanel.shapeTunnelsHint')" :disabled="!beamNGIncludeTunnels" :disabled-reason="t('exportPanel.ui.needsTunnels')" />
+              <SettingRow check v-model="beamNGShapeExtras" :label="t('exportPanel.shapeExtras')" :hint="t('exportPanel.shapeExtrasHint')" />
+            </template>
+            <SettingRow
+              check
+              v-model="beamNGApplyFoundations"
+              :label="t('exportPanel.ui.foundations')"
+              :hint="t('exportPanel.raiseUnderBuildings')"
+              :disabled="!hasOsmData || beamNGShapeMode === 'none'"
+              :disabled-reason="hasOsmData ? t('exportPanel.ui.needsShaping') : t('exportPanel.ui.needsOsm')"
+            />
+            <p v-if="terrainData?.raw" class="text-[11px] leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.generatedRaw') }}</p>
+            <p class="text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.reportNote') }}</p>
+          </SettingCard>
+
+          <!-- Elevation around the map, beyond its edges -->
+          <SettingCard :title="t('exportPanel.ui.cardSurroundings')">
+            <SettingRow :label="t('exportPanel.includeBackdrop')" :hint="t(`exportPanel.ui.backdropHint_${beamNGBackdropSource}`)">
+              <select v-model="beamNGBackdropSource" :class="SELECT_XS">
+                <option value="off">{{ t('exportPanel.ui.backdropOff') }}</option>
+                <option value="global30m">{{ t('exportPanel.ui.backdropGlobal') }}</option>
+                <option value="usgs1m">{{ t('exportPanel.ui.backdropUsgs') }}</option>
+                <option value="gpxz" :disabled="!canUseGpxzBackdrop">GPXZ</option>
+              </select>
+            </SettingRow>
+          </SettingCard>
+
+          <p class="px-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.communityQualityNotice') }}</p>
 
           <!-- Export button -->
           <button
@@ -337,19 +249,11 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
+      </SettingSection>
 
       <!-- 2D Assets (advanced mode) -->
-      <div v-if="advancedMode" class="space-y-1.5">
-        <button
-          @click="showExport2D = !showExport2D"
-          class="w-full flex items-center justify-between group"
-        >
-          <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">{{ t('exportPanel.assets2d') }}</h4>
-          <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExport2D ? 'rotate-180' : '']" />
-        </button>
-        <div v-if="showExport2D" class="grid grid-cols-2 gap-1.5">
+      <SettingSection v-if="advancedMode" v-model:open="showExport2D" :title="t('exportPanel.assets2d')" :icon="Layers">
+        <div class="grid grid-cols-2 gap-1.5">
           <!-- Heightmap -->
           <button 
             @click="downloadHeightmap"
@@ -430,17 +334,10 @@
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
           </button>
         </div>
-      </div>
+      </SettingSection>
 
       <!-- 3D Models (advanced mode) -->
-      <div v-if="advancedMode" class="space-y-1.5">
-        <button
-          @click="showExport3D = !showExport3D"
-          class="w-full flex items-center justify-between group"
-        >
-          <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">{{ t('exportPanel.models3d') }}</h4>
-          <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExport3D ? 'rotate-180' : '']" />
-        </button>
+      <SettingSection v-if="advancedMode" v-model:open="showExport3D" :title="t('exportPanel.models3d')" :icon="Box">
 
         <template v-if="showExport3D">
           <!-- Shared 3D options -->
@@ -522,18 +419,11 @@
             </button>
           </div>
         </template>
-      </div>
+      </SettingSection>
 
       <!-- Geo Data -->
-      <div class="space-y-1.5">
-        <button
-          @click="showExportGeo = !showExportGeo"
-          class="w-full flex items-center justify-between group"
-        >
-          <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 group-hover:text-[#FF6600] transition-colors">{{ t('exportPanel.geoData') }}</h4>
-          <ChevronDown :size="12" :class="['text-gray-400 dark:text-gray-500 transition-transform duration-200', showExportGeo ? 'rotate-180' : '']" />
-        </button>
-        <div v-if="showExportGeo" class="space-y-2">
+      <SettingSection v-model:open="showExportGeo" :title="t('exportPanel.geoData')" :icon="FileJson">
+        <div class="space-y-2">
           <div class="grid grid-cols-2 gap-1.5">
             <!-- GeoTIFF -->
             <button 
@@ -581,7 +471,7 @@
             </p>
           </div>
         </div>
-      </div>
+      </SettingSection>
     </template>
   </div>
 
@@ -682,6 +572,10 @@ import { createWGS84ToLocal } from '../../services/geoUtils';
 import { exportBeamNGLevel } from '../../services/exportBeamNGLevel';
 import { desktopApp, exportLevelOnDesktop } from '../../services/platform/desktop.js';
 import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../composables/useExportHotspots.js';
+import SettingSection from '../base/SettingSection.vue';
+import SettingCard from '../base/SettingCard.vue';
+import SettingRow from '../base/SettingRow.vue';
+import SegmentedControl from '../base/SegmentedControl.vue';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
 import { reverseLocationName } from '../../services/nominatim';
@@ -782,6 +676,18 @@ const beamNGShapeOverpasses = ref(storedOn('mapng_beamNGShapeOverpasses'));
 const beamNGShapeTunnels = ref(storedOn('mapng_beamNGShapeTunnels'));
 const beamNGShapeExtras = ref(storedOn('mapng_beamNGShapeExtras'));
 const beamNGLidarDecks = ref(storedOn('mapng_beamNGLidarDecks'));
+// The Terrain card's choice: 'all' (every edit), 'custom' (the boxes below
+// it) or 'none' (heights as generated). Old settings had one master box and
+// the five edit boxes; the first time, the choice follows from them.
+const SHAPE_EDITS = [beamNGShapeRoads, beamNGShapeBridges, beamNGShapeOverpasses, beamNGShapeTunnels, beamNGShapeExtras];
+const storedShapeMode = localStorage.getItem('mapng_beamNGShapeMode');
+const beamNGShapeMode = ref(['all', 'custom', 'none'].includes(storedShapeMode)
+  ? storedShapeMode
+  : !beamNGShapeTerrain.value ? 'none' : SHAPE_EDITS.every((r) => r.value) ? 'all' : 'custom');
+watch(beamNGShapeMode, (mode) => {
+  localStorage.setItem('mapng_beamNGShapeMode', mode);
+  beamNGShapeTerrain.value = mode !== 'none';
+}, { immediate: true });
 const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') !== 'false');
@@ -1843,12 +1749,13 @@ const handleBeamNGLevelExport = async () => {
     const structureOptions = {
       includeBridges: !advanced || beamNGIncludeBridges.value,
       includeTunnels: !advanced || beamNGIncludeTunnels.value,
-      shapeTerrain: !advanced || beamNGShapeTerrain.value,
-      shapeRoads: !advanced || beamNGShapeRoads.value,
-      shapeBridges: !advanced || beamNGShapeBridges.value,
-      shapeOverpasses: !advanced || beamNGShapeOverpasses.value,
-      shapeTunnels: !advanced || beamNGShapeTunnels.value,
-      shapeExtras: !advanced || beamNGShapeExtras.value,
+      // ('all': every edit; 'custom': the chosen ones; 'none': the master is off)
+      shapeTerrain: !advanced || beamNGShapeMode.value !== 'none',
+      shapeRoads: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeRoads.value,
+      shapeBridges: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeBridges.value,
+      shapeOverpasses: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeOverpasses.value,
+      shapeTunnels: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeTunnels.value,
+      shapeExtras: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeExtras.value,
       // measured bridge heights from the US lidar survey where it covers the map
       lidarDecks: !advanced || beamNGLidarDecks.value,
     };
