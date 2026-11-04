@@ -190,6 +190,27 @@
                 <input type="checkbox" v-model="showLabels" :class="CHECKBOX" />
             <span>{{ t('mapSelector.showLabels') }}</span>
             </label>
+            <!-- Overlays: what MapNG itself knows about the map (moved here from the control panel) -->
+            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer" :title="t('controlPanel.osmCoverageHint')">
+                <input type="checkbox" v-model="showOsmCoverage" :class="CHECKBOX" />
+                <span>{{ t('mapSelector.osmCoverage') }}</span>
+            </label>
+            <p v-if="showOsmCoverage && osmCoverageStatus !== 'ready'" class="pl-7 -mt-1 text-[10px]" :class="osmCoverageStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
+              {{ osmCoverageStatus === 'unavailable' ? t('controlPanel.osmCoverageUnavailable') : t('controlPanel.osmCoverageLoading') }}
+            </p>
+            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                <input type="checkbox" v-model="showHotspots" :class="CHECKBOX" />
+                <span>{{ t('mapSelector.hotspots') }}</span>
+            </label>
+            <p v-if="showHotspots" class="pl-7 -mt-1 text-[10px] max-w-[190px]" :class="hotspotsStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
+              {{ hotspotsStatus === 'unavailable' ? t('hotspots.unavailable') : hotspotsStatus === 'loading' ? t('hotspots.loading') : t('mapSelector.hotspotsCount', { count: (hotspotTotals.web + hotspotTotals.desktop).toLocaleString() }) }}
+            </p>
+            <div class="h-px bg-gray-100 dark:bg-gray-600 my-1"></div>
+            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                <input type="checkbox" :checked="shareExports === 'on'" @change="setShareExports($event.target.checked)" :class="CHECKBOX" />
+                <span>{{ t('mapSelector.shareExports') }}</span>
+            </label>
+            <button type="button" class="pl-7 text-[10px] text-[#FF6600] hover:underline" @click="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button>
         </div>
     </div>
 
@@ -248,7 +269,7 @@ L.Icon.Default.mergeOptions({
 // Static options to prevent reactivity issues
 const mapOptions = { scrollWheelZoom: true };
 const { t } = useI18n({ useScope: 'global' });
-const { show: showOsmCoverage, areas: osmCoverageAreas } = useOsmCoverage();
+const { show: showOsmCoverage, areas: osmCoverageAreas, status: osmCoverageStatus } = useOsmCoverage();
 // Archive regions are Geofabrik slugs ("utah", "new-mexico").
 const formatCoverageRegion = (region) => region.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -613,7 +634,7 @@ watch(() => props.zoom, (newZoom) => {
 });
 
 // Export hotspots (control panel toggle): everyone's shared export cells
-const { show: showHotspots, cells: hotspotCells } = useExportHotspots();
+const { show: showHotspots, cells: hotspotCells, status: hotspotsStatus, totals: hotspotTotals, share: shareExports, setShareExports, openHotspotPrivacy } = useExportHotspots();
 const leafletMap = ref(null);
 let hotspotLayer = null;
 const onMapReady = (map) => { leafletMap.value = map; };

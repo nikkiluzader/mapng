@@ -527,7 +527,11 @@
       "show": "Mostrar vista previa de elevacion",
       "hide": "Ocultar",
       "legend": "Magenta = datos faltantes/corruptos"
-    }
+    },
+    "osmCoverage": "Cobertura OSM de MapNG",
+    "hotspots": "Zonas de exportación",
+    "hotspotsCount": "{count} exportaciones compartidas",
+    "shareExports": "Compartir mis exportaciones (anónimo)"
   },
   "memoryWidget": {
     "mem": "MEM",

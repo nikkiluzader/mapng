@@ -508,7 +508,7 @@
     "osmCoverageLoading": "Loading coverage…",
     "customOverpass": "Use my own Overpass server (optional)",
     "customOverpassInvalid": "Must be a full https:// address.",
-    "customOverpassHint": "Paste your full Overpass URL including your key. Areas MapNG already hosts (Show MapNG OSM coverage) still load from MapNG's own copy, so your key is only used outside them; there it's tried first, with the public servers as backup. It stays in this browser only. Paid plans with Overpass access:",
+    "customOverpassHint": "Paste your full Overpass URL including your key. Areas MapNG already hosts (Map Layers → MapNG OSM coverage) still load from MapNG's own copy, so your key is only used outside them; there it's tried first, with the public servers as backup. It stays in this browser only. Paid plans with Overpass access:",
     "centerCoordinates": "Center Coordinates",
     "configurationSession": "Configuration & Session",
     "modeBasic": "Basic",
@@ -577,7 +577,11 @@
       "show": "Show elevation data preview",
       "hide": "Hide",
       "legend": "Magenta = missing/corrupt data"
-    }
+    },
+    "osmCoverage": "MapNG OSM coverage",
+    "hotspots": "Export hotspots",
+    "hotspotsCount": "{count} shared exports",
+    "shareExports": "Share my exports (anonymous)"
   },
   "memoryWidget": {
     "mem": "MEM",

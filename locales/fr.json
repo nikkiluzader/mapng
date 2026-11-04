@@ -526,7 +526,11 @@
       "show": "Afficher l'apercu des altitudes",
       "hide": "Masquer",
       "legend": "Magenta = donnees manquantes/corrompues"
-    }
+    },
+    "osmCoverage": "Couverture OSM de MapNG",
+    "hotspots": "Zones d'export",
+    "hotspotsCount": "{count} exports partagés",
+    "shareExports": "Partager mes exports (anonyme)"
   },
   "memoryWidget": {
     "mem": "MEM",

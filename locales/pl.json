@@ -526,7 +526,11 @@
       "show": "Pokaż podgląd danych wysokości",
       "hide": "Ukryj",
       "legend": "Magenta = brakujące/uszkodzone dane"
-    }
+    },
+    "osmCoverage": "Pokrycie OSM MapNG",
+    "hotspots": "Miejsca eksportów",
+    "hotspotsCount": "{count} udostępnionych eksportów",
+    "shareExports": "Udostępniaj moje eksporty (anonimowo)"
   },
   "memoryWidget": {
     "mem": "PAMIĘĆ",

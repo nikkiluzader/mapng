@@ -210,31 +210,6 @@
           :disabled="!fetchOSM"
           :disabled-reason="t('controlPanel.ui.needsOsmOn')"
         />
-        <!-- Outlines of the OSM archives MapNG hosts, on the 2D map -->
-        <div class="mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-600">
-          <BaseToggle v-model="showOsmCoverage">
-            <MapIcon :size="12" class="text-emerald-600 dark:text-emerald-400" />
-            <span class="text-xs">{{ t('controlPanel.showOsmCoverage') }}</span>
-          </BaseToggle>
-          <p v-if="showOsmCoverage" class="mt-0.5 ml-5 text-[10px] leading-tight" :class="osmCoverageStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
-            {{ osmCoverageStatus === 'unavailable' ? t('controlPanel.osmCoverageUnavailable') : osmCoverageStatus === 'loading' ? t('controlPanel.osmCoverageLoading') : t('controlPanel.osmCoverageHint') }}
-          </p>
-        </div>
-        <!-- Where people export (opt in to share; composables/useExportHotspots.js) -->
-        <div class="mt-1.5 pt-1.5 border-t border-gray-200 dark:border-gray-600 space-y-1">
-          <BaseToggle v-model="showHotspots">
-            <Flame :size="12" class="text-[#FF6600]" />
-            <span class="text-xs">{{ t('hotspots.show') }}</span>
-          </BaseToggle>
-          <p v-if="showHotspots" class="ml-5 text-[10px] leading-tight" :class="hotspotsStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
-            {{ hotspotsStatus === 'unavailable' ? t('hotspots.unavailable') : hotspotsStatus === 'loading' ? t('hotspots.loading') : t('hotspots.hint', { count: (hotspotTotals.web + hotspotTotals.desktop).toLocaleString() }) }}
-          </p>
-          <BaseToggle :model-value="shareExports === 'on'" @update:model-value="setShareExports">
-            <Share2 :size="12" class="text-[#FF6600]" />
-            <span class="text-xs">{{ t('hotspots.share') }}</span>
-          </BaseToggle>
-          <p class="ml-5 text-[10px] leading-tight text-gray-500 dark:text-gray-400">{{ t('hotspots.shareHint') }} <button type="button" class="text-[#FF6600] hover:underline" @click.prevent.stop="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button></p>
-        </div>
       </SettingCard>
 
     </SettingSection>
@@ -324,14 +299,12 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
-import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle, Map as MapIcon, Building2, Lock, Download, Flame, Share2, CheckCircle2 } from 'lucide-vue-next';
+import { MapPin, Box, Trees, Settings, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
-import BaseToggle from '../base/BaseToggle.vue';
 import SettingSection from '../base/SettingSection.vue';
 import SettingRow from '../base/SettingRow.vue';
 import SettingCard from '../base/SettingCard.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
-import { useExportHotspots } from '../../composables/useExportHotspots.js';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
@@ -352,7 +325,6 @@ import { exportJobData, importJobData } from '../../services/jobData';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
-import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -411,8 +383,6 @@ const handleImportJobFile = async (file) => {
 };
 
 const fetchOSM = ref(localStorage.getItem('mapng_fetchOSM') !== 'false');
-const { show: showOsmCoverage, status: osmCoverageStatus } = useOsmCoverage();
-const { show: showHotspots, status: hotspotsStatus, totals: hotspotTotals, share: shareExports, setShareExports, openHotspotPrivacy } = useExportHotspots();
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
 const elevationUnitOverride = ref(localStorage.getItem('mapng_elevationUnitOverride') || 'auto');

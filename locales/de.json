@@ -526,7 +526,11 @@
       "show": "Hoehendaten-Vorschau anzeigen",
       "hide": "Ausblenden",
       "legend": "Magenta = fehlende/fehlerhafte Daten"
-    }
+    },
+    "osmCoverage": "MapNG-OSM-Abdeckung",
+    "hotspots": "Export-Hotspots",
+    "hotspotsCount": "{count} geteilte Exporte",
+    "shareExports": "Meine Exporte teilen (anonym)"
   },
   "memoryWidget": {
     "mem": "MEM",
