@@ -1,9 +1,5 @@
 <template>
-  <div class="space-y-3">
-    <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-      <Download :size="16" class="text-gray-700 dark:text-gray-300" />
-      {{ t('batchExport.title') }}
-    </label>
+  <SettingSection :title="t('batchExport.title')" :icon="Download" storage-key="mapng_ui_sec_batchexports">
 
     <div class="space-y-1.5">
       <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchExport.assets2d') }}</h4>
@@ -78,10 +74,11 @@
         </label>
       </BaseCard>
     </div>
-  </div>
+  </SettingSection>
 </template>
 
 <script setup>
+import SettingSection from '../base/SettingSection.vue';
 import { useI18n } from 'vue-i18n';
 import BaseCard from '../base/BaseCard.vue';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';

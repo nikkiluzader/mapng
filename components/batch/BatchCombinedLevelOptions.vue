@@ -1,14 +1,10 @@
 <template>
-  <div class="space-y-3">
-    <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-      <PackageOpen :size="16" class="text-gray-700 dark:text-gray-300" />
-      {{ t('batchCombined.title') }}
-    </label>
+  <SettingSection :title="t('batchCombined.title')" :icon="PackageOpen" storage-key="mapng_ui_sec_batchlevel">
 
-    <BaseCard padded class="space-y-2 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
+    <BaseCard padded class="space-y-2 bg-white dark:bg-gray-800/40 border-gray-200 dark:border-gray-600">
       <!-- Level name -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400 shrink-0">{{ t('exportPanel.levelName') }}</span>
+        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.levelName') }}</span>
         <input
           :value="model.levelName"
           @input="update('levelName', $event.target.value)"
@@ -21,7 +17,7 @@
 
       <!-- Base texture -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400 shrink-0">{{ t('exportPanel.baseTexture') }}</span>
+        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.baseTexture') }}</span>
         <select :value="model.baseTexture" @change="update('baseTexture', $event.target.value)" :class="SELECT_XS">
           <option value="none">{{ t('exportPanel.none') }}</option>
           <option value="hybrid">{{ t('exportPanel.satelliteHybrid') }}</option>
@@ -33,7 +29,7 @@
 
       <!-- PBR materials -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400 shrink-0">{{ t('exportPanel.pbrMaterials') }}</span>
+        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.pbrMaterials') }}</span>
         <select :value="model.pbrSource" @change="update('pbrSource', $event.target.value)" :disabled="!includeOSM" :class="SELECT_XS">
           <option value="none">{{ t('exportPanel.off') }}</option>
           <option v-if="includeOSM" value="osm">{{ t('exportPanel.osmData') }}</option>
@@ -42,7 +38,7 @@
 
       <!-- Roads -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400 shrink-0">{{ t('exportPanel.roads') }}</span>
+        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.roads') }}</span>
         <select :value="model.roadType" @change="update('roadType', $event.target.value)" :disabled="!includeOSM" :class="SELECT_XS">
           <option v-if="includeOSM" value="decal">{{ t('exportPanel.roadTypeSpline') }}</option>
           <option value="none">{{ t('exportPanel.roadTypeNone') }}</option>
@@ -52,7 +48,7 @@
 
       <!-- Backdrop -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400 shrink-0">{{ t('exportPanel.includeBackdrop') }}</span>
+        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.includeBackdrop') }}</span>
         <select :value="model.backdropSource" @change="update('backdropSource', $event.target.value)" :class="SELECT_XS">
           <option value="off">Off</option>
           <option value="global30m">30m Global</option>
@@ -84,7 +80,7 @@
       </label>
 
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400 shrink-0">{{ t('exportPanel.seaLevelOffset') }}</span>
+        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.seaLevelOffset') }}</span>
         <div class="flex items-center gap-1">
           <input
             :value="model.seaLevelOffset"
@@ -99,10 +95,11 @@
         </div>
       </div>
     </BaseCard>
-  </div>
+  </SettingSection>
 </template>
 
 <script setup>
+import SettingSection from '../base/SettingSection.vue';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseCard from '../base/BaseCard.vue';

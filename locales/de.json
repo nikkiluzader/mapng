@@ -465,7 +465,14 @@
     "modeBasicHint": "Nur das BeamNG-Level. Wechsle zu Erweitert für Heightmap-, Textur- und 3D-Modell-Downloads, umliegende Kacheln und mehr Exportoptionen.",
     "modeAdvancedHint": "Alle Werkzeuge: 2D- und 3D-Downloads, umliegende Kacheln, Level-Optionen pro Kategorie und Vorschau-Extras.",
     "desktopHint": "Große und dichte Karten exportieren viel schneller und ohne Speichergrenze des Browsers in der kostenlosen Desktop-App.",
-    "desktopHintLink": "Für Windows oder Linux herunterladen"
+    "desktopHintLink": "Für Windows oder Linux herunterladen",
+    "ui": {
+      "location": "Ort",
+      "areaDetail": "Gebiet & Detail",
+      "mapData": "Kartendaten (OpenStreetMap)",
+      "osmHint": "Straßen, Gebäude, Wasser, Landnutzung und Straßendetails",
+      "needsOsmOn": "Zuerst OSM-Features einbeziehen einschalten"
+    }
   },
   "batchExport": {
     "title": "Exportoptionen",

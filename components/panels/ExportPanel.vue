@@ -1,5 +1,5 @@
 <template>
-  <div v-if="terrainData && !isGenerating" class="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-600">
+  <div v-if="terrainData && !isGenerating" class="space-y-3">
     <!-- Missing OSM Warning / Action -->
     <div v-if="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0" class="bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 flex items-center justify-between">
       <div class="text-[10px] text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
@@ -14,19 +14,7 @@
       </button>
     </div>
 
-    <button
-      @click="showExports = !showExports"
-      class="w-full flex items-center justify-between text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-[#FF6600] transition-colors group"
-    >
-      <span class="flex items-center gap-2">
-        <Download :size="16" />
-        {{ t('exportPanel.readyToExport') }}
-        <span class="text-xs text-gray-500 dark:text-gray-400 font-normal">{{ terrainData.width }}x{{ terrainData.height }}</span>
-      </span>
-      <ChevronDown :size="14" :class="['transition-transform duration-200', showExports ? 'rotate-180' : '']" />
-    </button>
-    
-    <template v-if="showExports">
+    <!-- (the "Ready to export" heading and the terrain stats come from ControlPanel, above) -->
       <!-- BeamNG Level: cards of settings (components/base/Setting*.vue), then the export -->
       <SettingSection v-model:open="showExportBeamNG" :title="t('exportPanel.beamngLevel')" :icon="PackageOpen">
           <SettingCard :title="t('exportPanel.ui.cardLevel')">
@@ -472,7 +460,6 @@
           </div>
         </div>
       </SettingSection>
-    </template>
   </div>
 
   <!-- BeamNG export progress modal -->
@@ -858,7 +845,6 @@ const modelRealWorldScale = ref(localStorage.getItem('mapng_modelRealWorldScale'
 watch(modelRealWorldScale, (v) => localStorage.setItem('mapng_modelRealWorldScale', String(v)));
 
 // Collapsible section states
-const showExports = ref(localStorage.getItem('mapng_showExports') !== 'false');
 const showExport2D = ref(localStorage.getItem('mapng_showExport2D') !== 'false');
 const showExport3D = ref(localStorage.getItem('mapng_showExport3D') !== 'false');
 const showExportBeamNG = ref(localStorage.getItem('mapng_showExportBeamNG') !== 'false');
@@ -927,7 +913,6 @@ const updatePreviewUrl = async (sourceUrl, targetRef, nextToken) => {
   }
 };
 
-watch(showExports, (v) => localStorage.setItem('mapng_showExports', String(v)));
 watch(showExport2D, (v) => localStorage.setItem('mapng_showExport2D', String(v)));
 watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v)));
 watch(showExportBeamNG, (v) => localStorage.setItem('mapng_showExportBeamNG', String(v)));

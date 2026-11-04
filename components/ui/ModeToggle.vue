@@ -30,8 +30,10 @@ const { t } = useI18n({ useScope: 'global' });
 
 const tabBase = 'flex-1 py-1.5 px-3 text-xs font-medium rounded-md flex items-center justify-center gap-1.5 transition-all';
 const tabInactive = 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800';
-const tabSingleActive = '!bg-gray-900 !text-white shadow-sm';
-const tabBatchActive = '!bg-[#FF6600] !text-white shadow-sm';
+// (one look for the active tab, in light and dark mode)
+const tabActive = '!bg-gray-900 dark:!bg-gray-700 !text-white shadow-sm';
+const tabSingleActive = tabActive;
+const tabBatchActive = tabActive;
 
 defineProps({
   batchMode: { type: Boolean, default: false },

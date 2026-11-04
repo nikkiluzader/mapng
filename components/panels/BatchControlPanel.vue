@@ -10,31 +10,14 @@
 
     <!-- Output mode toggle: separate tiles vs one combined BeamNG level -->
     <div class="space-y-1.5">
-      <div class="grid grid-cols-2 gap-1 p-1 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-        <button
-          type="button"
-          @click="combinedLevel = false"
-          :class="[
-            'flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors',
-            !combinedLevel ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
-          ]"
-        >
-          <Grid3X3 :size="13" />
-          {{ t('batchCombined.modeSeparate') }}
-        </button>
-        <button
-          type="button"
-          @click="combinedLevel = true"
-          :class="[
-            'flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors',
-            combinedLevel ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
-          ]"
-        >
-          <PackageOpen :size="13" />
-          {{ t('batchCombined.modeCombined') }}
-        </button>
-      </div>
-      <p class="text-[10px] text-gray-500 dark:text-gray-400 px-0.5">
+      <SegmentedControl
+        v-model="combinedLevel"
+        :options="[
+          { value: false, label: t('batchCombined.modeSeparate') },
+          { value: true, label: t('batchCombined.modeCombined') },
+        ]"
+      />
+      <p class="text-[11px] text-gray-500 dark:text-gray-400 px-0.5">
         {{ combinedLevel ? t('batchCombined.modeCombinedHint') : t('batchCombined.modeSeparateHint') }}
       </p>
     </div>
@@ -61,17 +44,7 @@
     </label>
 
     <!-- Collapsible: per-tile offsets + names -->
-    <div class="space-y-2">
-      <button @click="showTileLayout = !showTileLayout"
-        class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group">
-        <span class="flex items-center gap-2">
-          <Grid3X3 :size="16" class="text-gray-500 dark:text-gray-400 group-hover:text-[#FF6600] transition-colors" />
-          {{ t('batch.tileLayout') }}
-        </span>
-        <ChevronDown :size="14" :class="['transition-transform duration-200', showTileLayout ? 'rotate-180' : '']" />
-      </button>
-
-      <template v-if="showTileLayout">
+    <SettingSection v-model:open="showTileLayout" :title="t('batch.tileLayout')" :icon="Grid3X3">
         <div class="space-y-2">
           <div class="flex items-center justify-between">
             <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('batch.tileOffsets') }}</p>
@@ -134,17 +107,15 @@
             </div>
           </div>
         </div>
-      </template>
-    </div>
+    </SettingSection>
 
-    <hr class="border-gray-200 dark:border-gray-600" />
+    <!-- Coordinates -->
+    <SettingSection v-model:open="showCoordinates" :title="t('batch.gridCenter')" :icon="MapPin">
+        <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
+    </SettingSection>
 
     <!-- Resolution -->
-    <div class="space-y-2">
-      <label class="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-        <Box :size="16" class="text-gray-700 dark:text-gray-300" />
-        {{ t('batch.tileResolution') }}
-      </label>
+    <SettingSection :title="t('batch.tileResolution')" :icon="Box" storage-key="mapng_ui_sec_batchres">
       <ResolutionSelector
         :modelValue="resolution"
         @update:modelValue="$emit('resolutionChange', $event)"
@@ -159,37 +130,17 @@
         per-tile
         @update:model-value="(v) => emit('update:processingMetersPerPixel', v)"
       />
-    </div>
+      <SettingCard>
+        <SettingRow
+          check
+          v-model="sharedElevationBaseline"
+          :label="t('batch.sharedBaseline')"
+          :hint="sharedElevationBaseline ? (hasOffsetTiles ? t('batch.sharedBaselineAutoHint') : t('batch.sharedBaselineHint')) : ''"
+        />
+      </SettingCard>
+    </SettingSection>
 
-    <div class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-      <label class="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2 cursor-pointer">
-        <Mountain :size="12" class="text-amber-600 dark:text-amber-400" />
-        {{ t('batch.sharedBaseline') }}
-      </label>
-      <input type="checkbox" v-model="sharedElevationBaseline" class="accent-[#FF6600] w-4 h-4 cursor-pointer" />
-    </div>
 
-    <p v-if="sharedElevationBaseline && hasOffsetTiles" class="text-[10px] text-amber-600 dark:text-amber-500">
-      {{ t('batch.sharedBaselineAutoHint') }}
-    </p>
-    <p v-else-if="sharedElevationBaseline" class="text-[10px] text-amber-600 dark:text-amber-500">
-      {{ t('batch.sharedBaselineHint') }}
-    </p>
-
-    <hr class="border-gray-200 dark:border-gray-600" />
-
-    <BatchPerformanceProfile v-model:modelValue="performanceProfile" />
-
-    <hr class="border-gray-200 dark:border-gray-600" />
-
-    <!-- OSM Toggle -->
-    <div class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-      <label class="text-xs text-gray-700 dark:text-gray-300 flex items-center gap-2 cursor-pointer">
-        <Trees :size="12" class="text-emerald-600 dark:text-emerald-400" />
-        {{ t('batch.includeOsm') }}
-      </label>
-      <input type="checkbox" v-model="includeOSM" class="accent-[#FF6600] w-4 h-4 cursor-pointer" />
-    </div>
 
     <!-- Elevation Source -->
     <ElevationSourceSelector
@@ -204,25 +155,13 @@
       @verifyGpxzKey="checkGPXZStatus"
     />
 
-    <hr class="border-gray-200 dark:border-gray-600" />
+    <SettingSection :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
+      <SettingCard>
+        <SettingRow check v-model="includeOSM" :label="t('batch.includeOsm')" :hint="t('controlPanel.ui.osmHint')" />
+      </SettingCard>
+    </SettingSection>
 
-    <!-- Coordinates -->
-    <div class="space-y-2">
-      <button @click="showCoordinates = !showCoordinates"
-        class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group">
-        <span class="flex items-center gap-2">
-          <MapPin :size="16" class="text-gray-500 dark:text-gray-400 group-hover:text-[#FF6600] transition-colors" />
-          {{ t('batch.gridCenter') }}
-        </span>
-        <ChevronDown :size="14" :class="['transition-transform duration-200', showCoordinates ? 'rotate-180' : '']" />
-      </button>
-
-      <template v-if="showCoordinates">
-        <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
-      </template>
-    </div>
-
-    <hr class="border-gray-200 dark:border-gray-600" />
+    <BatchPerformanceProfile v-model:modelValue="performanceProfile" />
 
     <BatchCombinedLevelOptions
       v-if="combinedLevel"
@@ -238,8 +177,6 @@
       @update:exports="handleExportsUpdate"
       @update:mesh-resolution="(v) => meshResolution.value = v"
     />
-
-    <hr class="border-gray-200 dark:border-gray-600" />
 
     <!-- Combined level output summary -->
     <div v-if="combinedLevel" class="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
@@ -314,6 +251,10 @@
 </template>
 
 <script setup>
+import SettingCard from '../base/SettingCard.vue';
+import SettingRow from '../base/SettingRow.vue';
+import SegmentedControl from '../base/SegmentedControl.vue';
+import SettingSection from '../base/SettingSection.vue';
 import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen } from 'lucide-vue-next';

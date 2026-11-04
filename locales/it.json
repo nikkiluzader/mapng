@@ -465,7 +465,14 @@
     "modeBasicHint": "Solo il livello BeamNG. Passa ad Avanzato per scaricare heightmap, texture e modelli 3D, i riquadri circostanti e altre opzioni di esportazione.",
     "modeAdvancedHint": "Tutti gli strumenti: download 2D e 3D, riquadri circostanti, opzioni del livello per categoria ed extra dell’anteprima.",
     "desktopHint": "Le mappe grandi e dense si esportano molto più in fretta, senza il limite di memoria del browser, nell’app desktop gratuita.",
-    "desktopHintLink": "Scarica per Windows o Linux"
+    "desktopHintLink": "Scarica per Windows o Linux",
+    "ui": {
+      "location": "Luogo",
+      "areaDetail": "Area e dettaglio",
+      "mapData": "Dati mappa (OpenStreetMap)",
+      "osmHint": "Strade, edifici, acqua, uso del suolo e dettagli stradali",
+      "needsOsmOn": "Attiva prima Includi Funzionalità OSM"
+    }
   },
   "batchExport": {
     "title": "Opzioni Esportazione",

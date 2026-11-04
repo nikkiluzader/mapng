@@ -1,6 +1,5 @@
 <template>
-  <div class="space-y-2">
-    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('batch.performanceProfile') }}</label>
+  <SettingSection :title="t('batch.performanceProfile')" :icon="Gauge" storage-key="mapng_ui_sec_batchperf">
     <select
       :class="SELECT_MD"
       :value="modelValue"
@@ -13,10 +12,12 @@
     <p class="text-[10px] text-gray-500 dark:text-gray-400">
       {{ t('batch.profileHelp') }}
     </p>
-  </div>
+  </SettingSection>
 </template>
 
 <script setup>
+import SettingSection from '../base/SettingSection.vue';
+import { Gauge } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { SELECT_MD } from '../base/controlStyles.js';
 

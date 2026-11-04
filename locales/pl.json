@@ -465,7 +465,14 @@
     "modeBasicHint": "Tylko poziom BeamNG. Przełącz na Zaawansowany, aby pobrać mapę wysokości, tekstury i modele 3D, sąsiednie kafelki i więcej opcji eksportu.",
     "modeAdvancedHint": "Wszystkie narzędzia: pobieranie 2D i 3D, sąsiednie kafelki, opcje poziomu według kategorii i dodatki podglądu.",
     "desktopHint": "Duże i gęste mapy eksportują się dużo szybciej, bez limitu pamięci przeglądarki, w darmowej aplikacji desktopowej.",
-    "desktopHintLink": "Pobierz dla Windows lub Linux"
+    "desktopHintLink": "Pobierz dla Windows lub Linux",
+    "ui": {
+      "location": "Lokalizacja",
+      "areaDetail": "Obszar i szczegółowość",
+      "mapData": "Dane mapy (OpenStreetMap)",
+      "osmHint": "Drogi, budynki, woda, użytkowanie terenu i detale ulic",
+      "needsOsmOn": "Najpierw włącz Dołącz funkcje OSM"
+    }
   },
   "batchExport": {
     "title": "Opcje eksportu",

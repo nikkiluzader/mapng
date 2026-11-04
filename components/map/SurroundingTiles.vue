@@ -1,17 +1,5 @@
 <template>
-  <div class="space-y-3">
-    <!-- Collapsible Header -->
-    <button 
-      @click="isExpanded = !isExpanded"
-      class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
-    >
-      <span class="flex items-center gap-2">
-        <LayoutGrid :size="16" class="text-gray-500 dark:text-gray-400 group-hover:text-[#FF6600] transition-colors" />
-        {{ t('map.surrounding.title') }}
-      </span>
-      <ChevronDown :size="14" :class="['transition-transform duration-200', isExpanded ? 'rotate-180' : '']" />
-    </button>
-
+  <SettingSection v-model:open="isExpanded" :title="t('map.surrounding.title')" :icon="LayoutGrid">
     <template v-if="isExpanded">
       <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
         {{ t('map.surrounding.description') }}
@@ -123,10 +111,11 @@
         {{ t('map.surrounding.cancel') }}
       </button>
     </template>
-  </div>
+  </SettingSection>
 </template>
 
 <script setup>
+import SettingSection from '../base/SettingSection.vue';
 import { ref, computed, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { LayoutGrid, ChevronDown, Download, Loader2 } from 'lucide-vue-next';

@@ -466,7 +466,14 @@
     "modeBasicHint": "Solo el nivel de BeamNG. Cambia a Avanzado para descargar heightmaps, texturas y modelos 3D, teselas circundantes y más opciones de exportación.",
     "modeAdvancedHint": "Todas las herramientas: descargas 2D y 3D, teselas circundantes, opciones de nivel por categoría y extras de la vista previa.",
     "desktopHint": "Los mapas grandes y densos se exportan mucho más rápido, sin el límite de memoria del navegador, en la app de escritorio gratuita.",
-    "desktopHintLink": "Descargar para Windows o Linux"
+    "desktopHintLink": "Descargar para Windows o Linux",
+    "ui": {
+      "location": "Ubicación",
+      "areaDetail": "Área y detalle",
+      "mapData": "Datos del mapa (OpenStreetMap)",
+      "osmHint": "Carreteras, edificios, agua, uso del suelo y detalles de calle",
+      "needsOsmOn": "Activa primero Incluir funciones OSM"
+    }
   },
   "batchExport": {
     "title": "Opciones de exportacion",

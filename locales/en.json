@@ -516,7 +516,14 @@
     "modeBasicHint": "Just the BeamNG level. Switch to Advanced for heightmap, texture and 3D model downloads, Surrounding Tiles and more export options.",
     "modeAdvancedHint": "All tools: 2D and 3D asset downloads, Surrounding Tiles, per-category level options and preview extras.",
     "desktopHint": "Big and dense maps export much faster, without the browser memory limit, in the free desktop app.",
-    "desktopHintLink": "Download for Windows or Linux"
+    "desktopHintLink": "Download for Windows or Linux",
+    "ui": {
+      "location": "Location",
+      "areaDetail": "Area & detail",
+      "mapData": "Map data (OpenStreetMap)",
+      "osmHint": "Roads, buildings, water, land use and street detail",
+      "needsOsmOn": "Turn on Include OSM Features first"
+    }
   },
   "batchExport": {
     "title": "Export Options",

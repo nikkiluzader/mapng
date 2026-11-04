@@ -1,17 +1,6 @@
 <template>
-  <div class="space-y-2">
-    <button 
-      @click="showElevationSource = !showElevationSource"
-      class="w-full flex items-center justify-between text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-[#FF6600] transition-colors group"
-    >
-      <span class="flex items-center gap-2">
-        <Mountain :size="16" class="text-gray-500 dark:text-gray-400 group-hover:text-[#FF6600] transition-colors" />
-        {{ t('map.elevationDataSource') }}
-      </span>
-      <ChevronDown :size="14" :class="['transition-transform duration-200', showElevationSource ? 'rotate-180' : '']" />
-    </button>
-    
-    <div v-if="showElevationSource" class="space-y-2 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600">
+  <SettingSection v-model:open="showElevationSource" :title="t('map.elevationDataSource')" :icon="Mountain">
+    <div class="space-y-2 rounded-md border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/40 p-2.5">
         <select
             v-model="localElevationSource"
             class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none cursor-pointer"
@@ -105,10 +94,13 @@
                 </div>
         </div>
     </div>
-  </div>
+    <!-- (the control panel adds its upload and raw-terrain controls here) -->
+    <slot />
+  </SettingSection>
 </template>
 
 <script setup>
+import SettingSection from '../base/SettingSection.vue';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Mountain, ChevronDown } from 'lucide-vue-next';
@@ -184,7 +176,7 @@ const emit = defineEmits(['update:elevationSource', 'update:gpxzApiKey', 'verify
 
 const localElevationSource = ref(props.elevationSource);
 const localGpxzApiKey = ref(props.gpxzApiKey);
-const showElevationSource = ref(localStorage.getItem('mapng_showElevationSource') === 'true');
+const showElevationSource = ref(localStorage.getItem('mapng_showElevationSource') !== 'false');
 
 watch(showElevationSource, (v) => localStorage.setItem('mapng_showElevationSource', String(v)));
 

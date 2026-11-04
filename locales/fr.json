@@ -465,7 +465,14 @@
     "modeBasicHint": "Seulement le niveau BeamNG. Passe en Avancé pour télécharger heightmap, textures et modèles 3D, les tuiles voisines et plus d’options d’export.",
     "modeAdvancedHint": "Tous les outils : téléchargements 2D et 3D, tuiles voisines, options de niveau par catégorie et extras de l’aperçu.",
     "desktopHint": "Les cartes grandes et denses s’exportent bien plus vite, sans la limite de mémoire du navigateur, dans l’application de bureau gratuite.",
-    "desktopHintLink": "Télécharger pour Windows ou Linux"
+    "desktopHintLink": "Télécharger pour Windows ou Linux",
+    "ui": {
+      "location": "Lieu",
+      "areaDetail": "Zone et détail",
+      "mapData": "Données cartographiques (OpenStreetMap)",
+      "osmHint": "Routes, bâtiments, eau, occupation du sol et détails de rue",
+      "needsOsmOn": "Activez d'abord Inclure les elements OSM"
+    }
   },
   "batchExport": {
     "title": "Options d'export",
