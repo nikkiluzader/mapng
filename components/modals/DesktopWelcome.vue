@@ -35,6 +35,11 @@
             <span>{{ t('desktopWelcome.updates') }}</span>
           </label>
 
+          <label class="flex items-start gap-2 text-[11px] text-gray-700 dark:text-gray-200 cursor-pointer select-none">
+            <input v-model="shareExports" type="checkbox" class="mt-0.5 accent-[#FF6600]" />
+            <span>{{ t('hotspots.welcome') }} <button type="button" class="text-[#FF6600] hover:underline" @click.prevent.stop="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button></span>
+          </label>
+
           <div class="flex justify-end">
             <button type="button" class="px-4 py-2 rounded bg-[#FF6600] hover:bg-[#e85d00] text-white text-[12px] font-semibold transition-colors" @click="done">
               {{ t('desktopWelcome.start') }}
@@ -51,12 +56,14 @@ import { onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Cpu, FolderOpen, Library, PackageOpen } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
+import { openHotspotPrivacy, setShareExports } from '../../composables/useExportHotspots.js';
 
 const { t } = useI18n();
 const show = ref(false);
 const folder = ref(null);
 const folderOk = ref(false);
 const updates = ref(true);
+const shareExports = ref(false);   // (opt in: unticked until the user ticks it)
 
 onMounted(async () => {
   if (!desktopApp?.welcomeDone) return;
@@ -76,6 +83,7 @@ async function choose() {
 
 async function done() {
   show.value = false;
+  setShareExports(shareExports.value);
   await desktopApp.welcomeDone({ updates: updates.value });
   window.dispatchEvent(new CustomEvent('mapng:levels-changed'));
 }

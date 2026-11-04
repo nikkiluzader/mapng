@@ -56,6 +56,7 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **No more crash on load** when an area's trees reached past the map's edge (they piled up in one corner and crashed BeamNG's forest loader)
 - Every level now carries `mapng.json` (MapNG version, area, size and settings), so the desktop app can recognise and rebuild it
 - The website and the desktop app read MapNG's own OpenStreetMap tiles in hosted regions; trees scattered in woods come out the same on every export
+- **Export hotspots:** an optional 2D map overlay of where people export levels, from users who opt in to share (see [Export hotspots and privacy](#export-hotspots-and-privacy))
 
 ## What Was New (October 2026)
 
@@ -118,6 +119,19 @@ This helps keep community resource hubs focused on curated, polished releases wh
 | MapNG OSM tiles (Cloudflare R2) | MapNG's own OpenStreetMap copy for hosted regions |
 | OpenStreetMap / Overpass | Roads, land use, buildings, water, vegetation, street furniture elsewhere |
 | Nominatim | Location search and reverse naming |
+
+## Export Hotspots and Privacy
+
+The control panel's **Show export hotspots** draws the busy export areas on the 2D map. They come from users who choose to share: sharing is **off unless you turn it on** (control panel, under Include OSM Features; MapNG asks once after your first export, and the desktop app's welcome screen has a checkbox).
+
+- **What is sent:** for each level you export, the ~5 km grid square (0.05°) it falls in and whether it came from the website or the desktop app. The square is computed in your browser or app; the exact location never leaves your computer.
+- **What is never sent:** no name, account, email or device ID; no level name, settings or map data; no exact coordinates.
+- **Where it is stored:** in MapNG's own Cloudflare account, in a SQLite-backed Cloudflare Durable Object that only the MapNG developer can access (`hotspotsObject.js`).
+- **How it is stored:** one row per grid square with the web and desktop export counts and the date of the latest. Nothing links a row to a person. To stop spam, a hashed form of the sender's IP address is kept in memory only, to allow at most 30 reports an hour; it is never written to storage. Workers request logging is off.
+- **How it is used:** only for the hotspot overlay, which anyone can turn on, and for the developer to see where MapNG is used (for example, which regions get MapNG's own OSM tiles next).
+- **Never sold or shared:** the data is never sold, never shared with anyone and never used for advertising or tracking. It only appears as totals per square on the hotspot map.
+- Turning sharing off stops reports at once. Counts already added can't be traced back to anyone, so they can't be removed individually.
+- The whole table is public at [mapng.com/api/hotspots](https://mapng.com/api/hotspots), and [mapng.com/data.html](https://mapng.com/data.html) explains every field, the pipeline, and every other service MapNG connects to.
 
 ## Getting Started
 

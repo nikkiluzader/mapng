@@ -32,7 +32,8 @@
     "build": "Build {hash} - {time}",
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "Desktop app",
-    "desktopAppTooltip": "MapNG for Windows and Linux: big and dense maps, levels saved straight to BeamNG, rebuilds with new versions"
+    "desktopAppTooltip": "MapNG for Windows and Linux: big and dense maps, levels saved straight to BeamNG, rebuilds with new versions",
+    "yourData": "Your data"
   },
   "mode": {
     "singleTile": "Single Tile",
@@ -919,5 +920,42 @@
     "pointMods": "Exported levels are ready to drive: no download or unzip step.",
     "updates": "Check for MapNG updates automatically (MapNG always asks before downloading one)",
     "start": "Get started"
+  },
+  "hotspots": {
+    "show": "Show export hotspots",
+    "hint": "Where people have exported levels: bigger, darker dots mean more exports ({count} shared so far). Each dot is a ~5 km area.",
+    "loading": "Loading hotspots…",
+    "unavailable": "Hotspots unavailable right now.",
+    "share": "Share my export areas (anonymous)",
+    "shareHint": "Adds the rough area (~5 km) of each level you export to the hotspot map. Never the exact spot, and nothing about you.",
+    "tooltip": "{count} exports here (web {web} · desktop {desktop})",
+    "askTitle": "Add this export to the hotspot map?",
+    "askBody": "MapNG can count where levels get exported and show the busy areas on the 2D map. Only the rough area (~5 km) is shared, never the exact spot, and nothing about you. You can change this in the control panel.",
+    "askYes": "Share anonymously",
+    "askNo": "No thanks",
+    "welcome": "Share the rough area (~5 km) of my exports, anonymously, for MapNG's export hotspot map",
+    "privacy": {
+      "link": "How your data is used",
+      "title": "How export sharing works",
+      "intro": "Sharing is off unless you turn it on. When it's on, MapNG counts where levels are exported, so everyone can see the busy areas on the hotspot map.",
+      "sentTitle": "What is sent",
+      "sent": "For each level you export: which ~5 km square of the map it's in, and whether it came from the website or the desktop app. The square is worked out on your own computer, so your exact location never leaves it.",
+      "notSentTitle": "What is never sent",
+      "notSent": "No name, account, email or device ID. No level name, settings or map data. No exact coordinates. Your IP address is not stored.",
+      "whereTitle": "Where it is stored",
+      "where": "In MapNG's own Cloudflare account, in a small database (a Cloudflare Durable Object) that only the MapNG developer can access. Like every request to mapng.com, reports pass through Cloudflare's network.",
+      "howTitle": "How it is stored",
+      "how": "One row per ~5 km square: how many exports came from the website, how many from the desktop app, and the date of the latest one. Nothing links a row to the people who exported there. To stop spam, the server briefly keeps a scrambled (hashed) form of your IP address in memory to allow at most 30 reports an hour; it is never written to storage and is gone within the hour.",
+      "useTitle": "How it is used",
+      "use": "Only for the hotspot map: the counts per square are what the overlay draws, and anyone can turn it on. The MapNG developer looks at the same totals to see where MapNG is used, for example to choose which regions get MapNG's own faster OSM data next.",
+      "neverTitle": "Never sold or shared",
+      "never": "Your data is never sold, never shared with anyone, and never used for advertising or tracking. The only place it ever appears is the hotspot map, as totals per square.",
+      "controlTitle": "You're in control",
+      "control": "Turn sharing on or off at any time in the control panel, under Include OSM Features. Turning it off stops reports straight away. Counts already added can't be traced back to you, so they can't be picked out and removed individually.",
+      "statusOn": "Sharing is on for you.",
+      "statusOff": "Sharing is off for you.",
+      "close": "Got it",
+      "readMore": "Read the full details: exact data, pipeline and code"
+    }
   }
 }

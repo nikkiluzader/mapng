@@ -25,7 +25,8 @@
     "build": "Kompilacja {hash} - {time}",
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "Aplikacja desktopowa",
-    "desktopAppTooltip": "MapNG dla Windows i Linux: duże i gęste mapy, poziomy zapisywane prosto w BeamNG, przebudowa w nowych wersjach"
+    "desktopAppTooltip": "MapNG dla Windows i Linux: duże i gęste mapy, poziomy zapisywane prosto w BeamNG, przebudowa w nowych wersjach",
+    "yourData": "Twoje dane"
   },
   "mode": {
     "singleTile": "Pojedynczy kafelek",
@@ -858,5 +859,42 @@
     "pointMods": "Wyeksportowane poziomy są gotowe do jazdy: bez pobierania i rozpakowywania.",
     "updates": "Automatycznie sprawdzaj aktualizacje MapNG (MapNG zawsze pyta przed pobraniem)",
     "start": "Zaczynamy"
+  },
+  "hotspots": {
+    "show": "Pokaż miejsca eksportów",
+    "hint": "Gdzie eksportowano poziomy: większe, ciemniejsze kropki to więcej eksportów (dotąd udostępniono {count}). Każda kropka to obszar ok. 5 km.",
+    "loading": "Wczytywanie miejsc…",
+    "unavailable": "Miejsca eksportów są teraz niedostępne.",
+    "share": "Udostępniaj obszary moich eksportów (anonimowo)",
+    "shareHint": "Dodaje przybliżony obszar (ok. 5 km) każdego eksportowanego poziomu do mapy miejsc. Nigdy dokładne miejsce i nic o Tobie.",
+    "tooltip": "{count} eksportów tutaj (web {web} · desktop {desktop})",
+    "askTitle": "Dodać ten eksport do mapy miejsc?",
+    "askBody": "MapNG może liczyć, gdzie eksportowane są poziomy, i pokazywać popularne obszary na mapie 2D. Udostępniany jest tylko przybliżony obszar (ok. 5 km), nigdy dokładne miejsce i nic o Tobie. Możesz to zmienić w panelu sterowania.",
+    "askYes": "Udostępnij anonimowo",
+    "askNo": "Nie, dziękuję",
+    "welcome": "Anonimowo udostępniaj przybliżony obszar (ok. 5 km) moich eksportów dla mapy miejsc eksportów MapNG",
+    "privacy": {
+      "link": "Jak używane są Twoje dane",
+      "title": "Jak działa udostępnianie eksportów",
+      "intro": "Udostępnianie jest wyłączone, dopóki go nie włączysz. Gdy jest włączone, MapNG liczy, gdzie eksportowane są poziomy, aby każdy mógł zobaczyć popularne obszary na mapie miejsc.",
+      "sentTitle": "Co jest wysyłane",
+      "sent": "Dla każdego eksportowanego poziomu: w którym kwadracie mapy o boku ok. 5 km się znajduje i czy pochodzi ze strony, czy z aplikacji desktopowej. Kwadrat jest wyliczany na Twoim komputerze, więc dokładna lokalizacja nigdy go nie opuszcza.",
+      "notSentTitle": "Czego nigdy nie wysyłamy",
+      "notSent": "Żadnego imienia, konta, e-maila ani ID urządzenia. Żadnej nazwy poziomu, ustawień ani danych mapy. Żadnych dokładnych współrzędnych. Twój adres IP nie jest zapisywany.",
+      "whereTitle": "Gdzie jest przechowywane",
+      "where": "Na koncie Cloudflare MapNG, w małej bazie danych (Cloudflare Durable Object), do której dostęp ma tylko twórca MapNG. Jak każde zapytanie do mapng.com, zgłoszenia przechodzą przez sieć Cloudflare.",
+      "howTitle": "Jak jest przechowywane",
+      "how": "Jeden wiersz na kwadrat ok. 5 km: ile eksportów pochodziło ze strony, ile z aplikacji desktopowej i data ostatniego. Nic nie łączy wiersza z osobami, które tam eksportowały. Aby powstrzymać spam, serwer przez chwilę trzyma w pamięci zaszyfrowaną (zahaszowaną) postać Twojego adresu IP, by dopuścić najwyżej 30 zgłoszeń na godzinę; nigdy nie jest zapisywana i znika w ciągu godziny.",
+      "useTitle": "Do czego służy",
+      "use": "Tylko do mapy miejsc: liczby na kwadrat to to, co rysuje warstwa, a każdy może ją włączyć. Twórca MapNG patrzy na te same sumy, żeby wiedzieć, gdzie MapNG jest używany, na przykład by wybrać, które regiony dostaną jako następne własne, szybsze dane OSM MapNG.",
+      "neverTitle": "Nigdy nie sprzedajemy ani nie udostępniamy",
+      "never": "Twoje dane nigdy nie są sprzedawane, nikomu udostępniane ani używane do reklam czy śledzenia. Pojawiają się tylko na mapie miejsc, jako sumy na kwadrat.",
+      "controlTitle": "Ty decydujesz",
+      "control": "Włącz lub wyłącz udostępnianie w dowolnej chwili w panelu sterowania, w sekcji Dołącz funkcje OSM. Wyłączenie od razu zatrzymuje zgłoszenia. Już dodanych liczb nie da się powiązać z Tobą, więc nie można ich wskazać i usunąć pojedynczo.",
+      "statusOn": "Udostępnianie jest u Ciebie włączone.",
+      "statusOff": "Udostępnianie jest u Ciebie wyłączone.",
+      "close": "Rozumiem",
+      "readMore": "Przeczytaj wszystkie szczegóły: dokładne dane, przepływ i kod"
+    }
   }
 }

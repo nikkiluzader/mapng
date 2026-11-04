@@ -25,7 +25,8 @@
     "build": "Build {hash} - {time}",
     "desktopBuild": "MapNG Bureau {version}",
     "desktopApp": "Application de bureau",
-    "desktopAppTooltip": "MapNG pour Windows et Linux : cartes grandes et denses, niveaux enregistrés directement dans BeamNG, reconstruction avec les nouvelles versions"
+    "desktopAppTooltip": "MapNG pour Windows et Linux : cartes grandes et denses, niveaux enregistrés directement dans BeamNG, reconstruction avec les nouvelles versions",
+    "yourData": "Vos données"
   },
   "mode": {
     "singleTile": "Tuile unique",
@@ -859,5 +860,42 @@
     "pointMods": "Les niveaux exportés sont prêts à rouler : ni téléchargement ni décompression.",
     "updates": "Rechercher automatiquement les mises à jour de MapNG (MapNG demande toujours avant de télécharger)",
     "start": "Commencer"
+  },
+  "hotspots": {
+    "show": "Afficher les zones d'export",
+    "hint": "Où des niveaux ont été exportés : des points plus grands et plus foncés signifient plus d'exports ({count} partagés jusqu'ici). Chaque point couvre une zone d'environ 5 km.",
+    "loading": "Chargement des zones…",
+    "unavailable": "Zones indisponibles pour le moment.",
+    "share": "Partager mes zones d'export (anonyme)",
+    "shareHint": "Ajoute la zone approximative (~5 km) de chaque niveau exporté à la carte des zones. Jamais l'endroit exact, et rien sur vous.",
+    "tooltip": "{count} exports ici (web {web} · bureau {desktop})",
+    "askTitle": "Ajouter cet export à la carte des zones ?",
+    "askBody": "MapNG peut compter où les niveaux sont exportés et montrer les zones actives sur la carte 2D. Seule la zone approximative (~5 km) est partagée, jamais l'endroit exact, et rien sur vous. Vous pouvez changer cela dans le panneau de contrôle.",
+    "askYes": "Partager anonymement",
+    "askNo": "Non merci",
+    "welcome": "Partager anonymement la zone approximative (~5 km) de mes exports pour la carte des zones d'export de MapNG",
+    "privacy": {
+      "link": "Comment vos données sont utilisées",
+      "title": "Comment fonctionne le partage des exports",
+      "intro": "Le partage est désactivé tant que vous ne l'activez pas. Une fois activé, MapNG compte où les niveaux sont exportés, pour que chacun voie les zones actives sur la carte des zones.",
+      "sentTitle": "Ce qui est envoyé",
+      "sent": "Pour chaque niveau exporté : le carré d'environ 5 km de la carte où il se trouve, et s'il vient du site ou de l'application de bureau. Le carré est calculé sur votre propre ordinateur : votre position exacte ne le quitte jamais.",
+      "notSentTitle": "Ce qui n'est jamais envoyé",
+      "notSent": "Aucun nom, compte, e-mail ni identifiant d'appareil. Aucun nom de niveau, réglage ni donnée de carte. Aucune coordonnée exacte. Votre adresse IP n'est pas enregistrée.",
+      "whereTitle": "Où c'est stocké",
+      "where": "Dans le compte Cloudflare de MapNG, dans une petite base de données (un Durable Object Cloudflare) à laquelle seul le développeur de MapNG a accès. Comme toute requête vers mapng.com, les envois passent par le réseau de Cloudflare.",
+      "howTitle": "Comment c'est stocké",
+      "how": "Une ligne par carré d'environ 5 km : combien d'exports viennent du site, combien de l'application de bureau, et la date du plus récent. Rien ne relie une ligne aux personnes qui y ont exporté. Contre le spam, le serveur garde brièvement en mémoire une forme brouillée (hachée) de votre adresse IP pour limiter à 30 envois par heure ; elle n'est jamais enregistrée et disparaît dans l'heure.",
+      "useTitle": "À quoi ça sert",
+      "use": "Uniquement à la carte des zones : les totaux par carré sont ce que dessine la couche, que chacun peut activer. Le développeur de MapNG consulte ces mêmes totaux pour voir où MapNG est utilisé, par exemple pour choisir quelles régions recevront ensuite les données OSM propres et plus rapides de MapNG.",
+      "neverTitle": "Jamais vendu ni partagé",
+      "never": "Vos données ne sont jamais vendues, jamais partagées avec qui que ce soit, et jamais utilisées pour la publicité ou le pistage. Elles n'apparaissent que sur la carte des zones, en totaux par carré.",
+      "controlTitle": "Vous gardez la main",
+      "control": "Activez ou désactivez le partage à tout moment dans le panneau de contrôle, sous Inclure les elements OSM. Le désactiver arrête les envois immédiatement. Les comptes déjà ajoutés ne peuvent pas être reliés à vous, et ne peuvent donc pas être retrouvés et retirés un par un.",
+      "statusOn": "Le partage est activé pour vous.",
+      "statusOff": "Le partage est désactivé pour vous.",
+      "close": "Compris",
+      "readMore": "Lire tous les détails : données exactes, fonctionnement et code"
+    }
   }
 }

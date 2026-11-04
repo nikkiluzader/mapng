@@ -25,7 +25,8 @@
     "build": "Build {hash} - {time}",
     "desktopBuild": "MapNG Escritorio {version}",
     "desktopApp": "App de escritorio",
-    "desktopAppTooltip": "MapNG para Windows y Linux: mapas grandes y densos, niveles guardados directamente en BeamNG, reconstrucción con nuevas versiones"
+    "desktopAppTooltip": "MapNG para Windows y Linux: mapas grandes y densos, niveles guardados directamente en BeamNG, reconstrucción con nuevas versiones",
+    "yourData": "Tus datos"
   },
   "mode": {
     "singleTile": "Mosaico unico",
@@ -859,5 +860,42 @@
     "pointMods": "Los niveles exportados están listos para conducir: sin descargar ni descomprimir.",
     "updates": "Buscar actualizaciones de MapNG automáticamente (MapNG siempre pregunta antes de descargar)",
     "start": "Empezar"
+  },
+  "hotspots": {
+    "show": "Mostrar zonas de exportación",
+    "hint": "Dónde se han exportado niveles: puntos más grandes y oscuros significan más exportaciones ({count} compartidas hasta ahora). Cada punto es una zona de unos 5 km.",
+    "loading": "Cargando zonas…",
+    "unavailable": "Las zonas no están disponibles ahora.",
+    "share": "Compartir mis zonas de exportación (anónimo)",
+    "shareHint": "Añade la zona aproximada (~5 km) de cada nivel que exportes al mapa de zonas. Nunca el lugar exacto ni nada sobre ti.",
+    "tooltip": "{count} exportaciones aquí (web {web} · escritorio {desktop})",
+    "askTitle": "¿Añadir esta exportación al mapa de zonas?",
+    "askBody": "MapNG puede contar dónde se exportan niveles y mostrar las zonas más activas en el mapa 2D. Solo se comparte la zona aproximada (~5 km), nunca el lugar exacto ni nada sobre ti. Puedes cambiarlo en el panel de control.",
+    "askYes": "Compartir de forma anónima",
+    "askNo": "No, gracias",
+    "welcome": "Compartir de forma anónima la zona aproximada (~5 km) de mis exportaciones para el mapa de zonas de MapNG",
+    "privacy": {
+      "link": "Cómo se usan tus datos",
+      "title": "Cómo funciona compartir exportaciones",
+      "intro": "Compartir está desactivado a menos que lo actives. Si está activado, MapNG cuenta dónde se exportan niveles para que todos vean las zonas más activas en el mapa de zonas.",
+      "sentTitle": "Qué se envía",
+      "sent": "Por cada nivel que exportas: en qué cuadrado de ~5 km del mapa está y si vino de la web o de la app de escritorio. El cuadrado se calcula en tu propio ordenador, así que tu ubicación exacta nunca sale de él.",
+      "notSentTitle": "Qué nunca se envía",
+      "notSent": "Ningún nombre, cuenta, correo ni ID de dispositivo. Ni el nombre del nivel, ni ajustes ni datos del mapa. Ninguna coordenada exacta. Tu dirección IP no se guarda.",
+      "whereTitle": "Dónde se guarda",
+      "where": "En la cuenta de Cloudflare de MapNG, en una pequeña base de datos (un Durable Object de Cloudflare) a la que solo accede el desarrollador de MapNG. Como cualquier petición a mapng.com, los envíos pasan por la red de Cloudflare.",
+      "howTitle": "Cómo se guarda",
+      "how": "Una fila por cuadrado de ~5 km: cuántas exportaciones vinieron de la web, cuántas de la app de escritorio y la fecha de la última. Nada vincula una fila con las personas que exportaron allí. Para evitar spam, el servidor guarda brevemente en memoria una forma cifrada (hash) de tu IP para permitir como máximo 30 envíos por hora; nunca se escribe en disco y desaparece en menos de una hora.",
+      "useTitle": "Para qué se usa",
+      "use": "Solo para el mapa de zonas: los recuentos por cuadrado son lo que dibuja la capa, y cualquiera puede activarla. El desarrollador de MapNG mira esos mismos totales para saber dónde se usa MapNG, por ejemplo para elegir qué regiones reciben después los datos OSM propios y más rápidos de MapNG.",
+      "neverTitle": "Nunca se vende ni se comparte",
+      "never": "Tus datos nunca se venden, nunca se comparten con nadie y nunca se usan para publicidad ni seguimiento. Solo aparecen en el mapa de zonas, como totales por cuadrado.",
+      "controlTitle": "Tú decides",
+      "control": "Activa o desactiva compartir cuando quieras en el panel de control, en Incluir funciones OSM. Al desactivarlo, los envíos se detienen al instante. Los recuentos ya añadidos no se pueden vincular contigo, así que no se pueden localizar ni borrar uno a uno.",
+      "statusOn": "Compartir está activado.",
+      "statusOff": "Compartir está desactivado.",
+      "close": "Entendido",
+      "readMore": "Leer todos los detalles: datos exactos, proceso y código"
+    }
   }
 }

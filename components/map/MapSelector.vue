@@ -8,6 +8,7 @@
         style="height: 100%; width: 100%"
         @move="handleMove"
         @zoom="handleZoom"
+        @ready="onMapReady"
      >
       <!-- Base Layers -->
       <l-tile-layer
@@ -232,6 +233,8 @@ import { getAdjacentBounds, POSITION_LABELS } from '../../services/surroundingTi
 import { computeMetricSelectionBounds, computeUploadedCropBounds } from '../../services/uploadBounds';
 import { CHECKBOX } from '../base/controlStyles.js';
 import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
+import { useExportHotspots } from '../../composables/useExportHotspots.js';
+import { addHotspotLayer } from '../../services/hotspotLayer.js';
 
 // Fix Leaflet icon assets
 // @ts-ignore
@@ -607,6 +610,19 @@ watch(() => props.zoom, (newZoom) => {
     map.setZoom(newZoom);
     currentZoom.value = newZoom;
   }
+});
+
+// Export hotspots (control panel toggle): everyone's shared export cells
+const { show: showHotspots, cells: hotspotCells } = useExportHotspots();
+const leafletMap = ref(null);
+let hotspotLayer = null;
+const onMapReady = (map) => { leafletMap.value = map; };
+watch([leafletMap, showHotspots, hotspotCells], ([map, on, cells]) => {
+  if (hotspotLayer) { hotspotLayer.remove(); hotspotLayer = null; }
+  if (!map || !on || !cells.length) return;
+  hotspotLayer = addHotspotLayer(map, cells, (dot) => t('hotspots.tooltip', {
+    count: dot.total.toLocaleString(), web: dot.web.toLocaleString(), desktop: dot.desktop.toLocaleString(),
+  }));
 });
 
 // Fix for initial load centering

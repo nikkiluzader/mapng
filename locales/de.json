@@ -25,7 +25,8 @@
     "build": "Build {hash} - {time}",
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "Desktop-App",
-    "desktopAppTooltip": "MapNG für Windows und Linux: große und dichte Karten, Level direkt in BeamNG gespeichert, Neubau mit neuen Versionen"
+    "desktopAppTooltip": "MapNG für Windows und Linux: große und dichte Karten, Level direkt in BeamNG gespeichert, Neubau mit neuen Versionen",
+    "yourData": "Deine Daten"
   },
   "mode": {
     "singleTile": "Einzelnes Tile",
@@ -858,5 +859,42 @@
     "pointMods": "Exportierte Level sind sofort fahrbereit: kein Herunterladen oder Entpacken.",
     "updates": "Automatisch nach MapNG-Updates suchen (MapNG fragt immer vor dem Herunterladen)",
     "start": "Los geht's"
+  },
+  "hotspots": {
+    "show": "Export-Hotspots anzeigen",
+    "hint": "Wo Level exportiert wurden: größere, dunklere Punkte bedeuten mehr Exporte (bisher {count} geteilt). Jeder Punkt ist ein Gebiet von ca. 5 km.",
+    "loading": "Hotspots werden geladen…",
+    "unavailable": "Hotspots sind gerade nicht verfügbar.",
+    "share": "Meine Exportgebiete teilen (anonym)",
+    "shareHint": "Fügt das ungefähre Gebiet (ca. 5 km) jedes exportierten Levels zur Hotspot-Karte hinzu. Nie den genauen Ort und nichts über dich.",
+    "tooltip": "{count} Exporte hier (Web {web} · Desktop {desktop})",
+    "askTitle": "Diesen Export zur Hotspot-Karte hinzufügen?",
+    "askBody": "MapNG kann zählen, wo Level exportiert werden, und die beliebten Gebiete auf der 2D-Karte zeigen. Geteilt wird nur das ungefähre Gebiet (ca. 5 km), nie der genaue Ort und nichts über dich. Du kannst das im Bedienfeld ändern.",
+    "askYes": "Anonym teilen",
+    "askNo": "Nein danke",
+    "welcome": "Das ungefähre Gebiet (ca. 5 km) meiner Exporte anonym für MapNGs Export-Hotspot-Karte teilen",
+    "privacy": {
+      "link": "Wie deine Daten verwendet werden",
+      "title": "So funktioniert das Teilen von Exporten",
+      "intro": "Das Teilen ist aus, bis du es einschaltest. Ist es an, zählt MapNG, wo Level exportiert werden, damit alle die beliebten Gebiete auf der Hotspot-Karte sehen.",
+      "sentTitle": "Was gesendet wird",
+      "sent": "Für jedes exportierte Level: in welchem ca. 5 km großen Quadrat der Karte es liegt und ob es von der Website oder der Desktop-App kommt. Das Quadrat wird auf deinem eigenen Computer ermittelt, dein genauer Ort verlässt ihn also nie.",
+      "notSentTitle": "Was nie gesendet wird",
+      "notSent": "Kein Name, Konto, keine E-Mail oder Geräte-ID. Kein Levelname, keine Einstellungen oder Kartendaten. Keine genauen Koordinaten. Deine IP-Adresse wird nicht gespeichert.",
+      "whereTitle": "Wo es gespeichert wird",
+      "where": "In MapNGs eigenem Cloudflare-Konto, in einer kleinen Datenbank (einem Cloudflare Durable Object), auf die nur der MapNG-Entwickler zugreifen kann. Wie jede Anfrage an mapng.com laufen die Meldungen über das Netzwerk von Cloudflare.",
+      "howTitle": "Wie es gespeichert wird",
+      "how": "Eine Zeile pro ca. 5-km-Quadrat: wie viele Exporte von der Website kamen, wie viele von der Desktop-App, und das Datum des letzten. Nichts verbindet eine Zeile mit den Personen, die dort exportiert haben. Gegen Spam hält der Server kurz eine verschlüsselte (gehashte) Form deiner IP-Adresse im Arbeitsspeicher, um höchstens 30 Meldungen pro Stunde zuzulassen; sie wird nie gespeichert und ist innerhalb einer Stunde weg.",
+      "useTitle": "Wofür es verwendet wird",
+      "use": "Nur für die Hotspot-Karte: Die Zählungen pro Quadrat sind das, was die Ebene zeichnet, und alle können sie einschalten. Der MapNG-Entwickler sieht sich dieselben Summen an, um zu sehen, wo MapNG genutzt wird, zum Beispiel um zu entscheiden, welche Regionen als Nächstes MapNGs eigene schnellere OSM-Daten bekommen.",
+      "neverTitle": "Nie verkauft oder weitergegeben",
+      "never": "Deine Daten werden nie verkauft, nie an jemanden weitergegeben und nie für Werbung oder Tracking verwendet. Sie erscheinen nur auf der Hotspot-Karte, als Summen pro Quadrat.",
+      "controlTitle": "Du hast die Kontrolle",
+      "control": "Schalte das Teilen jederzeit im Bedienfeld unter OSM-Features einbeziehen ein oder aus. Ausschalten stoppt die Meldungen sofort. Bereits gezählte Exporte lassen sich nicht auf dich zurückführen und können daher nicht einzeln entfernt werden.",
+      "statusOn": "Teilen ist bei dir an.",
+      "statusOff": "Teilen ist bei dir aus.",
+      "close": "Verstanden",
+      "readMore": "Alle Details lesen: genaue Daten, Ablauf und Code"
+    }
   }
 }

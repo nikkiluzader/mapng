@@ -25,7 +25,8 @@
     "build": "Versione {hash} - {time}",
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "App desktop",
-    "desktopAppTooltip": "MapNG per Windows e Linux: mappe grandi e dense, livelli salvati direttamente in BeamNG, ricostruzione con le nuove versioni"
+    "desktopAppTooltip": "MapNG per Windows e Linux: mappe grandi e dense, livelli salvati direttamente in BeamNG, ricostruzione con le nuove versioni",
+    "yourData": "I tuoi dati"
   },
   "mode": {
     "singleTile": "Singola Tessera",
@@ -858,5 +859,42 @@
     "pointMods": "I livelli esportati sono pronti da guidare: niente download né decompressione.",
     "updates": "Cerca automaticamente gli aggiornamenti di MapNG (MapNG chiede sempre prima di scaricare)",
     "start": "Inizia"
+  },
+  "hotspots": {
+    "show": "Mostra zone di esportazione",
+    "hint": "Dove sono stati esportati i livelli: punti più grandi e scuri indicano più esportazioni ({count} condivise finora). Ogni punto è un'area di circa 5 km.",
+    "loading": "Caricamento zone…",
+    "unavailable": "Zone non disponibili al momento.",
+    "share": "Condividi le mie aree di esportazione (anonimo)",
+    "shareHint": "Aggiunge l'area approssimativa (~5 km) di ogni livello esportato alla mappa delle zone. Mai il punto esatto, e nulla su di te.",
+    "tooltip": "{count} esportazioni qui (web {web} · desktop {desktop})",
+    "askTitle": "Aggiungere questa esportazione alla mappa delle zone?",
+    "askBody": "MapNG può contare dove vengono esportati i livelli e mostrare le aree più attive sulla mappa 2D. Viene condivisa solo l'area approssimativa (~5 km), mai il punto esatto, e nulla su di te. Puoi cambiarlo nel pannello di controllo.",
+    "askYes": "Condividi in forma anonima",
+    "askNo": "No grazie",
+    "welcome": "Condividi in forma anonima l'area approssimativa (~5 km) delle mie esportazioni per la mappa delle zone di MapNG",
+    "privacy": {
+      "link": "Come vengono usati i tuoi dati",
+      "title": "Come funziona la condivisione delle esportazioni",
+      "intro": "La condivisione è disattivata finché non la attivi. Quando è attiva, MapNG conta dove vengono esportati i livelli, così tutti possono vedere le aree più attive sulla mappa delle zone.",
+      "sentTitle": "Cosa viene inviato",
+      "sent": "Per ogni livello esportato: in quale quadrato di ~5 km della mappa si trova, e se proviene dal sito o dall'app desktop. Il quadrato viene calcolato sul tuo computer, quindi la tua posizione esatta non lo lascia mai.",
+      "notSentTitle": "Cosa non viene mai inviato",
+      "notSent": "Nessun nome, account, email o ID del dispositivo. Nessun nome del livello, impostazione o dato della mappa. Nessuna coordinata esatta. Il tuo indirizzo IP non viene salvato.",
+      "whereTitle": "Dove viene conservato",
+      "where": "Nell'account Cloudflare di MapNG, in un piccolo database (un Durable Object di Cloudflare) a cui può accedere solo lo sviluppatore di MapNG. Come ogni richiesta a mapng.com, gli invii passano per la rete di Cloudflare.",
+      "howTitle": "Come viene conservato",
+      "how": "Una riga per quadrato di ~5 km: quante esportazioni dal sito, quante dall'app desktop, e la data dell'ultima. Nulla collega una riga alle persone che vi hanno esportato. Contro lo spam, il server tiene brevemente in memoria una forma cifrata (hash) del tuo indirizzo IP per consentire al massimo 30 invii all'ora; non viene mai salvata e sparisce entro un'ora.",
+      "useTitle": "Come viene usato",
+      "use": "Solo per la mappa delle zone: i conteggi per quadrato sono ciò che disegna il livello, e chiunque può attivarlo. Lo sviluppatore di MapNG guarda gli stessi totali per capire dove viene usato MapNG, ad esempio per scegliere quali regioni ricevono dopo i dati OSM propri e più veloci di MapNG.",
+      "neverTitle": "Mai venduti né condivisi",
+      "never": "I tuoi dati non vengono mai venduti, mai condivisi con nessuno e mai usati per pubblicità o tracciamento. Compaiono solo sulla mappa delle zone, come totali per quadrato.",
+      "controlTitle": "Decidi tu",
+      "control": "Attiva o disattiva la condivisione quando vuoi nel pannello di controllo, sotto Includi Funzionalità OSM. Disattivarla ferma subito gli invii. I conteggi già aggiunti non sono riconducibili a te, quindi non possono essere individuati e rimossi singolarmente.",
+      "statusOn": "La condivisione è attiva per te.",
+      "statusOff": "La condivisione è disattivata per te.",
+      "close": "Ho capito",
+      "readMore": "Leggi tutti i dettagli: dati esatti, processo e codice"
+    }
   }
 }

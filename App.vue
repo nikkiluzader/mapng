@@ -195,6 +195,7 @@
     <!-- Desktop app: the MapNG levels in the mods folder -->
     <LevelsSidebar v-if="desktopApp" ref="levelsSidebar" @show-on-map="handleShowLevelOnMap" />
     <DesktopWelcome v-if="desktopApp" />
+    <HotspotsPrivacy />
   </div>
   </div>
 
@@ -247,6 +248,7 @@ import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import LevelsSidebar from './components/layout/LevelsSidebar.vue';
 import DesktopWelcome from './components/modals/DesktopWelcome.vue';
+import HotspotsPrivacy from './components/modals/HotspotsPrivacy.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import { createGenerationProgress } from './services/generationProgress.js';

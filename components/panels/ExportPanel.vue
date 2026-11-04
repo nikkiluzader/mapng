@@ -321,6 +321,22 @@
               </div>
             </div>
           </div>
+
+          <!-- Once, after a first export: share where exports are (only a ~5 km cell) for the hotspot map -->
+          <div
+            v-if="askShareExports"
+            class="w-full flex items-start gap-2 p-2 rounded border border-[#FF6600]/40 bg-orange-50 dark:bg-orange-900/10"
+          >
+            <Flame :size="14" class="shrink-0 mt-0.5 text-[#FF6600]" />
+            <div class="min-w-0 flex-1 space-y-1.5">
+              <div class="text-[11px] font-medium text-gray-800 dark:text-gray-100">{{ t('hotspots.askTitle') }}</div>
+              <div class="text-[10px] leading-snug text-gray-600 dark:text-gray-300">{{ t('hotspots.askBody') }} <button type="button" class="text-[#FF6600] hover:underline" @click.prevent.stop="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button></div>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" class="px-2.5 py-0.5 text-[10px] font-semibold rounded bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors" @click="answerShareExports(true)">{{ t('hotspots.askYes') }}</button>
+                <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="answerShareExports(false)">{{ t('hotspots.askNo') }}</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -654,7 +670,7 @@ import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame
 } from 'lucide-vue-next';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
@@ -665,6 +681,7 @@ import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/trace
 import { createWGS84ToLocal } from '../../services/geoUtils';
 import { exportBeamNGLevel } from '../../services/exportBeamNGLevel';
 import { desktopApp, exportLevelOnDesktop } from '../../services/platform/desktop.js';
+import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../composables/useExportHotspots.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
 import { reverseLocationName } from '../../services/nominatim';
@@ -1329,6 +1346,23 @@ const triggerDownload = (blob, filename) => {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 };
 
+// Export hotspots (composables/useExportHotspots.js): count a finished level
+// export when this user shares; ask once, after the first one.
+const { share: shareExports, setShareExports } = useExportHotspots();
+const askShareExports = ref(false);
+let unreportedExport = null;
+const onLevelExported = (center) => {
+  const platform = desktopApp ? 'desktop' : 'web';
+  if (shareExports.value === 'on') reportExport(center, platform);
+  else if (shareExports.value == null) { unreportedExport = { center: { ...center }, platform }; askShareExports.value = true; }
+};
+const answerShareExports = (on) => {
+  setShareExports(on);
+  askShareExports.value = false;
+  if (on && unreportedExport) reportExport(unreportedExport.center, unreportedExport.platform);
+  unreportedExport = null;
+};
+
 const notifyExportSuccess = (type, filename) => {
   emit('exportSuccess', {
     mode: 'single',
@@ -1875,6 +1909,7 @@ const handleBeamNGLevelExport = async () => {
       console.log(`${BEAMNG_EXPORT_UI_LOG} Desktop export written:`, saved);
       beamNGDesktopSaved.value = { path: saved.path, filename: saved.filename };
       notifyExportSuccess('beamng_level_zip', saved.filename);
+      onLevelExported(props.center);
       return;
     }
 
@@ -1897,6 +1932,7 @@ const handleBeamNGLevelExport = async () => {
     if (!filename || typeof filename !== 'string') {
       throw new Error('BeamNG export did not return a valid filename.');
     }
+    onLevelExported(props.center);
 
     console.log(`${BEAMNG_EXPORT_UI_LOG} Triggering browser download...`, {
       filename,

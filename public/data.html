@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG Data and Privacy</title>
+<meta name="description" content="Exactly what MapNG collects for its export hotspot map, where it is stored, how the pipeline works, and every other service MapNG connects to.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --ok: #15803d; --code-bg: #1d1d22; --code-text: #f4f4f6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --ok: #4ade80; --code-bg: #0b0b0e; --code-text: #ececf0;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .card b { display: block; font-size: 15px; margin-bottom: 2px; }
+  .card span { color: var(--text-2); font-size: 14px; }
+  .card .tick { color: var(--ok); font-weight: 700; margin-right: 4px; }
+  section { margin-top: 44px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--text-2); }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; color: var(--text); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  td { color: var(--text-2); }
+  .flow { list-style: none; padding: 0; margin: 14px 0 0; counter-reset: step; }
+  .flow li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px 12px 52px; margin: 0 0 22px; counter-increment: step; }
+  .flow li::before { content: counter(step); position: absolute; left: 14px; top: 12px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+  .flow li:not(:last-child)::after { content: ""; position: absolute; left: 26px; bottom: -22px; width: 2px; height: 22px; background: var(--border); }
+  .flow b { color: var(--text); }
+  .flow .where { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--brand-ink); background: var(--brand-tint); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-top: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
+  .never li { break-inside: avoid; margin-bottom: 6px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>Your data and MapNG</h1>
+    <p class="lede">Everything about the one thing MapNG can collect, the export hotspot map: what is sent, what is stored, where, and why. Nothing on this page is hidden anywhere else.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="cards">
+    <div class="card"><b><span class="tick">✓</span>Off unless you turn it on</b><span>Nothing is sent until you choose to share.</span></div>
+    <div class="card"><b><span class="tick">✓</span>A ~5 km square, never the spot</b><span>Worked out on your computer before anything is sent.</span></div>
+    <div class="card"><b><span class="tick">✓</span>No IDs, no IP stored</b><span>No account, name, email or device ID, ever.</span></div>
+    <div class="card"><b><span class="tick">✓</span>Never sold or shared</b><span>No advertising, no tracking, no third parties.</span></div>
+    <div class="card"><b><span class="tick">✓</span>All of it is public</b><span>Download the whole database yourself, below.</span></div>
+  </div>
+
+  <section id="what">
+    <h2>What the hotspot map is</h2>
+    <p>The 2D map in MapNG has an optional <b>Show export hotspots</b> overlay. It shows the areas where people export BeamNG levels, as dots that get bigger and darker with more exports. The dots come only from people who chose to share. It helps everyone see where the community is building, and helps the developer decide where to improve MapNG next.</p>
+    <p>Sharing is off by default, on the website and in the desktop app. MapNG asks you once, after your first export, and the desktop app has an unticked box on its welcome screen. You can change your answer at any time in the control panel, under <b>Include OSM Features</b>.</p>
+  </section>
+
+  <section id="report">
+    <h2>Exactly what one report looks like</h2>
+    <p>When sharing is on and a level export finishes, MapNG sends one small message to <code>https://mapng.com/api/hotspots</code>. This is its entire content:</p>
+<pre><code>POST /api/hotspots
+Content-Type: application/json
+
+{ "y": 2397, "x": 1973, "platform": "web" }</code></pre>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Field</th><th>What it is</th></tr></thead>
+      <tbody>
+        <tr><td><code>y</code></td><td>The row of the ~5 km grid square your export's centre falls in. The world is divided into 0.05° squares: 3,600 rows from south to north.</td></tr>
+        <tr><td><code>x</code></td><td>The column of that square: 7,200 columns from west to east.</td></tr>
+        <tr><td><code>platform</code></td><td><code>"web"</code> or <code>"desktop"</code>: which version of MapNG made the export.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Your browser or the desktop app converts your export's location into that square <b>before</b> sending, so the exact coordinates never leave your computer. A square is about 5.5 km tall, and narrower further from the equator. Row 2397, column 1973 above is the square that contains part of St. Augustine, Florida: every export anywhere inside it sends the same three values.</p>
+    <p>That is the whole report: no level name, no settings, no map data, no account, no device or browser ID, no cookies.</p>
+  </section>
+
+  <section id="stored">
+    <h2>Exactly what is stored</h2>
+    <p>The server keeps one table with one row per grid square that has had at least one shared export. There is no other table, and nothing else is written anywhere.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Column</th><th>Type</th><th>Example</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>y</code></td><td>whole number</td><td>2397</td><td>Grid row of the square</td></tr>
+        <tr><td><code>x</code></td><td>whole number</td><td>1973</td><td>Grid column of the square</td></tr>
+        <tr><td><code>web</code></td><td>whole number</td><td>14</td><td>How many shared exports from the website fell in this square</td></tr>
+        <tr><td><code>desktop</code></td><td>whole number</td><td>5</td><td>How many shared exports from the desktop app fell in this square</td></tr>
+        <tr><td><code>last_day</code></td><td>date</td><td>2026-11-04</td><td>The day of the most recent one (a date, no time)</td></tr>
+      </tbody>
+    </table></div>
+    <p>A report adds 1 to <code>web</code> or <code>desktop</code> for its square and sets <code>last_day</code> to today. Nothing records who sent it, and once added, a count cannot be traced back to anyone.</p>
+  </section>
+
+  <section id="see">
+    <h2>See all of it yourself</h2>
+    <p>The full table is public. <a href="/api/hotspots">mapng.com/api/hotspots</a> returns every row exactly as stored, with no filtering. It is the same data the overlay draws, refreshed at most 10 minutes behind the database.</p>
+    <div class="stats" id="stats" aria-live="polite">
+      <div class="stat"><div class="v" id="s-total">…</div><div class="k">shared exports</div></div>
+      <div class="stat"><div class="v" id="s-cells">…</div><div class="k">grid squares</div></div>
+      <div class="stat"><div class="v" id="s-web">…</div><div class="k">from the website</div></div>
+      <div class="stat"><div class="v" id="s-desktop">…</div><div class="k">from the desktop app</div></div>
+    </div>
+    <p id="s-note" style="font-size:14px;color:var(--muted)">Loading the live numbers…</p>
+    <p>To turn a row into a place: the square's centre is at latitude <code>-90 + (y + 0.5) × 0.05</code> and longitude <code>-180 + (x + 0.5) × 0.05</code>.</p>
+  </section>
+
+  <section id="pipeline">
+    <h2>The whole pipeline, step by step</h2>
+    <ol class="flow">
+      <li><b>An export finishes</b><span class="where">your computer</span><br>Only BeamNG level exports count. Nothing happens unless sharing is on.</li>
+      <li><b>MapNG works out the grid square</b><span class="where">your computer</span><br>The centre of your export is rounded down to its 0.05° square (<code>services/exportHotspots.js</code>). The exact point is discarded.</li>
+      <li><b>One report is sent</b><span class="where">network</span><br>The three values above go to <code>mapng.com/api/hotspots</code> over HTTPS. If you're offline, the report is simply dropped; it is never queued or retried.</li>
+      <li><b>MapNG's Cloudflare Worker checks it</b><span class="where">Cloudflare</span><br>The Worker (<code>worker.js</code>) refuses anything that isn't a valid square and platform. To stop one machine spamming the map, it allows at most 30 reports per hour per address (details below). Request logging is switched off for this Worker.</li>
+      <li><b>The count goes up by one</b><span class="where">Cloudflare Durable Object</span><br>A single Durable Object (<code>hotspotsObject.js</code>) holds the table in its built-in SQLite storage and adds 1 to that square's row.</li>
+      <li><b>The overlay reads the totals</b><span class="where">network</span><br>Anyone who turns on the overlay downloads the table from <code>/api/hotspots</code>. Cloudflare keeps a copy for up to 10 minutes so the database isn't asked on every page view.</li>
+      <li><b>Dots are drawn</b><span class="where">your computer</span><br>Your browser merges nearby squares for the zoom level you're at and draws one dot per group (<code>services/hotspotLayer.js</code>).</li>
+    </ol>
+  </section>
+
+  <section id="spam">
+    <h2>The one thing kept in memory: spam protection</h2>
+    <p>Without a limit, one person could fake thousands of exports. So for a short while the server remembers how many reports each address has sent this hour. It never writes this down. It works like this:</p>
+    <ul>
+      <li>Your IP address is mixed with a fixed label and run through SHA-256, a one-way scramble. Only the first 8 bytes of the result are kept, in memory.</li>
+      <li>Next to it, a counter for the current hour. Over 30 reports in an hour, further reports are refused until the hour changes.</li>
+      <li>Entries from earlier hours are thrown away, and everything is lost whenever the server restarts. None of it is ever saved to storage or to a log.</li>
+    </ul>
+    <p class="note">Like every request to mapng.com, reports travel through Cloudflare's network, which runs the site. Cloudflare's own handling of traffic is covered by <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.</p>
+  </section>
+
+  <section id="use">
+    <h2>How the developer uses it</h2>
+    <p>Only to look at the same totals everyone can see: which areas people build in. For example, MapNG hosts its own fast copy of OpenStreetMap data for a few regions, and the hotspot map shows which regions deserve that next. That's it.</p>
+    <h3>Things MapNG will never do with it</h3>
+    <ul class="never">
+      <li>Sell it</li>
+      <li>Share it with anyone (beyond the public totals on this page)</li>
+      <li>Use it for advertising</li>
+      <li>Track you, or link it to you</li>
+      <li>Combine it with any other data about you</li>
+      <li>Collect more without updating this page first</li>
+    </ul>
+  </section>
+
+  <section id="control">
+    <h2>Your controls</h2>
+    <ul>
+      <li><b>Turn it on or off:</b> control panel → Include OSM Features → <b>Share my export areas (anonymous)</b>. Turning it off stops reports immediately.</li>
+      <li><b>Where your choice lives:</b> on your own computer only, in local storage under the key <code>mapng_share_exports</code> (<code>on</code> or <code>off</code>). Clearing your browser's site data resets it, and MapNG will ask again.</li>
+      <li><b>Check it yourself:</b> open your browser's developer tools, go to the Network tab, and export a level. With sharing on you'll see one <code>POST</code> to <code>/api/hotspots</code> with the three values; with it off, you'll see none.</li>
+      <li><b>Removing past counts:</b> because nothing links a count to a person, individual exports can't be found and removed. If the hotspot feature is ever retired, the table will be deleted.</li>
+    </ul>
+  </section>
+
+  <section id="other">
+    <h2>Everything else MapNG connects to</h2>
+    <p>MapNG has no accounts and no ads. To build a map it has to download map data, and the only thing those services receive is the area being loaded, like any map website. For completeness, here is every outside service it talks to:</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Service</th><th>Why</th><th>What it receives</th></tr></thead>
+      <tbody>
+        <tr><td>AWS Terrarium, USGS, GUGiK (Poland)</td><td>Elevation data</td><td>The map tiles for the area you select</td></tr>
+        <tr><td>GPXZ</td><td>Optional premium elevation</td><td>The area, and your own GPXZ key (only if you enter one)</td></tr>
+        <tr><td>Esri</td><td>Satellite imagery and map backgrounds</td><td>The map tiles you view or export</td></tr>
+        <tr><td>MapNG's own OSM tiles, OpenStreetMap Overpass servers, Overture Maps</td><td>Roads, buildings, land use</td><td>The area you select</td></tr>
+        <tr><td>Nominatim</td><td>Place search and level names</td><td>Your search text, or the area's centre</td></tr>
+        <tr><td>Cloudflare Web Analytics (website only)</td><td>Counting page views on mapng.com</td><td>A page view: no cookies and no fingerprinting, by Cloudflare's design (<a href="https://www.cloudflare.com/web-analytics/">about it</a>). The desktop app doesn't load it.</td></tr>
+        <tr><td>GitHub (desktop app only)</td><td>Update checks</td><td>A request for the latest version, only if you allowed update checks</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="source">
+    <h2>Read the code</h2>
+    <p>MapNG is open source, so none of this has to be taken on trust. The hotspot code is small:</p>
+    <ul>
+      <li><a href="https://github.com/nikkiluzader/mapng/blob/main/services/exportHotspots.js"><code>services/exportHotspots.js</code></a>: the grid and the rounding to a square</li>
+      <li><a href="https://github.com/nikkiluzader/mapng/blob/main/composables/useExportHotspots.js"><code>composables/useExportHotspots.js</code></a>: the opt-in, the report, loading the overlay</li>
+      <li><a href="https://github.com/nikkiluzader/mapng/blob/main/hotspotsObject.js"><code>hotspotsObject.js</code></a>: the server: checks, spam limit, the table</li>
+      <li><a href="https://github.com/nikkiluzader/mapng/blob/main/services/hotspotLayer.js"><code>services/hotspotLayer.js</code></a>: drawing the dots</li>
+    </ul>
+    <p>Questions, or something here that doesn't match the code? <a href="https://github.com/nikkiluzader/mapng/issues">Open an issue on GitHub</a>.</p>
+  </section>
+
+  <footer>
+    <p>Last updated 4 November 2026. If what MapNG collects ever changes, this page changes first.</p>
+    <p><a href="/">Back to MapNG</a></p>
+  </footer>
+</main>
+
+<script>
+  (async () => {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    try {
+      const r = await fetch('/api/hotspots');
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      const web = d.totals?.web ?? 0, desktop = d.totals?.desktop ?? 0;
+      set('s-total', (web + desktop).toLocaleString());
+      set('s-cells', (d.cells?.length ?? 0).toLocaleString());
+      set('s-web', web.toLocaleString());
+      set('s-desktop', desktop.toLocaleString());
+      set('s-note', d.at ? 'Live from /api/hotspots, as of ' + new Date(d.at).toLocaleString() + '.' : '');
+    } catch {
+      ['s-total', 's-cells', 's-web', 's-desktop'].forEach((id) => set(id, '–'));
+      set('s-note', "The live numbers couldn't be loaded right now.");
+    }
+  })();
+</script>
+</body>
+</html>

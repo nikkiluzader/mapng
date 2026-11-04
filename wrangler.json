@@ -28,13 +28,37 @@
           "binding": "OSM_TILES",
           "bucket_name": "mapng-osm"
         }
-      ]
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "HOTSPOTS",
+            "class_name": "ExportHotspots"
+          }
+        ]
+      }
     }
   },
   "r2_buckets": [
     {
       "binding": "OSM_TILES",
       "bucket_name": "mapng-osm"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "HOTSPOTS",
+        "class_name": "ExportHotspots"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "ExportHotspots"
+      ]
     }
   ]
 }

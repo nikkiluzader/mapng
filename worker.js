@@ -12,6 +12,9 @@
  * own OSM tile archives from the R2 bucket bound as OSM_TILES (see
  * handleOsmTiles; built by scripts/build-osm-tiles.py).
  *
+ * /api/hotspots counts opt-in export locations (coarse cells) and serves
+ * them for the 2D map's hotspot overlay (see hotspotsObject.js).
+ *
  * All other requests fall through to the static assets (dist/).
  */
 
@@ -21,6 +24,9 @@ import {
   buildOverpassQuery,
   snapOsmBounds,
 } from './services/overpassQuery.js';
+import { handleHotspots } from './hotspotsObject.js';
+
+export { ExportHotspots } from './hotspotsObject.js';
 
 const GPXZ_ORIGIN = 'https://api.gpxz.io';
 const NOMINATIM_OSM_ORIGIN = 'https://nominatim.openstreetmap.org';
@@ -185,6 +191,10 @@ export default {
 
     if (url.pathname === '/api/osm') {
       return handleOsm(request, url, ctx);
+    }
+
+    if (url.pathname === '/api/hotspots') {
+      return handleHotspots(request, env, ctx, jsonResponse);
     }
 
     if (url.pathname.startsWith(OSM_TILES_PREFIX)) {
