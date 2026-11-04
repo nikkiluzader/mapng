@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
   showLevelInFolder: (zipName) => ipcRenderer.invoke('levels:showInFolder', zipName),
   // the level's zip and saved project to the Recycle Bin / Trash: resolves { ok }
   deleteLevel: (zipName, levelName) => ipcRenderer.invoke('levels:delete', zipName, levelName),
+  // a level's saved settings for "Modify" ({ center, resolution, generationOptions, options, ... } or null)
+  levelProject: (levelName) => ipcRenderer.invoke('levels:project', levelName),
   // resolves { ok, path, replayed, seconds, fromSaved, downloaded } or { cancelled }; onProgress({ phase, update })
   rebuildLevel: (zipName, levelName, onProgress) => {
     const listener = (_event, name, progress) => { if (name === levelName) onProgress?.(progress); };

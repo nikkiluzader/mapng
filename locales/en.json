@@ -956,7 +956,11 @@
     "confirmDelete": "Delete \"{name}\"?\n\nThe level and its saved data go to the Recycle Bin (Trash on Linux), so you can restore them from there.",
     "rebuiltOffline": "Nothing was downloaded: it was made from the saved data.",
     "rebuiltSomeDownloaded": "{count} files weren't in the saved data and were downloaded.",
-    "rebuiltFetched": "Its area was downloaded again and saved, so the next rebuild won't need to."
+    "rebuiltFetched": "Its area was downloaded again and saved, so the next rebuild won't need to.",
+    "update": "Update",
+    "modify": "Modify",
+    "modifyHint": "Load this level back in, with its settings, to change them and export again. Uses its saved terrain and OSM data: nothing is downloaded.",
+    "modifyNoData": "\"{name}\" has no saved data, so it can't be modified offline. Use Update to rebuild it, or Show on map and generate it again."
   },
   "desktopWelcome": {
     "title": "Welcome to MapNG Desktop",

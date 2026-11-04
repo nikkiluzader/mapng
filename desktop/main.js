@@ -361,9 +361,13 @@ function saveProject(jobDir, job, result) {
     const generate = JSON.parse(fs.readFileSync(path.join(session, 'job.json'), 'utf8'));
     // (mirror health and probe times are of the moment, not of the map)
     for (const k of Object.keys(generate.localStorage || {})) if (/health|probe_at/i.test(k)) delete generate.localStorage[k];
+    // (a terrain made from a level's saved sources ("Modify"): those sources
+    // come along, so the new level can be rebuilt offline too)
+    const replayedFrom = generate.sources?.mode === 'replay' ? generate.sources.dir : null;
     delete generate.sources;
     fs.writeFileSync(path.join(tmp, 'generate.json'), JSON.stringify(generate, null, 1));
-    const src = path.join(session, 'sources');
+    const recorded = path.join(session, 'sources');
+    const src = replayedFrom && fs.existsSync(replayedFrom) && !(fs.existsSync(recorded) && fs.readdirSync(recorded).length) ? replayedFrom : recorded;
     if (fs.existsSync(src)) {
       fs.mkdirSync(path.join(tmp, 'sources'));
       for (const f of fs.readdirSync(src)) { linkOrCopy(path.join(src, f), path.join(tmp, 'sources', f)); sources++; }
@@ -422,9 +426,20 @@ function pruneSessions(keep) {
 
 const generating = new Map();
 
-ipcMain.handle('terrain:generate', async (event, params) => {
+ipcMain.handle('terrain:generate', async (event, requested) => {
   const id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const dir = sessionDirOf(id);
+  // ("Modify" in My Levels: the level's own generate settings, its saved
+  // sources replayed offline; nothing is downloaded)
+  let params = requested;
+  if (requested?.fromLevel) {
+    const projectDir = projectDirOf(String(requested.fromLevel));
+    if (!readProject(String(requested.fromLevel))?.rebuildable) throw new Error('This level has no saved data to modify it from.');
+    params = {
+      ...JSON.parse(fs.readFileSync(path.join(projectDir, 'generate.json'), 'utf8')),
+      sources: { mode: 'replay', dir: path.join(projectDir, 'sources'), fallback: true },
+    };
+  }
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify(params));
   const child = spawnRunner(GENERATOR, dir);
@@ -517,6 +532,28 @@ ipcMain.handle('levels:delete', async (_event, zipName, levelName) => {
   const project = projectDirOf(levelName);
   if (fs.existsSync(project)) { try { await shell.trashItem(project); } catch { fs.rmSync(project, { recursive: true, force: true }); } }
   return { ok: true };
+});
+
+/**
+ * What "Modify" needs to load a level back into the window: where and how
+ * big it is, how its terrain was generated, and the export options it was
+ * made with. Null for a level without saved data.
+ */
+ipcMain.handle('levels:project', (_event, levelName) => {
+  const project = readProject(String(levelName));
+  if (!project?.rebuildable) return null;
+  let generate = {};
+  try { generate = JSON.parse(fs.readFileSync(path.join(projectDirOf(String(levelName)), 'generate.json'), 'utf8')); } catch { /* none */ }
+  return {
+    levelName: project.levelName,
+    center: generate.center || project.center,
+    resolution: generate.resolution,
+    includeOSM: generate.includeOSM !== false,
+    useUSGS: !!generate.useUSGS, useGPXZ: !!generate.useGPXZ, useKRON86: !!generate.useKRON86,
+    generationOptions: generate.generationOptions || {},
+    options: project.options || {},
+    appVersion: project.appVersion,
+  };
 });
 
 ipcMain.handle('levels:showInFolder', (_event, zipName) => {

@@ -895,7 +895,11 @@
     "confirmDelete": "Usunąć „{name}”?\n\nPoziom i jego zapisane dane trafią do Kosza, skąd możesz je przywrócić.",
     "rebuiltOffline": "Nic nie pobrano: powstał z zapisanych danych.",
     "rebuiltSomeDownloaded": "{count} plików nie było w zapisanych danych i zostały pobrane.",
-    "rebuiltFetched": "Obszar pobrano ponownie i zapisano, więc następna przebudowa nie będzie tego potrzebować."
+    "rebuiltFetched": "Obszar pobrano ponownie i zapisano, więc następna przebudowa nie będzie tego potrzebować.",
+    "update": "Aktualizuj",
+    "modify": "Zmień",
+    "modifyHint": "Wczytaj ten poziom z jego ustawieniami, aby je zmienić i wyeksportować ponownie. Używa zapisanego terenu i danych OSM: nic nie jest pobierane.",
+    "modifyNoData": "„{name}” nie ma zapisanych danych, więc nie można go zmienić offline. Użyj Aktualizuj, aby go przebudować, albo Pokaż na mapie i wygeneruj ponownie."
   },
   "desktopWelcome": {
     "title": "Witaj w MapNG Desktop",

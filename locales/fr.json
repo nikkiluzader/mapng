@@ -896,7 +896,11 @@
     "confirmDelete": "Supprimer « {name} » ?\n\nLe niveau et ses données enregistrées vont à la Corbeille, d'où vous pouvez les restaurer.",
     "rebuiltOffline": "Rien n'a été téléchargé : il a été créé à partir des données enregistrées.",
     "rebuiltSomeDownloaded": "{count} fichiers manquaient dans les données enregistrées et ont été téléchargés.",
-    "rebuiltFetched": "La zone a été retéléchargée et enregistrée : la prochaine reconstruction n'en aura pas besoin."
+    "rebuiltFetched": "La zone a été retéléchargée et enregistrée : la prochaine reconstruction n'en aura pas besoin.",
+    "update": "Mettre à jour",
+    "modify": "Modifier",
+    "modifyHint": "Recharger ce niveau avec ses réglages pour les changer et l'exporter à nouveau. Utilise son terrain et ses données OSM enregistrés : rien n'est téléchargé.",
+    "modifyNoData": "« {name} » n'a pas de données enregistrées : il ne peut pas être modifié hors ligne. Utilisez Mettre à jour pour le reconstruire, ou Afficher sur la carte et générez-le à nouveau."
   },
   "desktopWelcome": {
     "title": "Bienvenue dans MapNG Bureau",

@@ -896,7 +896,11 @@
     "confirmDelete": "¿Eliminar «{name}»?\n\nEl nivel y sus datos guardados van a la Papelera, desde donde puedes restaurarlos.",
     "rebuiltOffline": "No se descargó nada: se creó con los datos guardados.",
     "rebuiltSomeDownloaded": "{count} archivos no estaban en los datos guardados y se descargaron.",
-    "rebuiltFetched": "La zona se descargó de nuevo y se guardó, así la próxima reconstrucción no lo necesitará."
+    "rebuiltFetched": "La zona se descargó de nuevo y se guardó, así la próxima reconstrucción no lo necesitará.",
+    "update": "Actualizar",
+    "modify": "Modificar",
+    "modifyHint": "Vuelve a cargar este nivel con sus ajustes para cambiarlos y exportarlo de nuevo. Usa su terreno y datos OSM guardados: no se descarga nada.",
+    "modifyNoData": "«{name}» no tiene datos guardados, así que no se puede modificar sin conexión. Usa Actualizar para reconstruirlo, o Mostrar en el mapa y vuelve a generarlo."
   },
   "desktopWelcome": {
     "title": "Bienvenido a MapNG Escritorio",

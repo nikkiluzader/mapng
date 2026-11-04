@@ -193,7 +193,7 @@
     </main>
 
     <!-- Desktop app: the MapNG levels in the mods folder -->
-    <LevelsSidebar v-if="desktopApp" ref="levelsSidebar" @show-on-map="handleShowLevelOnMap" />
+    <LevelsSidebar v-if="desktopApp" ref="levelsSidebar" @show-on-map="handleShowLevelOnMap" @modify="handleModifyLevel" />
     <DesktopWelcome v-if="desktopApp" />
     <HotspotsPrivacy />
   </div>
@@ -229,7 +229,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from './stores/mainStore';
@@ -253,7 +253,8 @@ import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import { createGenerationProgress } from './services/generationProgress.js';
 import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
-import { desktopApp, fetchTerrainDataOnDesktop } from './services/platform/desktop.js';
+import { desktopApp, fetchTerrainDataOnDesktop, generateNextFromLevel } from './services/platform/desktop.js';
+import { applyExportSettings } from './services/exportSettings.js';
 import { releaseUploadRasterCache } from './services/resamplerClient';
 import { applyAscCoordinateSystem } from './services/ascLoader.js';
 import { NODATA_AUTO } from './services/nodataDetect.js';
@@ -1007,6 +1008,31 @@ const handleShowLevelOnMap = (level) => {
   setCenter({ lat: level.center.lat, lng: level.center.lng });
   if (level.resolution) setResolution(level.resolution);
   if (level.metersPerPixel) handleProcessingMetersPerPixelChange(level.metersPerPixel);
+};
+
+/**
+ * "Modify" in My Levels: the level loaded back into the window to change
+ * and export again. Its export options go into the export panel, the map
+ * moves to its area and size, and its terrain is generated again from its
+ * saved sources (offline, no GPXZ calls); exporting replaces the level.
+ */
+const handleModifyLevel = async (level) => {
+  let info = null;
+  try { info = await desktopApp.levelProject(level.levelName); } catch { info = null; }
+  if (!info?.center) { window.alert(t('levels.modifyNoData', { name: level.title })); return; }
+  applyExportSettings(info.options, info.options?.levelName || level.title);
+  store.setAdvancedMode(true);
+  // (an uploaded elevation file takes another path: the level's own data wins)
+  if (uploadedElevationFile.value) handleElevationFileClear();
+  switchTo2D();
+  setCenter({ lat: info.center.lat, lng: info.center.lng });
+  if (info.resolution) setResolution(info.resolution);
+  const mpp = Number(info.generationOptions?.processingMetersPerPixel) || 1;
+  handleProcessingMetersPerPixelChange(mpp);
+  lastGenerationKey.value = null;
+  await nextTick();
+  generateNextFromLevel(level.levelName);
+  await handleGenerate(false, info.includeOSM, 'default', '', 'auto', mpp);
 };
 
 const switchTo2D = () => {

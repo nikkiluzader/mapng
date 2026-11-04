@@ -220,16 +220,24 @@ async function reviveTerrainValue(value, base) {
  * processing. The terrain's images come back as app:// file URLs, not
  * copies; an export links those files instead of sending them back.
  */
+// ("Modify" in My Levels: the next Generate Data makes this level's terrain
+// from its saved sources, offline, instead of fetching the area)
+let nextFromLevel = null;
+export function generateNextFromLevel(levelName) { nextFromLevel = levelName || null; }
+
 export async function fetchTerrainDataOnDesktop(center, resolution, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, onProgress, signal, generationOptions = {}) {
   if (signal?.aborted) throw new DOMException('Terrain generation cancelled', 'AbortError');
   let terrainId = null;
   const onAbort = () => { if (terrainId) desktopApp.cancelTerrain(terrainId); };
   signal?.addEventListener?.('abort', onAbort, { once: true });
   try {
+    const fromLevel = nextFromLevel;
+    nextFromLevel = null;
     const result = await desktopApp.generateTerrain({
       center: toRaw(center), resolution, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey,
       generationOptions: JSON.parse(JSON.stringify(toRaw(generationOptions) || {})),
       localStorage: settingsSnapshot(),
+      ...(fromLevel ? { fromLevel } : {}),
     }, {
       onStarted: (id) => { terrainId = id; if (signal?.aborted) desktopApp.cancelTerrain(id); },
       onProgress,

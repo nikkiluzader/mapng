@@ -556,6 +556,7 @@ import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
+import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
 import { reverseLocationName } from '../../services/nominatim';
@@ -680,8 +681,14 @@ const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 // Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
 const beamNGRoadType = ref(localStorage.getItem('mapng_beamNGRoadType') === 'none' ? 'none' : 'decal');
 const beamNGLevelName = ref('');
+// (a level loaded back by "Modify" in My Levels keeps its own name:
+// services/exportSettings.js)
+const pendingLevelName = (() => {
+  try { const v = localStorage.getItem(PENDING_LEVEL_NAME_KEY); localStorage.removeItem(PENDING_LEVEL_NAME_KEY); return v; } catch { return null; }
+})();
 const beamNGSuggestedLevelName = ref('');
 const beamNGLevelNameTouched = ref(false);
+if (pendingLevelName) { beamNGLevelName.value = pendingLevelName; beamNGLevelNameTouched.value = true; }
 let beamNGLevelNameRequestId = 0;
 const hasOsmData = computed(() => Array.isArray(props.terrainData?.osmFeatures) && props.terrainData.osmFeatures.length > 0);
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);

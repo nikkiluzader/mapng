@@ -895,7 +895,11 @@
     "confirmDelete": "„{name}“ löschen?\n\nDas Level und seine gespeicherten Daten kommen in den Papierkorb, du kannst sie dort wiederherstellen.",
     "rebuiltOffline": "Nichts wurde heruntergeladen: es entstand aus den gespeicherten Daten.",
     "rebuiltSomeDownloaded": "{count} Dateien fehlten in den gespeicherten Daten und wurden heruntergeladen.",
-    "rebuiltFetched": "Das Gebiet wurde erneut geladen und gespeichert, der nächste Neubau braucht das nicht mehr."
+    "rebuiltFetched": "Das Gebiet wurde erneut geladen und gespeichert, der nächste Neubau braucht das nicht mehr.",
+    "update": "Aktualisieren",
+    "modify": "Ändern",
+    "modifyHint": "Dieses Level mit seinen Einstellungen wieder laden, um sie zu ändern und neu zu exportieren. Nutzt seine gespeicherten Gelände- und OSM-Daten: es wird nichts heruntergeladen.",
+    "modifyNoData": "„{name}“ hat keine gespeicherten Daten und kann daher nicht offline geändert werden. Nutze Aktualisieren für einen Neubau, oder Auf Karte zeigen und neu erzeugen."
   },
   "desktopWelcome": {
     "title": "Willkommen bei MapNG Desktop",

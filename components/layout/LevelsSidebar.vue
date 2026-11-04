@@ -97,7 +97,17 @@
               :title="level.rebuildable ? t('levels.rebuildSavedHint') : t('levels.rebuildFetchHint')"
               @click="rebuild(level)"
             >
-              <Hammer :size="11" />{{ t('levels.rebuild') }}
+              <Hammer :size="11" />{{ t('levels.update') }}
+            </button>
+            <!-- (back into the window with its settings, to change and export again: App.vue handleModifyLevel) -->
+            <button
+              type="button"
+              class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:text-gray-700"
+              :disabled="anyBusy || !level.rebuildable"
+              :title="level.rebuildable ? t('levels.modifyHint') : t('levels.modifyNoData', { name: level.title })"
+              @click="$emit('modify', level)"
+            >
+              <SlidersHorizontal :size="11" />{{ t('levels.modify') }}
             </button>
             <button
               v-if="level.center"
@@ -136,10 +146,10 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { FolderOpen, Hammer, HardDrive, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, Trash2 } from 'lucide-vue-next';
+import { FolderOpen, Hammer, HardDrive, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 
-defineEmits(['show-on-map']);
+defineEmits(['show-on-map', 'modify']);
 const { t, locale } = useI18n();
 
 const OPEN_KEY = 'mapng_levels_sidebar_open';
