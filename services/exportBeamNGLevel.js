@@ -11526,15 +11526,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // AI navgraph is built from them). Legacy 'architect' / 'mesh' values from
   // saved settings or batch configs are treated as 'decal'.
   const includeRoads = roadType !== 'none';
-  if (includeRoads) {
-    const roadFeatureCount = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'road').length;
-    beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions, bridge decks and tunnels…`);
-    await yield_();
-  }
-  // the ground before any grading: where the sea really is (a cut below sea
-  // level is no sea)
-  const sourceHeightMap = exportTerrainData.heightMap;
   // measured bridge heights (US lidar), read before the roads are laid out
+  // (its own step, before the roads step begins: the road layout's time was
+  // reported as the lidar's)
   let lidar = null;
   if (includeRoads && includeBridges && options.lidarDecks !== false && (options.structureSolver ?? 'v2') === 'v2') {
     beginStep('lidar', 'Reading measured bridge heights (US lidar survey)…');
@@ -11545,6 +11539,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Lidar decks: ${lidar.skipped ? `skipped: ${lidar.skipped}` : `${lidar.dataset}, ${lidar.nodes} nodes, ${(lidar.bytes / 1e6).toFixed(1)} MB, ${lidar.points} points; datum ${lidar.datum.scale === 1 ? 'm' : 'ft'} ${lidar.datum.offset >= 0 ? '+' : ''}${lidar.datum.offset.toFixed(2)} m (spread ${lidar.datum.spread.toFixed(2)} m)`}`);
   }
+  if (includeRoads) {
+    const roadFeatureCount = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'road').length;
+    beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions, bridge decks and tunnels…`);
+    await yield_();
+  }
+  // the ground before any grading: where the sea really is (a cut below sea
+  // level is no sea)
+  const sourceHeightMap = exportTerrainData.heightMap;
   const decalRoads = includeRoads
     ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null })
     : [];
