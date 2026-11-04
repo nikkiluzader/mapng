@@ -934,6 +934,9 @@ let gpxzNextSlotAt = 0;
  * plan is known.
  */
 const acquireGpxzSlot = async (signal) => {
+  // (the desktop app replaying a level's saved sources for a rebuild: nothing
+  // reaches GPXZ, so nothing to pace; a 16k rebuild waited ~40 s here)
+  if (globalThis.__mapngReplayingSources) { signal?.throwIfAborted(); return; }
   const plan = gpxzRateLimitInfo;
   const rps = Math.max(1, Number(plan?.rps) || 1);
   // 10% headroom under the advertised rps absorbs timing jitter and the

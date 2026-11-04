@@ -247,6 +247,8 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true })
   fs.mkdirSync(dir, { recursive: true });
   // (downloaded: misses that went online; missedUrls: the first few, for the log)
   const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [] };
+  // (services/terrain.js skips the GPXZ request pacing while replaying)
+  if (mode === 'replay') globalThis.__mapngReplayingSources = true;
   const inner = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input?.url;

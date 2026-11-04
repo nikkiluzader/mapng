@@ -10,8 +10,9 @@
  */
 import proj4 from 'proj4';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
-import { sampleSatelliteTexture } from './satelliteImageSampler.js';
+import { sampleSatelliteTexture, satelliteLatticeRows } from './satelliteImageSampler.js';
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights } from './terrariumSampling.js';
+import { parallelMap, parallelThreads } from './parallel.js';
 
 const DEBUG_RESAMPLER = false;
 const debugLog = (...args) => {
@@ -845,6 +846,22 @@ const prepareGapFill = async (gapFillTiles, gapFillEpsgDefs, fallback, noData) =
  */
 const applyGapFill = (heightMap, width, height, noData, gapFill, toWGS84, targetBounds, reportProgress) => {
     if (!gapFill) return null;
+    const plan = gapFillPlan(heightMap, width, height, noData);
+    if (!plan) return null;
+    const message = `Filling gaps from ${gapFill.label}...`;
+    reportProgress?.({ stage: 'gap-fill', message, current: 0, total: height, force: true });
+    const fillMap = new Float32Array(width * height).fill(noData);
+    for (let y = 0; y < height; y++) {
+        sampleGapRow(y, width, height, plan.needed, fillMap, gapFill.sample, noData, toWGS84, targetBounds);
+        if ((y & 31) === 31 || y === height - 1) {
+            reportProgress?.({ stage: 'gap-fill', message, current: y + 1, total: height });
+        }
+    }
+    return blendGapFill(heightMap, fillMap, width, height, noData, gapFill.label);
+};
+
+/** Which pixels need a value from the filling source: the holes, and the covered pixels around them (the seam). */
+const gapFillPlan = (heightMap, width, height, noData) => {
 
     const total = width * height;
     // Only two kinds of pixel need a value from the filling source: the holes
@@ -868,30 +885,28 @@ const applyGapFill = (heightMap, width, height, noData, gapFill, toWGS84, target
         }
     }
     if (holes === 0) return null;
+    return { needed, holes };
+};
 
-    const message = `Filling gaps from ${gapFill.label}...`;
-    reportProgress?.({ stage: 'gap-fill', message, current: 0, total: height, force: true });
-
-    const fillMap = new Float32Array(total).fill(noData);
-    for (let y = 0; y < height; y++) {
-        const row = y * width;
-        for (let x = 0; x < width; x++) {
-            const idx = row + x;
-            if (!needed[idx]) continue;
-            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
-            let v = gapFill.sample(lng, lat);
-            if (!Number.isFinite(v) || v <= -200 || v === noData) v = noData;
-            fillMap[idx] = v;
-        }
-        if ((y & 31) === 31 || y === height - 1) {
-            reportProgress?.({ stage: 'gap-fill', message, current: y + 1, total: height });
-        }
+/** One row of the fill map: the filling source sampled where the plan needs it. */
+const sampleGapRow = (y, width, height, needed, fillMap, sample, noData, toWGS84, targetBounds) => {
+    const row = y * width;
+    for (let x = 0; x < width; x++) {
+        const idx = row + x;
+        if (!needed[idx]) continue;
+        const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+        let v = sample(lng, lat);
+        if (!Number.isFinite(v) || v <= -200 || v === noData) v = noData;
+        fillMap[idx] = v;
     }
+};
 
+const blendGapFill = (heightMap, fillMap, width, height, noData, label) => {
+    const total = width * height;
     const result = blendGapFillIntoHoles(heightMap, fillMap, width, height, noData);
     if (result) {
         console.info(
-            `[ResamplerWorker] Gap fill from ${gapFill.label}: patched ${result.filled}/${result.holes} empty pixels `
+            `[ResamplerWorker] Gap fill from ${label}: patched ${result.filled}/${result.holes} empty pixels `
             + `(${((result.filled / total) * 100).toFixed(1)}% of output), `
             + `seam ${result.seamPixels} px, mean offset ${result.meanDelta.toFixed(2)} m.`,
         );
@@ -1127,8 +1142,220 @@ const resampleHeight = async ({ id, center, width, height, targetBounds = null, 
     };
 };
 
+// ─── Height sampling on every core (the desktop app) ─────────────────────────
+// Where worker threads exist (Node: the desktop app's Generate Data), the
+// per-pixel height loop runs in row bands on every core: each band thread
+// builds its own CRS converters once and reads the source rasters from one
+// shared copy (SharedArrayBuffer), writing straight into a shared heightmap.
+// The browser keeps the one-thread loop (no worker threads in parallel.js).
+const BAND_ROWS = 64;
+const PARALLEL_HEIGHT_FROM = 1024 * 1024;   // pixels: below this one thread is quicker
+let bandContext = null;                     // a band thread's converters, built once per job
+
+/** Rows y0..y1-1 of the heightmap, from the shared tiles (a band thread's work). */
+export const sampleHeightBand = async ({ y0, y1 }, shared) => {
+    if (bandContext?.shared !== shared.jobKey) {
+        const layerStack = await buildLayerStack(shared.tiles, shared.epsgDefs, shared.noData);
+        bandContext = {
+            shared: shared.jobKey,
+            groups: layerStack[0] || [],
+            toWGS84: createLocalToWGS84(shared.center.lat, shared.center.lng),
+            heightMap: new Float32Array(shared.heightBuffer),
+        };
+    }
+    const { groups, toWGS84, heightMap } = bandContext;
+    const { width, height, targetBounds, noData } = shared;
+    // (the last-tile cache starts empty in every band: it only saves time)
+    for (const group of groups) group.lastTile = null;
+    for (let y = y0; y < y1; y++) {
+        const rowOffset = y * width;
+        for (let x = 0; x < width; x++) {
+            const [lng, lat] = getPixelLatLng(x, y, width, height, toWGS84, targetBounds);
+            let h = sampleHeightAt(lng, lat, groups, null, noData);
+            if (!Number.isFinite(h) || h <= -200 || h === noData) h = noData;
+            heightMap[rowOffset + x] = h;
+        }
+    }
+    return y1 - y0;
+};
+
+/** A raster in shared memory (the band threads read it without copies). */
+const toShared = (raster) => {
+    if (!raster || raster.buffer instanceof SharedArrayBuffer || typeof SharedArrayBuffer === 'undefined') return raster;
+    const copy = new raster.constructor(new SharedArrayBuffer(raster.byteLength));
+    copy.set(raster);
+    return copy;
+};
+
+/**
+ * The height loop on every core, or null where only one thread is available
+ * (then the caller samples here). The heightmap comes back in shared memory.
+ */
+const sampleHeightParallel = async ({ width, height, center, targetBounds, tiles, epsgDefs, noData, reportProgress }) => {
+    if (width * height < PARALLEL_HEIGHT_FROM || typeof SharedArrayBuffer === 'undefined') return null;
+    const threads = await parallelThreads();
+    if (threads <= 1) return null;
+    const heightBuffer = new SharedArrayBuffer(width * height * 4);
+    const shared = {
+        jobKey: `${Date.now()}-${Math.random()}`,
+        width, height, center, targetBounds, epsgDefs, noData, heightBuffer,
+        tiles: (tiles || []).map((t) => ({ ...t, raster: toShared(t.raster) })),
+    };
+    const bands = [];
+    for (let y0 = 0; y0 < height; y0 += BAND_ROWS) bands.push({ y0, y1: Math.min(height, y0 + BAND_ROWS) });
+    let rowsDone = 0;
+    await parallelMap(bands, {
+        local: sampleHeightBand,
+        module: new URL('./resamplerWorker.js', import.meta.url).href,
+        fn: 'sampleHeightBand',
+        shared,
+        threads,
+        onResult: (_i, rows) => {
+            rowsDone += rows;
+            reportProgress?.({ stage: 'sample-height-image', message: 'Mapping elevation to the output grid...', current: rowsDone, total: height });
+        },
+    });
+    return new Float32Array(heightBuffer);
+};
+
+// The satellite texture the same way: lattice row bands on every core, the
+// mosaic in shared memory, each band writing its rows of one shared output.
+const IMAGE_BAND_LATTICE_ROWS = 4;          // 64 output rows per band
+let imageBandContext = null;
+
+/** Lattice cell rows j0..j1-1 of the satellite texture (a band thread's work). */
+export const sampleImageBand = ({ j0, j1 }, shared) => {
+    if (imageBandContext?.jobKey !== shared.jobKey) {
+        const toWGS84 = createLocalToWGS84(shared.center.lat, shared.center.lng);
+        const { width, height, targetBounds, zoom, originX, originY } = shared;
+        imageBandContext = {
+            jobKey: shared.jobKey,
+            out: new Uint8ClampedArray(shared.outBuffer),
+            mosaic: { pixels: new Uint8ClampedArray(shared.mosaicBuffer), width: shared.mosaicWidth, height: shared.mosaicHeight },
+            gridToMosaic: (gx, gy) => {
+                const [lng, lat] = getPixelLatLng(gx, gy, width, height, toWGS84, targetBounds);
+                const p = project(lat, lng, zoom);
+                return [p.x - originX, p.y - originY];
+            },
+        };
+    }
+    const { out, mosaic, gridToMosaic } = imageBandContext;
+    sampleSatelliteTexture({
+        width: shared.width, height: shared.height, outWidth: shared.outWidth, outHeight: shared.outHeight,
+        mosaic, gridToMosaic, out, latticeRows: [j0, j1],
+    });
+    return j1 - j0;
+};
+
+/** The satellite texture on every core, or null where one thread is all there is. */
+const resampleSatelliteParallel = async ({ width, height, imageWidth, imageHeight, center, targetBounds, imageSource }) => {
+    const outWidth = imageWidth || width;
+    const outHeight = imageHeight || height;
+    if (outWidth * outHeight < PARALLEL_HEIGHT_FROM || typeof SharedArrayBuffer === 'undefined' || !imageSource?.pixels) return null;
+    const threads = await parallelThreads();
+    if (threads <= 1) return null;
+    let outBuffer;
+    try { outBuffer = new SharedArrayBuffer(outWidth * outHeight * 4); } catch { return null; }
+    const mosaic = toShared(imageSource.pixels instanceof Uint8ClampedArray ? imageSource.pixels : new Uint8ClampedArray(imageSource.pixels.buffer || imageSource.pixels));
+    const shared = {
+        jobKey: `${Date.now()}-${Math.random()}`,
+        width, height, outWidth, outHeight, center, targetBounds,
+        zoom: imageSource.zoom, originX: imageSource.minTileX * TILE_SIZE, originY: imageSource.minTileY * TILE_SIZE,
+        mosaicBuffer: mosaic.buffer, mosaicWidth: imageSource.width, mosaicHeight: imageSource.height,
+        outBuffer,
+    };
+    const rows = satelliteLatticeRows(outHeight);
+    if (rows < 2) return null;
+    const bands = [];
+    for (let j0 = 0; j0 < rows; j0 += IMAGE_BAND_LATTICE_ROWS) bands.push({ j0, j1: Math.min(rows, j0 + IMAGE_BAND_LATTICE_ROWS) });
+    await parallelMap(bands, {
+        local: sampleImageBand,
+        module: new URL('./resamplerWorker.js', import.meta.url).href,
+        fn: 'sampleImageBand',
+        shared,
+        threads,
+    });
+    // (an ordinary buffer: it is transferred back)
+    return { rgbaBuffer: new Uint8ClampedArray(outBuffer).slice(), imageWidth: outWidth, imageHeight: outHeight };
+};
+
+// Gap filling the same way: the fill map sampled in row bands on every core.
+// The Terrarium mosaic is decoded once here and shared; high-res gap tiles
+// (GPXZ chunks used as gap-fill) go to the threads as shared rasters.
+let gapBandContext = null;
+
+/** Rows y0..y1-1 of the fill map (a band thread's work). */
+export const sampleGapBand = async ({ y0, y1 }, shared) => {
+    if (gapBandContext?.jobKey !== shared.jobKey) {
+        const groups = shared.tiles?.length ? await buildPreparedTileGroups(shared.tiles, shared.epsgDefs, shared.noData) : [];
+        let fallback = null;
+        if (shared.fallback) {
+            fallback = { ...shared.fallback };
+            // (decoded once by the parent: the cache answers getTerrariumHeights)
+            terrariumHeightsCache.set(fallback, new Float32Array(shared.fallback.heightsBuffer));
+        }
+        gapBandContext = {
+            jobKey: shared.jobKey,
+            needed: new Uint8Array(shared.neededBuffer),
+            fillMap: new Float32Array(shared.fillBuffer),
+            toWGS84: createLocalToWGS84(shared.center.lat, shared.center.lng),
+            sample: (lng, lat) => sampleHeightAt(lng, lat, groups, fallback, shared.noData),
+        };
+    }
+    const { needed, fillMap, toWGS84, sample } = gapBandContext;
+    for (let y = y0; y < y1; y++) sampleGapRow(y, shared.width, shared.height, needed, fillMap, sample, shared.noData, toWGS84, shared.targetBounds);
+    return y1 - y0;
+};
+
+/**
+ * applyGapFill on every core: { result } (result null when there was nothing
+ * to fill), or null where one thread is all there is (the caller runs applyGapFill).
+ */
+const applyGapFillParallel = async ({ heightMap, width, height, noData, spec, center, targetBounds, reportProgress }) => {
+    if (!spec || (!spec.tiles?.length && !spec.fallback)) return null;
+    if (width * height < PARALLEL_HEIGHT_FROM || typeof SharedArrayBuffer === 'undefined') return null;
+    const threads = await parallelThreads();
+    if (threads <= 1) return null;
+    const plan = gapFillPlan(heightMap, width, height, noData);
+    if (!plan) return { result: null };
+    const label = spec.tiles?.length ? 'high-res gap-fill tiles' : 'global elevation tiles';
+    const message = `Filling gaps from ${label}...`;
+    reportProgress?.({ stage: 'gap-fill', message, current: 0, total: height, force: true });
+    const neededShared = toShared(plan.needed);
+    const fillBuffer = new SharedArrayBuffer(width * height * 4);
+    const fillMap = new Float32Array(fillBuffer).fill(noData);
+    let fallback = null;
+    if (spec.fallback) {
+        const heights = toShared(getTerrariumHeights(spec.fallback, noData));
+        const { pixels, ...meta } = spec.fallback;
+        fallback = { ...meta, heightsBuffer: heights.buffer };
+    }
+    const shared = {
+        jobKey: `${Date.now()}-${Math.random()}`,
+        width, height, center, targetBounds, noData,
+        neededBuffer: neededShared.buffer, fillBuffer, fallback,
+        tiles: (spec.tiles || []).map((t) => ({ ...t, raster: toShared(t.raster) })),
+        epsgDefs: spec.epsgDefs,
+    };
+    const bands = [];
+    for (let y0 = 0; y0 < height; y0 += BAND_ROWS) bands.push({ y0, y1: Math.min(height, y0 + BAND_ROWS) });
+    let rowsDone = 0;
+    await parallelMap(bands, {
+        local: sampleGapBand,
+        module: new URL('./resamplerWorker.js', import.meta.url).href,
+        fn: 'sampleGapBand',
+        shared,
+        threads,
+        onResult: (_i, rows) => {
+            rowsDone += rows;
+            reportProgress?.({ stage: 'gap-fill', message, current: rowsDone, total: height });
+        },
+    });
+    return { result: blendGapFill(heightMap, fillMap, width, height, noData, label) };
+};
+
 const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, imageHeight, targetBounds = null, smooth, fillHoles = true, expandFilledGaps = true, tiles, fallback, epsgDefs, imageSource, flat = false, gapFillTiles = null, gapFillEpsgDefs = null }) => {
-    const heightMap = new Float32Array(width * height);
+    let heightMap = null;
     const toWGS84 = createLocalToWGS84(center.lat, center.lng);
     const NO_DATA = -99999;
     const reportProgress = createProgressReporter(id);
@@ -1143,7 +1370,13 @@ const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, i
         reportProgress({ stage: 'prepare', message: 'Elevation tiles ready.', current: 1, total: 1, force: true });
     }
 
-    if (!flat) {
+    // (every core where threads exist; else the loop below, as before)
+    if (!flat && tiles?.length) {
+        heightMap = await sampleHeightParallel({ width, height, center, targetBounds, tiles, epsgDefs, noData: NO_DATA, reportProgress });
+    }
+    const sampledInParallel = !!heightMap;
+    if (!heightMap) heightMap = new Float32Array(width * height);
+    if (!flat && !sampledInParallel) {
         for (let y = 0; y < height; y++) {
             const rowOffset = y * width;
             for (let x = 0; x < width; x++) {
@@ -1166,14 +1399,24 @@ const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, i
     }
 
     reportProgress({ stage: 'sample-image', message: 'Mapping satellite imagery to the output grid...', current: 0, total: 1, force: true });
-    const image = resampleSatelliteImage({ width, height, imageWidth, imageHeight, toWGS84, targetBounds, imageSource });
+    const image = (await resampleSatelliteParallel({ width, height, imageWidth, imageHeight, center, targetBounds, imageSource }))
+        || resampleSatelliteImage({ width, height, imageWidth, imageHeight, toWGS84, targetBounds, imageSource });
     reportProgress({ stage: 'sample-image', message: 'Mapping satellite imagery to the output grid...', current: 1, total: 1, force: true });
 
     if (!flat) {
         fillFromLayerStack(heightMap, width, height, NO_DATA, layerStack, toWGS84, targetBounds, reportProgress);
-        applyGapFill(heightMap, width, height, NO_DATA, gapFill, toWGS84, targetBounds, reportProgress);
+        // (every core where threads exist; else the one-thread fill)
+        const parallelFill = await applyGapFillParallel({
+            heightMap, width, height, noData: NO_DATA, center, targetBounds, reportProgress,
+            spec: { tiles: gapFillTiles, epsgDefs: gapFillEpsgDefs, fallback },
+        });
+        if (!parallelFill) applyGapFill(heightMap, width, height, NO_DATA, gapFill, toWGS84, targetBounds, reportProgress);
         finalizeHeightMap(heightMap, width, height, NO_DATA, smooth, fillHoles, expandFilledGaps, reportProgress);
     }
+
+    // (from shared memory to an ordinary buffer: it is transferred back, and
+    // a SharedArrayBuffer cannot be)
+    if (sampledInParallel) heightMap = heightMap.slice();
 
     return {
         heightMap,
@@ -1213,7 +1456,8 @@ const resolveTileRasters = (tiles, directive) => {
 };
 
 // ─── Message Handler ─────────────────────────────────────────────────────────
-self.onmessage = async (e) => {
+// (band threads import this module for sampleHeightBand: they have no self)
+if (typeof self !== 'undefined') self.onmessage = async (e) => {
     const { type, id, ...params } = e.data;
 
     try {

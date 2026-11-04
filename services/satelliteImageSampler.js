@@ -14,6 +14,9 @@
 // downsampling no longer aliases (the old path took the nearest mosaic pixel).
 
 export const IMAGE_LATTICE_STEP = 16;
+
+/** How many lattice cell rows a texture of outHeight pixels has (for splitting it in bands). */
+export const satelliteLatticeRows = (outHeight) => Math.ceil((Math.max(1, Math.floor(outHeight)) - 1) / IMAGE_LATTICE_STEP);
 const MAX_TAPS = 4;
 
 /**
@@ -25,9 +28,11 @@ const MAX_TAPS = 4;
  * @param {{pixels: ArrayLike<number>, width: number, height: number}} p.mosaic  RGBA mosaic
  * @param {(gx: number, gy: number) => [number, number]} p.gridToMosaic  mosaic pixel position (pixel i spans [i, i+1))
  * @param {Uint8ClampedArray} [p.out]  RGBA output buffer (allocated when omitted)
+ * @param {[number, number]} [p.latticeRows]  only the lattice cell rows [first, end): a band of
+ *   the texture, for sampling it on several threads into one shared buffer (same pixels)
  * @returns {Uint8ClampedArray}
  */
-export function sampleSatelliteTexture({ width, height, outWidth, outHeight, mosaic, gridToMosaic, out }) {
+export function sampleSatelliteTexture({ width, height, outWidth, outHeight, mosaic, gridToMosaic, out, latticeRows = null }) {
   const outW = Math.max(1, Math.floor(outWidth));
   const outH = Math.max(1, Math.floor(outHeight));
   const rgba = out ?? new Uint8ClampedArray(outW * outH * 4);
@@ -43,9 +48,13 @@ export function sampleSatelliteTexture({ width, height, outWidth, outHeight, mos
   const nodesY = [];
   for (let y = 0; y < outH - 1; y += step) nodesY.push(y);
   nodesY.push(outH - 1);
+  // (a band computes only its own lattice rows, and the row below its last)
+  const cellRows = nodesY.length - 1;
+  const jFirst = latticeRows ? Math.max(0, latticeRows[0]) : 0;
+  const jEnd = latticeRows ? Math.min(cellRows, latticeRows[1]) : cellRows;
   const lx = new Float64Array(nodesX.length * nodesY.length);
   const ly = new Float64Array(nodesX.length * nodesY.length);
-  for (let j = 0; j < nodesY.length; j++) {
+  for (let j = jFirst; j <= Math.min(nodesY.length - 1, jEnd); j++) {
     for (let i = 0; i < nodesX.length; i++) {
       const [mx, my] = at(nodesX[i], nodesY[j]);
       lx[j * nodesX.length + i] = mx;
@@ -96,7 +105,7 @@ export function sampleSatelliteTexture({ width, height, outWidth, outHeight, mos
   for (let k = 0; k < taps; k++) tapOffsets.push(((k + 0.5) / taps - 0.5));
   const norm = 1 / (taps * taps);
 
-  for (let j = 0; j + 1 < nodesY.length; j++) {
+  for (let j = jFirst; j < jEnd; j++) {
     const y0 = nodesY[j];
     const y1 = nodesY[j + 1];
     const yEnd = j + 2 === nodesY.length ? y1 : y1 - 1;
@@ -136,7 +145,7 @@ export function sampleSatelliteTexture({ width, height, outWidth, outHeight, mos
     }
   }
   // A 1-pixel-wide/high output has a single lattice node per axis.
-  if (nodesX.length === 1 || nodesY.length === 1) {
+  if ((nodesX.length === 1 || nodesY.length === 1) && !latticeRows) {
     for (let y = 0; y < outH; y++) {
       for (let x = 0; x < outW; x++) {
         const [mx, my] = at(x, y);
