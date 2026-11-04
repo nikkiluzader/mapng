@@ -10212,8 +10212,14 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
    * Add a forest placement to priority or regular buckets with hard caps.
    */
   let placed = 0;
+  // (a point off the map comes back from geoToWorldPoint pinned to its edge:
+  // trees of a way or a scatter reaching past the bounds piled up there, 1277
+  // in one corner of a dense 2 km export, and BeamNG's forest cell tree
+  // recursed on the pile until it overflowed the stack and crashed the load)
+  const forestHalf = (terrainData.width * squareSize) / 2;
   const pushPlacement = (placement, { priority = false } = {}) => {
     if (!getManagedForestTemplate(biome, placement.type)) return;
+    if (!(Math.abs(placement.pos[0]) < forestHalf && Math.abs(placement.pos[1]) < forestHalf)) return;
     if (placed >= caps.forestTotal) return;
     const target = priority ? priorityPlacementsByType : regularPlacementsByType;
     if (!target.has(placement.type)) target.set(placement.type, []);
@@ -12456,7 +12462,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (vegetationCleared) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Vegetation: ${vegetationCleared} placement(s) kept off roads, sidewalks and bridges.`);
   // Hydrants and bins (mapped + generated) as Forest items: instanced and
   // cheap, and their orientation does not matter.
+  const propHalf = (terrainData.width * squareSize) / 2;
   const addPropPlacement = (type, x, y, z, yaw) => {
+    if (!(Math.abs(x) < propHalf && Math.abs(y) < propHalf)) return;   // (on the map only)
     if (!forestPlacements.has(type)) forestPlacements.set(type, []);
     const list = forestPlacements.get(type);
     if (list.length >= caps.forestPerType) return;

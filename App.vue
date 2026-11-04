@@ -245,6 +245,7 @@ import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import { createGenerationProgress } from './services/generationProgress.js';
 import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
+import { desktopApp, fetchTerrainDataOnDesktop } from './services/platform/desktop.js';
 import { releaseUploadRasterCache } from './services/resamplerClient';
 import { applyAscCoordinateSystem } from './services/ascLoader.js';
 import { NODATA_AUTO } from './services/nodataDetect.js';
@@ -875,23 +876,16 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         },
       );
     } else {
-      data = await fetchTerrainData(
-        center.value,
-        resolution.value,
-        fetchOSM,
-        useUSGS,
-        useGPXZ,
-        useKRON86,
-        gpxzApiKey,
-        undefined,
-        applyLoadingUpdate,
-        signal,
-        {
-          processingMetersPerPixel: Number(processingMpp || 1),
-          flat: useFlat,
-          raw,
-        },
-      );
+      const generationOptions = {
+        processingMetersPerPixel: Number(processingMpp || 1),
+        flat: useFlat,
+        raw,
+      };
+      // (the desktop app fetches and processes in a Node process: no 4 GB
+      // window limit; the website does it here)
+      data = desktopApp
+        ? await fetchTerrainDataOnDesktop(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, applyLoadingUpdate, signal, generationOptions)
+        : await fetchTerrainData(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, undefined, applyLoadingUpdate, signal, generationOptions);
     }
     terrainData.value = data;
     lastGenerationKey.value = requestKey;

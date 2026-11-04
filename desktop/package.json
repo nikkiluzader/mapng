@@ -17,7 +17,12 @@
   "scripts": {
     "start": "electron .",
     "stage": "node scripts/stage.mjs",
-    "pack:win": "node scripts/stage.mjs --platform win32 && electron-builder --win --x64",
-    "pack:linux": "node scripts/stage.mjs --platform linux && electron-builder --linux --x64"
-  }
+    "pack:win": "node scripts/stage.mjs --platform win32 && electron-builder --win --x64 --publish never -c.win.signAndEditExecutable=false",
+    "pack:linux": "node scripts/stage.mjs --platform linux && electron-builder --linux --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "homepage": "https://mapng.com",
+  "repository": "github:nikkiluzader/mapng"
 }

@@ -9,32 +9,19 @@
 // by hand).
 import fs from 'node:fs';
 import path from 'node:path';
-import v8 from 'node:v8';
 import { installBrowserShims } from './browserShims.mjs';
 import { reviveJobValue } from './jobFormat.mjs';
+import { appApiFetch, send, startMemoryReports } from './common.mjs';
 
 // (MAPNG_ASSETS: set by the app; the repo's public/ when run by hand)
 installBrowserShims({
   assetsDir: path.resolve(process.env.MAPNG_ASSETS || new URL('../../public', import.meta.url).pathname),
   apiOrigin: process.env.MAPNG_API_ORIGIN || 'https://mapng.com',
+  apiFetch: appApiFetch(),
 });
 const { exportBeamNGLevel } = await import('../../services/exportBeamNGLevel.js');
 
-const send = (msg) => (process.send ? process.send(msg) : console.log(JSON.stringify(msg)));
-
-// (the app's memory monitor shows this process while it runs)
-if (process.send) {
-  const heapLimit = v8.getHeapStatistics().heap_size_limit;
-  let cpuBefore = process.cpuUsage(); let at = Date.now();
-  setInterval(() => {
-    const { rss, heapUsed } = process.memoryUsage();
-    const cpuNow = process.cpuUsage(); const now = Date.now();
-    // (busy cores: CPU time over wall time)
-    const cores = ((cpuNow.user - cpuBefore.user) + (cpuNow.system - cpuBefore.system)) / 1000 / Math.max(1, now - at);
-    cpuBefore = cpuNow; at = now;
-    send({ type: 'memory', rss, heapUsed, heapLimit, cores });
-  }, 1000).unref();
-}
+startMemoryReports();
 
 async function main() {
   const jobDir = process.argv[2];

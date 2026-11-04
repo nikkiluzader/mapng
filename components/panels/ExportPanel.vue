@@ -293,12 +293,17 @@
 
           <div
             v-if="beamNGDesktopSaved"
-            class="w-full p-2 bg-emerald-600/15 border border-emerald-700 rounded text-[11px] space-y-1"
+            class="w-full flex items-start gap-2 p-2 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50"
           >
-            <div class="font-medium text-emerald-300 break-all">{{ t('exportPanel.desktopSaved', { name: beamNGDesktopSaved.filename }) }}</div>
-            <div class="flex gap-3">
-              <button type="button" class="underline text-emerald-200 hover:text-white" @click="showDesktopSavedLevel">{{ t('exportPanel.desktopShowInFolder') }}</button>
-              <button type="button" class="underline text-emerald-200/80 hover:text-white" @click="changeDesktopModsFolder">{{ t('exportPanel.desktopChangeFolder') }}</button>
+            <CheckCircle2 :size="14" class="shrink-0 mt-0.5 text-[#FF6600]" />
+            <div class="min-w-0 flex-1 space-y-1.5">
+              <div class="text-[11px] font-medium text-gray-700 dark:text-gray-200 [overflow-wrap:anywhere]">{{ t('exportPanel.desktopSaved', { name: beamNGDesktopSaved.filename }) }}</div>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="showDesktopSavedLevel">
+                  <FolderOpen :size="11" />{{ t('exportPanel.desktopShowInFolder') }}
+                </button>
+                <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="changeDesktopModsFolder">{{ t('exportPanel.desktopChangeFolder') }}</button>
+              </div>
             </div>
           </div>
         </div>
@@ -631,7 +636,7 @@ import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen
 } from 'lucide-vue-next';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';

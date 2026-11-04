@@ -673,7 +673,9 @@ const readCustomOverpassUrl = () => {
   }
 };
 // Only on the deployed site (same-origin Worker); not in node or file://.
-const cacheEndpointAvailable = () => /^https?:$/.test(globalThis.location?.protocol || "");
+// (the site, and the desktop app: its app:// page and its Node runners pass
+// /api/* on to mapng.com)
+const cacheEndpointAvailable = () => /^(https?|app):$/.test(globalThis.location?.protocol || "");
 const MAX_IN_FLIGHT = 3;
 const ATTEMPT_TIMEOUT_MS = 60000;   // server-side [timeout:30] + transfer
 const OVERALL_DEADLINE_MS = 150000;

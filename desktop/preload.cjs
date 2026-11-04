@@ -22,4 +22,20 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
     return () => ipcRenderer.removeListener('desktop:usage', listener);
   },
   cleanupJob: (jobId) => ipcRenderer.invoke('job:cleanup', jobId),
+  linkTerrainFile: (jobId, name, terrainId, file) => ipcRenderer.invoke('job:linkTerrainFile', jobId, name, terrainId, file),
+  // Generate Data in a Node process: resolves { id, seconds, width, height }
+  // or { id, cancelled }; onStarted(id) first (for cancelTerrain), then
+  // onProgress(update) with what the page's loading screen shows
+  generateTerrain: (params, { onStarted, onProgress } = {}) => {
+    let id = null;
+    const started = (_event, startedId) => { if (id === null) { id = startedId; onStarted?.(startedId); } };
+    const progress = (_event, progressId, update) => { if (progressId === id) onProgress?.(update); };
+    ipcRenderer.on('terrain:started', started);
+    ipcRenderer.on('terrain:progress', progress);
+    return ipcRenderer.invoke('terrain:generate', params).finally(() => {
+      ipcRenderer.removeListener('terrain:started', started);
+      ipcRenderer.removeListener('terrain:progress', progress);
+    });
+  },
+  cancelTerrain: (id) => ipcRenderer.invoke('terrain:cancel', id),
 });

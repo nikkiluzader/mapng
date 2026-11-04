@@ -1,0 +1,71 @@
+# MapNG desktop: on a version tag (v0.1.0, matching desktop/package.json),
+# build the Windows installer and the Linux AppImage and attach them to a
+# draft GitHub Release (with the latest*.yml files the app's updater reads).
+# Publish the draft by hand once it is checked: users are offered it then.
+name: Desktop release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            builder: --win
+          - os: ubuntu-latest
+            platform: linux
+            builder: --linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            desktop/package-lock.json
+
+      - name: Tag matches the desktop version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          want="v$(node -p "require('./desktop/package.json').version")"
+          [ "$want" = "${GITHUB_REF_NAME}" ] || { echo "tag ${GITHUB_REF_NAME} != desktop/package.json $want"; exit 1; }
+
+      - name: Build the page
+        run: |
+          npm ci
+          npm run build
+
+      - name: Stage the export runner and Node
+        working-directory: desktop
+        run: |
+          npm ci
+          node scripts/stage.mjs --platform ${{ matrix.platform }} --arch x64
+
+      - name: Package and publish
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # (a manual run builds without publishing: artifacts below)
+        run: npx electron-builder ${{ matrix.builder }} --x64 --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mapng-${{ matrix.platform }}
+          path: |
+            desktop/release/*.exe
+            desktop/release/*.AppImage
+            desktop/release/latest*.yml
+          if-no-files-found: error

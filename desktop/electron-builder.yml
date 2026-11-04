@@ -1,14 +1,22 @@
 # MapNG desktop packaging. Run scripts/stage.mjs for the target platform
 # first (the export runner + Node runtime) and npm run build at the repo root
 # (the page): both ride outside the asar, where a separate Node can read them.
+#
+# Releases: .github/workflows/desktop-release.yml builds both platforms on a
+# version tag (v0.1.0 = desktop/package.json's version) and publishes them to
+# a draft GitHub Release, with the latest*.yml files the updater reads.
 appId: com.mapng.desktop
 productName: MapNG
+copyright: Copyright © Nikki Luzader
 directories:
   output: release
+  buildResources: assets
+icon: assets/icon.png
 files:
   - main.js
   - preload.cjs
   - modsFolder.js
+  - updater.js
   - package.json
 extraResources:
   - from: ../dist
@@ -20,10 +28,30 @@ extraResources:
     to: runner/node_modules
   - from: build/node
     to: node
+publish:
+  provider: github
+  owner: nikkiluzader
+  repo: mapng
+  releaseType: draft
 win:
-  # (a folder for now; an installer and signing come with releases)
-  target: dir
-  signAndEditExecutable: false
+  target:
+    - target: nsis
+      arch: [x64]
+  # (unsigned for now: Windows SmartScreen warns on first run. On Linux,
+  # editing the exe's icon and version needs wine: pass
+  # -c.win.signAndEditExecutable=false there, as pack:win does)
+  artifactName: MapNG-Setup-${version}.${ext}
+nsis:
+  # (per user, no admin prompt; the user may pick the folder)
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: MapNG
+  deleteAppDataOnUninstall: false
 linux:
-  target: AppImage
+  target:
+    - target: AppImage
+      arch: [x64]
   category: Game
+  artifactName: MapNG-${version}-x86_64.${ext}

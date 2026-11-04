@@ -9,6 +9,8 @@ import { toRaw } from 'vue';
 export const desktopApp = (typeof window !== 'undefined' && window.mapngDesktop) || null;
 
 // (one IPC message each: well under Chromium's message size limit)
+const TERRAIN_FILE_URL = /^app:\/\/mapng\/__terrain\/([\w-]+)\/([\w.-]+)$/;
+const mimeOf = (file) => ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', json: 'application/json' }[file.split('.').pop().toLowerCase()] || '');
 const CHUNK_BYTES = 64 * 1024 * 1024;
 
 async function sendBytes(jobId, name, bytes) {
@@ -51,6 +53,13 @@ async function pack(value, key, job) {
   if (typeof value === 'function' || typeof value === 'symbol') return undefined;
   const name = () => `${String(key).replace(/[^\w-]+/g, '_')}_${++job.files}`;
   if (typeof value === 'string') {
+    // (a generated terrain's file: linked into the job where it already is)
+    const terrainFile = value.match(TERRAIN_FILE_URL);
+    if (terrainFile) {
+      const file = name();
+      await desktopApp.linkTerrainFile(job.id, file, terrainFile[1], terrainFile[2]);
+      return { $file: file, as: 'blobUrl', type: mimeOf(terrainFile[2]) };
+    }
     // (images by blob:/data: URL: the URL dies with the page, so the image goes)
     if (/^(blob|data):/.test(value)) {
       const blob = await (await fetch(value)).blob();
@@ -129,4 +138,73 @@ export async function exportLevelOnDesktop(terrainData, center, options) {
   const result = await desktopApp.runJob(jobId, { center: toRaw(center), terrainData: packedTerrain, options: packedOptions }, onProgress);
   await desktopApp.cleanupJob(jobId);
   return result;
+}
+
+// ---- Generate Data in Node --------------------------------------------------
+
+// (the page's settings the terrain services read: desktop/runner/common.mjs)
+function settingsSnapshot() {
+  const out = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith('mapng')) out[k] = localStorage.getItem(k);
+    }
+  } catch { /* none */ }
+  return out;
+}
+
+const TYPED_ARRAYS = {
+  Float32Array, Float64Array, Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array,
+};
+
+/** terrain.json's value read back in the page: images stay files, by URL. */
+async function reviveTerrainValue(value, base) {
+  if (Array.isArray(value)) return Promise.all(value.map((v) => reviveTerrainValue(v, base)));
+  if (!value || typeof value !== 'object') return value;
+  if (typeof value.$file === 'string') {
+    const url = `${base}/${value.$file}`;
+    if (value.as === 'blobUrl' || value.as === 'canvas') return url;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`terrain file ${value.$file}: ${r.status}`);
+    if (value.as === 'json') return r.json();
+    if (value.as === 'blob') return new Blob([await r.arrayBuffer()], { type: value.type || '' });
+    const Typed = TYPED_ARRAYS[value.as];
+    if (!Typed) throw new Error(`unknown terrain value kind ${value.as}`);
+    return new Typed(await r.arrayBuffer());
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(value)) out[k] = await reviveTerrainValue(v, base);
+  return out;
+}
+
+/**
+ * services/terrain.js fetchTerrainData's work done by the desktop app in a
+ * Node process (same arguments): no 4 GB window limit on the fetching and
+ * processing. The terrain's images come back as app:// file URLs, not
+ * copies; an export links those files instead of sending them back.
+ */
+export async function fetchTerrainDataOnDesktop(center, resolution, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, onProgress, signal, generationOptions = {}) {
+  if (signal?.aborted) throw new DOMException('Terrain generation cancelled', 'AbortError');
+  let terrainId = null;
+  const onAbort = () => { if (terrainId) desktopApp.cancelTerrain(terrainId); };
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+  try {
+    const result = await desktopApp.generateTerrain({
+      center: toRaw(center), resolution, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey,
+      generationOptions: JSON.parse(JSON.stringify(toRaw(generationOptions) || {})),
+      localStorage: settingsSnapshot(),
+    }, {
+      onStarted: (id) => { terrainId = id; if (signal?.aborted) desktopApp.cancelTerrain(id); },
+      onProgress,
+    });
+    if (result?.cancelled || signal?.aborted) throw new DOMException('Terrain generation cancelled', 'AbortError');
+    const base = `app://mapng/__terrain/${result.id}`;
+    const stored = await (await fetch(`${base}/terrain.json`)).json();
+    const data = await reviveTerrainValue(stored, base);
+    data.desktopTerrainId = result.id;
+    return data;
+  } finally {
+    signal?.removeEventListener?.('abort', onAbort);
+  }
 }

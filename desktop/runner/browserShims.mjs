@@ -72,9 +72,10 @@ const MIME = { '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/
 /**
  * assetsDir: the app's own files (public/ in development, the built dist/
  * when packaged), which the page reads by path (/beamng_shape_materials.json);
- * apiOrigin: where /api/* goes, as on mapng.com.
+ * apiOrigin: where /api/* goes, as on mapng.com; apiFetch: how (the app's
+ * main process, when given: desktop/runner/common.mjs appApiFetch).
  */
-export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com' } = {}) {
+export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com', apiFetch = null } = {}) {
   globalThis.document = {
     createElement(tag) {
       if (tag === 'canvas') return withBrowserMethods(createCanvas(300, 150));
@@ -115,14 +116,23 @@ export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com'
   };
   URL.revokeObjectURL = (url) => { blobs.delete(url); };
 
+  // (where the page's code thinks it runs: the desktop app's own origin)
+  globalThis.location = { protocol: 'app:', host: 'mapng', hostname: 'mapng', origin: 'app://mapng', href: 'app://mapng/', pathname: '/', search: '', hash: '' };
+
   const originalFetch = globalThis.fetch;
   globalThis.fetch = (input, init) => {
-    const url = typeof input === 'string' ? input : input?.url;
+    let url = typeof input === 'string' ? input : input instanceof URL ? input.href : input?.url;
+    if (url?.startsWith('app://mapng/')) { url = url.slice('app://mapng'.length); input = url; }
     if (url?.startsWith('blob:')) {
       const blob = blobs.get(url);
       return Promise.resolve(blob ? new Response(blob) : new Response(null, { status: 404 }));
     }
-    if (url?.startsWith('/api/')) return originalFetch(apiOrigin + url, init);
+    if (url?.startsWith('/api/') && apiFetch) return apiFetch(url, init);
+    if (url?.startsWith('/api/')) {
+      const headers = new Headers(init?.headers || undefined);
+      if (!headers.has('user-agent')) headers.set('user-agent', USER_AGENT);
+      return originalFetch(apiOrigin + url, { ...init, headers });
+    }
     if (url?.startsWith('/') && !url.startsWith('//') && assetsDir) {
       const rel = decodeURIComponent(url.split(/[?#]/)[0]);
       const file = path.join(assetsDir, path.normalize(rel).replace(/^([/\\])+/, ''));
@@ -133,9 +143,18 @@ export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com'
         headers: { 'content-type': MIME[path.extname(file).toLowerCase()] || 'application/octet-stream' },
       }));
     }
+    // (a browser names itself; Node's default "node" gets rate-limited by
+    // public servers such as the Overpass mirrors)
+    if (/^https?:/.test(url || '')) {
+      const headers = new Headers(init?.headers || (input instanceof Request ? input.headers : undefined));
+      if (!headers.has('user-agent')) headers.set('user-agent', USER_AGENT);
+      return originalFetch(input, { ...init, headers });
+    }
     return originalFetch(input, init);
   };
 }
+
+const USER_AGENT = `MapNG-Desktop/${process.env.MAPNG_VERSION || 'dev'} (+https://mapng.com)`;
 
 // an ImageBitmap: anything drawImage takes, with close()
 function bitmapOf(drawable) {

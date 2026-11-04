@@ -35,14 +35,17 @@ const CANVAS_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.js
 const RUNNER_EXTERNAL = ['@napi-rs/canvas', 'laz-perf'];
 // (work handed to worker threads: each is loaded by its own file name)
 const WORKER_MODULES = ['sidewalkPanels.js'];
+const RUNNERS = ['exportJob.mjs', 'generateJob.mjs'];
 const LAZ_PERF_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, '..', 'package.json'), 'utf8')).dependencies['laz-perf'].replace(/^[\^~]/, '');
 
 async function stageRunner() {
   const out = path.join(BUILD, 'runner');
   fs.rmSync(out, { recursive: true, force: true });
   await build({
-    entryPoints: [path.join(DESKTOP, 'runner', 'exportJob.mjs')],
-    outfile: path.join(out, 'exportJob.mjs'),
+    // (each runner the app starts: an export, and Generate Data)
+    entryPoints: RUNNERS.map((name) => path.join(DESKTOP, 'runner', name)),
+    outdir: out,
+    outExtension: { '.js': '.mjs' },
     bundle: true,
     platform: 'node',
     format: 'esm',
