@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
   // the levels sidebar: { folder, appVersion, levels: [...] }
   listLevels: () => ipcRenderer.invoke('levels:list'),
   showLevelInFolder: (zipName) => ipcRenderer.invoke('levels:showInFolder', zipName),
+  showLevelData: (levelName) => ipcRenderer.invoke('levels:showData', levelName),
   // the level's zip and saved project to the Recycle Bin / Trash: resolves { ok }
   deleteLevel: (zipName, levelName) => ipcRenderer.invoke('levels:delete', zipName, levelName),
   // a level's saved settings for "Modify" ({ center, resolution, generationOptions, options, ... } or null)

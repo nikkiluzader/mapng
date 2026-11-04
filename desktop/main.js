@@ -271,6 +271,25 @@ ipcMain.handle('job:write', (_event, jobId, name, bytes, append) => {
   if (append) fs.appendFileSync(file, data); else fs.writeFileSync(file, data);
 });
 
+/**
+ * Where an export's own downloads (US lidar for bridge heights, the
+ * surrounding backdrop) are kept and replayed: a terrain generated from a
+ * level's saved sources ("Modify") exports against that level's
+ * export-sources, recording anything new beside the job; otherwise the job
+ * records them all (saveProject keeps them with the level).
+ */
+function exportSourcesFor(terrainId, jobDir) {
+  const recordDir = path.join(jobDir, 'export-sources');
+  let replayDir = null;
+  try {
+    const generate = JSON.parse(fs.readFileSync(path.join(sessionDirOf(terrainId), 'job.json'), 'utf8'));
+    if (generate.sources?.mode === 'replay') replayDir = path.join(path.dirname(generate.sources.dir), 'export-sources');
+  } catch { /* a terrain from the page, or none */ }
+  return replayDir && fs.existsSync(replayDir)
+    ? { mode: 'replay', dir: replayDir, fallback: true, recordDir }
+    : { mode: 'record', dir: recordDir };
+}
+
 ipcMain.handle('job:run', async (event, jobId, job) => {
   const dir = jobDirOf(jobId);
   let outputDir = modsFolder();
@@ -279,7 +298,9 @@ ipcMain.handle('job:run', async (event, jobId, job) => {
     fs.rmSync(dir, { recursive: true, force: true });
     return { cancelled: true };
   }
-  fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify({ ...job, outputDir }));
+  const terrainId = typeof job.terrainData?.desktopTerrainId === 'string' ? job.terrainData.desktopTerrainId : null;
+  const sources = terrainId ? exportSourcesFor(terrainId, dir) : { mode: 'record', dir: path.join(dir, 'export-sources') };
+  fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify({ ...job, outputDir, sources }));
   const child = spawnRunner(RUNNER, dir);
   running.set(jobId, child);
   try {
@@ -373,6 +394,17 @@ function saveProject(jobDir, job, result) {
       for (const f of fs.readdirSync(src)) { linkOrCopy(path.join(src, f), path.join(tmp, 'sources', f)); sources++; }
     }
   }
+  // (the export's own downloads: lidar, backdrop; those it replayed, and new ones)
+  let exportSources = 0;
+  const exportDirs = [job.sources?.mode === 'replay' ? job.sources.dir : null, path.join(jobDir, 'export-sources')];
+  for (const d of exportDirs) {
+    if (!d || !fs.existsSync(d)) continue;
+    fs.mkdirSync(path.join(tmp, 'export-sources'), { recursive: true });
+    for (const f of fs.readdirSync(d)) {
+      const to = path.join(tmp, 'export-sources', f);
+      if (!fs.existsSync(to)) { linkOrCopy(path.join(d, f), to); exportSources++; }
+    }
+  }
   // images the page made or changed itself (not the generated terrain's files)
   const linked = linkedFiles.get(path.basename(jobDir)) || new Set();
   const overrides = {};
@@ -399,6 +431,7 @@ function saveProject(jobDir, job, result) {
     zip: result.path,
     rebuildable: !!terrainId && sources > 0,
     sources,
+    exportSources,
     center: job.center,
     options: job.options,
     overrides,
@@ -556,6 +589,12 @@ ipcMain.handle('levels:project', (_event, levelName) => {
   };
 });
 
+// a level's saved data (projects/<level>: the raw downloads, settings) in the file manager
+ipcMain.handle('levels:showData', async (_event, levelName) => {
+  const dir = projectDirOf(String(levelName));
+  if (fs.existsSync(dir)) await shell.openPath(dir);
+});
+
 ipcMain.handle('levels:showInFolder', (_event, zipName) => {
   const folder = modsFolder();
   const file = folder && path.join(folder, path.basename(String(zipName)));
@@ -656,7 +695,12 @@ async function rebuildLevel(sender, zipName, levelName) {
       platform: 'desktop',
     };
     const outDir = path.join(jobDir, 'out');
-    const job = { center: generate.center, terrainData: terrain, options, outputDir: outDir };
+    // (the export's lidar and backdrop: from the level's export-sources)
+    const savedExport = path.join(projectDir, 'export-sources');
+    const exportSources = replay && fs.existsSync(savedExport)
+      ? { mode: 'replay', dir: savedExport, fallback: true, recordDir: path.join(jobDir, 'export-sources') }
+      : { mode: 'record', dir: path.join(jobDir, 'export-sources') };
+    const job = { center: generate.center, terrainData: terrain, options, outputDir: outDir, sources: exportSources };
     fs.writeFileSync(path.join(jobDir, 'job.json'), JSON.stringify(job));
     const exp = spawnRunner(RUNNER, jobDir);
     state.children.add(exp);
@@ -682,6 +726,12 @@ async function rebuildLevel(sender, zipName, levelName) {
     }
     const final = { ...result, path: zip, filename: path.basename(zip) };
     if (replay) {
+      // (export downloads this rebuild had to make: kept for the next one)
+      const fresh = path.join(jobDir, 'export-sources');
+      if (fs.existsSync(fresh)) {
+        fs.mkdirSync(savedExport, { recursive: true });
+        for (const f of fs.readdirSync(fresh)) if (!fs.existsSync(path.join(savedExport, f))) linkOrCopy(path.join(fresh, f), path.join(savedExport, f));
+      }
       // (the same sources: the project gets the new version and date)
       fs.writeFileSync(path.join(projectDir, 'project.json'), JSON.stringify({ ...project, appVersion: app.getVersion(), exportedAt: new Date().toISOString(), zip }, null, 1));
     } else {

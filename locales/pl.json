@@ -899,7 +899,11 @@
     "update": "Aktualizuj",
     "modify": "Zmień",
     "modifyHint": "Wczytaj ten poziom z jego ustawieniami, aby je zmienić i wyeksportować ponownie. Używa zapisanego terenu i danych OSM: nic nie jest pobierane.",
-    "modifyNoData": "„{name}” nie ma zapisanych danych, więc nie można go zmienić offline. Użyj Aktualizuj, aby go przebudować, albo Pokaż na mapie i wygeneruj ponownie."
+    "modifyNoData": "„{name}” nie ma zapisanych danych, więc nie można go zmienić offline. Użyj Aktualizuj, aby go przebudować, albo Pokaż na mapie i wygeneruj ponownie.",
+    "showInMods": "Pokaż w folderze mods",
+    "showInModsHint": "Otwórz folder mods BeamNG z zaznaczonym zipem tego poziomu",
+    "showData": "Pokaż zapisane dane",
+    "showDataHint": "Otwórz folder z zapisanymi danymi tego poziomu: surowe pobrane dane terenu, satelity, OpenStreetMap i wysokości mostów, których używają Aktualizuj i Zmień. Nie jest częścią zipa poziomu."
   },
   "desktopWelcome": {
     "title": "Witaj w MapNG Desktop",

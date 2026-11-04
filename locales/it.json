@@ -899,7 +899,11 @@
     "update": "Aggiorna",
     "modify": "Modifica",
     "modifyHint": "Ricarica questo livello con le sue impostazioni per cambiarle ed esportarlo di nuovo. Usa il terreno e i dati OSM salvati: non viene scaricato nulla.",
-    "modifyNoData": "«{name}» non ha dati salvati, quindi non può essere modificato offline. Usa Aggiorna per ricostruirlo, oppure Mostra sulla mappa e generalo di nuovo."
+    "modifyNoData": "«{name}» non ha dati salvati, quindi non può essere modificato offline. Usa Aggiorna per ricostruirlo, oppure Mostra sulla mappa e generalo di nuovo.",
+    "showInMods": "Mostra nella cartella mods",
+    "showInModsHint": "Apri la cartella mods di BeamNG con lo zip di questo livello selezionato",
+    "showData": "Mostra dati salvati",
+    "showDataHint": "Apri la cartella con i dati salvati di questo livello: i download grezzi di terreno, satellite, OpenStreetMap e altezze dei ponti usati da Aggiorna e Modifica. Non fa parte dello zip del livello."
   },
   "desktopWelcome": {
     "title": "Benvenuto in MapNG Desktop",

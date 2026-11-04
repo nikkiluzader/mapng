@@ -945,8 +945,8 @@
     "showInFolder": "Show in folder",
     "working": "Working…",
     "starting": "Starting…",
-    "confirmSaved": "Rebuild \"{name}\" with this version of MapNG?\n\nIt is made again from its saved terrain and OSM data with the same settings, so it gets every fix since it was exported. The current level is replaced when the new one is ready.\n\nNothing is downloaded.",
-    "confirmFetch": "Rebuild \"{name}\" with this version of MapNG?\n\nThis level was made before MapNG saved its data, so its area is fetched again: OpenStreetMap may have changed since, and the export uses default settings. The current level is replaced when the new one is ready.",
+    "confirmSaved": "Update \"{name}\" with this version of MapNG?\n\nIt is made again from its saved terrain and OSM data with the same settings, so it gets every fix since it was exported. The current level is replaced when the new one is ready.\n\nNothing is downloaded.",
+    "confirmFetch": "Update \"{name}\" with this version of MapNG?\n\nThis level was made before MapNG saved its data, so its area is fetched again: OpenStreetMap may have changed since, and the export uses default settings. The current level is replaced when the new one is ready.",
     "cancelled": "Rebuild cancelled. The level was not changed.",
     "rebuilt": "Rebuilt with MapNG {version} in {seconds} s.",
     "savedData": "Saved data: rebuilds without downloading",
@@ -960,7 +960,11 @@
     "update": "Update",
     "modify": "Modify",
     "modifyHint": "Load this level back in, with its settings, to change them and export again. Uses its saved terrain and OSM data: nothing is downloaded.",
-    "modifyNoData": "\"{name}\" has no saved data, so it can't be modified offline. Use Update to rebuild it, or Show on map and generate it again."
+    "modifyNoData": "\"{name}\" has no saved data, so it can't be modified offline. Use Update to rebuild it, or Show on map and generate it again.",
+    "showInMods": "Show in mods folder",
+    "showInModsHint": "Open BeamNG's mods folder with this level's zip selected",
+    "showData": "Show saved data",
+    "showDataHint": "Open the folder with this level's saved data: the raw terrain, satellite, OpenStreetMap and bridge height downloads Update and Modify use. It isn't part of the level zip."
   },
   "desktopWelcome": {
     "title": "Welcome to MapNG Desktop",

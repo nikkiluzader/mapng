@@ -900,7 +900,11 @@
     "update": "Actualizar",
     "modify": "Modificar",
     "modifyHint": "Vuelve a cargar este nivel con sus ajustes para cambiarlos y exportarlo de nuevo. Usa su terreno y datos OSM guardados: no se descarga nada.",
-    "modifyNoData": "«{name}» no tiene datos guardados, así que no se puede modificar sin conexión. Usa Actualizar para reconstruirlo, o Mostrar en el mapa y vuelve a generarlo."
+    "modifyNoData": "«{name}» no tiene datos guardados, así que no se puede modificar sin conexión. Usa Actualizar para reconstruirlo, o Mostrar en el mapa y vuelve a generarlo.",
+    "showInMods": "Mostrar en la carpeta mods",
+    "showInModsHint": "Abrir la carpeta mods de BeamNG con el zip de este nivel seleccionado",
+    "showData": "Mostrar datos guardados",
+    "showDataHint": "Abrir la carpeta con los datos guardados de este nivel: las descargas en bruto de terreno, satélite, OpenStreetMap y alturas de puentes que usan Actualizar y Modificar. No forma parte del zip del nivel."
   },
   "desktopWelcome": {
     "title": "Bienvenido a MapNG Escritorio",

@@ -243,8 +243,12 @@ async function bodyTextOf(init) {
 // elsewhere, e.g. Overture when Overpass did not answer), and download it.
 const OSM_REQUEST = /^(overpass:|\/api\/osm(\?|$))/;
 
-export function installSourceRecorder({ dir, mode = 'record', fallback = true }) {
+// recordDir (replay mode): a request missing from dir that goes online is
+// recorded there, so the next replay has it (an export's lidar or backdrop
+// when "Modify" turns something new on).
+export function installSourceRecorder({ dir, mode = 'record', fallback = true, recordDir = null }) {
   fs.mkdirSync(dir, { recursive: true });
+  if (recordDir) fs.mkdirSync(recordDir, { recursive: true });
   // (downloaded: misses that went online; missedUrls: the first few, for the log)
   const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [] };
   // (services/terrain.js skips the GPXZ request pacing while replaying)
@@ -270,17 +274,22 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true })
       const normalized = String(url).replace(/^https?:\/\/[^/]+(\/api\/interpreter)/, 'overpass:$1');
       if (!fallback || OSM_REQUEST.test(normalized)) throw new TypeError(`fetch failed: not in the recorded sources (${url})`);
       stats.downloaded++;
-      return inner(input, init);
+      const live = await inner(input, init);
+      if (recordDir) await save(live, path.join(recordDir, `${key}.json`), path.join(recordDir, `${key}.bin`), url, init);
+      return live;
     }
     const r = await inner(input, init);
+    await save(r, metaFile, bodyFile, url, init);
+    return r;
+  };
+  async function save(r, metaPath, bodyPath, url, init) {
     try {
       const bytes = Buffer.from(await r.clone().arrayBuffer());
       const headers = Object.fromEntries([...r.headers.entries()].filter(([k]) => !/^(content-encoding|content-length|transfer-encoding|set-cookie)$/i.test(k)));
-      fs.writeFileSync(bodyFile, bytes);
-      fs.writeFileSync(metaFile, JSON.stringify({ url, method: init.method || 'GET', status: r.status, statusText: r.statusText, headers }));
+      fs.writeFileSync(bodyPath, bytes);
+      fs.writeFileSync(metaPath, JSON.stringify({ url, method: init.method || 'GET', status: r.status, statusText: r.statusText, headers }));
       stats.recorded++;
     } catch { /* an unreadable body (aborted): the caller sees the same */ }
-    return r;
-  };
+  }
   return stats;
 }

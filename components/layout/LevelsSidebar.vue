@@ -120,9 +120,19 @@
             <button
               type="button"
               class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors"
+              :title="t('levels.showInModsHint')"
               @click="desktopApp.showLevelInFolder(level.zipName)"
             >
-              {{ t('levels.showInFolder') }}
+              {{ t('levels.showInMods') }}
+            </button>
+            <button
+              v-if="level.rebuildable"
+              type="button"
+              class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors"
+              :title="t('levels.showDataHint')"
+              @click="desktopApp.showLevelData(level.levelName)"
+            >
+              {{ t('levels.showData') }}
             </button>
             <button
               type="button"

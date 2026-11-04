@@ -899,7 +899,11 @@
     "update": "Aktualisieren",
     "modify": "Ändern",
     "modifyHint": "Dieses Level mit seinen Einstellungen wieder laden, um sie zu ändern und neu zu exportieren. Nutzt seine gespeicherten Gelände- und OSM-Daten: es wird nichts heruntergeladen.",
-    "modifyNoData": "„{name}“ hat keine gespeicherten Daten und kann daher nicht offline geändert werden. Nutze Aktualisieren für einen Neubau, oder Auf Karte zeigen und neu erzeugen."
+    "modifyNoData": "„{name}“ hat keine gespeicherten Daten und kann daher nicht offline geändert werden. Nutze Aktualisieren für einen Neubau, oder Auf Karte zeigen und neu erzeugen.",
+    "showInMods": "Im Mods-Ordner zeigen",
+    "showInModsHint": "BeamNGs Mods-Ordner öffnen, mit der Zip dieses Levels ausgewählt",
+    "showData": "Gespeicherte Daten zeigen",
+    "showDataHint": "Den Ordner mit den gespeicherten Daten dieses Levels öffnen: die Rohdaten für Gelände, Satellit, OpenStreetMap und Brückenhöhen, die Aktualisieren und Ändern nutzen. Er gehört nicht zur Level-Zip."
   },
   "desktopWelcome": {
     "title": "Willkommen bei MapNG Desktop",

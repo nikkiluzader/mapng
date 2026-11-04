@@ -900,7 +900,11 @@
     "update": "Mettre à jour",
     "modify": "Modifier",
     "modifyHint": "Recharger ce niveau avec ses réglages pour les changer et l'exporter à nouveau. Utilise son terrain et ses données OSM enregistrés : rien n'est téléchargé.",
-    "modifyNoData": "« {name} » n'a pas de données enregistrées : il ne peut pas être modifié hors ligne. Utilisez Mettre à jour pour le reconstruire, ou Afficher sur la carte et générez-le à nouveau."
+    "modifyNoData": "« {name} » n'a pas de données enregistrées : il ne peut pas être modifié hors ligne. Utilisez Mettre à jour pour le reconstruire, ou Afficher sur la carte et générez-le à nouveau.",
+    "showInMods": "Afficher dans le dossier mods",
+    "showInModsHint": "Ouvrir le dossier mods de BeamNG avec le zip de ce niveau sélectionné",
+    "showData": "Afficher les données enregistrées",
+    "showDataHint": "Ouvrir le dossier des données enregistrées de ce niveau : les téléchargements bruts de terrain, satellite, OpenStreetMap et hauteurs de ponts qu'utilisent Mettre à jour et Modifier. Il ne fait pas partie du zip du niveau."
   },
   "desktopWelcome": {
     "title": "Bienvenue dans MapNG Bureau",

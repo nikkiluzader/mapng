@@ -46,3 +46,17 @@ test('every worker module the services start is staged beside the runner', () =>
   const browserOnly = new Set(['lazWorker.js', 'x.js']);
   for (const w of started) if (!browserOnly.has(w)) assert.ok(staged.has(w), `${w} is started as a worker but not staged (desktop/scripts/stage.mjs WORKER_MODULES)`);
 });
+
+// The test suite never loads the desktop main process or the runners, so a
+// syntax error there (a duplicate declaration once stopped the app starting)
+// would only show when the app runs: every one must at least compile.
+test('the desktop main process and runners compile', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const root = new URL('../desktop/', import.meta.url).pathname;
+  const files = ['main.js', 'updater.js', 'levelLibrary.js', 'modsFolder.js',
+    ...fs.readdirSync(path.join(root, 'runner')).filter((f) => f.endsWith('.mjs')).map((f) => `runner/${f}`)];
+  for (const f of files) {
+    const r = spawnSync(process.execPath, ['--check', path.join(root, f)], { encoding: 'utf8' });
+    assert.equal(r.status, 0, `${f} does not compile:\n${r.stderr}`);
+  }
+});

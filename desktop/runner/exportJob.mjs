@@ -9,7 +9,7 @@
 // by hand).
 import fs from 'node:fs';
 import path from 'node:path';
-import { installBrowserShims } from './browserShims.mjs';
+import { installBrowserShims, installSourceRecorder } from './browserShims.mjs';
 import { reviveJobValue } from './jobFormat.mjs';
 import { appApiFetch, send, startMemoryReports } from './common.mjs';
 
@@ -27,6 +27,9 @@ async function main() {
   const jobDir = process.argv[2];
   if (!jobDir) throw new Error('usage: exportJob.mjs <job dir>');
   const job = JSON.parse(fs.readFileSync(path.join(jobDir, 'job.json'), 'utf8'));
+  // (the export's own downloads: US lidar for bridge heights, the backdrop;
+  // recorded with the level, replayed by Update and Modify: main.js)
+  const sources = installSourceRecorder(job.sources || { dir: path.join(jobDir, 'export-sources'), mode: 'record' });
   const terrainData = await reviveJobValue(job.terrainData, jobDir);
   const started = Date.now();
   // (the zip written to the file as it is made, beside the final name; the
@@ -50,7 +53,8 @@ async function main() {
   fs.closeSync(fd);
   const out = path.join(job.outputDir, filename);
   fs.renameSync(partial, out);
-  send({ type: 'done', path: out, filename, size, seconds: (Date.now() - started) / 1000 });
+  console.log(`[Sources] export ${job.sources?.mode || 'record'}: ${sources.recorded} recorded, ${sources.replayed} from saved data, ${sources.downloaded} downloaded`);
+  send({ type: 'done', path: out, filename, size, seconds: (Date.now() - started) / 1000, sources: { recorded: sources.recorded, replayed: sources.replayed, downloaded: sources.downloaded } });
 }
 
 main().then(
