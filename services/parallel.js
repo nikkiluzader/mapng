@@ -52,10 +52,15 @@ export async function parallelThreads(limit = Infinity) {
  * (default: the machine's cores); a pool of workers takes items as they
  * free up. On any platform without worker threads, or for one item, the
  * work runs here, in order.
+ *
+ * prefill: every item handed out at the start (round-robin), so the workers
+ * run on while this thread is busy with something else; onPosted() is
+ * called once they are (with no workers: at once, before the work).
  */
-export async function parallelMap(items, { local, module, fn, shared = null, threads = Infinity, onResult } = {}) {
+export async function parallelMap(items, { local, module, fn, shared = null, threads = Infinity, onResult, prefill = false, onPosted } = {}) {
   const n = module ? Math.min(items.length, await parallelThreads(threads)) : 1;
   if (n <= 1) {
+    onPosted?.();
     const out = [];
     for (let i = 0; i < items.length; i++) { out.push(await local(items[i], shared)); onResult?.(i, out[i]); }
     return out;
@@ -67,7 +72,7 @@ export async function parallelMap(items, { local, module, fn, shared = null, thr
   try {
     await new Promise((resolve, reject) => {
       const feed = (w) => {
-        if (next >= items.length) return;
+        if (prefill || next >= items.length) return;
         const id = next++;
         w.postMessage({ id, item: items[id] });
       };
@@ -84,6 +89,9 @@ export async function parallelMap(items, { local, module, fn, shared = null, thr
         });
         w.on('error', reject);
       }
+      // (a worker's port keeps what comes before it listens)
+      if (prefill) for (let id = 0; id < items.length; id++) workers[id % n].postMessage({ id, item: items[id] });
+      onPosted?.();
     });
   } finally {
     await Promise.all(workers.map((w) => w.terminate()));

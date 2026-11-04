@@ -979,8 +979,12 @@ export const lateral = (p, d) => [p.x + d * p.ty, p.y - d * p.tx];
  */
 export function nearestOnTunnel(t, x, y, reach = Infinity) {
   if (!t.index) t.index = indexLine(t.line);
-  let best = null;
-  for (const i of t.index.near(x, y, reach)) {
+  // (the best kept in numbers and the candidates in a reused array: this
+  // runs for every heightmap square near a tunnel, millions in a city)
+  let bi = -1; let bd2 = Infinity; let bf = 0; let bSide = 1; let bBeyond = false;
+  const cand = t.index.nearInto(x, y, reach, NEAR_SCRATCH);
+  for (let c = 0; c < cand.length; c++) {
+    const i = cand[c];
     const a = t.line[i];
     const b = t.line[i + 1];
     const ex = b.x - a.x;
@@ -990,13 +994,18 @@ export function nearestOnTunnel(t, x, y, reach = Infinity) {
     const px = a.x + ex * f;
     const py = a.y + ey * f;
     const d2 = (x - px) ** 2 + (y - py) ** 2;
-    if (d2 > reach * reach || (best && d2 >= best.d2)) continue;
+    if (d2 > reach * reach || (bi >= 0 && d2 >= bd2)) continue;
     const Ls = Math.sqrt(L2);
-    const side = Math.sign((x - a.x) * (ey / Ls) - (y - a.y) * (ex / Ls)) || 1;
+    bSide = Math.sign((x - a.x) * (ey / Ls) - (y - a.y) * (ex / Ls)) || 1;
     // past either end of the line (not beside it)
     const along = ((x - a.x) * ex + (y - a.y) * ey) / Ls;
-    const beyond = (i === 0 && along < -1e-6) || (i === t.line.length - 2 && along > Ls + 1e-6);
-    best = { d2, i: f < 0.5 ? i : i + 1, s: a.s + (b.s - a.s) * f, d: side * Math.sqrt(d2), z: a.z + (b.z - a.z) * f, beyond };
+    bBeyond = (i === 0 && along < -1e-6) || (i === t.line.length - 2 && along > Ls + 1e-6);
+    bi = i; bd2 = d2; bf = f;
+  }
+  let best = null;
+  if (bi >= 0) {
+    const a = t.line[bi]; const b = t.line[bi + 1];
+    best = { d2: bd2, i: bf < 0.5 ? bi : bi + 1, s: a.s + (b.s - a.s) * bf, d: bSide * Math.sqrt(bd2), z: a.z + (b.z - a.z) * bf, beyond: bBeyond };
   }
   if (!best) return null;
   const sS = t.portals[0] ? t.line[t.iS].s : -Infinity;
@@ -1006,6 +1015,7 @@ export function nearestOnTunnel(t, x, y, reach = Infinity) {
   return best;
 }
 
+const NEAR_SCRATCH = [];
 function indexLine(line, cell = 16) {
   // integer cell keys (cx, cy offset well clear of any level's extent)
   const key = (cx, cy) => (cx + 32768) * 65536 + (cy + 32768);
@@ -1023,6 +1033,20 @@ function indexLine(line, cell = 16) {
   }
   const all = line.slice(0, -1).map((_, i) => i);
   return {
+    // near(), into a reused array (out is emptied first)
+    nearInto(x, y, reach, out) {
+      out.length = 0;
+      const r = Number.isFinite(reach) ? Math.ceil(reach / cell) : 1e9;
+      if (r > 64) { for (const i of all) out.push(i); return out; }
+      const fx = Math.floor(x / cell); const fy = Math.floor(y / cell);
+      for (let cx = fx - r; cx <= fx + r; cx++) {
+        for (let cy = fy - r; cy <= fy + r; cy++) {
+          const list = cells.get(key(cx, cy));
+          if (list) for (let k = 0; k < list.length; k++) out.push(list[k]);
+        }
+      }
+      return out;
+    },
     // segment indices near (x, y) (a segment in two cells may come twice)
     near(x, y, reach) {
       const r = Number.isFinite(reach) ? Math.ceil(reach / cell) : 1e9;

@@ -20,6 +20,7 @@ import { parallelMap, parallelThreads } from './parallel.js';
 import {
   SLAB_TILE_M, PANEL_SCRAP_M2, PANEL_TRI_FLOATS, LEVEL_REACH_CELLS, ringArea, pointInRing, ringTouches,
   stripUv, makeCropper, makeCutFinder, makeLevelFinder, stripPanels, panelsForItem,
+  unionTile, unionTiles as unionTilesLocal,
 } from './sidewalkPanels.js';
 import { buildCarriagewayIndex, carriagewaysAt, cutNodes, isInZone, isOnOtherCarriageway } from './roadMarkingCuts.js';
 import { isOneWayRoad } from './roadWidth.js';
@@ -1419,9 +1420,22 @@ function moveEnd(end, t) {
  */
 function joinCorners(runs, index, walkRuns = []) {
   const ends = runs.flatMap((run) => [runEnd(run, true), runEnd(run, false)]);
+  // (ends by grid cell of the reach: each against its neighbours, not all
+  // against all: 4 s of a dense 8 km map)
+  const REACH = 2 * CORNER_REACH_M;
+  const endGrid = new Map();
+  ends.forEach((e, i) => {
+    const k = `${Math.floor(e.p[0] / REACH)},${Math.floor(e.p[1] / REACH)}`;
+    if (!endGrid.has(k)) endGrid.set(k, []);
+    endGrid.get(k).push(i);
+  });
   const pairs = [];
   for (let i = 0; i < ends.length; i++) {
-    for (let j = i + 1; j < ends.length; j++) {
+    const gx = Math.floor(ends[i].p[0] / REACH); const gy = Math.floor(ends[i].p[1] / REACH);
+    const near = [];
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const j of endGrid.get(`${gx + dx},${gy + dy}`) || []) if (j > i) near.push(j);
+    near.sort((a, b) => a - b);
+    for (const j of near) {
       const A = ends[i];
       const B = ends[j];
       if (A.run === B.run || Math.hypot(A.p[0] - B.p[0], A.p[1] - B.p[1]) > 2 * CORNER_REACH_M) continue;
@@ -1434,10 +1448,11 @@ function joinCorners(runs, index, walkRuns = []) {
       const tA = (C[0] - A.p[0]) * A.d[0] + (C[1] - A.p[1]) * A.d[1];
       const tB = (C[0] - B.p[0]) * B.d[0] + (C[1] - B.p[1]) * B.d[1];
       if (tA < -2 || tB < -2 || tA > CORNER_REACH_M || tB > CORNER_REACH_M) continue;
-      pairs.push({ A, B, cost: tA + tB });
+      pairs.push({ A, B, cost: tA + tB, i, j });
     }
   }
-  pairs.sort((x, y) => x.cost - y.cost);
+  // (ties in the order the all-pairs loop found them)
+  pairs.sort((x, y) => x.cost - y.cost || x.i - y.i || x.j - y.j);
   const used = new Set();
   const corners = [];
   for (const { A, B } of pairs) {
@@ -1856,6 +1871,9 @@ function sweepCorner(builder, corner) {
  * runs, triangles }. Batches of RUNS_PER_MESH runs; names use letters (BeamNG
  * reads trailing digits of a Collada node name as a detail level).
  */
+// (integer cell keys: a walk's every point looks up dozens of cells, and
+// building strings for them took seconds of a dense 8 km map)
+const wallCellKey = (cx, cy) => (cx + 32768) * 65536 + (cy + 32768);
 function wallIndex(walls) {
   const cells = new Map();
   for (const wall of walls) {
@@ -1863,7 +1881,7 @@ function wallIndex(walls) {
       const a = wall[i]; const b = wall[i + 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
       for (let s = 0; s <= L + 4; s += 4) {
         const f = Math.min(1, L ? s / L : 0);
-        const key = `${Math.floor((a[0] + (b[0] - a[0]) * f) / 8)},${Math.floor((a[1] + (b[1] - a[1]) * f) / 8)}`;
+        const key = wallCellKey(Math.floor((a[0] + (b[0] - a[0]) * f) / 8), Math.floor((a[1] + (b[1] - a[1]) * f) / 8));
         if (!cells.has(key)) cells.set(key, new Set());
         cells.get(key).add([a, b]);
       }
@@ -1879,7 +1897,9 @@ function wallAhead(cells, x, y, nx, ny, reach, across = 1) {
   const cx = Math.floor(x / 8); const cy = Math.floor(y / 8); const r = Math.ceil(reach / 8);
   for (let i = -r; i <= r; i++) {
     for (let j = -r; j <= r; j++) {
-      for (const [a, b] of cells.get(`${cx + i},${cy + j}`) || []) {
+      const list = cells.get(wallCellKey(cx + i, cy + j));
+      if (!list) continue;
+      for (const [a, b] of list) {
         const ex = b[0] - a[0]; const ey = b[1] - a[1];
         const det = nx * ey - ny * ex;
         if (Math.abs(det) < 1e-6) continue;
@@ -2147,8 +2167,13 @@ export function buildWalkRuns(paths, carriageways, { groundAt, driveways = [], b
     const line = [...(head ? [head] : []), ...body, ...(tail ? [tail] : [])];
     // the sides of the slab off the road: it may run up to a road, not along one
     const sideOn = (x, y) => {
+      // (the nearest point by squared distance in a plain loop: this runs for
+      // every sample of every walk's cuts)
       let best = line[0]; let at = 0; let d = Infinity;
-      line.forEach((q, i) => { const e = Math.hypot(q[0] - x, q[1] - y); if (e < d) { d = e; best = q; at = i; } });
+      for (let i = 0; i < line.length; i++) {
+        const q = line[i]; const ex = q[0] - x; const ey = q[1] - y; const e = ex * ex + ey * ey;
+        if (e < d) { d = e; best = q; at = i; }
+      }
       const a = line[Math.max(0, at - 1)]; const b = line[Math.min(line.length - 1, at + 1)];
       const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
       const nx = -(b[1] - a[1]) / L * half; const ny = (b[0] - a[0]) / L * half;
@@ -3320,25 +3345,19 @@ function* mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [],
       }
     }
   }
-  const merged = [];
-  for (const { tx, ty, list } of byTile.values()) {
+  // each tile's union (sidewalkPanels.js unionTile): on other threads if the
+  // driver can (buildSidewalkMeshesParallel), else here
+  const unionTiles = [...byTile.values()].map(({ tx, ty, list }) => {
     const tb = [tx * OUTLINE_TILE_M + OUTLINE_TILE_OFF_M, ty * OUTLINE_TILE_M + OUTLINE_TILE_OFF_M];
     tb.push(tb[0] + OUTLINE_TILE_M, tb[1] + OUTLINE_TILE_M);
-    const clip = [[[tb[0], tb[1]], [tb[2], tb[1]], [tb[2], tb[3]], [tb[0], tb[3]], [tb[0], tb[1]]]];
-    const inside = (o) => o.box[0] > tb[0] && o.box[1] > tb[1] && o.box[2] < tb[2] && o.box[3] < tb[3];
-    const crop = (o) => {
-      if (inside(o)) return o.shape;
-      try { return polygonClipping.intersection(o.shape, clip); } catch { return null; }
-    };
-    const unionOf = (picked) => {
-      const pieces = picked.map(crop).filter((g) => g && g.length);
-      return pieces.length ? polygonClipping.union(...pieces) : [];
-    };
-    let polys;
-    // (then without the pockets, rather than no edge at all)
-    try { polys = unionOf(list); } catch { try { polys = unionOf(list.filter((o) => !o.pocket)); } catch { continue; } }
-    for (const polygon of polys) merged.push({ polygon, tb });
-  }
+    return { tb, shapes: list.map((o) => o.shape), boxes: list.map((o) => o.box), pockets: list.map((o) => !!o.pocket) };
+  });
+  const unioned = (yield { kind: 'unions', tiles: unionTiles }) || unionTiles.map(unionTile);
+  const merged = [];
+  unionTiles.forEach(({ tb }, i) => {
+    // (null: the union failed even without the pockets: no edge there)
+    for (const polygon of unioned[i] || []) merged.push({ polygon, tb });
+  });
   const EDGE_ON_SIDE_M = 1e-3;
   const onTileSide = (a, b, tb) => (Math.abs(a[0] - tb[0]) < EDGE_ON_SIDE_M && Math.abs(b[0] - tb[0]) < EDGE_ON_SIDE_M)
     || (Math.abs(a[0] - tb[2]) < EDGE_ON_SIDE_M && Math.abs(b[0] - tb[2]) < EDGE_ON_SIDE_M)
@@ -3385,8 +3404,25 @@ export function buildSidewalkMeshes(carriageways, options = {}) {
 export async function buildSidewalkMeshesParallel(carriageways, options = {}) {
   const gen = sidewalkMeshes(carriageways, options);
   let step = gen.next();
-  while (!step.done) step = gen.next(await panelsOnWorkers(step.value));
+  while (!step.done) step = gen.next(step.value.kind === 'unions' ? await unionsOnWorkers(step.value) : await panelsOnWorkers(step.value));
   return step.value;
+}
+
+// The walks' outline tiles merged on worker threads (sidewalkPanels.js
+// unionTiles), a few neighbouring tiles per work item; null (merged on this
+// thread) where there are no worker threads or few tiles.
+const PARALLEL_UNIONS_FROM = 64;
+async function unionsOnWorkers({ tiles }) {
+  if (tiles.length < PARALLEL_UNIONS_FROM || (await parallelThreads()) <= 1) return null;
+  const GROUP = 4;
+  const items = [];
+  for (let i = 0; i < tiles.length; i += GROUP) items.push(tiles.slice(i, i + GROUP));
+  const results = await parallelMap(items, {
+    local: unionTilesLocal,
+    module: new URL(['./sidewalk', 'Panels.js'].join(''), import.meta.url).href,
+    fn: 'unionTiles',
+  });
+  return results.flat();
 }
 
 // Walkway tops on worker threads: the strips in 256 m tiles (by their boxes'
@@ -3408,6 +3444,19 @@ async function panelsOnWorkers({ order, earlierOverlapping, cutRings, stations, 
     tiles.get(k).push(s);
   }
   const reach = (LEVEL_REACH_CELLS + 1) * cell;
+  // (the cut rings by grid cell: each tile looks up only those near its
+  // strips; all of them against every tile took 18 s of a dense 8 km map)
+  const CUT_GRID_M = 64;
+  const cutGrid = new Map();
+  cutRings.forEach((c, i) => {
+    for (let gx = Math.floor(c.box[0] / CUT_GRID_M); gx <= Math.floor(c.box[2] / CUT_GRID_M); gx++) {
+      for (let gy = Math.floor(c.box[1] / CUT_GRID_M); gy <= Math.floor(c.box[3] / CUT_GRID_M); gy++) {
+        const k = `${gx},${gy}`;
+        if (!cutGrid.has(k)) cutGrid.set(k, []);
+        cutGrid.get(k).push(i);
+      }
+    }
+  });
   const items = [...tiles.values()].map((list) => {
     const strips = new Map(); const before = {};
     let x0 = Infinity; let y0 = Infinity; let x1 = -Infinity; let y1 = -Infinity;
@@ -3417,15 +3466,24 @@ async function panelsOnWorkers({ order, earlierOverlapping, cutRings, stations, 
       x0 = Math.min(x0, s.box[0]); y0 = Math.min(y0, s.box[1]); x1 = Math.max(x1, s.box[2]); y1 = Math.max(y1, s.box[3]);
     }
     // (the cuts any of its strips' panels could find, in their order)
-    const cuts = cutRings.filter((c) => list.some((s) => c.box[0] <= s.box[2] && s.box[0] <= c.box[2] && c.box[1] <= s.box[3] && s.box[1] <= c.box[3]));
+    const near = new Set();
+    for (const s of list) {
+      for (let gx = Math.floor(s.box[0] / CUT_GRID_M); gx <= Math.floor(s.box[2] / CUT_GRID_M); gx++) {
+        for (let gy = Math.floor(s.box[1] / CUT_GRID_M); gy <= Math.floor(s.box[3] / CUT_GRID_M); gy++) {
+          for (const i of cutGrid.get(`${gx},${gy}`) || []) near.add(i);
+        }
+      }
+    }
+    const cuts = [...near].sort((a, b) => a - b).map((i) => cutRings[i])
+      .filter((c) => list.some((s) => c.box[0] <= s.box[2] && s.box[0] <= c.box[2] && c.box[1] <= s.box[3] && s.box[1] <= c.box[3]));
     const keys = new Set();
     for (const s of list) {
       for (let cx = Math.floor((s.box[0] - reach) / cell); cx <= Math.floor((s.box[2] + reach) / cell); cx++) {
         for (let cy = Math.floor((s.box[1] - reach) / cell); cy <= Math.floor((s.box[3] + reach) / cell); cy++) keys.add(`${cx},${cy}`);
       }
     }
-    const near = [...keys].filter((k) => stations.has(k)).map((k) => [k, stations.get(k)]);
-    return { strips: [...strips.values()].map(plain), own: list.map((s) => s.rank), before, cuts, stations: near, cell };
+    const nearStations = [...keys].filter((k) => stations.has(k)).map((k) => [k, stations.get(k)]);
+    return { strips: [...strips.values()].map(plain), own: list.map((s) => s.rank), before, cuts, stations: nearStations, cell };
   });
   const results = await parallelMap(items, {
     local: panelsForItem,
@@ -3577,6 +3635,34 @@ const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
  * overhead(x, y, z, zTop): a deck or tunnel there (the ground is not raised).
  * Returns { pixels, apply(set) }: set(idx, raw) for every edited pixel.
  */
+// pixel index -> [key, sum, n] in typed arrays (open addressing): a Map of
+// small arrays for the millions of pixels by a dense city's sidewalks spent
+// seconds allocating
+class PixelClaims {
+  constructor() { this.cap = 1 << 16; this.size = 0; this.alloc(this.cap); }
+  alloc(cap) {
+    this.idx = new Int32Array(cap).fill(-1); this.key = new Float64Array(cap); this.sum = new Float64Array(cap); this.n = new Uint32Array(cap);
+  }
+  slot(idx) {
+    const mask = this.cap - 1; let h = Math.imul(idx, 0x9E3779B1) & mask;
+    while (this.idx[h] !== -1 && this.idx[h] !== idx) h = (h + 1) & mask;
+    return h;
+  }
+  grow() {
+    const { idx, key, sum, n, cap } = this;
+    this.cap = cap * 2; this.alloc(this.cap);
+    for (let i = 0; i < cap; i++) if (idx[i] !== -1) { const h = this.slot(idx[i]); this.idx[h] = idx[i]; this.key[h] = key[i]; this.sum[h] = sum[i]; this.n[h] = n[i]; }
+  }
+  claim(idx, key, target) {
+    let h = this.slot(idx);
+    if (this.idx[h] === -1) {
+      if ((this.size + 1) * 2 > this.cap) { this.grow(); h = this.slot(idx); }
+      this.idx[h] = idx; this.key[h] = key; this.sum[h] = target; this.n[h] = 1; this.size++;
+    } else if (key < this.key[h] - 1e-6) { this.key[h] = key; this.sum[h] = target; this.n[h] = 1; }
+    else if (Math.abs(key - this.key[h]) <= 1e-6) { this.sum[h] += target; this.n[h]++; }
+  }
+}
+
 export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () => false } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -3585,7 +3671,7 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
   const onRoad = (x, y) => isOnOtherCarriageway(index, x, y, GROUND_ROAD_MARGIN_M, () => false);
   // per pixel: the best claim (smallest distance out past a slab; inside a
   // slab 0, averaged among slabs)
-  const best = new Map();   // idx -> [key, sum, n]
+  const best = new PixelClaims();
   for (const run of runs || []) {
     const p = run.points;
     // (behind a bare curb the ground itself is filled up to its top)
@@ -3610,7 +3696,7 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
       const [c1, r1] = toPixel(Math.max(...xs), Math.min(...ys));
       for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
         for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
-          const [x, y] = toWorld(c, r);
+          const x = ((c / (width - 1)) - 0.5) * worldSize; const y = (0.5 - r / (height - 1)) * worldSize;
           const t = ((x - ax) * dx + (y - ay) * dy) / L2;
           if (t < 0 || t > 1) continue;
           const o = (x - ax) * nx + (y - ay) * ny;   // out from the curb line
@@ -3630,15 +3716,16 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
             if (f >= 1) continue;
             key = past; target = top + (ground - top) * smooth01(f);
           }
-          const prev = best.get(idx);
-          if (!prev || key < prev[0] - 1e-6) best.set(idx, [key, target, 1]);
-          else if (Math.abs(key - prev[0]) <= 1e-6) { prev[1] += target; prev[2]++; }
+          best.claim(idx, key, target);
         }
       }
     }
   }
   const edits = [];
-  for (const [idx, [, sum, n]] of best) {
+  for (let h = 0; h < best.cap; h++) {
+    const idx = best.idx[h];
+    if (idx === -1) continue;
+    const sum = best.sum[h]; const n = best.n[h];
     const r = Math.floor(idx / width); const c = idx - r * width;
     const [x, y] = toWorld(c, r);
     if (onRoad(x, y)) continue;

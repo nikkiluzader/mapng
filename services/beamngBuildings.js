@@ -1483,10 +1483,74 @@ export function neighbourLevels(features, project) {
   return out;
 }
 
-export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [], gateRoads = [] } = {}) {
+/**
+ * A building footprint's first checks, shared by the builder and by the
+ * exporter choosing which buildings fit under the cap (every footprint that
+ * passes is built): { skip: reason } or its projected outline, ring (counter-
+ * clockwise), area, tags, holes and ground heights.
+ */
+export function screenBuilding(f, project, businessTags = null) {
+  if (!Array.isArray(f.geometry) || f.geometry.length < 3) return { skip: 'badGeometry' };
+  const projected = f.geometry.map((p) => project(p.lat, p.lng));
+  let ring = cleanRing(projected.map(([x, y]) => [x, y]));
+  if (ring.length < 3) return { skip: 'badGeometry' };
+  let area = signedArea(ring);
+  if (area < 0) { ring = ring.reverse(); area = -area; }
+  if (area < 4) return { skip: 'tiny' };
+  const tags = businessTags?.get(f) || f.tags || {};
+  if (area > MAX_AREA_M2 && !INDUSTRIAL_CLASSES.has(tags.building) && !BIG_BOX_CLASSES.has(tags.building)) return { skip: 'oversize' };
+  // a bridge's pier or tower mapped as a building (the Zakim's 98 m pylon:
+  // building=tower + man_made=pier stood as an office tower in the roadway):
+  // the bridge builder draws its piers and the bridge styles its towers
+  if (BRIDGE_PART_MAN_MADE.has(tags.man_made) || BRIDGE_PART_BUILDINGS.has(tags.building)) return { skip: 'bridgeParts' };
+  // stands beside a field: tiered seating (sportsFields.js buildSeating), not a block
+  if (tags.building === 'grandstand' || tags.building === 'bleachers' || tags.leisure === 'bleachers') return { skip: 'seating' };
+  const holes = (f.holes || []).map((h) => {
+    let hr = cleanRing(h.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]));
+    if (hr.length >= 3 && signedArea(hr) > 0) hr = hr.reverse();
+    return hr;
+  }).filter((h) => h.length >= 3);
+  const grounds = projected.map((p) => p[2]).filter(Number.isFinite);
+  if (grounds.length === 0) return { skip: 'noGround' };
+  return { projected, ring, area, tags, holes, grounds };
+}
+
+/**
+ * What buildTexturedBuildings reads beyond each building, made once for all
+ * of them (a worker thread builds a share of the buildings with it): the
+ * features with a racetrack's stands tagged as such, the streets, the
+ * neighbours' storeys, the businesses inside, each hotel's main building.
+ */
+export function buildingContext(features, project, raceways = []) {
   // a racetrack's untagged stands (long, narrow, along the raceway) built as grandstands
   const stands = tracksideStands(features, project, raceways);
   if (stands.size) features = features.map((f) => (stands.has(f) ? { ...f, tags: { ...f.tags, building: 'grandstand' } } : f));
+  const streets = streetIndex(features, project);
+  const levelsHints = neighbourLevels(features, project);
+  // restaurants, pubs and hotels mapped as points inside a building: its use
+  const businessTags = businessTagsByBuilding(features, project);
+  // a hotel of several buildings has one entrance: its biggest, per name
+  const hotelMain = new Map();
+  for (const f of features) {
+    if (f?.type !== 'building' || !(f.geometry?.length >= 3)) continue;
+    const t = businessTags.get(f) || f.tags || {};
+    if (!['hotel', 'motel'].includes(buildingUse(t)) || !t.name) continue;
+    const r = f.geometry.map((q) => project(q.lat, q.lng));
+    const a = Math.abs(signedArea(r));
+    if (!hotelMain.has(t.name) || a > hotelMain.get(t.name).a) hotelMain.set(t.name, { f, a });
+  }
+  return { features, streets, levelsHints, businessTags, hotelMain };
+}
+
+/**
+ * part: 'all'; 'buildings' (only the buildings: a worker's share, with the
+ * context made for all of them) or 'extras' (all but the buildings:
+ * fountains, pools, fields, stands, racetracks). tileKeyPrefix keeps two
+ * parts' tiles apart.
+ */
+export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [], gateRoads = [], part = 'all', context = null, tileKeyPrefix = '' } = {}) {
+  const ctx = context || buildingContext(features, project, raceways);
+  features = ctx.features;
   const meshes = [];
   let count = 0;
   // buildings grouped by tile (their footprint's centre): one shape per tile
@@ -1497,7 +1561,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     let cx = 0; let cy = 0;
     for (const [x, y] of ring) { cx += x; cy += y; }
     const tx = Math.floor(cx / ring.length / tileM); const ty = Math.floor(cy / ring.length / tileM);
-    const key = `${tx}_${ty}`;
+    const key = `${tileKeyPrefix}${tx}_${ty}`;
     let t = tiles.get(key);
     if (!t) {
       t = { key, origin: [(tx + 0.5) * tileM, (ty + 0.5) * tileM], full: [], lite: [], fullB: new MeshBuilder(), liteB: new MeshBuilder(), inBatch: 0 };
@@ -1518,20 +1582,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     heightSource: {},
     details: {},
   };
-  const streets = streetIndex(features, project);
-  const levelsHints = neighbourLevels(features, project);
-  // restaurants, pubs and hotels mapped as points inside a building: its use
-  const businessTags = businessTagsByBuilding(features, project);
-  // a hotel of several buildings has one entrance: its biggest, per name
-  const hotelMain = new Map();
-  for (const f of features) {
-    if (f?.type !== 'building' || !(f.geometry?.length >= 3)) continue;
-    const t = businessTags.get(f) || f.tags || {};
-    if (!['hotel', 'motel'].includes(buildingUse(t)) || !t.name) continue;
-    const r = f.geometry.map((q) => project(q.lat, q.lng));
-    const a = Math.abs(signedArea(r));
-    if (!hotelMain.has(t.name) || a > hotelMain.get(t.name).a) hotelMain.set(t.name, { f, a });
-  }
+  const { streets, levelsHints, businessTags, hotelMain } = ctx;
   const props = [];
   stats.props = props;
   const bump = (map, key) => { map[key] = (map[key] || 0) + 1; };
@@ -1543,34 +1594,20 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (lite) t.lite.push(lite);
     t.fullB = new MeshBuilder(); t.liteB = new MeshBuilder(); t.inBatch = 0;
   };
+  const finish = () => {
+    for (const t of tiles.values()) if (t.inBatch) flushTile(t);
+    const tileList = [...tiles.values()].filter((t) => t.full.length).map(({ key, origin, full, lite }) => ({ key, origin, full, lite }));
+    stats.tiles = tileList.length;
+    return { meshes, count, stats, tiles: tileList };
+  };
 
-  for (const f of features) {
+  for (const f of part === 'extras' ? [] : features) {
     if (f?.type !== 'building') continue;
     stats.footprints++;
     if (count >= maxBuildings) { stats.skipped.overCap++; continue; }
-    if (!Array.isArray(f.geometry) || f.geometry.length < 3) { stats.skipped.badGeometry++; continue; }
-    const projected = f.geometry.map((p) => project(p.lat, p.lng));
-    let ring = cleanRing(projected.map(([x, y]) => [x, y]));
-    if (ring.length < 3) { stats.skipped.badGeometry++; continue; }
-    let area = signedArea(ring);
-    if (area < 0) { ring = ring.reverse(); area = -area; }
-    if (area < 4) { stats.skipped.tiny++; continue; }
-    const tags = businessTags.get(f) || f.tags || {};
-    if (area > MAX_AREA_M2 && !INDUSTRIAL_CLASSES.has(tags.building) && !BIG_BOX_CLASSES.has(tags.building)) { stats.skipped.oversize++; continue; }
-    // a bridge's pier or tower mapped as a building (the Zakim's 98 m pylon:
-    // building=tower + man_made=pier stood as an office tower in the roadway):
-    // the bridge builder draws its piers and the bridge styles its towers
-    if (BRIDGE_PART_MAN_MADE.has(tags.man_made) || BRIDGE_PART_BUILDINGS.has(tags.building)) { stats.skipped.bridgeParts = (stats.skipped.bridgeParts || 0) + 1; continue; }
-    // stands beside a field: tiered seating (sportsFields.js buildSeating), not a block
-    if (tags.building === 'grandstand' || tags.building === 'bleachers' || tags.leisure === 'bleachers') { stats.skipped.seating = (stats.skipped.seating || 0) + 1; continue; }
-    const holes = (f.holes || []).map((h) => {
-      let hr = cleanRing(h.map((p) => project(p.lat, p.lng)).map(([x, y]) => [x, y]));
-      if (hr.length >= 3 && signedArea(hr) > 0) hr = hr.reverse();
-      return hr;
-    }).filter((h) => h.length >= 3);
-
-    const grounds = projected.map((p) => p[2]).filter(Number.isFinite);
-    if (grounds.length === 0) { stats.skipped.noGround++; continue; }
+    const sc = screenBuilding(f, project, businessTags);
+    if (sc.skip) { stats.skipped[sc.skip] = (stats.skipped[sc.skip] || 0) + 1; continue; }
+    const { projected, ring, area, tags, holes, grounds } = sc;
     const zMin = Math.min(...grounds);
     const zMax = Math.max(...grounds);
     const c = f.geometry[0];
@@ -1854,6 +1891,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (holes.length) stats.withHoles++;
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
+  if (part === 'buildings') return finish();
   // fountains: basins, bowls and jets from the fountain library (services/fountains.js)
   const fountainKinds = {};
   for (const fo of planFountains(features, project)) {
@@ -1972,8 +2010,5 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
       };
     }
   }
-  for (const t of tiles.values()) if (t.inBatch) flushTile(t);
-  const tileList = [...tiles.values()].filter((t) => t.full.length).map(({ key, origin, full, lite }) => ({ key, origin, full, lite }));
-  stats.tiles = tileList.length;
-  return { meshes, count, stats, tiles: tileList };
+  return finish();
 }

@@ -17,3 +17,13 @@ test('parallelMap keeps the order, on threads and in-line', async () => {
 test('parallelMap passes an error in the work back', async () => {
   await assert.rejects(parallelMap([{ n: 1 }, { n: -1 }], { local: square, module: work, fn: 'square', threads: 2 }), /negative/);
 });
+
+// prefill: all items handed out at once (the caller's thread busy meanwhile)
+test('parallelMap with prefill keeps the order and reports when posted', async () => {
+  const items = Array.from({ length: 30 }, (_, i) => ({ n: i, spin: (i * 31) % 7 }));
+  let posted = false;
+  const p = parallelMap(items, { local: square, module: work, fn: 'square', shared: { plus: 2 }, threads: 3, prefill: true, onPosted: () => { posted = true; } });
+  const out = await p;
+  assert.ok(posted);
+  assert.deepEqual(out, items.map((it) => it.n * it.n + 2));
+});

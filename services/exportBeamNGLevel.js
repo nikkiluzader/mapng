@@ -11,7 +11,7 @@ import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLO
 import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
 import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
-import { buildTexturedBuildings, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
+import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
@@ -28,6 +28,8 @@ import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations, gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
+import { geoToWorldPoint, getTerrainHeightWorld, terrainDrape, terrainGroundAt } from './terrainLookup.js';
+import { BUILDING_LITE_FROM_M, buildingTileScene } from './buildingTiles.js';
 import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
@@ -1179,24 +1181,129 @@ function buildTunnelGroups(tunnels, daes, levelName) {
   return { items, lightCount, zoneCount, lightSpacing };
 }
 
+// (the export report's building stats from several shares: counts added,
+// min and max kept, lists joined)
+function mergeBuildingStats(into, from) {
+  for (const [k, v] of Object.entries(from || {})) {
+    if (typeof v === 'number') {
+      if (k === 'min') into[k] = Math.min(into[k] ?? Infinity, v);
+      else if (k === 'max') into[k] = Math.max(into[k] ?? -Infinity, v);
+      else into[k] = (into[k] || 0) + v;
+    } else if (Array.isArray(v)) into[k] = [...(into[k] || []), ...v];
+    else if (v && typeof v === 'object') into[k] = mergeBuildingStats(into[k] && typeof into[k] === 'object' ? into[k] : {}, v);
+    else if (into[k] === undefined) into[k] = v;
+  }
+  return into;
+}
+
+// below this many buildings the threads cost more than they save
+const PARALLEL_BUILDINGS_FROM = 1500;
+
+/**
+ * The buildings built and written on worker threads (services/buildingWorker.js)
+ * where the platform has them: the shared context made here once, the
+ * footprints chosen under the cap here (the same ones, in the same order,
+ * as one builder would), each tile's buildings a task; fountains, pools,
+ * fields, stands and racetracks built here, in tiles of their own. Null
+ * where it runs in one thread (the web page), or for a few buildings.
+ */
+async function buildBuildingsOnWorkers(terrainData, features, project, options) {
+  const buildingFeatures = features.filter((f) => f?.type === 'building').length;
+  if (buildingFeatures < PARALLEL_BUILDINGS_FROM || (await parallelThreads()) <= 1) return null;
+  const ctx = buildingContext(features, project, options.raceways);
+  // the footprints that will be built, as the builder would choose them
+  const skipped = { badGeometry: 0, tiny: 0, oversize: 0, noGround: 0, overCap: 0 };
+  const groups = new Map();   // tile key → features
+  let footprints = 0; let chosen = 0;
+  for (const f of ctx.features) {
+    if (f?.type !== 'building') continue;
+    footprints++;
+    if (chosen >= options.maxBuildings) { skipped.overCap++; continue; }
+    const sc = screenBuilding(f, project, ctx.businessTags);
+    if (sc.skip) { skipped[sc.skip] = (skipped[sc.skip] || 0) + 1; continue; }
+    chosen++;
+    // (the builder's own tile: its ring's mean point)
+    let cx = 0; let cy = 0;
+    for (const [x, y] of sc.ring) { cx += x; cy += y; }
+    const key = `${Math.floor(cx / sc.ring.length / options.tileM)}_${Math.floor(cy / sc.ring.length / options.tileM)}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(f);
+  }
+  const hotelOf = new Map([...ctx.hotelMain].map(([name, { f }]) => [f, name]));
+  const items = [...groups.values()].map((list) => ({
+    features: list,
+    hints: list.map((f) => ctx.levelsHints.get(f) ?? null),
+    business: list.map((f) => ctx.businessTags.get(f) || null),
+    hotelMain: list.map((f) => hotelOf.get(f) || null),
+  }));
+  // (the heightmap in shared memory: every worker reads the same one)
+  const hm = terrainData.heightMap;
+  const shm = new Float32Array(new SharedArrayBuffer(hm.length * 4)); shm.set(hm);
+  const shared = {
+    terrain: { bounds: terrainData.bounds, width: terrainData.width, height: terrainData.height, minHeight: terrainData.minHeight, heightMap: shm },
+    squareSize: options.squareSize, tileM: options.tileM,
+    roads: ctx.features.filter((f) => f?.type === 'road'),
+    passages: ctx.streets.passages,
+  };
+  // (all handed out at once: the workers build while this thread does the extras)
+  let posted; const postedP = new Promise((r) => { posted = r; });
+  const sharesP = parallelMap(items, {
+    local: (item, sh) => import('./buildingWorker.js').then((m) => m.buildBuildingShare(item, sh)),
+    module: new URL('./buildingWorker.js', import.meta.url).href, fn: 'buildBuildingShare', shared,
+    // (two cores left to this thread's extras, which otherwise ran half as fast)
+    threads: Math.max(1, (await parallelThreads()) - 2),
+    prefill: true, onPosted: posted,
+  });
+  await postedP;
+  // fountains, pools, fields, stands, racetracks: here, their tiles named apart
+  const extras = buildTexturedBuildings(features, project, { ...options, part: 'extras', context: ctx, tileKeyPrefix: 'x' });
+  const shares = await sharesP;
+  const stats = mergeBuildingStats({}, extras.stats);
+  let count = extras.count; let meshes = extras.meshes.length;
+  let triangles = extras.meshes.reduce((n, m) => n + (m.geometry.index?.count ?? m.geometry.getAttribute('position')?.count ?? 0) / 3, 0);
+  for (const sh of shares) {
+    mergeBuildingStats(stats, sh.stats);
+    count += sh.count; meshes += sh.meshes; triangles += sh.triangles;
+  }
+  stats.footprints = footprints;
+  // (the workers built only chosen footprints: the skips are all counted here)
+  stats.skipped = skipped;
+  // (an extras tile over a building tile keeps no lite copy of its own: in
+  // one shared tile its full-only pieces had none)
+  const buildingKeys = new Set(shares.flatMap((sh) => sh.tiles.map((t) => t.key)));
+  const extraDaes = await buildBuildingTileDAEs(extras.tiles || [], { cloneLite: (t) => !buildingKeys.has(t.key.slice(1)) });
+  const tileDaes = [...shares.flatMap((sh) => sh.tiles.filter((t) => t.data)), ...extraDaes];
+  stats.tiles = tileDaes.length;
+  return { count, stats, tileDaes, meshes, triangles };
+}
+
 async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [], gateRoads = [] } = {}) {
   if (!terrainData.osmFeatures?.length) return null;
 
   // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
   // straight in world space (services/beamngBuildings.js).
   const squareSize = worldSize / terrainData.width;
-  const { meshes: buildingMeshes, count: buildingCount, stats: buildingStats, tiles: buildingTiles } = buildTexturedBuildings(
-    // (carports are open roofs on posts: native carport models, not walls)
-    // (a filling station's canopy: the game's pump island brings its own)
-    terrainData.osmFeatures.filter((f) => !isCarportFeature(f) && !fuelLayout(terrainData, squareSize).used.has(f.id)),
-    (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
-    { maxBuildings: caps.buildings, tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads },
-  );
+  // (carports are open roofs on posts: native carport models, not walls)
+  // (a filling station's canopy: the game's pump island brings its own)
+  const features = terrainData.osmFeatures.filter((f) => !isCarportFeature(f) && !fuelLayout(terrainData, squareSize).used.has(f.id));
+  const project = (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
+  const buildOptions = { maxBuildings: caps.buildings, tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads };
+  const parallel = await buildBuildingsOnWorkers(terrainData, features, project, buildOptions);
+  let buildingCount; let buildingStats; let tileDaes; let meshCount; let triangles;
+  if (parallel) {
+    ({ count: buildingCount, stats: buildingStats, tileDaes, meshes: meshCount, triangles } = parallel);
+  } else {
+    const built = buildTexturedBuildings(features, project, buildOptions);
+    buildingCount = built.count; buildingStats = built.stats; meshCount = built.meshes.length;
+    triangles = built.meshes.reduce((n, m) => n + (m.geometry.index?.count ?? m.geometry.getAttribute('position')?.count ?? 0) / 3, 0);
+    // (the buildings are their own tile shapes: buildBuildingTileDAEs)
+    tileDaes = await buildBuildingTileDAEs(built.tiles || []);
+  }
   if (reportStats) {
     reportStats.built = buildingCount;
     reportStats.stats = buildingStats;
-    reportStats.meshes = buildingMeshes.length;
-    reportStats.triangles = buildingMeshes.reduce((n, m) => n + (m.geometry.index?.count ?? m.geometry.getAttribute('position')?.count ?? 0) / 3, 0);
+    reportStats.meshes = meshCount;
+    reportStats.triangles = triangles;
   }
 
   // Barriers are exported as native TSStatic objects in BeamNG scene JSON,
@@ -1217,8 +1324,6 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
 
   // Verify there is at least one mesh child — an empty group means no features
   // were of a type that produces geometry (e.g. only road centrelines).
-  // (the buildings are their own tile shapes now: buildBuildingTileDAEs)
-  const tileDaes = await buildBuildingTileDAEs(buildingTiles || []);
   let hasMesh = false;
   osmGroup.traverse(c => { if (c.isMesh) hasMesh = true; });
   if (!hasMesh) return { data: null, tiles: tileDaes };
@@ -1297,12 +1402,6 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
 // BUILDING_TILE_M (a 16 km map: ~1000 shapes of 512 m, not 4000 of 256 m)
 const BUILDING_TILES_ACROSS = 32;
 const buildingTileSize = (worldSize) => Math.max(BUILDING_TILE_M, worldSize / BUILDING_TILES_ACROSS);
-// The lite mesh takes over at about this distance from a tile: the engine's
-// detail size is (shape radius) x ENGINE_PX / distance (BeamNG.Earth's
-// measurement, 2560 x 1440 at high mesh quality; lower settings switch nearer)
-const BUILDING_LITE_FROM_M = 400;
-const ENGINE_DETAIL_PX = 4100;
-const LITE_DOWN_TO_PX = 2;      // the lite mesh drawn down to this detail size (the stock shapes' smallest)
 
 /**
  * One Collada shape per building tile: base00 > start01 > the full meshes
@@ -1311,51 +1410,15 @@ const LITE_DOWN_TO_PX = 2;      // the lite mesh drawn down to this detail size 
  * lite geometry again as the collision mesh (Colmesh-1). Positions relative
  * to the tile's origin. Returns [{ key, origin: [x, y], data }].
  */
-async function buildBuildingTileDAEs(tiles) {
-  const roots = []; const metas = [];
+async function buildBuildingTileDAEs(tiles, { cloneLite = () => true } = {}) {
+  const scenes = [];
   for (const t of tiles) {
-    const [ox, oy] = t.origin;
-    const base00 = new THREE.Group(); base00.name = 'base00';
-    const start01 = new THREE.Group(); start01.name = 'start01';
-    base00.add(start01);
-    const box = new THREE.Box3();
-    for (const m of [...t.full, ...t.lite]) {
-      m.geometry.translate(-ox, -oy, 0);
-      m.geometry.computeBoundingBox();
-      box.union(m.geometry.boundingBox);
-    }
-    const radius = box.isEmpty() ? 1 : box.getSize(new THREE.Vector3()).length() / 2;
-    const fullPx = Math.max(LITE_DOWN_TO_PX + 1, Math.round((radius * ENGINE_DETAIL_PX) / BUILDING_LITE_FROM_M));
-    t.full.forEach((m, i) => { m.name = `bld${letterName(i)}${fullPx}`; start01.add(m); });
-    const lites = t.lite.length ? t.lite : t.full;
-    lites.forEach((m, i) => {
-      const lm = t.lite.length ? m : m.clone();
-      lm.name = `lite${letterName(i)}${LITE_DOWN_TO_PX}`;
-      start01.add(lm);
-    });
-    // collision: the lite walls and roofs (positions only)
-    const parts = lites.map((m) => {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', m.geometry.getAttribute('position').clone());
-      if (m.geometry.index) g.setIndex(m.geometry.index.clone());
-      return g;
-    });
-    const colGeom = mergeGeometries(parts);
-    parts.forEach((g) => g.dispose());
-    if (colGeom) {
-      colGeom.name = 'Colmesh-1';
-      const col = new THREE.Mesh(colGeom, new THREE.MeshBasicMaterial({ name: 'osm_object', color: 0xffffff }));
-      col.name = 'Colmesh-1';
-      start01.add(col);
-    }
-    base00.updateMatrixWorld(true);
-    roots.push(base00);
-    metas.push({ key: t.key, origin: [ox, oy], fullPx });
+    scenes.push(buildingTileScene(t, { cloneLite: cloneLite(t) }));
     // (the thread back between tiles: a city is hundreds of them)
     await new Promise((r) => setTimeout(r, 0));
   }
-  const data = await writeDaes(roots);
-  return metas.map((m, i) => ({ ...m, data: data[i] })).filter((t) => t.data);
+  const data = await writeDaes(scenes.map((sc) => sc.root));
+  return scenes.map((sc, i) => ({ ...sc.meta, data: data[i] })).filter((t) => t.data);
 }
 
 /**
@@ -4366,17 +4429,23 @@ function distanceToLine(xy, x, y) {
 // 16384² grid is 1 GiB, and a copy per pass plus a full-grid weight buffer ran
 // the tab out of memory. `ground` is a pixel's height before this pass.
 const exportHeightMaps = new WeakSet();
-function heightMapEditor(terrainData) {
-  const before = new Map();
+// keepGround: remember each pixel's height before this editor's first
+// change (ground(idx)); the others write straight through (a Map of every
+// pixel the terrain composer touches took 4 s of a dense 8 km export).
+function heightMapEditor(terrainData, { keepGround = false } = {}) {
+  const before = keepGround ? new Map() : null;
   return {
     at: (idx) => terrainData.heightMap[idx],
-    ground: (idx) => (before.has(idx) ? before.get(idx) : terrainData.heightMap[idx]),
+    ground: (idx) => {
+      if (!before) throw new Error('heightMapEditor: ground() needs { keepGround: true }');
+      return before.has(idx) ? before.get(idx) : terrainData.heightMap[idx];
+    },
     set(idx, value) {
       if (!exportHeightMaps.has(terrainData.heightMap)) {
         terrainData.heightMap = terrainData.heightMap.slice();
         exportHeightMaps.add(terrainData.heightMap);
       }
-      if (!before.has(idx)) before.set(idx, terrainData.heightMap[idx]);
+      if (before && !before.has(idx)) before.set(idx, terrainData.heightMap[idx]);
       terrainData.heightMap[idx] = value;
     },
   };
@@ -4510,7 +4579,7 @@ export function gradeDragStrips(terrainData, squareSize, carriageways) {
 export function gradeAbutments(terrainData, squareSize, decks) {
   const { width, height, minHeight } = terrainData;
   const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
-  const hm = heightMapEditor(terrainData);
+  const hm = heightMapEditor(terrainData, { keepGround: true });
   const worldSize = width * squareSize;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
   const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
@@ -4610,7 +4679,7 @@ export function gradeAbutments(terrainData, squareSize, decks) {
 function raiseApproachEmbankments(terrainData, squareSize, ramps) {
   const { width, height, minHeight } = terrainData;
   const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
-  const hm = heightMapEditor(terrainData);
+  const hm = heightMapEditor(terrainData, { keepGround: true });
   const worldSize = width * squareSize;
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
   const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
@@ -7590,70 +7659,8 @@ function sampleMeanHeight(terrainData) {
   return n ? sum / n : null;
 }
 
-function getTerrainHeightWorld(lat, lng, terrainData) {
-  const { bounds, width, height, heightMap, minHeight } = terrainData;
-  const sanitizeHeight = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
-  const u = Math.max(0, Math.min(1, (lng - bounds.west) / (bounds.east - bounds.west)));
-  const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
-  const fx = u * (width - 1);
-  const fy = v * (height - 1);
-  const c0 = Math.min(width - 1, Math.floor(fx));
-  const c1 = Math.min(width - 1, c0 + 1);
-  const r0 = Math.min(height - 1, Math.floor(fy));
-  const r1 = Math.min(height - 1, r0 + 1);
-  const tx = fx - c0;
-  const ty = fy - r0;
-  const h00 = sanitizeHeight(heightMap[r0 * width + c0]);
-  const h10 = sanitizeHeight(heightMap[r0 * width + c1]);
-  const h01 = sanitizeHeight(heightMap[r1 * width + c0]);
-  const h11 = sanitizeHeight(heightMap[r1 * width + c1]);
-  return (h00 * (1 - tx) * (1 - ty) + h10 * tx * (1 - ty) + h01 * (1 - tx) * ty + h11 * tx * ty) - minHeight;
-}
 
-/**
- * The ground as the game draws it at world (x, y): the heightmap sampled on
- * the terrain's own grid (samples squareSize apart from minus half its
- * extent, rows from the south). The (W - 1)-span lookups drift up to a
- * square from it across the map, centimetres of height on a slope: the
- * fields and pool decks that lie on the ground use this one.
- */
-function terrainGroundAt(terrainData, squareSize) {
-  const { width, height, heightMap, minHeight } = terrainData;
-  const ok = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
-  return (x, y) => {
-    const fx = Math.max(0, Math.min(width - 1.001, x / squareSize + width / 2));
-    const fj = Math.max(0, Math.min(height - 1.001, y / squareSize + height / 2));
-    const fy = height - 1 - fj;
-    const c0 = Math.floor(fx); const r0 = Math.floor(fy); const c1 = Math.min(width - 1, c0 + 1); const r1 = Math.min(height - 1, r0 + 1);
-    const tx = fx - c0; const ty = fy - r0;
-    return ok(heightMap[r0 * width + c0]) * (1 - tx) * (1 - ty) + ok(heightMap[r0 * width + c1]) * tx * (1 - ty)
-      + ok(heightMap[r1 * width + c0]) * (1 - tx) * ty + ok(heightMap[r1 * width + c1]) * tx * ty - minHeight;
-  };
-}
 
-/**
- * The drawn terrain's height at world (x, y), at or just over it: the higher
- * of the two triangles a terrain square may be split into (both agree on its
- * edges). A mesh draped on this, cut along the terrain's squares, lies on the
- * ground however the engine splits them. Also returns the grid: { sq, ox, oy }
- * (sample i at ox + i * sq).
- */
-function terrainDrape(terrainData, squareSize) {
-  const { width, height, heightMap, minHeight } = terrainData;
-  const ok = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
-  const at = (c, r) => ok(heightMap[Math.max(0, Math.min(height - 1, r)) * width + Math.max(0, Math.min(width - 1, c))]) - minHeight;
-  const drapeAt = (x, y) => {
-    const fx = Math.max(0, Math.min(width - 1.0001, x / squareSize + width / 2));
-    const fj = Math.max(0, Math.min(height - 1.0001, y / squareSize + height / 2));
-    const i = Math.floor(fx); const j = Math.floor(fj); const u = fx - i; const v = fj - j;
-    // corners by (i, j) from the south-west; heightmap rows from the north
-    const h00 = at(i, height - 1 - j); const h10 = at(i + 1, height - 1 - j); const h01 = at(i, height - 2 - j); const h11 = at(i + 1, height - 2 - j);
-    const a = u + v <= 1 ? h00 + (h10 - h00) * u + (h01 - h00) * v : h11 + (h01 - h11) * (1 - u) + (h10 - h11) * (1 - v);
-    const b = u >= v ? h00 + (h10 - h00) * u + (h11 - h10) * v : h00 + (h01 - h00) * v + (h11 - h01) * u;
-    return Math.max(a, b);
-  };
-  return { drapeAt, grid: { sq: squareSize, ox: -(width / 2) * squareSize, oy: -(height / 2) * squareSize } };
-}
 
 /**
  * Convert a geographic point to BeamNG world-space coordinates.
@@ -7715,17 +7722,6 @@ function inRingXY(x, y, ring) {
   return inside;
 }
 
-function geoToWorldPoint(lat, lng, terrainData, squareSize, zOffset = 0) {
-  const { bounds, width } = terrainData;
-  const worldSize = width * squareSize;
-  const u = Math.max(0, Math.min(1, (lng - bounds.west) / (bounds.east - bounds.west)));
-  const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
-  return [
-    (u - 0.5) * worldSize,
-    (0.5 - v) * worldSize,
-    getTerrainHeightWorld(lat, lng, terrainData) + zOffset,
-  ];
-}
 
 /**
  * Sample terrain height (relative to minHeight, like geoToWorldPoint's Z) at a

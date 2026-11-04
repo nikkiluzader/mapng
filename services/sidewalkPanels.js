@@ -265,3 +265,30 @@ export function panelsForItem(item) {
   }
   return out;
 }
+
+/**
+ * One outline tile's union (beamngSidewalks.js mergeWalks): the strips that
+ * reach it cropped to its square tb and merged; failing that, without the
+ * pockets; failing that, null (no edge there). item { tb, shapes, boxes,
+ * pockets }; a work item for a worker thread.
+ */
+export function unionTile({ tb, shapes, boxes, pockets }) {
+  const clip = [[[tb[0], tb[1]], [tb[2], tb[1]], [tb[2], tb[3]], [tb[0], tb[3]], [tb[0], tb[1]]]];
+  const crop = (k) => {
+    const b = boxes[k];
+    if (b[0] > tb[0] && b[1] > tb[1] && b[2] < tb[2] && b[3] < tb[3]) return shapes[k];
+    try { return polygonClipping.intersection(shapes[k], clip); } catch { return null; }
+  };
+  const unionOf = (ks) => {
+    const pieces = ks.map(crop).filter((g) => g && g.length);
+    return pieces.length ? polygonClipping.union(...pieces) : [];
+  };
+  const all = shapes.map((_, k) => k);
+  try { return unionOf(all); } catch { /* without the pockets */ }
+  try { return unionOf(all.filter((k) => !pockets[k])); } catch { return null; }
+}
+
+/** Several tiles' unions (one work item: the tiles of a few hundred metres). */
+export function unionTiles(tiles) {
+  return tiles.map(unionTile);
+}

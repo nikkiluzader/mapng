@@ -463,16 +463,18 @@ const MERGE_FADE_M = 10;     // lateral room past touching over which the merge 
 /** The nearest interior point of a polyline part to (x, y): { d, z } or null at its ends. */
 function nearestInterior(part, x, y) {
   const { xy, z } = part;
-  let best = null;
+  // (the best kept in numbers, one object at the end: this runs for every
+  // point of every overlapping branch)
+  let bi = -1; let bd = Infinity; let bt = 0; let bEnd = false;
   for (let i = 0; i + 1 < xy.length; i++) {
     const vx = xy[i + 1][0] - xy[i][0]; const vy = xy[i + 1][1] - xy[i][1];
     const L2 = vx * vx + vy * vy || 1e-9;
     const raw = ((x - xy[i][0]) * vx + (y - xy[i][1]) * vy) / L2;
     const t = Math.max(0, Math.min(1, raw));
     const d = Math.hypot(xy[i][0] + vx * t - x, xy[i][1] + vy * t - y);
-    if (!best || d < best.d) best = { d, z: z[i] + (z[i + 1] - z[i]) * t, end: (i === 0 && raw < 0) || (i === xy.length - 2 && raw > 1) };
+    if (bi < 0 || d < bd) { bi = i; bd = d; bt = t; bEnd = (i === 0 && raw < 0) || (i === xy.length - 2 && raw > 1); }
   }
-  return best && !best.end ? best : null;
+  return bi >= 0 && !bEnd ? { d: bd, z: z[bi] + (z[bi + 1] - z[bi]) * bt, end: false } : null;
 }
 
 /** Merge the heights of a chain's branches where they overlap off a fork (edits z in place). */
