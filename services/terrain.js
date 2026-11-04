@@ -710,7 +710,7 @@ export const fetchTerrariumMosaic = async (
     async ({ tx, ty }) => {
       completed++;
       if (completed % 10 === 0 || completed === requests.length) {
-        onProgress?.(`Downloading fallback terrain tiles... ${completed}/${requests.length}`);
+        onProgress?.(`${fetchWord('Downloading')} fallback terrain tiles... ${completed}/${requests.length}`);
       }
 
       const drawX = (tx - minTileX) * TILE_SIZE;
@@ -927,6 +927,12 @@ let gpxzRateLimitInfo = null;
 // await pattern is safe: the read and write of gpxzNextSlotAt happen in the same
 // synchronous block before any yield, so two callers cannot interleave.
 let gpxzNextSlotAt = 0;
+
+// (the desktop app replaying a level's saved sources, for Update / Modify:
+// progress says "Reading saved ..." instead of "Fetching" / "Downloading",
+// and no live GPXZ quota; nothing is downloaded then)
+const replayingSources = () => !!globalThis.__mapngReplayingSources;
+const fetchWord = (fetching = 'Fetching') => (replayingSources() ? 'Reading saved' : fetching);
 
 /**
  * Wait for the next globally-paced GPXZ request slot. Spacing is derived from
@@ -1161,7 +1167,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
     signal?.throwIfAborted();
     // 1. Probe rate limits if not already known
     if (!gpxzRateLimitInfo) {
-      onProgress?.('Checking GPXZ account limits...');
+      onProgress?.(replayingSources() ? 'Reading saved GPXZ account limits...' : 'Checking GPXZ account limits...');
       await probeGPXZLimits(apiKey, signal);
     }
 
@@ -1288,7 +1294,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
     }
 
     console.log(`[GPXZ] Split into ${requests.length} tiles (with overlap). Concurrency: ${concurrency}, global pace: ${Math.ceil(1000 / (Math.max(1, Number(gpxzRateLimitInfo?.rps) || 1) * 0.9))}ms/req`);
-    onProgress?.(`Fetching ${requests.length} GPXZ tiles (${rateInfo?.plan || 'free'} plan, ${concurrency}x concurrent)...`);
+    onProgress?.(replayingSources() ? `Reading ${requests.length} saved GPXZ tiles...` : `Fetching ${requests.length} GPXZ tiles (${rateInfo?.plan || 'free'} plan, ${concurrency}x concurrent)...`);
 
     let completedChunks = 0;
     const results = await pMap(
@@ -1371,8 +1377,8 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
 
         completedChunks++;
         const remaining = gpxzRateLimitInfo?.remaining;
-        const quotaInfo = remaining != null ? ` (${remaining} API calls remaining today)` : '';
-        onProgress?.(`Fetching GPXZ tiles... ${completedChunks}/${requests.length}${quotaInfo}`);
+        const quotaInfo = remaining != null && !replayingSources() ? ` (${remaining} API calls remaining today)` : '';
+        onProgress?.(`${fetchWord()} GPXZ tiles... ${completedChunks}/${requests.length}${quotaInfo}`);
 
         return result;
       },
@@ -1479,7 +1485,7 @@ const fetchUSGSRaw = async (bounds, onProgress, signal) => {
     for (let i = 0; i < data.items.length; i++) {
       const item = data.items[i];
       const downloadUrl = item.downloadURL;
-      onProgress?.(`Downloading USGS tile ${i + 1}/${data.items.length}...`);
+      onProgress?.(`${fetchWord('Downloading')} USGS tile ${i + 1}/${data.items.length}...`);
       signal?.throwIfAborted();
 
       try {
@@ -1745,7 +1751,7 @@ export const fetchTerrainData = async (
   let sourceGeoTiffs = undefined;
 
   if (useGPXZ && gpxzApiKey) {
-    onProgress?.("Fetching high-res GPXZ elevation data...");
+    onProgress?.(`${fetchWord()} high-res GPXZ elevation data...`);
     const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress, signal);
     if (gpxzResult) {
       rawData = gpxzResult.data;
@@ -1828,7 +1834,7 @@ export const fetchTerrainData = async (
   let colorSampler = null;
 
   // We always need global tiles for Satellite Texture, and as fallback for Height
-  onProgress?.("Fetching global tiles...");
+  onProgress?.(`${fetchWord()} global tiles...`);
 
   // Calculate tile range covering the fetchBounds for Terrain (Z15)
   const nw = project(fetchBounds.north, fetchBounds.west, TERRAIN_ZOOM);
@@ -1910,7 +1916,9 @@ export const fetchTerrainData = async (
   }
 
   onProgress?.(
-    `Downloading ${requests.filter((r) => r.type === "terrain").length} terrain and ${requests.filter((r) => r.type === "satellite").length} satellite tiles (${Math.max(1, Number(globalTileConcurrency || 20))}x concurrent)...`,
+    (replayingSources()
+      ? `Reading ${requests.filter((r) => r.type === "terrain").length} saved terrain and ${requests.filter((r) => r.type === "satellite").length} satellite tiles...`
+      : `Downloading ${requests.filter((r) => r.type === "terrain").length} terrain and ${requests.filter((r) => r.type === "satellite").length} satellite tiles (${Math.max(1, Number(globalTileConcurrency || 20))}x concurrent)...`),
   );
 
   let completed = 0;
@@ -1925,7 +1933,7 @@ export const fetchTerrainData = async (
       completed++;
       if (completed % 10 === 0 || completed === requests.length) {
         onProgress?.(
-          `Downloaded ${completed}/${requests.length} global tiles...`,
+          `${replayingSources() ? 'Read saved' : 'Downloaded'} ${completed}/${requests.length} global tiles...`,
         );
       }
       if (type === "terrain") {
@@ -2138,7 +2146,7 @@ export const fetchTerrainData = async (
   let osmRequestInfo = null;
   if (includeOSM) {
     signal?.throwIfAborted();
-    onProgress?.("Fetching OpenStreetMap data...");
+    onProgress?.(`${fetchWord()} OpenStreetMap data...`);
     osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: onProgress, signal }));
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
@@ -2664,12 +2672,12 @@ export const loadTerrainFromLaz = async (
     effectiveMetersPerPixel,
     width,
   );
-  onProgress?.('Downloading satellite tiles...');
+  onProgress?.(`${fetchWord('Downloading')} satellite tiles...`);
   const { satDataImg, satMinTileX, satMinTileY } = await fetchSatelliteMosaic(
     fetchBounds,
     satelliteZoom,
     signal,
-    (completed, total) => onProgress?.(`Downloaded ${completed}/${total} satellite tiles...`),
+    (completed, total) => onProgress?.(`${replayingSources() ? 'Read saved' : 'Downloaded'} ${completed}/${total} satellite tiles...`),
     globalTileConcurrency,
   );
   const colorSampler = (lat, lng) => {
@@ -2749,7 +2757,7 @@ export const loadTerrainFromLaz = async (
   let osmFeatures = [], osmRequestInfo = null;
   if (includeOSM) {
     signal?.throwIfAborted();
-    onProgress?.('Fetching OpenStreetMap data...');
+    onProgress?.(`${fetchWord()} OpenStreetMap data...`);
     osmFeatures = shapeRoads(await fetchOSMData(fetchBounds, { onStatus: onProgress, signal }));
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(fetchBounds),
@@ -2945,7 +2953,7 @@ export const addOSMToTerrain = async (
   baseColor = undefined,
   onProgress,
 ) => {
-  onProgress?.("Fetching OpenStreetMap data...");
+  onProgress?.(`${fetchWord()} OpenStreetMap data...`);
   const osmFeatures = shapeRoads(await fetchOSMData(terrainData.bounds, { onStatus: onProgress }));
   const osmRequestInfo = getLastOSMRequestInfo() || {
     ...getOSMQueryParameters(terrainData.bounds),
