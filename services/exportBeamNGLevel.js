@@ -25,7 +25,7 @@ import { placeBoats } from './boats.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
-import { applyBuildingFoundations, gradeGarageFootprints } from './buildingFoundations.js';
+import { gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
 import { geoToWorldPoint, getTerrainHeightWorld, terrainDrape, terrainGroundAt } from './terrainLookup.js';
@@ -6798,11 +6798,10 @@ function summarizeTerrainSamples(terrainData) {
 // work scales with the pixel count, road work with the roads, the ZIP with
 // its file count (≈ the roads: one folder per named road) and the backdrop's
 // downloads with the area, so the bar follows the time actually spent.
-function exportPhaseWeights({ size, osmFeatureCount, roadCount, buildingCount, includeBackdrop, applyFoundations }) {
+function exportPhaseWeights({ size, osmFeatureCount, roadCount, buildingCount, includeBackdrop }) {
   const px = (size / 4096) ** 2;
   return {
     prepare: 0.5,
-    foundations: applyFoundations ? 0.001 * buildingCount : 0,
     roads: 1 + 0.001 * roadCount,
     sidewalks: 0.005 * roadCount,
     props: 0.5 + 0.0002 * roadCount,
@@ -6889,7 +6888,7 @@ const onOff = (v) => (v ? 'on' : 'OFF');
 function shapingReportLines(sh, section) {
   section('Terrain Shaping and Structures');
   const lines = [];
-  const unchanged = !sh.rawTerrain && sh.includeBridges && sh.includeTunnels && sh.master && sh.roads && sh.bridges && sh.overpasses && sh.tunnels && sh.extras && sh.foundations === sh.foundationsRequested;
+  const unchanged = !sh.rawTerrain && sh.includeBridges && sh.includeTunnels && sh.master && sh.roads && sh.bridges && sh.overpasses && sh.tunnels && sh.extras;
   lines.push(unchanged
     ? '- All defaults: the terrain was shaped for roads, bridges, overpasses, tunnels, sidewalks and lakes as usual.'
     : '- Some terrain shaping was switched off (advanced mode). Off means the export left those heights exactly as generated.');
@@ -6899,13 +6898,12 @@ function shapingReportLines(sh, section) {
   lines.push(`- Bridges & overpasses: ${onOff(sh.includeBridges)}${sh.includeBridges ? ` (${sh.decksBuilt} deck(s) built)` : ' (bridge roads drawn on the ground; no road lifted over another)'}`);
   lines.push(`- Tunnels: ${onOff(sh.includeTunnels)}${sh.includeTunnels ? ` (${sh.tunnelsBuilt} built)` : ' (tunnel roads drawn over the ground)'}`);
   lines.push('', 'Terrain shaping at export');
-  lines.push(`- Master switch: ${onOff(sh.master)}${sh.master ? '' : ' (every switch below off, building foundations too)'}`);
+  lines.push(`- Master switch: ${onOff(sh.master)}${sh.master ? '' : ' (every switch below off)'}`);
   lines.push(`- Under roads (ground levelled to each road's smoothed profile, with side slopes): ${onOff(sh.roads)}`);
   lines.push(`- At bridges over water and valleys (approach embankments, abutment fill, ground kept clear under the deck): ${onOff(sh.bridges)}`);
   lines.push(`- At overpasses over roads (the same, for decks over another road): ${onOff(sh.overpasses)}`);
   lines.push(`- At tunnels (portal cuttings, headwall backfill, cut-and-cover cover): ${onOff(sh.tunnels)} (portal holes always open: they change no height)`);
   lines.push(`- Sidewalks, lake beds and car parks (ground under curbs and slabs, lake beds, multi-storey car park decks): ${onOff(sh.extras)}`);
-  lines.push(`- Building foundations: ${onOff(sh.foundations)}${sh.foundationsRequested && !sh.foundations ? ' (requested, but the master switch is off)' : ''}`);
   lines.push('', 'What the switches did here');
   const p = sh.plan;
   if (p) {
@@ -7449,7 +7447,6 @@ function buildBeamNGExportReport({
     'Selected Export Options',
     `- Base texture: ${options?.baseTexture ?? 'n/a'}`,
     `- Include buildings: ${formatBool(options?.includeBuildings)}`,
-    `- Apply foundations: ${formatBool(options?.applyFoundations)}`,
     `- Include bridges & overpasses: ${formatBool(options?.includeBridges !== false)}`,
     `- Include tunnels: ${formatBool(options?.includeTunnels !== false)}`,
     `- Terrain shaping at export (master): ${formatBool(options?.shapeTerrain !== false)}`,
@@ -11208,7 +11205,6 @@ async function generateZipToOPFS(zip, filename, onPercent) {
  * @param {string}  [options.baseTexture='hybrid']         — 'none' | 'hybrid' | 'satellite' | 'osm' | 'game' | 'painted'
  * @param {boolean} [options.includeBuildings=true]         — include generated OSM 3D objects (.dae)
  * @param {boolean} [options.includeSidewalks=true]         — raised curbs + sidewalks along drawn roads (.dae)
- * @param {boolean} [options.applyFoundations=true]         — apply terrain foundation pass under buildings
  * @param {boolean} [options.includeBackdrop=false]         — fetch and include surrounding terrain backdrop DAE
  * @param {boolean} [options.includeWater=true]             — emit native BeamNG inland water objects
  * @param {boolean} [options.includeNativeBarriers=true]    — emit native BeamNG TSStatic barrier objects from OSM barriers into MissionGroup/barriers
@@ -11283,7 +11279,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     treeSpeciesMix: requestedTreeMix = undefined,
     // the slabs' concrete: a key of SIDEWALK_LOOKS (beamngSidewalks.js)
     sidewalkLook = DEFAULT_SIDEWALK_LOOK,
-    applyFoundations: requestedFoundations = true,
     includeBackdrop = false,
     includeBridges = true,
     includeTunnels = true,
@@ -11307,8 +11302,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     onProgress,
   } = options;
   // Terrain shaping at export (advanced mode): a master switch and one per
-  // kind of road. Off, the export leaves those heights exactly as generated;
-  // the foundations under buildings go with the master switch.
+  // kind of road. Off, the export leaves those heights exactly as generated.
   const shapingOptions = {
     terrain: options.shapeTerrain !== false,
     roads: options.shapeRoads !== false,
@@ -11318,7 +11312,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   };
   const shaping = shapingSwitches(shapingOptions);
   const shapeExtras = shapingOptions.terrain && options.shapeExtras !== false;
-  const applyFoundations = requestedFoundations && shapingOptions.terrain;
   // Backward compat: generatePbrMaterials (bool) → pbrSource (string)
   let pbrSource = options.pbrSource;
   if (pbrSource === undefined) {
@@ -11336,7 +11329,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     options: {
       baseTexture,
       includeBuildings,
-      applyFoundations,
       includeBackdrop,
       includeWater,
       seaLevelOffset,
@@ -11370,7 +11362,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     roadCount: roadType === 'none' ? 0 : featureTypeCount('road'),
     buildingCount: includeBuildings ? featureTypeCount('building') : 0,
     includeBackdrop,
-    applyFoundations,
   });
   const totalWeight = Object.values(phaseWeights).reduce((sum, w) => sum + w, 0);
   let weightDone = 0;
@@ -11466,24 +11457,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let exportTerrainData = includeBuildings && shapeExtras
     ? await gradeGarageFootprints(foundationInput, isGarageFeature, { yieldFn: yield_ })
     : foundationInput;
-  if (applyFoundations) {
-    beginStep('foundations', 'Preparing building foundations…');
-    await yield_();
-    exportTerrainData = await applyBuildingFoundations(
-      exportTerrainData,
-      {
-        yieldFn: yield_,
-        onProgress: ({ completed, total, applied, skipped }) => {
-          if (!total) return;
-          const counts = Number.isFinite(applied) && Number.isFinite(skipped)
-            ? ` | Applied: ${applied}, Skipped: ${skipped}`
-            : '';
-          report(`Building foundations ${completed}/${total}${counts}`, completed / total);
-        },
-      }
-    );
-  }
-
   const lat = center.lat.toFixed(4);
   const lng = center.lng.toFixed(4);
   const fallbackLevelName = `mapng_${lat}_${lng}`.replace(/-/g, '_').replace(/\./g, '_');
@@ -13099,7 +13072,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       ...options,
       baseTexture,
       includeBuildings,
-      applyFoundations,
       includeBackdrop,
       includeWater,
       seaLevelOffset,
@@ -13149,8 +13121,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         overpasses: shaping.overpasses,
         tunnels: shaping.tunnels,
         extras: shapeExtras,
-        foundationsRequested: requestedFoundations,
-        foundations: applyFoundations,
         plan: sg?.shaping?.stats || null,
         decksBuilt: bridgeDecks.length,
         rawDeckParts: (sg?.classes?.segments || []).filter((seg) => seg.raw && seg.kind === 'deck').length,

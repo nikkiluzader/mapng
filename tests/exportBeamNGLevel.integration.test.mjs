@@ -249,7 +249,7 @@ async function buildExportForRoadType(roadType, { includeTrees = false, pbrSourc
       baseTexture,
       pbrSource,
       includeBuildings,
-      applyFoundations: false,
+      
       includeBackdrop: false,
       includeWater: false,
       includeTrees,
@@ -743,7 +743,7 @@ test('every biome defines the material of every GroundCover it emits', async () 
     for (const biomeId of biomeIds) {
       const result = await exportBeamNGLevel(makeTerrainData(), { lat: 0.5, lng: 0.5 }, {
         roadType: 'decal', levelName: 'mapng_demo', biomeId, baseTexture: 'none', pbrSource: 'none',
-        includeBuildings: false, applyFoundations: false, includeBackdrop: false, includeWater: false,
+        includeBuildings: false, includeBackdrop: false, includeWater: false,
         includeTrees: true, includeRocks: false, includeNativeBarriers: false,
       });
       const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
@@ -784,7 +784,7 @@ test('OSM grass polygons do not multiply GroundCover layers', async () => {
       terrain.osmFeatures = [...terrain.osmFeatures, ...fields];
       const result = await exportBeamNGLevel(terrain, { lat: 0.5, lng: 0.5 }, {
         roadType: 'decal', levelName: 'mapng_demo', biomeId, baseTexture: 'none', pbrSource: 'none',
-        includeBuildings: false, applyFoundations: false, includeBackdrop: false, includeWater: false,
+        includeBuildings: false, includeBackdrop: false, includeWater: false,
         includeTrees: true, includeRocks: false, includeNativeBarriers: false,
       });
       const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
@@ -802,7 +802,7 @@ test('without a biome the export picks the look from the location', async () => 
   try {
     const result = await exportBeamNGLevel(makeTerrainData(), { lat: 0.5, lng: 0.5 }, {
       roadType: 'decal', levelName: 'mapng_demo', baseTexture: 'none', pbrSource: 'none',
-      includeBuildings: false, applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeBuildings: false, includeBackdrop: false, includeWater: false,
       includeTrees: true, includeRocks: false, includeNativeBarriers: false,
     });
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());

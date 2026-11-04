@@ -63,10 +63,6 @@
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeBuildings" :disabled="!includeOSM" @change="update('includeBuildings', $event.target.checked)" />
       </label>
       <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400">{{ t('exportPanel.applyFoundations') }}</span>
-        <input type="checkbox" :class="CHECKBOX" :checked="model.applyFoundations" :disabled="!includeOSM" @change="update('applyFoundations', $event.target.checked)" />
-      </label>
-      <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
         <span class="text-[11px] text-gray-600 dark:text-gray-400">{{ t('exportPanel.treesBushes') }}</span>
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeTrees" :disabled="!includeOSM" @change="update('includeTrees', $event.target.checked)" />
       </label>

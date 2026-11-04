@@ -137,14 +137,6 @@
               <SettingRow check v-model="beamNGShapeTunnels" :label="t('exportPanel.shapeTunnels')" :hint="t('exportPanel.shapeTunnelsHint')" :disabled="!beamNGIncludeTunnels" :disabled-reason="t('exportPanel.ui.needsTunnels')" />
               <SettingRow check v-model="beamNGShapeExtras" :label="t('exportPanel.shapeExtras')" :hint="t('exportPanel.shapeExtrasHint')" />
             </template>
-            <SettingRow
-              check
-              v-model="beamNGApplyFoundations"
-              :label="t('exportPanel.ui.foundations')"
-              :hint="t('exportPanel.raiseUnderBuildings')"
-              :disabled="!hasOsmData || beamNGShapeMode === 'none'"
-              :disabled-reason="hasOsmData ? t('exportPanel.ui.needsShaping') : t('exportPanel.ui.needsOsm')"
-            />
             <p v-if="terrainData?.raw" class="text-[11px] leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.generatedRaw') }}</p>
             <p class="text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.reportNote') }}</p>
           </SettingCard>
@@ -647,9 +639,6 @@ const beamNGBackdropSource = ref(
   || (legacyIncludeBackdrop === 'true' ? 'global30m' : 'off')
 );
 const beamNGIncludeBuildings = ref(localStorage.getItem('mapng_beamNGIncludeBuildings') !== 'false');
-// Defaults match basic mode (everything on, no foundations: buildings carry
-// their own), so switching to advanced changes nothing until a box is changed.
-const beamNGApplyFoundations = ref(localStorage.getItem('mapng_beamNGApplyFoundations') === 'true');
 const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
 // Structures and the export's terrain shaping (advanced mode; basic builds
 // and shapes everything). Off, the export leaves those heights as generated.
@@ -919,7 +908,6 @@ watch(showExportBeamNG, (v) => localStorage.setItem('mapng_showExportBeamNG', St
 watch(beamNGPbrSource, (v) => localStorage.setItem('mapng_beamNGPbrSource', v));
 watch(beamNGBackdropSource, (v) => localStorage.setItem('mapng_beamNGBackdropSource', v));
 watch(beamNGIncludeBuildings, (v) => localStorage.setItem('mapng_beamNGIncludeBuildings', String(v)));
-watch(beamNGApplyFoundations, (v) => localStorage.setItem('mapng_beamNGApplyFoundations', String(v)));
 watch(beamNGIncludeBridges, (v) => localStorage.setItem('mapng_beamNGIncludeBridges', String(v)));
 watch(beamNGIncludeTunnels, (v) => localStorage.setItem('mapng_beamNGIncludeTunnels', String(v)));
 watch(beamNGShapeTerrain, (v) => localStorage.setItem('mapng_beamNGShapeTerrain', String(v)));
@@ -1718,10 +1706,9 @@ const handleBeamNGLevelExport = async () => {
       : beamNGBackdropSource.value;
     const effectiveIncludeBackdrop = effectiveBackdropSource !== 'off';
     // Basic mode ignores the (hidden) per-category boxes: buildings, trees,
-    // rocks and water whenever OSM data exists, and no terrain foundations.
+    // rocks and water whenever OSM data exists.
     const advanced = advancedMode.value;
     const effectiveIncludeBuildings = hasOsmData.value && (!advanced || beamNGIncludeBuildings.value);
-    const effectiveApplyFoundations = hasOsmData.value && advanced && beamNGApplyFoundations.value;
     const effectiveIncludeWater = hasOsmData.value && (!advanced || beamNGIncludeWater.value);
     // Flat terrain sits at height 0; place the water plane just below ground
     // (−1 m) so it doesn't flood the whole level. Matches the 3D preview default.
@@ -1754,7 +1741,6 @@ const handleBeamNGLevelExport = async () => {
       backdropElevationSource: effectiveBackdropSource,
       backdropGpxzApiKey: effectiveBackdropGpxzApiKey,
       includeBuildings: effectiveIncludeBuildings,
-      applyFoundations: effectiveApplyFoundations,
       includeWater: effectiveIncludeWater,
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
@@ -1772,7 +1758,6 @@ const handleBeamNGLevelExport = async () => {
       backdropElevationSource: effectiveBackdropSource,
       backdropGpxzApiKey: effectiveBackdropGpxzApiKey,
       includeBuildings: effectiveIncludeBuildings,
-      applyFoundations: effectiveApplyFoundations,
       pbrSource: effectivePbrSource,
       includeWater: effectiveIncludeWater,
       seaLevelOffset: effectiveSeaLevelOffset,

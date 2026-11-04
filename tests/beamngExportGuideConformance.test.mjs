@@ -102,7 +102,7 @@ async function exportZip(opts = {}) {
   const result = await exportBeamNGLevel(makeTerrainData(), { lat: 0.5, lng: 0.5 }, {
     roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
     baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
-    applyFoundations: false, includeBackdrop: false, includeWater: false,
+    includeBackdrop: false, includeWater: false,
     includeTrees: true, includeRocks: false, includeNativeBarriers: false,
     ...opts,
   });
@@ -466,7 +466,7 @@ test('terrain: .ter heights decode exactly against TerrainBlock.maxHeight (non-i
     const result = await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
       roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
       baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
-      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeBackdrop: false, includeWater: false,
       includeTrees: false, includeRocks: false, includeNativeBarriers: false,
     });
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
@@ -513,7 +513,7 @@ test('decal roads: drivable base layer carries oneWay/flipDirection/gatedRoad/la
     const result = await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
       roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
       baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
-      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeBackdrop: false, includeWater: false,
       includeTrees: false, includeRocks: false, includeNativeBarriers: false,
     });
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
@@ -711,7 +711,7 @@ test('decal roads: asphalt covers the carriageway, AI path + paint the driving l
     const result = await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
       roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
       baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
-      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeBackdrop: false, includeWater: false,
       includeTrees: false, includeRocks: false, includeNativeBarriers: false,
     });
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
@@ -770,7 +770,7 @@ test('road rules: a London export drives on the left with matching lane sides', 
     const result = await exportBeamNGLevel(td, { lat: 51.507, lng: -0.128 }, {
       roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
       baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
-      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeBackdrop: false, includeWater: false,
       includeTrees: false, includeRocks: false, includeNativeBarriers: false,
     });
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
@@ -813,7 +813,7 @@ test('traffic signals: heads link to signals.json instances; level masts get .li
     const result = await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
       roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
       baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
-      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeBackdrop: false, includeWater: false,
       includeTrees: false, includeRocks: false, includeNativeBarriers: false,
     });
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
@@ -858,7 +858,7 @@ test('street lamps: a lit street gets poles with night lights', async () => {
     const result = await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
       roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
       baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
-      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeBackdrop: false, includeWater: false,
       includeTrees: false, includeRocks: false, includeNativeBarriers: false,
     });
     const zip = await JSZip.loadAsync(await result.blob.arrayBuffer());
@@ -890,7 +890,7 @@ test('sidewalks: tagged street gets a curb mesh with collision, materials and a 
     const run = async (opts = {}) => JSZip.loadAsync(await (await exportBeamNGLevel(td, { lat: 0.5, lng: 0.5 }, {
       roadType: 'decal', levelName: LEVEL_ID, biomeId: 'west_coast_usa',
       baseTexture: 'none', pbrSource: 'none', includeBuildings: false,
-      applyFoundations: false, includeBackdrop: false, includeWater: false,
+      includeBackdrop: false, includeWater: false,
       includeTrees: false, includeRocks: false, includeNativeBarriers: false, ...opts,
     })).blob.arrayBuffer());
     const zip = await run();

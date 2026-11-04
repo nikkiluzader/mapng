@@ -438,7 +438,6 @@ const DEFAULT_LEVEL_OPTIONS = {
   roadType: 'decal',
   backdropSource: 'off',
   includeBuildings: true,
-  applyFoundations: true,
   includeTrees: true,
   includeRocks: false,
   includeWater: true,

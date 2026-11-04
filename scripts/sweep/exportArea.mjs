@@ -82,7 +82,7 @@ const t0 = Date.now();
 const { blob, structureChecks } = await exportBeamNGLevel(terrainData, meta.center, {
   treeSpeciesMix,
   baseTexture, pbrSource: 'osm', roadType: 'decal', includeBackdrop: false,
-  includeBuildings: true, applyFoundations: false, includeWater: true, seaLevelOffset: 0,
+  includeBuildings: true, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,
   ...(process.env.STRUCT ? { structureSolver: process.env.STRUCT } : {}),
   // measured bridge heights (US lidar): LIDAR=1 (off by default: the sweep stays offline and repeatable);
