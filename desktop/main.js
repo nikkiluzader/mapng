@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findModsFolder } from './modsFolder.js';
+import { listMapngLevels, readZipFile } from './levelLibrary.js';
 import { startUpdater } from './updater.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -67,6 +68,14 @@ function servePage() {
       if (!fs.existsSync(file)) return new Response(null, { status: 404 });
       return net.fetch(pathToFileURL(file).toString());
     }
+    // a level's preview image, out of its zip in the mods folder
+    const preview = url.pathname.match(/^\/__levelpreview\/([^/]+)\/([\w.-]{1,128})$/);
+    if (preview) {
+      const zipName = path.basename(decodeURIComponent(preview[1]));
+      const folder = modsFolder();
+      const bytes = folder ? (() => { try { return readZipFile(path.join(folder, zipName), `levels/${preview[2]}/preview.png`); } catch { return null; } })() : null;
+      return bytes ? new Response(bytes, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } }) : new Response(null, { status: 404 });
+    }
     if (url.pathname.startsWith('/api/')) {
       // (as on mapng.com: its worker answers /api/*)
       return net.fetch(`${API_ORIGIN}${url.pathname}${url.search}`, {
@@ -116,6 +125,7 @@ const jobDirOf = (jobId) => {
   return path.join(JOBS(), jobId);
 };
 const running = new Map();
+const linkedFiles = new Map();   // jobId → names linked from a generated terrain
 
 /** A runner script in the bundled Node, its output logged to export.log in dir. */
 function spawnRunner(script, dir) {
@@ -246,13 +256,17 @@ ipcMain.handle('job:run', async (event, jobId, job) => {
       });
       child.on('error', (error) => reject(new Error(`could not start the export (${NODE}): ${error.message}`)));
       child.on('exit', (code, signal) => {
-        if (result) resolve(result);
+        if (result) {
+          try { result.project = saveProject(dir, job, result); } catch (error) { console.error('project not saved:', error); }
+          resolve(result);
+        }
         else reject(new Error(signal ? `export stopped (${signal})` : `export ended with code ${code}; log: ${path.join(dir, 'export.log')}`));
       });
     });
   } finally {
     exportUsage.delete(jobId);
     running.delete(jobId);
+    linkedFiles.delete(jobId);
   }
 });
 
@@ -264,7 +278,81 @@ ipcMain.handle('job:linkTerrainFile', (_event, jobId, name, sessionId, file) => 
   const from = path.join(sessionDirOf(sessionId), path.basename(String(file)));
   const to = path.join(jobDirOf(jobId), name);
   try { fs.linkSync(from, to); } catch { fs.copyFileSync(from, to); }
+  if (!linkedFiles.has(jobId)) linkedFiles.set(jobId, new Set());
+  linkedFiles.get(jobId).add(name);
 });
+
+// ---- projects: what each level was made from, for a rebuild -----------------
+
+const PROJECTS = () => path.join(app.getPath('userData'), 'projects');
+const projectDirOf = (levelName) => {
+  if (!/^[\w.-]{1,128}$/.test(levelName) || levelName.startsWith('.')) throw new Error('bad level name');
+  return path.join(PROJECTS(), levelName);
+};
+const linkOrCopy = (from, to) => { try { fs.linkSync(from, to); } catch { fs.copyFileSync(from, to); } };
+
+/**
+ * After an export: the level's project (projects/<level folder name>), with
+ * the generate job and its recorded sources (a rebuild replays them), the
+ * export settings, and files the page changed after generating (a painted
+ * texture) as overrides. Written beside and swapped in; replaces the
+ * level's previous project.
+ */
+function saveProject(jobDir, job, result) {
+  const levelName = path.basename(result.filename, '.zip');
+  const dir = projectDirOf(levelName);
+  const tmp = `${dir}.saving`;
+  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.mkdirSync(path.join(tmp, 'overrides'), { recursive: true });
+  const terrainId = typeof job.terrainData?.desktopTerrainId === 'string' ? job.terrainData.desktopTerrainId : null;
+  let sources = 0;
+  if (terrainId) {
+    const session = sessionDirOf(terrainId);
+    const generate = JSON.parse(fs.readFileSync(path.join(session, 'job.json'), 'utf8'));
+    // (mirror health and probe times are of the moment, not of the map)
+    for (const k of Object.keys(generate.localStorage || {})) if (/health|probe_at/i.test(k)) delete generate.localStorage[k];
+    delete generate.sources;
+    fs.writeFileSync(path.join(tmp, 'generate.json'), JSON.stringify(generate, null, 1));
+    const src = path.join(session, 'sources');
+    if (fs.existsSync(src)) {
+      fs.mkdirSync(path.join(tmp, 'sources'));
+      for (const f of fs.readdirSync(src)) { linkOrCopy(path.join(src, f), path.join(tmp, 'sources', f)); sources++; }
+    }
+  }
+  // images the page made or changed itself (not the generated terrain's files)
+  const linked = linkedFiles.get(path.basename(jobDir)) || new Set();
+  const overrides = {};
+  for (const [k, v] of Object.entries(job.terrainData || {})) {
+    if (!v || typeof v !== 'object' || typeof v.$file !== 'string' || linked.has(v.$file)) continue;
+    if (!/(Url|Blob|Canvas)$/.test(k)) continue;
+    linkOrCopy(path.join(jobDir, v.$file), path.join(tmp, 'overrides', v.$file));
+    overrides[k] = v;
+  }
+  // (files the export options point at, e.g. a tree mix: kept beside them)
+  const keepRefs = (v) => {
+    if (Array.isArray(v)) v.forEach(keepRefs);
+    else if (v && typeof v === 'object') {
+      if (typeof v.$file === 'string') linkOrCopy(path.join(jobDir, path.basename(v.$file)), path.join(tmp, 'overrides', path.basename(v.$file)));
+      else Object.values(v).forEach(keepRefs);
+    }
+  };
+  keepRefs(job.options);
+  fs.writeFileSync(path.join(tmp, 'project.json'), JSON.stringify({
+    format: 1,
+    levelName,
+    appVersion: app.getVersion(),
+    exportedAt: new Date().toISOString(),
+    zip: result.path,
+    rebuildable: !!terrainId && sources > 0,
+    sources,
+    center: job.center,
+    options: job.options,
+    overrides,
+  }, null, 1));
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.renameSync(tmp, dir);
+  return dir;
+}
 
 // ---- terrain generation (the page's Generate Data, in Node) -----------------
 
@@ -330,6 +418,184 @@ ipcMain.handle('job:cleanup', (_event, jobId) => {
   fs.rmSync(jobDirOf(jobId), { recursive: true, force: true });
 });
 
+// ---- the levels sidebar: MapNG levels in the mods folder, and rebuilds ------
+
+const readProject = (levelName) => {
+  try { return JSON.parse(fs.readFileSync(path.join(projectDirOf(levelName), 'project.json'), 'utf8')); } catch { return null; }
+};
+
+ipcMain.handle('levels:list', () => {
+  const folder = modsFolder();
+  const levels = folder ? listMapngLevels(folder) : [];
+  return {
+    folder,
+    appVersion: app.getVersion(),
+    levels: levels.map(({ previewEntry, stamp, ...lv }) => {
+      const project = readProject(lv.levelName);
+      return {
+        ...lv,
+        appVersion: stamp?.appVersion || project?.appVersion || null,
+        exportedAt: stamp?.exportedAt || project?.exportedAt || null,
+        build: stamp?.build || null,
+        metersPerPixel: stamp?.metersPerPixel || (lv.sizeMeters && lv.resolution ? lv.sizeMeters / lv.resolution : null),
+        preview: previewEntry ? `app://mapng/__levelpreview/${encodeURIComponent(lv.zipName)}/${lv.levelName}` : null,
+        rebuildable: !!project?.rebuildable,
+        rebuilding: rebuilds.has(lv.levelName),
+      };
+    }),
+  };
+});
+
+ipcMain.handle('levels:showInFolder', (_event, zipName) => {
+  const folder = modsFolder();
+  const file = folder && path.join(folder, path.basename(String(zipName)));
+  if (file && fs.existsSync(file)) shell.showItemInFolder(file);
+});
+
+/** A runner to its end: resolves its 'done' message; progress and memory reported on the way. */
+function runToEnd(child, { usageKey, onProgress }) {
+  return new Promise((resolve, reject) => {
+    let done = null; let failure = null;
+    child.on('message', (msg) => {
+      if (msg?.type === 'progress') onProgress?.(msg.update ?? msg);
+      else if (msg?.type === 'memory') exportUsage.set(usageKey, msg);
+      else if (msg?.type === 'done') done = msg;
+      else if (msg?.type === 'error') failure = msg;
+    });
+    child.on('error', (error) => reject(new Error(`could not start (${NODE}): ${error.message}`)));
+    child.on('exit', (code, signal) => {
+      exportUsage.delete(usageKey);
+      if (done) resolve(done);
+      else if (failure?.aborted || signal) reject(Object.assign(new Error('cancelled'), { cancelled: true }));
+      else reject(new Error(failure?.message || `ended with code ${code}`));
+    });
+  });
+}
+
+const rebuilds = new Map();   // levelName → { children: Set }
+
+/**
+ * A level made again with this version of MapNG: from its project's
+ * recorded sources when it has one (the same elevation, imagery and OSM,
+ * today's code), else from its area fetched again. The new zip replaces the
+ * old one only when it is complete.
+ */
+async function rebuildLevel(sender, zipName, levelName) {
+  const folder = modsFolder();
+  if (!folder) throw new Error('No mods folder set.');
+  const zip = path.join(folder, path.basename(zipName));
+  const level = listMapngLevels(folder).find((l) => l.zipName === path.basename(zipName) && l.levelName === levelName);
+  if (!level) throw new Error('That level is no longer in the mods folder.');
+  const project = readProject(levelName);
+  const projectDir = projectDirOf(levelName);
+  const replay = !!project?.rebuildable;
+  if (!replay && !level.center) throw new Error('This level does not say where it is, so it cannot be fetched again.');
+  const state = { children: new Set() };
+  rebuilds.set(levelName, state);
+  const progress = (phase, update) => { if (!sender.isDestroyed()) sender.send('levels:progress', levelName, { phase, update }); };
+  try {
+    // 1. the terrain: replayed, or fetched again (and recorded this time)
+    let generate;
+    if (replay) {
+      generate = JSON.parse(fs.readFileSync(path.join(projectDir, 'generate.json'), 'utf8'));
+      generate.sources = { mode: 'replay', dir: path.join(projectDir, 'sources'), fallback: true };
+    } else {
+      const mpp = level.sizeMeters && level.resolution ? level.sizeMeters / level.resolution : 1;
+      generate = {
+        center: level.center, resolution: level.resolution || 2048, includeOSM: true,
+        useUSGS: false, useGPXZ: false, useKRON86: false, gpxzApiKey: '',
+        generationOptions: { processingMetersPerPixel: mpp }, localStorage: {},
+      };
+    }
+    const terrainId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const session = sessionDirOf(terrainId);
+    fs.mkdirSync(session, { recursive: true });
+    fs.writeFileSync(path.join(session, 'job.json'), JSON.stringify(generate));
+    const gen = spawnRunner(GENERATOR, session);
+    state.children.add(gen);
+    progress('terrain', replay ? 'Rebuilding the terrain from its saved data…' : 'Fetching the area again…');
+    await runToEnd(gen, { usageKey: `rebuild-gen:${levelName}`, onProgress: (u) => progress('terrain', u) });
+    state.children.delete(gen);
+    pruneSessions(terrainId);
+
+    // 2. the export, with the level's own settings
+    const jobId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+    const jobDir = jobDirOf(jobId);
+    fs.mkdirSync(jobDir, { recursive: true });
+    const terrain = JSON.parse(fs.readFileSync(path.join(session, 'terrain.json'), 'utf8'));
+    const linked = new Set();
+    for (const v of Object.values(terrain)) {
+      if (v && typeof v === 'object' && typeof v.$file === 'string') {
+        linkOrCopy(path.join(session, path.basename(v.$file)), path.join(jobDir, path.basename(v.$file)));
+        linked.add(v.$file);
+      }
+    }
+    linkedFiles.set(jobId, linked);
+    // (a texture painted after generating, and files the options point at)
+    if (project && fs.existsSync(path.join(projectDir, 'overrides'))) {
+      for (const f of fs.readdirSync(path.join(projectDir, 'overrides'))) linkOrCopy(path.join(projectDir, 'overrides', f), path.join(jobDir, f));
+      Object.assign(terrain, project.overrides || {});
+    }
+    terrain.desktopTerrainId = terrainId;
+    const options = {
+      ...(project?.options || level.stamp?.options || {}),
+      levelName: project?.options?.levelName || level.stamp?.options?.levelName || level.title || levelName,
+      appVersion: app.getVersion(),
+      platform: 'desktop',
+    };
+    const outDir = path.join(jobDir, 'out');
+    const job = { center: generate.center, terrainData: terrain, options, outputDir: outDir };
+    fs.writeFileSync(path.join(jobDir, 'job.json'), JSON.stringify(job));
+    const exp = spawnRunner(RUNNER, jobDir);
+    state.children.add(exp);
+    running.set(jobId, exp);
+    progress('export', 'Building the level…');
+    let result;
+    try {
+      result = await runToEnd(exp, { usageKey: jobId, onProgress: (p) => progress('export', p) });
+    } finally {
+      running.delete(jobId);
+      state.children.delete(exp);
+    }
+
+    // 3. swapped in: the old zip stays until the new one is complete
+    progress('export', 'Replacing the level in the mods folder…');
+    try {
+      fs.renameSync(result.path, zip);
+    } catch (error) {
+      if (error.code === 'EXDEV') { fs.copyFileSync(result.path, zip); fs.rmSync(result.path, { force: true }); }
+      else if (['EBUSY', 'EPERM', 'EACCES'].includes(error.code)) throw new Error('BeamNG is using this level. Go back to BeamNG\'s main menu (or close it) and rebuild again.');
+      else throw error;
+    }
+    const final = { ...result, path: zip, filename: path.basename(zip) };
+    if (replay) {
+      // (the same sources: the project gets the new version and date)
+      fs.writeFileSync(path.join(projectDir, 'project.json'), JSON.stringify({ ...project, appVersion: app.getVersion(), exportedAt: new Date().toISOString(), zip }, null, 1));
+    } else {
+      try { saveProject(jobDir, job, { ...final, filename: `${levelName}.zip` }); } catch (error) { console.error('project not saved:', error); }
+    }
+    fs.rmSync(jobDir, { recursive: true, force: true });
+    linkedFiles.delete(jobId);
+    return { ok: true, path: zip, replayed: replay, seconds: result.seconds };
+  } finally {
+    rebuilds.delete(levelName);
+  }
+}
+
+ipcMain.handle('levels:rebuild', async (event, zipName, levelName) => {
+  if (rebuilds.has(levelName)) throw new Error('That level is already being rebuilt.');
+  try {
+    return await rebuildLevel(event.sender, String(zipName), String(levelName));
+  } catch (error) {
+    if (error.cancelled) return { cancelled: true };
+    throw error;
+  }
+});
+
+ipcMain.handle('levels:cancel', (_event, levelName) => {
+  for (const child of rebuilds.get(levelName)?.children || []) child.kill();
+});
+
 // ---- the menu ---------------------------------------------------------------
 
 const REPO = 'https://github.com/nikkiluzader/mapng';
@@ -389,6 +655,6 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  for (const child of [...running.values(), ...generating.values()]) child.kill();
+  for (const child of [...running.values(), ...generating.values(), ...[...rebuilds.values()].flatMap((r) => [...r.children])]) child.kill();
   if (process.platform !== 'darwin') app.quit();
 });

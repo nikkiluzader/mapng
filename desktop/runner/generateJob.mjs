@@ -5,12 +5,14 @@
 //   node --max-old-space-size=<MB> generateJob.mjs <session dir>
 //
 // The session dir holds job.json ({ center, resolution, includeOSM, useUSGS,
-// useGPXZ, useKRON86, gpxzApiKey, generationOptions, localStorage }); the
+// useGPXZ, useKRON86, gpxzApiKey, generationOptions, localStorage,
+// sources? }); every network response it is made from goes to sources/ (or
+// is replayed from a project's: a rebuild); the
 // terrain data comes out as terrain.json there, its big values in files
 // beside it (jobFormat.mjs), which the page reads back and an export reuses.
 import fs from 'node:fs';
 import path from 'node:path';
-import { installBrowserShims } from './browserShims.mjs';
+import { installBrowserShims, installSourceRecorder } from './browserShims.mjs';
 import { appApiFetch, cancelSignal, installLocalStorage, send, startMemoryReports } from './common.mjs';
 import { writeJobValue } from './jobFormat.mjs';
 
@@ -27,6 +29,13 @@ async function main() {
   if (!dir) throw new Error('usage: generateJob.mjs <session dir>');
   const job = JSON.parse(fs.readFileSync(path.join(dir, 'job.json'), 'utf8'));
   installLocalStorage(job.localStorage);
+  // (what the terrain is made from, kept for a rebuild with later versions;
+  // a rebuild replays it: job.sources { mode: 'replay', dir, fallback })
+  const sources = installSourceRecorder({
+    dir: job.sources?.dir || path.join(dir, 'sources'),
+    mode: job.sources?.mode || 'record',
+    fallback: job.sources?.fallback !== false,
+  });
   const { fetchTerrainData } = await import('../../services/terrain.js');
   const started = Date.now();
   const data = await fetchTerrainData(
@@ -47,7 +56,7 @@ async function main() {
   // (the GeoTIFF readers stay here; the page and the export read only their source)
   if (sourceGeoTiffs?.source) out.sourceGeoTiffs = { source: sourceGeoTiffs.source };
   fs.writeFileSync(path.join(dir, 'terrain.json'), JSON.stringify(out));
-  send({ type: 'done', seconds: (Date.now() - started) / 1000, width: data.width, height: data.height });
+  send({ type: 'done', seconds: (Date.now() - started) / 1000, width: data.width, height: data.height, sources });
 }
 
 main().then(

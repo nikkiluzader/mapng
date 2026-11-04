@@ -38,4 +38,14 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
     });
   },
   cancelTerrain: (id) => ipcRenderer.invoke('terrain:cancel', id),
+  // the levels sidebar: { folder, appVersion, levels: [...] }
+  listLevels: () => ipcRenderer.invoke('levels:list'),
+  showLevelInFolder: (zipName) => ipcRenderer.invoke('levels:showInFolder', zipName),
+  // resolves { ok, path, replayed, seconds } or { cancelled }; onProgress({ phase, update })
+  rebuildLevel: (zipName, levelName, onProgress) => {
+    const listener = (_event, name, progress) => { if (name === levelName) onProgress?.(progress); };
+    ipcRenderer.on('levels:progress', listener);
+    return ipcRenderer.invoke('levels:rebuild', zipName, levelName).finally(() => ipcRenderer.removeListener('levels:progress', listener));
+  },
+  cancelRebuild: (levelName) => ipcRenderer.invoke('levels:cancel', levelName),
 });

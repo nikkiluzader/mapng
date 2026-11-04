@@ -79,6 +79,12 @@ async function pack(value, key, job) {
     await sendBytes(job.id, file, new Uint8Array(value));
     return { $file: file, as: 'Uint8Array' };
   }
+  if (value instanceof Blob && terrainBlobUrls.has(value)) {
+    const [, terrainId, terrainFile] = terrainBlobUrls.get(value).match(TERRAIN_FILE_URL);
+    const file = name();
+    await desktopApp.linkTerrainFile(job.id, file, terrainId, terrainFile);
+    return { $file: file, as: 'blob', type: value.type };
+  }
   if (value instanceof Blob) {
     const file = name();
     await sendBlob(job.id, file, value);
@@ -134,9 +140,12 @@ export async function exportLevelOnDesktop(terrainData, center, options) {
   const job = { id: jobId, files: 0 };
   onProgress?.({ step: 'Handing the map to the desktop exporter…', pct: 0 });
   const packedTerrain = await packTerrainData(terrainData, job);
-  const packedOptions = await pack(rest, 'options', job);
+  const info = await desktopApp.info().catch(() => ({}));
+  const packedOptions = await pack({ ...rest, appVersion: info?.version || null, platform: 'desktop' }, 'options', job);
   const result = await desktopApp.runJob(jobId, { center: toRaw(center), terrainData: packedTerrain, options: packedOptions }, onProgress);
   await desktopApp.cleanupJob(jobId);
+  // (the levels sidebar lists it)
+  if (!result?.cancelled) window.dispatchEvent(new CustomEvent('mapng:levels-changed'));
   return result;
 }
 
@@ -154,6 +163,9 @@ function settingsSnapshot() {
   return out;
 }
 
+// (Blobs read from a generated terrain's files: an export links the file)
+const terrainBlobUrls = new WeakMap();
+
 const TYPED_ARRAYS = {
   Float32Array, Float64Array, Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array,
 };
@@ -168,7 +180,11 @@ async function reviveTerrainValue(value, base) {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`terrain file ${value.$file}: ${r.status}`);
     if (value.as === 'json') return r.json();
-    if (value.as === 'blob') return new Blob([await r.arrayBuffer()], { type: value.type || '' });
+    if (value.as === 'blob') {
+      const blob = new Blob([await r.arrayBuffer()], { type: value.type || '' });
+      terrainBlobUrls.set(blob, url);
+      return blob;
+    }
     const Typed = TYPED_ARRAYS[value.as];
     if (!Typed) throw new Error(`unknown terrain value kind ${value.as}`);
     return new Typed(await r.arrayBuffer());

@@ -11128,6 +11128,41 @@ async function generateZipToOPFS(zip, filename, onPercent) {
  * @param {'decal'|'none'} [options.roadType='decal'] — 'decal' writes layered DecalRoads (the
  *   only road system); 'none' writes no roads. Legacy 'architect' / 'mesh' mean 'decal'.
  */
+// The export options worth keeping in mapng.json: plain settings only (no
+// callbacks, keys, images or big data)
+const STAMP_SKIP_OPTIONS = /^(on[A-Z]|.*(ApiKey|Key|Token|Secret)$|treeSpeciesMix$|appVersion$|platform$)/;
+function stampOptions(options) {
+  const out = {};
+  for (const [k, v] of Object.entries(options || {})) {
+    if (STAMP_SKIP_OPTIONS.test(k)) continue;
+    if (v == null || ['string', 'number', 'boolean'].includes(typeof v)) out[k] = v;
+    else if (Array.isArray(v) && v.length <= 32 && v.every((x) => x == null || ['string', 'number', 'boolean'].includes(typeof x))) out[k] = v;
+  }
+  return out;
+}
+
+/** levels/<name>/mapng.json: the level's maker, version, area and settings. */
+export function mapngLevelStamp({ terrainData, center, options = {}, levelName, worldSize }) {
+  const td = terrainData || {};
+  return {
+    generator: 'MapNG',
+    format: 1,
+    appVersion: options.appVersion || null,
+    platform: options.platform || 'web',
+    build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : null,
+    buildTime: typeof __BUILD_TIME__ !== 'undefined' ? __BUILD_TIME__ : null,
+    exportedAt: new Date().toISOString(),
+    levelName,
+    center: center ? { lat: Number(center.lat), lng: Number(center.lng) } : null,
+    bounds: td.bounds || null,
+    resolution: td.width || null,
+    metersPerPixel: td.processingMetersPerPixel || 1,
+    sizeMeters: Math.round((worldSize || 0) * 100) / 100,
+    elevationSource: options.elevationSource || (td.sourceGeoTiffs?.source ?? null),
+    options: stampOptions(options),
+  };
+}
+
 export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // Every module logs to the console (OSM, roads, bridges, buildings...); the
   // export keeps its share of that for export_report.txt.
@@ -12604,6 +12639,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // engine then derives it (and DST) from longitude, keeping clock ≈ sun.
   const exportDay = new Date();
   const skyDate = { year: exportDay.getFullYear(), month: exportDay.getMonth() + 1, day: exportDay.getDate() };
+
+  // mapng.json: what made this level, so the desktop app can list MapNG
+  // levels and rebuild them with a later version (its levels sidebar)
+  zip.file(`${base}/mapng.json`, JSON.stringify(mapngLevelStamp({ terrainData, center, options, levelName, worldSize }), null, 1));
 
   zip.file(`${base}/info.json`, JSON.stringify({
     authors: 'mapng',

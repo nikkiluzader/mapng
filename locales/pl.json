@@ -812,5 +812,28 @@
     "contextSingle": "Dziękujemy za eksport w MapNG.",
     "contextBatch": "Eksport wsadowy zakończony. Świetna robota.",
     "contextGeneral": "Wsparcie jest opcjonalne i mile widziane."
+  },
+  "levels": {
+    "title": "Moje poziomy",
+    "open": "Pokaż moje poziomy MapNG",
+    "close": "Ukryj",
+    "refresh": "Odśwież",
+    "noFolder": "Nie ustawiono folderu modów",
+    "empty": "W folderze modów nie ma jeszcze poziomów MapNG. Wyeksportowane poziomy pojawią się tutaj.",
+    "updateAvailable": "Dostępna aktualizacja",
+    "olderVersion": "Starszy MapNG",
+    "website": "Strona",
+    "cancel": "Anuluj",
+    "rebuild": "Przebuduj",
+    "rebuildSavedHint": "Utwórz ten poziom ponownie tą wersją MapNG, z zapisanych danych terenu i OSM",
+    "rebuildFetchHint": "Utwórz ten poziom ponownie tą wersją MapNG. Nie ma zapisanych danych, więc jego obszar zostanie pobrany ponownie",
+    "showOnMap": "Pokaż na mapie",
+    "showInFolder": "Pokaż w folderze",
+    "working": "Pracuję…",
+    "starting": "Uruchamianie…",
+    "confirmSaved": "Przebudować „{name}” tą wersją MapNG?\n\nZostanie utworzony ponownie z zapisanych danych terenu i OSM z tymi samymi ustawieniami, więc otrzyma wszystkie poprawki od czasu eksportu. Obecny poziom zostanie zastąpiony, gdy nowy będzie gotowy.",
+    "confirmFetch": "Przebudować „{name}” tą wersją MapNG?\n\nTen poziom powstał, zanim MapNG zapisywał dane, więc jego obszar zostanie pobrany ponownie: OpenStreetMap mógł się zmienić, a eksport użyje domyślnych ustawień. Obecny poziom zostanie zastąpiony, gdy nowy będzie gotowy.",
+    "cancelled": "Przebudowa anulowana. Poziom się nie zmienił.",
+    "rebuilt": "Przebudowano w MapNG {version} w {seconds} s."
   }
 }

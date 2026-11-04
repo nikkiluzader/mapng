@@ -812,5 +812,28 @@
     "contextSingle": "Danke für deinen Export mit MapNG.",
     "contextBatch": "Batch-Export abgeschlossen. Sehr gute Arbeit.",
     "contextGeneral": "Support ist optional und willkommen."
+  },
+  "levels": {
+    "title": "Meine Level",
+    "open": "Meine MapNG-Level anzeigen",
+    "close": "Ausblenden",
+    "refresh": "Aktualisieren",
+    "noFolder": "Kein Mods-Ordner festgelegt",
+    "empty": "Noch keine MapNG-Level im Mods-Ordner. Exportierte Level erscheinen hier.",
+    "updateAvailable": "Update verfügbar",
+    "olderVersion": "Ältere MapNG",
+    "website": "Website",
+    "cancel": "Abbrechen",
+    "rebuild": "Neu erstellen",
+    "rebuildSavedHint": "Dieses Level mit dieser MapNG-Version neu erstellen, aus seinen gespeicherten Gelände- und OSM-Daten",
+    "rebuildFetchHint": "Dieses Level mit dieser MapNG-Version neu erstellen. Es hat keine gespeicherten Daten, daher wird sein Gebiet neu abgerufen",
+    "showOnMap": "Auf der Karte zeigen",
+    "showInFolder": "Im Ordner zeigen",
+    "working": "Arbeite…",
+    "starting": "Starte…",
+    "confirmSaved": "„{name}“ mit dieser MapNG-Version neu erstellen?\n\nEs wird aus seinen gespeicherten Gelände- und OSM-Daten mit denselben Einstellungen neu erstellt und erhält so alle Korrekturen seit dem Export. Das aktuelle Level wird ersetzt, sobald das neue fertig ist.",
+    "confirmFetch": "„{name}“ mit dieser MapNG-Version neu erstellen?\n\nDieses Level entstand, bevor MapNG seine Daten speicherte, daher wird sein Gebiet neu abgerufen: OpenStreetMap kann sich seitdem geändert haben, und der Export nutzt Standardeinstellungen. Das aktuelle Level wird ersetzt, sobald das neue fertig ist.",
+    "cancelled": "Neuerstellung abgebrochen. Das Level wurde nicht verändert.",
+    "rebuilt": "Mit MapNG {version} in {seconds} s neu erstellt."
   }
 }

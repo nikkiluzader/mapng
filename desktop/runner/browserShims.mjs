@@ -3,6 +3,7 @@
 // Image, ImageData and createImageBitmap, and blob: URLs kept in memory so
 // images and fetch() can read them back. (scripts/sweep/polyfill.mjs stubs
 // the images instead; the desktop app needs the real ones.)
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createCanvas, Image, ImageData, loadImage } from '@napi-rs/canvas';
@@ -160,4 +161,65 @@ const USER_AGENT = `MapNG-Desktop/${process.env.MAPNG_VERSION || 'dev'} (+https:
 function bitmapOf(drawable) {
   if (typeof drawable.close !== 'function') drawable.close = () => {};
   return drawable;
+}
+
+// ---- the terrain's sources, recorded and replayed --------------------------
+
+const PASS_THROUGH = /^(blob:|data:|\/(?!api\/))/;
+
+/** The request a recorded response answers (the same whichever mirror served it). */
+function sourceKey(url, init = {}, bodyText = '') {
+  const u = String(url).replace(/^https?:\/\/[^/]+(\/api\/interpreter)/, 'overpass:$1');
+  const range = new Headers(init.headers || undefined).get('range') || '';
+  return crypto.createHash('sha1').update(`${(init.method || 'GET').toUpperCase()} ${u} ${range} ${bodyText}`).digest('hex');
+}
+
+async function bodyTextOf(init) {
+  if (init?.body == null) return '';
+  if (typeof init.body === 'string') return init.body;
+  if (init.body instanceof URLSearchParams) return init.body.toString();
+  return Buffer.from(await new Response(init.body).arrayBuffer()).toString('base64');
+}
+
+/**
+ * Every network response a terrain is made from kept in dir (mode
+ * 'record'), or served back from there (mode 'replay': a rebuild with
+ * today's code from the same elevation, imagery and OSM). A request
+ * nothing was recorded for goes to the network when fallback is on (an
+ * older recording), else fails like an offline network.
+ * Returns stats { recorded, replayed, missed }.
+ */
+export function installSourceRecorder({ dir, mode = 'record', fallback = true }) {
+  fs.mkdirSync(dir, { recursive: true });
+  const stats = { recorded: 0, replayed: 0, missed: 0 };
+  const inner = globalThis.fetch;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input?.url;
+    if (!url || PASS_THROUGH.test(url)) return inner(input, init);
+    const bodyText = await bodyTextOf(init);
+    const key = sourceKey(url, init, bodyText);
+    const metaFile = path.join(dir, `${key}.json`);
+    const bodyFile = path.join(dir, `${key}.bin`);
+    if (mode === 'replay') {
+      if (fs.existsSync(metaFile)) {
+        stats.replayed++;
+        const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));
+        const body = meta.status === 204 || meta.status === 304 ? null : fs.readFileSync(bodyFile);
+        return new Response(body, { status: meta.status, statusText: meta.statusText, headers: meta.headers });
+      }
+      stats.missed++;
+      if (!fallback) throw new TypeError(`fetch failed: not in the recorded sources (${url})`);
+      return inner(input, init);
+    }
+    const r = await inner(input, init);
+    try {
+      const bytes = Buffer.from(await r.clone().arrayBuffer());
+      const headers = Object.fromEntries([...r.headers.entries()].filter(([k]) => !/^(content-encoding|content-length|transfer-encoding|set-cookie)$/i.test(k)));
+      fs.writeFileSync(bodyFile, bytes);
+      fs.writeFileSync(metaFile, JSON.stringify({ url, method: init.method || 'GET', status: r.status, statusText: r.statusText, headers }));
+      stats.recorded++;
+    } catch { /* an unreadable body (aborted): the caller sees the same */ }
+    return r;
+  };
+  return stats;
 }

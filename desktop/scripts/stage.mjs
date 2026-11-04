@@ -36,6 +36,8 @@ const RUNNER_EXTERNAL = ['@napi-rs/canvas', 'laz-perf'];
 // (work handed to worker threads: each is loaded by its own file name)
 const WORKER_MODULES = ['sidewalkPanels.js'];
 const RUNNERS = ['exportJob.mjs', 'generateJob.mjs'];
+const gitHash = (() => { try { return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: DESKTOP }).toString().trim(); } catch { return 'unknown'; } })();
+const BUILD_DEFINES = { __BUILD_HASH__: JSON.stringify(gitHash), __BUILD_TIME__: JSON.stringify(new Date().toISOString()) };
 const LAZ_PERF_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, '..', 'package.json'), 'utf8')).dependencies['laz-perf'].replace(/^[\^~]/, '');
 
 async function stageRunner() {
@@ -53,6 +55,8 @@ async function stageRunner() {
     external: RUNNER_EXTERNAL,
     // (bundled CommonJS calling require(): give the ESM bundle one)
     banner: { js: "import { createRequire as __mapngRequire } from 'node:module'; const require = __mapngRequire(import.meta.url);" },
+    // (the build a level's mapng.json names, as the page's vite build does)
+    define: BUILD_DEFINES,
     logLevel: 'warning',
   });
   // the modules worker threads load (services/parallel.js), beside the bundle

@@ -873,5 +873,28 @@
     "contextSingle": "Thanks for exporting with MapNG.",
     "contextBatch": "Batch export complete. Nice work.",
     "contextGeneral": "Support is optional, and appreciated."
+  },
+  "levels": {
+    "title": "My Levels",
+    "open": "Show my MapNG levels",
+    "close": "Hide",
+    "refresh": "Refresh",
+    "noFolder": "No mods folder set",
+    "empty": "No MapNG levels in the mods folder yet. Levels you export appear here.",
+    "updateAvailable": "Update available",
+    "olderVersion": "Older MapNG",
+    "website": "Website",
+    "cancel": "Cancel",
+    "rebuild": "Rebuild",
+    "rebuildSavedHint": "Make this level again with this version of MapNG, from its saved terrain and OSM data",
+    "rebuildFetchHint": "Make this level again with this version of MapNG. It has no saved data, so its area is fetched again",
+    "showOnMap": "Show on map",
+    "showInFolder": "Show in folder",
+    "working": "Working…",
+    "starting": "Starting…",
+    "confirmSaved": "Rebuild \"{name}\" with this version of MapNG?\n\nIt is made again from its saved terrain and OSM data with the same settings, so it gets every fix since it was exported. The current level is replaced when the new one is ready.",
+    "confirmFetch": "Rebuild \"{name}\" with this version of MapNG?\n\nThis level was made before MapNG saved its data, so its area is fetched again: OpenStreetMap may have changed since, and the export uses default settings. The current level is replaced when the new one is ready.",
+    "cancelled": "Rebuild cancelled. The level was not changed.",
+    "rebuilt": "Rebuilt with MapNG {version} in {seconds} s."
   }
 }

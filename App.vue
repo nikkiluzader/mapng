@@ -191,6 +191,9 @@
         </div>
       </div>
     </main>
+
+    <!-- Desktop app: the MapNG levels in the mods folder -->
+    <LevelsSidebar v-if="desktopApp" ref="levelsSidebar" @show-on-map="handleShowLevelOnMap" />
   </div>
   </div>
 
@@ -241,6 +244,7 @@ import BatchProgressModal from './components/modals/BatchProgressModal.vue';
 import MapSelector from './components/map/MapSelector.vue';
 import Preview3D from './components/three/Preview3D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
+import LevelsSidebar from './components/layout/LevelsSidebar.vue';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import { createGenerationProgress } from './services/generationProgress.js';
@@ -989,6 +993,16 @@ const cancelGeneration = () => {
     abortController.abort();
     abortController = null;
   }
+};
+
+// (a level from the levels sidebar: the map on its area, at its size)
+const levelsSidebar = ref(null);
+const handleShowLevelOnMap = (level) => {
+  if (!level?.center) return;
+  switchTo2D();
+  setCenter({ lat: level.center.lat, lng: level.center.lng });
+  if (level.resolution) setResolution(level.resolution);
+  if (level.metersPerPixel) handleProcessingMetersPerPixelChange(level.metersPerPixel);
 };
 
 const switchTo2D = () => {

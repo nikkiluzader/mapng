@@ -813,5 +813,28 @@
     "contextSingle": "Gracias por exportar con MapNG.",
     "contextBatch": "Exportación por lotes completada. Gran trabajo.",
     "contextGeneral": "El apoyo es opcional y se agradece."
+  },
+  "levels": {
+    "title": "Mis niveles",
+    "open": "Mostrar mis niveles de MapNG",
+    "close": "Ocultar",
+    "refresh": "Actualizar",
+    "noFolder": "No hay carpeta de mods",
+    "empty": "Aún no hay niveles de MapNG en la carpeta de mods. Los niveles que exportes aparecerán aquí.",
+    "updateAvailable": "Actualización disponible",
+    "olderVersion": "MapNG anterior",
+    "website": "Web",
+    "cancel": "Cancelar",
+    "rebuild": "Reconstruir",
+    "rebuildSavedHint": "Crear este nivel de nuevo con esta versión de MapNG, a partir de sus datos guardados de terreno y OSM",
+    "rebuildFetchHint": "Crear este nivel de nuevo con esta versión de MapNG. No tiene datos guardados, así que su zona se descarga de nuevo",
+    "showOnMap": "Ver en el mapa",
+    "showInFolder": "Mostrar en la carpeta",
+    "working": "Trabajando…",
+    "starting": "Iniciando…",
+    "confirmSaved": "¿Reconstruir «{name}» con esta versión de MapNG?\n\nSe crea de nuevo a partir de sus datos guardados de terreno y OSM con los mismos ajustes, así que recibe todas las correcciones desde que se exportó. El nivel actual se sustituye cuando el nuevo esté listo.",
+    "confirmFetch": "¿Reconstruir «{name}» con esta versión de MapNG?\n\nEste nivel se creó antes de que MapNG guardara sus datos, así que su zona se descarga de nuevo: OpenStreetMap puede haber cambiado desde entonces y la exportación usa los ajustes predeterminados. El nivel actual se sustituye cuando el nuevo esté listo.",
+    "cancelled": "Reconstrucción cancelada. El nivel no ha cambiado.",
+    "rebuilt": "Reconstruido con MapNG {version} en {seconds} s."
   }
 }

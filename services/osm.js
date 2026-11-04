@@ -55,6 +55,21 @@ export const getLastOSMRequestInfo = () => {
   return lastOSMRequestInfo ? { ...lastOSMRequestInfo } : null;
 };
 
+// A repeatable stream of numbers in [0, 1) from a string (mulberry32 on an
+// FNV-1a hash of it).
+const seededStream = (key) => {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 16777619); }
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
 // --- Clipping Helpers ---
 
 const isInside = (p, bounds, edge) => {
@@ -551,8 +566,11 @@ export const parseOverpassResponse = (data, bounds) => {
       const areaM2 = Math.abs(widthM * heightM * 0.5);
       let treeSpacing = tags.natural === "scrub" ? 20 : isWetland ? 25 : 12;
       const treeCount = Math.min(2000, Math.floor(areaM2 / (treeSpacing * treeSpacing)));
+      // (seeded by the area: the same map makes the same trees each time,
+      // and a desktop rebuild from recorded sources matches the original)
+      const rand = seededStream(`${f.id}`);
       for (let i = 0; i < treeCount; i++) {
-        const pt = { lat: minLat + Math.random() * (maxLat - minLat), lng: minLng + Math.random() * (maxLng - minLng) };
+        const pt = { lat: minLat + rand() * (maxLat - minLat), lng: minLng + rand() * (maxLng - minLng) };
         if (isPointInPolygon(pt, f.geometry)) {
           let inHole = false;
           if (f.holes) {
