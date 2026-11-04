@@ -220,10 +220,21 @@ async function reviveTerrainValue(value, base) {
  * processing. The terrain's images come back as app:// file URLs, not
  * copies; an export links those files instead of sending them back.
  */
-// ("Modify" in My Levels: the next Generate Data makes this level's terrain
-// from its saved sources, offline, instead of fetching the area)
-let nextFromLevel = null;
-export function generateNextFromLevel(levelName) { nextFromLevel = levelName || null; }
+// ("Modify" in My Levels: while the map stays on the level's area, size and
+// detail, Generate Data makes its terrain from its saved sources, offline,
+// instead of fetching the area; e.g. again after ticking Raw terrain)
+let modifyingLevel = null;   // { levelName, lat, lng, resolution, mpp }
+export function generateNextFromLevel(levelName, { center, resolution, mpp } = {}) {
+  modifyingLevel = levelName ? { levelName, lat: Number(center?.lat), lng: Number(center?.lng), resolution: Number(resolution), mpp: Number(mpp) || 1 } : null;
+}
+const levelBeingModified = (center, resolution, mpp) => {
+  const m = modifyingLevel;
+  if (!m) return null;
+  const same = Math.abs(Number(center?.lat) - m.lat) < 1e-5 && Math.abs(Number(center?.lng) - m.lng) < 1e-5
+    && Number(resolution) === m.resolution && (Number(mpp) || 1) === m.mpp;
+  if (!same) modifyingLevel = null;   // (moved on: a new area is fetched as usual)
+  return same ? m.levelName : null;
+};
 
 export async function fetchTerrainDataOnDesktop(center, resolution, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, onProgress, signal, generationOptions = {}) {
   if (signal?.aborted) throw new DOMException('Terrain generation cancelled', 'AbortError');
@@ -231,8 +242,7 @@ export async function fetchTerrainDataOnDesktop(center, resolution, includeOSM, 
   const onAbort = () => { if (terrainId) desktopApp.cancelTerrain(terrainId); };
   signal?.addEventListener?.('abort', onAbort, { once: true });
   try {
-    const fromLevel = nextFromLevel;
-    nextFromLevel = null;
+    const fromLevel = levelBeingModified(toRaw(center), resolution, generationOptions?.processingMetersPerPixel);
     const result = await desktopApp.generateTerrain({
       center: toRaw(center), resolution, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey,
       generationOptions: JSON.parse(JSON.stringify(toRaw(generationOptions) || {})),

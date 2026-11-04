@@ -1022,6 +1022,8 @@ const handleModifyLevel = async (level) => {
   if (!info?.center) { window.alert(t('levels.modifyNoData', { name: level.title })); return; }
   applyExportSettings(info.options, info.options?.levelName || level.title);
   store.setAdvancedMode(true);
+  // (Raw terrain ticked the way the level was made: unchanged unless the user changes it)
+  store.setRawTerrain(!!info.generationOptions?.raw);
   // (an uploaded elevation file takes another path: the level's own data wins)
   if (uploadedElevationFile.value) handleElevationFileClear();
   switchTo2D();
@@ -1031,7 +1033,7 @@ const handleModifyLevel = async (level) => {
   handleProcessingMetersPerPixelChange(mpp);
   lastGenerationKey.value = null;
   await nextTick();
-  generateNextFromLevel(level.levelName);
+  generateNextFromLevel(level.levelName, { center: info.center, resolution: info.resolution || resolution.value, mpp });
   await handleGenerate(false, info.includeOSM, 'default', '', 'auto', mpp);
 };
 

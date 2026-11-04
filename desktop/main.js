@@ -473,8 +473,12 @@ ipcMain.handle('terrain:generate', async (event, requested) => {
   if (requested?.fromLevel) {
     const projectDir = projectDirOf(String(requested.fromLevel));
     if (!readProject(String(requested.fromLevel))?.rebuildable) throw new Error('This level has no saved data to modify it from.');
+    const saved = JSON.parse(fs.readFileSync(path.join(projectDir, 'generate.json'), 'utf8'));
     params = {
-      ...JSON.parse(fs.readFileSync(path.join(projectDir, 'generate.json'), 'utf8')),
+      ...saved,
+      // (Raw terrain as the window has it now: the saved downloads are untouched,
+      // so the terrain can be made either way)
+      generationOptions: { ...(saved.generationOptions || {}), raw: !!requested.generationOptions?.raw },
       sources: { mode: 'replay', dir: path.join(projectDir, 'sources'), fallback: true },
     };
   }
