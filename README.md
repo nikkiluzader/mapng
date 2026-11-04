@@ -56,6 +56,8 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **No more crash on load** when an area's trees reached past the map's edge (they piled up in one corner and crashed BeamNG's forest loader)
 - Every level now carries `mapng.json` (MapNG version, area, size and settings), so the desktop app can recognise and rebuild it
 - The website and the desktop app read MapNG's own OpenStreetMap tiles in hosted regions; trees scattered in woods come out the same on every export
+- **Desktop: Update and Modify in My Levels.** Update remakes a level with the current version; Modify loads it back in with its settings to change and export again. Both use the level's saved downloads (terrain, satellite, OSM, bridge-height lidar), so nothing is downloaded and no GPXZ calls are used. "Show saved data" opens a level's saved-data folder (it is not part of the level zip)
+- **Desktop: much faster big maps.** The heightmap resample runs on every CPU core (a 16k GPXZ map generates in about a minute), measured bridge heights from US lidar now work in the desktop app, and the 3D preview's texture choice is the export's Base Texture
 - **Clearer settings:** the sidebar follows the order you work in (location, area and detail, elevation, map data, generate, export), the level options are grouped into cards (Level, Content, Structures, Terrain edits, Surroundings), and greyed-out options say why. Map overlays live in the Map Layers box
 - The "Apply foundations" terrain option is gone: buildings carry their own foundations
 - **Export hotspots:** an optional 2D map overlay of where people export levels, from users who opt in to share (see [Export hotspots and privacy](#export-hotspots-and-privacy))
