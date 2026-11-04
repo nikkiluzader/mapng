@@ -555,6 +555,7 @@ import SettingSection from '../base/SettingSection.vue';
 import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
+import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
 import { reverseLocationName } from '../../services/nominatim';
@@ -627,12 +628,17 @@ const resolveBeamNGBaseTexture = (terrainData, preferred = 'osm') => {
 // The user's base texture choice is remembered across areas and reloads; the
 // selected value falls back per terrain when that texture isn't available
 // (e.g. 'painted' only exists after a touch-up).
-const beamNGBaseTexturePreference = ref(localStorage.getItem('mapng_beamNGBaseTexture') || 'osm');
+// (shared with the 3D preview's texture buttons: composables/useBaseTexture.js)
+const { baseTexture: beamNGBaseTexturePreference, setBaseTexture } = useBaseTexture();
 const beamNGBaseTexture = ref(resolveBeamNGBaseTexture(props.terrainData, beamNGBaseTexturePreference.value));
 const handleBeamNGBaseTextureChange = () => {
-  beamNGBaseTexturePreference.value = beamNGBaseTexture.value;
-  localStorage.setItem('mapng_beamNGBaseTexture', beamNGBaseTexture.value);
+  setBaseTexture(beamNGBaseTexture.value);
 };
+// (a texture picked in the 3D preview becomes the export's, when this terrain has it)
+watch(beamNGBaseTexturePreference, (preferred) => {
+  const resolved = resolveBeamNGBaseTexture(props.terrainData, preferred);
+  if (resolved === preferred) beamNGBaseTexture.value = resolved;
+});
 const legacyIncludeBackdrop = localStorage.getItem('mapng_beamNGIncludeBackdrop');
 const beamNGBackdropSource = ref(
   localStorage.getItem('mapng_beamNGBackdropSource')

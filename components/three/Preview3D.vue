@@ -162,7 +162,7 @@
           class="flex bg-gray-100 dark:bg-gray-800 rounded-md p-1 border border-gray-200 dark:border-gray-700 mb-2"
         >
           <button
-            @click="textureType = 'satellite'"
+            @click="pickTexture('satellite')"
             :class="[
               'flex-1 text-xs py-1.5 rounded transition-colors',
               textureType === 'satellite'
@@ -173,7 +173,7 @@
             {{ t('preview.satellite') }}
           </button>
           <button
-            @click="textureType = 'osm'"
+            @click="pickTexture('osm')"
             :disabled="!terrainData.osmTextureUrl"
             :title="
               !terrainData.osmTextureUrl
@@ -192,7 +192,7 @@
             {{ t('preview.osm') }}
           </button>
           <button
-            @click="textureType = 'hybrid'"
+            @click="pickTexture('hybrid')"
             :disabled="!terrainData.hybridTextureUrl"
             :title="
               !terrainData.hybridTextureUrl
@@ -211,7 +211,7 @@
             {{ t('preview.hybrid') }}
           </button>
           <button
-            @click="textureType = 'game'"
+            @click="pickTexture('game')"
             :disabled="!terrainData.gameTextureUrl && !terrainData.gameTextureCanvas"
             :title="
               !terrainData.gameTextureUrl && !terrainData.gameTextureCanvas
@@ -230,7 +230,7 @@
             {{ t('preview.game') }}
           </button>
           <button
-            @click="textureType = 'none'"
+            @click="pickTexture('none')"
             :class="[
               'flex-1 text-xs py-1.5 rounded transition-colors',
               textureType === 'none'
@@ -385,6 +385,7 @@
 
 <script setup>
 import { ref, computed, reactive, watch, onErrorCaptured } from "vue";
+import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { useI18n } from 'vue-i18n';
 import * as THREE from "three";
 import { TresCanvas } from "@tresjs/core";
@@ -508,7 +509,27 @@ const meshQualityOptions = [
 const surroundingQuality = computed(() => (meshQuality.value === 'full' ? 'high' : meshQuality.value));
 const preset = ref("Kloofendal Pure Sky");
 const sunPosition = ref("Mid Morning");
-const textureType = ref("hybrid");
+// (the same choice as the export panel's Base Texture: composables/useBaseTexture.js;
+// a touched-up texture previews as hybrid)
+const { baseTexture: sharedBaseTexture, setBaseTexture } = useBaseTexture();
+const PREVIEW_TEXTURES = ['satellite', 'osm', 'hybrid', 'game', 'none'];
+// (a texture this terrain doesn't have shows hybrid, else satellite, here;
+// the shared choice itself stays as picked)
+const previewHas = (type) => {
+  const td = props.terrainData || {};
+  if (type === 'none') return true;
+  if (type === 'satellite') return !!td.satelliteTextureUrl;
+  return !!(td[`${type}TextureUrl`] || td[`${type}TextureCanvas`]);
+};
+const previewTextureFor = (value) => {
+  if (PREVIEW_TEXTURES.includes(value) && previewHas(value)) return value;
+  return previewHas('hybrid') ? 'hybrid' : 'satellite';
+};
+const textureType = ref(previewTextureFor(sharedBaseTexture.value));
+// (only a click changes the shared choice; a fallback shown here does not)
+const pickTexture = (value) => { textureType.value = value; setBaseTexture(value); };
+watch(sharedBaseTexture, (value) => { const next = previewTextureFor(value); if (next !== textureType.value) textureType.value = next; });
+watch(() => props.terrainData, () => { textureType.value = previewTextureFor(sharedBaseTexture.value); });
 const surroundingTextureType = ref("none");
 const showWireframe = ref(false);
 const showWater = ref(true);

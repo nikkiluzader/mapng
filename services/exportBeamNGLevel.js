@@ -7673,8 +7673,13 @@ function sampleMeanHeight(terrainData) {
  * are served by the app); a script passes its own (options.lidarProvider).
  */
 export async function defaultLidarProvider() {
-  const { createLazPerf } = await import('laz-perf/lib/web');
-  const lp = await createLazPerf({ locateFile: (path) => (path.endsWith('.wasm') ? '/laz-perf.wasm' : path) });
+  // (in Node, the desktop app's export runner: laz-perf's Node build, which
+  // finds its own WASM; the web build's directory import fails there, and the
+  // installed app built every bridge deck without its measured height)
+  const inNode = typeof process !== 'undefined' && !!process.versions?.node && typeof window === 'undefined';
+  const lp = inNode
+    ? await (await import(/* @vite-ignore */ ['laz-perf', 'lib', 'node', 'index.js'].join('/'))).createLazPerf()
+    : await (await import('laz-perf/lib/web')).createLazPerf({ locateFile: (path) => (path.endsWith('.wasm') ? '/laz-perf.wasm' : path) });
   const index = (await (await fetch('/ept-index.json')).json()).datasets;
   return { index, lp, fetchImpl: (...a) => fetch(...a) };
 }
