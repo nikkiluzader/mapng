@@ -1230,12 +1230,23 @@ async function buildBuildingsOnWorkers(terrainData, features, project, options) 
     groups.get(key).push(f);
   }
   const hotelOf = new Map([...ctx.hotelMain].map(([name, { f }]) => [f, name]));
-  const items = [...groups.values()].map((list) => ({
+  // (each task one JSON string: structured-cloning 51k features' objects
+  // into the workers took 7 s of this thread)
+  const items = [...groups.values()].map((list) => JSON.stringify({
     features: list,
     hints: list.map((f) => ctx.levelsHints.get(f) ?? null),
     business: list.map((f) => ctx.businessTags.get(f) || null),
     hotelMain: list.map((f) => hotelOf.get(f) || null),
   }));
+  // the extras a task of their own, first: one thread, the longest task
+  // (they ran half as fast here beside the busy workers)
+  const slimRaceways = (options.raceways || []).map((cw) => ({ highway: cw.highway, nodes: cw.nodes, half: cw.half, tags: cw.tags, wayId: cw.wayId, oneWay: cw.oneWay }));
+  for (const part of ['water', 'fields']) {
+    items.unshift(JSON.stringify({
+      extras: part, features: ctx.features, raceways: slimRaceways, gateRoads: options.gateRoads || [],
+      maxBuildings: options.maxBuildings, buildingKeys: [...groups.keys()],
+    }));
+  }
   // (the heightmap in shared memory: every worker reads the same one)
   const hm = terrainData.heightMap;
   const shm = new Float32Array(new SharedArrayBuffer(hm.length * 4)); shm.set(hm);
@@ -1245,34 +1256,29 @@ async function buildBuildingsOnWorkers(terrainData, features, project, options) 
     roads: ctx.features.filter((f) => f?.type === 'road'),
     passages: ctx.streets.passages,
   };
-  // (all handed out at once: the workers build while this thread does the extras)
-  let posted; const postedP = new Promise((r) => { posted = r; });
-  const sharesP = parallelMap(items, {
+  const shares = await parallelMap(items, {
     local: (item, sh) => import('./buildingWorker.js').then((m) => m.buildBuildingShare(item, sh)),
     module: new URL('./buildingWorker.js', import.meta.url).href, fn: 'buildBuildingShare', shared,
-    // (two cores left to this thread's extras, which otherwise ran half as fast)
-    threads: Math.max(1, (await parallelThreads()) - 2),
-    prefill: true, onPosted: posted,
   });
-  await postedP;
-  // fountains, pools, fields, stands, racetracks: here, their tiles named apart
-  const extras = buildTexturedBuildings(features, project, { ...options, part: 'extras', context: ctx, tileKeyPrefix: 'x' });
-  const shares = await sharesP;
-  const stats = mergeBuildingStats({}, extras.stats);
-  let count = extras.count; let meshes = extras.meshes.length;
-  let triangles = extras.meshes.reduce((n, m) => n + (m.geometry.index?.count ?? m.geometry.getAttribute('position')?.count ?? 0) / 3, 0);
-  for (const sh of shares) {
+  // (the extras' stats first, as one builder would have them)
+  const stats = {}; let count = 0; let meshes = 0; let triangles = 0;
+  for (const sh of [shares[1], shares[0], ...shares.slice(2)]) {
     mergeBuildingStats(stats, sh.stats);
     count += sh.count; meshes += sh.meshes; triangles += sh.triangles;
   }
   stats.footprints = footprints;
   // (the workers built only chosen footprints: the skips are all counted here)
   stats.skipped = skipped;
-  // (an extras tile over a building tile keeps no lite copy of its own: in
-  // one shared tile its full-only pieces had none)
-  const buildingKeys = new Set(shares.flatMap((sh) => sh.tiles.map((t) => t.key)));
-  const extraDaes = await buildBuildingTileDAEs(extras.tiles || [], { cloneLite: (t) => !buildingKeys.has(t.key.slice(1)) });
-  const tileDaes = [...shares.flatMap((sh) => sh.tiles.filter((t) => t.data)), ...extraDaes];
+  // (the extras' tiles last, as before: water, then fields; they come as
+  // scenes, written now on every thread)
+  const extraTiles = [...shares[1].tiles, ...shares[0].tiles];
+  const extraData = await parallelMap(extraTiles.map((t) => t.scene), {
+    local: writeDae, module: new URL('./daeWorker.js', import.meta.url).href, fn: 'writeDae',
+  });
+  const tileDaes = [
+    ...shares.slice(2).flatMap((sh) => sh.tiles.filter((t) => t.data)),
+    ...extraTiles.map(({ scene, ...meta }, i) => ({ ...meta, data: extraData[i] })).filter((t) => t.data),
+  ];
   stats.tiles = tileDaes.length;
   return { count, stats, tileDaes, meshes, triangles };
 }
@@ -14010,9 +14016,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   };
   // Stream the archive to disk (OPFS) when available so the ~1 GB output never
   // has to accumulate in the JS heap; fall back to the in-memory blob elsewhere.
-  let zipBlob = await generateZipToOPFS(zip, zipFilename, onZipPercent);
-  let zipDelivery = 'opfs-stream';
-  if (!zipBlob) {
+  // (options.zipSink { write(chunk) }: the caller's own file, written as it
+  // comes; the desktop app's export runner. The result then has no blob.)
+  let zipBlob = null; let zipDelivery;
+  if (options.zipSink) {
+    await streamZipToWritable(zip, options.zipSink, onZipPercent);
+    zipDelivery = 'sink';
+  } else {
+    zipBlob = await generateZipToOPFS(zip, zipFilename, onZipPercent);
+    zipDelivery = 'opfs-stream';
+  }
+  if (!zipBlob && zipDelivery !== 'sink') {
     zipDelivery = 'in-memory';
     zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', streamFiles: true });
   }

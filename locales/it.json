@@ -23,7 +23,9 @@
     "switchToLightMode": "Passa a Modalità Chiara",
     "switchToDarkMode": "Passa a Modalità Scura",
     "build": "Versione {hash} - {time}",
-    "desktopBuild": "MapNG Desktop {version}"
+    "desktopBuild": "MapNG Desktop {version}",
+    "desktopApp": "App desktop",
+    "desktopAppTooltip": "MapNG per Windows e Linux: mappe grandi e dense, livelli salvati direttamente in BeamNG, ricostruzione con le nuove versioni"
   },
   "mode": {
     "singleTile": "Singola Tessera",
@@ -424,7 +426,9 @@
     "modeBasic": "Base",
     "modeAdvanced": "Avanzato",
     "modeBasicHint": "Solo il livello BeamNG. Passa ad Avanzato per scaricare heightmap, texture e modelli 3D, i riquadri circostanti e altre opzioni di esportazione.",
-    "modeAdvancedHint": "Tutti gli strumenti: download 2D e 3D, riquadri circostanti, opzioni del livello per categoria ed extra dell’anteprima."
+    "modeAdvancedHint": "Tutti gli strumenti: download 2D e 3D, riquadri circostanti, opzioni del livello per categoria ed extra dell’anteprima.",
+    "desktopHint": "Le mappe grandi e dense si esportano molto più in fretta, senza il limite di memoria del browser, nell’app desktop gratuita.",
+    "desktopHintLink": "Scarica per Windows o Linux"
   },
   "batchExport": {
     "title": "Opzioni Esportazione",

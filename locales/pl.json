@@ -23,7 +23,9 @@
     "switchToLightMode": "Przełącz na tryb jasny",
     "switchToDarkMode": "Przełącz na tryb ciemny",
     "build": "Kompilacja {hash} - {time}",
-    "desktopBuild": "MapNG Desktop {version}"
+    "desktopBuild": "MapNG Desktop {version}",
+    "desktopApp": "Aplikacja desktopowa",
+    "desktopAppTooltip": "MapNG dla Windows i Linux: duże i gęste mapy, poziomy zapisywane prosto w BeamNG, przebudowa w nowych wersjach"
   },
   "mode": {
     "singleTile": "Pojedynczy kafelek",
@@ -424,7 +426,9 @@
     "modeBasic": "Podstawowy",
     "modeAdvanced": "Zaawansowany",
     "modeBasicHint": "Tylko poziom BeamNG. Przełącz na Zaawansowany, aby pobrać mapę wysokości, tekstury i modele 3D, sąsiednie kafelki i więcej opcji eksportu.",
-    "modeAdvancedHint": "Wszystkie narzędzia: pobieranie 2D i 3D, sąsiednie kafelki, opcje poziomu według kategorii i dodatki podglądu."
+    "modeAdvancedHint": "Wszystkie narzędzia: pobieranie 2D i 3D, sąsiednie kafelki, opcje poziomu według kategorii i dodatki podglądu.",
+    "desktopHint": "Duże i gęste mapy eksportują się dużo szybciej, bez limitu pamięci przeglądarki, w darmowej aplikacji desktopowej.",
+    "desktopHintLink": "Pobierz dla Windows lub Linux"
   },
   "batchExport": {
     "title": "Opcje eksportu",

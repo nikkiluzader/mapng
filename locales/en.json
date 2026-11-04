@@ -30,7 +30,9 @@
     "switchToLightMode": "Switch to Light Mode",
     "switchToDarkMode": "Switch to Dark Mode",
     "build": "Build {hash} - {time}",
-    "desktopBuild": "MapNG Desktop {version}"
+    "desktopBuild": "MapNG Desktop {version}",
+    "desktopApp": "Desktop app",
+    "desktopAppTooltip": "MapNG for Windows and Linux: big and dense maps, levels saved straight to BeamNG, rebuilds with new versions"
   },
   "mode": {
     "singleTile": "Single Tile",
@@ -475,7 +477,9 @@
     "modeBasic": "Basic",
     "modeAdvanced": "Advanced",
     "modeBasicHint": "Just the BeamNG level. Switch to Advanced for heightmap, texture and 3D model downloads, Surrounding Tiles and more export options.",
-    "modeAdvancedHint": "All tools: 2D and 3D asset downloads, Surrounding Tiles, per-category level options and preview extras."
+    "modeAdvancedHint": "All tools: 2D and 3D asset downloads, Surrounding Tiles, per-category level options and preview extras.",
+    "desktopHint": "Big and dense maps export much faster, without the browser memory limit, in the free desktop app.",
+    "desktopHintLink": "Download for Windows or Linux"
   },
   "batchExport": {
     "title": "Export Options",

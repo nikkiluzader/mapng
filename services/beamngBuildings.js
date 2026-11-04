@@ -1544,9 +1544,10 @@ export function buildingContext(features, project, raceways = []) {
 
 /**
  * part: 'all'; 'buildings' (only the buildings: a worker's share, with the
- * context made for all of them) or 'extras' (all but the buildings:
- * fountains, pools, fields, stands, racetracks). tileKeyPrefix keeps two
- * parts' tiles apart.
+ * context made for all of them); 'extras' (all but the buildings:
+ * fountains, pools, fields, stands, racetracks), or half of them, 'water'
+ * (fountains, pools) or 'fields' (the rest). tileKeyPrefix keeps two parts'
+ * tiles apart.
  */
 export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [], gateRoads = [], part = 'all', context = null, tileKeyPrefix = '' } = {}) {
   const ctx = context || buildingContext(features, project, raceways);
@@ -1601,7 +1602,7 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     return { meshes, count, stats, tiles: tileList };
   };
 
-  for (const f of part === 'extras' ? [] : features) {
+  for (const f of part === 'all' || part === 'buildings' ? features : []) {
     if (f?.type !== 'building') continue;
     stats.footprints++;
     if (count >= maxBuildings) { stats.skipped.overCap++; continue; }
@@ -1892,6 +1893,10 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
   if (part === 'buildings') return finish();
+  // (the extras in two independent halves, for two worker threads: the
+  // water (fountains, pools), then the fields (pitches, stands, racetracks,
+  // floodlights), which depend on each other)
+  if (part === 'fields') return fieldExtras();
   // fountains: basins, bowls and jets from the fountain library (services/fountains.js)
   const fountainKinds = {};
   for (const fo of planFountains(features, project)) {
@@ -1914,6 +1919,10 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
   if (Object.keys(poolKinds).length) { stats.details.pools = poolKinds; stats.details.poolShapes = poolShapes; }
+  if (part === 'water') return finish();
+  return fieldExtras();
+
+  function fieldExtras() {
   // sports fields and the stands beside them (services/sportsFields.js)
   const pitchKinds = {};
   const pitches = planPitches(features, project, { groundAt, drape });
@@ -2011,4 +2020,5 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     }
   }
   return finish();
+  }
 }

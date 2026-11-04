@@ -3639,7 +3639,9 @@ const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 // small arrays for the millions of pixels by a dense city's sidewalks spent
 // seconds allocating
 class PixelClaims {
-  constructor() { this.cap = 1 << 16; this.size = 0; this.alloc(this.cap); }
+  // (order: the pixels in the order first claimed, neighbours together: the
+  // road and deck tests after run warm on them, not in hash order)
+  constructor() { this.cap = 1 << 16; this.size = 0; this.alloc(this.cap); this.order = new Int32Array(1 << 16); }
   alloc(cap) {
     this.idx = new Int32Array(cap).fill(-1); this.key = new Float64Array(cap); this.sum = new Float64Array(cap); this.n = new Uint32Array(cap);
   }
@@ -3657,7 +3659,9 @@ class PixelClaims {
     let h = this.slot(idx);
     if (this.idx[h] === -1) {
       if ((this.size + 1) * 2 > this.cap) { this.grow(); h = this.slot(idx); }
-      this.idx[h] = idx; this.key[h] = key; this.sum[h] = target; this.n[h] = 1; this.size++;
+      this.idx[h] = idx; this.key[h] = key; this.sum[h] = target; this.n[h] = 1;
+      if (this.size === this.order.length) { const o = new Int32Array(this.order.length * 2); o.set(this.order); this.order = o; }
+      this.order[this.size++] = idx;
     } else if (key < this.key[h] - 1e-6) { this.key[h] = key; this.sum[h] = target; this.n[h] = 1; }
     else if (Math.abs(key - this.key[h]) <= 1e-6) { this.sum[h] += target; this.n[h]++; }
   }
@@ -3722,9 +3726,9 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
     }
   }
   const edits = [];
-  for (let h = 0; h < best.cap; h++) {
-    const idx = best.idx[h];
-    if (idx === -1) continue;
+  for (let o = 0; o < best.size; o++) {
+    const idx = best.order[o];
+    const h = best.slot(idx);
     const sum = best.sum[h]; const n = best.n[h];
     const r = Math.floor(idx / width); const c = idx - r * width;
     const [x, y] = toWorld(c, r);

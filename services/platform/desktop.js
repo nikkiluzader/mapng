@@ -8,6 +8,9 @@ import { toRaw } from 'vue';
 
 export const desktopApp = (typeof window !== 'undefined' && window.mapngDesktop) || null;
 
+// where the website sends people for the desktop app (Windows, Linux)
+export const DESKTOP_DOWNLOAD_URL = 'https://github.com/nikkiluzader/mapng/releases/latest';
+
 // (one IPC message each: well under Chromium's message size limit)
 const TERRAIN_FILE_URL = /^app:\/\/mapng\/__terrain\/([\w-]+)\/([\w.-]+)$/;
 const mimeOf = (file) => ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', json: 'application/json' }[file.split('.').pop().toLowerCase()] || '');

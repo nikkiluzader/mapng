@@ -23,7 +23,9 @@
     "switchToLightMode": "Zu hellem Modus wechseln",
     "switchToDarkMode": "Zu dunklem Modus wechseln",
     "build": "Build {hash} - {time}",
-    "desktopBuild": "MapNG Desktop {version}"
+    "desktopBuild": "MapNG Desktop {version}",
+    "desktopApp": "Desktop-App",
+    "desktopAppTooltip": "MapNG für Windows und Linux: große und dichte Karten, Level direkt in BeamNG gespeichert, Neubau mit neuen Versionen"
   },
   "mode": {
     "singleTile": "Einzelnes Tile",
@@ -424,7 +426,9 @@
     "modeBasic": "Einfach",
     "modeAdvanced": "Erweitert",
     "modeBasicHint": "Nur das BeamNG-Level. Wechsle zu Erweitert für Heightmap-, Textur- und 3D-Modell-Downloads, umliegende Kacheln und mehr Exportoptionen.",
-    "modeAdvancedHint": "Alle Werkzeuge: 2D- und 3D-Downloads, umliegende Kacheln, Level-Optionen pro Kategorie und Vorschau-Extras."
+    "modeAdvancedHint": "Alle Werkzeuge: 2D- und 3D-Downloads, umliegende Kacheln, Level-Optionen pro Kategorie und Vorschau-Extras.",
+    "desktopHint": "Große und dichte Karten exportieren viel schneller und ohne Speichergrenze des Browsers in der kostenlosen Desktop-App.",
+    "desktopHintLink": "Für Windows oder Linux herunterladen"
   },
   "batchExport": {
     "title": "Exportoptionen",

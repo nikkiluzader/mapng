@@ -23,7 +23,9 @@
     "switchToLightMode": "Passer en mode clair",
     "switchToDarkMode": "Passer en mode sombre",
     "build": "Build {hash} - {time}",
-    "desktopBuild": "MapNG Bureau {version}"
+    "desktopBuild": "MapNG Bureau {version}",
+    "desktopApp": "Application de bureau",
+    "desktopAppTooltip": "MapNG pour Windows et Linux : cartes grandes et denses, niveaux enregistrés directement dans BeamNG, reconstruction avec les nouvelles versions"
   },
   "mode": {
     "singleTile": "Tuile unique",
@@ -424,7 +426,9 @@
     "modeBasic": "Basique",
     "modeAdvanced": "Avancé",
     "modeBasicHint": "Seulement le niveau BeamNG. Passe en Avancé pour télécharger heightmap, textures et modèles 3D, les tuiles voisines et plus d’options d’export.",
-    "modeAdvancedHint": "Tous les outils : téléchargements 2D et 3D, tuiles voisines, options de niveau par catégorie et extras de l’aperçu."
+    "modeAdvancedHint": "Tous les outils : téléchargements 2D et 3D, tuiles voisines, options de niveau par catégorie et extras de l’aperçu.",
+    "desktopHint": "Les cartes grandes et denses s’exportent bien plus vite, sans la limite de mémoire du navigateur, dans l’application de bureau gratuite.",
+    "desktopHintLink": "Télécharger pour Windows ou Linux"
   },
   "batchExport": {
     "title": "Options d'export",

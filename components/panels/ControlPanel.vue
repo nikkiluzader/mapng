@@ -173,6 +173,11 @@
         :label="t('controlPanel.resolutionOutputSize')"
       >
       </ResolutionSelector>
+      <!-- (the website only: big maps belong in the desktop app) -->
+      <p v-if="!desktopApp && Number(resolution) >= 4096" class="flex items-start gap-1.5 -mt-1 text-[10px] leading-snug text-gray-500 dark:text-gray-400">
+        <Download :size="11" class="shrink-0 mt-px text-[#FF6600]" />
+        <span>{{ t('controlPanel.desktopHint') }} <a :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">{{ t('controlPanel.desktopHintLink') }}</a></span>
+      </p>
 
       <ProcessingResolutionInput
         :model-value="processingMetersPerPixel"
@@ -339,7 +344,8 @@
 import { ref, computed, onMounted, watch } from 'vue';
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
-import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle, Map as MapIcon, Building2, Lock } from 'lucide-vue-next';
+import { MapPin, Box, Trees, ChevronDown, Settings, AlertTriangle, Map as MapIcon, Building2, Lock, Download } from 'lucide-vue-next';
+import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
 import BaseToggle from '../base/BaseToggle.vue';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';

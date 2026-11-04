@@ -29,21 +29,28 @@ async function main() {
   const job = JSON.parse(fs.readFileSync(path.join(jobDir, 'job.json'), 'utf8'));
   const terrainData = await reviveJobValue(job.terrainData, jobDir);
   const started = Date.now();
-  const { blob, filename } = await exportBeamNGLevel(terrainData, job.center, {
+  // (the zip written to the file as it is made, beside the final name; the
+  // game never sees half a zip: renamed when complete)
+  fs.mkdirSync(job.outputDir, { recursive: true });
+  let partial = null; let fd = null; let size = 0;
+  const { filename } = await exportBeamNGLevel(terrainData, job.center, {
     ...job.options,
     onProgress: (p) => send({ type: 'progress', ...p }),
+    zipSink: {
+      write(chunk) {
+        if (fd === null) { partial = path.join(job.outputDir, `.mapng-${process.pid}.zip.partial`); fd = fs.openSync(partial, 'w'); }
+        fs.writeSync(fd, chunk);
+        size += chunk.byteLength;
+      },
+    },
+  }).catch((error) => {
+    if (fd !== null) { fs.closeSync(fd); fs.rmSync(partial, { force: true }); }
+    throw error;
   });
-  fs.mkdirSync(job.outputDir, { recursive: true });
+  fs.closeSync(fd);
   const out = path.join(job.outputDir, filename);
-  // (written beside, then renamed: the game never sees half a zip; in 64 MB
-  // slices: Blob.stream() hands Node's web streams small chunks)
-  const partial = `${out}.partial`;
-  const fd = fs.openSync(partial, 'w');
-  try {
-    for (let o = 0; o < blob.size; o += 64 * 2 ** 20) fs.writeSync(fd, new Uint8Array(await blob.slice(o, o + 64 * 2 ** 20).arrayBuffer()));
-  } finally { fs.closeSync(fd); }
   fs.renameSync(partial, out);
-  send({ type: 'done', path: out, filename, size: blob.size, seconds: (Date.now() - started) / 1000 });
+  send({ type: 'done', path: out, filename, size, seconds: (Date.now() - started) / 1000 });
 }
 
 main().then(

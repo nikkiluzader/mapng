@@ -9,7 +9,7 @@ import { buildTexturedBuildings } from './beamngBuildings.js';
 import { streetIndex } from './buildingDetails.js';
 import { buildingTileScene } from './buildingTiles.js';
 import { ColladaExporter } from './ColladaExporter.js';
-import { DAE_OPTIONS } from './daeWorker.js';
+import { DAE_OPTIONS, describeScene } from './daeWorker.js';
 import { geoToWorldPoint, terrainDrape, terrainGroundAt } from './terrainLookup.js';
 
 let made = null;   // this worker's terrain lookups and streets (the same shared data for every task)
@@ -31,7 +31,11 @@ function lookups(shared) {
  * shared { terrain, squareSize, tileM, roads, passages }. Returns the tiles' shapes
  * { key, origin, fullPx, data }, the count, the stats and the mesh tally.
  */
-export function buildBuildingShare(item, shared) {
+export function buildBuildingShare(task, shared) {
+  // (a task comes as one JSON string: much cheaper to hand over than the
+  // same features as objects)
+  const item = typeof task === 'string' ? JSON.parse(task) : task;
+  if (item.extras) return buildExtras(item, shared);
   const { project, groundAt, drape, streets } = lookups(shared);
   const levelsHints = new Map(); const businessTags = new Map(); const hotelMain = new Map();
   item.features.forEach((f, i) => {
@@ -43,9 +47,37 @@ export function buildBuildingShare(item, shared) {
     maxBuildings: Infinity, tileM: shared.tileM, squareSize: shared.squareSize, groundAt, drape,
     part: 'buildings', context: { features: item.features, streets, levelsHints, businessTags, hotelMain },
   });
+  return shapesOf(built, () => true);
+}
+
+/**
+ * The extras (fountains, pools, fields, stands, racetracks: buildTexturedBuildings
+ * part 'extras') from all the features, in tiles named apart ('x'); an extras
+ * tile over a building tile keeps no lite copy of its own (buildingKeys).
+ */
+function buildExtras(item, shared) {
+  const { project, groundAt, drape, streets } = lookups(shared);
+  // (the features come with the stands already tagged; the extras read
+  // nothing else of the buildings' context but the streets)
+  const ctx = { features: item.features, streets, levelsHints: new Map(), businessTags: new Map(), hotelMain: new Map() };
+  const built = buildTexturedBuildings(item.features, project, {
+    maxBuildings: item.maxBuildings ?? Infinity, tileM: shared.tileM, squareSize: shared.squareSize, groundAt, drape,
+    raceways: item.raceways, gateRoads: item.gateRoads,
+    // ('water': fountains and pools, tiles 'x'; 'fields': pitches, stands, racetracks, lights, tiles 'y')
+    part: item.extras, context: ctx, tileKeyPrefix: item.extras === 'water' ? 'x' : 'y',
+  });
+  const buildingKeys = new Set(item.buildingKeys);
+  // (their shapes as scenes, written on every thread by the exporter: a
+  // field's draped surfaces made one big tile, and this one thread wrote
+  // them all for 8 s)
+  return shapesOf(built, (t) => !buildingKeys.has(t.key.slice(1)), true);
+}
+
+function shapesOf(built, cloneLite, asScenes = false) {
   const triangles = built.meshes.reduce((n, m) => n + (m.geometry.index?.count ?? m.geometry.getAttribute('position')?.count ?? 0) / 3, 0);
   const tiles = built.tiles.map((t) => {
-    const scene = buildingTileScene(t);
+    const scene = buildingTileScene(t, { cloneLite: cloneLite(t) });
+    if (asScenes) return { ...scene.meta, scene: describeScene(scene.root) };
     return { ...scene.meta, data: new ColladaExporter().parse(scene.root, undefined, DAE_OPTIONS)?.data ?? null };
   });
   return { tiles, count: built.count, stats: built.stats, meshes: built.meshes.length, triangles };

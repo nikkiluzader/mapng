@@ -51,6 +51,7 @@
           <a href="mailto:nikkiluzader@gmail.com" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.contact') }}</a>
           <a href="https://discord.gg/j6ZvcF8rgk" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.discord') }}</a>
           <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.github') }}</a>
+          <a v-if="!desktopApp" :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener noreferrer" :title="t('sidebar.desktopAppTooltip')" class="inline-flex items-center gap-1 h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none"><Download :size="11" />{{ t('sidebar.desktopApp') }}</a>
           <BaseButton
             variant="ghost"
             size="sm"
@@ -80,13 +81,13 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue';
-import { desktopApp } from '../../services/platform/desktop.js';
+import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
 import { SELECT_XS } from '../base/controlStyles.js';
-import { CircleHelp, Sun, Moon, Code } from 'lucide-vue-next';
+import { CircleHelp, Sun, Moon, Code, Download } from 'lucide-vue-next';
 
 const { t, locale } = useI18n({ useScope: 'global' });
 const locales = computed(() => getSupportedLocales());

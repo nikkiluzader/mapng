@@ -6,8 +6,8 @@
 
     <!-- Primary SEO -->
     <title>MapNG - Real-World Maps for BeamNG.drive</title>
-    <meta name="description" content="Turn any real-world location into a playable BeamNG.drive level: real terrain, textured buildings, roads with lane markings, traffic signals and signs, sidewalks, bridges, regional trees and AI traffic, built in your browser. Free and open source." />
-    <meta name="keywords" content="BeamNG, BeamNG.drive, BeamNG map maker, BeamNG map generator, BeamNG level generator, real world BeamNG map, BeamNG terrain generator, BeamNG heightmap, BeamNG modding, OpenStreetMap to BeamNG, real-world terrain, heightmap generator, GeoTIFF, GeoJSON, BeamNG level" />
+    <meta name="description" content="Turn any real-world location into a playable BeamNG.drive level: real terrain, textured buildings, roads with lane markings, traffic signals and signs, sidewalks, bridges, racetracks, regional trees and AI traffic, built in your browser or in the desktop app for Windows and Linux. Free and open source." />
+    <meta name="keywords" content="BeamNG, BeamNG.drive, BeamNG map maker, BeamNG map generator, BeamNG level generator, real world BeamNG map, BeamNG terrain generator, BeamNG heightmap, BeamNG modding, OpenStreetMap to BeamNG, real-world terrain, heightmap generator, GeoTIFF, GeoJSON, BeamNG level, BeamNG map maker desktop app" />
     <meta name="author" content="Nikki Luzader" />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://mapng.com/" />
@@ -42,7 +42,8 @@
       "url": "https://mapng.com/",
       "description": "A free, open-source web application that turns any real-world location into a playable BeamNG.drive level, plus terrain, texture and GIS exports, from real elevation and OpenStreetMap data.",
       "applicationCategory": "GameApplication",
-      "operatingSystem": "Web Browser (Desktop)",
+      "operatingSystem": "Web Browser (Desktop), Windows, Linux",
+      "downloadUrl": "https://github.com/nikkiluzader/mapng/releases/latest",
       "offers": {
         "@type": "Offer",
         "price": "0",
@@ -76,7 +77,10 @@
         "Batch mode for tile grids with per-tile exports (heightmaps, textures, road masks, GLB, DAE, .ter)",
         "Combined BeamNG level: stitch a 2x2, 4x4 or 8x8 batch grid into one playable level",
         "Live progress with step timings for generation and export",
-        "Location search, run configurations and .mapng session files, in 7 languages"
+        "Location search, run configurations and .mapng session files, in 7 languages",
+        "Desktop app for Windows and Linux: big and dense maps without the browser memory limit, generating and exporting on every CPU core, levels saved straight into BeamNG's mods folder, a list of your MapNG levels that rebuilds them with each new version, and updates with your consent",
+        "Racetracks, sports grounds, swimming pools and fountains built as real venues",
+        "Road tunnels with portals and lights"
       ],
       "keywords": "BeamNG, BeamNG.drive, map generator, level generator, real world map, terrain generator, heightmap, modding tool, OpenStreetMap, driving simulator"
     }
@@ -119,6 +123,14 @@
             "@type": "Answer",
             "text": "Yes, MapNG is free and open source under the MIT license. The Standard (30 m), USGS (1 m USA) and NMT (Poland) elevation sources are free. The optional GPXZ premium source requires an API key with a free tier of 100 requests per day."
           }
+        },
+        {
+          "@type": "Question",
+          "name": "Is there a MapNG desktop app?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. MapNG Desktop for Windows and Linux runs the same app on your own computer, free from GitHub Releases. It has no browser memory limit and uses every CPU core, so big and dense maps export much faster; it saves levels straight into BeamNG.drive's mods folder, lists your MapNG levels and can rebuild them with each new version, and updates itself when you agree to."
+          }
         }
       ]
     }
@@ -144,6 +156,8 @@
         </ul>
         <h2>How to Make a BeamNG Map from a Real-World Location</h2>
         <p>Select a location on the map or search by name, choose an output size (512 to 16384 px) and an elevation source, and generate. Check the terrain in the 3D preview, then export the BeamNG level package and unzip it into your BeamNG.drive levels folder.</p>
+        <h2>MapNG Desktop for Windows and Linux</h2>
+        <p>The free desktop app runs MapNG on your own computer: no browser memory limit, every CPU core, levels saved straight into BeamNG.drive's mods folder, and a list of your MapNG levels that rebuilds them with each new version. <a href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>.</p>
         <p><strong>Please enable JavaScript to use MapNG.</strong></p>
         <p><a href="https://github.com/nikkiluzader/mapng">View on GitHub</a></p>
       </div>
