@@ -7,6 +7,7 @@
         :options="mapOptions"
         style="height: 100%; width: 100%"
         @move="handleMove"
+        @moveend="flushMove"
         @zoom="handleZoom"
         @ready="onMapReady"
      >
@@ -529,7 +530,31 @@ const handleMove = () => {
   }
 
   currentCenter.value = { lat: c.lat, lng: normalizedLng };
-  emit('move', currentCenter.value);
+  emitMove(currentCenter.value);
+};
+
+// The rest of the app hears about a drag at most every MOVE_EMIT_MS, and
+// exactly where it ends (moveend): each report re-renders the sidebar, and
+// with a big terrain loaded that churn kept the 2D map stalling on garbage
+// collection. The selection box here follows every move (currentCenter).
+const MOVE_EMIT_MS = 120;
+let pendingMove = null;
+let moveTimer = null;
+let lastMoveEmitAt = 0;
+const flushMove = () => {
+  clearTimeout(moveTimer);
+  moveTimer = null;
+  if (!pendingMove) return;
+  lastMoveEmitAt = performance.now();
+  const c = pendingMove;
+  pendingMove = null;
+  emit('move', c);
+};
+const emitMove = (c) => {
+  pendingMove = c;
+  const since = performance.now() - lastMoveEmitAt;
+  if (since >= MOVE_EMIT_MS) flushMove();
+  else if (!moveTimer) moveTimer = setTimeout(flushMove, MOVE_EMIT_MS - since);
 };
 
 // Handle map zoom

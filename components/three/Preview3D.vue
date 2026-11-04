@@ -12,7 +12,7 @@
 
     <!-- dpr caps rendering at 2x device pixels: on 3-4x mobile/hiDPI screens the
          uncapped default more than doubles fragment work for no visible gain. -->
-    <TresCanvas v-else-if="!webGLRuntimeError" window-size :dpr="[1, 2]" :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="0.8" :renderer="{ logarithmicDepthBuffer: true }">
+    <TresCanvas v-else-if="!webGLRuntimeError" window-size :dpr="[1, 2]" :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="0.8" :renderer="{ logarithmicDepthBuffer: true }" power-preference="high-performance">
       <Suspense>
         <template #default>
           <TresGroup>

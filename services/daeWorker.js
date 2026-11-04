@@ -13,7 +13,9 @@ export const DAE_OPTIONS = { version: '1.4.1', upAxis: 'Z_UP' };
 // the whole buffer through postMessage)
 const own = (a) => (a.byteOffset === 0 && a.byteLength === a.buffer.byteLength ? a : a.slice());
 
-const MATERIAL_KEYS = ['name', 'side', 'opacity', 'transparent', 'shininess', 'reflectivity'];
+// (vertexColors, roughness, metalness, flatShading: the 3D preview's
+// materials, which come from a worker too: services/previewOsmWorker.js)
+const MATERIAL_KEYS = ['name', 'side', 'opacity', 'transparent', 'shininess', 'reflectivity', 'vertexColors', 'roughness', 'metalness', 'flatShading'];
 const COLOR_KEYS = ['color', 'emissive', 'specular'];
 
 function describeMaterial(m) {
@@ -32,6 +34,16 @@ function makeMaterial(d) {
 }
 
 /** A shape's scene (its root group, matrices updated) as plain, cloneable data. */
+/** The buffers of a description (to transfer it instead of copying it). */
+export function sceneBuffers(desc, out = new Set()) {
+  if (desc.geometry) {
+    for (const a of Object.values(desc.geometry.attributes)) out.add(a.array.buffer);
+    if (desc.geometry.index) out.add(desc.geometry.index.buffer);
+  }
+  for (const c of desc.children || []) sceneBuffers(c, out);
+  return out;
+}
+
 export function describeScene(root) {
   const geometries = new Map();
   const describeGeometry = (g) => {
@@ -52,6 +64,9 @@ export function describeScene(root) {
     matrix: o.matrix.toArray(),
     geometry: o.isMesh ? describeGeometry(o.geometry) : null,
     material: o.isMesh ? (Array.isArray(o.material) ? o.material.map(describeMaterial) : describeMaterial(o.material)) : null,
+    castShadow: !!o.castShadow,
+    receiveShadow: !!o.receiveShadow,
+    visible: o.visible !== false,
     children: o.children.map(node),
   });
   return node(root);
@@ -75,6 +90,9 @@ export function sceneFromDescription(desc) {
       ? new THREE.Mesh(makeGeometry(d.geometry), Array.isArray(d.material) ? d.material.map(makeMaterial) : makeMaterial(d.material))
       : new THREE.Group();
     o.name = d.name;
+    o.castShadow = !!d.castShadow;
+    o.receiveShadow = !!d.receiveShadow;
+    if (d.visible === false) o.visible = false;
     o.matrix.fromArray(d.matrix);
     o.matrix.decompose(o.position, o.quaternion, o.scale);
     for (const c of d.children) o.add(build(c));

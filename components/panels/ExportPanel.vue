@@ -757,7 +757,9 @@ const texturePaintResumeUrl = ref('');
 const texturePaintSourceKind = ref('hybrid');
 let texturePaintObjectUrls = [];
 
-const hasPaintedTexture = computed(() => !!props.terrainData?.paintedTextureBlob);
+// (the terrain isn't deeply reactive: a save bumps paintedTick)
+const paintedTick = ref(0);
+const hasPaintedTexture = computed(() => paintedTick.value >= 0 && !!props.terrainData?.paintedTextureBlob);
 
 const TEXTURE_SOURCE_LABEL_KEYS = {
   hybrid: 'exportPanel.satelliteHybrid',
@@ -853,6 +855,7 @@ const handleTexturePaintSave = ({ compositeBlob, paintLayerBlob }) => {
     td.paintedTextureBlob = compositeBlob;
     td.paintedPaintLayerBlob = paintLayerBlob;
     td.paintedTextureSource = texturePaintSourceKind.value;
+    paintedTick.value++;
     beamNGBaseTexture.value = 'painted';
   }
   closeTexturePaint();

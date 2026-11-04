@@ -820,6 +820,10 @@ function buildMenu(updater) {
 
 // one window: a second launch brings the first one forward
 if (!app.requestSingleInstanceLock()) app.quit();
+// (the gaming GPU, not integrated graphics, on laptops that have both: the 3D
+// preview is drawn with WebGL; the preview also asks for it, Preview3D.vue)
+app.commandLine.appendSwitch('force_high_performance_gpu');
+
 app.on('second-instance', () => {
   const win = BrowserWindow.getAllWindows()[0];
   if (win) { if (win.isMinimized()) win.restore(); win.focus(); }

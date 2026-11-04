@@ -1,6 +1,7 @@
 <script setup>
 import { shallowRef, watch, toRaw, onUnmounted } from 'vue';
 import { createOSMGroup } from '../../services/export3d';
+import { sceneFromDescription } from '../../services/daeWorker.js';
 
 const props = defineProps({
   terrainData: { required: true },
@@ -72,16 +73,79 @@ const applyVisibility = () => {
   });
 };
 
+// The shapes are built in a Web Worker (services/previewOsmWorker.js): built
+// here they froze the window for seconds in dense areas. The worker gets the
+// OSM features and the heightmap (for big maps a downsampled one: the
+// preview's terrain mesh is coarser still), and sends back finished meshes.
+// Where no worker starts, they are built here as before.
+const WORKER_HEIGHTMAP_MAX = 4096;
+let worker = null;
+let workerBroken = false;
+let buildSeq = 0;
+
+const getWorker = () => {
+  if (worker || workerBroken || typeof Worker === 'undefined') return worker;
+  try {
+    worker = new Worker(new URL('../../services/previewOsmWorker.js', import.meta.url), { type: 'module' });
+  } catch {
+    workerBroken = true;
+    worker = null;
+  }
+  return worker;
+};
+
+// (the fields createOSMGroup reads; a heightmap above WORKER_HEIGHTMAP_MAX sampled down)
+const workerTerrain = (data) => {
+  const { width, height, heightMap } = data;
+  let w = width; let h = height; let hm = heightMap;
+  const step = Math.max(1, Math.ceil(Math.max(width, height) / WORKER_HEIGHTMAP_MAX));
+  if (step > 1 && heightMap) {
+    w = Math.ceil(width / step); h = Math.ceil(height / step);
+    hm = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const sy = Math.min(height - 1, y * step) * width;
+      for (let x = 0; x < w; x++) hm[y * w + x] = heightMap[sy + Math.min(width - 1, x * step)];
+    }
+  }
+  return {
+    bounds: { ...data.bounds }, width: w, height: h, heightMap: hm,
+    minHeight: data.minHeight, maxHeight: data.maxHeight,
+    metersPerPixel: data.metersPerPixel, processingMetersPerPixel: data.processingMetersPerPixel,
+    osmFeatures: data.osmFeatures,
+  };
+};
+
+const buildHere = (rawData) => {
+  group.value = createOSMGroup(rawData, buildPreviewOptions(rawData));
+  applyVisibility();
+};
+
 const rebuildGroup = (data) => {
+  const seq = ++buildSeq;
   if (group.value) {
     disposeGroup(group.value);
     group.value = null;
   }
-
-  if (data) {
-    const rawData = toRaw(data);
-    group.value = createOSMGroup(rawData, buildPreviewOptions(rawData));
+  if (!data) return;
+  const rawData = toRaw(data);
+  const w = getWorker();
+  if (!w) { buildHere(rawData); return; }
+  const onMessage = ({ data: msg }) => {
+    if (msg?.id !== seq) return;
+    w.removeEventListener('message', onMessage);
+    if (seq !== buildSeq) return;   // (a newer terrain came meanwhile)
+    if (msg.error) { console.warn('[Preview] OSM worker failed, building here:', msg.error); buildHere(rawData); return; }
+    group.value = sceneFromDescription(msg.desc);
     applyVisibility();
+  };
+  w.addEventListener('message', onMessage);
+  try {
+    w.postMessage({ id: seq, terrain: workerTerrain(rawData), options: buildPreviewOptions(rawData) });
+  } catch (error) {
+    w.removeEventListener('message', onMessage);
+    console.warn('[Preview] OSM worker unavailable, building here:', error);
+    workerBroken = true;
+    buildHere(rawData);
   }
 };
 
@@ -101,6 +165,9 @@ watch(
 );
 
 onUnmounted(() => {
+  buildSeq++;
+  worker?.terminate();
+  worker = null;
   if (group.value) {
     disposeGroup(group.value);
     group.value = null;

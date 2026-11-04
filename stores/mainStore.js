@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, shallowRef } from 'vue';
 import { loadBatchState } from '../services/batchJob';
 
 const DEFAULT_CENTER = { lat: 35.1983, lng: -111.6513 };
@@ -56,7 +56,12 @@ export const useMainStore = defineStore('main', () => {
   }
 
   // --- Single Tile State ---
-  const terrainData = ref(null);
+  // (shallow: a generated terrain holds millions of objects — OSM features and
+  // their points, the heightmap; deep reactivity wrapped them all in proxies,
+  // and the 2D map stalled on garbage collection after generating. The
+  // terrain is replaced whole whenever it changes; in-place writes that the UI
+  // shows signal it themselves, e.g. the touched-up texture)
+  const terrainData = shallowRef(null);
   const lastGenerationKey = ref(null);
   const isLoading = ref(false);
   const loadingStatus = ref("Initializing...");
