@@ -27,6 +27,8 @@ import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData } from './cropTerrain.js';
 import { applyBuildingFoundations, gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
+import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
+import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
@@ -777,30 +779,122 @@ export function settleSigns(signs, { index, groundAt }) {
   return { signs: out, moved, dropped };
 }
 
-function generateSidewalksDAE(meshes) {
-  if (!meshes.length) return null;
-  const parts = meshes.map((mesh) => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', mesh.geometry.getAttribute('position').clone());
-    return g;
+/**
+ * Collada text for many shapes' scenes (root groups, matrices updated), in
+ * order: on worker threads where the platform has them (the desktop app's
+ * export runner: services/daeWorker.js), else here, a tick between shapes
+ * so the page stays responsive.
+ */
+async function writeDaes(roots) {
+  if (roots.length > 1 && (await parallelThreads()) > 1) {
+    return parallelMap(roots.map(describeScene), {
+      local: writeDae, module: new URL('./daeWorker.js', import.meta.url).href, fn: 'writeDae',
+    });
+  }
+  const out = [];
+  for (const root of roots) {
+    out.push(new ColladaExporter().parse(root, undefined, DAE_OPTIONS)?.data ?? null);
+    await new Promise((r) => setTimeout(r, 0));
+  }
+  return out;
+}
+
+/**
+ * The sidewalks cut into square tiles, each its own shape with its own
+ * collision mesh: [{ key, data }]. One map-wide shape came apart in the game
+ * on a dense 8 km map (10 M vertices in its walk tops, 22 M in its
+ * collision): a smeared "rainbow slab" over the city. Tiles also let the
+ * engine cull what is out of sight. A triangle goes to the tile its middle
+ * is in; the geometry stays in level coordinates (the objects sit at 0,0,0).
+ */
+async function generateSidewalkTileDAEs(meshes, tileM) {
+  if (!meshes.length) return [];
+  const tileKey = (x, y) => `${Math.floor(x / tileM)}_${Math.floor(y / tileM)}`.replace(/-/g, 'm');
+  // pass 1: triangles per tile, mesh and material
+  const counts = new Map();   // `${tile}|${mesh}|${material}` → triangles
+  const plans = meshes.map((mesh, mi) => {
+    const g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry;
+    const pos = g.getAttribute('position').array;
+    const groups = g.groups.length ? g.groups : [{ start: 0, count: pos.length / 3, materialIndex: 0 }];
+    const keys = new Array(pos.length / 9);
+    for (const gr of groups) {
+      for (let v = gr.start; v + 2 < gr.start + gr.count; v += 3) {
+        const o = v * 3;
+        const k = `${tileKey((pos[o] + pos[o + 3] + pos[o + 6]) / 3, (pos[o + 1] + pos[o + 4] + pos[o + 7]) / 3)}|${mi}|${gr.materialIndex}`;
+        keys[v / 3] = k;
+        counts.set(k, (counts.get(k) || 0) + 1);
+      }
+    }
+    return { g, groups, keys };
   });
-  const collisionGeom = mergeGeometries(parts);
-  parts.forEach((g) => g.dispose());
-  const base00 = new THREE.Group();
-  base00.name = 'base00';
-  const start01 = new THREE.Group();
-  start01.name = 'start01';
-  for (const mesh of meshes) start01.add(mesh);
-  if (collisionGeom) {
-    collisionGeom.name = 'Colmesh-1';
-    const collision = new THREE.Mesh(collisionGeom, new THREE.MeshBasicMaterial({ name: SIDEWALK_MATERIALS.curb }));
+  // pass 2: each bucket's vertices copied into its own arrays
+  const buckets = new Map();
+  for (const [k, n] of counts) buckets.set(k, { pos: new Float32Array(n * 9), uv: new Float32Array(n * 6), nrm: new Float32Array(n * 9), at: 0 });
+  plans.forEach(({ g, groups, keys }) => {
+    const pos = g.getAttribute('position').array;
+    const uv = g.getAttribute('uv')?.array;
+    const nrm = g.getAttribute('normal')?.array;
+    for (const gr of groups) {
+      for (let v = gr.start; v + 2 < gr.start + gr.count; v += 3) {
+        const b = buckets.get(keys[v / 3]);
+        b.pos.set(pos.subarray(v * 3, v * 3 + 9), b.at * 9);
+        if (uv) b.uv.set(uv.subarray(v * 2, v * 2 + 6), b.at * 6);
+        if (nrm) b.nrm.set(nrm.subarray(v * 3, v * 3 + 9), b.at * 9);
+        b.at++;
+      }
+    }
+  });
+  // tiles: a mesh per source mesh (its materials as groups) and the collision
+  const byTile = new Map();
+  for (const [k, b] of buckets) {
+    const [tile, mi, mat] = k.split('|');
+    if (!byTile.has(tile)) byTile.set(tile, new Map());
+    const perMesh = byTile.get(tile);
+    if (!perMesh.has(mi)) perMesh.set(mi, []);
+    perMesh.get(mi).push({ mat: Number(mat), b });
+  }
+  const roots = []; const keys = [];
+  for (const [tile, perMesh] of [...byTile].sort(([a], [b]) => a.localeCompare(b))) {
+    const base00 = new THREE.Group(); base00.name = 'base00';
+    const start01 = new THREE.Group(); start01.name = 'start01';
+    const collisionParts = [];
+    for (const [mi, parts] of perMesh) {
+      const src = meshes[Number(mi)];
+      const total = parts.reduce((n, p) => n + p.b.at, 0);
+      const pos = new Float32Array(total * 9); const uv = new Float32Array(total * 6); const nrm = new Float32Array(total * 9);
+      const geo = new THREE.BufferGeometry();
+      const materials = Array.isArray(src.material) ? src.material : [src.material];
+      const used = [];
+      let at = 0;
+      for (const { mat, b } of parts.sort((x, y) => x.mat - y.mat)) {
+        pos.set(b.pos, at * 9); uv.set(b.uv, at * 6); nrm.set(b.nrm, at * 9);
+        geo.addGroup(at * 3, b.at * 3, used.length);
+        used.push(materials[mat] || materials[0]);
+        at += b.at;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+      geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+      const mesh = new THREE.Mesh(geo, used);
+      mesh.name = src.name;
+      start01.add(mesh);
+      collisionParts.push(pos);
+    }
+    const colPos = new Float32Array(collisionParts.reduce((n, p) => n + p.length, 0));
+    let o = 0;
+    for (const p of collisionParts) { colPos.set(p, o); o += p.length; }
+    const colGeo = new THREE.BufferGeometry();
+    colGeo.setAttribute('position', new THREE.BufferAttribute(colPos, 3));
+    colGeo.name = 'Colmesh-1';
+    const collision = new THREE.Mesh(colGeo, new THREE.MeshBasicMaterial({ name: SIDEWALK_MATERIALS.curb }));
     collision.name = 'Colmesh-1';
     start01.add(collision);
+    base00.add(start01);
+    base00.updateMatrixWorld(true);
+    roots.push(base00); keys.push(tile);
   }
-  base00.add(start01);
-  base00.updateMatrixWorld(true);
-  const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
-  return result?.data ?? null;
+  const data = await writeDaes(roots);
+  return keys.map((key, i) => ({ key, data: data[i] })).filter((t) => t.data);
 }
 
 // Overhead wires as thin crossed ribbons (a double-sided material shows both
@@ -1218,7 +1312,7 @@ const LITE_DOWN_TO_PX = 2;      // the lite mesh drawn down to this detail size 
  * to the tile's origin. Returns [{ key, origin: [x, y], data }].
  */
 async function buildBuildingTileDAEs(tiles) {
-  const out = [];
+  const roots = []; const metas = [];
   for (const t of tiles) {
     const [ox, oy] = t.origin;
     const base00 = new THREE.Group(); base00.name = 'base00';
@@ -1255,12 +1349,13 @@ async function buildBuildingTileDAEs(tiles) {
       start01.add(col);
     }
     base00.updateMatrixWorld(true);
-    const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
-    if (result?.data) out.push({ key: t.key, origin: [ox, oy], data: result.data, fullPx });
+    roots.push(base00);
+    metas.push({ key: t.key, origin: [ox, oy], fullPx });
     // (the thread back between tiles: a city is hundreds of them)
     await new Promise((r) => setTimeout(r, 0));
   }
-  return out;
+  const data = await writeDaes(roots);
+  return metas.map((m, i) => ({ ...m, data: data[i] })).filter((t) => t.data);
 }
 
 /**
@@ -12331,7 +12426,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Plazas: ${plazas.count} of ${squares.length} pedestrian square(s) and courtyard(s) paved, ${plazas.triangles} triangles.`);
     }
   }
-  const sidewalksDae = generateSidewalksDAE(sidewalks.meshes);
+  const sidewalkTileDaes = await generateSidewalkTileDAEs(sidewalks.meshes, buildingTileSize(worldSize));
+  const sidewalksDae = sidewalkTileDaes.length > 0;
   // signs off the drawn roads (onto the verge, the sidewalk or the median)
   // and on the finished ground (settleSigns)
   const settled = settleSigns([...buildRoadSignProps(exportTerrainData, squareSize, {
@@ -12938,7 +13034,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const terrainBinaryData = await toZipBinary(terBlob);
   const terrainHeightmapData = await toZipBinary(heightmapBlob);
   const osmDaeData = await toZipBinary(osmDaeBlob);
-  const sidewalksDaeData = await toZipBinary(sidewalksDae);
   if (bridgeDaes.length > 0) {
     zip.folder(`${base}/map_assets/custom_assets/bridges`);
     for (const { key, data, deckData, extras } of bridgeDaes) {
@@ -13164,7 +13259,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
     if (sidewalksDae) {
       zip.folder(`${base}/map_assets/custom_assets/sidewalks`);
-      zip.file(`${base}/map_assets/custom_assets/sidewalks/sidewalks.dae`, sidewalksDaeData);
+      // (one shape per tile: generateSidewalkTileDAEs)
+      for (const t of sidewalkTileDaes) zip.file(`${base}/map_assets/custom_assets/sidewalks/sidewalks_${t.key}.dae`, await toZipBinary(t.data));
     }
     // (with the crosswalks' paint, wanted with or without sidewalks)
     if (sidewalksDae || includeRoads) zip.file(`${base}/map_assets/custom_assets/sidewalks/main.materials.json`, JSON.stringify({ ...getSidewalkMaterialDefs({ look: sidewalkLook }), ...getPlazaMaterialDefs() }, null, 2));
@@ -13648,15 +13744,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
 
 
-  if (sidewalksDae) {
-    // Curbs collide; decals don't project onto them (edge blends stay on the ground).
+  // Curbs collide; decals don't project onto them (edge blends stay on the ground).
+  for (const t of sidewalkTileDaes) {
     levelObjectItems.push({
       __parent: 'level_objects',
       class: 'TSStatic',
-      name: 'sidewalks',
+      name: `sidewalks_${t.key}`,
       persistentId: generatePersistentId(),
       position: [0, 0, 0],
-      shapeName: `/levels/${levelName}/map_assets/custom_assets/sidewalks/sidewalks.dae`,
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/sidewalks/sidewalks_${t.key}.dae`,
       collisionType: 'Collision Mesh',
       decalType: 'None',
       prebuildCollisionData: 0,

@@ -894,7 +894,10 @@ test('sidewalks: tagged street gets a curb mesh with collision, materials and a 
       includeTrees: false, includeRocks: false, includeNativeBarriers: false, ...opts,
     })).blob.arrayBuffer());
     const zip = await run();
-    const dae = await readText(zip, 'map_assets/custom_assets/sidewalks/sidewalks.dae');
+    // (one shape per tile, each with its own collision mesh)
+    const tiles = Object.keys(zip.files).filter((f) => /\/sidewalks\/sidewalks_[\w]+\.dae$/.test(f));
+    assert.ok(tiles.length >= 1, 'sidewalk tiles');
+    const dae = await readText(zip, tiles[0].slice(`${BASE}/`.length));
     assert.match(dae, /Colmesh-1/, 'collision mesh');
     assert.match(dae, /mapng_curbs/);
     assert.match(dae, /mapng_sidewalk/);
@@ -902,12 +905,12 @@ test('sidewalks: tagged street gets a curb mesh with collision, materials and a 
     const mats = JSON.parse(await readText(zip, 'map_assets/custom_assets/sidewalks/main.materials.json'));
     assert.match(mats.mapng_curbs.Stages[0].baseColorMap, /^\/assets\/materials\/trim\/concrete\/curbs\//);
     const levelObjects = parseNDJSON(await readText(zip, 'main/MissionGroup/level_objects/items.level.json'));
-    const sidewalks = levelObjects.find((o) => o.name === 'sidewalks');
-    assert.ok(sidewalks);
-    assert.equal(sidewalks.collisionType, 'Collision Mesh');
+    const sidewalks = levelObjects.filter((o) => /^sidewalks_/.test(o.name));
+    assert.equal(sidewalks.length, tiles.length);
+    for (const o of sidewalks) assert.equal(o.collisionType, 'Collision Mesh');
 
     const off = await run({ includeSidewalks: false });
-    assert.ok(!off.file(`${BASE}/map_assets/custom_assets/sidewalks/sidewalks.dae`));
+    assert.ok(!Object.keys(off.files).some((f) => /\/sidewalks\/sidewalks_[\w]+\.dae$/.test(f)));
   } finally {
     restore();
   }

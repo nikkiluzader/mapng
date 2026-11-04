@@ -18,6 +18,43 @@ import {
   Matrix4,
   MeshBasicMaterial,
 } from "three";
+import { weldGeometry } from './geometryWeld.js';
+
+// Numbers rounded to 1e-5 written as text, space-separated: the same text
+// as String(Math.round(v * 1e5) / 1e5), digit by digit into bytes (the
+// general number-to-string took 15 s of a dense 8 km export).
+const FIXED_BYTES = new Uint8Array(65536 * 24);
+const LATIN1 = new TextDecoder('latin1');
+function formatFixed5(array, from, to) {
+  const out = FIXED_BYTES; let o = 0;
+  for (let k = from; k < to; k++) {
+    if (k > from) out[o++] = 32;
+    let n = Math.round(array[k] * 1e5);
+    if (!Number.isFinite(n) || Math.abs(n) >= 9e15) {
+      // (far outside a level: the general way)
+      const str = String(Math.round(array[k] * 1e5) / 1e5);
+      for (let c = 0; c < str.length; c++) out[o++] = str.charCodeAt(c);
+      continue;
+    }
+    if (n < 0) { out[o++] = 45; n = -n; }
+    const ip = Math.floor(n / 1e5);
+    let fp = n - ip * 1e5;
+    // integer part
+    if (ip === 0) out[o++] = 48;
+    else {
+      const start = o; let x = ip;
+      while (x > 0) { const d = x % 10; out[o++] = 48 + d; x = (x - d) / 10; }
+      for (let a = start, b = o - 1; a < b; a++, b--) { const t = out[a]; out[a] = out[b]; out[b] = t; }
+    }
+    // fraction: five digits, trailing zeros dropped
+    if (fp > 0) {
+      out[o++] = 46;
+      let div = 1e4;
+      while (fp > 0) { const d = Math.floor(fp / div); out[o++] = 48 + d; fp -= d * div; div /= 10; }
+    }
+  }
+  return LATIN1.decode(out.subarray(0, o));
+}
 
 class ColladaExporter {
   parse(object, onDone, options = {}) {
@@ -212,10 +249,7 @@ class ColladaExporter {
       const CHUNK = 65536;
       for (let i = 0; i < array.length; i += CHUNK) {
         if (i > 0) parts.push(' ');
-        const end = Math.min(i + CHUNK, array.length);
-        const slice = new Array(end - i);
-        for (let k = i; k < end; k++) slice[k - i] = Math.round(array[k] * 1e5) / 1e5;
-        parts.push(slice.join(' '));
+        parts.push(formatFixed5(array, i, Math.min(i + CHUNK, array.length)));
       }
 
       parts.push(
@@ -248,10 +282,12 @@ class ColladaExporter {
 
     // Process the given piece of geometry into the geometry library
     // Returns the mesh id
-    function processGeometry(bufferGeometry) {
-      let info = geometryInfo.get(bufferGeometry);
+    function processGeometry(sourceGeometry) {
+      let info = geometryInfo.get(sourceGeometry);
 
       if (!info) {
+        // (shared corners written once: services/geometryWeld.js)
+        const bufferGeometry = weldGeometry(sourceGeometry);
         const geoBaseName = bufferGeometry.name
           ? toColladaIdToken(bufferGeometry.name, null)
           : null;
@@ -378,7 +414,7 @@ class ColladaExporter {
         libraryGeometries.push(gparts);
 
         info = { meshid: meshid, bufferGeometry: bufferGeometry };
-        geometryInfo.set(bufferGeometry, info);
+        geometryInfo.set(sourceGeometry, info);
       }
 
       return info;
