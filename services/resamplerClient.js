@@ -4,6 +4,7 @@
  */
 import proj4 from 'proj4';
 import { resampleToMeterGrid, resampleImageToMeterGrid } from './terrainResampler.js';
+import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 
 let worker = null;
 let messageId = 0;
@@ -209,6 +210,31 @@ const buildGapFillPayload = (gapFillData, transferables) => {
  * Prepare serializable tile metadata from GeoTIFF image objects.
  * Called on main thread to extract data the worker needs.
  */
+/**
+ * Load the proj4 definitions of a GeoTIFF source's CRSs here, before the
+ * tiles go to the worker (prepareTiles passes the loaded ones along): the
+ * worker would otherwise fetch them itself, past the desktop app's source
+ * recorder, so a rebuild would download them again.
+ */
+const ensureEpsgDefs = async (sourceData) => {
+    for (const item of sourceData || []) {
+        let code;
+        try {
+            const keys = item.image.getGeoKeys();
+            code = keys.ProjectedCSTypeGeoKey || keys.GeographicTypeGeoKey;
+        } catch { continue; }
+        if (!code || code === 4326) continue;
+        const epsg = `EPSG:${code}`;
+        if (proj4.defs(epsg)) continue;
+        const builtIn = getBuiltInProj4(code);
+        if (builtIn) { proj4.defs(epsg, builtIn); continue; }
+        try {
+            const response = await fetch(`https://epsg.io/${code}.proj4`);
+            if (response.ok) proj4.defs(epsg, await response.text());
+        } catch { /* the worker tries itself */ }
+    }
+};
+
 const prepareTiles = (sourceData) => {
     if (!sourceData) return { tiles: [], epsgDefs: {} };
     const tiles = [];
@@ -352,6 +378,7 @@ export const resampleHeightMapOffThread = async (
             let epsgDefs = {};
 
             if (source.type === 'geotiff' && source.data) {
+                await ensureEpsgDefs(source.data);
                 const prepared = prepareTiles(source.data);
                 tiles = prepared.tiles;
                 epsgDefs = prepared.epsgDefs;
@@ -431,6 +458,7 @@ export const resampleHeightAndImageOffThread = async (
             let epsgDefs = {};
 
             if (source.type === 'geotiff' && source.data) {
+                await ensureEpsgDefs(source.data);
                 const prepared = prepareTiles(source.data);
                 tiles = prepared.tiles;
                 epsgDefs = prepared.epsgDefs;

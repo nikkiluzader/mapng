@@ -1042,13 +1042,13 @@ const finalizeHeightMap = (
             return;
         }
 
-        reportProgress?.({ stage: 'finalize', message: 'Filling gaps in uploaded elevation...', current: 1, total: 3, force: true });
+        reportProgress?.({ stage: 'finalize', message: 'Filling gaps in the elevation...', current: 1, total: 3, force: true });
         debugLog('[ResamplerWorker] Hole filling enabled: starting push/pull seed');
         const seededMask = pushPullInpaint(heightMap, width, height, noData);
         if (!seededMask) {
             reportProgress?.({
                 stage: 'finalize',
-                message: 'No gaps detected in uploaded elevation.',
+                message: 'No gaps in the elevation.',
                 current: 3,
                 total: 3,
                 force: true,
@@ -1071,16 +1071,16 @@ const finalizeHeightMap = (
             const expandedMask = expandFill(heightMap, width, height, noData, expandPasses, 3, seededMask);
             relaxMask = expandedMask || seededMask;
         } else {
-            reportProgress?.({ stage: 'finalize', message: 'Skipping gap expansion for uploaded elevation.', current: 2, total: 3, force: true });
+            reportProgress?.({ stage: 'finalize', message: 'Skipping gap expansion.', current: 2, total: 3, force: true });
         }
         relaxFilled(heightMap, width, height, noData, relaxMask, relaxIterations);
     }
 
     if (smooth) {
-        reportProgress?.({ stage: 'finalize', message: 'Smoothing uploaded elevation...', current: 3, total: 3, force: true });
+        reportProgress?.({ stage: 'finalize', message: 'Smoothing the elevation...', current: 3, total: 3, force: true });
         smoothHeightMap(heightMap, width, height, noData, typeof smooth === 'number' ? smooth : 8);
     } else if (fillHoles) {
-        reportProgress?.({ stage: 'finalize', message: 'Uploaded elevation cleanup complete.', current: 3, total: 3, force: true });
+        reportProgress?.({ stage: 'finalize', message: 'Elevation cleanup complete.', current: 3, total: 3, force: true });
     }
 };
 
@@ -1090,11 +1090,11 @@ const resampleHeight = async ({ id, center, width, height, targetBounds = null, 
 
     const NO_DATA = -99999;
     const reportProgress = createProgressReporter(id);
-    reportProgress({ stage: 'prepare', message: 'Preparing uploaded elevation tiles...', current: 0, total: 1, force: true });
+    reportProgress({ stage: 'prepare', message: 'Preparing elevation tiles...', current: 0, total: 1, force: true });
     const layerStack = await buildLayerStack(tiles, epsgDefs, NO_DATA);
     const preparedGroups = layerStack[0] || [];
     const gapFill = await prepareGapFill(gapFillTiles, gapFillEpsgDefs, fallback, NO_DATA);
-    reportProgress({ stage: 'prepare', message: 'Uploaded elevation tiles ready.', current: 1, total: 1, force: true });
+    reportProgress({ stage: 'prepare', message: 'Elevation tiles ready.', current: 1, total: 1, force: true });
 
     // Main resampling loop. The gap-fill source is sampled separately below so
     // the two surfaces can be joined smoothly instead of butted together.
@@ -1110,7 +1110,7 @@ const resampleHeight = async ({ id, center, width, height, targetBounds = null, 
         if ((y & 31) === 31 || y === height - 1) {
             reportProgress({
                 stage: 'sample-height',
-                message: 'Mapping uploaded elevation to the output grid...',
+                message: 'Mapping elevation to the output grid...',
                 current: y + 1,
                 total: height,
             });
@@ -1139,8 +1139,8 @@ const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, i
     const preparedGroups = layerStack[0] || [];
     const gapFill = flat ? null : await prepareGapFill(gapFillTiles, gapFillEpsgDefs, fallback, NO_DATA);
     if (!flat) {
-        reportProgress({ stage: 'prepare', message: 'Preparing uploaded elevation tiles...', current: 0, total: 1, force: true });
-        reportProgress({ stage: 'prepare', message: 'Uploaded elevation tiles ready.', current: 1, total: 1, force: true });
+        reportProgress({ stage: 'prepare', message: 'Preparing elevation tiles...', current: 0, total: 1, force: true });
+        reportProgress({ stage: 'prepare', message: 'Elevation tiles ready.', current: 1, total: 1, force: true });
     }
 
     if (!flat) {
@@ -1157,7 +1157,7 @@ const resampleHeightAndImage = async ({ id, center, width, height, imageWidth, i
             if ((y & 31) === 31 || y === height - 1) {
                 reportProgress({
                     stage: 'sample-height-image',
-                    message: 'Mapping uploaded elevation to the output grid...',
+                    message: 'Mapping elevation to the output grid...',
                     current: y + 1,
                     total: height,
                 });

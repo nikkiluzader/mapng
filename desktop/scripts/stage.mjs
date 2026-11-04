@@ -34,7 +34,9 @@ const CANVAS_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, 'package.js
 // (left out of the bundle: native or loaded at run time)
 const RUNNER_EXTERNAL = ['@napi-rs/canvas', 'laz-perf'];
 // (work handed to worker threads: each is loaded by its own file name)
-const WORKER_MODULES = ['sidewalkPanels.js', 'daeWorker.js', 'buildingWorker.js'];
+// (the export's worker threads, and the page's heightmap resampler worker,
+// which the runner starts as `new URL('./resamplerWorker.js', import.meta.url)`)
+const WORKER_MODULES = ['sidewalkPanels.js', 'daeWorker.js', 'buildingWorker.js', 'resamplerWorker.js'];
 const RUNNERS = ['exportJob.mjs', 'generateJob.mjs'];
 const gitHash = (() => { try { return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: DESKTOP }).toString().trim(); } catch { return 'unknown'; } })();
 const BUILD_DEFINES = { __BUILD_HASH__: JSON.stringify(gitHash), __BUILD_TIME__: JSON.stringify(new Date().toISOString()) };

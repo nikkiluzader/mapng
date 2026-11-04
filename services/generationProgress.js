@@ -37,7 +37,7 @@ export function classifyGenerationStatus(text) {
   if (/smoothing roads|aligning roads/.test(s)) return 'roads';
   if (/finaliz/.test(s)) return 'finalize';
   if (/openstreetmap|overpass|osm data|\bmirror/.test(s)) return 'osm';
-  if (/resampling heightmap|mapping uploaded elevation/.test(s)) return 'resample';
+  if (/resampling heightmap|mapping (uploaded )?elevation/.test(s)) return 'resample';
   if (/satellite/.test(s) && !/terrain and \d+ satellite tiles/.test(s)) return 'satellite';
   if (/refill|repair|gaps|fallback|corrupt/.test(s)) return 'repair';
   if (/metric bounds|starting|checking gpxz|index/.test(s)) return 'prepare';

@@ -6,6 +6,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Worker as NodeWorker } from 'node:worker_threads';
 import { createCanvas, Image, ImageData, loadImage } from '@napi-rs/canvas';
 
 const blobs = new Map();
@@ -76,7 +77,54 @@ const MIME = { '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/
  * apiOrigin: where /api/* goes, as on mapng.com; apiFetch: how (the app's
  * main process, when given: desktop/runner/common.mjs appApiFetch).
  */
+// A browser Web Worker on Node's worker threads, for the page's own workers
+// (the heightmap resampler: without it the resampling ran on this one thread
+// in the slow fallback loop, which a 16k GPXZ map did not finish). The worker
+// module sees `self` with onmessage / postMessage, as in a browser.
+const WORKER_BOOT = `
+const { parentPort, workerData } = require('node:worker_threads');
+globalThis.self = globalThis;
+const early = [];
+let ready = false;
+self.postMessage = (data, transfer) => parentPort.postMessage(data, transfer || []);
+parentPort.on('message', (data) => {
+  if (!ready) { early.push(data); return; }
+  if (typeof self.onmessage === 'function') self.onmessage({ data });
+});
+import(workerData.url).then(() => {
+  ready = true;
+  for (const data of early.splice(0)) if (typeof self.onmessage === 'function') self.onmessage({ data });
+}, (error) => { throw error; });
+`;
+
+class ShimWorker {
+  constructor(url) {
+    this.onmessage = null;
+    this.onerror = null;
+    this.worker = new NodeWorker(WORKER_BOOT, { eval: true, workerData: { url: String(url) } });
+    this.worker.on('message', (data) => this.onmessage?.({ data }));
+    this.worker.on('error', (error) => { console.error('[Worker]', error); this.onerror?.(error); });
+    // (kept referenced: while the job waits on its answer nothing else keeps
+    // Node running; the runners end themselves with process.exit when done)
+  }
+
+  postMessage(data, transfer) {
+    const list = (Array.isArray(transfer) ? transfer : transfer?.transfer || []).filter((t) => t instanceof ArrayBuffer);
+    try {
+      this.worker.postMessage(data, list);
+    } catch (error) {
+      // (a buffer of native memory, e.g. a canvas's pixels, cannot be moved to
+      // another thread on newer Node: copied instead)
+      if (error?.name !== 'DataCloneError' || !list.length) throw error;
+      this.worker.postMessage(data);
+    }
+  }
+
+  terminate() { this.worker.terminate(); }
+}
+
 export function installBrowserShims({ assetsDir, apiOrigin = 'https://mapng.com', apiFetch = null } = {}) {
+  if (typeof globalThis.Worker === 'undefined') globalThis.Worker = ShimWorker;
   globalThis.document = {
     createElement(tag) {
       if (tag === 'canvas') return withBrowserMethods(createCanvas(300, 150));

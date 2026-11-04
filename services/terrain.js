@@ -2116,7 +2116,14 @@ export const fetchTerrainData = async (
     !(useGPXZ && rawData && !gpxzChunkFailures),
     imageSamplerData,
     fetchBounds,
-    undefined, // onProgress
+    // (the worker's stages, e.g. "Resampling heightmap 42%": a big map's
+    // resampling takes minutes and must not look stuck)
+    // (one stage for the loading screen: every line starts "Resampling heightmap", generationProgress.js)
+    ({ message, percent } = {}) => {
+      if (!Number.isFinite(percent)) return;
+      const detail = String(message || '').replace(/\.+$/, '');
+      onProgress?.(`Resampling heightmap to ${effectiveMetersPerPixel}m/px${detail ? `: ${detail}` : ''} (${Math.floor(percent)}%)`);
+    },
     undefined, // expandFilledGaps (defaults to true)
     flat,
     null, // gapFillData
