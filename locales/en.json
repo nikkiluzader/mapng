@@ -448,6 +448,23 @@
       "backdropHint_global30m": "Global 30 m terrain around the map",
       "backdropHint_usgs1m": "USGS 1 m terrain around the map, where available",
       "backdropHint_gpxz": "GPXZ terrain around the map (uses your GPXZ key)"
+    },
+    "weight": {
+      "title": "How heavy is this level?",
+      "rating_light": "Light",
+      "rating_heavy": "Heavy",
+      "rating_veryHeavy": "Very heavy",
+      "size": "{km} km across, corners {far} km from the centre, about {buildings} buildings.",
+      "summary_light": "Should load and run well on most PCs.",
+      "summary_heavy": "Needs a capable PC: expect longer loading and lower frame rates in busy areas.",
+      "summary_veryHeavy": "Many PCs won't load or run it smoothly. You can still export it.",
+      "farEdge": "Its corners are {km} km from the centre. Past about {limit} km BeamNG runs out of precision and objects start to jitter: pick a smaller area or a lower m/px.",
+      "nearEdge": "Its corners are {km} km from the centre, close to the {limit} km where BeamNG runs out of precision and objects start to jitter.",
+      "bigTerrain": "A {px} px terrain uses a lot of memory and takes longer to load.",
+      "hugeTerrain": "A {px} px terrain is beyond what most PCs can hold in memory.",
+      "manyBuildings": "Build everything is on: all {count} buildings are built. Building meshes are what uses BeamNG's memory: turn Build everything off, or pick a smaller area.",
+      "buildingsCapped": "{count} buildings in the area: {built} of them are built (Build everything is off).",
+      "uncapped": "Build everything is on: trees, fences, lamps and props aren't capped either. Dense foliage is what lowers the frame rate most."
     }
   },
   "controlPanel": {

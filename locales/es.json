@@ -415,6 +415,23 @@
       "backdropHint_global30m": "Terreno global de 30 m alrededor del mapa",
       "backdropHint_usgs1m": "Terreno USGS de 1 m alrededor del mapa, donde exista",
       "backdropHint_gpxz": "Terreno GPXZ alrededor del mapa (usa tu clave GPXZ)"
+    },
+    "weight": {
+      "title": "¿Cuánto pesa este nivel?",
+      "rating_light": "Ligero",
+      "rating_heavy": "Pesado",
+      "rating_veryHeavy": "Muy pesado",
+      "size": "{km} km de lado, esquinas a {far} km del centro, unos {buildings} edificios.",
+      "summary_light": "Debería cargar y funcionar bien en la mayoría de PCs.",
+      "summary_heavy": "Necesita un PC potente: cargas más largas y menos FPS en zonas densas.",
+      "summary_veryHeavy": "Muchos PCs no lo cargarán o no irá fluido. Aun así puedes exportarlo.",
+      "farEdge": "Sus esquinas están a {km} km del centro. A partir de unos {limit} km BeamNG pierde precisión y los objetos empiezan a vibrar: elige una zona más pequeña o menos m/px.",
+      "nearEdge": "Sus esquinas están a {km} km del centro, cerca de los {limit} km donde BeamNG pierde precisión y los objetos vibran.",
+      "bigTerrain": "Un terreno de {px} px usa mucha memoria y tarda más en cargar.",
+      "hugeTerrain": "Un terreno de {px} px supera la memoria de la mayoría de PCs.",
+      "manyBuildings": "Crear todo está activado: se crean los {count} edificios. Las mallas de edificios son lo que usa la memoria de BeamNG: desactiva Crear todo o elige una zona más pequeña.",
+      "buildingsCapped": "{count} edificios en la zona: se crean {built} (Crear todo está desactivado).",
+      "uncapped": "Crear todo está activado: árboles, vallas, farolas y objetos tampoco tienen límite. La vegetación densa es lo que más baja los FPS."
     }
   },
   "controlPanel": {

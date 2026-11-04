@@ -414,6 +414,23 @@
       "backdropHint_global30m": "Terreno globale a 30 m intorno alla mappa",
       "backdropHint_usgs1m": "Terreno USGS a 1 m intorno alla mappa, dove disponibile",
       "backdropHint_gpxz": "Terreno GPXZ intorno alla mappa (usa la tua chiave GPXZ)"
+    },
+    "weight": {
+      "title": "Quanto è pesante questo livello?",
+      "rating_light": "Leggero",
+      "rating_heavy": "Pesante",
+      "rating_veryHeavy": "Molto pesante",
+      "size": "{km} km di lato, angoli a {far} km dal centro, circa {buildings} edifici.",
+      "summary_light": "Dovrebbe caricarsi e girare bene sulla maggior parte dei PC.",
+      "summary_heavy": "Serve un PC potente: caricamenti più lunghi e meno FPS nelle zone dense.",
+      "summary_veryHeavy": "Molti PC non lo caricheranno o non girerà fluido. Puoi comunque esportarlo.",
+      "farEdge": "I suoi angoli sono a {km} km dal centro. Oltre circa {limit} km BeamNG perde precisione e gli oggetti iniziano a tremare: scegli un'area più piccola o meno m/px.",
+      "nearEdge": "I suoi angoli sono a {km} km dal centro, vicino ai {limit} km dove BeamNG perde precisione e gli oggetti tremano.",
+      "bigTerrain": "Un terreno da {px} px usa molta memoria e si carica più lentamente.",
+      "hugeTerrain": "Un terreno da {px} px supera la memoria della maggior parte dei PC.",
+      "manyBuildings": "Costruisci tutto è attivo: vengono costruiti tutti i {count} edifici. Sono le mesh degli edifici a occupare la memoria di BeamNG: disattiva Costruisci tutto o scegli un'area più piccola.",
+      "buildingsCapped": "{count} edifici nell'area: ne vengono costruiti {built} (Costruisci tutto è disattivo).",
+      "uncapped": "Costruisci tutto è attivo: anche alberi, recinzioni, lampioni e oggetti non hanno limiti. La vegetazione fitta è ciò che abbassa di più gli FPS."
     }
   },
   "controlPanel": {

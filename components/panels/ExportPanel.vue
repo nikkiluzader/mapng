@@ -153,6 +153,35 @@
             </SettingRow>
           </SettingCard>
 
+          <!-- How heavy the level will be (services/levelWeight.js): warnings, never a block -->
+          <SettingCard :title="t('exportPanel.weight.title')">
+            <template #header>
+              <span
+                class="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                :class="{
+                  'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300': levelWeight.rating === 'light',
+                  'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300': levelWeight.rating === 'heavy',
+                  'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300': levelWeight.rating === 'veryHeavy',
+                }"
+              >{{ t(`exportPanel.weight.rating_${levelWeight.rating}`) }}</span>
+            </template>
+            <p class="text-[11px] leading-snug text-gray-600 dark:text-gray-300">
+              {{ t('exportPanel.weight.size', { km: levelWeight.sizeKm < 10 ? levelWeight.sizeKm.toFixed(1) : Math.round(levelWeight.sizeKm), far: levelWeight.farthestKm < 10 ? levelWeight.farthestKm.toFixed(1) : Math.round(levelWeight.farthestKm), buildings: levelWeight.builtBuildings.toLocaleString() }) }}
+              {{ t(`exportPanel.weight.summary_${levelWeight.rating}`) }}
+            </p>
+            <ul v-if="levelWeight.notes.length" class="space-y-1">
+              <li
+                v-for="note in levelWeight.notes"
+                :key="note.key"
+                class="flex gap-1.5 text-[11px] leading-snug"
+                :class="note.rating === 'veryHeavy' ? 'text-red-700 dark:text-red-300' : note.rating === 'heavy' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-300'"
+              >
+                <AlertTriangle v-if="note.rating !== 'light'" :size="12" class="shrink-0 mt-px" />
+                <span>{{ t(`exportPanel.weight.${note.key}`, note.params) }}</span>
+              </li>
+            </ul>
+          </SettingCard>
+
           <p class="px-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.communityQualityNotice') }}</p>
 
           <!-- Export button -->
@@ -539,7 +568,7 @@ import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle
 } from 'lucide-vue-next';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
@@ -557,6 +586,7 @@ import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
+import { estimateLevelWeight } from '../../services/levelWeight.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
 import { reverseLocationName } from '../../services/nominatim';
@@ -691,6 +721,21 @@ const beamNGLevelNameTouched = ref(false);
 if (pendingLevelName) { beamNGLevelName.value = pendingLevelName; beamNGLevelNameTouched.value = true; }
 let beamNGLevelNameRequestId = 0;
 const hasOsmData = computed(() => Array.isArray(props.terrainData?.osmFeatures) && props.terrainData.osmFeatures.length > 0);
+// (how heavy the level will be: shown before exporting, services/levelWeight.js)
+const buildingFootprints = computed(() => {
+  const features = props.terrainData?.osmFeatures;
+  if (!Array.isArray(features)) return 0;
+  let n = 0;
+  for (const f of features) if (f?.type === 'building') n++;
+  return n;
+});
+const levelWeight = computed(() => estimateLevelWeight({
+  terrainPx: Number(props.terrainData?.width) || 0,
+  metersPerPixel: resolveProcessingMetersPerPixel(props.terrainData),
+  buildings: buildingFootprints.value,
+  safeCaps: !advancedMode.value || beamNGSafeCaps.value,
+  includeBuildings: hasOsmData.value && (!advancedMode.value || beamNGIncludeBuildings.value),
+}));
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
 const beamNGPendingDownloadUrl = ref('');

@@ -414,6 +414,23 @@
       "backdropHint_global30m": "Globales 30-m-Gelände rund um die Karte",
       "backdropHint_usgs1m": "USGS-1-m-Gelände rund um die Karte, wo verfügbar",
       "backdropHint_gpxz": "GPXZ-Gelände rund um die Karte (nutzt deinen GPXZ-Schlüssel)"
+    },
+    "weight": {
+      "title": "Wie schwer ist dieses Level?",
+      "rating_light": "Leicht",
+      "rating_heavy": "Schwer",
+      "rating_veryHeavy": "Sehr schwer",
+      "size": "{km} km breit, Ecken {far} km vom Zentrum, etwa {buildings} Gebäude.",
+      "summary_light": "Sollte auf den meisten PCs gut laden und laufen.",
+      "summary_heavy": "Braucht einen leistungsstarken PC: längeres Laden und weniger FPS in dichten Gegenden.",
+      "summary_veryHeavy": "Viele PCs laden oder spielen es nicht flüssig. Exportieren kannst du es trotzdem.",
+      "farEdge": "Die Ecken liegen {km} km vom Zentrum. Ab etwa {limit} km reicht BeamNGs Genauigkeit nicht mehr und Objekte beginnen zu zittern: wähle ein kleineres Gebiet oder weniger m/px.",
+      "nearEdge": "Die Ecken liegen {km} km vom Zentrum, nahe an den {limit} km, ab denen BeamNGs Genauigkeit nicht mehr reicht und Objekte zittern.",
+      "bigTerrain": "Ein Gelände mit {px} px braucht viel Speicher und lädt länger.",
+      "hugeTerrain": "Ein Gelände mit {px} px übersteigt den Speicher der meisten PCs.",
+      "manyBuildings": "Alles bauen ist an: alle {count} Gebäude werden gebaut. Gebäude-Meshes belegen BeamNGs Speicher: schalte Alles bauen aus oder wähle ein kleineres Gebiet.",
+      "buildingsCapped": "{count} Gebäude im Gebiet: {built} davon werden gebaut (Alles bauen ist aus).",
+      "uncapped": "Alles bauen ist an: Bäume, Zäune, Laternen und Objekte sind auch nicht begrenzt. Dichte Vegetation senkt die FPS am stärksten."
     }
   },
   "controlPanel": {

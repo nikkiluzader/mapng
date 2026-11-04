@@ -414,6 +414,23 @@
       "backdropHint_global30m": "Globalny teren 30 m wokół mapy",
       "backdropHint_usgs1m": "Teren USGS 1 m wokół mapy, gdzie dostępny",
       "backdropHint_gpxz": "Teren GPXZ wokół mapy (używa Twojego klucza GPXZ)"
+    },
+    "weight": {
+      "title": "Jak ciężki jest ten poziom?",
+      "rating_light": "Lekki",
+      "rating_heavy": "Ciężki",
+      "rating_veryHeavy": "Bardzo ciężki",
+      "size": "{km} km szerokości, narożniki {far} km od środka, około {buildings} budynków.",
+      "summary_light": "Powinien dobrze się wczytywać i działać na większości komputerów.",
+      "summary_heavy": "Wymaga mocnego komputera: dłuższe wczytywanie i mniej FPS w gęstych obszarach.",
+      "summary_veryHeavy": "Wiele komputerów go nie wczyta albo nie będzie działał płynnie. Nadal możesz go wyeksportować.",
+      "farEdge": "Jego narożniki są {km} km od środka. Powyżej około {limit} km BeamNG traci precyzję i obiekty zaczynają drgać: wybierz mniejszy obszar albo mniej m/px.",
+      "nearEdge": "Jego narożniki są {km} km od środka, blisko {limit} km, gdzie BeamNG traci precyzję i obiekty drgają.",
+      "bigTerrain": "Teren {px} px zajmuje dużo pamięci i dłużej się wczytuje.",
+      "hugeTerrain": "Teren {px} px przekracza pamięć większości komputerów.",
+      "manyBuildings": "Buduj wszystko jest włączone: powstaną wszystkie {count} budynki. To siatki budynków zajmują pamięć BeamNG: wyłącz Buduj wszystko albo wybierz mniejszy obszar.",
+      "buildingsCapped": "{count} budynków w obszarze: powstanie {built} z nich (Buduj wszystko jest wyłączone).",
+      "uncapped": "Buduj wszystko jest włączone: drzewa, ogrodzenia, latarnie i obiekty też nie mają limitu. Gęsta roślinność najbardziej obniża FPS."
     }
   },
   "controlPanel": {
