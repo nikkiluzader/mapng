@@ -292,12 +292,27 @@
           </a>
 
           <div
+            v-if="beamNGDesktopFailed"
+            class="w-full flex items-start gap-2 p-2 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20"
+          >
+            <AlertCircle :size="14" class="shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
+            <div class="min-w-0 flex-1 space-y-1.5">
+              <div class="text-[11px] font-medium text-red-700 dark:text-red-300">{{ t('exportPanel.desktopFailed') }}</div>
+              <div class="text-[10px] text-red-700/90 dark:text-red-300/90 [overflow-wrap:anywhere]">{{ beamNGDesktopFailed.message }}</div>
+              <button v-if="beamNGDesktopFailed.logPath" type="button" class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="showDesktopExportLog">
+                <FileText :size="11" />{{ t('exportPanel.desktopShowLog') }}
+              </button>
+            </div>
+          </div>
+
+          <div
             v-if="beamNGDesktopSaved"
             class="w-full flex items-start gap-2 p-2 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50"
           >
             <CheckCircle2 :size="14" class="shrink-0 mt-0.5 text-[#FF6600]" />
             <div class="min-w-0 flex-1 space-y-1.5">
               <div class="text-[11px] font-medium text-gray-700 dark:text-gray-200 [overflow-wrap:anywhere]">{{ t('exportPanel.desktopSaved', { name: beamNGDesktopSaved.filename }) }}</div>
+              <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.desktopLoadHint') }}</div>
               <div class="flex flex-wrap gap-1.5">
                 <button type="button" class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="showDesktopSavedLevel">
                   <FolderOpen :size="11" />{{ t('exportPanel.desktopShowInFolder') }}
@@ -598,7 +613,10 @@
                 <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
               </div>
             </div>
-            <div class="flex justify-end text-[10px] font-mono text-gray-500 dark:text-gray-400">
+            <div class="flex items-center justify-end gap-3 text-[10px] font-mono text-gray-500 dark:text-gray-400">
+              <button v-if="desktopApp" type="button" class="mr-auto font-sans px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="cancelDesktopExport">
+                {{ t('levels.cancel') }}
+              </button>
               {{ t('exportPanel.elapsed') }} {{ formatStepDuration(beamNGElapsedMs) }}
             </div>
           </div>
@@ -636,7 +654,7 @@ import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText
 } from 'lucide-vue-next';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
@@ -767,6 +785,10 @@ const beamNGPendingDownloadUrl = ref('');
 const beamNGPendingDownloadName = ref('');
 // (desktop app: the level written into the mods folder, { path, filename })
 const beamNGDesktopSaved = ref(null);
+const beamNGDesktopFailed = ref(null);   // { message, logPath }
+let desktopExportAbort = null;
+const cancelDesktopExport = () => desktopExportAbort?.abort();
+const showDesktopExportLog = () => desktopApp?.showItem(beamNGDesktopFailed.value?.logPath);
 const showDesktopSavedLevel = () => desktopApp?.showItem(beamNGDesktopSaved.value?.path);
 const changeDesktopModsFolder = () => desktopApp?.chooseModsFolder();
 
@@ -887,6 +909,7 @@ const clearPendingBeamNGDownload = () => {
   beamNGPendingDownloadUrl.value = '';
   beamNGPendingDownloadName.value = '';
   beamNGDesktopSaved.value = null;
+  beamNGDesktopFailed.value = null;
 };
 
 const isAnyExporting = computed(() => (
@@ -1846,7 +1869,8 @@ const handleBeamNGLevelExport = async () => {
     };
 
     if (desktopApp) {
-      const saved = await exportLevelOnDesktop(td, props.center, levelOptions);
+      desktopExportAbort = new AbortController();
+      const saved = await exportLevelOnDesktop(td, props.center, levelOptions, { signal: desktopExportAbort.signal });
       if (saved?.cancelled) return;
       console.log(`${BEAMNG_EXPORT_UI_LOG} Desktop export written:`, saved);
       beamNGDesktopSaved.value = { path: saved.path, filename: saved.filename };
@@ -1901,8 +1925,11 @@ const handleBeamNGLevelExport = async () => {
       stack: error?.stack,
       error,
     });
-    alert(t('export.errorBeamngLevel'));
+    // (the desktop app says why and keeps the export's log)
+    if (desktopApp) beamNGDesktopFailed.value = { message: error?.message || String(error), logPath: error?.logPath || null };
+    else alert(t('export.errorBeamngLevel'));
   } finally {
+    desktopExportAbort = null;
     clearInterval(elapsedTimer);
     isExportingBeamNGLevel.value = false;
     beamNGProgressStep.value = '';

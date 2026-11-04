@@ -22,7 +22,8 @@
     "stack": "Stack tecnologico",
     "switchToLightMode": "Passa a Modalità Chiara",
     "switchToDarkMode": "Passa a Modalità Scura",
-    "build": "Versione {hash} - {time}"
+    "build": "Versione {hash} - {time}",
+    "desktopBuild": "MapNG Desktop {version}"
   },
   "mode": {
     "singleTile": "Singola Tessera",
@@ -376,7 +377,10 @@
     "glbModel": "Modello GLB",
     "colladaDae": "Collada DAE",
     "beamngTerrain": "Terreno BeamNG",
-    "gameTexture": "Texture di gioco"
+    "gameTexture": "Texture di gioco",
+    "desktopFailed": "L’esportazione non è terminata.",
+    "desktopShowLog": "Mostra log",
+    "desktopLoadHint": "In BeamNG.drive: Freeroam, poi scegli il livello. Se il gioco è già aperto, riavvialo o ricarica le mod."
   },
   "controlPanel": {
     "outputSettings": "Impostazioni Output",
@@ -485,7 +489,9 @@
     "cores": "{value} di {total} core",
     "max": "{value} MB max",
     "peak": "picco {value} MB",
-    "unavailable": "API memoria non disponibile"
+    "unavailable": "API memoria non disponibile",
+    "generate": "GENERAZIONE",
+    "rebuild": "RICOSTRUZIONE"
   },
   "disclaimer": {
     "title": "Disclaimer Precisione Dati",
@@ -835,5 +841,18 @@
     "confirmFetch": "Ricostruire \"{name}\" con questa versione di MapNG?\n\nQuesto livello è stato creato prima che MapNG salvasse i suoi dati, quindi la sua zona viene scaricata di nuovo: OpenStreetMap potrebbe essere cambiato e l’esportazione usa le impostazioni predefinite. Il livello attuale viene sostituito quando il nuovo è pronto.",
     "cancelled": "Ricostruzione annullata. Il livello non è cambiato.",
     "rebuilt": "Ricostruito con MapNG {version} in {seconds} s."
+  },
+  "desktopWelcome": {
+    "title": "Benvenuto in MapNG Desktop",
+    "subtitle": "Mappe reali per BeamNG.drive, create sul tuo computer.",
+    "modsFolder": "I livelli vengono salvati direttamente nella cartella mod di BeamNG:",
+    "notFound": "Cartella mod di BeamNG non trovata",
+    "change": "Cambia…",
+    "notFoundHint": "Scegli la cartella mod di BeamNG.drive perché i tuoi livelli compaiano nel gioco.",
+    "pointPower": "Generazione ed esportazione girano fuori da questa finestra e usano tutto il computer, così funzionano anche zone grandi e dense.",
+    "pointLevels": "I miei livelli, a destra, elenca i tuoi livelli MapNG e li ricostruisce quando MapNG migliora.",
+    "pointMods": "I livelli esportati sono pronti da guidare: niente download né decompressione.",
+    "updates": "Cerca automaticamente gli aggiornamenti di MapNG (MapNG chiede sempre prima di scaricare)",
+    "start": "Inizia"
   }
 }

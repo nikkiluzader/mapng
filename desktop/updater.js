@@ -13,7 +13,7 @@ const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
  * settings: { read(), write(patch) } — the app's settings.json.
  * busy(): true while an export runs (no restart then).
  */
-export function startUpdater({ settings, busy }) {
+export function startUpdater({ settings, busy, ready = () => true }) {
   // (only a packaged build updates; the Linux build only as an AppImage)
   const supported = app.isPackaged && (process.platform !== 'linux' || !!process.env.APPIMAGE);
   autoUpdater.autoDownload = false;
@@ -117,12 +117,13 @@ export function startUpdater({ settings, busy }) {
   autoUpdater.on('error', () => { /* reported where a check or download was awaited */ });
 
   if (supported) {
-    setTimeout(() => check(), FIRST_CHECK_MS).unref?.();
+    setTimeout(() => { if (ready()) check(); }, FIRST_CHECK_MS).unref?.();
     setInterval(() => { if (settings.read().updates === 'on') check(); }, CHECK_EVERY_MS).unref?.();
   }
 
   return {
     checkNow: () => check({ byUser: true }),
+    checkSoon: () => { if (supported) setTimeout(() => check(), 3000).unref?.(); },
     setEnabled: (on) => settings.write({ updates: on ? 'on' : 'off' }),
     enabled: () => settings.read().updates === 'on',
   };

@@ -4,6 +4,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('mapngDesktop', {
   info: () => ipcRenderer.invoke('desktop:info'),
+  // the first-run welcome is answered (updates: check automatically or not)
+  welcomeDone: (answers) => ipcRenderer.invoke('desktop:welcomeDone', answers),
   chooseModsFolder: () => ipcRenderer.invoke('desktop:chooseModsFolder'),
   showItem: (file) => ipcRenderer.invoke('desktop:showItem', file),
   beginJob: () => ipcRenderer.invoke('job:begin'),

@@ -1,6 +1,6 @@
 // MapNG desktop: the web app in a window, its level export in a full Node
 // process (no 4 GB tab heap), the level written straight into BeamNG's mods.
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, shell } from 'electron';
 import { fork } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -168,6 +168,36 @@ function spawnRunner(script, dir) {
 }
 const exportUsage = new Map();   // jobId → the runner's last { rss, heapLimit, cores }
 
+// ---- taskbar progress and a notification when work ends ---------------------
+
+function taskbarProgress(fraction) {
+  for (const w of BrowserWindow.getAllWindows()) w.setProgressBar(fraction == null ? -1 : Math.max(0, Math.min(1, fraction)));
+}
+/** A notification, only while the app is in the background. */
+function notifyDone(title, body) {
+  const focused = BrowserWindow.getAllWindows().some((w) => w.isFocused());
+  if (focused || !Notification.isSupported()) return;
+  const n = new Notification({ title, body, silent: false });
+  n.on('click', () => { const w = BrowserWindow.getAllWindows()[0]; if (w) { if (w.isMinimized()) w.restore(); w.focus(); } });
+  n.show();
+}
+
+// (leftovers from before: finished jobs remove themselves; a failed one is
+// kept a few days for its log, a half-saved project not at all)
+function clearLeftovers() {
+  const KEEP_MS = 3 * 24 * 3600 * 1000;
+  try {
+    for (const d of fs.readdirSync(JOBS(), { withFileTypes: true })) {
+      const p = path.join(JOBS(), d.name);
+      if (d.isDirectory() && Date.now() - fs.statSync(p).mtimeMs > KEEP_MS) fs.rmSync(p, { recursive: true, force: true });
+    }
+  } catch { /* none yet */ }
+  try {
+    for (const d of fs.readdirSync(PROJECTS())) if (d.endsWith('.saving')) fs.rmSync(path.join(PROJECTS(), d), { recursive: true, force: true });
+  } catch { /* none yet */ }
+  pruneSessions(null);
+}
+
 // ---- system usage (the page's memory monitor) -------------------------------
 
 function cpuTimes() {
@@ -185,6 +215,9 @@ function systemUsage() {
   const cpu = span > 0 ? 1 - (now.idle - cpuBefore.idle) / span : 0;
   cpuBefore = now;
   const exports = [...exportUsage.values()];
+  // (what the background work is, for the monitor's label)
+  const keys = [...exportUsage.keys()];
+  const kind = keys.some((k) => k.startsWith('rebuild')) ? 'rebuild' : keys.some((k) => k.startsWith('gen:')) && keys.length === 1 ? 'generate' : 'export';
   // (every MapNG process: the window's and the exports')
   const appBytes = app.getAppMetrics().reduce((sum, m) => sum + (m.memory?.workingSetSize || 0) * 1024, 0)
     + exports.reduce((sum, e) => sum + e.rss, 0);
@@ -198,6 +231,7 @@ function systemUsage() {
       rss: exports.reduce((sum, e) => sum + e.rss, 0),
       heapLimit: Math.max(...exports.map((e) => e.heapLimit)),
       cores: exports.reduce((sum, e) => sum + e.cores, 0),
+      kind,
     } : null,
   };
 }
@@ -211,6 +245,9 @@ ipcMain.handle('desktop:info', () => ({
   version: app.getVersion(),
   platform: process.platform,
   modsFolder: modsFolder(),
+  modsFolderExists: !!modsFolder() && fs.existsSync(modsFolder()),
+  welcomed: !!readSettings().welcomed,
+  updates: readSettings().updates || null,
   memoryGB: Math.round(os.totalmem() / 2 ** 30),
 }));
 
@@ -247,26 +284,39 @@ ipcMain.handle('job:run', async (event, jobId, job) => {
   running.set(jobId, child);
   try {
     return await new Promise((resolve, reject) => {
-      let result = null;
+      let result = null; let failure = null;
       child.on('message', (msg) => {
-        if (msg?.type === 'progress') event.sender.send('job:progress', jobId, msg);
-        else if (msg?.type === 'memory') exportUsage.set(jobId, msg);
+        if (msg?.type === 'progress') {
+          event.sender.send('job:progress', jobId, msg);
+          if (Number.isFinite(msg.pct)) taskbarProgress(msg.pct / 100);
+        } else if (msg?.type === 'memory') exportUsage.set(jobId, msg);
         else if (msg?.type === 'done') result = msg;
-        else if (msg?.type === 'error') reject(new Error(msg.message));
+        else if (msg?.type === 'error') failure = msg;
       });
-      child.on('error', (error) => reject(new Error(`could not start the export (${NODE}): ${error.message}`)));
+      // (the page shows the reason and opens the log: "<reason> [log: <file>]")
+      const log = path.join(dir, 'export.log');
+      child.on('error', (error) => reject(new Error(`Could not start the export (${NODE}): ${error.message} [log: ${log}]`)));
       child.on('exit', (code, signal) => {
         if (result) {
           try { result.project = saveProject(dir, job, result); } catch (error) { console.error('project not saved:', error); }
+          notifyDone('MapNG: level ready', `${result.filename} is in BeamNG's mods folder.`);
           resolve(result);
+        } else if (signal) {
+          reject(new Error(`export stopped (${signal}) [log: ${log}]`));
+        } else {
+          // (out of memory: V8 dies without a message)
+          const tail = (() => { try { return fs.readFileSync(log, 'utf8').slice(-4000); } catch { return ''; } })();
+          const oom = /heap out of memory|Allocation failed/i.test(tail);
+          const reason = failure?.message || (oom ? 'The export ran out of memory.' : `The export stopped unexpectedly (code ${code}).`);
+          reject(new Error(`${reason} [log: ${log}]`));
         }
-        else reject(new Error(signal ? `export stopped (${signal})` : `export ended with code ${code}; log: ${path.join(dir, 'export.log')}`));
       });
     });
   } finally {
     exportUsage.delete(jobId);
     running.delete(jobId);
     linkedFiles.delete(jobId);
+    taskbarProgress(null);
   }
 });
 
@@ -366,7 +416,7 @@ const KEEP_SESSIONS = 3;
 function pruneSessions(keep) {
   let dirs = [];
   try { dirs = fs.readdirSync(SESSIONS(), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { return; }
-  const old = dirs.filter((d) => d !== keep).sort().reverse().slice(KEEP_SESSIONS - 1);
+  const old = dirs.filter((d) => d !== keep).sort().reverse().slice(keep ? KEEP_SESSIONS - 1 : KEEP_SESSIONS);
   for (const d of old) fs.rmSync(path.join(SESSIONS(), d), { recursive: true, force: true });
 }
 
@@ -550,9 +600,10 @@ async function rebuildLevel(sender, zipName, levelName) {
     state.children.add(exp);
     running.set(jobId, exp);
     progress('export', 'Building the level…');
+    const exportProgress = (p) => { if (Number.isFinite(p?.pct)) taskbarProgress(p.pct / 100); progress('export', p); };
     let result;
     try {
-      result = await runToEnd(exp, { usageKey: jobId, onProgress: (p) => progress('export', p) });
+      result = await runToEnd(exp, { usageKey: `rebuild-exp:${levelName}`, onProgress: exportProgress });
     } finally {
       running.delete(jobId);
       state.children.delete(exp);
@@ -576,9 +627,11 @@ async function rebuildLevel(sender, zipName, levelName) {
     }
     fs.rmSync(jobDir, { recursive: true, force: true });
     linkedFiles.delete(jobId);
+    notifyDone('MapNG: level rebuilt', `${level.title} is rebuilt with MapNG ${app.getVersion()}.`);
     return { ok: true, path: zip, replayed: replay, seconds: result.seconds };
   } finally {
     rebuilds.delete(levelName);
+    taskbarProgress(null);
   }
 }
 
@@ -647,8 +700,21 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(() => {
+  // (Windows: notifications name the app by this)
+  if (process.platform === 'win32') app.setAppUserModelId('com.mapng.desktop');
+  clearLeftovers();
   servePage();
-  const updater = startUpdater({ settings: { read: readSettings, write: writeSettings }, busy: () => running.size > 0 });
+  const updater = startUpdater({
+    settings: { read: readSettings, write: writeSettings },
+    busy: () => running.size > 0 || rebuilds.size > 0,
+    // (the first-run welcome asks about updates itself: no check before it)
+    ready: () => !!readSettings().welcomed,
+  });
+  ipcMain.handle('desktop:welcomeDone', (_event, { updates } = {}) => {
+    writeSettings({ welcomed: true, updates: updates ? 'on' : 'off' });
+    buildMenu(updater);
+    if (updates) updater.checkSoon();
+  });
   buildMenu(updater);
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

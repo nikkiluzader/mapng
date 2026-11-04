@@ -22,7 +22,8 @@
     "stack": "Stos technologiczny",
     "switchToLightMode": "Przełącz na tryb jasny",
     "switchToDarkMode": "Przełącz na tryb ciemny",
-    "build": "Kompilacja {hash} - {time}"
+    "build": "Kompilacja {hash} - {time}",
+    "desktopBuild": "MapNG Desktop {version}"
   },
   "mode": {
     "singleTile": "Pojedynczy kafelek",
@@ -376,7 +377,10 @@
     "glbModel": "Model GLB",
     "colladaDae": "Collada DAE",
     "beamngTerrain": "Teren BeamNG",
-    "gameTexture": "Tekstura gry"
+    "gameTexture": "Tekstura gry",
+    "desktopFailed": "Eksport się nie zakończył.",
+    "desktopShowLog": "Pokaż log",
+    "desktopLoadHint": "W BeamNG.drive: Freeroam, potem wybierz poziom. Jeśli gra już działa, uruchom ją ponownie lub przeładuj mody."
   },
   "controlPanel": {
     "outputSettings": "Ustawienia wyjścia",
@@ -485,7 +489,9 @@
     "cores": "{value} z {total} rdzeni",
     "max": "{value} MB maksimum",
     "peak": "szczyt {value} MB",
-    "unavailable": "API pamięci niedostępne"
+    "unavailable": "API pamięci niedostępne",
+    "generate": "GENEROWANIE",
+    "rebuild": "PRZEBUDOWA"
   },
   "disclaimer": {
     "title": "Zastrzeżenie dotyczące dokładności danych",
@@ -835,5 +841,18 @@
     "confirmFetch": "Przebudować „{name}” tą wersją MapNG?\n\nTen poziom powstał, zanim MapNG zapisywał dane, więc jego obszar zostanie pobrany ponownie: OpenStreetMap mógł się zmienić, a eksport użyje domyślnych ustawień. Obecny poziom zostanie zastąpiony, gdy nowy będzie gotowy.",
     "cancelled": "Przebudowa anulowana. Poziom się nie zmienił.",
     "rebuilt": "Przebudowano w MapNG {version} w {seconds} s."
+  },
+  "desktopWelcome": {
+    "title": "Witaj w MapNG Desktop",
+    "subtitle": "Prawdziwe mapy do BeamNG.drive, tworzone na Twoim komputerze.",
+    "modsFolder": "Poziomy są zapisywane bezpośrednio w folderze modów BeamNG:",
+    "notFound": "Nie znaleziono folderu modów BeamNG",
+    "change": "Zmień…",
+    "notFoundHint": "Wybierz folder modów BeamNG.drive, aby Twoje poziomy pojawiły się w grze.",
+    "pointPower": "Generowanie i eksport działają poza tym oknem i używają całego komputera, więc działają też duże i gęste obszary.",
+    "pointLevels": "Moje poziomy, po prawej, pokazuje Twoje poziomy MapNG i przebudowuje je, gdy MapNG się poprawia.",
+    "pointMods": "Wyeksportowane poziomy są gotowe do jazdy: bez pobierania i rozpakowywania.",
+    "updates": "Automatycznie sprawdzaj aktualizacje MapNG (MapNG zawsze pyta przed pobraniem)",
+    "start": "Zaczynamy"
   }
 }

@@ -134,14 +134,31 @@ async function packTerrainData(terrainData, job) {
  * the BeamNG mods folder. Resolves { path, filename, size }, or
  * { cancelled: true } when the user picked no folder.
  */
-export async function exportLevelOnDesktop(terrainData, center, options) {
+export async function exportLevelOnDesktop(terrainData, center, options, { signal } = {}) {
   const { onProgress, ...rest } = options;
   const jobId = await desktopApp.beginJob();
+  const onAbort = () => desktopApp.cancelJob(jobId);
+  signal?.addEventListener?.('abort', onAbort, { once: true });
+  try {
+    return await runDesktopExport(jobId, terrainData, center, rest, onProgress, signal);
+  } catch (error) {
+    if (signal?.aborted) { await desktopApp.cleanupJob(jobId); return { cancelled: true }; }
+    // ("Error invoking remote method 'job:run': Error: <reason> [log: <file>]")
+    const message = String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    const log = message.match(/\s*\[log: (.+)\]$/);
+    throw Object.assign(new Error(log ? message.slice(0, log.index) : message), { logPath: log?.[1] || null });
+  } finally {
+    signal?.removeEventListener?.('abort', onAbort);
+  }
+}
+
+async function runDesktopExport(jobId, terrainData, center, rest, onProgress, signal) {
   const job = { id: jobId, files: 0 };
   onProgress?.({ step: 'Handing the map to the desktop exporter…', pct: 0 });
   const packedTerrain = await packTerrainData(terrainData, job);
   const info = await desktopApp.info().catch(() => ({}));
   const packedOptions = await pack({ ...rest, appVersion: info?.version || null, platform: 'desktop' }, 'options', job);
+  if (signal?.aborted) throw new DOMException('Export cancelled', 'AbortError');
   const result = await desktopApp.runJob(jobId, { center: toRaw(center), terrainData: packedTerrain, options: packedOptions }, onProgress);
   await desktopApp.cleanupJob(jobId);
   // (the levels sidebar lists it)

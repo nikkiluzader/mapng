@@ -71,14 +71,16 @@
           <Moon v-else :size="14" />
         </BaseButton>
       </div>
-      <span v-if="isProductionHost" class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Main: {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</span>
+      <span v-if="desktopVersion" class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.desktopBuild', { version: desktopVersion }) }} · {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</span>
+      <span v-else-if="isProductionHost" class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Main: {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</span>
       <span v-else class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Dev: {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</span>
     </div>
   </aside>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { desktopApp } from '../../services/platform/desktop.js';
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
@@ -88,6 +90,13 @@ import { CircleHelp, Sun, Moon, Code } from 'lucide-vue-next';
 
 const { t, locale } = useI18n({ useScope: 'global' });
 const locales = computed(() => getSupportedLocales());
+
+// (the desktop app names its version instead of the site's build)
+const desktopVersion = ref(null);
+onMounted(async () => {
+  if (!desktopApp) return;
+  try { desktopVersion.value = (await desktopApp.info())?.version || null; } catch { /* none */ }
+});
 
 // Show only the build line that matches where the app is running: mapng.com
 // tracks main, everything else (dev.mapng.com, localhost, preview URLs) tracks

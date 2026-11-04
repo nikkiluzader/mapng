@@ -29,7 +29,8 @@
     "stack": "Stack",
     "switchToLightMode": "Switch to Light Mode",
     "switchToDarkMode": "Switch to Dark Mode",
-    "build": "Build {hash} - {time}"
+    "build": "Build {hash} - {time}",
+    "desktopBuild": "MapNG Desktop {version}"
   },
   "mode": {
     "singleTile": "Single Tile",
@@ -410,7 +411,10 @@
     "glbModel": "GLB Model",
     "colladaDae": "Collada DAE",
     "beamngTerrain": "BeamNG Terrain",
-    "gameTexture": "Game Texture"
+    "gameTexture": "Game Texture",
+    "desktopFailed": "The export did not finish.",
+    "desktopShowLog": "Show log",
+    "desktopLoadHint": "In BeamNG.drive: Freeroam, then pick the level. If the game is already running, restart it or rescan mods first."
   },
   "controlPanel": {
     "sessionData": "Session Data",
@@ -536,7 +540,9 @@
     "cores": "{value} of {total} cores",
     "max": "{value} MB max",
     "peak": "peak {value} MB",
-    "unavailable": "memory API unavailable"
+    "unavailable": "memory API unavailable",
+    "generate": "GENERATE",
+    "rebuild": "REBUILD"
   },
   "disclaimer": {
     "title": "Data Accuracy Disclaimer",
@@ -896,5 +902,18 @@
     "confirmFetch": "Rebuild \"{name}\" with this version of MapNG?\n\nThis level was made before MapNG saved its data, so its area is fetched again: OpenStreetMap may have changed since, and the export uses default settings. The current level is replaced when the new one is ready.",
     "cancelled": "Rebuild cancelled. The level was not changed.",
     "rebuilt": "Rebuilt with MapNG {version} in {seconds} s."
+  },
+  "desktopWelcome": {
+    "title": "Welcome to MapNG Desktop",
+    "subtitle": "Real-world maps for BeamNG.drive, made on your own computer.",
+    "modsFolder": "Levels are saved straight into BeamNG's mods folder:",
+    "notFound": "BeamNG's mods folder was not found",
+    "change": "Change…",
+    "notFoundHint": "Choose BeamNG.drive's mods folder so your levels show up in the game.",
+    "pointPower": "Generating and exporting run outside this window and use your whole computer, so big and dense areas work.",
+    "pointLevels": "My Levels, on the right, lists your MapNG levels and rebuilds them when MapNG gets better.",
+    "pointMods": "Exported levels are ready to drive: no download or unzip step.",
+    "updates": "Check for MapNG updates automatically (MapNG always asks before downloading one)",
+    "start": "Get started"
   }
 }
