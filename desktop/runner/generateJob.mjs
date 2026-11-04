@@ -35,6 +35,8 @@ async function main() {
     dir: job.sources?.dir || path.join(dir, 'sources'),
     mode: job.sources?.mode || 'record',
     fallback: job.sources?.fallback !== false,
+    // (a replay: anything the saved sources lack is recorded here, then kept with the level)
+    recordDir: job.sources?.mode === 'replay' ? path.join(dir, 'sources') : null,
   });
   const { fetchTerrainData } = await import('../../services/terrain.js');
   const started = Date.now();

@@ -300,7 +300,9 @@ ipcMain.handle('job:run', async (event, jobId, job) => {
   }
   const terrainId = typeof job.terrainData?.desktopTerrainId === 'string' ? job.terrainData.desktopTerrainId : null;
   const sources = terrainId ? exportSourcesFor(terrainId, dir) : { mode: 'record', dir: path.join(dir, 'export-sources') };
-  fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify({ ...job, outputDir, sources }));
+  // (saveProject gets this job too: its sources say which export downloads to keep)
+  const fullJob = { ...job, outputDir, sources };
+  fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify(fullJob));
   const child = spawnRunner(RUNNER, dir);
   running.set(jobId, child);
   try {
@@ -319,7 +321,7 @@ ipcMain.handle('job:run', async (event, jobId, job) => {
       child.on('error', (error) => reject(new Error(`Could not start the export (${NODE}): ${error.message} [log: ${log}]`)));
       child.on('exit', (code, signal) => {
         if (result) {
-          try { result.project = saveProject(dir, job, result); } catch (error) { console.error('project not saved:', error); }
+          try { result.project = saveProject(dir, fullJob, result); } catch (error) { console.error('project not saved:', error); }
           notifyDone('MapNG: level ready', `${result.filename} is in BeamNG's mods folder.`);
           resolve(result);
         } else if (signal) {
@@ -387,11 +389,14 @@ function saveProject(jobDir, job, result) {
     const replayedFrom = generate.sources?.mode === 'replay' ? generate.sources.dir : null;
     delete generate.sources;
     fs.writeFileSync(path.join(tmp, 'generate.json'), JSON.stringify(generate, null, 1));
-    const recorded = path.join(session, 'sources');
-    const src = replayedFrom && fs.existsSync(replayedFrom) && !(fs.existsSync(recorded) && fs.readdirSync(recorded).length) ? replayedFrom : recorded;
-    if (fs.existsSync(src)) {
-      fs.mkdirSync(path.join(tmp, 'sources'));
-      for (const f of fs.readdirSync(src)) { linkOrCopy(path.join(src, f), path.join(tmp, 'sources', f)); sources++; }
+    // (the replayed level's sources, and anything the replay had to download)
+    for (const src of [replayedFrom, path.join(session, 'sources')]) {
+      if (!src || !fs.existsSync(src)) continue;
+      fs.mkdirSync(path.join(tmp, 'sources'), { recursive: true });
+      for (const f of fs.readdirSync(src)) {
+        const to = path.join(tmp, 'sources', f);
+        if (!fs.existsSync(to)) { linkOrCopy(path.join(src, f), to); sources++; }
+      }
     }
   }
   // (the export's own downloads: lidar, backdrop; those it replayed, and new ones)
@@ -664,6 +669,11 @@ async function rebuildLevel(sender, zipName, levelName) {
     state.children.add(gen);
     progress('terrain', replay ? 'Rebuilding the terrain from its saved data…' : 'Fetching the area again…');
     const generated = await runToEnd(gen, { usageKey: `rebuild-gen:${levelName}`, onProgress: (u) => progress('terrain', u) });
+    if (replay) {
+      // (what the saved sources lacked and the replay downloaded: kept for next time)
+      const fresh = path.join(session, 'sources');
+      if (fs.existsSync(fresh)) for (const f of fs.readdirSync(fresh)) if (!fs.existsSync(path.join(projectDir, 'sources', f))) linkOrCopy(path.join(fresh, f), path.join(projectDir, 'sources', f));
+    }
     // (how much of the terrain came from the saved data, and what had to be fetched)
     const sources = generated?.sources || null;
     state.children.delete(gen);
