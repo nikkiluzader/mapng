@@ -884,10 +884,18 @@
     "showInFolder": "Im Ordner zeigen",
     "working": "Arbeite…",
     "starting": "Starte…",
-    "confirmSaved": "„{name}“ mit dieser MapNG-Version neu erstellen?\n\nEs wird aus seinen gespeicherten Gelände- und OSM-Daten mit denselben Einstellungen neu erstellt und erhält so alle Korrekturen seit dem Export. Das aktuelle Level wird ersetzt, sobald das neue fertig ist.",
+    "confirmSaved": "„{name}“ mit dieser MapNG-Version neu erstellen?\n\nEs wird aus seinen gespeicherten Gelände- und OSM-Daten mit denselben Einstellungen neu erstellt und erhält so alle Korrekturen seit dem Export. Das aktuelle Level wird ersetzt, sobald das neue fertig ist.\n\nEs wird nichts heruntergeladen.",
     "confirmFetch": "„{name}“ mit dieser MapNG-Version neu erstellen?\n\nDieses Level entstand, bevor MapNG seine Daten speicherte, daher wird sein Gebiet neu abgerufen: OpenStreetMap kann sich seitdem geändert haben, und der Export nutzt Standardeinstellungen. Das aktuelle Level wird ersetzt, sobald das neue fertig ist.",
     "cancelled": "Neuerstellung abgebrochen. Das Level wurde nicht verändert.",
-    "rebuilt": "Mit MapNG {version} in {seconds} s neu erstellt."
+    "rebuilt": "Mit MapNG {version} in {seconds} s neu erstellt.",
+    "savedData": "Gespeicherte Daten: Neubau ohne Download",
+    "noSavedData": "Keine gespeicherten Daten: ein Neubau lädt das Gebiet erneut",
+    "delete": "Löschen",
+    "deleteHint": "Dieses Level und seine gespeicherten Daten in den Papierkorb verschieben",
+    "confirmDelete": "„{name}“ löschen?\n\nDas Level und seine gespeicherten Daten kommen in den Papierkorb, du kannst sie dort wiederherstellen.",
+    "rebuiltOffline": "Nichts wurde heruntergeladen: es entstand aus den gespeicherten Daten.",
+    "rebuiltSomeDownloaded": "{count} Dateien fehlten in den gespeicherten Daten und wurden heruntergeladen.",
+    "rebuiltFetched": "Das Gebiet wurde erneut geladen und gespeichert, der nächste Neubau braucht das nicht mehr."
   },
   "desktopWelcome": {
     "title": "Willkommen bei MapNG Desktop",

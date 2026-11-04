@@ -189,9 +189,16 @@ async function bodyTextOf(init) {
  * older recording), else fails like an offline network.
  * Returns stats { recorded, replayed, missed }.
  */
+// OpenStreetMap requests (Overpass mirrors, MapNG's /api/osm cache, the
+// mirror probes). A rebuild that misses one of these must not go online: it
+// would take today's OSM instead of the map's (the first export got its OSM
+// elsewhere, e.g. Overture when Overpass did not answer), and download it.
+const OSM_REQUEST = /^(overpass:|\/api\/osm(\?|$))/;
+
 export function installSourceRecorder({ dir, mode = 'record', fallback = true }) {
   fs.mkdirSync(dir, { recursive: true });
-  const stats = { recorded: 0, replayed: 0, missed: 0 };
+  // (downloaded: misses that went online; missedUrls: the first few, for the log)
+  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [] };
   const inner = globalThis.fetch;
   globalThis.fetch = async (input, init = {}) => {
     const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input?.url;
@@ -208,7 +215,11 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true })
         return new Response(body, { status: meta.status, statusText: meta.statusText, headers: meta.headers });
       }
       stats.missed++;
-      if (!fallback) throw new TypeError(`fetch failed: not in the recorded sources (${url})`);
+      if (stats.missedUrls.length < 20) stats.missedUrls.push(url.slice(0, 160));
+      // (an OSM request the first run did not get fails the same way now)
+      const normalized = String(url).replace(/^https?:\/\/[^/]+(\/api\/interpreter)/, 'overpass:$1');
+      if (!fallback || OSM_REQUEST.test(normalized)) throw new TypeError(`fetch failed: not in the recorded sources (${url})`);
+      stats.downloaded++;
       return inner(input, init);
     }
     const r = await inner(input, init);

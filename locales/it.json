@@ -884,10 +884,18 @@
     "showInFolder": "Mostra nella cartella",
     "working": "In corso…",
     "starting": "Avvio…",
-    "confirmSaved": "Ricostruire \"{name}\" con questa versione di MapNG?\n\nViene rifatto dai suoi dati di terreno e OSM salvati con le stesse impostazioni, quindi riceve tutte le correzioni dall’esportazione. Il livello attuale viene sostituito quando il nuovo è pronto.",
+    "confirmSaved": "Ricostruire \"{name}\" con questa versione di MapNG?\n\nViene rifatto dai suoi dati di terreno e OSM salvati con le stesse impostazioni, quindi riceve tutte le correzioni dall’esportazione. Il livello attuale viene sostituito quando il nuovo è pronto.\n\nNon viene scaricato nulla.",
     "confirmFetch": "Ricostruire \"{name}\" con questa versione di MapNG?\n\nQuesto livello è stato creato prima che MapNG salvasse i suoi dati, quindi la sua zona viene scaricata di nuovo: OpenStreetMap potrebbe essere cambiato e l’esportazione usa le impostazioni predefinite. Il livello attuale viene sostituito quando il nuovo è pronto.",
     "cancelled": "Ricostruzione annullata. Il livello non è cambiato.",
-    "rebuilt": "Ricostruito con MapNG {version} in {seconds} s."
+    "rebuilt": "Ricostruito con MapNG {version} in {seconds} s.",
+    "savedData": "Dati salvati: ricostruzione senza download",
+    "noSavedData": "Nessun dato salvato: la ricostruzione riscarica l'area",
+    "delete": "Elimina",
+    "deleteHint": "Sposta questo livello e i suoi dati salvati nel Cestino",
+    "confirmDelete": "Eliminare «{name}»?\n\nIl livello e i suoi dati salvati finiscono nel Cestino, da cui puoi ripristinarli.",
+    "rebuiltOffline": "Non è stato scaricato nulla: è stato creato dai dati salvati.",
+    "rebuiltSomeDownloaded": "{count} file non erano nei dati salvati e sono stati scaricati.",
+    "rebuiltFetched": "L'area è stata riscaricata e salvata, così la prossima ricostruzione non ne avrà bisogno."
   },
   "desktopWelcome": {
     "title": "Benvenuto in MapNG Desktop",

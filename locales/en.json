@@ -945,10 +945,18 @@
     "showInFolder": "Show in folder",
     "working": "Working…",
     "starting": "Starting…",
-    "confirmSaved": "Rebuild \"{name}\" with this version of MapNG?\n\nIt is made again from its saved terrain and OSM data with the same settings, so it gets every fix since it was exported. The current level is replaced when the new one is ready.",
+    "confirmSaved": "Rebuild \"{name}\" with this version of MapNG?\n\nIt is made again from its saved terrain and OSM data with the same settings, so it gets every fix since it was exported. The current level is replaced when the new one is ready.\n\nNothing is downloaded.",
     "confirmFetch": "Rebuild \"{name}\" with this version of MapNG?\n\nThis level was made before MapNG saved its data, so its area is fetched again: OpenStreetMap may have changed since, and the export uses default settings. The current level is replaced when the new one is ready.",
     "cancelled": "Rebuild cancelled. The level was not changed.",
-    "rebuilt": "Rebuilt with MapNG {version} in {seconds} s."
+    "rebuilt": "Rebuilt with MapNG {version} in {seconds} s.",
+    "savedData": "Saved data: rebuilds without downloading",
+    "noSavedData": "No saved data: a rebuild downloads the area again",
+    "delete": "Delete",
+    "deleteHint": "Move this level and its saved data to the Recycle Bin (Trash on Linux)",
+    "confirmDelete": "Delete \"{name}\"?\n\nThe level and its saved data go to the Recycle Bin (Trash on Linux), so you can restore them from there.",
+    "rebuiltOffline": "Nothing was downloaded: it was made from the saved data.",
+    "rebuiltSomeDownloaded": "{count} files weren't in the saved data and were downloaded.",
+    "rebuiltFetched": "Its area was downloaded again and saved, so the next rebuild won't need to."
   },
   "desktopWelcome": {
     "title": "Welcome to MapNG Desktop",

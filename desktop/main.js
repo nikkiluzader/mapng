@@ -496,6 +496,29 @@ ipcMain.handle('levels:list', () => {
   };
 });
 
+/**
+ * A MapNG level deleted from the list: its zip and its saved project go to
+ * the system's Recycle Bin / Trash (so a mistake can be undone there), not
+ * deleted outright. Only a MapNG level in the mods folder, never mid-rebuild.
+ */
+ipcMain.handle('levels:delete', async (_event, zipName, levelName) => {
+  const folder = modsFolder();
+  if (!folder) throw new Error('No mods folder set.');
+  const name = path.basename(String(zipName));
+  const level = listMapngLevels(folder).find((l) => l.zipName === name && l.levelName === levelName);
+  if (!level) throw new Error('That level is no longer in the mods folder.');
+  if (rebuilds.has(levelName)) throw new Error('That level is being rebuilt. Cancel the rebuild first.');
+  try {
+    await shell.trashItem(path.join(folder, name));
+  } catch (error) {
+    if (/EBUSY|EPERM|EACCES|being used|in use/i.test(String(error?.message || error.code))) throw new Error('BeamNG is using this level. Go back to BeamNG\'s main menu (or close it) and delete it again.');
+    throw error;
+  }
+  const project = projectDirOf(levelName);
+  if (fs.existsSync(project)) { try { await shell.trashItem(project); } catch { fs.rmSync(project, { recursive: true, force: true }); } }
+  return { ok: true };
+});
+
 ipcMain.handle('levels:showInFolder', (_event, zipName) => {
   const folder = modsFolder();
   const file = folder && path.join(folder, path.basename(String(zipName)));
@@ -564,7 +587,9 @@ async function rebuildLevel(sender, zipName, levelName) {
     const gen = spawnRunner(GENERATOR, session);
     state.children.add(gen);
     progress('terrain', replay ? 'Rebuilding the terrain from its saved data…' : 'Fetching the area again…');
-    await runToEnd(gen, { usageKey: `rebuild-gen:${levelName}`, onProgress: (u) => progress('terrain', u) });
+    const generated = await runToEnd(gen, { usageKey: `rebuild-gen:${levelName}`, onProgress: (u) => progress('terrain', u) });
+    // (how much of the terrain came from the saved data, and what had to be fetched)
+    const sources = generated?.sources || null;
     state.children.delete(gen);
     pruneSessions(terrainId);
 
@@ -628,7 +653,7 @@ async function rebuildLevel(sender, zipName, levelName) {
     fs.rmSync(jobDir, { recursive: true, force: true });
     linkedFiles.delete(jobId);
     notifyDone('MapNG: level rebuilt', `${level.title} is rebuilt with MapNG ${app.getVersion()}.`);
-    return { ok: true, path: zip, replayed: replay, seconds: result.seconds };
+    return { ok: true, path: zip, replayed: replay, seconds: result.seconds, fromSaved: sources?.replayed ?? 0, downloaded: replay ? (sources?.downloaded ?? 0) : null };
   } finally {
     rebuilds.delete(levelName);
     taskbarProgress(null);

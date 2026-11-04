@@ -56,6 +56,9 @@ async function main() {
   // (the GeoTIFF readers stay here; the page and the export read only their source)
   if (sourceGeoTiffs?.source) out.sourceGeoTiffs = { source: sourceGeoTiffs.source };
   fs.writeFileSync(path.join(dir, 'terrain.json'), JSON.stringify(out));
+  // (in the log: whether a rebuild stayed offline, and what it had to fetch)
+  console.log(`[Sources] ${job.sources?.mode || 'record'}: ${sources.recorded} recorded, ${sources.replayed} from saved data, ${sources.missed} not saved (${sources.downloaded} downloaded instead)`);
+  for (const u of sources.missedUrls) console.log(`[Sources]   not saved: ${u}`);
   send({ type: 'done', seconds: (Date.now() - started) / 1000, width: data.width, height: data.height, sources });
 }
 

@@ -885,10 +885,18 @@
     "showInFolder": "Mostrar en la carpeta",
     "working": "Trabajando…",
     "starting": "Iniciando…",
-    "confirmSaved": "¿Reconstruir «{name}» con esta versión de MapNG?\n\nSe crea de nuevo a partir de sus datos guardados de terreno y OSM con los mismos ajustes, así que recibe todas las correcciones desde que se exportó. El nivel actual se sustituye cuando el nuevo esté listo.",
+    "confirmSaved": "¿Reconstruir «{name}» con esta versión de MapNG?\n\nSe crea de nuevo a partir de sus datos guardados de terreno y OSM con los mismos ajustes, así que recibe todas las correcciones desde que se exportó. El nivel actual se sustituye cuando el nuevo esté listo.\n\nNo se descarga nada.",
     "confirmFetch": "¿Reconstruir «{name}» con esta versión de MapNG?\n\nEste nivel se creó antes de que MapNG guardara sus datos, así que su zona se descarga de nuevo: OpenStreetMap puede haber cambiado desde entonces y la exportación usa los ajustes predeterminados. El nivel actual se sustituye cuando el nuevo esté listo.",
     "cancelled": "Reconstrucción cancelada. El nivel no ha cambiado.",
-    "rebuilt": "Reconstruido con MapNG {version} en {seconds} s."
+    "rebuilt": "Reconstruido con MapNG {version} en {seconds} s.",
+    "savedData": "Datos guardados: se reconstruye sin descargar",
+    "noSavedData": "Sin datos guardados: reconstruir descarga la zona de nuevo",
+    "delete": "Eliminar",
+    "deleteHint": "Mover este nivel y sus datos guardados a la Papelera",
+    "confirmDelete": "¿Eliminar «{name}»?\n\nEl nivel y sus datos guardados van a la Papelera, desde donde puedes restaurarlos.",
+    "rebuiltOffline": "No se descargó nada: se creó con los datos guardados.",
+    "rebuiltSomeDownloaded": "{count} archivos no estaban en los datos guardados y se descargaron.",
+    "rebuiltFetched": "La zona se descargó de nuevo y se guardó, así la próxima reconstrucción no lo necesitará."
   },
   "desktopWelcome": {
     "title": "Bienvenido a MapNG Escritorio",

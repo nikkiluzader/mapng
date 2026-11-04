@@ -71,6 +71,11 @@
             <span>{{ formatDate(level.exportedAt || level.modifiedAt) }}</span>
             <span>{{ formatBytes(level.zipBytes) }}</span>
           </div>
+          <!-- (whether a rebuild can run offline from the level's saved data) -->
+          <div class="flex items-center gap-1 text-[10px]" :class="level.rebuildable ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'" :title="level.rebuildable ? t('levels.rebuildSavedHint') : t('levels.rebuildFetchHint')">
+            <HardDrive :size="10" class="shrink-0" />
+            <span>{{ level.rebuildable ? t('levels.savedData') : t('levels.noSavedData') }}</span>
+          </div>
 
           <div v-if="busy[level.levelName]" class="space-y-1.5 pt-0.5">
             <div class="flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-300">
@@ -109,6 +114,15 @@
             >
               {{ t('levels.showInFolder') }}
             </button>
+            <button
+              type="button"
+              class="ml-auto flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+              :disabled="anyBusy"
+              :title="t('levels.deleteHint')"
+              @click="remove(level)"
+            >
+              <Trash2 :size="11" />{{ t('levels.delete') }}
+            </button>
           </div>
           <p v-if="messages[level.levelName]" class="text-[10px] leading-snug" :class="messages[level.levelName].error ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'">
             {{ messages[level.levelName].text }}
@@ -122,7 +136,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { FolderOpen, Hammer, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw } from 'lucide-vue-next';
+import { FolderOpen, Hammer, HardDrive, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, Trash2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 
 defineEmits(['show-on-map']);
@@ -185,7 +199,14 @@ async function rebuild(level) {
   try {
     const r = await desktopApp.rebuildLevel(level.zipName, level.levelName, (p) => { busy[level.levelName] = progressText(p); });
     if (r?.cancelled) messages[level.levelName] = { text: t('levels.cancelled') };
-    else messages[level.levelName] = { text: t('levels.rebuilt', { version: appVersion.value, seconds: Math.round(r.seconds || 0) }) };
+    else {
+      // (and whether it stayed offline: from the saved data, or what it downloaded)
+      const base = t('levels.rebuilt', { version: appVersion.value, seconds: Math.round(r.seconds || 0) });
+      const how = r.downloaded == null ? t('levels.rebuiltFetched')
+        : r.downloaded ? t('levels.rebuiltSomeDownloaded', { count: r.downloaded })
+          : t('levels.rebuiltOffline');
+      messages[level.levelName] = { text: `${base} ${how}` };
+    }
   } catch (error) {
     const text = String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
     messages[level.levelName] = { text, error: true };
@@ -196,6 +217,20 @@ async function rebuild(level) {
 }
 
 const cancel = (level) => desktopApp.cancelRebuild(level.levelName);
+
+// To the Recycle Bin / Trash (zip and saved data), after asking
+async function remove(level) {
+  if (!window.confirm(t('levels.confirmDelete', { name: level.title }))) return;
+  delete messages[level.levelName];
+  try {
+    await desktopApp.deleteLevel(level.zipName, level.levelName);
+  } catch (error) {
+    const text = String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    messages[level.levelName] = { text, error: true };
+    return;
+  }
+  refresh();
+}
 
 const formatSize = (level) => {
   const km = level.sizeMeters / 1000;
