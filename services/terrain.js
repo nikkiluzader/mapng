@@ -1,4 +1,5 @@
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
+import { fetchWord, replayingSources } from './sourceWording.js';
 import { parseRasterOrGridElevationFile, parseTifFile, parseTifFiles, parseGridFiles } from "./tifLoader.js";
 import { resolveNoDataValue, NODATA_AUTO, NODATA_FALLBACK } from "./nodataDetect.js";
 import { GAP_FILL_STANDARD, GAP_FILL_GPXZ, GAP_FILL_NONE } from "./gapFillSources.js";
@@ -928,11 +929,7 @@ let gpxzRateLimitInfo = null;
 // synchronous block before any yield, so two callers cannot interleave.
 let gpxzNextSlotAt = 0;
 
-// (the desktop app replaying a level's saved sources, for Update / Modify:
-// progress says "Reading saved ..." instead of "Fetching" / "Downloading",
-// and no live GPXZ quota; nothing is downloaded then)
-const replayingSources = () => !!globalThis.__mapngReplayingSources;
-const fetchWord = (fetching = 'Fetching') => (replayingSources() ? 'Reading saved' : fetching);
+// (progress wording while replaying a level's saved sources: services/sourceWording.js)
 
 /**
  * Wait for the next globally-paced GPXZ request slot. Spacing is derived from

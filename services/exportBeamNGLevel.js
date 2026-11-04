@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { replayingSources } from './sourceWording.js';
 import JSZip from 'jszip';
 import { createZipCompressor, precompressZipEntries } from './zipCompress.js';
 import { chooseBaseTextureSize } from './baseTextureSize.js';
@@ -1631,7 +1632,7 @@ async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) 
   let downloaded = 0;
   const onText = (text) => {
     // USGS / GPXZ backdrops fetch tile by tile: "… for tile NE (3/8)..."
-    const m = /^Fetching .*\((\d+)\/(\d+)\)/.exec(String(text));
+    const m = /^(?:Fetching|Reading saved) .*\((\d+)\/(\d+)\)/.exec(String(text));
     if (m) downloaded = Math.max(downloaded, (Number(m[1]) - 1) / Number(m[2]));
     options.onProgress?.(text, downloaded * 0.85);
   };
@@ -12600,7 +12601,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let backdropMaterialNames = [];
   let backdropDiagnostics = null;
   if (includeBackdrop) {
-    beginStep('backdrop', `Fetching the surrounding backdrop (${backdropElevationSource === 'global30m' ? 'global 30 m' : backdropElevationSource.toUpperCase()} elevation + satellite imagery, 8 tiles)…`);
+    beginStep('backdrop', `${replayingSources() ? 'Reading the saved' : 'Fetching the'} surrounding backdrop (${backdropElevationSource === 'global30m' ? 'global 30 m' : backdropElevationSource.toUpperCase()} elevation + satellite imagery, 8 tiles)…`);
     await yield_();
     const backdropResult = await generateTerrainBackdropDAE(exportTerrainData, worldSize, {
       elevationSource: backdropElevationSource,

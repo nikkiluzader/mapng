@@ -9,6 +9,7 @@
  * positions in one pass, then extracts per-position data from shared canvases.
  */
 
+import { fetchWord, fetchedWord } from './sourceWording.js';
 import { project, TERRAIN_ZOOM, fetchTerrainData, repairTerrariumBlendedTiles, repairTerrariumNoDataTiles } from './terrain.js';
 import { encode } from 'fast-png';
 import JSZip from 'jszip';
@@ -237,7 +238,7 @@ export const fetchSurroundingTiles = async (
     for (const pos of selectedPositions) {
       signal?.throwIfAborted();
       posIdx++;
-      onProgress?.(`Fetching ${elevationSource.toUpperCase()} data for tile ${pos} (${posIdx}/${selectedPositions.length})...`);
+      onProgress?.(`${fetchWord()} ${elevationSource.toUpperCase()} data for tile ${pos} (${posIdx}/${selectedPositions.length})...`);
 
       const b = allBounds[pos];
       const tileCenter = {
@@ -401,9 +402,9 @@ export const fetchSurroundingTiles = async (
   publishDownloadProgress();
 
   if (includeSatellite) {
-    onProgress?.(`Downloading ${terrainCount} terrain + ${satCount} satellite tiles...`);
+    onProgress?.(`${fetchWord('Downloading')} ${terrainCount} terrain + ${satCount} satellite tiles...`);
   } else {
-    onProgress?.(`Downloading ${terrainCount} terrain tiles...`);
+    onProgress?.(`${fetchWord('Downloading')} ${terrainCount} terrain tiles...`);
   }
 
   // 5. Fetch in batches with controlled concurrency
@@ -440,7 +441,7 @@ export const fetchSurroundingTiles = async (
     }));
 
     publishDownloadProgress();
-    onProgress?.(`Downloaded ${completed}/${requests.length} tiles...`);
+    onProgress?.(`${fetchedWord()} ${completed}/${requests.length} tiles...`);
   }
 
   // 6. Read terrain pixel data once (shared across all positions)
