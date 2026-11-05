@@ -105,12 +105,6 @@
     }
   },
   "status": {
-    "jobPreparing": "Preparando datos del trabajo...",
-    "jobExported": "Trabajo exportado correctamente.",
-    "jobExportFailed": "Error al exportar el trabajo.",
-    "jobImporting": "Importando datos del trabajo...",
-    "jobImported": "Trabajo importado correctamente.",
-    "jobImportFailed": "Error al importar el trabajo: {message}",
     "runConfigCopied": "Configuracion copiada al portapapeles (clave GPXZ enmascarada).",
     "clipboardWriteUnavailable": "No se puede escribir en el portapapeles en este navegador/sesion.",
     "clipboardReadUnavailable": "No se puede leer del portapapeles en este navegador/sesion.",
@@ -1076,7 +1070,11 @@
     "shareHint": "Obtén un código corto de tus ajustes actuales para dárselo a alguien.",
     "newCode": "Nuevo código",
     "receiveTitle": "Usar el código de alguien",
-    "receiveHint": "¿Te pasaron un código o enlace? Escríbelo aquí. Verás qué cambia antes de aplicar nada."
+    "receiveHint": "¿Te pasaron un código o enlace? Escríbelo aquí. Verás qué cambia antes de aplicar nada.",
+    "copyLongCode": "Copiar código largo (no caduca)",
+    "longCodeHint": "Toda la configuración en una línea de texto: funciona sin conexión y no caduca. Pégala en MapNG para usarla.",
+    "saveFile": "Guardar en archivo",
+    "loadFile": "Cargar archivo"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",

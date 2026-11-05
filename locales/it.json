@@ -105,12 +105,6 @@
     }
   },
   "status": {
-    "jobPreparing": "Preparazione dati del job...",
-    "jobExported": "Job esportato con successo.",
-    "jobExportFailed": "Esportazione job fallita.",
-    "jobImporting": "Importazione dati del job...",
-    "jobImported": "Job importato con successo.",
-    "jobImportFailed": "Importazione job fallita: {message}",
     "runConfigCopied": "Configurazione di esecuzione copiata negli appunti (chiave GPXZ mascherata).",
     "clipboardWriteUnavailable": "Scrittura negli appunti non disponibile in questo browser/sessione.",
     "clipboardReadUnavailable": "Lettura negli appunti non disponibile in questo browser/sessione.",
@@ -1075,7 +1069,11 @@
     "shareHint": "Ottieni un codice breve delle impostazioni attuali da dare a qualcuno.",
     "newCode": "Nuovo codice",
     "receiveTitle": "Usa il codice di qualcuno",
-    "receiveHint": "Hai ricevuto un codice o un link? Inseriscilo qui. Vedrai cosa cambia prima che venga applicato qualcosa."
+    "receiveHint": "Hai ricevuto un codice o un link? Inseriscilo qui. Vedrai cosa cambia prima che venga applicato qualcosa.",
+    "copyLongCode": "Copia codice lungo (non scade)",
+    "longCodeHint": "L'intera configurazione in una riga di testo: funziona offline e non scade. Incollala in MapNG per usarla.",
+    "saveFile": "Salva su file",
+    "loadFile": "Carica file"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",

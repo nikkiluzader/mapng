@@ -105,12 +105,6 @@
     }
   },
   "status": {
-    "jobPreparing": "Job-Daten werden vorbereitet...",
-    "jobExported": "Job erfolgreich exportiert.",
-    "jobExportFailed": "Job-Export fehlgeschlagen.",
-    "jobImporting": "Job-Daten werden importiert...",
-    "jobImported": "Job erfolgreich importiert.",
-    "jobImportFailed": "Job-Import fehlgeschlagen: {message}",
     "runConfigCopied": "Laufkonfiguration in die Zwischenablage kopiert (GPXZ-Schlussel maskiert).",
     "clipboardWriteUnavailable": "Schreiben in die Zwischenablage ist in diesem Browser/in dieser Sitzung nicht verfugbar.",
     "clipboardReadUnavailable": "Lesen aus der Zwischenablage ist in diesem Browser/in dieser Sitzung nicht verfugbar.",
@@ -1075,7 +1069,11 @@
     "shareHint": "Hol dir einen kurzen Code für deine aktuellen Einstellungen, um ihn weiterzugeben.",
     "newCode": "Neuer Code",
     "receiveTitle": "Code von jemandem nutzen",
-    "receiveHint": "Einen Code oder Link bekommen? Hier eingeben. Du siehst, was er ändert, bevor etwas übernommen wird."
+    "receiveHint": "Einen Code oder Link bekommen? Hier eingeben. Du siehst, was er ändert, bevor etwas übernommen wird.",
+    "copyLongCode": "Langen Code kopieren (läuft nie ab)",
+    "longCodeHint": "Die ganze Konfiguration als eine Textzeile: funktioniert offline und läuft nicht ab. In MapNG einfügen, um sie zu nutzen.",
+    "saveFile": "Als Datei speichern",
+    "loadFile": "Datei laden"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",

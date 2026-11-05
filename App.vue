@@ -55,7 +55,6 @@
         @generate="(preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource) => handleGenerate(preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
         @fetch-osm="handleFetchOSM"
         @surrounding-tiles-change="(v) => surroundingTilePositions = v"
-        @import-data="handleImportData"
         @elevation-file-selected="handleElevationFileSelected"
         @elevation-file-clear="handleElevationFileClear"
         @elevation-slot-selected="handleElevationSlotSelected"
@@ -975,46 +974,6 @@ const handleFetchOSM = async () => {
   }
 };
 
-const handleImportData = (data) => {
-  if (!data) return;
-
-  // 1. Update Map Central View if bounds exist
-  if (data.bounds) {
-      const lat = (data.bounds.north + data.bounds.south) / 2;
-      const lng = (data.bounds.east + data.bounds.west) / 2;
-      if (isValidCenter({ lat, lng })) {
-        setCenter({ lat, lng });
-      }
-  }
-
-  // 2. Update resolution
-  if (data.width) {
-      setResolution(data.width);
-  }
-
-  // 3. Set the data
-  terrainData.value = data;
-
-  // 4. Restore the generation key if it was included
-  if (data.generationKey) {
-      lastGenerationKey.value = data.generationKey;
-  } else {
-      // Fallback: build a key that marks this area as "valid/cached" for the current UI state
-      lastGenerationKey.value = buildGenerationKey(
-          center.value,
-          resolution.value,
-          !!data.osmFeatures?.length,
-          'default',
-          '',
-          null,
-          'auto',
-          processingMetersPerPixel.value
-      );
-  }
-
-  // 5. Jump to 3D Preview
-  previewMode.value = true;
-};
 
 const cancelGeneration = () => {
   if (abortController) {

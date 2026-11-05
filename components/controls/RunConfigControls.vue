@@ -1,12 +1,4 @@
 <template>
-  <div class="grid grid-cols-2 gap-2">
-    <BaseButton size="sm" variant="secondary" @click="$emit('copy')">{{ t('batch.copyConfig') }}</BaseButton>
-    <BaseButton size="sm" variant="secondary" @click="$emit('paste')">{{ t('batch.pasteConfig') }}</BaseButton>
-    <BaseButton size="sm" variant="secondary" @click="$emit('save')">{{ t('batch.saveConfig') }}</BaseButton>
-    <BaseButton size="sm" variant="secondary" @click="triggerLoad">{{ t('batch.loadConfig') }}</BaseButton>
-    <input ref="fileInput" type="file" accept="application/json,.json" class="hidden" @change="handleFile" />
-  </div>
-  <p v-if="status" class="text-[10px] text-gray-500 dark:text-gray-400">{{ status }}</p>
 
   <!-- Two directions, kept apart so it's clear which is which:
        share mine (get a code) / use someone else's (type their code) -->
@@ -39,7 +31,16 @@
         <BaseButton size="sm" variant="secondary" type="submit" :disabled="!codeInput.trim()">{{ t('config.open') }}</BaseButton>
       </form>
     </div>
+
+    <!-- the long code (never expires, works offline) and files, for keeping setups -->
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[10px]">
+      <button type="button" class="text-[#FF6600] hover:underline" :title="t('config.longCodeHint')" @click="$emit('copy')">{{ t('config.copyLongCode') }}</button>
+      <button type="button" class="text-[#FF6600] hover:underline" @click="$emit('save')">{{ t('config.saveFile') }}</button>
+      <button type="button" class="text-[#FF6600] hover:underline" @click="triggerLoad">{{ t('config.loadFile') }}</button>
+      <input ref="fileInput" type="file" accept="application/json,.json" class="hidden" @change="handleFile" />
+    </div>
   </div>
+  <p v-if="status" class="text-[10px] text-gray-500 dark:text-gray-400">{{ status }}</p>
 </template>
 
 <script setup>
@@ -56,7 +57,7 @@ const props = defineProps({
   sent: { type: Object, default: null },      // { id, link }
 });
 
-const emit = defineEmits(['copy', 'paste', 'save', 'load', 'send', 'open-code']);
+const emit = defineEmits(['copy', 'save', 'load', 'send', 'open-code']);
 
 const fileInput = ref(null);
 const codeInput = ref('');

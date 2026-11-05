@@ -105,12 +105,6 @@
     }
   },
   "status": {
-    "jobPreparing": "Przygotowanie danych zadania...",
-    "jobExported": "Zadanie wyeksportowane pomyślnie.",
-    "jobExportFailed": "Eksport zadania nie powiódł się.",
-    "jobImporting": "Importowanie danych zadania...",
-    "jobImported": "Zadanie zaimportowane pomyślnie.",
-    "jobImportFailed": "Import zadania nie powiódł się: {message}",
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",
     "clipboardWriteUnavailable": "Zapis do schowka niedostępny w tej przeglądarce/sesji.",
     "clipboardReadUnavailable": "Odczyt ze schowka niedostępny w tej przeglądarce/sesji.",
@@ -1075,7 +1069,11 @@
     "shareHint": "Pobierz krótki kod obecnych ustawień, aby go komuś przekazać.",
     "newCode": "Nowy kod",
     "receiveTitle": "Użyj czyjegoś kodu",
-    "receiveHint": "Dostałeś kod lub link? Wpisz go tutaj. Zobaczysz, co zmieni, zanim cokolwiek zostanie zastosowane."
+    "receiveHint": "Dostałeś kod lub link? Wpisz go tutaj. Zobaczysz, co zmieni, zanim cokolwiek zostanie zastosowane.",
+    "copyLongCode": "Kopiuj długi kod (nie wygasa)",
+    "longCodeHint": "Cała konfiguracja w jednej linii tekstu: działa offline i nie wygasa. Wklej ją w MapNG, aby jej użyć.",
+    "saveFile": "Zapisz do pliku",
+    "loadFile": "Wczytaj plik"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",

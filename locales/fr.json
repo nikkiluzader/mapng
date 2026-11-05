@@ -105,12 +105,6 @@
     }
   },
   "status": {
-    "jobPreparing": "Préparation des données du job...",
-    "jobExported": "Job exporté avec succès.",
-    "jobExportFailed": "Échec de l'export du job.",
-    "jobImporting": "Importation des données du job...",
-    "jobImported": "Job importé avec succès.",
-    "jobImportFailed": "Échec de l'import du job : {message}",
     "runConfigCopied": "Configuration d'execution copiee dans le presse-papiers (cle GPXZ masquee).",
     "clipboardWriteUnavailable": "Ecriture du presse-papiers indisponible dans ce navigateur/session.",
     "clipboardReadUnavailable": "Lecture du presse-papiers indisponible dans ce navigateur/session.",
@@ -1076,7 +1070,11 @@
     "shareHint": "Obtenez un code court de vos réglages actuels à donner à quelqu'un.",
     "newCode": "Nouveau code",
     "receiveTitle": "Utiliser le code de quelqu'un",
-    "receiveHint": "On vous a donné un code ou un lien ? Saisissez-le ici. Vous verrez ce qu'il change avant que rien ne soit appliqué."
+    "receiveHint": "On vous a donné un code ou un lien ? Saisissez-le ici. Vous verrez ce qu'il change avant que rien ne soit appliqué.",
+    "copyLongCode": "Copier le code long (n'expire jamais)",
+    "longCodeHint": "Toute la configuration en une ligne de texte : fonctionne hors ligne et n'expire pas. Collez-la dans MapNG pour l'utiliser.",
+    "saveFile": "Enregistrer dans un fichier",
+    "loadFile": "Charger un fichier"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",

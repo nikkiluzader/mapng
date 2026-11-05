@@ -114,12 +114,6 @@
     }
   },
   "status": {
-    "jobPreparing": "Preparing job data...",
-    "jobExported": "Job exported successfully.",
-    "jobExportFailed": "Job export failed.",
-    "jobImporting": "Importing job data...",
-    "jobImported": "Job imported successfully.",
-    "jobImportFailed": "Job import failed: {message}",
     "runConfigCopied": "Run configuration copied to clipboard (GPXZ key masked).",
     "clipboardWriteUnavailable": "Clipboard write unavailable in this browser/session.",
     "clipboardReadUnavailable": "Clipboard read unavailable in this browser/session.",
@@ -468,9 +462,6 @@
     }
   },
   "controlPanel": {
-    "sessionData": "Session Data",
-    "importJob": "Import Job",
-    "exportJob": "Export Job",
     "outputSettings": "Output Settings",
     "resolutionOutputSize": "Resolution (Output Size)",
     "nativeCoverage": "{source} native coverage",
@@ -1136,7 +1127,11 @@
     "shareHint": "Get a short code for your current settings to give to someone.",
     "newCode": "New code",
     "receiveTitle": "Use someone's code",
-    "receiveHint": "Got a code or link from someone? Enter it here. You'll see what it changes before anything is applied."
+    "receiveHint": "Got a code or link from someone? Enter it here. You'll see what it changes before anything is applied.",
+    "copyLongCode": "Copy long code (never expires)",
+    "longCodeHint": "The whole config as one line of text: works offline and doesn't expire. Paste it into MapNG to use it.",
+    "saveFile": "Save to file",
+    "loadFile": "Load file"
   },
   "usage": {
     "askTitle": "Share which settings you use?",

@@ -262,7 +262,6 @@
       <RunConfigControls
         :status="runConfigStatus"
         @copy="copyRunConfiguration"
-        @paste="pasteRunConfiguration"
         @save="saveRunConfiguration"
         @load="handleRunConfigFile"
         sendable
@@ -270,15 +269,6 @@
         :sent="sentConfig"
         @send="sendConfig"
         @open-code="openShareCode"
-      />
-      <JobStateControls
-        :has-terrain-data="!!terrainData"
-        :is-generating="isGenerating"
-        :is-exporting="isExportingJob"
-        :is-importing="isImportingJob"
-        :status="jobStatus"
-        @export="handleExportJob"
-        @import-file="handleImportJobFile"
       />
     </SettingSection>
 
@@ -328,14 +318,12 @@ import { useMainStore } from '../../stores/mainStore';
 import GenerateActions from '../controls/GenerateActions.vue';
 import ElevationUploadControl from '../controls/ElevationUploadControl.vue';
 import RunConfigControls from '../controls/RunConfigControls.vue';
-import JobStateControls from '../controls/JobStateControls.vue';
 import ProcessingResolutionInput from '../controls/ProcessingResolutionInput.vue';
 import TerrainStats from '../controls/TerrainStats.vue';
 import LazMetaCard from '../controls/LazMetaCard.vue';
 import RasterMetaCard from '../controls/RasterMetaCard.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
-import { exportJobData, importJobData } from '../../services/jobData';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
@@ -349,7 +337,7 @@ const { t } = useI18n({ useScope: 'global' });
 
 const props = defineProps(['center', 'zoom', 'resolution', 'devMode', 'isGenerating', 'terrainData', 'generationCacheKey', 'uploadedElevationFile', 'uploadedElevationMeta', 'uploadedAscCoordinateSystem', 'uploadedNoDataOverride', 'uploadedLayerOrder', 'elevationLayerSlots', 'maxElevationSlots', 'uploadedAreaMode', 'processingMetersPerPixel']);
 
-const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'importData', 'elevationFileSelected', 'elevationFileClear', 'elevationSlotSelected', 'elevationSlotRemoved', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedNoDataOverride', 'update:uploadedLayerOrder', 'update:uploadedAreaMode', 'update:processingMetersPerPixel', 'update:previewStale']);
+const emit = defineEmits(['locationChange', 'resolutionChange', 'zoomChange', 'generate', 'fetchOsm', 'surroundingTilesChange', 'elevationFileSelected', 'elevationFileClear', 'elevationSlotSelected', 'elevationSlotRemoved', 'showSupport', 'exportSuccess', 'update:uploadedAscCoordinateSystem', 'update:uploadedNoDataOverride', 'update:uploadedLayerOrder', 'update:uploadedAreaMode', 'update:processingMetersPerPixel', 'update:previewStale']);
 
 const handleLocationChange = (newLocation) => {
   emit('locationChange', { ...props.center, ...newLocation });
@@ -361,46 +349,6 @@ watch(() => store.advancedMode, (advanced) => {
   if (!advanced) handleSurroundingTilesChange([]);
 });
 const runConfigStatus = ref('');
-const isExportingJob = ref(false);
-const isImportingJob = ref(false);
-const jobStatus = ref('');
-
-const handleExportJob = async () => {
-  if (!props.terrainData) return;
-  isExportingJob.value = true;
-  jobStatus.value = t('status.jobPreparing');
-  try {
-    const blob = await exportJobData(props.terrainData, props.generationCacheKey);
-    const date = new Date().toISOString().slice(0, 10);
-    const lat = props.center.lat.toFixed(4);
-    const lng = props.center.lng.toFixed(4);
-    const filename = `MapNG_Job_${date}_${lat}_${lng}.mapng`;
-    triggerDownload(blob, filename);
-    jobStatus.value = t('status.jobExported');
-  } catch (e) {
-    console.error('Job export failed:', e);
-    jobStatus.value = t('status.jobExportFailed');
-  } finally {
-    isExportingJob.value = false;
-  }
-};
-
-const handleImportJobFile = async (file) => {
-  if (!file) return;
-  isImportingJob.value = true;
-  jobStatus.value = t('status.jobImporting');
-  try {
-    const data = await importJobData(file);
-    emit('importData', data);
-    jobStatus.value = t('status.jobImported');
-  } catch (e) {
-    console.error('Job import failed:', e);
-    jobStatus.value = t('status.jobImportFailed', { message: e.message });
-  } finally {
-    isImportingJob.value = false;
-  }
-};
-
 const fetchOSM = ref(localStorage.getItem('mapng_fetchOSM') !== 'false');
 const useUSGS = ref(false);
 const useGPXZ = ref(false);
@@ -684,15 +632,6 @@ const previewConfigText = async (text, { quiet = false } = {}) => {
     }
     return false;
   }
-};
-
-const pasteRunConfiguration = async () => {
-  if (!navigator.clipboard?.readText) {
-    runConfigStatus.value = t('status.clipboardReadUnavailable');
-    return;
-  }
-  try { await previewConfigText(await navigator.clipboard.readText()); }
-  catch { runConfigStatus.value = t('status.clipboardReadUnavailable'); }
 };
 
 // (the export panel reads its settings when it appears: re-created after a config is applied)
