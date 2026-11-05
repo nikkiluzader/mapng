@@ -109,7 +109,11 @@
     },
     "missingTile": "Brak: {label}",
     "myLocation": "Moja lokalizacja",
-    "osmCoverageWorld": "Świat"
+    "osmCoverageWorld": "Świat",
+    "zoomToSelection": "Przybliż do zaznaczenia",
+    "centerHere": "Wyśrodkuj zaznaczenie tutaj",
+    "copyCoordinates": "Kopiuj współrzędne",
+    "copied": "Skopiowano!"
   },
   "status": {
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",
@@ -563,7 +567,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satelita",
     "topoMap": "Mapa topograficzna",
-    "showLabels": "Pokaż etykiety",
     "elevationOverlay": {
       "title": "Wysokości (darmowy zbiór danych)",
       "show": "Pokaż podgląd danych wysokości",
@@ -573,7 +576,11 @@
     "osmCoverage": "Zasięg OSM MapNG",
     "hotspots": "Miejsca eksportów",
     "hotspotsCount": "{count} udostępnionych eksportów",
-    "shareExports": "Udostępniaj moje eksporty (anonimowo)"
+    "shareExports": "Udostępniaj moje eksporty (anonimowo)",
+    "satelliteNames": "Pokaż nazwy miejsc i ulic",
+    "groupMap": "Mapa",
+    "groupShow": "Pokaż na mapie",
+    "groupSharing": "Udostępnianie"
   },
   "memoryWidget": {
     "mem": "PAMIĘĆ",
@@ -1009,7 +1016,6 @@
     "unavailable": "Miejsca eksportów są teraz niedostępne.",
     "share": "Udostępniaj obszary moich eksportów (anonimowo)",
     "shareHint": "Dodaje przybliżony obszar (ok. 5 km) każdego eksportowanego poziomu do mapy miejsc eksportów. Nigdy dokładne miejsce i nic o Tobie.",
-    "tooltip": "{count} eksportów tutaj (web {web} · desktop {desktop})",
     "askTitle": "Dodać ten eksport do mapy miejsc eksportów?",
     "askBody": "MapNG może liczyć, gdzie eksportowane są poziomy, i pokazywać popularne obszary na mapie 2D. Udostępniany jest tylko przybliżony obszar (ok. 5 km), nigdy dokładne miejsce i nic o Tobie. Możesz to zmienić w każdej chwili w panelu Warstwy mapy.",
     "askYes": "Udostępnij anonimowo",
@@ -1037,7 +1043,15 @@
       "statusOff": "Udostępnianie jest u Ciebie wyłączone.",
       "close": "Rozumiem",
       "readMore": "Przeczytaj wszystkie szczegóły: dokładne dane, przepływ i kod"
-    }
+    },
+    "count": "Eksporty: {count}",
+    "today": "dzisiaj",
+    "yesterday": "wczoraj",
+    "daysAgo": "{n} dni temu",
+    "lastExport": "ostatni eksport {when}",
+    "clickToZoom": "kliknij, aby przybliżyć",
+    "web": "Web",
+    "desktop": "Desktop"
   },
   "report": {
     "title_crash": "MapNG nieoczekiwanie się zamknął",

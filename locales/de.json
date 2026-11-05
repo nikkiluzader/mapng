@@ -109,7 +109,11 @@
     },
     "missingTile": "Fehlt: {label}",
     "myLocation": "Mein Standort",
-    "osmCoverageWorld": "Welt"
+    "osmCoverageWorld": "Welt",
+    "zoomToSelection": "Auf Auswahl zoomen",
+    "centerHere": "Auswahl hierher verschieben",
+    "copyCoordinates": "Koordinaten kopieren",
+    "copied": "Kopiert!"
   },
   "status": {
     "runConfigCopied": "Run-Konfiguration in die Zwischenablage kopiert (GPXZ-Schlüssel maskiert).",
@@ -563,7 +567,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellit",
     "topoMap": "Topokarte",
-    "showLabels": "Beschriftungen anzeigen",
     "elevationOverlay": {
       "title": "Höhendaten (freier Datensatz)",
       "show": "Höhendaten-Vorschau anzeigen",
@@ -573,7 +576,11 @@
     "osmCoverage": "MapNG-OSM-Abdeckung",
     "hotspots": "Export-Hotspots",
     "hotspotsCount": "{count} geteilte Exporte",
-    "shareExports": "Meine Exporte teilen (anonym)"
+    "shareExports": "Meine Exporte teilen (anonym)",
+    "satelliteNames": "Orts- und Straßennamen zeigen",
+    "groupMap": "Karte",
+    "groupShow": "Auf der Karte zeigen",
+    "groupSharing": "Teilen"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1009,7 +1016,6 @@
     "unavailable": "Hotspots sind gerade nicht verfügbar.",
     "share": "Meine Exportgebiete teilen (anonym)",
     "shareHint": "Fügt das ungefähre Gebiet (ca. 5 km) jedes exportierten Levels zur Hotspot-Karte hinzu. Nie den genauen Ort und nichts über dich.",
-    "tooltip": "{count} Exporte hier (Web {web} · Desktop {desktop})",
     "askTitle": "Diesen Export zur Hotspot-Karte hinzufügen?",
     "askBody": "MapNG kann zählen, wo Level exportiert werden, und die beliebten Gebiete auf der 2D-Karte zeigen. Geteilt wird nur das ungefähre Gebiet (ca. 5 km), nie der genaue Ort und nichts über dich. Du kannst das jederzeit im Kartenebenen-Feld auf der Karte ändern.",
     "askYes": "Anonym teilen",
@@ -1037,7 +1043,15 @@
       "statusOff": "Teilen ist bei dir aus.",
       "close": "Verstanden",
       "readMore": "Alle Details lesen: genaue Daten, Ablauf und Code"
-    }
+    },
+    "count": "{count} Export | {count} Exporte",
+    "today": "heute",
+    "yesterday": "gestern",
+    "daysAgo": "vor {n} Tagen",
+    "lastExport": "letzter Export {when}",
+    "clickToZoom": "zum Vergrößern klicken",
+    "web": "Web",
+    "desktop": "Desktop"
   },
   "report": {
     "title_crash": "MapNG wurde unerwartet beendet",

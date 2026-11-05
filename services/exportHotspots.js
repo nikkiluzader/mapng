@@ -32,18 +32,44 @@ const BIN_PX = 28;   // cells within one such screen square make one dot
 
 /**
  * The cells merged per BIN_PX screen square, for the map's dots (project:
- * lat, lon -> map pixels at the zoom shown): [{ lat, lon, total, web, desktop }]. */
+ * lat, lon -> map pixels at the zoom shown): [{ lat, lon, total, web, desktop,
+ * cells, lastDay, bounds }]. cells is how many grid cells the dot holds,
+ * lastDay the newest of their days ('YYYY-MM-DD' or null), and bounds
+ * [[south, west], [north, east]] the cells' extent (to zoom into a dot). */
 export function binHotspots(cells, project) {
   const bins = new Map();
+  const half = HOTSPOT_CELL_DEG / 2;
   for (const cell of cells) {
     const { lat, lon } = hotspotCellCenter(cell.y, cell.x);
     const p = project(lat, lon);
     const key = `${Math.floor(p.x / BIN_PX)},${Math.floor(p.y / BIN_PX)}`;
-    const bin = bins.get(key) || { latSum: 0, lonSum: 0, total: 0, web: 0, desktop: 0 };
+    let bin = bins.get(key);
+    if (!bin) {
+      bin = { latSum: 0, lonSum: 0, total: 0, web: 0, desktop: 0, cells: 0, lastDay: null, s: Infinity, w: Infinity, n: -Infinity, e: -Infinity };
+      bins.set(key, bin);
+    }
     // (the dot sits at the exports' weighted middle)
     bin.latSum += lat * cell.total; bin.lonSum += lon * cell.total;
     bin.total += cell.total; bin.web += cell.web; bin.desktop += cell.desktop;
-    bins.set(key, bin);
+    bin.cells += 1;
+    if (cell.lastDay && (!bin.lastDay || cell.lastDay > bin.lastDay)) bin.lastDay = cell.lastDay;
+    bin.s = Math.min(bin.s, lat - half); bin.n = Math.max(bin.n, lat + half);
+    bin.w = Math.min(bin.w, lon - half); bin.e = Math.max(bin.e, lon + half);
   }
-  return [...bins.values()].map((b) => ({ lat: b.latSum / b.total, lon: b.lonSum / b.total, total: b.total, web: b.web, desktop: b.desktop }));
+  return [...bins.values()].map((b) => ({
+    lat: b.latSum / b.total, lon: b.lonSum / b.total, total: b.total, web: b.web, desktop: b.desktop,
+    cells: b.cells, lastDay: b.lastDay, bounds: [[b.s, b.w], [b.n, b.e]],
+  }));
 }
+
+/** Whole days from 'YYYY-MM-DD' to today (UTC), or null. */
+export function daysSince(day, now = Date.now()) {
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const then = Date.parse(`${day}T00:00:00Z`);
+  if (!Number.isFinite(then)) return null;
+  const today = Date.parse(`${new Date(now).toISOString().slice(0, 10)}T00:00:00Z`);
+  return Math.max(0, Math.round((today - then) / 86400000));
+}
+
+/** Exported here in the last week: the dot gets a pulsing ring. */
+export const HOTSPOT_RECENT_DAYS = 7;

@@ -109,7 +109,11 @@
     },
     "missingTile": "Manquante : {label}",
     "myLocation": "Ma position",
-    "osmCoverageWorld": "Monde"
+    "osmCoverageWorld": "Monde",
+    "zoomToSelection": "Zoomer sur la sélection",
+    "centerHere": "Centrer la sélection ici",
+    "copyCoordinates": "Copier les coordonnées",
+    "copied": "Copié !"
   },
   "status": {
     "runConfigCopied": "Configuration d'exécution copiée dans le presse-papiers (clé GPXZ masquée).",
@@ -563,7 +567,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",
     "topoMap": "Carte topo",
-    "showLabels": "Afficher les libellés",
     "elevationOverlay": {
       "title": "Altitude (jeu de données gratuit)",
       "show": "Afficher l'aperçu des altitudes",
@@ -573,7 +576,11 @@
     "osmCoverage": "Couverture OSM de MapNG",
     "hotspots": "Zones d'export",
     "hotspotsCount": "{count} exports partagés",
-    "shareExports": "Partager mes exports (anonyme)"
+    "shareExports": "Partager mes exports (anonyme)",
+    "satelliteNames": "Afficher les noms de lieux et de rues",
+    "groupMap": "Carte",
+    "groupShow": "Afficher sur la carte",
+    "groupSharing": "Partage"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1009,7 +1016,6 @@
     "unavailable": "Zones indisponibles pour le moment.",
     "share": "Partager mes zones d'export (anonyme)",
     "shareHint": "Ajoute la zone approximative (~5 km) de chaque niveau exporté à la carte des zones. Jamais l'endroit exact, et rien sur vous.",
-    "tooltip": "{count} exports ici (web {web} · bureau {desktop})",
     "askTitle": "Ajouter cet export à la carte des zones ?",
     "askBody": "MapNG peut compter où les niveaux sont exportés et montrer les zones actives sur la carte 2D. Seule la zone approximative (~5 km) est partagée, jamais l'endroit exact, et rien sur vous. Vous pouvez changer cela à tout moment dans l'encadré Couches de carte.",
     "askYes": "Partager anonymement",
@@ -1037,7 +1043,15 @@
       "statusOff": "Le partage est désactivé pour vous.",
       "close": "Compris",
       "readMore": "Lire tous les détails : données exactes, fonctionnement et code"
-    }
+    },
+    "count": "{count} export | {count} exports",
+    "today": "aujourd’hui",
+    "yesterday": "hier",
+    "daysAgo": "il y a {n} jours",
+    "lastExport": "dernier export {when}",
+    "clickToZoom": "cliquer pour zoomer",
+    "web": "Web",
+    "desktop": "Bureau"
   },
   "report": {
     "title_crash": "MapNG s'est fermé de façon inattendue",

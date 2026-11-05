@@ -2,8 +2,8 @@
   <div class="w-full h-full bg-gray-100 relative z-0">
      <l-map 
         ref="mapRef"
-        :center="[center.lat, center.lng]" 
-        :zoom="zoom" 
+        :center="initialCenter"
+        :zoom="initialZoom" 
         :options="mapOptions"
         style="height: 100%; width: 100%"
         @move="handleMove"
@@ -11,14 +11,14 @@
         @zoom="handleZoom"
         @ready="onMapReady"
      >
-      <!-- Base Layers -->
+      <!-- Base Layers (one world: no copies east or west, services/mapView.js) -->
       <l-tile-layer
         v-if="selectedLayer === 'osm'"
         :key="osmUrl"
         :url="osmUrl"
         :attribution="osmAttribution"
         layer-type="base"
-        :options="{ maxNativeZoom: osmMaxNativeZoom }"
+        :options="{ ...ONE_WORLD, maxNativeZoom: osmMaxNativeZoom }"
       />
 
       <l-tile-layer
@@ -27,6 +27,7 @@
         attribution="&copy; <a href='https://www.esri.com/'>Esri</a>"
         layer-type="base"
         :max-zoom="18"
+        :options="ONE_WORLD"
       />
 
       <l-tile-layer
@@ -34,9 +35,11 @@
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
         attribution="&copy; <a href='https://www.esri.com/'>Esri</a>"
         layer-type="base"
+        :options="ONE_WORLD"
       />
 
-      <!-- Overlay: Esri reference layers (keyless; CARTO's labels now need an API key).
+      <!-- Place and road names, only on the bases that have none (dark canvas,
+           satellite when "Show names" is on): Esri reference layers (keyless).
            z-index keeps them above a base layer switched in after them. -->
       <template v-if="showLabels">
         <l-tile-layer
@@ -47,7 +50,7 @@
           layer-type="overlay"
           :opacity="layer.opacity"
           :z-index="10"
-          :options="{ maxNativeZoom: layer.maxNativeZoom, minZoom: layer.minZoom ?? 0, maxZoom: layer.maxZoom ?? 22, updateWhenZooming: false, keepBuffer: 1 }"
+          :options="{ ...ONE_WORLD, maxNativeZoom: layer.maxNativeZoom, minZoom: layer.minZoom ?? 0, maxZoom: layer.maxZoom ?? 22, updateWhenZooming: false, keepBuffer: 1 }"
         />
       </template>
       
@@ -68,12 +71,31 @@
         </l-polygon>
       </template>
 
+      <!-- Everything outside the selection a little darker, so the export area stands out -->
+      <l-polygon
+        v-if="selectionMask && maskPaneReady"
+        :lat-lngs="selectionMask"
+        pane="mapngMask"
+        :stroke="false"
+        fill-color="#000000"
+        :fill-opacity="isDarkMode ? 0.32 : 0.2"
+        :interactive="false"
+      />
+      <l-marker
+        v-if="selectionLabel"
+        :lat-lng="selectionLabel.at"
+        :icon="selectionLabel.icon"
+        :interactive="false"
+        :keyboard="false"
+      />
+
       <l-rectangle 
         v-if="selectionBounds && !hasBatchGrid && !showUploadedCoverageBounds"
         :bounds="[[selectionBounds.south, selectionBounds.west], [selectionBounds.north, selectionBounds.east]]" 
         color="#FF6600"
         :weight="2"
         :fill-opacity="0.1"
+        :interactive="false"
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
 
@@ -122,6 +144,7 @@
         color="#FF6600"
         :weight="2"
         :fill-opacity="0.1"
+        :interactive="false"
         :options="{ dashArray: '2, 8', lineCap: 'round' }"
       />
 
@@ -167,57 +190,66 @@
     <!-- Live free-dataset elevation preview, fitted to the selection area -->
     <ElevationOverlay :bounds="elevationOverlayBounds" />
 
-    <!-- Custom Layer Control -->
-    <div class="absolute bottom-20 right-4 z-[400] max-h-[calc(100%-7rem)] overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 text-xs">
-        <div class="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b border-gray-200 dark:border-gray-600 font-medium flex items-center gap-2">
-            <Layers :size="14" class="text-[#FF6600]" />
-          {{ t('mapSelector.mapLayers') }}
-        </div>
-        <div class="p-2 space-y-1">
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+    <!-- Layer panel: the base map, MapNG's own overlays, and the two opt-ins. Folds to its header. -->
+    <div class="absolute bottom-20 right-4 z-[400] w-[220px] max-h-[calc(100%-7rem)] overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 text-xs">
+        <button
+          type="button"
+          class="w-full bg-gray-50 dark:bg-gray-700 px-3 py-2 font-medium flex items-center gap-2 text-left"
+          :class="layerPanelOpen ? 'border-b border-gray-200 dark:border-gray-600' : ''"
+          :aria-expanded="layerPanelOpen"
+          @click="layerPanelOpen = !layerPanelOpen"
+        >
+          <Layers :size="14" class="text-[#FF6600]" />
+          <span class="flex-1">{{ t('mapSelector.mapLayers') }}</span>
+          <ChevronDown :size="14" class="text-gray-400 transition-transform" :class="layerPanelOpen ? '' : '-rotate-90'" />
+        </button>
+        <div v-if="layerPanelOpen" class="p-2 space-y-1">
+            <p :class="PANEL_HEADING">{{ t('mapSelector.groupMap') }}</p>
+            <label :class="PANEL_ROW">
                 <input type="radio" v-model="selectedLayer" value="osm" class="accent-[#FF6600]" />
-            <span>{{ t('mapSelector.openStreetMap') }}</span>
+                <span>{{ t('mapSelector.openStreetMap') }}</span>
             </label>
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+            <label :class="PANEL_ROW">
                 <input type="radio" v-model="selectedLayer" value="satellite" class="accent-[#FF6600]" />
-            <span>{{ t('mapSelector.satellite') }}</span>
+                <span>{{ t('mapSelector.satellite') }}</span>
             </label>
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+            <label v-if="selectedLayer === 'satellite'" :class="PANEL_ROW" class="pl-7">
+                <input type="checkbox" v-model="satelliteNames" :class="CHECKBOX" />
+                <span>{{ t('mapSelector.satelliteNames') }}</span>
+            </label>
+            <label :class="PANEL_ROW">
                 <input type="radio" v-model="selectedLayer" value="topo" class="accent-[#FF6600]" />
-            <span>{{ t('mapSelector.topoMap') }}</span>
+                <span>{{ t('mapSelector.topoMap') }}</span>
             </label>
-            <div class="h-px bg-gray-100 dark:bg-gray-600 my-1"></div>
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
-                <input type="checkbox" v-model="showLabels" :class="CHECKBOX" />
-            <span>{{ t('mapSelector.showLabels') }}</span>
-            </label>
-            <!-- Overlays: what MapNG itself knows about the map (moved here from the control panel) -->
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer" :title="t('controlPanel.osmCoverageHint')">
+
+            <p :class="PANEL_HEADING" class="pt-2">{{ t('mapSelector.groupShow') }}</p>
+            <label :class="PANEL_ROW" :title="t('controlPanel.osmCoverageHint')">
                 <input type="checkbox" v-model="showOsmCoverage" :class="CHECKBOX" />
                 <span>{{ t('mapSelector.osmCoverage') }}</span>
             </label>
             <p v-if="showOsmCoverage && osmCoverageStatus !== 'ready'" class="pl-7 -mt-1 text-[10px]" :class="osmCoverageStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
               {{ osmCoverageStatus === 'unavailable' ? t('controlPanel.osmCoverageUnavailable') : t('controlPanel.osmCoverageLoading') }}
             </p>
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+            <label :class="PANEL_ROW">
                 <input type="checkbox" v-model="showHotspots" :class="CHECKBOX" />
                 <span>{{ t('mapSelector.hotspots') }}</span>
             </label>
-            <p v-if="showHotspots" class="pl-7 -mt-1 text-[10px] max-w-[190px]" :class="hotspotsStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
+            <p v-if="showHotspots" class="pl-7 -mt-1 text-[10px]" :class="hotspotsStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
               {{ hotspotsStatus === 'unavailable' ? t('hotspots.unavailable') : hotspotsStatus === 'loading' ? t('hotspots.loading') : t('mapSelector.hotspotsCount', { count: (hotspotTotals.web + hotspotTotals.desktop).toLocaleString() }) }}
             </p>
-            <div class="h-px bg-gray-100 dark:bg-gray-600 my-1"></div>
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+
+            <p :class="PANEL_HEADING" class="pt-2">{{ t('mapSelector.groupSharing') }}</p>
+            <label :class="PANEL_ROW">
                 <input type="checkbox" :checked="shareExports === 'on'" @change="setShareExports($event.target.checked)" :class="CHECKBOX" />
                 <span>{{ t('mapSelector.shareExports') }}</span>
             </label>
-            <button type="button" class="pl-7 text-[10px] text-[#FF6600] hover:underline" @click="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button>
+            <button type="button" class="pl-7 -mt-1 block text-[10px] text-[#FF6600] hover:underline" @click="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button>
             <!-- (separate: which settings, never where; composables/useUsageStats.js) -->
-            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+            <label :class="PANEL_ROW">
                 <input type="checkbox" :checked="shareSettings === 'on'" @change="setShareSettings($event.target.checked)" :class="CHECKBOX" />
                 <span>{{ t('usage.shareToggle') }}</span>
             </label>
-            <a href="https://mapng.com/data.html#usage" target="_blank" rel="noopener" class="block pl-7 text-[10px] text-[#FF6600] hover:underline">{{ t('usage.readMore') }}</a>
+            <a href="https://mapng.com/data.html#usage" target="_blank" rel="noopener" class="block pl-7 -mt-1 text-[10px] text-[#FF6600] hover:underline">{{ t('usage.readMore') }}</a>
         </div>
     </div>
 
@@ -246,6 +278,19 @@
             </svg>
         </div>
     </div>
+
+    <!-- Right-click menu -->
+    <div
+      v-if="contextMenu"
+      class="absolute z-[1000] min-w-[180px] rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs py-1"
+      :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
+      role="menu"
+      @contextmenu.prevent
+    >
+      <div class="px-3 py-1 text-[10px] text-gray-500 dark:text-gray-400 font-mono">{{ formatLatLng(contextMenu.lat, contextMenu.lng) }}</div>
+      <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="centerSelectionHere">{{ t('map.centerHere') }}</button>
+      <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="copyCoordinates">{{ copiedNotice ? t('map.copied') : t('map.copyCoordinates') }}</button>
+    </div>
   </div>
 </template>
 
@@ -255,10 +300,10 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import { useUsageStats } from '../../composables/useUsageStats.js';
-import { ref, computed, watch, onMounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { LMap, LTileLayer, LRectangle, LMarker, LTooltip, LPolygon } from '@vue-leaflet/vue-leaflet';
-import { Layers } from 'lucide-vue-next';
+import { Layers, ChevronDown } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import ElevationOverlay from './ElevationOverlay.vue';
@@ -268,6 +313,8 @@ import { CHECKBOX } from '../base/controlStyles.js';
 import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
 import { useExportHotspots } from '../../composables/useExportHotspots.js';
 import { addHotspotLayer } from '../../services/hotspotLayer.js';
+import { daysSince } from '../../services/exportHotspots.js';
+import { WORLD_BOUNDS, minZoomForWidth, formatSelectionSize, formatLatLng, clampLng } from '../../services/mapView.js';
 
 // Fix Leaflet icon assets
 // @ts-ignore
@@ -278,9 +325,16 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Static options to prevent reactivity issues
-const mapOptions = { scrollWheelZoom: true };
-const { t } = useI18n({ useScope: 'global' });
+// Static options to prevent reactivity issues. One flat world: the map stops
+// at ±180° and Mercator's ±85°, and never repeats east or west.
+const mapOptions = {
+  scrollWheelZoom: true,
+  maxBounds: WORLD_BOUNDS,
+  maxBoundsViscosity: 1,
+  worldCopyJump: false,
+};
+const ONE_WORLD = { noWrap: true, bounds: WORLD_BOUNDS };
+const { t, locale } = useI18n({ useScope: 'global' });
 const { show: showOsmCoverage, areas: osmCoverageAreas, status: osmCoverageStatus } = useOsmCoverage();
 // Archive regions are Geofabrik slugs ("utah", "new-mexico").
 // (planet pieces are named planet-<z>-<x>-<y>: shown as "World")
@@ -326,24 +380,32 @@ const batchTileFillOpacity = (tile) => {
 const emit = defineEmits(['move', 'zoom', 'batchTileDrag']);
 
 const mapRef = ref(null);
+// The map's starting view only. Later centre/zoom changes from outside go
+// through the watchers below: binding the live props here made vue-leaflet
+// pan back to every centre this map had just reported, which cut animated
+// moves (flyTo, panTo) short.
+const initialCenter = [props.center.lat, props.center.lng];
+const initialZoom = props.zoom;
 const currentCenter = ref(props.center);
 const currentZoom = ref(props.zoom);
-// Remembered across reloads; labels default off.
+// Remembered across reloads.
 const MAP_LAYERS = ['osm', 'satellite', 'topo'];
 const readStored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeStored = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 const storedLayer = readStored('mapng_mapLayer');
 const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'osm');
-const showLabels = ref(readStored('mapng_showLabels') === 'true');
+// Names on satellite imagery (default on). The light OSM and topo maps have
+// their own names, and the dark base never does: labels go only where missing.
+const satelliteNames = ref(readStored('mapng_satelliteLabels') !== 'false');
+const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'osm' && props.isDarkMode));
 watch(selectedLayer, (v) => writeStored('mapng_mapLayer', v));
-watch(showLabels, (v) => writeStored('mapng_showLabels', String(v)));
+const layerPanelOpen = ref(readStored('mapng_layerPanelOpen') !== 'false');
+watch(layerPanelOpen, (v) => writeStored('mapng_layerPanelOpen', String(v)));
+const PANEL_ROW = 'flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer';
+const PANEL_HEADING = 'px-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400';
+watch(satelliteNames, (v) => writeStored('mapng_satelliteLabels', String(v)));
 const isMovingProgrammatically = ref(false);
 
-const normalizeDatelineLongitude = (lng) => {
-  if (lng > 180) return -180;
-  if (lng < -180) return 180;
-  return lng;
-};
 
 const batchHandleIcon = L.divIcon({
   className: 'mapng-batch-handle',
@@ -391,7 +453,7 @@ const osmAttribution = computed(() => {
     : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 });
 
-const labelLayers = computed(() => (props.isDarkMode
+const labelLayers = computed(() => (selectedLayer.value !== 'satellite'
   ? [{ url: `${ESRI_LABEL_TILES}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 16, opacity: 1 }]
   : [
     // Each layer only where it helps (fewer tiles on Esri's 6-connection host):
@@ -538,12 +600,7 @@ const handleMove = () => {
   if (mapCenterUnchanged(c)) return;
   lastMapCenter = { lat: c.lat, lng: c.lng };
 
-  const normalizedLng = normalizeDatelineLongitude(c.lng);
-  if (normalizedLng !== c.lng) {
-    map.setView([c.lat, normalizedLng], map.getZoom(), { animate: false });
-  }
-
-  currentCenter.value = { lat: c.lat, lng: normalizedLng };
+  currentCenter.value = { lat: c.lat, lng: clampLng(c.lng) };
   emitMove(currentCenter.value);
 };
 
@@ -553,6 +610,10 @@ const handleMove = () => {
 // collection. The selection box here follows every move (currentCenter).
 const MOVE_EMIT_MS = 120;
 let pendingMove = null;
+// The last centre this map reported: when it comes back as the center prop it
+// is our own echo (already behind the map during an animated move), not a
+// request to move; obeying it cut flyTo/panTo animations short.
+let lastEmitted = null;
 let moveTimer = null;
 let lastMoveEmitAt = 0;
 const flushMove = () => {
@@ -562,6 +623,7 @@ const flushMove = () => {
   lastMoveEmitAt = performance.now();
   const c = pendingMove;
   pendingMove = null;
+  lastEmitted = c;
   emit('move', c);
 };
 const emitMove = (c) => {
@@ -601,7 +663,8 @@ const onMoveEnd = () => {
           && Math.abs(c.lat - target.lat) < PROGRAMMATIC_LANDING_DEG
           && Math.abs(c.lng - target.lng) < PROGRAMMATIC_LANDING_DEG
           ? { lat: target.lat, lng: target.lng }
-          : { lat: c.lat, lng: normalizeDatelineLongitude(c.lng) };
+          : { lat: c.lat, lng: clampLng(c.lng) };
+        lastEmitted = currentCenter.value;
         emit('move', currentCenter.value);
     }
 };
@@ -637,6 +700,7 @@ const openInOsm = () => {
 
 // Watch for external center changes (e.g., from AI search)
 watch(() => props.center, (newCenter) => {
+  if (lastEmitted && newCenter && newCenter.lat === lastEmitted.lat && newCenter.lng === lastEmitted.lng) return;
   const dist = Math.sqrt(
     Math.pow(currentCenter.value.lat - newCenter.lat, 2) + 
     Math.pow(currentCenter.value.lng - newCenter.lng, 2)
@@ -677,13 +741,179 @@ const { show: showHotspots, cells: hotspotCells, status: hotspotsStatus, totals:
 const { share: shareSettings, setShareSettings } = useUsageStats();
 const leafletMap = ref(null);
 let hotspotLayer = null;
-const onMapReady = (map) => { leafletMap.value = map; };
-watch([leafletMap, showHotspots, hotspotCells], ([map, on, cells]) => {
+
+// The box the map's own tools frame (the elevation preview's box): the export
+// area, the BYOD crop or the batch grid. Dimmed around, labelled with its size.
+const maskedBox = computed(() => (hasBatchGrid.value ? null : (uploadedCropBounds.value || (showUploadedCoverageBounds.value ? null : selectionBounds.value))));
+// Only once the box is big enough on screen to read (zoomed out, the dim
+// would just grey the whole map and the label would cover what is there).
+const maskPaneReady = ref(false);
+const boxScreenPx = computed(() => {
+  const b = maskedBox.value;
+  if (!b) return 0;
+  const lat = (b.north + b.south) / 2;
+  const metersPerPx = (156543.03 * Math.cos((lat * Math.PI) / 180)) / 2 ** currentZoom.value;
+  return activeSelectionSizeMeters.value / metersPerPx;
+});
+const selectionMask = computed(() => {
+  const b = maskedBox.value;
+  if (!b || boxScreenPx.value < 48) return null;
+  return [
+    [[-90, -180], [90, -180], [90, 180], [-90, 180]],
+    [[b.south, b.west], [b.north, b.west], [b.north, b.east], [b.south, b.east]],
+  ];
+});
+const selectionLabel = computed(() => {
+  const b = maskedBox.value;
+  const size = activeSelectionSizeMeters.value;
+  const text = formatSelectionSize(size, size);
+  if (!b || !text || boxScreenPx.value < 48) return null;
+  return {
+    at: [b.north, (b.east + b.west) / 2],
+    icon: L.divIcon({
+      className: 'mapng-selection-size',
+      html: `<span>${text}</span>`,
+      iconSize: [0, 0],
+    }),
+  };
+});
+
+// Map tools (Leaflet controls, top left under the zoom buttons): zoom to the
+// selection, a scale bar, the coordinates under the mouse.
+const coordsText = () => {
+  const c = currentCenter.value;
+  return formatLatLng(c?.lat, c?.lng);
+};
+const zoomToSelection = () => {
+  const map = leafletMap.value;
+  const b = elevationOverlayBounds.value;
+  if (!map || !b) return;
+  // Zoom only: the selection is the map centre, so moving the centre would move it.
+  const zoom = map.getBoundsZoom([[b.south, b.west], [b.north, b.east]], false, L.point(120, 120));
+  map.setZoom(Math.min(zoom, map.getMaxZoom() || 19));
+};
+let coordsEl = null;
+let cursorShown = false;
+const showCoords = (text) => { if (coordsEl) coordsEl.textContent = text; };
+watch(currentCenter, () => { if (!cursorShown) showCoords(coordsText()); });
+
+const addMapTools = (map) => {
+  const ZoomBox = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd() {
+      const bar = L.DomUtil.create('div', 'leaflet-bar');
+      const a = L.DomUtil.create('a', 'mapng-zoom-selection', bar);
+      a.href = '#';
+      a.role = 'button';
+      a.title = t('map.zoomToSelection');
+      a.setAttribute('aria-label', t('map.zoomToSelection'));
+      a.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>';
+      L.DomEvent.disableClickPropagation(bar);
+      L.DomEvent.on(a, 'click', (e) => { L.DomEvent.preventDefault(e); zoomToSelection(); });
+      return bar;
+    },
+  });
+  const Coords = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd() {
+      coordsEl = L.DomUtil.create('div', 'mapng-coords');
+      coordsEl.textContent = coordsText();
+      return coordsEl;
+    },
+  });
+  new ZoomBox().addTo(map);
+  L.control.scale({ position: 'topleft', maxWidth: 140 }).addTo(map);
+  new Coords().addTo(map);
+
+  let frame = 0;
+  map.on('mousemove', (e) => {
+    cursorShown = true;
+    if (frame) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      if (cursorShown) showCoords(formatLatLng(e.latlng.lat, clampLng(e.latlng.lng)));
+    });
+  });
+  map.on('mouseout', () => { cursorShown = false; showCoords(coordsText()); });
+};
+
+// One world fills the map's width at the furthest-out zoom (no grey sides).
+const fitMinZoom = (map) => {
+  const z = minZoomForWidth(map.getSize().x);
+  map.setMinZoom(z);
+  if (map.getZoom() < z) map.setZoom(z);
+};
+
+// Right-click (or long-press) menu: move the selection here, copy the spot.
+const contextMenu = ref(null);   // { x, y, lat, lng } in map-container pixels
+const copiedNotice = ref(false);
+const closeContextMenu = () => { contextMenu.value = null; };
+const centerSelectionHere = () => {
+  const m = contextMenu.value;
+  closeContextMenu();
+  if (!m || !leafletMap.value) return;
+  leafletMap.value.panTo([m.lat, m.lng]);
+};
+const copyCoordinates = async () => {
+  const m = contextMenu.value;
+  if (!m) return;
+  try {
+    await navigator.clipboard.writeText(formatLatLng(m.lat, m.lng));
+    copiedNotice.value = true;
+    setTimeout(() => { copiedNotice.value = false; closeContextMenu(); }, 900);
+  } catch {
+    closeContextMenu();
+  }
+};
+const onKeydown = (e) => { if (e.key === 'Escape') closeContextMenu(); };
+
+const onMapReady = (map) => {
+  leafletMap.value = map;
+  // (the dim outside the selection: above the tiles, under every overlay)
+  map.createPane('mapngMask').style.zIndex = '350';
+  map.getPane('mapngMask').style.pointerEvents = 'none';
+  maskPaneReady.value = true;
+  if (import.meta.env.DEV) window.__mapngMap = map;   // (dev server only: browser checks drive the map)
+  fitMinZoom(map);
+  map.on('resize', () => fitMinZoom(map));
+  addMapTools(map);
+  map.on('contextmenu', (e) => {
+    copiedNotice.value = false;
+    // (kept inside the map: the menu is ~200 × 100 px)
+    const size = map.getSize();
+    contextMenu.value = {
+      x: Math.min(e.containerPoint.x, size.x - 200),
+      y: Math.min(e.containerPoint.y, size.y - 100),
+      lat: e.latlng.lat,
+      lng: clampLng(e.latlng.lng),
+    };
+  });
+  map.on('movestart zoomstart click', closeContextMenu);
+  window.addEventListener('keydown', onKeydown);
+};
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+const hotspotWhen = (dot) => {
+  const days = daysSince(dot.lastDay);
+  if (days === null) return '';
+  const ago = days === 0 ? t('hotspots.today') : days === 1 ? t('hotspots.yesterday') : t('hotspots.daysAgo', { n: days });
+  return t('hotspots.lastExport', { when: ago });
+};
+const hotspotText = () => ({
+  count: (dot) => t('hotspots.count', { count: dot.total.toLocaleString() }, dot.total),
+  tooltip: (dot) => [t('hotspots.count', { count: dot.total.toLocaleString() }, dot.total), hotspotWhen(dot)].filter(Boolean).join(' · ')
+    + (dot.cells > 1 ? ` (${t('hotspots.clickToZoom')})` : ''),
+  when: hotspotWhen,
+  web: t('hotspots.web'),
+  desktop: t('hotspots.desktop'),
+  moveHere: t('map.centerHere'),
+});
+watch([leafletMap, showHotspots, hotspotCells, locale], ([map, on, cells]) => {
   if (hotspotLayer) { hotspotLayer.remove(); hotspotLayer = null; }
   if (!map || !on || !cells.length) return;
-  hotspotLayer = addHotspotLayer(map, cells, (dot) => t('hotspots.tooltip', {
-    count: dot.total.toLocaleString(), web: dot.web.toLocaleString(), desktop: dot.desktop.toLocaleString(),
-  }));
+  hotspotLayer = addHotspotLayer(map, cells, hotspotText(), (dot) => {
+    // "Move selection here": to the cell, close enough to see what is there
+    map.flyTo([dot.lat, dot.lon], Math.max(map.getZoom(), 13), { duration: 0.8 });
+  });
 });
 
 // Fix for initial load centering
@@ -699,3 +929,50 @@ onMounted(() => {
   });
 });
 </script>
+
+<style>
+/* Map tools (MapSelector addMapTools): one look with Leaflet's zoom bar */
+.mapng-zoom-selection { display: flex !important; align-items: center; justify-content: center; color: #374151; }
+.mapng-zoom-selection:hover { color: #FF6600; }
+.leaflet-control-scale-line { background: rgba(255, 255, 255, 0.8); border-color: #4b5563; color: #1f2937; font-size: 10px; }
+.mapng-coords {
+  background: rgba(255, 255, 255, 0.85); color: #1f2937; border-radius: 4px; padding: 1px 6px;
+  font: 10px/16px ui-monospace, SFMono-Regular, Menlo, monospace; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+  pointer-events: none; white-space: nowrap;
+}
+.dark .leaflet-bar a, .dark .mapng-zoom-selection { background: #1f2937; color: #e5e7eb; border-color: #4b5563; }
+.dark .leaflet-bar a:hover { background: #374151; }
+.dark .leaflet-control-scale-line { background: rgba(31, 41, 55, 0.85); color: #e5e7eb; border-color: #9ca3af; text-shadow: none; }
+.dark .mapng-coords { background: rgba(31, 41, 55, 0.85); color: #e5e7eb; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15); }
+/* The selection's size, pinned above its top edge */
+.mapng-selection-size { pointer-events: none; }
+.mapng-selection-size span {
+  position: absolute; left: 0; bottom: 4px; transform: translateX(-50%); white-space: nowrap;
+  background: #FF6600; color: #fff; font: 600 10px/16px system-ui, sans-serif; padding: 0 6px; border-radius: 9999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+</style>
+
+<style>
+/* Export hotspot popup (services/hotspotLayer.js) */
+.mapng-hotspot-popup { min-width: 170px; font: 12px/1.4 system-ui, sans-serif; color: #1f2937; }
+.mapng-hotspot-popup__title { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.mapng-hotspot-popup__bar { display: flex; gap: 2px; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+.mapng-hotspot-popup__bar span { display: block; min-width: 4px; }
+.mapng-hotspot-popup__web { background: #FF6600; }
+.mapng-hotspot-popup__desktop { background: #3B82F6; }
+.mapng-hotspot-popup__legend { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #4b5563; }
+.mapng-hotspot-popup__key { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
+.mapng-hotspot-popup__legend .mapng-hotspot-popup__desktop { margin-left: 8px; }
+.mapng-hotspot-popup__when { font-size: 11px; color: #6b7280; margin-top: 4px; }
+.mapng-hotspot-popup__button {
+  margin-top: 8px; width: 100%; padding: 4px 8px; border-radius: 6px; background: #FF6600; color: #fff;
+  font-weight: 600; font-size: 11px; border: 0; cursor: pointer;
+}
+.mapng-hotspot-popup__button:hover { background: #e55a00; }
+.dark .mapng-hotspot-popup-wrap .leaflet-popup-content-wrapper,
+.dark .mapng-hotspot-popup-wrap .leaflet-popup-tip { background: #1f2937; box-shadow: none; }
+.dark .mapng-hotspot-popup { color: #e5e7eb; }
+.dark .mapng-hotspot-popup__legend { color: #d1d5db; }
+.dark .mapng-hotspot-popup__when { color: #9ca3af; }
+</style>

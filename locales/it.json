@@ -109,7 +109,11 @@
     },
     "missingTile": "Mancante: {label}",
     "myLocation": "La mia posizione",
-    "osmCoverageWorld": "Mondo"
+    "osmCoverageWorld": "Mondo",
+    "zoomToSelection": "Zoom sulla selezione",
+    "centerHere": "Centra la selezione qui",
+    "copyCoordinates": "Copia coordinate",
+    "copied": "Copiato!"
   },
   "status": {
     "runConfigCopied": "Configurazione di esecuzione copiata negli appunti (chiave GPXZ mascherata).",
@@ -563,7 +567,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",
     "topoMap": "Mappa topografica",
-    "showLabels": "Mostra etichette",
     "elevationOverlay": {
       "title": "Altitudine (dataset gratuito)",
       "show": "Mostra anteprima altitudine",
@@ -573,7 +576,11 @@
     "osmCoverage": "Copertura OSM di MapNG",
     "hotspots": "Zone di esportazione",
     "hotspotsCount": "{count} esportazioni condivise",
-    "shareExports": "Condividi le mie esportazioni (anonimo)"
+    "shareExports": "Condividi le mie esportazioni (anonimo)",
+    "satelliteNames": "Mostra nomi di luoghi e strade",
+    "groupMap": "Mappa",
+    "groupShow": "Mostra sulla mappa",
+    "groupSharing": "Condivisione"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1009,7 +1016,6 @@
     "unavailable": "Zone non disponibili al momento.",
     "share": "Condividi le mie aree di esportazione (anonimo)",
     "shareHint": "Aggiunge l'area approssimativa (~5 km) di ogni livello esportato alla mappa delle zone. Mai il punto esatto, e nulla su di te.",
-    "tooltip": "{count} esportazioni qui (web {web} · desktop {desktop})",
     "askTitle": "Aggiungere questa esportazione alla mappa delle zone?",
     "askBody": "MapNG può contare dove vengono esportati i livelli e mostrare le aree più attive sulla mappa 2D. Viene condivisa solo l'area approssimativa (~5 km), mai il punto esatto, e nulla su di te. Puoi cambiarlo quando vuoi nel riquadro Layer mappa.",
     "askYes": "Condividi in forma anonima",
@@ -1037,7 +1043,15 @@
       "statusOff": "La condivisione è disattivata per te.",
       "close": "Ho capito",
       "readMore": "Leggi tutti i dettagli: dati esatti, processo e codice"
-    }
+    },
+    "count": "{count} esportazione | {count} esportazioni",
+    "today": "oggi",
+    "yesterday": "ieri",
+    "daysAgo": "{n} giorni fa",
+    "lastExport": "ultima esportazione {when}",
+    "clickToZoom": "clicca per ingrandire",
+    "web": "Web",
+    "desktop": "Desktop"
   },
   "report": {
     "title_crash": "MapNG si è chiuso inaspettatamente",

@@ -109,7 +109,11 @@
     },
     "missingTile": "Falta: {label}",
     "myLocation": "Mi ubicación",
-    "osmCoverageWorld": "Mundo"
+    "osmCoverageWorld": "Mundo",
+    "zoomToSelection": "Acercar a la selección",
+    "centerHere": "Centrar la selección aquí",
+    "copyCoordinates": "Copiar coordenadas",
+    "copied": "¡Copiado!"
   },
   "status": {
     "runConfigCopied": "Ajustes copiados al portapapeles (clave GPXZ oculta).",
@@ -563,7 +567,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satélite",
     "topoMap": "Mapa topográfico",
-    "showLabels": "Mostrar etiquetas",
     "elevationOverlay": {
       "title": "Elevación (conjunto gratuito)",
       "show": "Mostrar vista previa de elevación",
@@ -573,7 +576,11 @@
     "osmCoverage": "Cobertura OSM de MapNG",
     "hotspots": "Zonas de exportación",
     "hotspotsCount": "{count} exportaciones compartidas",
-    "shareExports": "Compartir mis exportaciones (anónimo)"
+    "shareExports": "Compartir mis exportaciones (anónimo)",
+    "satelliteNames": "Mostrar nombres de lugares y calles",
+    "groupMap": "Mapa",
+    "groupShow": "Mostrar en el mapa",
+    "groupSharing": "Compartir"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1009,7 +1016,6 @@
     "unavailable": "Las zonas no están disponibles ahora.",
     "share": "Compartir mis zonas de exportación (anónimo)",
     "shareHint": "Añade la zona aproximada (~5 km) de cada nivel que exportes al mapa de zonas. Nunca el lugar exacto ni nada sobre ti.",
-    "tooltip": "{count} exportaciones aquí (web {web} · escritorio {desktop})",
     "askTitle": "¿Añadir esta exportación al mapa de zonas?",
     "askBody": "MapNG puede contar dónde se exportan niveles y mostrar las zonas más activas en el mapa 2D. Solo se comparte la zona aproximada (~5 km), nunca el lugar exacto ni nada sobre ti. Puedes cambiarlo cuando quieras en el cuadro Capas del mapa.",
     "askYes": "Compartir de forma anónima",
@@ -1037,7 +1043,15 @@
       "statusOff": "Compartir está desactivado.",
       "close": "Entendido",
       "readMore": "Leer todos los detalles: datos exactos, proceso y código"
-    }
+    },
+    "count": "{count} exportación | {count} exportaciones",
+    "today": "hoy",
+    "yesterday": "ayer",
+    "daysAgo": "hace {n} días",
+    "lastExport": "última exportación {when}",
+    "clickToZoom": "clic para acercar",
+    "web": "Web",
+    "desktop": "Escritorio"
   },
   "report": {
     "title_crash": "MapNG se cerró inesperadamente",

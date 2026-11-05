@@ -109,7 +109,11 @@
     },
     "missingTile": "Missing: {label}",
     "myLocation": "My location",
-    "osmCoverageWorld": "World"
+    "osmCoverageWorld": "World",
+    "zoomToSelection": "Zoom to selection",
+    "centerHere": "Center selection here",
+    "copyCoordinates": "Copy coordinates",
+    "copied": "Copied!"
   },
   "status": {
     "runConfigCopied": "Run configuration copied to clipboard (GPXZ key masked).",
@@ -563,7 +567,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",
     "topoMap": "Topo map",
-    "showLabels": "Show labels",
     "elevationOverlay": {
       "title": "Elevation (free dataset)",
       "show": "Show elevation data preview",
@@ -573,7 +576,11 @@
     "osmCoverage": "MapNG OSM coverage",
     "hotspots": "Export hotspots",
     "hotspotsCount": "{count} shared exports",
-    "shareExports": "Share my exports (anonymous)"
+    "shareExports": "Share my exports (anonymous)",
+    "satelliteNames": "Show place and road names",
+    "groupMap": "Map",
+    "groupShow": "Show on map",
+    "groupSharing": "Sharing"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1009,7 +1016,6 @@
     "unavailable": "Hotspots unavailable right now.",
     "share": "Share my export areas (anonymous)",
     "shareHint": "Adds the rough area (~5 km) of each level you export to the hotspot map. Never the exact spot, and nothing about you.",
-    "tooltip": "{count} exports here (web {web} · desktop {desktop})",
     "askTitle": "Add this export to the hotspot map?",
     "askBody": "MapNG can count where levels get exported and show the busy areas on the 2D map. Only the rough area (~5 km) is shared, never the exact spot, and nothing about you. You can change this any time in the Map layers box on the map.",
     "askYes": "Share anonymously",
@@ -1037,7 +1043,15 @@
       "statusOff": "Sharing is off for you.",
       "close": "Got it",
       "readMore": "Read the full details: exact data, pipeline and code"
-    }
+    },
+    "count": "{count} export | {count} exports",
+    "today": "today",
+    "yesterday": "yesterday",
+    "daysAgo": "{n} days ago",
+    "lastExport": "last export {when}",
+    "clickToZoom": "click to zoom in",
+    "web": "Web",
+    "desktop": "Desktop"
   },
   "report": {
     "title_crash": "MapNG closed unexpectedly",
