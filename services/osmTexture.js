@@ -2004,8 +2004,13 @@ export const satelliteGroundClasses = async (terrainData, source = null) => {
   sctx.imageSmoothingEnabled = true;
   sctx.imageSmoothingQuality = "high";
   sctx.drawImage(satellite, 0, 0, w, h);
-  return { cls: classifyGroundGrid(sctx.getImageData(0, 0, w, h).data, w, h), w, h };
+  return { cls: classifyGroundGrid(sctx.getImageData(0, 0, w, h).data, w, h), w, h, image: satellite };
 };
+
+// Water as the game map shows it: its own satellite pixels (generateGameTexture)
+const WATER_EXCLUDED = new Set(["dam", "weir", "dock", "boatyard", "lock_gate"]);
+const isWaterArea = (tags = {}) => !WATER_EXCLUDED.has(tags.waterway) && (
+  tags.natural === "water" || !!tags.waterway || tags.landuse === "reservoir" || tags.landuse === "basin" || !!tags.water);
 
 export const generateGameTexture = async (terrainData, options = {}) => {
   const onProgress = options.onProgress;
@@ -2083,7 +2088,8 @@ export const generateGameTexture = async (terrainData, options = {}) => {
     ...options,
     palette: GAME_COLORS,
     baseColor: GAME_COLORS.defaultLanduse,
-    skipArea: satellite ? (tags, unmatched) => unmatched || leftToGround(tags) : null,
+    // (with a satellite image, water is drawn from it below instead)
+    skipArea: satellite ? (tags, unmatched) => unmatched || leftToGround(tags) || isWaterArea(tags) : null,
   });
 
   // gentle large-scale variation, then a fine grain: ground, not a vector map
@@ -2108,6 +2114,56 @@ export const generateGameTexture = async (terrainData, options = {}) => {
   ctx.fillStyle = ctx.createPattern(createNoisePattern("#808080"), "repeat");
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
+
+  // Water: the satellite's own pixels, not a paint (players disliked blue,
+  // and a creek looks like the creek). Mapped water (areas, and streams at
+  // their width) plus what the satellite itself shows as water, through one
+  // mask; after the grain, so the imagery stays clean.
+  if (ground?.image) {
+    const mask = document.createElement("canvas");
+    mask.width = canvas.width; mask.height = canvas.height;
+    const mctx2 = mask.getContext("2d");
+    mctx2.fillStyle = "#fff"; mctx2.strokeStyle = "#fff";
+    mctx2.lineCap = "round"; mctx2.lineJoin = "round";
+    for (const f of terrainData.osmFeatures || []) {
+      if (!isWaterArea(f?.tags) || isUndergroundArea(f.tags) || !(f.geometry?.length >= 2)) continue;
+      const pts = f.geometry.map((p) => toPixel(p.lat, p.lng));
+      const first = f.geometry[0]; const last = f.geometry[f.geometry.length - 1];
+      const closed = Math.abs(first.lat - last.lat) < 1e-9 && Math.abs(first.lng - last.lng) < 1e-9;
+      const linear = f.tags.waterway && f.tags.waterway !== "riverbank" && f.tags.area !== "yes";
+      mctx2.beginPath();
+      pts.forEach((q, i) => (i ? mctx2.lineTo(q.x, q.y) : mctx2.moveTo(q.x, q.y)));
+      if (linear && !closed) {
+        const wM = Number.parseFloat(f.tags.width) > 0 ? Number.parseFloat(f.tags.width)
+          : f.tags.waterway === "river" ? 8 : f.tags.waterway === "canal" ? 6 : f.tags.waterway === "stream" ? 3 : 2;
+        mctx2.lineWidth = Math.max(1, wM * METERS_TO_PX);
+        mctx2.stroke();
+      } else {
+        mctx2.closePath();
+        for (const hole of f.holes || []) {
+          hole.forEach((p, i) => { const q = toPixel(p.lat, p.lng); if (i) mctx2.lineTo(q.x, q.y); else mctx2.moveTo(q.x, q.y); });
+          mctx2.closePath();
+        }
+        mctx2.fill("evenodd");
+      }
+    }
+    // the satellite's own water (unmapped ponds, a river wider than its line)
+    const { cls, w, h } = ground;
+    const waterIdx = GROUND_CLASSES.indexOf("water");
+    const wc = document.createElement("canvas");
+    wc.width = w; wc.height = h;
+    const wctx = wc.getContext("2d");
+    const wd = wctx.createImageData(w, h);
+    for (let i = 0; i < w * h; i++) if (cls[i] === waterIdx) { wd.data[i * 4] = wd.data[i * 4 + 1] = wd.data[i * 4 + 2] = 255; wd.data[i * 4 + 3] = 255; }
+    wctx.putImageData(wd, 0, 0);
+    mctx2.imageSmoothingEnabled = true;
+    mctx2.drawImage(wc, 0, 0, mask.width, mask.height);
+    mctx2.globalCompositeOperation = "source-in";
+    mctx2.imageSmoothingQuality = "high";
+    mctx2.drawImage(ground.image, 0, 0, mask.width, mask.height);
+    ctx.drawImage(mask, 0, 0);
+    mask.width = 0; wc.width = 0;
+  }
 
   const blob = await new Promise((r) => canvas.toBlob((b) => r(b || null), "image/png"));
   const url = blob ? URL.createObjectURL(blob) : "";

@@ -25,6 +25,7 @@ import { roundRoadCorners } from "./roadCurves.js";
 import { measureStreetWidths } from "./streetWidths.js";
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from "./terrariumSampling.js";
 import { continuousLngRange } from "./lngRange.js";
+import { lowerRaisedWater } from "./waterBanks.js";
 import { scaleNativeDimsToProcessingMpp } from "./uploadBounds.js";
 import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSize.js";
 
@@ -2312,6 +2313,13 @@ export const fetchTerrainData = async (
   // real crests and filled real sags, carving lines and dips); tracks are
   // left alone.
   const fineRaster = !!rawData && !shouldSmooth;
+  // The global 30 m data reads tree tops along wooded rivers and creeks (a
+  // ridge where the water is): river water is brought down to its banks
+  // first, so roads, the preview and the export's water all see the valley.
+  if (!flat && !raw && !rawData && osmFeatures.length > 0) {
+    const lowered = lowerRaisedWater(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel);
+    if (lowered.cells) console.info(`[Terrain] Water brought down to its banks: ${lowered.cells} cells, up to ${lowered.maxDrop.toFixed(1)} m.`);
+  }
   if (!flat && !raw && osmFeatures.length > 0) {
     if (fineRaster) {
       onProgress?.("Aligning roads with the terrain...");
