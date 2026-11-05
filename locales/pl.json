@@ -1179,5 +1179,23 @@
     "shareToggle": "Udostępniaj, jakich ustawień używam (bez lokalizacji)",
     "welcome": "Anonimowo udostępniaj, jakich ustawień eksportu używam (nigdy gdzie), by pomóc zdecydować, co ulepszyć",
     "readMore": "Co jest udostępniane"
+  },
+  "progressStages": {
+    "generate": {
+      "prepare": "Przygotowanie",
+      "elevation": "Wczytywanie wysokości",
+      "terrain": "Budowa terenu",
+      "mapData": "Wczytywanie danych mapy",
+      "roads": "Kształtowanie dróg",
+      "textures": "Malowanie tekstur"
+    },
+    "export": {
+      "prepare": "Przygotowanie",
+      "roads": "Układanie dróg",
+      "terrain": "Budowa terenu",
+      "buildings": "Stawianie budynków",
+      "nature": "Sadzenie roślin",
+      "package": "Pakowanie poziomu"
+    }
   }
 }

@@ -1179,5 +1179,23 @@
     "shareToggle": "Teilen, welche Einstellungen ich nutze (ohne Ort)",
     "welcome": "Anonym teilen, welche Export-Einstellungen ich nutze (nie wo), damit klar ist, was verbessert werden soll",
     "readMore": "Was geteilt wird"
+  },
+  "progressStages": {
+    "generate": {
+      "prepare": "Vorbereiten",
+      "elevation": "Höhendaten laden",
+      "terrain": "Gelände aufbauen",
+      "mapData": "Kartendaten laden",
+      "roads": "Straßen formen",
+      "textures": "Texturen malen"
+    },
+    "export": {
+      "prepare": "Vorbereiten",
+      "roads": "Straßen verlegen",
+      "terrain": "Gelände aufbauen",
+      "buildings": "Gebäude platzieren",
+      "nature": "Natur pflanzen",
+      "package": "Level packen"
+    }
   }
 }

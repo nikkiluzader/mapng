@@ -11264,6 +11264,19 @@ export function mapngLevelStamp({ terrainData, center, options = {}, levelName, 
   };
 }
 
+/**
+ * The six stages the export card shows (components/ui/StageLoader.vue), each
+ * the export phases (beginStep) it covers, in the order they run.
+ */
+export const EXPORT_STEP_GROUPS = [
+  { key: 'prepare', members: ['prepare', 'lidar'] },
+  { key: 'roads', members: ['roads', 'sidewalks', 'props'] },
+  { key: 'terrain', members: ['texture', 'materials', 'ter', 'heightmap', 'thumbnail'] },
+  { key: 'buildings', members: ['buildings', 'water', 'furniture'] },
+  { key: 'nature', members: ['vegetation', 'backdrop'] },
+  { key: 'package', members: ['assets', 'zip', 'compress'] },
+];
+
 export async function exportBeamNGLevel(terrainData, center, options = {}) {
   // Every module logs to the console (OSM, roads, bridges, buildings...); the
   // export keeps its share of that for export_report.txt.
@@ -11391,7 +11404,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const report = (step, fraction = 0, completed = null) => {
     const pct = percentAt(fraction);
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Step`, { step, pct });
-    onProgress?.({ step, pct, elapsedMs: performance.now() - exportT0, completed });
+    onProgress?.({
+      step, pct, elapsedMs: performance.now() - exportT0, completed,
+      // for the stage card (EXPORT_STEP_GROUPS): the phase running, its share done, every phase's weight
+      phase: currentStep?.phase ?? null, phaseFraction: Math.max(0, Math.min(1, fraction)), phaseWeights,
+    });
   };
   /**
    * Close the active step into the processing log.

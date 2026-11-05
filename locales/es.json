@@ -1179,5 +1179,23 @@
     "shareToggle": "Compartir qué ajustes uso (sin ubicación)",
     "welcome": "Compartir de forma anónima qué ajustes de exportación uso (nunca dónde), para decidir qué mejorar",
     "readMore": "Qué se comparte"
+  },
+  "progressStages": {
+    "generate": {
+      "prepare": "Preparando",
+      "elevation": "Cargando elevación",
+      "terrain": "Creando terreno",
+      "mapData": "Cargando datos del mapa",
+      "roads": "Dando forma a carreteras",
+      "textures": "Pintando texturas"
+    },
+    "export": {
+      "prepare": "Preparando",
+      "roads": "Trazando carreteras",
+      "terrain": "Creando terreno",
+      "buildings": "Colocando edificios",
+      "nature": "Plantando naturaleza",
+      "package": "Empaquetando el nivel"
+    }
   }
 }

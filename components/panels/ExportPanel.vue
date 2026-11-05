@@ -506,53 +506,24 @@
     <Transition name="fade">
       <div
         v-if="isExportingBeamNGLevel"
-        class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+        class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/25 dark:bg-black/60 backdrop-blur-sm"
       >
-        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[calc(100vw-2rem)] max-w-md flex flex-col gap-4">
-          <!-- Header -->
-          <div class="flex items-center gap-3">
-            <Loader2 :size="20" class="animate-spin text-brand shrink-0" />
-            <div>
-              <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ t('exportPanel.exportingBeamng') }}</div>
-              <div class="text-caption text-gray-500 dark:text-gray-400">{{ t('exportPanel.mayTakeWhile') }}</div>
-            </div>
-          </div>
-
-          <!-- Progress bar -->
-          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-            <div
-              class="h-2 rounded-full bg-brand transition-all duration-300 ease-out"
-              :style="{ width: `${beamNGProgressPct}%` }"
-            />
-          </div>
-
-          <!-- Step label: fixed height (the text changes many times a second;
-               long lines clamp, full text on hover) -->
-          <div class="flex justify-between items-start gap-2 h-[2.875rem]">
-            <span class="min-w-0 flex-1 text-caption leading-snug text-gray-600 dark:text-gray-400 break-words line-clamp-3" :title="beamNGProgressStep">{{ beamNGProgressStep }}</span>
-            <span class="w-9 text-right text-caption font-mono text-brand shrink-0">{{ beamNGProgressPct }}%</span>
-          </div>
-
-          <!-- Finished steps (most recent last, room for five) and elapsed time -->
-          <div class="border-t border-gray-100 dark:border-gray-800 pt-2">
-            <div class="h-[78px] flex flex-col gap-0.5 overflow-hidden">
-              <div
-                v-for="(done, i) in beamNGProgressDone.slice(-5)"
-                :key="i"
-                class="flex justify-between gap-2 text-micro leading-snug text-gray-400 dark:text-gray-500"
-              >
-                <span class="min-w-0 flex-1 truncate" :title="done.step">✓ {{ done.step }}</span>
-                <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
-              </div>
-            </div>
-            <div class="flex items-center justify-end gap-3 text-micro font-mono text-gray-500 dark:text-gray-400">
-              <button v-if="desktopApp" type="button" class="mr-auto font-sans px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-brand hover:text-brand transition-colors" @click="cancelDesktopExport">
-                {{ t('levels.cancel') }}
-              </button>
-              {{ t('exportPanel.elapsed') }} {{ formatStepDuration(beamNGElapsedMs) }}
-            </div>
-          </div>
-        </div>
+        <!-- the stage card (components/ui/StageLoader.vue), fed by the exporter's
+             phases (EXPORT_STEP_GROUPS) -->
+        <StageLoader
+          :title="t('exportPanel.exportingBeamng')"
+          :steps="exportSteps"
+          :active-stage="beamNGPhase"
+          :active-fraction="beamNGPhaseFraction"
+          :pct="beamNGProgressPct"
+          :status="beamNGProgressStep"
+          :done="beamNGProgressDone"
+          :elapsed-ms="beamNGElapsedMs"
+          :elapsed-label="t('exportPanel.elapsed')"
+          :cancellable="desktopApp"
+          :cancel-label="t('levels.cancel')"
+          @cancel="cancelDesktopExport"
+        />
       </div>
     </Transition>
   </Teleport>
@@ -586,8 +557,9 @@ import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy, BarChart3
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy, BarChart3, Compass, Building2, Package
 } from 'lucide-vue-next';
+import StageLoader from '../ui/StageLoader.vue';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExports';
@@ -595,7 +567,7 @@ import { exportToGLB, exportToDAE } from '../../services/export3d';
 import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
-import { exportBeamNGLevel } from '../../services/exportBeamNGLevel';
+import { exportBeamNGLevel, EXPORT_STEP_GROUPS } from '../../services/exportBeamNGLevel';
 import { desktopApp, exportLevelOnDesktop } from '../../services/platform/desktop.js';
 import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../composables/useExportHotspots.js';
 import SettingSection from '../base/SettingSection.vue';
@@ -649,6 +621,18 @@ const beamNGProgressStep = ref('');
 const beamNGProgressPct  = ref(0);
 // Finished export steps ({ step, durationMs }) and the time since export began.
 const beamNGProgressDone = ref([]);
+// the stage card: the exporter's phase running, its share done, each phase's weight
+const beamNGPhase = ref(null);
+const beamNGPhaseFraction = ref(0);
+const beamNGPhaseWeights = ref({});
+const EXPORT_STEP_ICONS = { prepare: Compass, roads: Route, terrain: Mountain, buildings: Building2, nature: Trees, package: Package };
+const exportSteps = computed(() => EXPORT_STEP_GROUPS.map((g) => ({
+  key: g.key,
+  label: t(`progressStages.export.${g.key}`),
+  icon: EXPORT_STEP_ICONS[g.key],
+  // (before the first report every stage counts, so all six show)
+  members: g.members.map((m) => [m, beamNGPhase.value ? Number(beamNGPhaseWeights.value[m]) || 0 : 1]),
+})));
 const beamNGElapsedMs = ref(0);
 const formatStepDuration = (ms) => {
   if (!Number.isFinite(ms)) return '';
@@ -1777,6 +1761,9 @@ const handleBeamNGLevelExport = async () => {
   beamNGProgressPct.value  = 0;
   beamNGProgressDone.value = [];
   beamNGElapsedMs.value = 0;
+  beamNGPhase.value = null;
+  beamNGPhaseFraction.value = 0;
+  beamNGPhaseWeights.value = {};
   // ticks between progress events (a long step reports only when it ends)
   const elapsedTimer = setInterval(() => { beamNGElapsedMs.value = performance.now() - startedAt; }, 1000);
   try {
@@ -1878,9 +1865,11 @@ const handleBeamNGLevelExport = async () => {
       elevationSource: props.elevationSource,
       requestedResolution: props.resolution,
       requestedProcessingMetersPerPixel: resolveProcessingMetersPerPixel(td),
-      onProgress: ({ step, pct, elapsedMs, completed }) => {
+      onProgress: ({ step, pct, elapsedMs, completed, phase, phaseFraction, phaseWeights }) => {
         beamNGProgressStep.value = step;
         beamNGProgressPct.value  = pct;
+        if (phase) { beamNGPhase.value = phase; beamNGPhaseFraction.value = phaseFraction ?? 0; }
+        if (phaseWeights) beamNGPhaseWeights.value = phaseWeights;
         if (Number.isFinite(elapsedMs)) beamNGElapsedMs.value = elapsedMs;
         if (completed) beamNGProgressDone.value = [...beamNGProgressDone.value, completed];
         console.log(`${BEAMNG_EXPORT_UI_LOG} Progress:`, { step, pct });

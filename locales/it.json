@@ -1179,5 +1179,23 @@
     "shareToggle": "Condividi quali impostazioni uso (senza posizione)",
     "welcome": "Condividi in forma anonima quali impostazioni di esportazione uso (mai dove), per decidere cosa migliorare",
     "readMore": "Cosa viene condiviso"
+  },
+  "progressStages": {
+    "generate": {
+      "prepare": "Preparazione",
+      "elevation": "Caricamento altimetria",
+      "terrain": "Costruzione del terreno",
+      "mapData": "Caricamento dati mappa",
+      "roads": "Modellazione strade",
+      "textures": "Pittura texture"
+    },
+    "export": {
+      "prepare": "Preparazione",
+      "roads": "Posa delle strade",
+      "terrain": "Costruzione del terreno",
+      "buildings": "Posa degli edifici",
+      "nature": "Natura",
+      "package": "Impacchettamento livello"
+    }
   }
 }

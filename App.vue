@@ -146,47 +146,23 @@
           </Suspense>
         </div>
         
-        <!-- Loading Overlay -->
-        <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm">
-          <!-- Fixed size: the text changes many times a second, so every area
-               keeps its height (long status lines clamp, full text on hover) -->
-          <div class="text-center p-8 rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl w-[min(26rem,calc(100vw-2rem))]">
-            <Loader2 :size="48" class="text-brand animate-spin mx-auto mb-4" />
-            <h3 class="text-xl text-gray-900 dark:text-white font-bold mb-2">{{ t('app.processingTerrain') }}</h3>
-            <!-- Overall progress (services/generationProgress.js), the current step,
-                 the steps finished with their durations, and the time so far -->
-            <div class="w-full space-y-1.5 text-left">
-              <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                <div class="h-full rounded-full bg-brand transition-all duration-500 ease-out" :style="{ width: loadingOverallPct + '%' }"></div>
-              </div>
-              <div class="flex items-start justify-between gap-2 h-[3.125rem]">
-                <span class="min-w-0 flex-1 text-xs leading-snug text-gray-600 dark:text-gray-400 break-words line-clamp-3" :title="loadingStatus">{{ loadingStatus }}</span>
-                <span class="w-9 text-right text-caption font-mono text-brand shrink-0">{{ loadingOverallPct }}%</span>
-              </div>
-              <div class="h-4 text-caption leading-4 text-gray-500 dark:text-gray-400 truncate" :title="loadingProgressDetail">{{ loadingProgressDetail }}</div>
-              <div class="border-t border-gray-100 dark:border-gray-800 pt-2">
-                <div class="h-[78px] flex flex-col gap-0.5 overflow-hidden">
-                  <div
-                    v-for="(done, i) in loadingDone.slice(-5)"
-                    :key="i"
-                    class="flex justify-between gap-2 text-micro leading-snug text-gray-400 dark:text-gray-500"
-                  >
-                    <span class="min-w-0 flex-1 truncate" :title="done.step">✓ {{ done.step }}</span>
-                    <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
-                  </div>
-                </div>
-                <div class="flex justify-end text-micro font-mono text-gray-500 dark:text-gray-400">
-                  {{ t('exportPanel.elapsed') }} {{ formatStepDuration(loadingElapsedMs) }}
-                </div>
-              </div>
-            </div>
-            <button
-              @click="cancelGeneration"
-              class="mt-5 px-6 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors border border-gray-300 dark:border-gray-600"
-            >
-              {{ t('common.cancel') }}
-            </button>
-          </div>
+        <!-- Loading Overlay: the stage card (components/ui/StageLoader.vue), fed by
+             services/generationProgress.js -->
+        <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/25 dark:bg-black/60 backdrop-blur-sm">
+          <StageLoader
+            :title="t('app.processingTerrain')"
+            :steps="generationSteps"
+            :active-stage="loadingStage"
+            :active-fraction="loadingStageFraction"
+            :pct="loadingOverallPct"
+            :status="loadingStatus"
+            :done="loadingDone"
+            :elapsed-ms="loadingElapsedMs"
+            :elapsed-label="t('exportPanel.elapsed')"
+            cancellable
+            :cancel-label="t('common.cancel')"
+            @cancel="cancelGeneration"
+          />
         </div>
       </div>
     </main>
@@ -253,7 +229,9 @@ import ReportDialog from './components/modals/ReportDialog.vue';
 import { openReportDialog, logPathFrom } from './composables/useReportDialog.js';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
-import { createGenerationProgress } from './services/generationProgress.js';
+import { createGenerationProgress, GENERATION_STEP_GROUPS } from './services/generationProgress.js';
+import StageLoader from './components/ui/StageLoader.vue';
+import { Compass, Mountain, Grid3x3, Map as MapIcon, Route, Paintbrush } from 'lucide-vue-next';
 import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
 import { desktopApp, fetchTerrainDataOnDesktop, generateNextFromLevel } from './services/platform/desktop.js';
 import { applyExportSettings } from './services/exportSettings.js';
@@ -328,13 +306,27 @@ const formatStepDuration = (ms) => {
   const sec = Math.round(ms / 1000);
   return sec < 60 ? `${sec} s` : `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 };
-const applyGenerationProgress = ({ pct, completed }) => {
+const loadingStage = ref(null);
+const loadingStageFraction = ref(0);
+const loadingWeights = ref({});
+const GENERATION_STEP_ICONS = { prepare: Compass, elevation: Mountain, terrain: Grid3x3, mapData: MapIcon, roads: Route, textures: Paintbrush };
+const generationSteps = computed(() => GENERATION_STEP_GROUPS.map((g) => ({
+  key: g.key,
+  label: t(`progressStages.generate.${g.key}`),
+  icon: GENERATION_STEP_ICONS[g.key],
+  members: g.members.map((m) => [m, Number(loadingWeights.value[m]) || 0]),
+})));
+const applyGenerationProgress = ({ pct, completed, stage, stageFraction }) => {
   loadingOverallPct.value = pct;
+  if (stage) { loadingStage.value = stage; loadingStageFraction.value = stageFraction ?? 0; }
   if (completed) loadingDone.value = [...loadingDone.value, completed];
 };
 const startGenerationProgress = (options) => {
   stopGenerationProgress();
   generationProgress = createGenerationProgress(options);
+  loadingWeights.value = generationProgress.weights;
+  loadingStage.value = null;
+  loadingStageFraction.value = 0;
   generationStartedAt = performance.now();
   loadingOverallPct.value = 0;
   loadingDone.value = [];

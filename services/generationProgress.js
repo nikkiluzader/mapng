@@ -14,6 +14,19 @@
 
 export const GENERATION_STAGES = ['prepare', 'elevation', 'repair', 'resample', 'satellite', 'osm', 'roads', 'finalize', 'textures'];
 
+/**
+ * The six stages the progress card shows (components/ui/StageLoader.vue),
+ * each the fine stages above it covers, in order.
+ */
+export const GENERATION_STEP_GROUPS = [
+  { key: 'prepare', members: ['prepare'] },
+  { key: 'elevation', members: ['elevation', 'repair'] },
+  { key: 'terrain', members: ['resample'] },
+  { key: 'mapData', members: ['satellite', 'osm'] },
+  { key: 'roads', members: ['roads'] },
+  { key: 'textures', members: ['finalize', 'textures'] },
+];
+
 const stageSeconds = ({ px, includeOSM, upload }) => ({
   prepare: 0.3,
   elevation: 1 + 2 * px,
@@ -57,8 +70,9 @@ const countFraction = (text) => {
 /**
  * Track one generation run. update(status, percent?) takes each progress
  * message; tick() re-evaluates the time-based creep (call it on a timer).
- * Both return { pct, completed } where completed is the stage just finished
- * ({ step, durationMs }) or null.
+ * Both return { pct, completed, stage, stageFraction }: completed is the stage
+ * just finished ({ step, durationMs }) or null; stage the one running and
+ * stageFraction how far it is (0..1, never backwards).
  *
  * @param {{ resolution: number, includeOSM: boolean, upload?: boolean, startAt?: string }} options
  *   startAt skips the stages before it (adding OSM to existing terrain).
@@ -76,6 +90,7 @@ export function createGenerationProgress({ resolution, includeOSM, upload = fals
   let reported = 0;               // reported fraction of the current stage (percent / count)
   let counted = false;            // the stage reports its own progress: no creep
   let lastPct = 0;
+  let stageFraction = 0;          // shown share of the current stage (never backwards)
 
   const doneBefore = (i) => GENERATION_STAGES.slice(0, i).reduce((sum, stage) => sum + seconds[stage], 0);
   const percent = () => {
@@ -84,6 +99,7 @@ export function createGenerationProgress({ resolution, includeOSM, upload = fals
     // silent stretches creep toward 95 % of the stage, ~85 % by its expected time
     const creep = !counted && expected > 0 ? 0.95 * (1 - Math.exp((-2.3 * (now() - stageStartedAt)) / 1000 / expected)) : 0;
     const fraction = Math.max(reported, creep);
+    stageFraction = Math.max(stageFraction, Math.min(1, fraction));
     const pct = Math.floor(((doneBefore(index) + expected * Math.min(1, fraction)) / total) * 100);
     lastPct = Math.max(lastPct, Math.min(99, pct));
     return lastPct;
@@ -96,6 +112,7 @@ export function createGenerationProgress({ resolution, includeOSM, upload = fals
     if (next > index) {
       if (stageLabel) completed = { step: stageLabel, durationMs: now() - stageStartedAt };
       index = next;
+      stageFraction = 0;
       stageStartedAt = now();
       stageLabel = null;
       reported = 0;
@@ -106,12 +123,14 @@ export function createGenerationProgress({ resolution, includeOSM, upload = fals
     const fraction = stage && GENERATION_STAGES.indexOf(stage) !== index ? null
       : Number.isFinite(statusPercent) ? statusPercent / 100 : countFraction(status);
     if (fraction != null) { reported = Math.max(reported, fraction); counted = true; }
-    return { pct: percent(), completed };
+    return { pct: percent(), completed, stage: GENERATION_STAGES[index], stageFraction };
   };
 
   return {
     update,
-    tick: () => ({ pct: percent(), completed: null }),
+    tick: () => ({ pct: percent(), completed: null, stage: GENERATION_STAGES[index], stageFraction }),
+    // each stage's expected seconds in this run (0: skipped): the loader's weights
+    weights: { ...seconds },
     // closes the last stage (the caller shows it as finished)
     finish: () => (stageLabel ? { step: stageLabel, durationMs: now() - stageStartedAt } : null),
   };

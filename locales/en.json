@@ -1179,5 +1179,23 @@
     "shareToggle": "Share which settings I use (no location)",
     "welcome": "Share which export settings I use (never where), anonymously, to help decide what to improve",
     "readMore": "What's shared"
+  },
+  "progressStages": {
+    "generate": {
+      "prepare": "Preparing",
+      "elevation": "Loading elevation",
+      "terrain": "Building terrain",
+      "mapData": "Loading map data",
+      "roads": "Shaping roads",
+      "textures": "Painting textures"
+    },
+    "export": {
+      "prepare": "Preparing",
+      "roads": "Laying roads",
+      "terrain": "Building terrain",
+      "buildings": "Placing buildings",
+      "nature": "Planting nature",
+      "package": "Packing the level"
+    }
   }
 }
