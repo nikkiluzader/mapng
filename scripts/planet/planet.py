@@ -155,6 +155,18 @@ def load_state(wd):
     return json.load(open(p)) if os.path.exists(p) else {"blocks": {}}
 
 
+def update_state(wd, fn):
+    """Load, change and save the state under a lock: the builder and the
+    publisher (planet.py publish) both write it."""
+    import fcntl
+    with open(os.path.join(wd, "state.lock"), "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        st = load_state(wd)
+        fn(st)
+        save_state(wd, st)
+        return st
+
+
 def save_state(wd, st):
     p = os.path.join(wd, "state.json")
     tmp = p + ".tmp"
@@ -301,12 +313,22 @@ def cmd_split(args):
 # ── build ──────────────────────────────────────────────────────────────────
 
 def tiles_equal(a, b):
+    """Both archives hold the same tiles, compared one tile at a time (they
+    come out in tile order; whole archives in memory were GBs per job)."""
     from pmtiles.reader import MmapSource, all_tiles
-    def tiles(path):
-        with open(path, "r+b") as f:
-            return {k: gzip.decompress(v) for k, v in all_tiles(MmapSource(f))}
-    ta, tb = tiles(a), tiles(b)
-    return ta.keys() == tb.keys() and all(ta[k] == tb[k] for k in ta), len(ta)
+    import itertools
+    with open(a, "r+b") as fa, open(b, "r+b") as fb:
+        n = 0
+        for ta, tb in itertools.zip_longest(all_tiles(MmapSource(fa)), all_tiles(MmapSource(fb))):
+            if ta is None or tb is None or ta[0] != tb[0] or gzip.decompress(ta[1]) != gzip.decompress(tb[1]):
+                return False, n
+            n += 1
+        return True, n
+
+
+def group_of(b, gz):
+    k = b["z"] - gz
+    return (gz, b["x"] >> k, b["y"] >> k) if k >= 0 else (b["z"], b["x"], b["y"])
 
 
 def file_bytes(path):
@@ -360,7 +382,12 @@ def cmd_build(args):
     wd = args.workdir
     st = load_state(wd)
     todo = [b for b in st["blocks"].values() if b["state"] == "ready" or (args.retry and b["state"] in ("mismatch", "failed"))]
-    todo.sort(key=lambda b: -b.get("mb", 0))          # biggest first, so the tail is short
+    # zoom-3 group by group, sweeping west to east (column by column), biggest
+    # block first inside a group: a group can be published once it and its
+    # neighbours are built (features crossing into it come from their owner
+    # blocks' side files), and a sweep finishes neighbours close together, so
+    # the publisher uploads while the rest builds
+    todo.sort(key=lambda b: (group_of(b, START_ZOOM)[1], group_of(b, START_ZOOM)[2], -b.get("mb", 0)))
     if args.only:
         todo = [b for b in todo if bkey(b["z"], b["x"], b["y"]) in args.only.split(",")]
     # every leaf block (the builder writes features into neighbours that hold
@@ -377,9 +404,7 @@ def cmd_build(args):
                 _, res = f.result()
             except Exception as e:             # (a crash on this machine: retried with --retry)
                 res = {"state": "failed", "error": str(e)[-500:]}
-            st = load_state(wd)
-            st["blocks"][key].update(res)
-            save_state(wd, st)
+            update_state(wd, lambda st, key=key, res=res: st["blocks"][key].update(res))
             log(key, res)
 
 
@@ -394,98 +419,180 @@ def fold_in(data, extra_elements):
     return gzip.compress((head + sep + ",".join(extra_elements) + tail).encode("utf-8"), compresslevel=9)
 
 
-def cmd_merge(args):
-    """Join built blocks into one archive per group-zoom tile. Blocks never share
-    a tile, so this is a sort of tile ids, no de-duplication."""
-    from pmtiles.reader import MmapSource, Reader, all_tiles
-    from pmtiles.tile import Compression, TileType, tileid_to_zxy, zxy_to_tileid
-    from pmtiles.writer import Writer
-    wd = args.workdir
-    st = load_state(wd)
-    gz = args.group_zoom
-    groups = {}
-    for key, b in st["blocks"].items():
-        if b["state"] != "built":
-            continue
-        k = b["z"] - gz
-        g = (gz, b["x"] >> k, b["y"] >> k) if k >= 0 else (b["z"], b["x"], b["y"])
-        groups.setdefault(g, []).append(key)
-    # side files: features owned by one block that reach into tiles of
-    # blocks holding none of their points; group them by publish archive
+def load_side(wd, st, gz):
+    """Side files of every built block, grouped by publish archive (features
+    owned by one block reaching into tiles of blocks holding none of their
+    points). Kept until the end: a block's side lines can belong to a
+    neighbouring group published later."""
     side = {}
     for key, b in st["blocks"].items():
         sp = os.path.join(wd, "built", f"{key}.pmtiles.side")
-        if b["state"] != "built" or not os.path.exists(sp):
+        if b["state"] not in ("built", "merged") or not os.path.exists(sp):
             continue
         with open(sp, encoding="utf-8") as f:
             for line in f:
                 xy, el = line.rstrip("\n").split("\t", 1)
                 x, y = map(int, xy.split())
                 k = TILE_ZOOM - gz
-                g = (gz, x >> k, y >> k)
-                side.setdefault(g, {}).setdefault(zxy_to_tileid(TILE_ZOOM, x, y), []).append(el)
+                from pmtiles.tile import zxy_to_tileid
+                side.setdefault((gz, x >> k, y >> k), {}).setdefault(zxy_to_tileid(TILE_ZOOM, x, y), []).append(el)
+    return side
+
+
+def merge_group(wd, st, g, keys, extra, delete_built):
+    """One archive for group g from its built blocks and side lines; returns its path."""
+    from pmtiles.reader import MmapSource, all_tiles
+    from pmtiles.tile import Compression, TileType, tileid_to_zxy, zxy_to_tileid
+    from pmtiles.writer import Writer
+    os.makedirs(os.path.join(wd, "publish"), exist_ok=True)
+    out = os.path.join(wd, "publish", f"planet-{bkey(*g)}-{time.strftime('%Y-%m-%d')}.pmtiles")
+    check_space(sum(os.path.getsize(os.path.join(wd, "built", f"{k}.pmtiles")) for k in keys) / 2**30)
+    files = [open(os.path.join(wd, "built", f"{key}.pmtiles"), "r+b") for key in keys]
+
+    def stream(f):
+        # each archive's tiles come out in tile-id order (checked), so all
+        # blocks merge with one tile per block in memory
+        last = -1
+        for zxy, data in all_tiles(MmapSource(f)):
+            tid = zxy_to_tileid(*zxy)
+            if tid <= last:
+                raise RuntimeError(f"{f.name}: tiles out of order")
+            last = tid
+            yield tid, zxy, data
+
+    lon0 = lat0 = 1e9
+    lon1 = lat1 = -1e9
+    count = 0
+    with open(out, "wb") as fo:
+        w = Writer(fo)
+        side_only = ((tid, tileid_to_zxy(tid), None) for tid in sorted(extra))
+        last = None
+        for tid, (z, x, y), data in heapq.merge(*(stream(f) for f in files), side_only, key=lambda t: t[0]):
+            if tid == last:            # (a side-only entry for a tile a block already wrote)
+                continue
+            last = tid
+            if tid in extra:
+                data = fold_in(data, extra[tid])
+            w.write_tile(tid, data)
+            count += 1
+            west, south, east, north = tile_bbox(z, x, y)
+            lon0, lat0, lon1, lat1 = min(lon0, west), min(lat0, south), max(lon1, east), max(lat1, north)
+        w.finalize({
+            "tile_type": TileType.UNKNOWN, "tile_compression": Compression.GZIP,
+            "min_zoom": TILE_ZOOM, "max_zoom": TILE_ZOOM,
+            "min_lon_e7": int(lon0 * 1e7), "min_lat_e7": int(lat0 * 1e7),
+            "max_lon_e7": int(lon1 * 1e7), "max_lat_e7": int(lat1 * 1e7),
+            "center_zoom": TILE_ZOOM, "center_lon_e7": int((lon0 + lon1) / 2 * 1e7),
+            "center_lat_e7": int((lat0 + lat1) / 2 * 1e7),
+        }, {
+            "name": "mapng-osm", "format": "overpass-json-compact-v2", "source": os.path.basename(st.get("planet", "planet")),
+            "zoom": TILE_ZOOM, "group": bkey(*g), "blocks": sorted(keys),
+            "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "attribution": "© OpenStreetMap contributors (ODbL)",
+        })
+    for f in files:
+        f.close()
+    drop_cache(out, *(os.path.join(wd, "built", f"{k}.pmtiles") for k in keys))
+    if delete_built:
+        for key in keys:
+            os.remove(os.path.join(wd, "built", f"{key}.pmtiles"))
+        update_state(wd, lambda s2: [s2["blocks"][k].update(state="merged") for k in keys])
+    log(f"{os.path.basename(out)}: {count} tiles from {len(keys)} blocks, {os.path.getsize(out) / 2**20:.0f} MB")
+    return out
+
+
+def built_groups(st, gz):
+    groups = {}
+    for key, b in st["blocks"].items():
+        if b["state"] == "built":
+            groups.setdefault(group_of(b, gz), []).append(key)
+    return groups
+
+
+def cmd_merge(args):
+    """Join built blocks into one archive per group-zoom tile. Blocks never share
+    a tile, so this is a sort of tile ids, no de-duplication."""
+    wd = args.workdir
+    st = load_state(wd)
+    gz = args.group_zoom
+    side = load_side(wd, st, gz)
+    groups = built_groups(st, gz)
     for g in side:
         groups.setdefault(g, [])
-    os.makedirs(os.path.join(wd, "publish"), exist_ok=True)
-    date = time.strftime("%Y-%m-%d")
     for g, keys in sorted(groups.items()):
-        out = os.path.join(wd, "publish", f"planet-{bkey(*g)}-{date}.pmtiles")
-        check_space(sum(os.path.getsize(os.path.join(wd, "built", f"{k}.pmtiles")) for k in keys) / 2**30)
-        files = [open(os.path.join(wd, "built", f"{key}.pmtiles"), "r+b") for key in keys]
+        merge_group(wd, st, g, keys, side.get(g, {}), args.delete_built)
 
-        def stream(f):
-            # each archive's tiles come out in tile-id order (checked), so all
-            # blocks merge with one tile per block in memory
-            last = -1
-            for zxy, data in all_tiles(MmapSource(f)):
-                tid = zxy_to_tileid(*zxy)
-                if tid <= last:
-                    raise RuntimeError(f"{f.name}: tiles out of order")
-                last = tid
-                yield tid, zxy, data
 
-        lons, lats = [], []
-        count = 0
-        with open(out, "wb") as fo:
-            w = Writer(fo)
-            extra = side.get(g, {})
-            side_only = ((tid, tileid_to_zxy(tid), None) for tid in sorted(extra))
-            last = None
-            for tid, (z, x, y), data in heapq.merge(*(stream(f) for f in files), side_only, key=lambda t: t[0]):
-                if tid == last:            # (a side-only entry for a tile a block already wrote)
-                    continue
-                last = tid
-                if tid in extra:
-                    data = fold_in(data, extra[tid])
-                w.write_tile(tid, data)
-                count += 1
-                west, south, east, north = tile_bbox(z, x, y)
-                lons += [west, east]
-                lats += [south, north]
-            w.finalize({
-                "tile_type": TileType.UNKNOWN, "tile_compression": Compression.GZIP,
-                "min_zoom": TILE_ZOOM, "max_zoom": TILE_ZOOM,
-                "min_lon_e7": int(min(lons) * 1e7), "min_lat_e7": int(min(lats) * 1e7),
-                "max_lon_e7": int(max(lons) * 1e7), "max_lat_e7": int(max(lats) * 1e7),
-                "center_zoom": TILE_ZOOM, "center_lon_e7": int((min(lons) + max(lons)) / 2 * 1e7),
-                "center_lat_e7": int((min(lats) + max(lats)) / 2 * 1e7),
-            }, {
-                "name": "mapng-osm", "format": "overpass-json-compact-v2", "source": os.path.basename(st.get("planet", "planet")),
-                "zoom": TILE_ZOOM, "group": bkey(*g), "blocks": sorted(keys),
-                "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "attribution": "© OpenStreetMap contributors (ODbL)",
-            })
-        for f in files:
-            f.close()
-        drop_cache(out, *(os.path.join(wd, "built", f"{k}.pmtiles") for k in keys))
-        if args.delete_built:
-            for key in keys:
-                os.remove(os.path.join(wd, "built", f"{key}.pmtiles"))
-                if os.path.exists(os.path.join(wd, "built", f"{key}.pmtiles.side")):
-                    os.remove(os.path.join(wd, "built", f"{key}.pmtiles.side"))
-                st["blocks"][key]["state"] = "merged"
-            save_state(wd, st)
-        log(f"{os.path.basename(out)}: {count} tiles from {len(keys)} blocks, {os.path.getsize(out) / 2**20:.0f} MB")
+# Regional archives the planet replaces, by bounding box (w, s, e, n): dropped
+# from the manifest once every zoom-3 group they touch is published.
+OLD_REGIONS = {
+    "arizona": (-114.8224, 31.32659, -109.0437, 37.00596),
+    "utah": (-114.0556, 36.9963, -109.0401, 42.00323),
+    "florida": (-87.7, 24.4, -79.8, 31.1),
+}
+
+
+def groups_touching(bbox, gz):
+    w, s, e, n = bbox
+    def xy(lat, lon):
+        m = 1 << gz
+        x = int((lon + 180) / 360 * m)
+        y = int((1 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2 * m)
+        return min(m - 1, max(0, x)), min(m - 1, max(0, y))
+    x0, y0 = xy(n, w)
+    x1, y1 = xy(s, e)
+    return {(gz, x, y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)}
+
+
+def cmd_publish(args):
+    """Merge and upload each zoom-3 group as soon as it and its neighbours are
+    built (side lines from neighbours' owner blocks must be in), while the
+    rest builds. --watch repeats until every group is out."""
+    wd = args.workdir
+    gz = START_ZOOM
+    final = ("built", "merged", "empty")
+    while True:
+        st = load_state(wd)
+        leaves = [b for b in st["blocks"].values() if b["state"] not in ("split",)]
+        pending = {group_of(b, gz) for b in leaves if b["state"] not in final}
+        published = st.get("published", {})
+        groups = built_groups(st, gz)
+        side = None
+        did = False
+        for g in sorted(set(groups) | set()):
+            if bkey(*g) in published:
+                continue
+            gx, gy = g[1], g[2]
+            near = {(gz, gx + dx, gy + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)}
+            if near & pending:
+                continue
+            if side is None:
+                side = load_side(wd, st, gz)
+            out = merge_group(wd, st, g, groups[g], side.get(g, {}), True)
+            published_now = {**published, bkey(*g): True}
+            drop = [r for r, bbox in OLD_REGIONS.items()
+                    if r not in st.get("dropped", []) and all(bkey(*t) in published_now for t in groups_touching(bbox, gz))]
+            cmd = [PY, os.path.join(REPO, "scripts", "publish-osm-tiles.py"), out, "--tile", f"{g[0]}/{g[1]}/{g[2]}"]
+            for r in drop:
+                cmd += ["--drop-region", r]
+            r = run(cmd)
+            log(r.stderr.strip().splitlines()[-1] if r.stderr.strip() else f"published {out}")
+            def mark(s2, g=g, drop=drop):
+                s2.setdefault("published", {})[bkey(*g)] = True
+                s2["dropped"] = sorted(set(s2.get("dropped", [])) | set(drop))
+            update_state(wd, mark)
+            os.remove(out)                      # (uploaded and listed; R2 holds it now)
+            published = load_state(wd).get("published", {})
+            did = True
+        st = load_state(wd)
+        # groups with only side lines (no built block of their own) are rare: merged at the end
+        if not args.watch:
+            break
+        if not [b for b in st["blocks"].values() if b["state"] not in final + ("split",)] and not did and not built_groups(st, gz):
+            log("everything published")
+            break
+        if not did:
+            time.sleep(300)
 
 
 def cmd_status(args):
@@ -510,12 +617,13 @@ def main():
     p = sub.add_parser("split"); p.add_argument("workdir"); p.add_argument("--max-mb", type=float, default=600); p.add_argument("--batch", type=int, default=16); p.add_argument("--keep-filtered", action="store_true")
     p = sub.add_parser("build"); p.add_argument("workdir"); p.add_argument("--jobs", type=int, default=4); p.add_argument("--retry", action="store_true"); p.add_argument("--only")
     p = sub.add_parser("merge"); p.add_argument("workdir"); p.add_argument("--group-zoom", type=int, default=3); p.add_argument("--delete-built", action="store_true")
+    p = sub.add_parser("publish"); p.add_argument("workdir"); p.add_argument("--watch", action="store_true")
     p = sub.add_parser("status"); p.add_argument("workdir")
     args = ap.parse_args()
     roots = [args.workdir] + ([args.planet] if getattr(args, "planet", None) else [])
     if args.cmd != "status":
         start_cache_trimmer(*roots)
-    {"filter": cmd_filter, "split": cmd_split, "build": cmd_build, "merge": cmd_merge, "status": cmd_status}[args.cmd](args)
+    {"filter": cmd_filter, "split": cmd_split, "build": cmd_build, "merge": cmd_merge, "publish": cmd_publish, "status": cmd_status}[args.cmd](args)
 
 
 if __name__ == "__main__":
