@@ -189,7 +189,8 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
         : { valueKey: `config.edits_${e.terrainEdits}` });
     }
     if (e.backdrop) add('export', 'config.backdrop', { valueKey: e.backdrop === 'off' ? 'config.off' : `config.source_${e.backdrop}` });
-    if (typeof e.safeCaps === 'boolean') add('export', 'config.safeCaps', { valueKey: e.safeCaps ? 'config.on' : 'config.off' });
+    // (shown like the panel's "Build everything" box, the opposite of safe caps)
+    if (typeof e.safeCaps === 'boolean') add('export', 'config.buildEverything', { valueKey: e.safeCaps ? 'config.off' : 'config.on' });
   }
   return rows;
 }

@@ -106,8 +106,8 @@
 
   <section id="what">
     <h2>What the hotspot map is</h2>
-    <p>The 2D map in MapNG has an optional <b>Export hotspots</b> overlay, in the Map Layers box. It shows the areas where people export BeamNG levels, as dots that get bigger and darker with more exports. The dots come only from people who chose to share. It helps everyone see where the community is building, and helps the developer decide where to improve MapNG next.</p>
-    <p>Sharing is off by default, on the website and in the desktop app. MapNG asks you once, after your first export, and the desktop app has an unticked box on its welcome screen. You can change your answer at any time with <b>Share my exports (anonymous)</b> in the <b>Map Layers</b> box on the map.</p>
+    <p>The 2D map in MapNG has an optional <b>Export hotspots</b> overlay, in the Map layers box. It shows the areas where people export BeamNG levels, as dots that get bigger and darker with more exports. The dots come only from people who chose to share. It helps everyone see where the community is building, and helps the developer decide where to improve MapNG next.</p>
+    <p>Sharing is off by default, on the website and in the desktop app. MapNG asks you once, after your first export, and the desktop app has an unticked box on its welcome screen. You can change your answer at any time with <b>Share my exports (anonymous)</b> in the <b>Map layers</b> box on the map.</p>
   </section>
 
   <section id="report">
@@ -199,7 +199,7 @@ Content-Type: application/json
   <section id="control">
     <h2>Your controls</h2>
     <ul>
-      <li><b>Turn it on or off:</b> the <b>Map Layers</b> box on the map → <b>Share my exports (anonymous)</b>. Turning it off stops reports immediately.</li>
+      <li><b>Turn it on or off:</b> the <b>Map layers</b> box on the map → <b>Share my exports (anonymous)</b>. Turning it off stops reports immediately.</li>
       <li><b>Where your choice lives:</b> on your own computer only, in local storage under the key <code>mapng_share_exports</code> (<code>on</code> or <code>off</code>). Clearing your browser's site data resets it, and MapNG will ask again.</li>
       <li><b>Check it yourself:</b> open your browser's developer tools, go to the Network tab, and export a level. With sharing on you'll see one <code>POST</code> to <code>/api/hotspots</code> with the three values; with it off, you'll see none.</li>
       <li><b>Removing past counts:</b> because nothing links a count to a person, individual exports can't be found and removed. If the hotspot feature is ever retired, the table will be deleted.</li>
@@ -208,7 +208,7 @@ Content-Type: application/json
 
   <section id="usage">
     <h2>Settings stats: which settings people use</h2>
-    <p>A separate opt-in from the hotspot map, with its own switch (<em>Share which settings I use</em> in the Map Layers box, asked once after your first export). It tells the developer which settings people really pick, so defaults can be better and settings nobody uses can go.</p>
+    <p>A separate opt-in from the hotspot map, with its own switch (<em>Share which settings I use</em> in the Map layers box, asked once after your first export). It tells the developer which settings people really pick, so defaults can be better and settings nobody uses can go.</p>
     <p>When it's on and a level export finishes, MapNG sends one message to <code>https://mapng.com/api/usage</code>. A typical one, in full:</p>
 <pre><code>POST /api/usage
 Content-Type: application/json
@@ -247,7 +247,7 @@ Content-Type: application/json
 
   <section id="send-codes">
     <h2>Sending a config with a code</h2>
-    <p>Under <em>Configuration &amp; Session</em>, <strong>Share my settings → Get a code</strong> gives you a short code like <code>K7F-29Q</code>, or a link like <code>mapng.com/#K7F-29Q</code>, to give someone. They enter it under <strong>Use someone's code</strong>.</p>
+    <p>Under <em>Share &amp; save settings</em>, <strong>Share my settings → Get a code</strong> gives you a short code like <code>K7F-29Q</code>, or a link like <code>mapng.com/#K7F-29Q</code>, to give someone. They enter it under <strong>Use someone's code</strong>.</p>
     <ul>
       <li><strong>What's stored:</strong> your control-panel settings (location, area, elevation source, and the export settings), the same settings <em>Copy long code</em> gives you. Never your keys or your own servers (GPXZ key, custom Overpass address).</li>
       <li><strong>Where:</strong> private Cloudflare R2 storage with no public access.</li>

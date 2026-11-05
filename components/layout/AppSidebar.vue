@@ -48,11 +48,11 @@
       <div class="flex items-start justify-between gap-2 px-2">
         <div class="flex flex-wrap items-center gap-x-1 gap-y-1 min-w-0">
           <BaseButton variant="ghost" size="sm" class="h-6 px-2 text-[11px] font-medium leading-none" @click="$emit('show-disclaimer')">{{ t('sidebar.disclaimer') }}</BaseButton>
-          <a href="mailto:nikkiluzader@gmail.com" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.contact') }}</a>
-          <a href="https://discord.gg/j6ZvcF8rgk" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.discord') }}</a>
-          <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.github') }}</a>
-          <a :href="desktopApp ? 'https://mapng.com/data.html' : '/data.html'" target="_blank" rel="noopener" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none">{{ t('sidebar.yourData') }}</a>
-          <a v-if="!desktopApp" :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener noreferrer" :title="t('sidebar.desktopAppTooltip')" class="inline-flex items-center gap-1 h-6 text-[#FF6600] hover:text-[#E65C00] transition-colors px-2 leading-none"><Download :size="11" />{{ t('sidebar.desktopApp') }}</a>
+          <a href="mailto:nikkiluzader@gmail.com" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none">{{ t('sidebar.contact') }}</a>
+          <a href="https://discord.gg/j6ZvcF8rgk" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none">{{ t('sidebar.discord') }}</a>
+          <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none">{{ t('sidebar.github') }}</a>
+          <a :href="desktopApp ? 'https://mapng.com/data.html' : '/data.html'" target="_blank" rel="noopener" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none">{{ t('sidebar.yourData') }}</a>
+          <a v-if="!desktopApp" :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener noreferrer" :title="t('sidebar.desktopAppTooltip')" class="inline-flex items-center gap-1 h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none"><Download :size="11" />{{ t('sidebar.desktopApp') }}</a>
           <BaseButton
             variant="ghost"
             size="sm"

@@ -206,7 +206,7 @@
           <button
             type="button"
             @click="$emit('showSupport')"
-            class="shrink-0 px-2.5 py-1 text-[10px] font-semibold bg-[#f45d22] hover:bg-[#e4521a] text-white rounded transition-colors"
+            class="shrink-0 px-2.5 py-1 text-[10px] font-semibold bg-[#FF6600] hover:bg-[#e85d00] text-white rounded transition-colors"
           >
             {{ t('support.donate') }}
           </button>
@@ -233,7 +233,7 @@
       </BaseButton>
 
       <template v-if="hasResumableSavedState">
-        <BaseButton block size="md" variant="primary" class="bg-emerald-600 hover:bg-emerald-700" @click="$emit('resumeBatch')">
+        <BaseButton block size="md" variant="success" @click="$emit('resumeBatch')">
           <RotateCcw :size="14" />
           {{ t('batch.resumePrevious', { done: savedState.totalCompleted, total: savedState.tiles.length }) }}
         </BaseButton>

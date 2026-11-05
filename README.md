@@ -66,8 +66,8 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - Every level now carries `mapng.json` (MapNG version, area, size and settings), so the desktop app can recognise and rebuild it
 - The website and the desktop app read MapNG's own OpenStreetMap tiles in hosted regions; trees scattered in woods come out the same on every export
 - **Desktop: Update and Modify in My Levels.** Update remakes a level with the current version; Modify loads it back in with its settings to change and export again. Both use the level's saved downloads (terrain, satellite, OSM, bridge-height lidar), so nothing is downloaded and no GPXZ calls are used. "Show saved data" opens a level's saved-data folder (it is not part of the level zip)
-- **Desktop: much faster big maps.** The heightmap resample runs on every CPU core (a 16k GPXZ map generates in about a minute), measured bridge heights from US lidar now work in the desktop app, and the 3D preview's texture choice is the export's Base Texture
-- **Clearer settings:** the sidebar follows the order you work in (location, area and detail, elevation, map data, generate, export), the level options are grouped into cards (Level, Content, Structures, Terrain edits, Surroundings; Structures and Terrain edits in Advanced mode), and greyed-out options say why. Map overlays live in the Map Layers box
+- **Desktop: much faster big maps.** The heightmap resample runs on every CPU core (a 16k GPXZ map generates in about a minute), measured bridge heights from US lidar now work in the desktop app, and the 3D preview's texture choice is the export's base texture
+- **Clearer settings:** the sidebar follows the order you work in (location, area and detail, elevation, map data, generate, export), the level options are grouped into cards (Level, Content, Structures, Terrain edits, Surroundings; Structures and Terrain edits in Advanced mode), and greyed-out options say why. Map overlays live in the Map layers box
 - The "Apply foundations" terrain option is gone: buildings carry their own foundations
 - **Export hotspots:** an optional 2D map overlay of where people export levels, from users who opt in to share (see [Export hotspots and privacy](#export-hotspots-and-privacy))
 
@@ -138,7 +138,7 @@ This helps keep community resource hubs focused on curated, polished releases wh
 
 ## Export Hotspots and Privacy
 
-**Export hotspots**, in the Map Layers box on the 2D map, draws the busy export areas. They come from users who choose to share: sharing is **off unless you turn it on** (**Share my exports** in the same box; MapNG asks once after your first export, and the desktop app's welcome screen has a checkbox).
+**Export hotspots**, in the Map layers box on the 2D map, draws the busy export areas. They come from users who choose to share: sharing is **off unless you turn it on** (**Share my exports** in the same box; MapNG asks once after your first export, and the desktop app's welcome screen has a checkbox).
 
 - **What is sent:** for each level you export, the ~5 km grid square (0.05°) it falls in and whether it came from the website or the desktop app. The square is computed in your browser or app; the exact location never leaves your computer.
 - **What is never sent:** no name, account, email or device ID; no level name, settings or map data; no exact coordinates.
@@ -149,7 +149,7 @@ This helps keep community resource hubs focused on curated, polished releases wh
 - Turning sharing off stops reports at once. Counts already added can't be traced back to anyone, so they can't be removed individually.
 - The whole table is public at [mapng.com/api/hotspots](https://mapng.com/api/hotspots), and [mapng.com/data.html](https://mapng.com/data.html) explains every field, the pipeline, and every other service MapNG connects to.
 
-**Settings stats** are a separate opt-in (**Share which settings I use** in the Map Layers box). After an export, MapNG sends which settings you picked, from fixed lists only: never a location, level name or key. Only a running total per setting is stored, public at [mapng.com/api/usage](https://mapng.com/api/usage).
+**Settings stats** are a separate opt-in (**Share which settings I use** in the Map layers box). After an export, MapNG sends which settings you picked, from fixed lists only: never a location, level name or key. Only a running total per setting is stored, public at [mapng.com/api/usage](https://mapng.com/api/usage).
 
 **Send codes** keep your settings for 24 hours so someone can open them; **desktop problem reports** are sent only when you choose Send. Both are explained on the [data page](https://mapng.com/data.html).
 
@@ -195,10 +195,10 @@ Releases are built by `.github/workflows/desktop-release.yml` when a `vX.Y.Z` ta
 
 1. Pick a location on the map or search by name.
 2. Choose an output size, a processing scale (m/px) and an elevation source.
-3. Keep Include OSM Features on for roads, buildings, vegetation and everything built from them (turn on MapNG OSM coverage in the Map Layers box to see where MapNG has its own copy).
+3. Keep Include OSM features on for roads, buildings, vegetation and everything built from them (turn on MapNG OSM coverage in the Map layers box to see where MapNG has its own copy).
 4. Generate the terrain and check it in the 3D preview.
 5. Export the BeamNG level and put the ZIP in your BeamNG.drive `mods` folder (the desktop app saves it there for you).
-6. For larger areas, switch to Batch Job mode and process a tile grid, or stitch one into a combined level.
+6. For larger areas, switch to Batch job mode and process a tile grid, or stitch one into a combined level.
 
 ## Community
 

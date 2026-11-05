@@ -1,9 +1,4 @@
 <template>
-  <!-- Memory Widget — always on top -->
-  <div class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none">
-    <MemoryWidget />
-  </div>
-
   <!-- Mobile Restriction Overlay -->
   <MobileRestrictionOverlay />
 
@@ -92,6 +87,11 @@
 
     <!-- Main Content Area -->
     <main class="flex-1 relative flex flex-col h-full bg-gray-100 dark:bg-gray-950">
+      <!-- Memory widget: centred on the map area (not the window, where it covered
+           the elevation minimap's legend), above the map, below dialogs -->
+      <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
+        <MemoryWidget />
+      </div>
       <ViewTabs
         :preview-mode="previewMode"
         :can-preview="!!terrainData"

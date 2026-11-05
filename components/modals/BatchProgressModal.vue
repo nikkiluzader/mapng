@@ -246,7 +246,7 @@
 
         <template v-else-if="isPaused">
           <button @click="$emit('resume')"
-            class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#E65C00] text-white transition-colors">
+            class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors">
             <Play :size="14" />
             {{ t('batchProgress.resume') }}
           </button>
@@ -258,7 +258,7 @@
 
         <template v-else-if="isDone">
           <button v-if="failedCount > 0" @click="$emit('retryFailed')"
-            class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#E65C00] text-white transition-colors">
+            class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors">
             <RotateCcw :size="14" />
             {{ isCombinedLevel ? t('batchProgress.retryFailedCombined', { count: failedCount, suffix: failedCount !== 1 ? 's' : '' }) : t('batchProgress.retryFailed', { count: failedCount, suffix: failedCount !== 1 ? 's' : '' }) }}
           </button>

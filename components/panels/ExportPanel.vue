@@ -209,7 +209,7 @@
             class="w-full flex items-center justify-center gap-2 p-2 bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 rounded text-white text-[11px] font-medium transition-colors"
           >
             <Download :size="14" />
-            Download Ready: {{ beamNGPendingDownloadName || 'beamng_level.zip' }}
+            {{ t('exportPanel.downloadReady', { name: beamNGPendingDownloadName || 'beamng_level.zip' }) }}
           </a>
 
           <div
@@ -271,8 +271,8 @@
               <div class="text-[11px] font-medium text-gray-800 dark:text-gray-100">{{ t('usage.askTitle') }}</div>
               <div class="text-[10px] leading-snug text-gray-600 dark:text-gray-300">{{ t('usage.askBody') }} <button type="button" class="text-[#FF6600] hover:underline" @click.prevent.stop="openUsagePrivacy">{{ t('usage.readMore') }}</button></div>
               <div class="flex flex-wrap gap-1.5">
-                <button type="button" class="px-2.5 py-0.5 text-[10px] font-semibold rounded bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors" @click="answerShareSettings(true)">{{ t('hotspots.askYes') }}</button>
-                <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="answerShareSettings(false)">{{ t('hotspots.askNo') }}</button>
+                <button type="button" class="px-2.5 py-0.5 text-[10px] font-semibold rounded bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors" @click="answerShareSettings(true)">{{ t('usage.askYes') }}</button>
+                <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="answerShareSettings(false)">{{ t('usage.askNo') }}</button>
               </div>
             </div>
           </div>

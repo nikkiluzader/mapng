@@ -112,7 +112,7 @@
         :options="{ dashArray: '2, 6', lineCap: 'round' }"
       >
         <l-tooltip :permanent="false" direction="top" :offset="[0, -6]">
-          Missing {{ tile.label }}
+          {{ t('map.missingTile', { label: tile.label }) }}
         </l-tooltip>
       </l-rectangle>
 
@@ -228,8 +228,8 @@
           @click="openInOsm"
           type="button"
           :title="t('map.editInOsm')"
-          aria-label="Edit in OpenStreetMap"
-          class="w-full text-left text-[12px] font-medium text-[#0f766e] hover:text-[#065f55] transition-colors px-2 py-1.5"
+          :aria-label="t('map.editInOsm')"
+          class="w-full text-left text-[12px] font-medium text-teal-700 hover:text-teal-900 dark:text-teal-300 dark:hover:text-teal-200 transition-colors px-2 py-1.5"
         >
           {{ t('map.editInOsm') }}
         </button>

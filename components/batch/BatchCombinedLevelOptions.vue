@@ -50,9 +50,9 @@
       <div class="flex items-center justify-between gap-2">
         <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.includeBackdrop') }}</span>
         <select :value="model.backdropSource" @change="update('backdropSource', $event.target.value)" :class="SELECT_XS">
-          <option value="off">Off</option>
-          <option value="global30m">30m Global</option>
-          <option value="usgs1m">USGS 1m</option>
+          <option value="off">{{ t('exportPanel.ui.backdropOff') }}</option>
+          <option value="global30m">{{ t('exportPanel.ui.backdropGlobal') }}</option>
+          <option value="usgs1m">{{ t('exportPanel.ui.backdropUsgs') }}</option>
           <option value="gpxz">GPXZ</option>
         </select>
       </div>

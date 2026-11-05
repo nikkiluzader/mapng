@@ -38,12 +38,14 @@ const variantClass = computed(() => {
   switch (props.variant) {
     case 'primary':
       return props.prominent
-        ? 'bg-[#FF6600] text-white hover:bg-[#E65C00] shadow-orange-900/10'
-        : 'bg-[#FF6600] text-white hover:bg-[#E65C00] shadow-orange-900/10';
+        ? 'bg-[#FF6600] text-white hover:bg-[#e85d00] shadow-orange-900/10'
+        : 'bg-[#FF6600] text-white hover:bg-[#e85d00] shadow-orange-900/10';
     case 'secondary':
       return props.prominent
         ? 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 shadow-sm'
         : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+    case 'success':
+      return 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-900/10';
     case 'ghost':
       return 'bg-transparent text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 border border-transparent';
     default:

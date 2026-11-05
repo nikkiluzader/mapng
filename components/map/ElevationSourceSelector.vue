@@ -47,7 +47,7 @@
         <!-- GPXZ -->
         <div v-else-if="localElevationSource === 'gpxz'" class="space-y-0.5 w-full">
                 <span class="block text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
-                    {{ t('map.gpxzDescription') }} <a href="https://www.gpxz.io/docs/dataset#coverage" target="_blank" class="text-[#FF6600] hover:underline">{{ t('map.checkCoverage') }}</a>
+                    {{ t('map.gpxzDescription') }} <a href="https://www.gpxz.io/docs/dataset#coverage" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">{{ t('map.checkCoverage') }}</a>
                 </span>
 
                 <div class="mt-2 animate-in fade-in slide-in-from-top-1">
@@ -58,7 +58,7 @@
                         class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
                     />
                     <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight mt-1">
-                        {{ t('map.freeTier') }} <a href="https://www.gpxz.io/" target="_blank" class="text-[#FF6600] hover:underline">{{ t('map.getKey') }}</a>
+                        {{ t('map.freeTier') }} <a href="https://www.gpxz.io/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">{{ t('map.getKey') }}</a>
                     </p>
                     <p v-if="isBatchMode" class="text-[10px] text-amber-600 dark:text-amber-500 font-medium mt-1">
                       ⚠️ {{ t('map.gpxzBatchWarning', { tiles: totalTiles }) }}

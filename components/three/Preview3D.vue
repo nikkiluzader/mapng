@@ -6,8 +6,8 @@
       <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <p class="text-sm font-semibold text-gray-300">3D preview unavailable</p>
-      <p class="text-xs text-gray-500 max-w-xs">Your browser could not create a WebGL context. Try enabling GPU acceleration or opening the app in a different browser.</p>
+      <p class="text-sm font-semibold text-gray-300">{{ t('preview.webglTitle') }}</p>
+      <p class="text-xs text-gray-500 max-w-xs">{{ t('preview.webglBody') }}</p>
     </div>
 
     <!-- dpr caps rendering at 2x device pixels: on 3-4x mobile/hiDPI screens the
@@ -132,7 +132,7 @@
           v-model="sunPosition"
           :class="[SELECT_SM, 'appearance-none hover:bg-gray-50 dark:hover:bg-gray-700']"
         >
-          <option v-for="s in sunPositionOptions" :key="s" :value="s">{{ s }}</option>
+          <option v-for="s in sunPositionOptions" :key="s" :value="s">{{ t(`preview.sun_${s}`) }}</option>
         </select>
       </div>
 
@@ -343,8 +343,8 @@
                     class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#FF6600]"
                   ></div>
                 </div>
-                <span class="text-[10px] capitalize text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
-                  {{ key }}
+                <span class="text-[10px] text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
+                  {{ t(`preview.feature_${key}`) }}
                 </span>
               </label>
             </div>

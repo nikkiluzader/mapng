@@ -289,7 +289,7 @@
         <button
           type="button"
           @click="$emit('showSupport')"
-          class="shrink-0 px-3 py-1.5 text-[11px] font-semibold bg-[#f45d22] hover:bg-[#e4521a] text-white rounded-md transition-colors"
+          class="shrink-0 px-3 py-1.5 text-[11px] font-semibold bg-[#FF6600] hover:bg-[#e85d00] text-white rounded-md transition-colors"
         >
           {{ t('support.donate') }}
         </button>

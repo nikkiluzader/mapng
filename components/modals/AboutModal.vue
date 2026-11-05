@@ -101,7 +101,7 @@
 
         <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
           <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
-            {{ t('about.footerPrefix') }} <a href="https://github.com/nikkiluzader" target="_blank" class="text-[#FF6600] hover:underline">Nikki Luzader</a> • {{ t('about.footerMiddle') }} <a href="https://github.com/nikkiluzader/mapng" target="_blank" class="text-[#FF6600] hover:underline">GitHub</a>
+            {{ t('about.footerPrefix') }} <a href="https://github.com/nikkiluzader" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Nikki Luzader</a> • {{ t('about.footerMiddle') }} <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">GitHub</a>
           </p>
         </div>
       </div>

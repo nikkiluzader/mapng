@@ -16,7 +16,7 @@
           <button
             @click="handleSave"
             :disabled="!hasUnsavedChanges || isSaving"
-            class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#FF6600] text-white hover:bg-[#e65c00] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+            class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#FF6600] text-white hover:bg-[#e85d00] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
           >
             <Loader2 v-if="isSaving" :size="12" class="animate-spin" />
             <Check v-else :size="12" />
@@ -189,7 +189,7 @@
           <span>{{ t('exportPanel.texturePaint.polygonSelected') }}</span>
           <button
             @click="applyPolygonRecolor"
-            class="flex items-center gap-1 px-2 py-0.5 rounded bg-[#FF6600] text-white font-medium hover:bg-[#e65c00] transition-colors"
+            class="flex items-center gap-1 px-2 py-0.5 rounded bg-[#FF6600] text-white font-medium hover:bg-[#e85d00] transition-colors"
           >
             <span class="w-2.5 h-2.5 rounded-sm border border-white/60" :style="{ background: color }"></span>
             {{ t('exportPanel.texturePaint.applyColor') }}

@@ -41,7 +41,7 @@
 }
 
 .view-tab--active {
-  @apply bg-[#1d2d44] text-white shadow-sm;
+  @apply bg-gray-900 dark:bg-gray-700 text-white shadow-sm;
 }
 
 .view-tab--inactive {
@@ -53,7 +53,7 @@
 }
 
 .view-tab--active:hover {
-  @apply bg-[#1d2d44] text-white;
+  @apply bg-gray-900 dark:bg-gray-700 text-white;
 }
 
 .view-tab--inactive:hover {

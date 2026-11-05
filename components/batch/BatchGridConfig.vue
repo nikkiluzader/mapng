@@ -73,7 +73,7 @@
       </div>
     </div>
 
-    <div class="pt-2 border-top border-gray-200 dark:border-gray-600 space-y-2">
+    <div class="pt-2 border-t border-gray-200 dark:border-gray-600 space-y-2">
       <div class="grid grid-cols-3 gap-2 text-[10px]">
         <div class="text-center">
           <div class="text-gray-400 dark:text-gray-500">{{ t('batch.tiles') }}</div>
