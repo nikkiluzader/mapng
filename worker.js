@@ -193,9 +193,17 @@ const EXPOSED_HEADERS = [
   'content-type',
 ].join(', ');
 
+// The newest update page (public/updates/<version>/): /updates/latest and
+// /updates point at it. Bump with each update page.
+export const LATEST_UPDATE = '0.2.5';
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (/^\/updates\/?(latest\/?)?$/.test(url.pathname)) {
+      return new Response(null, { status: 302, headers: { Location: `/updates/${LATEST_UPDATE}/`, 'Cache-Control': 'no-cache' } });
+    }
 
     if (url.pathname === '/api/osm') {
       return handleOsm(request, url, ctx);

@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.2.5: It Feels Like BeamNG</title>
+<meta name="description" content="What's new in MapNG 0.2.5: BeamNG.drive's own look, progress like the game's loading screen, a better 2D map, levels across the date line, real water on the Game texture, and more.">
+<link rel="canonical" href="https://mapng.com/updates/0.2.5/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.2.5: it feels like BeamNG now">
+<meta property="og:description" content="BeamNG's own look, loading-screen progress, a better 2D map, levels across the date line, real water on the Game texture, and more.">
+<meta property="og:url" content="https://mapng.com/updates/0.2.5/">
+<meta property="og:image" content="https://mapng.com/updates/0.2.5/images/hero-bridge-of-lions.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: the in-game shot with the title over it */
+  .hero { position: relative; color: #fff; background: #111 url(images/hero-bridge-of-lions.jpg) center/cover no-repeat; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(70vh, 560px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.2.5</span></span>
+    <h1>It feels like BeamNG now</h1>
+    <p>BeamNG.drive's own look, progress like the game's loading screen, a better 2D map, levels across the date line, real water, and a lot of polish since the desktop app launched.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+  <span class="credit">St. Augustine's Bridge of Lions, a 1 km MapNG level in BeamNG.drive 0.40</span>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#look">🎨 New look</a>
+    <a href="#map">🗺️ 2D map</a>
+    <a href="#dateline">🌏 Date line</a>
+    <a href="#water">💧 Water</a>
+    <a href="#levels">🖥️ My Levels</a>
+    <a href="#share">🔗 Share codes</a>
+    <a href="#hotspots">🔥 Hotspots</a>
+    <a href="#osm">🌍 OSM data</a>
+    <a href="#polish">🧹 Polish</a>
+  </nav>
+
+  <p style="margin-top:28px">Since the desktop app launched, five updates have gone out, and <b>0.2.5 is out today</b>. Here's everything new since then. The website has all of it too, and exports target BeamNG.drive 0.40.</p>
+
+  <section id="look">
+    <div class="kicker">The look</div>
+    <h2>🎨 It looks and feels like BeamNG</h2>
+    <p>MapNG now uses <b>BeamNG.drive's own interface fonts</b>: Noto Sans for text, Overpass for titles and Overpass Mono for numbers. It also uses the game's orange palette and corner shapes, the same way everywhere, in light and dark mode.</p>
+    <figure><img src="images/new-look.jpg" alt="MapNG in light and dark mode with the new BeamNG-style fonts and colours" loading="lazy"></figure>
+
+    <h3>Progress that looks like the game's loading screen</h3>
+    <div class="split">
+      <div>
+        <p>Generate and Export now play out like a level load in BeamNG:</p>
+        <ul>
+          <li>six stage tiles fill in orange as MapNG works</li>
+          <li>a slanted bar runs start to finish for each stage</li>
+          <li>the stage name sits big underneath</li>
+          <li>the latest steps scroll by with their timings</li>
+        </ul>
+      </div>
+      <figure><img src="images/stage-loader.jpg" alt="The stage-by-stage progress card, light and dark" loading="lazy"></figure>
+    </div>
+  </section>
+
+  <section id="map">
+    <div class="kicker">The 2D map</div>
+    <h2>🗺️ A much better 2D map</h2>
+    <figure><img src="images/map-tools.jpg" alt="The 2D map's new tools, numbered one to six" loading="lazy"></figure>
+    <ol class="callouts">
+      <li><b>Zoom to selection.</b> Jump back to your export box from anywhere.</li>
+      <li><b>Scale bar</b>, in km and miles.</li>
+      <li><b>Cursor and crosshair coordinates.</b> See where your mouse is <em>and</em> where your selection is.</li>
+      <li><b>Shortcuts.</b> <b>Ctrl + scroll</b> zooms on the crosshair without moving your selection; a plain scroll still zooms toward the mouse.</li>
+      <li><b>Right-click menu:</b> center the selection here, or copy the coordinates.</li>
+      <li><b>Place and road names on satellite</b>, with a toggle to turn them off.</li>
+    </ol>
+    <p style="margin-top:18px">There's also more you can't see in a screenshot:</p>
+    <ul>
+      <li><b>The cursor is now a thin crosshair</b> instead of the grabbing hand.</li>
+      <li><b>Your selection shows its size</b> ("1.02 × 1.02 km"), and the map around it dims once you zoom in.</li>
+      <li><b>The map is one flat world</b>, with no more endless copies when you scroll sideways. The crosshair can still reach every edge, even after a fast swipe.</li>
+      <li><b>The Map layers box is grouped into Map, Show on map and Sharing</b>, and folds away.</li>
+    </ul>
+  </section>
+
+  <section id="dateline">
+    <div class="kicker">Anywhere on Earth</div>
+    <h2>🌏 Levels across the date line</h2>
+    <div class="split">
+      <figure><img src="images/date-line.jpg" alt="Taveuni, Fiji: a selection sitting on the 180° line" loading="lazy"></figure>
+      <div>
+        <p>Fiji, the far Aleutians and Chukotka sit right on the 180° line, and they now work properly. The map carries on past the line, dimmed behind a dashed border, so you can see both sides. Every download is split at 180° and stitched back together.</p>
+        <p>The free elevation data turned out to be <b>broken along 180°</b>: flat placeholder tiles on one side and ocean depths on dry land on the other. MapNG now spots those tiles and rebuilds them from the nearest detail level that has real data, so there's no fake cliff where the line crosses an island.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="water">
+    <div class="kicker">Water, fixed twice</div>
+    <h2>💧 Real water, and no more creeks on ridges</h2>
+    <h3>Real water on the Game texture</h3>
+    <p>On the Game base texture, lakes, rivers and the sea used to be painted blue, and a lot of you didn't like it. They now come <b>straight from the satellite image</b>, sandbars and all.</p>
+    <figure><img src="images/game-texture-water.jpg" alt="St. Augustine's bay on the Game texture: blue paint before, real water now" loading="lazy"></figure>
+
+    <h3>Creeks don't stand on ridges anymore</h3>
+    <p>This one came from a config someone shared. On the free 30 m elevation, a wooded creek came out as a <b>ten-metre ridge</b>, with the water floating on top. It turns out that along forested water, the free data measures the <b>treetops</b>, not the ground. MapNG now keeps water below its banks. It only does this where the water is clearly raised, so real valleys and canyons are left alone.</p>
+    <figure><img src="images/creek-fix.jpg" alt="The same creek before (on a ridge in the 3D preview) and now (in its valley, in game)" loading="lazy"></figure>
+  </section>
+
+  <section id="levels">
+    <div class="kicker">MapNG Desktop</div>
+    <h2>🖥️ Update and Modify your levels, without downloading again</h2>
+    <figure><img src="images/desktop-my-levels.jpg" alt="MapNG Desktop with My Levels open" loading="lazy"></figure>
+    <p style="margin-top:16px">In the desktop app, <b>My Levels</b> lists every MapNG level in your mods folder:</p>
+    <ul>
+      <li><b>Update</b> remakes a level with the newest MapNG and its own settings.</li>
+      <li><b>Modify</b> loads it back in so you can change anything (base texture, bridges, terrain edits, content) and export again.</li>
+      <li>Each level keeps everything it downloaded (terrain, satellite, OSM, bridge-height lidar, backdrop), so updates <b>work offline and don't spend GPXZ calls</b>.</li>
+      <li><b>Delete</b> sends a level and its saved data to the Recycle Bin.</li>
+    </ul>
+    <p><b>Big maps are faster too.</b> The heightmap step now runs on every CPU core, so a 16k GPXZ map that used to sit at "Resampling heightmap" for 20+ minutes generates in about a minute and a half. Measured bridge heights from US lidar now work in the desktop app as well.</p>
+  </section>
+
+  <section id="share">
+    <div class="kicker">Settings</div>
+    <h2>🔗 Share your settings with a code</h2>
+    <div class="split narrow-img">
+      <figure><img src="images/share-code.jpg" alt="A share code in the Share &amp; save settings section" loading="lazy"></figure>
+      <div>
+        <p><b>Get a code</b> gives you a short code like <code>K7F-29Q</code>, plus a link, for your whole setup. It works for 24 hours.</p>
+        <p>Paste it on the map, enter it, or open the link, and you see <b>exactly what it changes</b> before anything is applied. There's also a long code that never expires, and Save/Load to a file.</p>
+        <p><b>Your own GPXZ key and Overpass server never go in a code</b>, and someone else's code never changes yours.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="hotspots">
+    <div class="kicker">Community</div>
+    <h2>🔥 Where's everyone building?</h2>
+    <p>The optional <b>Export hotspots</b> overlay shows where the community exports levels: a soft glow when you're zoomed out, and dots you can click once you zoom in.</p>
+    <figure><img src="images/hotspots.jpg" alt="Export hotspots: a glow zoomed out, details up close" loading="lazy"><figcaption>Illustration using sample data.</figcaption></figure>
+    <p>It's <b>opt-in and anonymous</b>: only the ~5 km square of each export is counted, never the exact spot or anything about you. Turn it on with <em>Share my exports</em> in the Map layers box. <a href="/data.html">Full details</a>.</p>
+
+    <h3>⚖️ How heavy is this level?</h3>
+    <div class="split narrow-img">
+      <figure><img src="images/weight-card.jpg" alt="The How heavy is this level? card" loading="lazy"></figure>
+      <p>Before you export, a card rates the level from its size, how far its corners are from the centre (BeamNG starts to jitter past about 30 km) and its building count. <b>It only warns</b>; you can always export.</p>
+    </div>
+  </section>
+
+  <section id="osm">
+    <div class="kicker">Map data</div>
+    <h2>🌍 MapNG's own OpenStreetMap copy is growing</h2>
+    <p>Where MapNG hosts the OSM data itself, map data loads fast and doesn't depend on the public Overpass servers. That copy is now being built for <b>the whole planet</b>. Live today:</p>
+    <ul class="regions">
+      <li>Most of the US west of the Mississippi, south of 41°N</li>
+      <li>Mexico and Central America</li>
+      <li>Hawaii and the Pacific</li>
+      <li>The Great Lakes, New England and eastern Canada</li>
+      <li>Utah</li>
+      <li>Florida</li>
+    </ul>
+    <p>More regions are going live as they're built. Turn on <em>MapNG OSM coverage</em> in the Map layers box to see exactly where.</p>
+  </section>
+
+  <section id="polish">
+    <div class="kicker">And more</div>
+    <h2>🧹 A lot of polish</h2>
+    <div class="split narrow-img">
+      <figure><img src="images/expand-collapse.jpg" alt="Expand all and Collapse all above the settings" loading="lazy"></figure>
+      <div class="polish" style="margin-top:0">
+        <div><b>Expand all / Collapse all</b>For the settings, in single-tile and batch mode.</div>
+        <div><b>Settings in workflow order</b>Level options grouped into cards, and greyed-out options say why.</div>
+        <div><b>Opt-in problem reports</b>You see everything first; nothing is sent unless you choose Send.</div>
+        <div><b>Seven languages</b>Every string reviewed and translated.</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="outro">
+    <figure><img src="images/in-game-bayfront.jpg" alt="Downtown St. Augustine from the water, in BeamNG.drive" loading="lazy"></figure>
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>. Code-signing is in progress.</p>
+    <p>I'd love your feedback on all of this, especially the new look and the progress screens. Post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>
