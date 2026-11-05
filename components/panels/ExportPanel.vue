@@ -590,7 +590,7 @@ import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
-import { openReportDialog } from '../../composables/useReportDialog.js';
+import { currentSessionCode, openReportDialog } from '../../composables/useReportDialog.js';
 import { estimateLevelWeight } from '../../services/levelWeight.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
@@ -1826,7 +1826,10 @@ const handleBeamNGLevelExport = async () => {
       requestedResolution: props.resolution,
     });
 
+    // (the whole control panel as one line, for the report: services/sessionConfig.js)
+    const sessionCode = await currentSessionCode();
     const levelOptions = {
+      sessionCode,
       baseTexture: effectiveBaseTexture,
       includeBackdrop: effectiveIncludeBackdrop,
       backdropElevationSource: effectiveBackdropSource,

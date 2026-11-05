@@ -1001,7 +1001,8 @@
     "copy": "Kopiuj",
     "copied": "Skopiowano",
     "done": "Gotowe",
-    "sendReport": "Wyślij zgłoszenie"
+    "sendReport": "Wyślij zgłoszenie",
+    "incConfig": "Twoje ustawienia jako kod sesji (zawiera lokalizację, więc znika, gdy ją odznaczysz)"
   },
   "config": {
     "copied": "Konfiguracja skopiowana jako kod. Wklej ją w MapNG (Ctrl+V na mapie), aby jej użyć.",

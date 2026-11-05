@@ -1001,7 +1001,8 @@
     "copy": "Kopieren",
     "copied": "Kopiert",
     "done": "Fertig",
-    "sendReport": "Bericht senden"
+    "sendReport": "Bericht senden",
+    "incConfig": "Deine Einstellungen als Sitzungscode (enthält den Ort, entfällt also, wenn du ihn abwählst)"
   },
   "config": {
     "copied": "Konfiguration als Code kopiert. In MapNG einfügen (Strg+V auf der Karte), um sie zu nutzen.",

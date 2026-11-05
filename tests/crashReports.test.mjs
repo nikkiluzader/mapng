@@ -80,3 +80,8 @@ test('desktop reports drop keys, home folders and (if asked) the location', asyn
   assert.ok(!t.includes('SECRET123') && !t.includes('zzz'));
   assert.ok(scrubText('/home/nikki/a', '/home/nikki').startsWith('~/a'));
 });
+
+test('a report keeps a session code, and only a session code, in config', () => {
+  assert.equal(reportSummary({ kind: 'export', config: 'mapng:1:abc' }, 'MR-AAAAAA', 't').config, 'mapng:1:abc');
+  assert.equal(reportSummary({ kind: 'export', config: '<script>' }, 'MR-AAAAAA', 't').config, '');
+});

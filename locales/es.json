@@ -1002,7 +1002,8 @@
     "copy": "Copiar",
     "copied": "Copiado",
     "done": "Listo",
-    "sendReport": "Enviar informe"
+    "sendReport": "Enviar informe",
+    "incConfig": "Tus ajustes, como código de sesión (incluye la ubicación, así que se quita si la desmarcas)"
   },
   "config": {
     "copied": "Configuración copiada como código. Pégala en MapNG (Ctrl+V sobre el mapa) para usarla.",

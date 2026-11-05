@@ -335,6 +335,7 @@ import { buildRunConfiguration as buildRunConfigurationBase } from '../../servic
 import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, looksLikeSessionCode, parseSessionText } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
+import { setSessionCodeSource } from '../../composables/useReportDialog.js';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
 
@@ -722,8 +723,11 @@ const onWindowPaste = (event) => {
   event.preventDefault();
   previewConfigText(trimmed, { quiet: !looksLikeSessionCode(trimmed) });
 };
-onMounted(() => window.addEventListener('paste', onWindowPaste));
-onUnmounted(() => window.removeEventListener('paste', onWindowPaste));
+onMounted(() => {
+  window.addEventListener('paste', onWindowPaste);
+  setSessionCodeSource(() => encodeSessionCode(currentSessionConfig()));
+});
+onUnmounted(() => { window.removeEventListener('paste', onWindowPaste); setSessionCodeSource(null); });
 
 const saveRunConfiguration = () => {
   downloadJsonFile(currentSessionConfig(), `MapNG_Config_${new Date().toISOString().slice(0, 10)}.json`);

@@ -1001,7 +1001,8 @@
     "copy": "Copia",
     "copied": "Copiato",
     "done": "Fatto",
-    "sendReport": "Invia segnalazione"
+    "sendReport": "Invia segnalazione",
+    "incConfig": "Le tue impostazioni, come codice di sessione (include la posizione, quindi viene tolto se la deselezioni)"
   },
   "config": {
     "copied": "Configurazione copiata come codice. Incollala in MapNG (Ctrl+V sulla mappa) per usarla.",

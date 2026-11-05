@@ -45,6 +45,7 @@
                 <li v-if="preview.hasOptions">{{ t('report.incOptions') }}</li>
                 <li v-if="preview.dumpBytes">{{ t('report.incDump', { kb: Math.max(1, Math.round(preview.dumpBytes / 1024)) }) }}</li>
                 <li v-if="preview.area && includeArea">{{ t('report.incArea') }}</li>
+                <li v-if="preview.hasConfig && (includeArea || !preview.area)">{{ t('report.incConfig') }}</li>
                 <li v-if="description.trim()">{{ t('report.incDescription') }}</li>
                 <li class="text-gray-500 dark:text-gray-400">{{ t('report.incNever') }}</li>
               </ul>
@@ -77,7 +78,7 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CheckCircle2, LifeBuoy, Loader2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
-import { useReportDialog } from '../../composables/useReportDialog.js';
+import { currentSessionCode, useReportDialog } from '../../composables/useReportDialog.js';
 
 const { t } = useI18n();
 const { request, closeReportDialog } = useReportDialog();
@@ -98,7 +99,8 @@ watch(request, async (req) => {
   if (!req || !desktopApp?.prepareReport) return;
   preparing.value = true;
   try {
-    const r = await desktopApp.prepareReport(req.kind, { ...req.ctx, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' });
+    const config = req.ctx.config ?? await currentSessionCode();
+    const r = await desktopApp.prepareReport(req.kind, { ...req.ctx, config, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' });
     token.value = r.token; preview.value = r.preview;
   } catch (error) {
     failed.value = String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');

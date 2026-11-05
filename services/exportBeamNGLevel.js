@@ -7424,6 +7424,8 @@ function buildBeamNGExportReport({
     `- Export started (UTC): ${formatIsoTimestamp(exportStartedAt)}`,
     `- Report generated (UTC): ${formatIsoTimestamp(reportGeneratedAt)}`,
     `- Processing time before ZIP compression: ${formatDurationMs(totalDurationMs)}`,
+    // (the whole control panel as one line: paste it into MapNG to get these settings)
+    ...(typeof options?.sessionCode === 'string' && options.sessionCode ? [`- Session config (paste into MapNG): ${options.sessionCode}`] : []),
     '',
     'Terrain',
     `- Requested resolution: ${Number.isFinite(selectedResolution) ? `${selectedResolution} px` : 'n/a'}`,

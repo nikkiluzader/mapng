@@ -1062,7 +1062,8 @@
     "copy": "Copy",
     "copied": "Copied",
     "done": "Done",
-    "sendReport": "Send report"
+    "sendReport": "Send report",
+    "incConfig": "Your settings, as a session code (it includes the location, so it goes when you untick it)"
   },
   "config": {
     "copied": "Config copied as a code. Paste it into MapNG (Ctrl+V on the map) to use it.",

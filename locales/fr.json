@@ -1002,7 +1002,8 @@
     "copy": "Copier",
     "copied": "Copié",
     "done": "Terminé",
-    "sendReport": "Envoyer un rapport"
+    "sendReport": "Envoyer un rapport",
+    "incConfig": "Vos réglages, sous forme de code de session (il contient l'emplacement, donc il est retiré si vous le décochez)"
   },
   "config": {
     "copied": "Configuration copiée sous forme de code. Collez-la dans MapNG (Ctrl+V sur la carte) pour l'utiliser.",

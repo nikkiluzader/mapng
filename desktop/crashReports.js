@@ -63,6 +63,8 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {} } = {}
     description: String(ctx.description || '').slice(0, 4000),
     options: cleanOptions(ctx.options),
     area: ctx.area && typeof ctx.area === 'object' ? ctx.area : null,
+    // (the settings as a session code; holds the location, so it goes with it)
+    config: typeof ctx.config === 'string' && ctx.config.startsWith('mapng:') ? ctx.config.slice(0, 8000) : '',
     memory: { totalGB: +(os.totalmem() / 2 ** 30).toFixed(1), freeGB: +(os.freemem() / 2 ** 30).toFixed(1), cpus: os.cpus().length },
     log: ctx.logPath ? scrubText(readTail(ctx.logPath, MAX_LOG_CHARS)) : '',
     minidump: '',
@@ -88,6 +90,7 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {} } = {}
       logChars: report.log.length,
       logTail: report.log.slice(-1200),
       hasOptions: !!report.options,
+      hasConfig: !!report.config,
       area: report.area,
       dumpBytes: report.minidump ? dump.size : 0,
     },
@@ -99,7 +102,7 @@ export async function sendReport(token, { includeArea = true, description = '' }
   const report = prepared.get(token);
   if (!report) throw new Error('This report is no longer available. Try again.');
   const body = { ...report, description: String(description || report.description || '').slice(0, 4000) };
-  if (!includeArea) { body.area = null; body.options = cleanOptions(body.options, { keepLocation: false }); }
+  if (!includeArea) { body.area = null; body.config = ''; body.options = cleanOptions(body.options, { keepLocation: false }); }
   const r = await net.fetch(`${apiOrigin}/api/crash`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
