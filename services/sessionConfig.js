@@ -199,3 +199,32 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
   }
   return rows;
 }
+
+// ---- short send codes (mapng.com /api/share: shareCodes.js) --------------
+
+const SHARE_CHARS = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
+/** "k7f-29q", "K7F29Q" or a "mapng.com/#K7F-29Q" link → "K7F29Q", or null. */
+export function shareIdFrom(text) {
+  const t = String(text || '').trim();
+  const m = /(?:^|#)([A-Za-z0-9]{3}-?[A-Za-z0-9]{3})$/.exec(t);
+  if (!m) return null;
+  const id = m[1].toUpperCase().replace('-', '');
+  return [...id].every((c) => SHARE_CHARS.includes(c)) ? id : null;
+}
+export const shareLink = (id) => `https://mapng.com/#${id}`;
+
+/** Store a code for 24 hours: { id: "K7F-29Q", expiresAt }, or throws with the server's reason. */
+export async function sendSessionCode(code, fetchImpl = globalThis.fetch) {
+  const r = await fetchImpl('/api/share', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.id) throw new Error(d.error || `HTTP ${r.status}`);
+  return d;
+}
+
+/** The code stored under a send code, or throws (expired / unknown / offline). */
+export async function fetchSharedCode(id, fetchImpl = globalThis.fetch) {
+  const r = await fetchImpl(`/api/share/${encodeURIComponent(id)}`);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.code) throw new Error(d.error || `HTTP ${r.status}`);
+  return d.code;
+}

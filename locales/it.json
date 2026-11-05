@@ -1061,6 +1061,15 @@
     "edits_all": "Tutte",
     "edits_none": "Nessuna",
     "backdrop": "Dintorni",
-    "safeCaps": "Limiti sicuri"
+    "safeCaps": "Limiti sicuri",
+    "send": "Invia con un codice",
+    "codePlaceholder": "Codice, es. K7F-29Q",
+    "open": "Apri",
+    "copyCode": "Copia codice",
+    "copyLink": "Copia link",
+    "copiedShort": "Copiato",
+    "sentHint": "Dai questo codice o link a qualcuno: lo scrive in Apri, lo incolla o apre il link. Vale 24 ore e contiene le tue impostazioni e la posizione, mai le tue chiavi.",
+    "sendFailed": "Impossibile inviare la configurazione: {reason}",
+    "openFailed": "Impossibile aprire quel codice: {reason}"
   }
 }

@@ -265,6 +265,11 @@
         @paste="pasteRunConfiguration"
         @save="saveRunConfiguration"
         @load="handleRunConfigFile"
+        sendable
+        :sending="sendingConfig"
+        :sent="sentConfig"
+        @send="sendConfig"
+        @open-code="openShareCode"
       />
       <JobStateControls
         :has-terrain-data="!!terrainData"
@@ -332,7 +337,7 @@ import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { exportJobData, importJobData } from '../../services/jobData';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
-import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, looksLikeSessionCode, parseSessionText } from '../../services/sessionConfig.js';
+import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
 import { setSessionCodeSource } from '../../composables/useReportDialog.js';
@@ -713,12 +718,37 @@ const applyPendingConfig = () => {
   }
 };
 
+// Send: mapng.com keeps the code 24 hours under a short code (shareCodes.js)
+const sendingConfig = ref(false);
+const sentConfig = ref(null);   // { id, link }
+const sendConfig = async () => {
+  sendingConfig.value = true;
+  try {
+    const { id } = await sendSessionCode(await encodeSessionCode(currentSessionConfig()));
+    sentConfig.value = { id, link: shareLink(id) };
+    runConfigStatus.value = '';
+  } catch (error) {
+    sentConfig.value = null;
+    runConfigStatus.value = t('config.sendFailed', { reason: String(error?.message || error) });
+  } finally { sendingConfig.value = false; }
+};
+const openShareCode = async (text) => {
+  const id = shareIdFrom(text);
+  if (!id) { await previewConfigText(text); return; }   // (a full code typed into the box works too)
+  try { await previewConfigText(await fetchSharedCode(id)); }
+  catch (error) { runConfigStatus.value = t('config.openFailed', { reason: String(error?.message || error) }); }
+};
+
 // Ctrl+V anywhere outside a text box: a pasted MapNG config opens the same preview
 const onWindowPaste = (event) => {
   const target = event.target;
   if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
   const text = event.clipboardData?.getData('text') || '';
   const trimmed = text.trim();
+  if (/^(https?:\/\/)?(dev\.)?mapng\.com\/#[A-Za-z0-9]{3}-?[A-Za-z0-9]{3}$/.test(trimmed) || /^[A-Za-z0-9]{3}-[A-Za-z0-9]{3}$/.test(trimmed)) {
+    if (shareIdFrom(trimmed)) { event.preventDefault(); openShareCode(trimmed); }
+    return;
+  }
   if (!looksLikeSessionCode(trimmed) && !(trimmed.startsWith('{') && trimmed.includes('"center"'))) return;
   event.preventDefault();
   previewConfigText(trimmed, { quiet: !looksLikeSessionCode(trimmed) });
@@ -726,6 +756,12 @@ const onWindowPaste = (event) => {
 onMounted(() => {
   window.addEventListener('paste', onWindowPaste);
   setSessionCodeSource(() => encodeSessionCode(currentSessionConfig()));
+  // a mapng.com/#K7F-29Q link: open the sent config's preview
+  const linked = shareIdFrom(window.location.hash);
+  if (linked && /^#[A-Za-z0-9]{3}-?[A-Za-z0-9]{3}$/.test(window.location.hash)) {
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    openShareCode(linked);
+  }
 });
 onUnmounted(() => { window.removeEventListener('paste', onWindowPaste); setSessionCodeSource(null); });
 

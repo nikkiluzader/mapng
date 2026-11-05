@@ -1061,6 +1061,15 @@
     "edits_all": "Alle",
     "edits_none": "Keine",
     "backdrop": "Umgebung",
-    "safeCaps": "Sichere Grenzen"
+    "safeCaps": "Sichere Grenzen",
+    "send": "Mit Code senden",
+    "codePlaceholder": "Code, z. B. K7F-29Q",
+    "open": "Öffnen",
+    "copyCode": "Code kopieren",
+    "copyLink": "Link kopieren",
+    "copiedShort": "Kopiert",
+    "sentHint": "Gib diesen Code oder Link weiter: Die andere Person tippt ihn bei Öffnen ein, fügt ihn ein oder öffnet den Link. Er gilt 24 Stunden und enthält deine Einstellungen und den Ort, nie deine Schlüssel.",
+    "sendFailed": "Konfiguration konnte nicht gesendet werden: {reason}",
+    "openFailed": "Code konnte nicht geöffnet werden: {reason}"
   }
 }

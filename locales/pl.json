@@ -1061,6 +1061,15 @@
     "edits_all": "Wszystkie",
     "edits_none": "Brak",
     "backdrop": "Otoczenie",
-    "safeCaps": "Bezpieczne limity"
+    "safeCaps": "Bezpieczne limity",
+    "send": "Wyślij kodem",
+    "codePlaceholder": "Kod, np. K7F-29Q",
+    "open": "Otwórz",
+    "copyCode": "Kopiuj kod",
+    "copyLink": "Kopiuj link",
+    "copiedShort": "Skopiowano",
+    "sentHint": "Przekaż ten kod lub link: druga osoba wpisuje go w Otwórz, wkleja albo otwiera link. Działa 24 godziny i zawiera Twoje ustawienia i lokalizację, nigdy kluczy.",
+    "sendFailed": "Nie udało się wysłać konfiguracji: {reason}",
+    "openFailed": "Nie udało się otworzyć tego kodu: {reason}"
   }
 }

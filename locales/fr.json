@@ -1062,6 +1062,15 @@
     "edits_all": "Toutes",
     "edits_none": "Aucune",
     "backdrop": "Alentours",
-    "safeCaps": "Limites sûres"
+    "safeCaps": "Limites sûres",
+    "send": "Envoyer avec un code",
+    "codePlaceholder": "Code, ex. K7F-29Q",
+    "open": "Ouvrir",
+    "copyCode": "Copier le code",
+    "copyLink": "Copier le lien",
+    "copiedShort": "Copié",
+    "sentHint": "Donnez ce code ou ce lien à quelqu'un : il le tape sous Ouvrir, le colle ou ouvre le lien. Il fonctionne 24 heures et contient vos réglages et l'emplacement, jamais vos clés.",
+    "sendFailed": "Impossible d'envoyer la configuration : {reason}",
+    "openFailed": "Impossible d'ouvrir ce code : {reason}"
   }
 }

@@ -209,6 +209,17 @@ Content-Type: application/json
     <p>Crashes are recorded by Electron's built-in crash reporter, which is set to keep crash snapshots on your computer and never upload them itself.</p>
   </section>
 
+  <section id="send-codes">
+    <h2>Sending a config with a code</h2>
+    <p>Under <em>Configuration &amp; Session</em>, <strong>Send with a code</strong> lets you give your settings to someone with a short code like <code>K7F-29Q</code> or a link like <code>mapng.com/#K7F-29Q</code>.</p>
+    <ul>
+      <li><strong>What's stored:</strong> your control-panel settings (location, area, elevation source, and the export settings), the same as <em>Copy Configuration</em> gives you. Never your keys (GPXZ or any other).</li>
+      <li><strong>For how long:</strong> 24 hours, then the code stops working and the settings are deleted.</li>
+      <li><strong>Who can see it:</strong> anyone who has the code. Nothing ties the code to you. Your internet address is used only for spam protection (at most 30 codes an hour), in memory, as a one-way hash, and is not stored.</li>
+      <li><strong>Before anything changes,</strong> the person opening the code sees exactly what it would set and chooses Apply or Cancel.</li>
+    </ul>
+  </section>
+
   <section id="other">
     <h2>Everything else MapNG connects to</h2>
     <p>MapNG has no accounts and no ads. To build a map it has to download map data, and the only thing those services receive is the area being loaded, like any map website. For completeness, here is every outside service it talks to:</p>
@@ -221,6 +232,7 @@ Content-Type: application/json
         <tr><td>MapNG's own OSM tiles, OpenStreetMap Overpass servers, Overture Maps</td><td>Roads, buildings, land use</td><td>The area you select</td></tr>
         <tr><td>Nominatim</td><td>Place search and level names</td><td>Your search text, or the area's centre</td></tr>
         <tr><td>Cloudflare Web Analytics (website only)</td><td>Counting page views on mapng.com</td><td>A page view: no cookies and no fingerprinting, by Cloudflare's design (<a href="https://www.cloudflare.com/web-analytics/">about it</a>). The desktop app doesn't load it.</td></tr>
+        <tr><td>mapng.com send codes</td><td>Giving your settings to someone</td><td>Your settings, only when you click Send with a code (<a href="#send-codes">details</a>)</td></tr>
         <tr><td>mapng.com problem reports (desktop app only)</td><td>Fixing crashes and failed exports</td><td>A problem report, only when you choose Send (<a href="#reports">what's in one</a>)</td></tr>
         <tr><td>GitHub (desktop app only)</td><td>Update checks</td><td>A request for the latest version, only if you allowed update checks</td></tr>
       </tbody>

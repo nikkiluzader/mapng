@@ -12,6 +12,9 @@
  * own OSM tile archives from the R2 bucket bound as OSM_TILES (see
  * handleOsmTiles; built by scripts/build-osm-tiles.py).
  *
+ * /api/share keeps a session config for 24 hours under a short send code
+ * (see shareCodes.js).
+ *
  * /api/crash takes the desktop app's crash and problem reports (sent only
  * when the user agrees) into private storage (see crashReports.js).
  *
@@ -29,6 +32,7 @@ import {
 } from './services/overpassQuery.js';
 import { handleHotspots } from './hotspotsObject.js';
 import { handleCrashReports } from './crashReports.js';
+import { handleShareCodes } from './shareCodes.js';
 
 export { ExportHotspots } from './hotspotsObject.js';
 
@@ -195,6 +199,10 @@ export default {
 
     if (url.pathname === '/api/osm') {
       return handleOsm(request, url, ctx);
+    }
+
+    if (url.pathname === '/api/share' || url.pathname.startsWith('/api/share/')) {
+      return handleShareCodes(request, env, url, jsonResponse);
     }
 
     if (url.pathname === '/api/crash' || url.pathname.startsWith('/api/crash/')) {

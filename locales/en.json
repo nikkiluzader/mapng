@@ -1122,6 +1122,15 @@
     "edits_all": "All",
     "edits_none": "None",
     "backdrop": "Surroundings",
-    "safeCaps": "Safe limits"
+    "safeCaps": "Safe limits",
+    "send": "Send with a code",
+    "codePlaceholder": "Code, e.g. K7F-29Q",
+    "open": "Open",
+    "copyCode": "Copy code",
+    "copyLink": "Copy link",
+    "copiedShort": "Copied",
+    "sentHint": "Give this code or link to someone: they type it under Open, paste it, or open the link. It works for 24 hours, and holds your settings and location, never your keys.",
+    "sendFailed": "Couldn't send the config: {reason}",
+    "openFailed": "Couldn't open that code: {reason}"
   }
 }
