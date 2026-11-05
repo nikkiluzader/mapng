@@ -55,9 +55,29 @@ MIN_FREE_GB = float(os.environ.get("PLANET_MIN_FREE_GB", 25))
 WINDOWS_DRIVE = os.environ.get("PLANET_WINDOWS_DRIVE", "/mnt/c")
 
 
+WSL_VHDX = os.environ.get("PLANET_WSL_VHDX", "")
+
+
+def wsl_vhdx():
+    """WSL's virtual disk file on the Windows drive (it grows, never shrinks)."""
+    if WSL_VHDX:
+        return WSL_VHDX
+    import glob
+    found = glob.glob(os.path.join(WINDOWS_DRIVE, "Users", "*", "AppData", "Local", "wsl", "*", "ext4.vhdx"))
+    return max(found, key=os.path.getsize) if found else ""
+
+
 def free_gb():
-    paths = [WINDOWS_DRIVE] if os.path.exists(WINDOWS_DRIVE) else []
-    return min(shutil.disk_usage(p).free / 2**30 for p in paths + ["/"])
+    """Space a step can really use: C:'s free space plus the space already
+    inside WSL's disk file that WSL has freed (deleted files' room is reused
+    without the file growing, though C: never gets it back by itself)."""
+    root = shutil.disk_usage("/")
+    if not os.path.exists(WINDOWS_DRIVE):
+        return root.free / 2**30
+    c_free = shutil.disk_usage(WINDOWS_DRIVE).free
+    vhdx = wsl_vhdx()
+    reusable = max(0, os.path.getsize(vhdx) - root.used) if vhdx else 0
+    return min(root.free, c_free + reusable) / 2**30
 
 
 def drop_cache(*paths):
