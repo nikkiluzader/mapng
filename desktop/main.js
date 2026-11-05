@@ -846,7 +846,8 @@ ipcMain.handle('report:pending', () => {
 });
 ipcMain.handle('report:prepare', (_event, kind, ctx = {}) => prepareReport(String(kind), ctx, { build: String(ctx.build || ''), settings: readSettings() }));
 ipcMain.handle('report:send', async (_event, token, choices = {}) => {
-  const result = await sendReport(String(token), choices, API_ORIGIN);
+  // (MAPNG_REPORT_ORIGIN: testing against a local server before /api/crash is live)
+  const result = await sendReport(String(token), choices, process.env.MAPNG_REPORT_ORIGIN || API_ORIGIN);
   if (choices.kind === 'crash') { writeSettings({ crashSeenAt: Date.now() }); lastWindowCrash = null; }
   return result;
 });
