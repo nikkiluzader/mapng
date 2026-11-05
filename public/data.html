@@ -68,6 +68,13 @@
   .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
   .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); }
   .stat .k { font-size: 13px; color: var(--muted); }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 12px; }
+  .usage-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .usage-card h3 { font-size: 14px; margin: 0 0 6px; }
+  .usage-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; font-size: 13px; margin: 4px 0; }
+  .usage-row .bar { grid-column: 1 / -1; height: 4px; border-radius: 2px; background: var(--surface-2); overflow: hidden; }
+  .usage-row .bar span { display: block; height: 100%; background: var(--brand); border-radius: 2px; }
+  .usage-row .n { color: var(--muted); font-variant-numeric: tabular-nums; }
   .never { columns: 2 240px; column-gap: 24px; padding-left: 20px; }
   .never li { break-inside: avoid; margin-bottom: 6px; }
   footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
@@ -194,6 +201,30 @@ Content-Type: application/json
     </ul>
   </section>
 
+  <section id="usage">
+    <h2>Settings stats: which settings people use</h2>
+    <p>A separate opt-in from the hotspot map, with its own switch (<em>Share which settings I use</em> in the Map Layers box, asked once after your first export). It tells the developer which settings people really pick, so defaults can be better and settings nobody uses can go.</p>
+    <p>When it's on and a level export finishes, MapNG sends one message to <code>https://mapng.com/api/usage</code>. A typical one, in full:</p>
+<pre><code>POST /api/usage
+Content-Type: application/json
+
+{ "settings": { "platform": "desktop", "elevationSource": "default", "resolution": "4096",
+  "metersPerPixel": "1", "mapData": "on", "overtureBuildings": "on", "advancedMode": "off",
+  "rawTerrain": "off", "seaLevelOffset": "zero", "baseTexture": "game", "groundMaterials": "osm",
+  "roads": "decal", "buildings": "on", "water": "on", "trees": "on", "rocks": "on", "safeCaps": "on",
+  "bridges": "on", "tunnels": "on", "measuredBridgeHeights": "on", "terrainEdits": "all", "shapeTerrain": "on",
+  "shapeRoads": "on", "shapeBridges": "on", "shapeOverpasses": "on", "shapeTunnels": "on",
+  "shapeExtras": "on", "backdrop": "off" } }</code></pre>
+    <ul>
+      <li><strong>Only fixed choices.</strong> Every value comes from a short fixed list (on/off, a texture name, a size), and the server refuses anything else. Sizes are rounded into groups. There is no free text, so nothing personal can slip in.</li>
+      <li><strong>No location, ever.</strong> No coordinates, no grid square, no level name. It can't be matched to the hotspot map: the two are sent separately and neither carries anything that links them.</li>
+      <li><strong>Only totals are stored.</strong> The server adds 1 to each setting's count ("Game Texture: 412") and keeps nothing per export. Your internet address is used only for spam protection (at most 30 an hour), in memory, as a one-way hash.</li>
+    </ul>
+    <p>Everything stored, live from <code>/api/usage</code> (raw: <a href="/api/usage">/api/usage</a>):</p>
+    <p id="u-note" style="font-size:14px;color:var(--muted)">Loading the live numbers…</p>
+    <div class="usage-grid" id="u-grid"></div>
+  </section>
+
   <section id="reports">
     <h2>Problem reports from the desktop app</h2>
     <p>This is separate from the hotspot map. When the desktop app crashes, or an export, terrain generation or update fails, it can offer to send a <strong>problem report</strong> so the developer can fix it. You can also send one from <em>Help → Report a Problem</em>.</p>
@@ -232,6 +263,7 @@ Content-Type: application/json
         <tr><td>MapNG's own OSM tiles, OpenStreetMap Overpass servers, Overture Maps</td><td>Roads, buildings, land use</td><td>The area you select</td></tr>
         <tr><td>Nominatim</td><td>Place search and level names</td><td>Your search text, or the area's centre</td></tr>
         <tr><td>Cloudflare Web Analytics (website only)</td><td>Counting page views on mapng.com</td><td>A page view: no cookies and no fingerprinting, by Cloudflare's design (<a href="https://www.cloudflare.com/web-analytics/">about it</a>). The desktop app doesn't load it.</td></tr>
+        <tr><td>mapng.com settings stats</td><td>Knowing which settings people use</td><td>Your export settings, never the location, only if you opted in (<a href="#usage">details</a>)</td></tr>
         <tr><td>mapng.com send codes</td><td>Giving your settings to someone</td><td>Your settings, only when you click Send with a code (<a href="#send-codes">details</a>)</td></tr>
         <tr><td>mapng.com problem reports (desktop app only)</td><td>Fixing crashes and failed exports</td><td>A problem report, only when you choose Send (<a href="#reports">what's in one</a>)</td></tr>
         <tr><td>GitHub (desktop app only)</td><td>Update checks</td><td>A request for the latest version, only if you allowed update checks</td></tr>
@@ -273,6 +305,28 @@ Content-Type: application/json
     } catch {
       ['s-total', 's-cells', 's-web', 's-desktop'].forEach((id) => set(id, '–'));
       set('s-note', "The live numbers couldn't be loaded right now.");
+    }
+  })();
+  (async () => {
+    const note = document.getElementById('u-note');
+    const grid = document.getElementById('u-grid');
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    try {
+      const r = await fetch('/api/usage');
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      const by = {};
+      for (const [name, value, count] of d.rows || []) (by[name] ||= []).push([value, count]);
+      note.textContent = d.exports
+        ? `${d.exports.toLocaleString()} shared export(s), as of ${new Date(d.at).toLocaleString()}.`
+        : 'No exports shared yet.';
+      grid.innerHTML = (d.settings || Object.keys(by)).filter((n) => by[n]).map((name) => {
+        const rows = by[name];
+        const total = rows.reduce((n, [, c]) => n + c, 0) || 1;
+        return `<div class="usage-card"><h3>${esc(name)}</h3>${rows.map(([v, c]) => `<div class="usage-row"><span>${esc(v)}</span><span class="n">${c.toLocaleString()} · ${Math.round((100 * c) / total)}%</span><div class="bar"><span style="width:${((100 * c) / total).toFixed(1)}%"></span></div></div>`).join('')}</div>`;
+      }).join('');
+    } catch {
+      note.textContent = "The live numbers couldn't be loaded right now.";
     }
   })();
 </script>

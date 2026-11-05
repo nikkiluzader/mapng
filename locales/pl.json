@@ -1071,5 +1071,14 @@
     "sentHint": "Przekaż ten kod lub link: druga osoba wpisuje go w Otwórz, wkleja albo otwiera link. Działa 24 godziny i zawiera Twoje ustawienia i lokalizację, nigdy kluczy.",
     "sendFailed": "Nie udało się wysłać konfiguracji: {reason}",
     "openFailed": "Nie udało się otworzyć tego kodu: {reason}"
+  },
+  "usage": {
+    "askTitle": "Udostępniać, jakich ustawień używasz?",
+    "askBody": "MapNG może liczyć, jakie ustawienia eksportu są wybierane (np. Tekstura gry albo wyłączone zmiany terenu), aby twórca wiedział, co ulepszyć, a czego nikt nie używa. Wysyłane są tylko ustawienia: nigdy lokalizacja, nazwa poziomu ani nic o Tobie. Możesz to zmienić w każdej chwili w polu Warstwy mapy.",
+    "askYes": "Udostępniaj anonimowo",
+    "askNo": "Nie, dziękuję",
+    "shareToggle": "Udostępniaj, jakich ustawień używam (bez lokalizacji)",
+    "welcome": "Anonimowo udostępniaj, jakich ustawień eksportu używam (nigdy gdzie), by pomóc zdecydować, co ulepszyć",
+    "readMore": "Co jest udostępniane"
   }
 }

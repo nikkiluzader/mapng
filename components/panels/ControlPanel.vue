@@ -340,7 +340,7 @@ import { buildRunConfiguration as buildRunConfigurationBase } from '../../servic
 import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
-import { setSessionCodeSource } from '../../composables/useReportDialog.js';
+import { setSessionConfigSource } from '../../composables/useReportDialog.js';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
 
@@ -755,7 +755,7 @@ const onWindowPaste = (event) => {
 };
 onMounted(() => {
   window.addEventListener('paste', onWindowPaste);
-  setSessionCodeSource(() => encodeSessionCode(currentSessionConfig()));
+  setSessionConfigSource(currentSessionConfig);
   // a mapng.com/#K7F-29Q link: open the sent config's preview
   const linked = shareIdFrom(window.location.hash);
   if (linked && /^#[A-Za-z0-9]{3}-?[A-Za-z0-9]{3}$/.test(window.location.hash)) {
@@ -763,7 +763,7 @@ onMounted(() => {
     openShareCode(linked);
   }
 });
-onUnmounted(() => { window.removeEventListener('paste', onWindowPaste); setSessionCodeSource(null); });
+onUnmounted(() => { window.removeEventListener('paste', onWindowPaste); setSessionConfigSource(null); });
 
 const saveRunConfiguration = () => {
   downloadJsonFile(currentSessionConfig(), `MapNG_Config_${new Date().toISOString().slice(0, 10)}.json`);

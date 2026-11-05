@@ -1132,5 +1132,14 @@
     "sentHint": "Give this code or link to someone: they type it under Open, paste it, or open the link. It works for 24 hours, and holds your settings and location, never your keys.",
     "sendFailed": "Couldn't send the config: {reason}",
     "openFailed": "Couldn't open that code: {reason}"
+  },
+  "usage": {
+    "askTitle": "Share which settings you use?",
+    "askBody": "MapNG can count which export settings people pick (like Game Texture, or terrain edits off), so the developer knows what to improve and what nobody uses. Only the settings are sent: never the location, level name or anything about you. Change it any time in the Map Layers box.",
+    "askYes": "Share anonymously",
+    "askNo": "No thanks",
+    "shareToggle": "Share which settings I use (no location)",
+    "welcome": "Share which export settings I use (never where), anonymously, to help decide what to improve",
+    "readMore": "What's shared"
   }
 }

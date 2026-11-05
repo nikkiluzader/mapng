@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { encodeSessionCode } from '../services/sessionConfig.js';
 
 // The desktop app's report dialog (components/modals/ReportDialog.vue),
 // opened from anywhere: after a crash (on start), a failed export, generate
@@ -8,10 +9,15 @@ const request = ref(null);   // { kind, ctx } while open
 
 // the current settings as a session code (services/sessionConfig.js), set by
 // the control panel; reports include it so the problem can be rebuilt exactly
-let sessionCodeSource = null;
-export function setSessionCodeSource(fn) { sessionCodeSource = typeof fn === 'function' ? fn : null; }
+// (the control panel registers a function returning its current session config)
+let sessionConfigSource = null;
+export function setSessionConfigSource(fn) { sessionConfigSource = typeof fn === 'function' ? fn : null; }
+export function currentSessionConfigValue() {
+  try { return sessionConfigSource ? sessionConfigSource() : null; } catch { return null; }
+}
 export async function currentSessionCode() {
-  try { return sessionCodeSource ? await sessionCodeSource() : ''; } catch { return ''; }
+  const config = currentSessionConfigValue();
+  try { return config ? await encodeSessionCode(config) : ''; } catch { return ''; }
 }
 
 export function openReportDialog(kind, ctx = {}) { request.value = { kind, ctx: JSON.parse(JSON.stringify(ctx || {})) }; }

@@ -1071,5 +1071,14 @@
     "sentHint": "Gib diesen Code oder Link weiter: Die andere Person tippt ihn bei Öffnen ein, fügt ihn ein oder öffnet den Link. Er gilt 24 Stunden und enthält deine Einstellungen und den Ort, nie deine Schlüssel.",
     "sendFailed": "Konfiguration konnte nicht gesendet werden: {reason}",
     "openFailed": "Code konnte nicht geöffnet werden: {reason}"
+  },
+  "usage": {
+    "askTitle": "Teilen, welche Einstellungen du nutzt?",
+    "askBody": "MapNG kann zählen, welche Export-Einstellungen gewählt werden (etwa Spieltextur oder Geländeanpassungen aus), damit der Entwickler weiß, was er verbessern sollte und was niemand nutzt. Gesendet werden nur die Einstellungen: nie der Ort, der Levelname oder etwas über dich. Jederzeit änderbar im Kartenebenen-Feld.",
+    "askYes": "Anonym teilen",
+    "askNo": "Nein danke",
+    "shareToggle": "Teilen, welche Einstellungen ich nutze (ohne Ort)",
+    "welcome": "Anonym teilen, welche Export-Einstellungen ich nutze (nie wo), damit klar ist, was verbessert werden soll",
+    "readMore": "Was geteilt wird"
   }
 }

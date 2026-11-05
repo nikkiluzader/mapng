@@ -1072,5 +1072,14 @@
     "sentHint": "Donnez ce code ou ce lien à quelqu'un : il le tape sous Ouvrir, le colle ou ouvre le lien. Il fonctionne 24 heures et contient vos réglages et l'emplacement, jamais vos clés.",
     "sendFailed": "Impossible d'envoyer la configuration : {reason}",
     "openFailed": "Impossible d'ouvrir ce code : {reason}"
+  },
+  "usage": {
+    "askTitle": "Partager les réglages que vous utilisez ?",
+    "askBody": "MapNG peut compter les réglages d'export choisis (comme Texture du jeu, ou retouches du terrain désactivées), pour que le développeur sache quoi améliorer et ce que personne n'utilise. Seuls les réglages sont envoyés : jamais l'emplacement, le nom du niveau ni rien sur vous. Modifiable à tout moment dans le cadre Calques de la carte.",
+    "askYes": "Partager anonymement",
+    "askNo": "Non merci",
+    "shareToggle": "Partager les réglages que j'utilise (sans emplacement)",
+    "welcome": "Partager anonymement les réglages d'export que j'utilise (jamais où), pour aider à choisir quoi améliorer",
+    "readMore": "Ce qui est partagé"
   }
 }

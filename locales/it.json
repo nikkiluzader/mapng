@@ -1071,5 +1071,14 @@
     "sentHint": "Dai questo codice o link a qualcuno: lo scrive in Apri, lo incolla o apre il link. Vale 24 ore e contiene le tue impostazioni e la posizione, mai le tue chiavi.",
     "sendFailed": "Impossibile inviare la configurazione: {reason}",
     "openFailed": "Impossibile aprire quel codice: {reason}"
+  },
+  "usage": {
+    "askTitle": "Condividere quali impostazioni usi?",
+    "askBody": "MapNG può contare quali impostazioni di esportazione vengono scelte (come Texture di gioco o modifiche al terreno disattivate), così lo sviluppatore sa cosa migliorare e cosa non usa nessuno. Vengono inviate solo le impostazioni: mai la posizione, il nome del livello o qualcosa su di te. Modificabile in qualsiasi momento nel riquadro Livelli mappa.",
+    "askYes": "Condividi in forma anonima",
+    "askNo": "No grazie",
+    "shareToggle": "Condividi quali impostazioni uso (senza posizione)",
+    "welcome": "Condividi in forma anonima quali impostazioni di esportazione uso (mai dove), per decidere cosa migliorare",
+    "readMore": "Cosa viene condiviso"
   }
 }

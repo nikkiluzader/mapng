@@ -212,6 +212,12 @@
                 <span>{{ t('mapSelector.shareExports') }}</span>
             </label>
             <button type="button" class="pl-7 text-[10px] text-[#FF6600] hover:underline" @click="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button>
+            <!-- (separate: which settings, never where; composables/useUsageStats.js) -->
+            <label class="flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer">
+                <input type="checkbox" :checked="shareSettings === 'on'" @change="setShareSettings($event.target.checked)" :class="CHECKBOX" />
+                <span>{{ t('usage.shareToggle') }}</span>
+            </label>
+            <a href="https://mapng.com/data.html#usage" target="_blank" rel="noopener" class="block pl-7 text-[10px] text-[#FF6600] hover:underline">{{ t('usage.readMore') }}</a>
         </div>
     </div>
 
@@ -244,6 +250,7 @@
 </template>
 
 <script setup>
+import { useUsageStats } from '../../composables/useUsageStats.js';
 import { ref, computed, watch, onMounted, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { LMap, LTileLayer, LRectangle, LMarker, LTooltip, LPolygon } from '@vue-leaflet/vue-leaflet';
@@ -660,6 +667,7 @@ watch(() => props.zoom, (newZoom) => {
 
 // Export hotspots (control panel toggle): everyone's shared export cells
 const { show: showHotspots, cells: hotspotCells, status: hotspotsStatus, totals: hotspotTotals, share: shareExports, setShareExports, openHotspotPrivacy } = useExportHotspots();
+const { share: shareSettings, setShareSettings } = useUsageStats();
 const leafletMap = ref(null);
 let hotspotLayer = null;
 const onMapReady = (map) => { leafletMap.value = map; };

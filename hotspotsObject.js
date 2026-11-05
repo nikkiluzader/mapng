@@ -4,6 +4,7 @@
 // desktop app, and the day the cell was last seen. Nothing about who sent
 // them is stored; the short per-address limit below lives in memory only.
 import { HOTSPOT_PLATFORMS, isHotspotCell } from './services/exportHotspots.js';
+import { USAGE_FIELDS, validUsage } from './services/usageStats.js';
 
 const LIMIT_PER_HOUR = 30;   // reports one address may make in an hour
 
@@ -17,7 +18,47 @@ export class ExportHotspots {
       web INTEGER NOT NULL DEFAULT 0, desktop INTEGER NOT NULL DEFAULT 0,
       last_day TEXT NOT NULL,
       PRIMARY KEY (y, x))`);
+    // which settings people export with (opt in, separate: services/usageStats.js):
+    // one running total per setting and value, nothing per export
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS usage (
+      name TEXT NOT NULL, value TEXT NOT NULL, count INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (name, value))`);
     this.recent = new Map();   // address hash -> { hour, count }
+    this.recentUsage = new Map();
+  }
+
+  /** Add one export's settings to the totals. */
+  async reportUsage(settings, sender) {
+    const valid = validUsage(settings);
+    if (!valid.platform || Object.keys(valid).length < 3) return 'invalid';
+    const hour = Math.floor(Date.now() / 3600000);
+    const seen = this.recentUsage.get(sender);
+    if (seen && seen.hour === hour && seen.count >= LIMIT_PER_HOUR) return 'limited';
+    this.recentUsage.set(sender, { hour, count: seen?.hour === hour ? seen.count + 1 : 1 });
+    if (this.recentUsage.size > 10000) {
+      for (const [key, value] of this.recentUsage) if (value.hour !== hour) this.recentUsage.delete(key);
+    }
+    for (const [name, value] of Object.entries(valid)) {
+      this.sql.exec(
+        'INSERT INTO usage (name, value, count) VALUES (?, ?, 1) ON CONFLICT (name, value) DO UPDATE SET count = count + 1',
+        name, value,
+      );
+    }
+    return 'ok';
+  }
+
+  /** Everything stored for settings: every row [name, value, count] (served as is at GET /api/usage). */
+  async usage() {
+    const rows = this.sql.exec('SELECT name, value, count FROM usage ORDER BY name, count DESC').toArray();
+    const exports = rows.filter((r) => r.name === 'platform').reduce((n, r) => n + r.count, 0);
+    return {
+      about: 'Every row MapNG stores for settings usage: [setting, value, number of shared exports that used it]. No locations, no level names, nothing per export. Explained at https://mapng.com/data.html#usage',
+      columns: ['setting', 'value', 'count'],
+      rows: rows.map((r) => [r.name, r.value, r.count]),
+      exports,
+      settings: Object.keys(USAGE_FIELDS),
+      at: new Date().toISOString(),
+    };
   }
 
   /** Count one export in cell { y, x }; false when the sender is over its limit. */
@@ -42,6 +83,11 @@ export class ExportHotspots {
 
   async fetch(request) {
     const { pathname } = new URL(request.url);
+    if (pathname === '/usage-report') {
+      const { settings, sender } = await request.json();
+      return Response.json({ result: await this.reportUsage(settings, sender) });
+    }
+    if (pathname === '/usage') return Response.json(await this.usage());
     if (pathname === '/report') {
       const { y, x, platform, sender } = await request.json();
       return Response.json({ result: await this.report(y, x, platform, sender) });
@@ -98,6 +144,35 @@ export async function handleHotspots(request, env, ctx, json) {
   if (hit) return hit;
   const data = await (await stub.fetch('https://hotspots/cells')).json();
   const response = json(data, 200, { 'Cache-Control': `public, max-age=${HOTSPOTS_CACHE_S}` });
+  ctx.waitUntil(cache.put(key, response.clone()));
+  return response;
+}
+
+const USAGE_CACHE_S = 600;
+
+/** GET: the settings totals (edge-cached); POST { settings }: add one export's settings. */
+export async function handleUsage(request, env, ctx, json) {
+  if (!env.HOTSPOTS) return json({ error: 'Usage stats are not set up here' }, 503);
+  const stub = env.HOTSPOTS.get(env.HOTSPOTS.idFromName('global'));
+  const cache = caches.default;
+  const key = new Request(new URL('/api/usage', request.url).toString(), { method: 'GET' });
+  if (request.method === 'POST') {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: 'Bad request' }, 400); }
+    const { result } = await (await stub.fetch('https://hotspots/usage-report', {
+      method: 'POST',
+      body: JSON.stringify({ settings: body?.settings, sender: await senderHash(request) }),
+    })).json();
+    if (result === 'invalid') return json({ error: 'Bad request' }, 400);
+    if (result === 'limited') return json({ error: 'Too many reports' }, 429);
+    ctx.waitUntil(cache.delete(key));
+    return json({ ok: true }, 200);
+  }
+  if (request.method !== 'GET') return json({ error: 'Method Not Allowed' }, 405);
+  const hit = await cache.match(key);
+  if (hit) return hit;
+  const data = await (await stub.fetch('https://hotspots/usage')).json();
+  const response = json(data, 200, { 'Cache-Control': `public, max-age=${USAGE_CACHE_S}` });
   ctx.waitUntil(cache.put(key, response.clone()));
   return response;
 }

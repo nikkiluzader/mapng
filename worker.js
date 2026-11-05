@@ -30,7 +30,7 @@ import {
   buildOverpassQuery,
   snapOsmBounds,
 } from './services/overpassQuery.js';
-import { handleHotspots } from './hotspotsObject.js';
+import { handleHotspots, handleUsage } from './hotspotsObject.js';
 import { handleCrashReports } from './crashReports.js';
 import { handleShareCodes } from './shareCodes.js';
 
@@ -207,6 +207,10 @@ export default {
 
     if (url.pathname === '/api/crash' || url.pathname.startsWith('/api/crash/')) {
       return handleCrashReports(request, env, ctx, url, jsonResponse);
+    }
+
+    if (url.pathname === '/api/usage') {
+      return handleUsage(request, env, ctx, jsonResponse);
     }
 
     if (url.pathname === '/api/hotspots') {

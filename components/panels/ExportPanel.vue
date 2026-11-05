@@ -262,6 +262,20 @@
               </div>
             </div>
           </div>
+          <div
+            v-else-if="askShareSettings"
+            class="w-full flex items-start gap-2 p-2 rounded border border-[#FF6600]/40 bg-orange-50 dark:bg-orange-900/10"
+          >
+            <BarChart3 :size="14" class="shrink-0 mt-0.5 text-[#FF6600]" />
+            <div class="min-w-0 flex-1 space-y-1.5">
+              <div class="text-[11px] font-medium text-gray-800 dark:text-gray-100">{{ t('usage.askTitle') }}</div>
+              <div class="text-[10px] leading-snug text-gray-600 dark:text-gray-300">{{ t('usage.askBody') }} <button type="button" class="text-[#FF6600] hover:underline" @click.prevent.stop="openUsagePrivacy">{{ t('usage.readMore') }}</button></div>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" class="px-2.5 py-0.5 text-[10px] font-semibold rounded bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors" @click="answerShareSettings(true)">{{ t('hotspots.askYes') }}</button>
+                <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="answerShareSettings(false)">{{ t('hotspots.askNo') }}</button>
+              </div>
+            </div>
+          </div>
       </SettingSection>
 
       <!-- 2D Assets (advanced mode) -->
@@ -572,7 +586,7 @@ import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy, BarChart3
 } from 'lucide-vue-next';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
@@ -590,7 +604,8 @@ import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
-import { currentSessionCode, openReportDialog } from '../../composables/useReportDialog.js';
+import { currentSessionCode, currentSessionConfigValue, openReportDialog } from '../../composables/useReportDialog.js';
+import { reportUsage, useUsageStats } from '../../composables/useUsageStats.js';
 import { estimateLevelWeight } from '../../services/levelWeight.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
@@ -1304,16 +1319,32 @@ const triggerDownload = (blob, filename) => {
 const { share: shareExports, setShareExports } = useExportHotspots();
 const askShareExports = ref(false);
 let unreportedExport = null;
+// Settings stats (composables/useUsageStats.js): asked once too, after the
+// hotspot question is answered, so there's only ever one question showing
+const { share: shareSettings, setShareSettings } = useUsageStats();
+const askShareSettings = ref(false);
+let unreportedSettings = null;
 const onLevelExported = (center) => {
   const platform = desktopApp ? 'desktop' : 'web';
   if (shareExports.value === 'on') reportExport(center, platform);
   else if (shareExports.value == null) { unreportedExport = { center: { ...center }, platform }; askShareExports.value = true; }
+  const config = currentSessionConfigValue();
+  if (shareSettings.value === 'on') reportUsage(config, platform);
+  else if (shareSettings.value == null) { unreportedSettings = { config, platform }; if (!askShareExports.value) askShareSettings.value = true; }
 };
 const answerShareExports = (on) => {
   setShareExports(on);
   askShareExports.value = false;
   if (on && unreportedExport) reportExport(unreportedExport.center, unreportedExport.platform);
   unreportedExport = null;
+  if (shareSettings.value == null && unreportedSettings) askShareSettings.value = true;
+};
+const openUsagePrivacy = () => window.open('https://mapng.com/data.html#usage', '_blank', 'noopener');
+const answerShareSettings = (on) => {
+  setShareSettings(on);
+  askShareSettings.value = false;
+  if (on && unreportedSettings) reportUsage(unreportedSettings.config, unreportedSettings.platform);
+  unreportedSettings = null;
 };
 
 const notifyExportSuccess = (type, filename) => {

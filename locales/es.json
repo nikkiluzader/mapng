@@ -1072,5 +1072,14 @@
     "sentHint": "Da este código o enlace a alguien: lo escribe en Abrir, lo pega o abre el enlace. Funciona 24 horas y contiene tus ajustes y la ubicación, nunca tus claves.",
     "sendFailed": "No se pudo enviar la configuración: {reason}",
     "openFailed": "No se pudo abrir ese código: {reason}"
+  },
+  "usage": {
+    "askTitle": "¿Compartir qué ajustes usas?",
+    "askBody": "MapNG puede contar qué ajustes de exportación se eligen (como Textura del juego o ajustes del terreno desactivados), para que el desarrollador sepa qué mejorar y qué no usa nadie. Solo se envían los ajustes: nunca la ubicación, el nombre del nivel ni nada sobre ti. Cámbialo cuando quieras en el cuadro Capas del mapa.",
+    "askYes": "Compartir de forma anónima",
+    "askNo": "No, gracias",
+    "shareToggle": "Compartir qué ajustes uso (sin ubicación)",
+    "welcome": "Compartir de forma anónima qué ajustes de exportación uso (nunca dónde), para decidir qué mejorar",
+    "readMore": "Qué se comparte"
   }
 }

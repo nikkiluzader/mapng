@@ -40,6 +40,11 @@
             <span>{{ t('hotspots.welcome') }} <button type="button" class="text-[#FF6600] hover:underline" @click.prevent.stop="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button></span>
           </label>
 
+          <label class="flex items-start gap-2 text-[11px] text-gray-700 dark:text-gray-200 cursor-pointer select-none">
+            <input v-model="shareSettings" type="checkbox" class="mt-0.5 accent-[#FF6600]" />
+            <span>{{ t('usage.welcome') }} <a href="https://mapng.com/data.html#usage" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline" @click.stop>{{ t('usage.readMore') }}</a></span>
+          </label>
+
           <div class="flex justify-end">
             <button type="button" class="px-4 py-2 rounded bg-[#FF6600] hover:bg-[#e85d00] text-white text-[12px] font-semibold transition-colors" @click="done">
               {{ t('desktopWelcome.start') }}
@@ -57,6 +62,7 @@ import { useI18n } from 'vue-i18n';
 import { Cpu, FolderOpen, Library, PackageOpen } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { openHotspotPrivacy, setShareExports } from '../../composables/useExportHotspots.js';
+import { setShareSettings } from '../../composables/useUsageStats.js';
 
 const { t } = useI18n();
 const show = ref(false);
@@ -64,6 +70,7 @@ const folder = ref(null);
 const folderOk = ref(false);
 const updates = ref(true);
 const shareExports = ref(false);   // (opt in: unticked until the user ticks it)
+const shareSettings = ref(false);
 
 onMounted(async () => {
   if (!desktopApp?.welcomeDone) return;
@@ -84,6 +91,7 @@ async function choose() {
 async function done() {
   show.value = false;
   setShareExports(shareExports.value);
+  setShareSettings(shareSettings.value);
   await desktopApp.welcomeDone({ updates: updates.value });
   window.dispatchEvent(new CustomEvent('mapng:levels-changed'));
 }
