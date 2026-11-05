@@ -54,6 +54,28 @@
         />
       </template>
       
+      <!-- The world's edge: past it the map repeats (dimmed) so an edge selection
+           still shows both sides; the centre stops on the line (keepCenterOnWorld) -->
+      <l-polygon
+        v-if="maskPaneReady"
+        :lat-lngs="OUTSIDE_WORLD"
+        pane="mapngMask"
+        :stroke="false"
+        fill-color="#000000"
+        :fill-opacity="isDarkMode ? 0.45 : 0.3"
+        :interactive="false"
+      />
+      <l-rectangle
+        v-if="maskPaneReady"
+        :bounds="WORLD_BOUNDS"
+        pane="mapngMask"
+        :color="isDarkMode ? '#e5e7eb' : '#374151'"
+        :weight="2"
+        :fill="false"
+        :interactive="false"
+        :options="{ dashArray: '8, 6' }"
+      />
+
       <!-- MapNG's own OSM coverage (control panel toggle): the hosted archives' outlines -->
       <template v-if="showOsmCoverage">
         <l-polygon
@@ -325,15 +347,19 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
-// Static options to prevent reactivity issues. One flat world: the map stops
-// at ±180° and Mercator's ±85°, and never repeats east or west.
+// Static options to prevent reactivity issues. One flat world: the centre
+// stops at ±180° and Mercator's ±85°, and the world never repeats east or west.
 const mapOptions = {
   scrollWheelZoom: true,
-  maxBounds: WORLD_BOUNDS,
-  maxBoundsViscosity: 1,
-  worldCopyJump: false,
+  worldCopyJump: false,   // (the pan limit: keepCenterOnWorld)
 };
-const ONE_WORLD = { noWrap: true, bounds: WORLD_BOUNDS };
+// (tiles repeat past ±180° so a selection at the edge still shows what lies
+// across it; the border and the dimmed outside mark where the world ends)
+const ONE_WORLD = {};
+const OUTSIDE_WORLD = [
+  [[-89.9, -900], [89.9, -900], [89.9, 900], [-89.9, 900]],
+  [[WORLD_BOUNDS[0][0], -180], [WORLD_BOUNDS[1][0], -180], [WORLD_BOUNDS[1][0], 180], [WORLD_BOUNDS[0][0], 180]],
+];
 const { t, locale } = useI18n({ useScope: 'global' });
 const { show: showOsmCoverage, areas: osmCoverageAreas, status: osmCoverageStatus } = useOsmCoverage();
 // Archive regions are Geofabrik slugs ("utah", "new-mexico").
@@ -759,7 +785,7 @@ const selectionMask = computed(() => {
   const b = maskedBox.value;
   if (!b || boxScreenPx.value < 48) return null;
   return [
-    [[-90, -180], [90, -180], [90, 180], [-90, 180]],
+    [[-89.9, -900], [89.9, -900], [89.9, 900], [-89.9, 900]],
     [[b.south, b.west], [b.north, b.west], [b.north, b.east], [b.south, b.east]],
   ];
 });
@@ -792,10 +818,12 @@ const zoomToSelection = () => {
   const zoom = map.getBoundsZoom([[b.south, b.west], [b.north, b.east]], false, L.point(120, 120));
   map.setZoom(Math.min(zoom, map.getMaxZoom() || 19));
 };
-let coordsEl = null;
-let cursorShown = false;
-const showCoords = (text) => { if (coordsEl) coordsEl.textContent = text; };
-watch(currentCenter, () => { if (!cursorShown) showCoords(coordsText()); });
+// Two labelled rows: the mouse, and the crosshair (the selection's centre).
+// Text set directly (no Vue render per mouse move).
+let cursorValueEl = null;
+let centerValueEl = null;
+const showCursor = (text) => { if (cursorValueEl) cursorValueEl.textContent = text; };
+watch(currentCenter, () => { if (centerValueEl) centerValueEl.textContent = coordsText(); });
 
 const addMapTools = (map) => {
   const ZoomBox = L.Control.extend({
@@ -816,25 +844,65 @@ const addMapTools = (map) => {
   const Coords = L.Control.extend({
     options: { position: 'topleft' },
     onAdd() {
-      coordsEl = L.DomUtil.create('div', 'mapng-coords');
-      coordsEl.textContent = coordsText();
-      return coordsEl;
+      const box = L.DomUtil.create('div', 'mapng-coords');
+      const row = (key, label, value) => {
+        const r = L.DomUtil.create('div', `mapng-coords__row mapng-coords__row--${key}`, box);
+        const icon = L.DomUtil.create('span', 'mapng-coords__icon', r);
+        icon.innerHTML = key === 'cursor'
+          ? '<svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M5 3l14 7-6 2-2 6z"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 3v18M3 12h18"/></svg>';
+        L.DomUtil.create('span', 'mapng-coords__label', r).textContent = label;
+        const v = L.DomUtil.create('span', 'mapng-coords__value', r);
+        v.textContent = value;
+        return v;
+      };
+      cursorValueEl = row('cursor', t('map.coordsCursor'), '—');
+      centerValueEl = row('center', t('map.coordsCrosshair'), coordsText());
+      return box;
+    },
+  });
+  // Shortcut hints under the coordinates
+  const Keys = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd() {
+      const box = L.DomUtil.create('div', 'mapng-keys');
+      const row = (keys, text) => {
+        const r = L.DomUtil.create('div', 'mapng-keys__row', box);
+        const k = L.DomUtil.create('span', 'mapng-keys__keys', r);
+        keys.forEach((key, i) => {
+          if (i) k.append('+');
+          L.DomUtil.create('kbd', '', k).textContent = key;
+        });
+        L.DomUtil.create('span', 'mapng-keys__text', r).textContent = text;
+      };
+      row([t('map.keyScroll')], t('map.keyZoomCursor'));
+      row([t('map.keyCtrl'), t('map.keyScroll')], t('map.keyZoomCrosshair'));
+      row([t('map.keyRightClick')], t('map.keyMenu'));
+      row(['←↑↓→'], t('map.keyNudge'));
+      return box;
     },
   });
   new ZoomBox().addTo(map);
   L.control.scale({ position: 'topleft', maxWidth: 140 }).addTo(map);
   new Coords().addTo(map);
+  new Keys().addTo(map);
+
+  // Ctrl + scroll: zoom on the crosshair (the selection stays put); plain
+  // scroll zooms toward the mouse. Leaflet reads this option when it zooms,
+  // so each wheel event sets it first (capture phase, before Leaflet's own).
+  map.getContainer().addEventListener('wheel', (e) => {
+    map.options.scrollWheelZoom = e.ctrlKey ? 'center' : true;
+  }, { capture: true, passive: true });
 
   let frame = 0;
   map.on('mousemove', (e) => {
-    cursorShown = true;
     if (frame) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
-      if (cursorShown) showCoords(formatLatLng(e.latlng.lat, clampLng(e.latlng.lng)));
+      showCursor(formatLatLng(e.latlng.lat, clampLng(e.latlng.lng)));
     });
   });
-  map.on('mouseout', () => { cursorShown = false; showCoords(coordsText()); });
+  map.on('mouseout', () => { cancelAnimationFrame(frame); frame = 0; showCursor('—'); });
 };
 
 // One world fills the map's width at the furthest-out zoom (no grey sides).
@@ -842,6 +910,50 @@ const fitMinZoom = (map) => {
   const z = minZoomForWidth(map.getSize().x);
   map.setMinZoom(z);
   if (map.getZoom() < z) map.setZoom(z);
+};
+
+// The pan limit: the map's centre (the selection) stays on the world, at any
+// zoom, with blank space past the edges. (Leaflet's own maxBounds limits the
+// view instead, so the centre stopped half a screen short of every edge;
+// padding it fails north and south, where Mercator clips at ±85°.)
+const keepCenterOnWorld = (map) => {
+  const clampPoint = (p, zoom) => {
+    const world = 256 * 2 ** zoom;
+    return L.point(Math.min(world, Math.max(0, p.x)), Math.min(world, Math.max(0, p.y)));
+  };
+  // setView / zoom / flyTo: Leaflet asks _limitCenter for every target
+  const limitCenter = map._limitCenter;
+  map._limitCenter = function (center, zoom, bounds) {
+    const limited = limitCenter.call(this, center, zoom, bounds);
+    const p = this.project(limited, zoom);
+    const clamped = clampPoint(p, zoom);
+    return clamped.equals(p) ? limited : this.unproject(clamped, zoom);
+  };
+  // dragging: hold the pane where the centre is still on the world
+  map.dragging._draggable?.on('predrag', function () {
+    const half = map.getSize().divideBy(2);
+    const origin = map.getPixelOrigin();
+    const world = 256 * 2 ** map.getZoom();
+    const pos = this._newPos;
+    pos.x = Math.min(half.x + origin.x, Math.max(half.x + origin.x - world, pos.x));
+    pos.y = Math.min(half.y + origin.y, Math.max(half.y + origin.y - world, pos.y));
+  });
+  // a fling's coast (inertia): Leaflet sizes it here first; cut it at the edge
+  const limitOffset = map._limitOffset;
+  map._limitOffset = function (offset, bounds) {
+    const limited = limitOffset.call(this, offset, bounds);
+    const z = this.getZoom();
+    const from = this.getPixelBounds().getCenter();
+    const to = clampPoint(from.add(limited), z);
+    return to.subtract(from);
+  };
+  // anything else that still ends past an edge: settle back on it
+  map.on('moveend', () => {
+    const z = map.getZoom();
+    const raw = map.getPixelBounds().getCenter();
+    const want = clampPoint(raw, z);
+    if (!want.equals(raw)) map.panTo(map.unproject(want, z), { animate: true, duration: 0.25 });
+  });
 };
 
 // Right-click (or long-press) menu: move the selection here, copy the spot.
@@ -876,6 +988,7 @@ const onMapReady = (map) => {
   if (import.meta.env.DEV) window.__mapngMap = map;   // (dev server only: browser checks drive the map)
   fitMinZoom(map);
   map.on('resize', () => fitMinZoom(map));
+  keepCenterOnWorld(map);
   addMapTools(map);
   map.on('contextmenu', (e) => {
     copiedNotice.value = false;
@@ -931,19 +1044,51 @@ onMounted(() => {
 </script>
 
 <style>
+/* Map cursor: a thin crosshair like the selection's (white halo for satellite
+   and dark maps), also while dragging; clickable things keep the hand. */
+.leaflet-container.leaflet-grab,
+.leaflet-dragging .leaflet-container.leaflet-grab,
+.leaflet-container.leaflet-grab.leaflet-dragging,
+.leaflet-dragging .leaflet-grab { cursor: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cg%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%224%22/%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%231f2937%22%20stroke-width%3D%221.6%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%221.6%22%20fill%3D%22%23FF6600%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221%22/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair; }
+.leaflet-dragging .leaflet-grab .leaflet-interactive { cursor: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cg%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%224%22/%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%231f2937%22%20stroke-width%3D%221.6%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%221.6%22%20fill%3D%22%23FF6600%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221%22/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair; }
 /* Map tools (MapSelector addMapTools): one look with Leaflet's zoom bar */
 .mapng-zoom-selection { display: flex !important; align-items: center; justify-content: center; color: #374151; }
 .mapng-zoom-selection:hover { color: #FF6600; }
 .leaflet-control-scale-line { background: rgba(255, 255, 255, 0.8); border-color: #4b5563; color: #1f2937; font-size: 10px; }
 .mapng-coords {
-  background: rgba(255, 255, 255, 0.85); color: #1f2937; border-radius: 4px; padding: 1px 6px;
-  font: 10px/16px ui-monospace, SFMono-Regular, Menlo, monospace; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.92); color: #1f2937; border-radius: 6px; padding: 3px 7px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
   pointer-events: none; white-space: nowrap;
+  display: grid; grid-template-columns: auto auto auto; column-gap: 6px; row-gap: 1px; align-items: center;
+  font: 10px/16px system-ui, sans-serif;
 }
+.mapng-coords__row { display: contents; }
+.mapng-coords__icon { display: flex; color: #6b7280; }
+.mapng-coords__row--center .mapng-coords__icon { color: #FF6600; }
+.mapng-coords__label { color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; }
+.mapng-coords__value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; min-width: 128px; }
+.dark .leaflet-container { background: #111827; }
 .dark .leaflet-bar a, .dark .mapng-zoom-selection { background: #1f2937; color: #e5e7eb; border-color: #4b5563; }
 .dark .leaflet-bar a:hover { background: #374151; }
 .dark .leaflet-control-scale-line { background: rgba(31, 41, 55, 0.85); color: #e5e7eb; border-color: #9ca3af; text-shadow: none; }
-.dark .mapng-coords { background: rgba(31, 41, 55, 0.85); color: #e5e7eb; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15); }
+.dark .mapng-coords { background: rgba(31, 41, 55, 0.92); color: #e5e7eb; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.dark .mapng-coords__icon, .dark .mapng-coords__label { color: #9ca3af; }
+.dark .mapng-coords__row--center .mapng-coords__icon { color: #FF8533; }
+/* Shortcut hints (under the coordinates) */
+.mapng-keys {
+  background: rgba(255, 255, 255, 0.92); color: #4b5563; border-radius: 6px; padding: 4px 7px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
+  pointer-events: none; white-space: nowrap; font: 10px/16px system-ui, sans-serif;
+  display: grid; grid-template-columns: auto auto; column-gap: 8px; row-gap: 2px; align-items: center;
+}
+.mapng-keys__row { display: contents; }
+.mapng-keys__keys { display: flex; align-items: center; gap: 2px; color: #9ca3af; }
+.mapng-keys kbd {
+  font: 600 9px/14px system-ui, sans-serif; color: #1f2937; background: #f3f4f6; border: 1px solid #d1d5db;
+  border-bottom-width: 2px; border-radius: 4px; padding: 0 4px;
+}
+.dark .mapng-keys { background: rgba(31, 41, 55, 0.92); color: #d1d5db; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.dark .mapng-keys kbd { color: #e5e7eb; background: #374151; border-color: #4b5563; }
 /* The selection's size, pinned above its top edge */
 .mapng-selection-size { pointer-events: none; }
 .mapng-selection-size span {

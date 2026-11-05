@@ -113,7 +113,16 @@
     "zoomToSelection": "Auf Auswahl zoomen",
     "centerHere": "Auswahl hierher verschieben",
     "copyCoordinates": "Koordinaten kopieren",
-    "copied": "Kopiert!"
+    "copied": "Kopiert!",
+    "coordsCursor": "Mauszeiger",
+    "coordsCrosshair": "Fadenkreuz",
+    "keyScroll": "Mausrad",
+    "keyCtrl": "Strg",
+    "keyRightClick": "Rechtsklick",
+    "keyZoomCursor": "zum Mauszeiger zoomen",
+    "keyZoomCrosshair": "zum Fadenkreuz zoomen",
+    "keyMenu": "Menü",
+    "keyNudge": "Auswahl verschieben"
   },
   "status": {
     "runConfigCopied": "Run-Konfiguration in die Zwischenablage kopiert (GPXZ-Schlüssel maskiert).",

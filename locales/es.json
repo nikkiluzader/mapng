@@ -113,7 +113,16 @@
     "zoomToSelection": "Acercar a la selección",
     "centerHere": "Centrar la selección aquí",
     "copyCoordinates": "Copiar coordenadas",
-    "copied": "¡Copiado!"
+    "copied": "¡Copiado!",
+    "coordsCursor": "Cursor",
+    "coordsCrosshair": "Mira",
+    "keyScroll": "Rueda",
+    "keyCtrl": "Ctrl",
+    "keyRightClick": "Clic derecho",
+    "keyZoomCursor": "zoom hacia el cursor",
+    "keyZoomCrosshair": "zoom hacia la mira",
+    "keyMenu": "menú",
+    "keyNudge": "mover la selección"
   },
   "status": {
     "runConfigCopied": "Ajustes copiados al portapapeles (clave GPXZ oculta).",

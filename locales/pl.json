@@ -113,7 +113,16 @@
     "zoomToSelection": "Przybliż do zaznaczenia",
     "centerHere": "Wyśrodkuj zaznaczenie tutaj",
     "copyCoordinates": "Kopiuj współrzędne",
-    "copied": "Skopiowano!"
+    "copied": "Skopiowano!",
+    "coordsCursor": "Kursor",
+    "coordsCrosshair": "Celownik",
+    "keyScroll": "Kółko",
+    "keyCtrl": "Ctrl",
+    "keyRightClick": "Prawy klik",
+    "keyZoomCursor": "przybliż do kursora",
+    "keyZoomCrosshair": "przybliż do celownika",
+    "keyMenu": "menu",
+    "keyNudge": "przesuń zaznaczenie"
   },
   "status": {
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",

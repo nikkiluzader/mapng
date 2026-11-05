@@ -113,7 +113,16 @@
     "zoomToSelection": "Приблизить к выделению",
     "centerHere": "Переместить выделение сюда",
     "copyCoordinates": "Копировать координаты",
-    "copied": "Скопировано!"
+    "copied": "Скопировано!",
+    "coordsCursor": "Курсор",
+    "coordsCrosshair": "Прицел",
+    "keyScroll": "Колесо",
+    "keyCtrl": "Ctrl",
+    "keyRightClick": "Правый клик",
+    "keyZoomCursor": "зум к курсору",
+    "keyZoomCrosshair": "зум к прицелу",
+    "keyMenu": "меню",
+    "keyNudge": "сдвинуть выделение"
   },
   "status": {
     "runConfigCopied": "Конфигурация запуска скопирована в буфер обмена (ключ GPXZ скрыт).",

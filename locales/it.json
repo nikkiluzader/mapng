@@ -113,7 +113,16 @@
     "zoomToSelection": "Zoom sulla selezione",
     "centerHere": "Centra la selezione qui",
     "copyCoordinates": "Copia coordinate",
-    "copied": "Copiato!"
+    "copied": "Copiato!",
+    "coordsCursor": "Cursore",
+    "coordsCrosshair": "Mirino",
+    "keyScroll": "Rotellina",
+    "keyCtrl": "Ctrl",
+    "keyRightClick": "Clic destro",
+    "keyZoomCursor": "zoom verso il mouse",
+    "keyZoomCrosshair": "zoom verso il mirino",
+    "keyMenu": "menu",
+    "keyNudge": "sposta la selezione"
   },
   "status": {
     "runConfigCopied": "Configurazione di esecuzione copiata negli appunti (chiave GPXZ mascherata).",

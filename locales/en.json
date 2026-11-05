@@ -113,7 +113,16 @@
     "zoomToSelection": "Zoom to selection",
     "centerHere": "Center selection here",
     "copyCoordinates": "Copy coordinates",
-    "copied": "Copied!"
+    "copied": "Copied!",
+    "coordsCursor": "Cursor",
+    "coordsCrosshair": "Crosshair",
+    "keyScroll": "Scroll",
+    "keyCtrl": "Ctrl",
+    "keyRightClick": "Right-click",
+    "keyZoomCursor": "zoom to the mouse",
+    "keyZoomCrosshair": "zoom to the crosshair",
+    "keyMenu": "menu",
+    "keyNudge": "nudge the selection"
   },
   "status": {
     "runConfigCopied": "Run configuration copied to clipboard (GPXZ key masked).",
