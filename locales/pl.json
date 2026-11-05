@@ -1,4 +1,11 @@
 {
+  "overpassStatus": {
+    "title": "Serwery OpenStreetMap nie odpowiadają, ale MapNG nadal działa.",
+    "body": "Dane mapy pochodzą z Overture Maps, comiesięcznej kopii zapasowej OpenStreetMap. Może brakować niektórych szczegółów, np. liczby pasów. Dane na żywo wrócą, gdy OpenStreetMap znów zacznie działać.",
+    "dismiss": "Zminimalizuj",
+    "reopen": "Używane są zapasowe dane mapy. Kliknij, aby zobaczyć szczegóły",
+    "chip": "Zapasowe dane mapy"
+  },
   "common": {
     "cancel": "Anuluj"
   },
@@ -13,19 +20,19 @@
     "ru": "Rosyjski"
   },
   "sidebar": {
-    "tagline": "Zestaw narzędzi do tworzenia terenu BeamNG ze świata rzeczywistego",
+    "tagline": "Mapy ze świata rzeczywistego dla BeamNG.drive",
     "aboutTooltip": "Co to jest?",
     "disclaimer": "Zastrzeżenie",
     "contact": "Kontakt",
-    "discord": "Official Discord",
+    "discord": "Oficjalny Discord",
     "github": "GitHub",
-    "stack": "Stos technologiczny",
+    "stack": "Technologie",
     "switchToLightMode": "Przełącz na tryb jasny",
     "switchToDarkMode": "Przełącz na tryb ciemny",
     "build": "Kompilacja {hash} - {time}",
     "desktopBuild": "MapNG Desktop {version}",
     "desktopApp": "Aplikacja desktopowa",
-    "desktopAppTooltip": "MapNG dla Windows i Linux: duże i gęste mapy, poziomy zapisywane prosto w BeamNG, przebudowa w nowych wersjach",
+    "desktopAppTooltip": "MapNG dla Windows i Linux: duże i gęste mapy, poziomy zapisywane prosto w BeamNG i aktualizowane z każdą nową wersją",
     "yourData": "Twoje dane"
   },
   "mode": {
@@ -37,34 +44,37 @@
     "preview3d": "Podgląd 3D"
   },
   "mobile": {
-    "desktopRequired": "Wymagany komputer stacjonarny",
+    "desktopRequired": "Wymagany komputer",
     "description": "MapNG to wysokowydajne narzędzie do generowania terenu przeznaczone dla modyfikacji BeamNG.",
-    "details": "Aby zapewnić najlepsze doświadczenie z renderowaniem 3D, dokładnym wyborem mapy i zarządzaniem plikami, proszę uzyskać dostęp do tej aplikacji na komputerze stacjonarnym lub laptopie.",
+    "details": "Dla najlepszej obsługi renderowania 3D, dokładnego wyboru mapy i zarządzania plikami otwórz tę aplikację na komputerze stacjonarnym lub laptopie.",
     "inputHint": "Zalecane: mysz i klawiatura"
   },
   "map": {
+    "editInOsm": "Edytuj w OpenStreetMap",
     "osmCoverageTooltip": "Dane OSM MapNG: {region} (aktualizacja {date})",
     "latitude": "Szerokość geograficzna",
     "longitude": "Długość geograficzna",
     "selectLocation": "Wybierz lokalizację...",
     "searchPlaceholder": "Wyszukaj lokalizację...",
-    "noLocationsFound": "Nie znaleziono lokalizacji dla \"{query}\"",
+    "noLocationsFound": "Nie znaleziono lokalizacji dla „{query}”",
     "elevationDataSource": "Źródło danych wysokościowych",
     "standard30m": "Standardowa (30m globalnie)",
     "standardDescription": "Amazon Terrarium (SRTM). Niezawodne pokrycie globalne. Dobre do ogólnego terenu.",
+    "flatNone": "Brak (płaski)",
+    "flatNoneDescription": "Idealnie płaski teren — bez danych wysokościowych. Użyj z OSM, aby mieć drogi, budynki i drzewa na równym terenie.",
     "usgs1m": "USGS 1m DEM (tylko USA)",
     "online": "ONLINE",
     "offline": "OFFLINE",
-    "usgsDescription": "Wysokiej precyzji dane dla USA. Powrót do standardu, jeśli dane brakują/są uszkodzone.",
+    "usgsDescription": "Dane wysokiej precyzji dla USA. Jeśli danych brakuje lub są uszkodzone, używane jest źródło standardowe.",
     "kron86Poland": "NMT EVRF2007 (tylko Polska)",
     "outsideCoverage": "poza zasięgiem",
     "selectedSourceOutsideCoverage": "To źródło nie obejmuje obszaru na mapie, więc zostanie użyte źródło standardowe.",
-    "kron86Description": "Źródło indeksu NMT EVRF2007 GUGiK. Powrót do standardu, gdy kafle są niedostępne lub nieobsługiwane.",
-    "gpxzPremium": "GPXZ (Premium globalny)",
+    "kron86Description": "Wysokości w wysokiej rozdzielczości dla Polski (GUGiK). Tam, gdzie brakuje kafli, używane jest źródło standardowe.",
+    "gpxzPremium": "GPXZ (globalny premium)",
     "gpxzDescription": "Dane globalne najwyższej jakości. Wymaga klucza API.",
     "checkCoverage": "Sprawdź zasięg",
     "enterGpxzKey": "Wprowadź klucz API GPXZ",
-    "freeTier": "Warstwa bezpłatna: 100 żądań/dzień.",
+    "freeTier": "Plan darmowy: 100 zapytań dziennie.",
     "getKey": "Uzyskaj klucz",
     "gpxzBatchWarning": "Zadania wsadowe z GPXZ używają wielu wywołań API ({tiles} kafelków x wiele żądań na każdy).",
     "checking": "Sprawdzanie...",
@@ -73,9 +83,9 @@
     "plan": "Plan",
     "today": "Dzisiaj",
     "concurrency": "Współbieżność",
-    "parallel": "{count}x równoległa",
+    "parallel": "{count}× równolegle",
     "invalidApiKey": "Nieprawidłowy klucz API",
-    "largeAreaWarning": "Duży obszar ({area} km2). Używa wielu wywołań API.",
+    "largeAreaWarning": "Duży obszar ({area} km²). Używa wielu wywołań API.",
     "surrounding": {
       "title": "Sąsiednie kafelki",
       "description": "Pobierz sąsiednie kafelki dla terenu wykraczającego poza granice. Używa standardowej wysokości 30m, bez danych OSM.",
@@ -84,20 +94,21 @@
       "selectAll": "Zaznacz wszystko",
       "clear": "Wyczyść",
       "showOnMap": "Pokaż na mapie",
-      "satelliteQuality": "Jakość satelity",
+      "satelliteQuality": "Jakość zdjęć satelitarnych",
       "outputSize": "Rozmiar wyjścia",
       "scale": "Skala",
       "perTileArea": "Powierzchnia na kafelek",
       "upsampleNote": "Wysokość przeskalowana z danych źródłowych 30m. Taki sam rozmiar piksela jak kafelek środkowy.",
       "generateTerrainFirst": "Najpierw wygeneruj teren",
-      "download": "Pobierz {count} kafelek{suffix} (ZIP)",
+      "download": "Pobierz kafelki ({count}, ZIP)",
       "cancel": "Anuluj",
       "statusStarting": "Rozpoczynanie...",
       "statusDone": "Gotowe!",
-      "statusCancelled": "Anulowany.",
+      "statusCancelled": "Anulowano.",
       "error": "Nie udało się wygenerować sąsiednich kafelków. Spróbuj ponownie."
     },
-    "editInOsm": "Edytuj w OpenStreetMap"
+    "missingTile": "Brak: {label}",
+    "myLocation": "Moja lokalizacja"
   },
   "status": {
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",
@@ -105,7 +116,7 @@
     "clipboardReadUnavailable": "Odczyt ze schowka niedostępny w tej przeglądarce/sesji.",
     "clipboardEmpty": "Schowek jest pusty.",
     "runConfigPasted": "Konfiguracja wklejona ze schowka.",
-    "runConfigInvalidJson": "Zawartość schowka to nie prawidłowy JSON konfiguracji.",
+    "runConfigInvalidJson": "Zawartość schowka nie jest prawidłowym JSON-em konfiguracji.",
     "runConfigDownloaded": "Konfiguracja pobrana jako JSON.",
     "runConfigLoadedBatch": "Konfiguracja załadowana. Uruchom zadanie wsadowe, aby ponownie uruchomić z tymi ustawieniami.",
     "runConfigInvalidFile": "Nieprawidłowy plik konfiguracji (niezgodność schematu)."
@@ -129,21 +140,22 @@
     "saveConfig": "Zapisz konfigurację",
     "loadConfig": "Załaduj konfigurację",
     "performanceProfile": "Profil wydajności zadania wsadowego",
-    "profileThroughput": "Maksymalna przepustowość (najszybciej, wyższa pamięć)",
+    "profileThroughput": "Maksymalna przepustowość (najszybciej, więcej pamięci)",
     "profileBalanced": "Zrównoważone (rekomendowane)",
-    "profileLowMemory": "Niska pamięć 8192 Bezpieczna (wolniej, najstabilniejsza)",
-    "profileHelp": "Kontroluje współbieżność wewnętrznego harmonogramu dla etapów pobierania/obliczania/kodowania oraz rozdzielania kafelków wysokiej rozdzielczości.",
+    "profileLowMemory": "Mało pamięci (bezpieczne dla kafelków 8192 px; wolniej)",
+    "profileHelp": "Ile kafelków jest przetwarzanych naraz. Zmniejsz, jeśli przeglądarce kończy się pamięć.",
     "gridWidthColumns": "Szerokość (kolumny)",
     "gridHeightRows": "Wysokość (wiersze)",
     "tiles": "Kafelki",
     "totalArea": "Całkowita powierzchnia",
     "perimeter": "Obwód",
-    "westToEast": "Zachód na Wschód",
+    "westToEast": "Z zachodu na wschód",
     "northToSouth": "Z północy na południe",
-    "perTile": "Na kafelkę",
-    "largeBatchWarning": "Duże zadanie wsadowe ({count} kafelków). To będzie trwać długo i wyzwoli wiele pobrań.",
-    "resourceHeavy": "Intensywne zasoby.",
+    "perTile": "Na kafelek",
+    "largeBatchWarning": "Duże zadanie wsadowe ({count} kafelków). To potrwa długo i uruchomi wiele pobrań.",
+    "resourceHeavy": "Duże zużycie zasobów.",
     "resourceHeavyBody": "Duże siatki lub kafelki o wysokiej rozdzielczości mogą nadal osiągać limity pamięci przeglądarki lub limity pobierania.",
+    "tileLayout": "Przesunięcia i nazwy kafelków",
     "tileOffsets": "Przesunięcia kafelków (metry)",
     "resetAll": "Resetuj wszystko",
     "tilesFollowCenter": "Kafelki podążają za środkiem mapy",
@@ -154,11 +166,12 @@
     "tileEach": "Każdy kafelek: {resolution}m x {resolution}m przy {mpp}m/px",
     "gridCoverage": "Pokrycie siatki: {w} x {h}",
     "highResolutionWarning": "Kafelki o wysokiej rozdzielczości wymagają znacznej ilości pamięci RAM na kafelek.",
-    "sharedBaseline": "Wspólne wzniesienie (wszystkie mapy wysokości używają jednej wartości min/max)",
+    "sharedBaseline": "Wspólna baza wysokości (wszystkie mapy wysokości używają jednego min/max)",
     "sharedBaselineHint": "Wymagane dodatkowe wstępne skanowanie: zadanie wsadowe najpierw uruchamia jeden przebieg tylko wysokości, aby obliczyć globalne wartości min/max.",
-    "includeOsm": "Dołącz funkcje OSM",
+    "sharedBaselineAutoHint": "Włączone automatycznie, bo co najmniej jeden kafelek jest przesunięty — dzięki temu sąsiednie kafelki łączą się bez szwów. Odznacz, aby to zmienić.",
+    "includeOsm": "Dołącz obiekty OSM",
     "gridCenter": "Środek siatki",
-    "selectedPerTile": "{count} eksport{suffix} wybranych na kafelek",
+    "selectedPerTile": "Wybrane eksporty na kafelek: {count}",
     "totalFiles": "{tiles} kafelków x {exports} eksportów = {total} plików łącznie (spakowane do {tiles} plików ZIP)",
     "browserDownloadHint": "Twoja przeglądarka może poprosić o pozwolenie na pobranie wielu plików.",
     "startBatch": "Uruchom zadanie wsadowe ({tiles} kafelków)",
@@ -166,11 +179,27 @@
     "clearSavedJob": "Wyczyść zapisane zadanie",
     "clearCache": "Wyczyść pamięć podręczną"
   },
+  "batchCombined": {
+    "modeSeparate": "Osobne kafelki",
+    "modeCombined": "Połączony poziom",
+    "modeSeparateHint": "Każdy kafelek jest przetwarzany i pobierany jako osobny zestaw plików.",
+    "modeCombinedHint": "Wszystkie kafelki są łączone w jeden grywalny poziom BeamNG (wymagana kwadratowa siatka).",
+    "title": "Połączony poziom BeamNG",
+    "gridSize": "Rozmiar siatki (kwadrat)",
+    "gridSizeHint": "Połączone poziomy wymagają kwadratowej siatki o boku będącym potęgą dwójki, aby złożona mapa wysokości miała poprawny rozmiar terenu.",
+    "combinedHeightmap": "Połączona mapa wysokości",
+    "largeSizeNote": "Największy rozmiar w przeglądarce (~{mb} MB mapy wysokości w RAM). Użyj przeglądarki na komputerze z dużą ilością wolnej pamięci.",
+    "disabledWarning": "Za duże — przekracza limit 16384 px w przeglądarce. Zmniejsz rozdzielczość kafelków lub rozmiar siatki.",
+    "outputSummary": "Kafelki: {tiles} → jeden poziom BeamNG {dim}×{dim} px",
+    "outputHint": "Kafelki są łączone po przetworzeniu, a następnie eksportowane jako jeden grywalny poziom w pliku ZIP.",
+    "startCombined": "Zbuduj połączony poziom (kafelki: {tiles})"
+  },
   "upload": {
-    "autoDetected": "współrzędne auto-wykryte",
-    "usingSelected": "używając wybranych współrzędnych",
+    "autoDetected": "współrzędne wykryte automatycznie",
+    "usingSelected": "używam wybranych współrzędnych",
     "reading": "Czytanie pliku...",
-    "noGeoMetadata": "Brak metadanych geoprzestrzennych - używając wybranych współrzędnych",
+    "unsupportedCrsUsingSelected": "CRS nieobsługiwany, używam wybranych współrzędnych",
+    "noGeoMetadata": "Brak metadanych geoprzestrzennych - używam wybranych współrzędnych",
     "elevationUnits": "Jednostki wysokości",
     "auto": "Auto",
     "meters": "Metry",
@@ -179,11 +208,11 @@
     "coordinateSystem": "Układ współrzędnych",
     "crsPl1992": "PL-1992 (EPSG:2180)",
     "removeUploaded": "Usuń przesłany plik",
-    "uploadElevation": "Prześlij wysokość (.tif, .asc, .gml, .xml, .zip, .laz, .las)",
+    "uploadElevation": "Prześlij własne dane wysokości (.tif, .asc, .gml, .xml, .zip, .laz, .las)",
     "pointCloud": "Chmura punktów",
     "metersDetected": "metry wykryte",
     "feetDetected": "stopy wykryte",
-    "usFeetDetected": "US Survey stopy wykryte",
+    "usFeetDetected": "wykryto stopy amerykańskie (US survey)",
     "unknownDefaultMeters": "nieznane, domyślnie metry",
     "noDataValue": "Wartość braku danych",
     "noDataWhatsThis": "Co to jest?",
@@ -202,8 +231,8 @@
     "gapFillStandard": "Standardowy zbiór wysokości",
     "gapFillGpxz": "GPXZ (klucz API)",
     "gapFillNone": "Niczym — zostaw luki",
-    "gapFillStandardHint": "To, czego nie pokrywają Twoje warstwy, pochodzi ze zbioru globalnego, dopasowanego wysokością do Twoich danych na styku.",
-    "gapFillGpxzHint": "To, czego nie pokrywają Twoje warstwy, pochodzi z GPXZ, dopasowanego wysokością do Twoich danych na styku.",
+    "gapFillStandardHint": "To, czego nie pokrywają Twoje warstwy, pochodzi ze zbioru globalnego, dopasowane wysokością do Twoich danych na styku.",
+    "gapFillGpxzHint": "To, czego nie pokrywają Twoje warstwy, pochodzi z GPXZ, dopasowane wysokością do Twoich danych na styku.",
     "gapFillGpxzNoKeyHint": "Brak klucza API GPXZ — zostanie użyty zbiór globalny.",
     "gapFillNoneHint": "Obszary bez pokrycia są interpolowane z krawędzi Twoich danych, a nie z rzeczywistego zbioru.",
     "filesSelected": "wybrano plików: {count}",
@@ -217,10 +246,10 @@
     "showSettings": "Pokaż ustawienia sceny",
     "sceneSettings": "Ustawienia sceny",
     "meshQuality": "Jakość siatki",
-    "qualityLow": "Niska liczba wielokątów",
+    "qualityLow": "Mało wielokątów",
     "qualityBalanced": "Zrównoważone",
-    "qualityMaxSafe": "Maksymalny bezpieczny szczegół",
-    "qualityFull": "Pełny szczegół",
+    "qualityMaxSafe": "Maks. bezpieczna szczegółowość",
+    "qualityFull": "Pełna szczegółowość",
     "qualityFullHint": "Renderuje natywną siatkę terenu — większe obciążenie GPU i pamięci.",
     "environment": "Środowisko",
     "sunPositioning": "Pozycjonowanie słońca",
@@ -240,29 +269,41 @@
     "segmentedHybrid": "Seg. Hybrydowa",
     "surroundingsTexture": "Tekstura otoczenia",
     "surroundingTerrain": "Teren otaczający",
-    "surroundingDesc": "Adaptacyjne sąsiednie kafelki ze zszywaniem szwów i optymalizowanym szczegółami satelity dla szybszego ładowania.",
+    "surroundingDesc": "Pokazuje w podglądzie teren wokół Twojego obszaru (mniej szczegółów).",
     "wireframeMode": "Tryb szkieletu",
-    "features3d": "Funkcje 3D",
+    "features3d": "Obiekty 3D",
+    "water": "Woda",
+    "seaLevelOffset": "Przesunięcie poziomu morza",
     "resetCamera": "Resetuj kamerę",
     "previewNote": "Tylko podgląd: szybki, uproszczony widok terenu, dróg i budynków. Wyeksportowany poziom BeamNG jest tworzony w pełnej szczegółowości i w grze wygląda znacznie lepiej.",
-    "dismissNote": "Ukryj"
+    "dismissNote": "Ukryj",
+    "sun_Morning": "Rano",
+    "sun_Noon": "Południe",
+    "sun_Afternoon": "Popołudnie",
+    "sun_Evening": "Wieczór",
+    "sun_Night": "Noc",
+    "feature_buildings": "Budynki",
+    "feature_vegetation": "Roślinność",
+    "feature_barriers": "Bariery",
+    "webglTitle": "Podgląd 3D niedostępny",
+    "webglBody": "Twoja przeglądarka nie mogła uruchomić WebGL. Włącz w jej ustawieniach akcelerację sprzętową (GPU) albo spróbuj innej przeglądarki. Eksport nadal działa."
   },
   "exportPanel": {
-    "osmMissing": "Dane OSM brakują",
+    "osmMissing": "Brak jeszcze danych OpenStreetMap",
     "fetchNow": "Pobierz teraz",
     "readyToExport": "Gotowe do eksportu",
     "beamngLevel": "Poziom BeamNG",
     "levelName": "Nazwa poziomu",
     "levelNamePlaceholder": "Zasugerowana ze środka mapy",
-    "baseTexture": "Tekstura podstawowa",
+    "baseTexture": "Tekstura bazowa",
     "osm": "OSM",
     "none": "Brak",
     "pbrMaterials": "Materiały PBR",
     "off": "Wył.",
-    "osmData": "dane OSM",
+    "osmData": "Dane OSM",
     "includeBackdrop": "Dołącz tło",
     "includeBuildings": "Dołącz budynki",
-    "exportBuildings": "Eksportuj 3D budynki OSM",
+    "exportBuildings": "Eksportuj budynki 3D z OSM",
     "water": "Woda",
     "lakesRivers": "Jeziora i rzeki",
     "structuresHeading": "Budowle",
@@ -280,22 +321,27 @@
     "shapeTunnels": "Przy tunelach",
     "shapeTunnelsHint": "Wykopy, zasypka, przykrycie",
     "shapeExtras": "Chodniki i jeziora",
-    "shapeExtrasHint": "Krawężniki, dna, parkingi",
+    "shapeExtrasHint": "Krawężniki, dna jezior, parkingi",
     "lidarDecks": "Zmierzone wysokości mostów",
     "lidarDecksHint": "Lidar USA, kilka MB",
-    "treesBushes": "Drzewa/Krzewy",
-    "nativeForest": "Elementy rodzimego lasu",
+    "seaLevelOffset": "Przesunięcie poziomu morza",
+    "treesBushes": "Drzewa/krzewy",
+    "nativeForest": "Natywne elementy lasu BeamNG",
     "rocks": "Skały",
-    "quarryRock": "Kwatera/pokrycie skalne",
+    "quarryRock": "Kamieniołomy/pokrycie skalne",
     "safeCaps": "Limity zawartości",
     "roads": "Drogi",
+    "roadType": "Typ dróg",
+    "roadTypeSpline": "Drogi DecalRoad",
+    "roadTypeNone": "Brak",
+    "communityQualityNotice": "Eksporty MapNG to punkt wyjścia. Przed publikacją w serwisach z modami dodaj własną rozbudowę świata i dopracuj go.",
     "beamngLevelExport": "Eksport poziomu BeamNG",
     "generatePlayableZip": "Wygeneruj pakiet .zip do gry",
     "desktopSaved": "Zapisano w folderze modów: {name}",
     "desktopShowInFolder": "Pokaż w folderze",
     "desktopChangeFolder": "Zmień folder…",
     "satellite": "Satelita",
-    "satelliteHybrid": "Satelita hybrydowa",
+    "satelliteHybrid": "Satelitarna hybrydowa",
     "touchedUp": "Poprawiona",
     "texturePaint": {
       "open": "Popraw teksturę bazową",
@@ -333,11 +379,11 @@
     "geoTiff": "GeoTIFF",
     "geoJson": "GeoJSON",
     "osmVectors": "Wektory OSM",
-    "cleanupToolNotice": "Aby uzyskac znacznie bardziej szczegolowy workflow, wyeksportuj tutaj GeoTIFF i uzyj go z ",
+    "cleanupToolNotice": "Aby pracować z większą szczegółowością, wyeksportuj tutaj GeoTIFF i użyj go z ",
     "cleanupToolLinkLabel": "BeamNG Level Cleanup",
-    "cleanupToolCredit": ", aby wygenerowac znacznie bardziej szczegolowa mape. Narzedzie autorstwa AlexKidd.",
+    "cleanupToolCredit": ", aby wygenerować znacznie bardziej szczegółową mapę. Narzędzie autorstwa AlexKidd.",
     "exportingBeamng": "Eksportowanie poziomu BeamNG",
-    "mayTakeWhile": "Może to potrwać chwilę dla dużych map",
+    "mayTakeWhile": "Przy dużych mapach może to chwilę potrwać",
     "elapsed": "Upłynęło",
     "hybrid": "Hybrydowa",
     "surroundingTerrain": "Teren otaczający",
@@ -349,8 +395,9 @@
     "centerTexture": "Tekstura środkowa:",
     "tiles": "Kafelki:",
     "center": "Środek",
-    "centerPlusSurroundings": "Środek + Otoczenie",
+    "centerPlusSurroundings": "Środek + otoczenie",
     "surroundingsOnly": "Tylko otoczenie",
+    "realWorldScale": "Skala rzeczywista (1 jednostka = 1 m)",
     "glbModel": "Model GLB",
     "colladaDae": "Collada DAE",
     "beamngTerrain": "Teren BeamNG",
@@ -382,7 +429,7 @@
       "shapeHint_all": "MapNG dopasowuje grunt do dróg, mostów, wiaduktów, tuneli, chodników i jezior.",
       "shapeHint_custom": "Wybierz, jakie zmiany gruntu wprowadza MapNG.",
       "shapeHint_none": "Grunt zostaje dokładnie taki, jak wygenerowano. Mosty stają się prostymi pomostami z końcami na ziemi; tunele powstają tylko tam, gdzie już pasują (wloty pozostają otwarte).",
-      "generatedRaw": "Ten teren wygenerowano surowy (bez wygładzania). Wybiera się to przed „Wygeneruj dane”, w opcji „Surowy teren”.",
+      "generatedRaw": "Ten teren wygenerowano jako surowy (bez wygładzania). Wybiera się to przed „Wygeneruj dane”, w opcji „Surowy teren”.",
       "reportNote": "Każda zmiana jest wymieniona w pliku export_report.txt poziomu.",
       "backdropOff": "Wył.",
       "backdropGlobal": "30 m globalnie",
@@ -400,21 +447,31 @@
       "size": "{km} km szerokości, narożniki {far} km od środka, około {buildings} budynków.",
       "summary_light": "Powinien dobrze się wczytywać i działać na większości komputerów.",
       "summary_heavy": "Wymaga mocnego komputera: dłuższe wczytywanie i mniej FPS w gęstych obszarach.",
-      "summary_veryHeavy": "Wiele komputerów go nie wczyta albo nie będzie działał płynnie. Nadal możesz go wyeksportować.",
+      "summary_veryHeavy": "Na wielu komputerach się nie wczyta albo nie będzie działać płynnie. Nadal możesz go wyeksportować.",
       "farEdge": "Jego narożniki są {km} km od środka. Powyżej około {limit} km BeamNG traci precyzję i obiekty zaczynają drgać: wybierz mniejszy obszar albo mniej m/px.",
       "nearEdge": "Jego narożniki są {km} km od środka, blisko {limit} km, gdzie BeamNG traci precyzję i obiekty drgają.",
       "bigTerrain": "Teren {px} px zajmuje dużo pamięci i dłużej się wczytuje.",
       "hugeTerrain": "Teren {px} px przekracza pamięć większości komputerów.",
-      "manyBuildings": "Buduj wszystko jest włączone: powstaną wszystkie {count} budynki. To siatki budynków zajmują pamięć BeamNG: wyłącz Buduj wszystko albo wybierz mniejszy obszar.",
-      "buildingsCapped": "{count} budynków w obszarze: powstanie {built} z nich (Buduj wszystko jest wyłączone).",
+      "manyBuildings": "Buduj wszystko jest włączone: powstaną wszystkie budynki ({count}). To siatki budynków zajmują pamięć BeamNG: wyłącz Buduj wszystko albo wybierz mniejszy obszar.",
+      "buildingsCapped": "Budynki w obszarze: {count}; powstanie z nich {built} (Buduj wszystko jest wyłączone).",
       "uncapped": "Buduj wszystko jest włączone: drzewa, ogrodzenia, latarnie i obiekty też nie mają limitu. Gęsta roślinność najbardziej obniża FPS."
-    }
+    },
+    "downloadReady": "Gotowe do pobrania: {name}"
   },
   "controlPanel": {
     "resolutionOutputSize": "Rozdzielczość (rozmiar wyjścia)",
-    "nativeCoverage": "{source} rodzime pokrycie",
+    "nativeCoverage": "Natywne pokrycie {source}",
     "removeUploadedForCustomResolution": "Usuń przesłany plik, aby wybrać niestandardową rozdzielczość.",
-    "processingResolutionLabel": "Rozdzielczosc przetwarzania (metry na piksel)",
+    "uploadAreaMode": "Przesłany obszar",
+    "fullCoverage": "Pełne pokrycie",
+    "squareCrop": "Kwadratowe przycięcie",
+    "squareCropWithinCoverage": "Kwadratowe przycięcie pozostaje w granicach przesłanego pokrycia.",
+    "suggestedSquareExport": "Sugerowany kwadratowy eksport: {size} x {size} px.",
+    "switchToSquareCrop": "Przełącz na Kwadratowe przycięcie, aby wybrać obszar eksportu o boku będącym potęgą dwójki w granicach przesłanego pokrycia.",
+    "dragMapToPositionCrop": "Przeciągnij mapę, aby ustawić ramkę przycięcia w granicach przesłanego pokrycia.",
+    "previewOutOfDate": "Podgląd jest nieaktualny — uruchom ponownie Podgląd 3D, aby zastosować zmiany.",
+    "previewOutOfDatePanel": "Podgląd 3D jest nieaktualny. Uruchom ponownie Podgląd 3D, aby zastosować zmiany.",
+    "processingResolutionLabel": "Rozdzielczość przetwarzania (metry na piksel)",
     "processingResolutionCoverage": "Obejmuje {km} × {km} km przy {px} px ({mpp} m na piksel)",
     "processingResolutionCoverageTile": "Każdy kafelek obejmuje {km} × {km} km przy {px} px ({mpp} m na piksel)",
     "processingResolutionDetailUltra": "bardzo dokładnie: do rzeźbienia lub malowania terenu",
@@ -424,22 +481,27 @@
     "processingResolutionGuide": "1 m na piksel pasuje do większości map. Niższe wartości (0,25–0,5) dają dokładniejszy teren do rzeźbienia lub malowania w grze, na mniejszym obszarze. Wyższe (2–4) mieszczą bardzo duże obszary, z łagodniejszym terenem i drogami.",
     "processingResolutionRange": "Użyj wartości od {min} do {max} m na piksel.",
     "processingResolutionCoarse": "Przy {mpp} m na piksel drogi i drobne szczegóły wychodzą zgrubnie, a drogi ledwo widać w podglądzie 3D.",
-    "processingResolutionSuggest": " Ten sam obszar przy 1 m na piksel: wyjście {px} px z 1 m.",
+    "processingResolutionSuggest": " Ten sam obszar przy 1 m na piksel: {px} px na wyjściu.",
     "processingResolutionPickUltra": "0,25 m: najdokładniejszy teren, najmniejszy obszar",
     "processingResolutionPickHigh": "0,5 m: dokładny teren",
     "processingResolutionPickStandard": "1 m: zalecane",
     "processingResolutionPickLarge": "2 m: dwa razy większy obszar, łagodniejszy teren",
     "processingResolutionPickHuge": "4 m: bardzo duże obszary, zgrubny teren",
-    "includeOsmFeatures": "Dołącz funkcje OSM",
+    "includeOsmFeatures": "Dołącz obiekty OSM",
     "rawTerrain": "Surowy teren (bez wygładzania dróg)",
     "rawTerrainOn": "Włączone: wysokości są używane dokładnie tak, jak zostały pobrane. Drogi nie są dopasowywane, wygładzane ani poziomowane; łuki dróg pozostają gładkie. Mosty i tunele nadal powstają przy eksporcie.",
     "rawTerrainOff": "Wyłączone: drogi są dopasowywane, wygładzane i poziomowane w terenie. Włącz, aby zachować dane wysokościowe bez zmian.",
+    "overtureBuildings": "Dodaj brakujące budynki i wysokości z Overture",
+    "overtureBuildingsHint": "Uzupełnia budynki i wysokości, których brakuje w OpenStreetMap, jako proste bryły.",
     "showOsmCoverage": "Pokaż zasięg OSM MapNG",
     "osmCoverageHint": "Wewnątrz zielonych obrysów dane OSM wczytują się z kopii MapNG: szybko i niezależnie od awarii Overpass. Poza nimi pochodzą z Overpass.",
     "osmCoverageUnavailable": "Lista zasięgu jest teraz niedostępna.",
     "osmCoverageLoading": "Wczytywanie zasięgu…",
+    "customOverpass": "Użyj własnego serwera Overpass (opcjonalnie)",
+    "customOverpassInvalid": "Musi to być pełny adres https://.",
+    "customOverpassHint": "Wklej pełny adres URL Overpass razem z kluczem. Obszary, które MapNG już hostuje (Warstwy mapy → Zasięg OSM MapNG), nadal wczytują się z kopii MapNG, więc Twój klucz jest używany tylko poza nimi; tam jest próbowany jako pierwszy, a publiczne serwery służą jako zapas. Adres zostaje tylko w tej przeglądarce. Płatne plany z dostępem do Overpass:",
     "centerCoordinates": "Współrzędne środka",
-    "configurationSession": "Konfiguracja i sesja",
+    "configurationSession": "Udostępnij i zapisz ustawienia",
     "modeBasic": "Podstawowy",
     "modeAdvanced": "Zaawansowany",
     "modeBasicHint": "Tylko poziom BeamNG. Przełącz na Zaawansowany, aby pobrać mapę wysokości, tekstury i modele 3D, sąsiednie kafelki i więcej opcji eksportu.",
@@ -451,14 +513,14 @@
       "areaDetail": "Obszar i szczegółowość",
       "mapData": "Dane mapy (OpenStreetMap)",
       "osmHint": "Drogi, budynki, woda, użytkowanie terenu i detale ulic",
-      "needsOsmOn": "Najpierw włącz Dołącz funkcje OSM"
+      "needsOsmOn": "Najpierw włącz Dołącz obiekty OSM"
     }
   },
   "batchExport": {
     "title": "Opcje eksportu",
     "assets2d": "Zasoby 2D",
     "heightmap": "Mapa wysokości (16-bitowy PNG)",
-    "satelliteTexture": "Tekstura satelity (PNG)",
+    "satelliteTexture": "Tekstura satelitarna (PNG)",
     "osmTexture": "Tekstura OSM (do 8192x8192 PNG)",
     "hybridTexture": "Tekstura hybrydowa (do 8192x8192 PNG)",
     "roadMask": "Maska drogi (16-bitowy PNG)",
@@ -487,12 +549,12 @@
     "processing": "Przetwarzanie...",
     "preview3d": "Podgląd 3D",
     "usingCachedData": "Używanie danych z pamięci podręcznej",
-    "usingUploadedElevation": "Używanie przesłanego TIF",
+    "usingUploadedElevation": "Używane są przesłane dane wysokości",
     "viewBeforeDownload": "Wyświetl przed pobraniem",
     "dataReady": "Dane gotowe",
     "downloadBelow": "Pobierz poniżej",
     "generateData": "Wygeneruj dane",
-    "skip3dGetFiles": "Pomiń widok 3D, uzyskaj pliki"
+    "skip3dGetFiles": "Pomiń widok 3D, pobierz pliki"
   },
   "mapSelector": {
     "moveTile": "Przesuń {label}",
@@ -507,7 +569,7 @@
       "hide": "Ukryj",
       "legend": "Magenta = brakujące/uszkodzone dane"
     },
-    "osmCoverage": "Pokrycie OSM MapNG",
+    "osmCoverage": "Zasięg OSM MapNG",
     "hotspots": "Miejsca eksportów",
     "hotspotsCount": "{count} udostępnionych eksportów",
     "shareExports": "Udostępniaj moje eksporty (anonimowo)"
@@ -527,33 +589,33 @@
   },
   "disclaimer": {
     "title": "Zastrzeżenie dotyczące dokładności danych",
-    "lead": "Prosimy mieć świadomość, że wszystkie dane terenu, mapy wysokości i modele 3D wygenerowane przez MapNG są szacunkami na podstawie dostępnych satelitarnych i wysokościowych zestawów danych.",
+    "lead": "Pamiętaj, że wszystkie dane terenu, mapy wysokości i modele 3D wygenerowane przez MapNG są szacunkami opartymi na dostępnych danych wysokościowych, satelitarnych i OpenStreetMap, więc są tylko tak dobre jak te źródła.",
     "resolutionTitle": "Rozdzielczość i skala",
-    "resolutionBody": "Wszystkie mapy wysokosci sa eksportowane z wybrana rozdzielczoscia przetwarzania, aby zachowac spojna skale w silnikach gier. Przy zestawie Standard (30m) teren nadal jest powiekszany, wiec pozostaje gladszy i mniej szczegolowy niz natywne zrodla wysokiej rozdzielczosci, takie jak USGS lub GPXZ.",
-    "usage": "To narzędzie jest przeznaczone do użytku w modowaniu i kreatywnym. Nie powinno być używane do nawigacji, inżynierii lub krytycznego planowania w świecie rzeczywistym.",
+    "resolutionBody": "Mapy wysokości są eksportowane z wybraną rozdzielczością przetwarzania, aby zachować spójną skalę w silnikach gier. Przy zestawie Standard (30m) teren nadal jest powiększany, więc pozostaje gładszy i mniej szczegółowy niż natywne źródła wysokiej rozdzielczości, takie jak USGS lub GPXZ.",
+    "usage": "To narzędzie służy do modowania i twórczego użytku. Nie należy go używać do nawigacji, prac inżynierskich ani krytycznego planowania w świecie rzeczywistym.",
     "confirm": "Rozumiem"
   },
   "about": {
     "title": "O MapNG",
     "subtitle": "Prawdziwe miejsca jako mapy BeamNG.drive",
-    "hero": "MapNG zamienia dowolne prawdziwe miejsce w grywalny poziom BeamNG.drive: teren, tekstury, drogi z oznakowaniem i sygnalizacją, budynki, mosty, roślinność i więcej, tworzone bezpośrednio w przeglądarce.",
+    "hero": "MapNG zamienia dowolne prawdziwe miejsce w grywalny poziom BeamNG.drive: teren, tekstury, drogi z oznakowaniem i sygnalizacją, budynki, mosty, roślinność i więcej, tworzone w przeglądarce albo w darmowej aplikacji desktopowej dla Windows i Linux.",
     "whatTitle": "Co robi?",
-    "whatBody": "Wybierz miejsce i źródło wysokości, wygeneruj teren i sprawdź go w podglądzie 3D. Następnie wyeksportuj kompletny poziom BeamNG jako ZIP, zbudowany z prawdziwych danych wysokościowych i OpenStreetMap, albo przenieś dane GeoTIFF i GeoJSON do własnego workflow. Tryb wsadowy przetwarza całe siatki kafelków i potrafi złożyć je w jeden duży poziom.",
+    "whatBody": "Wybierz miejsce i źródło wysokości, wygeneruj teren i sprawdź go w podglądzie 3D. Następnie wyeksportuj kompletny poziom BeamNG jako ZIP, zbudowany z prawdziwych danych wysokościowych i OpenStreetMap, albo przenieś dane GeoTIFF i GeoJSON do własnej pracy. Tryb wsadowy przetwarza całe siatki kafelków i potrafi złożyć je w jeden duży poziom.",
     "elevationTitle": "Źródła wysokości",
     "elevationItems": [
       "Standard 30 m globalny (AWS Terrarium / SRTM), drogi wygładzane i wyrównywane automatycznie",
       "USGS 1 m DEM (USA: CONUS, Alaska, Hawaje)",
       "NMT EVRF2007 (Polska, kafelki GUGiK wysokiej rozdzielczości)",
-      "GPXZ premium (globalna wysoka rozdzielczość, równoległe zapytania w planach płatnych)",
+      "GPXZ (globalna wysoka rozdzielczość, z własnym kluczem API; szybciej w planach płatnych)",
       "Płaski teren",
-      "Własne pliki: chmury punktów LAZ/LAS, GeoTIFF, ASC, GML/XML, warstwowo i z reprojekcją, luki uzupełniane ze Standard lub GPXZ, z wygładzonymi szwami"
+      "Własne pliki: chmury punktów LAZ/LAS, GeoTIFF, ASC, GML/XML (także spakowane w ZIP), warstwowo i z reprojekcją, luki uzupełniane ze Standard lub GPXZ, z wygładzonymi szwami"
     ],
     "previewTitle": "Podgląd 3D",
     "previewItems": [
       "Oświetlenie HDR i kaskadowe cienie",
-      "Tryby tekstur satelitarny, OSM, hybrydowy i glina",
+      "Satelita, OSM, hybryda, tekstura gry albo sam teren",
       "Budynki, drzewa, krzewy i bariery 3D z OSM",
-      "Jakość siatki od low poly do pełnej natywnej szczegółowości",
+      "Jakość siatki od zrównoważonej do pełnej natywnej szczegółowości",
       "Kamera przybliżająca do kursora"
     ],
     "exportTitle": "Eksporty",
@@ -561,8 +623,7 @@
       "Pakiet poziomu BeamNG (.zip), do 16384 x 16384",
       "Wysokości GeoTIFF (WGS84 lub CRS źródła)",
       "Dane wektorowe OSM w GeoJSON",
-      "Dane zadania (.mapng): kompletna zapisana sesja",
-      "Tryb zaawansowany i tryb wsadowy (dla każdego kafelka) dodają: 16-bitowe mapy wysokości, tekstury satelitarne, OSM i hybrydowe, maski dróg, GLB, DAE i .ter"
+      "Tryb zaawansowany i tryb wsadowy (dla każdego kafelka) dodają: 16-bitowe mapy wysokości, obrazy satelitarne, OSM, hybrydowe i tekstury gry, maski dróg, GLB, DAE i .ter"
     ],
     "osmTitle": "Dane OpenStreetMap",
     "osmItems": [
@@ -570,7 +631,9 @@
       "Pokaż zasięg OSM MapNG zaznacza te regiony na mapie",
       "Wszędzie indziej: serwery lustrzane Overpass uszeregowane według stanu, z pamięcią podręczną na brzegu sieci",
       "Własny serwer Overpass (Tracestrack, Overspan); kopia MapNG odpowiada pierwsza, gdzie może",
-      "Baner informuje, gdy publiczne serwery Overpass nie działają"
+      "Baner informuje, gdy publiczne serwery Overpass nie działają",
+      "Overture Maps dodaje wysokości budynków i obrysy, których brakuje w OSM (domyślnie włączone, w opcji Dołącz obiekty OSM)",
+      "Jeśli zawiodą wszystkie serwery Overpass, dane OSM pochodzą z comiesięcznego wydania Overture Maps, więc eksport nadal działa"
     ],
     "resolutionTitle": "Rozdzielczość",
     "resolutionStrong": "Rozmiary wyjściowe od 512 do 16384 px przy dowolnej skali przetwarzania (m/px).",
@@ -601,12 +664,12 @@
       "Hydranty, kosze, ławki, słupy i linie energetyczne",
       "Mosty z wyliczonymi pomostami, filarami i dopasowanymi przyczółkami",
       "Ruch AI na sieci dróg, nazwy ulic na minimapie i stacje paliw",
-      "Otaczające tło terenu i szczegółowy export_report.txt do diagnozowania problemów"
+      "Otaczające tło terenu i szczegółowy export_report.txt do diagnozowania problemów",
+      "Sprawdzenie „Jak ciężki jest ten poziom?” przed eksportem, z limitami rozmiaru i precyzji BeamNG (tylko ostrzega)"
     ],
     "additionalTitle": "Dodatkowe funkcje",
     "additionalItems": [
-      "Konfiguracje: kopiuj, wklej, zapisz i wczytaj",
-      "Import/eksport zadań: zapisuj i przywracaj pełne sesje jako pliki .mapng",
+      "Udostępnij całą konfigurację: krótki kod lub link (ważny 24 godziny), długi kod, który nigdy nie wygasa, albo plik. Wklej go na mapie, aby go wczytać; Twoje własne klucze i serwery nigdy nie są w nim przekazywane",
       "Wyszukiwanie miejsc (Nominatim), gotowe malownicze lokalizacje i Moja lokalizacja",
       "Warstwy satelitarne i topograficzne Esri z etykietami, bez klucza; wybór jest zapamiętywany",
       "Minimapa wysokości wybranego obszaru",
@@ -618,40 +681,44 @@
     "footerMiddle": "Open source na"
   },
   "tech": {
-    "title": "Stos technologiczny MapNG",
-    "coreFramework": "Główna struktura",
+    "title": "Technologie MapNG",
+    "coreFramework": "Główny framework",
     "rendering": "Silnik 3D i renderowanie",
     "mapping": "Mapowanie i GIS",
     "texture": "Obróbka tekstury i obrazu",
     "sources": "Źródła danych",
     "deployment": "Wdrożenie",
-    "footer1": "Zbudowane, aby pomóc w przepływach pracy modowania BeamNG.drive.",
-    "footer2": "Narzędzia typu open-source dla przepływów pracy terenu ze świata rzeczywistego.",
+    "footer1": "Stworzone, by ułatwić modowanie BeamNG.drive.",
+    "footer2": "Otwarte narzędzia do pracy z terenem ze świata rzeczywistego.",
     "sections": {
       "core": [
         {
           "name": "Vue 3",
-          "desc": "Interfejs API kompozycji i zarządzanie stanem reaktywnym"
+          "desc": "Composition API i reaktywne zarządzanie stanem"
         },
         {
           "name": "JavaScript (ES6+)",
-          "desc": "Nowoczesny standard z modułami, async/await i wiadomościami pracownika"
+          "desc": "Nowoczesny standard z modułami, async/await i komunikacją z workerami"
         },
         {
           "name": "Tailwind CSS",
-          "desc": "Styling first-utility z obsługą trybu ciemnego"
+          "desc": "Stylowanie utility-first z obsługą trybu ciemnego"
         },
         {
           "name": "Vite",
-          "desc": "Szybki serwer dev i zoptymalizowane kompilacje produkcyjne"
+          "desc": "Szybki serwer deweloperski i zoptymalizowane kompilacje produkcyjne"
         },
         {
-          "name": "Stan reaktywny lokalny",
-          "desc": "Pinia plus Vue refs/computed z trwałością localStorage"
+          "name": "Reaktywny stan lokalny",
+          "desc": "Pinia oraz refs/computed Vue z zapisem w localStorage"
         },
         {
           "name": "Ikony Lucide",
-          "desc": "Piękny, spójny zestaw ikon (Vue components)"
+          "desc": "Ładny, spójny zestaw ikon (komponenty Vue)"
+        },
+        {
+          "name": "vue-i18n",
+          "desc": "Interfejs w 7 językach"
         }
       ],
       "render": [
@@ -669,7 +736,7 @@
         },
         {
           "name": "Cascaded Shadow Maps",
-          "desc": "CSM z 4 kaskadami, mapami cieni 4096 px i filtrowaniem PCF"
+          "desc": "CSM z 4 kaskadami, mapami cieni 2048 px i miękkim filtrowaniem PCF"
         },
         {
           "name": "Środowisko HDR",
@@ -677,7 +744,7 @@
         },
         {
           "name": "Eksportery Collada i GLTF",
-          "desc": "Kształty DAE dla BeamNG (budynki, mosty, chodniki, linie energetyczne, tło) i modele GLB w trybie wsadowym"
+          "desc": "Kształty DAE dla BeamNG (budynki, mosty, chodniki, linie energetyczne, tło) oraz modele GLB/DAE w trybie zaawansowanym i wsadowym"
         }
       ],
       "map": [
@@ -696,60 +763,92 @@
         {
           "name": "Geokodowanie Nominatim",
           "desc": "Wyszukiwanie przez dwa punkty dostępu oraz geokodowanie odwrotne dla proponowanych nazw poziomów"
+        },
+        {
+          "name": "PMTiles",
+          "desc": "Odczytuje własne archiwa OpenStreetMap MapNG prosto z Cloudflare R2 zapytaniami o zakres"
         }
       ],
       "tex": [
         {
-          "name": "Interfejs API HTML5 Canvas",
-          "desc": "Proceduralne generowanie tekstury do 8192x8192 z użytkami gruntowymi OSM, drogami i nakładkami"
+          "name": "HTML5 Canvas API",
+          "desc": "Proceduralne generowanie tekstur do 8192x8192 z użytkowaniem terenu OSM, drogami i nakładkami"
         },
         {
-          "name": "szybka-png",
-          "desc": "16-bitowe kodowanie mapy wysokości i maski drogi"
+          "name": "fast-png",
+          "desc": "16-bitowe kodowanie mapy wysokości i maski dróg"
         },
         {
-          "name": "Renderer pasa OSM",
-          "desc": "Proceduralne nakładki dróg, wypełnienia skrzyżowań, wskazówki przejścia dla pieszych i wygładzone krzywe"
+          "name": "Renderer pasów ruchu OSM",
+          "desc": "Proceduralne nakładki dróg, wypełnienia skrzyżowań, oznaczenia przejść dla pieszych i wygładzone łuki"
         },
         {
-          "name": "Pracownicy sieci Web",
-          "desc": "Poza wątkami przetwarzania terenu i próbkowania obrazu z transferowymi buforami"
+          "name": "Web Workers",
+          "desc": "Przetwarzanie terenu i próbkowanie obrazu poza głównym wątkiem, z buforami transferowalnymi"
         }
       ],
       "src": [
         {
           "name": "Kafelki terenu AWS",
-          "desc": "Globalna wysokość SRTM 30m (kodowanie Terrarium na Z15)"
+          "desc": "Globalne wysokości SRTM 30m (kodowanie Terrarium na Z15)"
         },
         {
-          "name": "Mapa National USGS",
-          "desc": "1m DEM poprzez API dostępu TNM (CONUS, Alaska, Hawaje)"
+          "name": "USGS National Map",
+          "desc": "1m DEM przez TNM Access API (CONUS, Alaska, Hawaje)"
         },
         {
-          "name": "API GPXZ",
-          "desc": "Premium globalna wysokość hi-res z automatycznym dzieleniem na kafelki, sondowanie limitów szybkości i równoległe żądania dla planów płatnych"
+          "name": "GPXZ API",
+          "desc": "Globalne wysokości w wysokiej rozdzielczości z własnym kluczem: automatyczny podział na części, sondowanie limitów zapytań i równoległe zapytania w planach płatnych"
+        },
+        {
+          "name": "Własne dane wysokości",
+          "desc": "Własny DEM: chmury punktów LAZ/LAS (laz-perf WASM), GeoTIFF (geotiff), siatki ASC i GML/XML (fast-xml-parser) — jeden lub wiele kafelków, reprojekcja do siatki wyjściowej"
         },
         {
           "name": "Esri World Imagery",
-          "desc": "Tekstury satelity wysokiej rozdzielczości na Z17 (~1,2m/px)"
+          "desc": "Tekstury satelitarne wysokiej rozdzielczości, przybliżenie dobrane do tekstury bazowej (około z17, ~1,2 m/px)"
         },
         {
           "name": "OpenStreetMap",
-          "desc": "Własne archiwum OSM MapNG na Cloudflare R2 (PMTiles, czytane zakresami), serwery lustrzane Overpass uszeregowane według stanu z pamięcią podręczną na brzegu sieci lub własny serwer Overpass"
+          "desc": "Własne archiwum OSM MapNG na Cloudflare R2 (PMTiles, czytane zakresami), serwery lustrzane Overpass uszeregowane według stanu z pamięcią podręczną na brzegu sieci lub własny serwer Overpass, a w ostateczności Overture Maps"
+        },
+        {
+          "name": "Overture Maps",
+          "desc": "Wysokości i obrysy budynków, których brakuje w OSM (wykryte przez Microsoft i Google, krajowe katastry), oraz wszystkie dane mapy, gdy serwery Overpass OpenStreetMap nie działają; z tiles.overturemaps.org (ODbL / CDLA)"
         },
         {
           "name": "JSZip",
-          "desc": "Tworzenie ZIP w przeglądarce dla poziomów BeamNG, zadań wsadowych i sesji .mapng, przy dużych poziomach zapisywane od razu na dysk (OPFS)"
+          "desc": "Tworzenie ZIP w przeglądarce dla poziomów BeamNG i zadań wsadowych, przy dużych poziomach zapisywane od razu na dysk (OPFS)"
         },
         {
-          "name": "Zarządzanie adresem URL Blob",
-          "desc": "Obsługa binarna dla dużych tekstur, map wysokości i spakowanych eksportów"
+          "name": "Zarządzanie adresami Blob URL",
+          "desc": "Obsługa danych binarnych dla dużych tekstur, map wysokości i spakowanych eksportów"
+        },
+        {
+          "name": "GUGiK NMT",
+          "desc": "Wysokości w wysokiej rozdzielczości dla Polski (EVRF2007)"
+        },
+        {
+          "name": "USGS 3DEP lidar",
+          "desc": "Zmierzone wysokości pomostów mostów w USA z publicznego archiwum lidar"
+        },
+        {
+          "name": "iNaturalist",
+          "desc": "Jakie gatunki drzew rosną w okolicy, do doboru drzew w każdym eksporcie"
         }
       ],
       "deploy": [
         {
           "name": "Cloudflare Workers",
-          "desc": "Strona i trasy /api na brzegu sieci (pamięć podręczna OSM, kafelki OSM z R2, proxy), publikowane dla każdej gałęzi przez Workers Builds"
+          "desc": "Strona i trasy /api na brzegu sieci (pamięć podręczna OSM, kafelki OSM z R2, proxy, mapa miejsc eksportów, statystyki ustawień, kody wysyłki, zgłoszenia problemów), publikowane dla każdej gałęzi przez Workers Builds"
+        },
+        {
+          "name": "Cloudflare R2 i Durable Objects",
+          "desc": "Archiwa OSM MapNG, kody wysyłki i zgłoszenia problemów (R2); miejsca eksportów i statystyki ustawień (Durable Object)"
+        },
+        {
+          "name": "Electron",
+          "desc": "MapNG Desktop dla Windows i Linux: wbudowane środowisko Node do generowania i eksportu na wszystkich rdzeniach CPU, z electron-updater do aktualizacji, na które się zgadzasz"
         }
       ]
     }
@@ -760,63 +859,63 @@
     "hideDetails": "Ukryj szczegóły",
     "tileGrid": "Siatka kafelków",
     "completedWithFailed": "{done}/{total} ukończone{failed}",
-    "failedSuffix": " - {count} nie powiodło się",
+    "failedSuffix": " - nieudane: {count}",
     "remaining": "pozostałe",
     "elapsed": "upłynęło",
     "processingTile": "Przetwarzanie kafelka {tile}",
     "finalizing": "Kończenie eksportu",
     "finalizingHint": "Nie zamykaj tej karty — pobieranie rozpocznie się po zakończeniu tego kroku.",
     "finalizeFailed": "Przetwarzanie końcowe nie powiodło się:",
-    "assemblingCombinedLevel": "Scalanie Polaczonego Poziomu",
+    "assemblingCombinedLevel": "Scalanie połączonego poziomu",
     "failedTiles": "Nieudane kafelki",
-    "unknownError": "Nieznany blad",
+    "unknownError": "Nieznany błąd",
     "jobSummary": "Podsumowanie zadania",
-    "totalQueueWait": "Calkowite oczekiwanie w kolejce",
+    "totalQueueWait": "Łączne oczekiwanie w kolejce",
     "slowestTile": "Najwolniejszy kafelek",
-    "compositeScore": "Wynik zlozony",
-    "lowerIsBetter": "nizsze jest lepsze",
+    "compositeScore": "Wynik złożony",
+    "lowerIsBetter": "niżej znaczy lepiej",
     "recommendation": "Rekomendacja",
     "peakHeap": "Szczytowa sterta JS",
-    "memorySamples": "Probki pamieci",
+    "memorySamples": "Próbki pamięci",
     "peakTileHeap": "Szczyt sterty kafelka",
-    "memoryUnavailable": "Probkowanie pamieci niedostepne w tej przegladarce; liczby czasu sa nadal przechwytywane.",
-    "copyBenchmark": "Skopiuj raport wzorcowy",
+    "memoryUnavailable": "Próbkowanie pamięci jest niedostępne w tej przeglądarce; czasy są nadal mierzone.",
+    "copyBenchmark": "Skopiuj raport z benchmarku",
     "perTileInstrumentation": "Instrumentacja na kafelek",
-    "heapStart": "start stosu",
+    "heapStart": "sterta na starcie",
     "heapAfterFetch": "sterta po pobraniu",
     "heapBeforeZip": "sterta przed ZIP",
     "heapAfterZip": "sterta po ZIP",
-    "heapEnd": "koniec stosu",
-    "heapPeak": "szczyt stosu",
+    "heapEnd": "sterta na końcu",
+    "heapPeak": "szczyt sterty",
     "paused": "Zadanie wsadowe wstrzymane",
-    "pausedDesc": "Ukonczono {count} kafelk{suffix}. Mozesz wznowic od miejsca, w ktorym skonczyles.",
+    "pausedDesc": "Ukończone kafelki: {count}. Możesz wznowić od miejsca, w którym przerwano.",
     "cancelBatch": "Anuluj zadanie wsadowe",
-    "resume": "Wznow",
+    "resume": "Wznów",
     "close": "Zamknij",
     "done": "Gotowe",
-    "retryFailed": "Ponow {count} nieudanych kafelk{suffix}",
-    "retryFailedCombined": "Ponow {count} nieudanych kafelk{suffix} (Polaczony Poziom)",
-    "headerCompleteWithErrors": "Zadanie wsadowe ukonczone (z bledami)",
-    "headerComplete": "Zadanie wsadowe zakonczone",
+    "retryFailed": "Ponów nieudane kafelki ({count})",
+    "retryFailedCombined": "Ponów nieudane kafelki ({count}, połączony poziom)",
+    "headerCompleteWithErrors": "Zadanie wsadowe ukończone (z błędami)",
+    "headerComplete": "Zadanie wsadowe ukończone",
     "headerJobFailed": "Zadanie wsadowe nieudane",
     "headerPaused": "Zadanie wsadowe wstrzymane",
     "headerRunning": "Zadanie wsadowe uruchomione",
-    "summaryWithErrors": "Ukonczone z bledami",
-    "summaryCombinedPartial": "Polaczony Poziom Wyeksportowany (Czesciowo)",
+    "summaryWithErrors": "Ukończone z błędami",
+    "summaryCombinedPartial": "Połączony poziom wyeksportowany (częściowo)",
     "summaryJobFailed": "Zadanie nieudane",
     "summaryAllExported": "Wszystkie kafelki wyeksportowane!",
-    "summaryCombinedExported": "Map Exported!",
-    "summaryExported": "Pomyslnie wyeksportowano {count} kafelk{suffix}",
-    "summarySubtitleCombinedExported": "{name}.zip exported",
-    "summaryFailedTail": " - {count} nie powiodlo sie",
-    "totalTime": "Calkowity czas",
-    "combinedLevelPartialTitle": "Polaczony Poziom Wyeksportowany z Brakujacymi Kafelkami",
-    "combinedLevelPartialDesc": "Plik ZIP dla \"{name}\" zostal wygenerowany, ale {count} kafelk{suffix} nie powiodlo/ly sie. Obszary nieudanych kafelkow pojawia sie jako plaski teren na poziomie morza. Ponow nieudane kafelki, aby wypelnic luki.",
-    "untitledLevel": "Poziom Bez Tytulu",
-    "benchmarkNoData": "Brak dostepnych danych wzorcowych.",
-    "clipboardUnavailable": "Schowek niedostepny.",
-    "benchmarkCopied": "Raport wzorcowy skopiowany.",
-    "benchmarkCopyFailed": "Nie udalo sie skopiowac raportu wzorcowego."
+    "summaryCombinedExported": "Poziom wyeksportowany!",
+    "summaryExported": "Wyeksportowane kafelki: {count}",
+    "summarySubtitleCombinedExported": "Wyeksportowano {name}.zip",
+    "summaryFailedTail": " - nieudane: {count}",
+    "totalTime": "Łączny czas",
+    "combinedLevelPartialTitle": "Połączony poziom wyeksportowany z brakującymi kafelkami",
+    "combinedLevelPartialDesc": "Plik ZIP dla „{name}” został utworzony, ale część kafelków się nie powiodła ({count}). Ich obszary są płaskim terenem na poziomie morza. Ponów nieudane kafelki, aby wypełnić luki.",
+    "untitledLevel": "Poziom bez nazwy",
+    "benchmarkNoData": "Brak danych z benchmarku.",
+    "clipboardUnavailable": "Schowek niedostępny.",
+    "benchmarkCopied": "Skopiowano raport z benchmarku.",
+    "benchmarkCopyFailed": "Nie udało się skopiować raportu z benchmarku."
   },
   "app": {
     "loadingScene": "Ładowanie sceny 3D...",
@@ -827,14 +926,14 @@
       "addingOsm": "Dodawanie danych OSM do istniejącego terenu...",
       "rendering3d": "Renderowanie sceny 3D...",
       "startingGeneration": "Uruchamianie generowania terenu...",
-      "cancelled": "Anulowany.",
+      "cancelled": "Anulowano.",
       "fetchingOsm": "Pobieranie danych OSM..."
     },
     "error": {
       "fetchOsm": "Nie udało się pobrać danych OSM.",
       "osmUnavailable": "Serwery OpenStreetMap obecnie nie odpowiadają, więc teren wygenerowano bez dróg, budynków i innych obiektów mapy. Spróbuj ponownie za kilka minut.",
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
-      "usgsFallback": "Dane USGS 1m dla tego obszaru były brakujące lub uszkodzone. Powrót do standardowego zestawu danych Terrarium.\n\nWyjście pozostaje na aktualnej siatce przetwarzania aplikacji.",
+      "usgsFallback": "Dla tego obszaru brakowało danych USGS 1m lub były uszkodzone. Używany jest standardowy zestaw danych Terrarium.\n\nWyjście pozostaje na obecnej siatce przetwarzania aplikacji.",
       "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do standardowego zestawu danych Terrarium."
     }
   },
@@ -859,14 +958,14 @@
     "noFolder": "Nie ustawiono folderu modów",
     "empty": "W folderze modów nie ma jeszcze poziomów MapNG. Wyeksportowane poziomy pojawią się tutaj.",
     "updateAvailable": "Dostępna aktualizacja",
-    "olderVersion": "Starszy MapNG",
+    "olderVersion": "Starsza wersja MapNG",
     "website": "Strona",
     "cancel": "Anuluj",
     "rebuild": "Przebuduj",
     "rebuildSavedHint": "Utwórz ten poziom ponownie tą wersją MapNG, z zapisanych danych terenu i OSM",
     "rebuildFetchHint": "Utwórz ten poziom ponownie tą wersją MapNG. Nie ma zapisanych danych, więc jego obszar zostanie pobrany ponownie",
     "showOnMap": "Pokaż na mapie",
-    "working": "Pracuję…",
+    "working": "Trwa praca…",
     "starting": "Uruchamianie…",
     "confirmSaved": "Zaktualizować „{name}” tą wersją MapNG?\n\nZostanie utworzony ponownie z zapisanych danych terenu i OSM z tymi samymi ustawieniami, więc otrzyma wszystkie poprawki od czasu eksportu. Obecny poziom zostanie zastąpiony, gdy nowy będzie gotowy.\n\nNic nie jest pobierane.",
     "confirmFetch": "Zaktualizować „{name}” tą wersją MapNG?\n\nTen poziom powstał, zanim MapNG zapisywał dane, więc jego obszar zostanie pobrany ponownie: OpenStreetMap mógł się zmienić, a eksport użyje domyślnych ustawień. Obecny poziom zostanie zastąpiony, gdy nowy będzie gotowy.",
@@ -878,14 +977,14 @@
     "deleteHint": "Przenieś ten poziom i jego zapisane dane do Kosza",
     "confirmDelete": "Usunąć „{name}”?\n\nPoziom i jego zapisane dane trafią do Kosza, skąd możesz je przywrócić.",
     "rebuiltOffline": "Nic nie pobrano: powstał z zapisanych danych.",
-    "rebuiltSomeDownloaded": "{count} plików nie było w zapisanych danych i zostały pobrane.",
-    "rebuiltFetched": "Obszar pobrano ponownie i zapisano, więc następna przebudowa nie będzie tego potrzebować.",
+    "rebuiltSomeDownloaded": "Plików spoza zapisanych danych pobrano: {count}.",
+    "rebuiltFetched": "Obszar pobrano ponownie i zapisano, więc następna przebudowa nie będzie musiała go pobierać.",
     "update": "Aktualizuj",
     "modify": "Zmień",
     "modifyHint": "Wczytaj ten poziom z jego ustawieniami, aby je zmienić i wyeksportować ponownie. Używa zapisanego terenu i danych OSM: nic nie jest pobierane.",
     "modifyNoData": "„{name}” nie ma zapisanych danych, więc nie można go zmienić offline. Użyj Aktualizuj, aby go przebudować, albo Pokaż na mapie i wygeneruj ponownie.",
-    "showInMods": "Pokaż w folderze mods",
-    "showInModsHint": "Otwórz folder mods BeamNG z zaznaczonym zipem tego poziomu",
+    "showInMods": "Pokaż w folderze modów",
+    "showInModsHint": "Otwórz folder modów BeamNG z zaznaczonym plikiem ZIP tego poziomu",
     "showData": "Pokaż zapisane dane",
     "showDataHint": "Otwórz folder z zapisanymi danymi tego poziomu: surowe pobrane dane terenu, satelity, OpenStreetMap i wysokości mostów, których używają Aktualizuj i Zmień. Nie jest częścią zipa poziomu."
   },
@@ -897,7 +996,7 @@
     "change": "Zmień…",
     "notFoundHint": "Wybierz folder modów BeamNG.drive, aby Twoje poziomy pojawiły się w grze.",
     "pointPower": "Generowanie i eksport działają poza tym oknem i używają całego komputera, więc działają też duże i gęste obszary.",
-    "pointLevels": "Moje poziomy, po prawej, pokazuje Twoje poziomy MapNG i przebudowuje je, gdy MapNG się poprawia.",
+    "pointLevels": "Moje poziomy, po prawej, pokazuje Twoje poziomy MapNG. Aktualizuj tworzy poziom na nowo najnowszą wersją MapNG, a Zmień wczytuje go z powrotem, aby zmienić jego ustawienia; oba korzystają z jego zapisanych pobrań.",
     "pointMods": "Wyeksportowane poziomy są gotowe do jazdy: bez pobierania i rozpakowywania.",
     "updates": "Automatycznie sprawdzaj aktualizacje MapNG (MapNG zawsze pyta przed pobraniem)",
     "start": "Zaczynamy"
@@ -908,17 +1007,17 @@
     "loading": "Wczytywanie miejsc…",
     "unavailable": "Miejsca eksportów są teraz niedostępne.",
     "share": "Udostępniaj obszary moich eksportów (anonimowo)",
-    "shareHint": "Dodaje przybliżony obszar (ok. 5 km) każdego eksportowanego poziomu do mapy miejsc. Nigdy dokładne miejsce i nic o Tobie.",
+    "shareHint": "Dodaje przybliżony obszar (ok. 5 km) każdego eksportowanego poziomu do mapy miejsc eksportów. Nigdy dokładne miejsce i nic o Tobie.",
     "tooltip": "{count} eksportów tutaj (web {web} · desktop {desktop})",
-    "askTitle": "Dodać ten eksport do mapy miejsc?",
-    "askBody": "MapNG może liczyć, gdzie eksportowane są poziomy, i pokazywać popularne obszary na mapie 2D. Udostępniany jest tylko przybliżony obszar (ok. 5 km), nigdy dokładne miejsce i nic o Tobie. Możesz to zmienić w każdej chwili w okienku warstw na mapie.",
+    "askTitle": "Dodać ten eksport do mapy miejsc eksportów?",
+    "askBody": "MapNG może liczyć, gdzie eksportowane są poziomy, i pokazywać popularne obszary na mapie 2D. Udostępniany jest tylko przybliżony obszar (ok. 5 km), nigdy dokładne miejsce i nic o Tobie. Możesz to zmienić w każdej chwili w panelu Warstwy mapy.",
     "askYes": "Udostępnij anonimowo",
     "askNo": "Nie, dziękuję",
     "welcome": "Anonimowo udostępniaj przybliżony obszar (ok. 5 km) moich eksportów dla mapy miejsc eksportów MapNG",
     "privacy": {
       "link": "Jak używane są Twoje dane",
       "title": "Jak działa udostępnianie eksportów",
-      "intro": "Udostępnianie jest wyłączone, dopóki go nie włączysz. Gdy jest włączone, MapNG liczy, gdzie eksportowane są poziomy, aby każdy mógł zobaczyć popularne obszary na mapie miejsc.",
+      "intro": "Udostępnianie jest wyłączone, dopóki go nie włączysz. Gdy jest włączone, MapNG liczy, gdzie eksportowane są poziomy, aby każdy mógł zobaczyć popularne obszary na mapie miejsc eksportów.",
       "sentTitle": "Co jest wysyłane",
       "sent": "Dla każdego eksportowanego poziomu: w którym kwadracie mapy o boku ok. 5 km się znajduje i czy pochodzi ze strony, czy z aplikacji desktopowej. Kwadrat jest wyliczany na Twoim komputerze, więc dokładna lokalizacja nigdy go nie opuszcza.",
       "notSentTitle": "Czego nigdy nie wysyłamy",
@@ -926,13 +1025,13 @@
       "whereTitle": "Gdzie jest przechowywane",
       "where": "Na koncie Cloudflare MapNG, w małej bazie danych (Cloudflare Durable Object), do której dostęp ma tylko twórca MapNG. Jak każde zapytanie do mapng.com, zgłoszenia przechodzą przez sieć Cloudflare.",
       "howTitle": "Jak jest przechowywane",
-      "how": "Jeden wiersz na kwadrat ok. 5 km: ile eksportów pochodziło ze strony, ile z aplikacji desktopowej i data ostatniego. Nic nie łączy wiersza z osobami, które tam eksportowały. Aby powstrzymać spam, serwer przez chwilę trzyma w pamięci zaszyfrowaną (zahaszowaną) postać Twojego adresu IP, by dopuścić najwyżej 30 zgłoszeń na godzinę; nigdy nie jest zapisywana i znika w ciągu godziny.",
+      "how": "Jeden wiersz na kwadrat ok. 5 km: ile eksportów pochodziło ze strony, ile z aplikacji desktopowej i data ostatniego. Nic nie łączy wiersza z osobami, które tam eksportowały. Aby powstrzymać spam, serwer przez chwilę trzyma w pamięci nieodwracalnie przekształconą (zahaszowaną) postać Twojego adresu IP, by dopuścić najwyżej 30 zgłoszeń na godzinę; nigdy nie jest zapisywana i znika w ciągu godziny.",
       "useTitle": "Do czego służy",
-      "use": "Tylko do mapy miejsc: liczby na kwadrat to to, co rysuje warstwa, a każdy może ją włączyć. Twórca MapNG patrzy na te same sumy, żeby wiedzieć, gdzie MapNG jest używany, na przykład by wybrać, które regiony dostaną jako następne własne, szybsze dane OSM MapNG.",
+      "use": "Tylko do mapy miejsc eksportów: warstwa pokazuje liczby na kwadrat, a każdy może ją włączyć. Twórca MapNG patrzy na te same sumy, żeby wiedzieć, gdzie MapNG jest używany, na przykład by wybrać, które regiony dostaną jako następne własne, szybsze dane OSM MapNG.",
       "neverTitle": "Nigdy nie sprzedajemy ani nie udostępniamy",
-      "never": "Twoje dane nigdy nie są sprzedawane, nikomu udostępniane ani używane do reklam czy śledzenia. Pojawiają się tylko na mapie miejsc, jako sumy na kwadrat.",
+      "never": "Twoje dane nigdy nie są sprzedawane, nikomu udostępniane ani używane do reklam czy śledzenia. Pojawiają się tylko na mapie miejsc eksportów, jako sumy na kwadrat.",
       "controlTitle": "Ty decydujesz",
-      "control": "Włącz lub wyłącz udostępnianie w dowolnej chwili opcją „Udostępniaj moje eksporty” w okienku warstw na mapie. Wyłączenie od razu zatrzymuje zgłoszenia. Już dodanych liczb nie da się powiązać z Tobą, więc nie można ich wskazać i usunąć pojedynczo.",
+      "control": "Włącz lub wyłącz udostępnianie w dowolnej chwili opcją „Udostępniaj moje eksporty” w panelu Warstwy mapy. Wyłączenie od razu zatrzymuje zgłoszenia. Już dodanych liczb nie da się powiązać z Tobą, więc nie można ich wskazać i usunąć pojedynczo.",
       "statusOn": "Udostępnianie jest u Ciebie włączone.",
       "statusOff": "Udostępnianie jest u Ciebie wyłączone.",
       "close": "Rozumiem",
@@ -946,7 +1045,7 @@
     "title_rebuild": "Aktualizacja się nie powiodła",
     "title_manual": "Zgłoś problem",
     "intro": "Wysłać zgłoszenie, aby pomóc to naprawić? Trafia prywatnie do twórcy MapNG i nic nie zostanie wysłane, dopóki nie wybierzesz Wyślij.",
-    "describe": "Co robiłeś? (opcjonalnie)",
+    "describe": "Co się działo? (opcjonalnie)",
     "describeManual": "Co poszło nie tak?",
     "includeArea": "Dołącz lokalizację mapy ({lat}, {lng}), aby można było odtworzyć problem",
     "preparing": "Przygotowywanie zgłoszenia…",
@@ -958,7 +1057,7 @@
     "incOptions": "Ustawienia eksportu",
     "incDump": "Zrzut awarii ({kb} KB): część tego, co MapNG miał w pamięci w chwili awarii, pokazująca, gdzie się zepsuł. Może zawierać np. ścieżki plików.",
     "incArea": "Lokalizacja i rozmiar mapy",
-    "incDescription": "To, co napisałeś",
+    "incDescription": "Twój opis",
     "incNever": "Nigdy nie są dołączane: imię ani konto, Twoje pliki, sam poziom ani nic innego z Twojego komputera.",
     "privacy": "Jak zgłoszenia są przechowywane i używane",
     "send": "Wyślij zgłoszenie",
@@ -969,15 +1068,15 @@
     "copied": "Skopiowano",
     "done": "Gotowe",
     "sendReport": "Wyślij zgłoszenie",
-    "incConfig": "Twoje ustawienia jako kod sesji (zawiera lokalizację, więc znika, gdy ją odznaczysz)"
+    "incConfig": "Twoje ustawienia jako kod (zawiera lokalizację, więc znika, gdy ją odznaczysz)"
   },
   "config": {
-    "copied": "Konfiguracja skopiowana jako kod. Wklej ją w MapNG (Ctrl+V na mapie), aby jej użyć.",
-    "invalid": "To nie jest konfiguracja MapNG.",
-    "applied": "Konfiguracja zastosowana. Wygeneruj, aby ją zbudować.",
-    "dialogTitle": "Użyć tej konfiguracji?",
-    "dialogIntro": "Ta konfiguracja ustawi:",
-    "dialogNote": "Twoje klucze (np. klucz GPXZ) nigdy nie trafiają do konfiguracji i pozostają bez zmian.",
+    "copied": "Ustawienia skopiowane jako kod. Wklej go w MapNG (Ctrl+V na mapie), aby ich użyć.",
+    "invalid": "To nie jest kod ustawień MapNG.",
+    "applied": "Ustawienia zastosowane. Naciśnij Podgląd 3D lub Wygeneruj dane, aby je zbudować.",
+    "dialogTitle": "Użyć tych ustawień?",
+    "dialogIntro": "Te ustawienia zmienią:",
+    "dialogNote": "Twoje klucze i serwery (np. klucz GPXZ) nigdy nie trafiają do kodu ustawień i pozostają bez zmian.",
     "section_data": "Obszar i dane",
     "section_export": "Eksport",
     "cancel": "Anuluj",
@@ -988,7 +1087,7 @@
     "elevation": "Wysokości",
     "source_default": "Standard 30 m",
     "source_none": "Płaski",
-    "source_kron86": "KRON86 (Polska)",
+    "source_kron86": "NMT EVRF2007 (Polska)",
     "source_usgs": "USGS 1 m",
     "source_gpxz": "GPXZ",
     "source_global30m": "Globalne 30 m",
@@ -1002,12 +1101,12 @@
     "baseTexture": "Tekstura bazowa",
     "tex_satellite": "Satelita",
     "tex_osm": "OSM",
-    "tex_hybrid": "Hybryda",
+    "tex_hybrid": "Hybrydowa",
     "tex_game": "Tekstura gry",
     "tex_none": "Brak",
-    "tex_painted": "Poprawiona (tu Hybryda)",
+    "tex_painted": "Poprawiona (tu hybrydowa)",
     "content": "Zawartość",
-    "structures": "Konstrukcje",
+    "structures": "Budowle",
     "list": "{list}",
     "customList": "Własne: {list}",
     "nothing": "brak",
@@ -1028,7 +1127,6 @@
     "edits_all": "Wszystkie",
     "edits_none": "Brak",
     "backdrop": "Otoczenie",
-    "safeCaps": "Bezpieczne limity",
     "send": "Pobierz kod",
     "codePlaceholder": "np. K7F-29Q, link lub kod mapng:1:",
     "open": "Otwórz",
@@ -1036,21 +1134,22 @@
     "copyLink": "Kopiuj link",
     "copiedShort": "Skopiowano",
     "sentHint": "Przekaż ten kod lub link: druga osoba wpisuje go w „Użyj czyjegoś kodu”, wkleja na mapie albo otwiera link. Działa 24 godziny, zawiera Twoje ustawienia i lokalizację, nigdy kluczy.",
-    "sendFailed": "Nie udało się wysłać konfiguracji: {reason}",
+    "sendFailed": "Nie udało się wysłać ustawień: {reason}",
     "openFailed": "Nie udało się otworzyć tego kodu: {reason}",
     "shareTitle": "Udostępnij moje ustawienia",
     "shareHint": "Pobierz krótki kod obecnych ustawień, aby go komuś przekazać.",
     "newCode": "Nowy kod",
     "receiveTitle": "Użyj czyjegoś kodu",
-    "receiveHint": "Dostałeś kod lub link? Wpisz go tutaj. Zobaczysz, co zmieni, zanim cokolwiek zostanie zastosowane.",
+    "receiveHint": "Masz od kogoś kod lub link? Wpisz go tutaj. Zobaczysz, co zmieni, zanim cokolwiek zostanie zastosowane.",
     "copyLongCode": "Kopiuj długi kod (nie wygasa)",
-    "longCodeHint": "Cała konfiguracja w jednej linii tekstu: działa offline i nie wygasa. Wklej ją w MapNG, aby jej użyć.",
+    "longCodeHint": "Wszystkie ustawienia w jednej linii tekstu: działa offline i nie wygasa. Wklej ten tekst w MapNG, aby go użyć.",
     "saveFile": "Zapisz do pliku",
-    "loadFile": "Wczytaj plik"
+    "loadFile": "Wczytaj plik",
+    "buildEverything": "Buduj wszystko"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
-    "askBody": "MapNG może liczyć, jakie ustawienia eksportu są wybierane (np. Tekstura gry albo wyłączone zmiany terenu), aby twórca wiedział, co ulepszyć, a czego nikt nie używa. Wysyłane są tylko ustawienia: nigdy lokalizacja, nazwa poziomu ani nic o Tobie. Możesz to zmienić w każdej chwili w polu Warstwy mapy.",
+    "askBody": "MapNG może liczyć, jakie ustawienia eksportu są wybierane (np. Tekstura gry albo wyłączone zmiany terenu), aby twórca wiedział, co ulepszyć, a czego nikt nie używa. Wysyłane są tylko ustawienia: nigdy lokalizacja, nazwa poziomu ani nic o Tobie. Możesz to zmienić w każdej chwili w panelu Warstwy mapy.",
     "askYes": "Udostępniaj anonimowo",
     "askNo": "Nie, dziękuję",
     "shareToggle": "Udostępniaj, jakich ustawień używam (bez lokalizacji)",
