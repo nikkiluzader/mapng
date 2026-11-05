@@ -245,17 +245,23 @@ def cmd_split(args):
     st = load_state(wd)
     src = os.path.join(wd, "filtered.osm.pbf")
     blocks = st["blocks"]
-    if not blocks:
-        n = 1 << START_ZOOM
-        todo = [(START_ZOOM, x, y) for x in range(n) for y in range(n)]
-        check_space(os.path.getsize(src) / 2**30 * 1.15)        # blocks overlap a little at their edges
-        log(f"extracting {len(todo)} zoom-{START_ZOOM} blocks from {src}")
+    n = 1 << START_ZOOM
+    first = [(START_ZOOM, x, y) for x in range(n) for y in range(n)]
+    todo = [b for b in first if bkey(*b) not in blocks]
+    if todo:
+        # pass by pass, each recorded when it finishes: a crash (this machine
+        # segfaults now and then in long runs) only repeats the pass it hit
+        if os.path.exists(src):
+            check_space(os.path.getsize(src) / 2**30 * 1.15 * len(todo) / len(first))
+        log(f"extracting {len(todo)} of {len(first)} zoom-{START_ZOOM} blocks from {src}, {args.batch} per pass")
         t0 = time.time()
-        extract_children(src, wd, todo, args.batch)
-        for z, x, y in todo:
-            blocks[bkey(z, x, y)] = {"z": z, "x": x, "y": y, "state": "extracted"}
-        save_state(wd, st)
-        log(f"done in {time.time() - t0:.0f} s")
+        for i in range(0, len(todo), args.batch):
+            part = todo[i:i + args.batch]
+            extract_children(src, wd, part, args.batch)
+            for z, x, y in part:
+                blocks[bkey(z, x, y)] = {"z": z, "x": x, "y": y, "state": "extracted"}
+            save_state(wd, st)
+            log(f"  pass done: {len([b for b in first if bkey(*b) in blocks])}/{len(first)} blocks ({time.time() - t0:.0f} s)")
         if not args.keep_filtered:
             os.remove(src)
             log(f"deleted {src}; {free_gb():.0f} GB free")
