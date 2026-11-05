@@ -45,15 +45,29 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **Bridges and tunnels** solved as one network with the roads and terrain: styled bridges (trusses, arches, suspension), lidar deck heights in the US, tunnel portals and lights
 - **Venues:** racetracks with kerbs, walls and catch fences, sports grounds with surfaces, markings and seating, swimming pools and fountains, floodlights
 - **AI traffic** on the road network, road names on the minimap, fuel stations
-- **OpenStreetMap data** from MapNG's own copy for the regions it hosts (fast and independent of Overpass outages), health-ranked Overpass mirrors elsewhere, or your own Overpass server; **Overture Maps** adds buildings and heights OpenStreetMap is missing, and is the backup source if every Overpass server is down
+- **OpenStreetMap data** from MapNG's own copy, growing region by region toward the whole planet (fast and independent of Overpass outages), health-ranked Overpass mirrors elsewhere, or your own Overpass server; **Overture Maps** adds buildings and heights OpenStreetMap is missing, and is the backup source if every Overpass server is down
 - **How heavy is this level?** Before you export, a card rates the level from its size, how far its corners are from the centre (BeamNG starts to jitter past about 30 km) and its building count. It only warns; you can always export
 - **Share your setup:** a short code or link for your settings (works for 24 hours), a long code that never expires, or a file. Whoever opens it sees exactly what it changes first, and your own keys and servers never go with it
 - **Basic and Advanced modes:** Basic builds the BeamNG level with everything the map has. Advanced adds per-category level options (buildings, water, trees, bridges, tunnels, terrain edits), heightmap, texture and 3D model downloads, surrounding tiles, and *Raw terrain*, which uses your elevation exactly as downloaded
 - **Batch mode** for tile grids up to 20×20, or a combined level stitched from a 2×2, 4×4 or 8×8 grid
-- Live progress with finished steps and timings, and a detailed `export_report.txt` in every level for troubleshooting
+- Stage-by-stage progress like BeamNG's loading screen, with finished steps and timings, and a detailed `export_report.txt` in every level for troubleshooting
 - 7 languages, light and dark mode
 
 ## What's New (November 2026)
+
+**MapNG 0.2.5**
+
+- **Feels like BeamNG.drive:** the game's own interface fonts (Noto Sans, Overpass and Overpass Mono, bundled so the desktop app works offline), its orange palette and its corners, used the same way everywhere
+- **Progress like the game's loading screen:** Generate and Export show six stage tiles that fill in orange, a slanted bar that runs start to finish for each stage, the stage name, and the latest steps with their timings
+- **2D map:** one flat world with a border at the date line (the map carries on past it, dimmed, so you can still see across); the crosshair reaches every edge, even after a fast swipe; Cursor and Crosshair coordinates; a thin crosshair cursor instead of the hand; Ctrl+scroll zooms on the crosshair without moving it, with a shortcut box under the coordinates
+- **Levels across the date line** (Fiji, the Aleutians, Chukotka) now generate and export both sides: every download is split at 180° and stitched back together, and broken free-elevation tiles along the line are repaired
+- **Export hotspots** are a soft glow zoomed out and simple dots up close
+- **Water on the Game texture** comes straight from the satellite image instead of a blue paint
+- **Creeks and rivers on the Standard 30 m source** no longer stand on a ridge: along wooded water the free data measures the treetops, so water is now kept below its banks
+- **Expand all / Collapse all** for the settings, in single-tile and batch mode
+- **MapNG's own OpenStreetMap copy** is growing toward the whole planet: most of the US west of the Mississippi and south of 41°N, Mexico and Central America, Hawaii and the Pacific, the Great Lakes, New England and eastern Canada, Utah and Florida are live, with more regions on the way
+
+**Earlier in November (0.2.0 to 0.2.4)**
 
 - **Share your settings:** *Share my settings* gives a short code or link (like `K7F-29Q`, valid 24 hours); *Use someone's code*, Ctrl+V on the map or opening a link shows what it would change before anything is applied. There's also a long code that never expires and Save/Load to a file, and the code is included in every `export_report.txt`. Your GPXZ key and custom Overpass address never travel in a config, and someone else's config never changes them
 - **How heavy is this level?** card in the export panel, with BeamNG's precision limit and size warnings
@@ -64,7 +78,7 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **Big cities load and draw properly:** dense 8 km levels ran out of BeamNG's GPU geometry pool, which showed as smeared "rainbow" slabs and black materials. Sidewalks are now split into tiles like the buildings, and every shape is lighter
 - **No more crash on load** when an area's trees reached past the map's edge (they piled up in one corner and crashed BeamNG's forest loader)
 - Every level now carries `mapng.json` (MapNG version, area, size and settings), so the desktop app can recognise and rebuild it
-- The website and the desktop app read MapNG's own OpenStreetMap tiles in hosted regions; trees scattered in woods come out the same on every export
+- The website and the desktop app read MapNG's own OpenStreetMap tiles wherever they cover the area; trees scattered in woods come out the same on every export
 - **Desktop: Update and Modify in My Levels.** Update remakes a level with the current version; Modify loads it back in with its settings to change and export again. Both use the level's saved downloads (terrain, satellite, OSM, bridge-height lidar), so nothing is downloaded and no GPXZ calls are used. "Show saved data" opens a level's saved-data folder (it is not part of the level zip)
 - **Desktop: much faster big maps.** The heightmap resample runs on every CPU core (a 16k GPXZ map generates in about a minute), measured bridge heights from US lidar now work in the desktop app, and the 3D preview's texture choice is the export's base texture
 - **Clearer settings:** the sidebar follows the order you work in (location, area and detail, elevation, map data, generate, export), the level options are grouped into cards (Level, Content, Structures, Terrain edits, Surroundings; Structures and Terrain edits in Advanced mode), and greyed-out options say why. Map overlays live in the Map layers box
@@ -129,7 +143,7 @@ This helps keep community resource hubs focused on curated, polished releases wh
 | GPXZ | Optional higher-resolution elevation, with your own API key |
 | Custom upload | Your own DEM: LAZ/LAS, GeoTIFF, ASC, GML/XML (single or multi-tile) |
 | Esri World Imagery | Satellite textures and map layers |
-| MapNG OSM tiles (Cloudflare R2) | MapNG's own OpenStreetMap copy for hosted regions |
+| MapNG OSM tiles (Cloudflare R2) | MapNG's own OpenStreetMap copy, region by region toward the whole planet |
 | OpenStreetMap / Overpass | Roads, land use, buildings, water, vegetation, street furniture elsewhere |
 | Your own Overpass server | Optional map data source you set yourself |
 | Overture Maps | Extra buildings and heights; backup map data |
@@ -219,4 +233,4 @@ The level ZIP contains:
 
 ## License
 
-[MIT](https://mit-license.org/)
+[MIT](https://mit-license.org/). The interface fonts, Noto Sans, Overpass and Overpass Mono (the ones BeamNG.drive's own UI uses), are under the [SIL Open Font License](https://openfontlicense.org/).

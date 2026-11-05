@@ -623,7 +623,7 @@
     "whatBody": "Pick a location, choose an elevation source, generate the terrain and check it in the 3D preview. Then export a complete BeamNG level ZIP built from real elevation and OpenStreetMap data, or take GeoTIFF and GeoJSON data into your own workflow. Batch mode processes whole grids of tiles and can stitch them into one large level.",
     "elevationTitle": "Elevation Sources",
     "elevationItems": [
-      "Standard 30 m global (AWS Terrarium / SRTM), with roads smoothed and levelled automatically",
+      "Standard 30 m global (AWS Terrarium / SRTM), with roads smoothed and levelled, and rivers kept below their banks, automatically",
       "USGS 1 m DEM (USA: CONUS, Alaska, Hawaii)",
       "NMT EVRF2007 (Poland, high-resolution GUGiK tiles)",
       "GPXZ (global high resolution, with your own API key; faster on paid plans)",
@@ -647,7 +647,7 @@
     ],
     "osmTitle": "OpenStreetMap Data",
     "osmItems": [
-      "MapNG's own OSM copy for the regions it hosts: fast, and unaffected by Overpass outages",
+      "MapNG's own OSM copy, growing region by region toward the whole planet: fast, and unaffected by Overpass outages",
       "Show MapNG OSM coverage outlines those regions on the map",
       "Everywhere else: health-ranked Overpass mirrors with an edge cache",
       "Bring your own Overpass server (Tracestrack, Overspan); MapNG's copy still answers first where it can",
@@ -674,7 +674,7 @@
     "beamngTitle": "BeamNG Level Export",
     "beamngBody": "A ready-to-drive level ZIP for BeamNG.drive 0.40, built from the real place:",
     "beamngItems": [
-      "Terrain painted with materials from OSM land use, and a 2x satellite base texture you can touch up before export",
+      "Terrain painted with materials from OSM land use, and a 2x satellite or Game base texture (its water straight from the satellite image) you can touch up before export",
       "A regional look chosen from the location: grass, ground cover, rocks and water",
       "Regional trees from BeamNG's own models, picked from OSM tags and the local climate",
       "Textured buildings with BeamNG's facades and roofs",
@@ -691,11 +691,13 @@
     "additionalItems": [
       "Share your whole setup: a short code or link (works for 24 hours), a long code that never expires, or a file. Paste one on the map to load it; your own keys and servers never go with it",
       "Location search (Nominatim), preset scenic locations and Use my location",
-      "Keyless Esri satellite and topo layers with labels; your choices are remembered",
+      "Keyless Esri satellite and topo layers (place and road names on satellite), one world with a border at the date line, a scale bar, cursor and crosshair coordinates, a right-click menu, and Ctrl+scroll to zoom on the crosshair",
       "Elevation overlay minimap of the selected area",
-      "Live progress with finished steps and timings for generation and export",
+      "Stage-by-stage progress cards for generation and export, with finished steps and timings",
       "Generation caching and cancel for long-running tasks",
-      "Light and dark mode, in 7 languages"
+      "Light and dark mode, in 7 languages",
+      "Export hotspots: an opt-in glow map of where people export levels",
+      "Expand all / Collapse all for the settings sections"
     ],
     "footerPrefix": "Created by",
     "footerMiddle": "Open Source on"
@@ -739,6 +741,10 @@
         {
           "name": "vue-i18n",
           "desc": "The interface in 7 languages"
+        },
+        {
+          "name": "Noto Sans and Overpass",
+          "desc": "BeamNG.drive's own interface fonts, bundled (SIL Open Font License)"
         }
       ],
       "render": [

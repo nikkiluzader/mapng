@@ -111,7 +111,7 @@
 
   <section id="what">
     <h2>What the hotspot map is</h2>
-    <p>The 2D map in MapNG has an optional <b>Export hotspots</b> overlay, in the Map layers box. It shows the areas where people export BeamNG levels, as dots that get bigger and darker with more exports. The dots come only from people who chose to share. It helps everyone see where the community is building, and helps the developer decide where to improve MapNG next.</p>
+    <p>The 2D map in MapNG has an optional <b>Export hotspots</b> overlay, in the Map layers box. It shows the areas where people export BeamNG levels: a soft glow when you're zoomed out, brighter where more people export, and small dots once you zoom in. Everything on it comes only from people who chose to share. It helps everyone see where the community is building, and helps the developer decide where to improve MapNG next.</p>
     <p>Sharing is off by default, on the website and in the desktop app. MapNG asks you once, after your first export, and the desktop app has an unticked box on its welcome screen. You can change your answer at any time with <b>Share my exports (anonymous)</b> in the <b>Map layers</b> box on the map.</p>
   </section>
 
@@ -172,7 +172,7 @@ Content-Type: application/json
       <li><b>MapNG's Cloudflare Worker checks it</b><span class="where">Cloudflare</span><br>The Worker (<code>worker.js</code>) refuses anything that isn't a valid square and platform. To stop one machine spamming the map, it allows at most 30 reports per hour per address (details below). Request logging is switched off for this Worker.</li>
       <li><b>The count goes up by one</b><span class="where">Cloudflare Durable Object</span><br>A single Durable Object (<code>hotspotsObject.js</code>) holds the table in its built-in SQLite storage and adds 1 to that square's row.</li>
       <li><b>The overlay reads the totals</b><span class="where">network</span><br>Anyone who turns on the overlay downloads the table from <code>/api/hotspots</code>. Cloudflare keeps a copy for up to 10 minutes so the database isn't asked on every page view.</li>
-      <li><b>Dots are drawn</b><span class="where">your computer</span><br>Your browser merges nearby squares for the zoom level you're at and draws one dot per group (<code>services/hotspotLayer.js</code>).</li>
+      <li><b>The glow and dots are drawn</b><span class="where">your computer</span><br>Your browser draws the glow from the squares (<code>services/heatLayer.js</code>) and, zoomed in, merges nearby squares into one dot per group (<code>services/hotspotLayer.js</code>). Hovering or clicking only reads this same table.</li>
     </ol>
   </section>
 
@@ -292,7 +292,7 @@ Content-Type: application/json
       <li><a href="https://github.com/nikkiluzader/mapng/blob/main/services/exportHotspots.js"><code>services/exportHotspots.js</code></a>: the grid and the rounding to a square</li>
       <li><a href="https://github.com/nikkiluzader/mapng/blob/main/composables/useExportHotspots.js"><code>composables/useExportHotspots.js</code></a>: the opt-in, the report, loading the overlay</li>
       <li><a href="https://github.com/nikkiluzader/mapng/blob/main/hotspotsObject.js"><code>hotspotsObject.js</code></a>: the server: checks, spam limit, the table</li>
-      <li><a href="https://github.com/nikkiluzader/mapng/blob/main/services/hotspotLayer.js"><code>services/hotspotLayer.js</code></a>: drawing the dots</li>
+      <li><a href="https://github.com/nikkiluzader/mapng/blob/main/services/hotspotLayer.js"><code>services/hotspotLayer.js</code></a> and <a href="https://github.com/nikkiluzader/mapng/blob/main/services/heatLayer.js"><code>services/heatLayer.js</code></a>: drawing the glow and the dots</li>
     </ul>
     <p>Questions, or something here that doesn't match the code? <a href="https://github.com/nikkiluzader/mapng/issues">Open an issue on GitHub</a>.</p>
   </section>

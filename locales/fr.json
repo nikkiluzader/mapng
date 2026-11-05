@@ -623,7 +623,7 @@
     "whatBody": "Choisissez un lieu et une source d'élévation, générez le terrain et vérifiez-le dans l'aperçu 3D. Exportez ensuite un niveau BeamNG complet en ZIP, construit à partir de vraies données d'élévation et d'OpenStreetMap, ou utilisez les données GeoTIFF et GeoJSON dans votre propre workflow. Le mode par lot traite des grilles entières de tuiles et peut les assembler en un grand niveau.",
     "elevationTitle": "Sources d'élévation",
     "elevationItems": [
-      "Standard 30 m mondial (AWS Terrarium / SRTM), routes lissées et aplanies automatiquement",
+      "Standard 30 m mondial (AWS Terrarium / SRTM), routes lissées et nivelées, et rivières sous leurs berges, automatiquement",
       "MNT USGS 1 m (États-Unis : CONUS, Alaska, Hawaï)",
       "NMT EVRF2007 (Pologne, tuiles GUGiK haute résolution)",
       "GPXZ (haute résolution mondiale, avec votre propre clé API ; plus rapide avec les offres payantes)",
@@ -647,7 +647,7 @@
     ],
     "osmTitle": "Données OpenStreetMap",
     "osmItems": [
-      "La copie OSM de MapNG pour les régions qu'il héberge : rapide et insensible aux pannes d'Overpass",
+      "La copie OSM de MapNG, qui s'étend région par région jusqu'à la planète entière : rapide et insensible aux pannes d'Overpass",
       "Afficher la couverture OSM de MapNG trace ces régions sur la carte",
       "Partout ailleurs : miroirs Overpass classés selon leur état, avec un cache en périphérie",
       "Votre propre serveur Overpass (Tracestrack, Overspan) ; la copie de MapNG répond d'abord quand elle le peut",
@@ -674,7 +674,7 @@
     "beamngTitle": "Export de niveau BeamNG",
     "beamngBody": "Un niveau ZIP prêt à rouler pour BeamNG.drive 0.40, construit à partir du vrai lieu :",
     "beamngItems": [
-      "Terrain peint avec des matériaux issus de l'occupation du sol OSM, et une texture de base satellite 2x que vous pouvez retoucher avant l'export",
+      "Terrain peint avec des matériaux issus de l'occupation du sol OSM, et une texture de base satellite 2x ou de jeu (l'eau tirée de l'image satellite) à retoucher avant l'export",
       "Un style régional choisi selon le lieu : herbe, couvre-sol, rochers et eau",
       "Des arbres régionaux issus des modèles de BeamNG, choisis selon les tags OSM et le climat",
       "Des bâtiments texturés avec les façades et toits de BeamNG",
@@ -691,11 +691,13 @@
     "additionalItems": [
       "Partagez toute votre configuration : un code court ou un lien (valable 24 heures), un code long qui n'expire jamais, ou un fichier. Collez-en un sur la carte pour le charger ; vos propres clés et serveurs n'en font jamais partie",
       "Recherche de lieux (Nominatim), lieux remarquables prédéfinis et Ma position",
-      "Couches satellite et topo Esri avec libellés, sans clé ; vos choix sont mémorisés",
+      "Couches satellite et topo Esri sans clé (noms de lieux et de rues sur le satellite), un seul monde avec une bordure à la ligne de changement de date, une échelle, les coordonnées du curseur et du réticule, un menu clic droit et Ctrl+molette pour zoomer sur le réticule",
       "Minicarte d'élévation de la zone choisie",
-      "Progression en direct avec étapes terminées et durées pour la génération et l'export",
+      "Cartes de progression étape par étape pour la génération et l'export, avec étapes terminées et durées",
       "Cache de génération et annulation des tâches longues",
-      "Mode clair et sombre, en 7 langues"
+      "Mode clair et sombre, en 7 langues",
+      "Points chauds d'export : une carte lumineuse facultative des lieux où l'on exporte des niveaux",
+      "Tout déplier / Tout replier pour les sections de réglages"
     ],
     "footerPrefix": "Créé par",
     "footerMiddle": "Open source sur"
@@ -739,6 +741,10 @@
         {
           "name": "vue-i18n",
           "desc": "L'interface en 7 langues"
+        },
+        {
+          "name": "Noto Sans et Overpass",
+          "desc": "Les polices de l'interface de BeamNG.drive, incluses (SIL Open Font License)"
         }
       ],
       "render": [
