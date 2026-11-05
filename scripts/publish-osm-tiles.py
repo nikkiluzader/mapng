@@ -2,9 +2,16 @@
 """
 Publish an OSM tile archive (scripts/build-osm-tiles.py) to the R2 bucket and
 list it in osm/manifest.json, which the app reads to pick an archive for an
-area (services/osmTiles.js resolveOsmTileArchiveUrl).
+area (services/osmTiles.js planTileSources: each tile from the newest archive covering it).
 
     python3 scripts/publish-osm-tiles.py <archive.pmtiles> --region arizona --poly arizona.poly
+    python3 scripts/publish-osm-tiles.py <planet-3-1-3-....pmtiles> --tile 3/1/3 [--drop-region arizona ...]
+
+Planet pieces (scripts/planet/planet.py merge) are one archive per zoom-3
+tile: --tile gives the region name planet-z-x-y and the tile's rectangle as
+coverage (every tile inside is either in the archive or has no OSM data).
+--drop-region removes older entries the new ones replace (a state the
+planet now covers); the objects themselves are deleted separately.
 
 - Uploads to osm/<region>-<YYYY-MM-DD>.pmtiles (archives are immutable; a
   rebuild gets a new name) unless an object of the same size is already there.
@@ -17,6 +24,7 @@ Uses scripts/r2.sh (credentials in ~/.config/mapng/r2.env).
 """
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
@@ -58,9 +66,16 @@ def read_poly(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("archive")
-    ap.add_argument("--region", required=True)
-    ap.add_argument("--poly", required=True, help="Geofabrik .poly outline of the extract")
+    ap.add_argument("--region")
+    ap.add_argument("--poly", help="Geofabrik .poly outline of the extract")
+    ap.add_argument("--tile", help="z/x/y: a planet piece (region planet-z-x-y, the tile's rectangle as coverage)")
+    ap.add_argument("--drop-region", action="append", default=[], help="manifest entries this one replaces")
     args = ap.parse_args()
+    if args.tile:
+        tz, tx, ty = (int(v) for v in args.tile.split("/"))
+        args.region = args.region or f"planet-{tz}-{tx}-{ty}"
+    if not args.region or not (args.poly or args.tile):
+        ap.error("give --region with --poly, or --tile")
 
     with open(args.archive, "rb") as f:
         reader = Reader(MmapSource(f))
@@ -83,7 +98,14 @@ def main():
         print(f"uploading {key} ({size / 1e6:.0f} MB)...", file=sys.stderr)
         r2("copyto", args.archive, f"r2:mapng-osm/{key}", "--s3-chunk-size", "64M", "--s3-upload-concurrency", "8")
 
-    polys = [p.simplify(SIMPLIFY_DEG, preserve_topology=True) for p in read_poly(args.poly)]
+    if args.tile:
+        n = 1 << tz
+        west, east = tx / n * 360 - 180, (tx + 1) / n * 360 - 180
+        lat = lambda yy: math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * yy / n))))
+        north, south = lat(ty), lat(ty + 1)
+        polys = [Polygon([(west, south), (east, south), (east, north), (west, north)])]
+    else:
+        polys = [p.simplify(SIMPLIFY_DEG, preserve_topology=True) for p in read_poly(args.poly)]
     coverage = [[[round(x, 5), round(y, 5)] for x, y in p.exterior.coords] for p in polys]
     minx = min(p.bounds[0] for p in polys)
     miny = min(p.bounds[1] for p in polys)
@@ -92,7 +114,8 @@ def main():
 
     current = r2("cat", f"r2:mapng-osm/{MANIFEST_KEY}", check=False)
     manifest = json.loads(current.stdout) if current.returncode == 0 and current.stdout.strip() else {"archives": []}
-    manifest["archives"] = [a for a in manifest.get("archives", []) if a.get("region") != args.region]
+    drop = {args.region, *args.drop_region}
+    manifest["archives"] = [a for a in manifest.get("archives", []) if a.get("region") not in drop]
     manifest["archives"].append({
         "region": args.region,
         "key": key,
