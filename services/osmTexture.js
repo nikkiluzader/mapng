@@ -1890,20 +1890,23 @@ export const GROUND_CLASSES = ['trees', 'grass', 'dry', 'soil', 'sand', 'paved',
 // grey reads as vegetation to the export's grass mask (isVegetationColor).
 const GROUND_COLORS = {
   trees: [63, 70, 39], grass: [82, 90, 49], dry: [109, 104, 76], soil: [126, 115, 97],
-  sand: [157, 141, 111], paved: [96, 95, 91], water: [74, 96, 104],
+  sand: [157, 141, 111], paved: [96, 95, 91], water: [90, 84, 74],
 };
+// (water is painted as its bed, muddy silt, not blue: BeamNG's own maps show
+// the ground under their water, and players disliked blue lakes and rivers.
+// Kept under 40° hue so the export's grass mask never takes it for grass.)
 export const GAME_COLORS = {
   forest: "#3f4627", scrub: "#605d37", heath: "#66603f", grass: "#525a31", orchard: "#4b5a2e", farmland: "#7e7361",
-  water: "#4a6068", wetland: "#4a5430", swamp: "#3f4627", glacier: "#9aa3a5", mud: "#5e5446",
+  water: "#5a544a", wetland: "#4a5430", swamp: "#3f4627", glacier: "#9aa3a5", mud: "#5e5446",
   bare: "#8f8676", sand: "#9d8d6f", dirt: "#7e7361", quarry: "#847a69",
   residential: "#555c35", commercial: "#62615c", industrial: "#5d5c58", retail: "#66655f",
   education: "#565e34", military: "#5e5c46", cemetery: "#4f5a30", sport: "#4d5c2e",
   recreation: "#525a31", park: "#4f5a30", parking: "#4c4c49", aeroway: "#6b6a65", apron: "#62615c",
   runway: "#454441", power: "#5d5c58", tourism: "#525a31", hospital: "#565e34",
-  swimming_pool: "#4f7d88", marina: "#62615c", harbourLand: "#5d5c58", fountain: "#4f7d88",
+  swimming_pool: "#6b6a65", marina: "#62615c", harbourLand: "#5d5c58", fountain: "#6b6a65",
   allotments: "#4f5a30", flowerbed: "#525a31", hedge: "#3f4627",
   building: "#5d5c58", buildingFill: "#5d5c58", buildingStroke: "#565550", path: "#7e7361", track: "#6d6250",
-  sidewalk: "#7d7a72", barrier: "#5a4c3c", coastline: "#4a6068", ocean: "#4a6068", defaultLanduse: "#525a31",
+  sidewalk: "#7d7a72", barrier: "#5a4c3c", coastline: "#5a544a", ocean: "#5a544a", defaultLanduse: "#525a31",
 };
 // broad land use the classification paints instead (when there is a satellite
 // image), and natural vegetation: the imagery is newer than many outlines (a
