@@ -46,12 +46,14 @@ const props = defineProps({
 
 const emit = defineEmits(['locationChange']);
 
-const latInput = ref(props.center.lat.toString());
-const lngInput = ref(props.center.lng.toString());
+// (at most 6 decimals, about 10 cm: full float precision showed 15 digits)
+const fmtCoord = (v) => String(Number(Number(v).toFixed(6)));
+const latInput = ref(fmtCoord(props.center.lat));
+const lngInput = ref(fmtCoord(props.center.lng));
 
 const presetLocations = [
   { name: t('map.selectLocation'), lat: 0, lng: 0, disabled: true },
-  { name: 'My Location', lat: 0, lng: 0, isMyLocation: true },
+  { name: t('map.myLocation'), lat: 0, lng: 0, isMyLocation: true },
   { name: "Devils Tower, USA", lat: 44.59056, lng: -104.71511 },
   { name: "Eye of the Sahara, Mauritania", lat: 21.11460876603993, lng: -11.393508911132812 },
   { name: "Glacier View Car Launch, USA", lat: 61.79551798203474, lng: -147.86878824234012 },
@@ -82,8 +84,8 @@ const handleCoordinatePaste = (e) => {
     const a = parseFloat(match[1]);
     const b = parseFloat(match[2]);
     if (!isNaN(a) && !isNaN(b)) {
-      latInput.value = a.toString();
-      lngInput.value = b.toString();
+      latInput.value = fmtCoord(a);
+      lngInput.value = fmtCoord(b);
       emit('locationChange', { lat: a, lng: b });
     }
     return;
@@ -94,8 +96,8 @@ const handleCoordinatePaste = (e) => {
 };
 
 const handleSearchSelect = (location) => {
-  latInput.value = location.lat.toString();
-  lngInput.value = location.lng.toString();
+  latInput.value = fmtCoord(location.lat);
+  lngInput.value = fmtCoord(location.lng);
   emit('locationChange', { lat: location.lat, lng: location.lng });
 };
 
@@ -111,8 +113,8 @@ const handleLocationSelect = (event) => {
           (position) => {
             const lat = position.coords.latitude;
             const lng = position.coords.longitude;
-            latInput.value = lat.toString();
-            lngInput.value = lng.toString();
+            latInput.value = fmtCoord(lat);
+            lngInput.value = fmtCoord(lng);
             emit('locationChange', { lat, lng });
           },
           (err) => {
@@ -126,8 +128,8 @@ const handleLocationSelect = (event) => {
         );
       }
     } else {
-      latInput.value = loc.lat.toString();
-      lngInput.value = loc.lng.toString();
+      latInput.value = fmtCoord(loc.lat);
+      lngInput.value = fmtCoord(loc.lng);
       emit('locationChange', { lat: loc.lat, lng: loc.lng });
     }
   }
@@ -136,10 +138,10 @@ const handleLocationSelect = (event) => {
 
 watch(() => props.center, (newVal) => {
   if (parseFloat(latInput.value) !== newVal.lat) {
-    latInput.value = newVal.lat.toString();
+    latInput.value = fmtCoord(newVal.lat);
   }
   if (parseFloat(lngInput.value) !== newVal.lng) {
-    lngInput.value = newVal.lng.toString();
+    lngInput.value = fmtCoord(newVal.lng);
   }
 }, { deep: true });
 </script>

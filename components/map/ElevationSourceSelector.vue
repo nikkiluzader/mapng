@@ -17,7 +17,7 @@
         </select>
 
         <p v-if="selectedOutsideCoverage" class="text-[10px] text-amber-600 dark:text-amber-500 font-medium leading-tight">
-          ⚠️ {{ t('map.selectedSourceOutsideCoverage') }}
+          <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('map.selectedSourceOutsideCoverage') }}
         </p>
 
         <!-- Default -->
@@ -61,7 +61,7 @@
                         {{ t('map.freeTier') }} <a href="https://www.gpxz.io/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">{{ t('map.getKey') }}</a>
                     </p>
                     <p v-if="isBatchMode" class="text-[10px] text-amber-600 dark:text-amber-500 font-medium mt-1">
-                      ⚠️ {{ t('map.gpxzBatchWarning', { tiles: totalTiles }) }}
+                      <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('map.gpxzBatchWarning', { tiles: totalTiles }) }}
                     </p>
                     <!-- GPXZ Account Status -->
                     <div v-if="localGpxzApiKey" class="mt-2">
@@ -85,11 +85,11 @@
                           <span class="text-gray-500 dark:text-gray-400">{{ t('map.concurrency') }}</span>
                           <span class="text-gray-700 dark:text-gray-300">{{ t('map.parallel', { count: gpxzStatus.concurrency }) }}</span>
                         </div>
-                        <p v-if="!gpxzStatus.valid" class="text-[10px] text-red-500 font-medium">⚠️ {{ t('map.invalidApiKey') }}</p>
+                        <p v-if="!gpxzStatus.valid" class="text-[10px] text-red-500 font-medium"><AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('map.invalidApiKey') }}</p>
                       </div>
                     </div>
                     <p v-if="isAreaLargeForGPXZ" class="text-[10px] text-orange-600 dark:text-orange-400 font-medium leading-tight mt-1">
-                        ⚠️ {{ t('map.largeAreaWarning', { area: areaSqKm.toFixed(2) }) }}
+                        <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('map.largeAreaWarning', { area: areaSqKm.toFixed(2) }) }}
                     </p>
                 </div>
         </div>
@@ -103,7 +103,7 @@
 import SettingSection from '../base/SettingSection.vue';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Mountain, ChevronDown } from 'lucide-vue-next';
+import { Mountain, ChevronDown, AlertTriangle } from 'lucide-vue-next';
 
 const { t } = useI18n({ useScope: 'global' });
 

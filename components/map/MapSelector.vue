@@ -168,7 +168,7 @@
     <ElevationOverlay :bounds="elevationOverlayBounds" />
 
     <!-- Custom Layer Control -->
-    <div class="absolute bottom-20 right-4 z-[400] bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 overflow-hidden text-gray-800 dark:text-gray-200 text-xs">
+    <div class="absolute bottom-20 right-4 z-[400] max-h-[calc(100%-7rem)] overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 text-xs">
         <div class="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b border-gray-200 dark:border-gray-600 font-medium flex items-center gap-2">
             <Layers :size="14" class="text-[#FF6600]" />
           {{ t('mapSelector.mapLayers') }}

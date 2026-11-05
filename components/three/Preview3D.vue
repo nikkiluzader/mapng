@@ -327,7 +327,7 @@
                     min="-2000"
                     max="2000"
                     :disabled="!showWater"
-                    class="w-20 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 disabled:opacity-60"
+                    class="w-20 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
                   />
                   <span class="text-[9px] text-gray-500 dark:text-gray-400">m</span>
                 </div>

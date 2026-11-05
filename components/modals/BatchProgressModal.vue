@@ -220,7 +220,7 @@
           <Pause :size="24" class="mx-auto mb-2 text-amber-500" />
           <p class="font-medium text-amber-800 dark:text-amber-200">{{ t('batchProgress.paused') }}</p>
           <p class="text-xs text-amber-600 dark:text-amber-400 mt-1">
-            {{ t('batchProgress.pausedDesc', { count: completedCount, suffix: completedCount !== 1 ? 's' : '' }) }}
+            {{ t('batchProgress.pausedDesc', { count: completedCount }) }}
           </p>
         </div>
       </div>
@@ -260,7 +260,7 @@
           <button v-if="failedCount > 0" @click="$emit('retryFailed')"
             class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors">
             <RotateCcw :size="14" />
-            {{ isCombinedLevel ? t('batchProgress.retryFailedCombined', { count: failedCount, suffix: failedCount !== 1 ? 's' : '' }) : t('batchProgress.retryFailed', { count: failedCount, suffix: failedCount !== 1 ? 's' : '' }) }}
+            {{ isCombinedLevel ? t('batchProgress.retryFailedCombined', { count: failedCount }) : t('batchProgress.retryFailed', { count: failedCount }) }}
           </button>
           <button @click="$emit('close')"
             :class="['py-2.5 text-sm font-medium rounded-lg transition-colors', failedCount > 0
@@ -538,7 +538,6 @@ const summarySubtitleText = computed(() => {
   }
   const exported = t('batchProgress.summaryExported', {
     count: completedCount.value,
-    suffix: completedCount.value !== 1 ? 's' : '',
   });
   if (failedCount.value > 0) {
     return `${exported}${t('batchProgress.summaryFailedTail', { count: failedCount.value })}`;

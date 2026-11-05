@@ -11,7 +11,7 @@
           type="text"
           maxlength="64"
           :placeholder="t('exportPanel.levelNamePlaceholder')"
-          class="min-w-0 flex-1 text-[11px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-700 dark:text-gray-300"
+          class="min-w-0 flex-1 text-[11px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
         />
       </div>
 
@@ -85,7 +85,7 @@
             step="1"
             min="-2000"
             max="2000"
-            class="w-20 text-[11px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-700 dark:text-gray-300"
+            class="w-20 text-[11px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
           />
           <span class="text-[10px] text-gray-500 dark:text-gray-400">m</span>
         </div>

@@ -33,10 +33,10 @@
         }">{{ combinedDim }} × {{ combinedDim }} px</span>
       </div>
       <p v-if="combinedTier === 'disabled'" class="text-[10px] text-red-600 dark:text-red-500 font-medium">
-        ⛔ {{ t('batchCombined.disabledWarning') }}
+        <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batchCombined.disabledWarning') }}
       </p>
       <p v-else-if="combinedDim >= COMBINED_SUPPORTED_MAX" class="text-[10px] text-amber-600 dark:text-amber-500 font-medium">
-        ⚠️ {{ t('batchCombined.largeSizeNote', { mb: combinedMemoryMB }) }}
+        <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batchCombined.largeSizeNote', { mb: combinedMemoryMB }) }}
       </p>
     </div>
 
@@ -105,12 +105,13 @@
     </div>
 
     <p v-if="totalTiles > 50" class="text-[10px] text-amber-600 dark:text-amber-500 font-medium">
-      ⚠️ {{ t('batch.largeBatchWarning', { count: totalTiles }) }}
+      <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batch.largeBatchWarning', { count: totalTiles }) }}
     </p>
   </BaseCard>
 </template>
 
 <script setup>
+import { AlertTriangle } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseCard from '../base/BaseCard.vue';

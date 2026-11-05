@@ -5,7 +5,7 @@
   <div
     v-if="down && !dismissed"
     role="status"
-    class="fixed top-2 left-1/2 -translate-x-1/2 z-[1100] w-[min(44rem,calc(100%-2rem))] flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 text-xs"
+    class="fixed top-2 left-1/2 -translate-x-1/2 z-[95] w-[min(44rem,calc(100%-2rem))] flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 text-xs"
   >
     <Info :size="16" class="shrink-0" />
     <p class="flex-1 leading-snug">

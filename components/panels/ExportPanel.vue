@@ -69,7 +69,7 @@
                 step="1"
                 min="-2000"
                 max="2000"
-                class="w-20 text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="w-20 text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
               />
               <span class="text-[11px] text-gray-500 dark:text-gray-400">m</span>
             </SettingRow>

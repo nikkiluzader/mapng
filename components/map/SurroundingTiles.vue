@@ -99,7 +99,7 @@
         <Download v-else :size="14" />
         <span v-if="isDownloading" class="truncate">{{ downloadStatus }}</span>
         <span v-else-if="!terrainData && selected.size > 0">{{ t('map.surrounding.generateTerrainFirst') }}</span>
-        <span v-else>{{ t('map.surrounding.download', { count: selected.size, suffix: selected.size !== 1 ? 's' : '' }) }}</span>
+        <span v-else>{{ t('map.surrounding.download', { count: selected.size }) }}</span>
       </button>
 
       <!-- Cancel link -->

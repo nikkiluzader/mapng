@@ -122,7 +122,7 @@
       >
         <p>{{ t('batch.tileEach', { resolution, mpp: processingMetersPerPixelNumber.toFixed(2) }) }}</p>
         <p>{{ t('batch.gridCoverage', { w: gridWidthDisplay, h: gridHeightDisplay }) }}</p>
-        <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium">⚠️ {{ t('batch.highResolutionWarning') }}</p>
+        <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium"><AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batch.highResolutionWarning') }}</p>
       </ResolutionSelector>
       <ProcessingResolutionInput
         :model-value="processingMetersPerPixel"
@@ -181,17 +181,17 @@
     <!-- Combined level output summary -->
     <div v-if="combinedLevel" class="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
       <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batchCombined.outputSummary', { tiles: totalTiles, dim: combinedDim }) }}</span></p>
-      <p class="text-amber-600 dark:text-amber-500 font-medium mt-1">
-        ℹ️ {{ t('batchCombined.outputHint') }}
+      <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
+        <Info :size="11" class="shrink-0 mt-px" />{{ t('batchCombined.outputHint') }}
       </p>
     </div>
 
     <!-- Selected exports count -->
     <div v-else class="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
-      <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batch.selectedPerTile', { count: selectedExportCount, suffix: selectedExportCount !== 1 ? 's' : '' }) }}</span></p>
+      <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batch.selectedPerTile', { count: selectedExportCount }) }}</span></p>
       <p>{{ t('batch.totalFiles', { tiles: totalTiles, exports: selectedExportCount, total: totalTiles * selectedExportCount }) }}</p>
-      <p class="text-amber-600 dark:text-amber-500 font-medium mt-1">
-        ℹ️ {{ t('batch.browserDownloadHint') }}
+      <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
+        <Info :size="11" class="shrink-0 mt-px" />{{ t('batch.browserDownloadHint') }}
       </p>
     </div>
 
@@ -258,7 +258,7 @@ import SegmentedControl from '../base/SegmentedControl.vue';
 import SettingSection from '../base/SettingSection.vue';
 import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen } from 'lucide-vue-next';
+import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info } from 'lucide-vue-next';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
