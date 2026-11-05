@@ -253,7 +253,7 @@ export default {
               : {}),
             ...(isNominatimOrigin
               ? {
-                  'User-Agent': 'mapng/1.0 (+https://mapng.dev; contact: nikkiluzader@gmail.com)',
+                  'User-Agent': 'mapng/1.0 (+https://mapng.com; contact: nikkiluzader@gmail.com)',
                   'Referer': requestOrigin,
                 }
               : {}),

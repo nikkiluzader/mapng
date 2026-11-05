@@ -1,7 +1,7 @@
 {
   "data_format": 1,
   "data_url": "https://raw.githubusercontent.com/nikkiluzader/mapng/main/public/taginfo.json",
-  "data_updated": "20261022T000000Z",
+  "data_updated": "20261105T000000Z",
   "project": {
     "name": "MapNG",
     "description": "Turns real-world elevation and OpenStreetMap data into drivable BeamNG.drive levels.",
@@ -12,7 +12,7 @@
     "contact_email": "nikkiluzader@gmail.com"
   },
   "tags": [
-    { "key": "highway", "object_types": ["way"], "description": "Roads are exported as drivable BeamNG roads; footways and paths are painted as terrain material." },
+    { "key": "highway", "object_types": ["way"], "description": "Roads are exported as drivable BeamNG DecalRoads with AI lanes; footways, cycleways and paths are drawn as narrow surfaces, and paved footways as raised sidewalks." },
     { "key": "lanes", "object_types": ["way"], "description": "Lane count for road width, lane markings and AI navigation lanes." },
     { "key": "lanes:forward", "object_types": ["way"], "description": "Per-direction lane count for markings and AI lanes." },
     { "key": "lanes:backward", "object_types": ["way"], "description": "Per-direction lane count for markings and AI lanes." },

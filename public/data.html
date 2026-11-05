@@ -91,7 +91,7 @@
   <div class="wrap">
     <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
     <h1>Your data and MapNG</h1>
-    <p class="lede">Everything about the one thing MapNG can collect, the export hotspot map: what is sent, what is stored, where, and why. Nothing on this page is hidden anywhere else.</p>
+    <p class="lede">Everything MapNG can collect, all of it only if you opt in: the export hotspot map, settings stats, send codes and desktop problem reports. What is sent, what is stored, where, and why. Nothing on this page is hidden anywhere else.</p>
   </div>
 </header>
 
@@ -131,7 +131,7 @@ Content-Type: application/json
 
   <section id="stored">
     <h2>Exactly what is stored</h2>
-    <p>The server keeps one table with one row per grid square that has had at least one shared export. There is no other table, and nothing else is written anywhere.</p>
+    <p>For the hotspot map, the server keeps one table with one row per grid square that has had at least one shared export. Nothing else about hotspots is written anywhere. (Settings stats, if you opt in to those, are a separate table of totals: <a href="#usage">see below</a>.)</p>
     <div class="table-wrap"><table>
       <thead><tr><th>Column</th><th>Type</th><th>Example</th><th>Meaning</th></tr></thead>
       <tbody>
@@ -247,9 +247,10 @@ Content-Type: application/json
 
   <section id="send-codes">
     <h2>Sending a config with a code</h2>
-    <p>Under <em>Configuration &amp; Session</em>, <strong>Send with a code</strong> lets you give your settings to someone with a short code like <code>K7F-29Q</code> or a link like <code>mapng.com/#K7F-29Q</code>.</p>
+    <p>Under <em>Configuration &amp; Session</em>, <strong>Share my settings → Get a code</strong> gives you a short code like <code>K7F-29Q</code>, or a link like <code>mapng.com/#K7F-29Q</code>, to give someone. They enter it under <strong>Use someone's code</strong>.</p>
     <ul>
-      <li><strong>What's stored:</strong> your control-panel settings (location, area, elevation source, and the export settings), the same as <em>Copy Configuration</em> gives you. Never your keys (GPXZ or any other).</li>
+      <li><strong>What's stored:</strong> your control-panel settings (location, area, elevation source, and the export settings), the same settings <em>Copy long code</em> gives you. Never your keys or your own servers (GPXZ key, custom Overpass address).</li>
+      <li><strong>Where:</strong> private Cloudflare R2 storage with no public access.</li>
       <li><strong>For how long:</strong> 24 hours, then the code stops working and the settings are deleted.</li>
       <li><strong>Who can see it:</strong> anyone who has the code. Nothing ties the code to you. Your internet address is used only for spam protection (at most 30 codes an hour), in memory, as a one-way hash, and is not stored.</li>
       <li><strong>Before anything changes,</strong> the person opening the code sees exactly what it would set and chooses Apply or Cancel.</li>
@@ -262,14 +263,17 @@ Content-Type: application/json
     <div class="table-wrap"><table>
       <thead><tr><th>Service</th><th>Why</th><th>What it receives</th></tr></thead>
       <tbody>
-        <tr><td>AWS Terrarium, USGS, GUGiK (Poland)</td><td>Elevation data</td><td>The map tiles for the area you select</td></tr>
+        <tr><td>AWS Terrarium, USGS, GUGiK (Poland)</td><td>Elevation data, and USGS 3DEP lidar for measured bridge heights</td><td>The map tiles for the area you select</td></tr>
         <tr><td>GPXZ</td><td>Optional premium elevation</td><td>The area, and your own GPXZ key (only if you enter one)</td></tr>
         <tr><td>Esri</td><td>Satellite imagery and map backgrounds</td><td>The map tiles you view or export</td></tr>
         <tr><td>MapNG's own OSM tiles, OpenStreetMap Overpass servers, Overture Maps</td><td>Roads, buildings, land use</td><td>The area you select</td></tr>
         <tr><td>Nominatim</td><td>Place search and level names</td><td>Your search text, or the area's centre</td></tr>
+        <tr><td>iNaturalist</td><td>Which tree species grow in the area</td><td>The area's bounding box, during a level export</td></tr>
+        <tr><td>epsg.io</td><td>Map projection details for uploaded elevation files</td><td>The projection code of your upload (only for uploads that need it)</td></tr>
+        <tr><td>Your own Overpass server (if you set one)</td><td>Map data</td><td>The area you select, and your own key if your address has one</td></tr>
         <tr><td>Cloudflare Web Analytics (website only)</td><td>Counting page views on mapng.com</td><td>A page view: no cookies and no fingerprinting, by Cloudflare's design (<a href="https://www.cloudflare.com/web-analytics/">about it</a>). The desktop app doesn't load it.</td></tr>
         <tr><td>mapng.com settings stats</td><td>Knowing which settings people use</td><td>Your export settings, never the location, only if you opted in (<a href="#usage">details</a>)</td></tr>
-        <tr><td>mapng.com send codes</td><td>Giving your settings to someone</td><td>Your settings, only when you click Send with a code (<a href="#send-codes">details</a>)</td></tr>
+        <tr><td>mapng.com send codes</td><td>Giving your settings to someone</td><td>Your settings, only when you click Get a code (<a href="#send-codes">details</a>)</td></tr>
         <tr><td>mapng.com problem reports (desktop app only)</td><td>Fixing crashes and failed exports</td><td>A problem report, only when you choose Send (<a href="#reports">what's in one</a>)</td></tr>
         <tr><td>GitHub (desktop app only)</td><td>Update checks</td><td>A request for the latest version, only if you allowed update checks</td></tr>
       </tbody>
