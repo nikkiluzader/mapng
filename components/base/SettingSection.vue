@@ -24,6 +24,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { ChevronDown } from 'lucide-vue-next';
+import { useSectionGroup } from '../../composables/useSectionGroup.js';
 
 const props = defineProps({
   title: { type: String, required: true },
@@ -51,5 +52,8 @@ watch(own, (v) => {
   if (!props.storageKey) return;
   try { localStorage.setItem(props.storageKey, String(v)); } catch { /* private mode */ }
 });
+// Expand all / Collapse all from the panel (SectionToggleAll)
+const group = useSectionGroup();
+if (group) watch(() => group.signal.value, (cmd) => { if (!cmd) return; own.value = cmd.open; emit('update:open', cmd.open); });
 defineExpose({ open });
 </script>

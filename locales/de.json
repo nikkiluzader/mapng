@@ -300,7 +300,8 @@
     "feature_vegetation": "Vegetation",
     "feature_barriers": "Barrieren",
     "webglTitle": "3D-Vorschau nicht verfügbar",
-    "webglBody": "Dein Browser konnte WebGL nicht starten. Schalte in seinen Einstellungen die Hardwarebeschleunigung (GPU) ein oder probiere einen anderen Browser. Exportieren funktioniert trotzdem."
+    "webglBody": "Dein Browser konnte WebGL nicht starten. Schalte in seinen Einstellungen die Hardwarebeschleunigung (GPU) ein oder probiere einen anderen Browser. Exportieren funktioniert trotzdem.",
+    "sun_MidMorning": "Vormittag"
   },
   "exportPanel": {
     "osmMissing": "Noch keine OpenStreetMap-Daten",
@@ -528,7 +529,9 @@
       "mapData": "Kartendaten (OpenStreetMap)",
       "osmHint": "Straßen, Gebäude, Wasser, Landnutzung und Straßendetails",
       "needsOsmOn": "Zuerst „OSM-Features einbeziehen“ einschalten"
-    }
+    },
+    "expandAll": "Alle aufklappen",
+    "collapseAll": "Alle zuklappen"
   },
   "batchExport": {
     "title": "Exportoptionen",

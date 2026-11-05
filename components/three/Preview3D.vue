@@ -132,7 +132,7 @@
           v-model="sunPosition"
           :class="[SELECT_SM, 'appearance-none hover:bg-gray-50 dark:hover:bg-gray-700']"
         >
-          <option v-for="s in sunPositionOptions" :key="s" :value="s">{{ t(`preview.sun_${s}`) }}</option>
+          <option v-for="s in sunPositionOptions" :key="s" :value="s">{{ t(`preview.sun_${s.replace(/\s+/g, '')}`) }}</option>
         </select>
       </div>
 
@@ -159,12 +159,12 @@
         </label>
 
         <div
-          class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700 mb-2"
+          class="flex flex-wrap gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700 mb-2"
         >
           <button
             @click="pickTexture('satellite')"
             :class="[
-              'flex-1 text-xs py-1.5 rounded transition-colors',
+              'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
               textureType === 'satellite'
                 ? 'bg-brand text-white shadow-sm font-medium'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
@@ -181,7 +181,7 @@
                 : t('preview.showOsmLayer')
             "
             :class="[
-              'flex-1 text-xs py-1.5 rounded transition-colors',
+              'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
               textureType === 'osm'
                 ? 'bg-brand text-white shadow-sm font-medium'
                 : !terrainData.osmTextureUrl
@@ -200,7 +200,7 @@
                 : t('preview.showHybridLayer')
             "
             :class="[
-              'flex-1 text-xs py-1.5 rounded transition-colors',
+              'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
               textureType === 'hybrid'
                 ? 'bg-brand text-white shadow-sm font-medium'
                 : !terrainData.hybridTextureUrl
@@ -219,7 +219,7 @@
                 : t('preview.showGameLayer')
             "
             :class="[
-              'flex-1 text-xs py-1.5 rounded transition-colors',
+              'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
               textureType === 'game'
                 ? 'bg-brand text-white shadow-sm font-medium'
                 : !terrainData.gameTextureUrl && !terrainData.gameTextureCanvas
@@ -232,7 +232,7 @@
           <button
             @click="pickTexture('none')"
             :class="[
-              'flex-1 text-xs py-1.5 rounded transition-colors',
+              'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
               textureType === 'none'
                 ? 'bg-brand text-white shadow-sm font-medium'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',

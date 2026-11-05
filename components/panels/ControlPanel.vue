@@ -16,6 +16,8 @@
       </p>
     </div>
 
+    <SectionToggleAll />
+
     <!-- 1. Where -->
     <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
       <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
@@ -301,6 +303,10 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import SectionToggleAll from '../base/SectionToggleAll.vue';
+import { provideSectionGroup } from '../../composables/useSectionGroup.js';
+// Expand all / Collapse all for every section in this panel
+provideSectionGroup();
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
 import { MapPin, Box, Trees, Settings, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';

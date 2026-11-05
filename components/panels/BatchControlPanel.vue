@@ -22,6 +22,8 @@
       </p>
     </div>
 
+    <SectionToggleAll />
+
     <BatchGridConfig
       :grid-cols="gridCols"
       :grid-rows="gridRows"
@@ -252,6 +254,10 @@
 
 <script setup>
 import { withoutPersonal } from '../../services/personalKeys.js';
+import SectionToggleAll from '../base/SectionToggleAll.vue';
+import { provideSectionGroup } from '../../composables/useSectionGroup.js';
+// Expand all / Collapse all for every section in this panel
+provideSectionGroup();
 import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
