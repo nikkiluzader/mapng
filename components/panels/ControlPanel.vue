@@ -241,6 +241,7 @@
     <!-- Export Panel (shown when data is available) -->
     <div v-if="terrainData && !isGenerating">
       <ExportPanel
+        :key="exportPanelKey"
         :terrain-data="terrainData"
         :is-generating="isGenerating"
         :center="center"
@@ -276,6 +277,14 @@
       />
     </SettingSection>
 
+    <!-- (outside the collapsible section: Ctrl+V on the map opens it too) -->
+    <SessionConfigDialog
+      v-if="pendingConfig"
+      :rows="pendingConfigRows"
+      @apply="applyPendingConfig"
+      @cancel="pendingConfig = null"
+    />
+
     <div class="p-3 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
       <div class="flex items-start justify-between gap-3">
         <div>
@@ -296,7 +305,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
 import { MapPin, Box, Trees, Settings, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
@@ -323,6 +332,9 @@ import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { exportJobData, importJobData } from '../../services/jobData';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
+import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, looksLikeSessionCode, parseSessionText } from '../../services/sessionConfig.js';
+import { setBaseTexture } from '../../composables/useBaseTexture.js';
+import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
 
@@ -635,55 +647,86 @@ const triggerDownload = (blob, filename) => {
   URL.revokeObjectURL(url);
 };
 
-// Strip the GPXZ API key before copying to clipboard so users can safely
-// share run configurations without leaking credentials.
-const sanitizeConfigForClipboard = (payload) => {
-  if (!payload || typeof payload !== 'object') return payload;
-  return {
-    ...payload,
-    gpxzApiKey: payload.gpxzApiKey ? '' : payload.gpxzApiKey,
-    gpxzApiKeyMasked: !!payload.gpxzApiKey,
-  };
-};
+// The whole control panel (data + export settings) as one config, never
+// with keys: services/sessionConfig.js. Copy gives a one-line "mapng:1:…"
+// code; Paste, Load and Ctrl+V on the map show what it would change first.
+const currentSessionConfig = () => buildSessionConfig({ ...buildRunConfiguration(), rawTerrain: store.rawTerrain }, localStorage);
 
 const copyRunConfiguration = async () => {
-  const payload = sanitizeConfigForClipboard(buildRunConfiguration());
-  const text = JSON.stringify(payload, null, 2);
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      runConfigStatus.value = t('status.runConfigCopied');
-      return;
-    }
+    const code = await encodeSessionCode(currentSessionConfig());
+    if (!navigator.clipboard?.writeText) throw new Error('no clipboard');
+    await navigator.clipboard.writeText(code);
+    runConfigStatus.value = t('config.copied');
   } catch {
-    // Fall through to error message
+    runConfigStatus.value = t('status.clipboardWriteUnavailable');
   }
-  runConfigStatus.value = t('status.clipboardWriteUnavailable');
+};
+
+// a config waiting for the user's Apply (SessionConfigDialog.vue)
+const pendingConfig = ref(null);
+const pendingConfigRows = computed(() => (pendingConfig.value ? describeSessionConfig(pendingConfig.value, { hasGpxzKey: !!gpxzApiKey.value }) : []));
+const previewConfigText = async (text, { quiet = false } = {}) => {
+  try {
+    pendingConfig.value = await parseSessionText(text);
+    return true;
+  } catch (error) {
+    if (!quiet) {
+      console.error('Not a MapNG config:', error);
+      runConfigStatus.value = String(text || '').trim() ? t('config.invalid') : t('status.clipboardEmpty');
+    }
+    return false;
+  }
 };
 
 const pasteRunConfiguration = async () => {
+  if (!navigator.clipboard?.readText) {
+    runConfigStatus.value = t('status.clipboardReadUnavailable');
+    return;
+  }
+  try { await previewConfigText(await navigator.clipboard.readText()); }
+  catch { runConfigStatus.value = t('status.clipboardReadUnavailable'); }
+};
+
+// (the export panel reads its settings when it appears: re-created after a config is applied)
+const exportPanelKey = ref(0);
+const applyPendingConfig = () => {
+  const config = pendingConfig.value;
+  pendingConfig.value = null;
+  if (!config) return;
   try {
-    if (!navigator.clipboard?.readText) {
-      runConfigStatus.value = t('status.clipboardReadUnavailable');
-      return;
+    applyRunConfiguration(config);
+    if (typeof config.advancedMode === 'boolean') store.setAdvancedMode(config.advancedMode);
+    if (typeof config.rawTerrain === 'boolean') store.setRawTerrain(config.rawTerrain);
+    if (typeof config.gapFillSource === 'string' && config.gapFillSource) gapFillSource.value = normalizeGapFillSource(config.gapFillSource);
+    if (typeof config.elevationUnitOverride === 'string' && config.elevationUnitOverride) elevationUnitOverride.value = config.elevationUnitOverride;
+    if (typeof config.overtureBuildings === 'boolean') overtureBuildings.value = config.overtureBuildings;
+    if (applyStoredSettings(config, localStorage)) {
+      if (config.export.baseTexture) setBaseTexture(config.export.baseTexture);
+      exportPanelKey.value += 1;
     }
-    const text = await navigator.clipboard.readText();
-    if (!text?.trim()) {
-      runConfigStatus.value = t('status.clipboardEmpty');
-      return;
-    }
-    const json = JSON.parse(text);
-    applyRunConfiguration(json);
-    runConfigStatus.value = t('status.runConfigPasted');
+    runConfigStatus.value = t('config.applied');
   } catch (error) {
-    console.error('Failed to paste run configuration:', error);
-    runConfigStatus.value = t('status.runConfigInvalidJson');
+    console.error('Failed to apply config:', error);
+    runConfigStatus.value = t('config.invalid');
   }
 };
 
+// Ctrl+V anywhere outside a text box: a pasted MapNG config opens the same preview
+const onWindowPaste = (event) => {
+  const target = event.target;
+  if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+  const text = event.clipboardData?.getData('text') || '';
+  const trimmed = text.trim();
+  if (!looksLikeSessionCode(trimmed) && !(trimmed.startsWith('{') && trimmed.includes('"center"'))) return;
+  event.preventDefault();
+  previewConfigText(trimmed, { quiet: !looksLikeSessionCode(trimmed) });
+};
+onMounted(() => window.addEventListener('paste', onWindowPaste));
+onUnmounted(() => window.removeEventListener('paste', onWindowPaste));
+
 const saveRunConfiguration = () => {
-  const payload = buildRunConfiguration();
-  downloadJsonFile(payload, `MapNG_RunConfig_${new Date().toISOString().slice(0, 10)}.json`);
+  downloadJsonFile(currentSessionConfig(), `MapNG_Config_${new Date().toISOString().slice(0, 10)}.json`);
   runConfigStatus.value = t('status.runConfigDownloaded');
 };
 
@@ -743,7 +786,7 @@ const applyRunConfiguration = (config) => {
   }
 
   const explicitSource = typeof src.elevationSource === 'string' ? src.elevationSource.toLowerCase() : null;
-  if (explicitSource && ['default', 'usgs', 'gpxz', 'kron86'].includes(explicitSource)) {
+  if (explicitSource && ['default', 'none', 'usgs', 'gpxz', 'kron86'].includes(explicitSource)) {
     elevationSource.value = explicitSource;
   } else {
     // Legacy fallback for shared configs that only include useUSGS/useGPXZ booleans.
@@ -759,9 +802,7 @@ const applyRunConfiguration = (config) => {
     }
   }
 
-  if (typeof src.gpxzApiKey === 'string') {
-    gpxzApiKey.value = src.gpxzApiKey;
-  }
+  // (keys never come from a config: the user's own GPXZ key stays)
   if (src.gpxzStatus && typeof src.gpxzStatus === 'object') {
     gpxzStatus.value = { ...src.gpxzStatus };
   }
@@ -770,10 +811,7 @@ const applyRunConfiguration = (config) => {
 const handleRunConfigFile = async (file) => {
   if (!file) return;
   try {
-    const text = await file.text();
-    const json = JSON.parse(text);
-    applyRunConfiguration(json);
-    runConfigStatus.value = t('status.runConfigLoadedSingle');
+    await previewConfigText(await file.text());
   } catch (error) {
     console.error('Failed to load run configuration:', error);
     runConfigStatus.value = t('status.runConfigInvalidFile');
