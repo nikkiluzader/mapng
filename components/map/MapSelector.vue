@@ -283,7 +283,10 @@ const mapOptions = { scrollWheelZoom: true };
 const { t } = useI18n({ useScope: 'global' });
 const { show: showOsmCoverage, areas: osmCoverageAreas, status: osmCoverageStatus } = useOsmCoverage();
 // Archive regions are Geofabrik slugs ("utah", "new-mexico").
-const formatCoverageRegion = (region) => region.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+// (planet pieces are named planet-<z>-<x>-<y>: shown as "World")
+const formatCoverageRegion = (region) => (region.startsWith('planet')
+  ? t('map.osmCoverageWorld')
+  : region.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
 
 
 const props = defineProps({

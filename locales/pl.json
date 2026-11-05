@@ -108,7 +108,8 @@
       "error": "Nie udało się wygenerować sąsiednich kafelków. Spróbuj ponownie."
     },
     "missingTile": "Brak: {label}",
-    "myLocation": "Moja lokalizacja"
+    "myLocation": "Moja lokalizacja",
+    "osmCoverageWorld": "Świat"
   },
   "status": {
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",

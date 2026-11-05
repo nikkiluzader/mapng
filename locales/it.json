@@ -108,7 +108,8 @@
       "error": "Impossibile generare le tessere adiacenti. Riprova."
     },
     "missingTile": "Mancante: {label}",
-    "myLocation": "La mia posizione"
+    "myLocation": "La mia posizione",
+    "osmCoverageWorld": "Mondo"
   },
   "status": {
     "runConfigCopied": "Configurazione di esecuzione copiata negli appunti (chiave GPXZ mascherata).",

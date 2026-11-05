@@ -108,7 +108,8 @@
       "error": "No se pudieron generar las teselas circundantes. Inténtalo de nuevo."
     },
     "missingTile": "Falta: {label}",
-    "myLocation": "Mi ubicación"
+    "myLocation": "Mi ubicación",
+    "osmCoverageWorld": "Mundo"
   },
   "status": {
     "runConfigCopied": "Ajustes copiados al portapapeles (clave GPXZ oculta).",

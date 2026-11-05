@@ -108,7 +108,8 @@
       "error": "Umliegende Tiles konnten nicht generiert werden. Bitte erneut versuchen."
     },
     "missingTile": "Fehlt: {label}",
-    "myLocation": "Mein Standort"
+    "myLocation": "Mein Standort",
+    "osmCoverageWorld": "Welt"
   },
   "status": {
     "runConfigCopied": "Run-Konfiguration in die Zwischenablage kopiert (GPXZ-Schlüssel maskiert).",

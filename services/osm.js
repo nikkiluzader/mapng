@@ -3,7 +3,7 @@ import {
   OVERPASS_ENDPOINTS,
   buildOverpassQuery,
 } from "./overpassQuery.js";
-import { fetchOsmFromTiles, resolveOsmTileArchiveUrl } from "./osmTiles.js";
+import { fetchOsmFromManifest, fetchOsmFromTiles, getOsmTileManifest, planTileSources } from "./osmTiles.js";
 import { isRacingTrackLine } from "./roadWidth.js";
 import { isGateBarrier } from "./gates.js";
 import {
@@ -1006,6 +1006,14 @@ const fetchOverpassOrOverture = async (request, { onStatus, signal } = {}) => {
   }
 };
 
+// (the status line only when the area is really read from MapNG's tiles)
+const fetchOsmFromManifestWithStatus = async (bounds, { onStatus, signal }) => {
+  const manifest = await getOsmTileManifest();
+  if (!manifest || !planTileSources(manifest.archives, bounds)) return null;
+  onStatus?.("Reading OpenStreetMap data from MapNG tiles...");
+  return fetchOsmFromManifest(bounds, { signal });
+};
+
 export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
   console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
 
@@ -1015,11 +1023,14 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
 
   try {
     let result = null;
-    const tileSource = osmTileSource || (cacheEndpointAvailable() ? await resolveOsmTileArchiveUrl(bounds) : null);
-    if (tileSource) {
+    // MapNG's own tiles first: one given source (tests, setOsmTileSource), or
+    // the published archives, each tile from the newest one covering it
+    // (osmTiles.js planTileSources: the planet is several archives)
+    if (osmTileSource || cacheEndpointAvailable()) {
       try {
-        onStatus?.("Reading OpenStreetMap data from MapNG tiles...");
-        const data = await fetchOsmFromTiles(tileSource, bounds, { signal });
+        const data = osmTileSource
+          ? (onStatus?.("Reading OpenStreetMap data from MapNG tiles..."), await fetchOsmFromTiles(osmTileSource, bounds, { signal }))
+          : await fetchOsmFromManifestWithStatus(bounds, { onStatus, signal });
         if (data) result = { endpoint: "mapng-osm-tiles", data };
       } catch (tileError) {
         if (tileError?.name === "AbortError" || signal?.aborted) throw tileError;

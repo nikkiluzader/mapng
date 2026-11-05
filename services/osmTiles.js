@@ -68,16 +68,62 @@ export const archiveCovers = (archive, bounds) => {
   return corners.every(([lon, lat]) => rings.some((ring) => insideRing(lon, lat, ring)));
 };
 
+const TILE_ZOOM = 13;
+
+const tileCorners = (x, y, z) => {
+  const n = 2 ** z;
+  const west = (x / n) * 360 - 180;
+  const east = ((x + 1) / n) * 360 - 180;
+  const lat = (yy) => (Math.atan(Math.sinh(Math.PI * (1 - (2 * yy) / n))) * 180) / Math.PI;
+  return { west, east, north: lat(y), south: lat(y + 1) };
+};
+
 /**
- * URL of the newest published archive that covers bounds, or null (no
- * manifest, e.g. local vite dev, or the area is not built yet).
+ * Which archive each tile of bounds is read from: for every z13 tile, the
+ * newest published archive that covers it. The planet is published as
+ * several archives (scripts/planet/planet.py merge: one per zoom-3 tile), so
+ * an area can straddle two; older regional archives (a state) still count
+ * where nothing newer covers a tile. Returns [{ key, tiles: [{x, y}] }], or
+ * null when some tile isn't covered by any archive (the caller falls back to
+ * Overpass for the whole area).
  */
-export const resolveOsmTileArchiveUrl = async (bounds) => {
+export const planTileSources = (archivesList, bounds, z = TILE_ZOOM) => {
+  const newestFirst = [...(archivesList || [])]
+    .sort((a, b) => String(b.built_at).localeCompare(String(a.built_at)));
+  const byKey = new Map();
+  for (const { x, y } of tilesCovering(bounds, z)) {
+    const c = tileCorners(x, y, z);
+    // (a tile's corners shrunk a hair inwards: tiles on an archive's edge
+    // share their corners with the outline itself)
+    const eps = 1e-9;
+    const tileBounds = { west: c.west + eps, east: c.east - eps, south: c.south + eps, north: c.north - eps };
+    const archive = newestFirst.find((a) => archiveCovers(a, tileBounds));
+    if (!archive) return null;
+    if (!byKey.has(archive.key)) byKey.set(archive.key, []);
+    byKey.get(archive.key).push({ x, y });
+  }
+  return [...byKey.entries()].map(([key, tiles]) => ({ key, tiles }));
+};
+
+/**
+ * Overpass-shaped {elements} for bounds from MapNG's published archives
+ * (each tile from the newest archive covering it), or null when the
+ * manifest is missing or some tile isn't covered.
+ */
+export const fetchOsmFromManifest = async (bounds, { signal } = {}) => {
   const manifest = await loadManifest();
-  const covering = (manifest?.archives || []).filter((archive) => archiveCovers(archive, bounds));
-  if (covering.length === 0) return null;
-  covering.sort((a, b) => String(b.built_at).localeCompare(String(a.built_at)));
-  return `/api/osm-tiles/${covering[0].key}`;
+  const plan = manifest ? planTileSources(manifest.archives, bounds) : null;
+  if (!plan) return null;
+  const payloads = await Promise.all(plan.flatMap(({ key, tiles }) => {
+    const archive = getOsmTileArchive(`/api/osm-tiles/${key}`);
+    return tiles.map(async ({ x, y }) => {
+      signal?.throwIfAborted?.();
+      const tile = await archive.getZxy(TILE_ZOOM, x, y, signal);
+      // (no tile: nothing of ours there, e.g. open sea; the archive covers it)
+      return tile?.data ? decodeTile(tile.data) : null;
+    });
+  }));
+  return mergeTileElements(payloads.filter(Boolean));
 };
 
 /** The PMTiles archive for a URL (or any pmtiles Source), cached per page. */

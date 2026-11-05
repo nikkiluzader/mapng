@@ -108,7 +108,8 @@
       "error": "Échec de la génération des tuiles environnantes. Veuillez réessayer."
     },
     "missingTile": "Manquante : {label}",
-    "myLocation": "Ma position"
+    "myLocation": "Ma position",
+    "osmCoverageWorld": "Monde"
   },
   "status": {
     "runConfigCopied": "Configuration d'exécution copiée dans le presse-papiers (clé GPXZ masquée).",

@@ -108,7 +108,8 @@
       "error": "Failed to generate surrounding tiles. Please try again."
     },
     "missingTile": "Missing: {label}",
-    "myLocation": "My location"
+    "myLocation": "My location",
+    "osmCoverageWorld": "World"
   },
   "status": {
     "runConfigCopied": "Run configuration copied to clipboard (GPXZ key masked).",
