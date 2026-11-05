@@ -70,6 +70,3 @@ export function daysSince(day, now = Date.now()) {
   const today = Date.parse(`${new Date(now).toISOString().slice(0, 10)}T00:00:00Z`);
   return Math.max(0, Math.round((today - then) / 86400000));
 }
-
-/** Exported here in the last week: the dot gets a pulsing ring. */
-export const HOTSPOT_RECENT_DAYS = 7;
