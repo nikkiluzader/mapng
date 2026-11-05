@@ -6,6 +6,7 @@
 // Shared three ways: as JSON (Save / Load), as a one-line code
 // "mapng:1:<deflated base64url>" (Copy / Paste, Ctrl+V on the map, export and
 // crash reports), and as a short send code (services/shareCodes.js).
+import { PERSONAL_STORAGE_KEYS, withoutPersonal } from './personalKeys.js';
 
 /** Export-panel settings: [name in the config, localStorage key, kind, default]. */
 export const EXPORT_FIELDS = [
@@ -39,7 +40,6 @@ export const DATA_FIELDS = [
   ['overtureBuildings', 'mapng_overtureBuildings', 'bool', true],
 ];
 
-const SECRET_RE = /key|token|secret|password|auth/i;
 const CODE_PREFIX = 'mapng:1:';
 
 const readKey = (storage, key) => { try { return storage.getItem(key); } catch { return null; } };
@@ -68,17 +68,8 @@ export const readExportSettings = (storage = globalThis.localStorage) =>
 export const readDataSettings = (storage = globalThis.localStorage) =>
   Object.fromEntries(DATA_FIELDS.map((f) => [f[0], readField(storage, f)]));
 
-/** Drop keys/tokens anywhere in a config (they never travel in one). */
-export function withoutSecrets(value, depth = 0) {
-  if (value == null || typeof value !== 'object' || depth > 6) return value;
-  if (Array.isArray(value)) return value.map((v) => withoutSecrets(v, depth + 1));
-  const out = {};
-  for (const [k, v] of Object.entries(value)) {
-    if (SECRET_RE.test(k) && k !== 'gpxzApiKeyMasked') continue;
-    out[k] = withoutSecrets(v, depth + 1);
-  }
-  return out;
-}
+/** Drop personal settings (keys, own servers, GPXZ account) anywhere in a config: services/personalKeys.js. */
+export const withoutSecrets = withoutPersonal;
 
 /**
  * The whole session config from a run configuration (the data part) and the
@@ -98,7 +89,10 @@ export function buildSessionConfig(runConfiguration, storage = globalThis.localS
 
 /** Put a config's `export` (and data extras) into storage: the panels read it from there. */
 export function applyStoredSettings(config, storage = globalThis.localStorage) {
-  const write = (key, value) => { try { storage.setItem(key, String(value)); } catch { /* private mode */ } };
+  const write = (key, value) => {
+    if (PERSONAL_STORAGE_KEYS.includes(key)) return;   // (never someone else's keys)
+    try { storage.setItem(key, String(value)); } catch { /* private mode */ }
+  };
   const exp = config?.export && typeof config.export === 'object' ? config.export : null;
   if (exp) {
     for (const field of EXPORT_FIELDS) {

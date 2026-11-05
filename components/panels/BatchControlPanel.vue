@@ -251,6 +251,7 @@
 </template>
 
 <script setup>
+import { withoutPersonal } from '../../services/personalKeys.js';
 import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
@@ -686,14 +687,8 @@ const buildRunConfiguration = () => {
   };
 };
 
-const sanitizeConfigForClipboard = (payload) => {
-  if (!payload || typeof payload !== 'object') return payload;
-  return {
-    ...payload,
-    gpxzApiKey: payload.gpxzApiKey ? '' : payload.gpxzApiKey,
-    gpxzApiKeyMasked: !!payload.gpxzApiKey,
-  };
-};
+// (keys, own servers and the GPXZ plan are never in a config: services/personalKeys.js)
+const sanitizeConfigForClipboard = (payload) => withoutPersonal(payload);
 
 const copyRunConfiguration = async () => {
   const payload = sanitizeConfigForClipboard(buildRunConfiguration());
@@ -730,7 +725,7 @@ const pasteRunConfiguration = async () => {
 };
 
 const saveRunConfiguration = () => {
-  const payload = buildRunConfiguration();
+  const payload = sanitizeConfigForClipboard(buildRunConfiguration());
   downloadJsonFile(payload, `MapNG_BatchRunConfig_${new Date().toISOString().slice(0, 10)}.json`);
   runConfigStatus.value = t('status.runConfigDownloaded');
 };
@@ -766,7 +761,7 @@ const normalizePerformanceProfile = (value) => {
 };
 
 const applyRunConfiguration = (config) => {
-  const src = config?.runConfiguration || config;
+  const src = withoutPersonal(config?.runConfiguration || config);
   if (!src || typeof src !== 'object') throw new Error('Invalid JSON schema');
 
   const schemaVersion = Number(src.schemaVersion ?? 1);
@@ -837,13 +832,8 @@ const applyRunConfiguration = (config) => {
     }
   }
 
-  if (typeof src.gpxzApiKey === 'string') {
-    gpxzApiKey.value = src.gpxzApiKey;
-  }
-
-  if (src.gpxzStatus && typeof src.gpxzStatus === 'object') {
-    gpxzStatus.value = { ...src.gpxzStatus };
-  }
+  // (keys and the GPXZ plan never come from a config: the user's own stay;
+  // services/personalKeys.js)
 
   const meshResolutionValue = toNumberOrNull(src.glbMeshResolution);
   if (meshResolutionValue !== null) {

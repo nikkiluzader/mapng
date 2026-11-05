@@ -340,6 +340,7 @@ import { buildRunConfiguration as buildRunConfigurationBase } from '../../servic
 import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
+import { withoutPersonal } from '../../services/personalKeys.js';
 import { setSessionConfigSource } from '../../composables/useReportDialog.js';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
@@ -790,7 +791,7 @@ const toBooleanOrNull = (value) => {
 const clampInt = (value, min, max) => Math.min(max, Math.max(min, parseInt(value, 10)));
 
 const applyRunConfiguration = (config) => {
-  const src = config?.runConfiguration || config;
+  const src = withoutPersonal(config?.runConfiguration || config);
   if (!src || typeof src !== 'object') throw new Error('Invalid JSON schema');
 
   const schemaVersion = Number(src.schemaVersion ?? 1);
@@ -843,9 +844,7 @@ const applyRunConfiguration = (config) => {
   }
 
   // (keys never come from a config: the user's own GPXZ key stays)
-  if (src.gpxzStatus && typeof src.gpxzStatus === 'object') {
-    gpxzStatus.value = { ...src.gpxzStatus };
-  }
+  // (nor the sender's GPXZ plan and limits: services/personalKeys.js)
 };
 
 const handleRunConfigFile = async (file) => {
