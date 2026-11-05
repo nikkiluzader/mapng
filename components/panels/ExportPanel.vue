@@ -2,13 +2,13 @@
   <div v-if="terrainData && !isGenerating" class="space-y-3">
     <!-- Missing OSM Warning / Action -->
     <div v-if="!terrainData.osmFeatures || terrainData.osmFeatures.length === 0" class="bg-blue-50 dark:bg-blue-900/20 p-2 rounded border border-blue-100 dark:border-blue-800 flex items-center justify-between">
-      <div class="text-[10px] text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+      <div class="text-micro text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
         <Trees :size="12" />
         <span>{{ t('exportPanel.osmMissing') }}</span>
       </div>
       <button 
         @click="$emit('fetchOsm')"
-        class="text-[10px] font-medium bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors"
+        class="text-micro font-medium bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors"
       >
         {{ t('exportPanel.fetchNow') }}
       </button>
@@ -25,7 +25,7 @@
                 type="text"
                 maxlength="64"
                 :placeholder="t('exportPanel.levelNamePlaceholder')"
-                class="w-44 text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+                class="w-44 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
               />
             </SettingRow>
             <SettingRow :label="t('exportPanel.baseTexture')">
@@ -43,8 +43,8 @@
                 :title="canPaintTexture ? t('exportPanel.texturePaint.open') : t('exportPanel.texturePaint.needsTexture')"
                 :class="['p-1 rounded border transition-colors shrink-0',
                   hasPaintedTexture
-                    ? 'border-[#FF6600] text-[#FF6600] bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40'
-                    : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:text-[#FF6600] hover:border-[#FF6600]',
+                    ? 'border-brand text-brand bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/40'
+                    : 'border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:text-brand hover:border-brand',
                   'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-500 disabled:hover:border-gray-300 dark:disabled:hover:border-gray-600']"
               >
                 <Loader2 v-if="isPreparingTexturePaint" :size="12" class="animate-spin" />
@@ -69,9 +69,9 @@
                 step="1"
                 min="-2000"
                 max="2000"
-                class="w-20 text-[12px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+                class="w-20 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
               />
-              <span class="text-[11px] text-gray-500 dark:text-gray-400">m</span>
+              <span class="text-caption text-gray-500 dark:text-gray-400">m</span>
             </SettingRow>
           </SettingCard>
 
@@ -129,7 +129,7 @@
                 { value: 'none', label: t('exportPanel.ui.shapeNone') },
               ]"
             />
-            <p class="text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.shapeHint_${beamNGShapeMode}`) }}</p>
+            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.shapeHint_${beamNGShapeMode}`) }}</p>
             <template v-if="beamNGShapeMode === 'custom'">
               <SettingRow check v-model="beamNGShapeRoads" :label="t('exportPanel.shapeRoads')" :hint="t('exportPanel.shapeRoadsHint')" />
               <SettingRow check v-model="beamNGShapeBridges" :label="t('exportPanel.shapeBridges')" :hint="t('exportPanel.shapeBridgesHint')" :disabled="!beamNGIncludeBridges" :disabled-reason="t('exportPanel.ui.needsBridges')" />
@@ -137,8 +137,8 @@
               <SettingRow check v-model="beamNGShapeTunnels" :label="t('exportPanel.shapeTunnels')" :hint="t('exportPanel.shapeTunnelsHint')" :disabled="!beamNGIncludeTunnels" :disabled-reason="t('exportPanel.ui.needsTunnels')" />
               <SettingRow check v-model="beamNGShapeExtras" :label="t('exportPanel.shapeExtras')" :hint="t('exportPanel.shapeExtrasHint')" />
             </template>
-            <p v-if="terrainData?.raw" class="text-[11px] leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.generatedRaw') }}</p>
-            <p class="text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.reportNote') }}</p>
+            <p v-if="terrainData?.raw" class="text-caption leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.generatedRaw') }}</p>
+            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.reportNote') }}</p>
           </SettingCard>
 
           <!-- Elevation around the map, beyond its edges -->
@@ -157,7 +157,7 @@
           <SettingCard :title="t('exportPanel.weight.title')">
             <template #header>
               <span
-                class="px-1.5 py-0.5 rounded text-[10px] font-semibold"
+                class="px-1.5 py-0.5 rounded text-micro font-semibold"
                 :class="{
                   'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300': levelWeight.rating === 'light',
                   'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300': levelWeight.rating === 'heavy',
@@ -165,7 +165,7 @@
                 }"
               >{{ t(`exportPanel.weight.rating_${levelWeight.rating}`) }}</span>
             </template>
-            <p class="text-[11px] leading-snug text-gray-600 dark:text-gray-300">
+            <p class="text-caption leading-snug text-gray-600 dark:text-gray-300">
               {{ t('exportPanel.weight.size', { km: levelWeight.sizeKm < 10 ? levelWeight.sizeKm.toFixed(1) : Math.round(levelWeight.sizeKm), far: levelWeight.farthestKm < 10 ? levelWeight.farthestKm.toFixed(1) : Math.round(levelWeight.farthestKm), buildings: levelWeight.builtBuildings.toLocaleString() }) }}
               {{ t(`exportPanel.weight.summary_${levelWeight.rating}`) }}
             </p>
@@ -173,7 +173,7 @@
               <li
                 v-for="note in levelWeight.notes"
                 :key="note.key"
-                class="flex gap-1.5 text-[11px] leading-snug"
+                class="flex gap-1.5 text-caption leading-snug"
                 :class="note.rating === 'veryHeavy' ? 'text-red-700 dark:text-red-300' : note.rating === 'heavy' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-600 dark:text-gray-300'"
               >
                 <AlertTriangle v-if="note.rating !== 'light'" :size="12" class="shrink-0 mt-px" />
@@ -182,21 +182,21 @@
             </ul>
           </SettingCard>
 
-          <p class="px-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.communityQualityNotice') }}</p>
+          <p class="px-0.5 text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.communityQualityNotice') }}</p>
 
           <!-- Export button -->
           <button
             @click="handleBeamNGLevelExport"
             :disabled="isAnyExporting"
-            class="relative w-full flex items-center gap-3 p-3 bg-[#FF6600] hover:bg-[#e85d00] border border-[#d65500] rounded text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+            class="relative w-full flex items-center gap-3 p-3 bg-brand hover:bg-brand-500 border border-brand-500 rounded text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div class="flex items-center justify-center w-8 h-8 shrink-0">
               <Loader2 v-if="isExportingBeamNGLevel" :size="20" class="animate-spin text-white" />
               <PackageOpen v-else :size="20" class="text-white/90" />
             </div>
             <div class="text-left">
-              <div class="text-[12px] font-semibold">{{ t('exportPanel.beamngLevelExport') }}</div>
-              <div class="text-[10px] text-white/90">{{ t('exportPanel.generatePlayableZip') }}</div>
+              <div class="text-xs font-semibold">{{ t('exportPanel.beamngLevelExport') }}</div>
+              <div class="text-micro text-white/90">{{ t('exportPanel.generatePlayableZip') }}</div>
             </div>
             <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity text-white" />
           </button>
@@ -206,7 +206,7 @@
             :href="beamNGPendingDownloadUrl"
             :download="beamNGPendingDownloadName || 'beamng_level.zip'"
             @click="handleBeamNGPendingDownloadClick"
-            class="w-full flex items-center justify-center gap-2 p-2 bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 rounded text-white text-[11px] font-medium transition-colors"
+            class="w-full flex items-center justify-center gap-2 p-2 bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 rounded text-white text-caption font-medium transition-colors"
           >
             <Download :size="14" />
             {{ t('exportPanel.downloadReady', { name: beamNGPendingDownloadName || 'beamng_level.zip' }) }}
@@ -218,13 +218,13 @@
           >
             <AlertCircle :size="14" class="shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
             <div class="min-w-0 flex-1 space-y-1.5">
-              <div class="text-[11px] font-medium text-red-700 dark:text-red-300">{{ t('exportPanel.desktopFailed') }}</div>
-              <div class="text-[10px] text-red-700/90 dark:text-red-300/90 [overflow-wrap:anywhere]">{{ beamNGDesktopFailed.message }}</div>
-              <button v-if="beamNGDesktopFailed.logPath" type="button" class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="showDesktopExportLog">
+              <div class="text-caption font-medium text-red-700 dark:text-red-300">{{ t('exportPanel.desktopFailed') }}</div>
+              <div class="text-micro text-red-700/90 dark:text-red-300/90 [overflow-wrap:anywhere]">{{ beamNGDesktopFailed.message }}</div>
+              <button v-if="beamNGDesktopFailed.logPath" type="button" class="flex items-center gap-1 px-2 py-0.5 text-micro rounded border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 hover:border-brand hover:text-brand transition-colors" @click="showDesktopExportLog">
                 <FileText :size="11" />{{ t('exportPanel.desktopShowLog') }}
               </button>
               <!-- (a report with this export's log and settings, after the user sees what's in it) -->
-              <button type="button" class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="reportDesktopExportFailure">
+              <button type="button" class="flex items-center gap-1 px-2 py-0.5 text-micro rounded border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-red-700 dark:text-red-300 hover:border-brand hover:text-brand transition-colors" @click="reportDesktopExportFailure">
                 <LifeBuoy :size="11" />{{ t('report.sendReport') }}
               </button>
             </div>
@@ -234,15 +234,15 @@
             v-if="beamNGDesktopSaved"
             class="w-full flex items-start gap-2 p-2 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50"
           >
-            <CheckCircle2 :size="14" class="shrink-0 mt-0.5 text-[#FF6600]" />
+            <CheckCircle2 :size="14" class="shrink-0 mt-0.5 text-brand" />
             <div class="min-w-0 flex-1 space-y-1.5">
-              <div class="text-[11px] font-medium text-gray-700 dark:text-gray-200 [overflow-wrap:anywhere]">{{ t('exportPanel.desktopSaved', { name: beamNGDesktopSaved.filename }) }}</div>
-              <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.desktopLoadHint') }}</div>
+              <div class="text-caption font-medium text-gray-700 dark:text-gray-200 [overflow-wrap:anywhere]">{{ t('exportPanel.desktopSaved', { name: beamNGDesktopSaved.filename }) }}</div>
+              <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.desktopLoadHint') }}</div>
               <div class="flex flex-wrap gap-1.5">
-                <button type="button" class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="showDesktopSavedLevel">
+                <button type="button" class="flex items-center gap-1 px-2 py-0.5 text-micro rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-brand hover:text-brand transition-colors" @click="showDesktopSavedLevel">
                   <FolderOpen :size="11" />{{ t('exportPanel.desktopShowInFolder') }}
                 </button>
-                <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="changeDesktopModsFolder">{{ t('exportPanel.desktopChangeFolder') }}</button>
+                <button type="button" class="px-2 py-0.5 text-micro rounded text-gray-500 dark:text-gray-400 hover:text-brand transition-colors" @click="changeDesktopModsFolder">{{ t('exportPanel.desktopChangeFolder') }}</button>
               </div>
             </div>
           </div>
@@ -250,29 +250,29 @@
           <!-- Once, after a first export: share where exports are (only a ~5 km cell) for the hotspot map -->
           <div
             v-if="askShareExports"
-            class="w-full flex items-start gap-2 p-2 rounded border border-[#FF6600]/40 bg-orange-50 dark:bg-orange-900/10"
+            class="w-full flex items-start gap-2 p-2 rounded border border-brand/40 bg-orange-50 dark:bg-orange-900/10"
           >
-            <Flame :size="14" class="shrink-0 mt-0.5 text-[#FF6600]" />
+            <Flame :size="14" class="shrink-0 mt-0.5 text-brand" />
             <div class="min-w-0 flex-1 space-y-1.5">
-              <div class="text-[11px] font-medium text-gray-800 dark:text-gray-100">{{ t('hotspots.askTitle') }}</div>
-              <div class="text-[10px] leading-snug text-gray-600 dark:text-gray-300">{{ t('hotspots.askBody') }} <button type="button" class="text-[#FF6600] hover:underline" @click.prevent.stop="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button></div>
+              <div class="text-caption font-medium text-gray-800 dark:text-gray-100">{{ t('hotspots.askTitle') }}</div>
+              <div class="text-micro leading-snug text-gray-600 dark:text-gray-300">{{ t('hotspots.askBody') }} <button type="button" class="text-brand hover:underline" @click.prevent.stop="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button></div>
               <div class="flex flex-wrap gap-1.5">
-                <button type="button" class="px-2.5 py-0.5 text-[10px] font-semibold rounded bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors" @click="answerShareExports(true)">{{ t('hotspots.askYes') }}</button>
-                <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="answerShareExports(false)">{{ t('hotspots.askNo') }}</button>
+                <button type="button" class="px-2.5 py-0.5 text-micro font-semibold rounded bg-brand hover:bg-brand-500 text-white transition-colors" @click="answerShareExports(true)">{{ t('hotspots.askYes') }}</button>
+                <button type="button" class="px-2 py-0.5 text-micro rounded text-gray-500 dark:text-gray-400 hover:text-brand transition-colors" @click="answerShareExports(false)">{{ t('hotspots.askNo') }}</button>
               </div>
             </div>
           </div>
           <div
             v-else-if="askShareSettings"
-            class="w-full flex items-start gap-2 p-2 rounded border border-[#FF6600]/40 bg-orange-50 dark:bg-orange-900/10"
+            class="w-full flex items-start gap-2 p-2 rounded border border-brand/40 bg-orange-50 dark:bg-orange-900/10"
           >
-            <BarChart3 :size="14" class="shrink-0 mt-0.5 text-[#FF6600]" />
+            <BarChart3 :size="14" class="shrink-0 mt-0.5 text-brand" />
             <div class="min-w-0 flex-1 space-y-1.5">
-              <div class="text-[11px] font-medium text-gray-800 dark:text-gray-100">{{ t('usage.askTitle') }}</div>
-              <div class="text-[10px] leading-snug text-gray-600 dark:text-gray-300">{{ t('usage.askBody') }} <button type="button" class="text-[#FF6600] hover:underline" @click.prevent.stop="openUsagePrivacy">{{ t('usage.readMore') }}</button></div>
+              <div class="text-caption font-medium text-gray-800 dark:text-gray-100">{{ t('usage.askTitle') }}</div>
+              <div class="text-micro leading-snug text-gray-600 dark:text-gray-300">{{ t('usage.askBody') }} <button type="button" class="text-brand hover:underline" @click.prevent.stop="openUsagePrivacy">{{ t('usage.readMore') }}</button></div>
               <div class="flex flex-wrap gap-1.5">
-                <button type="button" class="px-2.5 py-0.5 text-[10px] font-semibold rounded bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors" @click="answerShareSettings(true)">{{ t('usage.askYes') }}</button>
-                <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="answerShareSettings(false)">{{ t('usage.askNo') }}</button>
+                <button type="button" class="px-2.5 py-0.5 text-micro font-semibold rounded bg-brand hover:bg-brand-500 text-white transition-colors" @click="answerShareSettings(true)">{{ t('usage.askYes') }}</button>
+                <button type="button" class="px-2 py-0.5 text-micro rounded text-gray-500 dark:text-gray-400 hover:text-brand transition-colors" @click="answerShareSettings(false)">{{ t('usage.askNo') }}</button>
               </div>
             </div>
           </div>
@@ -288,13 +288,13 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isExportingHeightmap" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingHeightmap" :size="20" class="animate-spin text-brand" />
               <img v-else-if="heightmapPreviewUrl" :src="heightmapPreviewUrl" class="w-full h-full object-cover" />
               <Mountain v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.heightmap') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            <span class="text-caption font-medium">{{ t('exportPanel.heightmap') }}</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
+            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
 
           <!-- Satellite Texture -->
@@ -304,13 +304,13 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isExportingTexture" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingTexture" :size="20" class="animate-spin text-brand" />
               <img v-else-if="satellitePreviewUrl" :src="satellitePreviewUrl" class="w-full h-full object-cover" />
               <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.satellite') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            <span class="text-caption font-medium">{{ t('exportPanel.satellite') }}</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
 
           <!-- OSM Texture -->
@@ -320,13 +320,13 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isExportingOSMTexture" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingOSMTexture" :size="20" class="animate-spin text-brand" />
               <img v-else-if="osmPreviewUrl" :src="osmPreviewUrl" class="w-full h-full object-cover" />
               <Trees v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.osmTexture') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            <span class="text-caption font-medium">{{ t('exportPanel.osmTexture') }}</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
 
           <!-- Game Texture -->
@@ -336,13 +336,13 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isExportingGameTexture" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingGameTexture" :size="20" class="animate-spin text-brand" />
               <img v-else-if="gamePreviewUrl" :src="gamePreviewUrl" class="w-full h-full object-cover" />
               <Layers v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.gameTexture') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            <span class="text-caption font-medium">{{ t('exportPanel.gameTexture') }}</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px PNG</span>
+            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
 
           <!-- Road Mask -->
@@ -352,13 +352,13 @@
             class="relative flex flex-col items-center justify-center p-1.5 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-24 overflow-hidden"
           >
             <div class="w-full h-full flex items-center justify-center mb-0.5 overflow-hidden rounded bg-gray-100 dark:bg-gray-900">
-              <Loader2 v-if="isExportingRoadMask" :size="20" class="animate-spin text-[#FF6600]" />
+              <Loader2 v-if="isExportingRoadMask" :size="20" class="animate-spin text-brand" />
               <img v-else-if="roadMaskPreviewUrl" :src="roadMaskPreviewUrl" class="w-full h-full object-cover" />
               <Route v-else :size="24" class="text-gray-400 dark:text-gray-500" />
             </div>
-            <span class="text-[11px] font-medium">{{ t('exportPanel.roadMask') }}</span>
-            <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+            <span class="text-caption font-medium">{{ t('exportPanel.roadMask') }}</span>
+            <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData.width }}px 16-bit grayscale PNG</span>
+            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
           </button>
         </div>
       </SettingSection>
@@ -370,7 +370,7 @@
           <!-- Shared 3D options -->
           <div class="space-y-2 px-2 py-2 bg-gray-50 dark:bg-gray-700/50 rounded border border-gray-200 dark:border-gray-600">
             <div class="flex items-center gap-1.5">
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.centerTexture') }}</span>
+              <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.centerTexture') }}</span>
               <select v-model="modelCenterTextureType" :class="SELECT_XS">
                 <option value="satellite">{{ t('exportPanel.satellite') }}</option>
                 <option value="osm" :disabled="!terrainData?.osmTextureUrl">{{ t('exportPanel.osm') }}</option>
@@ -379,23 +379,23 @@
               </select>
             </div>
             <div class="flex items-center gap-2 flex-nowrap overflow-x-auto whitespace-nowrap pb-0.5">
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.tiles') }}</span>
+              <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.tiles') }}</span>
               <label class="flex items-center gap-1 cursor-pointer">
-                <input type="radio" v-model="modelTileSelection" value="center-only" class="accent-[#FF6600] w-3 h-3" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.center') }}</span>
+                <input type="radio" v-model="modelTileSelection" value="center-only" class="accent-brand w-3 h-3" />
+                <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.center') }}</span>
               </label>
               <label class="flex items-center gap-1 cursor-pointer">
-                <input type="radio" v-model="modelTileSelection" value="center-plus-surroundings" class="accent-[#FF6600] w-3 h-3" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.centerPlusSurroundings') }}</span>
+                <input type="radio" v-model="modelTileSelection" value="center-plus-surroundings" class="accent-brand w-3 h-3" />
+                <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.centerPlusSurroundings') }}</span>
               </label>
               <label class="flex items-center gap-1 cursor-pointer">
-                <input type="radio" v-model="modelTileSelection" value="surroundings-only" class="accent-[#FF6600] w-3 h-3" />
-                <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.surroundingsOnly') }}</span>
+                <input type="radio" v-model="modelTileSelection" value="surroundings-only" class="accent-brand w-3 h-3" />
+                <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.surroundingsOnly') }}</span>
               </label>
             </div>
             <label class="flex items-center gap-1.5 cursor-pointer">
               <input type="checkbox" v-model="modelRealWorldScale" :class="CHECKBOX" />
-              <span class="text-[9px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.realWorldScale') }}</span>
+              <span class="text-nano text-gray-500 dark:text-gray-400">{{ t('exportPanel.realWorldScale') }}</span>
             </label>
           </div>
 
@@ -407,12 +407,12 @@
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
-                <Loader2 v-if="isExportingGLB" :size="20" class="animate-spin text-[#FF6600]" />
+                <Loader2 v-if="isExportingGLB" :size="20" class="animate-spin text-brand" />
                 <Box v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
-              <span class="text-[11px] font-medium">{{ t('exportPanel.glbModel') }}</span>
-              <span class="text-[10px] text-gray-500 dark:text-gray-400">.glb binary</span>
-              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+              <span class="text-caption font-medium">{{ t('exportPanel.glbModel') }}</span>
+              <span class="text-micro text-gray-500 dark:text-gray-400">.glb binary</span>
+              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
             </button>
 
             <!-- DAE (Collada) Model -->
@@ -422,12 +422,12 @@
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
-                <Loader2 v-if="isExportingDAE" :size="20" class="animate-spin text-[#FF6600]" />
+                <Loader2 v-if="isExportingDAE" :size="20" class="animate-spin text-brand" />
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
-              <span class="text-[11px] font-medium">{{ t('exportPanel.colladaDae') }}</span>
-              <span class="text-[10px] text-gray-500 dark:text-gray-400">.dae + textures</span>
-              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+              <span class="text-caption font-medium">{{ t('exportPanel.colladaDae') }}</span>
+              <span class="text-micro text-gray-500 dark:text-gray-400">.dae + textures</span>
+              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
             </button>
             
             <!-- TER (BeamNG) Model -->
@@ -437,12 +437,12 @@
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
-                <Loader2 v-if="isExportingTER" :size="20" class="animate-spin text-[#FF6600]" />
+                <Loader2 v-if="isExportingTER" :size="20" class="animate-spin text-brand" />
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
-              <span class="text-[11px] font-medium">{{ t('exportPanel.beamngTerrain') }}</span>
-              <span class="text-[10px] text-gray-500 dark:text-gray-400">.ter heightmap</span>
-              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+              <span class="text-caption font-medium">{{ t('exportPanel.beamngTerrain') }}</span>
+              <span class="text-micro text-gray-500 dark:text-gray-400">.ter heightmap</span>
+              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
             </button>
           </div>
         </template>
@@ -459,12 +459,12 @@
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
-                <Loader2 v-if="isExportingGeoTIFF" :size="20" class="animate-spin text-[#FF6600]" />
+                <Loader2 v-if="isExportingGeoTIFF" :size="20" class="animate-spin text-brand" />
                 <FileCode v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
-              <span class="text-[11px] font-medium">{{ t('exportPanel.geoTiff') }}</span>
-              <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
-              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+              <span class="text-caption font-medium">{{ t('exportPanel.geoTiff') }}</span>
+              <span class="text-micro text-gray-500 dark:text-gray-400">{{ terrainData?.sourceGeoTiffs ? terrainData.sourceGeoTiffs.source.toUpperCase() : 'WGS84' }}</span>
+              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
             </button>
 
             <!-- OSM GeoJSON -->
@@ -474,23 +474,23 @@
               class="relative flex flex-col items-center justify-center p-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 transition-colors group disabled:opacity-50 disabled:cursor-not-allowed h-20"
             >
               <div class="w-full h-full flex items-center justify-center mb-0.5">
-                <Loader2 v-if="isExportingOSM" :size="20" class="animate-spin text-[#FF6600]" />
+                <Loader2 v-if="isExportingOSM" :size="20" class="animate-spin text-brand" />
                 <FileJson v-else :size="24" class="text-gray-400 dark:text-gray-500" />
               </div>
-              <span class="text-[11px] font-medium">{{ t('exportPanel.geoJson') }}</span>
-              <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.osmVectors') }}</span>
-              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[#FF6600]" />
+              <span class="text-caption font-medium">{{ t('exportPanel.geoJson') }}</span>
+              <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('exportPanel.osmVectors') }}</span>
+              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-brand" />
             </button>
           </div>
 
-          <div class="rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-2 text-[10px] text-amber-800 dark:text-amber-300 leading-snug">
+          <div class="rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-2 text-micro text-amber-800 dark:text-amber-300 leading-snug">
             <p>
               {{ t('exportPanel.cleanupToolNotice') }}
               <a
                 href="https://github.com/alexkleinwaechter/BeamNG_LevelCleanUp/releases/latest"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="font-semibold text-[#FF6600] underline underline-offset-2 hover:text-[#e85d00] transition-colors"
+                class="font-semibold text-brand underline underline-offset-2 hover:text-brand-500 transition-colors"
               >
                 {{ t('exportPanel.cleanupToolLinkLabel') }}
               </a>
@@ -508,20 +508,20 @@
         v-if="isExportingBeamNGLevel"
         class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm"
       >
-        <div class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[calc(100vw-2rem)] max-w-md flex flex-col gap-4">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 w-[calc(100vw-2rem)] max-w-md flex flex-col gap-4">
           <!-- Header -->
           <div class="flex items-center gap-3">
-            <Loader2 :size="20" class="animate-spin text-[#FF6600] shrink-0" />
+            <Loader2 :size="20" class="animate-spin text-brand shrink-0" />
             <div>
               <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ t('exportPanel.exportingBeamng') }}</div>
-              <div class="text-[11px] text-gray-500 dark:text-gray-400">{{ t('exportPanel.mayTakeWhile') }}</div>
+              <div class="text-caption text-gray-500 dark:text-gray-400">{{ t('exportPanel.mayTakeWhile') }}</div>
             </div>
           </div>
 
           <!-- Progress bar -->
           <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
             <div
-              class="h-2 rounded-full bg-[#FF6600] transition-all duration-300 ease-out"
+              class="h-2 rounded-full bg-brand transition-all duration-300 ease-out"
               :style="{ width: `${beamNGProgressPct}%` }"
             />
           </div>
@@ -529,8 +529,8 @@
           <!-- Step label: fixed height (the text changes many times a second;
                long lines clamp, full text on hover) -->
           <div class="flex justify-between items-start gap-2 h-[2.875rem]">
-            <span class="min-w-0 flex-1 text-[11px] leading-snug text-gray-600 dark:text-gray-400 break-words line-clamp-3" :title="beamNGProgressStep">{{ beamNGProgressStep }}</span>
-            <span class="w-9 text-right text-[11px] font-mono text-[#FF6600] shrink-0">{{ beamNGProgressPct }}%</span>
+            <span class="min-w-0 flex-1 text-caption leading-snug text-gray-600 dark:text-gray-400 break-words line-clamp-3" :title="beamNGProgressStep">{{ beamNGProgressStep }}</span>
+            <span class="w-9 text-right text-caption font-mono text-brand shrink-0">{{ beamNGProgressPct }}%</span>
           </div>
 
           <!-- Finished steps (most recent last, room for five) and elapsed time -->
@@ -539,14 +539,14 @@
               <div
                 v-for="(done, i) in beamNGProgressDone.slice(-5)"
                 :key="i"
-                class="flex justify-between gap-2 text-[10px] leading-snug text-gray-400 dark:text-gray-500"
+                class="flex justify-between gap-2 text-micro leading-snug text-gray-400 dark:text-gray-500"
               >
                 <span class="min-w-0 flex-1 truncate" :title="done.step">✓ {{ done.step }}</span>
                 <span class="font-mono shrink-0">{{ formatStepDuration(done.durationMs) }}</span>
               </div>
             </div>
-            <div class="flex items-center justify-end gap-3 text-[10px] font-mono text-gray-500 dark:text-gray-400">
-              <button v-if="desktopApp" type="button" class="mr-auto font-sans px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors" @click="cancelDesktopExport">
+            <div class="flex items-center justify-end gap-3 text-micro font-mono text-gray-500 dark:text-gray-400">
+              <button v-if="desktopApp" type="button" class="mr-auto font-sans px-2 py-0.5 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-brand hover:text-brand transition-colors" @click="cancelDesktopExport">
                 {{ t('levels.cancel') }}
               </button>
               {{ t('exportPanel.elapsed') }} {{ formatStepDuration(beamNGElapsedMs) }}

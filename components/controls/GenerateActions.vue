@@ -14,14 +14,14 @@
           <Mountain :size="16" />
           <span>{{ t('generateActions.preview3d') }}</span>
         </div>
-        <span class="text-[10px] font-normal opacity-90">{{ t('generateActions.usingCachedData') }}</span>
+        <span class="text-micro font-normal opacity-90">{{ t('generateActions.usingCachedData') }}</span>
       </template>
       <template v-else>
         <div class="flex items-center gap-2">
           <Mountain :size="16" />
           <span>{{ t('generateActions.preview3d') }}</span>
         </div>
-        <span class="text-[10px] font-normal opacity-90">{{ hasCustomElevation ? t('generateActions.usingUploadedElevation') : t('generateActions.viewBeforeDownload') }}</span>
+        <span class="text-micro font-normal opacity-90">{{ hasCustomElevation ? t('generateActions.usingUploadedElevation') : t('generateActions.viewBeforeDownload') }}</span>
       </template>
     </BaseButton>
 
@@ -39,14 +39,14 @@
           <CircleCheck :size="16" />
           <span>{{ t('generateActions.dataReady') }}</span>
         </div>
-        <span class="text-[10px] font-normal text-emerald-600 dark:text-emerald-400">{{ t('generateActions.downloadBelow') }}</span>
+        <span class="text-micro font-normal text-emerald-600 dark:text-emerald-400">{{ t('generateActions.downloadBelow') }}</span>
       </template>
       <template v-else>
         <div class="flex items-center gap-2">
           <FileDown :size="16" />
           <span>{{ t('generateActions.generateData') }}</span>
         </div>
-        <span class="text-[10px] font-normal text-gray-500 dark:text-gray-400">{{ t('generateActions.skip3dGetFiles') }}</span>
+        <span class="text-micro font-normal text-gray-500 dark:text-gray-400">{{ t('generateActions.skip3dGetFiles') }}</span>
       </template>
     </BaseButton>
   </div>

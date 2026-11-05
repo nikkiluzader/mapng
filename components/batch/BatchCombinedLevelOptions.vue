@@ -4,20 +4,20 @@
     <BaseCard padded class="space-y-2 bg-white dark:bg-gray-800/40 border-gray-200 dark:border-gray-600">
       <!-- Level name -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.levelName') }}</span>
+        <span class="text-xs text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.levelName') }}</span>
         <input
           :value="model.levelName"
           @input="update('levelName', $event.target.value)"
           type="text"
           maxlength="64"
           :placeholder="t('exportPanel.levelNamePlaceholder')"
-          class="min-w-0 flex-1 text-[11px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+          class="min-w-0 flex-1 text-caption bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
         />
       </div>
 
       <!-- Base texture -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.baseTexture') }}</span>
+        <span class="text-xs text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.baseTexture') }}</span>
         <select :value="model.baseTexture" @change="update('baseTexture', $event.target.value)" :class="SELECT_XS">
           <option value="none">{{ t('exportPanel.none') }}</option>
           <option value="hybrid">{{ t('exportPanel.satelliteHybrid') }}</option>
@@ -29,7 +29,7 @@
 
       <!-- PBR materials -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.pbrMaterials') }}</span>
+        <span class="text-xs text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.pbrMaterials') }}</span>
         <select :value="model.pbrSource" @change="update('pbrSource', $event.target.value)" :disabled="!includeOSM" :class="SELECT_XS">
           <option value="none">{{ t('exportPanel.off') }}</option>
           <option v-if="includeOSM" value="osm">{{ t('exportPanel.osmData') }}</option>
@@ -38,7 +38,7 @@
 
       <!-- Roads -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.roads') }}</span>
+        <span class="text-xs text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.roads') }}</span>
         <select :value="model.roadType" @change="update('roadType', $event.target.value)" :disabled="!includeOSM" :class="SELECT_XS">
           <option v-if="includeOSM" value="decal">{{ t('exportPanel.roadTypeSpline') }}</option>
           <option value="none">{{ t('exportPanel.roadTypeNone') }}</option>
@@ -48,7 +48,7 @@
 
       <!-- Backdrop -->
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.includeBackdrop') }}</span>
+        <span class="text-xs text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.includeBackdrop') }}</span>
         <select :value="model.backdropSource" @change="update('backdropSource', $event.target.value)" :class="SELECT_XS">
           <option value="off">{{ t('exportPanel.ui.backdropOff') }}</option>
           <option value="global30m">{{ t('exportPanel.ui.backdropGlobal') }}</option>
@@ -59,24 +59,24 @@
 
       <!-- Feature toggles -->
       <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400">{{ t('exportPanel.includeBuildings') }}</span>
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.includeBuildings') }}</span>
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeBuildings" :disabled="!includeOSM" @change="update('includeBuildings', $event.target.checked)" />
       </label>
       <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400">{{ t('exportPanel.treesBushes') }}</span>
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.treesBushes') }}</span>
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeTrees" :disabled="!includeOSM" @change="update('includeTrees', $event.target.checked)" />
       </label>
       <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400">{{ t('exportPanel.rocks') }}</span>
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.rocks') }}</span>
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeRocks" :disabled="!includeOSM" @change="update('includeRocks', $event.target.checked)" />
       </label>
       <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
-        <span class="text-[11px] text-gray-600 dark:text-gray-400">{{ t('exportPanel.water') }}</span>
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.water') }}</span>
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeWater" :disabled="!includeOSM" @change="update('includeWater', $event.target.checked)" />
       </label>
 
       <div class="flex items-center justify-between gap-2">
-        <span class="text-[12px] text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.seaLevelOffset') }}</span>
+        <span class="text-xs text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.seaLevelOffset') }}</span>
         <div class="flex items-center gap-1">
           <input
             :value="model.seaLevelOffset"
@@ -85,9 +85,9 @@
             step="1"
             min="-2000"
             max="2000"
-            class="w-20 text-[11px] bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+            class="w-20 text-caption bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
           />
-          <span class="text-[10px] text-gray-500 dark:text-gray-400">m</span>
+          <span class="text-micro text-gray-500 dark:text-gray-400">m</span>
         </div>
       </div>
     </BaseCard>

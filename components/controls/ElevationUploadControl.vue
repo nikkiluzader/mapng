@@ -10,40 +10,40 @@
 
       <!-- LAZ/LAS status -->
       <template v-if="isLazFile">
-        <p v-if="uploadedElevationMeta?.center" class="text-[11px] text-emerald-600 dark:text-emerald-400">
+        <p v-if="uploadedElevationMeta?.center" class="text-caption text-emerald-600 dark:text-emerald-400">
           {{ ptLabel }} — {{ t('upload.autoDetected') }}
         </p>
-        <p v-else-if="uploadedElevationMeta" class="text-[11px] text-amber-600 dark:text-amber-400">
+        <p v-else-if="uploadedElevationMeta" class="text-caption text-amber-600 dark:text-amber-400">
           {{ ptLabel }} — {{ t('upload.usingSelected') }}
         </p>
-        <p v-else class="text-[11px] text-blue-500 dark:text-blue-400 animate-pulse">
+        <p v-else class="text-caption text-blue-500 dark:text-blue-400 animate-pulse">
           {{ t('upload.reading') }}
         </p>
       </template>
 
       <!-- Raster/text upload status (GeoTIFF, ASC, GML, XML, ZIP) -->
       <template v-else>
-        <p v-if="uploadedElevationMeta?.center" class="text-[11px] text-emerald-600 dark:text-emerald-400">
+        <p v-if="uploadedElevationMeta?.center" class="text-caption text-emerald-600 dark:text-emerald-400">
           {{ detectedStatusLabel }}
         </p>
-        <p v-else-if="uploadedElevationMeta?.isGeoReferenced" class="text-[11px] text-amber-600 dark:text-amber-400">
+        <p v-else-if="uploadedElevationMeta?.isGeoReferenced" class="text-caption text-amber-600 dark:text-amber-400">
           {{ unsupportedStatusLabel }}
         </p>
-        <p v-else-if="uploadedElevationMeta" class="text-[11px] text-amber-600 dark:text-amber-400">
+        <p v-else-if="uploadedElevationMeta" class="text-caption text-amber-600 dark:text-amber-400">
           {{ t('upload.noGeoMetadata') }}
         </p>
-        <p v-else class="text-[11px] text-blue-500 dark:text-blue-400 animate-pulse">
+        <p v-else class="text-caption text-blue-500 dark:text-blue-400 animate-pulse">
           {{ t('upload.reading') }}
         </p>
       </template>
 
       <div v-if="uploadedElevationMeta" class="mt-2 space-y-1.5">
         <div class="flex items-center gap-2">
-          <label class="w-24 shrink-0 text-[11px] font-medium text-blue-700 dark:text-blue-300">{{ t('upload.elevationUnits') }}</label>
+          <label class="w-24 shrink-0 text-caption font-medium text-blue-700 dark:text-blue-300">{{ t('upload.elevationUnits') }}</label>
           <select
             :value="verticalUnitOverride"
             @change="$emit('update:verticalUnitOverride', $event.target.value)"
-            class="flex-1 min-w-0 text-[11px] rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+            class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
           >
             <option value="auto">{{ t('upload.auto') }} ({{ detectedUnitLabel }})</option>
             <option value="meters">{{ t('upload.meters') }}</option>
@@ -57,7 +57,7 @@
              of the way. -->
         <div v-if="detectedNoData !== null" class="space-y-1.5">
           <div class="flex items-center gap-2">
-            <label class="w-24 shrink-0 flex items-center gap-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
+            <label class="w-24 shrink-0 flex items-center gap-1 text-caption font-medium text-blue-700 dark:text-blue-300">
               {{ t('upload.noDataValue') }}
               <button
                 type="button"
@@ -72,7 +72,7 @@
             <select
               :value="noDataMode"
               @change="handleNoDataModeChange($event.target.value)"
-              class="flex-1 min-w-0 text-[11px] rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+              class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
             >
               <option value="auto">{{ t('upload.noDataAuto', { value: formatNoData(detectedNoData) }) }}</option>
               <option value="none">{{ t('upload.noDataNone') }}</option>
@@ -88,13 +88,13 @@
               :value="customNoData"
               @change="handleCustomNoDataChange($event.target.value)"
               :placeholder="String(detectedNoData)"
-              class="flex-1 min-w-0 text-[11px] rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 tabular-nums focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+              class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 tabular-nums focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
             />
           </div>
 
           <div
             v-if="showNoDataHelp"
-            class="rounded-md bg-blue-100/70 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-1.5 space-y-1.5 text-[10px] leading-relaxed text-blue-800 dark:text-blue-200"
+            class="rounded-lg bg-blue-100/70 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-1.5 space-y-1.5 text-micro leading-relaxed text-blue-800 dark:text-blue-200"
           >
             <p>{{ t('upload.noDataHelpWhat') }}</p>
             <p>{{ t('upload.noDataHelpFound', { value: formatNoData(detectedNoData), percent: detectedNoDataPercent }) }}</p>
@@ -103,11 +103,11 @@
         </div>
 
         <div v-if="showAscCoordinateSelector" class="flex items-center gap-2">
-          <label class="w-24 shrink-0 text-[11px] font-medium text-blue-700 dark:text-blue-300">{{ t('upload.coordinateSystem') }}</label>
+          <label class="w-24 shrink-0 text-caption font-medium text-blue-700 dark:text-blue-300">{{ t('upload.coordinateSystem') }}</label>
           <select
             :value="ascCoordinateSystem"
             @change="$emit('update:ascCoordinateSystem', $event.target.value)"
-            class="flex-1 min-w-0 text-[11px] rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+            class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
           >
             <option value="auto">{{ t('upload.auto') }}</option>
             <option value="2180">{{ t('upload.crsPl1992') }}</option>
@@ -127,7 +127,7 @@
   <!-- Idle: upload trigger -->
   <div v-else>
     <label
-      class="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 hover:border-[#FF6600] hover:text-[#FF6600] dark:hover:border-[#FF6600] dark:hover:text-[#FF6600] cursor-pointer transition-colors"
+      class="flex items-center gap-2 w-full px-3 py-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 hover:border-brand hover:text-brand dark:hover:border-brand dark:hover:text-brand cursor-pointer transition-colors"
     >
       <Upload :size="14" class="shrink-0" />
       <span>{{ t('upload.uploadElevation') }}</span>
@@ -150,16 +150,16 @@
       :key="slot.id"
       class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-50/60 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800"
     >
-      <span class="shrink-0 rounded bg-blue-200/70 dark:bg-blue-800/70 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 dark:text-blue-200 tabular-nums">
+      <span class="shrink-0 rounded bg-blue-200/70 dark:bg-blue-800/70 px-1.5 py-0.5 text-micro font-semibold text-blue-700 dark:text-blue-200 tabular-nums">
         {{ t('upload.fallbackBadge', { n: index + 1 }) }}
       </span>
       <div class="flex-1 min-w-0">
-        <p class="truncate text-[11px] font-medium text-blue-800 dark:text-blue-200" :title="slotFileLabel(slot)">
+        <p class="truncate text-caption font-medium text-blue-800 dark:text-blue-200" :title="slotFileLabel(slot)">
           {{ slotFileLabel(slot) }}
         </p>
-        <p v-if="slot.error" class="text-[10px] text-red-500 dark:text-red-400">{{ slot.error }}</p>
-        <p v-else-if="!slot.meta" class="text-[10px] text-blue-500 dark:text-blue-400 animate-pulse">{{ t('upload.reading') }}</p>
-        <p v-else class="text-[10px] text-emerald-600 dark:text-emerald-400">{{ slotSummary(slot) }}</p>
+        <p v-if="slot.error" class="text-micro text-red-500 dark:text-red-400">{{ slot.error }}</p>
+        <p v-else-if="!slot.meta" class="text-micro text-blue-500 dark:text-blue-400 animate-pulse">{{ t('upload.reading') }}</p>
+        <p v-else class="text-micro text-emerald-600 dark:text-emerald-400">{{ slotSummary(slot) }}</p>
       </div>
       <button
         type="button"
@@ -173,7 +173,7 @@
 
     <label
       v-if="canAddFallbackLayer"
-      class="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg border border-dashed border-blue-300 dark:border-blue-800 text-[11px] text-blue-600 dark:text-blue-400 hover:border-[#FF6600] hover:text-[#FF6600] cursor-pointer transition-colors"
+      class="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg border border-dashed border-blue-300 dark:border-blue-800 text-caption text-blue-600 dark:text-blue-400 hover:border-brand hover:text-brand cursor-pointer transition-colors"
     >
       <Plus :size="13" class="shrink-0" />
       <span>{{ t('upload.addFallbackLayer') }}</span>
@@ -185,7 +185,7 @@
         @change="handleFallbackChange"
       />
     </label>
-    <p v-else-if="fallbackSlots.length >= maxFallbackSlots" class="px-1 text-[10px] text-gray-400 dark:text-gray-500">
+    <p v-else-if="fallbackSlots.length >= maxFallbackSlots" class="px-1 text-micro text-gray-400 dark:text-gray-500">
       {{ t('upload.fallbackLayerLimit', { max: maxSlots }) }}
     </p>
   </template>
@@ -194,7 +194,7 @@
          covers whatever none of them reach. Only worth showing once an
          upload actually resolves to more than one survey. -->
     <div v-if="orderedLayers.length > 1" class="space-y-1">
-      <div class="flex items-center gap-1 text-[11px] font-medium text-blue-700 dark:text-blue-300">
+      <div class="flex items-center gap-1 text-caption font-medium text-blue-700 dark:text-blue-300">
         <Layers :size="12" class="shrink-0" />
         {{ t('upload.elevationLayers') }}
         <button
@@ -210,7 +210,7 @@
 
       <div
         v-if="showLayerHelp"
-        class="rounded-md bg-blue-100/70 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-1.5 text-[10px] leading-relaxed text-blue-800 dark:text-blue-200"
+        class="rounded-lg bg-blue-100/70 dark:bg-blue-900/40 border border-blue-200 dark:border-blue-800 px-2 py-1.5 text-micro leading-relaxed text-blue-800 dark:text-blue-200"
       >
         {{ t('upload.layersHelp') }}
       </div>
@@ -219,11 +219,11 @@
         <li
           v-for="(layer, index) in orderedLayers"
           :key="layer.id"
-          class="flex items-center gap-1.5 rounded-md border border-blue-200 dark:border-blue-800 bg-white/70 dark:bg-gray-900/50 px-2 py-1"
+          class="flex items-center gap-1.5 rounded-lg border border-blue-200 dark:border-blue-800 bg-white/70 dark:bg-gray-900/50 px-2 py-1"
         >
-          <span class="w-4 shrink-0 text-[10px] font-semibold text-blue-500 dark:text-blue-400 tabular-nums">{{ index + 1 }}.</span>
-          <span class="flex-1 min-w-0 truncate text-[11px] text-gray-700 dark:text-gray-200" :title="layer.label">{{ layer.label }}</span>
-          <span class="shrink-0 text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">{{ t('upload.layerTileCount', { count: layer.indices.length }) }}</span>
+          <span class="w-4 shrink-0 text-micro font-semibold text-blue-500 dark:text-blue-400 tabular-nums">{{ index + 1 }}.</span>
+          <span class="flex-1 min-w-0 truncate text-caption text-gray-700 dark:text-gray-200" :title="layer.label">{{ layer.label }}</span>
+          <span class="shrink-0 text-micro text-gray-400 dark:text-gray-500 tabular-nums">{{ t('upload.layerTileCount', { count: layer.indices.length }) }}</span>
           <button
             type="button"
             @click="moveLayer(index, -1)"
@@ -248,18 +248,18 @@
 
     <div v-if="showGapFillControl" class="space-y-1">
       <div class="flex items-center gap-2">
-        <label class="w-24 shrink-0 text-[11px] font-medium text-blue-700 dark:text-blue-300">{{ t('upload.fillGapsWith') }}</label>
+        <label class="w-24 shrink-0 text-caption font-medium text-blue-700 dark:text-blue-300">{{ t('upload.fillGapsWith') }}</label>
         <select
           :value="gapFillSource"
           @change="$emit('update:gapFillSource', $event.target.value)"
-          class="flex-1 min-w-0 text-[11px] rounded-md border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+          class="flex-1 min-w-0 text-caption rounded-lg border border-blue-300 dark:border-blue-700 bg-white dark:bg-gray-900 px-2 py-1 text-gray-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
         >
           <option :value="GAP_FILL_STANDARD">{{ t('upload.gapFillStandard') }}</option>
           <option :value="GAP_FILL_GPXZ">{{ t('upload.gapFillGpxz') }}</option>
           <option :value="GAP_FILL_NONE">{{ t('upload.gapFillNone') }}</option>
         </select>
       </div>
-      <p class="text-[10px] leading-snug text-blue-600/80 dark:text-blue-400/80 pl-[6.5rem]">
+      <p class="text-micro leading-snug text-blue-600/80 dark:text-blue-400/80 pl-[6.5rem]">
         {{ gapFillHint }}
       </p>
     </div>

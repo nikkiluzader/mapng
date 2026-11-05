@@ -1,7 +1,7 @@
 <template>
   <div class="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" @click.self="$emit('close')">
     <div class="w-full max-w-md rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
-      <div class="px-5 py-4 bg-gradient-to-r from-[#FF6600] to-[#f59e0b] text-white">
+      <div class="px-5 py-4 bg-gradient-to-r from-brand to-amber-500 text-white">
         <h2 class="text-lg font-bold">{{ t('support.modalTitle') }}</h2>
         <p class="text-xs text-white/90 mt-1">{{ t(contextLabel) }}</p>
       </div>
@@ -15,14 +15,14 @@
             :href="kofiUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="px-4 py-2 rounded-md bg-[#FF6600] hover:bg-[#e85d00] text-white text-sm font-semibold transition-colors"
+            class="px-4 py-2 rounded-lg bg-brand hover:bg-brand-500 text-white text-sm font-semibold transition-colors"
           >
             {{ t('support.openKofi') }}
           </a>
           <button
             type="button"
             @click="$emit('close')"
-            class="px-4 py-2 rounded-md bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium transition-colors"
+            class="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium transition-colors"
           >
             {{ t('support.notNow') }}
           </button>

@@ -10,7 +10,7 @@
         @focus="handleFocus"
         @keydown="handleKeydown"
         :placeholder="t('map.searchPlaceholder')"
-        class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 pl-8 text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-[#FF6600] focus:border-[#FF6600] outline-none placeholder-gray-400 dark:placeholder-gray-500"
+        class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-3 py-2 pl-8 text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-brand focus:border-brand outline-none placeholder-gray-400 dark:placeholder-gray-500"
       />
       
       <!-- Search Icon -->
@@ -24,7 +24,7 @@
       <!-- Loading Spinner -->
       <span
         v-else
-        class="absolute left-2.5 inset-y-0 flex items-center text-[#FF6600]"
+        class="absolute left-2.5 inset-y-0 flex items-center text-brand"
       >
         <Loader2 :size="14" class="animate-spin" />
       </span>
@@ -73,7 +73,7 @@
             <div class="text-xs font-medium text-gray-900 dark:text-white truncate">
               {{ getShortDisplayName(result.displayName) }}
             </div>
-            <div class="text-[10px] text-gray-500 dark:text-gray-400 truncate">
+            <div class="text-micro text-gray-500 dark:text-gray-400 truncate">
               {{ result.displayName }}
             </div>
           </div>

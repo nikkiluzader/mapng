@@ -9,9 +9,9 @@
       @click="toggle"
     >
       <span class="flex items-center gap-2 min-w-0">
-        <component :is="icon" v-if="icon" :size="14" class="shrink-0" :class="accent ? 'text-[#FF6600]' : 'text-gray-500 dark:text-gray-400 group-hover:text-[#FF6600]'" />
-        <span class="text-[13px] font-semibold text-gray-800 dark:text-gray-100 group-hover:text-[#FF6600] transition-colors truncate">{{ title }}</span>
-        <span v-if="$slots.aside" class="text-[11px] font-normal text-gray-500 dark:text-gray-400 shrink-0"><slot name="aside" /></span>
+        <component :is="icon" v-if="icon" :size="14" class="shrink-0" :class="accent ? 'text-brand' : 'text-gray-500 dark:text-gray-400 group-hover:text-brand'" />
+        <span class="font-display text-sm font-semibold text-gray-800 dark:text-gray-100 group-hover:text-brand transition-colors truncate">{{ title }}</span>
+        <span v-if="$slots.aside" class="text-caption font-normal text-gray-500 dark:text-gray-400 shrink-0"><slot name="aside" /></span>
       </span>
       <ChevronDown :size="14" class="shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
     </button>

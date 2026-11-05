@@ -221,18 +221,18 @@
           :aria-expanded="layerPanelOpen"
           @click="layerPanelOpen = !layerPanelOpen"
         >
-          <Layers :size="14" class="text-[#FF6600]" />
+          <Layers :size="14" class="text-brand" />
           <span class="flex-1">{{ t('mapSelector.mapLayers') }}</span>
           <ChevronDown :size="14" class="text-gray-400 transition-transform" :class="layerPanelOpen ? '' : '-rotate-90'" />
         </button>
         <div v-if="layerPanelOpen" class="p-2 space-y-1">
             <p :class="PANEL_HEADING">{{ t('mapSelector.groupMap') }}</p>
             <label :class="PANEL_ROW">
-                <input type="radio" v-model="selectedLayer" value="osm" class="accent-[#FF6600]" />
+                <input type="radio" v-model="selectedLayer" value="osm" class="accent-brand" />
                 <span>{{ t('mapSelector.openStreetMap') }}</span>
             </label>
             <label :class="PANEL_ROW">
-                <input type="radio" v-model="selectedLayer" value="satellite" class="accent-[#FF6600]" />
+                <input type="radio" v-model="selectedLayer" value="satellite" class="accent-brand" />
                 <span>{{ t('mapSelector.satellite') }}</span>
             </label>
             <label v-if="selectedLayer === 'satellite'" :class="PANEL_ROW" class="pl-7">
@@ -240,7 +240,7 @@
                 <span>{{ t('mapSelector.satelliteNames') }}</span>
             </label>
             <label :class="PANEL_ROW">
-                <input type="radio" v-model="selectedLayer" value="topo" class="accent-[#FF6600]" />
+                <input type="radio" v-model="selectedLayer" value="topo" class="accent-brand" />
                 <span>{{ t('mapSelector.topoMap') }}</span>
             </label>
 
@@ -249,14 +249,14 @@
                 <input type="checkbox" v-model="showOsmCoverage" :class="CHECKBOX" />
                 <span>{{ t('mapSelector.osmCoverage') }}</span>
             </label>
-            <p v-if="showOsmCoverage && osmCoverageStatus !== 'ready'" class="pl-7 -mt-1 text-[10px]" :class="osmCoverageStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
+            <p v-if="showOsmCoverage && osmCoverageStatus !== 'ready'" class="pl-7 -mt-1 text-micro" :class="osmCoverageStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
               {{ osmCoverageStatus === 'unavailable' ? t('controlPanel.osmCoverageUnavailable') : t('controlPanel.osmCoverageLoading') }}
             </p>
             <label :class="PANEL_ROW">
                 <input type="checkbox" v-model="showHotspots" :class="CHECKBOX" />
                 <span>{{ t('mapSelector.hotspots') }}</span>
             </label>
-            <p v-if="showHotspots" class="pl-7 -mt-1 text-[10px]" :class="hotspotsStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
+            <p v-if="showHotspots" class="pl-7 -mt-1 text-micro" :class="hotspotsStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
               {{ hotspotsStatus === 'unavailable' ? t('hotspots.unavailable') : hotspotsStatus === 'loading' ? t('hotspots.loading') : t('mapSelector.hotspotsCount', { count: (hotspotTotals.web + hotspotTotals.desktop).toLocaleString() }) }}
             </p>
 
@@ -265,13 +265,13 @@
                 <input type="checkbox" :checked="shareExports === 'on'" @change="setShareExports($event.target.checked)" :class="CHECKBOX" />
                 <span>{{ t('mapSelector.shareExports') }}</span>
             </label>
-            <button type="button" class="pl-7 -mt-1 block text-[10px] text-[#FF6600] hover:underline" @click="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button>
+            <button type="button" class="pl-7 -mt-1 block text-micro text-brand hover:underline" @click="openHotspotPrivacy">{{ t('hotspots.privacy.link') }}</button>
             <!-- (separate: which settings, never where; composables/useUsageStats.js) -->
             <label :class="PANEL_ROW">
                 <input type="checkbox" :checked="shareSettings === 'on'" @change="setShareSettings($event.target.checked)" :class="CHECKBOX" />
                 <span>{{ t('usage.shareToggle') }}</span>
             </label>
-            <a href="https://mapng.com/data.html#usage" target="_blank" rel="noopener" class="block pl-7 -mt-1 text-[10px] text-[#FF6600] hover:underline">{{ t('usage.readMore') }}</a>
+            <a href="https://mapng.com/data.html#usage" target="_blank" rel="noopener" class="block pl-7 -mt-1 text-micro text-brand hover:underline">{{ t('usage.readMore') }}</a>
         </div>
     </div>
 
@@ -283,7 +283,7 @@
           type="button"
           :title="t('map.editInOsm')"
           :aria-label="t('map.editInOsm')"
-          class="w-full text-left text-[12px] font-medium text-teal-700 hover:text-teal-900 dark:text-teal-300 dark:hover:text-teal-200 transition-colors px-2 py-1.5"
+          class="w-full text-left text-xs font-medium text-teal-700 hover:text-teal-900 dark:text-teal-300 dark:hover:text-teal-200 transition-colors px-2 py-1.5"
         >
           {{ t('map.editInOsm') }}
         </button>
@@ -292,7 +292,7 @@
 
     <!-- Center Crosshair -->
     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none">
-        <div class="w-8 h-8 text-[#FF6600] drop-shadow-lg flex items-center justify-center">
+        <div class="w-8 h-8 text-brand drop-shadow-lg flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="w-full h-full filter drop-shadow-md">
                 <line x1="12" y1="4" x2="12" y2="20" />
                 <line x1="4" y1="12" x2="20" y2="12" />
@@ -309,7 +309,7 @@
       role="menu"
       @contextmenu.prevent
     >
-      <div class="px-3 py-1 text-[10px] text-gray-500 dark:text-gray-400 font-mono">{{ formatLatLng(contextMenu.lat, contextMenu.lng) }}</div>
+      <div class="px-3 py-1 text-micro text-gray-500 dark:text-gray-400 font-mono">{{ formatLatLng(contextMenu.lat, contextMenu.lng) }}</div>
       <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="centerSelectionHere">{{ t('map.centerHere') }}</button>
       <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="copyCoordinates">{{ copiedNotice ? t('map.copied') : t('map.copyCoordinates') }}</button>
     </div>
@@ -428,7 +428,7 @@ watch(selectedLayer, (v) => writeStored('mapng_mapLayer', v));
 const layerPanelOpen = ref(readStored('mapng_layerPanelOpen') !== 'false');
 watch(layerPanelOpen, (v) => writeStored('mapng_layerPanelOpen', String(v)));
 const PANEL_ROW = 'flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer';
-const PANEL_HEADING = 'px-1 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400';
+const PANEL_HEADING = 'px-1 text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400';
 watch(satelliteNames, (v) => writeStored('mapng_satelliteLabels', String(v)));
 const isMovingProgrammatically = ref(false);
 
@@ -1053,20 +1053,20 @@ onMounted(() => {
 .leaflet-dragging .leaflet-grab .leaflet-interactive { cursor: url("data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cg%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%23fff%22%20stroke-width%3D%224%22/%3E%3Cpath%20d%3D%22M12%202v7M12%2015v7M2%2012h7M15%2012h7%22%20stroke%3D%22%231f2937%22%20stroke-width%3D%221.6%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%221.6%22%20fill%3D%22%23FF6600%22%20stroke%3D%22%23fff%22%20stroke-width%3D%221%22/%3E%3C/g%3E%3C/svg%3E") 12 12, crosshair; }
 /* Map tools (MapSelector addMapTools): one look with Leaflet's zoom bar */
 .mapng-zoom-selection { display: flex !important; align-items: center; justify-content: center; color: #374151; }
-.mapng-zoom-selection:hover { color: #FF6600; }
+.mapng-zoom-selection:hover { color: var(--brand); }
 .leaflet-control-scale-line { background: rgba(255, 255, 255, 0.8); border-color: #4b5563; color: #1f2937; font-size: 10px; }
 .mapng-coords {
   background: rgba(255, 255, 255, 0.92); color: #1f2937; border-radius: 6px; padding: 3px 7px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
   pointer-events: none; white-space: nowrap;
   display: grid; grid-template-columns: auto auto auto; column-gap: 6px; row-gap: 1px; align-items: center;
-  font: 10px/16px system-ui, sans-serif;
+  font: 10px/16px var(--font-sans);
 }
 .mapng-coords__row { display: contents; }
 .mapng-coords__icon { display: flex; color: #6b7280; }
-.mapng-coords__row--center .mapng-coords__icon { color: #FF6600; }
+.mapng-coords__row--center .mapng-coords__icon { color: var(--brand); }
 .mapng-coords__label { color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; font-size: 9px; }
-.mapng-coords__value { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; min-width: 128px; }
+.mapng-coords__value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; min-width: 128px; }
 .dark .leaflet-container { background: #111827; }
 .dark .leaflet-bar a, .dark .mapng-zoom-selection { background: #1f2937; color: #e5e7eb; border-color: #4b5563; }
 .dark .leaflet-bar a:hover { background: #374151; }
@@ -1078,13 +1078,13 @@ onMounted(() => {
 .mapng-keys {
   background: rgba(255, 255, 255, 0.92); color: #4b5563; border-radius: 6px; padding: 4px 7px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
-  pointer-events: none; white-space: nowrap; font: 10px/16px system-ui, sans-serif;
+  pointer-events: none; white-space: nowrap; font: 10px/16px var(--font-sans);
   display: grid; grid-template-columns: auto auto; column-gap: 8px; row-gap: 2px; align-items: center;
 }
 .mapng-keys__row { display: contents; }
 .mapng-keys__keys { display: flex; align-items: center; gap: 2px; color: #9ca3af; }
 .mapng-keys kbd {
-  font: 600 9px/14px system-ui, sans-serif; color: #1f2937; background: #f3f4f6; border: 1px solid #d1d5db;
+  font: 600 9px/14px var(--font-sans); color: #1f2937; background: #f3f4f6; border: 1px solid #d1d5db;
   border-bottom-width: 2px; border-radius: 4px; padding: 0 4px;
 }
 .dark .mapng-keys { background: rgba(31, 41, 55, 0.92); color: #d1d5db; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.12); }
@@ -1093,28 +1093,28 @@ onMounted(() => {
 .mapng-selection-size { pointer-events: none; }
 .mapng-selection-size span {
   position: absolute; left: 0; bottom: 4px; transform: translateX(-50%); white-space: nowrap;
-  background: #FF6600; color: #fff; font: 600 10px/16px system-ui, sans-serif; padding: 0 6px; border-radius: 9999px;
+  background: var(--brand); color: #fff; font: 600 10px/16px var(--font-sans); padding: 0 6px; border-radius: 9999px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 </style>
 
 <style>
 /* Export hotspot popup (services/hotspotLayer.js) */
-.mapng-hotspot-popup { min-width: 170px; font: 12px/1.4 system-ui, sans-serif; color: #1f2937; }
-.mapng-hotspot-popup__title { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.mapng-hotspot-popup { min-width: 170px; font: 12px/1.4 var(--font-sans); color: #1f2937; }
+.mapng-hotspot-popup__title { font-family: var(--font-display); font-weight: 600; font-size: 14px; margin-bottom: 6px; }
 .mapng-hotspot-popup__bar { display: flex; gap: 2px; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
 .mapng-hotspot-popup__bar span { display: block; min-width: 4px; }
-.mapng-hotspot-popup__web { background: #FF6600; }
+.mapng-hotspot-popup__web { background: var(--brand); }
 .mapng-hotspot-popup__desktop { background: #3B82F6; }
 .mapng-hotspot-popup__legend { display: flex; align-items: center; gap: 4px; font-size: 11px; color: #4b5563; }
 .mapng-hotspot-popup__key { display: inline-block; width: 8px; height: 8px; border-radius: 2px; }
 .mapng-hotspot-popup__legend .mapng-hotspot-popup__desktop { margin-left: 8px; }
 .mapng-hotspot-popup__when { font-size: 11px; color: #6b7280; margin-top: 4px; }
 .mapng-hotspot-popup__button {
-  margin-top: 8px; width: 100%; padding: 4px 8px; border-radius: 6px; background: #FF6600; color: #fff;
+  margin-top: 8px; width: 100%; padding: 4px 8px; border-radius: 8px; background: var(--brand); color: #fff;
   font-weight: 600; font-size: 11px; border: 0; cursor: pointer;
 }
-.mapng-hotspot-popup__button:hover { background: #e55a00; }
+.mapng-hotspot-popup__button:hover { background: var(--brand-500); }
 .dark .mapng-hotspot-popup-wrap .leaflet-popup-content-wrapper,
 .dark .mapng-hotspot-popup-wrap .leaflet-popup-tip { background: #1f2937; box-shadow: none; }
 .dark .mapng-hotspot-popup { color: #e5e7eb; }

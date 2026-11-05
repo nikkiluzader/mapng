@@ -6,7 +6,7 @@
       class="rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 overflow-hidden bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
     >
       <div class="pointer-events-auto bg-gray-50 dark:bg-gray-700 px-3 py-1.5 border-b border-gray-200 dark:border-gray-600 flex items-center gap-2 text-xs font-medium">
-        <Mountain :size="13" class="text-[#FF6600] shrink-0" />
+        <Mountain :size="13" class="text-brand shrink-0" />
         <span class="flex-1 truncate">{{ t('mapSelector.elevationOverlay.title') }}</span>
         <button
           class="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
@@ -18,8 +18,8 @@
       </div>
       <!-- pointer-events stay off so users can pan/zoom the main map through the window -->
       <div ref="miniMapEl" class="w-60 h-44 bg-gray-200 dark:bg-gray-900"></div>
-      <div class="pointer-events-auto px-3 py-1 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 flex items-center gap-1.5 text-[10px] text-gray-500 dark:text-gray-400">
-        <span class="inline-block w-2 h-2 rounded-sm shrink-0" style="background:#FF00FF"></span>
+      <div class="pointer-events-auto px-3 py-1 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 flex items-center gap-1.5 text-micro text-gray-500 dark:text-gray-400">
+        <span class="inline-block w-2 h-2 rounded shrink-0" style="background:#FF00FF"></span>
         <span class="truncate">{{ t('mapSelector.elevationOverlay.legend') }}</span>
       </div>
     </div>
@@ -31,7 +31,7 @@
       :title="t('mapSelector.elevationOverlay.show')"
       @click="setVisible(true)"
     >
-      <Mountain :size="16" class="text-[#FF6600]" />
+      <Mountain :size="16" class="text-brand" />
     </button>
   </div>
 </template>

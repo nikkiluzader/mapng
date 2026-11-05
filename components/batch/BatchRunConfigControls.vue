@@ -7,7 +7,7 @@
       <BaseButton size="sm" variant="secondary" @click="triggerLoad">{{ t('batch.loadConfig') }}</BaseButton>
       <input ref="fileInput" type="file" accept="application/json,.json" class="hidden" @change="handleFile" />
     </div>
-    <p v-if="status" class="text-[10px] text-gray-500 dark:text-gray-400">{{ status }}</p>
+    <p v-if="status" class="text-micro text-gray-500 dark:text-gray-400">{{ status }}</p>
   </div>
 </template>
 

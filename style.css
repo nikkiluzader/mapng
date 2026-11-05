@@ -8,19 +8,31 @@
   box-sizing: border-box;
 }
 
+/* Fonts and colours as tailwind.config.js (BeamNG.drive's UI tokens); plain
+   CSS (map controls, popups) reads the same values from these variables. */
+:root {
+  --font-sans: "Noto Sans Variable", "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Overpass Variable", "Overpass", var(--font-sans);
+  --font-mono: "Overpass Mono Variable", "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --brand: #ff6600;
+  --brand-500: #da5706;
+}
+
 body {
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    sans-serif;
+  font-family: var(--font-sans);
   background-color: #ffffff;
   color: #111827;
+}
+
+/* Leaflet's stylesheet sets Helvetica on the whole map (tooltips, popups,
+   attribution, zoom buttons): the app's text font there too */
+.leaflet-container {
+  font-family: var(--font-sans);
+}
+
+/* Titles in Overpass, as BeamNG's cards and headers (text stays Noto Sans) */
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
 }
 
 #root {

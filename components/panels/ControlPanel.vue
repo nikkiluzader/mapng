@@ -11,7 +11,7 @@
           { value: 'advanced', label: t('controlPanel.modeAdvanced') },
         ]"
       />
-      <p class="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+      <p class="mt-1.5 text-caption text-gray-500 dark:text-gray-400">
         {{ t(store.advancedMode ? 'controlPanel.modeAdvancedHint' : 'controlPanel.modeBasicHint') }}
       </p>
     </div>
@@ -27,7 +27,7 @@
         v-if="devMode"
         class="rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2"
       >
-        <p class="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
+        <p class="text-caption font-semibold text-amber-800 dark:text-amber-300">
           Developer mode enabled (press ~ to toggle)
         </p>
       </div>
@@ -44,7 +44,7 @@
               :class="[
                 'rounded border px-3 py-2 text-sm font-medium transition-colors',
                 uploadedAreaMode === 'native'
-                  ? 'border-[#FF6600] bg-orange-50 dark:bg-orange-900/20 text-[#FF6600]'
+                  ? 'border-brand bg-orange-50 dark:bg-orange-900/20 text-brand'
                   : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
               ]"
             >
@@ -56,7 +56,7 @@
               :class="[
                 'rounded border px-3 py-2 text-sm font-medium transition-colors',
                 uploadedAreaMode === 'crop'
-                  ? 'border-[#FF6600] bg-orange-50 dark:bg-orange-900/20 text-[#FF6600]'
+                  ? 'border-brand bg-orange-50 dark:bg-orange-900/20 text-brand'
                   : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
               ]"
             >
@@ -68,7 +68,7 @@
         <label v-if="uploadedAreaMode !== 'crop'" class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.resolutionOutputSize') }}</label>
         <div v-if="uploadedAreaMode !== 'crop'" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
           {{ nativeDims.width }} × {{ nativeDims.height }} px
-          <span class="text-[10px] ml-1">({{ t('controlPanel.nativeCoverage', { source: nativeDims.sourceLabel }) }})</span>
+          <span class="text-micro ml-1">({{ t('controlPanel.nativeCoverage', { source: nativeDims.sourceLabel }) }})</span>
         </div>
         <ResolutionSelector
           v-else
@@ -80,8 +80,8 @@
           <p>{{ t('controlPanel.squareCropWithinCoverage') }}</p>
           <p v-if="uploadedElevationMeta?.suggestedResolution">{{ t('controlPanel.suggestedSquareExport', { size: uploadedElevationMeta.suggestedResolution }) }}</p>
         </ResolutionSelector>
-        <div class="text-[10px] text-gray-500 dark:text-gray-400 pt-1 space-y-1">
-          <p v-if="nativeDims.note" class="text-[#FF6600] font-medium">
+        <div class="text-micro text-gray-500 dark:text-gray-400 pt-1 space-y-1">
+          <p v-if="nativeDims.note" class="text-brand font-medium">
             {{ nativeDims.note }}
           </p>
           <p v-if="supportsUploadAreaMode && uploadedAreaMode !== 'crop'">{{ t('controlPanel.switchToSquareCrop') }}</p>
@@ -102,9 +102,9 @@
       >
       </ResolutionSelector>
       <!-- (the website only: big maps belong in the desktop app) -->
-      <p v-if="!desktopApp && Number(resolution) >= 4096" class="flex items-start gap-1.5 -mt-1 text-[10px] leading-snug text-gray-500 dark:text-gray-400">
-        <Download :size="11" class="shrink-0 mt-px text-[#FF6600]" />
-        <span>{{ t('controlPanel.desktopHint') }} <a :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">{{ t('controlPanel.desktopHintLink') }}</a></span>
+      <p v-if="!desktopApp && Number(resolution) >= 4096" class="flex items-start gap-1.5 -mt-1 text-micro leading-snug text-gray-500 dark:text-gray-400">
+        <Download :size="11" class="shrink-0 mt-px text-brand" />
+        <span>{{ t('controlPanel.desktopHint') }} <a :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('controlPanel.desktopHintLink') }}</a></span>
       </p>
 
       <ProcessingResolutionInput
@@ -188,18 +188,18 @@
       <!-- OpenStreetMap features, and Overture's buildings where OSM has none -->
       <SettingCard>
         <SettingRow check v-model="fetchOSM" :label="t('controlPanel.includeOsmFeatures')" :hint="t('controlPanel.ui.osmHint')" />
-        <details v-if="fetchOSM" class="pl-4 text-[11px] text-gray-500 dark:text-gray-400" :open="!!customOverpassUrl">
-          <summary class="cursor-pointer select-none hover:text-[#FF6600]">{{ t('controlPanel.customOverpass') }}</summary>
+        <details v-if="fetchOSM" class="pl-4 text-caption text-gray-500 dark:text-gray-400" :open="!!customOverpassUrl">
+          <summary class="cursor-pointer select-none hover:text-brand">{{ t('controlPanel.customOverpass') }}</summary>
           <input
             v-model.trim="customOverpassUrl"
             type="password"
             autocomplete="off"
             spellcheck="false"
             placeholder="https://api.tracestrack.com/overpass/YOUR_KEY/interpreter"
-            class="mt-1 w-full px-1.5 py-1 rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-[11px] text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+            class="mt-1 w-full px-1.5 py-1 rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-caption text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
           />
           <p v-if="customOverpassUrl && !customOverpassValid" class="mt-0.5 text-amber-600 dark:text-amber-400">{{ t('controlPanel.customOverpassInvalid') }}</p>
-          <p class="mt-0.5 leading-snug">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Overspan</a></p>
+          <p class="mt-0.5 leading-snug">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-brand hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-brand hover:underline">Overspan</a></p>
         </details>
         <!-- (services/overtureTiles.js) -->
         <SettingRow
@@ -226,10 +226,10 @@
     />
 
     <!-- 5. The result: what was generated, and the exports -->
-    <h3 v-if="terrainData && !isGenerating" class="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-600 text-[13px] font-semibold text-emerald-700 dark:text-emerald-400">
+    <h3 v-if="terrainData && !isGenerating" class="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-600 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
       <CheckCircle2 :size="14" class="shrink-0" />
       {{ t('exportPanel.readyToExport') }}
-      <span class="text-[11px] font-normal text-gray-500 dark:text-gray-400">{{ terrainData.width }}×{{ terrainData.height }}</span>
+      <span class="text-caption font-normal text-gray-500 dark:text-gray-400">{{ terrainData.width }}×{{ terrainData.height }}</span>
     </h3>
     <!-- Terrain Stats (shown when data is available) -->
     <TerrainStats
@@ -284,12 +284,12 @@
       <div class="flex items-start justify-between gap-3">
         <div>
           <p class="text-xs font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
-          <p class="text-[11px] text-orange-700/90 dark:text-orange-300/90 leading-relaxed mt-1">{{ t('support.cardBody') }}</p>
+          <p class="text-caption text-orange-700/90 dark:text-orange-300/90 leading-relaxed mt-1">{{ t('support.cardBody') }}</p>
         </div>
         <button
           type="button"
           @click="$emit('showSupport')"
-          class="shrink-0 px-3 py-1.5 text-[11px] font-semibold bg-[#FF6600] hover:bg-[#e85d00] text-white rounded-md transition-colors"
+          class="shrink-0 px-3 py-1.5 text-caption font-semibold bg-brand hover:bg-brand-500 text-white rounded-lg transition-colors"
         >
           {{ t('support.donate') }}
         </button>

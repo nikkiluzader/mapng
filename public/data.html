@@ -12,6 +12,10 @@
 <meta property="og:image" content="https://mapng.com/og-image.jpg">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
   :root {
     --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
     --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
@@ -34,13 +38,14 @@
   }
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   a { color: var(--brand-ink); }
   .wrap { max-width: 860px; margin: 0 auto; padding: 0 16px; }
   header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
   header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
   .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
   .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
   h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
   .lede { font-size: 18px; max-width: 640px; margin: 0; color: rgba(255,255,255,.95); }
   main { padding: 0 0 64px; }
@@ -55,7 +60,7 @@
   p, li { color: var(--text-2); }
   .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
   pre { background: var(--code-bg); color: var(--code-text); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
+  code { font-family: "Overpass Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .92em; }
   p code, li code, td code { background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; color: var(--text); }
   .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
   table { border-collapse: collapse; width: 100%; font-size: 14px; }

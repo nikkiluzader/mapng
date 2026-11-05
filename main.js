@@ -3,6 +3,11 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import Tres from '@tresjs/core';
 import { i18n, setI18nLanguage } from './i18n';
+// BeamNG.drive's UI fonts (bundled, so the desktop app needs no network):
+// Noto Sans for text, Overpass for titles, Overpass Mono for numbers
+import '@fontsource-variable/noto-sans';
+import '@fontsource-variable/overpass';
+import '@fontsource-variable/overpass-mono';
 import 'leaflet/dist/leaflet.css';
 import './style.css';
 

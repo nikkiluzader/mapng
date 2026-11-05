@@ -4,19 +4,19 @@
       <!-- Header -->
       <div class="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800 shrink-0">
         <div class="flex items-center gap-2.5">
-          <div class="p-1.5 bg-[#FF6600] rounded-lg shadow-sm">
+          <div class="p-1.5 bg-brand rounded-lg shadow-sm">
             <Paintbrush :size="15" class="text-white" />
           </div>
           <div>
             <h2 class="text-sm font-bold text-gray-900 dark:text-white leading-tight">{{ t('exportPanel.texturePaint.title') }}</h2>
-            <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ sourceLabel }} · {{ nativeWidth }}×{{ nativeHeight }}px</p>
+            <p class="text-micro text-gray-500 dark:text-gray-400">{{ sourceLabel }} · {{ nativeWidth }}×{{ nativeHeight }}px</p>
           </div>
         </div>
         <div class="flex items-center gap-2">
           <button
             @click="handleSave"
             :disabled="!hasUnsavedChanges || isSaving"
-            class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#FF6600] text-white hover:bg-[#e85d00] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+            class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-brand text-white hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
           >
             <Loader2 v-if="isSaving" :size="12" class="animate-spin" />
             <Check v-else :size="12" />
@@ -40,7 +40,7 @@
             :key="toolDef.id"
             @click="tool = toolDef.id"
             :title="t(`exportPanel.texturePaint.${toolDef.id}`) + ` (${toolDef.key})`"
-            :class="['p-1.5 rounded-md transition-colors', tool === toolDef.id ? 'bg-[#FF6600] text-white shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-700']"
+            :class="['p-1.5 rounded-lg transition-colors', tool === toolDef.id ? 'bg-brand text-white shadow-sm' : 'hover:bg-gray-200 dark:hover:bg-gray-700']"
           >
             <component :is="toolDef.icon" :size="14" />
           </button>
@@ -59,7 +59,7 @@
           <!-- Color picker popover -->
           <div
             v-if="showColorPicker"
-            class="absolute top-9 left-0 z-20 p-3 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-600 space-y-2.5"
+            class="absolute top-9 left-0 z-20 p-3 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-600 space-y-2.5"
             @pointerdown.stop
           >
             <canvas
@@ -70,13 +70,13 @@
               @pointerdown="onPickerPointerDown"
             ></canvas>
             <div class="flex items-center gap-1.5">
-              <span class="text-[10px] text-gray-400">{{ t('exportPanel.texturePaint.hex') }}</span>
+              <span class="text-micro text-gray-400">{{ t('exportPanel.texturePaint.hex') }}</span>
               <input
                 v-model="hexInput"
                 @change="applyHexInput"
                 maxlength="7"
                 spellcheck="false"
-                class="w-20 text-[11px] font-mono bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5"
+                class="w-20 text-caption font-mono bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5"
               />
               <div class="w-5 h-5 rounded border border-gray-300 dark:border-gray-600" :style="{ background: color }"></div>
             </div>
@@ -90,7 +90,7 @@
               ></button>
             </div>
             <div v-if="recentColors.length" class="space-y-1">
-              <div class="text-[9px] uppercase tracking-wider text-gray-400">{{ t('exportPanel.texturePaint.recent') }}</div>
+              <div class="text-nano uppercase tracking-wider text-gray-400">{{ t('exportPanel.texturePaint.recent') }}</div>
               <div class="flex flex-wrap gap-1">
                 <button
                   v-for="(swatch, idx) in recentColors"
@@ -106,38 +106,38 @@
 
         <!-- Brush size -->
         <div class="flex items-center gap-1.5">
-          <span class="text-[10px] text-gray-400">{{ t('exportPanel.texturePaint.size') }}</span>
-          <input type="range" min="1" max="400" v-model.number="brushSize" class="w-96 accent-[#FF6600]" />
-          <span class="text-[10px] w-8 tabular-nums">{{ brushSize }}px</span>
+          <span class="text-micro text-gray-400">{{ t('exportPanel.texturePaint.size') }}</span>
+          <input type="range" min="1" max="400" v-model.number="brushSize" class="w-96 accent-brand" />
+          <span class="text-micro w-8 tabular-nums">{{ brushSize }}px</span>
         </div>
 
         <!-- Opacity -->
         <div class="flex items-center gap-1.5">
-          <span class="text-[10px] text-gray-400">{{ t('exportPanel.texturePaint.opacity') }}</span>
-          <input type="range" min="5" max="100" v-model.number="brushOpacity" class="w-20 accent-[#FF6600]" />
-          <span class="text-[10px] w-8 tabular-nums">{{ brushOpacity }}%</span>
+          <span class="text-micro text-gray-400">{{ t('exportPanel.texturePaint.opacity') }}</span>
+          <input type="range" min="5" max="100" v-model.number="brushOpacity" class="w-20 accent-brand" />
+          <span class="text-micro w-8 tabular-nums">{{ brushOpacity }}%</span>
         </div>
 
         <div class="w-px h-5 bg-gray-200 dark:bg-gray-700"></div>
 
         <!-- History -->
-        <button @click="undo" :disabled="!canUndo" :title="t('exportPanel.texturePaint.undo')" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed">
+        <button @click="undo" :disabled="!canUndo" :title="t('exportPanel.texturePaint.undo')" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed">
           <Undo2 :size="14" />
         </button>
-        <button @click="redo" :disabled="!canRedo" :title="t('exportPanel.texturePaint.redo')" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed">
+        <button @click="redo" :disabled="!canRedo" :title="t('exportPanel.texturePaint.redo')" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed">
           <Redo2 :size="14" />
         </button>
-        <button @click="resetStrokes" :title="t('exportPanel.texturePaint.reset')" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-red-400 hover:text-red-500">
+        <button @click="resetStrokes" :title="t('exportPanel.texturePaint.reset')" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-red-400 hover:text-red-500">
           <RotateCcw :size="14" />
         </button>
 
         <div class="w-px h-5 bg-gray-200 dark:bg-gray-700"></div>
 
         <!-- View -->
-        <button @click="fitToView(); requestRedraw()" :title="t('exportPanel.texturePaint.fit')" class="p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800">
+        <button @click="fitToView(); requestRedraw()" :title="t('exportPanel.texturePaint.fit')" class="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
           <Maximize :size="14" />
         </button>
-        <button @click="zoomToActual" title="100%" class="px-1.5 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-[10px] tabular-nums">
+        <button @click="zoomToActual" title="100%" class="px-1.5 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-micro tabular-nums">
           {{ Math.round(zoom * 100) }}%
         </button>
         <button
@@ -145,7 +145,7 @@
           @pointerup="peekOriginal = false"
           @pointerleave="peekOriginal = false"
           :title="t('exportPanel.texturePaint.peek')"
-          :class="['p-1.5 rounded-md transition-colors', peekOriginal ? 'bg-[#FF6600] text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800']"
+          :class="['p-1.5 rounded-lg transition-colors', peekOriginal ? 'bg-brand text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800']"
         >
           <Eye :size="14" />
         </button>
@@ -176,22 +176,22 @@
           }"
         ></div>
         <div v-if="isLoadingSource" class="absolute inset-0 flex items-center justify-center bg-white/70 dark:bg-gray-950/70">
-          <Loader2 :size="32" class="text-[#FF6600] animate-spin" />
+          <Loader2 :size="32" class="text-brand animate-spin" />
         </div>
 
         <!-- Polygon selection chip -->
         <div
           v-if="selectedPolygon"
-          class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-800/95 shadow-lg border border-gray-200 dark:border-gray-600 text-[11px] text-gray-700 dark:text-gray-200"
+          class="absolute top-3 left-1/2 -translate-x-1/2 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-800/95 shadow-lg border border-gray-200 dark:border-gray-600 text-caption text-gray-700 dark:text-gray-200"
           @pointerdown.stop
         >
-          <Hexagon :size="12" class="text-[#FF6600]" />
+          <Hexagon :size="12" class="text-brand" />
           <span>{{ t('exportPanel.texturePaint.polygonSelected') }}</span>
           <button
             @click="applyPolygonRecolor"
-            class="flex items-center gap-1 px-2 py-0.5 rounded bg-[#FF6600] text-white font-medium hover:bg-[#e85d00] transition-colors"
+            class="flex items-center gap-1 px-2 py-0.5 rounded bg-brand text-white font-medium hover:bg-brand-500 transition-colors"
           >
-            <span class="w-2.5 h-2.5 rounded-sm border border-white/60" :style="{ background: color }"></span>
+            <span class="w-2.5 h-2.5 rounded border border-white/60" :style="{ background: color }"></span>
             {{ t('exportPanel.texturePaint.applyColor') }}
           </button>
           <button @click="clearPolygonSelection" class="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -202,7 +202,7 @@
         <!-- Polygon draft hint -->
         <div
           v-else-if="tool === 'polygon' && polygonDraftCount > 0"
-          class="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-800/95 shadow-lg border border-gray-200 dark:border-gray-600 text-[10px] text-gray-500 dark:text-gray-400 pointer-events-none"
+          class="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-800/95 shadow-lg border border-gray-200 dark:border-gray-600 text-micro text-gray-500 dark:text-gray-400 pointer-events-none"
         >
           {{ t('exportPanel.texturePaint.polygonDraftHint') }}
         </div>
@@ -210,7 +210,7 @@
         <!-- Clone source hint -->
         <div
           v-else-if="tool === 'clone' && !hasCloneSource"
-          class="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-800/95 shadow-lg border border-gray-200 dark:border-gray-600 text-[10px] text-gray-500 dark:text-gray-400 pointer-events-none"
+          class="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-white/95 dark:bg-gray-800/95 shadow-lg border border-gray-200 dark:border-gray-600 text-micro text-gray-500 dark:text-gray-400 pointer-events-none"
         >
           {{ t('exportPanel.texturePaint.cloneSourceHint') }}
         </div>
@@ -218,8 +218,8 @@
 
       <!-- Footer hint -->
       <div class="px-4 py-1.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 shrink-0 flex items-center justify-between">
-        <span class="text-[9px] text-gray-400 dark:text-gray-500">{{ t('exportPanel.texturePaint.hint') }}</span>
-        <span class="text-[9px] text-gray-400 dark:text-gray-500">{{ t('exportPanel.texturePaint.eraserHint') }}</span>
+        <span class="text-nano text-gray-400 dark:text-gray-500">{{ t('exportPanel.texturePaint.hint') }}</span>
+        <span class="text-nano text-gray-400 dark:text-gray-500">{{ t('exportPanel.texturePaint.eraserHint') }}</span>
       </div>
     </div>
   </div>

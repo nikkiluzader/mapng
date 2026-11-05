@@ -3,7 +3,7 @@
     <!-- Batch Stability Note -->
     <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 flex items-start gap-2">
       <AlertTriangle :size="14" class="text-amber-500 mt-0.5 shrink-0" />
-      <p class="text-[10px] text-amber-700 dark:text-amber-400 leading-relaxed">
+      <p class="text-micro text-amber-700 dark:text-amber-400 leading-relaxed">
         <span class="font-bold">{{ t('batch.resourceHeavy') }}</span> {{ t('batch.resourceHeavyBody') }}
       </p>
     </div>
@@ -17,7 +17,7 @@
           { value: true, label: t('batchCombined.modeCombined') },
         ]"
       />
-      <p class="text-[11px] text-gray-500 dark:text-gray-400 px-0.5">
+      <p class="text-caption text-gray-500 dark:text-gray-400 px-0.5">
         {{ combinedLevel ? t('batchCombined.modeCombinedHint') : t('batchCombined.modeSeparateHint') }}
       </p>
     </div>
@@ -40,7 +40,7 @@
     <!-- Tiles Follow Map Center — always visible, independent of the tile layout section -->
     <label class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
       <span>{{ t('batch.tilesFollowCenter') }}</span>
-      <input type="checkbox" v-model="tileFollowCenterLocal" class="accent-[#FF6600] w-4 h-4 cursor-pointer" />
+      <input type="checkbox" v-model="tileFollowCenterLocal" class="accent-brand w-4 h-4 cursor-pointer" />
     </label>
 
     <!-- Collapsible: per-tile offsets + names -->
@@ -50,18 +50,18 @@
             <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('batch.tileOffsets') }}</p>
             <BaseButton size="sm" variant="secondary" @click="resetTileOffsets">{{ t('batch.resetAll') }}</BaseButton>
           </div>
-          <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batch.offsetHint') }}</p>
+          <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('batch.offsetHint') }}</p>
           <div class="max-h-44 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 p-2 space-y-1">
             <div
               v-for="entry in tileOffsetEntries"
               :key="entry.index"
               class="grid grid-cols-[54px_1fr_1fr_42px] gap-1 items-center"
             >
-              <span class="text-[10px] text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
+              <span class="text-micro text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
               <input
                 type="number"
                 step="10"
-                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-[10px] text-gray-900 dark:text-white"
+                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
                 :value="entry.offsetX"
                 @input="updateTileOffset(entry.index, 'offsetX', $event.target.value)"
                 placeholder="X"
@@ -69,13 +69,13 @@
               <input
                 type="number"
                 step="10"
-                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-[10px] text-gray-900 dark:text-white"
+                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
                 :value="entry.offsetY"
                 @input="updateTileOffset(entry.index, 'offsetY', $event.target.value)"
                 placeholder="Y"
               />
               <button
-                class="text-[10px] py-1 px-1 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800"
+                class="text-micro py-1 px-1 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800"
                 @click="resetTileOffset(entry.index)"
               >
                 0
@@ -89,17 +89,17 @@
             <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('batch.tileNames') }}</p>
             <BaseButton size="sm" variant="secondary" @click="resetTileNames">{{ t('batch.resetAll') }}</BaseButton>
           </div>
-          <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batch.tileNamesHint') }}</p>
+          <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('batch.tileNamesHint') }}</p>
           <div class="max-h-44 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 p-2 space-y-1">
             <div
               v-for="entry in tileNameEntries"
               :key="entry.index"
               class="grid grid-cols-[54px_1fr] gap-1 items-center"
             >
-              <span class="text-[10px] text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
+              <span class="text-micro text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
               <input
                 type="text"
-                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-[10px] text-gray-900 dark:text-white"
+                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
                 :value="entry.name"
                 :placeholder="entry.defaultName"
                 @input="updateTileName(entry.index, $event.target.value)"
@@ -179,7 +179,7 @@
     />
 
     <!-- Combined level output summary -->
-    <div v-if="combinedLevel" class="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
+    <div v-if="combinedLevel" class="text-micro text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
       <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batchCombined.outputSummary', { tiles: totalTiles, dim: combinedDim }) }}</span></p>
       <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
         <Info :size="11" class="shrink-0 mt-px" />{{ t('batchCombined.outputHint') }}
@@ -187,7 +187,7 @@
     </div>
 
     <!-- Selected exports count -->
-    <div v-else class="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
+    <div v-else class="text-micro text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
       <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batch.selectedPerTile', { count: selectedExportCount }) }}</span></p>
       <p>{{ t('batch.totalFiles', { tiles: totalTiles, exports: selectedExportCount, total: totalTiles * selectedExportCount }) }}</p>
       <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
@@ -200,13 +200,13 @@
       <div class="p-2.5 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <p class="text-[11px] font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
-            <p class="text-[10px] text-orange-700/90 dark:text-orange-300/90 mt-1 leading-relaxed">{{ t('support.cardBody') }}</p>
+            <p class="text-caption font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
+            <p class="text-micro text-orange-700/90 dark:text-orange-300/90 mt-1 leading-relaxed">{{ t('support.cardBody') }}</p>
           </div>
           <button
             type="button"
             @click="$emit('showSupport')"
-            class="shrink-0 px-2.5 py-1 text-[10px] font-semibold bg-[#FF6600] hover:bg-[#e85d00] text-white rounded transition-colors"
+            class="shrink-0 px-2.5 py-1 text-micro font-semibold bg-brand hover:bg-brand-500 text-white rounded transition-colors"
           >
             {{ t('support.donate') }}
           </button>

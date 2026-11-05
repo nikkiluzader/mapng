@@ -52,22 +52,22 @@ onUnmounted(() => { clearInterval(intervalId); stopUsage?.(); });
 </script>
 
 <template>
-  <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 font-mono text-[11px] tabular-nums select-none whitespace-nowrap pointer-events-none">
+  <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 font-mono text-caption tabular-nums select-none whitespace-nowrap pointer-events-none">
     <template v-if="desktopApp">
       <template v-if="usage">
-        <span class="text-white/50 uppercase tracking-wider text-[9px]">{{ t('memoryWidget.cpu') }}</span>
+        <span class="text-white/50 uppercase tracking-wider text-nano">{{ t('memoryWidget.cpu') }}</span>
         <span :class="level(usage.cpu)">{{ Math.round(usage.cpu * 100) }}%</span>
         <span class="text-white/25">·</span>
-        <span class="text-white/50 uppercase tracking-wider text-[9px]">{{ t('memoryWidget.ram') }}</span>
+        <span class="text-white/50 uppercase tracking-wider text-nano">{{ t('memoryWidget.ram') }}</span>
         <span :class="level(1 - usage.memFree / usage.memTotal)">{{ gb(usage.memTotal - usage.memFree) }}</span>
         <span class="text-white/30">/</span>
         <span class="text-white/50">{{ gb(usage.memTotal) }} GB</span>
         <span class="text-white/25">·</span>
-        <span class="text-white/50 text-[9px]">MapNG</span>
+        <span class="text-white/50 text-nano">MapNG</span>
         <span class="text-white/70">{{ gb(usage.app) }} GB</span>
         <template v-if="usage.export">
           <span class="text-white/25">|</span>
-          <span class="text-white/50 uppercase tracking-wider text-[9px]">{{ t(`memoryWidget.${usage.export.kind || 'export'}`) }}</span>
+          <span class="text-white/50 uppercase tracking-wider text-nano">{{ t(`memoryWidget.${usage.export.kind || 'export'}`) }}</span>
           <span :class="level(usage.export.rss / usage.export.heapLimit)">{{ gb(usage.export.rss) }} GB</span>
           <span class="text-white/35">{{ t('memoryWidget.peakGb', { value: exportPeak.toFixed(1) }) }}</span>
           <span class="text-white/25">·</span>
@@ -77,7 +77,7 @@ onUnmounted(() => { clearInterval(intervalId); stopUsage?.(); });
       <span v-else class="text-white/30 italic">…</span>
     </template>
     <template v-else>
-      <span class="text-white/50 uppercase tracking-wider text-[9px]">{{ t('memoryWidget.mem') }}</span>
+      <span class="text-white/50 uppercase tracking-wider text-nano">{{ t('memoryWidget.mem') }}</span>
       <template v-if="used !== null">
         <span :class="used / limit > 0.85 ? 'text-red-400' : used / limit > 0.65 ? 'text-yellow-400' : 'text-green-400'">
           {{ used }} MB

@@ -3,28 +3,28 @@
        (composables/useExportHotspots.js; worker side: hotspotsObject.js) -->
   <Teleport to="body">
     <div v-if="privacyOpen" class="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="privacyOpen = false">
-      <div class="bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-[calc(100vw-2rem)] max-w-lg max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden" role="dialog" aria-modal="true" :aria-label="t('hotspots.privacy.title')">
-        <div class="px-6 py-4 bg-gradient-to-r from-[#FF6600] to-[#f59e0b] text-white flex items-center gap-2">
+      <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-[calc(100vw-2rem)] max-w-lg max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden" role="dialog" aria-modal="true" :aria-label="t('hotspots.privacy.title')">
+        <div class="px-6 py-4 bg-gradient-to-r from-brand to-amber-500 text-white flex items-center gap-2">
           <ShieldCheck :size="18" class="shrink-0" />
           <h2 class="text-base font-bold">{{ t('hotspots.privacy.title') }}</h2>
         </div>
 
-        <div class="p-6 space-y-3 overflow-y-auto text-[11px] leading-relaxed text-gray-600 dark:text-gray-300">
+        <div class="p-6 space-y-3 overflow-y-auto text-caption leading-relaxed text-gray-600 dark:text-gray-300">
           <p class="text-gray-800 dark:text-gray-100">{{ t('hotspots.privacy.intro') }}</p>
           <section v-for="part in PARTS" :key="part">
-            <h3 class="text-[11px] font-semibold text-gray-800 dark:text-gray-100">{{ t(`hotspots.privacy.${part}Title`) }}</h3>
+            <h3 class="text-caption font-semibold text-gray-800 dark:text-gray-100">{{ t(`hotspots.privacy.${part}Title`) }}</h3>
             <p>{{ t(`hotspots.privacy.${part}`) }}</p>
           </section>
-          <a :href="DATA_PAGE" target="_blank" rel="noopener" class="inline-flex items-center gap-1 font-medium text-[#FF6600] hover:underline">
+          <a :href="DATA_PAGE" target="_blank" rel="noopener" class="inline-flex items-center gap-1 font-medium text-brand hover:underline">
             {{ t('hotspots.privacy.readMore') }}<ExternalLink :size="11" />
           </a>
         </div>
 
         <div class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3">
-          <span class="text-[10px] text-gray-500 dark:text-gray-400">
+          <span class="text-micro text-gray-500 dark:text-gray-400">
             {{ share === 'on' ? t('hotspots.privacy.statusOn') : t('hotspots.privacy.statusOff') }}
           </span>
-          <button type="button" class="px-4 py-1.5 rounded bg-[#FF6600] hover:bg-[#e85d00] text-white text-[12px] font-semibold transition-colors" @click="privacyOpen = false">
+          <button type="button" class="px-4 py-1.5 rounded bg-brand hover:bg-brand-500 text-white text-xs font-semibold transition-colors" @click="privacyOpen = false">
             {{ t('hotspots.privacy.close') }}
           </button>
         </div>

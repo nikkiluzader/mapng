@@ -4,17 +4,17 @@
 
     <div class="grid grid-cols-2 gap-2">
       <div class="space-y-1">
-        <label class="text-[10px] text-gray-500 dark:text-gray-400 font-medium px-1 uppercase tracking-wider">{{ t('map.latitude') }}</label>
+        <label class="text-micro text-gray-500 dark:text-gray-400 font-medium px-1 uppercase tracking-wider">{{ t('map.latitude') }}</label>
         <input type="text" v-model="latInput" @change="handleManualLocationChange"
           @paste="handleCoordinatePaste($event)" @keydown.enter="$event.target.blur()"
-          class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
+          class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-brand outline-none"
           :placeholder="t('map.latitude')" />
       </div>
       <div class="space-y-1">
-        <label class="text-[10px] text-gray-500 dark:text-gray-400 font-medium px-1 uppercase tracking-wider">{{ t('map.longitude') }}</label>
+        <label class="text-micro text-gray-500 dark:text-gray-400 font-medium px-1 uppercase tracking-wider">{{ t('map.longitude') }}</label>
         <input type="text" v-model="lngInput" @change="handleManualLocationChange"
           @paste="handleCoordinatePaste($event)" @keydown.enter="$event.target.blur()"
-          class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-[#FF6600] outline-none"
+          class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-brand outline-none"
           :placeholder="t('map.longitude')" />
       </div>
     </div>

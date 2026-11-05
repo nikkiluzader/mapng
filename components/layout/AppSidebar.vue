@@ -1,7 +1,7 @@
 <template>
   <aside class="w-full md:w-80 lg:w-96 flex-shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 z-10 relative shadow-xl">
     <div class="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3 bg-white dark:bg-gray-900">
-      <div class="p-1.5 bg-[#FF6600] rounded-lg">
+      <div class="p-1.5 bg-brand rounded-lg">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" class="w-7 h-7">
           <g fill="white" opacity="0.95">
             <polygon points="15,75 35,35 55,75" />
@@ -18,7 +18,7 @@
       <BaseButton
         size="sm"
         variant="ghost"
-        class="ml-auto text-gray-400 hover:text-[#FF6600] transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
+        class="ml-auto text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
         :title="t('sidebar.aboutTooltip')"
         @click="$emit('show-about')"
       >
@@ -32,9 +32,9 @@
       <slot />
     </div>
 
-    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-[11px] text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900 space-y-1.5">
+    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-caption text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900 space-y-1.5">
       <div class="flex items-center justify-between gap-2 px-2">
-        <label class="text-[10px] text-gray-400 dark:text-gray-500 uppercase tracking-wider">{{ t('language.label') }}</label>
+        <label class="text-micro text-gray-400 dark:text-gray-500 uppercase tracking-wider">{{ t('language.label') }}</label>
         <select
           :value="locale"
           :class="[SELECT_XS, 'h-7 px-2']"
@@ -47,16 +47,16 @@
       </div>
       <div class="flex items-start justify-between gap-2 px-2">
         <div class="flex flex-wrap items-center gap-x-1 gap-y-1 min-w-0">
-          <BaseButton variant="ghost" size="sm" class="h-6 px-2 text-[11px] font-medium leading-none" @click="$emit('show-disclaimer')">{{ t('sidebar.disclaimer') }}</BaseButton>
-          <a href="mailto:nikkiluzader@gmail.com" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none">{{ t('sidebar.contact') }}</a>
-          <a href="https://discord.gg/j6ZvcF8rgk" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none">{{ t('sidebar.discord') }}</a>
-          <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none">{{ t('sidebar.github') }}</a>
-          <a :href="desktopApp ? 'https://mapng.com/data.html' : '/data.html'" target="_blank" rel="noopener" class="inline-flex items-center h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none">{{ t('sidebar.yourData') }}</a>
-          <a v-if="!desktopApp" :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener noreferrer" :title="t('sidebar.desktopAppTooltip')" class="inline-flex items-center gap-1 h-6 text-[#FF6600] hover:text-[#e85d00] transition-colors px-2 leading-none"><Download :size="11" />{{ t('sidebar.desktopApp') }}</a>
+          <BaseButton variant="ghost" size="sm" class="h-6 px-2 text-caption font-medium leading-none" @click="$emit('show-disclaimer')">{{ t('sidebar.disclaimer') }}</BaseButton>
+          <a href="mailto:nikkiluzader@gmail.com" class="inline-flex items-center h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none">{{ t('sidebar.contact') }}</a>
+          <a href="https://discord.gg/j6ZvcF8rgk" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none">{{ t('sidebar.discord') }}</a>
+          <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none">{{ t('sidebar.github') }}</a>
+          <a :href="desktopApp ? 'https://mapng.com/data.html' : '/data.html'" target="_blank" rel="noopener" class="inline-flex items-center h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none">{{ t('sidebar.yourData') }}</a>
+          <a v-if="!desktopApp" :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener noreferrer" :title="t('sidebar.desktopAppTooltip')" class="inline-flex items-center gap-1 h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none"><Download :size="11" />{{ t('sidebar.desktopApp') }}</a>
           <BaseButton
             variant="ghost"
             size="sm"
-            class="h-6 text-gray-600 dark:text-gray-400 hover:text-[#FF6600] dark:hover:text-[#FF6600] transition-colors inline-flex items-center gap-1 px-2 leading-none"
+            class="h-6 text-gray-600 dark:text-gray-400 hover:text-brand dark:hover:text-brand transition-colors inline-flex items-center gap-1 px-2 leading-none"
             @click="$emit('show-stack')"
           >
             <Code :size="12" /> {{ t('sidebar.stack') }}
@@ -73,9 +73,9 @@
           <Moon v-else :size="14" />
         </BaseButton>
       </div>
-      <span v-if="desktopVersion" class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.desktopBuild', { version: desktopVersion }) }} · {{ t('sidebar.build', { hash: ownBuild.hash, time: ownBuild.time }) }}</span>
-      <span v-else-if="isProductionHost" class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Main: {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</span>
-      <span v-else class="block text-[10px] text-gray-400 dark:text-gray-500 leading-tight px-2">Dev: {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</span>
+      <span v-if="desktopVersion" class="block text-micro text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.desktopBuild', { version: desktopVersion }) }} · {{ t('sidebar.build', { hash: ownBuild.hash, time: ownBuild.time }) }}</span>
+      <span v-else-if="isProductionHost" class="block text-micro text-gray-400 dark:text-gray-500 leading-tight px-2">Main: {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</span>
+      <span v-else class="block text-micro text-gray-400 dark:text-gray-500 leading-tight px-2">Dev: {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</span>
     </div>
   </aside>
 </template>

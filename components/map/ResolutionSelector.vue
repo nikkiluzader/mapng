@@ -9,7 +9,7 @@
     >
       <option v-for="option in options" :key="option" :value="option">{{ formatOption(option) }}</option>
     </select>
-    <div class="text-[10px] text-gray-500 dark:text-gray-400 pt-1 space-y-1">
+    <div class="text-micro text-gray-500 dark:text-gray-400 pt-1 space-y-1">
       <slot></slot>
     </div>
   </div>

@@ -6,17 +6,17 @@
   >
     <button
       type="button"
-      class="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-[#FF6600] hover:bg-orange-50 dark:hover:bg-gray-800 transition-colors"
+      class="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:text-brand hover:bg-orange-50 dark:hover:bg-gray-800 transition-colors"
       :title="t('levels.open')"
       @click="setOpen(true)"
     >
       <Library :size="18" />
       <span
         v-if="updatableCount"
-        class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-[#FF6600] text-white text-[9px] leading-[14px] font-semibold text-center"
+        class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 rounded-full bg-brand text-white text-nano leading-[14px] font-semibold text-center"
       >{{ updatableCount }}</span>
     </button>
-    <span class="text-[10px] font-medium tracking-wider uppercase text-gray-400 dark:text-gray-500 [writing-mode:vertical-rl] rotate-180 select-none">{{ t('levels.title') }}</span>
+    <span class="text-micro font-medium tracking-wider uppercase text-gray-400 dark:text-gray-500 [writing-mode:vertical-rl] rotate-180 select-none">{{ t('levels.title') }}</span>
   </aside>
 
   <aside
@@ -24,24 +24,24 @@
     class="w-80 flex-shrink-0 flex flex-col border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 z-10 shadow-xl"
   >
     <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-      <Library :size="16" class="text-[#FF6600]" />
+      <Library :size="16" class="text-brand" />
       <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('levels.title') }}</h2>
-      <span class="text-[11px] text-gray-400 dark:text-gray-500">{{ levels.length }}</span>
-      <button type="button" class="ml-auto p-1 rounded text-gray-400 hover:text-[#FF6600] transition-colors" :title="t('levels.refresh')" @click="refresh">
+      <span class="text-caption text-gray-400 dark:text-gray-500">{{ levels.length }}</span>
+      <button type="button" class="ml-auto p-1 rounded text-gray-400 hover:text-brand transition-colors" :title="t('levels.refresh')" @click="refresh">
         <RefreshCw :size="14" :class="loading ? 'animate-spin' : ''" />
       </button>
-      <button type="button" class="p-1 rounded text-gray-400 hover:text-[#FF6600] transition-colors" :title="t('levels.close')" @click="setOpen(false)">
+      <button type="button" class="p-1 rounded text-gray-400 hover:text-brand transition-colors" :title="t('levels.close')" @click="setOpen(false)">
         <PanelRightClose :size="15" />
       </button>
     </div>
 
-    <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700 text-[10px] text-gray-500 dark:text-gray-400 flex items-center gap-2">
+    <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700 text-micro text-gray-500 dark:text-gray-400 flex items-center gap-2">
       <FolderOpen :size="12" class="shrink-0" />
       <span class="truncate" :title="folder || ''">{{ folder || t('levels.noFolder') }}</span>
     </div>
 
     <div class="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-gray-800/50 p-3 space-y-2.5">
-      <p v-if="!loading && !levels.length" class="text-[11px] text-gray-500 dark:text-gray-400 text-center py-8 px-4 leading-relaxed">
+      <p v-if="!loading && !levels.length" class="text-caption text-gray-500 dark:text-gray-400 text-center py-8 px-4 leading-relaxed">
         {{ t('levels.empty') }}
       </p>
 
@@ -55,44 +55,44 @@
           <Mountain v-else :size="28" class="absolute inset-0 m-auto text-gray-300 dark:text-gray-600" />
           <span
             v-if="isUpdatable(level)"
-            class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-[#FF6600] text-white text-[9px] font-semibold shadow"
+            class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-brand text-white text-nano font-semibold shadow"
           >{{ t('levels.updateAvailable') }}</span>
         </div>
 
         <div class="p-2.5 space-y-1.5">
           <div class="flex items-baseline gap-2 min-w-0">
-            <div class="text-[12px] font-semibold text-gray-800 dark:text-gray-100 truncate" :title="level.title">{{ level.title }}</div>
-            <span class="ml-auto shrink-0 text-[9px] px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
+            <div class="text-xs font-semibold text-gray-800 dark:text-gray-100 truncate" :title="level.title">{{ level.title }}</div>
+            <span class="ml-auto shrink-0 text-nano px-1.5 py-0.5 rounded border border-gray-200 dark:border-gray-600 text-gray-500 dark:text-gray-400">
               {{ level.appVersion ? `v${level.appVersion}` : (level.kind === 'older' ? t('levels.olderVersion') : t('levels.website')) }}
             </span>
           </div>
-          <div class="text-[10px] text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-2">
+          <div class="text-micro text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-2">
             <span v-if="level.sizeMeters">{{ formatSize(level) }}</span>
             <span>{{ formatDate(level.exportedAt || level.modifiedAt) }}</span>
             <span>{{ formatBytes(level.zipBytes) }}</span>
           </div>
           <!-- (whether a rebuild can run offline from the level's saved data) -->
-          <div class="flex items-center gap-1 text-[10px]" :class="level.rebuildable ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'" :title="level.rebuildable ? t('levels.rebuildSavedHint') : t('levels.rebuildFetchHint')">
+          <div class="flex items-center gap-1 text-micro" :class="level.rebuildable ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'" :title="level.rebuildable ? t('levels.rebuildSavedHint') : t('levels.rebuildFetchHint')">
             <HardDrive :size="10" class="shrink-0" />
             <span>{{ level.rebuildable ? t('levels.savedData') : t('levels.noSavedData') }}</span>
           </div>
 
           <div v-if="busy[level.levelName]" class="space-y-1.5 pt-0.5">
-            <div class="flex items-center gap-1.5 text-[10px] text-gray-600 dark:text-gray-300">
-              <Loader2 :size="11" class="animate-spin text-[#FF6600] shrink-0" />
+            <div class="flex items-center gap-1.5 text-micro text-gray-600 dark:text-gray-300">
+              <Loader2 :size="11" class="animate-spin text-brand shrink-0" />
               <span class="truncate" :title="busy[level.levelName]">{{ busy[level.levelName] }}</span>
             </div>
-            <button type="button" class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors" @click="cancel(level)">
+            <button type="button" class="px-2 py-0.5 text-micro rounded text-gray-500 dark:text-gray-400 hover:text-brand transition-colors" @click="cancel(level)">
               {{ t('levels.cancel') }}
             </button>
           </div>
           <div v-else class="flex flex-wrap gap-1.5 pt-0.5">
             <button
               type="button"
-              class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border transition-colors"
+              class="flex items-center gap-1 px-2 py-0.5 text-micro rounded border transition-colors"
               :class="isUpdatable(level)
-                ? 'bg-[#FF6600] hover:bg-[#e85d00] border-[#d65500] text-white'
-                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-[#FF6600] hover:text-[#FF6600]'"
+                ? 'bg-brand hover:bg-brand-500 border-brand-500 text-white'
+                : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-brand hover:text-brand'"
               :disabled="anyBusy"
               :title="level.rebuildable ? t('levels.rebuildSavedHint') : t('levels.rebuildFetchHint')"
               @click="rebuild(level)"
@@ -102,7 +102,7 @@
             <!-- (back into the window with its settings, to change and export again: App.vue handleModifyLevel) -->
             <button
               type="button"
-              class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:text-gray-700"
+              class="flex items-center gap-1 px-2 py-0.5 text-micro rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-brand hover:text-brand transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-gray-300 disabled:hover:text-gray-700"
               :disabled="anyBusy || !level.rebuildable"
               :title="level.rebuildable ? t('levels.modifyHint') : t('levels.modifyNoData', { name: level.title })"
               @click="$emit('modify', level)"
@@ -112,14 +112,14 @@
             <button
               v-if="level.center"
               type="button"
-              class="flex items-center gap-1 px-2 py-0.5 text-[10px] rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-[#FF6600] hover:text-[#FF6600] transition-colors"
+              class="flex items-center gap-1 px-2 py-0.5 text-micro rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:border-brand hover:text-brand transition-colors"
               @click="$emit('show-on-map', level)"
             >
               <MapPin :size="11" />{{ t('levels.showOnMap') }}
             </button>
             <button
               type="button"
-              class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors"
+              class="px-2 py-0.5 text-micro rounded text-gray-500 dark:text-gray-400 hover:text-brand transition-colors"
               :title="t('levels.showInModsHint')"
               @click="desktopApp.showLevelInFolder(level.zipName)"
             >
@@ -128,7 +128,7 @@
             <button
               v-if="level.rebuildable"
               type="button"
-              class="px-2 py-0.5 text-[10px] rounded text-gray-500 dark:text-gray-400 hover:text-[#FF6600] transition-colors"
+              class="px-2 py-0.5 text-micro rounded text-gray-500 dark:text-gray-400 hover:text-brand transition-colors"
               :title="t('levels.showDataHint')"
               @click="desktopApp.showLevelData(level.levelName)"
             >
@@ -136,7 +136,7 @@
             </button>
             <button
               type="button"
-              class="ml-auto flex items-center gap-1 px-1.5 py-0.5 text-[10px] rounded text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+              class="ml-auto flex items-center gap-1 px-1.5 py-0.5 text-micro rounded text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
               :disabled="anyBusy"
               :title="t('levels.deleteHint')"
               @click="remove(level)"
@@ -144,13 +144,13 @@
               <Trash2 :size="11" />{{ t('levels.delete') }}
             </button>
           </div>
-          <p v-if="messages[level.levelName]" class="text-[10px] leading-snug" :class="messages[level.levelName].error ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'">
+          <p v-if="messages[level.levelName]" class="text-micro leading-snug" :class="messages[level.levelName].error ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'">
             {{ messages[level.levelName].text }}
           </p>
           <button
             v-if="messages[level.levelName]?.error"
             type="button"
-            class="text-[10px] text-[#FF6600] hover:underline"
+            class="text-micro text-brand hover:underline"
             @click="openReportDialog('rebuild', { error: messages[level.levelName].text, area: level.center ? { lat: level.center.lat, lng: level.center.lng, resolution: level.resolution, metersPerPixel: level.metersPerPixel } : null })"
           >{{ t('report.sendReport') }}</button>
         </div>

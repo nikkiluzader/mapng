@@ -9,7 +9,7 @@
       <option value="balanced">{{ t('batch.profileBalanced') }}</option>
       <option value="low_memory">{{ t('batch.profileLowMemory') }}</option>
     </select>
-    <p class="text-[10px] text-gray-500 dark:text-gray-400">
+    <p class="text-micro text-gray-500 dark:text-gray-400">
       {{ t('batch.profileHelp') }}
     </p>
   </SettingSection>

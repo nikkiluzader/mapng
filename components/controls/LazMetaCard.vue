@@ -2,13 +2,13 @@
   <BaseCard class="bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600 space-y-2" padded>
     <!-- Header -->
     <div class="flex items-center gap-1.5 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-600 pb-2">
-      <ScanLine :size="13" class="text-[#FF6600]" />
+      <ScanLine :size="13" class="text-brand" />
       {{ title }}
     </div>
 
     <!-- Row grid -->
     <div class="space-y-1">
-      <div v-for="row in rows" :key="row.label" class="flex items-baseline justify-between gap-2 text-[11px]">
+      <div v-for="row in rows" :key="row.label" class="flex items-baseline justify-between gap-2 text-caption">
         <span class="text-gray-400 dark:text-gray-500 shrink-0">{{ row.label }}</span>
         <span class="text-gray-700 dark:text-gray-200 font-medium text-right tabular-nums">{{ row.value }}</span>
       </div>

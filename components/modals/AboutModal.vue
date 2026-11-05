@@ -3,7 +3,7 @@
     <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
       <div class="p-6 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
         <div class="flex items-center gap-3">
-          <div class="p-2 bg-[#FF6600] rounded-lg shadow-sm">
+          <div class="p-2 bg-brand rounded-lg shadow-sm">
             <Layers :size="20" class="text-white" />
           </div>
           <div>
@@ -23,7 +23,7 @@
 
         <div class="space-y-4">
           <h3 class="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Globe :size="16" class="text-[#FF6600]" />
+            <Globe :size="16" class="text-brand" />
             {{ t('about.whatTitle') }}
           </h3>
           <p>{{ t('about.whatBody') }}</p>
@@ -32,13 +32,13 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">{{ t('about.elevationTitle') }}</h4>
-            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+            <ul class="space-y-2 list-disc list-inside marker:text-brand">
               <li v-for="item in tm('about.elevationItems')" :key="item">{{ item }}</li>
             </ul>
           </div>
           <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">{{ t('about.previewTitle') }}</h4>
-            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+            <ul class="space-y-2 list-disc list-inside marker:text-brand">
               <li v-for="item in tm('about.previewItems')" :key="item">{{ item }}</li>
             </ul>
           </div>
@@ -47,13 +47,13 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">{{ t('about.exportTitle') }}</h4>
-            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+            <ul class="space-y-2 list-disc list-inside marker:text-brand">
               <li v-for="item in tm('about.exportItems')" :key="item">{{ item }}</li>
             </ul>
           </div>
           <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">{{ t('about.osmTitle') }}</h4>
-            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+            <ul class="space-y-2 list-disc list-inside marker:text-brand">
               <li v-for="item in tm('about.osmItems')" :key="item">{{ item }}</li>
             </ul>
           </div>
@@ -71,13 +71,13 @@
 
         <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider flex items-center gap-2">
-              <Grid3X3 :size="14" class="text-[#FF6600]" />
+              <Grid3X3 :size="14" class="text-brand" />
             {{ t('about.batchTitle') }}
           </h4>
           <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
             {{ t('about.batchIntro') }}
           </p>
-          <ul class="space-y-1 list-disc list-inside marker:text-[#FF6600] text-xs">
+          <ul class="space-y-1 list-disc list-inside marker:text-brand text-xs">
             <li v-for="item in tm('about.batchItems')" :key="item">{{ item }}</li>
           </ul>
         </div>
@@ -87,21 +87,21 @@
           <p class="text-xs bg-gray-100 dark:bg-gray-800 p-3 rounded border border-gray-200 dark:border-gray-700">
             {{ t('about.beamngBody') }}
           </p>
-          <ul class="space-y-1 list-disc list-inside marker:text-[#FF6600] text-xs">
+          <ul class="space-y-1 list-disc list-inside marker:text-brand text-xs">
             <li v-for="item in tm('about.beamngItems')" :key="item">{{ item }}</li>
           </ul>
         </div>
 
         <div class="space-y-2">
             <h4 class="font-bold text-gray-900 dark:text-white text-xs uppercase tracking-wider">{{ t('about.additionalTitle') }}</h4>
-            <ul class="space-y-2 list-disc list-inside marker:text-[#FF6600]">
+            <ul class="space-y-2 list-disc list-inside marker:text-brand">
               <li v-for="item in tm('about.additionalItems')" :key="item">{{ item }}</li>
             </ul>
         </div>
 
         <div class="pt-4 border-t border-gray-100 dark:border-gray-800">
           <p class="text-xs text-gray-500 dark:text-gray-400 text-center">
-            {{ t('about.footerPrefix') }} <a href="https://github.com/nikkiluzader" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">Nikki Luzader</a> • {{ t('about.footerMiddle') }} <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener" class="text-[#FF6600] hover:underline">GitHub</a>
+            {{ t('about.footerPrefix') }} <a href="https://github.com/nikkiluzader" target="_blank" rel="noopener" class="text-brand hover:underline">Nikki Luzader</a> • {{ t('about.footerMiddle') }} <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener" class="text-brand hover:underline">GitHub</a>
           </p>
         </div>
       </div>

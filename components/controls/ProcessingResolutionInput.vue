@@ -10,10 +10,10 @@
         @click="pick(choice.mpp)"
         :title="t(choice.hint)"
         :class="[
-          'px-1.5 py-0.5 rounded border text-[10px] leading-tight',
+          'px-1.5 py-0.5 rounded border text-micro leading-tight',
           current === choice.mpp
-            ? 'bg-[#FF6600] border-[#FF6600] text-white'
-            : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-[#FF6600]',
+            ? 'bg-brand border-brand text-white'
+            : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand',
         ]"
       >
         {{ choice.mpp }} m<span v-if="choice.mpp === 1"> ★</span>
@@ -25,18 +25,18 @@
       inputmode="decimal"
       @input="handleInput"
       @blur="clampOnBlur"
-      class="w-full border rounded px-2 py-2 text-sm outline-none bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-[#FF6600] focus:border-[#FF6600]"
+      class="w-full border rounded px-2 py-2 text-sm outline-none bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-brand focus:border-brand"
     />
-    <p v-if="outOfRange" class="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+    <p v-if="outOfRange" class="text-micro text-amber-600 dark:text-amber-400 font-medium">
       {{ t('controlPanel.processingResolutionRange', { min: MIN_MPP, max: MAX_MPP }) }}
     </p>
     <!-- what this setting means with the chosen output size -->
-    <p v-if="coverageKm" class="text-[10px] text-gray-700 dark:text-gray-300 font-medium">
+    <p v-if="coverageKm" class="text-micro text-gray-700 dark:text-gray-300 font-medium">
       {{ t(perTile ? 'controlPanel.processingResolutionCoverageTile' : 'controlPanel.processingResolutionCoverage', { km: coverageKm, px: resolution, mpp: current }) }}
       · {{ t(detailKey) }}
     </p>
-    <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('controlPanel.processingResolutionGuide') }}</p>
-    <p v-if="current > COARSE_MPP" class="flex items-start gap-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+    <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('controlPanel.processingResolutionGuide') }}</p>
+    <p v-if="current > COARSE_MPP" class="flex items-start gap-1 text-micro text-amber-600 dark:text-amber-400 font-medium">
       <AlertTriangle :size="11" class="shrink-0 mt-px" />
       <span>
         {{ t('controlPanel.processingResolutionCoarse', { mpp: current }) }}

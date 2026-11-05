@@ -24,13 +24,13 @@ const props = defineProps({
 });
 
 const layoutClass = computed(() => props.prominent
-  ? 'flex flex-col items-center justify-center text-center gap-1 w-full rounded-md'
-  : 'inline-flex items-center justify-center gap-2 rounded-md'
+  ? 'flex flex-col items-center justify-center text-center gap-1 w-full rounded-lg'
+  : 'inline-flex items-center justify-center gap-2 rounded-lg'
 );
 
 const base = computed(() => [
   props.prominent ? 'py-3 font-bold' : 'font-medium',
-  'transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#FF6600] disabled:opacity-50 disabled:cursor-not-allowed',
+  'transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand disabled:opacity-50 disabled:cursor-not-allowed',
   layoutClass.value,
 ]);
 
@@ -38,8 +38,8 @@ const variantClass = computed(() => {
   switch (props.variant) {
     case 'primary':
       return props.prominent
-        ? 'bg-[#FF6600] text-white hover:bg-[#e85d00] shadow-orange-900/10'
-        : 'bg-[#FF6600] text-white hover:bg-[#e85d00] shadow-orange-900/10';
+        ? 'bg-brand text-white hover:bg-brand-500 shadow-orange-900/10'
+        : 'bg-brand text-white hover:bg-brand-500 shadow-orange-900/10';
     case 'secondary':
       return props.prominent
         ? 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 shadow-sm'

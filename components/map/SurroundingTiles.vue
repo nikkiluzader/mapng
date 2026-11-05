@@ -1,7 +1,7 @@
 <template>
   <SettingSection v-model:open="isExpanded" :title="t('map.surrounding.title')" :icon="LayoutGrid">
     <template v-if="isExpanded">
-      <p class="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+      <p class="text-micro text-gray-500 dark:text-gray-400 leading-tight">
         {{ t('map.surrounding.description') }}
       </p>
 
@@ -11,10 +11,10 @@
           <!-- Center cell (not selectable) -->
           <div 
             v-if="pos === 'CENTER'"
-            class="aspect-square rounded-md bg-[#FF6600]/15 border-2 border-[#FF6600]/60 flex items-center justify-center select-none"
+            class="aspect-square rounded-lg bg-brand/15 border-2 border-brand/60 flex items-center justify-center select-none"
             :title="t('map.surrounding.centerTileTitle')"
           >
-            <span class="text-[11px] font-bold text-[#FF6600]">C</span>
+            <span class="text-caption font-bold text-brand">C</span>
           </div>
 
           <!-- Surrounding tile cell -->
@@ -23,7 +23,7 @@
             @click="toggle(pos)"
             :title="t('map.surrounding.tileTitle', { label: labels[pos], pos })"
             :class="[
-              'aspect-square rounded-md border-2 flex items-center justify-center transition-all duration-150 text-[11px] font-semibold',
+              'aspect-square rounded-lg border-2 flex items-center justify-center transition-all duration-150 text-caption font-semibold',
               selected.has(pos)
                 ? 'bg-emerald-100 dark:bg-emerald-900/40 border-emerald-500 dark:border-emerald-400 text-emerald-700 dark:text-emerald-300 shadow-sm shadow-emerald-200 dark:shadow-none'
                 : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-600 text-gray-400 dark:text-gray-500 hover:border-gray-400 dark:hover:border-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
@@ -35,15 +35,15 @@
       </div>
 
       <!-- Select All / Clear -->
-      <div class="flex items-center justify-center gap-3 text-[10px]">
-        <button @click="selectAll" class="text-[#FF6600] hover:underline font-medium">{{ t('map.surrounding.selectAll') }}</button>
+      <div class="flex items-center justify-center gap-3 text-micro">
+        <button @click="selectAll" class="text-brand hover:underline font-medium">{{ t('map.surrounding.selectAll') }}</button>
         <span class="text-gray-300 dark:text-gray-600">|</span>
         <button @click="clearAll" class="text-gray-500 dark:text-gray-400 hover:underline">{{ t('map.surrounding.clear') }}</button>
       </div>
 
       <!-- Show on Map toggle -->
       <div class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600">
-          <label class="text-[10px] text-gray-700 dark:text-gray-300 flex items-center gap-1.5 cursor-pointer">
+          <label class="text-micro text-gray-700 dark:text-gray-300 flex items-center gap-1.5 cursor-pointer">
               <LayoutGrid :size="10" class="text-blue-500" />
               {{ t('map.surrounding.showOnMap') }}
           </label>
@@ -56,7 +56,7 @@
 
       <!-- Satellite Quality -->
       <div class="space-y-1">
-        <span class="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{{ t('map.surrounding.satelliteQuality') }}</span>
+        <span class="text-micro text-gray-500 dark:text-gray-400 font-medium">{{ t('map.surrounding.satelliteQuality') }}</span>
         <select 
           v-model.number="satZoom"
           :class="SELECT_SM"
@@ -68,7 +68,7 @@
       </div>
 
       <!-- Output Info -->
-      <div class="text-[10px] text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-0.5">
+      <div class="text-micro text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-0.5">
         <div class="flex justify-between">
           <span>{{ t('map.surrounding.outputSize') }}</span>
           <span class="text-gray-700 dark:text-gray-300 font-medium">{{ outputSize }}×{{ outputSize }}px</span>
@@ -81,7 +81,7 @@
           <span>{{ t('map.surrounding.perTileArea') }}</span>
           <span class="text-gray-700 dark:text-gray-300 font-medium">{{ resolution }}×{{ resolution }}m</span>
         </div>
-        <p class="text-[9px] text-gray-400 dark:text-gray-500 pt-1 leading-tight">{{ t('map.surrounding.upsampleNote') }}</p>
+        <p class="text-nano text-gray-400 dark:text-gray-500 pt-1 leading-tight">{{ t('map.surrounding.upsampleNote') }}</p>
       </div>
 
       <!-- Download Button -->
@@ -89,7 +89,7 @@
         @click="handleDownload"
         :disabled="selected.size === 0 || isDownloading || !terrainData"
         :class="[
-          'w-full py-2.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2',
+          'w-full py-2.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2',
           selected.size > 0 && !isDownloading && terrainData
             ? 'bg-gray-800 dark:bg-gray-200 text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300 shadow-sm'
             : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
@@ -106,7 +106,7 @@
       <button
         v-if="isDownloading"
         @click="cancelDownload"
-        class="w-full text-center text-[10px] text-gray-500 hover:text-red-500 transition-colors py-1"
+        class="w-full text-center text-micro text-gray-500 hover:text-red-500 transition-colors py-1"
       >
         {{ t('map.surrounding.cancel') }}
       </button>

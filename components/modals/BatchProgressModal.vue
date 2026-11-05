@@ -26,7 +26,7 @@
           <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchProgress.instrumentation') }}</span>
           <button
             @click="showDetails = !showDetails"
-            class="text-xs font-medium text-[#FF6600] hover:underline"
+            class="text-xs font-medium text-brand hover:underline"
           >
             {{ showDetails ? t('batchProgress.hideDetails') : t('batchProgress.details') }}
           </button>
@@ -69,7 +69,7 @@
               :class="progressBarClass" :style="{ width: progressPercent + '%' }">
             </div>
           </div>
-          <div class="flex justify-between text-[10px] text-gray-500 dark:text-gray-400">
+          <div class="flex justify-between text-micro text-gray-500 dark:text-gray-400">
             <span>{{ progressPercent.toFixed(0) }}%</span>
             <span v-if="etaText && isRunning">~{{ etaText }} {{ t('batchProgress.remaining') }}</span>
             <span v-else-if="elapsedText">{{ elapsedText }} {{ t('batchProgress.elapsed') }}</span>
@@ -88,7 +88,7 @@
             <div class="h-full rounded-full bg-indigo-500 transition-all duration-500 ease-out"
               :style="{ width: finalizePercent + '%' }"></div>
           </div>
-          <p class="text-[10px] text-indigo-500 dark:text-indigo-400">{{ t('batchProgress.finalizingHint') }}</p>
+          <p class="text-micro text-indigo-500 dark:text-indigo-400">{{ t('batchProgress.finalizingHint') }}</p>
         </div>
 
         <!-- Current Tile Status (during processing) -->
@@ -162,19 +162,19 @@
               <p v-if="jobSummary?.memory?.supported">{{ t('batchProgress.peakHeap') }}: <span class="font-medium">{{ formatBytes(jobSummary.memory.peakUsedBytes) }}</span> / {{ formatBytes(jobSummary.memory.peakTotalBytes) }}</p>
               <p v-if="jobSummary?.memory?.supported">{{ t('batchProgress.memorySamples') }}: <span class="font-medium">{{ jobSummary.memory.sampleCount }}</span></p>
               <p v-if="jobSummary?.memory?.peakTile">{{ t('batchProgress.peakTileHeap') }}: <span class="font-medium">{{ jobSummary.memory.peakTile.label || `R${jobSummary.memory.peakTile.row + 1}C${jobSummary.memory.peakTile.col + 1}` }}</span> ({{ formatBytes(jobSummary.memory.peakTile.peakUsedBytes) }})</p>
-              <p v-if="!jobSummary?.memory?.supported" class="text-[10px]">{{ t('batchProgress.memoryUnavailable') }}</p>
+              <p v-if="!jobSummary?.memory?.supported" class="text-micro">{{ t('batchProgress.memoryUnavailable') }}</p>
             </div>
             <div class="flex items-center justify-between gap-2">
               <button
                 @click="copyBenchmarkReport"
-                class="py-1.5 px-2 text-[10px] font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
+                class="py-1.5 px-2 text-micro font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors"
               >
                 {{ t('batchProgress.copyBenchmark') }}
               </button>
-              <span v-if="benchmarkCopyStatus" class="text-[10px] text-gray-500 dark:text-gray-400">{{ benchmarkCopyStatus }}</span>
+              <span v-if="benchmarkCopyStatus" class="text-micro text-gray-500 dark:text-gray-400">{{ benchmarkCopyStatus }}</span>
             </div>
             <div v-if="jobSummary?.byStage" class="max-h-36 overflow-y-auto custom-scrollbar">
-              <div v-for="(stats, stage) in jobSummary.byStage" :key="stage" class="text-[10px] text-gray-600 dark:text-gray-300 grid grid-cols-4 gap-2 py-0.5">
+              <div v-for="(stats, stage) in jobSummary.byStage" :key="stage" class="text-micro text-gray-600 dark:text-gray-300 grid grid-cols-4 gap-2 py-0.5">
                 <span class="truncate" :title="stage">{{ stage }}</span>
                 <span>avg {{ formatDuration(stats.avgMs) }}</span>
                 <span>med {{ formatDuration(stats.medianMs) }}</span>
@@ -188,25 +188,25 @@
             <div class="max-h-56 overflow-y-auto custom-scrollbar space-y-2">
               <div v-for="tile in tilesWithInstrumentation" :key="tile.id || tile.index" class="border border-gray-200 dark:border-gray-700 rounded p-2 bg-white dark:bg-gray-900">
                 <div class="text-xs font-medium text-gray-700 dark:text-gray-200 mb-1">{{ tileLabel(tile) }} · {{ tile.status }}</div>
-                <div v-if="tile.lifecycle?.totalMs" class="text-[10px] text-gray-600 dark:text-gray-300 mb-1">total {{ formatDuration(tile.lifecycle.totalMs) }}</div>
+                <div v-if="tile.lifecycle?.totalMs" class="text-micro text-gray-600 dark:text-gray-300 mb-1">total {{ formatDuration(tile.lifecycle.totalMs) }}</div>
                 <div v-if="tile.memory" class="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-2">
-                  <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapStart') }}</div>
-                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.startUsedBytes) }}</div>
-                  <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapAfterFetch') }}</div>
-                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.afterFetchUsedBytes) }}</div>
-                  <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapBeforeZip') }}</div>
-                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.beforeZipUsedBytes) }}</div>
-                  <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapAfterZip') }}</div>
-                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.afterZipUsedBytes) }}</div>
-                  <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapEnd') }}</div>
-                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.endUsedBytes) }}</div>
-                  <div class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapPeak') }}</div>
-                  <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.peakUsedBytes) }}</div>
+                  <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapStart') }}</div>
+                  <div class="text-micro text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.startUsedBytes) }}</div>
+                  <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapAfterFetch') }}</div>
+                  <div class="text-micro text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.afterFetchUsedBytes) }}</div>
+                  <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapBeforeZip') }}</div>
+                  <div class="text-micro text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.beforeZipUsedBytes) }}</div>
+                  <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapAfterZip') }}</div>
+                  <div class="text-micro text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.afterZipUsedBytes) }}</div>
+                  <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapEnd') }}</div>
+                  <div class="text-micro text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.endUsedBytes) }}</div>
+                  <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('batchProgress.heapPeak') }}</div>
+                  <div class="text-micro text-gray-700 dark:text-gray-300 text-right">{{ formatBytes(tile.memory.peakUsedBytes) }}</div>
                 </div>
                 <div class="grid grid-cols-2 gap-x-3 gap-y-0.5">
                   <template v-for="(ms, stage) in tile.stageTimings" :key="stage">
-                    <div class="text-[10px] text-gray-500 dark:text-gray-400 truncate" :title="stage">{{ stage }}</div>
-                    <div class="text-[10px] text-gray-700 dark:text-gray-300 text-right">{{ formatDuration(ms) }}</div>
+                    <div class="text-micro text-gray-500 dark:text-gray-400 truncate" :title="stage">{{ stage }}</div>
+                    <div class="text-micro text-gray-700 dark:text-gray-300 text-right">{{ formatDuration(ms) }}</div>
                   </template>
                 </div>
               </div>
@@ -246,7 +246,7 @@
 
         <template v-else-if="isPaused">
           <button @click="$emit('resume')"
-            class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors">
+            class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-brand hover:bg-brand-500 text-white transition-colors">
             <Play :size="14" />
             {{ t('batchProgress.resume') }}
           </button>
@@ -258,7 +258,7 @@
 
         <template v-else-if="isDone">
           <button v-if="failedCount > 0" @click="$emit('retryFailed')"
-            class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-[#FF6600] hover:bg-[#e85d00] text-white transition-colors">
+            class="flex-1 py-2.5 text-sm font-medium rounded-lg flex items-center justify-center gap-2 bg-brand hover:bg-brand-500 text-white transition-colors">
             <RotateCcw :size="14" />
             {{ isCombinedLevel ? t('batchProgress.retryFailedCombined', { count: failedCount }) : t('batchProgress.retryFailed', { count: failedCount }) }}
           </button>
@@ -402,7 +402,7 @@ const progressSummaryText = computed(() => {
 const progressBarClass = computed(() => {
   if (isDone.value && failedCount.value === 0) return 'bg-emerald-500';
   if (isDone.value && failedCount.value > 0) return 'bg-amber-500';
-  return 'bg-[#FF6600]';
+  return 'bg-brand';
 });
 
 // Time calculations
@@ -485,7 +485,7 @@ const headerBgClass = computed(() => {
   if (isDone.value && !isJobFailed.value && failedCount.value === 0) return 'bg-emerald-100 dark:bg-emerald-900/30';
   if (isDone.value) return 'bg-amber-100 dark:bg-amber-900/30';
   if (isPaused.value) return 'bg-amber-100 dark:bg-amber-900/30';
-  return 'bg-[#FF6600]/10';
+  return 'bg-brand/10';
 });
 
 const headerIcon = computed(() => {
@@ -499,7 +499,7 @@ const headerIconClass = computed(() => {
   if (isDone.value && !isJobFailed.value && failedCount.value === 0) return 'text-emerald-600 dark:text-emerald-400';
   if (isDone.value) return 'text-amber-600 dark:text-amber-400';
   if (isPaused.value) return 'text-amber-600 dark:text-amber-400';
-  return 'text-[#FF6600]';
+  return 'text-brand';
 });
 
 // Summary

@@ -2,7 +2,7 @@
   <SettingSection :title="t('batchExport.title')" :icon="Download" storage-key="mapng_ui_sec_batchexports">
 
     <div class="space-y-1.5">
-      <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchExport.assets2d') }}</h4>
+      <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchExport.assets2d') }}</h4>
       <BaseCard padded class="space-y-1 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
         <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
           <input type="checkbox" :class="CHECKBOX" :checked="exports.heightmap" @change="updateExport('heightmap', $event.target.checked)" />
@@ -28,7 +28,7 @@
     </div>
 
     <div class="space-y-1.5">
-      <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchExport.models3d') }}</h4>
+      <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchExport.models3d') }}</h4>
       <BaseCard padded class="space-y-1 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
         <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
           <input type="checkbox" :class="CHECKBOX" :checked="exports.glb" @change="updateExport('glb', $event.target.checked)" />
@@ -43,7 +43,7 @@
           {{ t('batchExport.beamngTerrain') }}
         </label>
         <div v-if="exports.glb || exports.dae" class="flex items-center gap-2 pt-1 mt-1 border-t border-gray-200 dark:border-gray-600">
-          <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ t('batchExport.meshQuality') }}</span>
+          <span class="text-micro text-gray-500 dark:text-gray-400">{{ t('batchExport.meshQuality') }}</span>
           <select
             :class="SELECT_XS"
             :value="meshResolution"
@@ -55,14 +55,14 @@
             <option :value="1024">{{ t('batchExport.qualityUltra') }}</option>
           </select>
         </div>
-        <p v-if="exports.glb || exports.dae" class="text-[10px] text-gray-500 dark:text-gray-400">
+        <p v-if="exports.glb || exports.dae" class="text-micro text-gray-500 dark:text-gray-400">
           {{ t('batchExport.modelsNoSurroundings') }}
         </p>
       </BaseCard>
     </div>
 
     <div class="space-y-1.5">
-      <h4 class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchExport.geoData') }}</h4>
+      <h4 class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('batchExport.geoData') }}</h4>
       <BaseCard padded class="space-y-1 bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
         <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-700 dark:text-gray-300">
           <input type="checkbox" :class="CHECKBOX" :checked="exports.geotiff" @change="updateExport('geotiff', $event.target.checked)" />

@@ -8,7 +8,7 @@
     </div>
     <input
       type="checkbox"
-      class="accent-[#FF6600] w-4 h-4"
+      class="accent-brand w-4 h-4"
       :class="disabled ? 'cursor-not-allowed' : 'cursor-pointer'"
       :checked="modelValue"
       :disabled="disabled"

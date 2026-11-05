@@ -10,20 +10,20 @@
     :class="[indent ? 'pl-4' : '', disabled ? 'opacity-60' : '', check && !disabled ? 'cursor-pointer' : '', check && disabled ? 'cursor-not-allowed' : '']"
   >
     <div class="flex items-center justify-between gap-3 min-h-[22px]">
-      <span class="text-[12px] text-gray-700 dark:text-gray-200 min-w-0">{{ label }}</span>
+      <span class="text-xs text-gray-700 dark:text-gray-200 min-w-0">{{ label }}</span>
       <input
         v-if="check"
         type="checkbox"
         :checked="modelValue && !disabled"
         :disabled="disabled"
-        class="accent-[#FF6600] w-4 h-4 shrink-0"
+        class="accent-brand w-4 h-4 shrink-0"
         :class="disabled ? 'cursor-not-allowed' : 'cursor-pointer'"
         @change="$emit('update:modelValue', $event.target.checked)"
       />
       <div v-else class="flex items-center gap-1 shrink-0"><slot /></div>
     </div>
-    <p v-if="disabled && disabledReason" class="mt-0.5 text-[11px] leading-snug text-amber-700 dark:text-amber-300">{{ disabledReason }}</p>
-    <p v-else-if="hint" class="mt-0.5 text-[11px] leading-snug text-gray-500 dark:text-gray-400">{{ hint }}</p>
+    <p v-if="disabled && disabledReason" class="mt-0.5 text-caption leading-snug text-amber-700 dark:text-amber-300">{{ disabledReason }}</p>
+    <p v-else-if="hint" class="mt-0.5 text-caption leading-snug text-gray-500 dark:text-gray-400">{{ hint }}</p>
   </component>
 </template>
 

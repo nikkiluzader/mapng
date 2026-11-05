@@ -7,12 +7,17 @@
 <title>MapNG Reports</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
   :root { --bg:#f7f7f8; --surface:#fff; --border:#e3e3e8; --text:#1d1d22; --muted:#6e6e7a; --brand:#ff6600; --code:#f2f2f4; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#111114; --surface:#1a1a1f; --border:#2e2e36; --text:#ececf0; --muted:#9a9aa6; --brand:#ff7a1f; --code:#222229; } }
   :root[data-theme="dark"] { --bg:#111114; --surface:#1a1a1f; --border:#2e2e36; --text:#ececf0; --muted:#9a9aa6; --brand:#ff7a1f; --code:#222229; }
   * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 "Noto Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
   .wrap { max-width:1100px; margin:0 auto; padding:16px; }
+  h1, h2 { font-family:"Overpass","Noto Sans",system-ui,sans-serif; }
+  pre, code { font-family:"Overpass Mono",ui-monospace,monospace; }
   h1 { font-size:20px; margin:8px 0 12px; }
   .bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
   input { padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); min-width:240px; }

@@ -93,7 +93,7 @@
       ]"
       :title="showSceneSettings ? t('preview.hideSettings') : t('preview.showSettings')"
     >
-      <component :is="showSceneSettings ? ChevronLeft : ChevronRight" :size="14" class="text-[#FF6600]" />
+      <component :is="showSceneSettings ? ChevronLeft : ChevronRight" :size="14" class="text-brand" />
       <span v-if="!showSceneSettings" class="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">{{ t('preview.sceneSettings') }}</span>
     </button>
 
@@ -107,7 +107,7 @@
       <div
         class="flex items-center gap-2 text-gray-900 dark:text-white mb-3 border-b border-gray-200 dark:border-gray-700 pb-2"
       >
-        <Settings :size="16" class="text-[#FF6600]" />
+        <Settings :size="16" class="text-brand" />
         <span class="text-sm font-bold">{{ t('preview.sceneSettings') }}</span>
       </div>
 
@@ -147,7 +147,7 @@
         >
           <option v-for="q in meshQualityOptions" :key="q.value" :value="q.value">{{ t(q.labelKey) }}</option>
         </select>
-        <p v-if="meshQuality === 'full'" class="text-[10px] text-gray-400 dark:text-gray-500">
+        <p v-if="meshQuality === 'full'" class="text-micro text-gray-400 dark:text-gray-500">
           {{ t('preview.qualityFullHint') }}
         </p>
       </div>
@@ -159,14 +159,14 @@
         </label>
 
         <div
-          class="flex bg-gray-100 dark:bg-gray-800 rounded-md p-1 border border-gray-200 dark:border-gray-700 mb-2"
+          class="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700 mb-2"
         >
           <button
             @click="pickTexture('satellite')"
             :class="[
               'flex-1 text-xs py-1.5 rounded transition-colors',
               textureType === 'satellite'
-                ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+                ? 'bg-brand text-white shadow-sm font-medium'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
             ]"
           >
@@ -183,7 +183,7 @@
             :class="[
               'flex-1 text-xs py-1.5 rounded transition-colors',
               textureType === 'osm'
-                ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+                ? 'bg-brand text-white shadow-sm font-medium'
                 : !terrainData.osmTextureUrl
                   ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
@@ -202,7 +202,7 @@
             :class="[
               'flex-1 text-xs py-1.5 rounded transition-colors',
               textureType === 'hybrid'
-                ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+                ? 'bg-brand text-white shadow-sm font-medium'
                 : !terrainData.hybridTextureUrl
                   ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
@@ -221,7 +221,7 @@
             :class="[
               'flex-1 text-xs py-1.5 rounded transition-colors',
               textureType === 'game'
-                ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+                ? 'bg-brand text-white shadow-sm font-medium'
                 : !terrainData.gameTextureUrl && !terrainData.gameTextureCanvas
                   ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
@@ -234,7 +234,7 @@
             :class="[
               'flex-1 text-xs py-1.5 rounded transition-colors',
               textureType === 'none'
-                ? 'bg-[#FF6600] text-white shadow-sm font-medium'
+                ? 'bg-brand text-white shadow-sm font-medium'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
             ]"
           >
@@ -247,7 +247,7 @@
           <!-- Surroundings + wireframe: advanced mode -->
           <template v-if="advancedMode">
           <div>
-            <label class="text-[10px] text-gray-400 dark:text-gray-500 block mb-1">{{ t('preview.surroundingsTexture') }}</label>
+            <label class="text-micro text-gray-400 dark:text-gray-500 block mb-1">{{ t('preview.surroundingsTexture') }}</label>
             <select
               v-model="surroundingTextureType"
               :class="[SELECT_XS, 'w-full max-w-[140px] appearance-none hover:bg-gray-50 dark:hover:bg-gray-700']"
@@ -265,17 +265,17 @@
                 class="peer sr-only"
               />
               <div
-                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"
+                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"
               ></div>
             </div>
             <span class="text-xs text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white"
               >{{ t('preview.surroundingTerrain') }}</span
             >
           </label>
-          <p v-if="showSurroundings" class="text-[10px] text-gray-400 dark:text-gray-500 ml-11 -mt-1">{{ t('preview.surroundingDesc') }}</p>
+          <p v-if="showSurroundings" class="text-micro text-gray-400 dark:text-gray-500 ml-11 -mt-1">{{ t('preview.surroundingDesc') }}</p>
           <p
             v-if="showSurroundings && surroundingTextureType === 'satellite' && isSurroundingsLoading"
-            class="text-[10px] text-gray-400 dark:text-gray-500 ml-11 -mt-1"
+            class="text-micro text-gray-400 dark:text-gray-500 ml-11 -mt-1"
           >
             {{ surroundingsSatelliteProgress.completed }} of {{ surroundingsSatelliteProgress.total }} satellite images downloaded
           </p>
@@ -288,7 +288,7 @@
                 class="peer sr-only"
               />
               <div
-                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#FF6600]"
+                class="w-9 h-5 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand"
               ></div>
             </div>
             <span class="text-xs text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white"
@@ -310,15 +310,15 @@
                     class="peer sr-only"
                   />
                   <div
-                    class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#FF6600]"
+                    class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand"
                   ></div>
                 </div>
-                <span class="text-[10px] capitalize text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
+                <span class="text-micro capitalize text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
                   {{ t('preview.water') }}
                 </span>
               </label>
               <div class="col-span-2 flex items-center justify-between gap-2 px-0.5">
-                <span class="text-[10px] text-gray-500 dark:text-gray-400 shrink-0">{{ t('preview.seaLevelOffset') }}</span>
+                <span class="text-micro text-gray-500 dark:text-gray-400 shrink-0">{{ t('preview.seaLevelOffset') }}</span>
                 <div class="flex items-center gap-1">
                   <input
                     v-model.number="waterLevelOffsetMeters"
@@ -327,9 +327,9 @@
                     min="-2000"
                     max="2000"
                     :disabled="!showWater"
-                    class="w-20 text-[9px] bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-[#FF6600] focus:border-[#FF6600]"
+                    class="w-20 text-nano bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-600 dark:text-gray-300 disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
                   />
-                  <span class="text-[9px] text-gray-500 dark:text-gray-400">m</span>
+                  <span class="text-nano text-gray-500 dark:text-gray-400">m</span>
                 </div>
               </div>
               <label v-for="(val, key) in featureVisibility" :key="key" class="flex items-center gap-2 cursor-pointer group/check">
@@ -340,10 +340,10 @@
                     class="peer sr-only"
                   />
                   <div
-                    class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#FF6600]/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#FF6600]"
+                    class="w-7 h-4 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-brand/20 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-brand"
                   ></div>
                 </div>
-                <span class="text-[10px] text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
+                <span class="text-micro text-gray-700 dark:text-gray-300 group-hover/check:text-gray-900 dark:group-hover/check:text-white font-medium select-none">
                   {{ t(`preview.feature_${key}`) }}
                 </span>
               </label>
@@ -354,7 +354,7 @@
         <div class="pt-4 border-t border-gray-100 dark:border-gray-700">
           <button
             @click="resetCamera"
-            class="w-full flex items-center justify-center gap-2 py-2 bg-gray-900 dark:bg-gray-700 hover:bg-black dark:hover:bg-gray-600 text-white text-xs font-bold rounded-md transition-colors shadow-lg shadow-black/10"
+            class="w-full flex items-center justify-center gap-2 py-2 bg-gray-900 dark:bg-gray-700 hover:bg-black dark:hover:bg-gray-600 text-white text-xs font-bold rounded-lg transition-colors shadow-lg shadow-black/10"
           >
             <RotateCcw :size="14" />
             {{ t('preview.resetCamera') }}
@@ -366,10 +366,10 @@
     <!-- Preview-only note (bottom right: the memory widget sits bottom centre) -->
     <div
       v-if="showPreviewNote && webGLAvailable && !webGLRuntimeError"
-      class="absolute bottom-4 right-4 z-20 max-w-xs flex items-start gap-2 pl-3 pr-1.5 py-2 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 text-white/85 text-[11px] leading-snug shadow-lg"
+      class="absolute bottom-4 right-4 z-20 max-w-xs flex items-start gap-2 pl-3 pr-1.5 py-2 rounded-lg bg-black/60 backdrop-blur-sm border border-white/10 text-white/85 text-caption leading-snug shadow-lg"
       role="note"
     >
-      <Info :size="14" class="shrink-0 mt-px text-[#FF6600]" />
+      <Info :size="14" class="shrink-0 mt-px text-brand" />
       <span>{{ t('preview.previewNote') }}</span>
       <button
         @click="dismissPreviewNote"
