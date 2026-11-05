@@ -13,6 +13,8 @@ import { pendingCrash, prepareReport, sendReport, startCrashReporter } from './c
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const API_ORIGIN = process.env.MAPNG_API_ORIGIN || 'https://mapng.com';
+// (testing only: /api/share, /api/usage and /api/crash go here instead)
+const TEST_API_ORIGIN = process.env.MAPNG_TEST_API_ORIGIN || '';
 // (MAPNG_USER_DATA: settings and jobs somewhere else, for tests)
 if (process.env.MAPNG_USER_DATA) app.setPath('userData', process.env.MAPNG_USER_DATA);
 
@@ -78,8 +80,10 @@ function servePage() {
       return bytes ? new Response(bytes, { headers: { 'content-type': 'image/png', 'cache-control': 'no-store' } }) : new Response(null, { status: 404 });
     }
     if (url.pathname.startsWith('/api/')) {
-      // (as on mapng.com: its worker answers /api/*)
-      return net.fetch(`${API_ORIGIN}${url.pathname}${url.search}`, {
+      // (as on mapng.com: its worker answers /api/*; MAPNG_TEST_API_ORIGIN sends
+      // endpoints not yet live there to a local test server)
+      const origin = TEST_API_ORIGIN && /^\/api\/(share|usage|crash)(\/|$)/.test(url.pathname) ? TEST_API_ORIGIN : API_ORIGIN;
+      return net.fetch(`${origin}${url.pathname}${url.search}`, {
         method: request.method,
         headers: request.headers,
         body: ['GET', 'HEAD'].includes(request.method) ? undefined : request.body,
@@ -846,8 +850,7 @@ ipcMain.handle('report:pending', () => {
 });
 ipcMain.handle('report:prepare', (_event, kind, ctx = {}) => prepareReport(String(kind), ctx, { build: String(ctx.build || ''), settings: readSettings() }));
 ipcMain.handle('report:send', async (_event, token, choices = {}) => {
-  // (MAPNG_REPORT_ORIGIN: testing against a local server before /api/crash is live)
-  const result = await sendReport(String(token), choices, process.env.MAPNG_REPORT_ORIGIN || API_ORIGIN);
+  const result = await sendReport(String(token), choices, TEST_API_ORIGIN || API_ORIGIN);
   if (choices.kind === 'crash') { writeSettings({ crashSeenAt: Date.now() }); lastWindowCrash = null; }
   return result;
 });
