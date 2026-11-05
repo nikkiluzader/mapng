@@ -44,11 +44,15 @@ from collections import defaultdict
 import osmium
 from pmtiles.tile import Compression, TileType, zxy_to_tileid
 from pmtiles.writer import Writer
-from shapely.geometry import LineString, Polygon, box
+from shapely.geometry import LineString, MultiLineString, Polygon, box
+from shapely.prepared import prep
 from shapely.ops import linemerge, polygonize, unary_union
+from shapely import make_valid
+from shapely.errors import GEOSException
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MAX_SPAN = 3          # a relation wider/taller than this many tiles is split per tile
+MANY_TILES = 64       # a feature whose box covers more tiles goes only where its shape is
 COORD_DIGITS = 7      # Overpass precision
 
 
@@ -111,18 +115,142 @@ def dumps(el):
 
 
 class Tiles:
-    def __init__(self, z):
+    """Tile buckets; with a block (bz, bx, by) only the tiles inside that
+    lower-zoom tile are kept (planet builds: every tile comes from exactly one
+    block, so blocks join without de-duplication).
+
+    A feature can reach into a neighbouring block that has none of its
+    points (a big lake or forest over a block with no point of its outline):
+    that block's extract never sees it. With --blocks (every leaf block of
+    the planet), the feature's "owner" (the first block holding any of its
+    points, in key order) also writes it into the tiles of blocks that have
+    none of its points and that its shape really touches, as a side file
+    the merge step folds in (scripts/planet/planet.py)."""
+    def __init__(self, z, block=None, leaves=None):
         self.z = z
         self.buckets = defaultdict(list)    # (x, y) -> [json strings]
+        self.side = defaultdict(list)       # tiles of other blocks (owner's extras)
+        self.block = block
+        self.leaves = leaves or set()
+        self.leaf_zooms = sorted({int(k.split("-")[0]) for k in self.leaves})
+        if block:
+            bz, bx, by = block
+            k = z - bz
+            self.bx0, self.by0 = bx << k, by << k
+            self.bx1, self.by1 = ((bx + 1) << k) - 1, ((by + 1) << k) - 1
+            self.own = f"{bz}-{bx}-{by}"
 
-    def add_whole(self, element_json, coords):
-        x0, y0, x1, y1 = tile_range(coords, self.z)
+    def clamp(self, x0, y0, x1, y1):
+        """The tile range limited to the block (empty when outside it)."""
+        if not self.block:
+            return x0, y0, x1, y1
+        return max(x0, self.bx0), max(y0, self.by0), min(x1, self.bx1), min(y1, self.by1)
+
+    def inside(self, xy):
+        return not self.block or (self.bx0 <= xy[0] <= self.bx1 and self.by0 <= xy[1] <= self.by1)
+
+    def reaches_out(self, x0, y0, x1, y1):
+        return bool(self.block and self.leaves) and (x0 < self.bx0 or y0 < self.by0 or x1 > self.bx1 or y1 > self.by1)
+
+    def block_of_tile(self, x, y):
+        for bz in self.leaf_zooms:
+            k = self.z - bz
+            key = f"{bz}-{x >> k}-{y >> k}"
+            if key in self.leaves:
+                return key
+        return None
+
+    def blocks_of(self, coords):
+        return {b for b in (self.block_of_tile(*tile_xy(lat, lon, self.z)) for lat, lon in coords) if b}
+
+    def owner(self, coords):
+        """(this block owns the feature, blocks holding any of its points)"""
+        held = self.blocks_of(coords)
+        return (min(held) if held else self.own) == self.own, held
+
+    def outer_tiles(self, x0, y0, x1, y1, held, shape):
+        """Tiles of the range in blocks holding none of the feature's points
+        that the shape really touches (not just its bounding box: an
+        undersea cable's box covers 170 thousand ocean tiles)."""
+        prepared = prep(shape) if shape is not None else None
         for x in range(x0, x1 + 1):
             for y in range(y0, y1 + 1):
+                if self.inside((x, y)):
+                    continue
+                b = self.block_of_tile(x, y)
+                if b is None or b in held:
+                    continue
+                if prepared is not None:
+                    s, w, n, e = tile_bounds(x, y, self.z)
+                    if not prepared.intersects(box(w, s, e, n)):
+                        continue
+                yield x, y
+
+    def add_whole(self, element_json, coords, shape=None, tags=None):
+        x0, y0, x1, y1 = tile_range(coords, self.z)
+        cx0, cy0, cx1, cy1 = self.clamp(x0, y0, x1, y1)
+        # A feature over many tiles goes only into the tiles its shape really
+        # touches (as Overpass answers a bbox): its bounding box alone put
+        # one ring-shaped undersea cable into 150 thousand ocean tiles.
+        test = None
+        if (cx1 - cx0 + 1) * (cy1 - cy0 + 1) > MANY_TILES:
+            sh = shape if shape is not None else shape_of(coords, tags)
+            test = prep(sh) if sh is not None else None
+        for x in range(cx0, cx1 + 1):
+            for y in range(cy0, cy1 + 1):
+                if test is not None:
+                    s, w, n, e = tile_bounds(x, y, self.z)
+                    if not test.intersects(box(w, s, e, n)):
+                        continue
                 self.buckets[(x, y)].append(element_json)
+        if self.reaches_out(x0, y0, x1, y1):
+            mine, held = self.owner(coords)
+            if mine:
+                for xy in self.outer_tiles(x0, y0, x1, y1, held, shape if shape is not None else shape_of(coords, tags)):
+                    self.side[xy].append(element_json)
 
     def add_to(self, xy, element_json):
-        self.buckets[xy].append(element_json)
+        if self.inside(xy):
+            self.buckets[xy].append(element_json)
+        elif self.block:
+            self.side[xy].append(element_json)
+
+    def write_side(self, path):
+        with open(path, "w", encoding="utf-8") as f:
+            for (x, y) in sorted(self.side):
+                for el in self.side[(x, y)]:
+                    f.write(f"{x} {y}\t{el}\n")
+
+
+LINEAR_KEYS = ("highway", "barrier", "railway", "power", "communication")
+LINEAR_VALUES = {
+    "man_made": {"submarine_cable", "pipeline", "embankment", "cutline", "breakwater", "groyne", "pier"},
+    "natural": {"coastline", "cliff", "ridge", "arete", "tree_row", "earth_bank"},
+    "waterway": {"river", "stream", "canal", "drain", "ditch", "brook"},
+}
+
+
+def is_linear(tags):
+    """Closed ways that are still lines (a ring cable, a roundabout, a fence
+    round a field), not areas; area=yes always means an area."""
+    if not tags or tags.get("area") == "yes":
+        return False
+    if any(k in tags for k in LINEAR_KEYS):
+        return True
+    return any(tags.get(k) in vals for k, vals in LINEAR_VALUES.items())
+
+
+def shape_of(coords, tags=None):
+    """A way's shape for the tile test: a polygon when closed and not a
+    linear feature (is_linear), else a line."""
+    pts = [(lon, lat) for lat, lon in coords]
+    try:
+        if len(pts) >= 4 and pts[0] == pts[-1] and not is_linear(tags):
+            poly = Polygon(pts)
+            return poly if poly.is_valid else make_valid(poly)
+        return LineString(pts) if len(pts) >= 2 else None
+    except (GEOSException, ValueError):
+        return None
 
 
 def tags_dict(tag_list):
@@ -311,7 +439,7 @@ class WayNodePass(osmium.SimpleHandler):
             self.way_geom[w.id] = coords
         if matches:
             el = ["w", w.id, tags, geom_json(coords)]
-            self.tiles.add_whole(dumps(el), coords)
+            self.tiles.add_whole(dumps(el), coords, tags=tags)
             self.counts["way"] += 1
 
 
@@ -325,25 +453,51 @@ def assemble_area(members, way_geom):
         (inner if role == "inner" else outer).append(line)
     if not outer:
         return None
-    outer_polys = list(polygonize(linemerge(outer)))
-    if not outer_polys:
+    # (broken OSM shapes are common across a planet: self-touching rings,
+    # crossing members. Each ring is made valid first; if GEOS still can't
+    # combine them, a zero buffer repairs most; failing that the area is
+    # skipped rather than stopping the whole build)
+    try:
+        outer_polys = [valid(p) for p in polygonize(linemerge(outer))]
+        if not outer_polys:
+            return None
+        area = safe_union(outer_polys)
+        if inner:
+            inner_polys = [valid(p) for p in polygonize(linemerge(inner))]
+            if inner_polys:
+                area = valid(area).difference(safe_union(inner_polys))
+        if not area.is_valid:
+            area = area.buffer(0)
+    except GEOSException as err:
+        print(f"skipped a broken area relation: {err}", file=sys.stderr)
         return None
-    area = unary_union(outer_polys)
-    if inner:
-        inner_polys = list(polygonize(linemerge(inner)))
-        if inner_polys:
-            area = area.difference(unary_union(inner_polys))
-    if not area.is_valid:
-        area = area.buffer(0)
     return None if area.is_empty else area
+
+
+def valid(geom):
+    return geom if geom.is_valid else make_valid(geom)
+
+
+def safe_union(polys):
+    try:
+        return unary_union(polys)
+    except GEOSException:
+        return unary_union([p.buffer(0) for p in polys])
+
+
+def member_lines(member_json):
+    lines = [[(lon, lat) for lat, lon in coords] for m, coords in member_json if m[0] == "w" and len(coords) >= 2]
+    return MultiLineString(lines) if lines else None
 
 
 def ring_coords(ring):
     return [(lat, lon) for lon, lat in ring.coords]
 
 
-def emit_relations(relations, way_geom, node_loc, tiles):
-    next_synthetic = [-1]
+def emit_relations(relations, way_geom, node_loc, tiles, id_offset=0):
+    # (negative ids for cut pieces; planet blocks each get their own range, so
+    # pieces from neighbouring blocks never share an id in the browser's merge)
+    next_synthetic = [-1 - id_offset]
 
     def synthetic_id():
         i = next_synthetic[0]
@@ -368,20 +522,37 @@ def emit_relations(relations, way_geom, node_loc, tiles):
         x0, y0, x1, y1 = tile_range(all_coords, tiles.z)
         small = (x1 - x0) < MAX_SPAN and (y1 - y0) < MAX_SPAN
 
+        is_area = tags.get("type") in ("multipolygon", "boundary")
+
         if small:
             el = ["r", rid, tags, [m for m, _ in member_json]]
-            tiles.add_whole(dumps(el), all_coords)
+            shape = None
+            if tiles.reaches_out(x0, y0, x1, y1):
+                shape = (assemble_area(members, way_geom) if is_area else None) or member_lines(member_json)
+            tiles.add_whole(dumps(el), all_coords, shape)
             counts["relation_whole"] += 1
             continue
 
-        is_area = tags.get("type") in ("multipolygon", "boundary")
         area = assemble_area(members, way_geom) if is_area else None
         if area is not None:
             # Cut at tile edges; every piece is a standalone multipolygon relation.
-            for x in range(x0, x1 + 1):
-                for y in range(y0, y1 + 1):
+            # (planet blocks: only the area's owner block cuts it, for every
+            # tile it covers, the other blocks' tiles through the side file;
+            # the other blocks skip it, so no tile gets two sets of pieces)
+            if tiles.reaches_out(x0, y0, x1, y1):
+                mine, _held = tiles.owner(all_coords)
+                if not mine:
+                    continue
+                cx0, cy0, cx1, cy1 = x0, y0, x1, y1
+            else:
+                cx0, cy0, cx1, cy1 = tiles.clamp(x0, y0, x1, y1)
+            for x in range(cx0, cx1 + 1):
+                for y in range(cy0, cy1 + 1):
                     s, w, n, e = tile_bounds(x, y, tiles.z)
-                    piece = area.intersection(box(w, s, e, n))
+                    try:
+                        piece = area.intersection(box(w, s, e, n))
+                    except GEOSException:
+                        piece = area.buffer(0).intersection(box(w, s, e, n))
                     if piece.is_empty:
                         continue
                     polys = [piece] if isinstance(piece, Polygon) else [g for g in getattr(piece, "geoms", []) if isinstance(g, Polygon)]
@@ -400,10 +571,20 @@ def emit_relations(relations, way_geom, node_loc, tiles):
         # Large non-area relation: per tile, only the members that touch it.
         per_tile = defaultdict(list)
         for m, coords in member_json:
-            mx0, my0, mx1, my1 = tile_range(coords, tiles.z)
+            mx0, my0, mx1, my1 = tiles.clamp(*tile_range(coords, tiles.z))
             for x in range(mx0, mx1 + 1):
                 for y in range(my0, my1 + 1):
                     per_tile[(x, y)].append(m)
+        if tiles.reaches_out(x0, y0, x1, y1):
+            # (the owner also adds the members that cross blocks holding none
+            # of the relation's points)
+            mine, held = tiles.owner(all_coords)
+            if mine:
+                for m, coords in member_json:
+                    if m[0] != "w":
+                        continue
+                    for xy in tiles.outer_tiles(*tile_range(coords, tiles.z), held, shape_of(coords, {"highway": "line"})):
+                        per_tile[xy].append(m)
         for xy, ms in per_tile.items():
             el = ["r", rid, tags, ms]
             tiles.add_to(xy, dumps(el))
@@ -460,7 +641,14 @@ def main():
                     help="the input is OPL text with locations on its ways (see apply_opl)")
     ap.add_argument("--index", default="flex_mem",
                     help="osmium node location index, or none for a file with locations on its ways\n                    (osmium add-locations-to-ways; how big extracts are built: pyosmium's\n                    own reader corrupted memory part way through Florida)")
+    ap.add_argument("--blocks", default=None,
+                    help="JSON list of every leaf block key (z-x-y) of the planet: features reaching into\n                    blocks that hold none of their points are written there too, as <output>.side")
+    ap.add_argument("--block", default=None,
+                    help="z/x/y: keep only the tiles inside this lower-zoom tile (planet blocks)")
     args = ap.parse_args()
+    block = tuple(int(v) for v in args.block.split("/")) if args.block else None
+    # a block's own range of negative ids for cut pieces (its PMTiles tile id x 1e8)
+    id_offset = zxy_to_tileid(*block) * 100_000_000 if block else 0
 
     t0 = time.time()
     flt = load_filter()
@@ -472,7 +660,8 @@ def main():
     print(f"relations: {len(rel.relations)} matching, {len(rel.member_ways)} member ways "
           f"({time.time() - t0:.0f}s)", file=sys.stderr)
 
-    tiles = Tiles(args.zoom)
+    leaves = set(json.load(open(args.blocks))) if args.blocks else None
+    tiles = Tiles(args.zoom, block, leaves)
     wn = WayNodePass(flt, rel.member_ways, rel.member_nodes, tiles)
     if args.opl:
         apply_opl(args.input, wn, kinds="nw")
@@ -483,9 +672,16 @@ def main():
         wn.apply_file(args.input, locations=True, idx=args.index)
     print(f"nodes: {wn.counts['node']}, ways: {wn.counts['way']} ({time.time() - t0:.0f}s)", file=sys.stderr)
 
-    rc = emit_relations(rel.relations, wn.way_geom, wn.node_loc, tiles)
+    rc = emit_relations(rel.relations, wn.way_geom, wn.node_loc, tiles, id_offset)
     print(f"relations: {dict(rc)} ({time.time() - t0:.0f}s)", file=sys.stderr)
 
+    if block and leaves:
+        tiles.write_side(args.output + ".side")
+        print(f"side: {sum(len(v) for v in tiles.side.values())} elements for {len(tiles.side)} tiles of other blocks", file=sys.stderr)
+    if not tiles.buckets:
+        # (a block with nothing of ours in it, e.g. open ocean: no archive)
+        print(f"no tiles: {args.output} not written ({time.time() - t0:.0f}s)", file=sys.stderr)
+        return
     n, size = write_pmtiles(tiles, args.output, os.path.basename(args.input))
     print(f"wrote {args.output}: {n} tiles, {size / 1e6:.1f} MB ({time.time() - t0:.0f}s)", file=sys.stderr)
 
