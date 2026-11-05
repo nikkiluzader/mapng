@@ -2,6 +2,7 @@ import proj4 from 'proj4';
 import * as GeoTIFF from 'geotiff';
 import { createLocalToWGS84 } from './geoUtils.js';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
+import { continuousLngRange } from './lngRange.js';
 
 const normalizeLng = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
 
@@ -32,8 +33,7 @@ const getOutputBounds = (toWGS84, width, height, targetBounds) => {
         return {
             north: targetBounds.north,
             south: targetBounds.south,
-            east: normalizeLng(targetBounds.east),
-            west: normalizeLng(targetBounds.west),
+            ...continuousLngRange(targetBounds.west, targetBounds.east),
         };
     }
 
@@ -41,12 +41,7 @@ const getOutputBounds = (toWGS84, width, height, targetBounds) => {
     const halfHeight = height / 2;
     const nw = toWGS84.forward([-halfWidth, halfHeight]);
     const se = toWGS84.forward([halfWidth, -halfHeight]);
-    return {
-        north: nw[1],
-        west: nw[0],
-        south: se[1],
-        east: se[0],
-    };
+    return { north: nw[1], south: se[1], ...continuousLngRange(nw[0], se[0]) };
 };
 
 /**

@@ -16,7 +16,7 @@ import { decode } from 'fast-png';
 import * as GeoTIFF from 'geotiff';
 import { createLocalToWGS84 } from '../../services/geoUtils.js';
 import { resampleToMeterGrid } from '../../services/terrainResampler.js';
-import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights } from '../../services/terrariumSampling.js';
+import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from '../../services/terrariumSampling.js';
 import { AREAS_DIR, areas, key } from './env.mjs';
 
 const MIN_OSM_FEATURES = 50;
@@ -46,7 +46,10 @@ async function fetchOne({ name, lat, lng, size }) {
   // computeMetricFetchBounds (terrain.js)
   const toWGS84 = createLocalToWGS84(center.lat, center.lng);
   const hw = SIZE * MPP / 2 + 4;
-  const corners = [[-hw, hw], [hw, hw], [-hw, -hw], [hw, -hw]].map((c) => toWGS84.forward(c));
+  // (longitudes kept next to the centre's, as terrain.js unwrapLngNearRef: on
+  // the date line 179.99 and -179.99 are neighbours, not a world apart)
+  const unwrap = (x) => { let o = x; while (o - center.lng > 180) o -= 360; while (o - center.lng < -180) o += 360; return o; };
+  const corners = [[-hw, hw], [hw, hw], [-hw, -hw], [hw, -hw]].map((c) => toWGS84.forward(c)).map(([x, y]) => [unwrap(x), y]);
   const bounds = {
     north: Math.max(...corners.map((c) => c[1])), south: Math.min(...corners.map((c) => c[1])),
     east: Math.max(...corners.map((c) => c[0])), west: Math.min(...corners.map((c) => c[0])),
@@ -93,7 +96,7 @@ async function fetchOne({ name, lat, lng, size }) {
   const MW = (maxTx - minTx + 1) * TS, MH = (maxTy - minTy + 1) * TS;
   const rgba = new Uint8Array(MW * MH * 4);
   for (let ty = minTy; ty <= maxTy; ty++) for (let tx = minTx; tx <= maxTx; tx++) {
-    const res = await fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${Z}/${tx}/${ty}.png`);
+    const res = await fetch(`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${Z}/${((tx % 2 ** Z) + 2 ** Z) % 2 ** Z}/${ty}.png`);
     const png = decode(new Uint8Array(await res.arrayBuffer()));
     const ch = png.channels ?? png.data.length / (png.width * png.height);
     for (let y = 0; y < TS; y++) for (let x = 0; x < TS; x++) {
@@ -103,7 +106,7 @@ async function fetchOne({ name, lat, lng, size }) {
   }
   const th = decodeTerrariumPixels(rgba, MW, MH, NO_DATA);
   blendTerrariumTileSeams(th, MW, MH, NO_DATA);
-  const sampler = (lat, lng) => { const p = proj(lat, lng); return sampleTerrariumHeights(th, MW, MH, p.x - minTx * TS, p.y - minTy * TS, NO_DATA); };
+  const sampler = (lat, lng) => { const p = proj(lat, lng); return sampleTerrariumHeights(th, MW, MH, wrapMosaicX(p.x - minTx * TS, Z, MW, TS), p.y - minTy * TS, NO_DATA); };
   const sigmaPx = 5 / MPP, smoothR = Math.round((Math.sqrt(6 * sigmaPx * sigmaPx + 1) - 1) / 2);
   const t30 = await resampleToMeterGrid({ type: 'sampler', sampler }, center, SIZE, SIZE, 'bilinear', smoothR >= 1 ? smoothR : false, true, bounds, true);
   fs.writeFileSync(`${OUT}/t30.f32`, Buffer.from(t30.heightMap.buffer));

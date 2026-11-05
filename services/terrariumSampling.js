@@ -131,3 +131,16 @@ export const sampleTerrariumHeights = (heights, width, height, x, y, noData) => 
     if (complete) return sum;
     return validCnt > 0 ? validSum / validCnt : noData;
 };
+
+/**
+ * A mosaic x (pixels from the mosaic's left edge) for a point on the far side
+ * of the date line: the mosaic is fetched with tile numbers running past the
+ * last tile (wrapped when requested), while a longitude there projects to the
+ * world's other end. Moved by one world width when that lands inside the
+ * mosaic; anything else is returned unchanged.
+ */
+export function wrapMosaicX(x, zoom, width, tileSize = 256) {
+  const world = tileSize * 2 ** zoom;
+  const w = x < 0 ? x + world : x >= width ? x - world : x;
+  return w >= 0 && w < width ? w : x;
+}

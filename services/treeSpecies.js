@@ -108,8 +108,11 @@ async function fetchMixOver(bounds, minSpan, fetchImpl, timeoutMs) {
   const grow = (lo, hi) => { const span = hi - lo; const pad = Math.max(0, (minSpan - span) / 2); return [lo - pad, hi + pad]; };
   const [south, north] = grow(bounds.south, bounds.north);
   const [west, east] = grow(bounds.west, bounds.east);
+  // (iNaturalist reads swlng > nelng as a box across the date line, and
+  // clamps anything past ±180, so a date-line export is sent in that form)
+  const wrap = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
   const params = new URLSearchParams({
-    swlat: south.toFixed(5), swlng: west.toFixed(5), nelat: north.toFixed(5), nelng: east.toFixed(5),
+    swlat: south.toFixed(5), swlng: wrap(west).toFixed(5), nelat: north.toFixed(5), nelng: (east === 180 ? 180 : wrap(east)).toFixed(5),
     iconic_taxa: 'Plantae', quality_grade: 'research', per_page: '500',
   });
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;

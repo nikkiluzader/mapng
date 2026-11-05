@@ -11,8 +11,9 @@
 import proj4 from 'proj4';
 import { getBuiltInProj4 } from './uploadGeoMetadata.js';
 import { sampleSatelliteTexture, satelliteLatticeRows } from './satelliteImageSampler.js';
-import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights } from './terrariumSampling.js';
+import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from './terrariumSampling.js';
 import { parallelMap, parallelThreads } from './parallel.js';
+import { continuousLngRange } from './lngRange.js';
 
 const DEBUG_RESAMPLER = false;
 const debugLog = (...args) => {
@@ -84,8 +85,7 @@ const getOutputBounds = (toWGS84, width, height, targetBounds) => {
         return {
             north: targetBounds.north,
             south: targetBounds.south,
-            east: normalizeLng(targetBounds.east),
-            west: normalizeLng(targetBounds.west),
+            ...continuousLngRange(targetBounds.west, targetBounds.east),
         };
     }
 
@@ -93,7 +93,7 @@ const getOutputBounds = (toWGS84, width, height, targetBounds) => {
     const halfHeight = height / 2;
     const nw = toWGS84.forward([-halfWidth, halfHeight]);
     const se = toWGS84.forward([halfWidth, -halfHeight]);
-    return { north: nw[1], west: nw[0], south: se[1], east: se[0] };
+    return { north: nw[1], south: se[1], ...continuousLngRange(nw[0], se[0]) };
 };
 
 // ─── Bilinear Interpolation ──────────────────────────────────────────────────
@@ -148,7 +148,7 @@ const sampleTerrarium = (fallback, lat, lng, noDataVal) => {
         getTerrariumHeights(fallback, noDataVal),
         fallback.width,
         fallback.height,
-        p.x - fallback.minTileX * TILE_SIZE,
+        wrapMosaicX(p.x - fallback.minTileX * TILE_SIZE, fallback.zoom, fallback.width, TILE_SIZE),
         p.y - fallback.minTileY * TILE_SIZE,
         noDataVal,
     );
@@ -176,7 +176,7 @@ const resampleSatelliteImage = ({ width, height, imageWidth, imageHeight, toWGS8
     const gridToMosaic = (gx, gy) => {
         const [lng, lat] = getPixelLatLng(gx, gy, width, height, toWGS84, targetBounds);
         const p = project(lat, lng, imageSource.zoom);
-        return [p.x - originX, p.y - originY];
+        return [wrapMosaicX(p.x - originX, imageSource.zoom, imageSource.width, TILE_SIZE), p.y - originY];
     };
     sampleSatelliteTexture({
         width,
@@ -1235,7 +1235,7 @@ export const sampleImageBand = ({ j0, j1 }, shared) => {
             gridToMosaic: (gx, gy) => {
                 const [lng, lat] = getPixelLatLng(gx, gy, width, height, toWGS84, targetBounds);
                 const p = project(lat, lng, zoom);
-                return [p.x - originX, p.y - originY];
+                return [wrapMosaicX(p.x - originX, zoom, shared.mosaicWidth, TILE_SIZE), p.y - originY];
             },
         };
     }

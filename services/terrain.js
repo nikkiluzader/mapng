@@ -23,7 +23,8 @@ import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
 import { roundRoadCorners } from "./roadCurves.js";
 import { measureStreetWidths } from "./streetWidths.js";
-import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights } from "./terrariumSampling.js";
+import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from "./terrariumSampling.js";
+import { continuousLngRange } from "./lngRange.js";
 import { scaleNativeDimsToProcessingMpp } from "./uploadBounds.js";
 import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSize.js";
 
@@ -84,8 +85,7 @@ const computeMetricFetchBounds = (normalizedCenter, width, height, padMeters = 4
   return {
     north: Math.max(...lats),
     south: Math.min(...lats),
-    east: normalizeLng(Math.max(...unwrappedLngs)),
-    west: normalizeLng(Math.min(...unwrappedLngs)),
+    ...continuousLngRange(Math.min(...unwrappedLngs), Math.max(...unwrappedLngs)),
   };
 };
 
@@ -364,6 +364,66 @@ export const patchBlendedHeights = (heights, reference, size = TILE_SIZE) => {
   return replace.length;
 };
 
+/**
+ * The one height of a tile that holds nothing else (gaps aside), or null.
+ * AWS serves such placeholder tiles where its z15 source is missing (seen
+ * along the date line: a hillside came out as 1 km steps, the coast beside it
+ * as flat sea). Land is never perfectly level over a tile; open sea can be.
+ */
+export const flatTerrariumHeight = (heights) => {
+  let first = null;
+  for (const h of heights) {
+    if (h === NO_DATA_VALUE) continue;
+    if (first === null) first = h;
+    else if (h !== first) return null;
+  }
+  return first;
+};
+
+/**
+ * Whether a flat tile (one height, `flat`) is a placeholder, judged by its
+ * ancestor upsampled over the same square (`reference`): it is when a fifth
+ * of that square differs by more than 10 m. Real flat water passes: a lake
+ * (Geneva's z15 tiles are one height, 371 m) matches its ancestor; flat sea
+ * only counts land rising out of it, so its sea floor is never swapped in.
+ */
+const FLAT_TILE_DIFF_M = 10;
+const FLAT_REPAIR_MAX_ZOOM = 12;
+const FLAT_REPAIR_MIN_ZOOM = 6;
+const FLAT_REPAIR_HEIGHT_TOLERANCE_M = 250;
+const FLAT_TILE_DIFF_SHARE = 0.2;
+export const isFlatTerrariumPlaceholder = (flat, reference) => {
+  let differs = 0;
+  let valid = 0;
+  for (const h of reference) {
+    if (h === NO_DATA_VALUE || !Number.isFinite(h)) continue;
+    valid++;
+    if (flat > 0 ? Math.abs(h - flat) > FLAT_TILE_DIFF_M : h - flat > FLAT_TILE_DIFF_M) differs++;
+  }
+  return valid > 0 && differs / valid >= FLAT_TILE_DIFF_SHARE;
+};
+
+/**
+ * Blend two neighbouring tiles across their shared edge (a left of b when
+ * `horizontal`, else above it): the `half` pixels each side of the edge go
+ * linearly from a's value `half` in from the edge to b's.
+ */
+export const blendTileEdge = (a, b, horizontal, half, size = TILE_SIZE) => {
+  const h = Math.min(Math.floor(half), size / 2 - 1);
+  if (h < 1) return;
+  for (let line = 0; line < size; line++) {
+    const at = (tile, k) => (horizontal ? tile[line * size + k] : tile[k * size + line]);
+    const put = (tile, k, v) => { if (horizontal) tile[line * size + k] = v; else tile[k * size + line] = v; };
+    const from = at(a, size - 1 - h);
+    const to = at(b, h);
+    if (from === NO_DATA_VALUE || to === NO_DATA_VALUE) continue;
+    for (let k = 1; k <= 2 * h; k++) {
+      const v = from + ((to - from) * k) / (2 * h + 1);
+      if (k <= h) put(a, size - 1 - h + k, v); else put(b, k - h - 1, v);
+    }
+  }
+};
+
 /** Bilinear upsample of an ancestor sub-square (span x span of a 256 tile) to TILE_SIZE. */
 const upsampleAncestor = (ancestorHeights, srcX, srcY, span) => {
   const out = new Float32Array(TILE_SIZE * TILE_SIZE);
@@ -422,8 +482,9 @@ export const repairTerrariumBlendedTiles = async ({
     const { data } = ctx.getImageData(0, ty * TILE_SIZE, rowWidth, TILE_SIZE);
     for (let tx = 0; tx < tileCountX; tx++) {
       const heights = decodeTile(data, rowWidth, tx * TILE_SIZE, 0);
-      if (detectBlendedTerrarium(heights)) {
-        suspects.push({ tx: minTileX + tx, ty: minTileY + ty, drawX: tx * TILE_SIZE, drawY: ty * TILE_SIZE, heights });
+      const flat = flatTerrariumHeight(heights) !== null;
+      if (flat || detectBlendedTerrarium(heights)) {
+        suspects.push({ tx: minTileX + tx, ty: minTileY + ty, drawX: tx * TILE_SIZE, drawY: ty * TILE_SIZE, heights, flat });
       }
     }
   }
@@ -454,7 +515,81 @@ export const repairTerrariumBlendedTiles = async ({
 
   let tiles = 0;
   let pixels = 0;
-  await pMap(suspects, async ({ tx, ty, drawX, drawY, heights }) => {
+  const writeTile = (drawX, drawY, heights) => {
+    const img = ctx.getImageData(drawX, drawY, TILE_SIZE, TILE_SIZE);
+    for (let i = 0; i < heights.length; i++) {
+      if (heights[i] === NO_DATA_VALUE) continue;
+      encodeTerrariumHeight(heights[i], img.data, i * 4);
+    }
+    ctx.putImageData(img, drawX, drawY);
+  };
+
+  // Placeholder tiles (one flat height): refilled whole from the most detailed
+  // zoom at or below FLAT_REPAIR_MAX_ZOOM that holds real data there, one zoom
+  // shared by them all so neighbours meet without a step. Along the date line
+  // AWS is flat or wrong (ocean depths on land) at z10-z15 on one side or the
+  // other; a zoom counts when its square is not flat itself and, for a flat
+  // tile above sea level, lies near that height (the placeholder still carries
+  // the area's rough height).
+  const flatSuspects = suspects.filter((t) => t.flat);
+  if (flatSuspects.length) {
+    const top = Math.min(FLAT_REPAIR_MAX_ZOOM, zoom - 1);
+    await pMap(flatSuspects, async (t) => {
+      const value = flatTerrariumHeight(t.heights);
+      t.options = new Map();
+      for (let z = top; z >= FLAT_REPAIR_MIN_ZOOM; z--) {
+        signal?.throwIfAborted();
+        const step = zoom - z;
+        const ancestor = await loadAncestorHeights(z, t.tx >> step, t.ty >> step);
+        if (!ancestor) continue;
+        const span = TILE_SIZE / 2 ** step;
+        const reference = upsampleAncestor(ancestor, (t.tx % 2 ** step) * span, (t.ty % 2 ** step) * span, span);
+        if (flatTerrariumHeight(reference) !== null) continue;
+        if (value > 0) {
+          let sum = 0; let n = 0;
+          for (const h of reference) if (h !== NO_DATA_VALUE && Number.isFinite(h)) { sum += h; n++; }
+          if (!n || Math.abs(sum / n - value) > FLAT_REPAIR_HEIGHT_TOLERANCE_M) continue;
+        }
+        // real flat water (a lake, open sea) agrees with its ancestor: left alone
+        if (!isFlatTerrariumPlaceholder(value, reference)) { t.options.clear(); return; }
+        t.options.set(z, reference);
+      }
+    }, concurrency, signal);
+    const repairable = flatSuspects.filter((t) => t.options.size);
+    const shared = [...new Set(repairable.flatMap((t) => [...t.options.keys()]))]
+      .sort((a, b) => b - a)
+      .find((z) => repairable.every((t) => t.options.has(z)));
+    for (const t of repairable) {
+      t.z = shared ?? Math.max(...t.options.keys());
+      const reference = t.options.get(t.z);
+      t.changed = 0;
+      for (let i = 0; i < t.heights.length; i++) {
+        if (reference[i] === NO_DATA_VALUE || !Number.isFinite(reference[i])) continue;
+        t.heights[i] = reference[i];
+        t.changed++;
+      }
+    }
+    // The upsample stops at each tile's edge (half an ancestor pixel held
+    // flat, then a step): neighbours filled from the same zoom are blended
+    // across their shared edge, as one continuous upsample would be.
+    const byTile = new Map(repairable.map((t) => [`${t.tx},${t.ty}`, t]));
+    for (const a of repairable) {
+      const half = Math.max(1, 2 ** (zoom - a.z) / 2);
+      for (const [dx, dy] of [[1, 0], [0, 1]]) {
+        const b = byTile.get(`${a.tx + dx},${a.ty + dy}`);
+        if (!b || b.z !== a.z) continue;
+        blendTileEdge(a.heights, b.heights, dx === 1, half);
+      }
+    }
+    for (const t of repairable) {
+      writeTile(t.drawX, t.drawY, t.heights);
+      tiles++;
+      pixels += t.changed;
+    }
+    if (repairable.length) console.info(`[Terrarium] Refilled ${repairable.length} placeholder z${zoom} tile(s) from z${shared ?? 'mixed'}.`);
+  }
+
+  await pMap(suspects.filter((t) => !t.flat), async ({ tx, ty, drawX, drawY, heights }) => {
     // Judge the ancestor per pixel (patchBlendedHeights skips implausible
     // reference values): its real coastal cliffs would fail a whole-tile
     // blend test. Go coarser only while impossible depths remain.
@@ -1417,55 +1552,70 @@ const fetchUSGSRaw = async (bounds, onProgress, signal) => {
 
   try {
     signal?.throwIfAborted();
-    // 1. Query USGS API
-    // Round coordinates to 6 decimal places to improve cache hit rate and reduce query string length
-    const bbox = `${bounds.west.toFixed(6)},${bounds.south.toFixed(6)},${bounds.east.toFixed(6)},${bounds.north.toFixed(6)}`;
-    // Limit to 4 tiles to cover corners/overlaps without overloading memory
-    const url = `${USGS_PRODUCT_API}?datasets=${encodeURIComponent(USGS_DATASET)}&bbox=${bbox}&prodFormats=GeoTIFF&max=4`;
+    // 1. Query USGS API (a box across the date line: each side on its own,
+    // the far Aleutians; TNM's answers past ±180 were unreliable)
+    const queryProducts = async (b) => {
+      // Round coordinates to 6 decimal places to improve cache hit rate and reduce query string length
+      const bbox = `${b.west.toFixed(6)},${b.south.toFixed(6)},${b.east.toFixed(6)},${b.north.toFixed(6)}`;
+      // Limit to 4 tiles to cover corners/overlaps without overloading memory
+      const url = `${USGS_PRODUCT_API}?datasets=${encodeURIComponent(USGS_DATASET)}&bbox=${bbox}&prodFormats=GeoTIFF&max=4`;
 
-    console.log(`[USGS] Querying products: ${url}`);
+      console.log(`[USGS] Querying products: ${url}`);
 
-    let response = null;
-    let attempts = 0;
+      let response = null;
+      let attempts = 0;
 
-    while (attempts < MAX_RETRIES) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      while (attempts < MAX_RETRIES) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
 
-        response = await fetch(url, {
-          signal: signal || controller.signal,
-          // Ensure no custom headers are sent to avoid preflight OPTIONS request which fails on USGS
-          headers: {},
-        });
-        clearTimeout(timeoutId);
+          response = await fetch(url, {
+            signal: signal || controller.signal,
+            // Ensure no custom headers are sent to avoid preflight OPTIONS request which fails on USGS
+            headers: {},
+          });
+          clearTimeout(timeoutId);
 
-        if (response.ok) break;
+          if (response.ok) break;
 
-        console.warn(
-          `[USGS] API Query failed: ${response.status}. Retrying...`,
-        );
-      } catch (err) {
-        console.warn(`[USGS] Network error: ${err}. Retrying...`);
+          console.warn(
+            `[USGS] API Query failed: ${response.status}. Retrying...`,
+          );
+        } catch (err) {
+          console.warn(`[USGS] Network error: ${err}. Retrying...`);
+        }
+
+        attempts++;
+        await sleep(RETRY_DELAY * attempts);
       }
 
-      attempts++;
-      await sleep(RETRY_DELAY * attempts);
-    }
+      if (!response || !response.ok) {
+        console.warn(`[USGS] Failed to query API after ${MAX_RETRIES} attempts.`);
+        return null;
+      }
 
-    if (!response || !response.ok) {
-      console.warn(`[USGS] Failed to query API after ${MAX_RETRIES} attempts.`);
-      return null;
-    }
+      try {
+        const text = await response.text();
+        return JSON.parse(text).items || [];
+      } catch (e) {
+        console.warn(`[USGS] Failed to parse API response as JSON:`, e);
+        return null;
+      }
+    };
 
-    let data;
-    try {
-      const text = await response.text();
-      data = JSON.parse(text);
-    } catch (e) {
-      console.warn(`[USGS] Failed to parse API response as JSON:`, e);
-      return null;
+    const boxes = bounds.east > 180
+      ? [{ ...bounds, east: 180 }, { ...bounds, west: -180, east: bounds.east - 360 }]
+      : bounds.west < -180
+        ? [{ ...bounds, west: bounds.west + 360, east: 180 }, { ...bounds, west: -180 }]
+        : [bounds];
+    const items = [];
+    for (const box of boxes) {
+      const found = await queryProducts(box);
+      if (!found) return null;
+      for (const item of found) if (!items.some((i) => i.downloadURL === item.downloadURL)) items.push(item);
     }
+    const data = { items };
 
     if (!data.items || data.items.length === 0) {
       console.log(`[USGS] No products found for bounds.`);
@@ -1722,8 +1872,7 @@ export const fetchTerrainData = async (
     ? {
         north: Number(targetBounds.north),
         south: Number(targetBounds.south),
-        east: normalizeLng(Number(targetBounds.east)),
-        west: normalizeLng(Number(targetBounds.west)),
+        ...continuousLngRange(targetBounds.west, targetBounds.east),
       }
     : computeMetricFetchBounds(
         normalizedCenter,
@@ -2028,7 +2177,7 @@ export const fetchTerrainData = async (
   // Helper to get pixel from Mercator Canvas
   const getMercatorPixel = (lat, lng, data, zoom, minTx, minTy) => {
     const p = project(lat, lng, zoom);
-    const localX = p.x - minTx * TILE_SIZE;
+    const localX = wrapMosaicX(p.x - minTx * TILE_SIZE, zoom, data.width, TILE_SIZE);
     const localY = p.y - minTy * TILE_SIZE;
 
     const x = Math.floor(localX);
@@ -2063,7 +2212,7 @@ export const fetchTerrainData = async (
         terrariumHeights,
         terrainDataImg.width,
         terrainDataImg.height,
-        p.x - minTileX * TILE_SIZE,
+        wrapMosaicX(p.x - minTileX * TILE_SIZE, TERRAIN_ZOOM, terrainDataImg.width, TILE_SIZE),
         p.y - minTileY * TILE_SIZE,
         NO_DATA_VALUE,
       );
@@ -2340,16 +2489,14 @@ export const loadTerrainFromTif = async (
     fetchBounds = {
       north: Number(targetBounds.north),
       south: Number(targetBounds.south),
-      east: normalizeLng(Number(targetBounds.east)),
-      west: normalizeLng(Number(targetBounds.west)),
+      ...continuousLngRange(targetBounds.west, targetBounds.east),
     };
   } else if (preferNativeCoverage && uploadedRasterData.bounds && uploadedRasterData.nativeWidth && uploadedRasterData.nativeHeight) {
     ({ width, height } = scaleNativeDimsToProcessingMpp(uploadedRasterData.nativeWidth, uploadedRasterData.nativeHeight, effectiveMetersPerPixel));
     fetchBounds = {
       north: uploadedRasterData.bounds.north,
       south: uploadedRasterData.bounds.south,
-      east: normalizeLng(uploadedRasterData.bounds.east),
-      west: normalizeLng(uploadedRasterData.bounds.west),
+      ...continuousLngRange(uploadedRasterData.bounds.west, uploadedRasterData.bounds.east),
     };
   } else {
     width = resolution;
@@ -2640,16 +2787,14 @@ export const loadTerrainFromLaz = async (
     fetchBounds = {
       north: Number(targetBounds.north),
       south: Number(targetBounds.south),
-      east: normalizeLng(Number(targetBounds.east)),
-      west: normalizeLng(Number(targetBounds.west)),
+      ...continuousLngRange(targetBounds.west, targetBounds.east),
     };
   } else if (preferNativeCoverage && lazData.bounds && lazData.nativeWidth && lazData.nativeHeight) {
     ({ width, height } = scaleNativeDimsToProcessingMpp(lazData.nativeWidth, lazData.nativeHeight, effectiveMetersPerPixel));
     fetchBounds = {
       north: lazData.bounds.north,
       south: lazData.bounds.south,
-      east:  normalizeLng(lazData.bounds.east),
-      west:  normalizeLng(lazData.bounds.west),
+      ...continuousLngRange(lazData.bounds.west, lazData.bounds.east),
     };
   } else {
     width  = resolution;

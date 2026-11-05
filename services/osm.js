@@ -1014,37 +1014,117 @@ const fetchOsmFromManifestWithStatus = async (bounds, { onStatus, signal }) => {
   return fetchOsmFromManifest(bounds, { signal });
 };
 
+// One box's raw OSM data: MapNG's own tiles first (one given source for
+// tests, setOsmTileSource, or the published archives, each tile from the
+// newest one covering it: osmTiles.js planTileSources), then Overpass or
+// Overture. -> { endpoint, data }
+const fetchOsmRaw = async (bounds, { onStatus, signal } = {}) => {
+  if (osmTileSource || cacheEndpointAvailable()) {
+    try {
+      const data = osmTileSource
+        ? (onStatus?.("Reading OpenStreetMap data from MapNG tiles..."), await fetchOsmFromTiles(osmTileSource, bounds, { signal }))
+        : await fetchOsmFromManifestWithStatus(bounds, { onStatus, signal });
+      if (data) return { endpoint: "mapng-osm-tiles", data };
+    } catch (tileError) {
+      if (tileError?.name === "AbortError" || signal?.aborted) throw tileError;
+      console.warn("[OSM] MapNG tiles unavailable, using Overpass:", tileError?.message || tileError);
+    }
+  }
+  return fetchOverpassOrOverture({ query: buildOverpassQuery(bounds), bounds }, { onStatus, signal });
+};
+
+/**
+ * A box past ±180° (a selection on the date line) as its two halves on the
+ * real globe, or null for an ordinary box.
+ */
+export const splitAtDateLine = (input) => {
+  // (west > east is the same box written the other way: made continuous first)
+  const bounds = input.west > input.east ? { ...input, east: input.east + 360 } : input;
+  if (bounds.east > 180) {
+    return [{ ...bounds, east: 180 }, { ...bounds, west: -180, east: bounds.east - 360 }];
+  }
+  if (bounds.west < -180) {
+    return [{ ...bounds, west: bounds.west + 360, east: 180 }, { ...bounds, west: -180 }];
+  }
+  return null;
+};
+
+/**
+ * The two halves' raw OSM elements as one set, every longitude moved next to
+ * refLng (179.99 and -179.99 become neighbours). parts: [{ data, osmIds }].
+ * With real OSM ids (Overpass, MapNG tiles) a way crossing the line comes in
+ * both halves whole: kept once. Overture numbers each answer from 1, so its
+ * halves are kept apart (renumbered) instead.
+ */
+export const mergeAcrossDateLine = (parts, refLng) => {
+  const unwrap = (lon) => {
+    let out = lon;
+    while (out - refLng > 180) out -= 360;
+    while (out - refLng < -180) out += 360;
+    return out;
+  };
+  const fix = (value) => {
+    if (Array.isArray(value)) return value.map(fix);
+    if (!value || typeof value !== 'object') return value;
+    const out = {};
+    for (const [key, v] of Object.entries(value)) {
+      out[key] = key === 'lon' && Number.isFinite(v) ? unwrap(v) : fix(v);
+    }
+    // (an element's lon bounds no longer read min/max once unwrapped)
+    if (out.bounds && Number.isFinite(out.bounds.minlon)) {
+      const a = unwrap(out.bounds.minlon); const b = unwrap(out.bounds.maxlon);
+      out.bounds = { ...out.bounds, minlon: Math.min(a, b), maxlon: Math.max(a, b) };
+    }
+    return out;
+  };
+  const seen = new Set();
+  const elements = [];
+  parts.forEach(({ data, osmIds }, index) => {
+    for (const el of data?.elements || []) {
+      const id = osmIds ? el.id : (index + 1) * 1e12 + el.id;
+      const key = `${el.type}:${id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const renumbered = osmIds ? el : {
+        ...el, id,
+        ...(el.members ? { members: el.members.map((m) => ({ ...m, ref: (index + 1) * 1e12 + m.ref })) } : {}),
+      };
+      elements.push(fix(renumbered));
+    }
+  });
+  return { ...(parts[0]?.data || {}), elements };
+};
+
 export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
   console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
 
-  const query = buildOverpassQuery(bounds);
   const queryParams = getOSMQueryParameters(bounds);
   const startedAt = new Date().toISOString();
 
   try {
     let result = null;
-    // MapNG's own tiles first: one given source (tests, setOsmTileSource), or
-    // the published archives, each tile from the newest one covering it
-    // (osmTiles.js planTileSources: the planet is several archives)
-    if (osmTileSource || cacheEndpointAvailable()) {
-      try {
-        const data = osmTileSource
-          ? (onStatus?.("Reading OpenStreetMap data from MapNG tiles..."), await fetchOsmFromTiles(osmTileSource, bounds, { signal }))
-          : await fetchOsmFromManifestWithStatus(bounds, { onStatus, signal });
-        if (data) result = { endpoint: "mapng-osm-tiles", data };
-      } catch (tileError) {
-        if (tileError?.name === "AbortError" || signal?.aborted) throw tileError;
-        console.warn("[OSM] MapNG tiles unavailable, using Overpass:", tileError?.message || tileError);
+    // On the date line: each half on its own, then joined (mergeAcrossDateLine)
+    const halves = splitAtDateLine(bounds);
+    if (halves) {
+      const parts = [];
+      const endpoints = [];
+      for (const half of halves) {
+        const part = await fetchOsmRaw(half, { onStatus, signal });
+        parts.push({ data: part.data, osmIds: part.endpoint !== OVERTURE_ENDPOINT });
+        endpoints.push(part.endpoint);
       }
+      result = { endpoint: [...new Set(endpoints)].join(' + '), data: mergeAcrossDateLine(parts, (halves[0].west + halves[1].east + 360) / 2) };
+    } else {
+      result = await fetchOsmRaw(bounds, { onStatus, signal });
     }
-    if (!result) result = await fetchOverpassOrOverture({ query, bounds }, { onStatus, signal });
     const { endpoint } = result;
     let { data } = result;
 
     console.log(`[OSM] Winner: ${endpoint} — ${data.elements?.length || 0} elements`);
 
     let overtureBuildings = null;
-    if (endpoint !== OVERTURE_ENDPOINT && overtureBuildingsEnabled()) {
+    // (not across the date line: Overture's reader takes one ordinary box)
+    if (endpoint !== OVERTURE_ENDPOINT && !halves && overtureBuildingsEnabled()) {
       onStatus?.("Adding missing buildings and heights from Overture Maps...");
       const records = await fetchOvertureBuildingRecords(bounds, { signal });
       if (records) {
@@ -1067,7 +1147,8 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
       completedAt: new Date().toISOString(),
     };
 
-    const features = parseOverpassResponse(data, bounds);
+    // (clipped against the continuous box: on the date line east runs past 180)
+    const features = parseOverpassResponse(data, halves ? { ...bounds, west: halves[0].west, east: halves[1].east + 360 } : bounds);
     const fuelStations = features.filter((f) => f.type === "fuel_station").length;
     const fuelPumps = features.filter((f) => f.type === "fuel_pump").length;
     console.log(`[OSM] Parsed ${features.length} features (fuel stations: ${fuelStations}, fuel pumps: ${fuelPumps}).`);
