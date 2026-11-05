@@ -8,6 +8,9 @@ MapNG's OSM tiles for the whole planet, built in blocks on one PC.
     planet.py merge   <workdir> [--group-zoom 3]      join blocks into a few archives to publish
     planet.py status  <workdir>
 
+Pause: touch <workdir>/STOP. Builds already running finish; no new block
+starts. Remove the file and rerun build to continue.
+
 Why blocks: scripts/build-osm-tiles.py holds a whole input in RAM, and the
 PC (47 GB, 32 threads, occasional random crashes in long runs) can't build a
 planet at once. The planet is cut into lower-zoom tiles ("blocks", aligned to
@@ -337,6 +340,9 @@ def file_bytes(path):
 
 def build_block(wd, b):
     key = bkey(b["z"], b["x"], b["y"])
+    if os.path.exists(os.path.join(wd, "STOP")):
+        # (pause: blocks already running finish; new ones wait for the next run)
+        return key, {}
     src = os.path.join(wd, "blocks", f"{key}.osm.pbf")
     tmp = os.path.join(wd, "tmp", key)
     os.makedirs(tmp, exist_ok=True)
