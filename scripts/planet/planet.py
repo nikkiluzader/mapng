@@ -97,7 +97,7 @@ def drop_cache(*paths):
             pass
 
 
-def start_cache_trimmer(*roots, every=20):
+def start_cache_trimmer(*roots, every=5):
     """Release the file cache of the big files under these folders every few
     seconds while a step runs: osmium reading the 89 GB planet fills the
     cache as it goes, and Windows counts all of it against its own memory."""
@@ -116,6 +116,11 @@ def start_cache_trimmer(*roots, every=20):
                     if os.path.getsize(f) > 32 * 2**20:
                         fd = os.open(f, os.O_RDONLY)
                         try:
+                            # (pages still being written can't be dropped until
+                            # they're on disk: flush the file first; osmium reads
+                            # ~1 GB/s, hence every few seconds)
+                            if time.time() - os.path.getmtime(f) < 60:
+                                os.fsync(fd)
                             os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)
                         finally:
                             os.close(fd)
