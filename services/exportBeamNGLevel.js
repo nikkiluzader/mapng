@@ -5037,17 +5037,31 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
   // already meet the ground at their portals are built (no cutting, backfill
   // or cover; the portal holes still open, they change no height); the
   // rest stay roads on the ground
-  const keepFitting = (list) => {
-    if (shape) return list;
-    return list.filter((t) => {
-      const misfit = tunnelGroundMisfit(t);
-      if (misfit.ok) return true;
-      out.tunnels.splice(out.tunnels.indexOf(t), 1);
-      for (const [seg, tt] of [...out.bySeg]) if (tt === t) out.bySeg.delete(seg);
-      out.skipped.push({ osm: t.osm, reason: misfit.reason, length: t.length, shaping: true });
-      return false;
-    });
+  // On fine elevation (lidar, GPXZ, an upload) a real cut-and-cover tunnel's
+  // ramps are in the data already: one that would still dig its trenches
+  // deep into ground the data shows at road level doesn't match it (a road
+  // tagged tunnel under a deck the ground model removed: a 7-8 m trench by
+  // the Tignes dam) and stays a road on the ground. The 30 m data smooths
+  // ramps away: there the box is dug as before.
+  const fine = !terrainData?.coarseElevation;
+  const drop = (t, reason, shaping) => {
+    out.tunnels.splice(out.tunnels.indexOf(t), 1);
+    for (const [seg, tt] of [...out.bySeg]) if (tt === t) out.bySeg.delete(seg);
+    out.skipped.push({ osm: t.osm, reason, length: t.length, ...(shaping ? { shaping: true } : {}) });
   };
+  const keepFitting = (list) => list.filter((t) => {
+    if (shape) {
+      if (!fine || t.kind !== 'cutcover') return true;
+      const dig = cutCoverDig(t);
+      if (dig <= CUTCOVER_MAX_DIG_M) return true;
+      drop(t, `a cut-and-cover box would dig ${dig.toFixed(1)} m into ground the elevation data shows at road level (left on the ground)`, false);
+      return false;
+    }
+    const misfit = tunnelGroundMisfit(t);
+    if (misfit.ok) return true;
+    drop(t, misfit.reason, true);
+    return false;
+  });
   // (a pause after each tunnel graded: the browser gets the thread back)
   for (const t of keepFitting([...out.tunnels])) { gradeOne(t); yield; }
   // then the galleries (and the hillside tunnels short of rock that become
@@ -5089,6 +5103,19 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
   if (globalThis.__MAPNG_TUNNEL_DEBUG) globalThis.__MAPNG_TUNNEL_DEBUG(out, { groundAt, toWorld, toPixel, bridges, width, height, hmAt: (idx) => hm.at(idx) - minHeight });
   console.log(`[BeamNG Export] Tunnels: ${out.tunnels.length} bored (${out.tunnels.map((t) => `${Math.round(t.tubeLength)} m`).join(', ')}), ${out.skipped.length} left on the ground, ${out.holes.length} portal hole square(s).`);
   return out;
+}
+
+// a cut-and-cover tunnel's trenches on fine elevation data: at most this deep
+// into the ground (solveExportTunnels' keepFitting)
+const CUTCOVER_MAX_DIG_M = 3;
+/** How deep a cut-and-cover tunnel's approaches cut below the ground (m). */
+export function cutCoverDig(t) {
+  let worst = 0;
+  t.line.forEach((p, k) => {
+    if (k >= t.iS && k <= t.iN) return;
+    if (Number.isFinite(p.z) && Number.isFinite(p.g)) worst = Math.max(worst, p.g - p.z);
+  });
+  return worst;
 }
 
 // terrain shaping at tunnels off: a tunnel is built only where its road

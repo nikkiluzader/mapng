@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { composeTerrain } from '../services/structures/terrainCompose.js';
 import { shapingSwitches, shapingPlan } from '../services/structures/shaping.js';
 import { gradeLimit } from '../services/structures/profileSolve.js';
-import { generateDecalRoads, tunnelGroundMisfit } from '../services/exportBeamNGLevel.js';
+import { generateDecalRoads, tunnelGroundMisfit, cutCoverDig } from '../services/exportBeamNGLevel.js';
 import { STRUCTURE_SCENES, SCENE_SQUARE_SIZE as SQ } from './helpers/structureScenes.mjs';
 
 // a scene through the road and structure passes with the given export
@@ -106,6 +106,13 @@ test('tunnelGroundMisfit: a box never fits, a bore fits when its approaches meet
   const deep = tunnelGroundMisfit({ kind: 'bored', line: line(-3), iS: 3, iN: 6 });
   assert.equal(deep.ok, false);
   assert.match(deep.reason, /3\.0 m of cutting/);
+});
+
+test('cutCoverDig: how deep a box\'s approaches cut under the ground', () => {
+  // approaches 7 m under the ground (a trench), the box itself not counted
+  const line = Array.from({ length: 10 }, (_, k) => ({ z: k >= 3 && k <= 6 ? -12 : (k === 2 || k === 7 ? -7 : -1), g: 0 }));
+  assert.equal(cutCoverDig({ kind: 'cutcover', line, iS: 3, iN: 6 }), 7);
+  assert.equal(cutCoverDig({ kind: 'cutcover', line: line.map((p) => ({ ...p, z: Math.max(p.z, -2) })), iS: 3, iN: 6 }), 2);
 });
 
 test('shapingPlan on a hand-made graph: approaches belong to the structure they lead to', () => {
