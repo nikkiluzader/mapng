@@ -31,10 +31,21 @@ export function worldCoverTileName(lat, lng) {
 }
 
 const tiffs = new Map();   // file -> Promise<GeoTIFFImage | null>
+// (the first bytes must be a TIFF's: a server answering with a web page, as a
+// dev server does for a path it lacks, left the GeoTIFF reader waiting forever)
+async function looksLikeTiff(url) {
+  const r = await fetch(url, { headers: { Range: 'bytes=0-7' } });
+  if (r.status === 404 || r.status === 403) return null;
+  if (!r.ok) throw new Error(`WorldCover: ${r.status}`);
+  if (/text\/html/i.test(r.headers.get('content-type') || '')) throw new Error('WorldCover: not a GeoTIFF (a web page)');
+  const b = new Uint8Array(await r.arrayBuffer());
+  if (!((b[0] === 0x49 && b[1] === 0x49) || (b[0] === 0x4d && b[1] === 0x4d))) throw new Error('WorldCover: not a GeoTIFF');
+  return true;
+}
 function image(file, base) {
   const key = base + file;
   if (!tiffs.has(key)) {
-    tiffs.set(key, fromUrl(base + file).then((t) => t.getImage()).catch((e) => {
+    tiffs.set(key, looksLikeTiff(base + file).then((ok) => (ok ? fromUrl(base + file).then((t) => t.getImage()) : null)).catch((e) => {
       tiffs.delete(key);
       // (a tile that doesn't exist: open sea; WorldCover covers all land)
       if (/404|403|Not Found/i.test(String(e?.message || e))) return null;
@@ -50,7 +61,20 @@ function image(file, base) {
  * the tiles can't be read. base: where the tiles are read from (default: the
  * bucket in Node, the Worker's proxy in a browser).
  */
-export async function fetchWorldCoverGrid(bounds, nx, ny, { signal, base = inNode() ? WORLDCOVER_BUCKET : WORLDCOVER_PROXY } = {}) {
+// (the whole read gives up after this: an export never waits on the land cover)
+const WORLDCOVER_TIMEOUT_MS = 20000;
+
+export async function fetchWorldCoverGrid(bounds, nx, ny, opts = {}) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`WorldCover: no answer in ${WORLDCOVER_TIMEOUT_MS / 1000} s`)), opts.timeoutMs ?? WORLDCOVER_TIMEOUT_MS); });
+  try {
+    return await Promise.race([readWorldCoverGrid(bounds, nx, ny, opts), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readWorldCoverGrid(bounds, nx, ny, { signal, base = inNode() ? WORLDCOVER_BUCKET : WORLDCOVER_PROXY } = {}) {
   const out = new Uint8Array(nx * ny);
   const files = new Set();
   for (let la = Math.floor(bounds.south / 3) * 3; la < bounds.north; la += 3) {

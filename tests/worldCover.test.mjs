@@ -19,3 +19,19 @@ test('what may grow where: wood trees on tree cover, never on rock or snow; mapp
   assert.equal(plantAllowed(WC.BARE, 'scatter', 0), false);
   assert.equal(plantAllowed(0, 'wood', 0.99), true, 'no data (open sea, or WorldCover unreachable): as before');
 });
+
+test('a server answering with a web page (a dev server) is no land cover, and never a hang', async () => {
+  const { fetchWorldCoverGrid } = await import('../services/worldCover.js');
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => new Response('<!doctype html><html></html>', { status: 200, headers: { 'content-type': 'text/html' } });
+  try {
+    const t = Date.now();
+    await assert.rejects(fetchWorldCoverGrid({ north: 45.6, south: 45.5, west: 6.9, east: 7.0 }, 8, 8, { base: 'https://example.invalid/' }), /not a GeoTIFF/);
+    assert.ok(Date.now() - t < 2000);
+    // and one that never answers gives up at the time limit
+    globalThis.fetch = () => new Promise(() => {});
+    await assert.rejects(fetchWorldCoverGrid({ north: 45.6, south: 45.5, west: 6.9, east: 7.0 }, 8, 8, { base: 'https://example.invalid/x/', timeoutMs: 200 }), /no answer/);
+  } finally {
+    globalThis.fetch = real;
+  }
+});
