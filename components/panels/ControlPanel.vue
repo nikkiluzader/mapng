@@ -113,6 +113,16 @@
           :resolution="Number(resolution) || 0"
           @update:model-value="(v) => $emit('update:processingMetersPerPixel', v)"
         />
+        <!-- A huge area at a coarse m per pixel: fine for the terrain (BeamNG
+             spaces its squares out), but lots of OSM data is trouble -->
+        <p v-if="bigArea && fetchOSM" class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300">
+          <AlertTriangle :size="11" class="shrink-0 mt-px" />
+          <span>{{ t('controlPanel.bigAreaOsm', { km: sideKmText }) }}</span>
+        </p>
+        <p v-if="farShake" class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300">
+          <AlertTriangle :size="11" class="shrink-0 mt-px" />
+          <span>{{ t('controlPanel.farShake') }}</span>
+        </p>
 
       </SettingSection>
 
@@ -371,6 +381,7 @@ import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../.
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
 import TerrainChoice from '../ui/TerrainChoice.vue';
 import WizardLayout from '../ui/WizardLayout.vue';
+import { BIG_AREA_KM, reachesShakeDistance } from '../../services/levelLimits.js';
 import { getLoadedOsmFile, onOsmFileChange, osmFileCoverage } from '../../services/osmFile.js';
 import OsmFileInput from '../controls/OsmFileInput.vue';
 import { computeGridBounds } from '../../services/batchJob.js';
@@ -531,6 +542,11 @@ const processingMetersPerPixelNumber = computed(() => {
 });
 
 const metersPerPixel = computed(() => processingMetersPerPixelNumber.value);
+// (services/levelLimits.js: when a big area's notes show)
+const sideKm = computed(() => ((Number(props.resolution) || 0) * metersPerPixel.value) / 1000);
+const sideKmText = computed(() => (sideKm.value >= 10 ? sideKm.value.toFixed(0) : sideKm.value.toFixed(1)));
+const bigArea = computed(() => sideKm.value >= BIG_AREA_KM);
+const farShake = computed(() => reachesShakeDistance(sideKm.value));
 // (the box being generated, for the OSM file: does the file cover it)
 const selectionArea = computed(() => computeGridBounds(props.center, props.resolution, 1, 1, props.resolution * metersPerPixel.value));
 

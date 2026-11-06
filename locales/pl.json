@@ -232,7 +232,19 @@
     "outputSummary": "Kafelki: {tiles} → jeden poziom BeamNG {dim}×{dim} px",
     "outputHint": "Kafelki są łączone po przetworzeniu, a następnie eksportowane jako jeden grywalny poziom w pliku ZIP.",
     "startCombined": "Zbuduj połączony poziom (kafelki: {tiles})",
-    "disabledWarningDesktop": "Za duży: poziom MapNG może mieć najwyżej 16384 × 16384 px (tyle co pojedynczy kafelek). Zmniejsz rozdzielczość kafelka albo rozmiar siatki."
+    "disabledWarningDesktop": "Za duży: poziom MapNG może mieć najwyżej 16384 × 16384 px (tyle co pojedynczy kafelek). Zmniejsz rozdzielczość kafelka albo rozmiar siatki.",
+    "experimentalTag": "Eksperymentalne",
+    "expTitle": "Eksperymentalne: większe niż MapNG testowało",
+    "expIntro": "MapNG jest testowane do 16384 × 16384 px. Poziom {dim} × {dim} px wychodzi poza to i:",
+    "expCrash": "może zająć całą pamięć komputera i zawiesić lub wyłączyć system",
+    "expUnfinished": "może zatrzymać się w połowie i nigdy nie skończyć",
+    "expHours": "może trwać wiele godzin",
+    "expBroken": "poziom może w ogóle nie wczytać się albo nie działać w BeamNG",
+    "expFiles": "pliki są ogromne (sam teren to około {gb} GB)",
+    "expShake": "obiekty dalej niż 30 km od środka mogą drgać w BeamNG",
+    "expTip": "Duży obszar? Pojedynczy kafelek przy 2, 4 lub 8 m na piksel obejmie go bez tych ryzyk: BeamNG zamiast tego rozsuwa kwadraty terenu.",
+    "expDisclaimer": "Kontynuujesz na własne ryzyko: MapNG i jego twórcy nie odpowiadają za szkody w systemie, utracone dane ani stracony czas.",
+    "expAccept": "Rozumiem ryzyko i chcę spróbować mimo to"
   },
   "upload": {
     "autoDetected": "współrzędne wykryte automatycznie",
@@ -552,7 +564,9 @@
       "mapData": "Dane mapy (OpenStreetMap)",
       "osmHint": "Drogi, budynki, woda, użytkowanie terenu i detale ulic",
       "needsOsmOn": "Najpierw włącz Dołącz obiekty OSM"
-    }
+    },
+    "bigAreaOsm": "Duży obszar ({km} km szerokości). Teren w tym rozmiarze nie stanowi problemu, ale dużo danych OpenStreetMap (miejscowości, gęste drogi) niemal na pewno sprawi kłopoty: powolne lub nieudane generowanie i eksport oraz ciężki poziom. Najlepiej tam, gdzie danych mapy jest mało (pustynie, góry); w innym razie wyłącz dane OSM albo wybierz mniejszy obszar.",
+    "farShake": "Części tego poziomu leżą ponad 30 km od jego środka: w BeamNG obiekty tak daleko mogą zacząć drgać."
   },
   "batchExport": {
     "title": "Opcje eksportu",

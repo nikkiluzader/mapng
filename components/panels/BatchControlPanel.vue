@@ -32,6 +32,8 @@
         :tile-area-display="tileAreaDisplay"
         :combined-level="combinedLevel"
         :resolution="resolution"
+        :meters-per-pixel="processingMetersPerPixelNumber"
+        v-model:experimental-accepted="experimentalAccepted"
         @update:grid-cols="(v) => gridCols = v"
         @update:grid-rows="(v) => gridRows = v"
       />
@@ -308,6 +310,7 @@ import { useI18n } from 'vue-i18n';
 import { useMainStore } from '../../stores/mainStore';
 import TerrainChoice from '../ui/TerrainChoice.vue';
 import WizardLayout from '../ui/WizardLayout.vue';
+import { LEVEL_TESTED_MAX_PX, combinedLevelTier } from '../../services/levelLimits.js';
 import { getLoadedOsmFile, onOsmFileChange, osmFileCoverage } from '../../services/osmFile.js';
 import OsmFileInput from '../controls/OsmFileInput.vue';
 import { computeGridBounds } from '../../services/batchJob.js';
@@ -487,7 +490,7 @@ const handleExportsUpdate = (nextExports) => {
 // is a power-of-2 square (BeamNG .ter requirement).
 const POW2_GRID_OPTIONS = [2, 4, 8];
 // 16384² is the in-browser ceiling (see BatchGridConfig for the rationale).
-const COMBINED_SUPPORTED_MAX = 16384;
+const COMBINED_SUPPORTED_MAX = LEVEL_TESTED_MAX_PX;
 
 const DEFAULT_LEVEL_OPTIONS = {
   levelName: '',
@@ -548,13 +551,13 @@ watch(hasOffsetTiles, (offset, wasOffset) => {
   if (offset && !wasOffset) sharedElevationBaseline.value = true;
 });
 
-const combinedTierFor = (n) => {
-  const dim = n * Math.max(1, props.resolution);
-  if (dim > COMBINED_SUPPORTED_MAX) return 'disabled';
-  return 'ok';
-};
+const combinedTierFor = (n) => combinedLevelTier(n * Math.max(1, props.resolution), { desktop: isDesktop });
 const combinedDim = computed(() => gridCols.value * Math.max(1, props.resolution));
 const combinedTier = computed(() => combinedTierFor(gridCols.value));
+// (past the tested size: Start waits until the warning is accepted, again
+// for every new size)
+const experimentalAccepted = ref(false);
+watch(combinedDim, () => { experimentalAccepted.value = false; });
 
 // Snap an arbitrary grid size to the nearest valid power-of-2 square, stepping
 // down if the resolution cap would push the combined heightmap over the hard max.
@@ -645,6 +648,7 @@ const startDisabled = computed(() => {
   if (elevationSource.value === 'gpxz' && !gpxzApiKey.value) return true;
   if (combinedLevel.value) {
     if (combinedTier.value === 'disabled') return true;
+    if (combinedTier.value === 'experimental' && !experimentalAccepted.value) return true;
     return false;
   }
   return selectedExportCount.value === 0;

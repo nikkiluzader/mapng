@@ -232,7 +232,19 @@
     "outputSummary": "{tiles} teselas → un nivel de BeamNG de {dim}×{dim} px",
     "outputHint": "Las teselas se unen tras procesarlas y se exportan como un único ZIP de nivel jugable.",
     "startCombined": "Crear nivel combinado ({tiles} teselas)",
-    "disabledWarningDesktop": "Demasiado grande: un nivel de MapNG puede tener como máximo 16384 × 16384 px (igual que una tesela suelta). Baja la resolución de tesela o el tamaño de la cuadrícula."
+    "disabledWarningDesktop": "Demasiado grande: un nivel de MapNG puede tener como máximo 16384 × 16384 px (igual que una tesela suelta). Baja la resolución de tesela o el tamaño de la cuadrícula.",
+    "experimentalTag": "Experimental",
+    "expTitle": "Experimental: más grande de lo que MapNG ha probado",
+    "expIntro": "MapNG está probado hasta 16384 × 16384 px. Un nivel de {dim} × {dim} px va más allá y:",
+    "expCrash": "puede usar toda la memoria de tu PC y congelar o colgar tu sistema",
+    "expUnfinished": "puede detenerse a medias y no terminar nunca",
+    "expHours": "puede tardar muchas horas",
+    "expBroken": "puede que el nivel no cargue o no funcione en BeamNG",
+    "expFiles": "genera archivos enormes (solo el terreno ocupa unos {gb} GB)",
+    "expShake": "los objetos a más de 30 km del centro pueden temblar en BeamNG",
+    "expTip": "¿Una zona grande? Una sola tesela a 2, 4 u 8 m por píxel la cubre sin estos riesgos: BeamNG separa más los cuadros del terreno.",
+    "expDisclaimer": "Continúas bajo tu propia responsabilidad: MapNG y sus desarrolladores no se hacen responsables de daños a tu sistema, datos perdidos ni tiempo perdido.",
+    "expAccept": "Entiendo los riesgos y quiero intentarlo igualmente"
   },
   "upload": {
     "autoDetected": "coordenadas detectadas automáticamente",
@@ -552,7 +564,9 @@
       "mapData": "Datos del mapa (OpenStreetMap)",
       "osmHint": "Carreteras, edificios, agua, uso del suelo y detalles de calle",
       "needsOsmOn": "Activa primero Incluir elementos OSM"
-    }
+    },
+    "bigAreaOsm": "Zona grande ({km} km de lado). El terreno no da problemas a este tamaño, pero muchos datos de OpenStreetMap (pueblos, calles densas) casi seguro causarán problemas: generación y exportación lentas o fallidas, y un nivel pesado. Ideal donde hay pocos datos de mapa (desiertos, montañas); si no, desactiva los datos OSM o elige una zona más pequeña.",
+    "farShake": "Partes de este nivel están a más de 30 km de su centro: en BeamNG, los objetos tan lejos pueden empezar a temblar."
   },
   "batchExport": {
     "title": "Opciones de exportación",

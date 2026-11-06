@@ -232,7 +232,19 @@
     "outputSummary": "{tiles} tessere → un livello BeamNG da {dim}×{dim} px",
     "outputHint": "Le tessere vengono unite dopo l'elaborazione, poi esportate come un unico ZIP di livello giocabile.",
     "startCombined": "Crea livello combinato ({tiles} tessere)",
-    "disabledWarningDesktop": "Troppo grande: un livello MapNG può essere al massimo 16384 × 16384 px (come un singolo riquadro). Riduci la risoluzione dei riquadri o la dimensione della griglia."
+    "disabledWarningDesktop": "Troppo grande: un livello MapNG può essere al massimo 16384 × 16384 px (come un singolo riquadro). Riduci la risoluzione dei riquadri o la dimensione della griglia.",
+    "experimentalTag": "Sperimentale",
+    "expTitle": "Sperimentale: più grande di quanto MapNG sia testato",
+    "expIntro": "MapNG è testato fino a 16384 × 16384 px. Un livello di {dim} × {dim} px va oltre, e:",
+    "expCrash": "può usare tutta la memoria del PC e bloccare o mandare in crash il sistema",
+    "expUnfinished": "può fermarsi a metà e non finire mai",
+    "expHours": "può richiedere molte ore",
+    "expBroken": "il livello potrebbe non caricarsi o non funzionare affatto in BeamNG",
+    "expFiles": "i file sono enormi (il solo terreno è circa {gb} GB)",
+    "expShake": "gli oggetti a più di 30 km dal centro possono tremare in BeamNG",
+    "expTip": "Un'area grande? Un singolo riquadro a 2, 4 o 8 m per pixel la copre senza questi rischi: BeamNG distanzia invece i quadrati del terreno.",
+    "expDisclaimer": "Procedi a tuo rischio: MapNG e i suoi sviluppatori non sono responsabili di danni al sistema, dati persi o tempo perso.",
+    "expAccept": "Capisco i rischi e voglio provare comunque"
   },
   "upload": {
     "autoDetected": "coordinate rilevate automaticamente",
@@ -552,7 +564,9 @@
       "mapData": "Dati mappa (OpenStreetMap)",
       "osmHint": "Strade, edifici, acqua, uso del suolo e dettagli stradali",
       "needsOsmOn": "Attiva prima Includi elementi OSM"
-    }
+    },
+    "bigAreaOsm": "Area grande ({km} km di lato). Il terreno va bene a queste dimensioni, ma molti dati OpenStreetMap (paesi, strade fitte) causeranno quasi certamente problemi: generazione ed esportazioni lente o fallite, e un livello pesante. Ideale dove i dati della mappa sono pochi (deserti, montagne); altrimenti disattiva i dati OSM o scegli un'area più piccola.",
+    "farShake": "Parti di questo livello sono a più di 30 km dal centro: in BeamNG gli oggetti così lontani possono iniziare a tremare."
   },
   "batchExport": {
     "title": "Opzioni di esportazione",

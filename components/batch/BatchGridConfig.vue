@@ -10,12 +10,15 @@
             :key="n"
             type="button"
             :disabled="combinedTierFor(n) === 'disabled'"
+            :title="combinedTierFor(n) === 'experimental' ? t('batchCombined.experimentalTag') : undefined"
             @click="selectSquareGrid(n)"
             :class="[
               'px-2 py-1 rounded text-xs font-medium border transition-colors',
               gridCols === n
-                ? 'bg-brand border-brand-500 text-white'
-                : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand',
+                ? (combinedTierFor(n) === 'experimental' ? 'bg-red-600 border-red-700 text-white' : 'bg-brand border-brand-500 text-white')
+                : combinedTierFor(n) === 'experimental'
+                  ? 'bg-white dark:bg-gray-800 border-dashed border-red-400 dark:border-red-500 text-red-600 dark:text-red-400 hover:border-red-600'
+                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-brand',
               combinedTierFor(n) === 'disabled' ? 'opacity-40 cursor-not-allowed' : '',
             ]"
           >
@@ -29,12 +32,33 @@
         <span class="text-gray-400 dark:text-gray-500">{{ t('batchCombined.combinedHeightmap') }}</span>
         <span class="font-mono font-medium" :class="{
           'text-gray-700 dark:text-gray-300': combinedTier === 'ok',
-          'text-red-600 dark:text-red-500': combinedTier === 'disabled',
-        }">{{ combinedDim }} × {{ combinedDim }} px</span>
+          'text-red-600 dark:text-red-500': combinedTier !== 'ok',
+        }">
+          <span v-if="combinedTier === 'experimental'" class="mr-1 px-1 py-px rounded bg-red-600 text-white font-sans text-nano font-bold uppercase tracking-wide">{{ t('batchCombined.experimentalTag') }}</span>{{ combinedDim }} × {{ combinedDim }} px
+        </span>
       </div>
       <p v-if="combinedTier === 'disabled'" class="text-micro text-red-600 dark:text-red-500 font-medium">
         <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t(isDesktop ? 'batchCombined.disabledWarningDesktop' : 'batchCombined.disabledWarning') }}
       </p>
+      <!-- Past the tested size, desktop only: allowed after every warning, accepted -->
+      <div v-else-if="combinedTier === 'experimental'" class="rounded-lg border-2 border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-2.5 space-y-2 text-micro leading-snug text-red-800 dark:text-red-200">
+        <p class="flex items-center gap-1.5 text-caption font-bold"><AlertTriangle :size="13" class="shrink-0" />{{ t('batchCombined.expTitle') }}</p>
+        <p>{{ t('batchCombined.expIntro', { dim: combinedDim }) }}</p>
+        <ul class="list-disc pl-4 space-y-0.5">
+          <li>{{ t('batchCombined.expCrash') }}</li>
+          <li>{{ t('batchCombined.expUnfinished') }}</li>
+          <li>{{ t('batchCombined.expHours') }}</li>
+          <li>{{ t('batchCombined.expBroken') }}</li>
+          <li>{{ t('batchCombined.expFiles', { gb: terrainGB }) }}</li>
+          <li v-if="shakes">{{ t('batchCombined.expShake') }}</li>
+        </ul>
+        <p class="text-gray-700 dark:text-gray-300">{{ t('batchCombined.expTip') }}</p>
+        <p class="font-semibold">{{ t('batchCombined.expDisclaimer') }}</p>
+        <label class="flex items-start gap-2 pt-1 border-t border-red-200 dark:border-red-800 cursor-pointer text-caption font-semibold">
+          <input type="checkbox" class="mt-0.5 accent-red-600" :checked="experimentalAccepted" @change="$emit('update:experimentalAccepted', $event.target.checked)" />
+          <span>{{ t('batchCombined.expAccept') }}</span>
+        </label>
+      </div>
       <p v-else-if="combinedDim >= COMBINED_SUPPORTED_MAX" class="text-micro text-amber-600 dark:text-amber-500 font-medium">
         <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t(isDesktop ? 'batchCombined.largeSizeNoteDesktop' : 'batchCombined.largeSizeNote', { mb: combinedMemoryMB }) }}
       </p>
@@ -117,6 +141,7 @@ import { useI18n } from 'vue-i18n';
 import BaseCard from '../base/BaseCard.vue';
 import BaseButton from '../base/BaseButton.vue';
 import { desktopApp } from '../../services/platform/desktop.js';
+import { LEVEL_TESTED_MAX_PX, combinedLevelTier, terrainFileGB, reachesShakeDistance } from '../../services/levelLimits.js';
 
 const { t } = useI18n({ useScope: 'global' });
 const isDesktop = !!desktopApp;
@@ -132,28 +157,27 @@ const props = defineProps({
   tileAreaDisplay: { type: String, default: '' },
   combinedLevel: { type: Boolean, default: false },
   resolution: { type: Number, default: 1024 },
+  metersPerPixel: { type: Number, default: 1 },
+  // the experimental warning, accepted (Start waits for it)
+  experimentalAccepted: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['update:gridCols', 'update:gridRows']);
+const emit = defineEmits(['update:gridCols', 'update:gridRows', 'update:experimentalAccepted']);
 
 // Combined level grids must be square and a power of 2 so the stitched
 // heightmap (N × resolution) is itself a power-of-2 square (.ter requirement).
 const POW2_GRID_OPTIONS = [2, 4, 8];
-// 16384² is MapNG's largest level (a single tile's too). In a browser it is
-// also the ceiling of the tab's ~4 GB heap: the exporter's full-grid buffers
-// (minimap RGBA, road-architect + .ter heightfields) take 1 GiB each there.
-// The desktop app says only the first: it is the size limit, not memory.
-const COMBINED_SUPPORTED_MAX = 16384;
+// Past 16384² (the tested size): experimental on desktop, blocked in a
+// browser (services/levelLimits.js).
+const COMBINED_SUPPORTED_MAX = LEVEL_TESTED_MAX_PX;
 
 const combinedDimFor = (n) => n * Math.max(1, props.resolution);
-const combinedTierFor = (n) => {
-  const dim = combinedDimFor(n);
-  if (dim > COMBINED_SUPPORTED_MAX) return 'disabled';
-  return 'ok';
-};
+const combinedTierFor = (n) => combinedLevelTier(combinedDimFor(n), { desktop: isDesktop });
 
 const combinedDim = computed(() => combinedDimFor(props.gridCols));
 const combinedTier = computed(() => combinedTierFor(props.gridCols));
+const terrainGB = computed(() => terrainFileGB(combinedDim.value).toFixed(1));
+const shakes = computed(() => reachesShakeDistance((combinedDim.value * (props.metersPerPixel || 1)) / 1000));
 // Float32 stitched heightmap RAM estimate (4 bytes/px).
 const combinedMemoryMB = computed(() => Math.round((combinedDim.value * combinedDim.value * 4) / (1024 * 1024)));
 

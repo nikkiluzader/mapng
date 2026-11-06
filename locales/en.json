@@ -232,7 +232,19 @@
     "outputSummary": "{tiles} tiles → one {dim}×{dim} px BeamNG level",
     "outputHint": "Tiles are stitched after processing, then exported as a single playable level ZIP.",
     "startCombined": "Build combined level ({tiles} tiles)",
-    "disabledWarningDesktop": "Too large: a MapNG level can be at most 16384 × 16384 px (the same as a single tile). Lower the tile resolution or the grid size."
+    "disabledWarningDesktop": "Too large: a MapNG level can be at most 16384 × 16384 px (the same as a single tile). Lower the tile resolution or the grid size.",
+    "experimentalTag": "Experimental",
+    "expTitle": "Experimental: bigger than MapNG is tested for",
+    "expIntro": "MapNG is tested up to 16384 × 16384 px. A {dim} × {dim} px level goes past that, and:",
+    "expCrash": "it can use all of your PC's memory and freeze or crash your system",
+    "expUnfinished": "it can stop partway and never finish",
+    "expHours": "it can take many hours",
+    "expBroken": "the level may not load or work in BeamNG at all",
+    "expFiles": "the files are huge (the terrain alone is about {gb} GB)",
+    "expShake": "objects more than 30 km from the centre can shake in BeamNG",
+    "expTip": "Making a big area? A single tile at 2, 4 or 8 m per pixel covers it without these risks: BeamNG spaces the terrain squares out instead.",
+    "expDisclaimer": "You go ahead at your own risk: MapNG and its developers are not responsible for any damage to your system, lost data or lost time.",
+    "expAccept": "I understand the risks and want to try anyway"
   },
   "upload": {
     "autoDetected": "coordinates auto-detected",
@@ -552,7 +564,9 @@
       "mapData": "Map data (OpenStreetMap)",
       "osmHint": "Roads, buildings, water, land use and street detail",
       "needsOsmOn": "Turn on Include OSM features first"
-    }
+    },
+    "bigAreaOsm": "Big area ({km} km across). The terrain is fine at this size, but lots of OpenStreetMap data (towns, dense roads) will very likely cause problems: slow or failed generating and exports, and a heavy level. Best where map data is sparse (deserts, mountains); otherwise turn off OSM features or pick a smaller area.",
+    "farShake": "Parts of this level are more than 30 km from its centre: in BeamNG, objects that far out can start to shake."
   },
   "batchExport": {
     "title": "Export options",

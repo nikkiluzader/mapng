@@ -232,7 +232,19 @@
     "outputSummary": "{tiles} tuiles → un niveau BeamNG de {dim}×{dim} px",
     "outputHint": "Les tuiles sont assemblées après le traitement, puis exportées en un seul ZIP de niveau jouable.",
     "startCombined": "Créer le niveau combiné ({tiles} tuiles)",
-    "disabledWarningDesktop": "Trop grand : un niveau MapNG fait au plus 16384 × 16384 px (comme une tuile seule). Réduisez la résolution des tuiles ou la taille de la grille."
+    "disabledWarningDesktop": "Trop grand : un niveau MapNG fait au plus 16384 × 16384 px (comme une tuile seule). Réduisez la résolution des tuiles ou la taille de la grille.",
+    "experimentalTag": "Expérimental",
+    "expTitle": "Expérimental : plus grand que ce que MapNG a testé",
+    "expIntro": "MapNG est testé jusqu'à 16384 × 16384 px. Un niveau de {dim} × {dim} px va au-delà, et :",
+    "expCrash": "il peut utiliser toute la mémoire de votre PC et figer ou planter votre système",
+    "expUnfinished": "il peut s'arrêter en cours de route et ne jamais finir",
+    "expHours": "il peut prendre de nombreuses heures",
+    "expBroken": "le niveau peut ne pas se charger ou ne pas fonctionner dans BeamNG",
+    "expFiles": "les fichiers sont énormes (le terrain seul fait environ {gb} Go)",
+    "expShake": "les objets à plus de 30 km du centre peuvent trembler dans BeamNG",
+    "expTip": "Une grande zone ? Une seule tuile à 2, 4 ou 8 m par pixel la couvre sans ces risques : BeamNG espace les carrés du terrain à la place.",
+    "expDisclaimer": "Vous continuez à vos risques : MapNG et ses développeurs ne sont pas responsables des dommages à votre système, des données ou du temps perdus.",
+    "expAccept": "Je comprends les risques et veux essayer quand même"
   },
   "upload": {
     "autoDetected": "coordonnées détectées automatiquement",
@@ -552,7 +564,9 @@
       "mapData": "Données cartographiques (OpenStreetMap)",
       "osmHint": "Routes, bâtiments, eau, occupation du sol et détails de rue",
       "needsOsmOn": "Activez d'abord Inclure les éléments OSM"
-    }
+    },
+    "bigAreaOsm": "Grande zone ({km} km de côté). Le terrain ne pose pas de problème à cette taille, mais beaucoup de données OpenStreetMap (villes, routes denses) causeront très probablement des soucis : génération et exports lents ou en échec, et un niveau lourd. Idéal là où les données sont rares (déserts, montagnes) ; sinon désactivez les données OSM ou choisissez une zone plus petite.",
+    "farShake": "Des parties de ce niveau sont à plus de 30 km de son centre : dans BeamNG, les objets aussi loin peuvent commencer à trembler."
   },
   "batchExport": {
     "title": "Options d'export",
