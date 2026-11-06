@@ -1270,8 +1270,8 @@
     "customExportTitle": "À l'export du niveau"
   },
   "panelSteps": {
-    "where": "Où",
-    "builtFrom": "À partir de",
+    "where": "Lieu",
+    "builtFrom": "Sources",
     "get": "Ce que vous obtenez"
   },
   "genSummary": {
@@ -1302,10 +1302,10 @@
   },
   "osmFile": {
     "title": "Utiliser votre propre fichier OSM",
-    "hint": "Des données plus récentes, ou aucun serveur OpenStreetMap joignable ? Téléchargez cette zone depuis openstreetmap.org, puis déposez ici le fichier map.osm. Tant qu'il couvre la zone, MapNG le lit au lieu de télécharger.",
-    "download": "Télécharger map.osm",
-    "downloadTitle": "Cette zone depuis openstreetmap.org, directement de la base OSM (comme son bouton Exporter)",
-    "openSite": "Ouvrir sur openstreetmap.org",
+    "hint": "Des données plus récentes, ou aucun serveur OpenStreetMap joignable ? Récupérez cette zone directement sur openstreetmap.org, ou déposez ici un fichier .osm. Tant qu'il couvre la zone, MapNG le lit au lieu de télécharger.",
+    "download": "Télécharger",
+    "downloadTitle": "Enregistrer les données OpenStreetMap de cette zone dans un fichier .osm (vous choisissez où ; Téléchargements par défaut)",
+    "openSite": "Voir sur OSM",
     "tooBig": "Trop grande pour un export d'openstreetmap.org (au plus 0,25 degré carré et 50 000 points). Réduisez la zone ou enregistrez-la depuis JOSM.",
     "drop": "Déposez le fichier .osm ici, ou cliquez pour le choisir",
     "formats": ".osm (Exporter d'openstreetmap.org, JOSM) ou JSON Overpass",
@@ -1319,7 +1319,18 @@
     "coverage_full": "Couvre toute la zone : utilisé à la place des serveurs OSM.",
     "coverage_partial": "Couvre {pct} % de la zone : utilisé, et le reste de la zone n'a pas de données cartographiques.",
     "coverage_none": "Ne couvre pas cette zone : non utilisé. Les données cartographiques sont téléchargées comme d'habitude.",
-    "coverage_partialGrid": "Couvre {pct} % de la grille : les tuiles qu'il atteint l'utilisent, les autres téléchargent leurs données comme d'habitude."
+    "coverage_partialGrid": "Couvre {pct} % de la grille : les tuiles qu'il atteint l'utilisent, les autres téléchargent leurs données comme d'habitude.",
+    "pull": "Récupérer",
+    "pullTitle": "Récupérer cette zone sur openstreetmap.org et l'utiliser tout de suite (les mêmes données que son bouton Exporter)",
+    "openSiteTitle": "Ouvrir la page Exporter d'openstreetmap.org avec cette zone sélectionnée",
+    "fetching": "Récupération depuis openstreetmap.org… {size}",
+    "savedAs": "{name} enregistré",
+    "pulledFrom": "Récupéré sur openstreetmap.org à {time}",
+    "limitNote": "openstreetmap.org fournit au plus 50 000 points par export : environ 1 km² d'une ville dense, bien plus à la campagne.",
+    "err_too_big": "Trop de données pour un export d'openstreetmap.org (plus de 50 000 points). Réduisez la zone ou enregistrez-la depuis JOSM.",
+    "err_busy": "openstreetmap.org est occupé pour le moment. Réessayez dans une minute.",
+    "err_network": "openstreetmap.org est injoignable. Vérifiez votre connexion ou utilisez Voir sur OSM.",
+    "err_http": "openstreetmap.org n'a pas pu fournir cette zone. Survolez pour les détails."
   },
   "wizard": {
     "steps": "Étapes",

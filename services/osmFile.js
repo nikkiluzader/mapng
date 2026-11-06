@@ -220,13 +220,56 @@ export function osmExportUrl(area, marginFraction = 0.03) {
   return `https://api.openstreetmap.org/api/0.6/map?bbox=${f(area.west - dx)},${f(area.south - dy)},${f(area.east + dx)},${f(area.north + dy)}`;
 }
 
-/** openstreetmap.org's Export page, centred on the area (it sets its box from the view). */
+/**
+ * openstreetmap.org's Export page with its map, and so its export box, fitted
+ * to the area (the site reads ?bbox= and fits the view to it).
+ */
 export function osmExportPageUrl(area) {
+  const f = (v) => v.toFixed(6);
+  return `https://www.openstreetmap.org/export?bbox=${f(area.west)},${f(area.south)},${f(area.east)},${f(area.north)}`;
+}
+
+/** A file name for the area's export: osm_<lat>_<lon>.osm (its centre). */
+export function osmExportFileName(area) {
   const lat = (area.north + area.south) / 2;
   const lon = (area.east + area.west) / 2;
-  const span = Math.max(area.east - area.west, area.north - area.south);
-  const zoom = Math.max(3, Math.min(18, Math.round(Math.log2(360 / Math.max(span, 1e-6))) + 1));
-  return `https://www.openstreetmap.org/export#map=${zoom}/${lat.toFixed(5)}/${lon.toFixed(5)}`;
+  return `osm_${lat.toFixed(4)}_${lon.toFixed(4)}.osm`;
+}
+
+/**
+ * The area from openstreetmap.org's API (the request its Export button makes;
+ * the API allows the website's and the desktop app's origins). -> the .osm
+ * text. onProgress(bytes) while it arrives. Throws an Error with .code:
+ * 'too_big' (over the API's node or area limit), 'busy' (rate limited),
+ * 'network', or 'http'.
+ */
+export async function fetchOsmExport(area, { signal, onProgress } = {}) {
+  let response;
+  try {
+    response = await fetch(osmExportUrl(area), { signal, headers: { Accept: 'application/xml' } });
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e;
+    throw Object.assign(new Error(`openstreetmap.org could not be reached: ${e?.message || e}`), { code: 'network' });
+  }
+  if (!response.ok) {
+    const body = (await response.text().catch(() => '')).slice(0, 300);
+    const code = response.status === 400 && /too many nodes|area|bounding box/i.test(body) ? 'too_big'
+      : (response.status === 429 || response.status === 509) ? 'busy' : 'http';
+    throw Object.assign(new Error(body || `openstreetmap.org answered ${response.status}`), { code, status: response.status });
+  }
+  if (!response.body?.getReader) return response.text();
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  let bytes = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    text += decoder.decode(value, { stream: true });
+    onProgress?.(bytes);
+  }
+  return text + decoder.decode();
 }
 
 /** Whether openstreetmap.org will hand out `area` in one export (its box limit; the node cap shows only on asking). */
@@ -240,10 +283,11 @@ const listeners = new Set();
 /** The loaded file, or null. */
 export const getLoadedOsmFile = () => loaded;
 
-/** Read `text` (named `name`) as the loaded file; throws if it isn't OSM data. Keeps the text for the desktop app's generate job. */
-export function loadOsmFileText(text, name = 'map.osm') {
+/** Read `text` (named `name`) as the loaded file; throws if it isn't OSM data. Keeps the text for the desktop app's generate job (and a rebuild). */
+export function loadOsmFileText(text, name = 'map.osm', { source = 'file' } = {}) {
   const parsed = parseOsmFile(text);
-  loaded = { name, size: text.length, ...parsed, text, loadedAt: new Date().toISOString() };
+  // (source: 'file' dropped or picked, 'pulled' straight from openstreetmap.org)
+  loaded = { name, source, size: text.length, ...parsed, text, loadedAt: new Date().toISOString() };
   for (const fn of listeners) fn(loaded);
   return loaded;
 }

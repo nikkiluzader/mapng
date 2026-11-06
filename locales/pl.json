@@ -1270,8 +1270,8 @@
     "customExportTitle": "W eksporcie poziomu"
   },
   "panelSteps": {
-    "where": "Gdzie",
-    "builtFrom": "Zbudowany z",
+    "where": "Lokalizacja",
+    "builtFrom": "Źródła",
     "get": "Co otrzymasz"
   },
   "genSummary": {
@@ -1302,10 +1302,10 @@
   },
   "osmFile": {
     "title": "Użyj własnego pliku OSM",
-    "hint": "Nowsze dane albo brak dostępu do serwerów OpenStreetMap? Pobierz ten obszar z openstreetmap.org i upuść tutaj plik map.osm. Dopóki obejmuje obszar, MapNG czyta go zamiast pobierać.",
-    "download": "Pobierz map.osm",
-    "downloadTitle": "Ten obszar z openstreetmap.org, prosto z bazy OSM (tak jak przycisk Eksportuj)",
-    "openSite": "Otwórz na openstreetmap.org",
+    "hint": "Nowsze dane albo brak dostępu do serwerów OpenStreetMap? Pobierz ten obszar prosto z openstreetmap.org albo upuść tutaj plik .osm. Dopóki obejmuje obszar, MapNG czyta go zamiast pobierać.",
+    "download": "Zapisz",
+    "downloadTitle": "Zapisz dane OpenStreetMap tego obszaru jako plik .osm (ty wybierasz gdzie; najpierw Pobrane)",
+    "openSite": "Zobacz w OSM",
     "tooBig": "Za duży na jeden eksport z openstreetmap.org (najwyżej 0,25 stopnia kwadratowego i 50 000 punktów). Zmniejsz obszar albo zapisz go z JOSM.",
     "drop": "Upuść tutaj plik .osm lub kliknij, aby wybrać",
     "formats": ".osm (Eksport z openstreetmap.org, JOSM) lub JSON z Overpass",
@@ -1319,7 +1319,18 @@
     "coverage_full": "Obejmuje cały obszar: używany zamiast serwerów OSM.",
     "coverage_partial": "Obejmuje {pct}% obszaru: używany, a reszta obszaru nie ma danych mapy.",
     "coverage_none": "Nie obejmuje tego obszaru: nieużywany. Dane mapy są pobierane jak zwykle.",
-    "coverage_partialGrid": "Obejmuje {pct}% siatki: kafelki, do których sięga, używają go, pozostałe pobierają dane mapy jak zwykle."
+    "coverage_partialGrid": "Obejmuje {pct}% siatki: kafelki, do których sięga, używają go, pozostałe pobierają dane mapy jak zwykle.",
+    "pull": "Pobierz teraz",
+    "pullTitle": "Pobierz ten obszar z openstreetmap.org i od razu go użyj (te same dane co przycisk Eksportuj)",
+    "openSiteTitle": "Otwórz stronę Eksportuj na openstreetmap.org z zaznaczonym obszarem",
+    "fetching": "Pobieranie z openstreetmap.org… {size}",
+    "savedAs": "Zapisano {name}",
+    "pulledFrom": "Pobrano z openstreetmap.org o {time}",
+    "limitNote": "openstreetmap.org wydaje najwyżej 50 000 punktów na eksport: około 1 km² gęstego miasta, dużo więcej na wsi.",
+    "err_too_big": "Za dużo danych na jeden eksport z openstreetmap.org (ponad 50 000 punktów). Zmniejsz obszar albo zapisz go z JOSM.",
+    "err_busy": "openstreetmap.org jest teraz zajęty. Spróbuj ponownie za minutę.",
+    "err_network": "Nie można połączyć się z openstreetmap.org. Sprawdź połączenie albo użyj Zobacz w OSM.",
+    "err_http": "openstreetmap.org nie mógł wydać tego obszaru. Najedź kursorem, aby zobaczyć szczegóły."
   },
   "wizard": {
     "steps": "Kroki",

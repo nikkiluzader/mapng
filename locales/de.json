@@ -1270,8 +1270,8 @@
     "customExportTitle": "Im Level-Export"
   },
   "panelSteps": {
-    "where": "Wo",
-    "builtFrom": "Erstellt aus",
+    "where": "Ort",
+    "builtFrom": "Quellen",
     "get": "Ergebnis"
   },
   "genSummary": {
@@ -1302,10 +1302,10 @@
   },
   "osmFile": {
     "title": "Eigene OSM-Datei verwenden",
-    "hint": "Aktuellere Daten oder kein OpenStreetMap-Server erreichbar? Lade dieses Gebiet von openstreetmap.org herunter und lege die Datei map.osm hier ab. Solange sie das Gebiet abdeckt, liest MapNG sie statt abzurufen.",
-    "download": "map.osm herunterladen",
-    "downloadTitle": "Dieses Gebiet von openstreetmap.org, direkt aus der OSM-Datenbank (wie dort der Export-Knopf)",
-    "openSite": "Auf openstreetmap.org öffnen",
+    "hint": "Aktuellere Daten oder kein OpenStreetMap-Server erreichbar? Hole dieses Gebiet direkt von openstreetmap.org oder lege hier eine .osm-Datei ab. Solange sie das Gebiet abdeckt, liest MapNG sie statt abzurufen.",
+    "download": "Herunterladen",
+    "downloadTitle": "Die OpenStreetMap-Daten dieses Gebiets als .osm-Datei speichern (du wählst den Ort; zuerst Downloads)",
+    "openSite": "Auf OSM",
     "tooBig": "Zu groß für einen Export von openstreetmap.org (höchstens 0,25 Quadratgrad und 50.000 Punkte). Verkleinere das Gebiet oder speichere es aus JOSM.",
     "drop": "Die .osm-Datei hier ablegen oder klicken zum Auswählen",
     "formats": ".osm (Export von openstreetmap.org, JOSM) oder Overpass-JSON",
@@ -1319,7 +1319,18 @@
     "coverage_full": "Deckt das ganze Gebiet ab: wird statt der OSM-Server verwendet.",
     "coverage_partial": "Deckt {pct} % des Gebiets ab: wird verwendet, der Rest des Gebiets bekommt keine Kartendaten.",
     "coverage_none": "Deckt dieses Gebiet nicht ab: wird nicht verwendet. Kartendaten werden wie üblich abgerufen.",
-    "coverage_partialGrid": "Deckt {pct} % des Rasters ab: Kacheln, die sie erreicht, verwenden sie, die anderen laden ihre Kartendaten wie üblich."
+    "coverage_partialGrid": "Deckt {pct} % des Rasters ab: Kacheln, die sie erreicht, verwenden sie, die anderen laden ihre Kartendaten wie üblich.",
+    "pull": "Holen",
+    "pullTitle": "Dieses Gebiet von openstreetmap.org abrufen und sofort verwenden (dieselben Daten wie dort der Export-Knopf)",
+    "openSiteTitle": "Die Export-Seite von openstreetmap.org mit diesem Gebiet öffnen",
+    "fetching": "Wird von openstreetmap.org abgerufen… {size}",
+    "savedAs": "{name} gespeichert",
+    "pulledFrom": "Um {time} von openstreetmap.org geholt",
+    "limitNote": "openstreetmap.org gibt pro Export höchstens 50.000 Punkte heraus: etwa 1 km² einer dichten Stadt, auf dem Land viel mehr.",
+    "err_too_big": "Zu viele Daten für einen Export von openstreetmap.org (über 50.000 Punkte). Verkleinere das Gebiet oder speichere es aus JOSM.",
+    "err_busy": "openstreetmap.org ist gerade ausgelastet. Versuche es in einer Minute erneut.",
+    "err_network": "openstreetmap.org ist nicht erreichbar. Prüfe deine Verbindung oder nutze „Auf OSM“.",
+    "err_http": "openstreetmap.org konnte dieses Gebiet nicht herausgeben. Für Details mit der Maus darüberfahren."
   },
   "wizard": {
     "steps": "Schritte",

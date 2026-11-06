@@ -1270,8 +1270,8 @@
     "customExportTitle": "In the level export"
   },
   "panelSteps": {
-    "where": "Where",
-    "builtFrom": "Built from",
+    "where": "Location",
+    "builtFrom": "Sources",
     "get": "What you get"
   },
   "genSummary": {
@@ -1302,10 +1302,10 @@
   },
   "osmFile": {
     "title": "Use your own OSM file",
-    "hint": "Fresher data, or no OpenStreetMap server reachable? Download this area from openstreetmap.org, then drop the map.osm file here. While it covers the area, MapNG reads it instead of fetching.",
-    "download": "Download map.osm",
-    "downloadTitle": "This area from openstreetmap.org, straight from the OSM database (the same as its Export button)",
-    "openSite": "Open on openstreetmap.org",
+    "hint": "Fresher data, or no OpenStreetMap server reachable? Pull this area straight from openstreetmap.org, or drop an .osm file here. While it covers the area, MapNG reads it instead of fetching.",
+    "download": "Download",
+    "downloadTitle": "Save this area's OpenStreetMap data as an .osm file (you choose where; Downloads to start with)",
+    "openSite": "View on OSM",
     "tooBig": "Too big for one openstreetmap.org export (at most 0.25 square degrees and 50,000 points). Make the area smaller, or save the area from JOSM.",
     "drop": "Drop the .osm file here, or click to choose",
     "formats": ".osm (openstreetmap.org Export, JOSM) or Overpass JSON",
@@ -1319,7 +1319,18 @@
     "coverage_full": "Covers the whole area: used instead of the OSM servers.",
     "coverage_partial": "Covers {pct}% of the area: used, and the rest of the area gets no map data.",
     "coverage_none": "Doesn't cover this area: not used. Map data is fetched as usual.",
-    "coverage_partialGrid": "Covers {pct}% of the grid: tiles it reaches use it, the others download their map data as usual."
+    "coverage_partialGrid": "Covers {pct}% of the grid: tiles it reaches use it, the others download their map data as usual.",
+    "pull": "Pull",
+    "pullTitle": "Fetch this area from openstreetmap.org and use it right away (the same data as its Export button)",
+    "openSiteTitle": "Open openstreetmap.org's Export page with this area selected",
+    "fetching": "Fetching from openstreetmap.org… {size}",
+    "savedAs": "Saved {name}",
+    "pulledFrom": "Pulled from openstreetmap.org at {time}",
+    "limitNote": "openstreetmap.org hands out at most 50,000 points per export: about 1 km² of a dense town, much more of the countryside.",
+    "err_too_big": "Too much data for one openstreetmap.org export (over 50,000 points). Make the area smaller, or save it from JOSM.",
+    "err_busy": "openstreetmap.org is busy right now. Try again in a minute.",
+    "err_network": "openstreetmap.org could not be reached. Check your connection, or use View on OSM.",
+    "err_http": "openstreetmap.org couldn't hand out this area. Hover for details."
   },
   "wizard": {
     "steps": "Steps",

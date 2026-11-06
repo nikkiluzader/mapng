@@ -2,7 +2,7 @@
   <!-- An OpenStreetMap file of the user's own (services/osmFile.js): fetched
        from openstreetmap.org with one click, dropped here, then read instead
        of the Overpass servers while it covers the area. -->
-  <details class="pl-4 text-caption text-gray-500 dark:text-gray-400" :open="!!file || undefined">
+  <details class="pl-4 text-caption text-gray-500 dark:text-gray-400" :open="open" @toggle="open = $event.target.open">
     <summary class="cursor-pointer select-none hover:text-brand">
       {{ t('osmFile.title') }}
       <span v-if="file" class="ml-1 font-semibold" :class="coverageClass">· {{ t(`osmFile.short_${coverage.coverage}`) }}</span>
@@ -11,9 +11,11 @@
     <!-- a file is loaded: what it is, whether it covers the area -->
     <div v-if="file" class="mt-1 rounded-lg border px-2.5 py-2" :class="coverageBorder">
       <div class="flex items-start gap-2">
-        <FileText :size="14" class="shrink-0 mt-0.5 text-gray-400" />
+        <component :is="file.source === 'pulled' ? CloudDownload : FileText" :size="14" class="shrink-0 mt-0.5 text-gray-400" />
         <div class="min-w-0 flex-1">
-          <div class="font-medium text-gray-800 dark:text-gray-100 truncate" :title="file.name">{{ file.name }}</div>
+          <div class="font-medium text-gray-800 dark:text-gray-100 truncate" :title="file.name">
+            {{ file.source === 'pulled' ? t('osmFile.pulledFrom', { time: loadedTime }) : file.name }}
+          </div>
           <div class="text-micro text-gray-500 dark:text-gray-400">{{ t('osmFile.counts', { nodes: fmt(file.counts.nodes), ways: fmt(file.counts.ways) }) }}</div>
         </div>
         <button type="button" class="shrink-0 text-gray-400 hover:text-red-500" :title="t('osmFile.remove')" :aria-label="t('osmFile.remove')" @click="clearOsmFile()">
@@ -26,27 +28,51 @@
       </p>
     </div>
 
-    <!-- none yet: get one for the area, then drop it here -->
+    <!-- none yet: pull the area from openstreetmap.org, save it as a file, or look at it there; or drop a file -->
     <div v-else class="mt-1 space-y-1.5">
       <p class="leading-snug">{{ t('osmFile.hint') }}</p>
-      <div class="flex flex-wrap gap-1.5">
-        <a
-          v-if="areaOk"
-          :href="osmExportUrl(area)"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-brand text-white font-semibold hover:bg-brand-500"
-          :title="t('osmFile.downloadTitle')"
-        ><Download :size="12" />{{ t('osmFile.download') }}</a>
+      <div class="grid grid-cols-3 gap-1.5">
+        <button
+          type="button"
+          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded-md leading-tight text-center whitespace-nowrap bg-brand text-white font-semibold hover:bg-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="!areaOk || !!busy"
+          :title="areaOk ? t('osmFile.pullTitle') : t('osmFile.tooBig')"
+          @click="pull"
+        >
+          <Loader2 v-if="busy === 'pull'" :size="12" class="animate-spin" /><CloudDownload v-else :size="12" />{{ t('osmFile.pull') }}
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded-md leading-tight text-center whitespace-nowrap border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold hover:border-brand hover:text-brand disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="!areaOk || !!busy"
+          :title="areaOk ? t('osmFile.downloadTitle') : t('osmFile.tooBig')"
+          @click="download"
+        >
+          <Loader2 v-if="busy === 'download'" :size="12" class="animate-spin" /><Download v-else :size="12" />{{ t('osmFile.download') }}
+        </button>
         <a
           :href="osmExportPageUrl(area)"
           target="_blank"
           rel="noopener noreferrer"
-          class="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-brand hover:text-brand"
+          class="inline-flex items-center justify-center gap-1 px-1 py-1.5 rounded-md leading-tight text-center whitespace-nowrap border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold hover:border-brand hover:text-brand"
+          :title="t('osmFile.openSiteTitle')"
         ><ExternalLink :size="12" />{{ t('osmFile.openSite') }}</a>
       </div>
+      <!-- what's happening, what came of it, and the limit -->
+      <p v-if="busy" class="flex items-center gap-1.5 text-gray-600 dark:text-gray-300">
+        <Loader2 :size="12" class="animate-spin shrink-0" />{{ t('osmFile.fetching', { size: sizeText }) }}
+      </p>
+      <p v-else-if="saved" class="flex items-start gap-1.5 leading-snug text-emerald-700 dark:text-emerald-400">
+        <CheckCircle2 :size="12" class="shrink-0 mt-px" />{{ t('osmFile.savedAs', { name: saved }) }}
+      </p>
+      <p v-if="fetchError" :title="fetchError.detail" class="flex items-start gap-1.5 leading-snug text-red-600 dark:text-red-400">
+        <AlertTriangle :size="12" class="shrink-0 mt-px" />{{ t(`osmFile.err_${fetchError.code}`) }}
+      </p>
       <p v-if="!areaOk" class="flex items-start gap-1.5 leading-snug text-amber-700 dark:text-amber-300">
         <AlertTriangle :size="12" class="shrink-0 mt-px" />{{ t('osmFile.tooBig') }}
+      </p>
+      <p v-else class="flex items-start gap-1.5 leading-snug text-micro text-gray-400 dark:text-gray-500">
+        <Info :size="11" class="shrink-0 mt-px" />{{ t('osmFile.limitNote') }}
       </p>
       <label
         class="flex flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed px-3 py-3 text-center cursor-pointer transition-colors"
@@ -71,10 +97,11 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, shallowRef } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { AlertTriangle, CheckCircle2, Download, ExternalLink, FileText, Upload, X } from 'lucide-vue-next';
+import { AlertTriangle, CheckCircle2, CloudDownload, Download, ExternalLink, FileText, Info, Loader2, Upload, X } from 'lucide-vue-next';
+import { desktopApp } from '../../services/platform/desktop.js';
 import {
   getLoadedOsmFile, loadOsmFileText, clearOsmFile, onOsmFileChange,
-  osmFileCoverage, osmExportUrl, osmExportPageUrl, osmExportAreaOk,
+  osmFileCoverage, osmExportPageUrl, osmExportAreaOk, osmExportFileName, fetchOsmExport,
 } from '../../services/osmFile.js';
 
 const props = defineProps({
@@ -86,7 +113,9 @@ const props = defineProps({
 const { t, locale } = useI18n({ useScope: 'global' });
 
 const file = shallowRef(getLoadedOsmFile());
-const stop = onOsmFileChange((f) => { file.value = f; });
+// (open while a file is loaded, and stays open when it is removed)
+const open = ref(!!file.value);
+const stop = onOsmFileChange((f) => { file.value = f; if (f) open.value = true; });
 onBeforeUnmount(stop);
 
 const dragging = ref(false);
@@ -119,6 +148,69 @@ async function read(picked) {
     reading.value = false;
   }
 }
+// ---- Pull (straight in) and Download (a file to keep), both from openstreetmap.org ----
+const busy = ref('');          // 'pull' | 'download' | ''
+const bytes = ref(0);
+const saved = ref('');         // the file name a Download was saved as (when known)
+const fetchError = ref(null);  // { code, detail }
+const sizeText = computed(() => (bytes.value < 1e6 ? `${Math.round(bytes.value / 1e3)} KB` : `${(bytes.value / 1e6).toFixed(1)} MB`));
+const loadedTime = computed(() => (file.value ? new Date(file.value.loadedAt).toLocaleTimeString(locale.value, { hour: '2-digit', minute: '2-digit' }) : ''));
+let controller = null;
+onBeforeUnmount(() => controller?.abort());
+
+async function fetchArea(kind) {
+  busy.value = kind; bytes.value = 0; saved.value = ''; fetchError.value = null; error.value = '';
+  controller = new AbortController();
+  try {
+    return await fetchOsmExport(props.area, { signal: controller.signal, onProgress: (n) => { bytes.value = n; } });
+  } catch (e) {
+    if (e?.name !== 'AbortError') fetchError.value = { code: e?.code || 'http', detail: String(e?.message || e) };
+    return null;
+  } finally {
+    busy.value = '';
+  }
+}
+
+async function pull() {
+  const text = await fetchArea('pull');
+  if (text == null) return;
+  try {
+    loadOsmFileText(text, osmExportFileName(props.area), { source: 'pulled' });
+  } catch (e) {
+    fetchError.value = { code: 'http', detail: String(e?.message || e) };
+  }
+}
+
+// Saved where the user picks: the website's save picker (Chrome, Edge) opens
+// in Downloads; elsewhere a download (the desktop app asks where, from
+// Downloads: desktop/main.js).
+async function download() {
+  const text = await fetchArea('download');
+  if (text == null) return;
+  const name = osmExportFileName(props.area);
+  if (!desktopApp && typeof window.showSaveFilePicker === 'function') {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: name,
+        startIn: 'downloads',
+        types: [{ description: 'OpenStreetMap data', accept: { 'application/xml': ['.osm'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(text);
+      await writable.close();
+      saved.value = handle.name;
+      return;
+    } catch (e) {
+      if (e?.name === 'AbortError') return;   // (the user closed the picker)
+    }
+  }
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/xml' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  if (!desktopApp) saved.value = name;
+}
+
 const onDrop = (e) => { dragging.value = false; read(e.dataTransfer?.files?.[0]); };
 const onPick = (e) => { read(e.target.files?.[0]); e.target.value = ''; };
 </script>

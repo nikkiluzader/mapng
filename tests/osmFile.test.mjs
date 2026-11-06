@@ -134,3 +134,32 @@ test('fetchOSMData reads a loaded file and fetches nothing', async () => {
     globalThis.localStorage = realStorage;
   }
 });
+
+test('View on OSM: the Export page fitted to the area', async () => {
+  const { osmExportPageUrl, osmExportFileName } = await import('../services/osmFile.js');
+  const area = { south: 46, west: 7, north: 46.01, east: 7.01 };
+  assert.equal(osmExportPageUrl(area), 'https://www.openstreetmap.org/export?bbox=7.000000,46.000000,7.010000,46.010000');
+  assert.equal(osmExportFileName(area), 'osm_46.0050_7.0050.osm');
+});
+
+test('Pull/Download: openstreetmap.org answers become clear error codes', async () => {
+  const { fetchOsmExport } = await import('../services/osmFile.js');
+  const realFetch = globalThis.fetch;
+  const area = { south: 46, west: 7, north: 46.01, east: 7.01 };
+  const answer = (status, body) => { globalThis.fetch = async () => new Response(body, { status }); };
+  try {
+    answer(400, 'You requested too many nodes (limit is 50000). Either request a smaller area, or use planet.osm');
+    await assert.rejects(fetchOsmExport(area), (e) => e.code === 'too_big');
+    answer(509, 'Bandwidth limit exceeded');
+    await assert.rejects(fetchOsmExport(area), (e) => e.code === 'busy');
+    globalThis.fetch = async () => { throw new TypeError('Failed to fetch'); };
+    await assert.rejects(fetchOsmExport(area), (e) => e.code === 'network');
+    answer(200, OSM_ORG);
+    let seen = 0;
+    const text = await fetchOsmExport(area, { onProgress: (n) => { seen = n; } });
+    assert.ok(text.includes('<osm'));
+    assert.ok(seen > 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});

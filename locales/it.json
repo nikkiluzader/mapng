@@ -1270,8 +1270,8 @@
     "customExportTitle": "Nell'esportazione del livello"
   },
   "panelSteps": {
-    "where": "Dove",
-    "builtFrom": "Creato da",
+    "where": "Luogo",
+    "builtFrom": "Fonti",
     "get": "Cosa ottieni"
   },
   "genSummary": {
@@ -1302,10 +1302,10 @@
   },
   "osmFile": {
     "title": "Usa il tuo file OSM",
-    "hint": "Dati più recenti, o nessun server OpenStreetMap raggiungibile? Scarica quest'area da openstreetmap.org, poi trascina qui il file map.osm. Finché copre l'area, MapNG lo legge invece di scaricare.",
-    "download": "Scarica map.osm",
-    "downloadTitle": "Quest'area da openstreetmap.org, direttamente dal database OSM (come il suo pulsante Esporta)",
-    "openSite": "Apri su openstreetmap.org",
+    "hint": "Dati più recenti, o nessun server OpenStreetMap raggiungibile? Prendi quest'area direttamente da openstreetmap.org, o trascina qui un file .osm. Finché copre l'area, MapNG lo legge invece di scaricare.",
+    "download": "Scarica",
+    "downloadTitle": "Salva i dati OpenStreetMap di quest'area come file .osm (scegli tu dove; all'inizio Download)",
+    "openSite": "Vedi su OSM",
     "tooBig": "Troppo grande per un'esportazione di openstreetmap.org (al massimo 0,25 gradi quadrati e 50.000 punti). Riduci l'area o salvala da JOSM.",
     "drop": "Trascina qui il file .osm, o fai clic per sceglierlo",
     "formats": ".osm (Esporta di openstreetmap.org, JOSM) o JSON di Overpass",
@@ -1319,7 +1319,18 @@
     "coverage_full": "Copre tutta l'area: usato al posto dei server OSM.",
     "coverage_partial": "Copre il {pct}% dell'area: usato, e il resto dell'area resta senza dati della mappa.",
     "coverage_none": "Non copre quest'area: non usato. I dati della mappa vengono scaricati come al solito.",
-    "coverage_partialGrid": "Copre il {pct}% della griglia: i riquadri che raggiunge lo usano, gli altri scaricano i dati della mappa come al solito."
+    "coverage_partialGrid": "Copre il {pct}% della griglia: i riquadri che raggiunge lo usano, gli altri scaricano i dati della mappa come al solito.",
+    "pull": "Prendi",
+    "pullTitle": "Scarica quest'area da openstreetmap.org e usala subito (gli stessi dati del suo pulsante Esporta)",
+    "openSiteTitle": "Apri la pagina Esporta di openstreetmap.org con quest'area selezionata",
+    "fetching": "Download da openstreetmap.org… {size}",
+    "savedAs": "{name} salvato",
+    "pulledFrom": "Preso da openstreetmap.org alle {time}",
+    "limitNote": "openstreetmap.org fornisce al massimo 50.000 punti per esportazione: circa 1 km² di una città densa, molto di più in campagna.",
+    "err_too_big": "Troppi dati per un'esportazione di openstreetmap.org (oltre 50.000 punti). Riduci l'area o salvala da JOSM.",
+    "err_busy": "openstreetmap.org è occupato in questo momento. Riprova tra un minuto.",
+    "err_network": "Impossibile raggiungere openstreetmap.org. Controlla la connessione o usa Vedi su OSM.",
+    "err_http": "openstreetmap.org non ha potuto fornire quest'area. Passa il mouse per i dettagli."
   },
   "wizard": {
     "steps": "Passaggi",

@@ -1270,8 +1270,8 @@
     "customExportTitle": "En la exportación del nivel"
   },
   "panelSteps": {
-    "where": "Dónde",
-    "builtFrom": "Hecho con",
+    "where": "Ubicación",
+    "builtFrom": "Fuentes",
     "get": "Qué obtienes"
   },
   "genSummary": {
@@ -1302,10 +1302,10 @@
   },
   "osmFile": {
     "title": "Usar tu propio archivo OSM",
-    "hint": "¿Datos más recientes o ningún servidor de OpenStreetMap disponible? Descarga esta zona desde openstreetmap.org y suelta aquí el archivo map.osm. Mientras cubra la zona, MapNG lo lee en lugar de descargar.",
-    "download": "Descargar map.osm",
-    "downloadTitle": "Esta zona desde openstreetmap.org, directamente de la base de datos de OSM (igual que su botón Exportar)",
-    "openSite": "Abrir en openstreetmap.org",
+    "hint": "¿Datos más recientes o ningún servidor de OpenStreetMap disponible? Trae esta zona directamente de openstreetmap.org o suelta aquí un archivo .osm. Mientras cubra la zona, MapNG lo lee en lugar de descargar.",
+    "download": "Descargar",
+    "downloadTitle": "Guardar los datos de OpenStreetMap de esta zona como archivo .osm (tú eliges dónde; primero Descargas)",
+    "openSite": "Ver en OSM",
     "tooBig": "Demasiado grande para una exportación de openstreetmap.org (como máximo 0,25 grados cuadrados y 50.000 puntos). Reduce la zona o guárdala desde JOSM.",
     "drop": "Suelta aquí el archivo .osm o haz clic para elegirlo",
     "formats": ".osm (Exportar de openstreetmap.org, JOSM) o JSON de Overpass",
@@ -1319,7 +1319,18 @@
     "coverage_full": "Cubre toda la zona: se usa en lugar de los servidores de OSM.",
     "coverage_partial": "Cubre el {pct} % de la zona: se usa, y el resto de la zona no tiene datos de mapa.",
     "coverage_none": "No cubre esta zona: no se usa. Los datos de mapa se descargan como siempre.",
-    "coverage_partialGrid": "Cubre el {pct} % de la cuadrícula: las teselas que alcanza lo usan, las demás descargan sus datos de mapa como siempre."
+    "coverage_partialGrid": "Cubre el {pct} % de la cuadrícula: las teselas que alcanza lo usan, las demás descargan sus datos de mapa como siempre.",
+    "pull": "Traer",
+    "pullTitle": "Obtener esta zona de openstreetmap.org y usarla al momento (los mismos datos que su botón Exportar)",
+    "openSiteTitle": "Abrir la página Exportar de openstreetmap.org con esta zona seleccionada",
+    "fetching": "Obteniendo de openstreetmap.org… {size}",
+    "savedAs": "Guardado {name}",
+    "pulledFrom": "Traído de openstreetmap.org a las {time}",
+    "limitNote": "openstreetmap.org entrega como máximo 50.000 puntos por exportación: alrededor de 1 km² de una ciudad densa, mucho más en el campo.",
+    "err_too_big": "Demasiados datos para una exportación de openstreetmap.org (más de 50.000 puntos). Reduce la zona o guárdala desde JOSM.",
+    "err_busy": "openstreetmap.org está ocupado ahora. Inténtalo de nuevo en un minuto.",
+    "err_network": "No se pudo contactar con openstreetmap.org. Revisa tu conexión o usa Ver en OSM.",
+    "err_http": "openstreetmap.org no pudo entregar esta zona. Pasa el ratón para ver detalles."
   },
   "wizard": {
     "steps": "Pasos",

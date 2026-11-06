@@ -161,6 +161,15 @@ function createWindow() {
   // each went. (Anything else the page downloads asks as usual.)
   win.webContents.session.on('will-download', (_event, item) => {
     const name = item.getFilename();
+    // (an area's OSM data, "Download" in Map data: Electron asks where to
+    // save it; the dialog opens in Downloads with the name filled in)
+    if (/\.osm$/i.test(name)) {
+      item.setSaveDialogOptions({
+        defaultPath: path.join(app.getPath('downloads'), name),
+        filters: [{ name: 'OpenStreetMap data', extensions: ['osm'] }],
+      });
+      return;
+    }
     if (!BATCH_FILE.test(name)) return;
     const dir = batchFolder();
     fs.mkdirSync(dir, { recursive: true });
