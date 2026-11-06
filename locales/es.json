@@ -1257,11 +1257,19 @@
     "readyHint30": "30 m global: edificios y árboles quitados del suelo, ríos y carreteras nivelados, detalle fino del suelo y acantilados nítidos. Lidar y GPXZ: carreteras alineadas, nada más.",
     "readyHintFine": "Carreteras alineadas con tu elevación y niveladas en puentes, túneles y aceras. Donde rellena el 30 m global, también se quitan edificios y árboles, se nivelan ríos y carreteras y se añaden detalle fino y acantilados.",
     "custom": "Personalizado",
-    "customHint": "Lo mismo, y tú eliges qué ajustes hace la exportación del nivel.",
+    "customHint": "Elige cada ajuste tú mismo, al generar y en la exportación del nivel.",
     "untouched": "Sin tocar",
     "untouchedHint": "La elevación tal como se descargó: ningún ajuste.",
     "untouchedWarn": "Con el 30 m global, edificios y árboles quedan como bultos en el suelo y las carreteras siguen cada bache.",
-    "basicNote": "Terreno: Listo para conducir (edificios y árboles quitados de los datos de 30 m, carreteras niveladas). Cámbialo en Avanzado."
+    "basicNote": "Terreno: Listo para conducir (edificios y árboles quitados de los datos de 30 m, carreteras niveladas). Cámbialo en Avanzado.",
+    "customGenTitle": "Al generar",
+    "genGroundFilter": "Suelo bajo edificios y árboles",
+    "genGroundFilterHint": "Solo 30 m global: se quitan edificios, bosques y tableros de viaductos",
+    "genLowerWater": "Ríos al nivel de sus orillas",
+    "genLowerWaterHint": "Solo 30 m global: mide las copas de los árboles junto a los ríos",
+    "genSmoothRoads": "Carreteras suavizadas en el terreno",
+    "genSmoothRoadsHint": "Planas a lo ancho, suaves a lo largo, unidas en los cruces",
+    "customExportTitle": "En la exportación del nivel"
   },
   "panelSteps": {
     "where": "Dónde",

@@ -296,7 +296,7 @@ import { useMainStore } from '../../stores/mainStore';
 import TerrainChoice from '../ui/TerrainChoice.vue';
 import StepHeader from '../ui/StepHeader.vue';
 import GenerateSummary from '../ui/GenerateSummary.vue';
-import { terrainMode, terrainShapingOptions, setTerrainMode } from '../../composables/useTerrainMode.js';
+import { terrainMode, terrainShapingOptions, terrainGenerationOptions, setTerrainMode } from '../../composables/useTerrainMode.js';
 import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info, Settings } from 'lucide-vue-next';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
@@ -721,6 +721,7 @@ const handleStart = () => {
     levelOptions: combinedLevel.value ? normalizeLevelOptions(levelOptions.value) : null,
     // the Terrain choice: Untouched generates raw; the combined level's export edits follow it
     rawTerrain: store.advancedMode && terrainMode.value === 'untouched',
+    generationEdits: (({ raw, ...passes }) => passes)(terrainGenerationOptions(store.advancedMode)),
     shaping: terrainShapingOptions(store.advancedMode),
   });
 };

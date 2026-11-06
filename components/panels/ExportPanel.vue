@@ -123,7 +123,7 @@
           <SettingCard v-if="advancedMode" :title="t('exportPanel.ui.cardTerrain')">
             <p class="text-caption leading-snug text-gray-700 dark:text-gray-200">{{ t(`exportPanel.ui.terrainSummary_${terrainMode}`) }}</p>
             <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.terrainChangeHere') }}</p>
-            <p v-if="terrainData && !!terrainData.raw !== (terrainMode === 'untouched')" class="text-caption leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.terrainRegenerate') }}</p>
+            <p v-if="terrainChoiceChangedSinceGenerate" class="text-caption leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.terrainRegenerate') }}</p>
             <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.reportNote') }}</p>
           </SettingCard>
 
@@ -554,7 +554,7 @@ import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
 import { exportBeamNGLevel, EXPORT_STEP_GROUPS } from '../../services/exportBeamNGLevel';
-import { terrainMode, terrainShapingOptions } from '../../composables/useTerrainMode.js';
+import { terrainMode, terrainShapingOptions, terrainGenerationOptions } from '../../composables/useTerrainMode.js';
 import { desktopApp, exportLevelOnDesktop } from '../../services/platform/desktop.js';
 import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../composables/useExportHotspots.js';
 import SettingSection from '../base/SettingSection.vue';
@@ -719,6 +719,13 @@ let desktopExportAbort = null;
 const cancelDesktopExport = () => desktopExportAbort?.abort();
 const showDesktopExportLog = () => desktopApp?.showItem(beamNGDesktopFailed.value?.logPath);
 // (the last export's options, for a report about it)
+// the Terrain choice's generation passes no longer match the generated terrain's
+const terrainChoiceChangedSinceGenerate = computed(() => {
+  const made = props.terrainData?.generationEdits;
+  if (!made) return !!props.terrainData && !!props.terrainData.raw !== (advancedMode.value && terrainMode.value === 'untouched');
+  const now = terrainGenerationOptions(advancedMode.value);
+  return Object.keys(now).some((k) => !!now[k] !== !!made[k]);
+});
 let lastExportOptions = null;
 const reportDesktopExportFailure = () => openReportDialog('export', {
   error: beamNGDesktopFailed.value?.message || '',

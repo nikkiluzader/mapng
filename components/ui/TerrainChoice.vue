@@ -33,8 +33,13 @@
       </span>
     </label>
 
-    <!-- Custom: the export's edits, one by one (the generation passes stay on) -->
+    <!-- Custom: the generation passes, then the export's edits, one by one -->
     <div v-if="terrainMode === 'custom'" class="pl-2 space-y-0.5">
+      <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 pt-1">{{ t('terrainChoice.customGenTitle') }}</div>
+      <SettingRow check indent v-model="generationEdits.groundFilter.value" :label="t('terrainChoice.genGroundFilter')" :hint="t('terrainChoice.genGroundFilterHint')" />
+      <SettingRow check indent v-model="generationEdits.lowerWater.value" :label="t('terrainChoice.genLowerWater')" :hint="t('terrainChoice.genLowerWaterHint')" />
+      <SettingRow check indent v-model="generationEdits.smoothRoads.value" :label="t('terrainChoice.genSmoothRoads')" :hint="t('terrainChoice.genSmoothRoadsHint')" />
+      <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 pt-2">{{ t('terrainChoice.customExportTitle') }}</div>
       <SettingRow check indent v-model="terrainEdits.shapeRoads.value" :label="t('exportPanel.shapeRoads')" :hint="t('exportPanel.shapeRoadsHint')" />
       <SettingRow check indent v-model="terrainEdits.shapeBridges.value" :label="t('exportPanel.shapeBridges')" :hint="t('exportPanel.shapeBridgesHint')" />
       <SettingRow check indent v-model="terrainEdits.shapeOverpasses.value" :label="t('exportPanel.shapeOverpasses')" :hint="t('exportPanel.shapeOverpassesHint')" />
@@ -55,7 +60,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { AlertTriangle } from 'lucide-vue-next';
 import SettingRow from '../base/SettingRow.vue';
-import { terrainMode, terrainEdits, setTerrainMode } from '../../composables/useTerrainMode.js';
+import { terrainMode, terrainEdits, generationEdits, setTerrainMode } from '../../composables/useTerrainMode.js';
 
 const props = defineProps({
   // the elevation source picked: 'mapterhorn' (Best free), 'default' (global 30 m), 'gpxz', 'usgs', 'kron86', 'none'

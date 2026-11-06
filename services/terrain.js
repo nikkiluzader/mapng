@@ -1862,6 +1862,10 @@ export const fetchTerrainData = async (
     useMapterhorn = false,
     // buildings, woods and viaduct decks taken out of the global 30 m (dsmGround.js); off: as downloaded
     groundFilter = true,
+    // river water brought down to its banks on the global 30 m (waterBanks.js); off: as downloaded
+    lowerWater = true,
+    // roads aligned, smoothed and levelled into the terrain (roadSnap.js, roadSmoother.js); off: left as they are
+    smoothRoads = true,
   } = generationOptions || {};
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
@@ -2374,13 +2378,13 @@ export const fetchTerrainData = async (
   // The global 30 m data reads tree tops along wooded rivers and creeks (a
   // ridge where the water is): river water is brought down to its banks
   // first, so roads, the preview and the export's water all see the valley.
-  if (!flat && !raw && !rawData && osmFeatures.length > 0) {
+  if (!flat && !raw && !rawData && lowerWater && osmFeatures.length > 0) {
     onProgress?.("Bringing river water down to its banks (the 30 m data reads the tree tops along it)...");
     await letProgressPaint();
     const lowered = lowerRaisedWater(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel);
     if (lowered.cells) console.info(`[Terrain] Water brought down to its banks: ${lowered.cells} cells, up to ${lowered.maxDrop.toFixed(1)} m.`);
   }
-  if (!flat && !raw && osmFeatures.length > 0) {
+  if (!flat && !raw && smoothRoads && osmFeatures.length > 0) {
     if (fineRaster) {
       onProgress?.("Aligning roads with the terrain...");
       await letProgressPaint();
@@ -2427,6 +2431,8 @@ export const fetchTerrainData = async (
     groundFilterInfo,
     // built from the global 30 m (no lidar, upload, raw or flat): the export may add fine ground detail
     coarseElevation: !flat && !raw && !rawData,
+    // the generation passes asked for (the Terrain choice): the export panel says when they no longer match
+    generationEdits: { raw: !!raw, groundFilter: !!groundFilter, lowerWater: !!lowerWater, smoothRoads: !!smoothRoads },
     sourceGeoTiffs,
     processingMetersPerPixel: effectiveMetersPerPixel,
     flat,

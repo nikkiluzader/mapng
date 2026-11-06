@@ -231,6 +231,7 @@ import { openReportDialog, logPathFrom } from './composables/useReportDialog.js'
 import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import { createGenerationProgress, GENERATION_STEP_GROUPS } from './services/generationProgress.js';
+import { terrainGenerationOptions } from './composables/useTerrainMode.js';
 import StageLoader from './components/ui/StageLoader.vue';
 import { Compass, Mountain, Grid3x3, Map as MapIcon, Shovel, Paintbrush } from 'lucide-vue-next';
 import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
@@ -606,6 +607,8 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     gapFillSource,
     uploadedAreaMode: uploadedAreaMode.value,
     rawTerrain: store.rawTerrainActive,
+    // (the Terrain choice's generation passes: changing one generates again)
+    generationEdits: terrainGenerationOptions(store.advancedMode),
     // Include file identity so changing uploads always invalidates cached terrain.
     uploadedElevation: uploadSignature,
   });
@@ -780,6 +783,8 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
   const useKRON86 = normalizedSource === 'kron86';
   const useFlat = normalizedSource === 'none';
   const raw = store.rawTerrainActive;
+  // (the Terrain choice: Custom picks the generation passes; raw is Untouched)
+  const { raw: _rawChoice, ...generationEdits } = terrainGenerationOptions(store.advancedMode);
   const requestKey = buildGenerationKey(
     center.value,
     resolution.value,
@@ -810,6 +815,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       Number(cachedParams.processingMetersPerPixel || 1) === Number(newParams.processingMetersPerPixel || 1) &&
       cachedParams.elevationSource === newParams.elevationSource &&
       !!cachedParams.rawTerrain === !!newParams.rawTerrain &&
+      JSON.stringify(cachedParams.generationEdits || null) === JSON.stringify(newParams.generationEdits || null) &&
       (cachedParams.gpxzKeySig ?? '') === (newParams.gpxzKeySig ?? '');
 
     if (requestKey === lastGenerationKey.value) {
@@ -861,6 +867,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
   startGenerationProgress({
     resolution: resolution.value, includeOSM: !!fetchOSM, upload: !!uploadedElevationFile.value,
     raw, flat: useFlat, source: uploadedElevationFile.value ? 'upload' : normalizedSource,
+    groundFilter: generationEdits.groundFilter, smoothRoads: generationEdits.smoothRoads,
   });
   applyLoadingUpdate(t('app.status.startingGeneration'));
   
@@ -901,6 +908,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
           targetBounds,
           preferNativeCoverage: uploadedAreaMode.value !== 'crop',
           raw,
+          ...generationEdits,
         },
       );
     } else {
@@ -909,6 +917,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         flat: useFlat,
         raw,
         useMapterhorn: normalizedSource === 'mapterhorn',
+        ...generationEdits,
       };
       // (the desktop app fetches and processes in a Node process: no 4 GB
       // window limit; the website does it here)

@@ -411,6 +411,7 @@ export function createBatchJobState(config) {
     levelOptions: config.combinedLevel ? normalizeCombinedLevelOptions(config.levelOptions) : null,
     // the Terrain choice (composables/useTerrainMode.js): raw generation, and the combined level's export edits
     rawTerrain: !!config.rawTerrain,
+    generationEdits: config.generationEdits && typeof config.generationEdits === 'object' ? { ...config.generationEdits } : null,
     shaping: config.shaping && typeof config.shaping === 'object' ? { ...config.shaping } : null,
     elevationNormalization: {
       // Combined mode stitches raw meters and quantizes once at export, so a
@@ -1703,6 +1704,7 @@ async function processTile(state, tile, ctx, signal) {
             useMapterhorn: state.elevationSource === 'mapterhorn',
             flat: state.elevationSource === 'none',
             raw: !!state.rawTerrain,
+            ...(state.generationEdits || {}),
           },
         );
       }));

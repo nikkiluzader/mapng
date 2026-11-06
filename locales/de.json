@@ -1257,11 +1257,19 @@
     "readyHint30": "Global 30 m: Gebäude und Bäume aus dem Boden entfernt, Flüsse und Straßen eingeebnet, feine Bodendetails und scharfe Klippen. Lidar und GPXZ: Straßen angepasst, sonst nichts.",
     "readyHintFine": "Straßen an deine Höhendaten angepasst und an Brücken, Tunneln und Gehwegen eingeebnet. Wo das globale 30-m-Modell aushilft, werden dort auch Gebäude und Bäume entfernt, Flüsse und Straßen eingeebnet, feine Details und Klippen ergänzt.",
     "custom": "Eigene",
-    "customHint": "Dasselbe, und du wählst, welche Anpassungen der Level-Export vornimmt.",
+    "customHint": "Jede Anpassung selbst wählen, beim Erzeugen und im Level-Export.",
     "untouched": "Unverändert",
     "untouchedHint": "Die Höhen genau wie heruntergeladen: keinerlei Anpassungen.",
     "untouchedWarn": "Beim globalen 30-m-Modell bleiben Gebäude und Bäume als Buckel im Boden, und Straßen folgen jeder Unebenheit.",
-    "basicNote": "Gelände: Fahrbereit (Gebäude und Bäume aus 30-m-Daten entfernt, Straßen eingeebnet). In „Erweitert“ änderbar."
+    "basicNote": "Gelände: Fahrbereit (Gebäude und Bäume aus 30-m-Daten entfernt, Straßen eingeebnet). In „Erweitert“ änderbar.",
+    "customGenTitle": "Beim Erzeugen",
+    "genGroundFilter": "Boden unter Gebäuden und Bäumen",
+    "genGroundFilterHint": "Nur globales 30 m: Gebäude, Wälder und Viaduktdecks entfernt",
+    "genLowerWater": "Flüsse auf Uferhöhe",
+    "genLowerWaterHint": "Nur globales 30 m: es misst die Baumkronen an Flüssen",
+    "genSmoothRoads": "Straßen ins Gelände geglättet",
+    "genSmoothRoadsHint": "Quer eben, längs glatt, an Kreuzungen verbunden",
+    "customExportTitle": "Im Level-Export"
   },
   "panelSteps": {
     "where": "Wo",

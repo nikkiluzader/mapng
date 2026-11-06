@@ -1257,11 +1257,19 @@
     "readyHint30": "30 m globale: edifici e alberi tolti dal terreno, fiumi e strade livellati, dettaglio fine del suolo e scogliere nette. Lidar e GPXZ: strade allineate, nient'altro.",
     "readyHintFine": "Strade allineate alla tua altitudine e livellate a ponti, gallerie e marciapiedi. Dove riempie il 30 m globale, anche lì edifici e alberi tolti, fiumi e strade livellati, dettaglio fine e scogliere.",
     "custom": "Personalizzato",
-    "customHint": "Lo stesso, e scegli tu quali ritocchi fa l'esportazione del livello.",
+    "customHint": "Scegli tu ogni ritocco, nella generazione e nell'esportazione del livello.",
     "untouched": "Intatto",
     "untouchedHint": "L'altitudine esattamente come scaricata: nessun ritocco.",
     "untouchedWarn": "Con il 30 m globale edifici e alberi restano come gobbe nel terreno e le strade seguono ogni dosso.",
-    "basicNote": "Terreno: Pronto da guidare (edifici e alberi tolti dai dati a 30 m, strade livellate). Si cambia in Avanzato."
+    "basicNote": "Terreno: Pronto da guidare (edifici e alberi tolti dai dati a 30 m, strade livellate). Si cambia in Avanzato.",
+    "customGenTitle": "Nella generazione",
+    "genGroundFilter": "Terreno sotto edifici e alberi",
+    "genGroundFilterHint": "Solo 30 m globale: tolti edifici, boschi e impalcati dei viadotti",
+    "genLowerWater": "Fiumi all'altezza delle sponde",
+    "genLowerWaterHint": "Solo 30 m globale: misura le chiome degli alberi lungo i fiumi",
+    "genSmoothRoads": "Strade levigate nel terreno",
+    "genSmoothRoadsHint": "Piane in larghezza, lisce in lunghezza, unite agli incroci",
+    "customExportTitle": "Nell'esportazione del livello"
   },
   "panelSteps": {
     "where": "Dove",

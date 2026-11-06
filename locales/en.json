@@ -1257,11 +1257,19 @@
     "readyHint30": "Global 30 m: buildings and trees taken out of the ground, rivers and roads levelled in, fine ground detail and sharp cliffs. Lidar and GPXZ: roads aligned, nothing else.",
     "readyHintFine": "Roads aligned with your elevation and levelled at bridges, tunnels and sidewalks. Where the global 30 m fills in, it also gets buildings and trees taken out, rivers and roads levelled, fine detail and cliffs.",
     "custom": "Custom",
-    "customHint": "The same, and you choose which edits the level export makes.",
+    "customHint": "Choose each edit yourself, when generating and in the level export.",
     "untouched": "Untouched",
     "untouchedHint": "The elevation exactly as downloaded: no edits at all.",
     "untouchedWarn": "On the global 30 m, buildings and trees stay as lumps in the ground and roads follow every bump.",
-    "basicNote": "Terrain: Ready to drive (buildings and trees taken out of 30 m data, roads levelled in). Switch to Advanced to change it."
+    "basicNote": "Terrain: Ready to drive (buildings and trees taken out of 30 m data, roads levelled in). Switch to Advanced to change it.",
+    "customGenTitle": "When generating",
+    "genGroundFilter": "Ground under buildings and trees",
+    "genGroundFilterHint": "Global 30 m only: buildings, woods and viaduct decks taken out",
+    "genLowerWater": "Rivers down to their banks",
+    "genLowerWaterHint": "Global 30 m only: it reads the tree tops along rivers",
+    "genSmoothRoads": "Roads smoothed into the terrain",
+    "genSmoothRoadsHint": "Level across, smooth along, joined at junctions",
+    "customExportTitle": "In the level export"
   },
   "panelSteps": {
     "where": "Where",

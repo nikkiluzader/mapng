@@ -1257,11 +1257,19 @@
     "readyHint30": "Globalne 30 m: budynki i drzewa usunięte z gruntu, rzeki i drogi wyrównane, drobne detale gruntu i ostre klify. Lidar i GPXZ: drogi dopasowane, nic więcej.",
     "readyHintFine": "Drogi dopasowane do Twoich wysokości i wyrównane przy mostach, tunelach i chodnikach. Tam, gdzie uzupełnia globalne 30 m, również usunięte budynki i drzewa, wyrównane rzeki i drogi, drobne detale i klify.",
     "custom": "Własne",
-    "customHint": "To samo, a Ty wybierasz, jakie poprawki robi eksport poziomu.",
+    "customHint": "Wybierz każdą poprawkę sam, przy generowaniu i w eksporcie poziomu.",
     "untouched": "Nietknięty",
     "untouchedHint": "Wysokości dokładnie tak, jak pobrane: żadnych poprawek.",
     "untouchedWarn": "Przy globalnym 30 m budynki i drzewa zostają jako garby w gruncie, a drogi idą po każdym wyboju.",
-    "basicNote": "Teren: Gotowy do jazdy (budynki i drzewa usunięte z danych 30 m, drogi wyrównane). Zmienisz to w trybie Zaawansowanym."
+    "basicNote": "Teren: Gotowy do jazdy (budynki i drzewa usunięte z danych 30 m, drogi wyrównane). Zmienisz to w trybie Zaawansowanym.",
+    "customGenTitle": "Przy generowaniu",
+    "genGroundFilter": "Grunt pod budynkami i drzewami",
+    "genGroundFilterHint": "Tylko globalne 30 m: usunięte budynki, lasy i pomosty wiaduktów",
+    "genLowerWater": "Rzeki na poziomie brzegów",
+    "genLowerWaterHint": "Tylko globalne 30 m: mierzy korony drzew wzdłuż rzek",
+    "genSmoothRoads": "Drogi wygładzone w terenie",
+    "genSmoothRoadsHint": "Płaskie w poprzek, gładkie wzdłuż, połączone na skrzyżowaniach",
+    "customExportTitle": "W eksporcie poziomu"
   },
   "panelSteps": {
     "where": "Gdzie",

@@ -33,7 +33,7 @@ export const GENERATION_STEP_GROUPS = [
 ];
 
 // source: 'default' (global 30 m), 'mapterhorn' (Best free), 'gpxz', 'usgs', 'kron86', 'upload'
-const stageSeconds = ({ px, includeOSM, upload, raw, flat, source }) => {
+const stageSeconds = ({ px, includeOSM, upload, raw, flat, source, groundFilter = true, smoothRoads = true }) => {
   const coarse = !upload && !flat && (source === 'default' || source === 'mapterhorn');
   return {
     prepare: 0.3,
@@ -47,8 +47,8 @@ const stageSeconds = ({ px, includeOSM, upload, raw, flat, source }) => {
     satellite: upload ? 1 + 1 * px : 0,
     osm: includeOSM ? 2 + 0.3 * px : 0,
     // (the ground filter: bare-earth and Copernicus grids fetched, then filtered; global 30 m only, never raw)
-    ground: includeOSM && coarse && !raw ? 1.5 + 1.5 * px : 0,
-    roads: includeOSM && !raw && !flat ? 0.3 + 0.8 * px : 0,
+    ground: includeOSM && coarse && !raw && groundFilter ? 1.5 + 1.5 * px : 0,
+    roads: includeOSM && !raw && !flat && smoothRoads ? 0.3 + 0.8 * px : 0,
     finalize: 0.3 + 1 * px,
     // (with the game texture: ~2.5 s at 2048²)
     textures: 0.5 + 6 * px,
@@ -98,9 +98,9 @@ const countFraction = (text) => {
  * @param {{ resolution: number, includeOSM: boolean, upload?: boolean, raw?: boolean, flat?: boolean, source?: string, startAt?: string }} options
  *   startAt skips the stages before it (adding OSM to existing terrain).
  */
-export function createGenerationProgress({ resolution, includeOSM, upload = false, raw = false, flat = false, source = 'mapterhorn', startAt = null, now = () => performance.now() }) {
+export function createGenerationProgress({ resolution, includeOSM, upload = false, raw = false, flat = false, source = 'mapterhorn', groundFilter = true, smoothRoads = true, startAt = null, now = () => performance.now() }) {
   const px = (Math.max(256, Number(resolution) || 1024) / 4096) ** 2;
-  const seconds = stageSeconds({ px, includeOSM, upload, raw, flat, source });
+  const seconds = stageSeconds({ px, includeOSM, upload, raw, flat, source, groundFilter, smoothRoads });
   const startIndex = startAt ? Math.max(0, GENERATION_STAGES.indexOf(startAt)) : 0;
   GENERATION_STAGES.forEach((stage, i) => { if (i < startIndex) seconds[stage] = 0; });
   const total = GENERATION_STAGES.reduce((sum, stage) => sum + seconds[stage], 0) || 1;

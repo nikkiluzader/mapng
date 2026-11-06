@@ -4,7 +4,7 @@
 //              filter, rivers brought down to their banks, roads levelled in,
 //              fine ground detail and sharpened cliffs; lidar, GPXZ and uploads
 //              get the light pass (roads aligned). Every export edit is on.
-//   custom     The same generation, and the export's edits chosen one by one.
+//   custom     The generation passes and the export's edits chosen one by one.
 //   untouched  The elevation exactly as downloaded: no generation passes
 //              ("Raw terrain") and no export edits.
 //
@@ -41,8 +41,16 @@ function storedMode() {
   return 'ready';
 }
 
+// the generation passes a Custom choice picks from (Generate Data's options, storage key)
+export const TERRAIN_GENERATION_KEYS = [
+  ['groundFilter', 'mapng_genGroundFilter'],
+  ['lowerWater', 'mapng_genLowerWater'],
+  ['smoothRoads', 'mapng_genSmoothRoads'],
+];
+
 export const terrainMode = ref(storedMode());
 export const terrainEdits = Object.fromEntries(TERRAIN_EDIT_KEYS.map(([k, key]) => [k, ref(read(key) !== 'false')]));
+export const generationEdits = Object.fromEntries(TERRAIN_GENERATION_KEYS.map(([k, key]) => [k, ref(read(key) !== 'false')]));
 
 // (the old "no export edits" setting, met for the first time: Custom with every box off)
 if (!TERRAIN_MODES.includes(read(MODE_KEY)) && (read('mapng_beamNGShapeMode') === 'none' || read('mapng_beamNGShapeTerrain') === 'false')) {
@@ -58,6 +66,7 @@ const syncKeys = (mode) => {
 };
 watch(terrainMode, syncKeys, { immediate: true });
 for (const [k, key] of TERRAIN_EDIT_KEYS) watch(terrainEdits[k], (v) => write(key, String(!!v)));
+for (const [k, key] of TERRAIN_GENERATION_KEYS) watch(generationEdits[k], (v) => write(key, String(!!v)));
 
 export function setTerrainMode(mode) {
   if (TERRAIN_MODES.includes(mode)) terrainMode.value = mode;
@@ -83,5 +92,18 @@ export function terrainShapingOptions(advanced = true) {
   return {
     shapeTerrain: mode !== 'untouched',
     ...Object.fromEntries(TERRAIN_EDIT_KEYS.map(([k]) => [k, pick(k)])),
+  };
+}
+
+/**
+ * Generate Data's options for the choice (advanced: false = Basic, always
+ * Ready to drive): Untouched is raw; Custom picks the passes one by one.
+ */
+export function terrainGenerationOptions(advanced = true) {
+  const mode = advanced ? terrainMode.value : 'ready';
+  const pick = (k) => mode !== 'custom' || generationEdits[k].value;
+  return {
+    raw: mode === 'untouched',
+    ...Object.fromEntries(TERRAIN_GENERATION_KEYS.map(([k]) => [k, pick(k)])),
   };
 }
