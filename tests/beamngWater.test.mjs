@@ -221,3 +221,29 @@ test('lake tiles reach a diagonal shore everywhere where the bank is higher; on 
   assert.ok(level.past <= 2 * Math.SQRT2 + 0.5, `half a cell past the shore at most: ${level.past.toFixed(1)} m`);
   assert.ok(level.depthMissed <= 2 * Math.SQRT2 + 0.5, `gaps only along the shore: ${level.depthMissed.toFixed(1)} m`);
 });
+
+test('lake beds: a bank inside the outline is left, no wall along the shore', async () => {
+  const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
+  // a 100 m grid at 1 m: water recorded flat at 10 m for x < 0, a bank rising
+  // 1 m per metre east of x = 0 to 40 m, and the lake outline reaching 30 m up it
+  const N = 101; const SIZE = 100;
+  const ground = (x) => (x < 0 ? 10 : 10 + x);
+  const hm = new Float32Array(N * N);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) hm[r * N + c] = ground((c / (N - 1) - 0.5) * SIZE);
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+  const ring = [[-45, -30], [30, -30], [30, 30], [-45, 30], [-45, -30]];
+  const plan = planLakes({ features: [{ type: 'water', tags: { natural: 'water', water: 'reservoir' }, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) }], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+  const level = plan.lakes[0].level;
+  carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 }).apply((idx, v) => { hm[idx] = v; });
+  assert.ok(at(-20, 0) < level - 1, 'the bed under the water is cut');
+  assert.equal(at(10, 0), 20, 'the bank 10 m over the water is left');
+  assert.equal(at(25, 0), 35, 'and higher up too');
+  // (above the water, where a wall would show: at most a short steepening at
+  // the waterline, never the wall the old cut left)
+  let worst = 0;
+  for (let x = -44; x < 29; x++) if (Math.max(at(x, 0), at(x + 1, 0)) > level) worst = Math.max(worst, Math.abs(at(x + 1, 0) - at(x, 0)));
+  assert.ok(worst <= 3, `no wall over the water: steepest step ${worst.toFixed(2)} m per metre`);
+  // (the old cut took the whole 30 m of bank inside the outline down to the bed)
+  assert.ok(at(29, 0) > 30, 'the top of the bank inside the outline stays');
+});

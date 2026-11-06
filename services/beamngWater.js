@@ -453,9 +453,16 @@ export function planLakes({ features = [], toWorld, heightAt }) {
 // 5 cm over the ground). Inside each lake the ground near its level is
 // lowered to LAKE_BED_M under it, sloping up to LAKE_BED_EDGE_M under it over
 // LAKE_BANK_M from the shore. Ground already deeper is left; nothing raised.
+// Only ground near the water is cut: up to LAKE_CUT_FULL_M over the level
+// fully, the cut fading out by LAKE_CUT_TOP_M; higher ground inside the
+// outline (a reservoir's bank, its drawdown ring, an island's slope) is left
+// as it is. Cut to the bed regardless, it stood as a wall all along the shore
+// wherever the outline climbed the bank (Lac du Chevril, Tignes).
 const LAKE_BED_M = 1.5;
 const LAKE_BED_EDGE_M = 0.3;
 const LAKE_BANK_M = 3;
+const LAKE_CUT_FULL_M = 0.5;
+const LAKE_CUT_TOP_M = 2.5;
 const distToRing = (x, y, ring) => {
   let best = Infinity;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -488,9 +495,16 @@ export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
         const idx = r * width + c;
         const ground = heightMap[idx] - minHeight;
         if (ground < level - LAKE_BED_M) continue;
+        const above = ground - level;
+        if (above >= LAKE_CUT_TOP_M) continue;
         const d = Math.min(distToRing(x, y, poly.outer), ...poly.holes.map((h) => distToRing(x, y, h)));
         const depth = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, d / LAKE_BANK_M);
-        const target = level - depth;
+        let target = level - depth;
+        // (ground a little over the water: cut less and less, so the bank meets the bed without a step)
+        if (above > LAKE_CUT_FULL_M) {
+          const k = (above - LAKE_CUT_FULL_M) / (LAKE_CUT_TOP_M - LAKE_CUT_FULL_M);
+          target += (ground - target) * k * k * (3 - 2 * k);
+        }
         if (target < ground) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
       }
     }
