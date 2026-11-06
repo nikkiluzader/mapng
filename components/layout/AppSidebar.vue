@@ -44,50 +44,54 @@
       <slot />
     </div>
 
-    <div class="px-3 py-2 border-t border-gray-200 dark:border-gray-700 text-caption text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900 space-y-1.5">
-      <div class="flex items-center justify-between gap-2 px-2">
-        <label class="text-micro text-gray-400 dark:text-gray-500 uppercase tracking-wider">{{ t('language.label') }}</label>
-        <select
-          :value="locale"
-          :class="[SELECT_XS, 'h-7 px-2']"
-          @change="handleLocaleChange"
+    <!-- The footer: one bar of icons (name on hover), then language and dark
+         mode, and under it the build this is. -->
+    <div class="px-2.5 pt-1.5 pb-2 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+      <div class="flex items-center gap-0.5">
+        <component
+          :is="link.href ? 'a' : 'button'"
+          v-for="link in footerLinks"
+          :key="link.key"
+          :href="link.href"
+          :target="link.href ? '_blank' : undefined"
+          :rel="link.href ? 'noopener noreferrer' : undefined"
+          :type="link.href ? undefined : 'button'"
+          class="mapng-foot-icon"
+          :data-tip="link.label"
+          :aria-label="link.title || link.label"
+          @click="link.emit && $emit(link.emit)"
         >
-          <option v-for="code in locales" :key="code" :value="code">
-            {{ t(`language.${code}`) }}
-          </option>
-        </select>
-      </div>
-      <div class="flex items-start justify-between gap-2 px-2">
-        <div class="flex flex-wrap items-center gap-x-1 gap-y-1 min-w-0">
-          <BaseButton variant="ghost" size="sm" class="h-6 px-2 text-caption font-medium leading-none" @click="$emit('show-disclaimer')">{{ t('sidebar.disclaimer') }}</BaseButton>
-          <a href="mailto:nikkiluzader@gmail.com" class="inline-flex items-center h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none">{{ t('sidebar.contact') }}</a>
-          <a href="https://discord.gg/j6ZvcF8rgk" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none">{{ t('sidebar.discord') }}</a>
-          <a href="https://github.com/nikkiluzader/mapng" target="_blank" rel="noopener noreferrer" class="inline-flex items-center h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none">{{ t('sidebar.github') }}</a>
-          <a :href="desktopApp ? 'https://mapng.com/data.html' : '/data.html'" target="_blank" rel="noopener" class="inline-flex items-center h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none">{{ t('sidebar.yourData') }}</a>
-          <a v-if="!desktopApp" :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener noreferrer" :title="t('sidebar.desktopAppTooltip')" class="inline-flex items-center gap-1 h-6 text-brand hover:text-brand-500 transition-colors px-2 leading-none"><Download :size="11" />{{ t('sidebar.desktopApp') }}</a>
-          <BaseButton
-            variant="ghost"
-            size="sm"
-            class="h-6 text-gray-600 dark:text-gray-400 hover:text-brand dark:hover:text-brand transition-colors inline-flex items-center gap-1 px-2 leading-none"
-            @click="$emit('show-stack')"
+          <component :is="link.icon" :size="15" />
+        </component>
+        <!-- language: the short name on a button, the real picker laid over it -->
+        <label class="mapng-foot-icon ml-auto !w-auto px-2 gap-1 text-micro font-semibold" :data-tip="t('language.label')">
+          <Globe :size="15" />{{ localeShort }}
+          <select
+            :value="locale"
+            class="absolute inset-0 opacity-0 cursor-pointer"
+            :aria-label="t('language.label')"
+            @change="handleLocaleChange"
           >
-            <Code :size="12" /> {{ t('sidebar.stack') }}
-          </BaseButton>
-        </div>
-        <BaseButton
-          variant="secondary"
-          size="sm"
-          class="h-7 w-7 p-0 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
-          :title="isDarkMode ? t('sidebar.switchToLightMode') : t('sidebar.switchToDarkMode')"
+            <option v-for="code in locales" :key="code" :value="code">{{ t(`language.${code}`) }}</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          class="mapng-foot-icon"
+          :data-tip="isDarkMode ? t('sidebar.switchToLightMode') : t('sidebar.switchToDarkMode')"
+          :aria-label="isDarkMode ? t('sidebar.switchToLightMode') : t('sidebar.switchToDarkMode')"
           @click="$emit('toggle-dark')"
         >
-          <Sun v-if="isDarkMode" :size="14" />
-          <Moon v-else :size="14" />
-        </BaseButton>
+          <Sun v-if="isDarkMode" :size="15" />
+          <Moon v-else :size="15" />
+        </button>
       </div>
-      <span v-if="desktopVersion" class="block text-micro text-gray-400 dark:text-gray-500 leading-tight px-2">{{ t('sidebar.desktopBuild', { version: desktopVersion }) }} · {{ t('sidebar.build', { hash: ownBuild.hash, time: ownBuild.time }) }}</span>
-      <span v-else-if="isProductionHost" class="block text-micro text-gray-400 dark:text-gray-500 leading-tight px-2">Main: {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</span>
-      <span v-else class="block text-micro text-gray-400 dark:text-gray-500 leading-tight px-2">Dev: {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</span>
+      <!-- (the desktop app: its version and the build; the website: which branch's build) -->
+      <div class="mt-0.5 text-center text-micro text-gray-400 dark:text-gray-500 leading-tight truncate">
+        <template v-if="desktopVersion">{{ t('sidebar.desktopBuild', { version: desktopVersion }) }} · {{ t('sidebar.build', { hash: ownBuild.hash, time: ownBuild.time }) }}</template>
+        <template v-else-if="isProductionHost">Main · {{ t('sidebar.build', { hash: buildMainHash, time: buildMainTime }) }}</template>
+        <template v-else>Dev · {{ t('sidebar.build', { hash: buildDevHash, time: buildDevTime }) }}</template>
+      </div>
     </div>
   </aside>
 </template>
@@ -99,13 +103,25 @@ import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
-import { SELECT_XS } from '../base/controlStyles.js';
-import { CircleHelp, Sun, Moon, Code, Download, RotateCw } from 'lucide-vue-next';
+import { CircleHelp, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield } from 'lucide-vue-next';
 
 const { t, locale } = useI18n({ useScope: 'global' });
 const isDesktop = !!desktopApp;
 const reloadApp = () => window.location.reload();
 const locales = computed(() => getSupportedLocales());
+// (the language's short name on the footer button: EN, DE, … and 中文)
+const localeShort = computed(() => (String(locale.value).startsWith('zh') ? '中文' : String(locale.value).slice(0, 2).toUpperCase()));
+// The footer's links, all alike: an icon, the name on hover. The desktop app
+// has no "get the desktop app" link.
+const footerLinks = computed(() => [
+  { key: 'discord', icon: MessageCircle, label: t('sidebar.discord'), href: 'https://discord.gg/j6ZvcF8rgk' },
+  { key: 'github', icon: Github, label: t('sidebar.github'), href: 'https://github.com/nikkiluzader/mapng' },
+  { key: 'contact', icon: Mail, label: t('sidebar.contact'), href: 'mailto:nikkiluzader@gmail.com' },
+  ...(desktopApp ? [] : [{ key: 'desktop', icon: Download, label: t('sidebar.desktopApp'), title: t('sidebar.desktopAppTooltip'), href: DESKTOP_DOWNLOAD_URL }]),
+  { key: 'data', icon: Database, label: t('sidebar.yourData'), href: desktopApp ? 'https://mapng.com/data.html' : '/data.html' },
+  { key: 'disclaimer', icon: Shield, label: t('sidebar.disclaimer'), emit: 'show-disclaimer' },
+  { key: 'stack', icon: Code, label: t('sidebar.stack'), emit: 'show-stack' },
+]);
 
 // (the desktop app names its version instead of the site's build)
 const desktopVersion = ref(null);
@@ -143,3 +159,20 @@ const handleLocaleChange = (event) => {
   setI18nLanguage(event.target.value);
 };
 </script>
+
+<style>
+/* the footer's icon buttons, with their name above on hover */
+.mapng-foot-icon { position: relative; width: 30px; height: 30px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; color: rgb(107 114 128); transition: color .15s, background-color .15s; }
+.dark .mapng-foot-icon { color: rgb(156 163 175); }
+.mapng-foot-icon:hover, .mapng-foot-icon:focus-visible { background: rgb(243 244 246); color: var(--brand, #ff6600); }
+.dark .mapng-foot-icon:hover, .dark .mapng-foot-icon:focus-visible { background: rgb(31 41 55); }
+.mapng-foot-icon:hover::after, .mapng-foot-icon:focus-visible::after {
+  content: attr(data-tip); position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+  background: rgb(17 24 39); color: #fff; font-size: 11px; font-weight: 500; line-height: 1.2; padding: 3px 7px; border-radius: 6px;
+  white-space: nowrap; pointer-events: none; z-index: 30;
+}
+.dark .mapng-foot-icon:hover::after, .dark .mapng-foot-icon:focus-visible::after { background: rgb(243 244 246); color: rgb(17 24 39); }
+/* (the first and last keep their name inside the sidebar) */
+.mapng-foot-icon:first-child:hover::after { left: 0; transform: none; }
+.mapng-foot-icon:last-child:hover::after { left: auto; right: 0; transform: none; }
+</style>
