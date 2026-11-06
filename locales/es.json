@@ -598,12 +598,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satélite",
     "topoMap": "Mapa topográfico",
-    "elevationOverlay": {
-      "title": "Elevación (conjunto gratuito)",
-      "show": "Mostrar vista previa de elevación",
-      "hide": "Ocultar",
-      "legend": "Magenta = datos faltantes/corruptos"
-    },
     "osmCoverage": "Cobertura OSM de MapNG",
     "hotspots": "Zonas de exportación",
     "hotspotsCount": "{count} exportaciones compartidas",
@@ -712,7 +706,6 @@
       "Comparte toda tu configuración: un código corto o enlace (válido 24 horas), un código largo que nunca caduca o un archivo. Pega uno en el mapa para cargarlo; tus propias claves y servidores nunca van con él",
       "Búsqueda de lugares (Nominatim), lugares destacados predefinidos y Mi ubicación",
       "Capas satélite y topográficas de Esri sin clave (nombres de lugares y calles en satélite), un solo mundo con borde en la línea de cambio de fecha, escala, coordenadas del cursor y de la mira, menú con clic derecho y Ctrl+rueda para acercar a la mira",
-      "Minimapa de elevación del área seleccionada",
       "Tarjetas de progreso por etapas para generación y exportación, con pasos terminados y tiempos",
       "Caché de generación y cancelación de tareas largas",
       "Modo claro y oscuro, en 7 idiomas",

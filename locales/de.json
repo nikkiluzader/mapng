@@ -598,12 +598,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellit",
     "topoMap": "Topokarte",
-    "elevationOverlay": {
-      "title": "Höhendaten (freier Datensatz)",
-      "show": "Höhendaten-Vorschau anzeigen",
-      "hide": "Ausblenden",
-      "legend": "Magenta = fehlende/fehlerhafte Daten"
-    },
     "osmCoverage": "MapNG-OSM-Abdeckung",
     "hotspots": "Export-Hotspots",
     "hotspotsCount": "{count} geteilte Exporte",
@@ -712,7 +706,6 @@
       "Teile dein ganzes Setup: ein kurzer Code oder Link (24 Stunden gültig), ein langer Code, der nie abläuft, oder eine Datei. Füge einen auf der Karte ein, um ihn zu laden; deine eigenen Schlüssel und Server gehen nie mit",
       "Ortssuche (Nominatim), voreingestellte sehenswerte Orte und Mein Standort",
       "Esri-Satelliten- und Topo-Ebenen ohne API-Schlüssel (Orts- und Straßennamen auf Satellit), eine Welt mit Grenze an der Datumsgrenze, Maßstab, Koordinaten von Mauszeiger und Fadenkreuz, Rechtsklickmenü und Strg+Mausrad zum Zoomen auf das Fadenkreuz",
-      "Höhen-Minikarte des gewählten Gebiets",
       "Fortschrittskarten Stufe für Stufe für Generierung und Export, mit erledigten Schritten und Zeiten",
       "Generierungs-Cache und Abbrechen langer Vorgänge",
       "Hell- und Dunkelmodus, in 7 Sprachen",

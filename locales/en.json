@@ -598,12 +598,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",
     "topoMap": "Topo map",
-    "elevationOverlay": {
-      "title": "Elevation (free dataset)",
-      "show": "Show elevation data preview",
-      "hide": "Hide",
-      "legend": "Magenta = missing/corrupt data"
-    },
     "osmCoverage": "MapNG OSM coverage",
     "hotspots": "Export hotspots",
     "hotspotsCount": "{count} shared exports",
@@ -712,7 +706,6 @@
       "Share your whole setup: a short code or link (works for 24 hours), a long code that never expires, or a file. Paste one on the map to load it; your own keys and servers never go with it",
       "Location search (Nominatim), preset scenic locations and Use my location",
       "Keyless Esri satellite and topo layers (place and road names on satellite), one world with a border at the date line, a scale bar, cursor and crosshair coordinates, a right-click menu, and Ctrl+scroll to zoom on the crosshair",
-      "Elevation overlay minimap of the selected area",
       "Stage-by-stage progress cards for generation and export, with finished steps and timings",
       "Generation caching and cancel for long-running tasks",
       "Light and dark mode, in 7 languages",

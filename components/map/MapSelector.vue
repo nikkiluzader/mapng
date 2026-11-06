@@ -210,7 +210,6 @@
     </l-map>
 
     <!-- Live free-dataset elevation preview, fitted to the selection area -->
-    <ElevationOverlay :bounds="elevationOverlayBounds" />
 
     <!-- Layer panel: the base map, MapNG's own overlays, and the two opt-ins. Folds to its header. -->
     <div class="absolute bottom-20 right-4 z-[400] w-[220px] max-h-[calc(100%-7rem)] overflow-y-auto bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-600 text-gray-800 dark:text-gray-200 text-xs">
@@ -328,7 +327,6 @@ import { LMap, LTileLayer, LRectangle, LMarker, LTooltip, LPolygon } from '@vue-
 import { Layers, ChevronDown } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import ElevationOverlay from './ElevationOverlay.vue';
 import { getAdjacentBounds, POSITION_LABELS } from '../../services/surroundingTiles';
 import { computeMetricSelectionBounds, computeUploadedCropBounds } from '../../services/uploadBounds';
 import { CHECKBOX } from '../base/controlStyles.js';
@@ -559,9 +557,9 @@ const uploadedCropBounds = computed(() => {
   return computeUploadedCropBounds(currentCenter.value, activeSelectionSizeMeters.value, nativeCoverageBounds.value);
 });
 
-// Area the elevation minimap stays fitted to: the batch grid extent when a
-// grid is shown, otherwise the crop box (BYOD crop mode) or the selection box.
-const elevationOverlayBounds = computed(() => {
+// The area being exported: the batch grid extent when a grid is shown,
+// otherwise the crop box (BYOD crop mode) or the selection box.
+const exportAreaBounds = computed(() => {
   if (hasBatchGrid.value) {
     let north = -Infinity;
     let south = Infinity;
@@ -812,7 +810,7 @@ const coordsText = () => {
 };
 const zoomToSelection = () => {
   const map = leafletMap.value;
-  const b = elevationOverlayBounds.value;
+  const b = exportAreaBounds.value;
   if (!map || !b) return;
   // Zoom only: the selection is the map centre, so moving the centre would move it.
   const zoom = map.getBoundsZoom([[b.south, b.west], [b.north, b.east]], false, L.point(120, 120));

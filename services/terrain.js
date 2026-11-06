@@ -161,7 +161,8 @@ const decodeTerrariumHeight = (r, g, b) => {
   const h = r * 256 + g + b / 256 - 32768;
   // Tolerance, not an exact sentinel match: AWS resamples the Terrarium tiles
   // server-side, so coastline pixels arrive already blended between land values
-  // and -32768 (see components/map/ElevationOverlay.vue for the full rationale).
+  // and -32768, giving -8000..-30000 m along shores (the blended ones above this
+  // tolerance are repaired by repairTerrariumBlendedTiles below).
   return h <= -32760 ? NO_DATA_VALUE : h;
 };
 

@@ -598,12 +598,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",
     "topoMap": "Carte topo",
-    "elevationOverlay": {
-      "title": "Altitude (jeu de données gratuit)",
-      "show": "Afficher l'aperçu des altitudes",
-      "hide": "Masquer",
-      "legend": "Magenta = données manquantes/corrompues"
-    },
     "osmCoverage": "Couverture OSM de MapNG",
     "hotspots": "Zones d'export",
     "hotspotsCount": "{count} exports partagés",
@@ -712,7 +706,6 @@
       "Partagez toute votre configuration : un code court ou un lien (valable 24 heures), un code long qui n'expire jamais, ou un fichier. Collez-en un sur la carte pour le charger ; vos propres clés et serveurs n'en font jamais partie",
       "Recherche de lieux (Nominatim), lieux remarquables prédéfinis et Ma position",
       "Couches satellite et topo Esri sans clé (noms de lieux et de rues sur le satellite), un seul monde avec une bordure à la ligne de changement de date, une échelle, les coordonnées du curseur et du réticule, un menu clic droit et Ctrl+molette pour zoomer sur le réticule",
-      "Minicarte d'élévation de la zone choisie",
       "Cartes de progression étape par étape pour la génération et l'export, avec étapes terminées et durées",
       "Cache de génération et annulation des tâches longues",
       "Mode clair et sombre, en 7 langues",

@@ -598,12 +598,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satelita",
     "topoMap": "Mapa topograficzna",
-    "elevationOverlay": {
-      "title": "Wysokości (darmowy zbiór danych)",
-      "show": "Pokaż podgląd danych wysokości",
-      "hide": "Ukryj",
-      "legend": "Magenta = brakujące/uszkodzone dane"
-    },
     "osmCoverage": "Zasięg OSM MapNG",
     "hotspots": "Miejsca eksportów",
     "hotspotsCount": "{count} udostępnionych eksportów",
@@ -712,7 +706,6 @@
       "Udostępnij całą konfigurację: krótki kod lub link (ważny 24 godziny), długi kod, który nigdy nie wygasa, albo plik. Wklej go na mapie, aby go wczytać; Twoje własne klucze i serwery nigdy nie są w nim przekazywane",
       "Wyszukiwanie miejsc (Nominatim), gotowe malownicze lokalizacje i Moja lokalizacja",
       "Warstwy satelitarne i topograficzne Esri bez klucza (nazwy miejsc i ulic na satelicie), jeden świat z granicą na linii zmiany daty, skala, współrzędne kursora i celownika, menu pod prawym przyciskiem oraz Ctrl+kółko do przybliżania na celownik",
-      "Minimapa wysokości wybranego obszaru",
       "Karty postępu etap po etapie dla generowania i eksportu, z ukończonymi krokami i czasami",
       "Pamięć podręczna generowania i anulowanie długich zadań",
       "Tryb jasny i ciemny, w 7 językach",

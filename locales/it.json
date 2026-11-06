@@ -598,12 +598,6 @@
     "openStreetMap": "OpenStreetMap",
     "satellite": "Satellite",
     "topoMap": "Mappa topografica",
-    "elevationOverlay": {
-      "title": "Altitudine (dataset gratuito)",
-      "show": "Mostra anteprima altitudine",
-      "hide": "Nascondi",
-      "legend": "Magenta = dati mancanti/corrotti"
-    },
     "osmCoverage": "Copertura OSM di MapNG",
     "hotspots": "Zone di esportazione",
     "hotspotsCount": "{count} esportazioni condivise",
@@ -712,7 +706,6 @@
       "Condividi tutta la tua configurazione: un codice breve o un link (valido 24 ore), un codice lungo che non scade mai o un file. Incollane uno sulla mappa per caricarlo; le tue chiavi e i tuoi server non vengono mai inclusi",
       "Ricerca luoghi (Nominatim), luoghi panoramici predefiniti e La mia posizione",
       "Layer Esri satellite e topografici senza chiave (nomi di luoghi e strade sul satellite), un solo mondo con bordo alla linea del cambiamento di data, scala, coordinate del cursore e del mirino, menu con clic destro e Ctrl+rotellina per lo zoom sul mirino",
-      "Minimappa di altitudine dell'area scelta",
       "Schede di avanzamento per fasi per generazione ed esportazione, con passaggi completati e tempi",
       "Cache di generazione e annullamento delle attività lunghe",
       "Modalità chiara e scura, in 7 lingue",
