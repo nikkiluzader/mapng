@@ -640,7 +640,7 @@
     "whatBody": "Wähle einen Ort und eine Höhendatenquelle, generiere das Gelände und prüfe es in der 3D-Vorschau. Exportiere dann ein komplettes BeamNG-Level als ZIP aus echten Höhen- und OpenStreetMap-Daten, oder nimm GeoTIFF- und GeoJSON-Daten in deinen eigenen Workflow mit. Der Batch-Modus verarbeitet ganze Tile-Raster und kann sie zu einem großen Level zusammensetzen.",
     "elevationTitle": "Höhendatenquellen",
     "elevationItems": [
-      "Global 30 m (AWS Terrain Tiles, überwiegend SRTM): der Ersatz, wo es kein Lidar gibt, oder allein; Straßen automatisch geglättet und eingeebnet, Flüsse unter ihren Ufern",
+      "Global 30 m (AWS Terrain Tiles, überwiegend SRTM): der Ersatz, wo es kein Lidar gibt, oder allein; Straßen automatisch geglättet und eingeebnet, Flüsse unter ihren Ufern; Gebäude, Bäume und Hochstraßen automatisch herausgerechnet",
       "Beste kostenlose, die Voreinstellung: kostenloses Lidar von Mapterhorn, wo es eine nationale Vermessung gibt (große Teile Europas, Japan, Australien, Neuseeland, Teile der USA und Kanadas), sonst die globalen 30 m; kein Schlüssel nötig",
       "USGS 1 m DEM (USA: CONUS, Alaska, Hawaii)",
       "NMT EVRF2007 (Polen, hochaufgelöste GUGiK-Kacheln)",
@@ -838,6 +838,14 @@
         {
           "name": "Mapterhorn",
           "desc": "Kostenlose Geländekacheln aus 155 offenen nationalen und globalen Höhenquellen (Terrarium-WebP, bis z17)"
+        },
+        {
+          "name": "GEDTM30 (OpenGeoHub)",
+          "desc": "Globales 30-m-Geländemodell ohne Bebauung (CC-BY 4.0), damit unter Gebäuden und Bäumen in den globalen 30 m der Boden gefunden wird"
+        },
+        {
+          "name": "Copernicus GLO-30",
+          "desc": "Zweites globales 30-m-Modell (2011–2015, EU/ESA, über Mapterhorn), vom Bodenfilter eingemittelt"
         },
         {
           "name": "USGS National Map",

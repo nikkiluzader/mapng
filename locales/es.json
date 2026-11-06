@@ -640,7 +640,7 @@
     "whatBody": "Elige un lugar y una fuente de elevación, genera el terreno y revísalo en la vista previa 3D. Después exporta un nivel completo de BeamNG en ZIP, creado con datos reales de elevación y de OpenStreetMap, o lleva los datos GeoTIFF y GeoJSON a tu propio flujo de trabajo. El modo por lotes procesa cuadrículas enteras de teselas y puede unirlas en un nivel grande.",
     "elevationTitle": "Fuentes de elevación",
     "elevationItems": [
-      "Global 30 m (AWS Terrain Tiles, sobre todo SRTM): el respaldo donde no hay lidar, o por sí solo; carreteras suavizadas y niveladas y ríos bajo sus orillas, automáticamente",
+      "Global 30 m (AWS Terrain Tiles, sobre todo SRTM): el respaldo donde no hay lidar, o por sí solo; carreteras suavizadas y niveladas y ríos bajo sus orillas, automáticamente; edificios, árboles y viaductos eliminados automáticamente",
       "Mejor gratis, la opción por defecto: lidar gratuito de Mapterhorn donde existe un levantamiento nacional (gran parte de Europa, Japón, Australia, Nueva Zelanda, partes de EE. UU. y Canadá), el global de 30 m en el resto; no necesita clave",
       "MDE USGS 1 m (EE. UU.: CONUS, Alaska, Hawái)",
       "NMT EVRF2007 (Polonia, teselas GUGiK de alta resolución)",
@@ -838,6 +838,14 @@
         {
           "name": "Mapterhorn",
           "desc": "Teselas de terreno gratuitas de 155 fuentes de elevación abiertas, nacionales y globales (Terrarium WebP, hasta z17)"
+        },
+        {
+          "name": "GEDTM30 (OpenGeoHub)",
+          "desc": "Modelo global de terreno desnudo de 30 m (CC-BY 4.0), para hallar el suelo bajo edificios y árboles en el global de 30 m"
+        },
+        {
+          "name": "Copernicus GLO-30",
+          "desc": "Segundo modelo global de 30 m (2011–2015, UE/ESA, vía Mapterhorn), promediado por el filtro de suelo"
         },
         {
           "name": "USGS National Map",

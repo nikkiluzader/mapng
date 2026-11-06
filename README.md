@@ -146,6 +146,8 @@ This helps keep community resource hubs focused on curated, polished releases wh
 | Source | Purpose |
 |---|---|
 | AWS Terrain Tiles (mostly SRTM) | Global 30 m elevation: the fallback where there's no lidar |
+| GEDTM30 (OpenGeoHub, CC-BY 4.0) | Global bare-earth 30 m: the ground filter's reference for taking buildings and trees out of the global 30 m |
+| Copernicus GLO-30 (EU/ESA, via Mapterhorn) | Second global 30 m, averaged in by the ground filter where the data is radar |
 | Mapterhorn | Free lidar where a national survey exists (open-data sources, mapterhorn.com/attribution); the default, with the global 30 m elsewhere |
 | USGS TNM Access API | 1 m US elevation where available |
 | GUGiK NMT EVRF2007 (Poland) | High-resolution Poland elevation tiles |

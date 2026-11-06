@@ -640,7 +640,7 @@
     "whatBody": "Choisissez un lieu et une source d'élévation, générez le terrain et vérifiez-le dans l'aperçu 3D. Exportez ensuite un niveau BeamNG complet en ZIP, construit à partir de vraies données d'élévation et d'OpenStreetMap, ou utilisez les données GeoTIFF et GeoJSON dans votre propre workflow. Le mode par lot traite des grilles entières de tuiles et peut les assembler en un grand niveau.",
     "elevationTitle": "Sources d'élévation",
     "elevationItems": [
-      "Global 30 m (AWS Terrain Tiles, surtout SRTM) : le relais là où il n'y a pas de lidar, ou seul ; routes lissées et nivelées et rivières sous leurs berges, automatiquement",
+      "Global 30 m (AWS Terrain Tiles, surtout SRTM) : le relais là où il n'y a pas de lidar, ou seul ; routes lissées et nivelées et rivières sous leurs berges, automatiquement; bâtiments, arbres et viaducs retirés automatiquement",
       "Meilleur gratuit, par défaut : le lidar gratuit de Mapterhorn là où un relevé national existe (une grande partie de l'Europe, le Japon, l'Australie, la Nouvelle-Zélande, une partie des États-Unis et du Canada), le global 30 m ailleurs ; aucune clé requise",
       "MNT USGS 1 m (États-Unis : CONUS, Alaska, Hawaï)",
       "NMT EVRF2007 (Pologne, tuiles GUGiK haute résolution)",
@@ -838,6 +838,14 @@
         {
           "name": "Mapterhorn",
           "desc": "Tuiles de relief gratuites issues de 155 sources d'altitude ouvertes, nationales et mondiales (Terrarium WebP, jusqu'à z17)"
+        },
+        {
+          "name": "GEDTM30 (OpenGeoHub)",
+          "desc": "Modèle de terrain nu mondial à 30 m (CC-BY 4.0), pour retrouver le sol sous les bâtiments et les arbres dans le global 30 m"
+        },
+        {
+          "name": "Copernicus GLO-30",
+          "desc": "Deuxième modèle mondial à 30 m (2011–2015, UE/ESA, via Mapterhorn), moyenné par le filtre de sol"
         },
         {
           "name": "USGS National Map",

@@ -640,7 +640,7 @@
     "whatBody": "Pick a location, choose an elevation source, generate the terrain and check it in the 3D preview. Then export a complete BeamNG level ZIP built from real elevation and OpenStreetMap data, or take GeoTIFF and GeoJSON data into your own workflow. Batch mode processes whole grids of tiles and can stitch them into one large level.",
     "elevationTitle": "Elevation Sources",
     "elevationItems": [
-      "Global 30 m (AWS Terrain Tiles, mostly SRTM): the fallback where there's no lidar, or on its own; roads smoothed and levelled and rivers kept below their banks automatically",
+      "Global 30 m (AWS Terrain Tiles, mostly SRTM): the fallback where there's no lidar, or on its own; roads smoothed and levelled and rivers kept below their banks automatically; buildings, trees and viaduct decks taken out automatically",
       "Best free, the default: Mapterhorn's free lidar where a national survey exists (much of Europe, Japan, Australia, New Zealand, parts of the US and Canada), the global 30 m elsewhere; no key needed",
       "USGS 1 m DEM (USA: CONUS, Alaska, Hawaii)",
       "NMT EVRF2007 (Poland, high-resolution GUGiK tiles)",
@@ -838,6 +838,14 @@
         {
           "name": "Mapterhorn",
           "desc": "Free terrain tiles from 155 open national and global elevation sources (Terrarium WebP, up to z17)"
+        },
+        {
+          "name": "GEDTM30 (OpenGeoHub)",
+          "desc": "Global 30 m bare-earth terrain model (CC-BY 4.0), used to find the ground under buildings and trees in the global 30 m"
+        },
+        {
+          "name": "Copernicus GLO-30",
+          "desc": "Second global 30 m model (2011–2015, EU/ESA, via Mapterhorn), averaged in by the ground filter"
         },
         {
           "name": "USGS National Map",

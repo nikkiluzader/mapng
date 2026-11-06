@@ -640,7 +640,7 @@
     "whatBody": "Scegli un luogo e una fonte di altitudine, genera il terreno e controllalo nell'anteprima 3D. Poi esporta un livello BeamNG completo in ZIP, costruito da dati reali di altitudine e di OpenStreetMap, oppure porta i dati GeoTIFF e GeoJSON nel tuo flusso di lavoro. La modalità batch elabora intere griglie di tessere e può unirle in un unico grande livello.",
     "elevationTitle": "Fonti di altitudine",
     "elevationItems": [
-      "Globale 30 m (AWS Terrain Tiles, soprattutto SRTM): il ripiego dove non c'è lidar, o da solo; strade levigate e livellate e fiumi sotto le sponde, automaticamente",
+      "Globale 30 m (AWS Terrain Tiles, soprattutto SRTM): il ripiego dove non c'è lidar, o da solo; strade levigate e livellate e fiumi sotto le sponde, automaticamente; edifici, alberi e viadotti tolti automaticamente",
       "Migliore gratuito, il predefinito: il lidar gratuito di Mapterhorn dove esiste un rilievo nazionale (gran parte dell'Europa, Giappone, Australia, Nuova Zelanda, parte di Stati Uniti e Canada), altrove il globale 30 m; nessuna chiave richiesta",
       "DEM USGS 1 m (USA: CONUS, Alaska, Hawaii)",
       "NMT EVRF2007 (Polonia, tessere GUGiK ad alta risoluzione)",
@@ -838,6 +838,14 @@
         {
           "name": "Mapterhorn",
           "desc": "Tile del terreno gratuite da 155 fonti altimetriche aperte, nazionali e globali (Terrarium WebP, fino a z17)"
+        },
+        {
+          "name": "GEDTM30 (OpenGeoHub)",
+          "desc": "Modello globale del terreno nudo a 30 m (CC-BY 4.0), per trovare il suolo sotto edifici e alberi nel globale 30 m"
+        },
+        {
+          "name": "Copernicus GLO-30",
+          "desc": "Secondo modello globale a 30 m (2011–2015, UE/ESA, via Mapterhorn), mediato dal filtro del suolo"
         },
         {
           "name": "USGS National Map",

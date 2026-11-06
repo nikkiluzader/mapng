@@ -640,7 +640,7 @@
     "whatBody": "Wybierz miejsce i źródło wysokości, wygeneruj teren i sprawdź go w podglądzie 3D. Następnie wyeksportuj kompletny poziom BeamNG jako ZIP, zbudowany z prawdziwych danych wysokościowych i OpenStreetMap, albo przenieś dane GeoTIFF i GeoJSON do własnej pracy. Tryb wsadowy przetwarza całe siatki kafelków i potrafi złożyć je w jeden duży poziom.",
     "elevationTitle": "Źródła wysokości",
     "elevationItems": [
-      "Globalne 30 m (AWS Terrain Tiles, głównie SRTM): zastępstwo tam, gdzie nie ma lidaru, lub samodzielnie; drogi automatycznie wygładzane i wyrównywane, rzeki poniżej brzegów",
+      "Globalne 30 m (AWS Terrain Tiles, głównie SRTM): zastępstwo tam, gdzie nie ma lidaru, lub samodzielnie; drogi automatycznie wygładzane i wyrównywane, rzeki poniżej brzegów; budynki, drzewa i wiadukty usuwane automatycznie",
       "Najlepsze darmowe, domyślnie: darmowy lidar z Mapterhorn tam, gdzie istnieje krajowy pomiar (duża część Europy, Japonia, Australia, Nowa Zelandia, części USA i Kanady), w pozostałych miejscach globalne 30 m; bez klucza",
       "USGS 1 m DEM (USA: CONUS, Alaska, Hawaje)",
       "NMT EVRF2007 (Polska, kafelki GUGiK wysokiej rozdzielczości)",
@@ -838,6 +838,14 @@
         {
           "name": "Mapterhorn",
           "desc": "Darmowe kafle terenu z 155 otwartych krajowych i globalnych źródeł wysokości (Terrarium WebP, do z17)"
+        },
+        {
+          "name": "GEDTM30 (OpenGeoHub)",
+          "desc": "Globalny model terenu bez zabudowy 30 m (CC-BY 4.0), do znajdowania gruntu pod budynkami i drzewami w globalnych 30 m"
+        },
+        {
+          "name": "Copernicus GLO-30",
+          "desc": "Drugi globalny model 30 m (2011–2015, UE/ESA, przez Mapterhorn), uśredniany przez filtr gruntu"
         },
         {
           "name": "USGS National Map",
