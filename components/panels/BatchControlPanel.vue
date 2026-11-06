@@ -37,7 +37,7 @@
       />
 
       <!-- Resolution -->
-      <SettingSection id="mapng-bsec-area" :changed="areaChanged" resettable @reset="resetArea" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_batchres">
+      <SettingSection id="mapng-bsec-area" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_batchres">
         <ResolutionSelector
           :modelValue="resolution"
           @update:modelValue="$emit('resolutionChange', $event)"
@@ -602,8 +602,6 @@ const tileAreaDisplay = computed(() => formatArea(tileAreaKm.value));
 const perimeterDisplay = computed(() => formatDist(2 * (gridWidthKm.value + gridHeightKm.value)));
 const gridWidthDisplay = computed(() => formatDist(gridWidthKm.value));
 // Sections that differ from the defaults (a dot by the title) and their Reset
-const areaChanged = computed(() => Number(props.resolution) !== 1024 || processingMetersPerPixelNumber.value !== 1 || sharedElevationBaseline.value);
-const resetArea = () => { emit('resolutionChange', 1024); emit('update:processingMetersPerPixel', 1); sharedElevationBaseline.value = false; };
 const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || terrainMode.value !== 'ready');
 const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
 const layoutChanged = computed(() => hasOffsetTiles.value || tileNames.value.some((e) => String(e.name || '').trim() && e.name !== defaultTileName(e.index)));

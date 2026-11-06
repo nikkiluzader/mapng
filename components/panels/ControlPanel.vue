@@ -23,7 +23,7 @@
       </SettingSection>
 
       <!-- 2. How big and how detailed -->
-      <SettingSection id="mapng-sec-area" :changed="areaChanged" resettable @reset="resetArea" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_area">
+      <SettingSection id="mapng-sec-area" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_area">
         <div
           v-if="devMode"
           class="rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2"
@@ -484,8 +484,6 @@ watch(() => props.terrainData, (newData) => {
 });
 
 // Sections that differ from the defaults (a dot by the title) and their Reset
-const areaChanged = computed(() => Number(props.resolution) !== 1024 || Number(props.processingMetersPerPixel || 1) !== 1);
-const resetArea = () => { emit('resolutionChange', 1024); emit('update:processingMetersPerPixel', 1); };
 const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || (store.advancedMode && terrainMode.value !== 'ready'));
 const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
 const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value);

@@ -13,7 +13,7 @@
           <component :is="icon" v-if="icon" :size="14" class="shrink-0" :class="accent ? 'text-brand' : 'text-gray-500 dark:text-gray-400 group-hover:text-brand'" />
           <span class="font-display text-sm font-semibold text-gray-800 dark:text-gray-100 group-hover:text-brand transition-colors truncate">{{ title }}</span>
           <!-- (something here differs from the defaults) -->
-          <span v-if="changed" class="w-1.5 h-1.5 rounded-full bg-brand shrink-0" :title="t('sections.changedTitle')"></span>
+          <span v-if="changed" class="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500 shrink-0" :title="t('sections.changedTitle')"></span>
           <span v-if="$slots.aside" class="text-caption font-normal text-gray-500 dark:text-gray-400 shrink-0"><slot name="aside" /></span>
         </span>
         <ChevronDown :size="14" class="shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200" :class="open ? 'rotate-180' : ''" />
