@@ -1,6 +1,6 @@
 // MapNG desktop: the web app in a window, its level export in a full Node
 // process (no 4 GB tab heap), the level written straight into BeamNG's mods.
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, screen, shell } from 'electron';
 import { fork } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -99,12 +99,40 @@ function servePage() {
   });
 }
 
+// The window opens as it was closed: its size and place (when that still
+// fits on a connected screen) and maximised or full screen.
+const MIN_W = 1024, MIN_H = 640;
+function savedWindowState() {
+  const w = readSettings().window;
+  if (!w || !(w.width >= MIN_W) || !(w.height >= MIN_H)) return null;
+  // (a monitor that is gone, or moved: only keep the place when most of the
+  // window's title bar lands on a screen)
+  const onScreen = Number.isFinite(w.x) && Number.isFinite(w.y) && screen.getAllDisplays().some(({ workArea: a }) => (
+    w.x + w.width / 2 > a.x && w.x + w.width / 2 < a.x + a.width && w.y >= a.y - 8 && w.y + 40 < a.y + a.height
+  ));
+  return { width: w.width, height: w.height, ...(onScreen ? { x: w.x, y: w.y } : {}), maximized: !!w.maximized, fullScreen: !!w.fullScreen };
+}
+function rememberWindowState(win) {
+  let timer = null;
+  const save = () => {
+    if (win.isDestroyed()) return;
+    const b = win.getNormalBounds();   // (the size it returns to when un-maximised)
+    writeSettings({ window: { x: b.x, y: b.y, width: b.width, height: b.height, maximized: win.isMaximized(), fullScreen: win.isFullScreen() } });
+  };
+  const later = () => { clearTimeout(timer); timer = setTimeout(save, 400); };
+  for (const ev of ['resize', 'move', 'maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen']) win.on(ev, later);
+  win.on('close', () => { clearTimeout(timer); save(); });
+}
+
 function createWindow() {
+  const saved = savedWindowState();
   const win = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1024,
-    minHeight: 640,
+    width: saved?.width || 1440,
+    height: saved?.height || 900,
+    ...(saved && Number.isFinite(saved.x) ? { x: saved.x, y: saved.y } : {}),
+    show: false,
+    minWidth: MIN_W,
+    minHeight: MIN_H,
     title: 'MapNG',
     backgroundColor: '#111111',
     webPreferences: {
@@ -142,6 +170,13 @@ function createWindow() {
       if (!win.isDestroyed()) win.webContents.send('desktop:batchFileSaved', { name, path: state === 'completed' ? file : null, state });
     });
   });
+  // (shown once placed: maximising a visible window flashes the old size first)
+  win.once('ready-to-show', () => {
+    if (saved?.maximized) win.maximize();
+    if (saved?.fullScreen) win.setFullScreen(true);
+    win.show();
+  });
+  rememberWindowState(win);
   win.loadURL('app://mapng/');
   return win;
 }
