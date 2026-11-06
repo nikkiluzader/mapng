@@ -292,6 +292,8 @@ const joinWays = (wayNodesList) => {
   return rings;
 };
 
+const NOT_A_ROUTE = new Set(["via_ferrata"]);
+
 export const parseOverpassResponse = (data, bounds) => {
   const ways = {};
   const relations = [];
@@ -443,7 +445,10 @@ export const parseOverpassResponse = (data, bounds) => {
     const w = ways[id];
     const tags = w.tags;
 
-    if (tags.highway) {
+    // (a via ferrata is a cable-protected climbing route up a rock face, not a
+    // road or a path: built as one, its 'bridge' pieces became a road deck on
+    // pillars hanging off the cliff, Via Ferrata Le Roc de Tovière, Tignes)
+    if (tags.highway && !NOT_A_ROUTE.has(tags.highway)) {
       // Keep original way geometry. Aggressive signature-based joining can produce
       // long discontinuous polylines across intersections/branches.
       rawFeatures.push({ id: id.toString(), type: "road", geometry: w.nodes, tags });

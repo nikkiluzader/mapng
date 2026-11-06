@@ -163,3 +163,13 @@ test('Pull/Download: openstreetmap.org answers become clear error codes', async 
     globalThis.fetch = realFetch;
   }
 });
+
+test('a via ferrata (a climbing route) is not a road', () => {
+  const data = { elements: [
+    { type: 'way', id: 1, tags: { highway: 'via_ferrata', bridge: 'yes', layer: '1' }, geometry: [{ lat: 45.0, lon: 7.0 }, { lat: 45.0001, lon: 7.0001 }] },
+    { type: 'way', id: 2, tags: { highway: 'path' }, geometry: [{ lat: 45.0, lon: 7.0 }, { lat: 45.0001, lon: 7.0002 }] },
+  ] };
+  const features = parseOverpassResponse(data, { south: 44.99, west: 6.99, north: 45.01, east: 7.01 });
+  assert.equal(features.filter((f) => f.type === 'road').length, 1);
+  assert.equal(features.find((f) => f.type === 'road').tags.highway, 'path');
+});
