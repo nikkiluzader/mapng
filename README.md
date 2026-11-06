@@ -55,6 +55,14 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 ## What's New (November 2026)
 
+**MapNG 0.2.6** ([update page](https://mapng.com/updates/0.2.6/))
+
+- **Free lidar, by default:** the new default elevation source, **Best free (lidar + global 30 m)**, builds levels from Mapterhorn's free national lidar wherever a survey exists (much of Europe, Japan, Australia, New Zealand, parts of the US and Canada), and from the global 30 m elsewhere; no key, no sign-up. It matches GPXZ's lidar to 0.1–2.5 m where both have it
+- **A hint under the elevation source** says whether free lidar covers your selection and how fine it is, with a one-click switch; GPXZ users can check GPXZ's datasets there (one request, on click)
+- **Compare sources here:** small hillshades of the global 30 m, Mapterhorn and GPXZ at your selection, side by side
+- **Free lidar coverage** layer on the 2D map
+- Lidar tiles go through MapNG's own cache (stored after first use); elevated roads tagged as viaducts are bridges again; the old default stays as **Global 30 m only**; the elevation minimap is gone
+
 **MapNG 0.2.5**
 
 - **Feels like BeamNG.drive:** the game's own interface fonts (Noto Sans, Overpass and Overpass Mono, bundled so the desktop app works offline), its orange palette and its corners, used the same way everywhere

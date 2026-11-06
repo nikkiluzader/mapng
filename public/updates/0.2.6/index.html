@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.2.6: Free Lidar, Built In</title>
+<meta name="description" content="What's new in MapNG 0.2.6: free national lidar wherever it exists, chosen by default, with a hint, a side-by-side source comparison and a coverage map.">
+<link rel="canonical" href="https://mapng.com/updates/0.2.6/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.2.6: free lidar, built in">
+<meta property="og:description" content="Free national lidar wherever it exists, by default. No key, no sign-up.">
+<meta property="og:url" content="https://mapng.com/updates/0.2.6/">
+<meta property="og:image" content="https://mapng.com/updates/0.2.6/images/hero-lauterbrunnen.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: the in-game shot with the title over it */
+  .hero { position: relative; color: #fff; background: #111 url(images/hero-lauterbrunnen.jpg) center/cover no-repeat; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(70vh, 560px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.2.6</span></span>
+    <h1>Free lidar, built in</h1>
+    <p>Wherever a country has published a lidar survey, MapNG now builds your level from it, for free and by default. No key, no sign-up.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+  <span class="credit">Lauterbrunnen, Switzerland: a 1 km MapNG level built from free 0.8 m lidar, in BeamNG.drive 0.40</span>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#lidar">🏔️ Free lidar</a>
+    <a href="#hint">💡 The hint</a>
+    <a href="#compare">🔍 Compare sources</a>
+    <a href="#coverage">🗺️ Coverage map</a>
+    <a href="#more">🧹 More</a>
+    <a href="#thanks">🙏 Thanks</a>
+  </nav>
+
+  <p style="margin-top:28px">Until now, MapNG's free elevation was a 30&nbsp;m global dataset: fine for hills, soft and blurry up close. Lidar (laser surveys flown by national mapping agencies) shows the real ground down to about a metre, but getting it meant a paid key or a country-specific download. <b>As of 0.2.6, MapNG uses free lidar wherever it exists</b>, in the browser and in the desktop app.</p>
+
+  <section id="lidar">
+    <div class="kicker">Elevation</div>
+    <h2>🏔️ Free lidar, chosen for you</h2>
+    <figure><img src="images/before-after-lauterbrunnen.jpg" alt="The same 1 km Lauterbrunnen map in MapNG's 3D preview, from the global 30 m data and from free lidar" loading="lazy"><figcaption>Lauterbrunnen in MapNG's 3D preview: the global 30 m on the left, free lidar on the right. The river channel, the terraces and the cliff walls only exist in the lidar.</figcaption></figure>
+    <p>The new default elevation source is called <b>Best free (lidar + global 30 m)</b>. It comes from <a href="https://mapterhorn.com">Mapterhorn</a>, an open project that collects 155 national and global elevation datasets, all under open licences:</p>
+    <ul>
+      <li><b>Lidar where a national survey exists:</b> much of Europe (England, Scotland and Wales at 1&nbsp;m, Germany at 1&nbsp;m, Switzerland to 0.5&nbsp;m, France, Spain, the Netherlands, Austria and more), Japan, Australia, New Zealand, and parts of the US and Canada.</li>
+      <li><b>The global 30 m everywhere else</b>, the same data MapNG has always used, so nothing gets worse where there's no lidar.</li>
+      <li>MapNG picks the finest detail that's useful for your map's resolution, and fills the edge of a survey from the next coarser lidar, never from the 30&nbsp;m.</li>
+    </ul>
+    <p>We checked it against professional lidar in 15 cities: where both have lidar, it matches GPXZ's lidar to within 0.1–2.5&nbsp;m. Against the old 30&nbsp;m data, Sydney's error dropped from 21&nbsp;m to 0.5&nbsp;m.</p>
+    <div class="note">Already set up? If you were on the old default ("Standard"), MapNG moves you to Best free once. The old data is still in the list as <b>Global 30 m only</b> if you want it, and GPXZ, USGS, the Polish lidar and your own uploads are all unchanged.</div>
+  </section>
+
+  <section id="hint">
+    <div class="kicker">The elevation source</div>
+    <h2>💡 MapNG tells you what's available</h2>
+    <figure><img src="images/free-lidar-hint.jpg" alt="Under the elevation source dropdown: Free lidar (about 0.4 m) covers 100% of this area, with a Use it button" loading="lazy"></figure>
+    <p>Under the elevation source, a small hint checks your selection as you move the map:</p>
+    <ul>
+      <li>On another source, if free lidar covers your area it says so, with how fine it is, and a one-click <b>Use it</b>.</li>
+      <li>On Best free, it says what your area gets, or that there's no lidar there and the global 30&nbsp;m will be used.</li>
+      <li>GPXZ users can also check which GPXZ dataset covers the area. That one runs only when you click, since it uses one request from your plan.</li>
+    </ul>
+    <figure><img src="images/no-lidar-dark.jpg" alt="São Paulo in dark mode: No free lidar here, the global 30 m will be used" loading="lazy"><figcaption>São Paulo has no free lidar, and the hint says so up front.</figcaption></figure>
+  </section>
+
+  <section id="compare">
+    <div class="kicker">Seeing is believing</div>
+    <h2>🔍 Compare the sources yourself</h2>
+    <figure><img src="images/compare-sources.jpg" alt="Compare sources here: three small hillshades of Lauterbrunnen from the global 30 m, Mapterhorn and GPXZ" loading="lazy"></figure>
+    <p><b>Compare sources here</b> draws a 500&nbsp;m square at your selection's centre from each source, side by side: the global 30&nbsp;m (smoothed the way MapNG builds levels from it), Mapterhorn, and, if you ask and have a key, GPXZ. You see the difference before you generate anything.</p>
+  </section>
+
+  <section id="coverage">
+    <div class="kicker">The 2D map</div>
+    <h2>🗺️ See where free lidar exists</h2>
+    <figure><img src="images/lidar-coverage.jpg" alt="The 2D map over Europe with Free lidar coverage turned on: most of Western Europe is covered in green" loading="lazy"></figure>
+    <p>Turn on <b>Free lidar coverage</b> under Map layers to see where free high-resolution elevation exists, worldwide. It's drawn from a small index that ships with MapNG, so it costs nothing while you pan.</p>
+  </section>
+
+  <section id="more">
+    <div class="kicker">And more</div>
+    <h2>🧹 Smaller changes</h2>
+    <div class="polish">
+      <div><b>Elevated roads fixed</b>Roads tagged as viaducts (and boardwalks, cantilever and movable bridges) were sometimes levelled into the ground like normal roads. They're bridges again.</div>
+      <div><b>One tile, one download</b>Lidar tiles go through MapNG's own server, which keeps each one after its first use. That's lighter on Mapterhorn, and areas people have used keep working even if it's ever down.</div>
+      <div><b>Clearer source names</b>Every message that said "falls back to Standard" now names the global 30&nbsp;m, in all seven languages.</div>
+      <div><b>Elevation minimap removed</b>The small bottom-left preview only ever showed the 30&nbsp;m data. Compare sources here replaces it, for every source.</div>
+    </div>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks to Mapterhorn</h2>
+    <p>The free lidar comes from <a href="https://mapterhorn.com">Mapterhorn</a>, by Oliver Wipfli and contributors, funded by the EU's NGI0 programme through NLnet. They do the hard part: collecting 155 national datasets under open licences into one consistent set of tiles. Every level built from them credits them and the national sources in its export report; the full list is on <a href="https://mapterhorn.com/attribution">their attribution page</a>.</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>. Code-signing is in progress.</p>
+    <p>Try your favourite place with Best free and tell me what you see. Post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.2.5/">Previous update (0.2.5)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>
