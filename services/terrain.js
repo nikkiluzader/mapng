@@ -1937,13 +1937,13 @@ export const fetchTerrainData = async (
         console.info(`[Mapterhorn] z${mh.zoom} (~${mh.metersPerPixel.toFixed(1)} m), lidar on ${Math.round(mh.lidarFraction * 100)}% of ${mh.tilesFetched} tiles.`);
       } else {
         mapterhornInfo = { zoom: 12, lidarFraction: 0, fallbackReason: 'no_lidar' };
-        onProgress?.('Mapterhorn has no lidar here. Using the standard 30 m elevation...');
+        onProgress?.('Mapterhorn has no lidar here. Using the global 30 m elevation...');
       }
     } catch (error) {
       if (signal?.aborted) throw error;
       console.warn('[Mapterhorn] Request failed, falling back to the standard 30 m:', error);
       mapterhornInfo = { fallbackReason: 'request_failed' };
-      onProgress?.('Mapterhorn did not answer. Using the standard 30 m elevation...');
+      onProgress?.('Mapterhorn did not answer. Using the global 30 m elevation...');
     }
   }
 
