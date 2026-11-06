@@ -1,5 +1,6 @@
-// The default elevation source: Mapterhorn (free lidar where a national survey exists, Standard 30 m elsewhere).
-// Until 2026-11, Standard 30 m was the default, so most saved "default" choices are the old default rather than a
+// The default elevation source, "Best free": Mapterhorn (free lidar where a national survey exists, the global
+// 30 m elsewhere).
+// Until 2026-11, the global 30 m ("Standard") was the default, so most saved "default" choices are the old default rather than a
 // decision: they move to Mapterhorn once (a flag per setting), and a later switch back to Standard is kept.
 export const DEFAULT_ELEVATION_SOURCE = 'mapterhorn';
 const MIGRATED_SUFFIX = '_mapterhornDefault';

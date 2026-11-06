@@ -292,7 +292,7 @@ const compareOpen = ref(false);
 const compare = ref({});           // key -> { url, state, note, detail }
 let compareAbort = null;
 const compareCells = computed(() => [
-  { key: 'standard', label: t('config.source_default'), ...compare.value.standard },
+  { key: 'standard', label: t('map.compareGlobal30'), ...compare.value.standard },
   { key: 'mapterhorn', label: 'Mapterhorn', ...compare.value.mapterhorn },
   { key: 'gpxz', label: 'GPXZ', ...(compare.value.gpxz || { state: localGpxzApiKey.value ? 'ask' : 'none', note: t('map.compareNeedsKey') }) },
 ]);

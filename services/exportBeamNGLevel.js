@@ -6749,14 +6749,14 @@ function resolveElevationSourceLabel(terrainData, selectedElevationSource) {
   if (normalized === 'gpxz') return 'GPXZ';
   if (normalized === 'mapterhorn') {
     const mh = terrainData?.mapterhornInfo;
-    if (!mh || mh.fallbackReason) return `Mapterhorn requested, ${mh?.fallbackReason === 'no_lidar' ? 'no lidar here' : 'not reachable'}: Standard 30 m used (© Mapterhorn, mapterhorn.com/attribution)`;
-    return `Mapterhorn lidar, z${mh.zoom} (~${Number(mh.metersPerPixel).toFixed(1)} m), on ${Math.round(mh.lidarFraction * 100)}% of the area; Standard 30 m elsewhere (© Mapterhorn and its open-data sources, mapterhorn.com/attribution)`;
+    if (!mh || mh.fallbackReason) return `Best free (Mapterhorn): ${mh?.fallbackReason === 'no_lidar' ? 'no lidar here' : 'Mapterhorn not reachable'}, global 30 m (AWS Terrain Tiles) used`;
+    return `Best free: Mapterhorn lidar, z${mh.zoom} (~${Number(mh.metersPerPixel).toFixed(1)} m), on ${Math.round(mh.lidarFraction * 100)}% of the area; global 30 m (AWS Terrain Tiles) elsewhere (© Mapterhorn and its open-data sources, mapterhorn.com/attribution)`;
   }
   if (normalized === 'kron86') {
     return terrainData?.kron86Fallback ? 'NMT EVRF2007 requested, fell back to default/WGS84 source' : 'NMT EVRF2007 (Poland)';
   }
   if (normalized === 'default') {
-    return sourceGeoTiffsSource ? `Default (${String(sourceGeoTiffsSource).toUpperCase()})` : 'Default/WGS84';
+    return sourceGeoTiffsSource ? `Global 30 m (${String(sourceGeoTiffsSource).toUpperCase()})` : 'Global 30 m (AWS Terrain Tiles)';
   }
   if (explicit) return explicit;
   if (sourceGeoTiffsSource) return String(sourceGeoTiffsSource).toUpperCase();

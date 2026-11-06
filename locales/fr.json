@@ -58,21 +58,22 @@
     "searchPlaceholder": "Rechercher un lieu...",
     "noLocationsFound": "Aucun lieu trouvé pour \"{query}\"",
     "elevationDataSource": "Source de données d'élévation",
-    "standard30m": "Standard (30m global)",
-    "mapterhornFree": "Mapterhorn (lidar gratuit)",
-    "standardDescription": "Amazon Terrarium (SRTM). Couverture mondiale fiable. Bon pour le relief général.",
-    "mapterhornDescription": "Lidar gratuit là où un relevé national existe (une grande partie de l'Europe, le Japon, l'Australie, la Nouvelle-Zélande, une partie des États-Unis et du Canada) ; Standard 30 m ailleurs. Aucune clé requise.",
+    "standard30m": "Global 30 m uniquement",
+    "mapterhornFree": "Meilleur gratuit (lidar + global 30 m)",
+    "standardDescription": "AWS Terrain Tiles (surtout SRTM). Utilisé automatiquement là où il n'y a pas de lidar ; choisissez-le pour l'utiliser partout.",
+    "mapterhornDescription": "Lidar gratuit de Mapterhorn là où un relevé national existe (une grande partie de l'Europe, le Japon, l'Australie, la Nouvelle-Zélande, une partie des États-Unis et du Canada) ; le global 30 m ailleurs. Aucune clé requise.",
     "hintFreeLidar": "Un lidar gratuit (~{res} m) couvre {pct} % de cette zone.",
     "hintUseFreeLidar": "L'utiliser",
     "hintMhFull": "Le lidar (~{res} m) couvre toute la zone.",
-    "hintMhPartial": "Le lidar (~{res} m) couvre {pct} % de la zone ; Standard 30 m complète le reste.",
-    "hintMhNone": "Pas de lidar gratuit ici : Standard 30 m sera utilisé.",
+    "hintMhPartial": "Le lidar (~{res} m) couvre {pct} % de la zone ; le global 30 m complète le reste.",
+    "hintMhNone": "Pas de lidar gratuit ici : le global 30 m sera utilisé.",
     "hintChecking": "Recherche d'un lidar gratuit ici…",
     "gpxzCheckHere": "Vérifier GPXZ ici (1 requête)",
     "gpxzHere": "meilleur {res} m ({sources})",
     "gpxzHereFailed": "vérification impossible",
     "compareHere": "Comparer les sources ici",
     "compareHide": "Masquer la comparaison",
+    "compareGlobal30": "Global 30 m",
     "compareAddGpxz": "Ajouter GPXZ (1 requête)",
     "compareNeedsKey": "clé GPXZ requise",
     "compareNoLidar": "pas de lidar ici",
@@ -84,11 +85,11 @@
     "usgs1m": "USGS DEM 1m (USA uniquement)",
     "online": "EN LIGNE",
     "offline": "HORS LIGNE",
-    "usgsDescription": "Données haute précision pour les USA. Bascule vers Standard si les données sont absentes ou corrompues.",
+    "usgsDescription": "Données de haute précision pour les États-Unis. Le global 30 m prend le relais là où les données manquent ou sont corrompues.",
     "kron86Poland": "NMT EVRF2007 (Pologne uniquement)",
     "outsideCoverage": "hors couverture",
-    "selectedSourceOutsideCoverage": "Cette source ne couvre pas la zone de la carte : Standard sera utilisé à la place.",
-    "kron86Description": "Élévation haute résolution pour la Pologne (GUGiK). Bascule vers Standard là où les tuiles manquent.",
+    "selectedSourceOutsideCoverage": "Cette source ne couvre pas la zone de la carte : le global 30 m sera utilisé.",
+    "kron86Description": "Élévation haute résolution pour la Pologne (GUGiK). Le global 30 m prend le relais là où des tuiles manquent.",
     "gpxzPremium": "GPXZ (premium mondial)",
     "gpxzDescription": "Données mondiales de la meilleure qualité. Clé API requise.",
     "checkCoverage": "Vérifier la couverture",
@@ -261,7 +262,7 @@
     "layerMoveDown": "Priorité inférieure",
     "layersHelp": "Votre import contient plusieurs levés. Celui du haut sert partout où il a des données ; chacun en dessous comble ce que les précédents ont laissé vide. Réordonnez-les pour choisir lequel l'emporte en cas de recouvrement — le plus récent en premier par défaut.",
     "fillGapsWith": "Combler les vides avec",
-    "gapFillStandard": "Jeu d'élévation standard",
+    "gapFillStandard": "Élévation globale 30 m",
     "gapFillGpxz": "GPXZ (clé API)",
     "gapFillNone": "Rien — laisser les vides",
     "gapFillStandardHint": "Ce que vos couches ne couvrent pas vient du jeu global, recalé en altitude sur vos données à la jointure.",
@@ -627,7 +628,7 @@
     "title": "Avertissement sur la précision des données",
     "lead": "Veuillez noter que toutes les données de terrain, heightmaps et modèles 3D générés par MapNG sont des estimations basées sur les données d'élévation, satellite et OpenStreetMap disponibles : ils ne valent que ce que valent ces sources.",
     "resolutionTitle": "Résolution et échelle",
-    "resolutionBody": "Les heightmaps sont exportées avec la résolution de traitement sélectionnée afin de conserver une échelle cohérente dans les moteurs de jeu. Avec le jeu de données Standard (30 m), le terrain reste suréchantillonné, donc plus lisse et moins détaillé que des sources natives haute résolution comme USGS ou GPXZ.",
+    "resolutionBody": "Les heightmaps sont exportées avec la résolution de traitement sélectionnée afin de conserver une échelle cohérente dans les moteurs de jeu. Avec le jeu de données global 30 m, le terrain reste suréchantillonné, donc plus lisse et moins détaillé que des sources natives haute résolution comme USGS ou GPXZ.",
     "usage": "Cet outil est destiné au modding et à un usage créatif. Il ne doit pas être utilisé pour la navigation, l'ingénierie ou la planification critique dans le monde réel.",
     "confirm": "J'ai compris"
   },
@@ -639,13 +640,13 @@
     "whatBody": "Choisissez un lieu et une source d'élévation, générez le terrain et vérifiez-le dans l'aperçu 3D. Exportez ensuite un niveau BeamNG complet en ZIP, construit à partir de vraies données d'élévation et d'OpenStreetMap, ou utilisez les données GeoTIFF et GeoJSON dans votre propre workflow. Le mode par lot traite des grilles entières de tuiles et peut les assembler en un grand niveau.",
     "elevationTitle": "Sources d'élévation",
     "elevationItems": [
-      "Standard 30 m mondial (AWS Terrarium / SRTM), routes lissées et nivelées, et rivières sous leurs berges, automatiquement",
-      "Mapterhorn : lidar gratuit là où un relevé national existe (une grande partie de l'Europe, le Japon, l'Australie, la Nouvelle-Zélande, une partie des États-Unis et du Canada), Standard 30 m ailleurs ; aucune clé requise",
+      "Global 30 m (AWS Terrain Tiles, surtout SRTM) : le relais là où il n'y a pas de lidar, ou seul ; routes lissées et nivelées et rivières sous leurs berges, automatiquement",
+      "Meilleur gratuit, par défaut : le lidar gratuit de Mapterhorn là où un relevé national existe (une grande partie de l'Europe, le Japon, l'Australie, la Nouvelle-Zélande, une partie des États-Unis et du Canada), le global 30 m ailleurs ; aucune clé requise",
       "MNT USGS 1 m (États-Unis : CONUS, Alaska, Hawaï)",
       "NMT EVRF2007 (Pologne, tuiles GUGiK haute résolution)",
       "GPXZ (haute résolution mondiale, avec votre propre clé API ; plus rapide avec les offres payantes)",
       "Terrain plat",
-      "Vos propres fichiers : nuages de points LAZ/LAS, GeoTIFF, ASC, GML/XML (aussi zippés), superposés et reprojetés, trous comblés par Standard ou GPXZ et raccords fondus"
+      "Vos propres fichiers : nuages de points LAZ/LAS, GeoTIFF, ASC, GML/XML (aussi zippés), superposés et reprojetés, trous comblés par le global 30 m ou GPXZ et raccords fondus"
     ],
     "previewTitle": "Aperçu 3D",
     "previewItems": [
@@ -674,7 +675,7 @@
     ],
     "resolutionTitle": "Résolution",
     "resolutionStrong": "Tailles de sortie de 512 à 16384 px, à n'importe quelle échelle de traitement (m/px).",
-    "resolutionBody": "À 1 m/px, cela couvre de 0,26 km² à 268 km². L'élévation Standard 30 m est suréchantillonnée et ses routes lissées automatiquement ; USGS, GPXZ, NMT et vos fichiers gardent leur vrai détail.",
+    "resolutionBody": "À 1 m/px, cela couvre de 0,26 km² à 268 km². L'élévation globale 30 m est suréchantillonnée et ses routes lissées automatiquement ; USGS, GPXZ, NMT et vos fichiers gardent leur vrai détail.",
     "batchTitle": "Mode par lot",
     "batchIntro": "Traitez de grandes zones sous forme de grille de tuiles (jusqu'à 20 x 20). Chaque tuile est générée à son tour et ses exports sélectionnés sont regroupés dans son propre ZIP. Fonctionnalités :",
     "batchItems": [
@@ -832,7 +833,7 @@
       "src": [
         {
           "name": "Tuiles de terrain AWS",
-          "desc": "Élévation SRTM 30 m mondiale (encodage Terrarium en Z15)"
+          "desc": "Élévation globale 30 m, surtout SRTM (encodage Terrarium en z15) : le relais là où il n'y a pas de lidar"
         },
         {
           "name": "Mapterhorn",
@@ -979,8 +980,8 @@
       "fetchOsm": "Échec de la récupération des données OSM.",
       "osmUnavailable": "Les serveurs OpenStreetMap ne répondent pas pour le moment : le terrain a été généré sans routes, bâtiments ni autres éléments de carte. Réessayez dans quelques minutes.",
       "fetchTerrain": "Échec de la récupération des données de terrain. La zone demandée est peut-être trop grande ou le service est indisponible.",
-      "usgsFallback": "Les données USGS 1m pour cette zone étaient absentes ou corrompues. Bascule vers le jeu de données Terrarium Standard.\n\nLa sortie reste sur la grille de traitement actuelle de l'application.",
-      "kron86Fallback": "Les données NMT EVRF2007 ne sont disponibles que pour les tuiles prises en charge en Pologne. Bascule vers le jeu de données Terrarium Standard."
+      "usgsFallback": "Les données USGS 1m pour cette zone étaient absentes ou corrompues. Bascule vers le jeu de données global 30 m.\n\nLa sortie reste sur la grille de traitement actuelle de l'application.",
+      "kron86Fallback": "Les données NMT EVRF2007 ne sont disponibles que pour les tuiles prises en charge en Pologne. Bascule vers le jeu de données global 30 m."
     }
   },
   "support": {
@@ -1138,8 +1139,8 @@
     "area": "Zone",
     "areaValue": "{px} px à {mpp} m/px ({km} km de large)",
     "elevation": "Élévation",
-    "source_default": "Standard 30 m",
-    "source_mapterhorn": "Mapterhorn (lidar gratuit)",
+    "source_default": "Global 30 m uniquement",
+    "source_mapterhorn": "Meilleur gratuit (lidar + global 30 m)",
     "source_none": "Plat",
     "source_kron86": "NMT EVRF2007 (Pologne)",
     "source_usgs": "USGS 1 m",

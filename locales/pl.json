@@ -58,21 +58,22 @@
     "searchPlaceholder": "Wyszukaj lokalizację...",
     "noLocationsFound": "Nie znaleziono lokalizacji dla „{query}”",
     "elevationDataSource": "Źródło danych wysokościowych",
-    "standard30m": "Standardowa (30m globalnie)",
-    "mapterhornFree": "Mapterhorn (darmowy lidar)",
-    "standardDescription": "Amazon Terrarium (SRTM). Niezawodne pokrycie globalne. Dobre do ogólnego terenu.",
-    "mapterhornDescription": "Darmowy lidar tam, gdzie istnieje krajowy pomiar (duża część Europy, Japonia, Australia, Nowa Zelandia, części USA i Kanady); w pozostałych miejscach Standardowa 30 m. Klucz nie jest potrzebny.",
+    "standard30m": "Tylko globalne 30 m",
+    "mapterhornFree": "Najlepsze darmowe (lidar + globalne 30 m)",
+    "standardDescription": "AWS Terrain Tiles (głównie SRTM). Używane automatycznie tam, gdzie nie ma lidaru; wybierz, by używać ich wszędzie.",
+    "mapterhornDescription": "Darmowy lidar z Mapterhorn tam, gdzie istnieje krajowy pomiar (duża część Europy, Japonia, Australia, Nowa Zelandia, części USA i Kanady); w pozostałych miejscach globalne 30 m. Klucz nie jest potrzebny.",
     "hintFreeLidar": "Darmowy lidar (~{res} m) pokrywa {pct}% tego obszaru.",
     "hintUseFreeLidar": "Użyj",
     "hintMhFull": "Lidar (~{res} m) pokrywa cały obszar.",
-    "hintMhPartial": "Lidar (~{res} m) pokrywa {pct}% obszaru; resztę uzupełnia Standardowa 30 m.",
-    "hintMhNone": "Brak darmowego lidaru w tym miejscu: zostanie użyta Standardowa 30 m.",
+    "hintMhPartial": "Lidar (~{res} m) pokrywa {pct}% obszaru; resztę uzupełniają globalne 30 m.",
+    "hintMhNone": "Brak darmowego lidaru w tym miejscu: zostaną użyte globalne 30 m.",
     "hintChecking": "Szukam darmowego lidaru w tym miejscu…",
     "gpxzCheckHere": "Sprawdź GPXZ tutaj (1 zapytanie)",
     "gpxzHere": "najlepsza {res} m ({sources})",
     "gpxzHereFailed": "nie udało się sprawdzić",
     "compareHere": "Porównaj źródła tutaj",
     "compareHide": "Ukryj porównanie",
+    "compareGlobal30": "Globalne 30 m",
     "compareAddGpxz": "Dodaj GPXZ (1 zapytanie)",
     "compareNeedsKey": "wymaga klucza GPXZ",
     "compareNoLidar": "brak lidaru",
@@ -84,11 +85,11 @@
     "usgs1m": "USGS 1m DEM (tylko USA)",
     "online": "ONLINE",
     "offline": "OFFLINE",
-    "usgsDescription": "Dane wysokiej precyzji dla USA. Jeśli danych brakuje lub są uszkodzone, używane jest źródło standardowe.",
+    "usgsDescription": "Dane wysokiej precyzji dla USA. Tam, gdzie danych brakuje lub są uszkodzone, używane są globalne 30 m.",
     "kron86Poland": "NMT EVRF2007 (tylko Polska)",
     "outsideCoverage": "poza zasięgiem",
-    "selectedSourceOutsideCoverage": "To źródło nie obejmuje obszaru na mapie, więc zostanie użyte źródło standardowe.",
-    "kron86Description": "Wysokości w wysokiej rozdzielczości dla Polski (GUGiK). Tam, gdzie brakuje kafli, używane jest źródło standardowe.",
+    "selectedSourceOutsideCoverage": "To źródło nie obejmuje obszaru na mapie, więc zostaną użyte globalne 30 m.",
+    "kron86Description": "Dane wysokościowe wysokiej rozdzielczości dla Polski (GUGiK). Tam, gdzie brakuje kafli, używane są globalne 30 m.",
     "gpxzPremium": "GPXZ (globalny premium)",
     "gpxzDescription": "Dane globalne najwyższej jakości. Wymaga klucza API.",
     "checkCoverage": "Sprawdź zasięg",
@@ -261,7 +262,7 @@
     "layerMoveDown": "Niższy priorytet",
     "layersHelp": "Twój plik zawiera kilka nalotów. Górny jest używany wszędzie tam, gdzie ma dane; każdy niższy wypełnia to, co poprzednie zostawiły puste. Zmień kolejność, aby zdecydować, który wygrywa przy nakładaniu — domyślnie najnowszy pierwszy.",
     "fillGapsWith": "Wypełnij luki",
-    "gapFillStandard": "Standardowy zbiór wysokości",
+    "gapFillStandard": "Globalne dane wysokości 30 m",
     "gapFillGpxz": "GPXZ (klucz API)",
     "gapFillNone": "Niczym — zostaw luki",
     "gapFillStandardHint": "To, czego nie pokrywają Twoje warstwy, pochodzi ze zbioru globalnego, dopasowane wysokością do Twoich danych na styku.",
@@ -627,7 +628,7 @@
     "title": "Zastrzeżenie dotyczące dokładności danych",
     "lead": "Pamiętaj, że wszystkie dane terenu, mapy wysokości i modele 3D wygenerowane przez MapNG są szacunkami opartymi na dostępnych danych wysokościowych, satelitarnych i OpenStreetMap, więc są tylko tak dobre jak te źródła.",
     "resolutionTitle": "Rozdzielczość i skala",
-    "resolutionBody": "Mapy wysokości są eksportowane z wybraną rozdzielczością przetwarzania, aby zachować spójną skalę w silnikach gier. Przy zestawie Standard (30m) teren nadal jest powiększany, więc pozostaje gładszy i mniej szczegółowy niż natywne źródła wysokiej rozdzielczości, takie jak USGS lub GPXZ.",
+    "resolutionBody": "Mapy wysokości są eksportowane z wybraną rozdzielczością przetwarzania, aby zachować spójną skalę w silnikach gier. Przy globalnym zestawie 30 m teren nadal jest powiększany, więc pozostaje gładszy i mniej szczegółowy niż natywne źródła wysokiej rozdzielczości, takie jak USGS lub GPXZ.",
     "usage": "To narzędzie służy do modowania i twórczego użytku. Nie należy go używać do nawigacji, prac inżynierskich ani krytycznego planowania w świecie rzeczywistym.",
     "confirm": "Rozumiem"
   },
@@ -639,13 +640,13 @@
     "whatBody": "Wybierz miejsce i źródło wysokości, wygeneruj teren i sprawdź go w podglądzie 3D. Następnie wyeksportuj kompletny poziom BeamNG jako ZIP, zbudowany z prawdziwych danych wysokościowych i OpenStreetMap, albo przenieś dane GeoTIFF i GeoJSON do własnej pracy. Tryb wsadowy przetwarza całe siatki kafelków i potrafi złożyć je w jeden duży poziom.",
     "elevationTitle": "Źródła wysokości",
     "elevationItems": [
-      "Standard 30 m globalny (AWS Terrarium / SRTM), z drogami automatycznie wygładzanymi i wyrównywanymi oraz rzekami poniżej brzegów",
-      "Mapterhorn: darmowy lidar tam, gdzie istnieje krajowy pomiar (duża część Europy, Japonia, Australia, Nowa Zelandia, części USA i Kanady), w pozostałych miejscach Standardowa 30 m; bez klucza",
+      "Globalne 30 m (AWS Terrain Tiles, głównie SRTM): zastępstwo tam, gdzie nie ma lidaru, lub samodzielnie; drogi automatycznie wygładzane i wyrównywane, rzeki poniżej brzegów",
+      "Najlepsze darmowe, domyślnie: darmowy lidar z Mapterhorn tam, gdzie istnieje krajowy pomiar (duża część Europy, Japonia, Australia, Nowa Zelandia, części USA i Kanady), w pozostałych miejscach globalne 30 m; bez klucza",
       "USGS 1 m DEM (USA: CONUS, Alaska, Hawaje)",
       "NMT EVRF2007 (Polska, kafelki GUGiK wysokiej rozdzielczości)",
       "GPXZ (globalna wysoka rozdzielczość, z własnym kluczem API; szybciej w planach płatnych)",
       "Płaski teren",
-      "Własne pliki: chmury punktów LAZ/LAS, GeoTIFF, ASC, GML/XML (także spakowane w ZIP), warstwowo i z reprojekcją, luki uzupełniane ze Standard lub GPXZ, z wygładzonymi szwami"
+      "Własne pliki: chmury punktów LAZ/LAS, GeoTIFF, ASC, GML/XML (także spakowane w ZIP), warstwowo i z reprojekcją, luki uzupełniane z globalnych 30 m lub GPXZ, z wygładzonymi szwami"
     ],
     "previewTitle": "Podgląd 3D",
     "previewItems": [
@@ -674,7 +675,7 @@
     ],
     "resolutionTitle": "Rozdzielczość",
     "resolutionStrong": "Rozmiary wyjściowe od 512 do 16384 px przy dowolnej skali przetwarzania (m/px).",
-    "resolutionBody": "Przy 1 m/px to od 0,26 km² do 268 km². Dane Standard 30 m są nadpróbkowane, a ich drogi automatycznie wygładzane; USGS, GPXZ, NMT i własne pliki zachowują prawdziwe szczegóły.",
+    "resolutionBody": "Przy 1 m/px to od 0,26 km² do 268 km². Globalne dane 30 m są nadpróbkowane, a ich drogi automatycznie wygładzane; USGS, GPXZ, NMT i własne pliki zachowują prawdziwe szczegóły.",
     "batchTitle": "Tryb zadań wsadowych",
     "batchIntro": "Przetwarzaj duże obszary jako siatkę kafelków (do 20 x 20). Każdy kafelek jest generowany po kolei, a wybrane eksporty trafiają do jego własnego ZIP. Funkcje:",
     "batchItems": [
@@ -832,7 +833,7 @@
       "src": [
         {
           "name": "Kafelki terenu AWS",
-          "desc": "Globalne wysokości SRTM 30m (kodowanie Terrarium na Z15)"
+          "desc": "Globalne dane wysokości 30 m, głównie SRTM (kodowanie Terrarium na z15): zastępstwo tam, gdzie nie ma lidaru"
         },
         {
           "name": "Mapterhorn",
@@ -979,8 +980,8 @@
       "fetchOsm": "Nie udało się pobrać danych OSM.",
       "osmUnavailable": "Serwery OpenStreetMap obecnie nie odpowiadają, więc teren wygenerowano bez dróg, budynków i innych obiektów mapy. Spróbuj ponownie za kilka minut.",
       "fetchTerrain": "Nie udało się pobrać danych terenu. Żądany obszar może być zbyt duży lub usługa jest niedostępna.",
-      "usgsFallback": "Dla tego obszaru brakowało danych USGS 1m lub były uszkodzone. Używany jest standardowy zestaw danych Terrarium.\n\nWyjście pozostaje na obecnej siatce przetwarzania aplikacji.",
-      "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do standardowego zestawu danych Terrarium."
+      "usgsFallback": "Dla tego obszaru brakowało danych USGS 1m lub były uszkodzone. Używany jest globalny zestaw danych 30 m.\n\nWyjście pozostaje na obecnej siatce przetwarzania aplikacji.",
+      "kron86Fallback": "Dane NMT EVRF2007 są dostępne tylko dla obsługiwanych kafli w Polsce. Powrót do globalnego zestawu danych 30 m."
     }
   },
   "support": {
@@ -1138,8 +1139,8 @@
     "area": "Obszar",
     "areaValue": "{px} px przy {mpp} m/px ({km} km szerokości)",
     "elevation": "Wysokości",
-    "source_default": "Standard 30 m",
-    "source_mapterhorn": "Mapterhorn (darmowy lidar)",
+    "source_default": "Tylko globalne 30 m",
+    "source_mapterhorn": "Najlepsze darmowe (lidar + globalne 30 m)",
     "source_none": "Płaski",
     "source_kron86": "NMT EVRF2007 (Polska)",
     "source_usgs": "USGS 1 m",

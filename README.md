@@ -36,7 +36,7 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 ## Highlights
 
 - **Playable BeamNG level ZIP** for BeamNG.drive 0.40, from `512` up to `16384` px, at any processing scale (m/px)
-- **Elevation sources:** Standard 30 m global, USGS 1 m (USA), NMT EVRF2007 (Poland), GPXZ (with your own API key), flat, and your own LAZ/LAS, GeoTIFF, ASC and GML/XML uploads, also zipped (layered, reprojected, gaps filled from Standard or GPXZ)
+- **Elevation sources:** Best free (the default: Mapterhorn's free lidar where a national survey exists, the global 30 m elsewhere), Global 30 m only (AWS Terrain Tiles), USGS 1 m (USA), NMT EVRF2007 (Poland), GPXZ (with your own API key), flat, and your own LAZ/LAS, GeoTIFF, ASC and GML/XML uploads, also zipped (layered, reprojected, gaps filled from the global 30 m or GPXZ)
 - **Terrain:** materials painted from OSM land use, a 2× satellite base texture with a touch-up painter, and a surrounding backdrop
 - **Regional look:** grass, ground cover, rocks, water and trees chosen from the location (no biome to pick)
 - **Buildings** textured with BeamNG's own facades and roofs
@@ -63,7 +63,7 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **Levels across the date line** (Fiji, the Aleutians, Chukotka) now generate and export both sides: every download is split at 180° and stitched back together, and broken free-elevation tiles along the line are repaired
 - **Export hotspots** are a soft glow zoomed out and simple dots up close
 - **Water on the Game texture** comes straight from the satellite image instead of a blue paint
-- **Creeks and rivers on the Standard 30 m source** no longer stand on a ridge: along wooded water the free data measures the treetops, so water is now kept below its banks
+- **Creeks and rivers on the global 30 m source** no longer stand on a ridge: along wooded water the free data measures the treetops, so water is now kept below its banks
 - **Expand all / Collapse all** for the settings, in single-tile and batch mode
 - **MapNG's own OpenStreetMap copy** is growing toward the whole planet: most of the US west of the Mississippi and south of 41°N, Mexico and Central America, Hawaii and the Pacific, the Great Lakes, New England and eastern Canada, Utah and Florida are live, with more regions on the way
 
@@ -137,8 +137,8 @@ This helps keep community resource hubs focused on curated, polished releases wh
 
 | Source | Purpose |
 |---|---|
-| AWS Terrarium / SRTM | Standard global elevation |
-| Mapterhorn | Free lidar where a national survey exists (open-data sources, mapterhorn.com/attribution), Standard 30 m elsewhere |
+| AWS Terrain Tiles (mostly SRTM) | Global 30 m elevation: the fallback where there's no lidar |
+| Mapterhorn | Free lidar where a national survey exists (open-data sources, mapterhorn.com/attribution); the default, with the global 30 m elsewhere |
 | USGS TNM Access API | 1 m US elevation where available |
 | GUGiK NMT EVRF2007 (Poland) | High-resolution Poland elevation tiles |
 | GPXZ | Optional higher-resolution elevation, with your own API key |
