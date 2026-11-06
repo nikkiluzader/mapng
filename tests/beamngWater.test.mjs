@@ -247,3 +247,28 @@ test('lake beds: a bank inside the outline is left, no wall along the shore', as
   // (the old cut took the whole 30 m of bank inside the outline down to the bed)
   assert.ok(at(29, 0) > 30, 'the top of the bank inside the outline stays');
 });
+
+test('dams: a dam the ground model took out is filled back to its crest; a weir across a river is left', async () => {
+  const { planLakes, planDams, fillDams } = await import('../services/beamngWater.js');
+  // 200 m grid at 1 m: a gorge along x (floor at 0 m, walls rising to 100 m
+  // past |y| = 30), a lake south of y = -10 at 80 m held by a dam across the
+  // gorge between y = -10 and 10 whose ground the survey removed (gorge floor)
+  const N = 201; const SIZE = 200;
+  const ground = (x, y) => (Math.abs(x) > 30 ? 100 : y < -10 ? 80 : Math.abs(x) * 0.5);
+  const hm = new Float32Array(N * N);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) hm[r * N + c] = ground((c / (N - 1) - 0.5) * SIZE, (0.5 - r / (N - 1)) * SIZE);
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+  const feat = (ring, tags) => ({ type: 'water', tags, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) });
+  const toWorld = (lat, lng) => [lng, lat];
+  const lakePlan = planLakes({ features: [feat([[-30, -90], [30, -90], [30, -11], [-30, -11], [-30, -90]], { natural: 'water', water: 'reservoir' })], toWorld, heightAt: at });
+  const dam = feat([[-34, -10], [34, -10], [34, 10], [-34, 10], [-34, -10]], { waterway: 'dam', name: 'Test dam' });
+  const weir = feat([[-30, 60], [30, 60]], { waterway: 'dam' });
+  const dams = planDams({ features: [dam, weir], toWorld, heightAt: at, lakes: lakePlan.lakes });
+  assert.equal(dams.length, 1, 'the weir across the river (no lake) is left');
+  assert.ok(dams[0].crest >= 81.5 && dams[0].crest <= 100, `crest ${dams[0].crest}`);
+  fillDams(dams, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 }).apply((idx, v) => { hm[idx] = v; });
+  assert.ok(Math.abs(at(0, 0) - dams[0].crest) < 0.01, 'the gorge is filled across the dam');
+  assert.equal(at(0, 40), 0, 'downstream of the dam untouched');
+  assert.equal(at(0, 60), 0, 'the weir untouched');
+});

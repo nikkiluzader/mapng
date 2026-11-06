@@ -701,3 +701,94 @@ export function fillRemnants(heightMap, width, height, lowered, { rounds = 2, ke
   }
   return { pixels: edits.size, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
 }
+
+// ── Dams ─────────────────────────────────────────────────────────────────────
+// A lidar ground model takes man-made structures out, a dam among them: the
+// Barrage du Chevril (Tignes) came out as its gorge, 110 m under the lake it
+// holds back, the water ending at a cut through the middle of the dam. Each
+// OSM dam is filled back to its crest: an outline (waterway=dam drawn as an
+// area) wherever it stands; a line only where it holds a lake back (a
+// reservoir dam drawn as a line; a weir across a river is left, the river
+// runs over it). The crest: the ground along the outline where the dam meets
+// the rock (its high ends), never under the lake it holds back. Ground is only
+// raised.
+const DAM_LINE_HALF_M = 4;        // a dam drawn as a line: its half width
+const DAM_LAKE_NEAR_M = 40;       // a line this close to a lake holds it back
+const DAM_FREEBOARD_M = 1.5;      // the crest at least this over the lake
+
+const isClosedRing = (g) => g.length > 3 && Math.hypot(g[0][0] - g[g.length - 1][0], g[0][1] - g[g.length - 1][1]) < 0.5;
+// a line as a thin polygon (its two sides joined at the ends)
+function bufferLine(pts, half) {
+  const left = []; const right = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)]; const b = pts[Math.min(pts.length - 1, i + 1)];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
+    left.push([pts[i][0] + nx * half, pts[i][1] + ny * half]);
+    right.push([pts[i][0] - nx * half, pts[i][1] - ny * half]);
+  }
+  const ring = [...left, ...right.reverse()];
+  ring.push(ring[0]);
+  return ring;
+}
+const sampleRing = (ring, step) => {
+  const out = [];
+  for (let i = 0; i < ring.length - 1; i++) {
+    const [ax, ay] = ring[i]; const [bx, by] = ring[i + 1];
+    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) / step));
+    for (let k = 0; k < n; k++) out.push([ax + ((bx - ax) * k) / n, ay + ((by - ay) * k) / n]);
+  }
+  return out;
+};
+
+/**
+ * The dams to rebuild: [{ poly, crest, name }]. features: OSM features
+ * (dams come as type 'water', waterway=dam); toWorld(lat, lng) -> [x, y];
+ * heightAt(x, y) the ground; lakes: planLakes' [{ poly, level }].
+ */
+export function planDams({ features = [], toWorld, heightAt, lakes = [] }) {
+  const dams = [];
+  for (const f of features) {
+    const t = f.tags || {};
+    if (norm(t.waterway) !== 'dam' || !(f.geometry?.length > 1)) continue;
+    const pts = f.geometry.map((p) => toWorld(p.lat, p.lng));
+    const area = isClosedRing(pts);
+    // the lakes beside it, and the highest of their levels
+    const near = lakes.filter(({ poly }) => pts.some(([x, y]) => poly.contains(x, y) || Math.min(distToRing(x, y, poly.outer)) < DAM_LAKE_NEAR_M));
+    const lakeLevel = near.length ? Math.max(...near.map((l) => l.level)) : null;
+    if (!area && lakeLevel === null) continue;   // a weir across a river
+    const ring = area ? pts : bufferLine(pts, Number.parseFloat(t.width) / 2 || DAM_LINE_HALF_M);
+    const poly = makePolygon(ring);
+    // where it meets the rock: the high part of the ground along its outline
+    const along = sampleRing(ring, 2).map(([x, y]) => heightAt(x, y)).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!along.length) continue;
+    const ends = along[Math.min(along.length - 1, Math.floor(along.length * 0.85))];
+    const crest = Math.min(along[along.length - 1], Math.max(ends, lakeLevel !== null ? lakeLevel + DAM_FREEBOARD_M : -Infinity));
+    dams.push({ poly, crest, name: t.name || null });
+  }
+  return dams;
+}
+
+/**
+ * Terrain edits that fill each dam to its crest (grid as carveLakeBeds).
+ * Returns { pixels, apply(set) }: set(idx, raw).
+ */
+export function fillDams(dams, grid) {
+  const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const edits = new Map();
+  for (const { poly, crest } of dams || []) {
+    const [x0, y0, x1, y1] = poly.box;
+    const [c0, r0] = toPixel(x0, y1); const [c1, r1] = toPixel(x1, y0);
+    for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
+      for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+        const [x, y] = toWorld(c, r);
+        if (!poly.contains(x, y)) continue;
+        const idx = r * width + c;
+        if (heightMap[idx] - minHeight < crest) edits.set(idx, Math.max(edits.get(idx) ?? -Infinity, crest + minHeight));
+      }
+    }
+  }
+  return { pixels: edits.size, apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+}

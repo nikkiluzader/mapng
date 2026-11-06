@@ -17,7 +17,7 @@ import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
 import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
-import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, planLakes, planRivers } from './beamngWater.js';
+import { carveLakeBeds, carveWaterUnderDecks, fillDams, fillRemnants, levelUnderDecks, planDams, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
@@ -6946,7 +6946,7 @@ function shapingReportLines(sh, section) {
   lines.push(`- At bridges over water and valleys (approach embankments, abutment fill, ground kept clear under the deck): ${onOff(sh.bridges)}`);
   lines.push(`- At overpasses over roads (the same, for decks over another road): ${onOff(sh.overpasses)}`);
   lines.push(`- At tunnels (portal cuttings, headwall backfill, cut-and-cover cover): ${onOff(sh.tunnels)} (portal holes always open: they change no height)`);
-  lines.push(`- Sidewalks, lake beds and car parks (ground under curbs and slabs, lake beds, multi-storey car park decks): ${onOff(sh.extras)}`);
+  lines.push(`- Sidewalks, lake beds, dams and car parks (ground under curbs and slabs, lake beds, dams the elevation data left out, multi-storey car park decks): ${onOff(sh.extras)}`);
   lines.push('', 'What the switches did here');
   const p = sh.plan;
   if (p) {
@@ -12188,6 +12188,23 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const hmLake = heightMapEditor(exportTerrainData);
       beds.apply((idx, v) => hmLake.set(idx, v));
       lakePlan.stats.bedPixels = beds.pixels;
+      // Dams the elevation data took out (a lidar ground model removes them
+      // like bridges): filled back to their crests (services/beamngWater.js)
+      if (shapeExtras) {
+        const dams = planDams({
+          features: exportTerrainData.osmFeatures || [],
+          toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
+          heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+          lakes: lakePlan.lakes,
+        });
+        const filled = fillDams(dams, {
+          heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+          worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
+        });
+        filled.apply((idx, v) => hmLake.set(idx, v));
+        lakePlan.stats.damPixels = filled.pixels;
+        if (filled.pixels) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Dams: ${dams.length} rebuilt to their crests (${dams.filter((d) => d.name).map((d) => d.name).join(', ') || 'unnamed'}), ${filled.pixels} terrain points raised.`);
+      }
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds skipped: ${err?.message || err}`);
       lakePlan = null;
