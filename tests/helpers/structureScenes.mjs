@@ -9,11 +9,14 @@ const SQ = SIZE / (N - 1);
 const DEG = SIZE / 111320;
 
 const ll = (x, y) => ({ lat: (y / SIZE) * DEG, lng: (x / SIZE) * DEG });
+export const sceneWay = (id, pts, tags) => ({ id: String(id), type: 'road', geometry: pts.map(([x, y]) => ll(x, y)), tags });
 const way = (id, pts, tags) => ({ id: String(id), type: 'road', geometry: pts.map(([x, y]) => ll(x, y)), tags });
 const water = (id, pts, tags) => ({ id: String(id), type: 'water', geometry: pts.map(([x, y]) => ll(x, y)), tags });
 
 // terrain from height(x, y), world metres
-function terrain(height, features) {
+// (coarse: the scene stands for the global 30 m, which smooths a cut-and-cover
+// tunnel's ramps away; fine data has them in the ground)
+function terrain(height, features, { coarse = false } = {}) {
   const hm = new Float32Array(N * N);
   let min = Infinity; let max = -Infinity;
   for (let r = 0; r < N; r++) {
@@ -30,10 +33,13 @@ function terrain(height, features) {
     bounds: { south: -DEG / 2, north: DEG / 2, west: -DEG / 2, east: DEG / 2 },
     roadRules: { countryCode: 'US', region: 'Americas' },
     osmFeatures: features,
+    ...(coarse ? { coarseElevation: true } : {}),
   };
 }
 
 const flat = () => 10;
+
+export { terrain as sceneTerrain };
 
 export const STRUCTURE_SCENES = [
   {
@@ -152,7 +158,7 @@ export const STRUCTURE_SCENES = [
       way(2, [[-150, 0], [150, 0]], { highway: 'trunk', oneway: 'yes', tunnel: 'yes', layer: '-1' }),
       way(3, [[150, 0], [450, 0]], { highway: 'trunk', oneway: 'yes' }),
       ...[-100, -50, 0, 50, 100].map((x, i) => way(10 + i, [[x, -300], [x, 300]], { highway: 'residential' })),
-    ]),
+    ], { coarse: true }),
   },
   {
     name: 'ramp joint between decks of different layers',
@@ -180,7 +186,7 @@ export const STRUCTURE_SCENES = [
       way(1, [[-400, 0], [-120, 0]], { highway: 'secondary' }),
       way(2, [[-120, 0], [120, 0]], { highway: 'secondary', tunnel: 'yes', layer: '-1' }),
       way(3, [[120, 0], [400, 0]], { highway: 'secondary' }),
-    ]),
+    ], { coarse: true }),
   },
   {
     name: 'deck running off the map edge',

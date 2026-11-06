@@ -201,3 +201,27 @@ test('a plain deck over a road: a ditch beside the road does not hold it down on
   const noCross = simpleSpans({ edges: graph.edges }, new Set([1])).pins.find(([k, i]) => k === 1 && i === 12);
   assert.ok(noCross[2] - 9 < 1.5, 'with nothing under it, the straight line from rim to rim');
 });
+
+test('cut and cover on fine data: built where its ramps are in the survey, left on the ground where the data shows the road at grade', async () => {
+  const { runStructureScene, sceneTerrain, sceneWay } = await import('./helpers/structureScenes.mjs');
+  const roads = [
+    sceneWay(1, [[-450, 0], [-150, 0]], { highway: 'trunk' }),
+    sceneWay(2, [[-150, 0], [150, 0]], { highway: 'trunk', tunnel: 'yes', layer: '-1' }),
+    sceneWay(3, [[150, 0], [450, 0]], { highway: 'trunk' }),
+    sceneWay(10, [[0, -300], [0, 300]], { highway: 'residential' }),
+  ];
+  // the ramps in the survey: the road's trench dropping 7 m over 120 m to each portal, 12 m wide
+  const ramps = (x, y) => {
+    if (Math.abs(y) > 6) return 10;
+    const d = Math.abs(x);
+    return d >= 270 ? 10 : d > 150 ? 10 - 7 * (270 - d) / 120 : 10;
+  };
+  const quiet = console.log; console.log = () => {};
+  let withRamps; let atGrade;
+  try {
+    withRamps = await runStructureScene({ name: 'fine cut-and-cover with ramps', build: () => sceneTerrain(ramps, roads) });
+    atGrade = await runStructureScene({ name: 'fine cut-and-cover at grade', build: () => sceneTerrain(() => 10, roads) });
+  } finally { console.log = quiet; }
+  assert.ok(withRamps.summary.tunnels > 0, 'with its ramps in the survey: built');
+  assert.equal(atGrade.summary.tunnels, 0, 'the data shows the road at grade: left on the ground');
+});
