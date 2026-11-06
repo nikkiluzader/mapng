@@ -48,12 +48,22 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **OpenStreetMap data** from MapNG's own copy, growing region by region toward the whole planet (fast and independent of Overpass outages), health-ranked Overpass mirrors elsewhere, or your own Overpass server; **Overture Maps** adds buildings and heights OpenStreetMap is missing, and is the backup source if every Overpass server is down
 - **How heavy is this level?** Before you export, a card rates the level from its size, how far its corners are from the centre (BeamNG starts to jitter past about 30 km) and its building count. It only warns; you can always export
 - **Share your setup:** a short code or link for your settings (works for 24 hours), a long code that never expires, or a file. Whoever opens it sees exactly what it changes first, and your own keys and servers never go with it
-- **Basic and Advanced modes:** Basic builds the BeamNG level with everything the map has. Advanced adds per-category level options (buildings, water, trees, bridges, tunnels, terrain edits), heightmap, texture and 3D model downloads, surrounding tiles, and *Raw terrain*, which uses your elevation exactly as downloaded
+- **A step-by-step control panel:** Location, Sources, Generate, Export (batch: Location, Sources, What you get, Run), with your setup always shown above the buttons
+- **Basic and Advanced modes:** Basic builds the BeamNG level with everything the map has. Advanced adds the Terrain choice (Ready to drive, Custom or Untouched), per-category level options (buildings, water, trees, bridges, tunnels), heightmap, texture and 3D model downloads, and surrounding tiles
+- **Your own OpenStreetMap data:** pull the area straight from openstreetmap.org, or drop in an `.osm` file, when the public servers are down or behind
 - **Batch mode** for tile grids up to 20×20, or a combined level stitched from a 2×2, 4×4 or 8×8 grid
 - Stage-by-stage progress like BeamNG's loading screen, with finished steps and timings, and a detailed `export_report.txt` in every level for troubleshooting
 - 7 languages, light and dark mode
 
 ## What's New (November 2026)
+
+**MapNG 0.2.8** ([update page](https://mapng.com/updates/0.2.8/))
+
+- **A fresh control panel:** four steps (Location, Sources, Generate, Export) with the buttons always at the bottom; batch mode gets the same, with Separate tiles / Combined level in place of Basic/Advanced
+- **One Terrain choice:** Ready to drive, Custom or Untouched, in one place instead of Raw terrain and Terrain edits
+- **Your own OSM data:** Pull, Download or View the area on openstreetmap.org, or drop in an `.osm` file
+- **Smooth, detailed progress** for generating and exporting
+- **Desktop polish:** the window opens as you left it, a reload button, no save dialogs in batch jobs, a new footer, Dark map as its own layer, a one-time delete warning, and combined levels over 16384 px as an Experimental option with clear warnings
 
 **MapNG 0.2.7** ([update page](https://mapng.com/updates/0.2.7/))
 
