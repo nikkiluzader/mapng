@@ -866,6 +866,10 @@
           "desc": "Zweites globales 30-m-Modell (2011–2015, EU/ESA, über Mapterhorn), vom Bodenfilter eingemittelt"
         },
         {
+          "name": "ESA WorldCover",
+          "desc": "Globale Landbedeckung mit 10 m (2021, CC BY 4.0): Bäume werden nur gepflanzt, wo sie Baumbestand zeigt"
+        },
+        {
           "name": "USGS National Map",
           "desc": "1m DEM via TNM Access API (CONUS, Alaska, Hawaii)"
         },

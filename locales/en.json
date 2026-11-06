@@ -866,6 +866,10 @@
           "desc": "Second global 30 m model (2011–2015, EU/ESA, via Mapterhorn), averaged in by the ground filter"
         },
         {
+          "name": "ESA WorldCover",
+          "desc": "Global 10 m land cover (2021, CC BY 4.0): trees are planted only where it sees tree cover"
+        },
+        {
           "name": "USGS National Map",
           "desc": "1m DEM via TNM Access API (CONUS, Alaska, Hawaii)"
         },

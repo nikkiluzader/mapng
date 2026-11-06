@@ -866,6 +866,10 @@
           "desc": "Secondo modello globale a 30 m (2011–2015, UE/ESA, via Mapterhorn), mediato dal filtro del suolo"
         },
         {
+          "name": "ESA WorldCover",
+          "desc": "Copertura del suolo globale a 10 m (2021, CC BY 4.0): gli alberi vengono piantati solo dove mostra copertura arborea"
+        },
+        {
           "name": "USGS National Map",
           "desc": "DEM a 1m tramite API TNM Access (CONUS, Alaska, Hawaii)"
         },

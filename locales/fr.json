@@ -866,6 +866,10 @@
           "desc": "Deuxième modèle mondial à 30 m (2011–2015, UE/ESA, via Mapterhorn), moyenné par le filtre de sol"
         },
         {
+          "name": "ESA WorldCover",
+          "desc": "Occupation du sol mondiale à 10 m (2021, CC BY 4.0) : les arbres ne sont plantés que là où elle voit un couvert arboré"
+        },
+        {
           "name": "USGS National Map",
           "desc": "MNT 1 m via l'API TNM Access (CONUS, Alaska, Hawaï)"
         },

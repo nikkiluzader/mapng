@@ -13,7 +13,7 @@ import { fromUrl } from 'geotiff';
 
 export const WORLDCOVER_BUCKET = 'https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/';
 export const WORLDCOVER_PROXY = '/api/worldcover/';
-export const WORLDCOVER_ATTRIBUTION = 'ESA WorldCover 2021 (© ESA WorldCover project, CC BY 4.0)';
+export const WORLDCOVER_ATTRIBUTION = '© ESA WorldCover project / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium (CC BY 4.0)';
 
 // the map's classes
 export const WC = {

@@ -866,6 +866,10 @@
           "desc": "Segundo modelo global de 30 m (2011–2015, UE/ESA, vía Mapterhorn), promediado por el filtro de suelo"
         },
         {
+          "name": "ESA WorldCover",
+          "desc": "Cobertura del suelo global a 10 m (2021, CC BY 4.0): solo se plantan árboles donde muestra cubierta arbórea"
+        },
+        {
           "name": "USGS National Map",
           "desc": "MDE de 1 m vía TNM Access API (CONUS, Alaska, Hawái)"
         },

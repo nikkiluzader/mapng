@@ -866,6 +866,10 @@
           "desc": "Drugi globalny model 30 m (2011–2015, UE/ESA, przez Mapterhorn), uśredniany przez filtr gruntu"
         },
         {
+          "name": "ESA WorldCover",
+          "desc": "Globalne pokrycie terenu w rozdzielczości 10 m (2021, CC BY 4.0): drzewa sadzone są tylko tam, gdzie widać pokrywę drzew"
+        },
+        {
           "name": "USGS National Map",
           "desc": "1m DEM przez TNM Access API (CONUS, Alaska, Hawaje)"
         },
