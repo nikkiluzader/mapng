@@ -73,3 +73,21 @@ test('a cliff on a curved slope, or two close together, never overshoots its own
   assert.ok(max <= 100 + 1e-3, `peak ${max.toFixed(2)} m above a 100 m top`);
   for (let x = 1; x < W; x++) assert.ok(r.heightMap[100 * W + x] >= r.heightMap[100 * W + x - 1] - 1e-3, `not monotonic at ${x}`);
 });
+
+test('no cliff step where a road crosses the cliff; in place gives the same heights as a copy', async () => {
+  const { sharpenCliffs } = await import('../services/terrainDetail.js');
+  const ramp = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) ramp[y * W + x] = x < 85 ? 100 : x > 115 ? 80 : 100 - (20 * (x - 85)) / 30;
+  const cliff = { type: 'cliff', tags: { natural: 'cliff' }, geometry: [{ lat: lat(190), lng: lng(100) }, { lat: lat(10), lng: lng(100) }] };
+  const road = { type: 'road', tags: { highway: 'track' }, geometry: [{ lat: lat(100), lng: lng(0) }, { lat: lat(100), lng: lng(200) }] };
+  const a = addFineGroundDetail({ heightMap: ramp, width: W, height: H, bounds: B, metersPerPixel: 1, osmFeatures: [cliff, road] });
+  assert.equal(a.stats.cliffs, 1);
+  // on the road the ground is the data's ramp; 60 m along the cliff, the step
+  assert.ok(Math.abs(a.heightMap[100 * W + 95] - ramp[100 * W + 95]) < 0.05, `on the road ${a.heightMap[100 * W + 95].toFixed(2)}`);
+  assert.ok(a.heightMap[40 * W + 95] > 98.5, `away from it ${a.heightMap[40 * W + 95].toFixed(2)}`);
+  const copy = Float32Array.from(ramp);
+  const b = addFineGroundDetail({ heightMap: copy, width: W, height: H, bounds: B, metersPerPixel: 1, osmFeatures: [cliff, road], inPlace: true });
+  assert.equal(b.heightMap, copy);
+  assert.deepEqual(b.heightMap, a.heightMap);
+  assert.ok(sharpenCliffs);
+});

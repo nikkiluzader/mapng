@@ -11575,18 +11575,22 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions, bridge decks and tunnels…`);
     await yield_();
   }
-  // the ground before any grading: where the sea really is (a cut below sea
-  // level is no sea)
-  const sourceHeightMap = exportTerrainData.heightMap;
-  // the global 30 m holds nothing smaller than tens of metres: small relief by land cover, on unbuilt ground only,
-  // before the roads are laid (they level their corridors over it). A copy: the generated data stays as it was.
+  // the global 30 m holds nothing smaller than tens of metres: small relief by land cover and sharpened OSM cliffs,
+  // on unbuilt ground only, before the roads are laid (they level their corridors over it) and before the ground is
+  // taken as the level's own (sourceHeightMap). Never on the generated data itself: on the export's copy.
   let fineDetail = null;
   if (shapeDetail && terrainData?.coarseElevation && exportTerrainData.bounds) {
-    const d = addFineGroundDetail({ heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, bounds: exportTerrainData.bounds, metersPerPixel: squareSize, osmFeatures: exportTerrainData.osmFeatures });
+    // (changed in place when the export already holds its own copy: no second full-size heightmap on 16k maps)
+    const owned = exportTerrainData.heightMap !== terrainData?.heightMap;   // (Vue never proxies typed arrays)
+    const d = addFineGroundDetail({ heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, bounds: exportTerrainData.bounds, metersPerPixel: squareSize, osmFeatures: exportTerrainData.osmFeatures, inPlace: owned });
     exportTerrainData = { ...exportTerrainData, heightMap: d.heightMap };
     fineDetail = d.stats;
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Fine ground detail: ${(d.stats.share * 100).toFixed(0)}% of the terrain, up to ${d.stats.maxAdd.toFixed(2)} m; ${d.stats.cliffs} mapped cliff(s) sharpened.`);
   }
+  // the ground before any grading: where the sea really is (a cut below sea
+  // level is no sea)
+  const sourceHeightMap = exportTerrainData.heightMap;
+
   const decalRoads = includeRoads
     ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null })
     : [];
