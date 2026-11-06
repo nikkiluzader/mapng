@@ -115,8 +115,18 @@
             </p>
           </div>
 
-          <!-- Post-processing failure (heightmap stitch, level ZIP, report) -->
-          <div v-if="finalizeError"
+          <!-- The combined level itself failed: say so plainly (the report may still have downloaded) -->
+          <div v-if="finalizeError && isCombinedLevel && !combinedLevelMade"
+            class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+            <p class="text-sm font-medium text-red-800 dark:text-red-200 flex items-center gap-1.5">
+              <XCircle :size="14" class="text-red-500 flex-shrink-0" />
+              {{ t('batchProgress.combinedFailedTitle') }}
+            </p>
+            <p class="text-xs text-red-700 dark:text-red-300 mt-1 break-words">{{ finalizeError }}</p>
+            <p class="text-xs text-red-600 dark:text-red-400 mt-1">{{ isDesktop ? t('batchProgress.combinedFailedHintDesktop') : t('batchProgress.combinedFailedHint') }}</p>
+          </div>
+          <!-- Post-processing failure (heightmap stitch, report) -->
+          <div v-else-if="finalizeError"
             class="flex items-start gap-2 text-xs bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded p-2">
             <XCircle :size="12" class="text-red-500 mt-0.5 flex-shrink-0" />
             <div>
@@ -125,8 +135,23 @@
             </div>
           </div>
 
+          <!-- Where the desktop app saved the level -->
+          <div v-if="state.combinedSaved" class="text-xs bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded p-2 text-emerald-800 dark:text-emerald-200 break-words">
+            {{ t('batchProgress.savedToMods', { name: state.combinedSaved.filename }) }}
+          </div>
+
+          <!-- The finished job's files, again (a browser may have blocked the automatic downloads) -->
+          <div v-if="jobFiles.length" class="space-y-1.5">
+            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchProgress.filesHint') }}</p>
+            <a v-for="f in jobFiles" :key="f.url" :href="f.url" :download="f.name"
+              class="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100">
+              <span class="flex items-center gap-1.5 min-w-0"><Download :size="13" class="flex-shrink-0" /><span class="truncate">{{ f.name }}</span></span>
+              <span class="text-gray-400 flex-shrink-0">{{ formatSize(f.size) }}</span>
+            </a>
+          </div>
+
           <!-- Combined Level Partial Export Warning -->
-          <div v-if="isCombinedLevelPartial" class="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
+          <div v-if="isCombinedLevelPartial && combinedLevelMade" class="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3">
             <p class="text-sm font-medium text-orange-800 dark:text-orange-200">
               {{ t('batchProgress.combinedLevelPartialTitle') }}
             </p>
@@ -279,9 +304,10 @@ import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   Loader2, Check, X, XCircle, Square, Play, Pause, RotateCcw,
-  CheckCircle2, AlertTriangle, Package,
+  CheckCircle2, AlertTriangle, Package, Download,
 } from 'lucide-vue-next';
-import { estimateTimeRemaining, formatDuration } from '../../services/batchJob';
+import { estimateTimeRemaining, formatDuration, getBatchDownloads } from '../../services/batchJob';
+import { desktopApp } from '../../services/platform/desktop.js';
 import { summarizeStageTimings, buildBatchBenchmarkReport } from '../../services/batchRuntime';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -348,6 +374,12 @@ const finalizePercent = computed(() => {
   return Number.isFinite(pct) ? Math.max(0, Math.min(100, pct)) : null;
 });
 const finalizeError = computed(() => props.state.finalizeError || null);
+const isDesktop = !!desktopApp;
+// (the finished job's files: their names are in the state, their URLs in batchJob)
+const jobFiles = computed(() => (props.state.downloadNames?.length ? getBatchDownloads(props.state.id) : []));
+// the level ZIP was made (downloaded, or saved by the desktop app)
+const combinedLevelMade = computed(() => !!props.state.combinedSaved || jobFiles.value.some((f) => /\.zip$/i.test(f.name)));
+const formatSize = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : bytes >= 1e6 ? `${(bytes / 1e6).toFixed(0)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} KB`);
 
 const isAssembling = computed(() => isRunning.value
   && (isFinalizing.value || (isTerminalByCounts.value && isCombinedLevel.value)));
@@ -514,7 +546,7 @@ const summaryIconClass = computed(() =>
 );
 const summaryTitle = computed(() => {
   if (isJobFailed.value && failedCount.value === 0) return t('batchProgress.summaryJobFailed');
-  if (isCombinedLevelPartial.value) return t('batchProgress.summaryCombinedPartial');
+  if (isCombinedLevelPartial.value && combinedLevelMade.value) return t('batchProgress.summaryCombinedPartial');
   if (failedCount.value > 0) return t('batchProgress.summaryWithErrors');
   if (isCombinedLevel.value) return t('batchProgress.summaryCombinedExported');
   return t('batchProgress.summaryAllExported');
@@ -532,8 +564,10 @@ const summarySubtextClass = computed(() =>
 
 const summarySubtitleText = computed(() => {
   // Only claim the level shipped when nothing failed on the way out.
-  if (isCombinedLevel.value && failedCount.value === 0 && !finalizeError.value) {
-    const name = levelName.value || t('batchProgress.untitledLevel');
+  if (isCombinedLevel.value && failedCount.value === 0 && combinedLevelMade.value) {
+    // (the file as made: a level with no name typed is named after its centre)
+    const zip = props.state.combinedSaved?.filename || jobFiles.value.find((f) => /\.zip$/i.test(f.name))?.name || '';
+    const name = zip.replace(/\.zip$/i, '') || levelName.value || t('batchProgress.untitledLevel');
     return t('batchProgress.summarySubtitleCombinedExported', { name });
   }
   const exported = t('batchProgress.summaryExported', {

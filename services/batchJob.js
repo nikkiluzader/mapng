@@ -33,6 +33,7 @@ import { classifyError, runWithRetry } from './retryPolicy.js';
 import { createTaskQueue, createRateLimiter } from './taskQueues.js';
 import { installBatchFetchCache, clearBatchCache } from './batchCache.js';
 import { getBaseTextureSize } from './baseTextureSize.js';
+import { desktopApp, exportLevelOnDesktop } from './platform/desktop.js';
 
 // ─── Grid Computation ────────────────────────────────────────────────
 
@@ -429,6 +430,10 @@ export function createBatchJobState(config) {
     // to keep reporting progress instead of announcing completion early.
     finalizing: null,
     finalizeError: null,
+    // the finished job's files offered again in the dialog (names only: the
+    // URLs live in jobDownloads), and where the desktop app saved the level
+    downloadNames: [],
+    combinedSaved: null,
     currentTileIndex: -1,
     currentTileId: null,
     tiles,
@@ -484,6 +489,9 @@ const migrateLoadedState = (state) => {
   // was assembling live only in memory.
   state.finalizing = null;
   state.finalizeError = state.finalizeError || null;
+  // (the files' URLs died with the page)
+  state.downloadNames = [];
+  state.combinedSaved = state.combinedSaved || null;
   const fallbackScheduler = deriveSchedulerConfig(state);
   state.scheduler = {
     ...fallbackScheduler,
@@ -559,6 +567,37 @@ function triggerDownload(blob, filename) {
   link.download = filename;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// The finished job's own files (the combined level ZIP, the stitched heightmap,
+// the report): downloaded once at the end, and kept by URL until the next job
+// so the finished dialog can offer them again. A browser may block automatic
+// downloads at the end of a long job (no click to go with them; a second one in
+// a row asks "download multiple files?"), and revoking the URL after a few
+// seconds lost the level whenever that prompt was answered late.
+const jobDownloads = new Map();   // job id -> [{ name, url, size }]
+
+/** The finished job's files, for the dialog: [{ name, url, size }]. */
+export function getBatchDownloads(jobId) {
+  return jobDownloads.get(jobId) || [];
+}
+
+function releaseBatchDownloads() {
+  for (const files of jobDownloads.values()) for (const f of files) URL.revokeObjectURL(f.url);
+  jobDownloads.clear();
+}
+
+function offerJobDownload(state, blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const files = jobDownloads.get(state.id) || [];
+  files.push({ name: filename, url, size: blob.size });
+  jobDownloads.set(state.id, files);
+  // (the dialog watches the names; the URLs never go into the saved state)
+  state.downloadNames = files.map((f) => f.name);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
 }
 
 const formatReportNumber = (value, digits = 3) => {
@@ -696,7 +735,7 @@ function downloadBatchElevationReport(state) {
   const date = new Date().toISOString().slice(0, 10);
   const lat = Number(state?.center?.lat || 0).toFixed(4);
   const lng = Number(state?.center?.lng || 0).toFixed(4);
-  triggerDownload(blob, `MapNG_Batch_Elevation_Report_${date}_${lat}_${lng}.txt`);
+  offerJobDownload(state, blob, `MapNG_Batch_Elevation_Report_${date}_${lat}_${lng}.txt`);
 }
 
 const isJsonMimeType = (mime = '') => {
@@ -1145,7 +1184,7 @@ function downloadCompositeHeightmap(state, composite) {
   const lat = Number(state.center?.lat || 0).toFixed(4);
   const lng = Number(state.center?.lng || 0).toFixed(4);
   const scaledLabel = composite.scale < 1 ? `_scaled_${composite.width}x${composite.height}` : '';
-  triggerDownload(blob, `MapNG_Batch_Heightmap_Grid_${date}_${lat}_${lng}${scaledLabel}.png`);
+  offerJobDownload(state, blob, `MapNG_Batch_Heightmap_Grid_${date}_${lat}_${lng}${scaledLabel}.png`);
 }
 
 // ─── Combined BeamNG Level assembly ──────────────────────────────────────────
@@ -1450,11 +1489,18 @@ async function finalizeCombinedLevel(state, combined, report) {
     const options = buildCombinedExportOptions(state, combined, ({ step, pct }) => {
       report(`Combined level: ${step}`, pct);
     });
-    const { blob, filename } = await exportBeamNGLevel(terrainData, center, options);
-    if (blob instanceof Blob) {
-      report('Downloading combined level ZIP…', 100);
-      triggerDownload(blob, filename || `MapNG_CombinedLevel_${new Date().toISOString().slice(0, 10)}.zip`);
+    if (desktopApp) {
+      // (the desktop app: written into the BeamNG mods folder by its export
+      // runner, which is not held to the window's ~4 GB of memory)
+      const saved = await exportLevelOnDesktop(terrainData, center, options);
+      if (saved?.cancelled) throw new Error('No mods folder was chosen, so the level was not saved.');
+      state.combinedSaved = { path: saved.path || '', filename: saved.filename || '' };
+      return;
     }
+    const { blob, filename } = await exportBeamNGLevel(terrainData, center, options);
+    if (!(blob instanceof Blob)) throw new Error('The level export returned no ZIP.');
+    report('Downloading combined level ZIP…', 100);
+    offerJobDownload(state, blob, filename || `MapNG_CombinedLevel_${new Date().toISOString().slice(0, 10)}.zip`);
   } finally {
     cleanup();
   }
@@ -1849,6 +1895,10 @@ export async function runBatchJob(state, onProgress, onTileComplete, onError, si
 
   if (!state.startedAt) state.startedAt = Date.now();
   state.status = JOB_STATES.RUNNING;
+  // (a run makes its files afresh: the last job's are let go)
+  releaseBatchDownloads();
+  state.downloadNames = [];
+  state.combinedSaved = null;
   sampleMemory(state, { label: 'job_start', force: true });
   checkpoint(state);
 
@@ -1941,13 +1991,8 @@ export async function runBatchJob(state, onProgress, onTileComplete, onError, si
         }
       };
 
-      if (state.totalFailed === 0 && compositeHeightmap?.writtenTiles?.size === state.tiles.length) {
-        await finalizeStep(async () => {
-          finalize('Generating stitched grid heightmap…');
-          await yieldToUi();
-          downloadCompositeHeightmap(state, compositeHeightmap);
-        });
-      }
+      // The level first: when a browser lets only one automatic download through,
+      // it is the one that matters (the others are offered again in the dialog).
       if (combinedLevel?.writtenTiles?.size > 0) {
         await finalizeStep(() => finalizeCombinedLevel(state, combinedLevel, finalize));
         // Canceled or paused while the level was being assembled.
@@ -1956,6 +2001,13 @@ export async function runBatchJob(state, onProgress, onTileComplete, onError, si
           checkpoint(state);
           return;
         }
+      }
+      if (state.totalFailed === 0 && compositeHeightmap?.writtenTiles?.size === state.tiles.length) {
+        await finalizeStep(async () => {
+          finalize('Generating stitched grid heightmap…');
+          await yieldToUi();
+          downloadCompositeHeightmap(state, compositeHeightmap);
+        });
       }
       if (state.totalCompleted > 0) {
         await finalizeStep(async () => {
