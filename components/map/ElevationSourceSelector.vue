@@ -5,8 +5,8 @@
             v-model="localElevationSource"
             class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-brand outline-none cursor-pointer"
         >
-            <option value="default">{{ t('map.standard30m') }}</option>
             <option value="mapterhorn">{{ t('map.mapterhornFree') }}</option>
+            <option value="default">{{ t('map.standard30m') }}</option>
             <option value="none">{{ t('map.flatNone') }}</option>
             <option value="kron86" :disabled="!coverage.kron86 && localElevationSource !== 'kron86'">
               {{ t('map.kron86Poland') }}{{ coverage.kron86 ? '' : ` — ${t('map.outsideCoverage')}` }}

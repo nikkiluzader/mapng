@@ -1,3 +1,4 @@
+import { DEFAULT_ELEVATION_SOURCE } from './elevationDefaults.js';
 export const JOB_STATES = Object.freeze({
   PENDING: 'pending',
   RUNNING: 'running',
@@ -69,7 +70,7 @@ export const normalizeBatchConfig = (config) => {
     tileNames,
     tileOffsets,
     includeOSM: !!config.includeOSM,
-    elevationSource: config.elevationSource || 'default',
+    elevationSource: config.elevationSource || DEFAULT_ELEVATION_SOURCE,
     gpxzApiKey: config.gpxzApiKey || '',
     glbMeshResolution: Number(config.glbMeshResolution || 256),
     performanceProfile: config.performanceProfile || 'balanced',

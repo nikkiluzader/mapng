@@ -253,6 +253,7 @@
 </template>
 
 <script setup>
+import { initialElevationSource } from '../../services/elevationDefaults.js';
 import { withoutPersonal } from '../../services/personalKeys.js';
 import SectionToggleAll from '../base/SectionToggleAll.vue';
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
@@ -361,7 +362,7 @@ const normalizeTileNames = (names, tileCount, cols = gridCols.value) => {
 
 // Settings
 const includeOSM = ref(localStorage.getItem('mapng_batch_osm') !== 'false');
-const elevationSource = ref(localStorage.getItem('mapng_batch_elevation') || 'default');
+const elevationSource = ref(initialElevationSource('mapng_batch_elevation'));
 const gpxzApiKey = ref(localStorage.getItem('mapng_gpxzApiKey') || '');
 const gpxzStatus = ref(null);
 const isCheckingGPXZ = ref(false);

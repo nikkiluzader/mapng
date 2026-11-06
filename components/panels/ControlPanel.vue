@@ -302,6 +302,7 @@
 </template>
 
 <script setup>
+import { DEFAULT_ELEVATION_SOURCE, initialElevationSource } from '../../services/elevationDefaults.js';
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import SectionToggleAll from '../base/SectionToggleAll.vue';
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
@@ -361,7 +362,7 @@ const useGPXZ = ref(false);
 const elevationUnitOverride = ref(localStorage.getItem('mapng_elevationUnitOverride') || 'auto');
 // Which dataset fills the parts of an export the upload does not cover.
 const gapFillSource = ref(normalizeGapFillSource(localStorage.getItem('mapng_gapFillSource')));
-const elevationSource = ref(localStorage.getItem('mapng_elevationSource') || 'default');
+const elevationSource = ref(initialElevationSource('mapng_elevationSource'));
 const gpxzApiKey = ref(localStorage.getItem('mapng_gpxzApiKey') || '');
 const gpxzStatus = ref(null); // { plan, used, limit, remaining, concurrency, valid }
 const isCheckingGPXZ = ref(false);
@@ -433,13 +434,13 @@ const checkGPXZStatus = async () => {
 watch(showCoordinates, (v) => localStorage.setItem('mapng_showCoordinates', String(v)));
 
 // If USGS returns no data the terrain pipeline falls back to global tiles;
-// reflect that in the UI by resetting the source selector to 'default'.
+// reflect that in the UI by resetting the source selector to the default.
 watch(() => props.terrainData, (newData) => {
   if (newData?.usgsFallback) {
-    elevationSource.value = 'default';
+    elevationSource.value = DEFAULT_ELEVATION_SOURCE;
     alert(t('app.error.usgsFallback'));
   } else if (newData?.kron86Fallback) {
-    elevationSource.value = 'default';
+    elevationSource.value = DEFAULT_ELEVATION_SOURCE;
     alert(t('app.error.kron86Fallback'));
   }
 });
