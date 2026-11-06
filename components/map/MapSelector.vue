@@ -14,11 +14,19 @@
       <!-- Base Layers (one world: no copies east or west, services/mapView.js) -->
       <l-tile-layer
         v-if="selectedLayer === 'osm'"
-        :key="osmUrl"
-        :url="osmUrl"
-        :attribution="osmAttribution"
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
         layer-type="base"
-        :options="{ ...ONE_WORLD, maxNativeZoom: osmMaxNativeZoom }"
+        :options="{ ...ONE_WORLD, maxNativeZoom: 19 }"
+      />
+
+      <!-- The dark map: a choice of its own (dark mode no longer swaps the user's map) -->
+      <l-tile-layer
+        v-if="selectedLayer === 'dark'"
+        :url="DARK_URL"
+        :attribution="DARK_ATTRIBUTION"
+        layer-type="base"
+        :options="{ ...ONE_WORLD, maxNativeZoom: 16 }"
       />
 
       <l-tile-layer
@@ -242,6 +250,10 @@
                 <input type="radio" v-model="selectedLayer" value="topo" class="accent-brand" />
                 <span>{{ t('mapSelector.topoMap') }}</span>
             </label>
+            <label :class="PANEL_ROW">
+                <input type="radio" v-model="selectedLayer" value="dark" class="accent-brand" />
+                <span>{{ t('mapSelector.darkMap') }}</span>
+            </label>
 
             <p :class="PANEL_HEADING" class="pt-2">{{ t('mapSelector.groupShow') }}</p>
             <label :class="PANEL_ROW" :title="t('controlPanel.osmCoverageHint')">
@@ -438,15 +450,15 @@ const initialZoom = props.zoom;
 const currentCenter = ref(props.center);
 const currentZoom = ref(props.zoom);
 // Remembered across reloads.
-const MAP_LAYERS = ['osm', 'satellite', 'topo'];
+const MAP_LAYERS = ['osm', 'satellite', 'topo', 'dark'];
 const readStored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeStored = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 const storedLayer = readStored('mapng_mapLayer');
 const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'osm');
-// Names on satellite imagery (default on). The light OSM and topo maps have
-// their own names, and the dark base never does: labels go only where missing.
+// Names on satellite imagery (default on). The OSM and topo maps have their
+// own names, and the dark base never does: labels go only where missing.
 const satelliteNames = ref(readStored('mapng_satelliteLabels') !== 'false');
-const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'osm' && props.isDarkMode));
+const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'dark'));
 watch(selectedLayer, (v) => writeStored('mapng_mapLayer', v));
 const layerPanelOpen = ref(readStored('mapng_layerPanelOpen') !== 'false');
 watch(layerPanelOpen, (v) => writeStored('mapng_layerPanelOpen', String(v)));
@@ -486,21 +498,10 @@ const ESRI_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services';
 const ESRI_LABEL_TILES = 'https://services.arcgisonline.com/ArcGIS/rest/services';
 const ESRI_REFERENCE_ATTRIBUTION = 'Labels &copy; <a href="https://www.esri.com/">Esri</a> and its data providers';
 
-const osmUrl = computed(() => {
-  return props.isDarkMode
-    ? `${ESRI_TILES}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`
-    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-});
-
-// Esri's Canvas basemaps stop at z16 ("Map data not yet available" tiles
-// beyond); Leaflet upscales instead. vue-leaflet only passes this via options.
-const osmMaxNativeZoom = computed(() => (props.isDarkMode ? 16 : 19));
-
-const osmAttribution = computed(() => {
-  return props.isDarkMode
-    ? '&copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-});
+// Esri's dark canvas (keyless), with its names as a layer of their own. It
+// stops at z16 ("Map data not yet available" beyond); Leaflet upscales instead.
+const DARK_URL = `${ESRI_TILES}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`;
+const DARK_ATTRIBUTION = '&copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
 const labelLayers = computed(() => (selectedLayer.value !== 'satellite'
   ? [{ url: `${ESRI_LABEL_TILES}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 16, opacity: 1 }]

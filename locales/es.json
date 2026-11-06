@@ -231,7 +231,8 @@
     "disabledWarning": "Demasiado grande: supera el límite de 16384 px del navegador. Reduce la resolución de las teselas o el tamaño de la cuadrícula.",
     "outputSummary": "{tiles} teselas → un nivel de BeamNG de {dim}×{dim} px",
     "outputHint": "Las teselas se unen tras procesarlas y se exportan como un único ZIP de nivel jugable.",
-    "startCombined": "Crear nivel combinado ({tiles} teselas)"
+    "startCombined": "Crear nivel combinado ({tiles} teselas)",
+    "disabledWarningDesktop": "Demasiado grande: un nivel de MapNG puede tener como máximo 16384 × 16384 px (igual que una tesela suelta). Baja la resolución de tesela o el tamaño de la cuadrícula."
   },
   "upload": {
     "autoDetected": "coordenadas detectadas automáticamente",
@@ -609,7 +610,8 @@
     "satelliteNames": "Mostrar nombres de lugares y calles",
     "groupMap": "Mapa",
     "groupShow": "Mostrar en el mapa",
-    "groupSharing": "Compartir"
+    "groupSharing": "Compartir",
+    "darkMap": "Mapa oscuro"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1038,8 +1040,7 @@
     "savedData": "Datos guardados: se reconstruye sin descargar",
     "noSavedData": "Sin datos guardados: reconstruir descarga la zona de nuevo",
     "delete": "Eliminar",
-    "deleteHint": "Mover este nivel y sus datos guardados a la Papelera",
-    "confirmDelete": "¿Eliminar «{name}»?\n\nEl nivel y sus datos guardados van a la Papelera, desde donde puedes restaurarlos.",
+    "deleteHint": "Mover este nivel y sus datos guardados a la Papelera. Desaparece de BeamNG y de Mis niveles; se puede restaurar desde la Papelera.",
     "rebuiltOffline": "No se descargó nada: se creó con los datos guardados.",
     "rebuiltSomeDownloaded": "{count} archivos no estaban en los datos guardados y se descargaron.",
     "rebuiltFetched": "La zona se descargó de nuevo y se guardó, así que la próxima reconstrucción no tendrá que hacerlo.",
@@ -1050,7 +1051,13 @@
     "showInMods": "Mostrar en la carpeta de mods",
     "showInModsHint": "Abrir la carpeta de mods de BeamNG con el zip de este nivel seleccionado",
     "showData": "Mostrar datos guardados",
-    "showDataHint": "Abrir la carpeta con los datos guardados de este nivel: las descargas en bruto de terreno, satélite, OpenStreetMap y alturas de puentes que usan Actualizar y Modificar. No forma parte del zip del nivel."
+    "showDataHint": "Abrir la carpeta con los datos guardados de este nivel: las descargas en bruto de terreno, satélite, OpenStreetMap y alturas de puentes que usan Actualizar y Modificar. No forma parte del zip del nivel.",
+    "deleteWarnTitle": "Eliminar niveles",
+    "deleteWarnLevel": "¿Eliminar \"{name}\"?",
+    "deleteWarnBody": "Eliminar mueve el ZIP del nivel fuera de tu carpeta de mods de BeamNG, junto con sus datos guardados (de los que Actualizar lo reconstruye), a la Papelera. Desaparece de BeamNG y de Mis niveles; puedes restaurar ambos desde la Papelera.",
+    "deleteWarnOnce": "Esto solo aparece una vez: a partir de ahora Eliminar actúa al momento. Pasa el ratón sobre el botón para volver a leerlo.",
+    "deleteWarnCancel": "Cancelar",
+    "deleteWarnConfirm": "Eliminar"
   },
   "desktopWelcome": {
     "title": "Te damos la bienvenida a MapNG Desktop",

@@ -231,7 +231,8 @@
     "disabledWarning": "Zu groß — überschreitet das Browser-Limit von 16384 px. Senke die Tile-Auflösung oder die Rastergröße.",
     "outputSummary": "{tiles} Tiles → ein BeamNG-Level mit {dim}×{dim} px",
     "outputHint": "Die Tiles werden nach der Verarbeitung zusammengesetzt und als ein einziges spielbares Level-ZIP exportiert.",
-    "startCombined": "Kombiniertes Level erstellen ({tiles} Tiles)"
+    "startCombined": "Kombiniertes Level erstellen ({tiles} Tiles)",
+    "disabledWarningDesktop": "Zu groß: Ein MapNG-Level kann höchstens 16384 × 16384 px groß sein (wie eine einzelne Kachel). Verringere die Kachelauflösung oder die Rastergröße."
   },
   "upload": {
     "autoDetected": "Koordinaten automatisch erkannt",
@@ -609,7 +610,8 @@
     "satelliteNames": "Orts- und Straßennamen zeigen",
     "groupMap": "Karte",
     "groupShow": "Auf der Karte zeigen",
-    "groupSharing": "Teilen"
+    "groupSharing": "Teilen",
+    "darkMap": "Dunkle Karte"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1038,8 +1040,7 @@
     "savedData": "Gespeicherte Daten: Neuerstellung ohne Download",
     "noSavedData": "Keine gespeicherten Daten: Beim Neuerstellen wird das Gebiet erneut geladen",
     "delete": "Löschen",
-    "deleteHint": "Dieses Level und seine gespeicherten Daten in den Papierkorb verschieben",
-    "confirmDelete": "„{name}“ löschen?\n\nDas Level und seine gespeicherten Daten kommen in den Papierkorb, du kannst sie dort wiederherstellen.",
+    "deleteHint": "Dieses Level und seine gespeicherten Daten in den Papierkorb verschieben. Es verschwindet aus BeamNG und „Meine Level“; aus dem Papierkorb wiederherstellbar.",
     "rebuiltOffline": "Nichts wurde heruntergeladen: es entstand aus den gespeicherten Daten.",
     "rebuiltSomeDownloaded": "{count} Dateien fehlten in den gespeicherten Daten und wurden heruntergeladen.",
     "rebuiltFetched": "Das Gebiet wurde erneut geladen und gespeichert, beim nächsten Neuerstellen ist das nicht mehr nötig.",
@@ -1050,7 +1051,13 @@
     "showInMods": "Im Mods-Ordner zeigen",
     "showInModsHint": "BeamNGs Mods-Ordner öffnen, mit der Zip dieses Levels ausgewählt",
     "showData": "Gespeicherte Daten zeigen",
-    "showDataHint": "Den Ordner mit den gespeicherten Daten dieses Levels öffnen: die Rohdaten für Gelände, Satellit, OpenStreetMap und Brückenhöhen, die Aktualisieren und Ändern nutzen. Er gehört nicht zur Level-Zip."
+    "showDataHint": "Den Ordner mit den gespeicherten Daten dieses Levels öffnen: die Rohdaten für Gelände, Satellit, OpenStreetMap und Brückenhöhen, die Aktualisieren und Ändern nutzen. Er gehört nicht zur Level-Zip.",
+    "deleteWarnTitle": "Level löschen",
+    "deleteWarnLevel": "„{name}“ löschen?",
+    "deleteWarnBody": "Löschen verschiebt die ZIP-Datei des Levels aus deinem BeamNG-Mods-Ordner zusammen mit den gespeicherten Daten (aus denen „Aktualisieren“ es neu baut) in den Papierkorb. Es verschwindet aus BeamNG und aus „Meine Level“; beides lässt sich aus dem Papierkorb wiederherstellen.",
+    "deleteWarnOnce": "Das erscheint nur einmal: Ab jetzt löscht „Löschen“ sofort. Fahre mit der Maus über den Knopf, um es erneut zu lesen.",
+    "deleteWarnCancel": "Abbrechen",
+    "deleteWarnConfirm": "Löschen"
   },
   "desktopWelcome": {
     "title": "Willkommen bei MapNG Desktop",

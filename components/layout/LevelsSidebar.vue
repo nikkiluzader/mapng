@@ -156,11 +156,31 @@
         </div>
       </div>
     </div>
+    <!-- Once: what Delete does (afterwards it just deletes; the button's tooltip says the same) -->
+    <Teleport to="body">
+      <div v-if="deleteWarning" class="fixed inset-0 z-[10002] flex items-center justify-center bg-black/60 backdrop-blur-sm" @keydown.esc="answerDeleteWarning(false)">
+        <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-[calc(100vw-2rem)] max-w-md flex flex-col overflow-hidden" role="dialog" aria-modal="true">
+          <div class="px-6 py-4 bg-gradient-to-r from-red-600 to-brand text-white flex items-center gap-2">
+            <Trash2 :size="18" class="shrink-0" />
+            <h2 class="text-base font-bold">{{ t('levels.deleteWarnTitle') }}</h2>
+          </div>
+          <div class="p-6 space-y-3 text-xs leading-relaxed text-gray-700 dark:text-gray-200">
+            <p class="font-semibold">{{ t('levels.deleteWarnLevel', { name: deleteWarning.title }) }}</p>
+            <p>{{ t('levels.deleteWarnBody') }}</p>
+            <p class="text-caption text-gray-500 dark:text-gray-400">{{ t('levels.deleteWarnOnce') }}</p>
+          </div>
+          <div class="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-2">
+            <button type="button" class="px-3 py-1.5 rounded text-xs text-gray-600 dark:text-gray-300 hover:text-brand" @click="answerDeleteWarning(false)">{{ t('levels.deleteWarnCancel') }}</button>
+            <button ref="deleteWarnButton" type="button" class="px-4 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white text-xs font-semibold" @click="answerDeleteWarning(true)">{{ t('levels.deleteWarnConfirm') }}</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </aside>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { FolderOpen, Hammer, HardDrive, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
@@ -245,9 +265,28 @@ async function rebuild(level) {
 
 const cancel = (level) => desktopApp.cancelRebuild(level.levelName);
 
-// To the Recycle Bin / Trash (zip and saved data), after asking
-async function remove(level) {
-  if (!window.confirm(t('levels.confirmDelete', { name: level.title }))) return;
+// To the Recycle Bin / Trash (zip and saved data). The first time, a warning
+// says what that means; after it was confirmed once, Delete just deletes (the
+// button's tooltip keeps the explanation).
+const DELETE_WARNED_KEY = 'mapng_levelDeleteWarned';
+const deleteWarned = ref((() => { try { return localStorage.getItem(DELETE_WARNED_KEY) === 'true'; } catch { return false; } })());
+const deleteWarning = ref(null);   // the level the warning is about
+const deleteWarnButton = ref(null);
+watch(deleteWarnButton, (el) => el?.focus());
+
+function remove(level) {
+  if (!deleteWarned.value) { deleteWarning.value = level; return; }
+  deleteLevel(level);
+}
+function answerDeleteWarning(confirmed) {
+  const level = deleteWarning.value;
+  deleteWarning.value = null;
+  if (!confirmed || !level) return;
+  deleteWarned.value = true;
+  try { localStorage.setItem(DELETE_WARNED_KEY, 'true'); } catch { /* private mode */ }
+  deleteLevel(level);
+}
+async function deleteLevel(level) {
   delete messages[level.levelName];
   try {
     await desktopApp.deleteLevel(level.zipName, level.levelName);

@@ -231,7 +231,8 @@
     "disabledWarning": "Trop grand — dépasse la limite de 16384 px du navigateur. Réduisez la résolution des tuiles ou la taille de la grille.",
     "outputSummary": "{tiles} tuiles → un niveau BeamNG de {dim}×{dim} px",
     "outputHint": "Les tuiles sont assemblées après le traitement, puis exportées en un seul ZIP de niveau jouable.",
-    "startCombined": "Créer le niveau combiné ({tiles} tuiles)"
+    "startCombined": "Créer le niveau combiné ({tiles} tuiles)",
+    "disabledWarningDesktop": "Trop grand : un niveau MapNG fait au plus 16384 × 16384 px (comme une tuile seule). Réduisez la résolution des tuiles ou la taille de la grille."
   },
   "upload": {
     "autoDetected": "coordonnées détectées automatiquement",
@@ -609,7 +610,8 @@
     "satelliteNames": "Afficher les noms de lieux et de rues",
     "groupMap": "Carte",
     "groupShow": "Afficher sur la carte",
-    "groupSharing": "Partage"
+    "groupSharing": "Partage",
+    "darkMap": "Carte sombre"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1038,8 +1040,7 @@
     "savedData": "Données enregistrées : reconstruction sans téléchargement",
     "noSavedData": "Pas de données enregistrées : la reconstruction retélécharge la zone",
     "delete": "Supprimer",
-    "deleteHint": "Mettre ce niveau et ses données enregistrées à la Corbeille",
-    "confirmDelete": "Supprimer « {name} » ?\n\nLe niveau et ses données enregistrées vont à la Corbeille, d'où vous pouvez les restaurer.",
+    "deleteHint": "Déplacer ce niveau et ses données enregistrées vers la Corbeille. Il quitte BeamNG et Mes niveaux ; restaurable depuis la Corbeille.",
     "rebuiltOffline": "Rien n'a été téléchargé : il a été créé à partir des données enregistrées.",
     "rebuiltSomeDownloaded": "{count} fichiers manquaient dans les données enregistrées et ont été téléchargés.",
     "rebuiltFetched": "La zone a été retéléchargée et enregistrée : la prochaine reconstruction n'en aura pas besoin.",
@@ -1050,7 +1051,13 @@
     "showInMods": "Afficher dans le dossier mods",
     "showInModsHint": "Ouvrir le dossier mods de BeamNG avec le zip de ce niveau sélectionné",
     "showData": "Afficher les données enregistrées",
-    "showDataHint": "Ouvrir le dossier des données enregistrées de ce niveau : les téléchargements bruts de terrain, satellite, OpenStreetMap et hauteurs de ponts qu'utilisent Mettre à jour et Modifier. Il ne fait pas partie du zip du niveau."
+    "showDataHint": "Ouvrir le dossier des données enregistrées de ce niveau : les téléchargements bruts de terrain, satellite, OpenStreetMap et hauteurs de ponts qu'utilisent Mettre à jour et Modifier. Il ne fait pas partie du zip du niveau.",
+    "deleteWarnTitle": "Supprimer des niveaux",
+    "deleteWarnLevel": "Supprimer « {name} » ?",
+    "deleteWarnBody": "Supprimer déplace le ZIP du niveau hors de votre dossier de mods BeamNG, avec ses données enregistrées (dont Mettre à jour le reconstruit), vers la Corbeille. Il disparaît de BeamNG et de Mes niveaux ; vous pouvez restaurer les deux depuis la Corbeille.",
+    "deleteWarnOnce": "Ce message n'apparaît qu'une fois : désormais Supprimer agit tout de suite. Survolez le bouton pour le relire.",
+    "deleteWarnCancel": "Annuler",
+    "deleteWarnConfirm": "Supprimer"
   },
   "desktopWelcome": {
     "title": "Bienvenue dans MapNG Desktop",

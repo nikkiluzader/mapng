@@ -231,7 +231,8 @@
     "disabledWarning": "Za duże — przekracza limit 16384 px w przeglądarce. Zmniejsz rozdzielczość kafelków lub rozmiar siatki.",
     "outputSummary": "Kafelki: {tiles} → jeden poziom BeamNG {dim}×{dim} px",
     "outputHint": "Kafelki są łączone po przetworzeniu, a następnie eksportowane jako jeden grywalny poziom w pliku ZIP.",
-    "startCombined": "Zbuduj połączony poziom (kafelki: {tiles})"
+    "startCombined": "Zbuduj połączony poziom (kafelki: {tiles})",
+    "disabledWarningDesktop": "Za duży: poziom MapNG może mieć najwyżej 16384 × 16384 px (tyle co pojedynczy kafelek). Zmniejsz rozdzielczość kafelka albo rozmiar siatki."
   },
   "upload": {
     "autoDetected": "współrzędne wykryte automatycznie",
@@ -609,7 +610,8 @@
     "satelliteNames": "Pokaż nazwy miejsc i ulic",
     "groupMap": "Mapa",
     "groupShow": "Pokaż na mapie",
-    "groupSharing": "Udostępnianie"
+    "groupSharing": "Udostępnianie",
+    "darkMap": "Ciemna mapa"
   },
   "memoryWidget": {
     "mem": "PAMIĘĆ",
@@ -1038,8 +1040,7 @@
     "savedData": "Zapisane dane: przebudowa bez pobierania",
     "noSavedData": "Brak zapisanych danych: przebudowa pobiera obszar ponownie",
     "delete": "Usuń",
-    "deleteHint": "Przenieś ten poziom i jego zapisane dane do Kosza",
-    "confirmDelete": "Usunąć „{name}”?\n\nPoziom i jego zapisane dane trafią do Kosza, skąd możesz je przywrócić.",
+    "deleteHint": "Przenieś ten poziom i jego zapisane dane do Kosza. Znika z BeamNG i Moich poziomów; można go przywrócić z Kosza.",
     "rebuiltOffline": "Nic nie pobrano: powstał z zapisanych danych.",
     "rebuiltSomeDownloaded": "Plików spoza zapisanych danych pobrano: {count}.",
     "rebuiltFetched": "Obszar pobrano ponownie i zapisano, więc następna przebudowa nie będzie musiała go pobierać.",
@@ -1050,7 +1051,13 @@
     "showInMods": "Pokaż w folderze modów",
     "showInModsHint": "Otwórz folder modów BeamNG z zaznaczonym plikiem ZIP tego poziomu",
     "showData": "Pokaż zapisane dane",
-    "showDataHint": "Otwórz folder z zapisanymi danymi tego poziomu: surowe pobrane dane terenu, satelity, OpenStreetMap i wysokości mostów, których używają Aktualizuj i Zmień. Nie jest częścią zipa poziomu."
+    "showDataHint": "Otwórz folder z zapisanymi danymi tego poziomu: surowe pobrane dane terenu, satelity, OpenStreetMap i wysokości mostów, których używają Aktualizuj i Zmień. Nie jest częścią zipa poziomu.",
+    "deleteWarnTitle": "Usuwanie poziomów",
+    "deleteWarnLevel": "Usunąć „{name}”?",
+    "deleteWarnBody": "Usuń przenosi plik ZIP poziomu z folderu modów BeamNG, razem z zapisanymi danymi (z których Aktualizuj go odbudowuje), do Kosza. Znika z BeamNG i z Moich poziomów; oba można przywrócić z Kosza.",
+    "deleteWarnOnce": "To okno pojawia się tylko raz: od teraz Usuń działa od razu. Najedź na przycisk, aby przeczytać to ponownie.",
+    "deleteWarnCancel": "Anuluj",
+    "deleteWarnConfirm": "Usuń"
   },
   "desktopWelcome": {
     "title": "Witaj w MapNG Desktop",

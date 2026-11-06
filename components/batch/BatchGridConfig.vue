@@ -33,7 +33,7 @@
         }">{{ combinedDim }} × {{ combinedDim }} px</span>
       </div>
       <p v-if="combinedTier === 'disabled'" class="text-micro text-red-600 dark:text-red-500 font-medium">
-        <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batchCombined.disabledWarning') }}
+        <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t(isDesktop ? 'batchCombined.disabledWarningDesktop' : 'batchCombined.disabledWarning') }}
       </p>
       <p v-else-if="combinedDim >= COMBINED_SUPPORTED_MAX" class="text-micro text-amber-600 dark:text-amber-500 font-medium">
         <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t(isDesktop ? 'batchCombined.largeSizeNoteDesktop' : 'batchCombined.largeSizeNote', { mb: combinedMemoryMB }) }}
@@ -139,9 +139,10 @@ const emit = defineEmits(['update:gridCols', 'update:gridRows']);
 // Combined level grids must be square and a power of 2 so the stitched
 // heightmap (N × resolution) is itself a power-of-2 square (.ter requirement).
 const POW2_GRID_OPTIONS = [2, 4, 8];
-// 16384² is the in-browser ceiling: above it the exporter's own full-grid
-// buffers (minimap RGBA, road-architect + .ter heightfields) exceed the ~4 GB
-// tab heap. Larger levels need offline/streamed assembly (separate tool).
+// 16384² is MapNG's largest level (a single tile's too). In a browser it is
+// also the ceiling of the tab's ~4 GB heap: the exporter's full-grid buffers
+// (minimap RGBA, road-architect + .ter heightfields) take 1 GiB each there.
+// The desktop app says only the first: it is the size limit, not memory.
 const COMBINED_SUPPORTED_MAX = 16384;
 
 const combinedDimFor = (n) => n * Math.max(1, props.resolution);

@@ -231,7 +231,8 @@
     "disabledWarning": "Too large — exceeds the 16384 px in-browser limit. Lower tile resolution or grid size.",
     "outputSummary": "{tiles} tiles → one {dim}×{dim} px BeamNG level",
     "outputHint": "Tiles are stitched after processing, then exported as a single playable level ZIP.",
-    "startCombined": "Build combined level ({tiles} tiles)"
+    "startCombined": "Build combined level ({tiles} tiles)",
+    "disabledWarningDesktop": "Too large: a MapNG level can be at most 16384 × 16384 px (the same as a single tile). Lower the tile resolution or the grid size."
   },
   "upload": {
     "autoDetected": "coordinates auto-detected",
@@ -609,7 +610,8 @@
     "satelliteNames": "Show place and road names",
     "groupMap": "Map",
     "groupShow": "Show on map",
-    "groupSharing": "Sharing"
+    "groupSharing": "Sharing",
+    "darkMap": "Dark map"
   },
   "memoryWidget": {
     "mem": "MEM",
@@ -1038,8 +1040,7 @@
     "savedData": "Saved data: rebuilds without downloading",
     "noSavedData": "No saved data: a rebuild downloads the area again",
     "delete": "Delete",
-    "deleteHint": "Move this level and its saved data to the Recycle Bin (Trash on Linux)",
-    "confirmDelete": "Delete \"{name}\"?\n\nThe level and its saved data go to the Recycle Bin (Trash on Linux), so you can restore them from there.",
+    "deleteHint": "Move this level and its saved data to the Recycle Bin (Trash on Linux). It leaves BeamNG and My Levels; restore it from the Recycle Bin.",
     "rebuiltOffline": "Nothing was downloaded: it was made from the saved data.",
     "rebuiltSomeDownloaded": "{count} files weren't in the saved data and were downloaded.",
     "rebuiltFetched": "Its area was downloaded again and saved, so the next rebuild won't need to.",
@@ -1050,7 +1051,13 @@
     "showInMods": "Show in mods folder",
     "showInModsHint": "Open BeamNG's mods folder with this level's zip selected",
     "showData": "Show saved data",
-    "showDataHint": "Open the folder with this level's saved data: the raw terrain, satellite, OpenStreetMap and bridge height downloads Update and Modify use. It isn't part of the level zip."
+    "showDataHint": "Open the folder with this level's saved data: the raw terrain, satellite, OpenStreetMap and bridge height downloads Update and Modify use. It isn't part of the level zip.",
+    "deleteWarnTitle": "Deleting levels",
+    "deleteWarnLevel": "Delete \"{name}\"?",
+    "deleteWarnBody": "Delete moves the level's ZIP out of your BeamNG mods folder, together with its saved data (what Update rebuilds it from), into the Recycle Bin (Trash on Linux). It disappears from BeamNG and from My Levels; you can restore both from the Recycle Bin.",
+    "deleteWarnOnce": "This only shows once: from now on Delete works straight away. Hover the Delete button to read this again.",
+    "deleteWarnCancel": "Cancel",
+    "deleteWarnConfirm": "Delete"
   },
   "desktopWelcome": {
     "title": "Welcome to MapNG Desktop",
