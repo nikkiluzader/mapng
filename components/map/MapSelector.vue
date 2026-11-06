@@ -251,6 +251,11 @@
             <p v-if="showOsmCoverage && osmCoverageStatus !== 'ready'" class="pl-7 -mt-1 text-micro" :class="osmCoverageStatus === 'unavailable' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'">
               {{ osmCoverageStatus === 'unavailable' ? t('controlPanel.osmCoverageUnavailable') : t('controlPanel.osmCoverageLoading') }}
             </p>
+            <label :class="PANEL_ROW" :title="t('mapSelector.lidarCoverageHint')">
+                <input type="checkbox" v-model="showLidarCoverage" :class="CHECKBOX" data-testid="lidar-coverage-toggle" />
+                <span>{{ t('mapSelector.lidarCoverage') }}</span>
+            </label>
+            <p v-if="showLidarCoverage && lidarCoverageStatus === 'unavailable'" class="pl-7 -mt-1 text-micro text-amber-600 dark:text-amber-400">{{ t('mapSelector.lidarCoverageUnavailable') }}</p>
             <label :class="PANEL_ROW">
                 <input type="checkbox" v-model="showHotspots" :class="CHECKBOX" />
                 <span>{{ t('mapSelector.hotspots') }}</span>
@@ -333,6 +338,7 @@ import { CHECKBOX } from '../base/controlStyles.js';
 import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
 import { useExportHotspots } from '../../composables/useExportHotspots.js';
 import { addHotspotLayer } from '../../services/hotspotLayer.js';
+import { loadLidarCoverage, createLidarCoverageLayer } from '../../services/lidarCoverageLayer.js';
 import { daysSince } from '../../services/exportHotspots.js';
 import { WORLD_BOUNDS, minZoomForWidth, formatSelectionSize, formatLatLng, clampLng } from '../../services/mapView.js';
 
@@ -765,6 +771,24 @@ const { show: showHotspots, cells: hotspotCells, status: hotspotsStatus, totals:
 const { share: shareSettings, setShareSettings } = useUsageStats();
 const leafletMap = ref(null);
 let hotspotLayer = null;
+
+// Free lidar coverage (Mapterhorn z13+, prebuilt index shipped with the app)
+const readPref = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v === 'true'; } catch { return d; } };
+const showLidarCoverage = ref(readPref('mapng_lidarCoverage', false));
+const lidarCoverageStatus = ref('idle');
+let lidarCoverageLayer = null;
+watch(showLidarCoverage, (v) => { try { localStorage.setItem('mapng_lidarCoverage', String(v)); } catch { /* private mode */ } });
+watch([leafletMap, showLidarCoverage], async ([map, on]) => {
+  if (lidarCoverageLayer) { lidarCoverageLayer.remove(); lidarCoverageLayer = null; }
+  if (!map || !on) return;
+  lidarCoverageStatus.value = 'loading';
+  try {
+    const index = await loadLidarCoverage();
+    if (!showLidarCoverage.value || leafletMap.value !== map) return;
+    lidarCoverageLayer = createLidarCoverageLayer(index).addTo(map);
+    lidarCoverageStatus.value = 'ready';
+  } catch { lidarCoverageStatus.value = 'unavailable'; }
+}, { immediate: true });
 
 // The box the map's own tools frame (the elevation preview's box): the export
 // area, the BYOD crop or the batch grid. Dimmed around, labelled with its size.
