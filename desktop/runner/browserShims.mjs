@@ -246,6 +246,16 @@ const OSM_REQUEST = /^(overpass:|\/api\/osm(\?|$))/;
 // recordDir (replay mode): a request missing from dir that goes online is
 // recorded there, so the next replay has it (an export's lidar or backdrop
 // when "Modify" turns something new on).
+// mode 'cache' (the app's Generate Data / Preview 3D): dir is a download cache
+// shared by every generate in this run of the app (desktop/main.js clears it
+// at start): what it holds is used, what it lacks is downloaded and added;
+// each generate's own full set goes to recordDir either way (the level's
+// saved data). Map data in it expires after CACHE_OSM_MS (someone fixing
+// their town on OSM wants it fresh); error answers never go in.
+const CACHE_OSM_MS = 30 * 60 * 1000;
+const cacheable = (status) => (status >= 200 && status < 300) || status === 404;
+const linkInto = (from, to) => { try { fs.linkSync(from, to); } catch { try { fs.copyFileSync(from, to); } catch { /* best effort */ } } };
+
 export function installSourceRecorder({ dir, mode = 'record', fallback = true, recordDir = null }) {
   fs.mkdirSync(dir, { recursive: true });
   if (recordDir) fs.mkdirSync(recordDir, { recursive: true });
@@ -261,6 +271,28 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
     const key = sourceKey(url, init, bodyText);
     const metaFile = path.join(dir, `${key}.json`);
     const bodyFile = path.join(dir, `${key}.bin`);
+    if (mode === 'cache') {
+      const normalized = String(url).replace(/^https?:\/\/[^/]+(\/api\/interpreter)/, 'overpass:$1');
+      let meta = null;
+      try { meta = fs.existsSync(metaFile) ? JSON.parse(fs.readFileSync(metaFile, 'utf8')) : null; } catch { meta = null; }
+      const stale = meta && OSM_REQUEST.test(normalized) && !(Date.now() - (meta.savedAt || 0) < CACHE_OSM_MS);
+      if (meta && !stale) {
+        stats.replayed++;
+        if (recordDir) { linkInto(metaFile, path.join(recordDir, `${key}.json`)); if (fs.existsSync(bodyFile)) linkInto(bodyFile, path.join(recordDir, `${key}.bin`)); }
+        const body = meta.status === 204 || meta.status === 304 ? null : fs.readFileSync(bodyFile);
+        return new Response(body, { status: meta.status, statusText: meta.statusText, headers: meta.headers });
+      }
+      stats.downloaded++;
+      const live = await inner(input, init);
+      const recMeta = recordDir ? path.join(recordDir, `${key}.json`) : metaFile;
+      const recBody = recordDir ? path.join(recordDir, `${key}.bin`) : bodyFile;
+      await save(live, recMeta, recBody, url, init);
+      if (recordDir && cacheable(live.status) && fs.existsSync(recMeta)) {
+        try { fs.rmSync(metaFile, { force: true }); fs.rmSync(bodyFile, { force: true }); } catch { /* replaced below */ }
+        linkInto(recBody, bodyFile); linkInto(recMeta, metaFile);
+      }
+      return live;
+    }
     if (mode === 'replay') {
       if (fs.existsSync(metaFile)) {
         stats.replayed++;
@@ -287,7 +319,7 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
       const bytes = Buffer.from(await r.clone().arrayBuffer());
       const headers = Object.fromEntries([...r.headers.entries()].filter(([k]) => !/^(content-encoding|content-length|transfer-encoding|set-cookie)$/i.test(k)));
       fs.writeFileSync(bodyPath, bytes);
-      fs.writeFileSync(metaPath, JSON.stringify({ url, method: init.method || 'GET', status: r.status, statusText: r.statusText, headers }));
+      fs.writeFileSync(metaPath, JSON.stringify({ url, method: init.method || 'GET', status: r.status, statusText: r.statusText, headers, savedAt: Date.now() }));
       stats.recorded++;
     } catch { /* an unreadable body (aborted): the caller sees the same */ }
   }

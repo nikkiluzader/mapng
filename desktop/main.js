@@ -280,6 +280,8 @@ function clearLeftovers() {
     for (const d of fs.readdirSync(PROJECTS())) if (d.endsWith('.saving')) fs.rmSync(path.join(PROJECTS(), d), { recursive: true, force: true });
   } catch { /* none yet */ }
   pruneSessions(null);
+  // (the download cache is for one run of the app)
+  fs.rmSync(SOURCE_CACHE(), { recursive: true, force: true });
 }
 
 // ---- system usage (the page's memory monitor) -------------------------------
@@ -534,6 +536,11 @@ function saveProject(jobDir, job, result) {
 // ---- terrain generation (the page's Generate Data, in Node) -----------------
 
 const SESSIONS = () => path.join(app.getPath('userData'), 'terrain');
+// The downloads of this run's generates (runner/browserShims.mjs, mode
+// 'cache'): Generate Data / Preview 3D again after changing a setting reads
+// what it already fetched (elevation tiles, imagery, map data), only what's
+// new is downloaded. Temporary: emptied when the app starts.
+const SOURCE_CACHE = () => path.join(app.getPath('userData'), 'download-cache');
 const sessionDirOf = (id) => {
   if (!/^[\w-]{1,64}$/.test(id)) throw new Error('bad terrain id');
   return path.join(SESSIONS(), id);
@@ -566,6 +573,8 @@ ipcMain.handle('terrain:generate', async (event, requested) => {
       generationOptions: { ...(saved.generationOptions || {}), raw: !!requested.generationOptions?.raw },
       sources: { mode: 'replay', dir: path.join(projectDir, 'sources'), fallback: true },
     };
+  } else {
+    params = { ...requested, sources: { mode: 'cache', dir: SOURCE_CACHE() } };
   }
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify(params));
