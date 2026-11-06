@@ -168,6 +168,9 @@ onMounted(() => { frame = requestAnimationFrame(animate); });
 onBeforeUnmount(() => cancelAnimationFrame(frame));
 // (a report jumps the targets at once; the frame loop eases toward them)
 watch(() => [props.activeStage, props.activeFraction, props.pct], recompute);
+// (a new card stage: its bar starts over in the same update as its name, not
+// a frame later with the old stage's fill under the new name)
+watch(() => activeStep.value?.key ?? null, (key) => { lastStepKey = key; shownStage.value = 0; targetStage = 0; }, { flush: 'sync' });
 
 const shownPct = computed(() => Math.min(99, Math.floor(shown.value * 100)));
 const shownStageFraction = computed(() => shownStage.value);
