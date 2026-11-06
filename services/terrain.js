@@ -27,6 +27,8 @@ import { measureStreetWidths } from "./streetWidths.js";
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from "./terrariumSampling.js";
 import { continuousLngRange } from "./lngRange.js";
 import { lowerRaisedWater } from "./waterBanks.js";
+import { removeSurfaceObjects } from "./dsmGround.js";
+import { fetchGedtmGrid } from "./gedtm.js";
 import { scaleNativeDimsToProcessingMpp } from "./uploadBounds.js";
 import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSize.js";
 
@@ -1857,6 +1859,8 @@ export const fetchTerrainData = async (
     raw = false,
     // free Mapterhorn lidar where it exists (elevation source "mapterhorn")
     useMapterhorn = false,
+    // buildings, woods and viaduct decks taken out of the global 30 m (dsmGround.js); off: as downloaded
+    groundFilter = true,
   } = generationOptions || {};
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
@@ -2341,6 +2345,21 @@ export const fetchTerrainData = async (
   // real crests and filled real sags, carving lines and dips); tracks are
   // left alone.
   const fineRaster = !!rawData && !shouldSmooth;
+  // The global 30 m is a radar surface model in most of the world: dense districts stand on their rooftops.
+  // Buildings, woods and viaduct decks come out first, so the creeks, roads and bridges below sit on ground.
+  let groundFilterInfo = null;
+  if (!flat && !raw && !rawData && groundFilter && osmFeatures.length > 0) {
+    onProgress?.("Finding the ground under buildings and trees...");
+    try {
+      groundFilterInfo = await removeSurfaceObjects({ heightMap, width, height, bounds: finalBounds, metersPerPixel: effectiveMetersPerPixel, osmFeatures, fetchGedtm: fetchGedtmGrid, signal });
+      if (groundFilterInfo.applied) console.info(`[Terrain] Ground under buildings: ${(groundFilterInfo.share * 100).toFixed(0)}% of the area lowered, mean ${groundFilterInfo.meanCut.toFixed(1)} m, up to ${groundFilterInfo.maxCut.toFixed(1)} m (rooftop signal ${groundFilterInfo.dsmSlope.toFixed(2)}).`);
+      else console.info(`[Terrain] Ground filter skipped: ${groundFilterInfo.reason}${Number.isFinite(groundFilterInfo.dsmSlope) ? ` (rooftop signal ${groundFilterInfo.dsmSlope.toFixed(2)})` : ''}.`);
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      console.warn('[Terrain] Ground filter failed; the elevation is used as downloaded:', error);
+      groundFilterInfo = { applied: false, reason: 'error' };
+    }
+  }
   // The global 30 m data reads tree tops along wooded rivers and creeks (a
   // ridge where the water is): river water is brought down to its banks
   // first, so roads, the preview and the export's water all see the valley.
@@ -2389,6 +2408,7 @@ export const fetchTerrainData = async (
     kron86Fallback,
     kron86FallbackReason,
     mapterhornInfo,
+    groundFilterInfo,
     sourceGeoTiffs,
     processingMetersPerPixel: effectiveMetersPerPixel,
     flat,
