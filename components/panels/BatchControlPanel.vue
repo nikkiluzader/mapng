@@ -483,6 +483,11 @@ const DEFAULT_LEVEL_OPTIONS = {
   includeTrees: true,
   includeRocks: false,
   includeWater: true,
+  // (as a single tile's level: structures, measured bridge heights, content caps)
+  includeBridges: true,
+  includeTunnels: true,
+  lidarDecks: true,
+  safeCaps: true,
   seaLevelOffset: 0,
 };
 

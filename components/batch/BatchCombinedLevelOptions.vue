@@ -75,6 +75,24 @@
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeWater" :disabled="!includeOSM" @change="update('includeWater', $event.target.checked)" />
       </label>
 
+      <!-- (as a single tile's level: bridges, tunnels, measured bridge heights, content caps) -->
+      <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.includeBridges') }}</span>
+        <input type="checkbox" :class="CHECKBOX" :checked="model.includeBridges" :disabled="!includeOSM" @change="update('includeBridges', $event.target.checked)" />
+      </label>
+      <label class="flex items-center justify-between gap-2 cursor-pointer pl-3" :class="{ 'opacity-50': !includeOSM || !model.includeBridges }">
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.lidarDecks') }}</span>
+        <input type="checkbox" :class="CHECKBOX" :checked="model.lidarDecks" :disabled="!includeOSM || !model.includeBridges" @change="update('lidarDecks', $event.target.checked)" />
+      </label>
+      <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.includeTunnels') }}</span>
+        <input type="checkbox" :class="CHECKBOX" :checked="model.includeTunnels" :disabled="!includeOSM" @change="update('includeTunnels', $event.target.checked)" />
+      </label>
+      <label class="flex items-center justify-between gap-2 cursor-pointer">
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.safeCaps') }}</span>
+        <input type="checkbox" :class="CHECKBOX" :checked="model.safeCaps" @change="update('safeCaps', $event.target.checked)" />
+      </label>
+
       <div class="flex items-center justify-between gap-2">
         <span class="text-xs text-gray-700 dark:text-gray-200 shrink-0">{{ t('exportPanel.seaLevelOffset') }}</span>
         <div class="flex items-center gap-1">
