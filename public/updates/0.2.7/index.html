@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.2.7: Solid Ground Everywhere</title>
+<meta name="description" content="What's new in MapNG 0.2.7: buildings and trees taken out of the global 30 m, fine ground detail, sharp mapped cliffs, smoother junctions and more reliable combined levels.">
+<link rel="canonical" href="https://mapng.com/updates/0.2.7/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.2.7: solid ground everywhere">
+<meta property="og:description" content="Better terrain where there is no lidar: no building blobs, real detail, sharp cliffs, smooth junctions.">
+<meta property="og:url" content="https://mapng.com/updates/0.2.7/">
+<meta property="og:image" content="https://mapng.com/updates/0.2.7/images/hero-saopaulo.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: the in-game shot with the title over it */
+  .hero { position: relative; color: #fff; background: #111 url(images/hero-saopaulo.jpg) center/cover no-repeat; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(70vh, 560px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.2.7</span></span>
+    <h1>Solid ground, everywhere</h1>
+    <p>Most of the world has no free lidar. This update makes the global 30&nbsp;m data much better: no more buildings baked into the ground, real detail, sharp cliffs and smooth junctions.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+  <span class="credit">São Paulo, Brazil: a 1 km MapNG level from the global 30 m (there's no free lidar here), in BeamNG.drive 0.40</span>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#ground">🏙️ Ground under cities</a>
+    <a href="#detail">🌿 Fine detail</a>
+    <a href="#cliffs">🧗 Cliffs</a>
+    <a href="#junctions">🛣️ Junctions</a>
+    <a href="#combined">🧩 Combined levels</a>
+    <a href="#more">🧹 More</a>
+    <a href="#thanks">🙏 Thanks</a>
+  </nav>
+
+  <p style="margin-top:28px">Where a national lidar survey exists, MapNG has used it by default since 0.2.6. Everywhere else it falls back to a 30&nbsp;m global dataset, and that data has two problems: it's soft, and in cities it measures the tops of buildings and trees rather than the ground. <b>0.2.7 is about making those levels good.</b> This time the page also shows a few images from behind the scenes: the heightmaps MapNG makes, drawn as hillshades, before and after.</p>
+
+  <section id="ground">
+    <div class="kicker">Elevation</div>
+    <h2>🏙️ The ground under cities</h2>
+    <figure><img src="images/ground-filter.jpg" alt="Three hillshades of the same 800 m of São Paulo: the global 30 m with building-shaped blobs, MapNG 0.2.7 with level streets, and real lidar for reference" loading="lazy"><figcaption>Behind the scenes: 800&nbsp;m of São Paulo as heightmaps. Left, the global 30&nbsp;m with towers and tree canopy as lumps; middle, what MapNG 0.2.7 builds; right, real lidar from the city's own survey, which MapNG doesn't use. It's here only to check against.</figcaption></figure>
+    <p>The free global data comes from radar flown from space, and radar bounces off roofs and treetops. In a dense city that means hills that are really blocks of towers, and streets that climb onto them. MapNG now finds the real ground first:</p>
+    <ul>
+      <li>It compares the 30&nbsp;m data with <b>GEDTM30</b>, a global bare-earth model, and with OpenStreetMap's buildings, woods and viaducts, and lowers what stands above the ground.</li>
+      <li>Where both are radar, it also averages in <b>Copernicus GLO-30</b>, a second, independent survey, so their errors partly cancel.</li>
+      <li>Only the global 30&nbsp;m gets this. Lidar, GPXZ, USGS and your own uploads are left exactly as they are.</li>
+    </ul>
+    <table class="nums">
+      <tr><th>Average error against lidar, cities with a survey to check (lower is better)</th><th>On roads</th><th>Bare ground</th><th>Under bridges</th></tr>
+      <tr><td>Global 30 m as it comes</td><td class="n">7.8 m</td><td class="n">5.1 m</td><td class="n">7.5 m</td></tr>
+      <tr><td><b>MapNG 0.2.7</b></td><td class="n"><b>4.8 m</b></td><td class="n"><b>3.1 m</b></td><td class="n"><b>4.2 m</b></td></tr>
+    </table>
+    <figure><img src="images/saopaulo-aerial.jpg" alt="São Paulo in BeamNG.drive from the air: high-rises and low houses on level streets" loading="lazy"><figcaption>The same São Paulo level in game: towers stand on the street instead of on a hill of their own.</figcaption></figure>
+  </section>
+
+  <section id="detail">
+    <div class="kicker">Terrain</div>
+    <h2>🌿 Fine ground detail</h2>
+    <figure><img src="images/detail-stellenbosch.jpg" alt="Two hillshades of a hillside near Stellenbosch: smooth from the 30 m data, and with small bumps and hollows added; the roads stay smooth" loading="lazy"><figcaption>Behind the scenes: a hillside near Stellenbosch, South Africa. The 30&nbsp;m data alone is one smooth sheet (left); with fine ground detail (right), woods and scrub get small bumps and hollows, and roads stay smooth.</figcaption></figure>
+    <p>30&nbsp;m data has nothing smaller than a few tens of metres, so every slope comes out like a sheet of plastic. When a level is built from it, MapNG now adds small relief that depends on what covers the ground:</p>
+    <ul>
+      <li>about half a metre in woods and scrub, less on grass, almost nothing in fields, more on bare rock and steep slopes</li>
+      <li>none on roads, railways, buildings, water, car parks or sports pitches, fading out towards them</li>
+      <li>the same place always gets the same ground, so batch tiles meet without seams</li>
+    </ul>
+    <p>It changes only the BeamNG level. The heightmap and GeoTIFF downloads stay the real data. It's on by default, with a switch under <b>Advanced → terrain edits</b>.</p>
+  </section>
+
+  <section id="cliffs">
+    <div class="kicker">Terrain</div>
+    <h2>🧗 Cliffs that are cliffs</h2>
+    <div class="chart">
+      <div class="legend"><span><i style="background:var(--s1,#2f6fd6)"></i>Global 30 m</span><span><i style="background:var(--s2,#e85d00)"></i>MapNG 0.2.7</span></div>
+      <svg class="profile" viewBox="0 0 760 340" role="img" aria-labelledby="pt pd" data-pts='[[-45.0, 866.17, 866.03], [-44.0, 865.4, 865.26], [-43.0, 864.67, 864.54], [-42.0, 863.99, 863.87], [-41.0, 863.35, 863.25], [-40.0, 862.76, 862.67], [-39.0, 862.2, 862.12], [-38.0, 861.66, 861.59], [-37.0, 861.16, 861.09], [-36.0, 860.67, 860.6], [-35.0, 860.19, 860.12], [-34.0, 859.72, 859.65], [-33.0, 859.25, 859.17], [-32.0, 858.78, 858.69], [-31.0, 858.3, 858.29], [-30.0, 857.81, 858.17], [-29.0, 857.3, 858.16], [-28.0, 856.78, 858.16], [-27.0, 856.22, 858.14], [-26.0, 855.64, 858.14], [-25.0, 855.03, 858.14], [-24.0, 854.39, 858.14], [-23.0, 853.72, 858.13], [-22.0, 853.02, 858.13], [-21.0, 852.29, 858.13], [-20.0, 851.53, 858.16], [-19.0, 850.76, 858.18], [-18.0, 849.96, 858.19], [-17.0, 849.16, 858.19], [-16.0, 848.34, 858.18], [-15.0, 847.52, 858.19], [-14.0, 846.71, 858.21], [-13.0, 845.9, 858.23], [-12.0, 845.1, 858.27], [-11.0, 844.31, 858.29], [-10.0, 843.53, 858.3], [-9.0, 842.76, 858.29], [-8.0, 842.01, 858.27], [-7.0, 841.28, 858.24], [-6.0, 840.56, 858.19], [-5.0, 839.83, 858.15], [-4.0, 839.11, 858.13], [-3.0, 838.37, 858.11], [-2.0, 837.61, 857.98], [-1.0, 836.82, 857.07], [0.0, 835.99, 856.81], [1.0, 835.1, 856.54], [2.0, 834.14, 856.27], [3.0, 833.09, 856.08], [4.0, 831.96, 855.99], [5.0, 830.72, 854.53], [6.0, 829.39, 846.24], [7.0, 827.95, 835.87], [8.0, 826.39, 825.52], [9.0, 824.72, 815.59], [10.0, 822.92, 806.49], [11.0, 820.84, 798.51], [12.0, 818.34, 791.78], [13.0, 815.52, 787.07], [14.0, 812.38, 784.42], [15.0, 808.46, 782.47], [16.0, 803.44, 779.59], [17.0, 797.79, 775.78], [18.0, 792.33, 772.15], [19.0, 787.38, 769.03], [20.0, 783.05, 766.52], [21.0, 778.78, 764.1], [22.0, 774.36, 761.54], [23.0, 769.79, 758.84], [24.0, 765.5, 756.41], [25.0, 761.8, 754.53], [26.0, 758.83, 753.35], [27.0, 755.72, 752.05], [28.0, 752.56, 750.7], [29.0, 749.36, 748.98], [30.0, 746.48, 746.56], [31.0, 744.1, 744.17], [32.0, 742.02, 742.08], [33.0, 740.0, 740.05], [34.0, 737.69, 737.72], [35.0, 735.4, 735.42], [36.0, 733.39, 733.41], [37.0, 731.66, 731.71], [38.0, 730.22, 730.28], [39.0, 729.18, 729.25], [40.0, 728.42, 728.47], [41.0, 727.8, 727.86], [42.0, 727.3, 727.35], [43.0, 726.93, 726.99], [44.0, 726.71, 726.79], [45.0, 726.57, 726.67]]' data-x0="-45.0" data-x1="45.0" data-y0="720" data-y1="880">
+<title id="pt">Ground height across a mapped cliff on Table Mountain</title>
+<desc id="pd">Global 30 m: a steady slope from 866 m down to 727 m over 90 m. MapNG 0.2.7: level at 858 m up to the mapped cliff line, then a drop to about 766 m within 20 m, joining the 30 m data again below.</desc>
+<line x1="56" x2="740" y1="296.0" y2="296.0" class="g"/><text x="48" y="300.0" class="t" text-anchor="end">720</text><line x1="56" x2="740" y1="261.5" y2="261.5" class="g"/><text x="48" y="265.5" class="t" text-anchor="end">740</text><line x1="56" x2="740" y1="227.0" y2="227.0" class="g"/><text x="48" y="231.0" class="t" text-anchor="end">760</text><line x1="56" x2="740" y1="192.5" y2="192.5" class="g"/><text x="48" y="196.5" class="t" text-anchor="end">780</text><line x1="56" x2="740" y1="158.0" y2="158.0" class="g"/><text x="48" y="162.0" class="t" text-anchor="end">800</text><line x1="56" x2="740" y1="123.5" y2="123.5" class="g"/><text x="48" y="127.5" class="t" text-anchor="end">820</text><line x1="56" x2="740" y1="89.0" y2="89.0" class="g"/><text x="48" y="93.0" class="t" text-anchor="end">840</text><line x1="56" x2="740" y1="54.5" y2="54.5" class="g"/><text x="48" y="58.5" class="t" text-anchor="end">860</text><line x1="56" x2="740" y1="20.0" y2="20.0" class="g"/><text x="48" y="24.0" class="t" text-anchor="end">880</text><text x="94.0" y="314" class="t" text-anchor="middle">-40</text><text x="246.0" y="314" class="t" text-anchor="middle">-20</text><text x="398.0" y="314" class="t" text-anchor="middle">0</text><text x="550.0" y="314" class="t" text-anchor="middle">+20</text><text x="702.0" y="314" class="t" text-anchor="middle">+40</text>
+<text x="398.0" y="334" class="t" text-anchor="middle">metres from the mapped cliff line (face on the right)</text>
+<line x1="398.0" x2="398.0" y1="20" y2="296" class="cliff"/>
+<text x="404.0" y="32" class="t">mapped cliff line</text>
+<path d="M56.0,43.9 L63.6,45.2 L71.2,46.4 L78.8,47.6 L86.4,48.7 L94.0,49.7 L101.6,50.7 L109.2,51.6 L116.8,52.5 L124.4,53.3 L132.0,54.2 L139.6,55.0 L147.2,55.8 L154.8,56.6 L162.4,57.4 L170.0,58.3 L177.6,59.2 L185.2,60.1 L192.8,61.0 L200.4,62.0 L208.0,63.1 L215.6,64.2 L223.2,65.3 L230.8,66.5 L238.4,67.8 L246.0,69.1 L253.6,70.4 L261.2,71.8 L268.8,73.2 L276.4,74.6 L284.0,76.0 L291.6,77.4 L299.2,78.8 L306.8,80.2 L314.4,81.6 L322.0,82.9 L329.6,84.2 L337.2,85.5 L344.8,86.8 L352.4,88.0 L360.0,89.3 L367.6,90.5 L375.2,91.8 L382.8,93.1 L390.4,94.5 L398.0,95.9 L405.6,97.5 L413.2,99.1 L420.8,100.9 L428.4,102.9 L436.0,105.0 L443.6,107.3 L451.2,109.8 L458.8,112.5 L466.4,115.4 L474.0,118.5 L481.6,122.1 L489.2,126.4 L496.8,131.2 L504.4,136.6 L512.0,143.4 L519.6,152.1 L527.2,161.8 L534.8,171.2 L542.4,179.8 L550.0,187.2 L557.6,194.6 L565.2,202.2 L572.8,210.1 L580.4,217.5 L588.0,223.9 L595.6,229.0 L603.2,234.4 L610.8,239.8 L618.4,245.4 L626.0,250.3 L633.6,254.4 L641.2,258.0 L648.8,261.5 L656.4,265.5 L664.0,269.4 L671.6,272.9 L679.2,275.9 L686.8,278.4 L694.4,280.2 L702.0,281.5 L709.6,282.5 L717.2,283.4 L724.8,284.0 L732.4,284.4 L740.0,284.7" class="s1"/><path d="M56.0,44.1 L63.6,45.4 L71.2,46.7 L78.8,47.8 L86.4,48.9 L94.0,49.9 L101.6,50.8 L109.2,51.8 L116.8,52.6 L124.4,53.5 L132.0,54.3 L139.6,55.1 L147.2,55.9 L154.8,56.8 L162.4,57.4 L170.0,57.7 L177.6,57.7 L185.2,57.7 L192.8,57.7 L200.4,57.7 L208.0,57.7 L215.6,57.7 L223.2,57.7 L230.8,57.7 L238.4,57.7 L246.0,57.7 L253.6,57.6 L261.2,57.6 L268.8,57.6 L276.4,57.6 L284.0,57.6 L291.6,57.6 L299.2,57.6 L306.8,57.5 L314.4,57.4 L322.0,57.4 L329.6,57.4 L337.2,57.5 L344.8,57.5 L352.4,57.6 L360.0,57.7 L367.6,57.7 L375.2,57.8 L382.8,58.0 L390.4,59.6 L398.0,60.0 L405.6,60.5 L413.2,60.9 L420.8,61.3 L428.4,61.4 L436.0,63.9 L443.6,78.2 L451.2,96.1 L458.8,114.0 L466.4,131.1 L474.0,146.8 L481.6,160.6 L489.2,172.2 L496.8,180.3 L504.4,184.9 L512.0,188.2 L519.6,193.2 L527.2,199.8 L534.8,206.0 L542.4,211.4 L550.0,215.8 L557.6,219.9 L565.2,224.3 L572.8,229.0 L580.4,233.2 L588.0,236.4 L595.6,238.5 L603.2,240.7 L610.8,243.0 L618.4,246.0 L626.0,250.2 L633.6,254.3 L641.2,257.9 L648.8,261.4 L656.4,265.4 L664.0,269.4 L671.6,272.9 L679.2,275.8 L686.8,278.3 L694.4,280.0 L702.0,281.4 L709.6,282.4 L717.2,283.3 L724.8,283.9 L732.4,284.3 L740.0,284.5" class="s2"/>
+<text x="215.6" y="100.0" class="lab">Global 30 m</text>
+<text x="215.6" y="47.6" class="lab">MapNG 0.2.7</text>
+<line class="xh" x1="0" x2="0" y1="20" y2="296" style="display:none"/>
+<rect class="hit" x="56" y="20" width="684" height="276" fill="transparent"/>
+</svg>
+      <div class="tip" role="presentation"></div>
+    </div>
+    <p class="bts">Behind the scenes: ground height across a mapped cliff on Table Mountain, Cape Town, sampled from both heightmaps. Hover or tap for heights.</p>
+    <p>At 30&nbsp;m, a cliff smears into a long ramp. Where OpenStreetMap maps a cliff as a line (and many famous ones are), MapNG now turns that ramp back into a cliff: the top stays level right up to the mapped edge, a steep face drops just past it, and bare rock is painted where the face is steeper than 45°. It's only applied where the data really does drop on the mapped side, and it fades out where a road or path crosses the cliff.</p>
+  </section>
+
+  <section id="junctions">
+    <div class="kicker">Roads</div>
+    <h2>🛣️ No more rings at junctions</h2>
+    <figure><img src="images/rings-saopaulo.jpg" alt="Two hillshades of a São Paulo junction: round rings on the road in 0.2.6, smooth in 0.2.7" loading="lazy"><figcaption>Behind the scenes: the terrain under Avenida Brigadeiro Faria Lima, 0.2.6 on the left, 0.2.7 on the right. The rings were in the levels too, not just the preview.</figcaption></figure>
+    <p>Road smoothing ended each piece of road with a flat, round end at that point's height. Where the road carried on uphill past a junction, or changed its number of lanes, that flat disc sat on a road that kept climbing, and its edge showed as a ring. Now the road carries straight on past the junction and fades out. Where two roads still meet at slightly different heights, the join is smoothed over a couple of metres. Real steps, like a frontage road on a terrace beside a highway, stay steps.</p>
+    <figure><img src="images/rings-plane.jpg" alt="Two hillshades of the same roads laid on a perfectly smooth tilted plane: rings in 0.2.6, none in 0.2.7" loading="lazy"><figcaption>How we found it: the same roads laid on a perfectly smooth tilted plane, so anything that shows was made by the smoothing itself. Sharp creases over 20&nbsp;cm dropped from 14,592 pixels to 1,318.</figcaption></figure>
+  </section>
+
+  <section id="combined">
+    <div class="kicker">Batch</div>
+    <h2>🧩 Combined levels you can't lose</h2>
+    <figure><img src="images/combined-files.jpg" alt="MapNG's finished batch window: Level exported, with Download buttons for the level ZIP and the elevation report" loading="lazy"><figcaption>The finished window now lists your files, with a Download button for each.</figcaption></figure>
+    <p>A combined level is one big level stitched from a grid of tiles. At the end of a long job, the browser could block its download, or ask "download multiple files?" and lose it if you answered late, leaving only the small elevation report. Now:</p>
+    <ul>
+      <li>the level downloads first, before the other files</li>
+      <li>the finished window lists every file with a <b>Download</b> button, until you start the next job</li>
+      <li>if the level can't be built, the window says so plainly, with the reason and what to try</li>
+      <li>in the <b>desktop app</b>, combined levels go straight into your BeamNG mods folder, like single levels, and aren't limited by the window's memory</li>
+    </ul>
+  </section>
+
+  <section id="more">
+    <div class="kicker">And more</div>
+    <h2>🧹 Smaller changes</h2>
+    <div class="polish">
+      <div><b>Clearer progress</b>When there's no lidar for your area, the progress now says it's using the global 30&nbsp;m.</div>
+      <div><b>Export report</b>Lists the ground filter (and Copernicus, when it's averaged in), fine ground detail, and how many cliffs were sharpened.</div>
+      <div><b>Credits</b>GEDTM30 and Copernicus GLO-30 are credited on the About and Tech pages, the data page, the README and in each level's report.</div>
+    </div>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks</h2>
+    <p>The bare-earth reference is <a href="https://zenodo.org/records/14900181">GEDTM30</a> by OpenGeoHub (CC-BY 4.0). The second radar survey is <a href="https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model">Copernicus GLO-30</a> (© DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018, provided under COPERNICUS by the European Union and ESA), served through <a href="https://mapterhorn.com">Mapterhorn</a>. Thanks also to the Discord members whose São Paulo report started all of this.</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p>Try a city or a cliff you know with no lidar and tell me what you see. Post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.2.6/">Previous update (0.2.6)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+<script>
+// the cliff profile: a crosshair and both heights under the pointer
+(() => {
+  const svg = document.querySelector('.profile'); if (!svg) return;
+  const pts = JSON.parse(svg.dataset.pts), x0 = +svg.dataset.x0, x1 = +svg.dataset.x1;
+  const tip = svg.parentElement.querySelector('.tip'), xh = svg.querySelector('.xh'), hit = svg.querySelector('.hit');
+  const vb = svg.viewBox.baseVal, L = +hit.getAttribute('x'), Wd = +hit.getAttribute('width');
+  const show = (e) => {
+    const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) * vb.width / r.width;
+    const s = x0 + (px - L) / Wd * (x1 - x0); if (s < x0 || s > x1) return hide();
+    const p = pts.reduce((a, b) => Math.abs(b[0] - s) < Math.abs(a[0] - s) ? b : a);
+    const X = L + (p[0] - x0) / (x1 - x0) * Wd;
+    xh.setAttribute('x1', X); xh.setAttribute('x2', X); xh.style.display = '';
+    tip.innerHTML = `<b>${p[0] > 0 ? '+' : ''}${p[0]} m</b><br><i style="background:var(--s1,#2f6fd6)"></i>Global 30 m: ${p[1].toFixed(0)} m<br><i style="background:var(--s2,#e85d00)"></i>MapNG 0.2.7: ${p[2].toFixed(0)} m`;
+    const cx = X * r.width / vb.width; tip.style.display = 'block';
+    tip.style.left = Math.min(r.width - tip.offsetWidth, Math.max(0, cx + 14)) + 'px'; tip.style.top = '40px';
+  };
+  const hide = () => { tip.style.display = 'none'; xh.style.display = 'none'; };
+  svg.addEventListener('pointermove', show); svg.addEventListener('pointerdown', show); svg.addEventListener('pointerleave', hide);
+})();
+</script>
+</body>
+</html>

@@ -55,6 +55,14 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 ## What's New (November 2026)
 
+**MapNG 0.2.7** ([update page](https://mapng.com/updates/0.2.7/))
+
+- **Better ground where there's no lidar:** buildings, trees and viaduct decks are taken out of the global 30 m (it measures roofs and treetops in cities), and Copernicus GLO-30 is averaged in where both are radar. Checked against lidar in about 30 city areas, the average error on roads drops from 7.8 to 4.8 m, on bare ground from 5.1 to 3.1 m
+- **Fine ground detail:** small bumps and hollows by land cover (more in woods and scrub, almost none in fields, none on roads) on levels from the global 30 m; a switch in Advanced → terrain edits
+- **Cliffs:** OSM-mapped cliffs become steep faces with a level top again, with rock on the face
+- **No more rings at junctions:** road smoothing left round marks where roads met on a slope
+- **Combined levels:** the level comes first, can be downloaded again from the finished window, and a failure says why; the desktop app saves combined levels straight into the mods folder
+
 **MapNG 0.2.6** ([update page](https://mapng.com/updates/0.2.6/))
 
 - **Free lidar, by default:** the new default elevation source, **Best free (lidar + global 30 m)**, builds levels from Mapterhorn's free national lidar wherever a survey exists (much of Europe, Japan, Australia, New Zealand, parts of the US and Canada), and from the global 30 m elsewhere; no key, no sign-up. It matches GPXZ's lidar to 0.1–2.5 m where both have it
