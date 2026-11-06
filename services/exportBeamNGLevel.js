@@ -21,6 +21,7 @@ import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, pla
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
+import { fetchWorldCoverGrid, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
 import { fetchTreeSpeciesMix, TREE_MIX_CREDIT } from './treeSpecies.js';
 import { placeBoats } from './boats.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
@@ -7493,6 +7494,9 @@ function buildBeamNGExportReport({
     `- Forest placement groups: ${forestPlacements.size}`,
     `- Forest placement files: ${forestFiles.length}`,
     `- Forest placements total: ${forestPlacementCount}`,
+    ...(forestPlacements?.landCover ? [forestPlacements.landCover.used
+      ? `- Left out by land cover (${forestPlacements.landCover.attribution}): ${forestPlacements.landCover.dropped.wood} trees of mapped woods where it sees no tree cover, ${forestPlacements.landCover.dropped.bush} bushes on rock, snow or water, ${forestPlacements.landCover.dropped.scatter} scattered trees on bare ground`
+      : '- Land cover (ESA WorldCover): unavailable, trees follow OSM alone'] : []),
     `- Ground cover objects: ${groundCoverObjects.length}`,
     `- OSM DAE written: ${formatBool(!!osmDaeBlob)}`,
     `- Backdrop DAE written: ${formatBool(!!backdropDaeBlob)}`,
@@ -10258,6 +10262,8 @@ const OPEN_GROUND_CLEAR_M = 4;
 const TREELESS_GOLF = new Set(['bunker', 'green', 'tee', 'fairway', 'driving_range', 'water_hazard', 'lateral_water_hazard']);
 
 async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null }, biome, tick = async () => {}) {
+  // (what the land cover left out, for the report: set when trees are planted)
+  let landCover = null;
   // Buildings, water and open playing ground, for the scattered and canopy
   // trees (a yard's tree is not in the house or the pool): world rings
   // bucketed by 32 m cells
@@ -10362,14 +10368,43 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
       const type = getOwnVegetationSelector(biome, SIGNATURE_SELECTORS[group]);
       return type ? [{ type, height: treeItemHeight(type) ?? (group.includes('shrub') ? 2.5 : 10) }] : [];
     };
-    const pickTree = ({ kind, tags, point, urban, area, seed }) => {
+    // What really covers the ground (services/worldCover.js, ESA WorldCover,
+    // 10 m): trees from a mapped wood only where there is tree cover, bushes
+    // not on rock or snow, no scattered trees on bare ground. OSM's woods are
+    // often drawn generously, and in the mountains far above the tree line
+    // (Tignes: 144,000 trees above 2,250 m, most of them in the open).
+    const worldSize = terrainData.width * squareSize;
+    const coverN = Math.min(4096, Math.max(64, Math.ceil(worldSize / 10)));
+    let coverGrid = null;
+    try {
+      coverGrid = terrainData.bounds ? await fetchWorldCoverGrid(terrainData.bounds, coverN, coverN) : null;
+    } catch (error) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Land cover (WorldCover) unavailable; trees follow OSM alone.`, error?.message || error);
+    }
+    const coverAt = (x, y) => {
+      if (!coverGrid) return 0;
+      const c = Math.min(coverN - 1, Math.max(0, Math.floor((x / worldSize + 0.5) * coverN)));
+      const r = Math.min(coverN - 1, Math.max(0, Math.floor((0.5 - y / worldSize) * coverN)));
+      return coverGrid[r * coverN + c];
+    };
+    const coverDropped = { wood: 0, bush: 0, scatter: 0 };
+    const coverKeeps = (placement, kind, seedText) => {
+      if (plantAllowed(coverAt(placement.pos[0], placement.pos[1]), kind, seededRandom(hashString(seedText)))) return true;
+      coverDropped[kind]++;
+      return false;
+    };
+    // (a placement's height above the sea, for the species: conifers in the mountains)
+    const baseZ = Number.isFinite(terrainData.minHeight) ? terrainData.minHeight : 0;
+    const elevationOf = (placement) => placement.pos[2] + baseZ;
+    landCover = { used: !!coverGrid, dropped: coverDropped, attribution: WORLDCOVER_ATTRIBUTION };
+    const pickTree = ({ kind, tags, point, urban, area, seed, elevation = null }) => {
       const hint = treeHintFromTags(tags);
       // exact species the biome ships (Italy: olive, cypress)
       if (kind === 'tree' && (hint === 'olive' || hint === 'cypress')) {
         const type = getOwnVegetationSelector(biome, hint);
         if (type) return { type, scale: 0.85 + 0.3 * seededRandom(hashString(`${seed}:s`)) };
       }
-      const group = chooseTreeGroup({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed, mix: treeMix });
+      const group = chooseTreeGroup({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed, mix: treeMix, elevation });
       // (an olive or cypress drawn from the local mix: the biome's own, if it ships one)
       if (kind === 'tree' && (group === 'olive' || group === 'cypress')) {
         const type = getOwnVegetationSelector(biome, group);
@@ -10449,7 +10484,8 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
             caps.forestPerArea, 1, 1, hashString(`${feature.id}:scatter`));
           placements.forEach((placement, idx) => {
             if (inBuildingOrWater(placement.pos[0], placement.pos[1])) return;
-            const choice = pickTree({ kind: 'tree', tags, point: centre, urban, area: true, seed: `${feature.id}:s${idx}` });
+            if (!coverKeeps(placement, 'scatter', `${feature.id}:wcs${idx}`)) return;
+            const choice = pickTree({ kind: 'tree', tags, point: centre, urban, area: true, seed: `${feature.id}:s${idx}`, elevation: elevationOf(placement) });
             if (!choice) return;
             placement.type = choice.type;
             placement.scale = roundTo(choice.scale, 6);
@@ -10475,7 +10511,8 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
             hashString(`${feature.id}:tree_area`),
           );
           placements.forEach((placement, idx) => {
-            const choice = pickTree({ kind: 'tree', tags, point: centre, urban, area: true, seed: `${feature.id}:a${idx}` });
+            if (!coverKeeps(placement, 'wood', `${feature.id}:wca${idx}`)) return;
+            const choice = pickTree({ kind: 'tree', tags, point: centre, urban, area: true, seed: `${feature.id}:a${idx}`, elevation: elevationOf(placement) });
             if (!choice) return;
             placement.type = choice.type;
             placement.scale = roundTo(choice.scale, 6);
@@ -10487,6 +10524,8 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
           if (floor) {
             sampleAreaPlacements(feature, terrainData, squareSize, 'area_bush', UNDERSTORY_PER_M2 * bushDensityMultiplier,
               caps.forestPerArea, 1, 1, hashString(`${feature.id}:floor`)).forEach((placement, idx) => {
+              // (a wood's floor only under its trees: the same land cover rule)
+              if (!plantAllowed(coverAt(placement.pos[0], placement.pos[1]), 'wood', seededRandom(hashString(`${feature.id}:wcf${idx}`)))) return;
               const choice = chooseTreeItem(floor, { lat: centre.lat, lon: centre.lng, seed: `${feature.id}:f${idx}` });
               if (!choice) return;
               placement.type = choice.type;
@@ -10508,6 +10547,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
             hashString(feature.id),
           );
           placements.forEach((placement, idx) => {
+            if (!coverKeeps(placement, 'bush', `${feature.id}:wcb${idx}`)) return;
             const choice = pickTree({ kind: 'shrub', tags, point: centre, urban, area: true, seed: `${feature.id}:b${idx}` });
             if (!choice) return;
             placement.type = choice.type;
@@ -10593,9 +10633,9 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
       }
         spots.forEach(([gx, gy], k) => {
           const point = { lat: north - gy * cellLat, lng: west + gx * cellLng };
-          const [x, y] = geoToWorldPoint(point.lat, point.lng, terrainData, squareSize, 0);
+          const [x, y, z] = geoToWorldPoint(point.lat, point.lng, terrainData, squareSize, 0);
           if (inBuildingOrWater(x, y) || nearMapped(x, y)) return;
-          const choice = pickTree({ kind: 'tree', tags: {}, point, urban, area: count > 1, seed: `canopy:${pi}:${k}` });
+          const choice = pickTree({ kind: 'tree', tags: {}, point, urban, area: count > 1, seed: `canopy:${pi}:${k}`, elevation: z + baseZ });
           if (!choice) return;
           const placement = makeForestPlacement(choice.type, point, terrainData, squareSize, seed + k, 1, 1);
           placement.scale = roundTo(choice.scale, 6);
@@ -10652,6 +10692,8 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
     if (merged.length > 0) placementsByType.set(type, merged);
   }
 
+  // (for the report: what the land cover left out)
+  if (landCover) placementsByType.landCover = landCover;
   return placementsByType;
 }
 

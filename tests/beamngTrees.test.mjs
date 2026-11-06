@@ -119,3 +119,19 @@ test('the desert side of California keeps desert bushes', async () => {
   assert.equal(group({ kind: 'shrub', lat: 39.53, lon: -119.81, seed: 's' }), 'desert_shrub', 'Reno');
   assert.equal(group({ kind: 'shrub', lat: 36.17, lon: -115.14, seed: 's' }), 'desert_shrub', 'Las Vegas');
 });
+
+test('mountain trees: untagged trees high up are conifers; tags still win; the tropics have no such line', async () => {
+  const { chooseTreeGroup, montaneConiferLine } = await import('../services/beamngTrees.js');
+  // Tignes (French Alps), 45.5°N: the region alone draws broadleaves and holm oaks
+  const at = (elevation, extra = {}) => chooseTreeGroup({ kind: 'tree', lat: 45.5, lon: 6.94, seed: 's1', elevation, ...extra });
+  assert.equal(at(2100), 'conifer');
+  assert.equal(at(1800), 'conifer');
+  assert.ok(Math.abs(montaneConiferLine(45.5) - 1380) < 30);
+  // a broadleaf tagged as such stays one
+  assert.equal(at(2100, { tags: { leaf_type: 'broadleaved' } }), 'deciduous');
+  // low down the old rule decides (no elevation known: as before)
+  assert.equal(chooseTreeGroup({ kind: 'tree', lat: 45.5, lon: 6.94, seed: 's1' }), chooseTreeGroup({ kind: 'tree', lat: 45.5, lon: 6.94, seed: 's1', elevation: 300 }));
+  assert.equal(montaneConiferLine(5), null);
+  // the Colorado Rockies, 39.6°N at 2,900 m: western pines
+  assert.equal(chooseTreeGroup({ kind: 'tree', lat: 39.6, lon: -105.9, seed: 's2', elevation: 2900 }), 'pine_west');
+});

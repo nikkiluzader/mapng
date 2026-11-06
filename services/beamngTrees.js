@@ -105,6 +105,28 @@ export function understoryGroup(lat, lon) {
   return 'fern';
 }
 
+/**
+ * The height above the sea from which untagged trees are conifers, by
+ * latitude (null: no such line, the tropics' montane forests are broadleaf):
+ * the subalpine spruce, fir, larch and pine belt. ~1,400 m in the Alps, the
+ * Pyrenees and the Appalachians' spruce-fir; higher towards the subtropics
+ * (Atlas, Himalaya foothills), lower towards the boreal north.
+ */
+export function montaneConiferLine(lat) {
+  const a = Math.abs(lat);
+  if (a < 25) return null;
+  const pts = [[25, 2200], [35, 1500], [45, 1400], [55, 1000], [65, 400], [90, 0]];
+  for (let i = 1; i < pts.length; i++) {
+    if (a <= pts[i][0]) {
+      const [a0, z0] = pts[i - 1]; const [a1, z1] = pts[i];
+      return z0 + ((a - a0) / (a1 - a0)) * (z1 - z0);
+    }
+  }
+  return 0;
+}
+// (the belt fades in over this many metres below the line)
+const MONTANE_BLEND_M = 300;
+
 // ── What OSM says about a tree ───────────────────────────────────────────────
 
 // (a scientific name's kind, treeSpecies.js, as a group hint)
@@ -158,9 +180,19 @@ function groupOfKind(kind, c) {
  * export (treeSpecies.fetchTreeSpeciesMix), drawn from for a tree OSM says
  * nothing about; without one, the climate rule.
  */
-export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = false, area = false, height = null, seed = '', mix = null }) {
+export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = false, area = false, height = null, seed = '', mix = null, elevation = null }) {
   const c = treeClimate(lat, lon);
   const u = hash01(seed, 'group');
+  // High in the mountains an untagged tree is a conifer, whatever grows in
+  // the lowlands around (Tignes, 2,000 m: oaks, aspens and holm oaks came out
+  // of the region's climate and records, where the forest is larch and spruce)
+  const line = kind === 'tree' && Number.isFinite(elevation) ? montaneConiferLine(lat) : null;
+  if (line !== null && !treeHintFromTags(tags)) {
+    const over = elevation - line;
+    if (over >= 0 || (over > -MONTANE_BLEND_M && hash01(seed, 'montane') < 1 + over / MONTANE_BLEND_M)) {
+      return c.westCoast || c.dryWest ? 'pine_west' : 'conifer';
+    }
+  }
   if (kind === 'shrub') {
     if (summerDry(lat, lon)) return 'shrub_west';
     if (c.dryWest || (!northAmerica(lat, lon) && Math.abs(lat) < 42 && c.hotDesert)) return 'desert_shrub';

@@ -232,6 +232,27 @@ export default {
       return handleMapterhornTiles(request, env, ctx, url);
     }
 
+    // ESA WorldCover (services/worldCover.js): the bucket sends no CORS headers,
+    // so the browser reads its tiles through here, by range requests. Only its
+    // own tile names: not an open proxy.
+    if (url.pathname.startsWith('/api/worldcover/')) {
+      const file = url.pathname.slice('/api/worldcover/'.length);
+      const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'range', 'Access-Control-Expose-Headers': 'content-range, content-length, accept-ranges' };
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...cors, 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Max-Age': '86400' } });
+      if (!/^ESA_WorldCover_10m_2021_v200_[NS]\d{2}[EW]\d{3}_Map\.tif$/.test(file)) return new Response('Not Found', { status: 404, headers: cors });
+      if (request.method !== 'GET' && request.method !== 'HEAD') return new Response('Method Not Allowed', { status: 405, headers: cors });
+      const range = request.headers.get('Range');
+      const upstream = await fetch(`https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/${file}`, {
+        method: request.method,
+        headers: range ? { Range: range } : {},
+        cf: { cacheEverything: true, cacheTtl: 30 * 86400 },
+      });
+      const headers = new Headers(upstream.headers);
+      for (const [k, v] of Object.entries(cors)) headers.set(k, v);
+      headers.set('Cache-Control', 'public, max-age=2592000, immutable');
+      return new Response(upstream.body, { status: upstream.status, headers });
+    }
+
     const proxySimple = async (origin, stripPrefix) => {
       if (request.method === 'OPTIONS') {
         return new Response(null, {
