@@ -172,7 +172,7 @@
 
       <!-- Batch Grid Tiles -->
       <l-rectangle
-        v-for="tile in batchGrid"
+        v-for="tile in shownBatchGrid"
         :key="'batch-' + tile.index"
         :bounds="[[tile.bounds.south, tile.bounds.west], [tile.bounds.north, tile.bounds.east]]"
         :color="batchTileColor(tile)"
@@ -182,7 +182,7 @@
       />
 
       <l-marker
-        v-for="tile in batchGrid"
+        v-for="tile in shownBatchGrid"
         v-if="batchEditable"
         :key="'batch-handle-' + tile.index"
         :lat-lng="[tile.center.lat, tile.center.lng]"
@@ -384,10 +384,29 @@ const props = defineProps({
   uploadedAreaMode: { type: String, default: 'native' },
   surroundingTilePositions: { type: Array, default: () => [] },
   batchGrid: { type: Array, default: () => [] },
+  batchGridFollowsCenter: { type: Boolean, default: false },
   batchEditable: { type: Boolean, default: false },
 });
 
 const hasBatchGrid = computed(() => props.batchGrid && props.batchGrid.length > 0);
+// The batch grid as drawn: the app lays it out around its centre, which hears
+// about a drag only every MOVE_EMIT_MS, so drawn as given the boxes jumped
+// after the map in steps. Shifted by how far the map has moved since, they
+// follow it like the single selection box; the app's own layout takes over
+// when the move is reported.
+const shownBatchGrid = computed(() => {
+  const grid = props.batchGrid;
+  if (!grid?.length) return grid || [];
+  if (!props.batchGridFollowsCenter) return grid;
+  const dLat = currentCenter.value.lat - props.center.lat;
+  const dLng = currentCenter.value.lng - props.center.lng;
+  if ((Math.abs(dLat) < 1e-12 && Math.abs(dLng) < 1e-12) || Math.abs(dLng) > 180) return grid;
+  return grid.map((tile) => ({
+    ...tile,
+    bounds: { north: tile.bounds.north + dLat, south: tile.bounds.south + dLat, east: tile.bounds.east + dLng, west: tile.bounds.west + dLng },
+    center: { lat: tile.center.lat + dLat, lng: tile.center.lng + dLng },
+  }));
+});
 
 const batchTileColor = (tile) => {
   switch (tile.status) {
@@ -571,7 +590,7 @@ const exportAreaBounds = computed(() => {
     let south = Infinity;
     let east = -Infinity;
     let west = Infinity;
-    for (const tile of props.batchGrid) {
+    for (const tile of shownBatchGrid.value) {
       const b = tile?.bounds;
       if (!b) continue;
       north = Math.max(north, b.north);
@@ -675,7 +694,9 @@ const handleZoom = () => {
 // back exactly when the map lands there, instead of the map's own
 // pixel-rounded centre, so manually entered coordinates keep every digit.
 let programmaticTarget = null;
-const PROGRAMMATIC_LANDING_DEG = 1e-6;
+// (landed: within 1.5 screen pixels of the target, at the zoom it landed at;
+// the map's own centre is rounded to whole pixels, ~20 m per pixel at zoom 13)
+const landingToleranceDeg = (zoom) => (1.5 * 360) / (256 * 2 ** zoom);
 
 const onMoveEnd = () => {
     isMovingProgrammatically.value = false;
@@ -690,8 +711,8 @@ const onMoveEnd = () => {
         if (!target && mapCenterUnchanged(c)) return;
         lastMapCenter = { lat: c.lat, lng: c.lng };
         currentCenter.value = target
-          && Math.abs(c.lat - target.lat) < PROGRAMMATIC_LANDING_DEG
-          && Math.abs(c.lng - target.lng) < PROGRAMMATIC_LANDING_DEG
+          && Math.abs(c.lat - target.lat) < landingToleranceDeg(map.getZoom())
+          && Math.abs(c.lng - target.lng) < landingToleranceDeg(map.getZoom())
           ? { lat: target.lat, lng: target.lng }
           : { lat: c.lat, lng: clampLng(c.lng) };
         lastEmitted = currentCenter.value;
@@ -1025,8 +1046,36 @@ const onMapReady = (map) => {
   });
   map.on('movestart zoomstart click', closeContextMenu);
   window.addEventListener('keydown', onKeydown);
+  // Leaflet only notices window resizes. When a side panel opens or closes
+  // (My Levels, the sidebar) the map's box changes without one, Leaflet kept
+  // its old size, and the centre it reported drifted off the crosshair drawn
+  // in the middle of the box. Tell it on every box change; invalidateSize pans
+  // so the same place stays in the middle.
+  // The new size, then the same centre exactly (a pan by half the size change
+  // rounds to whole pixels and nudged the reported centre by a few metres):
+  // a programmatic move, reported back as its target, like typed coordinates.
+  let resizeFrame = 0;
+  mapResizeObserver = new ResizeObserver(() => {
+    cancelAnimationFrame(resizeFrame);
+    resizeFrame = requestAnimationFrame(() => {
+      // (read first: the resize itself fires a move that reports the shifted centre)
+      const c = { lat: currentCenter.value.lat, lng: currentCenter.value.lng };
+      const before = map.getSize();
+      isMovingProgrammatically.value = true;
+      map.invalidateSize({ pan: false });
+      if (before.equals(map.getSize())) { isMovingProgrammatically.value = false; return; }
+      map.off('moveend', onMoveEnd);
+      map.off('dragstart', onDragStart);
+      map.on('moveend', onMoveEnd);
+      map.on('dragstart', onDragStart);
+      programmaticTarget = c;
+      map.setView([c.lat, c.lng], map.getZoom(), { animate: false });
+    });
+  });
+  mapResizeObserver.observe(map.getContainer());
 };
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown));
+let mapResizeObserver = null;
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); });
 const hotspotWhen = (dot) => {
   const days = daysSince(dot.lastDay);
   if (days === null) return '';

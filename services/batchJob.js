@@ -590,8 +590,9 @@ function releaseBatchDownloads() {
 function offerJobDownload(state, blob, filename) {
   const url = URL.createObjectURL(blob);
   const files = jobDownloads.get(state.id) || [];
-  files.push({ name: filename, url, size: blob.size });
+  files.push({ name: filename, url, size: blob.size, savedPath: null });
   jobDownloads.set(state.id, files);
+  downloadState = state;
   // (the dialog watches the names; the URLs never go into the saved state)
   state.downloadNames = files.map((f) => f.name);
   const link = document.createElement('a');
@@ -599,6 +600,19 @@ function offerJobDownload(state, blob, filename) {
   link.download = filename;
   link.click();
 }
+
+// The desktop app saves MapNG_Batch_* files without asking (Downloads/MapNG
+// Batch, desktop/main.js) and says where: the dialog then offers "Show in
+// folder", and the page lets go of the file's bytes.
+let downloadState = null;
+desktopApp?.onBatchFileSaved?.(({ name, path }) => {
+  if (!downloadState || !path) return;
+  const f = getBatchDownloads(downloadState.id).find((d) => d.name === name && !d.savedPath);
+  if (!f) return;
+  f.savedPath = path;
+  URL.revokeObjectURL(f.url);
+  downloadState.downloadNames = [...downloadState.downloadNames];
+});
 
 const formatReportNumber = (value, digits = 3) => {
   if (!Number.isFinite(value)) return 'n/a';
@@ -1844,7 +1858,10 @@ async function processTile(state, tile, ctx, signal) {
       }
 
       const date = new Date().toISOString().slice(0, 10);
-      triggerDownload(zipBlob, `MapNG_Batch_${sanitizeFilenamePart(label)}_${date}_${tile.center.lat.toFixed(4)}_${tile.center.lng.toFixed(4)}.zip`);
+      const tileZipName = `MapNG_Batch_${sanitizeFilenamePart(label)}_${date}_${tile.center.lat.toFixed(4)}_${tile.center.lng.toFixed(4)}.zip`;
+      // (the desktop app saves it without a dialog and the finished window lists it)
+      if (desktopApp) offerJobDownload(state, zipBlob, tileZipName);
+      else triggerDownload(zipBlob, tileZipName);
 
       tile.status = TILE_STATES.DONE;
       tile.lifecycle.completedAt = Date.now();

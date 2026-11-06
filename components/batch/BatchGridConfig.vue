@@ -36,7 +36,7 @@
         <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batchCombined.disabledWarning') }}
       </p>
       <p v-else-if="combinedDim >= COMBINED_SUPPORTED_MAX" class="text-micro text-amber-600 dark:text-amber-500 font-medium">
-        <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batchCombined.largeSizeNote', { mb: combinedMemoryMB }) }}
+        <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t(isDesktop ? 'batchCombined.largeSizeNoteDesktop' : 'batchCombined.largeSizeNote', { mb: combinedMemoryMB }) }}
       </p>
     </div>
 
@@ -116,8 +116,10 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BaseCard from '../base/BaseCard.vue';
 import BaseButton from '../base/BaseButton.vue';
+import { desktopApp } from '../../services/platform/desktop.js';
 
 const { t } = useI18n({ useScope: 'global' });
+const isDesktop = !!desktopApp;
 
 const props = defineProps({
   gridCols: { type: Number, default: 3 },

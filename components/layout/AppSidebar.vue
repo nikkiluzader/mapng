@@ -15,10 +15,22 @@
         <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">MapNG</h1>
         <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('sidebar.tagline') }}</p>
       </div>
+      <!-- (the desktop app has no browser reload button: one here, as View → Reload / Ctrl+R) -->
       <BaseButton
+        v-if="isDesktop"
         size="sm"
         variant="ghost"
         class="ml-auto text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
+        :title="t('sidebar.reloadTooltip')"
+        :aria-label="t('sidebar.reloadTooltip')"
+        @click="reloadApp"
+      >
+        <RotateCw :size="18" />
+      </BaseButton>
+      <BaseButton
+        size="sm"
+        variant="ghost"
+        :class="[isDesktop ? '' : 'ml-auto', 'text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800']"
         :title="t('sidebar.aboutTooltip')"
         @click="$emit('show-about')"
       >
@@ -88,9 +100,11 @@ import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
 import { SELECT_XS } from '../base/controlStyles.js';
-import { CircleHelp, Sun, Moon, Code, Download } from 'lucide-vue-next';
+import { CircleHelp, Sun, Moon, Code, Download, RotateCw } from 'lucide-vue-next';
 
 const { t, locale } = useI18n({ useScope: 'global' });
+const isDesktop = !!desktopApp;
+const reloadApp = () => window.location.reload();
 const locales = computed(() => getSupportedLocales());
 
 // (the desktop app names its version instead of the site's build)

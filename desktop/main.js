@@ -126,8 +126,35 @@ function createWindow() {
     lastWindowCrash = { reason: details.reason, exitCode: details.exitCode, at: Date.now() };
     if (Date.now() - lastReload > 60_000 && !win.isDestroyed()) { lastReload = Date.now(); win.loadURL('app://mapng/'); }
   });
+  // Batch jobs' own files (MapNG_Batch_*: separate tiles' ZIPs, the stitched
+  // heightmap, the elevation report) are saved without asking, into
+  // Downloads/MapNG Batch: a batch of 16 tiles opened 16 save dialogs, and the
+  // end of a combined level one more for its report. The window is told where
+  // each went. (Anything else the page downloads asks as usual.)
+  win.webContents.session.on('will-download', (_event, item) => {
+    const name = item.getFilename();
+    if (!BATCH_FILE.test(name)) return;
+    const dir = batchFolder();
+    fs.mkdirSync(dir, { recursive: true });
+    const file = uniqueFile(dir, name);
+    item.setSavePath(file);
+    item.once('done', (_e, state) => {
+      if (!win.isDestroyed()) win.webContents.send('desktop:batchFileSaved', { name, path: state === 'completed' ? file : null, state });
+    });
+  });
   win.loadURL('app://mapng/');
   return win;
+}
+
+const BATCH_FILE = /^MapNG_Batch_[^\\/]+$/;
+const batchFolder = () => path.join(app.getPath('downloads'), 'MapNG Batch');
+// name.ext, or name (2).ext, name (3).ext… when it is taken
+function uniqueFile(dir, name) {
+  const ext = path.extname(name), base = name.slice(0, name.length - ext.length);
+  for (let n = 1; ; n++) {
+    const file = path.join(dir, n === 1 ? name : `${base} (${n})${ext}`);
+    if (!fs.existsSync(file)) return file;
+  }
 }
 
 // ---- level exports ----------------------------------------------------------
@@ -262,6 +289,7 @@ ipcMain.handle('desktop:info', () => ({
   welcomed: !!readSettings().welcomed,
   updates: readSettings().updates || null,
   memoryGB: Math.round(os.totalmem() / 2 ** 30),
+  batchFolder: batchFolder(),
 }));
 
 ipcMain.handle('desktop:chooseModsFolder', (event) => chooseModsFolder(BrowserWindow.fromWebContents(event.sender)));

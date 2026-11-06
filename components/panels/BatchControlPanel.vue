@@ -4,7 +4,7 @@
     <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 flex items-start gap-2">
       <AlertTriangle :size="14" class="text-amber-500 mt-0.5 shrink-0" />
       <p class="text-micro text-amber-700 dark:text-amber-400 leading-relaxed">
-        <span class="font-bold">{{ t('batch.resourceHeavy') }}</span> {{ t('batch.resourceHeavyBody') }}
+        <span class="font-bold">{{ t('batch.resourceHeavy') }}</span> {{ isDesktop ? t('batch.resourceHeavyBodyDesktop') : t('batch.resourceHeavyBody') }}
       </p>
     </div>
 
@@ -193,7 +193,7 @@
       <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batch.selectedPerTile', { count: selectedExportCount }) }}</span></p>
       <p>{{ t('batch.totalFiles', { tiles: totalTiles, exports: selectedExportCount, total: totalTiles * selectedExportCount }) }}</p>
       <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
-        <Info :size="11" class="shrink-0 mt-px" />{{ t('batch.browserDownloadHint') }}
+        <Info :size="11" class="shrink-0 mt-px" />{{ isDesktop ? t('batch.browserDownloadHintDesktop') : t('batch.browserDownloadHint') }}
       </p>
     </div>
 
@@ -257,6 +257,7 @@ import { initialElevationSource } from '../../services/elevationDefaults.js';
 import { withoutPersonal } from '../../services/personalKeys.js';
 import SectionToggleAll from '../base/SectionToggleAll.vue';
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
+import { desktopApp } from '../../services/platform/desktop.js';
 // Expand all / Collapse all for every section in this panel
 provideSectionGroup();
 import SettingCard from '../base/SettingCard.vue';
@@ -280,6 +281,7 @@ import { probeGPXZLimits } from '../../services/terrain';
 import { cloneRateLimitInfo, downloadJsonFile } from '../../services/traceability';
 
 const { t } = useI18n({ useScope: 'global' });
+const isDesktop = !!desktopApp;
 
 const props = defineProps({
   center: { type: Object, required: true },

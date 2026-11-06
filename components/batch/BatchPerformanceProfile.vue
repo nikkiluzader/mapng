@@ -10,7 +10,7 @@
       <option value="low_memory">{{ t('batch.profileLowMemory') }}</option>
     </select>
     <p class="text-micro text-gray-500 dark:text-gray-400">
-      {{ t('batch.profileHelp') }}
+      {{ isDesktop ? t('batch.profileHelpDesktop') : t('batch.profileHelp') }}
     </p>
   </SettingSection>
 </template>
@@ -20,8 +20,10 @@ import SettingSection from '../base/SettingSection.vue';
 import { Gauge } from 'lucide-vue-next';
 import { useI18n } from 'vue-i18n';
 import { SELECT_MD } from '../base/controlStyles.js';
+import { desktopApp } from '../../services/platform/desktop.js';
 
 const { t } = useI18n({ useScope: 'global' });
+const isDesktop = !!desktopApp;
 
 defineProps({
   modelValue: { type: String, default: 'balanced' },

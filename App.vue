@@ -114,6 +114,7 @@
             :uploaded-area-mode="uploadedAreaMode"
             :surrounding-tile-positions="surroundingTilePositions"
             :batch-grid="batchGridTiles"
+            :batch-grid-follows-center="batchGridFollowsCenter"
             :batch-editable="batchMode && !batchRunning && !showBatchProgress"
             @move="handleMapMove" 
             @zoom="store.setZoom"
@@ -450,6 +451,14 @@ const applyAscCoordinateSelection = async (meta) => {
 };
 
 // Compute batch grid tiles for map overlay (live preview while configuring)
+// The preview grid is laid out around the map centre (it moves with a drag);
+// a job's own tiles, or "Tiles follow map center" turned off, stay where they
+// are on the map. (MapSelector draws a following grid at the live centre.)
+const batchGridFollowsCenter = computed(() => {
+  if (!batchMode.value || batchTileFollowCenter.value === false) return false;
+  const status = batchState.value?.status;
+  return !(batchState.value && (showBatchProgress.value || batchRunning.value || ['running', 'paused', 'pending'].includes(status)));
+});
 const batchGridTiles = computed(() => {
   if (!batchMode.value) return [];
   // Use persisted batch tiles only while a job is active/paused

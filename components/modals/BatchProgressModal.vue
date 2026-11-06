@@ -88,7 +88,7 @@
             <div class="h-full rounded-full bg-indigo-500 transition-all duration-500 ease-out"
               :style="{ width: finalizePercent + '%' }"></div>
           </div>
-          <p class="text-micro text-indigo-500 dark:text-indigo-400">{{ t('batchProgress.finalizingHint') }}</p>
+          <p class="text-micro text-indigo-500 dark:text-indigo-400">{{ isDesktop ? t('batchProgress.finalizingHintDesktop') : t('batchProgress.finalizingHint') }}</p>
         </div>
 
         <!-- Current Tile Status (during processing) -->
@@ -142,12 +142,23 @@
 
           <!-- The finished job's files, again (a browser may have blocked the automatic downloads) -->
           <div v-if="jobFiles.length" class="space-y-1.5">
-            <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchProgress.filesHint') }}</p>
-            <a v-for="f in jobFiles" :key="f.url" :href="f.url" :download="f.name"
-              class="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100">
-              <span class="flex items-center gap-1.5 min-w-0"><Download :size="13" class="flex-shrink-0" /><span class="truncate">{{ f.name }}</span></span>
-              <span class="text-gray-400 flex-shrink-0">{{ formatSize(f.size) }}</span>
-            </a>
+            <!-- (the desktop app saved them already, into Downloads/MapNG Batch: show where) -->
+            <template v-if="isDesktop">
+              <p class="text-xs text-gray-500 dark:text-gray-400 break-words">{{ t('batchProgress.filesSavedHint', { folder: batchFolder }) }}</p>
+              <button v-for="f in jobFiles" :key="f.url" type="button" :disabled="!f.savedPath" @click="desktopApp.showItem(f.savedPath)"
+                class="w-full flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100 disabled:opacity-60 text-left">
+                <span class="flex items-center gap-1.5 min-w-0"><FolderOpen :size="13" class="flex-shrink-0" /><span class="truncate">{{ f.name }}</span></span>
+                <span class="text-gray-400 flex-shrink-0">{{ f.savedPath ? t('batchProgress.showInFolder') : t('batchProgress.savingFile') }}</span>
+              </button>
+            </template>
+            <template v-else>
+              <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('batchProgress.filesHint') }}</p>
+              <a v-for="f in jobFiles" :key="f.url" :href="f.url" :download="f.name"
+                class="flex items-center justify-between gap-2 text-xs px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-100">
+                <span class="flex items-center gap-1.5 min-w-0"><Download :size="13" class="flex-shrink-0" /><span class="truncate">{{ f.name }}</span></span>
+                <span class="text-gray-400 flex-shrink-0">{{ formatSize(f.size) }}</span>
+              </a>
+            </template>
           </div>
 
           <!-- Combined Level Partial Export Warning -->
@@ -304,7 +315,7 @@ import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import {
   Loader2, Check, X, XCircle, Square, Play, Pause, RotateCcw,
-  CheckCircle2, AlertTriangle, Package, Download,
+  CheckCircle2, AlertTriangle, Package, Download, FolderOpen,
 } from 'lucide-vue-next';
 import { estimateTimeRemaining, formatDuration, getBatchDownloads } from '../../services/batchJob';
 import { desktopApp } from '../../services/platform/desktop.js';
@@ -375,8 +386,12 @@ const finalizePercent = computed(() => {
 });
 const finalizeError = computed(() => props.state.finalizeError || null);
 const isDesktop = !!desktopApp;
+// (where the desktop app saves batch files: Downloads/MapNG Batch)
+const batchFolder = ref('Downloads/MapNG Batch');
+if (desktopApp) desktopApp.info().then((i) => { if (i?.batchFolder) batchFolder.value = i.batchFolder; }).catch(() => {});
 // (the finished job's files: their names are in the state, their URLs in batchJob)
-const jobFiles = computed(() => (props.state.downloadNames?.length ? getBatchDownloads(props.state.id) : []));
+// (copies: a file's saved path changes in place, and the same array would read as unchanged)
+const jobFiles = computed(() => (props.state.downloadNames?.length ? getBatchDownloads(props.state.id).map((f) => ({ ...f })) : []));
 // the level ZIP was made (downloaded, or saved by the desktop app)
 const combinedLevelMade = computed(() => !!props.state.combinedSaved || jobFiles.value.some((f) => /\.zip$/i.test(f.name)));
 const formatSize = (bytes) => (bytes >= 1e9 ? `${(bytes / 1e9).toFixed(1)} GB` : bytes >= 1e6 ? `${(bytes / 1e6).toFixed(0)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} KB`);
