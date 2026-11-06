@@ -1374,6 +1374,9 @@
     "rowTerrain": "Teren",
     "rowMapData": "Dane mapy",
     "rowGrid": "Siatka",
-    "rowOutput": "Wynik"
+    "rowOutput": "Wynik",
+    "exportStale": "Ustawienia zmieniły się od wygenerowania tego terenu. Eksport teraz użyje starego terenu (z jego źródłem wysokości i wyborem terenu). Wygeneruj ponownie, aby użyć nowych ustawień.",
+    "generateAgain": "Wygeneruj ponownie",
+    "exportStaleShort": "Ten eksport używa terenu wygenerowanego z wcześniejszymi ustawieniami."
   }
 }

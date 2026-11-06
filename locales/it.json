@@ -1374,6 +1374,9 @@
     "rowTerrain": "Terreno",
     "rowMapData": "Dati della mappa",
     "rowGrid": "Griglia",
-    "rowOutput": "Risultato"
+    "rowOutput": "Risultato",
+    "exportStale": "Le impostazioni sono cambiate da quando questo terreno è stato generato. Esportare ora usa il terreno vecchio (con la sua fonte di elevazione e scelta del terreno). Genera di nuovo per usare le nuove impostazioni.",
+    "generateAgain": "Genera di nuovo",
+    "exportStaleShort": "Questa esportazione usa il terreno generato con le impostazioni precedenti."
   }
 }

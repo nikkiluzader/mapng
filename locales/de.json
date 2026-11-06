@@ -1374,6 +1374,9 @@
     "rowTerrain": "Gelände",
     "rowMapData": "Kartendaten",
     "rowGrid": "Raster",
-    "rowOutput": "Ausgabe"
+    "rowOutput": "Ausgabe",
+    "exportStale": "Deine Einstellungen haben sich seit dem Erzeugen dieses Geländes geändert. Ein Export jetzt verwendet das alte Gelände (mit seiner Höhenquelle und Geländewahl). Erzeuge es erneut, um die neuen Einstellungen zu verwenden.",
+    "generateAgain": "Erneut erzeugen",
+    "exportStaleShort": "Dieser Export verwendet das mit deinen früheren Einstellungen erzeugte Gelände."
   }
 }

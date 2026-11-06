@@ -266,6 +266,18 @@
 
     <!-- 4. Export: what was generated, and what the level gets (the export button sits in the bar below) -->
     <div v-show="step === 4" class="space-y-5">
+      <!-- (settings changed since generating: the export would use the old
+           terrain, its old elevation source and Terrain choice; say so first) -->
+      <div v-if="exportStale" class="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2.5 space-y-2">
+        <p class="flex items-start gap-1.5 text-caption leading-snug font-medium text-amber-800 dark:text-amber-200">
+          <AlertTriangle :size="13" class="shrink-0 mt-px" />{{ t('wizard.exportStale') }}
+        </p>
+        <button
+          type="button"
+          class="px-3 py-1 rounded-md bg-brand hover:bg-brand-500 text-white text-caption font-semibold"
+          @click="$emit('generate', false, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
+        >{{ t('wizard.generateAgain') }}</button>
+      </div>
       <h3 v-if="terrainData && !isGenerating" class="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-600 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
         <CheckCircle2 :size="14" class="shrink-0" />
         {{ t('exportPanel.readyToExport') }}
@@ -314,6 +326,9 @@
         />
       </template>
       <!-- (ExportPanel teleports its export button here) -->
+      <p v-if="step === 4 && exportStale" class="flex items-center gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300">
+        <AlertTriangle :size="11" class="shrink-0" />{{ t('wizard.exportStaleShort') }}
+      </p>
       <div v-show="step === 4" id="mapng-wizard-export" class="space-y-2"></div>
     </template>
   </WizardLayout>
@@ -536,6 +551,9 @@ const wizardSteps = computed(() => [
   { key: 'generate', label: t('wizard.generate'), done: !!props.terrainData && isCached.value },
   { key: 'export', label: t('wizard.export'), locked: !props.terrainData, lockedReason: t('wizard.exportLocked') },
 ]);
+// (the terrain on screen was made from other settings than these: an export now
+// would use it as it is, e.g. still from the old elevation source)
+const exportStale = computed(() => !!props.terrainData && !props.isGenerating && !isCached.value && !props.uploadedElevationFile);
 watch(() => props.isGenerating, (now, before) => {
   if (before && !now && props.terrainData) step.value = 4;
 });

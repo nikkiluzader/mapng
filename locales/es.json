@@ -1374,6 +1374,9 @@
     "rowTerrain": "Terreno",
     "rowMapData": "Datos de mapa",
     "rowGrid": "Cuadrícula",
-    "rowOutput": "Resultado"
+    "rowOutput": "Resultado",
+    "exportStale": "Tus ajustes cambiaron desde que se generó este terreno. Exportar ahora usa el terreno antiguo (su fuente de elevación y su elección de terreno). Vuelve a generar para usar los nuevos ajustes.",
+    "generateAgain": "Generar de nuevo",
+    "exportStaleShort": "Esta exportación usa el terreno generado con tus ajustes anteriores."
   }
 }

@@ -1374,6 +1374,9 @@
     "rowTerrain": "Terrain",
     "rowMapData": "Données cartographiques",
     "rowGrid": "Grille",
-    "rowOutput": "Résultat"
+    "rowOutput": "Résultat",
+    "exportStale": "Vos réglages ont changé depuis la génération de ce terrain. Exporter maintenant utilise l'ancien terrain (sa source d'élévation et son choix de terrain). Générez à nouveau pour utiliser les nouveaux réglages.",
+    "generateAgain": "Générer à nouveau",
+    "exportStaleShort": "Cet export utilise le terrain généré avec vos réglages précédents."
   }
 }

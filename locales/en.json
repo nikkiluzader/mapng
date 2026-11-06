@@ -1374,6 +1374,9 @@
     "rowTerrain": "Terrain",
     "rowMapData": "Map data",
     "rowGrid": "Grid",
-    "rowOutput": "Output"
+    "rowOutput": "Output",
+    "exportStale": "Your settings changed since this terrain was generated. Exporting now uses the old terrain (its elevation source and Terrain choice). Generate again to use the new settings.",
+    "generateAgain": "Generate again",
+    "exportStaleShort": "This export uses the terrain generated with your earlier settings."
   }
 }
