@@ -632,10 +632,13 @@ const summaryItems = computed(() => {
 // The wizard (components/ui/WizardLayout.vue): Where, Built from, What you
 // get, Run. Nothing is locked: Start runs from any step.
 const step = ref(1);
+// (a step stays ticked once moved past, wherever the user goes after)
+const furthestStep = ref(1);
+watch(step, (n) => { furthestStep.value = Math.max(furthestStep.value, n); });
 const wizardSteps = computed(() => [
-  { key: 'where', label: t('panelSteps.where'), done: step.value > 1 },
-  { key: 'built', label: t('panelSteps.builtFrom'), done: step.value > 2 },
-  { key: 'get', label: t('panelSteps.get'), done: step.value > 3 },
+  { key: 'where', label: t('panelSteps.where'), done: furthestStep.value > 1 },
+  { key: 'built', label: t('panelSteps.builtFrom'), done: furthestStep.value > 2 },
+  { key: 'get', label: t('panelSteps.get'), done: furthestStep.value > 3 },
   { key: 'run', label: t('wizard.run') },
 ]);
 const gridHeightDisplay = computed(() => formatDist(gridHeightKm.value));

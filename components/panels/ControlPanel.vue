@@ -524,9 +524,14 @@ const summaryItems = computed(() => {
 // and Export once there is terrain to export. After generating it moves on
 // to Export by itself.
 const step = ref(1);
+// (a step stays ticked once moved past, wherever the user goes after: going
+// back to look at Location doesn't untick it; with terrain made, Location and
+// Sources are done; Generate is ticked while the terrain matches the settings)
+const furthestStep = ref(1);
+watch(step, (n) => { furthestStep.value = Math.max(furthestStep.value, n); });
 const wizardSteps = computed(() => [
-  { key: 'where', label: t('panelSteps.where'), done: step.value > 1 },
-  { key: 'built', label: t('panelSteps.builtFrom'), done: step.value > 2 },
+  { key: 'where', label: t('panelSteps.where'), done: furthestStep.value > 1 || !!props.terrainData },
+  { key: 'built', label: t('panelSteps.builtFrom'), done: furthestStep.value > 2 || !!props.terrainData },
   { key: 'generate', label: t('wizard.generate'), done: !!props.terrainData && isCached.value },
   { key: 'export', label: t('wizard.export'), locked: !props.terrainData, lockedReason: t('wizard.exportLocked') },
 ]);
