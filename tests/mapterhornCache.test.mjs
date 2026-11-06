@@ -17,9 +17,10 @@ const edge = () => { const m = new Map(); return { match: async (r) => m.get(r.u
 const ctx = () => { const p = []; return { waitUntil: (x) => p.push(x), done: () => Promise.all(p) }; };
 const req = (path, ip = '1.2.3.4') => new Request(`https://mapng.com${path}`, { headers: { 'CF-Connecting-IP': ip } });
 
-test('paths: lidar zooms only, inside the tile grid', () => {
+test('paths: z12 (Copernicus) and lidar zooms only, inside the tile grid', () => {
   assert.deepEqual(parseMapterhornPath('/api/mapterhorn/16/34318/22950.webp'), { z: 16, x: 34318, y: 22950, key: 'mapterhorn/16/34318/22950.webp' });
-  assert.equal(parseMapterhornPath('/api/mapterhorn/12/1/1.webp'), null);       // base layer not served
+  assert.equal(parseMapterhornPath('/api/mapterhorn/11/1/1.webp'), null);       // coarse base layer not served
+  assert.ok(parseMapterhornPath('/api/mapterhorn/12/1/1.webp'));               // z12: Copernicus 30 m (ground filter)
   assert.equal(parseMapterhornPath('/api/mapterhorn/13/9000/1.webp'), null);    // x outside 2^13
   assert.equal(parseMapterhornPath('/api/mapterhorn/16/1/1.png'), null);
   assert.equal(parseMapterhornPath('/api/mapterhorn/../secret'), null);

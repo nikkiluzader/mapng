@@ -1,15 +1,15 @@
-// /api/mapterhorn/{z}/{x}/{y}.webp: a pull-through cache of Mapterhorn's lidar tiles (z13-z18) in the R2 bucket
+// /api/mapterhorn/{z}/{x}/{y}.webp: a pull-through cache of Mapterhorn's tiles (z12-z18: Copernicus 30 m and lidar) in the R2 bucket
 // (OSM_TILES binding, keys mapterhorn/{z}/{x}/{y}.webp). A tile is fetched from tiles.mapterhorn.com once, kept,
 // and served from R2 after that, so MapNG's users put one request per tile on Mapterhorn, the tiles anyone has
 // used keep working if Mapterhorn is down, and the browser talks to mapng.com only. A full mirror (9.9 TB) is
 // not kept: only tiles someone used are stored.
 //
 // Misses (no lidar there: Mapterhorn answers 404) are remembered in the edge cache only, never in R2 (writes cost).
-// The base layer (z0-z12) is not served here: the app never asks for it through MapNG. Fresh upstream fetches are
+// The coarse base layer (z0-z11) is not served here: the app never asks for it through MapNG. Fresh upstream fetches are
 // capped per address so nobody can fill the bucket by crawling the route.
 
 const UPSTREAM = 'https://tiles.mapterhorn.com';
-const MIN_Z = 13;
+const MIN_Z = 12;   // z12: Copernicus GLO-30 outside lidar (the ground filter's second 30 m), z13+: lidar
 const MAX_Z = 18;
 const HIT_TTL_S = 30 * 24 * 3600;      // tiles change only with a Mapterhorn release
 const MISS_TTL_S = 7 * 24 * 3600;

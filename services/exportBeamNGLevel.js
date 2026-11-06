@@ -7447,7 +7447,7 @@ function buildBeamNGExportReport({
     `- Bounds north/south/east/west: ${formatNumber(bounds.north, 6)}, ${formatNumber(bounds.south, 6)}, ${formatNumber(bounds.east, 6)}, ${formatNumber(bounds.west, 6)}`,
     `- Elevation source used: ${resolveElevationSourceLabel(originalTerrainData, options?.elevationSource)}`,
     ...(originalTerrainData?.groundFilterInfo ? [`- Ground under buildings (global 30 m): ${(() => { const g = originalTerrainData.groundFilterInfo;
-      if (g.applied) return `taken out: ${(g.share * 100).toFixed(0)}% of the area lowered, mean ${g.meanCut.toFixed(1)} m, up to ${g.maxCut.toFixed(1)} m (rooftop signal ${g.dsmSlope.toFixed(2)}; GEDTM30, OpenGeoHub, CC-BY 4.0)`;
+      if (g.applied) return `taken out: ${(g.share * 100).toFixed(0)}% of the area lowered, mean ${g.meanCut.toFixed(1)} m, up to ${g.maxCut.toFixed(1)} m (rooftop signal ${g.dsmSlope.toFixed(2)}; GEDTM30, OpenGeoHub, CC-BY 4.0${g.copMixed ? '; averaged with Copernicus GLO-30, DLR e.V. / Airbus, EU and ESA, via Mapterhorn' : ''})`;
       return { bare_earth_already: 'not needed, the elevation here is bare earth already', gedtm_unavailable: 'skipped, GEDTM30 not reachable', error: 'skipped after an error', no_fit: 'skipped, not enough map data' }[g.reason] || `skipped (${g.reason})`; })()}`] : []),
     `- Source GeoTIFF source: ${originalTerrainData?.sourceGeoTiffs?.source ? String(originalTerrainData.sourceGeoTiffs.source).toUpperCase() : 'n/a'}`,
     `- Normalized terrain size for BeamNG (square power-of-two): ${formatBool(didCropToSquare)}`,

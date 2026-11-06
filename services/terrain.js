@@ -29,6 +29,7 @@ import { continuousLngRange } from "./lngRange.js";
 import { lowerRaisedWater } from "./waterBanks.js";
 import { removeSurfaceObjects } from "./dsmGround.js";
 import { fetchGedtmGrid } from "./gedtm.js";
+import { fetchCopernicusGrid } from "./copernicus.js";
 import { scaleNativeDimsToProcessingMpp } from "./uploadBounds.js";
 import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSize.js";
 
@@ -2351,7 +2352,7 @@ export const fetchTerrainData = async (
   if (!flat && !raw && !rawData && groundFilter && osmFeatures.length > 0) {
     onProgress?.("Finding the ground under buildings and trees...");
     try {
-      groundFilterInfo = await removeSurfaceObjects({ heightMap, width, height, bounds: finalBounds, metersPerPixel: effectiveMetersPerPixel, osmFeatures, fetchGedtm: fetchGedtmGrid, signal });
+      groundFilterInfo = await removeSurfaceObjects({ heightMap, width, height, bounds: finalBounds, metersPerPixel: effectiveMetersPerPixel, osmFeatures, fetchGedtm: fetchGedtmGrid, fetchCopernicus: fetchCopernicusGrid, signal });
       if (groundFilterInfo.applied) console.info(`[Terrain] Ground under buildings: ${(groundFilterInfo.share * 100).toFixed(0)}% of the area lowered, mean ${groundFilterInfo.meanCut.toFixed(1)} m, up to ${groundFilterInfo.maxCut.toFixed(1)} m (rooftop signal ${groundFilterInfo.dsmSlope.toFixed(2)}).`);
       else console.info(`[Terrain] Ground filter skipped: ${groundFilterInfo.reason}${Number.isFinite(groundFilterInfo.dsmSlope) ? ` (rooftop signal ${groundFilterInfo.dsmSlope.toFixed(2)})` : ''}.`);
     } catch (error) {

@@ -18,6 +18,7 @@
 //     opening, as BeamNG.Earth's dsmground) is blended in when lower: in flat dense cities it finds street level.
 //     Never deeper than the buildings there explain, and faded out at the map's edge.
 //  5. Never more than 1 m above our data (a surface model is an upper bound of the ground, up to its noise).
+//  6. Copernicus GLO-30 (copernicus.js) goes through the same steps and is averaged in where the data is radar.
 // The correction is applied to the full grid bilinearly. Runs before road smoothing, so roads level onto ground.
 import { createGridProjector } from './geoUtils.js';
 
@@ -215,7 +216,7 @@ export function groundFromSurface(a, gedtm, m, n, cell) {
  * In place on the full heightmap (row 0 north, width x height at mpp metres). fetchGedtm(bounds, n) -> Float32Array.
  * Returns stats ({ applied, reason?, ... }).
  */
-export async function removeSurfaceObjects({ heightMap, width, height, bounds, metersPerPixel, osmFeatures, fetchGedtm, signal }) {
+export async function removeSurfaceObjects({ heightMap, width, height, bounds, metersPerPixel, osmFeatures, fetchGedtm, fetchCopernicus = null, signal }) {
   const sizeM = Math.max(width, height) * metersPerPixel;
   const cell = Math.max(P.CELL_MIN_M, sizeM / P.MAX_CELLS);
   const n = Math.max(16, Math.round(sizeM / cell));
@@ -234,6 +235,23 @@ export async function removeSurfaceObjects({ heightMap, width, height, bounds, m
   const res = groundFromSurface(a, gedtm, m, n, cell);
   if (!res) return { applied: false, reason: 'no_fit' };
   if (!res.out) return { ...res.stats, applied: false, reason: 'bare_earth_already' };
+  // Copernicus GLO-30 through the same filter, averaged in by the rooftop gate (two radar models with partly
+  // independent errors; measured: roads 4.97 -> 4.78 m, bare ground 3.56 -> 3.11 m, under bridges 4.65 -> 4.24 m)
+  let copMixed = false;
+  if (fetchCopernicus) {
+    let cop = null;
+    try { cop = await fetchCopernicus(bounds, n, { signal }); } catch (e) { if (signal?.aborted) throw e; }
+    if (cop) {
+      const c = new Float32Array(n * n); for (let k = 0; k < n * n; k++) c[k] = Number.isFinite(cop[k]) ? cop[k] : a[k];
+      const rc = groundFromSurface(c, gedtm, m, n, cell);
+      const co = rc?.out || c;
+      const d = []; for (let k = 0; k < n * n; k += 7) if (Number.isFinite(co[k]) && Number.isFinite(res.out[k])) d.push(res.out[k] - co[k]);
+      d.sort((p, q) => p - q); const off = d.length ? d[d.length >> 1] : 0;
+      const w = 0.5 * res.stats.dsmGate;
+      for (let k = 0; k < n * n; k++) if (Number.isFinite(co[k]) && Number.isFinite(res.out[k])) res.out[k] = res.out[k] * (1 - w) + (co[k] + off) * w;
+      copMixed = true;
+    }
+  }
   // the correction, bilinear onto the full grid
   const c = new Float32Array(n * n); for (let k = 0; k < n * n; k++) c[k] = Number.isFinite(res.out[k]) && Number.isFinite(a[k]) ? res.out[k] - a[k] : 0;
   for (let py = 0; py < height; py++) {
@@ -245,5 +263,5 @@ export async function removeSurfaceObjects({ heightMap, width, height, bounds, m
       heightMap[py * width + px] = i0 + d;
     }
   }
-  return { ...res.stats, cell, n };
+  return { ...res.stats, copMixed, cell, n };
 }

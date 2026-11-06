@@ -70,6 +70,12 @@ const defaultLoadImage = async (url, signal) => {
   return direct.bitmap || null;
 };
 
+/** One Mapterhorn tile's heights (512 x 512, Terrarium), through MapNG's cache; null when there is no tile. */
+export async function loadMapterhornTile(z, x, y, { signal, loadImage = defaultLoadImage } = {}) {
+  const img = await loadImage(`${MAPTERHORN_CACHE_URL}/${z}/${x}/${y}.webp`, signal);
+  return img ? decodeImage(img) : null;
+}
+
 const decodeImage = (img) => {
   const c = document.createElement('canvas');
   c.width = TILE; c.height = TILE;
