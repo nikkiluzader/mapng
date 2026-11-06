@@ -34,6 +34,24 @@
         </div>
         <p v-else-if="probing" class="text-micro text-gray-400 leading-tight">{{ t('map.hintChecking') }}</p>
 
+        <!-- Compare here: a 500 m square from each source at the selection's centre, as hillshades -->
+        <div v-if="center" class="text-micro leading-tight">
+          <button type="button" data-testid="compare-toggle" class="text-brand hover:underline" @click="toggleCompare">
+            {{ compareOpen ? t('map.compareHide') : t('map.compareHere') }}
+          </button>
+          <div v-if="compareOpen" data-testid="compare-panel" class="mt-1.5 grid grid-cols-3 gap-1.5">
+            <figure v-for="cell in compareCells" :key="cell.key" class="flex flex-col gap-0.5 min-w-0">
+              <div class="aspect-square rounded border border-gray-200 dark:border-gray-600 bg-gray-100 dark:bg-gray-900 overflow-hidden flex items-center justify-center">
+                <img v-if="cell.url" :src="cell.url" :alt="cell.label" class="w-full h-full object-cover" style="image-rendering: auto" />
+                <button v-else-if="cell.key === 'gpxz' && cell.state === 'ask'" type="button" class="px-1 text-center text-brand hover:underline" @click="loadGpxzCompare">{{ t('map.compareAddGpxz') }}</button>
+                <span v-else class="px-1 text-center text-gray-400">{{ cell.state === 'loading' ? '…' : cell.note }}</span>
+              </div>
+              <figcaption class="truncate font-bold text-gray-700 dark:text-gray-200" :title="cell.label">{{ cell.label }}</figcaption>
+              <span v-if="cell.detail" class="truncate text-gray-500 dark:text-gray-400">{{ cell.detail }}</span>
+            </figure>
+          </div>
+        </div>
+
         <!-- Default -->
         <span v-if="localElevationSource === 'default'" class="block text-micro text-gray-500 dark:text-gray-400 leading-tight">
             {{ t('map.standardDescription') }}
@@ -128,6 +146,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Mountain, ChevronDown, AlertTriangle, Sparkles } from 'lucide-vue-next';
 import { boxAround, probeMapterhorn, probeGpxz } from '../../services/sourceAdvisor.js';
+import { standardPatch, mapterhornPatch, gpxzPatch, hillshadeDataUrl } from '../../services/sourceCompare.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -266,6 +285,45 @@ const checkGpxzHere = async () => {
   } catch (e) { gpxzProbe.value = t('map.gpxzHereFailed'); }
 };
 watch(() => [props.center?.lat, props.center?.lng], () => { if (gpxzProbe.value !== 'loading') gpxzProbe.value = null; });
+
+// ── Compare here ──
+const COMPARE_SIDE_M = 512, COMPARE_PX = 192;
+const compareOpen = ref(false);
+const compare = ref({});           // key -> { url, state, note, detail }
+let compareAbort = null;
+const compareCells = computed(() => [
+  { key: 'standard', label: t('config.source_default'), ...compare.value.standard },
+  { key: 'mapterhorn', label: 'Mapterhorn', ...compare.value.mapterhorn },
+  { key: 'gpxz', label: 'GPXZ', ...(compare.value.gpxz || { state: localGpxzApiKey.value ? 'ask' : 'none', note: t('map.compareNeedsKey') }) },
+]);
+const centerPoint = () => ({ lat: Number(props.center?.lat), lng: Number(props.center?.lng) });
+const setCell = (key, v) => { compare.value = { ...compare.value, [key]: v }; };
+const loadCompare = async () => {
+  compareAbort?.abort(); compareAbort = new AbortController(); const signal = compareAbort.signal;
+  const c = centerPoint(); compare.value = {};
+  const cell = COMPARE_SIDE_M / COMPARE_PX;
+  setCell('standard', { state: 'loading' }); setCell('mapterhorn', { state: 'loading' });
+  standardPatch(c, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal })
+    .then((h) => setCell('standard', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: '~30 m' }))
+    .catch(() => { if (!signal.aborted) setCell('standard', { note: t('map.compareFailed') }); });
+  try {
+    const p = probe.value?.reachable ? probe.value : await probeMapterhorn(boxAround(c, 0.6), { signal });
+    if (!p.zoom) setCell('mapterhorn', { note: t('map.compareNoLidar') });
+    else {
+      const h = await mapterhornPatch(c, p.zoom, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal });
+      setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~${fmtRes(p.metersPerPixel)} m · ${t('map.compareFree')}` });
+    }
+  } catch { if (!signal.aborted) setCell('mapterhorn', { note: t('map.compareFailed') }); }
+};
+const loadGpxzCompare = async () => {
+  const c = centerPoint(); setCell('gpxz', { state: 'loading' });
+  try {
+    const h = await gpxzPatch(c, localGpxzApiKey.value, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal: compareAbort?.signal });
+    setCell('gpxz', { url: hillshadeDataUrl(h, COMPARE_PX, COMPARE_SIDE_M / COMPARE_PX), detail: t('map.compareOneCall') });
+  } catch { setCell('gpxz', { note: t('map.compareFailed') }); }
+};
+const toggleCompare = () => { compareOpen.value = !compareOpen.value; if (compareOpen.value) loadCompare(); else compareAbort?.abort(); };
+watch(() => [props.center?.lat, props.center?.lng], () => { if (compareOpen.value) { compareOpen.value = false; compareAbort?.abort(); } });
 
 watch(() => props.gpxzApiKey, (newVal) => {
   localGpxzApiKey.value = newVal;
