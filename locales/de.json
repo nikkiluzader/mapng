@@ -465,13 +465,6 @@
       "lidarDecksHint": "Brückenhöhen aus der US-Lidar-Vermessung (einige MB)",
       "needsBridges": "Zuerst Brücken einschalten",
       "needsTunnels": "Zuerst Tunnel einschalten",
-      "shapeAll": "Alle",
-      "shapeCustom": "Eigene",
-      "shapeNone": "Keine",
-      "shapeHint_all": "MapNG passt den Boden an Straßen, Brücken, Überführungen, Tunnel, Gehwege und Seen an.",
-      "shapeHint_custom": "Wähle, welche Anpassungen MapNG am Boden vornimmt.",
-      "shapeHint_none": "Der Boden bleibt genau wie erzeugt. Brücken werden einfache Fahrbahnen mit Enden auf dem Boden; Tunnel entstehen nur, wo sie schon passen (Portalöffnungen bleiben offen).",
-      "generatedRaw": "Dieses Gelände wurde roh erzeugt (ohne Glättung). Das wird vor „Daten generieren“ unter „Rohes Gelände“ gewählt.",
       "reportNote": "Jede Anpassung steht in der export_report.txt des Levels.",
       "backdropOff": "Aus",
       "backdropGlobal": "30 m global",
@@ -535,9 +528,6 @@
     "processingResolutionPickLarge": "2 m: doppelte Fläche, weicheres Gelände",
     "processingResolutionPickHuge": "4 m: sehr große Gebiete, grobes Gelände",
     "includeOsmFeatures": "OSM-Features einbeziehen",
-    "rawTerrain": "Rohes Gelände (keine Straßenglättung)",
-    "rawTerrainOn": "An: Höhendaten werden genau wie heruntergeladen verwendet. Straßen werden nicht ausgerichtet, geglättet oder nivelliert; Straßenkurven bleiben glatt. Brücken und Tunnel werden beim Export weiterhin gebaut.",
-    "rawTerrainOff": "Aus: Straßen werden ins Gelände ausgerichtet, geglättet und nivelliert. Einschalten, um die Höhendaten unverändert zu lassen.",
     "overtureBuildings": "Fehlende Gebäude und Höhen aus Overture ergänzen",
     "overtureBuildingsHint": "Ergänzt Gebäude und Höhen, die in OpenStreetMap fehlen, als einfache Quader.",
     "showOsmCoverage": "MapNG-OSM-Abdeckung anzeigen",
@@ -1307,6 +1297,7 @@
   "sections": {
     "reset": "Zurücksetzen",
     "resetTitle": "Diesen Bereich auf die Standardwerte zurücksetzen",
-    "changedTitle": "Von den Standardwerten geändert"
+    "changedTitle": "Von den Standardwerten geändert",
+    "more": "Mehr"
   }
 }

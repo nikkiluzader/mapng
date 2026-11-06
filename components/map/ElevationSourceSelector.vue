@@ -58,9 +58,11 @@
         </span>
 
         <!-- Mapterhorn -->
-        <span v-else-if="localElevationSource === 'mapterhorn'" class="block text-micro text-gray-500 dark:text-gray-400 leading-tight">
-            {{ t('map.mapterhornDescription') }} <a href="https://mapterhorn.com/coverage" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('map.checkCoverage') }}</a>
-        </span>
+        <!-- (folded: the hint above already says what this area gets) -->
+        <details v-else-if="localElevationSource === 'mapterhorn'" class="text-micro text-gray-500 dark:text-gray-400 leading-tight">
+            <summary class="cursor-pointer select-none hover:text-brand w-fit">{{ t('sections.more') }}</summary>
+            <p class="mt-1">{{ t('map.mapterhornDescription') }} <a href="https://mapterhorn.com/coverage" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('map.checkCoverage') }}</a></p>
+        </details>
 
         <!-- None / Flat -->
         <span v-else-if="localElevationSource === 'none'" class="block text-micro text-gray-500 dark:text-gray-400 leading-tight">

@@ -465,13 +465,6 @@
       "lidarDecksHint": "Alturas de puentes del estudio lidar de EE. UU. (unos MB)",
       "needsBridges": "Activa primero Puentes",
       "needsTunnels": "Activa primero Túneles",
-      "shapeAll": "Todos",
-      "shapeCustom": "Personalizado",
-      "shapeNone": "Ninguno",
-      "shapeHint_all": "MapNG adapta el suelo a carreteras, puentes, pasos elevados, túneles, aceras y lagos.",
-      "shapeHint_custom": "Elige qué modificaciones hace MapNG en el suelo.",
-      "shapeHint_none": "El suelo queda tal como se generó. Los puentes son tableros simples con los extremos en el suelo; los túneles solo se crean donde ya encajan (las bocas siguen abiertas).",
-      "generatedRaw": "Este terreno se generó en bruto (sin suavizado). Eso se elige antes de «Generar datos», en «Terreno sin procesar».",
       "reportNote": "Cada modificación aparece en el export_report.txt del nivel.",
       "backdropOff": "No",
       "backdropGlobal": "30 m global",
@@ -535,9 +528,6 @@
     "processingResolutionPickLarge": "2 m: el doble de área, terreno más suave",
     "processingResolutionPickHuge": "4 m: áreas muy grandes, terreno grueso",
     "includeOsmFeatures": "Incluir elementos OSM",
-    "rawTerrain": "Terreno sin procesar (sin suavizado de carreteras)",
-    "rawTerrainOn": "Activado: la elevación se usa tal como se descarga. Las carreteras no se ajustan, suavizan ni nivelan en ella; las curvas siguen suaves. Puentes y túneles se siguen construyendo al exportar.",
-    "rawTerrainOff": "Desactivado: las carreteras se ajustan, suavizan y nivelan en el terreno. Actívalo para no modificar tus datos de elevación.",
     "overtureBuildings": "Añadir edificios y alturas que faltan desde Overture",
     "overtureBuildingsHint": "Completa los edificios y alturas que faltan en OpenStreetMap, como bloques simples.",
     "showOsmCoverage": "Mostrar cobertura OSM de MapNG",
@@ -1307,6 +1297,7 @@
   "sections": {
     "reset": "Restablecer",
     "resetTitle": "Devolver esta sección a los valores predeterminados",
-    "changedTitle": "Cambiado respecto a los valores predeterminados"
+    "changedTitle": "Cambiado respecto a los valores predeterminados",
+    "more": "Más"
   }
 }

@@ -465,13 +465,6 @@
       "lidarDecksHint": "Hauteurs des tabliers issues du relevé lidar américain (quelques Mo)",
       "needsBridges": "Activez d'abord Ponts",
       "needsTunnels": "Activez d'abord Tunnels",
-      "shapeAll": "Toutes",
-      "shapeCustom": "Personnalisé",
-      "shapeNone": "Aucune",
-      "shapeHint_all": "MapNG adapte le sol aux routes, ponts, passages supérieurs, tunnels, trottoirs et lacs.",
-      "shapeHint_custom": "Choisissez les modifications que MapNG apporte au sol.",
-      "shapeHint_none": "Le sol reste exactement tel que généré. Les ponts deviennent de simples tabliers posés au sol à leurs extrémités ; les tunnels ne sont construits que là où ils tiennent déjà (les entrées restent ouvertes).",
-      "generatedRaw": "Ce terrain a été généré brut (sans lissage). Cela se choisit avant « Générer les données », avec « Terrain brut ».",
       "reportNote": "Chaque modification est listée dans le export_report.txt du niveau.",
       "backdropOff": "Non",
       "backdropGlobal": "30 m mondial",
@@ -535,9 +528,6 @@
     "processingResolutionPickLarge": "2 m : deux fois la zone, terrain plus doux",
     "processingResolutionPickHuge": "4 m : très grandes zones, terrain grossier",
     "includeOsmFeatures": "Inclure les éléments OSM",
-    "rawTerrain": "Terrain brut (sans lissage des routes)",
-    "rawTerrainOn": "Activé : l'élévation est utilisée telle que téléchargée. Les routes ne sont ni alignées, ni lissées, ni nivelées dedans ; les courbes restent lisses. Ponts et tunnels sont toujours construits à l'export.",
-    "rawTerrainOff": "Désactivé : les routes sont alignées, lissées et nivelées dans le terrain. Activez pour garder vos données d'élévation intactes.",
     "overtureBuildings": "Ajouter les bâtiments et hauteurs manquants depuis Overture",
     "overtureBuildingsHint": "Ajoute les bâtiments et les hauteurs qui manquent dans OpenStreetMap, sous forme de simples blocs.",
     "showOsmCoverage": "Afficher la couverture OSM de MapNG",
@@ -1307,6 +1297,7 @@
   "sections": {
     "reset": "Réinitialiser",
     "resetTitle": "Remettre cette section aux valeurs par défaut",
-    "changedTitle": "Modifié par rapport aux valeurs par défaut"
+    "changedTitle": "Modifié par rapport aux valeurs par défaut",
+    "more": "Plus"
   }
 }

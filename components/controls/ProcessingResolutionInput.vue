@@ -35,7 +35,10 @@
       {{ t(perTile ? 'controlPanel.processingResolutionCoverageTile' : 'controlPanel.processingResolutionCoverage', { km: coverageKm, px: resolution, mpp: current }) }}
       · {{ t(detailKey) }}
     </p>
-    <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('controlPanel.processingResolutionGuide') }}</p>
+    <details class="text-micro text-gray-500 dark:text-gray-400">
+      <summary class="cursor-pointer select-none hover:text-brand w-fit">{{ t('sections.more') }}</summary>
+      <p class="mt-1">{{ t('controlPanel.processingResolutionGuide') }}</p>
+    </details>
     <p v-if="current > COARSE_MPP" class="flex items-start gap-1 text-micro text-amber-600 dark:text-amber-400 font-medium">
       <AlertTriangle :size="11" class="shrink-0 mt-px" />
       <span>

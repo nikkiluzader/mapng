@@ -465,13 +465,6 @@
       "lidarDecksHint": "Bridge deck heights from the US lidar survey (a few MB)",
       "needsBridges": "Turn on Bridges first",
       "needsTunnels": "Turn on Tunnels first",
-      "shapeAll": "All",
-      "shapeCustom": "Custom",
-      "shapeNone": "None",
-      "shapeHint_all": "MapNG shapes the ground to fit roads, bridges, overpasses, tunnels, sidewalks and lakes.",
-      "shapeHint_custom": "Choose which edits MapNG makes to the ground.",
-      "shapeHint_none": "The ground stays exactly as generated. Bridges become plain decks with their ends on the ground; tunnels are built only where they already fit (portal holes still open).",
-      "generatedRaw": "This terrain was generated raw (no smoothing). That's chosen before Generate Data, under Raw terrain.",
       "reportNote": "Every edit is listed in the level's export_report.txt.",
       "backdropOff": "Off",
       "backdropGlobal": "30 m global",
@@ -535,9 +528,6 @@
     "processingResolutionPickLarge": "2 m: twice the area, softer terrain",
     "processingResolutionPickHuge": "4 m: very large areas, coarse terrain",
     "includeOsmFeatures": "Include OSM features",
-    "rawTerrain": "Raw terrain (no road smoothing)",
-    "rawTerrainOn": "On: your elevation is used exactly as downloaded. Roads are not snapped, smoothed or levelled into it; road curves stay smooth. Bridges and tunnels are still built at export.",
-    "rawTerrainOff": "Off: roads are snapped, smoothed and levelled into the terrain. Turn on to keep your elevation data untouched.",
     "overtureBuildings": "Add missing buildings and heights from Overture",
     "overtureBuildingsHint": "Fills in buildings and heights OpenStreetMap is missing, as plain boxes.",
     "showOsmCoverage": "Show MapNG OSM coverage",
@@ -1307,6 +1297,7 @@
   "sections": {
     "reset": "Reset",
     "resetTitle": "Put this section back to the defaults",
-    "changedTitle": "Changed from the defaults"
+    "changedTitle": "Changed from the defaults",
+    "more": "More"
   }
 }

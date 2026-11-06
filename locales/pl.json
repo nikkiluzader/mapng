@@ -465,13 +465,6 @@
       "lidarDecksHint": "Wysokości pomostów z amerykańskiego pomiaru lidar (kilka MB)",
       "needsBridges": "Najpierw włącz Mosty",
       "needsTunnels": "Najpierw włącz Tunele",
-      "shapeAll": "Wszystkie",
-      "shapeCustom": "Własne",
-      "shapeNone": "Brak",
-      "shapeHint_all": "MapNG dopasowuje grunt do dróg, mostów, wiaduktów, tuneli, chodników i jezior.",
-      "shapeHint_custom": "Wybierz, jakie zmiany gruntu wprowadza MapNG.",
-      "shapeHint_none": "Grunt zostaje dokładnie taki, jak wygenerowano. Mosty stają się prostymi pomostami z końcami na ziemi; tunele powstają tylko tam, gdzie już pasują (wloty pozostają otwarte).",
-      "generatedRaw": "Ten teren wygenerowano jako surowy (bez wygładzania). Wybiera się to przed „Wygeneruj dane”, w opcji „Surowy teren”.",
       "reportNote": "Każda zmiana jest wymieniona w pliku export_report.txt poziomu.",
       "backdropOff": "Wył.",
       "backdropGlobal": "30 m globalnie",
@@ -535,9 +528,6 @@
     "processingResolutionPickLarge": "2 m: dwa razy większy obszar, łagodniejszy teren",
     "processingResolutionPickHuge": "4 m: bardzo duże obszary, zgrubny teren",
     "includeOsmFeatures": "Dołącz obiekty OSM",
-    "rawTerrain": "Surowy teren (bez wygładzania dróg)",
-    "rawTerrainOn": "Włączone: wysokości są używane dokładnie tak, jak zostały pobrane. Drogi nie są dopasowywane, wygładzane ani poziomowane; łuki dróg pozostają gładkie. Mosty i tunele nadal powstają przy eksporcie.",
-    "rawTerrainOff": "Wyłączone: drogi są dopasowywane, wygładzane i poziomowane w terenie. Włącz, aby zachować dane wysokościowe bez zmian.",
     "overtureBuildings": "Dodaj brakujące budynki i wysokości z Overture",
     "overtureBuildingsHint": "Uzupełnia budynki i wysokości, których brakuje w OpenStreetMap, jako proste bryły.",
     "showOsmCoverage": "Pokaż zasięg OSM MapNG",
@@ -1307,6 +1297,7 @@
   "sections": {
     "reset": "Przywróć",
     "resetTitle": "Przywróć domyślne ustawienia tej sekcji",
-    "changedTitle": "Zmienione względem domyślnych"
+    "changedTitle": "Zmienione względem domyślnych",
+    "more": "Więcej"
   }
 }

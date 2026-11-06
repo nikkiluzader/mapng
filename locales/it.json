@@ -465,13 +465,6 @@
       "lidarDecksHint": "Altezze degli impalcati dal rilievo lidar USA (pochi MB)",
       "needsBridges": "Attiva prima Ponti",
       "needsTunnels": "Attiva prima Gallerie",
-      "shapeAll": "Tutte",
-      "shapeCustom": "Personalizzate",
-      "shapeNone": "Nessuna",
-      "shapeHint_all": "MapNG adatta il suolo a strade, ponti, cavalcavia, gallerie, marciapiedi e laghi.",
-      "shapeHint_custom": "Scegli quali modifiche MapNG apporta al suolo.",
-      "shapeHint_none": "Il suolo resta esattamente com'è stato generato. I ponti diventano semplici impalcati con le estremità a terra; le gallerie si creano solo dove già ci stanno (gli imbocchi restano aperti).",
-      "generatedRaw": "Questo terreno è stato generato grezzo (senza levigatura). Si sceglie prima di «Genera dati», con «Terreno grezzo».",
       "reportNote": "Ogni modifica è elencata nel file export_report.txt del livello.",
       "backdropOff": "Disattivato",
       "backdropGlobal": "30 m globale",
@@ -535,9 +528,6 @@
     "processingResolutionPickLarge": "2 m: area doppia, terreno più morbido",
     "processingResolutionPickHuge": "4 m: aree molto grandi, terreno grossolano",
     "includeOsmFeatures": "Includi elementi OSM",
-    "rawTerrain": "Terreno grezzo (nessuna levigatura strade)",
-    "rawTerrainOn": "Attivato: l'altitudine è usata esattamente come scaricata. Le strade non vengono allineate, levigate o livellate; le curve restano morbide. Ponti e gallerie vengono comunque creati all'esportazione.",
-    "rawTerrainOff": "Disattivato: le strade vengono allineate, levigate e livellate nel terreno. Attivalo per lasciare intatti i dati di altitudine.",
     "overtureBuildings": "Aggiungi edifici e altezze mancanti da Overture",
     "overtureBuildingsHint": "Aggiunge, come semplici blocchi, gli edifici e le altezze che mancano in OpenStreetMap.",
     "showOsmCoverage": "Mostra copertura OSM di MapNG",
@@ -1307,6 +1297,7 @@
   "sections": {
     "reset": "Ripristina",
     "resetTitle": "Riporta questa sezione ai valori predefiniti",
-    "changedTitle": "Modificato rispetto ai valori predefiniti"
+    "changedTitle": "Modificato rispetto ai valori predefiniti",
+    "more": "Altro"
   }
 }

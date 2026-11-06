@@ -1,5 +1,14 @@
 <template>
-  <SettingSection :title="t('batch.performanceProfile')" :icon="Gauge" storage-key="mapng_ui_sec_batchperf">
+  <!-- (rarely changed: starts folded, with the changed dot and Reset off Balanced) -->
+  <SettingSection
+    :title="t('batch.performanceProfile')"
+    :icon="Gauge"
+    storage-key="mapng_ui_sec_batchperf2"
+    :default-open="false"
+    :changed="modelValue !== 'balanced'"
+    resettable
+    @reset="$emit('update:modelValue', 'balanced')"
+  >
     <select
       :class="SELECT_MD"
       :value="modelValue"

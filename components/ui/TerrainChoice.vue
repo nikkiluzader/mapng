@@ -28,7 +28,8 @@
           {{ option.label }}
           <span v-if="option.value === 'ready'" class="ml-1 text-micro font-semibold text-brand">{{ t('terrainChoice.recommended') }}</span>
         </span>
-        <span class="block text-caption leading-snug text-gray-500 dark:text-gray-400">{{ option.hint }}</span>
+        <!-- (the picked one says what it does; the others only their name) -->
+        <span v-if="terrainMode === option.value" class="block text-caption leading-snug text-gray-500 dark:text-gray-400">{{ option.hint }}</span>
       </span>
     </label>
 
