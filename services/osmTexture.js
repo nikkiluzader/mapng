@@ -2012,6 +2012,49 @@ const WATER_EXCLUDED = new Set(["dam", "weir", "dock", "boatyard", "lock_gate"])
 const isWaterArea = (tags = {}) => !WATER_EXCLUDED.has(tags.waterway) && (
   tags.natural === "water" || !!tags.waterway || tags.landuse === "reservoir" || tags.landuse === "basin" || !!tags.water);
 
+// Steep ground as bare rock, over whatever it was painted: a texture is laid
+// on the terrain from straight above, so on a face steeper than ~45° a field's
+// green or a wood's dark green is smeared down it in vertical streaks
+// (Fizz_Mechanic's Tignes cliffs); rock is what is really there. Only over the
+// natural colours (greens and browns): a road, a building or water keeps its
+// own. The edge is dithered between 42° and 48°, a few rock tones mixed in.
+// In strips of rows: no texture-sized pixel buffer. -> the share painted.
+const STEEP_ROCK = [[0x8f, 0x86, 0x76], [0x7a, 0x74, 0x69], [0x99, 0x92, 0x84]];
+export function paintSteepRock(ctx, canvas, terrainData) {
+  const hm = terrainData?.heightMap; const W = terrainData?.width; const H = terrainData?.height;
+  if (!hm || !(W > 2) || !(H > 2) || hm.length !== W * H) return 0;
+  const mpp = Number(terrainData.processingMetersPerPixel) > 0 ? Number(terrainData.processingMetersPerPixel) : 1;
+  const sx = W / canvas.width; const sy = H / canvas.height;
+  const hash = (x, y) => { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+  let painted = 0;
+  const STRIP = 256;
+  for (let y0 = 0; y0 < canvas.height; y0 += STRIP) {
+    const rows = Math.min(STRIP, canvas.height - y0);
+    const img = ctx.getImageData(0, y0, canvas.width, rows);
+    const d = img.data; let changed = false;
+    for (let ty = 0; ty < rows; ty++) {
+      const hy = Math.min(H - 2, Math.max(1, Math.floor((y0 + ty + 0.5) * sy)));
+      for (let tx = 0; tx < canvas.width; tx++) {
+        const hx = Math.min(W - 2, Math.max(1, Math.floor((tx + 0.5) * sx)));
+        const k = hy * W + hx;
+        const gx = (hm[k + 1] - hm[k - 1]) / (2 * mpp); const gy = (hm[k + W] - hm[k - W]) / (2 * mpp);
+        const u = hash(tx, y0 + ty);
+        if (Math.hypot(gx, gy) < 0.9 + 0.21 * u) continue;   // tan 42°..48°
+        const i = (ty * canvas.width + tx) * 4;
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        // (natural colours only: green or brown, not the greys of roads, buildings and water)
+        if (Math.abs(r - g) < 6 && Math.abs(g - b) < 6) continue;
+        if (b > g + 4) continue;
+        const c = STEEP_ROCK[Math.floor(hash(y0 + ty, tx) * STEEP_ROCK.length)];
+        d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
+        changed = true; painted++;
+      }
+    }
+    if (changed) ctx.putImageData(img, 0, y0);
+  }
+  return painted / (canvas.width * canvas.height);
+}
+
 export const generateGameTexture = async (terrainData, options = {}) => {
   const onProgress = options.onProgress;
   onProgress?.("Painting the game map texture...");
@@ -2164,6 +2207,9 @@ export const generateGameTexture = async (terrainData, options = {}) => {
     ctx.drawImage(mask, 0, 0);
     mask.width = 0; wc.width = 0;
   }
+
+  const steep = paintSteepRock(ctx, canvas, terrainData);
+  if (steep) console.log(`[Game Texture] Steep ground (over ~45°) painted as rock: ${(steep * 100).toFixed(1)}% of the texture.`);
 
   const blob = await new Promise((r) => canvas.toBlob((b) => r(b || null), "image/png"));
   const url = blob ? URL.createObjectURL(blob) : "";

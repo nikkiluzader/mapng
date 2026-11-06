@@ -794,6 +794,28 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
     }
   }
 
+  // 3b. Any steep natural ground as rock (mapped as a cliff or not): over
+  // ~45° a grass or dirt material is smeared down the face in streaks, and
+  // it is rock that's there. Natural ground only (default, grass, dirt,
+  // dirt-grass, lawn); the edge dithered between 42° and 48°.
+  if (hm?.length === size * size) {
+    const NATURAL = new Set([0, 1, 2, 8, 9]);
+    let steepPx = 0;
+    for (let y = 1; y < size - 1; y++) {
+      for (let x = 1; x < size - 1; x++) {
+        const k = y * size + x;
+        if (!NATURAL.has(layerMap[k])) continue;
+        const gx = (hm[k + 1] - hm[k - 1]) / (2 * metersPerPixel), gy = (hm[k + size] - hm[k - size]) / (2 * metersPerPixel);
+        const g2 = gx * gx + gy * gy;
+        if (g2 < 0.81) continue;   // under 42°
+        let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177);
+        const t = 0.9 + 0.21 * (((n ^ (n >>> 16)) >>> 0) / 4294967296);
+        if (g2 >= t * t) { layerMap[k] = 4; steepPx++; }
+      }
+    }
+    if (steepPx) console.log(`[OSM Materials] Steep ground (over ~45°) as rock: ${(steepPx / (size * size) * 100).toFixed(1)}% of the terrain.`);
+  }
+
   for (const feature of osmFeatures) {
     if (!feature.geometry?.length || feature.type !== 'water') continue;
     const t = feature.tags || {};
