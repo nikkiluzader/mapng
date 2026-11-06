@@ -204,6 +204,7 @@
           <p v-if="customOverpassUrl && !customOverpassValid" class="mt-0.5 text-amber-600 dark:text-amber-400">{{ t('controlPanel.customOverpassInvalid') }}</p>
           <p class="mt-0.5 leading-snug">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-brand hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-brand hover:underline">Overspan</a></p>
         </details>
+        <OsmFileInput v-if="fetchOSM" :area="selectionArea" />
         <!-- (services/overtureTiles.js) -->
         <SettingRow
           check
@@ -344,6 +345,8 @@ import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../.
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
 import TerrainChoice from '../ui/TerrainChoice.vue';
 import StepHeader from '../ui/StepHeader.vue';
+import OsmFileInput from '../controls/OsmFileInput.vue';
+import { computeGridBounds } from '../../services/batchJob.js';
 import GenerateSummary from '../ui/GenerateSummary.vue';
 import { terrainMode, setTerrainMode } from '../../composables/useTerrainMode.js';
 import { reloadTerrainSettings } from '../../composables/useTerrainMode.js';
@@ -481,6 +484,8 @@ const processingMetersPerPixelNumber = computed(() => {
 });
 
 const metersPerPixel = computed(() => processingMetersPerPixelNumber.value);
+// (the box being generated, for the OSM file: does the file cover it)
+const selectionArea = computed(() => computeGridBounds(props.center, props.resolution, 1, 1, props.resolution * metersPerPixel.value));
 
 // Detect active file type for metadata card routing
 const isLazFileActive = computed(() => {

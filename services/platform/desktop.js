@@ -4,6 +4,7 @@
 // The terrain data goes over as files of a job (desktop/runner/jobFormat.mjs
 // reads them back): the OSM features as JSON, typed arrays as their bytes,
 // canvases and images as PNGs, the rest inline in job.json.
+import { getLoadedOsmFile } from '../osmFile.js';
 import { toRaw } from 'vue';
 
 export const desktopApp = (typeof window !== 'undefined' && window.mapngDesktop) || null;
@@ -247,6 +248,8 @@ export async function fetchTerrainDataOnDesktop(center, resolution, includeOSM, 
       center: toRaw(center), resolution, includeOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey,
       generationOptions: JSON.parse(JSON.stringify(toRaw(generationOptions) || {})),
       localStorage: settingsSnapshot(),
+      // (an OSM file the user loaded: read there instead of fetching, like here)
+      ...(includeOSM && getLoadedOsmFile() ? { osmFile: { name: getLoadedOsmFile().name, text: getLoadedOsmFile().text } } : {}),
       ...(fromLevel ? { fromLevel } : {}),
     }, {
       onStarted: (id) => { terrainId = id; if (signal?.aborted) desktopApp.cancelTerrain(id); },

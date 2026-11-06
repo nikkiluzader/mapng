@@ -38,6 +38,19 @@ async function main() {
     // (a replay: anything the saved sources lack is recorded here, then kept with the level)
     recordDir: job.sources?.mode === 'replay' ? path.join(dir, 'sources') : null,
   });
+  // An OSM file the user loaded in the page: read instead of fetching. Kept
+  // with the sources, so a rebuild of the level reads the same file.
+  const sourcesDir = job.sources?.dir || path.join(dir, 'sources');
+  const savedOsmFile = path.join(sourcesDir, 'user-osm-file.json');
+  let osmFile = job.osmFile || null;
+  if (!osmFile && job.sources?.mode === 'replay' && fs.existsSync(savedOsmFile)) osmFile = JSON.parse(fs.readFileSync(savedOsmFile, 'utf8'));
+  if (osmFile?.text) {
+    const { loadOsmFileText } = await import('../../services/osmFile.js');
+    loadOsmFileText(osmFile.text, osmFile.name);
+    const keepIn = job.sources?.mode === 'replay' ? path.join(dir, 'sources') : sourcesDir;
+    fs.mkdirSync(keepIn, { recursive: true });
+    fs.writeFileSync(path.join(keepIn, 'user-osm-file.json'), JSON.stringify({ name: osmFile.name, text: osmFile.text }));
+  }
   const { fetchTerrainData } = await import('../../services/terrain.js');
   const started = Date.now();
   const data = await fetchTerrainData(

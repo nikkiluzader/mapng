@@ -1307,5 +1307,26 @@
     "resetTitle": "Remettre cette section aux valeurs par défaut",
     "changedTitle": "Modifié par rapport aux valeurs par défaut",
     "more": "Plus"
+  },
+  "osmFile": {
+    "title": "Utiliser votre propre fichier OSM",
+    "hint": "Des données plus récentes, ou aucun serveur OpenStreetMap joignable ? Téléchargez cette zone depuis openstreetmap.org, puis déposez ici le fichier map.osm. Tant qu'il couvre la zone, MapNG le lit au lieu de télécharger.",
+    "download": "Télécharger map.osm",
+    "downloadTitle": "Cette zone depuis openstreetmap.org, directement de la base OSM (comme son bouton Exporter)",
+    "openSite": "Ouvrir sur openstreetmap.org",
+    "tooBig": "Trop grande pour un export d'openstreetmap.org (au plus 0,25 degré carré et 50 000 points). Réduisez la zone ou enregistrez-la depuis JOSM.",
+    "drop": "Déposez le fichier .osm ici, ou cliquez pour le choisir",
+    "formats": ".osm (Exporter d'openstreetmap.org, JOSM) ou JSON Overpass",
+    "reading": "Lecture du fichier…",
+    "bad": "Ce fichier n'a pas pu être lu comme des données OpenStreetMap.",
+    "remove": "Ne plus utiliser ce fichier",
+    "counts": "{nodes} points · {ways} chemins",
+    "short_full": "utilisé",
+    "short_partial": "couvre une partie",
+    "short_none": "autre zone",
+    "coverage_full": "Couvre toute la zone : utilisé à la place des serveurs OSM.",
+    "coverage_partial": "Couvre {pct} % de la zone : utilisé, et le reste de la zone n'a pas de données cartographiques.",
+    "coverage_none": "Ne couvre pas cette zone : non utilisé. Les données cartographiques sont téléchargées comme d'habitude.",
+    "coverage_partialGrid": "Couvre {pct} % de la grille : les tuiles qu'il atteint l'utilisent, les autres téléchargent leurs données comme d'habitude."
   }
 }

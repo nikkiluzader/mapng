@@ -1307,5 +1307,26 @@
     "resetTitle": "Diesen Bereich auf die Standardwerte zurücksetzen",
     "changedTitle": "Von den Standardwerten geändert",
     "more": "Mehr"
+  },
+  "osmFile": {
+    "title": "Eigene OSM-Datei verwenden",
+    "hint": "Aktuellere Daten oder kein OpenStreetMap-Server erreichbar? Lade dieses Gebiet von openstreetmap.org herunter und lege die Datei map.osm hier ab. Solange sie das Gebiet abdeckt, liest MapNG sie statt abzurufen.",
+    "download": "map.osm herunterladen",
+    "downloadTitle": "Dieses Gebiet von openstreetmap.org, direkt aus der OSM-Datenbank (wie dort der Export-Knopf)",
+    "openSite": "Auf openstreetmap.org öffnen",
+    "tooBig": "Zu groß für einen Export von openstreetmap.org (höchstens 0,25 Quadratgrad und 50.000 Punkte). Verkleinere das Gebiet oder speichere es aus JOSM.",
+    "drop": "Die .osm-Datei hier ablegen oder klicken zum Auswählen",
+    "formats": ".osm (Export von openstreetmap.org, JOSM) oder Overpass-JSON",
+    "reading": "Datei wird gelesen…",
+    "bad": "Diese Datei konnte nicht als OpenStreetMap-Daten gelesen werden.",
+    "remove": "Diese Datei nicht mehr verwenden",
+    "counts": "{nodes} Punkte · {ways} Wege",
+    "short_full": "in Verwendung",
+    "short_partial": "deckt einen Teil ab",
+    "short_none": "anderes Gebiet",
+    "coverage_full": "Deckt das ganze Gebiet ab: wird statt der OSM-Server verwendet.",
+    "coverage_partial": "Deckt {pct} % des Gebiets ab: wird verwendet, der Rest des Gebiets bekommt keine Kartendaten.",
+    "coverage_none": "Deckt dieses Gebiet nicht ab: wird nicht verwendet. Kartendaten werden wie üblich abgerufen.",
+    "coverage_partialGrid": "Deckt {pct} % des Rasters ab: Kacheln, die sie erreicht, verwenden sie, die anderen laden ihre Kartendaten wie üblich."
   }
 }

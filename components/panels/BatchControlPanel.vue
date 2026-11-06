@@ -176,6 +176,7 @@
     <SettingSection id="mapng-bsec-mapdata" :changed="!includeOSM" resettable @reset="includeOSM = true" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
       <SettingCard>
         <SettingRow check v-model="includeOSM" :label="t('batch.includeOsm')" :hint="t('controlPanel.ui.osmHint')" />
+        <OsmFileInput v-if="includeOSM" :area="gridArea" grid />
       </SettingCard>
     </SettingSection>
 
@@ -295,6 +296,8 @@ import { useI18n } from 'vue-i18n';
 import { useMainStore } from '../../stores/mainStore';
 import TerrainChoice from '../ui/TerrainChoice.vue';
 import StepHeader from '../ui/StepHeader.vue';
+import OsmFileInput from '../controls/OsmFileInput.vue';
+import { computeGridBounds } from '../../services/batchJob.js';
 import GenerateSummary from '../ui/GenerateSummary.vue';
 import { terrainMode, terrainShapingOptions, terrainGenerationOptions, setTerrainMode } from '../../composables/useTerrainMode.js';
 import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info, Settings } from 'lucide-vue-next';
@@ -575,8 +578,10 @@ function formatArea(km2) {
 
 // Computed
 const totalTiles = computed(() => gridCols.value * gridRows.value);
-const gridWidthKm = computed(() => (gridCols.value * props.resolution) / 1000);
-const gridHeightKm = computed(() => (gridRows.value * props.resolution) / 1000);
+// (the whole grid's box, for the OSM file: does the file cover it)
+const gridArea = computed(() => computeGridBounds(props.center, props.resolution, gridCols.value, gridRows.value, props.resolution * processingMetersPerPixelNumber.value));
+const gridWidthKm = computed(() => (gridCols.value * props.resolution * processingMetersPerPixelNumber.value) / 1000);
+const gridHeightKm = computed(() => (gridRows.value * props.resolution * processingMetersPerPixelNumber.value) / 1000);
 const totalAreaKm = computed(() => gridWidthKm.value * gridHeightKm.value);
 const totalAreaDisplay = computed(() => formatArea(totalAreaKm.value));
 const tileAreaKm = computed(() => (props.resolution * props.resolution) / 1_000_000);

@@ -1307,5 +1307,26 @@
     "resetTitle": "Przywróć domyślne ustawienia tej sekcji",
     "changedTitle": "Zmienione względem domyślnych",
     "more": "Więcej"
+  },
+  "osmFile": {
+    "title": "Użyj własnego pliku OSM",
+    "hint": "Nowsze dane albo brak dostępu do serwerów OpenStreetMap? Pobierz ten obszar z openstreetmap.org i upuść tutaj plik map.osm. Dopóki obejmuje obszar, MapNG czyta go zamiast pobierać.",
+    "download": "Pobierz map.osm",
+    "downloadTitle": "Ten obszar z openstreetmap.org, prosto z bazy OSM (tak jak przycisk Eksportuj)",
+    "openSite": "Otwórz na openstreetmap.org",
+    "tooBig": "Za duży na jeden eksport z openstreetmap.org (najwyżej 0,25 stopnia kwadratowego i 50 000 punktów). Zmniejsz obszar albo zapisz go z JOSM.",
+    "drop": "Upuść tutaj plik .osm lub kliknij, aby wybrać",
+    "formats": ".osm (Eksport z openstreetmap.org, JOSM) lub JSON z Overpass",
+    "reading": "Czytanie pliku…",
+    "bad": "Nie udało się odczytać tego pliku jako danych OpenStreetMap.",
+    "remove": "Przestań używać tego pliku",
+    "counts": "{nodes} punktów · {ways} linii",
+    "short_full": "w użyciu",
+    "short_partial": "obejmuje część",
+    "short_none": "inny obszar",
+    "coverage_full": "Obejmuje cały obszar: używany zamiast serwerów OSM.",
+    "coverage_partial": "Obejmuje {pct}% obszaru: używany, a reszta obszaru nie ma danych mapy.",
+    "coverage_none": "Nie obejmuje tego obszaru: nieużywany. Dane mapy są pobierane jak zwykle.",
+    "coverage_partialGrid": "Obejmuje {pct}% siatki: kafelki, do których sięga, używają go, pozostałe pobierają dane mapy jak zwykle."
   }
 }

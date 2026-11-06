@@ -9,8 +9,11 @@ import { isGateBarrier } from "./gates.js";
 import {
   OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture, fetchOvertureBuildingRecords, mergeOvertureBuildings,
 } from "./overtureTiles.js";
+import { getLoadedOsmFile, osmFileCoverage } from "./osmFile.js";
 
 const OVERTURE_ENDPOINT = "overture-maps";
+// (the user's own OSM file: osmFile.js)
+export const OSM_FILE_ENDPOINT = "osm-file";
 
 const BUSINESS_NODE_KEYS = new Set(BUSINESS_NODES.map(([k, v]) => `${k}=${v}`));
 const isBusinessNode = (tags = {}) => BUSINESS_NODE_KEYS.has(`amenity=${tags.amenity}`) || BUSINESS_NODE_KEYS.has(`tourism=${tags.tourism}`);
@@ -1021,6 +1024,19 @@ const fetchOsmFromManifestWithStatus = async (bounds, { onStatus, signal }) => {
 // newest one covering it: osmTiles.js planTileSources), then Overpass or
 // Overture. -> { endpoint, data }
 const fetchOsmRaw = async (bounds, { onStatus, signal } = {}) => {
+  // An OSM file the user loaded (osmFile.js) wins over every server while it
+  // covers any of the area: they loaded it to get exactly that data.
+  const file = getLoadedOsmFile();
+  if (file) {
+    const { coverage, share } = osmFileCoverage(file.bounds, bounds);
+    if (coverage !== "none") {
+      onStatus?.(coverage === "full"
+        ? `Reading OpenStreetMap data from your file ${file.name}...`
+        : `Reading OpenStreetMap data from your file ${file.name} (it covers ${Math.round(share * 100)}% of this area)...`);
+      return { endpoint: OSM_FILE_ENDPOINT, data: file.data, coverage, share };
+    }
+    console.warn(`[OSM] ${file.name} doesn't cover this area; fetching as usual.`);
+  }
   if (osmTileSource || cacheEndpointAvailable()) {
     try {
       const data = osmTileSource
@@ -1145,6 +1161,7 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
         ? { overtureRelease: OVERTURE_RELEASE, attribution: OVERTURE_ATTRIBUTION }
         : {}),
       ...(overtureBuildings ? { overtureBuildings, attribution: OVERTURE_ATTRIBUTION } : {}),
+      ...(String(endpoint).includes(OSM_FILE_ENDPOINT) ? { osmFile: { name: getLoadedOsmFile()?.name, coverage: result.coverage, share: result.share, loadedAt: getLoadedOsmFile()?.loadedAt } } : {}),
       startedAt,
       completedAt: new Date().toISOString(),
     };

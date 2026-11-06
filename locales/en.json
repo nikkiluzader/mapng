@@ -1307,5 +1307,26 @@
     "resetTitle": "Put this section back to the defaults",
     "changedTitle": "Changed from the defaults",
     "more": "More"
+  },
+  "osmFile": {
+    "title": "Use your own OSM file",
+    "hint": "Fresher data, or no OpenStreetMap server reachable? Download this area from openstreetmap.org, then drop the map.osm file here. While it covers the area, MapNG reads it instead of fetching.",
+    "download": "Download map.osm",
+    "downloadTitle": "This area from openstreetmap.org, straight from the OSM database (the same as its Export button)",
+    "openSite": "Open on openstreetmap.org",
+    "tooBig": "Too big for one openstreetmap.org export (at most 0.25 square degrees and 50,000 points). Make the area smaller, or save the area from JOSM.",
+    "drop": "Drop the .osm file here, or click to choose",
+    "formats": ".osm (openstreetmap.org Export, JOSM) or Overpass JSON",
+    "reading": "Reading the file…",
+    "bad": "This file could not be read as OpenStreetMap data.",
+    "remove": "Stop using this file",
+    "counts": "{nodes} points · {ways} ways",
+    "short_full": "in use",
+    "short_partial": "covers part",
+    "short_none": "other area",
+    "coverage_full": "Covers the whole area: used instead of the OSM servers.",
+    "coverage_partial": "Covers {pct}% of the area: used, and the rest of the area gets no map data.",
+    "coverage_none": "Doesn't cover this area: not used. Map data is fetched as usual.",
+    "coverage_partialGrid": "Covers {pct}% of the grid: tiles it reaches use it, the others download their map data as usual."
   }
 }
