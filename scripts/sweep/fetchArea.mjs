@@ -34,7 +34,8 @@ const KEY = key('GPXZ_API_KEY');
 if (!KEY) throw new Error('GPXZ_API_KEY missing (~/.config/mapng/mapng.env)');
 
 const realFetchBase = globalThis.fetch;
-globalThis.fetch = (url, init = {}) => realFetchBase(url, { ...init, headers: { 'User-Agent': 'MapNG-sweep/1.0 (local diagnostics)', ...(init.headers || {}) } });
+// (merged through Headers: PMTiles passes a Headers object, which a spread empties, dropping its Range header)
+globalThis.fetch = (url, init = {}) => { const headers = new Headers(init.headers || {}); if (!headers.has('User-Agent')) headers.set('User-Agent', 'MapNG-sweep/1.0 (local diagnostics)'); return realFetchBase(url, { ...init, headers }); };
 
 async function fetchOne({ name, lat, lng, size }) {
   const center = { lat, lng }; const SIZE = size || 1024;

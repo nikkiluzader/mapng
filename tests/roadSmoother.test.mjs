@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { smoothRoadsInHeightmap } from '../services/roadSmoother.js';
+import { smoothRoadsInHeightmap, isGroundLevelRoad } from '../services/roadSmoother.js';
 
 const W = 256;
 const H = 256;
@@ -393,4 +393,17 @@ test('a step no road has (an elevated ramp the lidar took out) becomes a drivabl
   for (let x = 20; x < 168; x++) worst = Math.max(worst, Math.abs(hm[row * W + x + 1] - hm[row * W + x]));
   assert.ok(worst < 0.16, `steepest grade ${(worst * 100).toFixed(0)} %`);
   assert.ok(hm[row * W + 165] > 8.5, 'it still reaches the street');
+});
+
+test('any bridge value but "no" is no ground road (a bridge=viaduct with no layer was levelled as ground)', () => {
+  const road = (tags) => ({ type: 'road', tags: { highway: 'primary', ...tags }, geometry: [{ lat: 0, lng: 0 }, { lat: 0, lng: 0.001 }] });
+  for (const bridge of ['yes', 'viaduct', 'cantilever', 'boardwalk', 'movable', 'aqueduct']) assert.equal(isGroundLevelRoad(road({ bridge })), false, bridge);
+  assert.equal(isGroundLevelRoad(road({ bridge: 'no' })), true);
+  assert.equal(isGroundLevelRoad(road({ man_made: 'bridge' })), false);
+  assert.equal(isGroundLevelRoad(road({ location: 'overground' })), false);
+  // tunnels as the tunnel builder reads them; a building passage or culvert stays on the ground
+  assert.equal(isGroundLevelRoad(road({ tunnel: 'yes' })), false);
+  assert.equal(isGroundLevelRoad(road({ tunnel: 'avalanche_protector' })), false);
+  assert.equal(isGroundLevelRoad(road({ tunnel: 'building_passage' })), true);
+  assert.equal(isGroundLevelRoad(road({ tunnel: 'culvert' })), true);
 });

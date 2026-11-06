@@ -198,8 +198,17 @@ export function isGroundLevelRoad(feature) {
     // no vehicle road would.
     if (NON_DRIVEABLE_HIGHWAYS.has(tags.highway)) return false;
     const layer = Number.parseInt(tags.layer, 10) || 0;
-    // Skip bridges, overpasses, tunnels, and elevated roads
-    if (layer > 0 || tags.bridge === 'yes' || tags.tunnel === 'yes' || tags.covered === 'yes' || tags.location === 'elevated') {
+    // Skip bridges, overpasses, tunnels, and elevated roads. Any bridge value
+    // but "no" is a bridge (viaduct, cantilever, boardwalk, movable...), as the
+    // structure solver reads it (structures/graph.js structureOf): an
+    // elevated highway tagged bridge=viaduct with no layer was levelled as a
+    // ground road. Tunnels as its tunnel builder (beamngTunnels.js
+    // isBoredTunnelTag); a building passage or culvert stays on the ground.
+    const bridge = (!!tags.bridge && tags.bridge !== 'no') || tags.man_made === 'bridge'
+        || tags.location === 'elevated' || tags.location === 'overground';
+    const tunnel = tags.tunnel === 'yes' || tags.tunnel === 'avalanche_protector'
+        || tags.location === 'underground' || tags.location === 'underwater';
+    if (layer > 0 || bridge || tunnel || tags.covered === 'yes') {
         return false;
     }
     return Array.isArray(feature.geometry) && feature.geometry.length >= 2;
