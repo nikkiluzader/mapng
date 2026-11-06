@@ -40,7 +40,8 @@
 
     <ModeToggle :batch-mode="batchMode" @set-batch-mode="$emit('set-batch-mode', $event)" />
 
-    <div class="flex-1 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-gray-800/50 p-5">
+    <!-- (the panel lays itself out: components/ui/WizardLayout.vue, with its own scrolling) -->
+    <div class="flex-1 min-h-0 flex flex-col">
       <slot />
     </div>
 

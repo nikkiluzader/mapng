@@ -551,9 +551,7 @@
       "mapData": "Données cartographiques (OpenStreetMap)",
       "osmHint": "Routes, bâtiments, eau, occupation du sol et détails de rue",
       "needsOsmOn": "Activez d'abord Inclure les éléments OSM"
-    },
-    "expandAll": "Tout déplier",
-    "collapseAll": "Tout replier"
+    }
   },
   "batchExport": {
     "title": "Options d'export",
@@ -591,7 +589,7 @@
     "usingUploadedElevation": "Données d'élévation importées utilisées",
     "viewBeforeDownload": "Voir avant de télécharger",
     "dataReady": "Données prêtes",
-    "downloadBelow": "Télécharger ci-dessous",
+    "downloadBelow": "Aller à l'export",
     "generateData": "Générer les données",
     "skip3dGetFiles": "Ignorer la vue 3D, récupérer les fichiers"
   },
@@ -1273,15 +1271,8 @@
   },
   "panelSteps": {
     "where": "Où",
-    "whereHint": "La zone de la carte",
-    "whereHintBatch": "La grille et la taille de chaque tuile",
     "builtFrom": "À partir de",
-    "builtFromHint": "Altitude, terrain et données de carte",
-    "build": "Créer",
-    "buildHint": "Générez, puis choisissez ce que le niveau contient",
-    "get": "Ce que vous obtenez",
-    "getHintCombined": "Un niveau BeamNG avec toutes les tuiles",
-    "getHintSeparate": "Des fichiers pour chaque tuile"
+    "get": "Ce que vous obtenez"
   },
   "genSummary": {
     "title": "Vous allez créer",
@@ -1300,7 +1291,8 @@
     "source_kron86": "NMT (Pologne)",
     "source_usgs": "USGS 1 m",
     "source_gpxz": "GPXZ",
-    "source_upload": "Votre fichier d'altitude"
+    "source_upload": "Votre fichier d'altitude",
+    "osmFile": "Données cartographiques : votre fichier"
   },
   "sections": {
     "reset": "Réinitialiser",
@@ -1328,5 +1320,27 @@
     "coverage_partial": "Couvre {pct} % de la zone : utilisé, et le reste de la zone n'a pas de données cartographiques.",
     "coverage_none": "Ne couvre pas cette zone : non utilisé. Les données cartographiques sont téléchargées comme d'habitude.",
     "coverage_partialGrid": "Couvre {pct} % de la grille : les tuiles qu'il atteint l'utilisent, les autres téléchargent leurs données comme d'habitude."
+  },
+  "wizard": {
+    "steps": "Étapes",
+    "back": "Retour",
+    "next": "Suivant",
+    "generate": "Générer",
+    "export": "Exporter",
+    "run": "Lancer",
+    "exportLocked": "Générez d'abord le terrain",
+    "review": "Récapitulatif",
+    "reviewHint": "L'aperçu 3D montre le terrain avant l'export ; Générer les données passe directement aux options du niveau. Cliquez sur une ligne pour la modifier.",
+    "runHint": "Démarrer génère et exporte toutes les tuiles d'un coup, sans aperçu entre les deux. Cliquez sur une ligne pour la modifier.",
+    "generated": "Terrain prêt : il correspond à ces réglages.",
+    "generatedStale": "Réglages modifiés depuis la génération : générez à nouveau pour les utiliser.",
+    "toExport": "Aller à l'export →",
+    "rowArea": "Zone",
+    "rowResolution": "Résolution",
+    "rowElevation": "Élévation",
+    "rowTerrain": "Terrain",
+    "rowMapData": "Données cartographiques",
+    "rowGrid": "Grille",
+    "rowOutput": "Résultat"
   }
 }

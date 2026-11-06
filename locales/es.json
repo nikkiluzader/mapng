@@ -551,9 +551,7 @@
       "mapData": "Datos del mapa (OpenStreetMap)",
       "osmHint": "Carreteras, edificios, agua, uso del suelo y detalles de calle",
       "needsOsmOn": "Activa primero Incluir elementos OSM"
-    },
-    "expandAll": "Expandir todo",
-    "collapseAll": "Contraer todo"
+    }
   },
   "batchExport": {
     "title": "Opciones de exportación",
@@ -591,7 +589,7 @@
     "usingUploadedElevation": "Usando la elevación cargada",
     "viewBeforeDownload": "Ver antes de descargar",
     "dataReady": "Datos listos",
-    "downloadBelow": "Descarga abajo",
+    "downloadBelow": "Ir a Exportar",
     "generateData": "Generar datos",
     "skip3dGetFiles": "Omitir vista 3D y obtener archivos"
   },
@@ -1273,15 +1271,8 @@
   },
   "panelSteps": {
     "where": "Dónde",
-    "whereHint": "La zona del mapa",
-    "whereHintBatch": "La cuadrícula y el tamaño de cada tesela",
     "builtFrom": "Hecho con",
-    "builtFromHint": "Elevación, terreno y datos del mapa",
-    "build": "Crear",
-    "buildHint": "Genera y luego elige qué lleva el nivel",
-    "get": "Qué obtienes",
-    "getHintCombined": "Un nivel de BeamNG con todas las teselas",
-    "getHintSeparate": "Archivos para cada tesela"
+    "get": "Qué obtienes"
   },
   "genSummary": {
     "title": "Vas a crear",
@@ -1300,7 +1291,8 @@
     "source_kron86": "NMT (Polonia)",
     "source_usgs": "USGS 1 m",
     "source_gpxz": "GPXZ",
-    "source_upload": "Tu archivo de elevación"
+    "source_upload": "Tu archivo de elevación",
+    "osmFile": "Datos de mapa: tu archivo"
   },
   "sections": {
     "reset": "Restablecer",
@@ -1328,5 +1320,27 @@
     "coverage_partial": "Cubre el {pct} % de la zona: se usa, y el resto de la zona no tiene datos de mapa.",
     "coverage_none": "No cubre esta zona: no se usa. Los datos de mapa se descargan como siempre.",
     "coverage_partialGrid": "Cubre el {pct} % de la cuadrícula: las teselas que alcanza lo usan, las demás descargan sus datos de mapa como siempre."
+  },
+  "wizard": {
+    "steps": "Pasos",
+    "back": "Atrás",
+    "next": "Siguiente",
+    "generate": "Generar",
+    "export": "Exportar",
+    "run": "Ejecutar",
+    "exportLocked": "Genera primero el terreno",
+    "review": "Resumen",
+    "reviewHint": "La vista previa 3D muestra el terreno antes de exportar; Generar datos va directo a las opciones del nivel. Haz clic en una línea para cambiarla.",
+    "runHint": "Iniciar genera y exporta todas las teselas de una vez, sin vista previa entre medias. Haz clic en una línea para cambiarla.",
+    "generated": "Terreno listo: coincide con estos ajustes.",
+    "generatedStale": "Ajustes cambiados desde la generación: vuelve a generar para usarlos.",
+    "toExport": "Ir a Exportar →",
+    "rowArea": "Área",
+    "rowResolution": "Resolución",
+    "rowElevation": "Elevación",
+    "rowTerrain": "Terreno",
+    "rowMapData": "Datos de mapa",
+    "rowGrid": "Cuadrícula",
+    "rowOutput": "Resultado"
   }
 }

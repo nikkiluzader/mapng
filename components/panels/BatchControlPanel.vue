@@ -1,225 +1,279 @@
 <template>
-  <div class="space-y-6">
-    <!-- Batch Stability Note -->
-    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 flex items-start gap-2">
-      <AlertTriangle :size="14" class="text-amber-500 mt-0.5 shrink-0" />
-      <p class="text-micro text-amber-700 dark:text-amber-400 leading-relaxed">
-        <span class="font-bold">{{ t('batch.resourceHeavy') }}</span> {{ isDesktop ? t('batch.resourceHeavyBodyDesktop') : t('batch.resourceHeavyBody') }}
-      </p>
-    </div>
-
-    <!-- Output mode toggle: separate tiles vs one combined BeamNG level -->
-    <div class="space-y-1.5">
-      <SegmentedControl
-        v-model="combinedLevel"
-        :options="[
-          { value: false, label: t('batchCombined.modeSeparate') },
-          { value: true, label: t('batchCombined.modeCombined') },
-        ]"
-      />
-      <p class="text-caption text-gray-500 dark:text-gray-400 px-0.5">
-        {{ combinedLevel ? t('batchCombined.modeCombinedHint') : t('batchCombined.modeSeparateHint') }}
-      </p>
-    </div>
-
-    <SectionToggleAll />
+  <WizardLayout v-model="step" :steps="wizardSteps">
+    <!-- Separate tiles / Combined level (batch mode has no Basic/Advanced: every option shows) -->
+    <template #bar>
+      <div :title="combinedLevel ? t('batchCombined.modeCombinedHint') : t('batchCombined.modeSeparateHint')">
+        <SegmentedControl
+          v-model="combinedLevel"
+          :options="[
+            { value: false, label: t('batchCombined.modeSeparate') },
+            { value: true, label: t('batchCombined.modeCombined') },
+          ]"
+        />
+      </div>
+    </template>
 
     <!-- 1. Where: the grid's place, its size and each tile's -->
-    <StepHeader :n="1" :title="t('panelSteps.where')" :hint="t('panelSteps.whereHintBatch')" />
-    <!-- Coordinates -->
-    <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
-        <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
-    </SettingSection>
+    <div v-show="step === 1" class="space-y-6">
+      <!-- Coordinates -->
+      <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
+          <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
+      </SettingSection>
 
-    <BatchGridConfig
-      id="mapng-bsec-grid"
-      :grid-cols="gridCols"
-      :grid-rows="gridRows"
-      :total-tiles="totalTiles"
-      :total-area-display="totalAreaDisplay"
-      :perimeter-display="perimeterDisplay"
-      :grid-width-display="gridWidthDisplay"
-      :grid-height-display="gridHeightDisplay"
-      :tile-area-display="tileAreaDisplay"
-      :combined-level="combinedLevel"
-      :resolution="resolution"
-      @update:grid-cols="(v) => gridCols = v"
-      @update:grid-rows="(v) => gridRows = v"
-    />
-
-    <!-- Resolution -->
-    <SettingSection id="mapng-bsec-area" :changed="areaChanged" resettable @reset="resetArea" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_batchres">
-      <ResolutionSelector
-        :modelValue="resolution"
-        @update:modelValue="$emit('resolutionChange', $event)"
-      >
-        <p>{{ t('batch.tileEach', { resolution, mpp: processingMetersPerPixelNumber.toFixed(2) }) }}</p>
-        <p>{{ t('batch.gridCoverage', { w: gridWidthDisplay, h: gridHeightDisplay }) }}</p>
-        <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium"><AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batch.highResolutionWarning') }}</p>
-      </ResolutionSelector>
-      <ProcessingResolutionInput
-        :model-value="processingMetersPerPixel"
+      <BatchGridConfig
+        id="mapng-bsec-grid"
+        :grid-cols="gridCols"
+        :grid-rows="gridRows"
+        :total-tiles="totalTiles"
+        :total-area-display="totalAreaDisplay"
+        :perimeter-display="perimeterDisplay"
+        :grid-width-display="gridWidthDisplay"
+        :grid-height-display="gridHeightDisplay"
+        :tile-area-display="tileAreaDisplay"
+        :combined-level="combinedLevel"
         :resolution="resolution"
-        per-tile
-        @update:model-value="(v) => emit('update:processingMetersPerPixel', v)"
+        @update:grid-cols="(v) => gridCols = v"
+        @update:grid-rows="(v) => gridRows = v"
       />
-      <SettingCard>
-        <SettingRow
-          check
-          v-model="sharedElevationBaseline"
-          :label="t('batch.sharedBaseline')"
-          :hint="sharedElevationBaseline ? (hasOffsetTiles ? t('batch.sharedBaselineAutoHint') : t('batch.sharedBaselineHint')) : ''"
+
+      <!-- Resolution -->
+      <SettingSection id="mapng-bsec-area" :changed="areaChanged" resettable @reset="resetArea" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_batchres">
+        <ResolutionSelector
+          :modelValue="resolution"
+          @update:modelValue="$emit('resolutionChange', $event)"
+        >
+          <p>{{ t('batch.tileEach', { resolution, mpp: processingMetersPerPixelNumber.toFixed(2) }) }}</p>
+          <p>{{ t('batch.gridCoverage', { w: gridWidthDisplay, h: gridHeightDisplay }) }}</p>
+          <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium"><AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batch.highResolutionWarning') }}</p>
+        </ResolutionSelector>
+        <ProcessingResolutionInput
+          :model-value="processingMetersPerPixel"
+          :resolution="resolution"
+          per-tile
+          @update:model-value="(v) => emit('update:processingMetersPerPixel', v)"
         />
-      </SettingCard>
-    </SettingSection>
+        <SettingCard>
+          <SettingRow
+            check
+            v-model="sharedElevationBaseline"
+            :label="t('batch.sharedBaseline')"
+            :hint="sharedElevationBaseline ? (hasOffsetTiles ? t('batch.sharedBaselineAutoHint') : t('batch.sharedBaselineHint')) : ''"
+          />
+        </SettingCard>
+      </SettingSection>
 
 
 
-    <!-- Tiles Follow Map Center — always visible, independent of the tile layout section -->
-    <label class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-      <span>{{ t('batch.tilesFollowCenter') }}</span>
-      <input type="checkbox" v-model="tileFollowCenterLocal" class="accent-brand w-4 h-4 cursor-pointer" />
-    </label>
+      <!-- Tiles Follow Map Center — always visible, independent of the tile layout section -->
+      <label class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+        <span>{{ t('batch.tilesFollowCenter') }}</span>
+        <input type="checkbox" v-model="tileFollowCenterLocal" class="accent-brand w-4 h-4 cursor-pointer" />
+      </label>
 
-    <!-- Collapsible: per-tile offsets + names -->
-    <SettingSection v-model:open="showTileLayout" :changed="layoutChanged" resettable @reset="resetTileOffsets(); resetTileNames()" :title="t('batch.tileLayout')" :icon="Grid3X3">
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('batch.tileOffsets') }}</p>
-            <BaseButton size="sm" variant="secondary" @click="resetTileOffsets">{{ t('batch.resetAll') }}</BaseButton>
-          </div>
-          <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('batch.offsetHint') }}</p>
-          <div class="max-h-44 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 p-2 space-y-1">
-            <div
-              v-for="entry in tileOffsetEntries"
-              :key="entry.index"
-              class="grid grid-cols-[54px_1fr_1fr_42px] gap-1 items-center"
-            >
-              <span class="text-micro text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
-              <input
-                type="number"
-                step="10"
-                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
-                :value="entry.offsetX"
-                @input="updateTileOffset(entry.index, 'offsetX', $event.target.value)"
-                placeholder="X"
-              />
-              <input
-                type="number"
-                step="10"
-                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
-                :value="entry.offsetY"
-                @input="updateTileOffset(entry.index, 'offsetY', $event.target.value)"
-                placeholder="Y"
-              />
-              <button
-                class="text-micro py-1 px-1 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800"
-                @click="resetTileOffset(entry.index)"
+      <!-- Collapsible: per-tile offsets + names -->
+      <SettingSection v-model:open="showTileLayout" :changed="layoutChanged" resettable @reset="resetTileOffsets(); resetTileNames()" :title="t('batch.tileLayout')" :icon="Grid3X3">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('batch.tileOffsets') }}</p>
+              <BaseButton size="sm" variant="secondary" @click="resetTileOffsets">{{ t('batch.resetAll') }}</BaseButton>
+            </div>
+            <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('batch.offsetHint') }}</p>
+            <div class="max-h-44 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 p-2 space-y-1">
+              <div
+                v-for="entry in tileOffsetEntries"
+                :key="entry.index"
+                class="grid grid-cols-[54px_1fr_1fr_42px] gap-1 items-center"
               >
-                0
-              </button>
+                <span class="text-micro text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
+                <input
+                  type="number"
+                  step="10"
+                  class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
+                  :value="entry.offsetX"
+                  @input="updateTileOffset(entry.index, 'offsetX', $event.target.value)"
+                  placeholder="X"
+                />
+                <input
+                  type="number"
+                  step="10"
+                  class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
+                  :value="entry.offsetY"
+                  @input="updateTileOffset(entry.index, 'offsetY', $event.target.value)"
+                  placeholder="Y"
+                />
+                <button
+                  class="text-micro py-1 px-1 rounded border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-gray-800"
+                  @click="resetTileOffset(entry.index)"
+                >
+                  0
+                </button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('batch.tileNames') }}</p>
-            <BaseButton size="sm" variant="secondary" @click="resetTileNames">{{ t('batch.resetAll') }}</BaseButton>
-          </div>
-          <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('batch.tileNamesHint') }}</p>
-          <div class="max-h-44 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 p-2 space-y-1">
-            <div
-              v-for="entry in tileNameEntries"
-              :key="entry.index"
-              class="grid grid-cols-[54px_1fr] gap-1 items-center"
-            >
-              <span class="text-micro text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
-              <input
-                type="text"
-                class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
-                :value="entry.name"
-                :placeholder="entry.defaultName"
-                @input="updateTileName(entry.index, $event.target.value)"
-              />
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('batch.tileNames') }}</p>
+              <BaseButton size="sm" variant="secondary" @click="resetTileNames">{{ t('batch.resetAll') }}</BaseButton>
+            </div>
+            <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('batch.tileNamesHint') }}</p>
+            <div class="max-h-44 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 p-2 space-y-1">
+              <div
+                v-for="entry in tileNameEntries"
+                :key="entry.index"
+                class="grid grid-cols-[54px_1fr] gap-1 items-center"
+              >
+                <span class="text-micro text-gray-600 dark:text-gray-300">R{{ entry.row + 1 }}C{{ entry.col + 1 }}</span>
+                <input
+                  type="text"
+                  class="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 text-micro text-gray-900 dark:text-white"
+                  :value="entry.name"
+                  :placeholder="entry.defaultName"
+                  @input="updateTileName(entry.index, $event.target.value)"
+                />
+              </div>
             </div>
           </div>
-        </div>
-    </SettingSection>
+      </SettingSection>
 
+
+    </div>
 
     <!-- 2. Built from: elevation (with the Terrain choice) and map data -->
-    <StepHeader :n="2" :title="t('panelSteps.builtFrom')" :hint="t('panelSteps.builtFromHint')" />
-    <!-- Elevation Source -->
-    <ElevationSourceSelector
-      id="mapng-bsec-elevation"
-      :changed="elevationChanged"
-      resettable
-      @reset="resetElevation"
-      v-model:elevationSource="elevationSource"
-      :usgsStatus="null"
-      v-model:gpxzApiKey="gpxzApiKey"
-      :gpxzStatus="gpxzStatus"
-      :isCheckingGPXZ="isCheckingGPXZ"
-      :isBatchMode="true"
-      :totalTiles="totalTiles"
-      :center="center"
-      @verifyGpxzKey="checkGPXZStatus"
-    >
-      <!-- Terrain: the same choice as a single tile (advanced; basic is always Ready to drive) -->
-      <p v-if="!store.advancedMode" class="text-caption leading-snug text-gray-500 dark:text-gray-400 px-1">{{ t('terrainChoice.basicNote') }}</p>
-      <SettingCard v-else>
-        <TerrainChoice :elevation-source="elevationSource" />
-      </SettingCard>
-    </ElevationSourceSelector>
+    <div v-show="step === 2" class="space-y-6">
+      <!-- Elevation Source -->
+      <ElevationSourceSelector
+        id="mapng-bsec-elevation"
+        :changed="elevationChanged"
+        resettable
+        @reset="resetElevation"
+        v-model:elevationSource="elevationSource"
+        :usgsStatus="null"
+        v-model:gpxzApiKey="gpxzApiKey"
+        :gpxzStatus="gpxzStatus"
+        :isCheckingGPXZ="isCheckingGPXZ"
+        :isBatchMode="true"
+        :totalTiles="totalTiles"
+        :center="center"
+        @verifyGpxzKey="checkGPXZStatus"
+      >
+        <!-- Terrain: the same choice as a single tile (batch has no Basic mode: always shown) -->
+        <SettingCard>
+          <TerrainChoice :elevation-source="elevationSource" />
+        </SettingCard>
+      </ElevationSourceSelector>
 
-    <SettingSection id="mapng-bsec-mapdata" :changed="!includeOSM" resettable @reset="includeOSM = true" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
-      <SettingCard>
-        <SettingRow check v-model="includeOSM" :label="t('batch.includeOsm')" :hint="t('controlPanel.ui.osmHint')" />
-        <OsmFileInput v-if="includeOSM" :area="gridArea" grid />
-      </SettingCard>
-    </SettingSection>
+      <SettingSection id="mapng-bsec-mapdata" :changed="!includeOSM" resettable @reset="includeOSM = true" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
+        <SettingCard>
+          <SettingRow check v-model="includeOSM" :label="t('batch.includeOsm')" :hint="t('controlPanel.ui.osmHint')" />
+          <OsmFileInput v-if="includeOSM" :area="gridArea" grid />
+        </SettingCard>
+      </SettingSection>
 
 
-    <!-- 3. What you get: the combined level or each tile's files, then start -->
-    <StepHeader :n="3" :title="t('panelSteps.get')" :hint="combinedLevel ? t('panelSteps.getHintCombined') : t('panelSteps.getHintSeparate')" />
-    <BatchCombinedLevelOptions
-      v-if="combinedLevel"
-      :level-options="levelOptions"
-      :include-o-s-m="includeOSM"
-      @update:level-options="handleLevelOptionsUpdate"
-    />
-    <BatchExportOptions
-      v-else
-      :exports="exports"
-      :include-o-s-m="includeOSM"
-      :mesh-resolution="meshResolution"
-      @update:exports="handleExportsUpdate"
-      @update:mesh-resolution="(v) => meshResolution.value = v"
-    />
-
-    <!-- Combined level output summary -->
-    <div v-if="combinedLevel" class="text-micro text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
-      <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batchCombined.outputSummary', { tiles: totalTiles, dim: combinedDim }) }}</span></p>
-      <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
-        <Info :size="11" class="shrink-0 mt-px" />{{ t('batchCombined.outputHint') }}
-      </p>
     </div>
 
-    <!-- Selected exports count -->
-    <div v-else class="text-micro text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
-      <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batch.selectedPerTile', { count: selectedExportCount }) }}</span></p>
-      <p>{{ t('batch.totalFiles', { tiles: totalTiles, exports: selectedExportCount, total: totalTiles * selectedExportCount }) }}</p>
-      <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
-        <Info :size="11" class="shrink-0 mt-px" />{{ isDesktop ? t('batch.browserDownloadHintDesktop') : t('batch.browserDownloadHint') }}
-      </p>
+    <!-- 3. What you get: the combined level or each tile's files -->
+    <div v-show="step === 3" id="mapng-bsec-output" class="space-y-6">
+      <BatchCombinedLevelOptions
+        v-if="combinedLevel"
+        :level-options="levelOptions"
+        :include-o-s-m="includeOSM"
+        @update:level-options="handleLevelOptionsUpdate"
+      />
+      <BatchExportOptions
+        v-else
+        :exports="exports"
+        :include-o-s-m="includeOSM"
+        :mesh-resolution="meshResolution"
+        @update:exports="handleExportsUpdate"
+        @update:mesh-resolution="(v) => meshResolution.value = v"
+      />
+
+      <!-- Combined level output summary -->
+      <div v-if="combinedLevel" class="text-micro text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
+        <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batchCombined.outputSummary', { tiles: totalTiles, dim: combinedDim }) }}</span></p>
+        <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
+          <Info :size="11" class="shrink-0 mt-px" />{{ t('batchCombined.outputHint') }}
+        </p>
+      </div>
+
+      <!-- Selected exports count -->
+      <div v-else class="text-micro text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 space-y-1">
+        <p><span class="font-medium text-gray-700 dark:text-gray-300">{{ t('batch.selectedPerTile', { count: selectedExportCount }) }}</span></p>
+        <p>{{ t('batch.totalFiles', { tiles: totalTiles, exports: selectedExportCount, total: totalTiles * selectedExportCount }) }}</p>
+        <p class="flex items-start gap-1 text-gray-500 dark:text-gray-400 mt-1">
+          <Info :size="11" class="shrink-0 mt-px" />{{ isDesktop ? t('batch.browserDownloadHintDesktop') : t('batch.browserDownloadHint') }}
+        </p>
+      </div>
+
+      <BatchPerformanceProfile v-model:modelValue="performanceProfile" />
+
+
     </div>
 
-    <BatchPerformanceProfile v-model:modelValue="performanceProfile" />
+    <!-- 4. Run: the whole setup at a glance, then Start below -->
+    <div v-show="step === 4" class="space-y-4">
+      <!-- Batch Stability Note -->
+      <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-3 py-2 flex items-start gap-2">
+        <AlertTriangle :size="14" class="text-amber-500 mt-0.5 shrink-0" />
+        <p class="text-micro text-amber-700 dark:text-amber-400 leading-relaxed">
+          <span class="font-bold">{{ t('batch.resourceHeavy') }}</span> {{ isDesktop ? t('batch.resourceHeavyBodyDesktop') : t('batch.resourceHeavyBody') }}
+        </p>
+      </div>
+
+      <div class="space-y-1.5">
+        <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('wizard.review') }}</div>
+        <GenerateSummary rows :items="summaryItems" @step="(n) => step = n" />
+        <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('wizard.runHint') }}</p>
+      </div>
+      <div v-if="hasResumableSavedState" class="space-y-2">
+          <BaseButton block size="md" variant="success" @click="$emit('resumeBatch')">
+            <RotateCcw :size="14" />
+            {{ t('batch.resumePrevious', { done: savedState.totalCompleted, total: savedState.tiles.length }) }}
+          </BaseButton>
+          <BaseButton block size="sm" variant="secondary" @click="$emit('clearSavedBatch')">
+            <X :size="12" />
+            {{ t('batch.clearSavedJob') }}
+          </BaseButton>
+          <BaseButton block size="sm" variant="secondary" @click="$emit('clearCache')">
+            <X :size="12" />
+            {{ t('batch.clearCache') }}
+          </BaseButton>
+      </div>
+      <!-- Share & save settings (the same name as a single tile's) -->
+      <SettingSection :title="t('controlPanel.configurationSession')" :icon="Settings" storage-key="mapng_ui_sec_batchconfig" :default-open="false">
+        <BatchRunConfigControls
+          :status="runConfigStatus"
+          @copy="copyRunConfiguration"
+          @paste="pasteRunConfiguration"
+          @save="saveRunConfiguration"
+          @load="handleRunConfigFile"
+        />
+
+      </SettingSection>
+
+      <div class="p-2.5 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="text-caption font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
+              <p class="text-micro text-orange-700/90 dark:text-orange-300/90 mt-1 leading-relaxed">{{ t('support.cardBody') }}</p>
+            </div>
+            <button
+              type="button"
+              @click="$emit('showSupport')"
+              class="shrink-0 px-2.5 py-1 text-micro font-semibold bg-brand hover:bg-brand-500 text-white rounded transition-colors"
+            >
+              {{ t('support.donate') }}
+            </button>
+          </div>
+        </div>
 
 
-    <GenerateSummary :items="summaryItems" />
-    <div class="space-y-2">
+    </div>
+
+    <template #footer>
+      <GenerateSummary compact :items="summaryItems" @step="(n) => step = n" />
       <BaseButton
         block
         size="lg"
@@ -230,59 +284,17 @@
         <Play :size="16" />
         {{ combinedLevel ? t('batchCombined.startCombined', { tiles: totalTiles }) : t('batch.startBatch', { tiles: totalTiles }) }}
       </BaseButton>
-
-      <template v-if="hasResumableSavedState">
-        <BaseButton block size="md" variant="success" @click="$emit('resumeBatch')">
-          <RotateCcw :size="14" />
-          {{ t('batch.resumePrevious', { done: savedState.totalCompleted, total: savedState.tiles.length }) }}
-        </BaseButton>
-        <BaseButton block size="sm" variant="secondary" @click="$emit('clearSavedBatch')">
-          <X :size="12" />
-          {{ t('batch.clearSavedJob') }}
-        </BaseButton>
-        <BaseButton block size="sm" variant="secondary" @click="$emit('clearCache')">
-          <X :size="12" />
-          {{ t('batch.clearCache') }}
-        </BaseButton>
-      </template>
-    </div>
-
-    <!-- Share & save settings (the same name as a single tile's) -->
-    <SettingSection :title="t('controlPanel.configurationSession')" :icon="Settings" storage-key="mapng_ui_sec_batchconfig" :default-open="false">
-      <BatchRunConfigControls
-        :status="runConfigStatus"
-        @copy="copyRunConfiguration"
-        @paste="pasteRunConfiguration"
-        @save="saveRunConfiguration"
-        @load="handleRunConfigFile"
-      />
-
-    </SettingSection>
-
-    <div class="p-2.5 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <p class="text-caption font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
-            <p class="text-micro text-orange-700/90 dark:text-orange-300/90 mt-1 leading-relaxed">{{ t('support.cardBody') }}</p>
-          </div>
-          <button
-            type="button"
-            @click="$emit('showSupport')"
-            class="shrink-0 px-2.5 py-1 text-micro font-semibold bg-brand hover:bg-brand-500 text-white rounded transition-colors"
-          >
-            {{ t('support.donate') }}
-          </button>
-        </div>
-      </div>
-
-
-  </div>
+      <!-- (a job left unfinished: picked up from any step; clearing it is on the Run step) -->
+      <button v-if="hasResumableSavedState" type="button" class="w-full flex items-center justify-center gap-1.5 text-caption font-semibold text-emerald-700 dark:text-emerald-400 hover:underline" @click="$emit('resumeBatch')">
+        <RotateCcw :size="12" />{{ t('batch.resumePrevious', { done: savedState.totalCompleted, total: savedState.tiles.length }) }}
+      </button>
+    </template>
+  </WizardLayout>
 </template>
 
 <script setup>
 import { initialElevationSource } from '../../services/elevationDefaults.js';
 import { withoutPersonal } from '../../services/personalKeys.js';
-import SectionToggleAll from '../base/SectionToggleAll.vue';
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 import { desktopApp } from '../../services/platform/desktop.js';
 // Expand all / Collapse all for every section in this panel
@@ -291,11 +303,12 @@ import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
 import SegmentedControl from '../base/SegmentedControl.vue';
 import SettingSection from '../base/SettingSection.vue';
-import { ref, computed, watch, nextTick } from 'vue';
+import { ref, shallowRef, computed, watch, nextTick, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '../../stores/mainStore';
 import TerrainChoice from '../ui/TerrainChoice.vue';
-import StepHeader from '../ui/StepHeader.vue';
+import WizardLayout from '../ui/WizardLayout.vue';
+import { getLoadedOsmFile, onOsmFileChange, osmFileCoverage } from '../../services/osmFile.js';
 import OsmFileInput from '../controls/OsmFileInput.vue';
 import { computeGridBounds } from '../../services/batchJob.js';
 import GenerateSummary from '../ui/GenerateSummary.vue';
@@ -591,23 +604,39 @@ const gridWidthDisplay = computed(() => formatDist(gridWidthKm.value));
 // Sections that differ from the defaults (a dot by the title) and their Reset
 const areaChanged = computed(() => Number(props.resolution) !== 1024 || processingMetersPerPixelNumber.value !== 1 || sharedElevationBaseline.value);
 const resetArea = () => { emit('resolutionChange', 1024); emit('update:processingMetersPerPixel', 1); sharedElevationBaseline.value = false; };
-const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || (store.advancedMode && terrainMode.value !== 'ready'));
+const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || terrainMode.value !== 'ready');
 const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
 const layoutChanged = computed(() => hasOffsetTiles.value || tileNames.value.some((e) => String(e.name || '').trim() && e.name !== defaultTileName(e.index)));
 
 // The one-line summary above Start (components/ui/GenerateSummary.vue)
+// The setup in one line (the wizard's bottom bar) and as the Run step's list
+// (components/ui/GenerateSummary.vue); each part goes to its step.
+const osmFile = shallowRef(getLoadedOsmFile());
+const stopOsmFile = onOsmFileChange((f) => { osmFile.value = f; });
+onUnmounted(stopOsmFile);
 const summaryItems = computed(() => {
-  const mode = store.advancedMode ? terrainMode.value : 'ready';
+  const mode = terrainMode.value;
+  const fromFile = includeOSM.value && osmFile.value && osmFileCoverage(osmFile.value.bounds, gridArea.value).coverage !== 'none';
   return [
-    { key: 'tiles', label: t('genSummary.tiles', { cols: gridCols.value, rows: gridRows.value }), target: 'mapng-bsec-grid' },
-    { key: 'area', label: `${gridWidthDisplay.value} × ${gridHeightDisplay.value}`, target: 'mapng-bsec-grid' },
-    { key: 'px', label: t('genSummary.pxTile', { px: props.resolution }), target: 'mapng-bsec-area' },
-    { key: 'source', label: t(`genSummary.source_${elevationSource.value}`), target: 'mapng-bsec-elevation' },
-    { key: 'terrain', label: t(`terrainChoice.${mode}`), target: 'mapng-bsec-elevation', warn: mode === 'untouched' },
-    { key: 'osm', label: t(includeOSM.value ? 'genSummary.osmOn' : 'genSummary.osmOff'), target: 'mapng-bsec-mapdata', warn: !includeOSM.value },
-    { key: 'out', label: t(combinedLevel.value ? 'genSummary.combined' : 'genSummary.separate'), target: '' },
+    { key: 'tiles', rowLabel: t('wizard.rowGrid'), label: t('genSummary.tiles', { cols: gridCols.value, rows: gridRows.value }), target: 'mapng-bsec-grid', step: 1 },
+    { key: 'area', rowLabel: t('wizard.rowArea'), label: `${gridWidthDisplay.value} × ${gridHeightDisplay.value}`, target: 'mapng-bsec-grid', step: 1 },
+    { key: 'px', rowLabel: t('wizard.rowResolution'), label: t('genSummary.pxTile', { px: props.resolution }), target: 'mapng-bsec-area', step: 1 },
+    { key: 'source', rowLabel: t('wizard.rowElevation'), label: t(`genSummary.source_${elevationSource.value}`), target: 'mapng-bsec-elevation', step: 2 },
+    { key: 'terrain', rowLabel: t('wizard.rowTerrain'), label: t(`terrainChoice.${mode}`), target: 'mapng-bsec-elevation', step: 2, warn: mode === 'untouched' },
+    { key: 'osm', rowLabel: t('wizard.rowMapData'), label: t(!includeOSM.value ? 'genSummary.osmOff' : fromFile ? 'genSummary.osmFile' : 'genSummary.osmOn'), target: 'mapng-bsec-mapdata', step: 2, warn: !includeOSM.value },
+    { key: 'out', rowLabel: t('wizard.rowOutput'), label: t(combinedLevel.value ? 'genSummary.combined' : 'genSummary.separate'), target: 'mapng-bsec-output', step: 3 },
   ];
 });
+
+// The wizard (components/ui/WizardLayout.vue): Where, Built from, What you
+// get, Run. Nothing is locked: Start runs from any step.
+const step = ref(1);
+const wizardSteps = computed(() => [
+  { key: 'where', label: t('panelSteps.where'), done: step.value > 1 },
+  { key: 'built', label: t('panelSteps.builtFrom'), done: step.value > 2 },
+  { key: 'get', label: t('panelSteps.get'), done: step.value > 3 },
+  { key: 'run', label: t('wizard.run') },
+]);
 const gridHeightDisplay = computed(() => formatDist(gridHeightKm.value));
 const selectedExportCount = computed(() =>
   Object.values(exports.value).filter(Boolean).length
@@ -725,9 +754,9 @@ const handleStart = () => {
     combinedLevel: combinedLevel.value,
     levelOptions: combinedLevel.value ? normalizeLevelOptions(levelOptions.value) : null,
     // the Terrain choice: Untouched generates raw; the combined level's export edits follow it
-    rawTerrain: store.advancedMode && terrainMode.value === 'untouched',
-    generationEdits: (({ raw, ...passes }) => passes)(terrainGenerationOptions(store.advancedMode)),
-    shaping: terrainShapingOptions(store.advancedMode),
+    rawTerrain: terrainMode.value === 'untouched',
+    generationEdits: (({ raw, ...passes }) => passes)(terrainGenerationOptions(true)),
+    shaping: terrainShapingOptions(true),
   });
 };
 

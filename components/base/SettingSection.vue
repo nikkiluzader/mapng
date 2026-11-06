@@ -69,7 +69,7 @@ watch(own, (v) => {
   if (!props.storageKey) return;
   try { localStorage.setItem(props.storageKey, String(v)); } catch { /* private mode */ }
 });
-// Expand all / Collapse all from the panel (SectionToggleAll)
+// Expand all / Collapse all from the panel (provideSectionGroup)
 const group = useSectionGroup();
 if (group) watch(() => group.signal.value, (cmd) => { if (!cmd) return; own.value = cmd.open; emit('update:open', cmd.open); });
 defineExpose({ open });

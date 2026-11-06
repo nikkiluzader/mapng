@@ -551,9 +551,7 @@
       "mapData": "Dane mapy (OpenStreetMap)",
       "osmHint": "Drogi, budynki, woda, użytkowanie terenu i detale ulic",
       "needsOsmOn": "Najpierw włącz Dołącz obiekty OSM"
-    },
-    "expandAll": "Rozwiń wszystko",
-    "collapseAll": "Zwiń wszystko"
+    }
   },
   "batchExport": {
     "title": "Opcje eksportu",
@@ -591,7 +589,7 @@
     "usingUploadedElevation": "Używane są przesłane dane wysokości",
     "viewBeforeDownload": "Wyświetl przed pobraniem",
     "dataReady": "Dane gotowe",
-    "downloadBelow": "Pobierz poniżej",
+    "downloadBelow": "Przejdź do eksportu",
     "generateData": "Wygeneruj dane",
     "skip3dGetFiles": "Pomiń widok 3D, pobierz pliki"
   },
@@ -1273,15 +1271,8 @@
   },
   "panelSteps": {
     "where": "Gdzie",
-    "whereHint": "Obszar mapy",
-    "whereHintBatch": "Siatka i rozmiar każdego kafelka",
     "builtFrom": "Zbudowany z",
-    "builtFromHint": "Wysokości, teren i dane mapy",
-    "build": "Zbuduj",
-    "buildHint": "Wygeneruj, potem wybierz, co dostanie poziom",
-    "get": "Co otrzymasz",
-    "getHintCombined": "Jeden poziom BeamNG ze wszystkich kafelków",
-    "getHintSeparate": "Pliki dla każdego kafelka"
+    "get": "Co otrzymasz"
   },
   "genSummary": {
     "title": "Zbudujesz",
@@ -1300,7 +1291,8 @@
     "source_kron86": "NMT (Polska)",
     "source_usgs": "USGS 1 m",
     "source_gpxz": "GPXZ",
-    "source_upload": "Twój plik wysokości"
+    "source_upload": "Twój plik wysokości",
+    "osmFile": "Dane mapy: twój plik"
   },
   "sections": {
     "reset": "Przywróć",
@@ -1328,5 +1320,27 @@
     "coverage_partial": "Obejmuje {pct}% obszaru: używany, a reszta obszaru nie ma danych mapy.",
     "coverage_none": "Nie obejmuje tego obszaru: nieużywany. Dane mapy są pobierane jak zwykle.",
     "coverage_partialGrid": "Obejmuje {pct}% siatki: kafelki, do których sięga, używają go, pozostałe pobierają dane mapy jak zwykle."
+  },
+  "wizard": {
+    "steps": "Kroki",
+    "back": "Wstecz",
+    "next": "Dalej",
+    "generate": "Generuj",
+    "export": "Eksport",
+    "run": "Uruchom",
+    "exportLocked": "Najpierw wygeneruj teren",
+    "review": "Podsumowanie",
+    "reviewHint": "Podgląd 3D pokazuje teren przed eksportem; Generuj dane przechodzi od razu do opcji poziomu. Kliknij wiersz, aby go zmienić.",
+    "runHint": "Start generuje i eksportuje wszystkie kafelki za jednym razem, bez podglądu po drodze. Kliknij wiersz, aby go zmienić.",
+    "generated": "Teren gotowy: zgadza się z tymi ustawieniami.",
+    "generatedStale": "Ustawienia zmieniły się od generowania: wygeneruj ponownie, aby ich użyć.",
+    "toExport": "Przejdź do eksportu →",
+    "rowArea": "Obszar",
+    "rowResolution": "Rozdzielczość",
+    "rowElevation": "Wysokości",
+    "rowTerrain": "Teren",
+    "rowMapData": "Dane mapy",
+    "rowGrid": "Siatka",
+    "rowOutput": "Wynik"
   }
 }

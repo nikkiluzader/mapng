@@ -1,282 +1,326 @@
 <template>
-  <div class="space-y-5">
+  <div class="flex-1 min-h-0 flex flex-col">
+  <WizardLayout v-model="step" :steps="wizardSteps">
     <!-- Basic / Advanced: advanced restores the map-maker tools (2D/3D asset
          downloads, Surrounding Tiles, per-category level export options). -->
-    <div>
-      <SegmentedControl
-        :model-value="store.advancedMode ? 'advanced' : 'basic'"
-        @update:model-value="store.setAdvancedMode($event === 'advanced')"
-        :options="[
-          { value: 'basic', label: t('controlPanel.modeBasic') },
-          { value: 'advanced', label: t('controlPanel.modeAdvanced') },
-        ]"
-      />
-      <p class="mt-1.5 text-caption text-gray-500 dark:text-gray-400">
-        {{ t(store.advancedMode ? 'controlPanel.modeAdvancedHint' : 'controlPanel.modeBasicHint') }}
-      </p>
-    </div>
-
-    <SectionToggleAll />
-
-    <!-- 1. Where -->
-    <StepHeader :n="1" :title="t('panelSteps.where')" :hint="t('panelSteps.whereHint')" />
-    <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
-      <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
-    </SettingSection>
-
-    <!-- 2. How big and how detailed -->
-    <SettingSection id="mapng-sec-area" :changed="areaChanged" resettable @reset="resetArea" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_area">
-      <div
-        v-if="devMode"
-        class="rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2"
-      >
-        <p class="text-caption font-semibold text-amber-800 dark:text-amber-300">
-          Developer mode enabled (press ~ to toggle)
-        </p>
+    <template #bar>
+      <div :title="t(store.advancedMode ? 'controlPanel.modeAdvancedHint' : 'controlPanel.modeBasicHint')">
+        <SegmentedControl
+          :model-value="store.advancedMode ? 'advanced' : 'basic'"
+          @update:model-value="store.setAdvancedMode($event === 'advanced')"
+          :options="[
+            { value: 'basic', label: t('controlPanel.modeBasic') },
+            { value: 'advanced', label: t('controlPanel.modeAdvanced') },
+          ]"
+        />
       </div>
+    </template>
 
-      <!-- Uploaded georeferenced sources can use either full native coverage
-           or a user-selected square crop inside that coverage. -->
-      <div v-if="nativeDims" class="space-y-1">
-        <div v-if="supportsUploadAreaMode" class="space-y-2">
-          <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.uploadAreaMode') }}</label>
-          <div class="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              @click="$emit('update:uploadedAreaMode', 'native')"
-              :class="[
-                'rounded border px-3 py-2 text-sm font-medium transition-colors',
-                uploadedAreaMode === 'native'
-                  ? 'border-brand bg-orange-50 dark:bg-orange-900/20 text-brand'
-                  : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
-              ]"
-            >
-              {{ t('controlPanel.fullCoverage') }}
-            </button>
-            <button
-              type="button"
-              @click="$emit('update:uploadedAreaMode', 'crop')"
-              :class="[
-                'rounded border px-3 py-2 text-sm font-medium transition-colors',
-                uploadedAreaMode === 'crop'
-                  ? 'border-brand bg-orange-50 dark:bg-orange-900/20 text-brand'
-                  : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
-              ]"
-            >
-              {{ t('controlPanel.squareCrop') }}
-            </button>
+    <!-- 1. Where: the place, how big and how detailed -->
+    <div v-show="step === 1" class="space-y-5">
+      <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
+        <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
+      </SettingSection>
+
+      <!-- 2. How big and how detailed -->
+      <SettingSection id="mapng-sec-area" :changed="areaChanged" resettable @reset="resetArea" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_area">
+        <div
+          v-if="devMode"
+          class="rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2"
+        >
+          <p class="text-caption font-semibold text-amber-800 dark:text-amber-300">
+            Developer mode enabled (press ~ to toggle)
+          </p>
+        </div>
+
+        <!-- Uploaded georeferenced sources can use either full native coverage
+             or a user-selected square crop inside that coverage. -->
+        <div v-if="nativeDims" class="space-y-1">
+          <div v-if="supportsUploadAreaMode" class="space-y-2">
+            <label class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.uploadAreaMode') }}</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                @click="$emit('update:uploadedAreaMode', 'native')"
+                :class="[
+                  'rounded border px-3 py-2 text-sm font-medium transition-colors',
+                  uploadedAreaMode === 'native'
+                    ? 'border-brand bg-orange-50 dark:bg-orange-900/20 text-brand'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
+                ]"
+              >
+                {{ t('controlPanel.fullCoverage') }}
+              </button>
+              <button
+                type="button"
+                @click="$emit('update:uploadedAreaMode', 'crop')"
+                :class="[
+                  'rounded border px-3 py-2 text-sm font-medium transition-colors',
+                  uploadedAreaMode === 'crop'
+                    ? 'border-brand bg-orange-50 dark:bg-orange-900/20 text-brand'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300',
+                ]"
+              >
+                {{ t('controlPanel.squareCrop') }}
+              </button>
+            </div>
+          </div>
+
+          <label v-if="uploadedAreaMode !== 'crop'" class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.resolutionOutputSize') }}</label>
+          <div v-if="uploadedAreaMode !== 'crop'" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
+            {{ nativeDims.width }} × {{ nativeDims.height }} px
+            <span class="text-micro ml-1">({{ t('controlPanel.nativeCoverage', { source: nativeDims.sourceLabel }) }})</span>
+          </div>
+          <ResolutionSelector
+            v-else
+            :modelValue="resolution"
+            @update:modelValue="$emit('resolutionChange', $event)"
+            :label="t('controlPanel.resolutionOutputSize')"
+            :max-resolution="maxSquareCropResolution"
+          >
+            <p>{{ t('controlPanel.squareCropWithinCoverage') }}</p>
+            <p v-if="uploadedElevationMeta?.suggestedResolution">{{ t('controlPanel.suggestedSquareExport', { size: uploadedElevationMeta.suggestedResolution }) }}</p>
+          </ResolutionSelector>
+          <div class="text-micro text-gray-500 dark:text-gray-400 pt-1 space-y-1">
+            <p v-if="nativeDims.note" class="text-brand font-medium">
+              {{ nativeDims.note }}
+            </p>
+            <p v-if="supportsUploadAreaMode && uploadedAreaMode !== 'crop'">{{ t('controlPanel.switchToSquareCrop') }}</p>
+            <p v-else-if="supportsUploadAreaMode">{{ t('controlPanel.dragMapToPositionCrop') }}</p>
+            <p v-else>{{ t('controlPanel.removeUploadedForCustomResolution') }}</p>
+            <p v-if="previewStale" class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+              <AlertTriangle :size="11" class="shrink-0" />
+              {{ t('controlPanel.previewOutOfDatePanel') }}
+            </p>
           </div>
         </div>
 
-        <label v-if="uploadedAreaMode !== 'crop'" class="text-xs text-gray-500 dark:text-gray-400">{{ t('controlPanel.resolutionOutputSize') }}</label>
-        <div v-if="uploadedAreaMode !== 'crop'" class="w-full bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-2 text-sm text-gray-500 dark:text-gray-400">
-          {{ nativeDims.width }} × {{ nativeDims.height }} px
-          <span class="text-micro ml-1">({{ t('controlPanel.nativeCoverage', { source: nativeDims.sourceLabel }) }})</span>
-        </div>
         <ResolutionSelector
           v-else
           :modelValue="resolution"
           @update:modelValue="$emit('resolutionChange', $event)"
           :label="t('controlPanel.resolutionOutputSize')"
-          :max-resolution="maxSquareCropResolution"
         >
-          <p>{{ t('controlPanel.squareCropWithinCoverage') }}</p>
-          <p v-if="uploadedElevationMeta?.suggestedResolution">{{ t('controlPanel.suggestedSquareExport', { size: uploadedElevationMeta.suggestedResolution }) }}</p>
         </ResolutionSelector>
-        <div class="text-micro text-gray-500 dark:text-gray-400 pt-1 space-y-1">
-          <p v-if="nativeDims.note" class="text-brand font-medium">
-            {{ nativeDims.note }}
-          </p>
-          <p v-if="supportsUploadAreaMode && uploadedAreaMode !== 'crop'">{{ t('controlPanel.switchToSquareCrop') }}</p>
-          <p v-else-if="supportsUploadAreaMode">{{ t('controlPanel.dragMapToPositionCrop') }}</p>
-          <p v-else>{{ t('controlPanel.removeUploadedForCustomResolution') }}</p>
-          <p v-if="previewStale" class="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
-            <AlertTriangle :size="11" class="shrink-0" />
-            {{ t('controlPanel.previewOutOfDatePanel') }}
-          </p>
+        <!-- (the website only: big maps belong in the desktop app) -->
+        <p v-if="!desktopApp && Number(resolution) >= 4096" class="flex items-start gap-1.5 -mt-1 text-micro leading-snug text-gray-500 dark:text-gray-400">
+          <Download :size="11" class="shrink-0 mt-px text-brand" />
+          <span>{{ t('controlPanel.desktopHint') }} <a :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('controlPanel.desktopHintLink') }}</a></span>
+        </p>
+
+        <ProcessingResolutionInput
+          :model-value="processingMetersPerPixel"
+          :resolution="Number(resolution) || 0"
+          @update:model-value="(v) => $emit('update:processingMetersPerPixel', v)"
+        />
+
+      </SettingSection>
+
+      <!-- Surrounding Tiles (advanced mode) -->
+      <SurroundingTiles
+        v-if="store.advancedMode"
+        :terrain-data="terrainData"
+        :center="center"
+        :resolution="resolution"
+        @update:selected-positions="handleSurroundingTilesChange"
+        @update:show-on-map="() => {}"
+      />
+
+    </div>
+
+    <!-- 2. Built from: elevation (with uploads and the Terrain choice), then OpenStreetMap -->
+    <div v-show="step === 2" class="space-y-5">
+        <ElevationSourceSelector
+          id="mapng-sec-elevation"
+          :changed="elevationChanged"
+          resettable
+          @reset="resetElevation"
+          v-model:elevationSource="elevationSource"
+          :usgsStatus="usgsStatus"
+          v-model:gpxzApiKey="gpxzApiKey"
+          :gpxzStatus="gpxzStatus"
+          :isCheckingGPXZ="isCheckingGPXZ"
+          :isAreaLargeForGPXZ="isAreaLargeForGPXZ"
+          :areaSqKm="areaSqKm"
+          :center="center"
+          @verifyGpxzKey="checkGPXZStatus"
+        >
+        <!-- Elevation Upload (BYOD: tif/tiff/asc/gml/xml/zip/laz/las) -->
+        <ElevationUploadControl
+          :uploaded-elevation-file="uploadedElevationFile"
+          :uploaded-elevation-meta="uploadedElevationMeta"
+          :vertical-unit-override="elevationUnitOverride"
+          :asc-coordinate-system="uploadedAscCoordinateSystem"
+          :no-data-override="uploadedNoDataOverride"
+          :gap-fill-source="gapFillSource"
+          :layer-order="uploadedLayerOrder"
+          :layer-slots="elevationLayerSlots"
+          :max-slots="maxElevationSlots"
+          :gpxz-key-available="!!gpxzApiKey"
+          @update:verticalUnitOverride="(v) => elevationUnitOverride = v"
+          @update:gapFillSource="(v) => gapFillSource = v"
+          @update:layerOrder="(v) => $emit('update:uploadedLayerOrder', v)"
+          @slot-selected="(i, files) => $emit('elevationSlotSelected', i, files)"
+          @slot-removed="(i) => $emit('elevationSlotRemoved', i)"
+          @update:ascCoordinateSystem="(v) => $emit('update:uploadedAscCoordinateSystem', v)"
+          @update:noDataOverride="(v) => $emit('update:uploadedNoDataOverride', v)"
+          @file-selected="$emit('elevationFileSelected', $event)"
+          @clear="$emit('elevationFileClear')"
+        />
+
+        <!-- LAZ Metadata Card -->
+        <LazMetaCard
+          v-if="isLazFileActive && uploadedElevationMeta"
+          :meta="uploadedElevationMeta"
+        />
+
+        <!-- Raster Metadata Card -->
+        <RasterMetaCard
+          v-if="uploadedElevationMeta && !isLazFileActive"
+          :meta="uploadedElevationMeta"
+          :vertical-unit-override="elevationUnitOverride"
+        />
+          <!-- Terrain: how much MapNG shapes the elevation (advanced; basic is always Ready to drive) -->
+          <p v-if="!store.advancedMode" class="text-caption leading-snug text-gray-500 dark:text-gray-400 px-1">{{ t('terrainChoice.basicNote') }}</p>
+          <SettingCard v-else>
+            <TerrainChoice :elevation-source="elevationSource" :upload="!!uploadedElevationFile && (!Array.isArray(uploadedElevationFile) || uploadedElevationFile.length > 0)" />
+          </SettingCard>
+        </ElevationSourceSelector>
+
+      <SettingSection id="mapng-sec-mapdata" :changed="mapDataChanged" resettable @reset="resetMapData" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
+        <!-- OpenStreetMap features, and Overture's buildings where OSM has none -->
+        <SettingCard>
+          <SettingRow check v-model="fetchOSM" :label="t('controlPanel.includeOsmFeatures')" :hint="t('controlPanel.ui.osmHint')" />
+          <details v-if="fetchOSM" class="pl-4 text-caption text-gray-500 dark:text-gray-400" :open="!!customOverpassUrl">
+            <summary class="cursor-pointer select-none hover:text-brand">{{ t('controlPanel.customOverpass') }}</summary>
+            <input
+              v-model.trim="customOverpassUrl"
+              type="password"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="https://api.tracestrack.com/overpass/YOUR_KEY/interpreter"
+              class="mt-1 w-full px-1.5 py-1 rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-caption text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
+            />
+            <p v-if="customOverpassUrl && !customOverpassValid" class="mt-0.5 text-amber-600 dark:text-amber-400">{{ t('controlPanel.customOverpassInvalid') }}</p>
+            <p class="mt-0.5 leading-snug">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-brand hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-brand hover:underline">Overspan</a></p>
+          </details>
+          <OsmFileInput v-if="fetchOSM" :area="selectionArea" />
+          <!-- (services/overtureTiles.js) -->
+          <SettingRow
+            check
+            v-model="overtureBuildings"
+            :label="t('controlPanel.overtureBuildings')"
+            :hint="t('controlPanel.overtureBuildingsHint')"
+            :disabled="!fetchOSM"
+            :disabled-reason="t('controlPanel.ui.needsOsmOn')"
+          />
+        </SettingCard>
+
+      </SettingSection>
+
+    </div>
+
+    <!-- 3. Generate: the whole setup at a glance, then the buttons below -->
+    <div v-show="step === 3" class="space-y-4">
+      <div class="space-y-1.5">
+        <div class="text-micro font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">{{ t('wizard.review') }}</div>
+        <GenerateSummary rows :items="summaryItems" @step="(n) => step = n" />
+        <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('wizard.reviewHint') }}</p>
+      </div>
+      <!-- (generated already: whether it still matches the settings) -->
+      <div v-if="terrainData && !isGenerating" class="rounded-lg border px-3 py-2 text-caption" :class="isCached ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-900/10' : 'border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10'">
+        <div class="flex items-center gap-1.5 font-semibold" :class="isCached ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-300'">
+          <CheckCircle2 v-if="isCached" :size="13" class="shrink-0" /><AlertTriangle v-else :size="13" class="shrink-0" />
+          {{ isCached ? t('wizard.generated') : t('wizard.generatedStale') }}
+        </div>
+        <button type="button" class="mt-1 text-brand hover:underline" @click="step = 4">{{ t('wizard.toExport') }}</button>
+      </div>
+      <!-- Configuration & Session (collapsed by default) -->
+      <SettingSection v-model:open="showConfig" :title="t('controlPanel.configurationSession')" :icon="Settings">
+        <RunConfigControls
+          :status="runConfigStatus"
+          @copy="copyRunConfiguration"
+          @save="saveRunConfiguration"
+          @load="handleRunConfigFile"
+          sendable
+          :sending="sendingConfig"
+          :sent="sentConfig"
+          @send="sendConfig"
+          @open-code="openShareCode"
+        />
+      </SettingSection>
+
+      <div class="p-3 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
+            <p class="text-caption text-orange-700/90 dark:text-orange-300/90 leading-relaxed mt-1">{{ t('support.cardBody') }}</p>
+          </div>
+          <button
+            type="button"
+            @click="$emit('showSupport')"
+            class="shrink-0 px-3 py-1.5 text-caption font-semibold bg-brand hover:bg-brand-500 text-white rounded-lg transition-colors"
+          >
+            {{ t('support.donate') }}
+          </button>
         </div>
       </div>
 
-      <ResolutionSelector
-        v-else
-        :modelValue="resolution"
-        @update:modelValue="$emit('resolutionChange', $event)"
-        :label="t('controlPanel.resolutionOutputSize')"
-      >
-      </ResolutionSelector>
-      <!-- (the website only: big maps belong in the desktop app) -->
-      <p v-if="!desktopApp && Number(resolution) >= 4096" class="flex items-start gap-1.5 -mt-1 text-micro leading-snug text-gray-500 dark:text-gray-400">
-        <Download :size="11" class="shrink-0 mt-px text-brand" />
-        <span>{{ t('controlPanel.desktopHint') }} <a :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('controlPanel.desktopHintLink') }}</a></span>
-      </p>
-
-      <ProcessingResolutionInput
-        :model-value="processingMetersPerPixel"
-        :resolution="Number(resolution) || 0"
-        @update:model-value="(v) => $emit('update:processingMetersPerPixel', v)"
-      />
-
-    </SettingSection>
-
-    <!-- Surrounding Tiles (advanced mode) -->
-    <SurroundingTiles
-      v-if="store.advancedMode"
-      :terrain-data="terrainData"
-      :center="center"
-      :resolution="resolution"
-      @update:selected-positions="handleSurroundingTilesChange"
-      @update:show-on-map="() => {}"
-    />
-
-    <!-- 3. Where the data comes from: elevation (with uploads and the Terrain choice), then OpenStreetMap -->
-    <StepHeader :n="2" :title="t('panelSteps.builtFrom')" :hint="t('panelSteps.builtFromHint')" />
-      <ElevationSourceSelector
-        id="mapng-sec-elevation"
-        :changed="elevationChanged"
-        resettable
-        @reset="resetElevation"
-        v-model:elevationSource="elevationSource"
-        :usgsStatus="usgsStatus"
-        v-model:gpxzApiKey="gpxzApiKey"
-        :gpxzStatus="gpxzStatus"
-        :isCheckingGPXZ="isCheckingGPXZ"
-        :isAreaLargeForGPXZ="isAreaLargeForGPXZ"
-        :areaSqKm="areaSqKm"
-        :center="center"
-        @verifyGpxzKey="checkGPXZStatus"
-      >
-      <!-- Elevation Upload (BYOD: tif/tiff/asc/gml/xml/zip/laz/las) -->
-      <ElevationUploadControl
-        :uploaded-elevation-file="uploadedElevationFile"
-        :uploaded-elevation-meta="uploadedElevationMeta"
-        :vertical-unit-override="elevationUnitOverride"
-        :asc-coordinate-system="uploadedAscCoordinateSystem"
-        :no-data-override="uploadedNoDataOverride"
-        :gap-fill-source="gapFillSource"
-        :layer-order="uploadedLayerOrder"
-        :layer-slots="elevationLayerSlots"
-        :max-slots="maxElevationSlots"
-        :gpxz-key-available="!!gpxzApiKey"
-        @update:verticalUnitOverride="(v) => elevationUnitOverride = v"
-        @update:gapFillSource="(v) => gapFillSource = v"
-        @update:layerOrder="(v) => $emit('update:uploadedLayerOrder', v)"
-        @slot-selected="(i, files) => $emit('elevationSlotSelected', i, files)"
-        @slot-removed="(i) => $emit('elevationSlotRemoved', i)"
-        @update:ascCoordinateSystem="(v) => $emit('update:uploadedAscCoordinateSystem', v)"
-        @update:noDataOverride="(v) => $emit('update:uploadedNoDataOverride', v)"
-        @file-selected="$emit('elevationFileSelected', $event)"
-        @clear="$emit('elevationFileClear')"
-      />
-
-      <!-- LAZ Metadata Card -->
-      <LazMetaCard
-        v-if="isLazFileActive && uploadedElevationMeta"
-        :meta="uploadedElevationMeta"
-      />
-
-      <!-- Raster Metadata Card -->
-      <RasterMetaCard
-        v-if="uploadedElevationMeta && !isLazFileActive"
-        :meta="uploadedElevationMeta"
-        :vertical-unit-override="elevationUnitOverride"
-      />
-        <!-- Terrain: how much MapNG shapes the elevation (advanced; basic is always Ready to drive) -->
-        <p v-if="!store.advancedMode" class="text-caption leading-snug text-gray-500 dark:text-gray-400 px-1">{{ t('terrainChoice.basicNote') }}</p>
-        <SettingCard v-else>
-          <TerrainChoice :elevation-source="elevationSource" :upload="!!uploadedElevationFile && (!Array.isArray(uploadedElevationFile) || uploadedElevationFile.length > 0)" />
-        </SettingCard>
-      </ElevationSourceSelector>
-
-    <SettingSection id="mapng-sec-mapdata" :changed="mapDataChanged" resettable @reset="resetMapData" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
-      <!-- OpenStreetMap features, and Overture's buildings where OSM has none -->
-      <SettingCard>
-        <SettingRow check v-model="fetchOSM" :label="t('controlPanel.includeOsmFeatures')" :hint="t('controlPanel.ui.osmHint')" />
-        <details v-if="fetchOSM" class="pl-4 text-caption text-gray-500 dark:text-gray-400" :open="!!customOverpassUrl">
-          <summary class="cursor-pointer select-none hover:text-brand">{{ t('controlPanel.customOverpass') }}</summary>
-          <input
-            v-model.trim="customOverpassUrl"
-            type="password"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="https://api.tracestrack.com/overpass/YOUR_KEY/interpreter"
-            class="mt-1 w-full px-1.5 py-1 rounded border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-caption text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
-          />
-          <p v-if="customOverpassUrl && !customOverpassValid" class="mt-0.5 text-amber-600 dark:text-amber-400">{{ t('controlPanel.customOverpassInvalid') }}</p>
-          <p class="mt-0.5 leading-snug">{{ t('controlPanel.customOverpassHint') }} <a href="https://tracestrack.com/2026/08/07/using-overpass-api-in-turbo-or-josm/" target="_blank" rel="noopener" class="text-brand hover:underline">Tracestrack</a> · <a href="https://overspan.dev/" target="_blank" rel="noopener" class="text-brand hover:underline">Overspan</a></p>
-        </details>
-        <OsmFileInput v-if="fetchOSM" :area="selectionArea" />
-        <!-- (services/overtureTiles.js) -->
-        <SettingRow
-          check
-          v-model="overtureBuildings"
-          :label="t('controlPanel.overtureBuildings')"
-          :hint="t('controlPanel.overtureBuildingsHint')"
-          :disabled="!fetchOSM"
-          :disabled-reason="t('controlPanel.ui.needsOsmOn')"
-        />
-      </SettingCard>
-
-    </SettingSection>
-
-    <!-- 4. Generate -->
-    <StepHeader :n="3" :title="t('panelSteps.build')" :hint="t('panelSteps.buildHint')" />
-    <GenerateSummary :items="summaryItems" />
-    <!-- Generate Actions -->
-    <GenerateActions
-      :is-generating="isGenerating"
-      :is-cached="isCached"
-      :use-gpxz="useGPXZ"
-      :gpxz-api-key="gpxzApiKey"
-      :has-custom-elevation="!!uploadedElevationFile"
-      @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
-    />
-
-    <!-- 5. The result: what was generated, and the exports -->
-    <h3 v-if="terrainData && !isGenerating" class="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-600 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
-      <CheckCircle2 :size="14" class="shrink-0" />
-      {{ t('exportPanel.readyToExport') }}
-      <span class="text-caption font-normal text-gray-500 dark:text-gray-400">{{ terrainData.width }}×{{ terrainData.height }}</span>
-    </h3>
-    <!-- Terrain Stats (shown when data is available) -->
-    <TerrainStats
-      :terrain-data="terrainData"
-      :meters-per-pixel="metersPerPixel"
-      :area-display="areaDisplay"
-    />
-
-    <!-- Export Panel (shown when data is available) -->
-    <div v-if="terrainData && !isGenerating">
-      <ExportPanel
-        :key="exportPanelKey"
-        :terrain-data="terrainData"
-        :is-generating="isGenerating"
-        :center="center"
-        :zoom="zoom"
-        :resolution="resolution"
-        :elevation-source="elevationSource"
-        :gpxz-api-key="gpxzApiKey"
-        :gpxz-status="gpxzStatus"
-        :fetch-o-s-m="fetchOSM"
-        :surrounding-tile-positions="surroundingTilePositions"
-        @fetch-osm="$emit('fetchOsm')"
-        @export-success="$emit('exportSuccess', $event)"
-      />
     </div>
 
-    <!-- Configuration & Session (collapsed by default) -->
-    <SettingSection v-model:open="showConfig" :title="t('controlPanel.configurationSession')" :icon="Settings">
-      <RunConfigControls
-        :status="runConfigStatus"
-        @copy="copyRunConfiguration"
-        @save="saveRunConfiguration"
-        @load="handleRunConfigFile"
-        sendable
-        :sending="sendingConfig"
-        :sent="sentConfig"
-        @send="sendConfig"
-        @open-code="openShareCode"
+    <!-- 4. Export: what was generated, and what the level gets (the export button sits in the bar below) -->
+    <div v-show="step === 4" class="space-y-5">
+      <h3 v-if="terrainData && !isGenerating" class="flex items-center gap-2 pt-4 border-t border-gray-200 dark:border-gray-600 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+        <CheckCircle2 :size="14" class="shrink-0" />
+        {{ t('exportPanel.readyToExport') }}
+        <span class="text-caption font-normal text-gray-500 dark:text-gray-400">{{ terrainData.width }}×{{ terrainData.height }}</span>
+      </h3>
+      <!-- Terrain Stats (shown when data is available) -->
+      <TerrainStats
+        :terrain-data="terrainData"
+        :meters-per-pixel="metersPerPixel"
+        :area-display="areaDisplay"
       />
-    </SettingSection>
+
+      <!-- Export Panel (shown when data is available) -->
+      <div v-if="terrainData && !isGenerating">
+        <ExportPanel
+          :key="exportPanelKey"
+        button-target="#mapng-wizard-export"
+          :terrain-data="terrainData"
+          :is-generating="isGenerating"
+          :center="center"
+          :zoom="zoom"
+          :resolution="resolution"
+          :elevation-source="elevationSource"
+          :gpxz-api-key="gpxzApiKey"
+          :gpxz-status="gpxzStatus"
+          :fetch-o-s-m="fetchOSM"
+          :surrounding-tile-positions="surroundingTilePositions"
+          @fetch-osm="$emit('fetchOsm')"
+          @export-success="$emit('exportSuccess', $event)"
+        />
+      </div>
+
+    </div>
+
+    <template #footer>
+      <template v-if="step < 4">
+        <GenerateSummary compact :items="summaryItems" @step="(n) => step = n" />
+        <GenerateActions
+          :is-generating="isGenerating"
+          :is-cached="isCached"
+          :use-gpxz="useGPXZ"
+          :gpxz-api-key="gpxzApiKey"
+          :has-custom-elevation="!!uploadedElevationFile"
+          @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
+          @ready="step = 4"
+        />
+      </template>
+      <!-- (ExportPanel teleports its export button here) -->
+      <div v-show="step === 4" id="mapng-wizard-export" class="space-y-2"></div>
+    </template>
+  </WizardLayout>
 
     <!-- (outside the collapsible section: Ctrl+V on the map opens it too) -->
     <SessionConfigDialog
@@ -285,30 +329,12 @@
       @apply="applyPendingConfig"
       @cancel="pendingConfig = null"
     />
-
-    <div class="p-3 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-xs font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
-          <p class="text-caption text-orange-700/90 dark:text-orange-300/90 leading-relaxed mt-1">{{ t('support.cardBody') }}</p>
-        </div>
-        <button
-          type="button"
-          @click="$emit('showSupport')"
-          class="shrink-0 px-3 py-1.5 text-caption font-semibold bg-brand hover:bg-brand-500 text-white rounded-lg transition-colors"
-        >
-          {{ t('support.donate') }}
-        </button>
-      </div>
-    </div>
-
   </div>
 </template>
 
 <script setup>
 import { DEFAULT_ELEVATION_SOURCE, initialElevationSource } from '../../services/elevationDefaults.js';
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import SectionToggleAll from '../base/SectionToggleAll.vue';
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue';
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 // Expand all / Collapse all for every section in this panel
 provideSectionGroup();
@@ -344,11 +370,12 @@ import { setSessionConfigSource } from '../../composables/useReportDialog.js';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
 import TerrainChoice from '../ui/TerrainChoice.vue';
-import StepHeader from '../ui/StepHeader.vue';
+import WizardLayout from '../ui/WizardLayout.vue';
+import { getLoadedOsmFile, onOsmFileChange, osmFileCoverage } from '../../services/osmFile.js';
 import OsmFileInput from '../controls/OsmFileInput.vue';
 import { computeGridBounds } from '../../services/batchJob.js';
 import GenerateSummary from '../ui/GenerateSummary.vue';
-import { terrainMode, setTerrainMode } from '../../composables/useTerrainMode.js';
+import { terrainMode, setTerrainMode, terrainGenerationOptions } from '../../composables/useTerrainMode.js';
 import { reloadTerrainSettings } from '../../composables/useTerrainMode.js';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -464,20 +491,42 @@ const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainM
 const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value);
 const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; };
 
-// The one-line summary above Generate (components/ui/GenerateSummary.vue)
+// The setup in one line (the wizard's bottom bar) and as the review step's
+// list (components/ui/GenerateSummary.vue); each part goes to its step.
+const osmFile = shallowRef(getLoadedOsmFile());
+const stopOsmFile = onOsmFileChange((f) => { osmFile.value = f; });
+onUnmounted(stopOsmFile);
 const summaryItems = computed(() => {
   const upload = Array.isArray(props.uploadedElevationFile) ? props.uploadedElevationFile.length > 0 : !!props.uploadedElevationFile;
   const km = ((Number(props.resolution) || 0) * (Number(props.processingMetersPerPixel) || 1)) / 1000;
   const kmText = km >= 10 ? km.toFixed(0) : km.toFixed(1);
   const mode = store.advancedMode ? terrainMode.value : 'ready';
+  const fromFile = fetchOSM.value && osmFile.value && osmFileCoverage(osmFile.value.bounds, selectionArea.value).coverage !== 'none';
   return [
-    { key: 'area', label: t('genSummary.area', { w: kmText, h: kmText }), target: 'mapng-sec-area' },
-    { key: 'px', label: t('genSummary.px', { px: props.resolution }), target: 'mapng-sec-area' },
-    { key: 'source', label: t(`genSummary.source_${upload ? 'upload' : elevationSource.value}`), target: 'mapng-sec-elevation' },
-    { key: 'terrain', label: t(`terrainChoice.${mode}`), target: 'mapng-sec-elevation', warn: mode === 'untouched' },
-    { key: 'osm', label: t(fetchOSM.value ? 'genSummary.osmOn' : 'genSummary.osmOff'), target: 'mapng-sec-mapdata', warn: !fetchOSM.value },
+    { key: 'area', rowLabel: t('wizard.rowArea'), label: t('genSummary.area', { w: kmText, h: kmText }), target: 'mapng-sec-area', step: 1 },
+    { key: 'px', rowLabel: t('wizard.rowResolution'), label: t('genSummary.px', { px: props.resolution }), target: 'mapng-sec-area', step: 1 },
+    { key: 'source', rowLabel: t('wizard.rowElevation'), label: t(`genSummary.source_${upload ? 'upload' : elevationSource.value}`), target: 'mapng-sec-elevation', step: 2 },
+    { key: 'terrain', rowLabel: t('wizard.rowTerrain'), label: t(`terrainChoice.${mode}`), target: 'mapng-sec-elevation', step: 2, warn: mode === 'untouched' },
+    { key: 'osm', rowLabel: t('wizard.rowMapData'), label: t(!fetchOSM.value ? 'genSummary.osmOff' : fromFile ? 'genSummary.osmFile' : 'genSummary.osmOn'), target: 'mapng-sec-mapdata', step: 2, warn: !fetchOSM.value },
   ];
 });
+
+// The wizard (components/ui/WizardLayout.vue): Where, Built from, Generate,
+// and Export once there is terrain to export. After generating it moves on
+// to Export by itself.
+const step = ref(1);
+const wizardSteps = computed(() => [
+  { key: 'where', label: t('panelSteps.where'), done: step.value > 1 },
+  { key: 'built', label: t('panelSteps.builtFrom'), done: step.value > 2 },
+  { key: 'generate', label: t('wizard.generate'), done: !!props.terrainData && isCached.value },
+  { key: 'export', label: t('wizard.export'), locked: !props.terrainData, lockedReason: t('wizard.exportLocked') },
+]);
+watch(() => props.isGenerating, (now, before) => {
+  if (before && !now && props.terrainData) step.value = 4;
+});
+// (the terrain gone, e.g. a new upload cleared it: Export can't stay open)
+watch(() => props.terrainData, (td) => { if (!td && step.value === 4) step.value = 3; });
+
 const processingMetersPerPixelNumber = computed(() => {
   const parsed = Number(props.processingMetersPerPixel);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
@@ -592,18 +641,25 @@ const signatureForKey = (key) => {
 
 // True when the current UI params exactly match the last successful generation,
 // so the user can skip re-fetching and go straight to export.
+// Whether the terrain shown was made from these settings: the fields of
+// App.vue's generation key this panel knows, compared one by one (a copy of
+// the whole key here never matched it, so this always said "changed").
 const isCached = computed(() => {
   if (props.uploadedElevationFile) return false; // always re-generate when custom file is active
   if (!props.generationCacheKey || !props.terrainData) return false;
-  const currentKey = JSON.stringify({
-    lat: props.center.lat,
-    lng: props.center.lng,
-    resolution: props.resolution,
-    osm: fetchOSM.value,
-    elevationSource: elevationSource.value,
-    gpxzKeySig: elevationSource.value === 'gpxz' ? signatureForKey(gpxzApiKey.value) : '',
-  });
-  return currentKey === props.generationCacheKey;
+  let made;
+  try { made = JSON.parse(props.generationCacheKey); } catch { return false; }
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  return made.lat === props.center.lat
+    && made.lng === props.center.lng
+    && Number(made.resolution) === Number(props.resolution)
+    && Number(made.processingMetersPerPixel) === Number(metersPerPixel.value)
+    && made.osm === fetchOSM.value
+    && made.elevationSource === elevationSource.value
+    && made.gpxzKeySig === (elevationSource.value === 'gpxz' ? signatureForKey(gpxzApiKey.value) : '')
+    && (made.gapFillSource === undefined || made.gapFillSource === gapFillSource.value)
+    && !!made.rawTerrain === !!store.rawTerrainActive
+    && (made.generationEdits === undefined || same(made.generationEdits, terrainGenerationOptions(store.advancedMode)));
 });
 
 // GPXZ has a 10 km² per-request limit; warn when the selected area exceeds it.

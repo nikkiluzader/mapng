@@ -551,9 +551,7 @@
       "mapData": "Dati mappa (OpenStreetMap)",
       "osmHint": "Strade, edifici, acqua, uso del suolo e dettagli stradali",
       "needsOsmOn": "Attiva prima Includi elementi OSM"
-    },
-    "expandAll": "Espandi tutto",
-    "collapseAll": "Comprimi tutto"
+    }
   },
   "batchExport": {
     "title": "Opzioni di esportazione",
@@ -591,7 +589,7 @@
     "usingUploadedElevation": "Utilizzo dei dati di altitudine caricati",
     "viewBeforeDownload": "Visualizza prima del download",
     "dataReady": "Dati pronti",
-    "downloadBelow": "Download qui sotto",
+    "downloadBelow": "Vai a Esporta",
     "generateData": "Genera dati",
     "skip3dGetFiles": "Salta vista 3D, ottieni file"
   },
@@ -1273,15 +1271,8 @@
   },
   "panelSteps": {
     "where": "Dove",
-    "whereHint": "L'area della mappa",
-    "whereHintBatch": "La griglia e la dimensione di ogni riquadro",
     "builtFrom": "Creato da",
-    "builtFromHint": "Altitudine, terreno e dati della mappa",
-    "build": "Crea",
-    "buildHint": "Genera, poi scegli cosa avrà il livello",
-    "get": "Cosa ottieni",
-    "getHintCombined": "Un livello BeamNG da tutti i riquadri",
-    "getHintSeparate": "File per ogni riquadro"
+    "get": "Cosa ottieni"
   },
   "genSummary": {
     "title": "Stai per creare",
@@ -1300,7 +1291,8 @@
     "source_kron86": "NMT (Polonia)",
     "source_usgs": "USGS 1 m",
     "source_gpxz": "GPXZ",
-    "source_upload": "Il tuo file di altitudine"
+    "source_upload": "Il tuo file di altitudine",
+    "osmFile": "Dati della mappa: il tuo file"
   },
   "sections": {
     "reset": "Ripristina",
@@ -1328,5 +1320,27 @@
     "coverage_partial": "Copre il {pct}% dell'area: usato, e il resto dell'area resta senza dati della mappa.",
     "coverage_none": "Non copre quest'area: non usato. I dati della mappa vengono scaricati come al solito.",
     "coverage_partialGrid": "Copre il {pct}% della griglia: i riquadri che raggiunge lo usano, gli altri scaricano i dati della mappa come al solito."
+  },
+  "wizard": {
+    "steps": "Passaggi",
+    "back": "Indietro",
+    "next": "Avanti",
+    "generate": "Genera",
+    "export": "Esporta",
+    "run": "Avvia",
+    "exportLocked": "Genera prima il terreno",
+    "review": "Riepilogo",
+    "reviewHint": "L'anteprima 3D mostra il terreno prima dell'esportazione; Genera dati va dritto alle opzioni del livello. Fai clic su una riga per cambiarla.",
+    "runHint": "Avvia genera ed esporta tutti i riquadri in una volta, senza anteprima nel mezzo. Fai clic su una riga per cambiarla.",
+    "generated": "Terreno pronto: corrisponde a queste impostazioni.",
+    "generatedStale": "Impostazioni cambiate dalla generazione: genera di nuovo per usarle.",
+    "toExport": "Vai a Esporta →",
+    "rowArea": "Area",
+    "rowResolution": "Risoluzione",
+    "rowElevation": "Elevazione",
+    "rowTerrain": "Terreno",
+    "rowMapData": "Dati della mappa",
+    "rowGrid": "Griglia",
+    "rowOutput": "Risultato"
   }
 }

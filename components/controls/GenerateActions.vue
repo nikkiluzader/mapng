@@ -30,8 +30,8 @@
       variant="secondary"
       size="lg"
       prominent
-      :disabled="isGenerating || isCached || (useGPXZ && !gpxzApiKey)"
-      @click="$emit('generate', false)"
+      :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
+      @click="isCached ? $emit('ready') : $emit('generate', false)"
     >
       <span v-if="isGenerating" class="animate-pulse text-xs">{{ t('generateActions.processing') }}</span>
       <template v-else-if="isCached">
@@ -67,5 +67,6 @@ defineProps({
   hasCustomElevation: { type: Boolean, default: false },
 });
 
-defineEmits(['generate']);
+// ready: the data is made already (the wizard goes to Export)
+defineEmits(['generate', 'ready']);
 </script>

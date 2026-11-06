@@ -170,36 +170,40 @@
 
           <p class="px-0.5 text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.communityQualityNotice') }}</p>
 
-          <!-- Export button -->
-          <button
-            @click="handleBeamNGLevelExport"
-            :disabled="isAnyExporting"
-            class="relative w-full flex items-center gap-3 p-3 bg-brand hover:bg-brand-500 border border-brand-500 rounded text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div class="flex items-center justify-center w-8 h-8 shrink-0">
-              <Loader2 v-if="isExportingBeamNGLevel" :size="20" class="animate-spin text-white" />
-              <PackageOpen v-else :size="20" class="text-white/90" />
-            </div>
-            <div class="text-left">
-              <div class="text-xs font-semibold">{{ t('exportPanel.beamngLevelExport') }}</div>
-              <div class="text-micro text-white/90">{{ t('exportPanel.generatePlayableZip') }}</div>
-            </div>
-            <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity text-white" />
-          </button>
+          <!-- Export button (in the wizard: in its bottom bar, buttonTarget) -->
+          <Teleport defer :to="buttonTarget || 'body'" :disabled="!buttonTarget">
+            <button
+              @click="handleBeamNGLevelExport"
+              :disabled="isAnyExporting"
+              class="relative w-full flex items-center gap-3 p-3 bg-brand hover:bg-brand-500 border border-brand-500 rounded text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div class="flex items-center justify-center w-8 h-8 shrink-0">
+                <Loader2 v-if="isExportingBeamNGLevel" :size="20" class="animate-spin text-white" />
+                <PackageOpen v-else :size="20" class="text-white/90" />
+              </div>
+              <div class="text-left">
+                <div class="text-xs font-semibold">{{ t('exportPanel.beamngLevelExport') }}</div>
+                <div class="text-micro text-white/90">{{ t('exportPanel.generatePlayableZip') }}</div>
+              </div>
+              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity text-white" />
+            </button>
 
-          <a
-            v-if="beamNGPendingDownloadUrl"
-            :href="beamNGPendingDownloadUrl"
-            :download="beamNGPendingDownloadName || 'beamng_level.zip'"
-            @click="handleBeamNGPendingDownloadClick"
-            class="w-full flex items-center justify-center gap-2 p-2 bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 rounded text-white text-caption font-medium transition-colors"
-          >
-            <Download :size="14" />
-            {{ t('exportPanel.downloadReady', { name: beamNGPendingDownloadName || 'beamng_level.zip' }) }}
-          </a>
+            <a
+              v-if="beamNGPendingDownloadUrl"
+              :href="beamNGPendingDownloadUrl"
+              :download="beamNGPendingDownloadName || 'beamng_level.zip'"
+              @click="handleBeamNGPendingDownloadClick"
+              class="w-full flex items-center justify-center gap-2 p-2 bg-emerald-600 hover:bg-emerald-700 border border-emerald-700 rounded text-white text-caption font-medium transition-colors"
+            >
+              <Download :size="14" />
+              {{ t('exportPanel.downloadReady', { name: beamNGPendingDownloadName || 'beamng_level.zip' }) }}
+            </a>
+
+          </Teleport>
 
           <div
             v-if="beamNGDesktopFailed"
+            id="mapng-export-outcome-failed"
             class="w-full flex items-start gap-2 p-2 rounded border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20"
           >
             <AlertCircle :size="14" class="shrink-0 mt-0.5 text-red-600 dark:text-red-400" />
@@ -218,6 +222,7 @@
 
           <div
             v-if="beamNGDesktopSaved"
+            id="mapng-export-outcome-saved"
             class="w-full flex items-start gap-2 p-2 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50"
           >
             <CheckCircle2 :size="14" class="shrink-0 mt-0.5 text-brand" />
@@ -573,6 +578,8 @@ const { t } = useI18n({ useScope: 'global' });
 
 const props = defineProps({
   terrainData: { type: Object, default: null },
+  // (the wizard's bottom bar: a selector the export button is teleported to)
+  buttonTarget: { type: String, default: '' },
   isGenerating: { type: Boolean, default: false },
   center: { type: Object, required: true },
   zoom: { type: Number, required: true },
@@ -583,6 +590,9 @@ const props = defineProps({
   fetchOSM: { type: Boolean, default: true },
   surroundingTilePositions: { type: Array, default: () => [] },
 });
+// (the button is in the wizard's bottom bar: bring what came of the export into view)
+const showExportOutcome = (id) => nextTick(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+
 
 const store = useMainStore();
 const advancedMode = computed(() => store.advancedMode);
@@ -1848,6 +1858,7 @@ const handleBeamNGLevelExport = async () => {
       if (saved?.cancelled) return;
       console.log(`${BEAMNG_EXPORT_UI_LOG} Desktop export written:`, saved);
       beamNGDesktopSaved.value = { path: saved.path, filename: saved.filename };
+      showExportOutcome('mapng-export-outcome-saved');
       notifyExportSuccess('beamng_level_zip', saved.filename);
       onLevelExported(props.center);
       return;
@@ -1902,7 +1913,7 @@ const handleBeamNGLevelExport = async () => {
       error,
     });
     // (the desktop app says why and keeps the export's log)
-    if (desktopApp) beamNGDesktopFailed.value = { message: error?.message || String(error), logPath: error?.logPath || null };
+    if (desktopApp) { beamNGDesktopFailed.value = { message: error?.message || String(error), logPath: error?.logPath || null }; showExportOutcome('mapng-export-outcome-failed'); }
     else alert(t('export.errorBeamngLevel'));
   } finally {
     desktopExportAbort = null;
