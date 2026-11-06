@@ -2,28 +2,12 @@
 // national lidar and 1-10 m models), drawn from a prebuilt index of z13 tiles (public/data/mapterhorn-coverage.json,
 // scripts/mapterhorn/buildCoverage.mjs) on a canvas grid layer: no tile requests to anyone while panning.
 import L from 'leaflet';
+import { coveredCell } from './lidarCoverage.js';
 
-export const COVERAGE_URL = '/data/mapterhorn-coverage.json';
+export { loadLidarCoverage, isCoveredAt } from './lidarCoverage.js';
+
 const FILL = 'rgba(16, 185, 129, 0.30)';     // emerald, apart from the orange hotspots and the selection
 const EDGE = 'rgba(5, 150, 105, 0.85)';
-
-let loading = null;
-/** The index as a Map(y -> [[x0, length], ...]) on the z13 grid. */
-export function loadLidarCoverage(fetchImpl = fetch) {
-  if (!loading) {
-    loading = fetchImpl(COVERAGE_URL).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then((d) => ({ z: d.z, generated: d.generated, rows: new Map(Object.entries(d.rows).map(([y, runs]) => [Number(y), runs])) }))
-      .catch((e) => { loading = null; throw e; });
-  }
-  return loading;
-}
-
-/** Whether the z13 cell holding (lat, lng) is covered. */
-export function isCoveredAt(index, lat, lng) {
-  const n = 2 ** index.z; const s = Math.sin((lat * Math.PI) / 180);
-  const x = Math.floor(((lng + 180) / 360) * n), y = Math.floor((0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n);
-  return (index.rows.get(y) || []).some(([x0, len]) => x >= x0 && x < x0 + len);
-}
 
 export function createLidarCoverageLayer(index) {
   const Layer = L.GridLayer.extend({
@@ -49,7 +33,7 @@ export function createLidarCoverageLayer(index) {
       // a crisp outline where coverage ends, once cells are big enough to see
       if (scale >= 6) {
         ctx.strokeStyle = EDGE; ctx.lineWidth = 1.5;
-        const has = (x, y) => (index.rows.get(y) || []).some(([x0, len]) => x >= x0 && x < x0 + len);
+        const has = (x, y) => coveredCell(index, x, y);
         for (let y = cy0; y < cy0 + span; y++) for (let x = cx0; x < cx0 + span; x++) {
           if (!has(x, y)) continue;
           const px = offX + (x - cx0) * scale, py = offY + (y - cy0) * scale;

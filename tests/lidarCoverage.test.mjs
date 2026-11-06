@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-import { loadLidarCoverage, isCoveredAt } from '../services/lidarCoverageLayer.js';
+import { loadLidarCoverage, isCoveredAt } from '../services/lidarCoverage.js';
 
 const file = new URL('../public/data/mapterhorn-coverage.json', import.meta.url);
 const fetchImpl = async () => new Response(fs.readFileSync(file), { status: 200 });
