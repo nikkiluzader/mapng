@@ -13,6 +13,7 @@ const SHAPE_EDITS = [
   ['shapeOverpasses', 'mapng_beamNGShapeOverpasses'],
   ['shapeTunnels', 'mapng_beamNGShapeTunnels'],
   ['shapeExtras', 'mapng_beamNGShapeExtras'],
+  ['shapeDetail', 'mapng_beamNGShapeDetail'],
 ];
 
 /** The localStorage entries the export panel would hold for these options. */

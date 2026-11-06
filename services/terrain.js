@@ -2410,6 +2410,8 @@ export const fetchTerrainData = async (
     kron86FallbackReason,
     mapterhornInfo,
     groundFilterInfo,
+    // built from the global 30 m (no lidar, upload, raw or flat): the export may add fine ground detail
+    coarseElevation: !flat && !raw && !rawData,
     sourceGeoTiffs,
     processingMetersPerPixel: effectiveMetersPerPixel,
     flat,

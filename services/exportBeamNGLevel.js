@@ -38,6 +38,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
+import { addFineGroundDetail } from './terrainDetail.js';
 import { styleDecks, linkCrossings, thinArchDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
 import { prepareSurvey, lidarPins } from './lidarDecks.js';
 import { buildLampGlowDAE, lampGlowMaterialDef, LAMP_GLOW_SHAPE, buildFloodGlowDAE, floodGlowMaterialDef, FLOOD_GLOW_SHAPE } from './lampGlow.js';
@@ -7461,7 +7462,7 @@ function buildBeamNGExportReport({
     `- Include bridges & overpasses: ${formatBool(options?.includeBridges !== false)}`,
     `- Include tunnels: ${formatBool(options?.includeTunnels !== false)}`,
     `- Terrain shaping at export (master): ${formatBool(options?.shapeTerrain !== false)}`,
-    `- Shape terrain under roads / at bridges / at overpasses / at tunnels / sidewalks+lakes+car parks: ${[options?.shapeRoads, options?.shapeBridges, options?.shapeOverpasses, options?.shapeTunnels, options?.shapeExtras].map((v) => (options?.shapeTerrain !== false && v !== false ? 'Yes' : 'No')).join(' / ')}`,
+    `- Shape terrain under roads / at bridges / at overpasses / at tunnels / sidewalks+lakes+car parks / fine ground detail (global 30 m): ${[options?.shapeRoads, options?.shapeBridges, options?.shapeOverpasses, options?.shapeTunnels, options?.shapeExtras, options?.shapeDetail].map((v) => (options?.shapeTerrain !== false && v !== false ? 'Yes' : 'No')).join(' / ')}`,
     `- Raw terrain at data generation: ${formatBool(!!originalTerrainData?.raw)}`,
     '  (details: "Terrain Shaping and Structures" below)',
     `- Include backdrop: ${formatBool(options?.includeBackdrop)}`,
@@ -11341,6 +11342,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   };
   const shaping = shapingSwitches(shapingOptions);
   const shapeExtras = shapingOptions.terrain && options.shapeExtras !== false;
+  // fine ground detail on levels from the global 30 m (terrainDetail.js); never on lidar or uploads
+  const shapeDetail = shapingOptions.terrain && options.shapeDetail !== false;
   // Backward compat: generatePbrMaterials (bool) → pbrSource (string)
   let pbrSource = options.pbrSource;
   if (pbrSource === undefined) {
@@ -11575,6 +11578,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // the ground before any grading: where the sea really is (a cut below sea
   // level is no sea)
   const sourceHeightMap = exportTerrainData.heightMap;
+  // the global 30 m holds nothing smaller than tens of metres: small relief by land cover, on unbuilt ground only,
+  // before the roads are laid (they level their corridors over it). A copy: the generated data stays as it was.
+  let fineDetail = null;
+  if (shapeDetail && terrainData?.coarseElevation && exportTerrainData.bounds) {
+    const d = addFineGroundDetail({ heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, bounds: exportTerrainData.bounds, metersPerPixel: squareSize, osmFeatures: exportTerrainData.osmFeatures });
+    exportTerrainData = { ...exportTerrainData, heightMap: d.heightMap };
+    fineDetail = d.stats;
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Fine ground detail: ${(d.stats.share * 100).toFixed(0)}% of the terrain, up to ${d.stats.maxAdd.toFixed(2)} m.`);
+  }
   const decalRoads = includeRoads
     ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null })
     : [];

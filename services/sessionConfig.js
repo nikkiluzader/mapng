@@ -28,6 +28,7 @@ export const EXPORT_FIELDS = [
   ['shapeOverpasses', 'mapng_beamNGShapeOverpasses', 'bool', true],
   ['shapeTunnels', 'mapng_beamNGShapeTunnels', 'bool', true],
   ['shapeExtras', 'mapng_beamNGShapeExtras', 'bool', true],
+  ['shapeDetail', 'mapng_beamNGShapeDetail', 'bool', true],
   ['backdrop', 'mapng_beamNGBackdropSource', ['off', 'global30m', 'usgs1m', 'gpxz'], 'off'],
   ['seaLevelOffset', 'mapng_beamNGSeaLevelOffset', 'number', 0],
 ];
@@ -182,7 +183,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     add('export', 'config.structures', { valueKey: 'config.list', params: { list: structures.length ? structures.map((k) => `config.c_${k}`) : ['config.nothing'] } });
     if (e.terrainEdits) {
       const custom = e.terrainEdits === 'custom'
-        ? ['shapeRoads', 'shapeBridges', 'shapeOverpasses', 'shapeTunnels', 'shapeExtras'].filter((k) => e[k] !== false).map((k) => `config.c_${k}`)
+        ? ['shapeRoads', 'shapeBridges', 'shapeOverpasses', 'shapeTunnels', 'shapeExtras', 'shapeDetail'].filter((k) => e[k] !== false).map((k) => `config.c_${k}`)
         : null;
       add('export', 'config.terrainEdits', custom
         ? { valueKey: 'config.customList', params: { list: custom.length ? custom : ['config.nothing'] } }

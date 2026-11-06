@@ -136,6 +136,7 @@
               <SettingRow check v-model="beamNGShapeOverpasses" :label="t('exportPanel.shapeOverpasses')" :hint="t('exportPanel.shapeOverpassesHint')" :disabled="!beamNGIncludeBridges" :disabled-reason="t('exportPanel.ui.needsBridges')" />
               <SettingRow check v-model="beamNGShapeTunnels" :label="t('exportPanel.shapeTunnels')" :hint="t('exportPanel.shapeTunnelsHint')" :disabled="!beamNGIncludeTunnels" :disabled-reason="t('exportPanel.ui.needsTunnels')" />
               <SettingRow check v-model="beamNGShapeExtras" :label="t('exportPanel.shapeExtras')" :hint="t('exportPanel.shapeExtrasHint')" />
+              <SettingRow check v-model="beamNGShapeDetail" :label="t('exportPanel.shapeDetail')" :hint="t('exportPanel.shapeDetailHint')" />
             </template>
             <p v-if="terrainData?.raw" class="text-caption leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.generatedRaw') }}</p>
             <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.reportNote') }}</p>
@@ -692,6 +693,7 @@ const beamNGShapeBridges = ref(storedOn('mapng_beamNGShapeBridges'));
 const beamNGShapeOverpasses = ref(storedOn('mapng_beamNGShapeOverpasses'));
 const beamNGShapeTunnels = ref(storedOn('mapng_beamNGShapeTunnels'));
 const beamNGShapeExtras = ref(storedOn('mapng_beamNGShapeExtras'));
+const beamNGShapeDetail = ref(storedOn('mapng_beamNGShapeDetail'));
 const beamNGLidarDecks = ref(storedOn('mapng_beamNGLidarDecks'));
 // The Terrain card's choice: 'all' (every edit), 'custom' (the boxes below
 // it) or 'none' (heights as generated). Old settings had one master box and
@@ -989,6 +991,7 @@ watch(beamNGShapeBridges, (v) => localStorage.setItem('mapng_beamNGShapeBridges'
 watch(beamNGShapeOverpasses, (v) => localStorage.setItem('mapng_beamNGShapeOverpasses', String(v)));
 watch(beamNGShapeTunnels, (v) => localStorage.setItem('mapng_beamNGShapeTunnels', String(v)));
 watch(beamNGShapeExtras, (v) => localStorage.setItem('mapng_beamNGShapeExtras', String(v)));
+watch(beamNGShapeDetail, (v) => localStorage.setItem('mapng_beamNGShapeDetail', String(v)));
 watch(beamNGLidarDecks, (v) => localStorage.setItem('mapng_beamNGLidarDecks', String(v)));
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGSeaLevelOffset, (v) => {
@@ -1820,6 +1823,7 @@ const handleBeamNGLevelExport = async () => {
       shapeOverpasses: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeOverpasses.value,
       shapeTunnels: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeTunnels.value,
       shapeExtras: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeExtras.value,
+      shapeDetail: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeDetail.value,
       // measured bridge heights from the US lidar survey where it covers the map
       lidarDecks: !advanced || beamNGLidarDecks.value,
     };
