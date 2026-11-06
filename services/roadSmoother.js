@@ -23,6 +23,21 @@ const FEATHER_M = 6.0;
 // winning outright. Wide enough for junction overlaps and touching embankments,
 // far below the gap between a road core (1.0) and a neighbour's feather.
 const TIE_WEIGHT = 13;
+// Where two claims of different heights meet (a side street's level surface
+// on the avenue's, the inside of a fork) the winner-takes-it switch leaves a
+// short step; the road surface is blurred over this radius (metres) to make
+// it a ramp.
+const SEAM_BLUR_M = 2;
+// Height difference up to which the seam blur mixes two neighbouring claims
+// (metres; it fades out by twice this). Junction seams are a few tenths.
+const SEAM_BLUR_RANGE_M = 0.5;
+// A seam: two claims of at least this road weight (in 1/255: 0.5) on one
+// pixel, more than SEAM_MIN_DZ_M apart in height. Flags in roadCount's top bits.
+const SEAM_MIN_W8 = 128;
+const SEAM_MIN_DZ_M = 0.02;
+const SEAM_FLAG = 0x80;
+const NEAR_SEAM = 0x40;
+const COUNT_MASK = 0x3f;
 // Bare-earth (lidar) elevation has bridges taken out: the approach embankment
 // ends in a cliff, and the OSM node where the road meets its bridge often
 // lands at its foot (Jacksonville: 10 m down in the last 5 m). Where a ground
@@ -469,8 +484,19 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
     const roadCount = new Uint8Array(width * height);
     let hasRoads = false;
 
+    // Ends where another corridor meets this one (a junction, or the same road
+    // carrying on with another lane count). There the end is not rounded: the
+    // road's cross-section carries on past it and fades out. A flat round disc
+    // at the end's height sat on the continuing road (which keeps climbing on a
+    // slope) and tied with its core, and the averaged disc edge showed as a
+    // ring at every junction.
+    const endpointCounts = new Map();
+    for (const p of profiles) for (const k of [p.corridor.startKey, p.corridor.endKey]) endpointCounts.set(k, (endpointCounts.get(k) || 0) + 1);
+
     for (const profile of profiles) {
         const { corridor, points, zSmooth, bridgeAtStart, bridgeAtEnd } = profile;
+        const sharedStart = (endpointCounts.get(corridor.startKey) || 0) >= 2;
+        const sharedEnd = (endpointCounts.get(corridor.endKey) || 0) >= 2;
 
         const radiusMeters = corridorHalfWidthMeters(corridor, isUrbanRoad);
         // The core is flat. We add an extra margin for feathering back to the terrain.
@@ -510,13 +536,28 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
                     // (a road meeting a bridge ends square there: its rounded
                     // end reached on under the deck and lifted the road
                     // passing below toward the approach's height)
-                    if ((bridgeAtStart && i === 0) || (bridgeAtEnd && i === points.length - 2)) {
+                    const first = i === 0, last = i === points.length - 2;
+                    let inCap = false;
+                    if ((first && (bridgeAtStart || sharedStart)) || (last && (bridgeAtEnd || sharedEnd))) {
                         const along = ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / (((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2) || 1);
-                        if ((bridgeAtStart && i === 0 && along < 0) || (bridgeAtEnd && i === points.length - 2 && along > 1)) continue;
+                        if ((bridgeAtStart && first && along < 0) || (bridgeAtEnd && last && along > 1)) continue;
+                        inCap = (sharedStart && first && along < 0) || (sharedEnd && last && along > 1);
                     }
 
                     let w = 1.0;
-                    if (dist > coreRadiusPx) {
+                    if (inCap) {
+                        // (past a shared end: the road's own cross-section, faded out
+                        // over the feather by the distance past the end, so the claim
+                        // carries on continuously from the road and never stands flat)
+                        const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+                        const ex = first ? p1.x : p2.x, ey = first ? p1.y : p2.y;
+                        const past = Math.abs((x - ex) * (p2.x - p1.x) + (y - ey) * (p2.y - p1.y)) / len;
+                        const side = Math.abs((x - ex) * (p2.y - p1.y) - (y - ey) * (p2.x - p1.x)) / len;
+                        const fadePx = Math.max(1, radiusPx - coreRadiusPx);
+                        if (side > radiusPx || past >= fadePx) continue;
+                        const across = side > coreRadiusPx ? 0.5 * (1 + Math.cos(Math.PI * (side - coreRadiusPx) / (radiusPx - coreRadiusPx))) : 1;
+                        w = across * 0.5 * (1 + Math.cos(Math.PI * past / fadePx));
+                    } else if (dist > coreRadiusPx) {
                         // Feather from 1.0 to 0.0 using cosine for a smooth curve
                         const f = (dist - coreRadiusPx) / (radiusPx - coreRadiusPx);
                         w = 0.5 * (1 + Math.cos(Math.PI * f));
@@ -540,6 +581,9 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
             const z = zMap.get(idx);
             const wq = Math.max(1, Math.round(w * 255));
             const best = roadW[idx];
+            // (two road surfaces claiming the pixel at different heights: a
+            // seam, which the seam blur below rounds off)
+            const seam = best >= SEAM_MIN_W8 && wq >= SEAM_MIN_W8 && Math.abs(z - roadZ[idx]) > SEAM_MIN_DZ_M ? SEAM_FLAG : 0;
 
             if (wq > best + TIE_WEIGHT) {
                 // Stronger claim: this corridor's surface covers the pixel, so it
@@ -549,20 +593,34 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
                 // service road came out tilted by a fraction of their height gap.
                 roadZ[idx] = z;
                 roadW[idx] = wq;
-                roadCount[idx] = 1;
+                roadCount[idx] = 1 | seam | (roadCount[idx] & SEAM_FLAG);
             } else if (wq + TIE_WEIGHT >= best) {
                 // Comparable claims — two corridors meeting at a junction, or two
                 // embankments overlapping. Averaging them is what keeps crossing
                 // corridors from creasing, so it stays for near-ties only.
-                const n = roadCount[idx];
+                // (low 7 bits: how many claims were averaged; top bit: seam)
+                const n = roadCount[idx] & COUNT_MASK;
                 roadZ[idx] = (roadZ[idx] * n + z) / (n + 1);
-                if (n < 255) roadCount[idx] = n + 1;
+                roadCount[idx] = Math.min(COUNT_MASK, n + 1) | seam | (roadCount[idx] & SEAM_FLAG);
                 if (wq > best) roadW[idx] = wq;
+            } else if (seam) {
+                roadCount[idx] |= SEAM_FLAG;
             }
         }
     }
 
     if (!hasRoads) return;
+
+    // Round off the steps where two claims of different heights meet (see
+    // SEAM_BLUR_M), on the road surfaces only: each pixel counts by its road
+    // weight^8, so a road's own surface counts far above a neighbour's
+    // embankment, and only within SEAM_BLUR_RANGE_M of the pixel's height, so
+    // real shelves stay. Only pixels near a marked seam
+    // change (blurring a straight road's edge shifts it by a few cm on a
+    // slope). Runs in place on roadZ.
+    const r = Math.max(1, Math.round(SEAM_BLUR_M / metersPerPixel));
+    seamBlurPass(roadZ, roadW, roadCount, width, height, r, 1, width, height, SEAM_FLAG, NEAR_SEAM);
+    seamBlurPass(roadZ, roadW, roadCount, width, height, r, width, height, width, SEAM_FLAG | NEAR_SEAM, 0);
 
     // Blend the leveled roads back into the heightmap
     for (let i = 0; i < heightMap.length; i++) {
@@ -572,3 +630,50 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
         }
     }
 }
+
+// One direction of the seam blur, in place on z along every line (step 1:
+// rows, step width: columns). A triangle kernel of radius 2r; a neighbour
+// counts by its road weight^8 (w8 in 1/255), and only while its height is
+// within SEAM_BLUR_RANGE_M of this pixel's (fading out by twice that). A pixel
+// changes only with a pixel flagged `near` within the kernel on its line, and
+// gets `mark` set then (the row pass marks, the column pass reads both: a
+// square around each seam).
+const SEAM_WEIGHT = new Float64Array(256).map((_, b) => (b / 255) ** 8);
+function seamBlurPass(z, w8, flags, width, height, r, step, lineLen, lines, near, mark) {
+    const zl = new Float64Array(lineLen), wl = new Float64Array(lineLen);
+    const lastNear = new Int32Array(lineLen), nextNear = new Int32Array(lineLen);
+    const R = 2 * r, tau = SEAM_BLUR_RANGE_M;
+    const lineStride = step === 1 ? width : 1;
+    for (let l = 0; l < lines; l++) {
+        const o = l * lineStride;
+        let any = false, prev = -1e9;
+        for (let k = 0; k < lineLen; k++) {
+            const i = o + k * step;
+            zl[k] = z[i]; wl[k] = SEAM_WEIGHT[w8[i]];
+            if (flags[i] & near) { prev = k; any = true; }
+            lastNear[k] = prev;
+        }
+        if (!any) continue;
+        let next = 1e9;
+        for (let k = lineLen - 1; k >= 0; k--) { if (flags[o + k * step] & near) next = k; nextNear[k] = next; }
+        for (let k = 0; k < lineLen; k++) {
+            if (!(wl[k] > 1e-6) || (k - lastNear[k] > R && nextNear[k] - k > R)) continue;
+            const z0 = zl[k];
+            let sw = 0, sz = 0;
+            for (let d = -R; d <= R; d++) {
+                const j = k + d;
+                if (j < 0 || j >= lineLen) continue;
+                const wj = wl[j];
+                if (!(wj > 0)) continue;
+                const dz = Math.abs(zl[j] - z0);
+                if (dz >= 2 * tau) continue;
+                const c = (R + 1 - Math.abs(d)) * wj * (dz <= tau ? 1 : 2 - dz / tau);
+                sw += c; sz += c * zl[j];
+            }
+            const i = o + k * step;
+            if (sw > 0) z[i] = sz / sw;
+            if (mark) flags[i] |= mark;
+        }
+    }
+}
+

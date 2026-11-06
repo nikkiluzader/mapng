@@ -407,3 +407,27 @@ test('any bridge value but "no" is no ground road (a bridge=viaduct with no laye
   assert.equal(isGroundLevelRoad(road({ tunnel: 'building_passage' })), true);
   assert.equal(isGroundLevelRoad(road({ tunnel: 'culvert' })), true);
 });
+
+test('no rings or steps where roads meet on a slope (lane change and a side street at one node)', () => {
+  const mpp = 1;
+  const bounds = makeBounds(W, H, mpp);
+  // a plane rising 5% east and 3% south: every road on it is a straight slope
+  const hm = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) hm[y * W + x] = 0.05 * x + 0.03 * y;
+  const at = (x, y) => ({ lat: latAtPy(bounds, y), lng: lngAtPx(bounds, x) });
+  const roads = [
+    { type: 'road', id: 'a', tags: { highway: 'primary', lanes: '5', oneway: 'yes', name: 'Avenue' }, geometry: [at(20, 128), at(128, 128)] },
+    { type: 'road', id: 'b', tags: { highway: 'primary', lanes: '3', oneway: 'yes', name: 'Avenue' }, geometry: [at(128, 128), at(235, 128)] },
+    { type: 'road', id: 'c', tags: { highway: 'residential', name: 'Side' }, geometry: [at(128, 128), at(160, 235)] },
+  ];
+  smoothRoadsInHeightmap(hm, W, H, bounds, roads, mpp);
+  // the old flat round caps left rings round the node
+  let worst = 0, wx = 0, wy = 0;
+  for (let y = 100; y <= 156; y++) for (let x = 100; x <= 156; x++) {
+    const i = y * W + x;
+    const d2 = Math.max(Math.abs(hm[i - 1] - 2 * hm[i] + hm[i + 1]), Math.abs(hm[i - W] - 2 * hm[i] + hm[i + W]));
+    if (d2 > worst) { worst = d2; wx = x; wy = y; }
+  }
+  // (a plain road edge here: ~0.04 m; the old rings: 0.45 m)
+  assert.ok(worst < 0.2, `crease of ${worst.toFixed(3)} m at ${wx},${wy} near the junction`);
+});
