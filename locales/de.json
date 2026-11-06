@@ -1242,7 +1242,7 @@
       "elevation": "Höhendaten laden",
       "terrain": "Gelände aufbauen",
       "mapData": "Kartendaten laden",
-      "roads": "Straßen formen",
+      "shaping": "Gelände formen",
       "textures": "Texturen malen"
     },
     "export": {

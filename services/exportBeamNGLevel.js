@@ -6805,26 +6805,34 @@ function summarizeTerrainSamples(terrainData) {
 // work scales with the pixel count, road work with the roads, the ZIP with
 // its file count (≈ the roads: one folder per named road) and the backdrop's
 // downloads with the area, so the bar follows the time actually spent.
-function exportPhaseWeights({ size, osmFeatureCount, roadCount, buildingCount, includeBackdrop }) {
+function exportPhaseWeights({ size, osmFeatureCount, roadCount, buildingCount, includeBackdrop, fineDetail = false, bridgeLidar = false }) {
+  // Roughly seconds, from a timed 2048² export (px 0.25: 2211 roads, 2822
+  // buildings, ~10k features): roads + sidewalks 9 s, base texture 1.7 s,
+  // materials 1.2 s, terrain.ter 1.7 s, thumbnail 2.4 s, buildings 2.5 s,
+  // furniture 2.5 s, vegetation 2.2 s, assembling 2.5 s, compression 7 s. The
+  // progress card then paces each phase by this run's own speed.
   const px = (size / 4096) ** 2;
   return {
     prepare: 0.5,
+    // fine ground detail and cliffs (8k: 6.5 s), measured bridge heights (~0.3 s a US survey node)
+    detail: fineDetail ? 0.3 + 1.6 * px : 0,
+    lidar: bridgeLidar ? 3 : 0,
     roads: 1 + 0.001 * roadCount,
-    sidewalks: 0.005 * roadCount,
+    sidewalks: 0.0025 * roadCount,
     props: 0.5 + 0.0002 * roadCount,
-    texture: 0.5 + 1 * px,
-    materials: 0.3 * px,
-    ter: 0.1 * px,
-    heightmap: 1.4 * px,
-    thumbnail: 0.4,
-    buildings: 0.0004 * buildingCount,
-    water: 0.2,
-    furniture: 0.2 + 0.00005 * osmFeatureCount,
-    vegetation: 0.00008 * osmFeatureCount,
+    texture: 0.5 + 4.5 * px,
+    materials: 0.3 + 3.5 * px,
+    ter: 0.3 + 6 * px,
+    heightmap: 0.2 + 1.4 * px,
+    thumbnail: 0.5 + 7 * px,
     backdrop: includeBackdrop ? 4 + 15 * px : 0,
-    assets: 0.5,
-    zip: 0.5,
-    compress: 2 + 0.018 * roadCount + 2.5 * px,
+    buildings: 0.3 + 0.0008 * buildingCount,
+    water: 0.2,
+    furniture: 0.5 + 0.0002 * osmFeatureCount,
+    vegetation: 0.5 + 0.00015 * osmFeatureCount,
+    assets: 0.4,
+    zip: 0.5 + 8 * px,
+    compress: 2 + 0.002 * roadCount + 8 * px,
   };
 }
 
@@ -11278,11 +11286,11 @@ export function mapngLevelStamp({ terrainData, center, options = {}, levelName, 
  * the export phases (beginStep) it covers, in the order they run.
  */
 export const EXPORT_STEP_GROUPS = [
-  { key: 'prepare', members: ['prepare', 'lidar'] },
+  { key: 'prepare', members: ['prepare', 'detail', 'lidar'] },
   { key: 'roads', members: ['roads', 'sidewalks', 'props'] },
-  { key: 'terrain', members: ['texture', 'materials', 'ter', 'heightmap', 'thumbnail'] },
+  { key: 'terrain', members: ['texture', 'materials', 'ter', 'heightmap', 'thumbnail', 'backdrop'] },
   { key: 'buildings', members: ['buildings', 'water', 'furniture'] },
-  { key: 'nature', members: ['vegetation', 'backdrop'] },
+  { key: 'nature', members: ['vegetation'] },
   { key: 'package', members: ['assets', 'zip', 'compress'] },
 ];
 
@@ -11394,6 +11402,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     roadCount: roadType === 'none' ? 0 : featureTypeCount('road'),
     buildingCount: includeBuildings ? featureTypeCount('building') : 0,
     includeBackdrop,
+    fineDetail: shapeDetail && !!terrainData?.coarseElevation,
+    bridgeLidar: roadType !== 'none' && includeBridges && options.lidarDecks !== false && (options.structureSolver ?? 'v2') === 'v2',
   });
   const totalWeight = Object.values(phaseWeights).reduce((sum, w) => sum + w, 0);
   let weightDone = 0;
@@ -11557,6 +11567,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // AI navgraph is built from them). Legacy 'architect' / 'mesh' values from
   // saved settings or batch configs are treated as 'decal'.
   const includeRoads = roadType !== 'none';
+  // the global 30 m holds nothing smaller than tens of metres: small relief by land cover and sharpened OSM cliffs,
+  // on unbuilt ground only, before the roads are laid (they level their corridors over it) and before the ground is
+  // taken as the level's own (sourceHeightMap). Never on the generated data itself: on the export's copy.
+  let fineDetail = null;
+  if (shapeDetail && terrainData?.coarseElevation && exportTerrainData.bounds) {
+    const cliffLines = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'cliff').length;
+    beginStep('detail', `Adding fine ground detail by land cover${cliffLines ? ` and sharpening ${cliffLines} mapped cliff line${cliffLines === 1 ? '' : 's'}` : ''} (global 30 m terrain)…`);
+    await yield_();
+    // (changed in place when the export already holds its own copy: no second full-size heightmap on 16k maps)
+    const owned = exportTerrainData.heightMap !== terrainData?.heightMap;   // (Vue never proxies typed arrays)
+    const d = addFineGroundDetail({ heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, bounds: exportTerrainData.bounds, metersPerPixel: squareSize, osmFeatures: exportTerrainData.osmFeatures, inPlace: owned });
+    exportTerrainData = { ...exportTerrainData, heightMap: d.heightMap };
+    fineDetail = d.stats;
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Fine ground detail: ${(d.stats.share * 100).toFixed(0)}% of the terrain, up to ${d.stats.maxAdd.toFixed(2)} m; ${d.stats.cliffs} mapped cliff(s) sharpened.`);
+  }
   // measured bridge heights (US lidar), read before the roads are laid out
   // (its own step, before the roads step begins: the road layout's time was
   // reported as the lidar's)
@@ -11572,20 +11597,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   if (includeRoads) {
     const roadFeatureCount = (exportTerrainData.osmFeatures || []).filter((f) => f.type === 'road').length;
-    beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions, bridge decks and tunnels…`);
+    beginStep('roads', `Laying out ${roadFeatureCount} OSM roads: DecalRoads, lane markings, junctions, bridge decks and tunnels${shapingOptions.terrain && shapingOptions.roads ? ', and shaping the terrain under them' : ' (terrain under them left as it is)'}…`);
     await yield_();
-  }
-  // the global 30 m holds nothing smaller than tens of metres: small relief by land cover and sharpened OSM cliffs,
-  // on unbuilt ground only, before the roads are laid (they level their corridors over it) and before the ground is
-  // taken as the level's own (sourceHeightMap). Never on the generated data itself: on the export's copy.
-  let fineDetail = null;
-  if (shapeDetail && terrainData?.coarseElevation && exportTerrainData.bounds) {
-    // (changed in place when the export already holds its own copy: no second full-size heightmap on 16k maps)
-    const owned = exportTerrainData.heightMap !== terrainData?.heightMap;   // (Vue never proxies typed arrays)
-    const d = addFineGroundDetail({ heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, bounds: exportTerrainData.bounds, metersPerPixel: squareSize, osmFeatures: exportTerrainData.osmFeatures, inPlace: owned });
-    exportTerrainData = { ...exportTerrainData, heightMap: d.heightMap };
-    fineDetail = d.stats;
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Fine ground detail: ${(d.stats.share * 100).toFixed(0)}% of the terrain, up to ${d.stats.maxAdd.toFixed(2)} m; ${d.stats.cliffs} mapped cliff(s) sharpened.`);
   }
   // the ground before any grading: where the sea really is (a cut below sea
   // level is no sea)
@@ -12290,6 +12303,27 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   await yield_();
   let previewBlob = await generatePreviewBlob(exportTerrainData);
 
+  // The surrounding backdrop is terrain too: built here, with the terrain
+  // stage, from the finished heights (terrain.ter is written). It ran after
+  // the trees, under "Planting nature" on the progress card.
+  let backdropDaeBlob = null;
+  let backdropTextureFiles = [];
+  let backdropMaterialNames = [];
+  let backdropDiagnostics = null;
+  if (includeBackdrop) {
+    beginStep('backdrop', `${replayingSources() ? 'Reading the saved' : 'Fetching the'} surrounding backdrop (${backdropElevationSource === 'global30m' ? 'global 30 m' : backdropElevationSource.toUpperCase()} elevation + satellite imagery, 8 tiles)…`);
+    await yield_();
+    const backdropResult = await generateTerrainBackdropDAE(exportTerrainData, worldSize, {
+      elevationSource: backdropElevationSource,
+      gpxzApiKey: backdropGpxzApiKey,
+      onProgress: (text, fraction) => report(`Backdrop: ${String(text).replace(/\.\.\.$/, '…')}`, fraction),
+    });
+    backdropDaeBlob = backdropResult?.daeBlob ?? null;
+    backdropTextureFiles = backdropResult?.textureFiles ?? [];
+    backdropMaterialNames = backdropResult?.materialNames ?? [];
+    backdropDiagnostics = backdropResult?.diagnostics ?? null;
+  }
+
   let osmDaeBlob = null;
   let buildingTileDaes = [];
   const buildingReport = { dragGrade };
@@ -12638,24 +12672,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const groundCoverObjects = buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, biome);
   const managedForestItemData = cloneManagedItemData(Array.from(forestPlacements.keys()), biome);
   vegLap('ground cover and item data done');
-
-  let backdropDaeBlob = null;
-  let backdropTextureFiles = [];
-  let backdropMaterialNames = [];
-  let backdropDiagnostics = null;
-  if (includeBackdrop) {
-    beginStep('backdrop', `${replayingSources() ? 'Reading the saved' : 'Fetching the'} surrounding backdrop (${backdropElevationSource === 'global30m' ? 'global 30 m' : backdropElevationSource.toUpperCase()} elevation + satellite imagery, 8 tiles)…`);
-    await yield_();
-    const backdropResult = await generateTerrainBackdropDAE(exportTerrainData, worldSize, {
-      elevationSource: backdropElevationSource,
-      gpxzApiKey: backdropGpxzApiKey,
-      onProgress: (text, fraction) => report(`Backdrop: ${String(text).replace(/\.\.\.$/, '…')}`, fraction),
-    });
-    backdropDaeBlob = backdropResult?.daeBlob ?? null;
-    backdropTextureFiles = backdropResult?.textureFiles ?? [];
-    backdropMaterialNames = backdropResult?.materialNames ?? [];
-    backdropDiagnostics = backdropResult?.diagnostics ?? null;
-  }
 
   beginStep('assets', 'Loading bundled assets (MapNG flag, reflection cubemap)…');
   await yield_();

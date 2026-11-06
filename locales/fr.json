@@ -1242,7 +1242,7 @@
       "elevation": "Chargement du relief",
       "terrain": "Construction du terrain",
       "mapData": "Chargement des données",
-      "roads": "Façonnage des routes",
+      "shaping": "Modelage du terrain",
       "textures": "Peinture des textures"
     },
     "export": {

@@ -1242,7 +1242,7 @@
       "elevation": "Caricamento altimetria",
       "terrain": "Costruzione del terreno",
       "mapData": "Caricamento dati mappa",
-      "roads": "Modellazione strade",
+      "shaping": "Modellazione del terreno",
       "textures": "Pittura texture"
     },
     "export": {

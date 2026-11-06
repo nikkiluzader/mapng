@@ -1242,7 +1242,7 @@
       "elevation": "Wczytywanie wysokości",
       "terrain": "Budowa terenu",
       "mapData": "Wczytywanie danych mapy",
-      "roads": "Kształtowanie dróg",
+      "shaping": "Kształtowanie terenu",
       "textures": "Malowanie tekstur"
     },
     "export": {

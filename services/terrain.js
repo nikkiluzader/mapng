@@ -2337,6 +2337,16 @@ export const fetchTerrainData = async (
     };
   }
 
+  // The shaping steps below run in one go on the page's own thread: without a
+  // frame between a message and the work, the browser never drew the message
+  // (the progress jumped from map data to "Finalizing"). The desktop app's
+  // Node runner has no frames to wait for.
+  const letProgressPaint = () => (typeof requestAnimationFrame === 'function'
+    ? new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))
+    : Promise.resolve());
+
+  if (raw && !flat) onProgress?.("Raw terrain: the elevation is kept exactly as downloaded (no ground filter, no road smoothing)...");
+
   // Roads are smoothed and levelled into the terrain. Coarse terrain (global
   // 30 m, coarse GPXZ blurred like it) is lumpy and stair-stepped under roads
   // and gets the full treatment. Fine rasters (GPXZ / USGS / KRON86 at lidar
@@ -2350,7 +2360,7 @@ export const fetchTerrainData = async (
   // Buildings, woods and viaduct decks come out first, so the creeks, roads and bridges below sit on ground.
   let groundFilterInfo = null;
   if (!flat && !raw && !rawData && groundFilter && osmFeatures.length > 0) {
-    onProgress?.("Finding the ground under buildings and trees...");
+    onProgress?.("Finding the ground under buildings and trees (GEDTM30 bare-earth model, Copernicus GLO-30)...");
     try {
       groundFilterInfo = await removeSurfaceObjects({ heightMap, width, height, bounds: finalBounds, metersPerPixel: effectiveMetersPerPixel, osmFeatures, fetchGedtm: fetchGedtmGrid, fetchCopernicus: fetchCopernicusGrid, signal });
       if (groundFilterInfo.applied) console.info(`[Terrain] Ground under buildings: ${(groundFilterInfo.share * 100).toFixed(0)}% of the area lowered, mean ${groundFilterInfo.meanCut.toFixed(1)} m, up to ${groundFilterInfo.maxCut.toFixed(1)} m (rooftop signal ${groundFilterInfo.dsmSlope.toFixed(2)}).`);
@@ -2365,15 +2375,20 @@ export const fetchTerrainData = async (
   // ridge where the water is): river water is brought down to its banks
   // first, so roads, the preview and the export's water all see the valley.
   if (!flat && !raw && !rawData && osmFeatures.length > 0) {
+    onProgress?.("Bringing river water down to its banks (the 30 m data reads the tree tops along it)...");
+    await letProgressPaint();
     const lowered = lowerRaisedWater(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel);
     if (lowered.cells) console.info(`[Terrain] Water brought down to its banks: ${lowered.cells} cells, up to ${lowered.maxDrop.toFixed(1)} m.`);
   }
   if (!flat && !raw && osmFeatures.length > 0) {
     if (fineRaster) {
       onProgress?.("Aligning roads with the terrain...");
+      await letProgressPaint();
       osmFeatures = snapRoadsToTerrain(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, isGroundLevelRoad).features;
     }
-    onProgress?.("Smoothing roads in heightmap...");
+    const roadCount = osmFeatures.filter((f) => f?.type === 'road').length;
+    onProgress?.(`Smoothing ${roadCount} roads into the terrain (level across, smooth along, joined at junctions)...`);
+    await letProgressPaint();
     smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, { skipTracks: fineRaster, fine: fineRaster });
   }
 

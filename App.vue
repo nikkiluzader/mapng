@@ -232,7 +232,7 @@ import ViewTabs from './components/ui/ViewTabs.vue';
 import OverpassStatusBanner from './components/ui/OverpassStatusBanner.vue';
 import { createGenerationProgress, GENERATION_STEP_GROUPS } from './services/generationProgress.js';
 import StageLoader from './components/ui/StageLoader.vue';
-import { Compass, Mountain, Grid3x3, Map as MapIcon, Route, Paintbrush } from 'lucide-vue-next';
+import { Compass, Mountain, Grid3x3, Map as MapIcon, Shovel, Paintbrush } from 'lucide-vue-next';
 import { fetchTerrainData, addOSMToTerrain, parseElevationFile, loadTerrainFromUploadedElevation } from './services/terrain';
 import { desktopApp, fetchTerrainDataOnDesktop, generateNextFromLevel } from './services/platform/desktop.js';
 import { applyExportSettings } from './services/exportSettings.js';
@@ -310,7 +310,7 @@ const formatStepDuration = (ms) => {
 const loadingStage = ref(null);
 const loadingStageFraction = ref(0);
 const loadingWeights = ref({});
-const GENERATION_STEP_ICONS = { prepare: Compass, elevation: Mountain, terrain: Grid3x3, mapData: MapIcon, roads: Route, textures: Paintbrush };
+const GENERATION_STEP_ICONS = { prepare: Compass, elevation: Mountain, terrain: Grid3x3, mapData: MapIcon, shaping: Shovel, textures: Paintbrush };
 const generationSteps = computed(() => GENERATION_STEP_GROUPS.map((g) => ({
   key: g.key,
   label: t(`progressStages.generate.${g.key}`),
@@ -336,7 +336,7 @@ const startGenerationProgress = (options) => {
   generationTimer = setInterval(() => {
     loadingElapsedMs.value = performance.now() - generationStartedAt;
     if (generationProgress) applyGenerationProgress(generationProgress.tick());
-  }, 500);
+  }, 200);
 };
 const stopGenerationProgress = () => {
   if (generationTimer) clearInterval(generationTimer);
@@ -857,7 +857,11 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
   lastLoggedLoadingPercent.value = -1;
   loadingProgressPercent.value = null;
   loadingProgressDetail.value = '';
-  startGenerationProgress({ resolution: resolution.value, includeOSM: !!fetchOSM, upload: !!uploadedElevationFile.value });
+  // (what this run will do: Raw terrain skips the ground filter and road shaping, the source sets the elevation stage)
+  startGenerationProgress({
+    resolution: resolution.value, includeOSM: !!fetchOSM, upload: !!uploadedElevationFile.value,
+    raw, flat: useFlat, source: uploadedElevationFile.value ? 'upload' : normalizedSource,
+  });
   applyLoadingUpdate(t('app.status.startingGeneration'));
   
   // Flush old data to free memory before loading new large datasets

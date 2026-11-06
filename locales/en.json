@@ -1242,7 +1242,7 @@
       "elevation": "Loading elevation",
       "terrain": "Building terrain",
       "mapData": "Loading map data",
-      "roads": "Shaping roads",
+      "shaping": "Shaping the terrain",
       "textures": "Painting textures"
     },
     "export": {

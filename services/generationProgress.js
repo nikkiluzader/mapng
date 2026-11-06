@@ -7,37 +7,53 @@
 // "x/y" count or, for silent steps (the heightmap resample: 35 s at 16k),
 // by the time spent against the stage's expected length.
 //
-// Stage seconds at 4096² (px = (resolution / 4096)²), from timed standard-
-// source runs: 16k tiles 16 s (8k: 40 s on a slower connection), resample
-// 35 s, road smoothing 3 s, textures 4 s. OSM is weighted for MapNG's own
-// tiles (~1 s); a slow Overpass run creeps through its share instead.
+// Stage seconds at 4096² (px = (resolution / 4096)²), from timed runs: 16k
+// tiles 16 s (8k: 40 s on a slower connection), resample 35 s, road smoothing
+// 3 s, textures 4 s. OSM is weighted for MapNG's own tiles (~1 s); a slow
+// Overpass run creeps through its share instead. Stages a run skips (Raw
+// terrain: no ground filter, no road shaping; lidar: no ground filter) weigh 0.
 
-export const GENERATION_STAGES = ['prepare', 'elevation', 'repair', 'resample', 'satellite', 'osm', 'roads', 'finalize', 'textures'];
+export const GENERATION_STAGES = ['prepare', 'source', 'tiles', 'repair', 'resample', 'satellite', 'osm', 'ground', 'roads', 'finalize', 'textures'];
 
 /**
  * The six stages the progress card shows (components/ui/StageLoader.vue),
- * each the fine stages above it covers, in order.
+ * each the fine stages above it covers, in the order they run: elevation
+ * (the chosen source: lidar, GPXZ, USGS..., then the global tiles it is
+ * filled from, with satellite imagery), resampling to the level's grid, map
+ * data, then shaping (the ground under buildings and trees, roads levelled
+ * into the terrain: neither runs with Raw terrain), textures.
  */
 export const GENERATION_STEP_GROUPS = [
   { key: 'prepare', members: ['prepare'] },
-  { key: 'elevation', members: ['elevation', 'repair'] },
+  { key: 'elevation', members: ['source', 'tiles', 'repair'] },
   { key: 'terrain', members: ['resample'] },
   { key: 'mapData', members: ['satellite', 'osm'] },
-  { key: 'roads', members: ['roads'] },
+  { key: 'shaping', members: ['ground', 'roads'] },
   { key: 'textures', members: ['finalize', 'textures'] },
 ];
 
-const stageSeconds = ({ px, includeOSM, upload }) => ({
-  prepare: 0.3,
-  elevation: 1 + 2 * px,
-  repair: 0.3,
-  resample: 0.5 + 2.2 * px,
-  satellite: upload ? 1 + 1 * px : 0,
-  osm: includeOSM ? 2 + 0.3 * px : 0,
-  roads: includeOSM ? 0.1 + 0.2 * px : 0,
-  finalize: 0.1 + 0.05 * px,
-  textures: 0.3 + 0.25 * px,
-});
+// source: 'default' (global 30 m), 'mapterhorn' (Best free), 'gpxz', 'usgs', 'kron86', 'upload'
+const stageSeconds = ({ px, includeOSM, upload, raw, flat, source }) => {
+  const coarse = !upload && !flat && (source === 'default' || source === 'mapterhorn');
+  return {
+    prepare: 0.3,
+    source: flat || upload ? (upload ? 1 + 3 * px : 0)
+      : source === 'gpxz' ? 2 + 6 * px
+      : source === 'usgs' || source === 'kron86' ? 3 + 5 * px
+      : source === 'mapterhorn' ? 1 + 3 * px : 0,
+    tiles: flat ? 0.3 : 1 + 2 * px,
+    repair: 0.3,
+    resample: 0.5 + 2.2 * px,
+    satellite: upload ? 1 + 1 * px : 0,
+    osm: includeOSM ? 2 + 0.3 * px : 0,
+    // (the ground filter: bare-earth and Copernicus grids fetched, then filtered; global 30 m only, never raw)
+    ground: includeOSM && coarse && !raw ? 1.5 + 1.5 * px : 0,
+    roads: includeOSM && !raw && !flat ? 0.3 + 0.8 * px : 0,
+    finalize: 0.3 + 1 * px,
+    // (with the game texture: ~2.5 s at 2048²)
+    textures: 0.5 + 6 * px,
+  };
+};
 
 /**
  * The stage a progress message belongs to, or null when it says nothing
@@ -46,15 +62,20 @@ const stageSeconds = ({ px, includeOSM, upload }) => ({
 export function classifyGenerationStatus(text) {
   const s = String(text || '').toLowerCase();
   if (!s) return null;
-  if (/generating (osm|hybrid) texture|procedural noise|vector maps|blending satellite imagery/.test(s)) return 'textures';
-  if (/smoothing roads|aligning roads|ground under buildings/.test(s)) return 'roads';
+  if (/generating (osm|hybrid|game map) texture|procedural noise|vector maps|blending satellite imagery/.test(s)) return 'textures';
+  // (a note, not a stage: Raw terrain skips the shaping stages)
+  if (/^raw terrain:/.test(s)) return null;
+  if (/smoothing (\d+ )?roads|aligning roads/.test(s)) return 'roads';
+  if (/ground under buildings|river water/.test(s)) return 'ground';
   if (/finaliz/.test(s)) return 'finalize';
-  if (/openstreetmap|overpass|osm data|\bmirror/.test(s)) return 'osm';
+  if (/openstreetmap|overpass|osm data|\bmirror|overture/.test(s)) return 'osm';
   if (/resampling heightmap|mapping (uploaded )?elevation/.test(s)) return 'resample';
-  if (/satellite/.test(s) && !/terrain and \d+ satellite tiles/.test(s)) return 'satellite';
-  if (/refill|repair|gaps|fallback|corrupt/.test(s)) return 'repair';
-  if (/metric bounds|starting|checking gpxz|index/.test(s)) return 'prepare';
-  if (/tile|gpxz|usgs|nmt|elevation|point cloud|laz|downloading|fetching|rate limited|retrying|interrupted/.test(s)) return 'elevation';
+  // (the global tiles: the terrain the source is filled from, with the satellite imagery)
+  if (/global tiles|terrain and \d+ satellite tiles|fallback terrain tiles/.test(s)) return 'tiles';
+  if (/satellite/.test(s)) return 'satellite';
+  if (/refill|repair|gaps|corrupt/.test(s)) return 'repair';
+  if (/metric bounds|starting/.test(s)) return 'prepare';
+  if (/mapterhorn|gpxz|usgs|nmt|evrf|point cloud|laz|lidar|tile|elevation|downloading|fetching|rate limited|retrying|interrupted|index/.test(s)) return 'source';
   return null;
 }
 
@@ -74,12 +95,12 @@ const countFraction = (text) => {
  * just finished ({ step, durationMs }) or null; stage the one running and
  * stageFraction how far it is (0..1, never backwards).
  *
- * @param {{ resolution: number, includeOSM: boolean, upload?: boolean, startAt?: string }} options
+ * @param {{ resolution: number, includeOSM: boolean, upload?: boolean, raw?: boolean, flat?: boolean, source?: string, startAt?: string }} options
  *   startAt skips the stages before it (adding OSM to existing terrain).
  */
-export function createGenerationProgress({ resolution, includeOSM, upload = false, startAt = null, now = () => performance.now() }) {
+export function createGenerationProgress({ resolution, includeOSM, upload = false, raw = false, flat = false, source = 'mapterhorn', startAt = null, now = () => performance.now() }) {
   const px = (Math.max(256, Number(resolution) || 1024) / 4096) ** 2;
-  const seconds = stageSeconds({ px, includeOSM, upload });
+  const seconds = stageSeconds({ px, includeOSM, upload, raw, flat, source });
   const startIndex = startAt ? Math.max(0, GENERATION_STAGES.indexOf(startAt)) : 0;
   GENERATION_STAGES.forEach((stage, i) => { if (i < startIndex) seconds[stage] = 0; });
   const total = GENERATION_STAGES.reduce((sum, stage) => sum + seconds[stage], 0) || 1;
@@ -96,8 +117,10 @@ export function createGenerationProgress({ resolution, includeOSM, upload = fals
   const percent = () => {
     const stage = GENERATION_STAGES[index];
     const expected = seconds[stage];
-    // silent stretches creep toward 95 % of the stage, ~85 % by its expected time
-    const creep = !counted && expected > 0 ? 0.95 * (1 - Math.exp((-2.3 * (now() - stageStartedAt)) / 1000 / expected)) : 0;
+    // silent stretches creep: ~85 % of the stage by its expected time, then on
+    // slowly toward 99 % (an Overpass outage held the bar still for 45 s at 95 %)
+    const t = expected > 0 ? (now() - stageStartedAt) / 1000 / expected : 0;
+    const creep = !counted && expected > 0 ? 0.9 * (1 - Math.exp(-2.3 * t)) + 0.09 * (1 - Math.exp(-t / 6)) : 0;
     const fraction = Math.max(reported, creep);
     stageFraction = Math.max(stageFraction, Math.min(1, fraction));
     const pct = Math.floor(((doneBefore(index) + expected * Math.min(1, fraction)) / total) * 100);
