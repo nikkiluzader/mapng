@@ -24,7 +24,15 @@
 
     <SectionToggleAll />
 
+    <!-- 1. Where: the grid's place, its size and each tile's -->
+    <StepHeader :n="1" :title="t('panelSteps.where')" :hint="t('panelSteps.whereHintBatch')" />
+    <!-- Coordinates -->
+    <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
+        <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
+    </SettingSection>
+
     <BatchGridConfig
+      id="mapng-bsec-grid"
       :grid-cols="gridCols"
       :grid-rows="gridRows"
       :total-tiles="totalTiles"
@@ -39,6 +47,34 @@
       @update:grid-rows="(v) => gridRows = v"
     />
 
+    <!-- Resolution -->
+    <SettingSection id="mapng-bsec-area" :changed="areaChanged" resettable @reset="resetArea" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_batchres">
+      <ResolutionSelector
+        :modelValue="resolution"
+        @update:modelValue="$emit('resolutionChange', $event)"
+      >
+        <p>{{ t('batch.tileEach', { resolution, mpp: processingMetersPerPixelNumber.toFixed(2) }) }}</p>
+        <p>{{ t('batch.gridCoverage', { w: gridWidthDisplay, h: gridHeightDisplay }) }}</p>
+        <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium"><AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batch.highResolutionWarning') }}</p>
+      </ResolutionSelector>
+      <ProcessingResolutionInput
+        :model-value="processingMetersPerPixel"
+        :resolution="resolution"
+        per-tile
+        @update:model-value="(v) => emit('update:processingMetersPerPixel', v)"
+      />
+      <SettingCard>
+        <SettingRow
+          check
+          v-model="sharedElevationBaseline"
+          :label="t('batch.sharedBaseline')"
+          :hint="sharedElevationBaseline ? (hasOffsetTiles ? t('batch.sharedBaselineAutoHint') : t('batch.sharedBaselineHint')) : ''"
+        />
+      </SettingCard>
+    </SettingSection>
+
+
+
     <!-- Tiles Follow Map Center — always visible, independent of the tile layout section -->
     <label class="flex items-center justify-between p-2 rounded bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
       <span>{{ t('batch.tilesFollowCenter') }}</span>
@@ -46,7 +82,7 @@
     </label>
 
     <!-- Collapsible: per-tile offsets + names -->
-    <SettingSection v-model:open="showTileLayout" :title="t('batch.tileLayout')" :icon="Grid3X3">
+    <SettingSection v-model:open="showTileLayout" :changed="layoutChanged" resettable @reset="resetTileOffsets(); resetTileNames()" :title="t('batch.tileLayout')" :icon="Grid3X3">
         <div class="space-y-2">
           <div class="flex items-center justify-between">
             <p class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ t('batch.tileOffsets') }}</p>
@@ -111,41 +147,15 @@
         </div>
     </SettingSection>
 
-    <!-- Coordinates -->
-    <SettingSection v-model:open="showCoordinates" :title="t('batch.gridCenter')" :icon="MapPin">
-        <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
-    </SettingSection>
 
-    <!-- Resolution -->
-    <SettingSection :title="t('batch.tileResolution')" :icon="Box" storage-key="mapng_ui_sec_batchres">
-      <ResolutionSelector
-        :modelValue="resolution"
-        @update:modelValue="$emit('resolutionChange', $event)"
-      >
-        <p>{{ t('batch.tileEach', { resolution, mpp: processingMetersPerPixelNumber.toFixed(2) }) }}</p>
-        <p>{{ t('batch.gridCoverage', { w: gridWidthDisplay, h: gridHeightDisplay }) }}</p>
-        <p v-if="resolution >= 4096" class="text-amber-600 dark:text-amber-500 font-medium"><AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('batch.highResolutionWarning') }}</p>
-      </ResolutionSelector>
-      <ProcessingResolutionInput
-        :model-value="processingMetersPerPixel"
-        :resolution="resolution"
-        per-tile
-        @update:model-value="(v) => emit('update:processingMetersPerPixel', v)"
-      />
-      <SettingCard>
-        <SettingRow
-          check
-          v-model="sharedElevationBaseline"
-          :label="t('batch.sharedBaseline')"
-          :hint="sharedElevationBaseline ? (hasOffsetTiles ? t('batch.sharedBaselineAutoHint') : t('batch.sharedBaselineHint')) : ''"
-        />
-      </SettingCard>
-    </SettingSection>
-
-
-
+    <!-- 2. Built from: elevation (with the Terrain choice) and map data -->
+    <StepHeader :n="2" :title="t('panelSteps.builtFrom')" :hint="t('panelSteps.builtFromHint')" />
     <!-- Elevation Source -->
     <ElevationSourceSelector
+      id="mapng-bsec-elevation"
+      :changed="elevationChanged"
+      resettable
+      @reset="resetElevation"
       v-model:elevationSource="elevationSource"
       :usgsStatus="null"
       v-model:gpxzApiKey="gpxzApiKey"
@@ -163,14 +173,15 @@
       </SettingCard>
     </ElevationSourceSelector>
 
-    <SettingSection :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
+    <SettingSection id="mapng-bsec-mapdata" :changed="!includeOSM" resettable @reset="includeOSM = true" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
       <SettingCard>
         <SettingRow check v-model="includeOSM" :label="t('batch.includeOsm')" :hint="t('controlPanel.ui.osmHint')" />
       </SettingCard>
     </SettingSection>
 
-    <BatchPerformanceProfile v-model:modelValue="performanceProfile" />
 
+    <!-- 3. What you get: the combined level or each tile's files, then start -->
+    <StepHeader :n="3" :title="t('panelSteps.get')" :hint="combinedLevel ? t('panelSteps.getHintCombined') : t('panelSteps.getHintSeparate')" />
     <BatchCombinedLevelOptions
       v-if="combinedLevel"
       :level-options="levelOptions"
@@ -203,32 +214,11 @@
       </p>
     </div>
 
-    <!-- Action Buttons -->
+    <BatchPerformanceProfile v-model:modelValue="performanceProfile" />
+
+
+    <GenerateSummary :items="summaryItems" />
     <div class="space-y-2">
-      <div class="p-2.5 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <p class="text-caption font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
-            <p class="text-micro text-orange-700/90 dark:text-orange-300/90 mt-1 leading-relaxed">{{ t('support.cardBody') }}</p>
-          </div>
-          <button
-            type="button"
-            @click="$emit('showSupport')"
-            class="shrink-0 px-2.5 py-1 text-micro font-semibold bg-brand hover:bg-brand-500 text-white rounded transition-colors"
-          >
-            {{ t('support.donate') }}
-          </button>
-        </div>
-      </div>
-
-      <BatchRunConfigControls
-        :status="runConfigStatus"
-        @copy="copyRunConfiguration"
-        @paste="pasteRunConfiguration"
-        @save="saveRunConfiguration"
-        @load="handleRunConfigFile"
-      />
-
       <BaseButton
         block
         size="lg"
@@ -255,6 +245,36 @@
         </BaseButton>
       </template>
     </div>
+
+    <!-- Share & save settings (the same name as a single tile's) -->
+    <SettingSection :title="t('controlPanel.configurationSession')" :icon="Settings" storage-key="mapng_ui_sec_batchconfig" :default-open="false">
+      <BatchRunConfigControls
+        :status="runConfigStatus"
+        @copy="copyRunConfiguration"
+        @paste="pasteRunConfiguration"
+        @save="saveRunConfiguration"
+        @load="handleRunConfigFile"
+      />
+
+    </SettingSection>
+
+    <div class="p-2.5 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <p class="text-caption font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
+            <p class="text-micro text-orange-700/90 dark:text-orange-300/90 mt-1 leading-relaxed">{{ t('support.cardBody') }}</p>
+          </div>
+          <button
+            type="button"
+            @click="$emit('showSupport')"
+            class="shrink-0 px-2.5 py-1 text-micro font-semibold bg-brand hover:bg-brand-500 text-white rounded transition-colors"
+          >
+            {{ t('support.donate') }}
+          </button>
+        </div>
+      </div>
+
+
   </div>
 </template>
 
@@ -274,8 +294,10 @@ import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '../../stores/mainStore';
 import TerrainChoice from '../ui/TerrainChoice.vue';
-import { terrainMode, terrainShapingOptions } from '../../composables/useTerrainMode.js';
-import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info } from 'lucide-vue-next';
+import StepHeader from '../ui/StepHeader.vue';
+import GenerateSummary from '../ui/GenerateSummary.vue';
+import { terrainMode, terrainShapingOptions, setTerrainMode } from '../../composables/useTerrainMode.js';
+import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info, Settings } from 'lucide-vue-next';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
@@ -556,6 +578,26 @@ const tileAreaKm = computed(() => (props.resolution * props.resolution) / 1_000_
 const tileAreaDisplay = computed(() => formatArea(tileAreaKm.value));
 const perimeterDisplay = computed(() => formatDist(2 * (gridWidthKm.value + gridHeightKm.value)));
 const gridWidthDisplay = computed(() => formatDist(gridWidthKm.value));
+// Sections that differ from the defaults (a dot by the title) and their Reset
+const areaChanged = computed(() => Number(props.resolution) !== 1024 || processingMetersPerPixelNumber.value !== 1 || sharedElevationBaseline.value);
+const resetArea = () => { emit('resolutionChange', 1024); emit('update:processingMetersPerPixel', 1); sharedElevationBaseline.value = false; };
+const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || (store.advancedMode && terrainMode.value !== 'ready'));
+const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
+const layoutChanged = computed(() => hasOffsetTiles.value || tileNames.value.some((e) => String(e.name || '').trim() && e.name !== defaultTileName(e.index)));
+
+// The one-line summary above Start (components/ui/GenerateSummary.vue)
+const summaryItems = computed(() => {
+  const mode = store.advancedMode ? terrainMode.value : 'ready';
+  return [
+    { key: 'tiles', label: t('genSummary.tiles', { cols: gridCols.value, rows: gridRows.value }), target: 'mapng-bsec-grid' },
+    { key: 'area', label: `${gridWidthDisplay.value} × ${gridHeightDisplay.value}`, target: 'mapng-bsec-grid' },
+    { key: 'px', label: t('genSummary.pxTile', { px: props.resolution }), target: 'mapng-bsec-area' },
+    { key: 'source', label: t(`genSummary.source_${elevationSource.value}`), target: 'mapng-bsec-elevation' },
+    { key: 'terrain', label: t(`terrainChoice.${mode}`), target: 'mapng-bsec-elevation', warn: mode === 'untouched' },
+    { key: 'osm', label: t(includeOSM.value ? 'genSummary.osmOn' : 'genSummary.osmOff'), target: 'mapng-bsec-mapdata', warn: !includeOSM.value },
+    { key: 'out', label: t(combinedLevel.value ? 'genSummary.combined' : 'genSummary.separate'), target: '' },
+  ];
+});
 const gridHeightDisplay = computed(() => formatDist(gridHeightKm.value));
 const selectedExportCount = computed(() =>
   Object.values(exports.value).filter(Boolean).length

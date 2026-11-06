@@ -1272,5 +1272,41 @@
     "untouchedHint": "Wysokości dokładnie tak, jak pobrane: żadnych poprawek.",
     "untouchedWarn": "Przy globalnym 30 m budynki i drzewa zostają jako garby w gruncie, a drogi idą po każdym wyboju.",
     "basicNote": "Teren: Gotowy do jazdy (budynki i drzewa usunięte z danych 30 m, drogi wyrównane). Zmienisz to w trybie Zaawansowanym."
+  },
+  "panelSteps": {
+    "where": "Gdzie",
+    "whereHint": "Obszar mapy",
+    "whereHintBatch": "Siatka i rozmiar każdego kafelka",
+    "builtFrom": "Zbudowany z",
+    "builtFromHint": "Wysokości, teren i dane mapy",
+    "build": "Zbuduj",
+    "buildHint": "Wygeneruj, potem wybierz, co dostanie poziom",
+    "get": "Co otrzymasz",
+    "getHintCombined": "Jeden poziom BeamNG ze wszystkich kafelków",
+    "getHintSeparate": "Pliki dla każdego kafelka"
+  },
+  "genSummary": {
+    "title": "Zbudujesz",
+    "jump": "Przejdź do tego ustawienia",
+    "area": "{w} × {h} km",
+    "px": "{px} px",
+    "pxTile": "{px} px na kafelek",
+    "tiles": "{cols}×{rows} kafelków",
+    "osmOn": "Dane mapy",
+    "osmOff": "Bez danych mapy",
+    "combined": "Jeden połączony poziom",
+    "separate": "Pliki dla kafelków",
+    "source_mapterhorn": "Najlepsze darmowe",
+    "source_default": "Globalne 30 m",
+    "source_none": "Płaski",
+    "source_kron86": "NMT (Polska)",
+    "source_usgs": "USGS 1 m",
+    "source_gpxz": "GPXZ",
+    "source_upload": "Twój plik wysokości"
+  },
+  "sections": {
+    "reset": "Przywróć",
+    "resetTitle": "Przywróć domyślne ustawienia tej sekcji",
+    "changedTitle": "Zmienione względem domyślnych"
   }
 }

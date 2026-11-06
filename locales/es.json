@@ -1272,5 +1272,41 @@
     "untouchedHint": "La elevación tal como se descargó: ningún ajuste.",
     "untouchedWarn": "Con el 30 m global, edificios y árboles quedan como bultos en el suelo y las carreteras siguen cada bache.",
     "basicNote": "Terreno: Listo para conducir (edificios y árboles quitados de los datos de 30 m, carreteras niveladas). Cámbialo en Avanzado."
+  },
+  "panelSteps": {
+    "where": "Dónde",
+    "whereHint": "La zona del mapa",
+    "whereHintBatch": "La cuadrícula y el tamaño de cada tesela",
+    "builtFrom": "Hecho con",
+    "builtFromHint": "Elevación, terreno y datos del mapa",
+    "build": "Crear",
+    "buildHint": "Genera y luego elige qué lleva el nivel",
+    "get": "Qué obtienes",
+    "getHintCombined": "Un nivel de BeamNG con todas las teselas",
+    "getHintSeparate": "Archivos para cada tesela"
+  },
+  "genSummary": {
+    "title": "Vas a crear",
+    "jump": "Ir a este ajuste",
+    "area": "{w} × {h} km",
+    "px": "{px} px",
+    "pxTile": "{px} px por tesela",
+    "tiles": "{cols}×{rows} teselas",
+    "osmOn": "Datos del mapa",
+    "osmOff": "Sin datos del mapa",
+    "combined": "Un nivel combinado",
+    "separate": "Archivos por tesela",
+    "source_mapterhorn": "Mejor gratuito",
+    "source_default": "30 m global",
+    "source_none": "Plano",
+    "source_kron86": "NMT (Polonia)",
+    "source_usgs": "USGS 1 m",
+    "source_gpxz": "GPXZ",
+    "source_upload": "Tu archivo de elevación"
+  },
+  "sections": {
+    "reset": "Restablecer",
+    "resetTitle": "Devolver esta sección a los valores predeterminados",
+    "changedTitle": "Cambiado respecto a los valores predeterminados"
   }
 }

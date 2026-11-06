@@ -19,12 +19,13 @@
     <SectionToggleAll />
 
     <!-- 1. Where -->
+    <StepHeader :n="1" :title="t('panelSteps.where')" :hint="t('panelSteps.whereHint')" />
     <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
       <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
     </SettingSection>
 
     <!-- 2. How big and how detailed -->
-    <SettingSection :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_area">
+    <SettingSection id="mapng-sec-area" :changed="areaChanged" resettable @reset="resetArea" :title="t('controlPanel.ui.areaDetail')" :icon="Box" storage-key="mapng_ui_sec_area">
       <div
         v-if="devMode"
         class="rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2"
@@ -127,8 +128,13 @@
       @update:show-on-map="() => {}"
     />
 
-    <!-- 3. Where the data comes from: elevation (with uploads and raw terrain), then OpenStreetMap -->
+    <!-- 3. Where the data comes from: elevation (with uploads and the Terrain choice), then OpenStreetMap -->
+    <StepHeader :n="2" :title="t('panelSteps.builtFrom')" :hint="t('panelSteps.builtFromHint')" />
       <ElevationSourceSelector
+        id="mapng-sec-elevation"
+        :changed="elevationChanged"
+        resettable
+        @reset="resetElevation"
         v-model:elevationSource="elevationSource"
         :usgsStatus="usgsStatus"
         v-model:gpxzApiKey="gpxzApiKey"
@@ -181,7 +187,7 @@
         </SettingCard>
       </ElevationSourceSelector>
 
-    <SettingSection :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
+    <SettingSection id="mapng-sec-mapdata" :changed="mapDataChanged" resettable @reset="resetMapData" :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
       <!-- OpenStreetMap features, and Overture's buildings where OSM has none -->
       <SettingCard>
         <SettingRow check v-model="fetchOSM" :label="t('controlPanel.includeOsmFeatures')" :hint="t('controlPanel.ui.osmHint')" />
@@ -212,6 +218,8 @@
     </SettingSection>
 
     <!-- 4. Generate -->
+    <StepHeader :n="3" :title="t('panelSteps.build')" :hint="t('panelSteps.buildHint')" />
+    <GenerateSummary :items="summaryItems" />
     <!-- Generate Actions -->
     <GenerateActions
       :is-generating="isGenerating"
@@ -335,6 +343,9 @@ import { setSessionConfigSource } from '../../composables/useReportDialog.js';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
 import TerrainChoice from '../ui/TerrainChoice.vue';
+import StepHeader from '../ui/StepHeader.vue';
+import GenerateSummary from '../ui/GenerateSummary.vue';
+import { terrainMode, setTerrainMode } from '../../composables/useTerrainMode.js';
 import { reloadTerrainSettings } from '../../composables/useTerrainMode.js';
 
 const { t } = useI18n({ useScope: 'global' });
@@ -442,6 +453,28 @@ watch(() => props.terrainData, (newData) => {
   }
 });
 
+// Sections that differ from the defaults (a dot by the title) and their Reset
+const areaChanged = computed(() => Number(props.resolution) !== 1024 || Number(props.processingMetersPerPixel || 1) !== 1);
+const resetArea = () => { emit('resolutionChange', 1024); emit('update:processingMetersPerPixel', 1); };
+const elevationChanged = computed(() => elevationSource.value !== 'mapterhorn' || (store.advancedMode && terrainMode.value !== 'ready'));
+const resetElevation = () => { elevationSource.value = 'mapterhorn'; setTerrainMode('ready'); };
+const mapDataChanged = computed(() => !fetchOSM.value || !overtureBuildings.value);
+const resetMapData = () => { fetchOSM.value = true; overtureBuildings.value = true; };
+
+// The one-line summary above Generate (components/ui/GenerateSummary.vue)
+const summaryItems = computed(() => {
+  const upload = Array.isArray(props.uploadedElevationFile) ? props.uploadedElevationFile.length > 0 : !!props.uploadedElevationFile;
+  const km = ((Number(props.resolution) || 0) * (Number(props.processingMetersPerPixel) || 1)) / 1000;
+  const kmText = km >= 10 ? km.toFixed(0) : km.toFixed(1);
+  const mode = store.advancedMode ? terrainMode.value : 'ready';
+  return [
+    { key: 'area', label: t('genSummary.area', { w: kmText, h: kmText }), target: 'mapng-sec-area' },
+    { key: 'px', label: t('genSummary.px', { px: props.resolution }), target: 'mapng-sec-area' },
+    { key: 'source', label: t(`genSummary.source_${upload ? 'upload' : elevationSource.value}`), target: 'mapng-sec-elevation' },
+    { key: 'terrain', label: t(`terrainChoice.${mode}`), target: 'mapng-sec-elevation', warn: mode === 'untouched' },
+    { key: 'osm', label: t(fetchOSM.value ? 'genSummary.osmOn' : 'genSummary.osmOff'), target: 'mapng-sec-mapdata', warn: !fetchOSM.value },
+  ];
+});
 const processingMetersPerPixelNumber = computed(() => {
   const parsed = Number(props.processingMetersPerPixel);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;

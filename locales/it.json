@@ -1272,5 +1272,41 @@
     "untouchedHint": "L'altitudine esattamente come scaricata: nessun ritocco.",
     "untouchedWarn": "Con il 30 m globale edifici e alberi restano come gobbe nel terreno e le strade seguono ogni dosso.",
     "basicNote": "Terreno: Pronto da guidare (edifici e alberi tolti dai dati a 30 m, strade livellate). Si cambia in Avanzato."
+  },
+  "panelSteps": {
+    "where": "Dove",
+    "whereHint": "L'area della mappa",
+    "whereHintBatch": "La griglia e la dimensione di ogni riquadro",
+    "builtFrom": "Creato da",
+    "builtFromHint": "Altitudine, terreno e dati della mappa",
+    "build": "Crea",
+    "buildHint": "Genera, poi scegli cosa avrà il livello",
+    "get": "Cosa ottieni",
+    "getHintCombined": "Un livello BeamNG da tutti i riquadri",
+    "getHintSeparate": "File per ogni riquadro"
+  },
+  "genSummary": {
+    "title": "Stai per creare",
+    "jump": "Vai a questa impostazione",
+    "area": "{w} × {h} km",
+    "px": "{px} px",
+    "pxTile": "{px} px per riquadro",
+    "tiles": "{cols}×{rows} riquadri",
+    "osmOn": "Dati della mappa",
+    "osmOff": "Nessun dato della mappa",
+    "combined": "Un livello combinato",
+    "separate": "File per riquadro",
+    "source_mapterhorn": "Miglior gratuito",
+    "source_default": "30 m globale",
+    "source_none": "Piatto",
+    "source_kron86": "NMT (Polonia)",
+    "source_usgs": "USGS 1 m",
+    "source_gpxz": "GPXZ",
+    "source_upload": "Il tuo file di altitudine"
+  },
+  "sections": {
+    "reset": "Ripristina",
+    "resetTitle": "Riporta questa sezione ai valori predefiniti",
+    "changedTitle": "Modificato rispetto ai valori predefiniti"
   }
 }

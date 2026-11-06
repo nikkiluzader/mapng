@@ -1272,5 +1272,41 @@
     "untouchedHint": "L'altitude telle que téléchargée : aucune retouche.",
     "untouchedWarn": "Avec le 30 m global, bâtiments et arbres restent des bosses dans le sol et les routes suivent chaque relief.",
     "basicNote": "Terrain : Prêt à rouler (bâtiments et arbres retirés des données 30 m, routes nivelées). À changer en mode Avancé."
+  },
+  "panelSteps": {
+    "where": "Où",
+    "whereHint": "La zone de la carte",
+    "whereHintBatch": "La grille et la taille de chaque tuile",
+    "builtFrom": "À partir de",
+    "builtFromHint": "Altitude, terrain et données de carte",
+    "build": "Créer",
+    "buildHint": "Générez, puis choisissez ce que le niveau contient",
+    "get": "Ce que vous obtenez",
+    "getHintCombined": "Un niveau BeamNG avec toutes les tuiles",
+    "getHintSeparate": "Des fichiers pour chaque tuile"
+  },
+  "genSummary": {
+    "title": "Vous allez créer",
+    "jump": "Aller à ce réglage",
+    "area": "{w} × {h} km",
+    "px": "{px} px",
+    "pxTile": "{px} px par tuile",
+    "tiles": "{cols}×{rows} tuiles",
+    "osmOn": "Données de carte",
+    "osmOff": "Sans données de carte",
+    "combined": "Un niveau combiné",
+    "separate": "Fichiers par tuile",
+    "source_mapterhorn": "Meilleur gratuit",
+    "source_default": "30 m global",
+    "source_none": "Plat",
+    "source_kron86": "NMT (Pologne)",
+    "source_usgs": "USGS 1 m",
+    "source_gpxz": "GPXZ",
+    "source_upload": "Votre fichier d'altitude"
+  },
+  "sections": {
+    "reset": "Réinitialiser",
+    "resetTitle": "Remettre cette section aux valeurs par défaut",
+    "changedTitle": "Modifié par rapport aux valeurs par défaut"
   }
 }

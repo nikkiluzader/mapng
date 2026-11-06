@@ -1272,5 +1272,41 @@
     "untouchedHint": "The elevation exactly as downloaded: no edits at all.",
     "untouchedWarn": "On the global 30 m, buildings and trees stay as lumps in the ground and roads follow every bump.",
     "basicNote": "Terrain: Ready to drive (buildings and trees taken out of 30 m data, roads levelled in). Switch to Advanced to change it."
+  },
+  "panelSteps": {
+    "where": "Where",
+    "whereHint": "The area of the map",
+    "whereHintBatch": "The grid and how big each tile is",
+    "builtFrom": "Built from",
+    "builtFromHint": "Elevation, terrain and map data",
+    "build": "Build it",
+    "buildHint": "Generate, then choose what the level gets",
+    "get": "What you get",
+    "getHintCombined": "One BeamNG level from all tiles",
+    "getHintSeparate": "Files for each tile"
+  },
+  "genSummary": {
+    "title": "You're about to build",
+    "jump": "Go to this setting",
+    "area": "{w} × {h} km",
+    "px": "{px} px",
+    "pxTile": "{px} px per tile",
+    "tiles": "{cols}×{rows} tiles",
+    "osmOn": "Map data",
+    "osmOff": "No map data",
+    "combined": "One combined level",
+    "separate": "Files per tile",
+    "source_mapterhorn": "Best free",
+    "source_default": "Global 30 m",
+    "source_none": "Flat",
+    "source_kron86": "NMT (Poland)",
+    "source_usgs": "USGS 1 m",
+    "source_gpxz": "GPXZ",
+    "source_upload": "Your elevation file"
+  },
+  "sections": {
+    "reset": "Reset",
+    "resetTitle": "Put this section back to the defaults",
+    "changedTitle": "Changed from the defaults"
   }
 }

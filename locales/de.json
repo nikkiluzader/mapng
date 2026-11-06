@@ -1272,5 +1272,41 @@
     "untouchedHint": "Die Höhen genau wie heruntergeladen: keinerlei Anpassungen.",
     "untouchedWarn": "Beim globalen 30-m-Modell bleiben Gebäude und Bäume als Buckel im Boden, und Straßen folgen jeder Unebenheit.",
     "basicNote": "Gelände: Fahrbereit (Gebäude und Bäume aus 30-m-Daten entfernt, Straßen eingeebnet). In „Erweitert“ änderbar."
+  },
+  "panelSteps": {
+    "where": "Wo",
+    "whereHint": "Der Kartenausschnitt",
+    "whereHintBatch": "Das Raster und die Größe jeder Kachel",
+    "builtFrom": "Erstellt aus",
+    "builtFromHint": "Höhen, Gelände und Kartendaten",
+    "build": "Erstellen",
+    "buildHint": "Daten erzeugen, dann wählen, was das Level bekommt",
+    "get": "Ergebnis",
+    "getHintCombined": "Ein BeamNG-Level aus allen Kacheln",
+    "getHintSeparate": "Dateien für jede Kachel"
+  },
+  "genSummary": {
+    "title": "Das wird erstellt",
+    "jump": "Zu dieser Einstellung",
+    "area": "{w} × {h} km",
+    "px": "{px} px",
+    "pxTile": "{px} px je Kachel",
+    "tiles": "{cols}×{rows} Kacheln",
+    "osmOn": "Kartendaten",
+    "osmOff": "Keine Kartendaten",
+    "combined": "Ein kombiniertes Level",
+    "separate": "Dateien je Kachel",
+    "source_mapterhorn": "Bestes kostenloses",
+    "source_default": "Global 30 m",
+    "source_none": "Flach",
+    "source_kron86": "NMT (Polen)",
+    "source_usgs": "USGS 1 m",
+    "source_gpxz": "GPXZ",
+    "source_upload": "Deine Höhendatei"
+  },
+  "sections": {
+    "reset": "Zurücksetzen",
+    "resetTitle": "Diesen Bereich auf die Standardwerte zurücksetzen",
+    "changedTitle": "Von den Standardwerten geändert"
   }
 }
