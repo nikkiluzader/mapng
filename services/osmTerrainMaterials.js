@@ -677,7 +677,7 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
   const areas = [];
   const residential = [];
   for (const feature of osmFeatures) {
-    if (feature.type === 'road') continue;
+    if (feature.type === 'road' || feature.type === 'cliff') continue;   // (cliff lines: rock strip below)
     if (feature.tags?.landuse === 'residential' && feature.geometry?.length >= 3) residential.push(feature.geometry.map(pt => toPx(pt.lat, pt.lng)));
     const matIdx = areaMatIndex(feature);
     if (matIdx < 0 || !feature.geometry?.length) continue;
@@ -762,6 +762,38 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
   }
 
   // 3. Paint linear waterways.
+  // 3a. Cliff lines: bare rock on the face, which lies on the line's right (OSM convention): wherever the ground
+  // there is steeper than 45 degrees (the export sharpens these cliffs, terrainDetail.js), else a strip
+  const hm = terrainData.heightMap;
+  for (const feature of osmFeatures) {
+    if (feature.type !== 'cliff' || !(feature.geometry?.length > 1)) continue;
+    const pts = feature.geometry.map(pt => toPx(pt.lat, pt.lng));
+    const reach = Math.max(2, 25 / metersPerPixel), back = Math.max(1, 2 / metersPerPixel);
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const p of pts) { x0 = Math.min(x0, p.px); y0 = Math.min(y0, p.py); x1 = Math.max(x1, p.px); y1 = Math.max(y1, p.py); }
+    for (let y = Math.max(1, Math.floor(y0 - reach)); y <= Math.min(size - 2, Math.ceil(y1 + reach)); y++) {
+      for (let x = Math.max(1, Math.floor(x0 - reach)); x <= Math.min(size - 2, Math.ceil(x1 + reach)); x++) {
+        let best = Infinity, side = 0;
+        for (let i = 0; i < pts.length - 1; i++) {
+          const ax = pts[i].px, ay = pts[i].py, dx = pts[i + 1].px - ax, dy = pts[i + 1].py - ay, l2 = dx * dx + dy * dy;
+          if (l2 < 1e-9) continue;
+          const t = Math.min(1, Math.max(0, ((x + 0.5 - ax) * dx + (y + 0.5 - ay) * dy) / l2));
+          const ex = ax + dx * t - x - 0.5, ey = ay + dy * t - y - 0.5, d = Math.hypot(ex, ey);
+          if (d < best) { best = d; side = (-(x + 0.5 - ax - dx * t) * dy + (y + 0.5 - ay - dy * t) * dx) / Math.sqrt(l2); }
+        }
+        // side > 0: right of travel in image space (y down)
+        if (best > reach || side < -back) continue;
+        const k = y * size + x;
+        let steep = side < 4 / metersPerPixel;   // without heights: a 4 m strip
+        if (hm?.length === size * size) {
+          const gx = (hm[k + 1] - hm[k - 1]) / (2 * metersPerPixel), gy = (hm[k + size] - hm[k - size]) / (2 * metersPerPixel);
+          steep = Math.hypot(gx, gy) > 1;
+        }
+        if (steep) layerMap[k] = 4;
+      }
+    }
+  }
+
   for (const feature of osmFeatures) {
     if (!feature.geometry?.length || feature.type !== 'water') continue;
     const t = feature.tags || {};

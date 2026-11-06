@@ -11585,7 +11585,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const d = addFineGroundDetail({ heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height, bounds: exportTerrainData.bounds, metersPerPixel: squareSize, osmFeatures: exportTerrainData.osmFeatures });
     exportTerrainData = { ...exportTerrainData, heightMap: d.heightMap };
     fineDetail = d.stats;
-    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Fine ground detail: ${(d.stats.share * 100).toFixed(0)}% of the terrain, up to ${d.stats.maxAdd.toFixed(2)} m.`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Fine ground detail: ${(d.stats.share * 100).toFixed(0)}% of the terrain, up to ${d.stats.maxAdd.toFixed(2)} m; ${d.stats.cliffs} mapped cliff(s) sharpened.`);
   }
   const decalRoads = includeRoads
     ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null })

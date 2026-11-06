@@ -491,6 +491,8 @@ export const parseOverpassResponse = (data, bounds) => {
           }
         }
         const linearWaterway = type === "water" && !!tags.waterway && !areaLike;
+        // a cliff mapped as a line (top edge, face on its right): kept for the export's cliff sharpening
+        if (!areaLike && tags.natural === "cliff" && nodes.length >= 2) { rawFeatures.push({ id: id.toString(), type: "cliff", geometry: nodes, tags }); continue; }
         if (!areaLike && !linearWaterway && type !== "road" && type !== "barrier") continue;
         rawFeatures.push({ id: id.toString(), type, geometry: nodes, tags });
       }
@@ -516,7 +518,7 @@ export const parseOverpassResponse = (data, bounds) => {
       continue;
     }
     const isLinearWaterway = f.type === "water" && !!f.tags?.waterway && f.tags?.area !== "yes" && !isClosedRing(f.geometry);
-    if (f.type === "road" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || isLinearWaterway) {
+    if (f.type === "road" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || isLinearWaterway) {
       const clippedSegments = clipLineString(f.geometry, bounds);
       clippedSegments.forEach((segment, index) => {
         if (segment.length > 1) {
