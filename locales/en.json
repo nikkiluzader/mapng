@@ -7,7 +7,8 @@
     "chip": "Backup map data"
   },
   "common": {
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "close": "Close"
   },
   "language": {
     "label": "Language",
@@ -551,7 +552,6 @@
     "customOverpassInvalid": "Must be a full https:// address.",
     "customOverpassHint": "Paste your full Overpass URL including your key. Areas MapNG already hosts (Map layers → MapNG OSM coverage) still load from MapNG's own copy, so your key is only used outside them; there it's tried first, with the public servers as backup. It stays in this browser only. Paid plans with Overpass access:",
     "centerCoordinates": "Center coordinates",
-    "configurationSession": "Share & save settings",
     "modeBasic": "Basic",
     "modeAdvanced": "Advanced",
     "modeBasicHint": "Just the BeamNG level. Switch to Advanced for heightmap, texture and 3D model downloads, Surrounding tiles and more export options.",
@@ -1239,7 +1239,8 @@
     "longCodeHint": "The whole config as one line of text: works offline and doesn't expire. Paste it into MapNG to use it.",
     "saveFile": "Save to file",
     "loadFile": "Load file",
-    "buildEverything": "Build everything"
+    "buildEverything": "Build everything",
+    "shareDialogTitle": "Share & load settings"
   },
   "usage": {
     "askTitle": "Share which settings you use?",

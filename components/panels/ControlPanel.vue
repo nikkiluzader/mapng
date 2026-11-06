@@ -245,20 +245,6 @@
         </div>
         <button type="button" class="mt-1 text-brand hover:underline" @click="step = 4">{{ t('wizard.toExport') }}</button>
       </div>
-      <!-- Configuration & Session (collapsed by default) -->
-      <SettingSection v-model:open="showConfig" :title="t('controlPanel.configurationSession')" :icon="Settings">
-        <RunConfigControls
-          :status="runConfigStatus"
-          @copy="copyRunConfiguration"
-          @save="saveRunConfiguration"
-          @load="handleRunConfigFile"
-          sendable
-          :sending="sendingConfig"
-          :sent="sentConfig"
-          @send="sendConfig"
-          @open-code="openShareCode"
-        />
-      </SettingSection>
 
       <div class="p-3 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
         <div class="flex items-start justify-between gap-3">
@@ -333,6 +319,20 @@
   </WizardLayout>
 
     <!-- (outside the collapsible section: Ctrl+V on the map opens it too) -->
+    <!-- Share & load settings: opened from the share icon in the top bar -->
+    <ShareDialog>
+      <RunConfigControls
+        :status="runConfigStatus"
+        @copy="copyRunConfiguration"
+        @save="saveRunConfiguration"
+        @load="handleRunConfigFile"
+        sendable
+        :sending="sendingConfig"
+        :sent="sentConfig"
+        @send="sendConfig"
+        @open-code="openShareCode"
+      />
+    </ShareDialog>
     <SessionConfigDialog
       v-if="pendingConfig"
       :rows="pendingConfigRows"
@@ -350,7 +350,7 @@ import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 provideSectionGroup();
 import { CUSTOM_OVERPASS_STORAGE_KEY, OVERTURE_BUILDINGS_STORAGE_KEY } from '../../services/osm.js';
 import { useI18n } from 'vue-i18n';
-import { MapPin, Box, Trees, Settings, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
+import { MapPin, Box, Trees, AlertTriangle, Download, CheckCircle2 } from 'lucide-vue-next';
 import { desktopApp, DESKTOP_DOWNLOAD_URL } from '../../services/platform/desktop.js';
 import SettingSection from '../base/SettingSection.vue';
 import SettingRow from '../base/SettingRow.vue';
@@ -375,6 +375,8 @@ import { buildRunConfiguration as buildRunConfigurationBase } from '../../servic
 import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
+import ShareDialog from '../modals/ShareDialog.vue';
+import { closeShareDialog } from '../../composables/useShareDialog.js';
 import { withoutPersonal } from '../../services/personalKeys.js';
 import { setSessionConfigSource } from '../../composables/useReportDialog.js';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
@@ -419,7 +421,6 @@ const usgsStatus = ref(null);
 
 // Collapsible section states (persisted via localStorage, hidden by default)
 const showCoordinates = ref(localStorage.getItem('mapng_showCoordinates') !== 'false');
-const showConfig = ref(false);
 
 onMounted(async () => {
   // Initialise elevation-source flags from persisted selection
@@ -737,6 +738,8 @@ const copyRunConfiguration = async () => {
 
 // a config waiting for the user's Apply (SessionConfigDialog.vue)
 const pendingConfig = ref(null);
+// (a code opened: its review takes over from the share window)
+watch(pendingConfig, (cfg) => { if (cfg) closeShareDialog(); });
 const pendingConfigRows = computed(() => (pendingConfig.value ? describeSessionConfig(pendingConfig.value, { hasGpxzKey: !!gpxzApiKey.value }) : []));
 const previewConfigText = async (text, { quiet = false } = {}) => {
   try {

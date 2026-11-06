@@ -243,17 +243,6 @@
             {{ t('batch.clearCache') }}
           </BaseButton>
       </div>
-      <!-- Share & save settings (the same name as a single tile's) -->
-      <SettingSection :title="t('controlPanel.configurationSession')" :icon="Settings" storage-key="mapng_ui_sec_batchconfig" :default-open="false">
-        <BatchRunConfigControls
-          :status="runConfigStatus"
-          @copy="copyRunConfiguration"
-          @paste="pasteRunConfiguration"
-          @save="saveRunConfiguration"
-          @load="handleRunConfigFile"
-        />
-
-      </SettingSection>
 
       <div class="p-2.5 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
           <div class="flex items-start justify-between gap-2">
@@ -273,6 +262,17 @@
 
 
     </div>
+
+    <!-- Share & load settings: opened from the share icon in the top bar -->
+    <ShareDialog>
+      <BatchRunConfigControls
+        :status="runConfigStatus"
+        @copy="copyRunConfiguration"
+        @paste="pasteRunConfiguration"
+        @save="saveRunConfiguration"
+        @load="handleRunConfigFile"
+      />
+    </ShareDialog>
 
     <template #footer>
       <GenerateSummary compact :items="summaryItems" @step="(n) => step = n" />
@@ -310,13 +310,14 @@ import { useI18n } from 'vue-i18n';
 import { useMainStore } from '../../stores/mainStore';
 import TerrainChoice from '../ui/TerrainChoice.vue';
 import WizardLayout from '../ui/WizardLayout.vue';
+import ShareDialog from '../modals/ShareDialog.vue';
 import { LEVEL_TESTED_MAX_PX, combinedLevelTier } from '../../services/levelLimits.js';
 import { getLoadedOsmFile, onOsmFileChange, osmFileCoverage } from '../../services/osmFile.js';
 import OsmFileInput from '../controls/OsmFileInput.vue';
 import { computeGridBounds } from '../../services/batchJob.js';
 import GenerateSummary from '../ui/GenerateSummary.vue';
 import { terrainMode, terrainShapingOptions, terrainGenerationOptions, setTerrainMode } from '../../composables/useTerrainMode.js';
-import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info, Settings } from 'lucide-vue-next';
+import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info } from 'lucide-vue-next';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';

@@ -7,7 +7,8 @@
     "chip": "Ersatz-Kartendaten"
   },
   "common": {
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "close": "Schließen"
   },
   "language": {
     "label": "Sprache",
@@ -551,7 +552,6 @@
     "customOverpassInvalid": "Muss eine vollständige https://-Adresse sein.",
     "customOverpassHint": "Füge deine vollständige Overpass-URL inklusive Schlüssel ein. Gebiete, die MapNG bereits hostet (Kartenebenen → MapNG-OSM-Abdeckung), laden weiterhin aus MapNGs eigener Kopie, dein Schlüssel wird also nur außerhalb davon genutzt; dort wird er zuerst versucht, mit den öffentlichen Servern als Reserve. Er bleibt nur in diesem Browser gespeichert. Bezahlte Tarife mit Overpass-Zugang:",
     "centerCoordinates": "Zentrumskoordinaten",
-    "configurationSession": "Einstellungen teilen & speichern",
     "modeBasic": "Einfach",
     "modeAdvanced": "Erweitert",
     "modeBasicHint": "Nur das BeamNG-Level. Wechsle zu Erweitert für Heightmap-, Textur- und 3D-Modell-Downloads, Umliegende Tiles und mehr Exportoptionen.",
@@ -1239,7 +1239,8 @@
     "longCodeHint": "Alle Einstellungen als eine Textzeile: funktioniert offline und läuft nicht ab. In MapNG einfügen, um sie zu nutzen.",
     "saveFile": "Als Datei speichern",
     "loadFile": "Datei laden",
-    "buildEverything": "Alles bauen"
+    "buildEverything": "Alles bauen",
+    "shareDialogTitle": "Einstellungen teilen & laden"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",

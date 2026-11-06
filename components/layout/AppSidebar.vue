@@ -15,12 +15,23 @@
         <h1 class="text-xl font-bold tracking-tight text-gray-900 dark:text-white">MapNG</h1>
         <p class="text-xs text-gray-500 dark:text-gray-400">{{ t('sidebar.tagline') }}</p>
       </div>
+      <!-- Share & load settings (components/modals/ShareDialog.vue, shown by the active panel) -->
+      <BaseButton
+        size="sm"
+        variant="ghost"
+        class="ml-auto text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
+        :title="t('config.shareDialogTitle')"
+        :aria-label="t('config.shareDialogTitle')"
+        @click="openShareDialog"
+      >
+        <Share2 :size="18" />
+      </BaseButton>
       <!-- (the desktop app has no browser reload button: one here, as View → Reload / Ctrl+R) -->
       <BaseButton
         v-if="isDesktop"
         size="sm"
         variant="ghost"
-        class="ml-auto text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
+        class="text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
         :title="t('sidebar.reloadTooltip')"
         :aria-label="t('sidebar.reloadTooltip')"
         @click="reloadApp"
@@ -30,7 +41,7 @@
       <BaseButton
         size="sm"
         variant="ghost"
-        :class="[isDesktop ? '' : 'ml-auto', 'text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800']"
+        :class="['text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800']"
         :title="t('sidebar.aboutTooltip')"
         @click="$emit('show-about')"
       >
@@ -104,7 +115,8 @@ import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
-import { CircleHelp, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield } from 'lucide-vue-next';
+import { CircleHelp, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, Share2 } from 'lucide-vue-next';
+import { openShareDialog } from '../../composables/useShareDialog.js';
 
 const { t, locale } = useI18n({ useScope: 'global' });
 const isDesktop = !!desktopApp;

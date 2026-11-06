@@ -7,7 +7,8 @@
     "chip": "Datos de respaldo"
   },
   "common": {
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "close": "Cerrar"
   },
   "language": {
     "label": "Idioma",
@@ -551,7 +552,6 @@
     "customOverpassInvalid": "Debe ser una dirección https:// completa.",
     "customOverpassHint": "Pega tu URL completa de Overpass, incluida tu clave. Las zonas que MapNG ya aloja (Capas del mapa → Cobertura OSM de MapNG) se siguen cargando desde la copia propia de MapNG, así que tu clave solo se usa fuera de ellas; allí se prueba primero, con los servidores públicos como respaldo. Solo se guarda en este navegador. Planes de pago con acceso a Overpass:",
     "centerCoordinates": "Coordenadas del centro",
-    "configurationSession": "Compartir y guardar ajustes",
     "modeBasic": "Básico",
     "modeAdvanced": "Avanzado",
     "modeBasicHint": "Solo el nivel de BeamNG. Cambia a Avanzado para descargar mapas de altura, texturas y modelos 3D, teselas circundantes y más opciones de exportación.",
@@ -1239,7 +1239,8 @@
     "longCodeHint": "Todos los ajustes en una línea de texto: funciona sin conexión y no caduca. Pégalo en MapNG para usarlo.",
     "saveFile": "Guardar en archivo",
     "loadFile": "Cargar archivo",
-    "buildEverything": "Crear todo"
+    "buildEverything": "Crear todo",
+    "shareDialogTitle": "Compartir y cargar ajustes"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",

@@ -7,7 +7,8 @@
     "chip": "Données de secours"
   },
   "common": {
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "close": "Fermer"
   },
   "language": {
     "label": "Langue",
@@ -551,7 +552,6 @@
     "customOverpassInvalid": "Doit être une adresse https:// complète.",
     "customOverpassHint": "Collez votre URL Overpass complète, clé comprise. Les zones déjà hébergées par MapNG (Couches de carte → Couverture OSM de MapNG) continuent d'être chargées depuis la copie de MapNG : votre clé ne sert qu'en dehors. Là, votre serveur est essayé en premier, avec les serveurs publics en secours. L'adresse reste uniquement dans ce navigateur. Offres payantes avec accès Overpass :",
     "centerCoordinates": "Coordonnées du centre",
-    "configurationSession": "Partager et enregistrer les réglages",
     "modeBasic": "Simple",
     "modeAdvanced": "Avancé",
     "modeBasicHint": "Seulement le niveau BeamNG. Passez en Avancé pour télécharger heightmap, textures et modèles 3D, utiliser les tuiles environnantes et avoir plus d'options d'export.",
@@ -1239,7 +1239,8 @@
     "longCodeHint": "Tous les réglages en une ligne de texte : fonctionne hors ligne et n'expire pas. Collez-la dans MapNG pour l'utiliser.",
     "saveFile": "Enregistrer dans un fichier",
     "loadFile": "Charger un fichier",
-    "buildEverything": "Tout construire"
+    "buildEverything": "Tout construire",
+    "shareDialogTitle": "Partager et charger les réglages"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",

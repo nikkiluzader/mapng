@@ -7,7 +7,8 @@
     "chip": "Zapasowe dane mapy"
   },
   "common": {
-    "cancel": "Anuluj"
+    "cancel": "Anuluj",
+    "close": "Zamknij"
   },
   "language": {
     "label": "Język",
@@ -551,7 +552,6 @@
     "customOverpassInvalid": "Musi to być pełny adres https://.",
     "customOverpassHint": "Wklej pełny adres URL Overpass razem z kluczem. Obszary, które MapNG już hostuje (Warstwy mapy → Zasięg OSM MapNG), nadal wczytują się z kopii MapNG, więc Twój klucz jest używany tylko poza nimi; tam jest próbowany jako pierwszy, a publiczne serwery służą jako zapas. Adres zostaje tylko w tej przeglądarce. Płatne plany z dostępem do Overpass:",
     "centerCoordinates": "Współrzędne środka",
-    "configurationSession": "Udostępnij i zapisz ustawienia",
     "modeBasic": "Podstawowy",
     "modeAdvanced": "Zaawansowany",
     "modeBasicHint": "Tylko poziom BeamNG. Przełącz na Zaawansowany, aby pobrać mapę wysokości, tekstury i modele 3D, sąsiednie kafelki i więcej opcji eksportu.",
@@ -1239,7 +1239,8 @@
     "longCodeHint": "Wszystkie ustawienia w jednej linii tekstu: działa offline i nie wygasa. Wklej ten tekst w MapNG, aby go użyć.",
     "saveFile": "Zapisz do pliku",
     "loadFile": "Wczytaj plik",
-    "buildEverything": "Buduj wszystko"
+    "buildEverything": "Buduj wszystko",
+    "shareDialogTitle": "Udostępnij i wczytaj ustawienia"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
