@@ -144,7 +144,9 @@
     "keyZoomCursor": "przybliż do kursora",
     "keyZoomCrosshair": "przybliż do celownika",
     "keyMenu": "menu",
-    "keyNudge": "przesuń zaznaczenie"
+    "keyNudge": "przesuń zaznaczenie",
+    "hintMhFullAt": "Lidar (~{res} m) obejmuje cały obszar. Dla tak dużego obszaru jest czytany przy ~{used} m.",
+    "hintMhDesktopFiner": "Aplikacja desktopowa czyta go przy ~{res} m."
   },
   "status": {
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",

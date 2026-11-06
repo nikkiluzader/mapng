@@ -142,6 +142,7 @@
     <div v-show="step === 2" class="space-y-5">
         <ElevationSourceSelector
           id="mapng-sec-elevation"
+          :meters-per-pixel="metersPerPixel"
           :changed="elevationChanged"
           resettable
           @reset="resetElevation"

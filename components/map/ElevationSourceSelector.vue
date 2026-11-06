@@ -148,11 +148,15 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { Mountain, ChevronDown, AlertTriangle, Sparkles } from 'lucide-vue-next';
 import { boxAround, probeMapterhorn, probeGpxz } from '../../services/sourceAdvisor.js';
+import { mapterhornZoomFor, mapterhornMosaicBudget, mapterhornMetersPerPixel } from '../../services/mapterhorn.js';
+import { desktopApp } from '../../services/platform/desktop.js';
 import { standardPatch, mapterhornPatch, gpxzPatch, hillshadeDataUrl } from '../../services/sourceCompare.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
 const props = defineProps({
+  // (the selection's metres per pixel: how fine the lidar is read for it)
+  metersPerPixel: { type: Number, default: 1 },
   elevationSource: {
     type: String,
     required: true
@@ -261,13 +265,35 @@ const runProbe = () => {
 watch(() => [props.center?.lat, props.center?.lng, props.areaSqKm], runProbe, { immediate: true });
 
 const fmtRes = (m) => (m < 1.5 ? m.toFixed(1) : String(Math.round(m)));
+// How fine the lidar is actually read for this selection: the generator steps
+// down a zoom until the stitched heights fit its memory (services/mapterhorn.js),
+// much sooner in a browser tab than in the desktop app.
+// -> { res (m/px), limited (the size held it back, not the map's own detail) }
+const lidarRead = (desktop) => {
+  const lat = Number(props.center?.lat), lng = Number(props.center?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const box = boxAround({ lat, lng }, props.areaSqKm > 0 ? Math.sqrt(props.areaSqKm) : 1);
+  const mpp = props.metersPerPixel || 1;
+  const z = mapterhornZoomFor(box, mpp, { budget: mapterhornMosaicBudget(desktop) });
+  const zDetail = mapterhornZoomFor(box, mpp, { budget: Infinity });
+  return { res: mapterhornMetersPerPixel(z, lat), limited: z < zDetail };
+};
 const sourceHint = computed(() => {
   const p = probe.value; const src = localElevationSource.value;
   if (!p || !p.reachable || src === 'none') return null;
   const pct = Math.round(p.coverage * 100); const res = p.metersPerPixel ? fmtRes(p.metersPerPixel) : null;
   if (src === 'mapterhorn') {
     if (pct === 0) return { kind: 'warn', text: t('map.hintMhNone') };
-    if (pct >= 100 && res) return { kind: 'info', text: t('map.hintMhFull', { res }) };
+    if (pct >= 100 && res) {
+      // (an area too big to read at the lidar's own detail: say what it gets)
+      const here = lidarRead(!!desktopApp);
+      if (here?.limited && here.res > p.metersPerPixel * 1.25) {
+        const desk = desktopApp ? null : lidarRead(true);
+        const tail = desk && desk.res < here.res * 0.8 ? ` ${t('map.hintMhDesktopFiner', { res: fmtRes(Math.max(desk.res, p.metersPerPixel)) })}` : '';
+        return { kind: 'info', text: t('map.hintMhFullAt', { res, used: fmtRes(here.res) }) + tail };
+      }
+      return { kind: 'info', text: t('map.hintMhFull', { res }) };
+    }
     return { kind: 'info', text: t('map.hintMhPartial', { res: res || '?', pct }) };
   }
   if ((src === 'default' || src === 'gpxz') && pct > 0 && res) return { kind: 'suggest', text: t('map.hintFreeLidar', { res, pct }) };

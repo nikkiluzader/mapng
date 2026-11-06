@@ -20,7 +20,17 @@ const LIDAR_MIN_ZOOM = 13;          // deeper than z12 = a national lidar model
 const MERC_HALF = 20037508.342789244;
 const CHUNK_PX = 4096;              // grid chunk size (the resampler skips a tile's last row/column: chunks overlap)
 const OVERLAP_PX = 2;
-const MAX_MOSAIC_PX = 72e6;         // memory budget for the stitched heights (~290 MB of Float32)
+// memory budget for the stitched heights (Float32): ~290 MB in a browser tab
+// (the 4 GB heap), ~2.5 GB in the desktop app's generator, a full Node process
+// (16 km at 1 m gets z16, ~0.8 m, there instead of z14, ~3.3 m: Fizz_Mechanic's
+// Tignes level, where the hint promised ~0.4 m lidar and the level got 3.3 m)
+const WEB_MOSAIC_PX = 72e6;
+const DESKTOP_MOSAIC_PX = 640e6;
+const inDesktopRunner = () => typeof process !== 'undefined' && !!process.versions?.node && !process.versions.electron;
+/** The stitched-heights budget in pixels: desktop (the app's Node generator) or a browser tab. */
+export const mapterhornMosaicBudget = (desktop = inDesktopRunner()) => (desktop ? DESKTOP_MOSAIC_PX : WEB_MOSAIC_PX);
+/** Ground metres per pixel of a zoom's tiles at a latitude. */
+export const mapterhornMetersPerPixel = (zoom, lat) => (tileSizeM(zoom) / TILE) * Math.cos((lat * Math.PI) / 180);
 const NO_DATA = -99999;
 
 const tileSizeM = (z) => (2 * MERC_HALF) / 2 ** z;
@@ -38,7 +48,7 @@ const tileRange = (b, z) => {
  * The zoom whose pixels are about as fine as the map's (no finer: a 1 m map gains nothing from 0.6 m tiles), within
  * the memory budget. Mercator pixels shrink by cos(lat) on the ground.
  */
-export function mapterhornZoomFor(bounds, metersPerPixel) {
+export function mapterhornZoomFor(bounds, metersPerPixel, { budget = mapterhornMosaicBudget() } = {}) {
   const lat = (bounds.north + bounds.south) / 2;
   const k = Math.cos((lat * Math.PI) / 180);
   // the coarsest zoom whose ground pixels are still no larger than the map's
@@ -46,7 +56,7 @@ export function mapterhornZoomFor(bounds, metersPerPixel) {
   while (z > LIDAR_MIN_ZOOM && (tileSizeM(z - 1) / TILE) * k <= metersPerPixel) z--;
   for (; z > LIDAR_MIN_ZOOM; z--) {
     const r = tileRange(bounds, z);
-    if ((r.x1 - r.x0 + 1) * (r.y1 - r.y0 + 1) * TILE * TILE <= MAX_MOSAIC_PX) break;
+    if ((r.x1 - r.x0 + 1) * (r.y1 - r.y0 + 1) * TILE * TILE <= budget) break;
   }
   return z;
 }

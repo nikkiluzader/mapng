@@ -144,7 +144,9 @@
     "keyZoomCursor": "zoom to the mouse",
     "keyZoomCrosshair": "zoom to the crosshair",
     "keyMenu": "menu",
-    "keyNudge": "nudge the selection"
+    "keyNudge": "nudge the selection",
+    "hintMhFullAt": "Lidar (~{res} m) covers this whole area. For an area this big it's read at ~{used} m.",
+    "hintMhDesktopFiner": "The desktop app reads it at ~{res} m."
   },
   "status": {
     "runConfigCopied": "Run configuration copied to clipboard (GPXZ key masked).",

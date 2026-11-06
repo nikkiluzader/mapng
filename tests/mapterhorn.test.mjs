@@ -70,3 +70,12 @@ test('a missing deep tile at a lidar edge comes from its lidar ancestor, never f
   assert.ok(vals.has(1600) && vals.has(1400), [...vals].join(','));
   assert.ok(!vals.has(1200));
 });
+
+test('the stitched-heights budget: a 16 km area at 1 m gets ~0.8 m lidar on desktop, ~3.3 m in a browser', async () => {
+  const { mapterhornMosaicBudget, mapterhornMetersPerPixel } = await import('../services/mapterhorn.js');
+  const c = { lat: 45.5, lng: 6.94 }; const dLat = 8192 / 111320; const dLng = 8192 / (111320 * Math.cos((c.lat * Math.PI) / 180));
+  const B = { north: c.lat + dLat, south: c.lat - dLat, east: c.lng + dLng, west: c.lng - dLng };
+  assert.equal(mapterhornZoomFor(B, 1, { budget: mapterhornMosaicBudget(true) }), 16);
+  assert.equal(mapterhornZoomFor(B, 1, { budget: mapterhornMosaicBudget(false) }), 14);
+  assert.ok(Math.abs(mapterhornMetersPerPixel(16, c.lat) - 0.84) < 0.02);
+});

@@ -144,7 +144,9 @@
     "keyZoomCursor": "zoom hacia el cursor",
     "keyZoomCrosshair": "zoom hacia la mira",
     "keyMenu": "menú",
-    "keyNudge": "mover la selección"
+    "keyNudge": "mover la selección",
+    "hintMhFullAt": "Lidar (~{res} m) cubre toda la zona. Para una zona tan grande se lee a ~{used} m.",
+    "hintMhDesktopFiner": "La app de escritorio lo lee a ~{res} m."
   },
   "status": {
     "runConfigCopied": "Ajustes copiados al portapapeles (clave GPXZ oculta).",
