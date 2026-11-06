@@ -7495,7 +7495,7 @@ function buildBeamNGExportReport({
     `- Forest placement files: ${forestFiles.length}`,
     `- Forest placements total: ${forestPlacementCount}`,
     ...(forestPlacements?.landCover ? [forestPlacements.landCover.used
-      ? `- Left out by land cover (${forestPlacements.landCover.attribution}): ${forestPlacements.landCover.dropped.wood} trees of mapped woods where it sees no tree cover, ${forestPlacements.landCover.dropped.bush} bushes on rock, snow or water, ${forestPlacements.landCover.dropped.scatter} scattered trees on bare ground`
+      ? `- Left out by land cover (${forestPlacements.landCover.attribution}): ${forestPlacements.landCover.dropped.wood} trees (of mapped woods, or seen as canopy in the imagery) where it sees no tree cover, ${forestPlacements.landCover.dropped.bush} bushes on rock, snow or water, ${forestPlacements.landCover.dropped.scatter} scattered trees on bare ground`
       : '- Land cover (ESA WorldCover): unavailable, trees follow OSM alone'] : []),
     `- Ground cover objects: ${groundCoverObjects.length}`,
     `- OSM DAE written: ${formatBool(!!osmDaeBlob)}`,
@@ -10635,6 +10635,9 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
           const point = { lat: north - gy * cellLat, lng: west + gx * cellLng };
           const [x, y, z] = geoToWorldPoint(point.lat, point.lng, terrainData, squareSize, 0);
           if (inBuildingOrWater(x, y) || nearMapped(x, y)) return;
+          // (the satellite's 'canopy' is often shadow or dark grass on a steep
+          // mountainside: only where the land cover sees trees too)
+          if (!coverKeeps({ pos: [x, y] }, 'wood', `canopy:${pi}:${k}:wc`)) return;
           const choice = pickTree({ kind: 'tree', tags: {}, point, urban, area: count > 1, seed: `canopy:${pi}:${k}`, elevation: z + baseZ });
           if (!choice) return;
           const placement = makeForestPlacement(choice.type, point, terrainData, squareSize, seed + k, 1, 1);
