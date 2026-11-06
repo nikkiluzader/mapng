@@ -6,6 +6,7 @@
             class="w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-1 text-xs text-gray-900 dark:text-white focus:ring-1 focus:ring-brand outline-none cursor-pointer"
         >
             <option value="default">{{ t('map.standard30m') }}</option>
+            <option value="mapterhorn">{{ t('map.mapterhornFree') }}</option>
             <option value="none">{{ t('map.flatNone') }}</option>
             <option value="kron86" :disabled="!coverage.kron86 && localElevationSource !== 'kron86'">
               {{ t('map.kron86Poland') }}{{ coverage.kron86 ? '' : ` — ${t('map.outsideCoverage')}` }}
@@ -20,9 +21,27 @@
           <AlertTriangle :size="11" class="inline -mt-0.5 mr-0.5" />{{ t('map.selectedSourceOutsideCoverage') }}
         </p>
 
+        <!-- What free lidar holds here (Mapterhorn), measured over the selection when it settles -->
+        <div v-if="sourceHint" data-testid="source-hint"
+          :class="['rounded border px-2 py-1.5 text-micro leading-tight flex items-start gap-1.5',
+            sourceHint.kind === 'suggest' ? 'border-brand/40 bg-brand/5 text-gray-700 dark:text-gray-200'
+            : sourceHint.kind === 'warn' ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+            : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300']">
+          <Sparkles v-if="sourceHint.kind === 'suggest'" :size="12" class="text-brand shrink-0 mt-px" />
+          <span class="flex-1">{{ sourceHint.text }}</span>
+          <button v-if="sourceHint.kind === 'suggest'" type="button" @click="localElevationSource = 'mapterhorn'"
+            class="shrink-0 font-bold text-brand hover:underline">{{ t('map.hintUseFreeLidar') }}</button>
+        </div>
+        <p v-else-if="probing" class="text-micro text-gray-400 leading-tight">{{ t('map.hintChecking') }}</p>
+
         <!-- Default -->
         <span v-if="localElevationSource === 'default'" class="block text-micro text-gray-500 dark:text-gray-400 leading-tight">
             {{ t('map.standardDescription') }}
+        </span>
+
+        <!-- Mapterhorn -->
+        <span v-else-if="localElevationSource === 'mapterhorn'" class="block text-micro text-gray-500 dark:text-gray-400 leading-tight">
+            {{ t('map.mapterhornDescription') }} <a href="https://mapterhorn.com/coverage" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('map.checkCoverage') }}</a>
         </span>
 
         <!-- None / Flat -->
@@ -49,6 +68,10 @@
                 <span class="block text-micro text-gray-500 dark:text-gray-400 leading-tight">
                     {{ t('map.gpxzDescription') }} <a href="https://www.gpxz.io/docs/dataset#coverage" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('map.checkCoverage') }}</a>
                 </span>
+                <p v-if="localGpxzApiKey" class="text-micro leading-tight mt-1">
+                  <button type="button" class="text-brand hover:underline disabled:opacity-50" :disabled="gpxzProbe === 'loading'" @click="checkGpxzHere">{{ t('map.gpxzCheckHere') }}</button>
+                  <span v-if="gpxzProbe && gpxzProbe !== 'loading'" class="text-gray-600 dark:text-gray-300"> · {{ gpxzProbe }}</span>
+                </p>
 
                 <div class="mt-2 animate-in fade-in slide-in-from-top-1">
                     <input
@@ -103,7 +126,8 @@
 import SettingSection from '../base/SettingSection.vue';
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Mountain, ChevronDown, AlertTriangle } from 'lucide-vue-next';
+import { Mountain, ChevronDown, AlertTriangle, Sparkles } from 'lucide-vue-next';
+import { boxAround, probeMapterhorn, probeGpxz } from '../../services/sourceAdvisor.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -191,6 +215,57 @@ watch(() => props.elevationSource, (newVal) => {
 watch(localGpxzApiKey, (newVal) => {
   emit('update:gpxzApiKey', newVal);
 });
+
+// ── Free lidar here? (Mapterhorn over the selection box, once the map settles) ──
+const probe = ref(null);          // { coverage, zoom, metersPerPixel, reachable }
+const probing = ref(false);
+let probeTimer = null; let probeAbort = null;
+const selectionBox = () => {
+  const lat = Number(props.center?.lat), lng = Number(props.center?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const side = props.areaSqKm > 0 ? Math.sqrt(props.areaSqKm) : 1;
+  return boxAround({ lat, lng }, Math.min(side, 20));
+};
+const runProbe = () => {
+  clearTimeout(probeTimer);
+  probeTimer = setTimeout(async () => {
+    const box = selectionBox(); if (!box) return;
+    probeAbort?.abort(); probeAbort = new AbortController();
+    probing.value = true;
+    try { probe.value = await probeMapterhorn(box, { signal: probeAbort.signal }); }
+    catch { /* aborted by a newer selection */ }
+    finally { probing.value = false; }
+  }, 700);
+};
+watch(() => [props.center?.lat, props.center?.lng, props.areaSqKm], runProbe, { immediate: true });
+
+const fmtRes = (m) => (m < 1.5 ? m.toFixed(1) : String(Math.round(m)));
+const sourceHint = computed(() => {
+  const p = probe.value; const src = localElevationSource.value;
+  if (!p || !p.reachable || src === 'none') return null;
+  const pct = Math.round(p.coverage * 100); const res = p.metersPerPixel ? fmtRes(p.metersPerPixel) : null;
+  if (src === 'mapterhorn') {
+    if (pct === 0) return { kind: 'warn', text: t('map.hintMhNone') };
+    if (pct >= 100 && res) return { kind: 'info', text: t('map.hintMhFull', { res }) };
+    return { kind: 'info', text: t('map.hintMhPartial', { res: res || '?', pct }) };
+  }
+  if ((src === 'default' || src === 'gpxz') && pct > 0 && res) return { kind: 'suggest', text: t('map.hintFreeLidar', { res, pct }) };
+  return null;
+});
+
+// GPXZ at the selection, on request only (one call of the user's plan)
+const gpxzProbe = ref(null);
+const checkGpxzHere = async () => {
+  const box = selectionBox(); if (!box || !localGpxzApiKey.value) return;
+  gpxzProbe.value = 'loading';
+  try {
+    const pts = await probeGpxz(box, localGpxzApiKey.value);
+    const best = Math.min(...pts.map((p) => p.resolution).filter(Number.isFinite));
+    const names = [...new Set(pts.map((p) => p.source).filter((n) => n && !/bathymetry/.test(n)))].join(', ');
+    gpxzProbe.value = t('map.gpxzHere', { res: fmtRes(best), sources: names });
+  } catch (e) { gpxzProbe.value = t('map.gpxzHereFailed'); }
+};
+watch(() => [props.center?.lat, props.center?.lng], () => { if (gpxzProbe.value !== 'loading') gpxzProbe.value = null; });
 
 watch(() => props.gpxzApiKey, (newVal) => {
   localGpxzApiKey.value = newVal;

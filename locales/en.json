@@ -59,7 +59,18 @@
     "noLocationsFound": "No locations found for \"{query}\"",
     "elevationDataSource": "Elevation data source",
     "standard30m": "Standard (30m global)",
+    "mapterhornFree": "Mapterhorn (free lidar)",
     "standardDescription": "Amazon Terrarium (SRTM). Reliable global coverage. Good for general terrain.",
+    "mapterhornDescription": "Free lidar where a national survey exists (much of Europe, Japan, Australia, New Zealand, parts of the US and Canada); Standard 30 m everywhere else. No key needed.",
+    "hintFreeLidar": "Free lidar (~{res} m) covers {pct}% of this area.",
+    "hintUseFreeLidar": "Use it",
+    "hintMhFull": "Lidar (~{res} m) covers this whole area.",
+    "hintMhPartial": "Lidar (~{res} m) covers {pct}% of this area; Standard 30 m fills the rest.",
+    "hintMhNone": "No free lidar here: Standard 30 m will be used.",
+    "hintChecking": "Checking for free lidar here…",
+    "gpxzCheckHere": "Check GPXZ here (uses 1 call)",
+    "gpxzHere": "best {res} m ({sources})",
+    "gpxzHereFailed": "couldn't check",
     "flatNone": "None (flat)",
     "flatNoneDescription": "Perfectly flat terrain — skips elevation entirely. Use with OSM for roads, buildings, and trees on level ground.",
     "usgs1m": "USGS 1m DEM (USA only)",
@@ -624,6 +635,7 @@
     "elevationTitle": "Elevation Sources",
     "elevationItems": [
       "Standard 30 m global (AWS Terrarium / SRTM), with roads smoothed and levelled, and rivers kept below their banks, automatically",
+      "Mapterhorn: free lidar where a national survey exists (much of Europe, Japan, Australia, New Zealand, parts of the US and Canada), Standard 30 m elsewhere; no key needed",
       "USGS 1 m DEM (USA: CONUS, Alaska, Hawaii)",
       "NMT EVRF2007 (Poland, high-resolution GUGiK tiles)",
       "GPXZ (global high resolution, with your own API key; faster on paid plans)",
@@ -817,6 +829,10 @@
         {
           "name": "AWS Terrain Tiles",
           "desc": "Global 30m SRTM elevation (Terrarium encoding at Z15)"
+        },
+        {
+          "name": "Mapterhorn",
+          "desc": "Free terrain tiles from 155 open national and global elevation sources (Terrarium WebP, up to z17)"
         },
         {
           "name": "USGS National Map",
@@ -1119,6 +1135,7 @@
     "areaValue": "{px} px at {mpp} m/px ({km} km across)",
     "elevation": "Elevation",
     "source_default": "Standard 30 m",
+    "source_mapterhorn": "Mapterhorn (free lidar)",
     "source_none": "Flat",
     "source_kron86": "NMT EVRF2007 (Poland)",
     "source_usgs": "USGS 1 m",

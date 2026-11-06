@@ -138,6 +138,7 @@ This helps keep community resource hubs focused on curated, polished releases wh
 | Source | Purpose |
 |---|---|
 | AWS Terrarium / SRTM | Standard global elevation |
+| Mapterhorn | Free lidar where a national survey exists (open-data sources, mapterhorn.com/attribution), Standard 30 m elsewhere |
 | USGS TNM Access API | 1 m US elevation where available |
 | GUGiK NMT EVRF2007 (Poland) | High-resolution Poland elevation tiles |
 | GPXZ | Optional higher-resolution elevation, with your own API key |

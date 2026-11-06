@@ -59,7 +59,18 @@
     "noLocationsFound": "Nessuna posizione trovata per \"{query}\"",
     "elevationDataSource": "Fonte dati di altitudine",
     "standard30m": "Standard (30m globale)",
+    "mapterhornFree": "Mapterhorn (lidar gratuito)",
     "standardDescription": "Amazon Terrarium (SRTM). Copertura globale affidabile. Buono per terreni generici.",
+    "mapterhornDescription": "Lidar gratuito dove esiste un rilievo nazionale (gran parte dell'Europa, Giappone, Australia, Nuova Zelanda, parte di Stati Uniti e Canada); altrove Standard 30 m. Nessuna chiave richiesta.",
+    "hintFreeLidar": "Un lidar gratuito (~{res} m) copre il {pct}% di quest'area.",
+    "hintUseFreeLidar": "Usalo",
+    "hintMhFull": "Il lidar (~{res} m) copre tutta l'area.",
+    "hintMhPartial": "Il lidar (~{res} m) copre il {pct}% dell'area; Standard 30 m completa il resto.",
+    "hintMhNone": "Qui non c'è lidar gratuito: verrà usato Standard 30 m.",
+    "hintChecking": "Ricerca di lidar gratuito qui…",
+    "gpxzCheckHere": "Controlla GPXZ qui (usa 1 richiesta)",
+    "gpxzHere": "migliore {res} m ({sources})",
+    "gpxzHereFailed": "controllo non riuscito",
     "flatNone": "Nessuna (piatto)",
     "flatNoneDescription": "Terreno perfettamente piatto — salta del tutto l'altitudine. Usalo con OSM per avere strade, edifici e alberi su terreno pianeggiante.",
     "usgs1m": "USGS 1m DEM (solo USA)",
@@ -624,6 +635,7 @@
     "elevationTitle": "Fonti di altitudine",
     "elevationItems": [
       "Standard 30 m globale (AWS Terrarium / SRTM), con strade levigate e livellate e fiumi sotto le loro sponde, automaticamente",
+      "Mapterhorn: lidar gratuito dove esiste un rilievo nazionale (gran parte dell'Europa, Giappone, Australia, Nuova Zelanda, parte di Stati Uniti e Canada), altrove Standard 30 m; nessuna chiave richiesta",
       "DEM USGS 1 m (USA: CONUS, Alaska, Hawaii)",
       "NMT EVRF2007 (Polonia, tessere GUGiK ad alta risoluzione)",
       "GPXZ (alta risoluzione globale, con la tua chiave API; più veloce con i piani a pagamento)",
@@ -817,6 +829,10 @@
         {
           "name": "AWS Terrain Tiles",
           "desc": "Altitudine SRTM globale a 30m (codifica Terrarium a Z15)"
+        },
+        {
+          "name": "Mapterhorn",
+          "desc": "Tile del terreno gratuite da 155 fonti altimetriche aperte, nazionali e globali (Terrarium WebP, fino a z17)"
         },
         {
           "name": "USGS National Map",
@@ -1119,6 +1135,7 @@
     "areaValue": "{px} px a {mpp} m/px ({km} km di lato)",
     "elevation": "Altitudine",
     "source_default": "Standard 30 m",
+    "source_mapterhorn": "Mapterhorn (lidar gratuito)",
     "source_none": "Piatto",
     "source_kron86": "NMT EVRF2007 (Polonia)",
     "source_usgs": "USGS 1 m",

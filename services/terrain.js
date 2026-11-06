@@ -19,6 +19,7 @@ import {
 } from "./resamplerClient.js";
 import { createLocalToWGS84 } from "./geoUtils.js";
 import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
+import { fetchMapterhornRaw } from "./mapterhorn.js";
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
 import { roundRoadCorners } from "./roadCurves.js";
@@ -1853,6 +1854,8 @@ export const fetchTerrainData = async (
     targetBounds = null,
     flat = false,
     raw = false,
+    // free Mapterhorn lidar where it exists (elevation source "mapterhorn")
+    useMapterhorn = false,
   } = generationOptions || {};
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
@@ -1911,6 +1914,30 @@ export const fetchTerrainData = async (
           source: "gpxz",
         };
       }
+    }
+  }
+
+  // Mapterhorn: free lidar tiles where a national model exists (deeper than z12); the standard 30 m fills the rest.
+  let mapterhornInfo = null;
+  if (!rawData && useMapterhorn && !flat) {
+    try {
+      const mh = await fetchMapterhornRaw(fetchBounds, { metersPerPixel: effectiveMetersPerPixel, onProgress, signal });
+      if (mh?.tiles?.length) {
+        rawData = { tiles: mh.tiles };
+        rawDataSourceType = 'grid';
+        mapterhornInfo = { zoom: mh.zoom, lidarFraction: mh.lidarFraction, metersPerPixel: mh.metersPerPixel };
+        // (coarse national models, e.g. the US 10 m layer at z13-z14: smoothed like GPXZ's coarse datasets)
+        shouldSmooth = mh.metersPerPixel > 4;
+        console.info(`[Mapterhorn] z${mh.zoom} (~${mh.metersPerPixel.toFixed(1)} m), lidar on ${Math.round(mh.lidarFraction * 100)}% of ${mh.tilesFetched} tiles.`);
+      } else {
+        mapterhornInfo = { zoom: 12, lidarFraction: 0, fallbackReason: 'no_lidar' };
+        onProgress?.('Mapterhorn has no lidar here. Using the standard 30 m elevation...');
+      }
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      console.warn('[Mapterhorn] Request failed, falling back to the standard 30 m:', error);
+      mapterhornInfo = { fallbackReason: 'request_failed' };
+      onProgress?.('Mapterhorn did not answer. Using the standard 30 m elevation...');
     }
   }
 
@@ -2360,6 +2387,7 @@ export const fetchTerrainData = async (
     usgsFallback,
     kron86Fallback,
     kron86FallbackReason,
+    mapterhornInfo,
     sourceGeoTiffs,
     processingMetersPerPixel: effectiveMetersPerPixel,
     flat,

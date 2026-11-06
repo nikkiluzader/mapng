@@ -1506,6 +1506,7 @@ async function computeBatchElevationNormalization(state, scheduleFetch, onProgre
         generateSegmentedHybridAsset: false,
         globalTileConcurrency: Number(state.scheduler?.globalTileConcurrency || 20),
         processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
+        useMapterhorn: state.elevationSource === 'mapterhorn',
       },
     ));
 
@@ -1620,6 +1621,7 @@ async function processTile(state, tile, ctx, signal) {
             generateGameTextureAsset: needsGameTexture,
             globalTileConcurrency: Number(state.scheduler?.globalTileConcurrency || 20),
             processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
+            useMapterhorn: state.elevationSource === 'mapterhorn',
             flat: state.elevationSource === 'none',
           },
         );

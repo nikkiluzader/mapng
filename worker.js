@@ -33,6 +33,8 @@ import {
 import { handleHotspots, handleUsage } from './hotspotsObject.js';
 import { handleCrashReports } from './crashReports.js';
 import { handleShareCodes } from './shareCodes.js';
+import { handleMapterhornTiles } from './mapterhornCache.js';
+import { LATEST_UPDATE } from './updates.js';
 
 export { ExportHotspots } from './hotspotsObject.js';
 
@@ -193,9 +195,6 @@ const EXPOSED_HEADERS = [
   'content-type',
 ].join(', ');
 
-// The newest update page (public/updates/<version>/): /updates/latest and
-// /updates point at it. Bump with each update page.
-export const LATEST_UPDATE = '0.2.5';
 
 export default {
   async fetch(request, env, ctx) {
@@ -227,6 +226,10 @@ export default {
 
     if (url.pathname.startsWith(OSM_TILES_PREFIX)) {
       return handleOsmTiles(request, url, env, ctx);
+    }
+
+    if (url.pathname.startsWith('/api/mapterhorn/')) {
+      return handleMapterhornTiles(request, env, ctx, url);
     }
 
     const proxySimple = async (origin, stripPrefix) => {

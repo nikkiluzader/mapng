@@ -772,7 +772,7 @@ const applyRunConfiguration = (config) => {
   }
 
   const explicitSource = typeof src.elevationSource === 'string' ? src.elevationSource.toLowerCase() : null;
-  if (explicitSource && ['default', 'none', 'usgs', 'gpxz', 'kron86'].includes(explicitSource)) {
+  if (explicitSource && ['default', 'mapterhorn', 'none', 'usgs', 'gpxz', 'kron86'].includes(explicitSource)) {
     elevationSource.value = explicitSource;
   } else {
     // Legacy fallback for shared configs that only include useUSGS/useGPXZ booleans.

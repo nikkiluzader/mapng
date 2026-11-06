@@ -895,6 +895,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         processingMetersPerPixel: Number(processingMpp || 1),
         flat: useFlat,
         raw,
+        useMapterhorn: normalizedSource === 'mapterhorn',
       };
       // (the desktop app fetches and processes in a Node process: no 4 GB
       // window limit; the website does it here)

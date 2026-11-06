@@ -10,7 +10,7 @@ const ON_OFF = ['on', 'off'];
 /** Every setting that can be counted, and the values it can have. */
 export const USAGE_FIELDS = {
   platform: ['web', 'desktop'],
-  elevationSource: ['default', 'none', 'kron86', 'usgs', 'gpxz', 'upload'],
+  elevationSource: ['default', 'mapterhorn', 'none', 'kron86', 'usgs', 'gpxz', 'upload'],
   resolution: ['512', '1024', '2048', '4096', '8192', '16384', 'other'],
   metersPerPixel: ['under1', '1', '1to2', '2to4', 'over4'],
   mapData: ON_OFF,

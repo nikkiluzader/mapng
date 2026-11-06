@@ -59,7 +59,18 @@
     "noLocationsFound": "Nie znaleziono lokalizacji dla „{query}”",
     "elevationDataSource": "Źródło danych wysokościowych",
     "standard30m": "Standardowa (30m globalnie)",
+    "mapterhornFree": "Mapterhorn (darmowy lidar)",
     "standardDescription": "Amazon Terrarium (SRTM). Niezawodne pokrycie globalne. Dobre do ogólnego terenu.",
+    "mapterhornDescription": "Darmowy lidar tam, gdzie istnieje krajowy pomiar (duża część Europy, Japonia, Australia, Nowa Zelandia, części USA i Kanady); w pozostałych miejscach Standardowa 30 m. Klucz nie jest potrzebny.",
+    "hintFreeLidar": "Darmowy lidar (~{res} m) pokrywa {pct}% tego obszaru.",
+    "hintUseFreeLidar": "Użyj",
+    "hintMhFull": "Lidar (~{res} m) pokrywa cały obszar.",
+    "hintMhPartial": "Lidar (~{res} m) pokrywa {pct}% obszaru; resztę uzupełnia Standardowa 30 m.",
+    "hintMhNone": "Brak darmowego lidaru w tym miejscu: zostanie użyta Standardowa 30 m.",
+    "hintChecking": "Szukam darmowego lidaru w tym miejscu…",
+    "gpxzCheckHere": "Sprawdź GPXZ tutaj (1 zapytanie)",
+    "gpxzHere": "najlepsza {res} m ({sources})",
+    "gpxzHereFailed": "nie udało się sprawdzić",
     "flatNone": "Brak (płaski)",
     "flatNoneDescription": "Idealnie płaski teren — bez danych wysokościowych. Użyj z OSM, aby mieć drogi, budynki i drzewa na równym terenie.",
     "usgs1m": "USGS 1m DEM (tylko USA)",
@@ -624,6 +635,7 @@
     "elevationTitle": "Źródła wysokości",
     "elevationItems": [
       "Standard 30 m globalny (AWS Terrarium / SRTM), z drogami automatycznie wygładzanymi i wyrównywanymi oraz rzekami poniżej brzegów",
+      "Mapterhorn: darmowy lidar tam, gdzie istnieje krajowy pomiar (duża część Europy, Japonia, Australia, Nowa Zelandia, części USA i Kanady), w pozostałych miejscach Standardowa 30 m; bez klucza",
       "USGS 1 m DEM (USA: CONUS, Alaska, Hawaje)",
       "NMT EVRF2007 (Polska, kafelki GUGiK wysokiej rozdzielczości)",
       "GPXZ (globalna wysoka rozdzielczość, z własnym kluczem API; szybciej w planach płatnych)",
@@ -817,6 +829,10 @@
         {
           "name": "Kafelki terenu AWS",
           "desc": "Globalne wysokości SRTM 30m (kodowanie Terrarium na Z15)"
+        },
+        {
+          "name": "Mapterhorn",
+          "desc": "Darmowe kafle terenu z 155 otwartych krajowych i globalnych źródeł wysokości (Terrarium WebP, do z17)"
         },
         {
           "name": "USGS National Map",
@@ -1119,6 +1135,7 @@
     "areaValue": "{px} px przy {mpp} m/px ({km} km szerokości)",
     "elevation": "Wysokości",
     "source_default": "Standard 30 m",
+    "source_mapterhorn": "Mapterhorn (darmowy lidar)",
     "source_none": "Płaski",
     "source_kron86": "NMT EVRF2007 (Polska)",
     "source_usgs": "USGS 1 m",
