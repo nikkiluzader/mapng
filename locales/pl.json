@@ -479,7 +479,12 @@
       "backdropHint_off": "Brak terenu poza krawędziami mapy",
       "backdropHint_global30m": "Globalny teren 30 m wokół mapy",
       "backdropHint_usgs1m": "Teren USGS 1 m wokół mapy, gdzie dostępny",
-      "backdropHint_gpxz": "Teren GPXZ wokół mapy (używa Twojego klucza GPXZ)"
+      "backdropHint_gpxz": "Teren GPXZ wokół mapy (używa Twojego klucza GPXZ)",
+      "terrainSummary_ready": "Teren: Gotowy do jazdy. Wykonywane są wszystkie poprawki.",
+      "terrainSummary_custom": "Teren: Własne. Tylko wybrane poprawki.",
+      "terrainSummary_untouched": "Teren: Nietknięty. Wysokości dokładnie tak, jak pobrane.",
+      "terrainChangeHere": "Zmień w sekcji Teren, w części o wysokościach powyżej.",
+      "terrainRegenerate": "Wybór terenu zmienił się od wygenerowania: wygeneruj dane ponownie, aby go zastosować."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -1253,5 +1258,19 @@
       "nature": "Sadzenie roślin",
       "package": "Pakowanie poziomu"
     }
+  },
+  "terrainChoice": {
+    "title": "Teren",
+    "subtitle": "jak mocno MapNG kształtuje wysokości",
+    "recommended": "Zalecane",
+    "ready": "Gotowy do jazdy",
+    "readyHint30": "Globalne 30 m: budynki i drzewa usunięte z gruntu, rzeki i drogi wyrównane, drobne detale gruntu i ostre klify. Lidar i GPXZ: drogi dopasowane, nic więcej.",
+    "readyHintFine": "Drogi dopasowane do Twoich wysokości i wyrównane przy mostach, tunelach i chodnikach. Tam, gdzie uzupełnia globalne 30 m, również usunięte budynki i drzewa, wyrównane rzeki i drogi, drobne detale i klify.",
+    "custom": "Własne",
+    "customHint": "To samo, a Ty wybierasz, jakie poprawki robi eksport poziomu.",
+    "untouched": "Nietknięty",
+    "untouchedHint": "Wysokości dokładnie tak, jak pobrane: żadnych poprawek.",
+    "untouchedWarn": "Przy globalnym 30 m budynki i drzewa zostają jako garby w gruncie, a drogi idą po każdym wyboju.",
+    "basicNote": "Teren: Gotowy do jazdy (budynki i drzewa usunięte z danych 30 m, drogi wyrównane). Zmienisz to w trybie Zaawansowanym."
   }
 }

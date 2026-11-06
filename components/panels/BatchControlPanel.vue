@@ -155,7 +155,13 @@
       :totalTiles="totalTiles"
       :center="center"
       @verifyGpxzKey="checkGPXZStatus"
-    />
+    >
+      <!-- Terrain: the same choice as a single tile (advanced; basic is always Ready to drive) -->
+      <p v-if="!store.advancedMode" class="text-caption leading-snug text-gray-500 dark:text-gray-400 px-1">{{ t('terrainChoice.basicNote') }}</p>
+      <SettingCard v-else>
+        <TerrainChoice :elevation-source="elevationSource" />
+      </SettingCard>
+    </ElevationSourceSelector>
 
     <SettingSection :title="t('controlPanel.ui.mapData')" :icon="Trees" storage-key="mapng_ui_sec_mapdata">
       <SettingCard>
@@ -266,6 +272,9 @@ import SegmentedControl from '../base/SegmentedControl.vue';
 import SettingSection from '../base/SettingSection.vue';
 import { ref, computed, watch, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { useMainStore } from '../../stores/mainStore';
+import TerrainChoice from '../ui/TerrainChoice.vue';
+import { terrainMode, terrainShapingOptions } from '../../composables/useTerrainMode.js';
 import { Grid3X3, Box, Trees, Mountain, MapPin, ChevronDown, Play, RotateCcw, X, AlertTriangle, PackageOpen, Info } from 'lucide-vue-next';
 import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
@@ -282,6 +291,7 @@ import { cloneRateLimitInfo, downloadJsonFile } from '../../services/traceabilit
 
 const { t } = useI18n({ useScope: 'global' });
 const isDesktop = !!desktopApp;
+const store = useMainStore();
 
 const props = defineProps({
   center: { type: Object, required: true },
@@ -522,7 +532,7 @@ const snapToValidSquareGrid = () => {
 
 watch(combinedLevel, (on) => {
   if (on) snapToValidSquareGrid();
-});
+}, { immediate: true });   // (also when the panel opens already in combined mode: a 3×3 grid from separate tiles stayed, and built a 3072² level)
 // Re-validate when resolution changes while in combined mode (cap depends on it).
 watch(() => props.resolution, () => {
   if (combinedLevel.value) snapToValidSquareGrid();
@@ -662,6 +672,9 @@ const handleStart = () => {
     exports: normalizeExports(exports.value),
     combinedLevel: combinedLevel.value,
     levelOptions: combinedLevel.value ? normalizeLevelOptions(levelOptions.value) : null,
+    // the Terrain choice: Untouched generates raw; the combined level's export edits follow it
+    rawTerrain: store.advancedMode && terrainMode.value === 'untouched',
+    shaping: terrainShapingOptions(store.advancedMode),
   });
 };
 

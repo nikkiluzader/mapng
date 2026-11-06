@@ -174,15 +174,10 @@
         :meta="uploadedElevationMeta"
         :vertical-unit-override="elevationUnitOverride"
       />
-        <!-- Raw terrain (advanced): skip the road/terrain smoothing at Generate Data -->
-        <SettingCard v-if="store.advancedMode">
-          <SettingRow
-            check
-            :model-value="store.rawTerrain"
-            @update:model-value="store.setRawTerrain"
-            :label="t('controlPanel.rawTerrain')"
-            :hint="t(store.rawTerrain ? 'controlPanel.rawTerrainOn' : 'controlPanel.rawTerrainOff')"
-          />
+        <!-- Terrain: how much MapNG shapes the elevation (advanced; basic is always Ready to drive) -->
+        <p v-if="!store.advancedMode" class="text-caption leading-snug text-gray-500 dark:text-gray-400 px-1">{{ t('terrainChoice.basicNote') }}</p>
+        <SettingCard v-else>
+          <TerrainChoice :elevation-source="elevationSource" :upload="!!uploadedElevationFile && (!Array.isArray(uploadedElevationFile) || uploadedElevationFile.length > 0)" />
         </SettingCard>
       </ElevationSourceSelector>
 
@@ -339,6 +334,8 @@ import { withoutPersonal } from '../../services/personalKeys.js';
 import { setSessionConfigSource } from '../../composables/useReportDialog.js';
 import { getMaxSquareCropResolution, scaleNativeDimsToProcessingMpp } from '../../services/uploadBounds';
 import { normalizeGapFillSource } from '../../services/gapFillSources.js';
+import TerrainChoice from '../ui/TerrainChoice.vue';
+import { reloadTerrainSettings } from '../../composables/useTerrainMode.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -655,6 +652,8 @@ const applyPendingConfig = () => {
     if (typeof config.elevationUnitOverride === 'string' && config.elevationUnitOverride) elevationUnitOverride.value = config.elevationUnitOverride;
     if (typeof config.overtureBuildings === 'boolean') overtureBuildings.value = config.overtureBuildings;
     if (applyStoredSettings(config, localStorage)) {
+      // (the code's terrain edits went into the old keys: the Terrain choice reads them back)
+      reloadTerrainSettings();
       if (config.export.baseTexture) setBaseTexture(config.export.baseTexture);
       exportPanelKey.value += 1;
     }

@@ -479,7 +479,12 @@
       "backdropHint_off": "Sin terreno más allá de los bordes del mapa",
       "backdropHint_global30m": "Terreno global de 30 m alrededor del mapa",
       "backdropHint_usgs1m": "Terreno USGS de 1 m alrededor del mapa, donde exista",
-      "backdropHint_gpxz": "Terreno GPXZ alrededor del mapa (usa tu clave GPXZ)"
+      "backdropHint_gpxz": "Terreno GPXZ alrededor del mapa (usa tu clave GPXZ)",
+      "terrainSummary_ready": "Terreno: Listo para conducir. Se hacen todos los ajustes.",
+      "terrainSummary_custom": "Terreno: Personalizado. Solo se hacen los ajustes que elegiste.",
+      "terrainSummary_untouched": "Terreno: Sin tocar. La elevación se usa tal como se descargó.",
+      "terrainChangeHere": "Cámbialo en Terreno, en la sección de elevación de arriba.",
+      "terrainRegenerate": "La opción de Terreno cambió desde que se generó: vuelve a generar los datos para aplicarla."
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",
@@ -1253,5 +1258,19 @@
       "nature": "Plantando naturaleza",
       "package": "Empaquetando el nivel"
     }
+  },
+  "terrainChoice": {
+    "title": "Terreno",
+    "subtitle": "cuánto modela MapNG la elevación",
+    "recommended": "Recomendado",
+    "ready": "Listo para conducir",
+    "readyHint30": "30 m global: edificios y árboles quitados del suelo, ríos y carreteras nivelados, detalle fino del suelo y acantilados nítidos. Lidar y GPXZ: carreteras alineadas, nada más.",
+    "readyHintFine": "Carreteras alineadas con tu elevación y niveladas en puentes, túneles y aceras. Donde rellena el 30 m global, también se quitan edificios y árboles, se nivelan ríos y carreteras y se añaden detalle fino y acantilados.",
+    "custom": "Personalizado",
+    "customHint": "Lo mismo, y tú eliges qué ajustes hace la exportación del nivel.",
+    "untouched": "Sin tocar",
+    "untouchedHint": "La elevación tal como se descargó: ningún ajuste.",
+    "untouchedWarn": "Con el 30 m global, edificios y árboles quedan como bultos en el suelo y las carreteras siguen cada bache.",
+    "basicNote": "Terreno: Listo para conducir (edificios y árboles quitados de los datos de 30 m, carreteras niveladas). Cámbialo en Avanzado."
   }
 }

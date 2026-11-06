@@ -479,7 +479,12 @@
       "backdropHint_off": "Pas de terrain au-delà des bords de la carte",
       "backdropHint_global30m": "Terrain mondial à 30 m autour de la carte",
       "backdropHint_usgs1m": "Terrain USGS à 1 m autour de la carte, si disponible",
-      "backdropHint_gpxz": "Terrain GPXZ autour de la carte (utilise votre clé GPXZ)"
+      "backdropHint_gpxz": "Terrain GPXZ autour de la carte (utilise votre clé GPXZ)",
+      "terrainSummary_ready": "Terrain : Prêt à rouler. Toutes les retouches sont faites.",
+      "terrainSummary_custom": "Terrain : Personnalisé. Seules les retouches choisies sont faites.",
+      "terrainSummary_untouched": "Terrain : Intact. L'altitude est utilisée telle que téléchargée.",
+      "terrainChangeHere": "À changer sous Terrain, dans la section altitude ci-dessus.",
+      "terrainRegenerate": "Le choix de Terrain a changé depuis la génération : générez les données à nouveau pour l'appliquer."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -1253,5 +1258,19 @@
       "nature": "Plantation de la nature",
       "package": "Emballage du niveau"
     }
+  },
+  "terrainChoice": {
+    "title": "Terrain",
+    "subtitle": "à quel point MapNG façonne l'altitude",
+    "recommended": "Recommandé",
+    "ready": "Prêt à rouler",
+    "readyHint30": "30 m global : bâtiments et arbres retirés du sol, rivières et routes nivelées, détail fin du sol et falaises nettes. Lidar et GPXZ : routes alignées, rien d'autre.",
+    "readyHintFine": "Routes alignées sur votre altitude et nivelées aux ponts, tunnels et trottoirs. Là où le 30 m global complète, il a aussi bâtiments et arbres retirés, rivières et routes nivelées, détail fin et falaises.",
+    "custom": "Personnalisé",
+    "customHint": "La même chose, et vous choisissez les retouches faites à l'export du niveau.",
+    "untouched": "Intact",
+    "untouchedHint": "L'altitude telle que téléchargée : aucune retouche.",
+    "untouchedWarn": "Avec le 30 m global, bâtiments et arbres restent des bosses dans le sol et les routes suivent chaque relief.",
+    "basicNote": "Terrain : Prêt à rouler (bâtiments et arbres retirés des données 30 m, routes nivelées). À changer en mode Avancé."
   }
 }

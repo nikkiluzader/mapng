@@ -4,6 +4,7 @@
 // generated again the export panel shows exactly what the level was made
 // with, ready to change. Keys: components/panels/ExportPanel.vue.
 import { setBaseTexture } from '../composables/useBaseTexture.js';
+import { reloadTerrainSettings } from '../composables/useTerrainMode.js';
 
 export const PENDING_LEVEL_NAME_KEY = 'mapng_pendingLevelName';
 
@@ -46,6 +47,8 @@ export function applyExportSettings(options = {}, levelName = '') {
   for (const [key, value] of Object.entries(exportSettingsFor(options))) {
     try { localStorage.setItem(key, value); } catch { /* private mode */ }
   }
+  // (the level's terrain edits: the Terrain choice reads them back)
+  reloadTerrainSettings();
   // (a touched-up texture isn't kept with the level: its source look instead)
   const base = options.baseTexture === 'painted' ? 'hybrid' : options.baseTexture;
   if (base) setBaseTexture(base);

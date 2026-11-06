@@ -479,7 +479,12 @@
       "backdropHint_off": "No terrain beyond the map's edges",
       "backdropHint_global30m": "Global 30 m terrain around the map",
       "backdropHint_usgs1m": "USGS 1 m terrain around the map, where available",
-      "backdropHint_gpxz": "GPXZ terrain around the map (uses your GPXZ key)"
+      "backdropHint_gpxz": "GPXZ terrain around the map (uses your GPXZ key)",
+      "terrainSummary_ready": "Terrain: Ready to drive. Every edit is made.",
+      "terrainSummary_custom": "Terrain: Custom. Only the edits you picked are made.",
+      "terrainSummary_untouched": "Terrain: Untouched. The elevation is used exactly as downloaded.",
+      "terrainChangeHere": "Change it under Terrain, in the elevation section above.",
+      "terrainRegenerate": "The Terrain choice changed since this terrain was generated: Generate Data again to apply it."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -1253,5 +1258,19 @@
       "nature": "Planting nature",
       "package": "Packing the level"
     }
+  },
+  "terrainChoice": {
+    "title": "Terrain",
+    "subtitle": "how much MapNG shapes the elevation",
+    "recommended": "Recommended",
+    "ready": "Ready to drive",
+    "readyHint30": "Global 30 m: buildings and trees taken out of the ground, rivers and roads levelled in, fine ground detail and sharp cliffs. Lidar and GPXZ: roads aligned, nothing else.",
+    "readyHintFine": "Roads aligned with your elevation and levelled at bridges, tunnels and sidewalks. Where the global 30 m fills in, it also gets buildings and trees taken out, rivers and roads levelled, fine detail and cliffs.",
+    "custom": "Custom",
+    "customHint": "The same, and you choose which edits the level export makes.",
+    "untouched": "Untouched",
+    "untouchedHint": "The elevation exactly as downloaded: no edits at all.",
+    "untouchedWarn": "On the global 30 m, buildings and trees stay as lumps in the ground and roads follow every bump.",
+    "basicNote": "Terrain: Ready to drive (buildings and trees taken out of 30 m data, roads levelled in). Switch to Advanced to change it."
   }
 }

@@ -119,26 +119,11 @@
             <SettingRow check v-model="beamNGIncludeTunnels" :label="t('exportPanel.includeTunnels')" :hint="t('exportPanel.includeTunnelsHint')" :disabled="!hasOsmData" />
           </SettingCard>
 
-          <!-- How the export reshapes the ground (generation-time smoothing is "Raw terrain", before Generate Data) -->
+          <!-- Terrain: chosen once, in the elevation section (TerrainChoice); here only what this level gets -->
           <SettingCard v-if="advancedMode" :title="t('exportPanel.ui.cardTerrain')">
-            <SegmentedControl
-              v-model="beamNGShapeMode"
-              :options="[
-                { value: 'all', label: t('exportPanel.ui.shapeAll') },
-                { value: 'custom', label: t('exportPanel.ui.shapeCustom') },
-                { value: 'none', label: t('exportPanel.ui.shapeNone') },
-              ]"
-            />
-            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.shapeHint_${beamNGShapeMode}`) }}</p>
-            <template v-if="beamNGShapeMode === 'custom'">
-              <SettingRow check v-model="beamNGShapeRoads" :label="t('exportPanel.shapeRoads')" :hint="t('exportPanel.shapeRoadsHint')" />
-              <SettingRow check v-model="beamNGShapeBridges" :label="t('exportPanel.shapeBridges')" :hint="t('exportPanel.shapeBridgesHint')" :disabled="!beamNGIncludeBridges" :disabled-reason="t('exportPanel.ui.needsBridges')" />
-              <SettingRow check v-model="beamNGShapeOverpasses" :label="t('exportPanel.shapeOverpasses')" :hint="t('exportPanel.shapeOverpassesHint')" :disabled="!beamNGIncludeBridges" :disabled-reason="t('exportPanel.ui.needsBridges')" />
-              <SettingRow check v-model="beamNGShapeTunnels" :label="t('exportPanel.shapeTunnels')" :hint="t('exportPanel.shapeTunnelsHint')" :disabled="!beamNGIncludeTunnels" :disabled-reason="t('exportPanel.ui.needsTunnels')" />
-              <SettingRow check v-model="beamNGShapeExtras" :label="t('exportPanel.shapeExtras')" :hint="t('exportPanel.shapeExtrasHint')" />
-              <SettingRow check v-model="beamNGShapeDetail" :label="t('exportPanel.shapeDetail')" :hint="t('exportPanel.shapeDetailHint')" />
-            </template>
-            <p v-if="terrainData?.raw" class="text-caption leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.generatedRaw') }}</p>
+            <p class="text-caption leading-snug text-gray-700 dark:text-gray-200">{{ t(`exportPanel.ui.terrainSummary_${terrainMode}`) }}</p>
+            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.terrainChangeHere') }}</p>
+            <p v-if="terrainData && !!terrainData.raw !== (terrainMode === 'untouched')" class="text-caption leading-snug text-amber-700 dark:text-amber-300">{{ t('exportPanel.ui.terrainRegenerate') }}</p>
             <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.reportNote') }}</p>
           </SettingCard>
 
@@ -569,12 +554,12 @@ import { exportGeoTiff } from '../../services/exportGeoTiff';
 import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/traceability';
 import { createWGS84ToLocal } from '../../services/geoUtils';
 import { exportBeamNGLevel, EXPORT_STEP_GROUPS } from '../../services/exportBeamNGLevel';
+import { terrainMode, terrainShapingOptions } from '../../composables/useTerrainMode.js';
 import { desktopApp, exportLevelOnDesktop } from '../../services/platform/desktop.js';
 import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../composables/useExportHotspots.js';
 import SettingSection from '../base/SettingSection.vue';
 import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
-import SegmentedControl from '../base/SegmentedControl.vue';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
 import { currentSessionCode, currentSessionConfigValue, openReportDialog } from '../../composables/useReportDialog.js';
@@ -687,26 +672,7 @@ const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') 
 const storedOn = (key) => localStorage.getItem(key) !== 'false';
 const beamNGIncludeBridges = ref(storedOn('mapng_beamNGIncludeBridges'));
 const beamNGIncludeTunnels = ref(storedOn('mapng_beamNGIncludeTunnels'));
-const beamNGShapeTerrain = ref(storedOn('mapng_beamNGShapeTerrain'));
-const beamNGShapeRoads = ref(storedOn('mapng_beamNGShapeRoads'));
-const beamNGShapeBridges = ref(storedOn('mapng_beamNGShapeBridges'));
-const beamNGShapeOverpasses = ref(storedOn('mapng_beamNGShapeOverpasses'));
-const beamNGShapeTunnels = ref(storedOn('mapng_beamNGShapeTunnels'));
-const beamNGShapeExtras = ref(storedOn('mapng_beamNGShapeExtras'));
-const beamNGShapeDetail = ref(storedOn('mapng_beamNGShapeDetail'));
 const beamNGLidarDecks = ref(storedOn('mapng_beamNGLidarDecks'));
-// The Terrain card's choice: 'all' (every edit), 'custom' (the boxes below
-// it) or 'none' (heights as generated). Old settings had one master box and
-// the five edit boxes; the first time, the choice follows from them.
-const SHAPE_EDITS = [beamNGShapeRoads, beamNGShapeBridges, beamNGShapeOverpasses, beamNGShapeTunnels, beamNGShapeExtras];
-const storedShapeMode = localStorage.getItem('mapng_beamNGShapeMode');
-const beamNGShapeMode = ref(['all', 'custom', 'none'].includes(storedShapeMode)
-  ? storedShapeMode
-  : !beamNGShapeTerrain.value ? 'none' : SHAPE_EDITS.every((r) => r.value) ? 'all' : 'custom');
-watch(beamNGShapeMode, (mode) => {
-  localStorage.setItem('mapng_beamNGShapeMode', mode);
-  beamNGShapeTerrain.value = mode !== 'none';
-}, { immediate: true });
 const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') !== 'false');
@@ -985,13 +951,6 @@ watch(beamNGBackdropSource, (v) => localStorage.setItem('mapng_beamNGBackdropSou
 watch(beamNGIncludeBuildings, (v) => localStorage.setItem('mapng_beamNGIncludeBuildings', String(v)));
 watch(beamNGIncludeBridges, (v) => localStorage.setItem('mapng_beamNGIncludeBridges', String(v)));
 watch(beamNGIncludeTunnels, (v) => localStorage.setItem('mapng_beamNGIncludeTunnels', String(v)));
-watch(beamNGShapeTerrain, (v) => localStorage.setItem('mapng_beamNGShapeTerrain', String(v)));
-watch(beamNGShapeRoads, (v) => localStorage.setItem('mapng_beamNGShapeRoads', String(v)));
-watch(beamNGShapeBridges, (v) => localStorage.setItem('mapng_beamNGShapeBridges', String(v)));
-watch(beamNGShapeOverpasses, (v) => localStorage.setItem('mapng_beamNGShapeOverpasses', String(v)));
-watch(beamNGShapeTunnels, (v) => localStorage.setItem('mapng_beamNGShapeTunnels', String(v)));
-watch(beamNGShapeExtras, (v) => localStorage.setItem('mapng_beamNGShapeExtras', String(v)));
-watch(beamNGShapeDetail, (v) => localStorage.setItem('mapng_beamNGShapeDetail', String(v)));
 watch(beamNGLidarDecks, (v) => localStorage.setItem('mapng_beamNGLidarDecks', String(v)));
 watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGSeaLevelOffset, (v) => {
@@ -1817,13 +1776,8 @@ const handleBeamNGLevelExport = async () => {
       includeBridges: !advanced || beamNGIncludeBridges.value,
       includeTunnels: !advanced || beamNGIncludeTunnels.value,
       // ('all': every edit; 'custom': the chosen ones; 'none': the master is off)
-      shapeTerrain: !advanced || beamNGShapeMode.value !== 'none',
-      shapeRoads: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeRoads.value,
-      shapeBridges: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeBridges.value,
-      shapeOverpasses: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeOverpasses.value,
-      shapeTunnels: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeTunnels.value,
-      shapeExtras: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeExtras.value,
-      shapeDetail: !advanced || beamNGShapeMode.value === 'all' || beamNGShapeDetail.value,
+      // (the Terrain choice: composables/useTerrainMode.js; basic always shapes everything)
+      ...terrainShapingOptions(advanced),
       // measured bridge heights from the US lidar survey where it covers the map
       lidarDecks: !advanced || beamNGLidarDecks.value,
     };

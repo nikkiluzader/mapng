@@ -479,7 +479,12 @@
       "backdropHint_off": "Kein Gelände jenseits der Kartenränder",
       "backdropHint_global30m": "Globales 30-m-Gelände rund um die Karte",
       "backdropHint_usgs1m": "USGS-1-m-Gelände rund um die Karte, wo verfügbar",
-      "backdropHint_gpxz": "GPXZ-Gelände rund um die Karte (nutzt deinen GPXZ-Schlüssel)"
+      "backdropHint_gpxz": "GPXZ-Gelände rund um die Karte (nutzt deinen GPXZ-Schlüssel)",
+      "terrainSummary_ready": "Gelände: Fahrbereit. Alle Anpassungen werden vorgenommen.",
+      "terrainSummary_custom": "Gelände: Eigene. Nur die gewählten Anpassungen werden vorgenommen.",
+      "terrainSummary_untouched": "Gelände: Unverändert. Die Höhen werden genau wie heruntergeladen verwendet.",
+      "terrainChangeHere": "Ändern unter „Gelände“ im Höhendaten-Bereich oben.",
+      "terrainRegenerate": "Die Gelände-Auswahl hat sich seit der Erzeugung geändert: Daten erneut erzeugen, um sie anzuwenden."
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",
@@ -1253,5 +1258,19 @@
       "nature": "Natur pflanzen",
       "package": "Level packen"
     }
+  },
+  "terrainChoice": {
+    "title": "Gelände",
+    "subtitle": "wie stark MapNG die Höhen formt",
+    "recommended": "Empfohlen",
+    "ready": "Fahrbereit",
+    "readyHint30": "Global 30 m: Gebäude und Bäume aus dem Boden entfernt, Flüsse und Straßen eingeebnet, feine Bodendetails und scharfe Klippen. Lidar und GPXZ: Straßen angepasst, sonst nichts.",
+    "readyHintFine": "Straßen an deine Höhendaten angepasst und an Brücken, Tunneln und Gehwegen eingeebnet. Wo das globale 30-m-Modell aushilft, werden dort auch Gebäude und Bäume entfernt, Flüsse und Straßen eingeebnet, feine Details und Klippen ergänzt.",
+    "custom": "Eigene",
+    "customHint": "Dasselbe, und du wählst, welche Anpassungen der Level-Export vornimmt.",
+    "untouched": "Unverändert",
+    "untouchedHint": "Die Höhen genau wie heruntergeladen: keinerlei Anpassungen.",
+    "untouchedWarn": "Beim globalen 30-m-Modell bleiben Gebäude und Bäume als Buckel im Boden, und Straßen folgen jeder Unebenheit.",
+    "basicNote": "Gelände: Fahrbereit (Gebäude und Bäume aus 30-m-Daten entfernt, Straßen eingeebnet). In „Erweitert“ änderbar."
   }
 }

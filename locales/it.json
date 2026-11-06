@@ -479,7 +479,12 @@
       "backdropHint_off": "Nessun terreno oltre i bordi della mappa",
       "backdropHint_global30m": "Terreno globale a 30 m intorno alla mappa",
       "backdropHint_usgs1m": "Terreno USGS a 1 m intorno alla mappa, dove disponibile",
-      "backdropHint_gpxz": "Terreno GPXZ intorno alla mappa (usa la tua chiave GPXZ)"
+      "backdropHint_gpxz": "Terreno GPXZ intorno alla mappa (usa la tua chiave GPXZ)",
+      "terrainSummary_ready": "Terreno: Pronto da guidare. Vengono fatti tutti i ritocchi.",
+      "terrainSummary_custom": "Terreno: Personalizzato. Solo i ritocchi scelti.",
+      "terrainSummary_untouched": "Terreno: Intatto. L'altitudine è usata esattamente come scaricata.",
+      "terrainChangeHere": "Cambialo in Terreno, nella sezione altitudine qui sopra.",
+      "terrainRegenerate": "La scelta del Terreno è cambiata dalla generazione: genera di nuovo i dati per applicarla."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -1253,5 +1258,19 @@
       "nature": "Natura",
       "package": "Impacchettamento livello"
     }
+  },
+  "terrainChoice": {
+    "title": "Terreno",
+    "subtitle": "quanto MapNG modella l'altitudine",
+    "recommended": "Consigliato",
+    "ready": "Pronto da guidare",
+    "readyHint30": "30 m globale: edifici e alberi tolti dal terreno, fiumi e strade livellati, dettaglio fine del suolo e scogliere nette. Lidar e GPXZ: strade allineate, nient'altro.",
+    "readyHintFine": "Strade allineate alla tua altitudine e livellate a ponti, gallerie e marciapiedi. Dove riempie il 30 m globale, anche lì edifici e alberi tolti, fiumi e strade livellati, dettaglio fine e scogliere.",
+    "custom": "Personalizzato",
+    "customHint": "Lo stesso, e scegli tu quali ritocchi fa l'esportazione del livello.",
+    "untouched": "Intatto",
+    "untouchedHint": "L'altitudine esattamente come scaricata: nessun ritocco.",
+    "untouchedWarn": "Con il 30 m globale edifici e alberi restano come gobbe nel terreno e le strade seguono ogni dosso.",
+    "basicNote": "Terreno: Pronto da guidare (edifici e alberi tolti dai dati a 30 m, strade livellate). Si cambia in Avanzato."
   }
 }

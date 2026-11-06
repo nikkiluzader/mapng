@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed, shallowRef } from 'vue';
 import { loadBatchState } from '../services/batchJob';
+import { terrainMode, setTerrainMode } from '../composables/useTerrainMode.js';
 
 const DEFAULT_CENTER = { lat: 35.1983, lng: -111.6513 };
 
@@ -44,10 +45,12 @@ export const useMainStore = defineStore('main', () => {
   // asset / 3D model downloads, Surrounding Tiles, per-category level export
   // toggles and the preview's surroundings + wireframe. Basic is the default.
   const advancedMode = ref(localStorage.getItem('mapng_advanced_mode') === 'true');
-  // Raw terrain (advanced mode only): generation leaves the elevation and OSM
-  // roads exactly as pulled (no height blur, road snapping or road smoothing;
-  // the road curves stay). Read it through rawTerrainActive so basic mode never applies it.
-  const rawTerrain = ref(localStorage.getItem('mapng_raw_terrain') === 'true');
+  // Raw terrain: the Terrain choice "Untouched" (composables/useTerrainMode.js;
+  // advanced mode and batch jobs): generation leaves the elevation and OSM
+  // roads exactly as pulled (no height blur, ground filter, river lowering,
+  // road snapping or smoothing; the road curves stay). Read it through
+  // rawTerrainActive so basic mode never applies it.
+  const rawTerrain = computed(() => terrainMode.value === 'untouched');
   const rawTerrainActive = computed(() => advancedMode.value && rawTerrain.value);
 
   if (batchMode.value && Number(resolution.value) > 8192) {
@@ -120,9 +123,10 @@ export const useMainStore = defineStore('main', () => {
     if (!advancedMode.value) surroundingTilePositions.value = [];
   }
 
+  // (a share code's rawTerrain: Untouched, or back to Ready to drive from it)
   function setRawTerrain(value) {
-    rawTerrain.value = !!value;
-    localStorage.setItem('mapng_raw_terrain', String(rawTerrain.value));
+    if (value) setTerrainMode('untouched');
+    else if (terrainMode.value === 'untouched') setTerrainMode('ready');
   }
 
   function toggleDarkMode() {

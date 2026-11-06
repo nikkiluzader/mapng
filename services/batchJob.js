@@ -409,6 +409,9 @@ export function createBatchJobState(config) {
     performanceProfile,
     combinedLevel: !!config.combinedLevel,
     levelOptions: config.combinedLevel ? normalizeCombinedLevelOptions(config.levelOptions) : null,
+    // the Terrain choice (composables/useTerrainMode.js): raw generation, and the combined level's export edits
+    rawTerrain: !!config.rawTerrain,
+    shaping: config.shaping && typeof config.shaping === 'object' ? { ...config.shaping } : null,
     elevationNormalization: {
       // Combined mode stitches raw meters and quantizes once at export, so a
       // seamless heightmap doesn't depend on the pre-scan. The baseline follows
@@ -1301,6 +1304,9 @@ async function writeTileToCombinedLevel(combined, state, tile, terrainData) {
 
   const key = `${tile.row}:${tile.col}`;
   if (combined.writtenTiles.has(key)) return;
+  // (the stitched level is global 30 m terrain, so it gets fine ground detail
+  // and cliffs at export, only when every tile was)
+  combined.coarseElevation = (combined.coarseElevation ?? true) && !!terrainData.coarseElevation;
 
   // 1. Heightmap (Float32 meters). The UI caps the combined dimension at 16384²
   // (~1 GB here), which allocates fine; this guard only trips on an already
@@ -1426,6 +1432,8 @@ async function assembleCombinedTerrainData(state, combined) {
     bounds: combined.bounds,
     osmFeatures: Array.from(combined.osmById.values()),
     processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
+    // (dropped before: combined levels never got fine ground detail or cliffs)
+    coarseElevation: !!combined.coarseElevation,
   };
 
   let cleanupUrl = null;
@@ -1479,6 +1487,7 @@ function buildCombinedExportOptions(state, combined, onProgress) {
     elevationSource: state.elevationSource,
     requestedResolution: combined.width,
     requestedProcessingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
+    ...(state.shaping || {}),
     onProgress,
   };
 }
@@ -1567,6 +1576,7 @@ async function computeBatchElevationNormalization(state, scheduleFetch, onProgre
         globalTileConcurrency: Number(state.scheduler?.globalTileConcurrency || 20),
         processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
         useMapterhorn: state.elevationSource === 'mapterhorn',
+        raw: !!state.rawTerrain,
       },
     ));
 
@@ -1683,6 +1693,7 @@ async function processTile(state, tile, ctx, signal) {
             processingMetersPerPixel: Number(state.processingMetersPerPixel || 1),
             useMapterhorn: state.elevationSource === 'mapterhorn',
             flat: state.elevationSource === 'none',
+            raw: !!state.rawTerrain,
           },
         );
       }));
