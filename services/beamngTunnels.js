@@ -92,8 +92,8 @@ const CC_HEAD_OVER_M = 0.3;            // headwall top over the street
 const CC_STREET_BEHIND_M = 16;         // the street behind a box's portal: its ground this far in
 const TRENCH_DONE_M = 0.25;
 const RAW_PORTAL_OPEN_M = 0.5;
-const RAW_APRON_M = 2.5;                // ...and an apron slab this far out in front of the face
-const RAW_APRON_SQUARES = 2.5;
+const RAW_APRON_M = 4;                  // ...and an apron slab this far out in front of the face
+const RAW_APRON_SQUARES = 4;
 const RAW_HEAD_GROW_M = 3;              // terrain shaping off: the headwall this much taller and wider each side           // terrain shaping off: a portal where the ground is no more than this over the road            // the approach meets the ground again within this
 const APPROACH_FIT_M = [4, 40];        // approach road samples a portal's height is fitted to
 const APPROACH_MAX_GRADE = 0.25;
@@ -1233,7 +1233,8 @@ export function tunnelHoleAt(t, x, y, lo, hi = lo) {
   // so wherever the ground dips into it, all along, it opens (from a little
   // in front of the face: no teeth of ground left standing in the mouth)
   if (t.raw) {
-    if (!n || n.into < -1.5 * t.squareSize) return false;
+    // (out in front of the face as far as the apron reaches, less half a square)
+    if (!n || n.into < -Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) + 0.5 * t.squareSize) return false;
     const ad = across(t, n);
     if (ad > t.W + LINING_M + 2.5 * t.squareSize) return false;
     // (in front of the face only as far as the portal's apron reaches)
@@ -1474,15 +1475,33 @@ export function buildPortalGeometry(t, end) {
   }
   // the terrain as surveyed: an apron slab at road level out in front of the
   // face, over the squares opened there (the ground standing up into the mouth)
+  // (its own object, apart from the portal's walls: the road decal clips onto
+  // it as onto a deck, and a portal takes no decals; small pieces and a skirt,
+  // as a dam's crest top: a flat slab with a box of no height took none)
+  let apron = null;
   if (t.raw) {
     const L = Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize);
-    const at = (u, w) => [p.x + u * Lv[0] - w * tin[0], p.y + u * Lv[1] - w * tin[1], p.z];
-    const a = at(-hr, 0); const b = at(hl, 0); const cc = at(hl, L); const d = at(-hr, L);
+    const at = (u, w, dz = 0) => [p.x + u * Lv[0] - w * tin[0], p.y + u * Lv[1] - w * tin[1], p.z + dz];
+    const A = makeTris();
     const up = () => [0, 0, 1];
-    T.tri(a, b, cc, [[0, 0], [(hl + hr) / 4, 0], [(hl + hr) / 4, L / 4]], up);
-    T.tri(a, cc, d, [[0, 0], [(hl + hr) / 4, L / 4], [0, L / 4]], up);
+    const nu = Math.max(1, Math.ceil((hl + hr) / 3)); const nw = Math.max(1, Math.ceil(L / 3));
+    for (let i = 0; i < nu; i++) {
+      for (let k = 0; k < nw; k++) {
+        const u0 = -hr + ((hl + hr) * i) / nu; const u1 = -hr + ((hl + hr) * (i + 1)) / nu;
+        const w0 = (L * k) / nw; const w1 = (L * (k + 1)) / nw;
+        const a = at(u0, w0); const b = at(u1, w0); const cc = at(u1, w1); const d = at(u0, w1);
+        A.tri(a, b, cc, [[u0 / 4, w0 / 4], [u1 / 4, w0 / 4], [u1 / 4, w1 / 4]], up);
+        A.tri(a, cc, d, [[u0 / 4, w0 / 4], [u1 / 4, w1 / 4], [u0 / 4, w1 / 4]], up);
+      }
+    }
+    // the skirt along its outer edge
+    const s0 = at(-hr, L); const s1 = at(hl, L); const s2 = at(hl, L, -1); const s3 = at(-hr, L, -1);
+    const out = () => [-tin[0], -tin[1], 0];
+    A.tri(s0, s1, s2, [[0, 0], [1, 0], [1, 1]], out);
+    A.tri(s0, s2, s3, [[0, 0], [1, 1], [0, 1]], out);
+    apron = { pos: A.pos, uv: A.uv };
   }
-  return { pos: pos.concat(T.pos), uv: uv.concat(T.uv) };
+  return { pos: pos.concat(T.pos), uv: uv.concat(T.uv), apron };
 }
 
 /**

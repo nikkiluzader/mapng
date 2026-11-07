@@ -1141,8 +1141,13 @@ function generateTunnelDAEs(tunnels) {
   };
   for (const t of tunnels) {
     buildTubeGeometry(t).forEach((piece, i) => write(t, `tube${i + 1}`, piece));
-    if (t.portals[0]) write(t, 'portal_a', buildPortalGeometry(t, 'S'));
-    if (t.portals[1]) write(t, 'portal_b', buildPortalGeometry(t, 'N'));
+    for (const [k, end, on] of [['a', 'S', t.portals[0]], ['b', 'N', t.portals[1]]]) {
+      if (!on) continue;
+      const g = buildPortalGeometry(t, end);
+      write(t, `portal_${k}`, g);
+      // (terrain shaping off: the apron in front of the face, which takes the road decal)
+      if (g.apron?.pos.length) write(t, `apron_${k}`, g.apron);
+    }
     const windows = buildWindowGeometry(t);
     if (windows) write(t, 'windows', windows);
   }

@@ -369,6 +369,8 @@ test('terrain left as surveyed (raw): the bore runs out to where the ground meet
   const g = buildPortalGeometry(raw, 'S');
   const pS = raw.line[raw.iS];
   let apron = 0;
-  for (let k = 0; k < g.pos.length; k += 3) if (Math.abs(g.pos[k + 2] - pS.z) < 1e-6 && (g.pos[k + 1] - pS.y) * pS.ty + (g.pos[k] - pS.x) * pS.tx < -1) apron++;
-  assert.ok(apron >= 2, 'apron vertices out in front of the face');
+  const ap = g.apron?.pos || [];
+  for (let k = 0; k < ap.length; k += 3) if (Math.abs(ap[k + 2] - pS.z) < 1e-6 && (ap[k + 1] - pS.y) * pS.ty + (ap[k] - pS.x) * pS.tx < -1) apron++;
+  assert.ok(apron >= 2, 'apron vertices out in front of the face, its own part (it takes the road decal)');
+  assert.equal(buildPortalGeometry(shaped, 'S').apron, null, 'shaped tunnels: no apron');
 });
