@@ -33,6 +33,7 @@ import * as THREE from 'three';
 import { buildingUse, businessTagsByBuilding, isHistoricBuilding } from './buildingUses.js';
 import { planFountains, buildFountain, FOUNTAIN_MATERIAL_STAGES } from './fountains.js';
 import { planPools, buildPool, POOL_MATERIAL_STAGES } from './pools.js';
+import { planDams, buildDam } from './dams.js';
 import { planPitches, buildPitch, planSeating, buildSeating, drapedMesh, SPORTS_MATERIAL_STAGES, SPORTS_MATERIAL_FLAGS } from './sportsFields.js';
 import { planRaceways, buildRaceway, planRacewayAreas, carriagewayTest, tracksideStands, dragStartFirst } from './racetracks.js';
 import { planFieldPoles, planStandLights, planTrackPoles } from './sportsLights.js';
@@ -1919,6 +1920,17 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
   }
   if (Object.keys(poolKinds).length) { stats.details.pools = poolKinds; stats.details.poolShapes = poolShapes; }
+  // dams (services/dams.js): concrete over the gap the elevation data left
+  const dams = [];
+  if (groundAt) {
+    for (const d of planDams(features, project, { groundAt })) {
+      const tile = tileFor(d.ring);
+      if (!buildDam(new TeeBuilder(tile.fullB, tile.liteB), d, groundAt)) continue;
+      dams.push({ name: d.name, crest: Math.round(d.crest * 10) / 10, gap: Math.round(d.gap) });
+      if (++tile.inBatch >= MESH_BATCH) flushTile(tile);
+    }
+  }
+  if (dams.length) stats.details.dams = dams;
   if (part === 'water') return finish();
   return fieldExtras();
 
