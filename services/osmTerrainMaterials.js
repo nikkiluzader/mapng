@@ -691,7 +691,7 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
 
   // 1a. Ground no OSM area covers, from what really covers it (ESA
   // WorldCover, 10 m, read while generating: terrainData.landCover): grass
-  // and fields Grass, woods, scrub, wetland and tundra a forest floor
+  // Grass, fields Dirt (as OSM farmland), woods, scrub, wetland and tundra a forest floor
   // (DirtGrass), bare ground Dirt (rock on a slope over ~25°), snow and ice
   // rock (no snow material ships); built-up, water and no data left to the
   // satellite's vegetation (1b). Most land outside towns has no OSM area:
@@ -702,7 +702,7 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
     const hmLc = terrainData.heightMap?.length === size * size ? terrainData.heightMap : null;
     const byClass = new Int16Array(256).fill(-1);
     byClass[10] = 8; byClass[95] = 8; byClass[20] = 8; byClass[90] = 8; byClass[100] = 8;
-    byClass[30] = 1; byClass[40] = 1;
+    byClass[30] = 1; byClass[40] = 2;   // (fields as OSM farmland is painted: bare cultivated ground)
     byClass[60] = 2; byClass[70] = 4;
     let filled = 0;
     for (let y = 0; y < size; y++) {

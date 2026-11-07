@@ -46,3 +46,30 @@ test('OSM land cover finds the deserts coordinates miss', () => {
   assert.ok(dryCoverShare(green, lat, area) < 0.6, 'a forest map is not dry');
   assert.equal(dryCoverShare([square(lat, lon, 0.0001, { natural: 'sand' })], lat, 4e6), null, 'a speck of land cover says nothing');
 });
+
+test('regional look from WorldCover: desert, high rock, open grassland; the West Coast and woods keep theirs', async () => {
+  const { resolveRegionalBiome, landCoverShares } = await import('../services/beamngRegion.js');
+  // a land cover grid with these class shares
+  const lc = (mix) => {
+    const n = 100; const grid = new Uint8Array(n * n); let i = 0;
+    for (const [cls, share] of Object.entries(mix)) for (let k = 0; k < share * n * n; k++) grid[i++] = Number(cls);
+    return { grid, n };
+  };
+  assert.equal(landCoverShares(lc({ 80: 0.9, 30: 0.1 })), null, 'mostly water: says nothing');
+  // Sahara-like, low and warm
+  assert.equal(resolveRegionalBiome({ lat: 25, lon: 10, meanHeightM: 300, landCover: lc({ 60: 0.85, 20: 0.15 }) }).biomeId, 'johnson_valley');
+  // a glacier summit in the Alps (inside the Mediterranean box)
+  assert.equal(resolveRegionalBiome({ lat: 45.43, lon: 6.9, meanHeightM: 3000, landCover: lc({ 60: 0.75, 70: 0.15, 100: 0.1 }) }).biomeId, 'utah');
+  // Montana prairie
+  const prairie = resolveRegionalBiome({ lat: 47.43, lon: -111.02, meanHeightM: 1100, landCover: lc({ 30: 0.76, 40: 0.23, 10: 0.01 }) });
+  assert.equal(prairie.biomeId, 'utah');
+  assert.match(prairie.reason, /grassland/);
+  // Iowa corn: fields, not steppe
+  assert.equal(resolveRegionalBiome({ lat: 42, lon: -93.5, meanHeightM: 300, landCover: lc({ 40: 0.8, 30: 0.15, 10: 0.05 }) }).biomeId, 'east_coast_usa');
+  // a wooded East Coast map
+  assert.equal(resolveRegionalBiome({ lat: 40, lon: -75, meanHeightM: 100, landCover: lc({ 10: 0.6, 30: 0.2, 50: 0.2 }) }).biomeId, 'east_coast_usa');
+  // Los Angeles stays West Coast even if WorldCover says scrub
+  assert.equal(resolveRegionalBiome({ lat: 34.05, lon: -118.25, meanHeightM: 100, landCover: lc({ 20: 0.5, 50: 0.4, 60: 0.1 }) }).biomeId, 'west_coast_usa');
+  // without land cover: as before
+  assert.equal(resolveRegionalBiome({ lat: 47.43, lon: -111.02, meanHeightM: 1100 }).biomeId, 'east_coast_usa');
+});

@@ -11657,6 +11657,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     meanHeightM: sampleMeanHeight(exportTerrainData),
     features: exportTerrainData.osmFeatures || [],
     mapAreaM2: (exportTerrainData.width * computeSquareSize(exportTerrainData)) ** 2,
+    // (what covers the land: ESA WorldCover, read while generating)
+    landCover: exportTerrainData.landCover || null,
   });
   const resolvedBiomeId = biomeId || regional.biomeId;
   const biome = getBeamNGBiomeById(resolvedBiomeId);
@@ -14236,3 +14238,6 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
   return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes };
 }
+
+// (tests: the planting on its own)
+export { buildForestPlacements as __buildForestPlacements };
