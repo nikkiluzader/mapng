@@ -305,3 +305,14 @@ test('profile: a short bridge over a stream stays on its road line, no clearance
   const { z: zr } = solveProfiles({ edges: [deck], nodes, pins: [[0, 0, 100], [0, 8, 100]], crossings: { crossings: [], water: [{ ...minor, minor: false }] } });
   assert.ok(Math.max(...zr[0]) > 102, 'a river run lost its clearance');
 });
+
+test('profile: a river mapped with its banks inside: the deck clears the banks too, not only the water', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // the wet run spans 80 m: banks at 6 m inside it for 20 m each side, the bed at 0; road ends at 8 m
+  const n = 41;
+  const g = Array.from({ length: n }, (_, i) => (i < 5 || i > 35 ? 8 : i < 10 || i > 30 ? 6 : 0));
+  const deck = { x: Float64Array.from({ length: n }, (_, i) => i * 2), y: new Float64Array(n), s: Float64Array.from({ length: n }, (_, i) => i * 2), g: Float64Array.from(g), from: 'A', to: 'B', highway: 'secondary', layer: 1, half: 4, bridge: true, tunnel: false };
+  const nodes = new Map([['A', { edges: [{ edge: 0, end: 0 }] }], ['B', { edges: [{ edge: 0, end: 1 }] }]]);
+  const { z } = solveProfiles({ edges: [deck], nodes, pins: [[0, 0, 8], [0, 40, 8]], crossings: { crossings: [], water: [{ edge: 0, i0: 5, i1: 35, need: 3 }] } });
+  for (let i = 5; i <= 35; i++) assert.ok(z[0][i] - 2.2 >= g[i] + 0.5 - 0.05, `the deck's underside ${(z[0][i] - 2.2 - g[i]).toFixed(2)} m over the bank at ${i * 2} m`);
+});

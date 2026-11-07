@@ -41,6 +41,7 @@ const W_STRUCTURE = 0;
 const SMOOTH = 0.35;          // pull toward the neighbours' average
 const TUNNEL_COVER_M = 7;     // road surface this far under the ground in a tunnel (tube + roof)
 const DECK_UNDER_M = 2.2;     // deck depth under its road surface
+const WATER_OVER_GROUND_M = 0.5;   // over water, the deck's underside at least this over the ground at each station
 const MINOR_CROWN_M = 0.3;    // a deck over a stream: this far over the line between its banks at most
 const OUTER_ROUNDS = 6;       // crossing requirements refreshed this often
 const SWEEPS = 120;           // smoothing sweeps per round (or until settled)
@@ -308,7 +309,12 @@ export function* solveProfilesSteps(graph) {
   for (const run of water) {
     let surface = Infinity;
     for (let i = run.i0; i <= run.i1; i++) surface = Math.min(surface, G[off[run.edge] + i]);
-    for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, Math.min(surface + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M, minorCap(run, i))]);
+    // (and its underside over each station's own ground: a river mapped with its banks in it had the
+    // deck through the banks, Clear Creek under I-70, the Tame Valley Canal)
+    for (let i = run.i0; i <= run.i1; i++) {
+      const k = off[run.edge] + i;
+      waterSeeds.push([k, Math.min(Math.max(surface + (run.needs?.[i - run.i0] ?? run.need), G[k] + WATER_OVER_GROUND_M) + DECK_UNDER_M, minorCap(run, i))]);
+    }
   }
 
   // station indices that are an edge's end at a node: held by the junction
@@ -731,7 +737,7 @@ export function profileResidual(graph, z) {
     let surface = Infinity;
     for (let i = run.i0; i <= run.i1; i++) surface = Math.min(surface, edges[run.edge].g[i]);
     if (run.minor) continue;   // (a stream: no clearance asked, the solve's cap)
-    for (let i = run.i0; i <= run.i1; i++) water = Math.max(water, surface + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M - z[run.edge][i]);
+    for (let i = run.i0; i <= run.i1; i++) water = Math.max(water, Math.max(surface + (run.needs?.[i - run.i0] ?? run.need), edges[run.edge].g[i] + WATER_OVER_GROUND_M) + DECK_UNDER_M - z[run.edge][i]);
   }
   const r = (v) => Math.round(Math.max(0, v) * 1000) / 1000;
   return { joint: r(joint), crossing: r(crossing), grade: r(grade), water: r(water), cover: r(cover) };
