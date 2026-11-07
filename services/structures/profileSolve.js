@@ -580,11 +580,68 @@ export function* solveProfilesSteps(graph) {
   }
   if (split) clampGrades();
   verticalCurves(graph, Z, L, U, off, pinned, held);
+  tieTwinDecks(edges, Z, off, pinned, held);
   const z = edges.map((e, k) => Z.slice(off[k], off[k] + e.s.length));
   const result = { z, rounds, residual: profileResidual(graph, z) };
   // (debug: the envelopes, for tools)
   if (globalThis.__MAPNG_STRUCT_DEBUG) Object.defineProperty(result, 'debug', { value: { L, U, off }, enumerable: false });
   return result;
+}
+
+// A divided road's two carriageways side by side on one bridge (two OSM lines, two decks of one layer,
+// flush and parallel): one surface, at one height where they run alongside (solved apart they stood
+// 0.2-0.3 m apart: a step between the Golden Gate's carriageways). Each takes the mean of the two, eased
+// out over TWIN_EASE_M before either's end (their joints with their own roads kept); pinned and held
+// stations kept.
+const TWIN_GAP_M = 1.2;        // edge to edge at most this apart (beyond: a median, decks of their own)
+const TWIN_COS = 0.95;
+const TWIN_EASE_M = 30;
+const TWIN_MAX_DZ_M = 1.5;     // more apart than this: not one surface (a ramp alongside at another level)
+function tieTwinDecks(edges, Z, off, pinned, held) {
+  const decks = edges.map((e, k) => k).filter((k) => edges[k].bridge && !edges[k].tunnel && edges[k].s.length > 1);
+  if (decks.length < 2) return;
+  const fixed = (v) => !!(pinned?.[v] || held?.[v]);
+  const target = new Map();   // station -> [sum, n] of partners' heights
+  const ease = (e, i) => Math.min(1, Math.min(e.s[i], e.s[e.s.length - 1] - e.s[i]) / TWIN_EASE_M);
+  for (const a of decks) {
+    const ea = edges[a];
+    for (let i = 0; i < ea.s.length; i++) {
+      const ia = Math.min(i, ea.s.length - 2);
+      const ux = ea.x[ia + 1] - ea.x[ia]; const uy = ea.y[ia + 1] - ea.y[ia]; const ul = Math.hypot(ux, uy) || 1;
+      for (const b of decks) {
+        if (b === a) continue;
+        const eb = edges[b];
+        if ((eb.layer || 0) !== (ea.layer || 0)) continue;
+        // (not a fork's branches: they share a node, and the ramp follows the main deck, never the other
+        // way; nor a ramp beside its main line)
+        if (ea.from === eb.from || ea.from === eb.to || ea.to === eb.from || ea.to === eb.to) continue;
+        if (/_link$/.test(ea.highway || '') !== /_link$/.test(eb.highway || '')) continue;
+        let best = null;
+        for (let j = 0; j + 1 < eb.s.length; j++) {
+          const vx = eb.x[j + 1] - eb.x[j]; const vy = eb.y[j + 1] - eb.y[j]; const L2 = vx * vx + vy * vy || 1e-9;
+          const t = ((ea.x[i] - eb.x[j]) * vx + (ea.y[i] - eb.y[j]) * vy) / L2;
+          if (t < 0 || t > 1) continue;
+          const d = Math.hypot(eb.x[j] + vx * t - ea.x[i], eb.y[j] + vy * t - ea.y[i]);
+          if (!best || d < best.d) best = { d, j, t, cos: Math.abs((ux * vx + uy * vy) / (ul * Math.sqrt(L2))) };
+        }
+        if (!best || best.cos < TWIN_COS || best.d > ea.half + eb.half + TWIN_GAP_M || best.d < 0.5 * (ea.half + eb.half)) continue;
+        const zb = Z[off[b] + best.j] + (Z[off[b] + best.j + 1] - Z[off[b] + best.j]) * best.t;
+        const va = off[a] + i;
+        if (Math.abs(zb - Z[va]) > TWIN_MAX_DZ_M) continue;
+        const w = Math.min(ease(ea, i), ease(eb, best.j));
+        const cur = target.get(va) || [0, 0, 0];
+        cur[0] += zb * w; cur[1] += w; cur[2] = Math.max(cur[2], w);
+        target.set(va, cur);
+      }
+    }
+  }
+  const next = new Map();
+  for (const [v, [sum, wsum, wmax]] of target) {
+    if (fixed(v) || wsum <= 0) continue;
+    const mean = (Z[v] + sum / wsum) / 2;
+    next.set(v, Z[v] + (mean - Z[v]) * wmax);
+  }
+  for (const [v, z] of next) Z[v] = z;
 }
 
 // Vertical curves where a deck meets a road on the ground: the deck's grade

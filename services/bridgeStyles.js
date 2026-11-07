@@ -170,6 +170,10 @@ const CORRIDOR_M = 30;         // ... and this close side by side share one styl
  * paint. Spans are drawn on typed parts only. outlines: [{ ring: [[x, y]...], tags }].
  */
 export function styleDecks(decks, { outlines = [], groundAt }) {
+  // a drawbridge's movable span (bridge:movable on its way): drawn over whatever the deck's style is
+  for (const deck of decks) {
+    deck.movableSpans = deck.parts.map((part, pi) => (part.movable ? { part: pi, s0: 0, s1: arcs(part.xy).at(-1), kind: String(part.movable) } : null)).filter(Boolean);
+  }
   const parts = [];
   decks.forEach((deck, di) => deck.parts.forEach((part, pi) => parts.push({ deck, di, pi, part })));
   for (const p of parts) {
@@ -257,6 +261,11 @@ function offOthers(p, sp) {
 
 /** Whether a pier at (x, y) of part pi stands inside one of the deck's styled spans (it spans it). */
 export function inStyledSpan(deck, pi, x, y) {
+  // (a movable span's leaves are cantilevered off its end piers: no pier under them)
+  if (deck.movableSpans?.some((m) => m.part === pi)) {
+    const part = deck.parts[pi]; const sArr = arcs(part.xy); const at = nearestS(part, sArr, x, y);
+    if (deck.movableSpans.some((m) => m.part === pi && at > m.s0 + 1 && at < m.s1 - 1)) return true;
+  }
   if (!deck.style || !['truss', 'arch', 'stoneArch', 'suspension', 'cable'].includes(deck.style.type)) return false;
   const part = deck.parts[pi];
   const s = arcs(part.xy);
@@ -279,6 +288,7 @@ export function inStyledSpan(deck, pi, x, y) {
  */
 export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () => 1.2 }) {
   const out = { steel: newBuilder(), concrete: newBuilder(), stone: newBuilder(), cable: newBuilder() };
+  for (const m of deck.movableSpans || []) movableSpan(out, deck.parts[m.part], m, groundAt, depthOf(deck.parts[m.part]));
   const st = deck.style;
   if (!st) return out;
   for (const sp of archRuns(deck, st)) {
@@ -544,6 +554,54 @@ function deckArch(b, part, sArr, sp, L, groundAt, depth, stone) {
   }
 }
 
+// ── movable spans ─────────────────────────────────────────────────────────────
+
+const MOVABLE_PIER_ALONG_M = 6;   // a bascule's / lift's end pier along the road (its counterweight pit)
+const MOVABLE_PIER_OUT_M = 1.8;   // ... out past the deck's parapets each side
+const MOVABLE_PIER_TOP_M = 0.45;  // ... its top this far under the road (the deck runs over it)
+const SWING_PIER_R_M = 0.35;      // a swing span's pivot pier: this share of the deck's width across
+const LEAF_FASCIA_M = 1.3;        // the steel leaves' fascia under the parapets
+
+/**
+ * A drawbridge's movable span (OSM bridge:movable): closed, as it is driven. A bascule's and a lift's
+ * end piers (wide, out past the deck: the counterweight pits; tower houses stand on their corners, see
+ * bridgeTowers.js), steel along the leaves' edges; a swing span's pivot pier at its middle. The plain
+ * piers are kept off it (inStyledSpan).
+ */
+function movableSpan(out, part, m, groundAt, depth) {
+  const sArr = arcs(part.xy);
+  const L = m.s1 - m.s0;
+  if (L < 6) return;
+  const half = part.half + PARAPET_W_M;
+  const pier = (s, lenM, across) => {
+    const c = along(part, s, 0, sArr);
+    const a = along(part, Math.max(0, s - 0.5), 0, sArr); const b = along(part, Math.min(sArr.at(-1), s + 0.5), 0, sArr);
+    const ul = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; const u = [(b[0] - a[0]) / ul, (b[1] - a[1]) / ul]; const n = [-u[1], u[0]];
+    const top = c[2] - MOVABLE_PIER_TOP_M;
+    const P = (sa, sc) => [c[0] + u[0] * sa * lenM / 2 + n[0] * sc * across, c[1] + u[1] * sa * lenM / 2 + n[1] * sc * across];
+    const ring = [P(-1, -1), P(1, -1), P(1, 1), P(-1, 1)];
+    const g = Math.min(...ring.map(([x, y]) => groundAt(x, y)));
+    if (top - g < 1) return;
+    for (let i = 0; i < 4; i++) {
+      const A = ring[i]; const B = ring[(i + 1) % 4];
+      out.concrete.quad([A[0], A[1], g - 1], [B[0], B[1], g - 1], [B[0], B[1], top], [A[0], A[1], top], [(A[0] + B[0]) / 2 - c[0], (A[1] + B[1]) / 2 - c[1], 0]);
+    }
+    out.concrete.quad([ring[0][0], ring[0][1], top], [ring[1][0], ring[1][1], top], [ring[2][0], ring[2][1], top], [ring[3][0], ring[3][1], top], [0, 0, 1]);
+  };
+  if (m.kind === 'swing') { pier(m.s0 + L / 2, Math.min(L * 0.25, 10), half * (0.5 + SWING_PIER_R_M)); return; }
+  // the end piers, half under the span and half under the approach
+  pier(m.s0, MOVABLE_PIER_ALONG_M, half + MOVABLE_PIER_OUT_M);
+  pier(m.s1, MOVABLE_PIER_ALONG_M, half + MOVABLE_PIER_OUT_M);
+  // the leaves: steel along both edges, under the parapets (the deck's own concrete sides stay inside it)
+  const n = Math.max(2, Math.round(L / 2));
+  for (const side of [1, -1]) {
+    for (let i = 0; i < n; i++) {
+      const a = along(part, m.s0 + (L * i) / n, side * (half + 0.03), sArr); const b = along(part, m.s0 + (L * (i + 1)) / n, side * (half + 0.03), sArr);
+      beam(out.steel, [a[0], a[1], a[2] - LEAF_FASCIA_M / 2 - 0.1], [b[0], b[1], b[2] - LEAF_FASCIA_M / 2 - 0.1], 0.12, LEAF_FASCIA_M);
+    }
+  }
+}
+
 // ── suspension and cable-stayed ──────────────────────────────────────────────
 
 const LEG = [2.4, 3.0];       // a tower's / pylon's leg
@@ -580,6 +638,7 @@ const CROSSING_M = 45;        // cable / suspension decks this close side by sid
  * leads (deck.style.crossing = { decks, lead }); the others draw nothing of their own (their piers still
  * left out). Call after styleDecks.
  */
+const TWIN_HALF_SHARE = 0.7;
 export function linkCrossings(decks, { roads = [] } = {}) {
   const cs = decks.filter((d) => d.style && (d.style.type === 'cable' || d.style.type === 'suspension'));
   const longest = (d) => Math.max(...d.style.spans.map((sp) => sp.s1 - sp.s0));
@@ -593,9 +652,12 @@ export function linkCrossings(decks, { roads = [] } = {}) {
     const lead = g.reduce((a, b) => (longest(b) > longest(a) ? b : a));
     // what a tower's legs must keep out of: every deck's lanes (styled or not: a ramp alongside) and the
     // ground roads under the crossing
+    // (a twin: a deck of this crossing about as wide as the lead's, a divided road's other carriageway;
+    // a narrower deck flush alongside is a ramp outside the cable plane)
+    const leadHalf = Math.max(...lead.parts.map((p) => p.half));
     const obstacles = [
       ...decks.filter((d) => d !== lead).flatMap((d) => d.parts.map((p) => ({
-        xy: p.xy, z: p.z, half: p.half,
+        xy: p.xy, z: p.z, half: p.half, twin: g.includes(d) && p.half >= TWIN_HALF_SHARE * leadHalf,
         halfs: p.halfL ? p.xy.map((_, i) => Math.max(p.halfL[i], p.halfR[i])) : null,
       }))),
       ...roads.map((r) => ({ xy: r.xy, z: null, half: r.half, halfs: null })),
@@ -630,6 +692,23 @@ function nearestS(part, sArr, x, y) {
  * past any other deck of the crossing right beside (a leg never stands in a lane). Returns { P, n, feet:
  * [left, right] ground points, edges: [left, right] offsets on the lead's part, zDeck }.
  */
+// A divided road's carriageways side by side on one suspension or cable-stayed bridge (two OSM lines, two
+// decks at one height): its cable planes over the outer edges of them all, not over the lead deck's own
+// edge in the median (the Golden Gate's hangers came down on the line between its carriageways).
+const FLUSH_DZ_M = 1;
+function outerEdgeLat(crossing, lead, s, side) {
+  const P = along(lead.part, s, 0, lead.sArr);
+  const k = side > 0 ? 0 : 1;
+  let lat = sideHalf(lead.part, lead.sArr, s, k) + PARAPET_W_M;
+  for (let guard = 0; guard < 120; guard++) {
+    const q = along(lead.part, s, side * (lat + 0.5), lead.sArr);
+    const h = obstacleAt(crossing.obstacles || [], q[0], q[1]);
+    if (!h || !h.twin || h.z == null || Math.abs(h.z - P[2]) > FLUSH_DZ_M) break;
+    lat += 0.5;
+  }
+  return side * lat;
+}
+
 function leadEdges(crossing, lead, s) {
   const P = along(lead.part, s, 0, lead.sArr);
   const Q = along(lead.part, Math.min(lead.sArr.at(-1), s + 1), 0, lead.sArr);
@@ -667,7 +746,7 @@ function leadEdges(crossing, lead, s) {
     }
     return true;
   };
-  return { P, n, feet, knees, strutClear, edges: [edgeOf(1), -edgeOf(-1)], zDeck: P[2] };
+  return { P, n, feet, knees, strutClear, edges: [outerEdgeLat(crossing, lead, s, 1), outerEdgeLat(crossing, lead, s, -1)], zDeck: P[2] };
 }
 
 const EDGE_STRIP_M = 1;       // a stay may pass low over a lane's outermost metre (the edge line's strip), no further in
@@ -746,7 +825,7 @@ function obstacleAt(obstacles, x, y) {
       const r = (o.halfs ? o.halfs[i] + (o.halfs[i + 1] - o.halfs[i]) * t : o.half) + PARAPET_W_M + 0.3;
       if (Math.hypot(ax + vx * t - x, ay + vy * t - y) > r) continue;
       const z = o.z ? o.z[i] + (o.z[i + 1] - o.z[i]) * t : null;
-      if (!hit || (z ?? -Infinity) > (hit.z ?? -Infinity)) hit = { z };
+      if (!hit || (z ?? -Infinity) > (hit.z ?? -Infinity)) hit = { z, twin: !!o.twin };
     }
   }
   return hit;
@@ -766,6 +845,9 @@ function edgeFeet(b, crossing, lead, E, k, a0, a1) {
   // closer than their widths: the higher one covers the lower's edge) leaves its surface open (a foot
   // under it would bring the stay up through that deck's lanes)
   const edgeAt = (sd) => {
+    // (across a twin flush against it at its height: the far edge of the two)
+    const outer = outerEdgeLat(crossing, lead, sd, side);
+    if (Math.abs(outer) > sideHalf(lead.part, lead.sArr, sd, k) + PARAPET_W_M + 0.25) return outer;
     let lat = side * (sideHalf(lead.part, lead.sArr, sd, k) + PARAPET_W_M);
     for (let guard = 0; guard < 80; guard++) {
       const p = along(lead.part, sd, lat, lead.sArr);

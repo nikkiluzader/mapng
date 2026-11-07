@@ -28,7 +28,8 @@ export function structureOf(tags = {}) {
     bridge,
     tunnel,
     // a drawbridge opens for ships: no navigation clearance under it
-    movable: tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),
+    // (its kind where mapped: bascule, lift, swing; 'yes' for a movable span of no kind given)
+    movable: (tags['bridge:movable'] && tags['bridge:movable'] !== 'no') ? String(tags['bridge:movable']).toLowerCase() : (tags.bridge === 'movable' ? 'yes' : false),
     covered: tags.covered === 'yes',
     cutting: !!tags.cutting && tags.cutting !== 'no',
     embankment: !!tags.embankment && tags.embankment !== 'no',

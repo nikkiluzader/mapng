@@ -13,6 +13,7 @@ import { planDams, damAt, damGuardrails, damTopGeometry, assignDamAxes } from '.
 import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
 import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
+import { findBridgeTowers, towerPierGeometry, towerHouseTags } from './bridgeTowers.js';
 import { buildTexturedBuildings, buildingContext, screenBuilding, getBuildingMaterialDefs, garageExtras, isGarageFeature, FACADE_EMISSIVE_FILE, BUILDING_TILE_M, letterName } from './beamngBuildings.js';
 import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
@@ -1072,7 +1073,8 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops =
     const g = buildDeckGeometry(deck, { groundAt, roadLines, groundRoads, neighbours: decks.filter((d) => d !== deck).flatMap((d) => d.parts) });
     if (!g.positions.length) return;
     // its style (bridgeStyles.js): steel, concrete and stone apart
-    const style = deck.style ? buildStyleGeometry(deck, { groundAt, newBuilder: newBridgeBuilder, depthOf: deckDepthOf }) : null;
+    // (a movable span is drawn on a deck of no other style too)
+    const style = deck.style || deck.movableSpans?.length ? buildStyleGeometry(deck, { groundAt, newBuilder: newBridgeBuilder, depthOf: deckDepthOf }) : null;
     const pts = deck.parts.flatMap((p) => p.xy.map(([x, y], k) => [x, y, p.z[k]]));
     const origin = [
       Math.round(pts.reduce((n, p) => n + p[0], 0) / pts.length * 100) / 100,
@@ -1084,8 +1086,15 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops =
     const data = toDae(g.sides, origin);
     const deckData = toDae(g.top, origin);
     const extras = [];
+    // its tower houses' piers (bridgeTowers.js)
+    if (deck.towers?.length) {
+      const tb = newBridgeBuilder();
+      towerPierGeometry(tb, deck.towers, groundAt);
+      const d = tb.pos.length ? toDae({ positions: tb.pos, uvs: tb.uv }, origin, BRIDGE_MATERIAL) : null;
+      if (d) extras.push({ kind: 'towers', data: d, triangles: tb.pos.length / 9 });
+    }
     if (style) {
-      for (const [kind, b, material] of [['steel', style.steel, steelMaterial(deck.style.paint)], ['struct', style.concrete, BRIDGE_MATERIAL], ['stone', style.stone, BRIDGE_STONE_MATERIAL], ['cables', style.cable, steelMaterial('black')]]) {
+      for (const [kind, b, material] of [['steel', style.steel, steelMaterial(deck.style?.paint || deck.parts.find((p) => p.paint)?.paint || '')], ['struct', style.concrete, BRIDGE_MATERIAL], ['stone', style.stone, BRIDGE_STONE_MATERIAL], ['cables', style.cable, steelMaterial('black')]]) {
         if (!b.pos.length) continue;
         const d = toDae({ positions: b.pos, uvs: b.uv }, origin, material);
         if (d) extras.push({ kind, data: d, triangles: b.pos.length / 9 });
@@ -1317,7 +1326,7 @@ async function buildBuildingsOnWorkers(terrainData, features, project, options) 
   return { count, stats, tileDaes, meshes, triangles };
 }
 
-async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [], gateRoads = [], dams = null } = {}) {
+async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [], gateRoads = [], dams = null, replace = null } = {}) {
   if (!terrainData.osmFeatures?.length) return null;
 
   // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
@@ -1325,7 +1334,9 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
   const squareSize = worldSize / terrainData.width;
   // (carports are open roofs on posts: native carport models, not walls)
   // (a filling station's canopy: the game's pump island brings its own)
-  const features = terrainData.osmFeatures.filter((f) => !isCarportFeature(f) && !fuelLayout(terrainData, squareSize).used.has(f.id));
+  const features = terrainData.osmFeatures.filter((f) => !isCarportFeature(f) && !fuelLayout(terrainData, squareSize).used.has(f.id))
+    // (copies with export-only tags: a bridge's tower houses on their decks)
+    .map((f) => replace?.get(f) || f);
   const project = (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
   const buildOptions = { maxBuildings: caps.buildings, tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads, dams };
   const parallel = await buildBuildingsOnWorkers(terrainData, features, project, buildOptions);
@@ -6117,7 +6128,7 @@ function buildDeckPaths(terrainData, squareSize) {
     for (const piece of clipGeometryToMargin(f.geometry, terrainData.bounds)) {
       const nodes = resampleGeometryToSpacing(piece, 2).map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
       const layer = Number.parseFloat(tags.layer);
-      out.push({ nodes, half, wood: !concrete && (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk' || !tags.surface), ...(Number.isFinite(layer) ? { layer } : {}) });
+      out.push({ nodes, half, bridge: !pier, wood: !concrete && (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk' || !tags.surface), ...(Number.isFinite(layer) ? { layer } : {}) });
     }
   }
   return out;
@@ -9046,7 +9057,57 @@ function collectMappedStreetProps(terrainData, squareSize) {
   return out;
 }
 
-function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], props = null, underDeck = () => false, deckAt = () => null, seaZ = -Infinity } = {}) {
+// a bridge's lamp on its parapet: the parapet's middle past the road's edge (beamngBridges.js
+// PARAPET_W_M 0.45), on its top (PARAPET_H_M 0.9)
+const DECK_LAMP_PARAPET_OFF_M = 0.22;
+const DECK_LAMP_PARAPET_H_M = 0.9;
+/**
+ * The deck roads, each urban where a ground road at either of its ends is (a bridge over water has no
+ * buildings beside it: a town's main road lit up to the river was dark across its bridge). Its own lit=*
+ * still decides first (streetLamps.js isLitRoad).
+ */
+function deckRoadsForLamps(carriageways, ground) {
+  const decks = carriageways.filter((cw) => cw.bridge && !cw.tunnel && cw.nodes?.length >= 2);
+  // urban road points, gridded (a deck's end within DECK_LAMP_JOIN_M of one: it lands in town)
+  const CELL = 80; const grid = new Map();
+  const put = (p) => { const k = `${Math.floor(p[0] / CELL)},${Math.floor(p[1] / CELL)}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(p); };
+  for (const cw of ground) if (cw.urban) for (const p of cw.nodes || []) put(p);
+  const near = (p) => {
+    const cx = Math.floor(p[0] / CELL); const cy = Math.floor(p[1] / CELL);
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (const q of grid.get(`${cx + dx},${cy + dy}`) || []) if (Math.hypot(q[0] - p[0], q[1] - p[1]) < DECK_LAMP_JOIN_M) return true;
+    return false;
+  };
+  // (deck road to deck road: carried along a bridge of several parts)
+  const urban = new Set(decks.filter((cw) => cw.urban));
+  for (const cw of urban) for (const p of cw.nodes) put(p);
+  let changed = true;
+  for (let round = 0; changed && round < 20; round++) {
+    changed = false;
+    for (const cw of decks) {
+      if (urban.has(cw)) continue;
+      if (near(cw.nodes[0]) || near(cw.nodes[cw.nodes.length - 1])) { urban.add(cw); changed = true; for (const p of cw.nodes) put(p); }
+    }
+  }
+  return decks.map((cw) => (urban.has(cw) && !cw.urban ? { ...cw, urban: true } : cw));
+}
+const DECK_LAMP_JOIN_M = 80;   // (a bridge landing in a town: an urban road this near either end; the waterfront roads at its feet often have no buildings beside them)
+
+/** The nearest deck road's centreline point to (x, y): { x, y, z, half } or null. */
+function nearestDeckRoad(carriageways, x, y) {
+  let best = null;
+  for (const cw of carriageways) {
+    const n = cw.nodes || [];
+    for (let i = 0; i + 1 < n.length; i++) {
+      const vx = n[i + 1][0] - n[i][0]; const vy = n[i + 1][1] - n[i][1]; const L2 = vx * vx + vy * vy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((x - n[i][0]) * vx + (y - n[i][1]) * vy) / L2));
+      const px = n[i][0] + vx * t; const py = n[i][1] + vy * t; const d = Math.hypot(px - x, py - y);
+      if (!best || d < best.d) best = { d, x: px, y: py, z: n[i][2] + (n[i + 1][2] - n[i][2]) * t, half: cw.half };
+    }
+  }
+  return best;
+}
+
+function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], deckCarriageways = [], deckParts = [], props = null, underDeck = () => false, deckAt = () => null, seaZ = -Infinity } = {}) {
   const profile = getStreetFurnitureProfile(biome);
   if (!profile) return [];
 
@@ -9067,10 +9128,11 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   const LAMP_LIMIT = caps.streetLamps;
   const osmLampSpots = [];
   // Pole + dusk-to-dawn PointLight at the luminaire, arm toward `facing`.
-  const addLamp = (posX, posY, facing, name, asset = profile.lamp) => {
+  const addLamp = (posX, posY, facing, name, asset = profile.lamp, onZ = null) => {
     if (!asset?.shapeFile || lampCount >= LAMP_LIMIT) return;
-    const z = getTerrainHeightAtWorldXY(posX, posY, terrainData, squareSize);
-    if (underDeck(posX, posY, z, z + (asset.lightHeight ?? 6) + 1)) return;
+    // (a lamp on a bridge's parapet stands at its height: onZ)
+    const z = onZ ?? getTerrainHeightAtWorldXY(posX, posY, terrainData, squareSize);
+    if (onZ == null && underDeck(posX, posY, z, z + (asset.lightHeight ?? 6) + 1)) return;
     objects.push({
       __parent: 'street_furniture',
       class: 'TSStatic',
@@ -9191,6 +9253,18 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   for (let i = 0; i < generatedLamps.length; i++) {
     const lamp = generatedLamps[i];
     addLamp(lamp.x, lamp.y, lamp.facing, `street_lamp_gen_${i}`, lampFor(lamp.highway));
+  }
+  // ... and along lit bridges (the same rule: lit=yes, or an urban main road), on the parapet's top at
+  // the deck's height, the arm over the road (the ground pass keeps off decks: no lamp on the river bed)
+  const deckLamps = deckCarriageways.length ? generateRoadLamps(deckCarriageways, osmLampSpots, LAMP_LIMIT - lampCount, { litStreets: !northAmerica }) : [];
+  for (let i = 0; i < deckLamps.length; i++) {
+    const lamp = deckLamps[i];
+    // (the solved deck's own centreline, height and width: the carriageways' nodes are not at its height)
+    const at = nearestDeckRoad(deckParts.map((q) => ({ nodes: q.xy.map((v, k) => [v[0], v[1], q.z[k]]), half: q.half })), lamp.x, lamp.y);
+    if (!at) continue;
+    const d = Math.hypot(lamp.x - at.x, lamp.y - at.y) || 1;
+    const off = at.half + DECK_LAMP_PARAPET_OFF_M;
+    addLamp(at.x + ((lamp.x - at.x) / d) * off, at.y + ((lamp.y - at.y) / d) * off, lamp.facing, `bridge_lamp_${i}`, lampFor(lamp.highway), at.z + DECK_LAMP_PARAPET_H_M);
   }
 
   // Benches along major town streets (streetProps.js), facing the road.
@@ -12031,6 +12105,21 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     .filter((f) => f.type === 'bridge_infra' && f.geometry?.length > 2)
     .map((f) => ({ ring: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), tags: f.tags || {} }));
   const styledBridges = styleDecks(bridgeDecks, { outlines: bridgeOutlines, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
+  // buildings that are part of a bridge (a drawbridge's tower houses, services/bridgeTowers.js): their
+  // houses at the deck's height (copies of their features for the building pass), their piers drawn
+  // with the bridge
+  const bridgeTowers = bridgeDecks.length ? findBridgeTowers({
+    buildings: (exportTerrainData.osmFeatures || [])
+      .filter((f) => f.type === 'building' && f.geometry?.length > 2)
+      .map((f) => ({ f, ring: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)) })),
+    outlines: bridgeOutlines,
+    decks: bridgeDecks,
+    groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+    wetAt: buildWaterLookup(exportTerrainData, squareSize),
+  }) : [];
+  const bridgeTowerHouses = bridgeTowers.length ? new Map(bridgeTowers.map((t) => [t.f, { ...t.f, tags: towerHouseTags(t) }])) : null;
+  for (const t of bridgeTowers) (t.deck.towers ||= []).push(t);
+  if (bridgeTowers.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge tower houses: ${bridgeTowers.length} (${bridgeTowers.filter((t) => t.pier).length} on piers of their own).`);
   linkCrossings(bridgeDecks, { roads: groundCarriageways.map((cw) => ({ xy: cw.nodes, half: cw.half })) });
   // (a deck arch's road on its vault: a thin slab, no girders in the vault)
   thinArchDecks(bridgeDecks);
@@ -12582,6 +12671,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       gateRoads: gateWaysOf(exportTerrainData, groundCarriageways, squareSize),
       // (the dams the roads were pinned to: one crest for the road and the concrete)
       dams: decalRoads.structureGraph?.dams || null,
+      replace: bridgeTowerHouses,
     });
     osmDaeBlob = osm?.data || null;
     buildingTileDaes = osm?.tiles || [];
@@ -12775,6 +12865,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const trafficSignalObjects = buildTrafficSignalObjects(signalProps);
   const streetFurnitureObjects = buildStreetFurnitureObjects(exportTerrainData, squareSize, biome, {
     carriageways: groundCarriageways,
+    deckCarriageways: includeBridges ? deckRoadsForLamps(decalRoads.carriageways || [], groundCarriageways) : [],
+    deckParts: includeBridges ? bridgeDecks.flatMap((d) => d.parts) : [],
     props: streetProps,
     underDeck,
     deckAt: sidewalks.deckAt,

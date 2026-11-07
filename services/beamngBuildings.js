@@ -249,6 +249,7 @@ const ROOF_OVERHANG_M = 0.35;
 const ROOF_THICK_M = 0.12;
 const SOFFIT_TINT = [0.93, 0.92, 0.9];
 const RECT_FILL = 0.85;     // footprint / oriented-box area needed for a pitched roof
+const RECT_FILL_TAGGED = 0.75;   // ... where its roof shape is mapped (an octagonal tower's fills 0.83)
 
 const bandV = (band) => {
   const eps = 1.5 / 1024;
@@ -569,7 +570,9 @@ export function planBuilding(tags = {}, { area, seed, lat, lon, rectFill, levels
       ? (r('hip') < style.hipped ? 'hipped' : 'gabled')
       : 'flat';
   }
-  if (roof !== 'flat' && rectFill < RECT_FILL) roof = 'flat';
+  // (a pitched roof mapped on a near-square footprint with chamfered corners, a tower's: kept, on its box)
+  const taggedPitch = ['hipped', 'pyramidal', 'gabled'].includes(String(tags['roof:shape'] || '').toLowerCase());
+  if (roof !== 'flat' && rectFill < (taggedPitch ? RECT_FILL_TAGGED : RECT_FILL)) roof = 'flat';
   if (roof === 'skillion') roof = 'gabled';
   if (roof === 'pyramidal') roof = 'hipped';
   const pitch = Number.parseFloat(tags['roof:angle']) || style.pitch;
@@ -1492,7 +1495,9 @@ export function neighbourLevels(features, project) {
  */
 export function screenBuilding(f, project, businessTags = null) {
   if (!Array.isArray(f.geometry) || f.geometry.length < 3) return { skip: 'badGeometry' };
-  const projected = f.geometry.map((p) => project(p.lat, p.lng));
+  // (a bridge's tower house: on its pier at the deck's height, mapng:base_z, not on the river bed)
+  const baseZ = Number(f.tags?.['mapng:base_z']);
+  const projected = f.geometry.map((p) => { const q = project(p.lat, p.lng); return Number.isFinite(baseZ) ? [q[0], q[1], baseZ] : q; });
   let ring = cleanRing(projected.map(([x, y]) => [x, y]));
   if (ring.length < 3) return { skip: 'badGeometry' };
   let area = signedArea(ring);
@@ -1613,7 +1618,8 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
     const zMin = Math.min(...grounds);
     const zMax = Math.max(...grounds);
     const c = f.geometry[0];
-    const seed = `${f.id}:${c.lat.toFixed(6)}:${c.lng.toFixed(6)}`;
+    // (one look for a set built as one: a bridge's tower houses, mapng:look_seed)
+    const seed = f.tags?.['mapng:look_seed'] || `${f.id}:${c.lat.toFixed(6)}:${c.lng.toFixed(6)}`;
     // a multi-storey car park: decks and ramps (else, too small or odd for
     // ramps, a plain building)
     const tile = tileFor(ring);

@@ -880,3 +880,18 @@ test('a walk mapped along the curb and off it again has no wobble where it is pu
   }
   assert.ok(worst < 0.15, `at most 15 cm off over a metre either side (${worst.toFixed(3)} m)`);
 });
+
+test('a road bridge sidewalk swinging out round a tower stays at the deck height, not down to the water', async () => {
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  // the deck: a road along x at y=0, 150 m up, half width 5; the sea at 0 under it
+  const deck = { owner: 'd', half: 5, nodes: Array.from({ length: 51 }, (_, i) => [i * 4, 0, 150]), tags: { layer: '1' } };
+  // the sidewalk 6.5 m off the centreline, out to 12 m for 30 m round the tower (x 90..120)
+  const nodes = Array.from({ length: 101 }, (_, i) => { const x = i * 2; return [x, -(x > 90 && x < 120 ? 12 : 6.5), 0]; });
+  const runs = buildDeckRuns([{ nodes, half: 1.5, bridge: true, layer: 1 }], [deck], { groundAt: () => 0, seaZ: 0 });
+  const z = runs.flatMap((r) => r.centre.map((q) => q[2]));
+  assert.ok(z.length > 50);
+  assert.ok(Math.min(...z) > 148, `the sidewalk dips to ${Math.min(...z).toFixed(1)} m`);
+  // a pier over the water (not a bridge) still sits low over it
+  const pier = buildDeckRuns([{ nodes: nodes.map((q) => [q[0], -40, 0]), half: 1.2 }], [deck], { groundAt: () => 0, seaZ: 0 });
+  assert.ok(Math.max(...pier.flatMap((r) => r.centre.map((q) => q[2]))) < 5);
+});

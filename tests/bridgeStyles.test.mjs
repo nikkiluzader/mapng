@@ -299,3 +299,40 @@ test('deck arches under a rolling deck over an island: no rib or column into the
     assert.ok(n > 0, 'no arch built');
   }
 });
+
+test('a bascule span: wide end piers out past the deck, nothing over the road, no plain piers under its leaves', () => {
+  const p = part(0, 30, 0, 8, { movable: 'bascule', half: 3.5 });
+  const deck = { parts: [p] };
+  styleDecks([deck], { groundAt: () => -3 });
+  assert.equal(deck.movableSpans.length, 1);
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const g = buildStyleGeometry(deck, { groundAt: () => -3, newBuilder: segBuilder });
+  const zs = []; const ys = [];
+  for (let i = 0; i < g.concrete.pos.length; i += 3) { ys.push(g.concrete.pos[i + 1]); zs.push(g.concrete.pos[i + 2]); }
+  assert.ok(zs.length > 0, 'no end piers');
+  assert.ok(Math.max(...zs) <= 8 - 0.4, 'an end pier comes up through the road');
+  assert.ok(Math.max(...ys.map(Math.abs)) > 3.5 + 1.5, 'the end piers stay inside the deck');
+  assert.ok(g.steel.pos.length > 0, 'no steel on the leaves');
+  assert.equal(inStyledSpan(deck, 0, 15, 0), true, 'a plain pier may stand under the leaves');
+  assert.equal(inStyledSpan(deck, 0, 0.2, 0), false);
+});
+
+test('a suspension span mapped as two carriageways side by side: cable planes over their outer edges, nothing in the median', async () => {
+  const { linkCrossings } = await import('../services/bridgeStyles.js');
+  // two 9 m carriageways, centrelines 9.4 m apart (edge to edge, a 0.4 m line between them)
+  const a = { parts: [part(0, 600, 0, 60, { structure: 'suspension', half: 4.5 })] };
+  const b = { parts: [part(0, 600, -9.4, 60, { structure: 'suspension', half: 4.5 })] };
+  styleDecks([a, b], { groundAt: flat });
+  linkCrossings([a, b]);
+  const segBuilder = () => ({ ...builder(), segments: [] });
+  const g = [a, b].map((d) => buildStyleGeometry(d, { groundAt: flat, newBuilder: segBuilder }));
+  const all = g.flatMap((x) => [...x.cable.segments, ...x.steel.segments, ...x.concrete.segments]);
+  assert.ok(all.length > 30, 'no structure');
+  for (const [p, q, w] of all) {
+    for (let t = 0; t <= 1.0001; t += 0.05) {
+      const y = p[1] + (q[1] - p[1]) * t; const z = p[2] + (q[2] - p[2]) * t;
+      // anything between the outer edges (-13.9 .. 4.5) within headroom over the road
+      if (y > -13.9 + w / 2 && y < 4.5 - w / 2 && z > 60 + 0.05 && z < 60 + 5) assert.fail(`a member over the lanes at y ${y.toFixed(2)}, z ${z.toFixed(2)}`);
+    }
+  }
+});

@@ -78,16 +78,27 @@ async function fetchOne({ name, lat, lng, size }) {
     } else console.warn('points', r.status);
   }
   const B = 0.002;
-  const rurl = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${bounds.north + B}&bbox_bottom=${bounds.south - B}&bbox_left=${bounds.west - B}&bbox_right=${bounds.east + B}&res_m=best&projection=best&tight_bounds=false`;
-  const rr = await fetch(rurl, { headers: { 'x-api-key': KEY } });
-  if (!rr.ok) throw new Error(`hires-raster ${rr.status} ${await rr.text()}`);
-  const tiffBuf = await rr.arrayBuffer();
-  fs.writeFileSync(`${OUT}/gpxz.tif`, Buffer.from(tiffBuf));
-  const tiff = await GeoTIFF.fromArrayBuffer(tiffBuf);
-  image = await tiff.getImage();
-  const raster = (await image.readRasters())[0];
+  // (the raster API takes 10 km2 a request: a bigger area in a grid of overlapping tiles, as the app)
+  const areaKm2 = (SIZE * MPP / 1000) ** 2 * 1.25;
+  const nTiles = areaKm2 > 9 ? Math.ceil(Math.sqrt(areaKm2 / 8)) : 1;
+  const tiles = [];
+  const dLat = (bounds.north - bounds.south) / nTiles; const dLng = (bounds.east - bounds.west) / nTiles;
+  for (let ty = 0; ty < nTiles; ty++) for (let tx = 0; tx < nTiles; tx++) {
+    const n = bounds.north - ty * dLat + B; const sB = bounds.north - (ty + 1) * dLat - B;
+    const w = bounds.west + tx * dLng - B; const e = bounds.west + (tx + 1) * dLng + B;
+    const rurl = `https://api.gpxz.io/v1/elevation/hires-raster?bbox_top=${n}&bbox_bottom=${sB}&bbox_left=${w}&bbox_right=${e}&res_m=best&projection=best&tight_bounds=false`;
+    const rr = await fetch(rurl, { headers: { 'x-api-key': KEY } });
+    if (!rr.ok) throw new Error(`hires-raster ${rr.status} ${await rr.text()}`);
+    const tiffBuf = await rr.arrayBuffer();
+    fs.writeFileSync(nTiles > 1 ? `${OUT}/gpxz_${ty}_${tx}.tif` : `${OUT}/gpxz.tif`, Buffer.from(tiffBuf));
+    const tiff = await GeoTIFF.fromArrayBuffer(tiffBuf);
+    const img = await tiff.getImage();
+    tiles.push({ image: img, raster: (await img.readRasters())[0] });
+    image = img;
+  }
   rasterRes = image.getResolution();
-  gpxz = await resampleToMeterGrid({ type: 'geotiff', data: [{ image, raster }] }, center, SIZE, SIZE, 'bilinear', gpxzSmooth, true, bounds, true);
+  if (nTiles > 1) console.log(name, 'gpxz in', tiles.length, 'tiles');
+  gpxz = await resampleToMeterGrid({ type: 'geotiff', data: tiles }, center, SIZE, SIZE, 'bilinear', gpxzSmooth, true, bounds, true);
   fs.writeFileSync(`${OUT}/gpxz.f32`, Buffer.from(gpxz.heightMap.buffer));
   }
 

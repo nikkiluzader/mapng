@@ -25,6 +25,7 @@ import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
 import { roundRoadCorners } from "./roadCurves.js";
 import { measureStreetWidths } from "./streetWidths.js";
+import { fitTwinCarriageways } from "./twinCarriageways.js";
 import { decodeTerrariumPixels, blendTerrariumTileSeams, sampleTerrariumHeights, wrapMosaicX } from "./terrariumSampling.js";
 import { continuousLngRange } from "./lngRange.js";
 import { lowerRaisedWater } from "./waterBanks.js";
@@ -159,7 +160,8 @@ const globalTerrainSmoothRadius = (metersPerPixel) => {
 // Streets lined by buildings take the width between their walls (OSM rarely
 // tags one: a class default made Tokyo's 4 m lanes 8 m wide), before anything
 // draws or levels them, so the game texture, the preview and the export agree.
-const shapeRoads = (osmFeatures) => measureStreetWidths(roundRoadCorners(osmFeatures).features).features;
+// (then a divided road's carriageways fitted side by side: twinCarriageways.js)
+const shapeRoads = (osmFeatures) => fitTwinCarriageways(measureStreetWidths(roundRoadCorners(osmFeatures).features).features).features;
 
 const decodeTerrariumHeight = (r, g, b) => {
   const h = r * 256 + g + b / 256 - 32768;

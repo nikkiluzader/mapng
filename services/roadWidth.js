@@ -340,6 +340,19 @@ export function estimateRoadCrossSection(tags = {}, highway, isOneWay = false, {
     }
   }
 
+  // a cap only (twinCarriageways.js: a divided road's carriageway fitted beside its twin): narrower,
+  // the extras give way first, then the lanes, to the cap; never wider
+  const cap = parseRoadWidthMeters(tags['mapng:carriageway_max']);
+  if (Number.isFinite(cap) && cap > 0 && cap / 2 < carriagewayHalfWidth) {
+    const half = cap / 2;
+    const extras = (leftExtra + rightExtra) / 2;
+    const keepExtras = Math.max(0, half - drivingHalfWidth);
+    const f = extras > 0 ? Math.min(1, keepExtras / extras) : 0;
+    leftExtra *= f; rightExtra *= f;
+    drivingHalfWidth = Math.min(drivingHalfWidth, half - (leftExtra + rightExtra) / 2);
+    carriagewayHalfWidth = drivingHalfWidth + (leftExtra + rightExtra) / 2;
+  }
+
   return {
     drivingHalfWidth,
     leftExtra,

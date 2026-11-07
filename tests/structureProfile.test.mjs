@@ -316,3 +316,18 @@ test('profile: a river mapped with its banks inside: the deck clears the banks t
   const { z } = solveProfiles({ edges: [deck], nodes, pins: [[0, 0, 8], [0, 40, 8]], crossings: { crossings: [], water: [{ edge: 0, i0: 5, i1: 35, need: 3 }] } });
   for (let i = 5; i <= 35; i++) assert.ok(z[0][i] - 2.2 >= g[i] + 0.5 - 0.05, `the deck's underside ${(z[0][i] - 2.2 - g[i]).toFixed(2)} m over the bank at ${i * 2} m`);
 });
+
+test('profile: a divided road\'s two decks side by side meet at one height (no step between them)', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // two parallel 400 m decks 9.2 m apart (halves 4.5), pinned at their ends 0.6 m apart in height
+  const mk = (y, z0, z1, from, to) => {
+    const n = 101; const s = Float64Array.from({ length: n }, (_, i) => i * 4);
+    return { x: s.slice(), y: new Float64Array(n).fill(y), s, g: new Float64Array(n).fill(0), from, to, highway: 'motorway', layer: 1, half: 4.5, bridge: true, tunnel: false, _z: [z0, z1] };
+  };
+  const a = mk(0, 60, 60, 'A0', 'A1'); const b = mk(9.2, 60.6, 60.6, 'B0', 'B1');
+  const nodes = new Map([['A0', { edges: [{ edge: 0, end: 0 }] }], ['A1', { edges: [{ edge: 0, end: 1 }] }], ['B0', { edges: [{ edge: 1, end: 0 }] }], ['B1', { edges: [{ edge: 1, end: 1 }] }]]);
+  const { z } = solveProfiles({ edges: [a, b], nodes, pins: [[0, 0, 60], [0, 100, 60], [1, 0, 60.6], [1, 100, 60.6]], crossings: { crossings: [], water: [] } });
+  // mid-span: one height; at the ends: their own (pinned)
+  assert.ok(Math.abs(z[0][50] - z[1][50]) < 0.02, `a step of ${(z[1][50] - z[0][50]).toFixed(2)} m mid-span`);
+  assert.ok(Math.abs(z[0][0] - 60) < 1e-6 && Math.abs(z[1][0] - 60.6) < 1e-6, 'the ends moved');
+});

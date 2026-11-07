@@ -2586,6 +2586,7 @@ const WALK_ATTACH_CLEAR_M = 0.3;
  * that deck's height. paths: [{ nodes, half, wood }], roads: the bridge
  * carriageways. Their posts stand wherever the deck is clear of the ground.
  */
+const DECK_PATH_BRIDGE_GAP_M = 250;   // a bridge sidewalk off its deck this long at most is carried across
 export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
   if (!groundAt) return [];
   const index = bridges?.length ? buildCarriagewayIndex(bridges) : null;
@@ -2606,11 +2607,26 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
     // the upper deck's median)
     const ours = (hit) => { const l = layerByOwner.get(hit.owner); return !Number.isFinite(path.layer) || !Number.isFinite(l) || l === path.layer; };
     const roadsAt = (q) => (index ? carriagewaysAt(index, q[0], q[1], DECK_ROAD_M).filter(ours) : []);
+    const onRoad = nodes.map((q) => roadsAt(q)[0] || null);
     const raw = nodes.map((q, i) => {
-      const road = roadsAt(q)[0] || null;
+      const road = onRoad[i];
       if (road) return road.z + CURB_H - WALK_H;
       return onLand(i) ? ground[i] : least;
     });
+    // a road bridge's sidewalk leaving its deck's edge for a stretch (round a tower's legs, a
+    // cantilevered walkway past the cable planes): on a line between its heights either side, not
+    // down to the water and up again (the Golden Gate's sidewalks)
+    if (path.bridge) {
+      const sAt = [0]; for (let i = 1; i < nodes.length; i++) sAt.push(sAt[i - 1] + Math.hypot(nodes[i][0] - nodes[i - 1][0], nodes[i][1] - nodes[i - 1][1]));
+      for (let i = 0; i < nodes.length; i++) {
+        if (onRoad[i]) continue;
+        let a = i - 1; while (a >= 0 && !onRoad[a]) a--;
+        let b = i + 1; while (b < nodes.length && !onRoad[b]) b++;
+        if (a < 0 || b >= nodes.length || sAt[b] - sAt[a] > DECK_PATH_BRIDGE_GAP_M) continue;
+        const t = (sAt[i] - sAt[a]) / ((sAt[b] - sAt[a]) || 1);
+        raw[i] = raw[a] + (raw[b] - raw[a]) * t;
+      }
+    }
     let z = raw;
     for (let pass = 0; pass < 4; pass++) z = z.map((v, i) => (i === 0 || i === z.length - 1 ? v : (z[i - 1] + 2 * v + z[i + 1]) / 4));
     const onBridge = nodes.some((q) => roadsAt(q).length);

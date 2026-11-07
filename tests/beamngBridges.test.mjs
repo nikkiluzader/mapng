@@ -506,3 +506,13 @@ test("a low deck's sides wall down to the ground, but never across a road passin
   assert.ok(wallsAt([]) > 0, 'walled down where nothing passes under');
   assert.equal(wallsAt([under]), 0, 'open over the track');
 });
+
+test('a level deck: its road surface object has height (the game draws no decals on a flat box)', () => {
+  const xy = []; for (let x = 0; x <= 200; x += 4) xy.push([x, 0]);
+  const deck = { parts: [{ xy, z: xy.map(() => 50), half: 4 }] };
+  const top = buildDeckGeometry(deck, { groundAt: () => 0 }).top.positions;
+  let lo = Infinity; let hi = -Infinity;
+  for (let i = 2; i < top.length; i += 3) { lo = Math.min(lo, top[i]); hi = Math.max(hi, top[i]); }
+  assert.ok(hi - lo >= 0.1, `the road surface box is ${(hi - lo).toFixed(3)} m tall`);
+  assert.ok(Math.abs(hi - 50) < 1e-6, 'nothing of it over the road');
+});

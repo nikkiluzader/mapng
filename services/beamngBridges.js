@@ -582,6 +582,7 @@ const GIRDER_W_M = 0.6;
 const GIRDER_EVERY_M = 3;
 export const PARAPET_W_M = 0.45;       // slab past the road's edge, a parapet on it
 const PARAPET_H_M = 0.9;
+const TOP_SKIRT_M = 0.15;     // the road surface object's skirt under its edges (its box must have height)
 const FOOTING_M = 2;                   // a pier reaches this far into the ground
 const PIER_T_M = 1.8;                  // a wall pier's thickness along the deck
 const PIER_CAP_H_M = 1.2;
@@ -1171,6 +1172,11 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
     const right = (k) => [-nrm[k][0], -nrm[k][1], 0];
     // slab: top (under the road decal), sides, underside
     top.strip(L, R, () => [0, 0, 1]);
+    // (and a thin skirt under its edges, inside the slab's sides: a level deck's top alone is a flat box
+    // and the game draws no decals on a box without height: the Golden Gate's road had no paint)
+    const Ls = row(outL, -TOP_SKIRT_M); const Rs = row(outR, -TOP_SKIRT_M);
+    top.strip(Ls, L, (k) => [nrm[k][0], nrm[k][1], 0]);
+    top.strip(R, Rs, (k) => [-nrm[k][0], -nrm[k][1], 0]);
     runs(L, Lb, sides[0].shown, left);
     runs(R, Rb, sides[1].shown, right);
     b.strip(Lb, Rb, () => [0, 0, -1]);
