@@ -75,3 +75,22 @@ test('splitAtDams: a road is cut into its own piece where it runs on a dam', asy
   assert.ok(pieces[1].slice(1, -1).every((p) => Math.abs(p.x) <= 40), 'the middle piece on the dam');
   assert.equal(splitAtDams(pts, [], (p) => [p.x, 0]).length, 1);
 });
+
+test('arch dams: a dam with a road takes that road as its axis; the air side flares out with depth, the water side stays straight', async () => {
+  const { planDams, buildDam, damTopGeometry } = await import('../services/dams.js');
+  // gorge along y; the lake south (bed at 60 m), the valley north (floor 0 m)
+  const ground = (x, y) => (Math.abs(x) > 30 ? 100 : y < -6 ? 60 : Math.abs(x) * 0.5);
+  const [d] = planDams([feat([[-40, -6], [40, -6], [40, 6], [-40, 6], [-40, -6]], { waterway: 'dam' })], project, { groundAt: ground });
+  d.axis = Array.from({ length: 21 }, (_, i) => [-40 + i * 4, 0]);
+  d.half = 3.5;
+  const m = recorder();
+  assert.equal(buildDam(m, d, ground), 'arch dam');
+  const pts = m.tris.flatMap(([, v]) => v);
+  const low = pts.filter((p) => p[2] < 20);
+  assert.ok(low.some((p) => p[1] > 5), 'deep down, the dam reaches out on the valley side');
+  assert.ok(Math.max(...low.map((p) => p[1])) > 15, 'and flares: thicker at the foot than at the crest');
+  assert.ok(pts.every((p) => p[1] >= -5 - 1e-6), 'the water side straight down from the crest edge');
+  const top = damTopGeometry(d);
+  const zs = top.positions.filter((_, k) => k % 3 === 2);
+  assert.ok(zs.some((z) => z === 100) && zs.every((z) => z >= 99), 'the crest top: a strip over the axis at the crest, with its skirt');
+});

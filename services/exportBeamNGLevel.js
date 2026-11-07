@@ -9,7 +9,7 @@ import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
-import { planDams, damAt, damGuardrails, damTopGeometry } from './dams.js';
+import { planDams, damAt, damGuardrails, damTopGeometry, assignDamAxes } from './dams.js';
 import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
 import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
@@ -11754,6 +11754,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const drawnHalf = new Map();
     for (const cw of decalRoads.carriageways || []) drawnHalf.set(cw.owner, Math.max(drawnHalf.get(cw.owner) || 0, cw.half || 0));
     for (const e of sg.edges) { const h = drawnHalf.get(e.seg); if (h > e.half) e.half = h; }
+    // (a dam with a road on it shaped round that road: services/dams.js)
+    if (sg.dams?.length) assignDamAxes(sg);
     const decks = decksFromSolver(sg);
     const parts = decks.flatMap((d) => d.parts);
     sg.built = true;
