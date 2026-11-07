@@ -176,3 +176,40 @@ test('decks forking at a node stay one surface while their lanes overlap', async
   assert.ok(worst(0) <= 0.03, `main deck grade ${(worst(0) * 100).toFixed(1)}%`);
   assert.ok(worst(1) <= 0.075, `ramp grade ${(worst(1) * 100).toFixed(1)}%`);
 });
+
+test('profile: a tunnel road the tunnel builder left out stays on its ground', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // a tunnel-tagged road over a 10 m hill, not built (today's tunnels
+  // pinned, this one not among them): a road on the ground, not a straight
+  // line under the hill with no tube round it
+  const n = 61; const x = []; const g = [];
+  for (let i = 0; i < n; i++) { x.push(i * 4); g.push(10 * Math.exp(-(((i - 30) / 25) ** 2))); }
+  const e = { x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(x), g: Float64Array.from(g), from: 'A', to: 'B', highway: 'secondary', layer: -1, half: 4, bridge: false, tunnel: true };
+  const nodes = new Map([['A', { edges: [{ edge: 0, end: 0 }] }], ['B', { edges: [{ edge: 0, end: 1 }] }]]);
+  const { z } = solveProfiles({ edges: [e], nodes, pins: [], tunnelsPinned: true, crossings: { crossings: [], water: [] } });
+  let worst = 0;
+  for (let i = 0; i < n; i++) worst = Math.max(worst, Math.abs(z[0][i] - g[i]));
+  assert.ok(worst < 1, `${worst.toFixed(1)} m off its ground`);
+});
+
+test('profile: a deck mapped as two ways meeting mid-span is one line from rim to rim', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // a canyon 100 m deep and 240 m wide; the bridge is two ways joined over
+  // the river (the second drawn the other way round), rims at 100 m
+  const half = (dir, from, to) => {
+    const n = 31; const x = []; const g = [];
+    for (let i = 0; i < n; i++) { const xx = dir > 0 ? -120 + i * 4 : 120 - i * 4; x.push(xx); g.push(Math.abs(xx) > 110 ? 100 : 0); }
+    return { x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(x.map((_, i) => i * 4)), g: Float64Array.from(g), from, to, highway: 'motorway', layer: 1, half: 6, bridge: true, tunnel: false };
+  };
+  const west = half(1, 'W', 'M'); const east = half(-1, 'E', 'M');
+  const road = (x0, from, to) => { const n = 11; const x = Array.from({ length: n }, (_, i) => x0 + (x0 < 0 ? -1 : 1) * i * 4); return { x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(x.map((_, i) => i * 4)), g: new Float64Array(n).fill(100), from, to, highway: 'motorway', layer: 0, half: 6, bridge: false, tunnel: false }; };
+  const wr = road(-120, 'W', 'w'); const er = road(120, 'E', 'e');
+  const nodes = new Map([
+    ['W', { edges: [{ edge: 0, end: 0 }, { edge: 2, end: 0 }] }], ['E', { edges: [{ edge: 1, end: 0 }, { edge: 3, end: 0 }] }],
+    ['M', { edges: [{ edge: 0, end: 1 }, { edge: 1, end: 1 }] }], ['w', { edges: [{ edge: 2, end: 1 }] }], ['e', { edges: [{ edge: 3, end: 1 }] }],
+  ]);
+  const water = [{ edge: 0, i0: 3, i1: 30, need: 10 }, { edge: 1, i0: 3, i1: 30, need: 10 }];
+  const { z } = solveProfiles({ edges: [west, east, wr, er], nodes, pins: [], crossings: { crossings: [], water } });
+  const low = Math.min(...z[0], ...z[1]);
+  assert.ok(low > 98, `deck sags to ${low.toFixed(1)} m (rims at 100 m)`);
+});

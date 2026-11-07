@@ -220,3 +220,53 @@ test('a deck arch carries a thin slab (no girders in its vault); a truss keeps i
   assert.equal(arch.parts[0].depth, 0.5);
   assert.equal(truss.parts[0].depth, undefined);
 });
+
+test('an arch over a gorge, mapped as two ways meeting mid-span: one concrete arch under the deck, wall to wall', () => {
+  // a gorge 200 m deep and 300 m wide (walls at |x| 150), the deck at 200 m in two parts meeting at x 0
+  const gorge = (x) => (Math.abs(x) > 150 ? 200 : 200 - 200 * Math.cos((x / 150) * Math.PI / 2));
+  const west = part(-220, 0, 0, 200, { structure: 'arch' }); const east = part(0, 220, 0, 200, { structure: 'arch' });
+  const deck = { parts: [west, east] };
+  styleDecks([deck], { groundAt: (x) => gorge(x) });
+  const g = buildStyleGeometry(deck, { groundAt: (x) => gorge(x), newBuilder: builder });
+  assert.equal(g.steel.pos.length, 0, 'no steel arch over the deck');
+  assert.ok(g.concrete.pos.length > 0, 'a concrete arch');
+  for (let i = 2; i < g.concrete.pos.length; i += 3) assert.ok(g.concrete.pos[i] <= 200 + 1e-6, 'nothing over the road');
+  // one arch: its lowest points are at the walls, not on the river under the middle
+  let midLow = Infinity;
+  for (let i = 0; i < g.concrete.pos.length; i += 3) if (Math.abs(g.concrete.pos[i]) < 20) midLow = Math.min(midLow, g.concrete.pos[i + 2]);
+  assert.ok(midLow > 150, `the arch comes down to ${midLow.toFixed(0)} m mid-span`);
+});
+
+test('a long arch low over its span (a harbour arch) stays a steel arch over the deck', () => {
+  const p = part(0, 500, 0, 50, { structure: 'arch' });
+  const deck = { parts: [p] };
+  styleDecks([deck], { groundAt: flat });
+  const g = buildStyleGeometry(deck, { groundAt: flat, newBuilder: builder });
+  assert.ok(g.steel.pos.length > 0);
+});
+
+test('an arch typed by its outline is drawn off the approach spans mapped as beam bridges', () => {
+  const p = part(-300, 300, 0, 50);
+  const deck = { parts: [p] };
+  const ring = (x0, x1) => [[x0, -20], [x1, -20], [x1, 20], [x0, 20]];
+  const outlines = [
+    { ring: ring(-310, 310), tags: { man_made: 'bridge', 'bridge:structure': 'arch' } },
+    { ring: ring(-310, -150), tags: { man_made: 'bridge', 'bridge:structure': 'beam' } },
+    { ring: ring(150, 310), tags: { man_made: 'bridge', 'bridge:structure': 'beam' } },
+  ];
+  styleDecks([deck], { outlines, groundAt: flat });
+  assert.equal(deck.style.type, 'arch');
+  for (const sp of deck.style.spans) assert.ok(sp.s0 >= 148 && sp.s1 <= 452, `span ${sp.s0.toFixed(0)}..${sp.s1.toFixed(0)} on the approaches`);
+});
+
+test('an arch with its own outline inside the whole bridge\'s is drawn inside it only', () => {
+  const p = part(-300, 300, 0, 50);
+  const deck = { parts: [p] };
+  const ring = (x0, x1) => [[x0, -20], [x1, -20], [x1, 20], [x0, 20]];
+  const outlines = [
+    { ring: ring(-310, 310), tags: { man_made: 'bridge', 'bridge:structure': 'arch' } },
+    { ring: ring(-150, 150), tags: { man_made: 'bridge', 'bridge:structure': 'arch' } },
+  ];
+  styleDecks([deck], { outlines, groundAt: flat });
+  for (const sp of deck.style.spans) assert.ok(sp.s0 >= 148 && sp.s1 <= 452, `span ${sp.s0.toFixed(0)}..${sp.s1.toFixed(0)}`);
+});

@@ -63,10 +63,11 @@ const RAW_DECK_RAMP_FACTOR = 2; // a deck that may not shape its approaches ramp
 // ground was still sagging toward it when the sweeps ran out (a 1.5 km
 // viaduct dipped to 2.6 m over the ground between abutments at 10 m).
 const TAUT_ANCHORS_MAX = 48;
-function tautProfile(Z, L, U, s, base, n, freeA = false, freeB = false, G = null) {
+function tautProfile(Z, L, U, idx, s, freeA = false, freeB = false, G = null) {
+  const n = idx.length;
   if (n < 3) return 0;
   const anchors = [0, n - 1];
-  const zA = new Map([[0, Z[base]], [n - 1, Z[base + n - 1]]]);
+  const zA = new Map([[0, Z[idx[0]]], [n - 1, Z[idx[n - 1]]]]);
   // a free end (the road leaves the map there): nothing holds it, it is
   // carried level from the nearest anchor inside (a viaduct cut by the map
   // edge came down to the ground there, its deck through the terrain)
@@ -74,8 +75,8 @@ function tautProfile(Z, L, U, s, base, n, freeA = false, freeB = false, G = null
   // the envelopes allow at the end; a far junction's height carried flat
   // stood a deck 3 m over the deck it forks from)
   // (never under the ground at the map edge: a deck dived 6 m into a hillside there)
-  const clampAt = (i, z) => { const v = base + i; const lo = Math.max(L[v], G ? G[v] : -Infinity); return Math.min(Math.max(lo, U[v]), Math.max(lo, z)); };
-  const lowest = (i) => (Number.isFinite(L[base + i]) ? clampAt(i, L[base + i]) : Z[base + i]);
+  const clampAt = (i, z) => { const v = idx[i]; const lo = Math.max(L[v], G ? G[v] : -Infinity); return Math.min(Math.max(lo, U[v]), Math.max(lo, z)); };
+  const lowest = (i) => (Number.isFinite(L[idx[i]]) ? clampAt(i, L[idx[i]]) : Z[idx[i]]);
   const carry = () => {
     const inner = anchors.length >= 3;
     if (freeA) zA.set(0, inner ? clampAt(0, zA.get(anchors[1])) : lowest(0));
@@ -90,7 +91,7 @@ function tautProfile(Z, L, U, s, base, n, freeA = false, freeB = false, G = null
       const a = anchors[k]; const b = anchors[k + 1]; const za = zA.get(a); const zb = zA.get(b);
       const span = s[b] - s[a] || 1;
       for (let i = a + 1; i < b; i++) {
-        const v = base + i; const z = za + (zb - za) * ((s[i] - s[a]) / span);
+        const v = idx[i]; const z = za + (zb - za) * ((s[i] - s[a]) / span);
         const lo = L[v]; const hi = Math.max(lo, U[v]);
         if (lo - z > worst) { worst = lo - z; at = i; to = lo; }
         else if (z - hi > worst) { worst = z - hi; at = i; to = hi; }
@@ -100,12 +101,12 @@ function tautProfile(Z, L, U, s, base, n, freeA = false, freeB = false, G = null
     let k = 0; while (anchors[k] < at) k++;
     anchors.splice(k, 0, at); zA.set(at, to);
   }
-  for (const i of [0, n - 1]) if ((i === 0 ? freeA : freeB) && anchors.length >= 2) { const v = base + i; moved = Math.max(moved, Math.abs(zA.get(i) - Z[v])); Z[v] = zA.get(i); }
+  for (const i of [0, n - 1]) if ((i === 0 ? freeA : freeB) && anchors.length >= 2) { const v = idx[i]; moved = Math.max(moved, Math.abs(zA.get(i) - Z[v])); Z[v] = zA.get(i); }
   for (let k = 0; k + 1 < anchors.length; k++) {
     const a = anchors[k]; const b = anchors[k + 1]; const za = zA.get(a); const zb = zA.get(b);
     const span = s[b] - s[a] || 1;
     for (let i = a + 1; i < b; i++) {
-      const v = base + i;
+      const v = idx[i];
       const z = Math.min(Math.max(L[v], U[v]), Math.max(L[v], za + (zb - za) * ((s[i] - s[a]) / span)));
       moved = Math.max(moved, Math.abs(z - Z[v])); Z[v] = z;
     }
@@ -118,7 +119,7 @@ function tautProfile(Z, L, U, s, base, n, freeA = false, freeB = false, G = null
 // keeps its slope; a short hollow or spike in the elevation data, steeper
 // than the slope around it, is bridged by fill or cut). A deck or tunnel
 // does not follow the ground: its class limit only.
-function allowedRise(e) {
+function allowedRise(e, structure = !!(e.bridge || e.tunnel)) {
   const lim = gradeLimit(e.highway);
   const n = e.s.length; const out = new Float64Array(Math.max(0, n - 1));
   const g = (i) => (Number.isFinite(e.g[i]) ? e.g[i] : 0);
@@ -128,7 +129,7 @@ function allowedRise(e) {
   let a = 0; let b = 0; let a2 = 0; let b2 = 0;
   for (let i = 0; i + 1 < n; i++) {
     const ds = e.s[i + 1] - e.s[i];
-    if (e.bridge || e.tunnel) { out[i] = lim * ds; continue; }
+    if (structure) { out[i] = lim * ds; continue; }
     const mid = (e.s[i] + e.s[i + 1]) / 2;
     while (a + 1 < n && e.s[a + 1] <= mid - LONG_GRADE_M) a++;
     while (b + 1 < n && e.s[b] < mid + LONG_GRADE_M) b++;
@@ -168,8 +169,15 @@ function makeHeap(key, sign) {
  * A generator (yields between rounds and sweep blocks, for the browser);
  * solveProfiles() for a plain call.
  */
+// A structure for the solve: a bridge, or a tunnel someone builds (with
+// today's tunnels pinned, one the tunnel builder left out is a road on the
+// ground: solved as a structure, a straight line between its ends, it ran
+// 24 m under a Monaco hill with no tube round it)
+const structureFor = (graph) => (e) => !!(e.bridge || (e.tunnel && (e.external || !graph.tunnelsPinned)));
+
 export function* solveProfilesSteps(graph) {
   const { edges, nodes } = graph;
+  const asStructure = structureFor(graph);
   // (roads of different layers alongside, overlapping: held apart as crossings are)
   const crossings = [...(graph.crossings?.crossings || []), ...(graph.crossings?.overlaps || [])];
   const water = graph.crossings?.water || [];
@@ -181,7 +189,7 @@ export function* solveProfilesSteps(graph) {
     for (let i = 0; i < e.s.length; i++) {
       const v = off[k] + i;
       G[v] = Number.isFinite(e.g[i]) ? e.g[i] : 0;
-      W[v] = e.bridge || e.tunnel ? W_STRUCTURE : W_GROUND;
+      W[v] = asStructure(e) ? W_STRUCTURE : W_GROUND;
       edgeOf[v] = k;
     }
   });
@@ -195,7 +203,7 @@ export function* solveProfilesSteps(graph) {
   });
   // (a plain deck between held approaches, terrain shaping off, may ramp
   // this much steeper than its class: it must rise within its own length)
-  const stepRise = edges.map((e, k) => (graph.noCut?.[k] ? allowedRise(e).map((r) => r * RAW_DECK_RAMP_FACTOR) : allowedRise(e)));
+  const stepRise = edges.map((e, k) => (graph.noCut?.[k] ? allowedRise(e, asStructure(e)).map((r) => r * RAW_DECK_RAMP_FACTOR) : allowedRise(e, asStructure(e))));
   // neighbours: along each edge (with the step's allowed rise) and between
   // the ends meeting at a node (no rise)
   const nbr = Array.from({ length: N }, () => []);
@@ -253,9 +261,9 @@ export function* solveProfilesSteps(graph) {
   {
     // (not a structure's approach: a road meeting one at a node ramps to it)
     const structNode = new Set();
-    for (const e of edges) if (e.bridge || e.tunnel || e.external) { structNode.add(e.from); structNode.add(e.to); }
+    for (const e of edges) if (asStructure(e) || e.external) { structNode.add(e.from); structNode.add(e.to); }
     edges.forEach((e, k) => {
-      if (e.bridge || e.tunnel || e.external || structNode.has(e.from) || structNode.has(e.to)) return;
+      if (asStructure(e) || e.external || structNode.has(e.from) || structNode.has(e.to)) return;
       banded.fill(1, off[k], off[k] + e.s.length);
     });
   }
@@ -350,6 +358,62 @@ export function* solveProfilesSteps(graph) {
   // (a node where a road leaves the map: nothing beyond it holds a deck
   // down; a tunnel road nobody bores stays to the ground there)
   const freeEnd = (id) => nodes.get(id)?.kind === 'edgeOfMap';
+  // structure edges joined end to end at a node of their own (a deck mapped
+  // as two ways meeting mid-span) are one taut line from abutment to
+  // abutment: solved apart, their shared node started at the river's level
+  // and the sweeps never lifted it back (an arch bridge sagged 85 m)
+  const taut = edges.map((e, k) => asStructure(e) && W[off[k]] === 0);
+  const chains = [];
+  {
+    const seen = new Uint8Array(edges.length);
+    // the one other taut edge through a node with exactly two ends, or null
+    const across = (id, k) => {
+      const node = nodes.get(id);
+      if (!node || node.edges.length !== 2) return null;
+      const o = node.edges.find((x) => x.edge !== k);
+      return o && taut[o.edge] && !seen[o.edge] ? o : null;
+    };
+    edges.forEach((e, k) => {
+      if (!taut[k] || seen[k]) return;
+      seen[k] = 1;
+      // walk back to the chain's start, then forward
+      const back = []; let cur = { edge: k, rev: false };
+      for (;;) {
+        const ce = edges[cur.edge]; const startNode = cur.rev ? ce.to : ce.from;
+        const o = across(startNode, cur.edge);
+        if (!o) break;
+        seen[o.edge] = 1;
+        cur = { edge: o.edge, rev: o.end === 0 };   // entering it at its end 0 means we walk it backwards
+        back.push(cur);
+      }
+      const list = [...back.reverse(), { edge: k, rev: false }];
+      cur = list[list.length - 1];
+      for (;;) {
+        const ce = edges[cur.edge]; const endNode = cur.rev ? ce.from : ce.to;
+        const o = across(endNode, cur.edge);
+        if (!o) break;
+        seen[o.edge] = 1;
+        cur = { edge: o.edge, rev: o.end !== 0 };
+        list.push(cur);
+      }
+      const idx = []; const ss = []; let acc = 0;
+      for (const { edge, rev } of list) {
+        const ce = edges[edge]; const n = ce.s.length;
+        for (let j = 0; j < n; j++) {
+          const i = rev ? n - 1 - j : j;
+          if (j > 0) acc += Math.abs(ce.s[i] - ce.s[rev ? i + 1 : i - 1]);
+          idx.push(off[edge] + i); ss.push(acc);
+        }
+      }
+      const first = list[0]; const last = list[list.length - 1];
+      const fe = edges[first.edge]; const le = edges[last.edge];
+      chains.push({
+        idx: Int32Array.from(idx), s: Float64Array.from(ss),
+        freeA: !!fe.bridge && freeEnd(first.rev ? fe.to : fe.from),
+        freeB: !!le.bridge && freeEnd(last.rev ? le.from : le.to),
+      });
+    });
+  }
   const projectNetwork = () => {
     let moved = 0;
     for (let pass = 0; pass < 4; pass++) {
@@ -434,13 +498,15 @@ export function* solveProfilesSteps(graph) {
       edges.forEach((e, k) => {
         const base = off[k];
         // (a structure with no pull to its ground anywhere: straight between its ends, inside the envelopes)
-        if (W[base] === 0 && (e.bridge || e.tunnel)) { moved = Math.max(moved, tautProfile(Z, FL, FU, e.s, base, e.s.length, e.bridge && freeEnd(e.from), e.bridge && freeEnd(e.to), G)); return; }
+        if (taut[k]) return;   // (solved as chains below)
         for (let i = 1; i + 1 < e.s.length; i++) {
           const v = base + i;
           const next = Math.min(U[v], Math.max(L[v], (W[v] * G[v] + SMOOTH * (Z[v - 1] + Z[v + 1])) / (W[v] + 2 * SMOOTH)));
           moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
         }
       });
+      // (a structure with no pull to its ground anywhere: straight between its ends, inside the envelopes)
+      for (const c of chains) moved = Math.max(moved, tautProfile(Z, FL, FU, c.idx, c.s, c.freeA, c.freeB, G));
       for (const ends of meets) {
         let sw = 0; let sz = 0; let lo = -Infinity; let hi = Infinity;
         for (const v of ends) { sw += W[v]; sz += W[v] * Z[v]; lo = Math.max(lo, L[v]); hi = Math.min(hi, U[v]); }
@@ -493,6 +559,7 @@ export function solveProfiles(graph) {
  */
 export function profileResidual(graph, z) {
   const { edges, nodes } = graph;
+  const asStructure = structureFor(graph);
   let joint = 0; let crossing = 0; let grade = 0; let water = 0; let cover = 0;
   for (const node of nodes.values()) {
     if (node.edges.length < 2) continue;
@@ -508,15 +575,15 @@ export function profileResidual(graph, z) {
     crossing = Math.max(crossing, c.sep - (zu - zd));
   }
   edges.forEach((e, k) => {
-    const rise = allowedRise(e);
+    const rise = allowedRise(e, asStructure(e));
     for (let i = 0; i + 1 < e.s.length; i++) {
       const moved = Math.abs(z[k][i] - e.g[i]) > 0.05 || Math.abs(z[k][i + 1] - e.g[i + 1]) > 0.05;
-      if (!(e.bridge || e.tunnel || moved)) continue;
+      if (!(asStructure(e) || moved)) continue;
       const ds = (e.s[i + 1] - e.s[i]) || 1;
       // (no steeper than the solve allows, or than the ground already was)
       grade = Math.max(grade, (Math.abs(z[k][i + 1] - z[k][i]) - Math.max(rise[i], Math.abs(e.g[i + 1] - e.g[i]))) / ds);
     }
-    if (e.tunnel) for (let i = 1; i + 1 < e.s.length; i++) cover = Math.max(cover, z[k][i] - (e.g[i] - TUNNEL_COVER_M));
+    if (e.tunnel && asStructure(e)) for (let i = 1; i + 1 < e.s.length; i++) cover = Math.max(cover, z[k][i] - (e.g[i] - TUNNEL_COVER_M));
   });
   for (const run of graph.crossings?.water || []) {
     for (let i = run.i0; i <= run.i1; i++) water = Math.max(water, edges[run.edge].g[i] + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M - z[run.edge][i]);

@@ -183,7 +183,18 @@ export function styleDecks(decks, { outlines = [], groundAt }) {
       if (!paint && (o.tags.colour || o.tags['bridge:colour'])) paint = o.tags.colour || o.tags['bridge:colour'];
       if (!material && o.tags.material) material = String(o.tags.material).toLowerCase();
     }
-    Object.assign(p, { type, source, paint, material });
+    // outlines of another type over parts of it (a harbour arch's approach spans mapped as beam
+    // bridges): its style is drawn off them (Sydney's arch ran on over 600 m of approach viaduct)
+    const others = type ? outlines.filter((o) => o.tags['bridge:structure'] && typeOfTags({ structure: o.tags['bridge:structure'], bridgeKind: o.tags.bridge }) !== type) : [];
+    // ... and outlines of its own type over only part of it (the main span's own outline inside the
+    // whole bridge's): its style is drawn inside those only
+    const n = p.part.xy.length;
+    const within = type ? outlines.filter((o) => {
+      if (typeOfTags({ structure: o.tags['bridge:structure'], bridgeKind: o.tags.bridge }) !== type) return false;
+      const k = p.part.xy.filter(([x, y]) => inRing(x, y, o.ring)).length;
+      return k > 0 && k < 0.9 * n;
+    }) : [];
+    Object.assign(p, { type, source, paint, material, others, within });
   }
   // twins: an untyped part running alongside a typed one takes its type
   const dirOf = (xy) => { const a = xy[0]; const b = xy[xy.length - 1]; const L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1; return [(b[0] - a[0]) / L, (b[1] - a[1]) / L]; };
@@ -215,13 +226,33 @@ export function styleDecks(decks, { outlines = [], groundAt }) {
     const mine = parts.filter((p) => p.deck === deck && p.type);
     if (!mine.length) continue;
     const spans = [];
-    for (const p of mine) for (const sp of spansOf(p.part, groundAt, SPAN_RULES[p.type] || {})) spans.push({ part: p.pi, ...sp });
+    for (const p of mine) for (const sp of spansOf(p.part, groundAt, SPAN_RULES[p.type] || {})) for (const piece of offOthers(p, sp)) spans.push({ part: p.pi, ...piece });
     if (!spans.length) continue;
     const main = mine[0];
     deck.style = { type: main.type, paint: paintOf(mine.find((p) => p.paint)?.paint), material: main.material, source: main.source, corridor: mine.some((p) => p.twin) ? 2 : 1, spans };
     styled++;
   }
   return styled;
+}
+
+// A span with the stretches inside another type's outline left out (pieces of MIN_RUN_M / the type's run).
+function offOthers(p, sp) {
+  if (!p.others?.length && !p.within?.length) return [sp];
+  const s = arcs(p.part.xy); const xy = p.part.xy;
+  const minRun = (SPAN_RULES[p.type] || {}).minRun ?? MIN_RUN_M;
+  const out = []; let start = null;
+  for (let k = 0; k < xy.length; k++) {
+    const inSpan = s[k] >= sp.s0 - 1e-6 && s[k] <= sp.s1 + 1e-6;
+    const ok = inSpan && !p.others.some((o) => inRing(xy[k][0], xy[k][1], o.ring))
+      && (!p.within.length || p.within.some((o) => inRing(xy[k][0], xy[k][1], o.ring)));
+    if (ok && start === null) start = s[k];
+    if ((!ok || k === xy.length - 1) && start !== null) {
+      const end = ok ? s[k] : s[k - 1];
+      if (end - start >= minRun) out.push({ s0: Math.max(sp.s0, start), s1: Math.min(sp.s1, end) });
+      start = null;
+    }
+  }
+  return out;
 }
 
 /** Whether a pier at (x, y) of part pi stands inside one of the deck's styled spans (it spans it). */
@@ -250,8 +281,8 @@ export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () =>
   const out = { steel: newBuilder(), concrete: newBuilder(), stone: newBuilder(), cable: newBuilder() };
   const st = deck.style;
   if (!st) return out;
-  for (const sp of st.spans) {
-    const part = deck.parts[sp.part];
+  for (const sp of archRuns(deck, st)) {
+    const part = sp.virtual || deck.parts[sp.part];
     const sArr = arcs(part.xy);
     const off = part.half + PARAPET_W_M + SIDE_GAP_M;
     const L = sp.s1 - sp.s0;
@@ -264,7 +295,7 @@ export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () =>
         if (k > 0) archPier(out.concrete, part, sArr, sub.s0, groundAt, depthOf(part), false);
       }
     }
-    else if (st.type === 'arch' && L >= THROUGH_ARCH_M) arch(out.steel, part, sArr, sp, off, L);
+    else if (st.type === 'arch' && L >= THROUGH_ARCH_M && highClear(part, sArr, sp, groundAt) <= L * THROUGH_ARCH_LOW) arch(out.steel, part, sArr, sp, off, L);
     else if (st.type === 'suspension' || st.type === 'cable') {
       // one set of towers per crossing, drawn by its lead deck (once, on its main span)
       if ((st.crossing?.lead ?? deck) !== deck || sp !== mainSpan(deck).sp) continue;
@@ -278,9 +309,13 @@ export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () =>
       const clears = [];
       for (let k = 0; k <= 8; k++) { const p = along(part, sp.s0 + (L * k) / 8, 0, sArr); clears.push(p[2] - groundAt(p[0], p[1])); }
       clears.sort((a, c) => a - c);
+      // (over a gorge, the deck high over the whole span: one arch from wall to wall, not a row of 60 m
+      // arches on 200 m legs)
+      const gorge = !stone && clears[6] >= GORGE_CLEAR_M;
+      const b = stone ? out.stone : out.concrete;
+      if (gorge) { gorgeArch(b, part, sArr, sp, L, groundAt, depthOf(part)); continue; }
       const target = Math.max(18, Math.min(60, clears[4] * 2.2));
       const n = Math.max(1, Math.round(L / target));
-      const b = stone ? out.stone : out.concrete;
       for (let k = 0; k < n; k++) {
         const sub = { s0: sp.s0 + (L * k) / n, s1: sp.s0 + (L * (k + 1)) / n };
         deckArch(b, part, sArr, sub, sub.s1 - sub.s0, groundAt, depthOf(part), stone);
@@ -292,6 +327,83 @@ export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () =>
 }
 
 const TRUSS_MAX_M = 120;      // a truss spans at most this; longer runs are several, a pier between
+const THROUGH_ARCH_LOW = 0.2;  // ... and only with the deck low over its span (Sydney: 50 m over 500 m); higher, a deck arch
+const GORGE_CLEAR_M = 30;      // a deck this high over its span's middle: a gorge, one arch wall to wall
+const GORGE_RISE = 0.2;        // a gorge arch's rise over its span
+
+/** The span's clearance over the ground, upper quartile of 9 samples (its approach stretches, lower, aside). */
+function highClear(part, sArr, sp, groundAt) {
+  const c = [];
+  for (let k = 0; k <= 8; k++) { const p = along(part, sp.s0 + ((sp.s1 - sp.s0) * k) / 8, 0, sArr); c.push(p[2] - groundAt(p[0], p[1])); }
+  return c.sort((a, b) => a - b)[6];
+}
+
+/**
+ * An arch style's spans with spans of parts joined end to end (a bridge mapped as two ways meeting
+ * mid-span) as one: { virtual: a part of both, s0, s1 }. Drawn per way, each half sprang from the river
+ * under the middle (or one half went steel over the deck and the other in small arches). Other styles:
+ * the spans as they are.
+ */
+function archRuns(deck, st) {
+  if (st.type !== 'arch') return st.spans;
+  const end = (p, last) => p.xy[last ? p.xy.length - 1 : 0];
+  const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1;
+  const info = st.spans.map((sp) => { const part = deck.parts[sp.part]; const L = arcs(part.xy).at(-1); return { sp, part, L, atStart: sp.s0 < 1, atEnd: sp.s1 > L - 1 }; });
+  const used = new Set(); const out = [];
+  for (const a of info) {
+    if (used.has(a)) continue;
+    // a run: a's span to its part's end, on into a span from the next part's start (or end, the other way)
+    const b = a.atEnd && info.find((o) => o !== a && !used.has(o) && ((o.atStart && near(end(a.part, true), end(o.part, false))) || (o.atEnd && near(end(a.part, true), end(o.part, true)))));
+    if (!b) { out.push(a.sp); continue; }
+    used.add(a); used.add(b);
+    const fwd = near(end(a.part, true), end(b.part, false));
+    const bxy = fwd ? b.part.xy : [...b.part.xy].reverse(); const bz = fwd ? b.part.z : [...b.part.z].reverse();
+    const virtual = { ...a.part, xy: [...a.part.xy, ...bxy.slice(1)], z: [...a.part.z, ...bz.slice(1)], halfL: undefined, halfR: undefined };
+    const s1 = a.L + (fwd ? b.sp.s1 : b.L - b.sp.s0);
+    out.push({ part: a.sp.part, virtual, s0: a.sp.s0, s1 });
+  }
+  return out;
+}
+
+/**
+ * One concrete arch across a gorge: it springs from the walls where the ground lies a fifth of the arch's
+ * span under the deck (not from the rims, level with the road), spandrel columns up to the deck, and
+ * columns from the ground beyond the springings to the span's ends.
+ */
+function gorgeArch(b, part, sArr, sp, L, groundAt, depth) {
+  const half = part.half + PARAPET_W_M;
+  const clearAt = (s) => { const p = along(part, s, 0, sArr); return p[2] - groundAt(p[0], p[1]); };
+  let a = sp.s0; let c = sp.s1;
+  for (let i = 0; i < 400 && c - a > 20; i++) {
+    const want = (c - a) * GORGE_RISE;
+    const okA = clearAt(a) >= want; const okC = clearAt(c) >= want;
+    if (okA && okC) break;
+    if (!okA) a += 2;
+    if (!okC) c -= 2;
+  }
+  const crown = along(part, (a + c) / 2, 0, sArr)[2] - depth - 0.15;
+  const ga = groundAt(...along(part, a, 0, sArr).slice(0, 2)); const gc = groundAt(...along(part, c, 0, sArr).slice(0, 2));
+  const springs = [Math.min(ga + 0.3, crown - 2), Math.min(gc + 0.3, crown - 2)];
+  const La = c - a;
+  if (La < 20) return;
+  const zOf = (t) => springs[0] + (springs[1] - springs[0]) * t + Math.max(0, crown - (springs[0] + springs[1]) / 2) * 4 * t * (1 - t);
+  const m = Math.max(16, Math.round(La / 4));
+  const ribW = Math.max(3, half * 1.4);
+  const pts = Array.from({ length: m + 1 }, (_, i) => { const t = i / m; const p = along(part, a + La * t, 0, sArr); return [p[0], p[1], zOf(t)]; });
+  for (let i = 0; i < m; i++) beam(b, pts[i], pts[i + 1], ribW, 2.4);
+  // columns: on the rib inside the springings, from the ground outside them
+  const step = Math.max(COLUMN_M * 2, 12);
+  for (let s = sp.s0 + step / 2; s < sp.s1 - 2; s += step) {
+    const deckUnder = along(part, s, 0, sArr)[2] - depth - 0.15;
+    const inArch = s > a && s < c;
+    const zb = inArch ? zOf((s - a) / La) + 1.2 : groundAt(...along(part, s, 0, sArr).slice(0, 2));
+    if (deckUnder - zb < 0.8) continue;
+    for (const o of [half * 0.55, -half * 0.55]) {
+      const p = along(part, s, o, sArr);
+      beam(b, [p[0], p[1], zb], [p[0], p[1], deckUnder], 1.4, 1.4);
+    }
+  }
+}
 const THROUGH_ARCH_M = 250;   // an arch spanning this far in one: steel over the deck (Sydney Harbour), else deck arches
 const SHORT_ARCH_M = 30;
 const STONE_MATERIALS = new Set(['stone', 'masonry', 'brick', 'granite', 'sandstone', 'limestone']);
@@ -349,7 +461,7 @@ function truss(b, part, sArr, sp, off, L) {
 }
 
 function arch(b, part, sArr, sp, off, L) {
-  const rise = Math.min(40, Math.max(8, L * ARCH_RISE));
+  const rise = Math.min(100, Math.max(8, L * ARCH_RISE));
   const m = Math.max(12, Math.round(L / 5));
   const sides = [off, -off];
   const z0 = along(part, sp.s0, 0, sArr)[2]; const z1 = along(part, sp.s1, 0, sArr)[2];
