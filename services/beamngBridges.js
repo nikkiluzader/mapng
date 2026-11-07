@@ -741,6 +741,85 @@ const deckUnder = (p, decks, zLow, zHigh) => decks.some((q) => {
   return false;
 });
 
+// A bent over the lower decks under a pier site: the offsets [left, right]
+// (along nrm) of a column outside every lower deck's lanes crossing the pier
+// line, or null (too wide, a column on a road, no headroom under the cap).
+const STRADDLE_MAX_M = 44;
+const STRADDLE_HEAD_M = 3.8;   // the upper deck's girders this far over a lower deck's road (no cap beam: the columns carry the deck)
+function straddleBent(x, y, nrm, decks, g, zTop, roadLines) {
+  let lo = Infinity; let hi = -Infinity; let zLow = -Infinity;
+  for (const q of decks) {
+    for (let j = 0; j + 1 < q.xy.length; j++) {
+      const [ax, ay] = q.xy[j]; const [bx, by] = q.xy[j + 1];
+      const vx = bx - ax; const vy = by - ay; const len = Math.hypot(vx, vy) || 1e-9;
+      // where the pier line (x, y) + t * nrm crosses this segment
+      const den = nrm[0] * vy - nrm[1] * vx;
+      if (Math.abs(den) < 1e-9) continue;
+      const wx = ax - x; const wy = ay - y;
+      const t = (wx * vy - wy * vx) / den; const sq = (wx * nrm[1] - wy * nrm[0]) / den;
+      if (sq < -1e-6 || sq > 1 + 1e-6 || Math.abs(t) > STRADDLE_MAX_M) continue;
+      const zq = q.z[j] + (q.z[j + 1] - q.z[j]) * sq;
+      if (zq < g - 1 || zq > zTop) continue;
+      const sin = Math.abs(nrm[0] * vy - nrm[1] * vx) / len;
+      const reach = ((q.half ?? 0) + PIER_ROAD_EDGE_M) / Math.max(0.3, sin);
+      lo = Math.min(lo, t - reach); hi = Math.max(hi, t + reach);
+      zLow = Math.max(zLow, zq);
+    }
+  }
+  if (!Number.isFinite(lo)) return null;
+  const left = lo - PIER_COLUMN_M / 2; const right = hi + PIER_COLUMN_M / 2;
+  if (right - left > STRADDLE_MAX_M || zTop - zLow < STRADDLE_HEAD_M) return null;
+  for (const off of [left, right]) {
+    const p = [x + nrm[0] * off, y + nrm[1] * off];
+    if (nearAnySegment(p, roadLines, PIER_ROAD_EDGE_M + PIER_COLUMN_M) || deckUnder(p, decks, g - 1, zTop)) return null;
+  }
+  return [left, right];
+}
+
+// Columns under a deck stacked over roads on the ground (Upper over Lower
+// Wacker): the offsets (along nrm) of slim columns in the gaps between the
+// lower lanes and just outside them, within the deck's width, or null (no
+// headroom, no room for a column, or columns bunched to one side). The
+// deck floated: every pier site stood on a lower road and was left out.
+const AMONG_STEP_M = 0.25;
+const AMONG_CURB_M = 0.6;      // a column this far from a lower lane's edge (on its curb)
+const AMONG_OUT_M = 1.5;       // ... or this far out past the deck's edge, under a cap
+function columnsAmongRoads(x, y, nrm, width, g, zTop, decks, roadLines) {
+  if (zTop - g < STRADDLE_HEAD_M) return null;
+  const W = width / 2 + AMONG_OUT_M;
+  const n = Math.round((2 * W) / AMONG_STEP_M);
+  const free = [];
+  for (let k = 0; k <= n; k++) {
+    const t = -W + k * AMONG_STEP_M;
+    // (the column's faces too, not its centre alone, clear of the lanes)
+    free.push([-PIER_COLUMN_M / 2, 0, PIER_COLUMN_M / 2].every((d) => {
+      const p = [x + nrm[0] * (t + d), y + nrm[1] * (t + d)];
+      return !nearRoadEdge(p, roadLines, AMONG_CURB_M) && !deckUnder(p, decks, g - 1, zTop);
+    }));
+  }
+  // free runs: a column at an inner gap's middle, at an outer run's lane side
+  const cols = [];
+  for (let k = 0; k <= n;) {
+    if (!free[k]) { k++; continue; }
+    let e = k; while (e + 1 <= n && free[e + 1]) e++;
+    const a = -W + k * AMONG_STEP_M; const b = -W + e * AMONG_STEP_M;
+    if (k === 0 && e === n) return null;   // nothing under it: a plain pier
+    if (k === 0) cols.push(b); else if (e === n) cols.push(a); else cols.push((a + b) / 2);
+    k = e + 1;
+  }
+  // (one column alone: a C-bent at the curb, the deck reaching over the
+  // lanes from it; two or more spread across the deck)
+  if (!cols.length || (cols.length >= 2 && cols[cols.length - 1] - cols[0] < 0.4 * width)) return null;
+  return cols;
+}
+// (within a lane edge + margin of a road line: its half width, 3 m unknown)
+const nearRoadEdge = (p, lines, margin) => lines.length > 0 && anySegmentNear(lines, p, segmentIndex(lines).maxHalf + margin, (line, j) => {
+  const [ax, ay] = line[j]; const [bx, by] = line[j + 1];
+  const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy || 1e-9;
+  const t = Math.max(0, Math.min(1, ((p[0] - ax) * vx + (p[1] - ay) * vy) / L2));
+  return Math.hypot(ax + vx * t - p[0], ay + vy * t - p[1]) < (line.half ?? 3) + margin;
+});
+
 export function pierSites(part, { groundAt, roadLines = [], decks = [] }) {
   const { xy, z, half } = part;
   const s = arcLengths(xy);
@@ -767,12 +846,23 @@ export function pierSites(part, { groundAt, roadLines = [], decks = [] }) {
       const u = [(xy[j + 1][0] - xy[j][0]) / len, (xy[j + 1][1] - xy[j][1]) / len];
       const nrm = [-u[1], u[0]];
       const foot = [[x, y], [x + nrm[0] * pw / 2, y + nrm[1] * pw / 2], [x - nrm[0] * pw / 2, y - nrm[1] * pw / 2]];
-      if (foot.some((p) => nearAnySegment(p, roadLines, PIER_ROAD_M))) continue;
       const zTop = z[j] + (z[j + 1] - z[j]) * f - under;
       const g = groundAt(x, y);
+      if (foot.some((p) => nearAnySegment(p, roadLines, PIER_ROAD_M))) {
+        const cols = off === 0 ? columnsAmongRoads(x, y, nrm, width, g, zTop, decks, roadLines) : null;
+        if (cols) { out.push({ x, y, u, width, pierWidth: pw, zTop, zBottom: g - FOOTING_M, straddle: cols }); break; }
+        continue;
+      }
       if (zTop - g < PIER_MIN_CLEAR_M) break;
-      // (nor through a lower deck's lanes: stacked ramps, a car hit one)
-      if (foot.some((p) => deckUnder(p, decks, g - 1, zTop))) continue;
+      // (nor through a lower deck's lanes: stacked ramps, a car hit one;
+      // a deck stacked right under this one is straddled by a bent instead,
+      // a column each side of it: a double-deck bridge's upper deck had no
+      // support at all, floating over the lower one)
+      if (foot.some((p) => deckUnder(p, decks, g - 1, zTop))) {
+        const bent = off === 0 ? straddleBent(x, y, nrm, decks, g, zTop, roadLines) : null;
+        if (bent) { out.push({ x, y, u, width, pierWidth: pw, zTop, zBottom: g - FOOTING_M, straddle: bent }); break; }
+        continue;
+      }
       out.push({ x, y, u, width, pierWidth: pw, zTop, zBottom: g - FOOTING_M });
       break;
     }
@@ -1151,7 +1241,20 @@ export function buildDeckGeometry(deck, { groundAt, roadLines = [], groundRoads:
       // (a truss or arch spans its span: no pier inside it)
       if (inStyledSpan(deck, pi, p.x, p.y)) continue;
       const deckW = p.width;
-      if (deckW > PIER_BENT_W_M) {
+      if (p.straddle) {
+        // a column each side of the deck under it, up to the girders (no cap
+        // beam over the lower deck's lanes: no headroom for one), and a cap
+        // on each column out to the deck's edge where it stands beside it
+        const hw = deckW / 2;
+        for (const off of p.straddle) {
+          b.box(p.x - p.u[1] * off, p.y + p.u[0] * off, p.u, PIER_COLUMN_M / 2, PIER_COLUMN_M / 2, p.zBottom, p.zTop);
+          const edge = off < 0 ? -hw : hw;
+          if (Math.abs(off) > hw) {
+            const a = Math.min(off, edge); const c = Math.max(off, edge); const m = (a + c) / 2;
+            b.box(p.x - p.u[1] * m, p.y + p.u[0] * m, p.u, PIER_T_M / 2, (c - a) / 2 + PIER_COLUMN_M / 2, p.zTop - PIER_CAP_H_M, p.zTop);
+          }
+        }
+      } else if (deckW > PIER_BENT_W_M) {
         const cols = Math.max(2, Math.round(deckW / 8));
         const span = deckW - 2 * PIER_COLUMN_M;
         for (let c = 0; c < cols; c++) {

@@ -60,10 +60,14 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
   if (!z) return { segments: [], stats: {} };
   // stations over a road: around every crossing this edge is the upper of
   const overRoad = edges.map((e) => new Uint8Array(e.s.length));
-  for (const c of graph.crossings?.crossings || []) {
+  // (and along a road it is stacked over, graph.crossings.overlaps, where
+  // it was lifted over it: held on its ground, Untouched, it stays a road)
+  const zAt = (side) => { const zz = z[side.edge]; return zz[side.i] + (zz[Math.min(side.i + 1, zz.length - 1)] - zz[side.i]) * (side.f || 0); };
+  for (const c of [...(graph.crossings?.crossings || []), ...(graph.crossings?.overlaps || [])]) {
     const up = c[c.upper]; const dn = c[c.upper === 'a' ? 'b' : 'a'];
     // (over a tunnel the road stands on the ground or its roof: no deck)
     if (edges[dn.edge].tunnel || edges[dn.edge].external) continue;
+    if (c.rule === 'overlap' && zAt(up) - zAt(dn) < DECK_MIN_H) continue;
     const e = edges[up.edge];
     const reach = (edges[dn.edge].half || 4) + OVER_ROAD_MARGIN_M;
     for (let i = 0; i < e.s.length; i++) if (Math.abs(e.s[i] - up.s) <= reach) overRoad[up.edge][i] = 1;

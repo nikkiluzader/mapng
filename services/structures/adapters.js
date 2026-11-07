@@ -99,6 +99,10 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
   const bySeg = new Map();
   edges.forEach((e, k) => { if (!bySeg.has(e.seg)) bySeg.set(e.seg, []); bySeg.get(e.seg).push(k); });
   let decals = 0; let nodes = 0;
+  // a grass / dirt edge blend hangs past the deck: clipped over objects it
+  // smears down the parapets and walls (and over a stacked deck under it),
+  // so its stretches on a deck are left off (as today's builder does)
+  const cutEdges = [];
   for (const g of groups || []) {
     for (const d of g.__items || []) {
       if (d.__owner === undefined || !Array.isArray(d.nodes)) continue;
@@ -107,6 +111,9 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
       const pieces = bySeg.get(d.__owner);
       if (!pieces) continue;
       let onDeck = false;
+      const edgeBlend = typeof d.__layer === 'string' && d.__layer.startsWith('edge_');
+      const deckNode = edgeBlend ? new Uint8Array(d.nodes.length) : null;
+      let ni = -1;
       // nodes run along the stations: search near the last match first
       let lastK = -1; let lastI = 0;
       const scan = (k, from, to, acc, node) => {
@@ -117,6 +124,7 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
         }
       };
       for (const node of d.nodes) {
+        ni++;
         const acc = { best: Infinity, k: -1, i: 0 };
         if (lastK >= 0) {
           // track along the road: widen the window only while the best match
@@ -151,15 +159,32 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
         }
         node[2] = Math.round((bz + (bk === 'deck' ? deckLift : 0)) * 1000) / 1000;
         // (a dam's crest too: without overObjects the game lays the decal on the terrain)
-        if (bk === 'deck' || bk === 'dam') onDeck = true;
+        if (bk === 'deck' || bk === 'dam') { onDeck = true; if (deckNode) deckNode[ni] = 1; }
         nodes++;
       }
+      if (onDeck && edgeBlend) { cutEdges.push([g, d, deckNode]); continue; }
       if (onDeck) d.overObjects = true;
       // (its position with its first node: a decal over a dam's notch kept the
       // ground's height there, 35 m under its road, and drew nowhere near it)
       if (Array.isArray(d.position) && d.nodes[0]) d.position = [d.nodes[0][0], d.nodes[0][1], d.nodes[0][2]];
       decals++;
     }
+  }
+  for (const [g, d, deckNode] of cutEdges) {
+    const runs = [];
+    let run = [];
+    d.nodes.forEach((node, i) => { if (deckNode[i]) { if (run.length >= 2) runs.push(run); run = []; } else run.push(node); });
+    if (run.length >= 2) runs.push(run);
+    const at = g.__items.indexOf(d);
+    if (at < 0) continue;
+    const pieces = runs.map((nodes, k) => {
+      const piece = { ...d, nodes, name: runs.length > 1 ? `${d.name}_e${k + 1}` : d.name, persistentId: k === 0 ? d.persistentId : (globalThis.crypto?.randomUUID?.() ?? `${String(d.persistentId).slice(0, -4)}${String(k).padStart(4, '0')}`) };
+      if (Array.isArray(piece.position)) piece.position = [nodes[0][0], nodes[0][1], nodes[0][2]];
+      for (const key of ['__owner', '__layer']) if (d[key] !== undefined) Object.defineProperty(piece, key, { value: d[key], enumerable: false });
+      return piece;
+    });
+    g.__items.splice(at, 1, ...pieces);
+    decals += pieces.length;
   }
   return { decals, nodes };
 }

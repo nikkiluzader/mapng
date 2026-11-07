@@ -2367,7 +2367,9 @@ export const fetchTerrainData = async (
   // The global 30 m is a radar surface model in most of the world: dense districts stand on their rooftops.
   // Buildings, woods and viaduct decks come out first, so the creeks, roads and bridges below sit on ground.
   let groundFilterInfo = null;
-  if (!flat && !raw && !rawData && groundFilter && osmFeatures.length > 0) {
+  // (also a lidar source that only had coarse data here, smoothed as 30 m:
+  // the filter itself leaves bare-earth data alone)
+  if (!flat && !raw && (!rawData || shouldSmooth) && groundFilter && osmFeatures.length > 0) {
     onProgress?.("Finding the ground under buildings and trees (GEDTM30 bare-earth model, Copernicus GLO-30)...");
     try {
       groundFilterInfo = await removeSurfaceObjects({ heightMap, width, height, bounds: finalBounds, metersPerPixel: effectiveMetersPerPixel, osmFeatures, fetchGedtm: fetchGedtmGrid, fetchCopernicus: fetchCopernicusGrid, signal });
@@ -2433,8 +2435,11 @@ export const fetchTerrainData = async (
     kron86FallbackReason,
     mapterhornInfo,
     groundFilterInfo,
-    // built from the global 30 m (no lidar, upload, raw or flat): the export may add fine ground detail
-    coarseElevation: !flat && !raw && !rawData,
+    // built from the global 30 m, or a source that only had coarse data
+    // here (GPXZ / Mapterhorn smoothed as 30 m; no raw or flat): the export
+    // may add fine ground detail, and digs what the data can't show (a
+    // city underpass's ramps)
+    coarseElevation: !flat && !raw && (!rawData || shouldSmooth),
     // the generation passes asked for (the Terrain choice): the export panel says when they no longer match
     generationEdits: { raw: !!raw, groundFilter: !!groundFilter, lowerWater: !!lowerWater, smoothRoads: !!smoothRoads },
     sourceGeoTiffs,

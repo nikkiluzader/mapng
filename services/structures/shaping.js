@@ -23,6 +23,7 @@ const DIP_REACH_M = 15;   // the dip's floor: the lowest ground within this of t
 const DIP_MIN_M = 0.5;    // shallower than this under the rims: no dip, the bridge's own ends
 const RIM_FLAT_M = 8;     // the ground flatter than the class grade this far: the rim
 const RIM_DROP_M = 0.5;   // ... or fallen this far from its best: over the crest
+const OPEN_END_DROP_M = 2;   // a bridge's end this far under its other rim, with the map's edge beyond: it runs on out of the map
 const CROSSING_MIN_TOP_M = 3.8;   // a deck's top over a road under it, whatever the grade (3.4 m clear under a thin slab)
 
 /**
@@ -262,10 +263,10 @@ export function simpleSpans(graph, rawDeck, measured = []) {
       if (s[j] < s[b0] - DIP_REACH_M || s[j] > s[b1] + DIP_REACH_M) continue;
       if (g[j] < g[m]) m = j;
     }
-    // climbed out to the rim, one way (dir -1 / +1)
-    const rim = (dir) => {
-      let best = m; let flatFrom = null;
-      for (let j = m + dir; j >= 0 && j < path.length; j += dir) {
+    // climbed out to the rim, one way (dir -1 / +1), from the floor (or from `from`)
+    const rim = (dir, from = m) => {
+      let best = from; let flatFrom = null;
+      for (let j = from + dir; j >= 0 && j < path.length; j += dir) {
         if (g[j] < g[best] - RIM_DROP_M) break;                // over the crest
         const rise = (g[j] - g[j - dir]) / Math.max(1e-6, Math.abs(s[j] - s[j - dir]));
         if (g[j] > g[best]) best = j;
@@ -274,15 +275,38 @@ export function simpleSpans(graph, rawDeck, measured = []) {
       }
       return best;
     };
-    let A = rim(-1); let B = rim(1);
+    // (and from each of the bridge's own ends, outward: under a long deck the
+    // floor's walk stops at the first crest, a road or a hump under it, and
+    // the rim fell back to OSM's end of the bridge, a few metres out from
+    // the abutment at the wall's foot: the approach held on the ground went
+    // straight down the wall and the deck climbed back out at twice its grade)
+    let A = Math.min(rim(-1), rim(-1, b0)); let B = Math.max(rim(1), rim(1, b1));
     // no real dip under it (flat ground, an overpass whose embankments the
     // elevation doesn't hold): left to the solve, which ramps it up over
     // what it crosses within its own length
-    if (Math.min(g[A], g[B]) - g[m] < DIP_MIN_M) continue;
+    // a bridge running on out of the map (its approach reaches the map's
+    // edge, the ground never climbing to a rim on that side): carried on to
+    // the edge at its far rim's height, not ramped down onto low ground a
+    // few metres short of it (the viaduct goes on beyond the map)
+    const kindAt = (j) => {
+      const [k, i] = path[j]; const e = edges[k];
+      const id = i === 0 ? e.from : i === e.s.length - 1 ? e.to : undefined;
+      return id === undefined ? null : graph.nodes?.get(id)?.kind ?? null;
+    };
+    const outA = kindAt(0) === 'edgeOfMap'; const outB = kindAt(path.length - 1) === 'edgeOfMap';
+    let zAo = null; let zBo = null;
+    // (the other side's rim found inside the map, short of its own edge)
+    if (outB && A > 0 && g[A] - g[m] >= DIP_MIN_M && g[Math.max(B, b1)] < g[A] - OPEN_END_DROP_M) { B = path.length - 1; zBo = Math.max(g[A], g[B]); }
+    else if (outA && B < path.length - 1 && g[B] - g[m] >= DIP_MIN_M && g[Math.min(A, b0)] < g[B] - OPEN_END_DROP_M) { A = 0; zAo = Math.max(g[B], g[A]); }
+    if (Math.min(zAo ?? g[A], zBo ?? g[B]) - g[m] < DIP_MIN_M) continue;
     A = Math.min(A, b0); B = Math.max(B, b1);
-    const zA = g[A]; const zB = g[B]; const L = s[B] - s[A] || 1;
+    const zA = zAo ?? g[A]; const zB = zBo ?? g[B]; const L = s[B] - s[A] || 1;
     // the rims and every measured station between them, in order along the span
     const anchors = [[s[A], zA]];
+    // each road crossing under it: the deck lifted over it (the line runs
+    // over all of them: the upper hull of the rims and the lifts, never down
+    // between two lifts and back up, nor a lift's spike under the line)
+    const lifts = [];
     for (let j = A + 1; j < B; j++) {
       const key = `${path[j][0]}:${path[j][1]}`; const z = known.get(key); const low = under.get(key);
       if (Number.isFinite(z)) { anchors.push([s[j], z]); continue; }
@@ -290,9 +314,22 @@ export function simpleSpans(graph, rawDeck, measured = []) {
       const rimLine = zA + ((zB - zA) * (s[j] - s[A])) / L;
       const reach = rimLine + 2 * lim * Math.min(s[j] - s[A], s[B] - s[j]);
       const top = Math.max(Math.min(low.road + low.sep, reach), low.road + CROSSING_MIN_TOP_M);
-      if (top > rimLine) anchors.push([s[j], top]);
+      if (top > rimLine) lifts.push([s[j], top]);
     }
-    anchors.push([s[B], zB]);
+    anchors.push([s[B], zB], ...lifts);
+    anchors.sort((p, q) => p[0] - q[0]);
+    {
+      // (upper hull, monotone chain)
+      const hull = [];
+      for (const p of anchors) {
+        while (hull.length >= 2) {
+          const [ax, az] = hull[hull.length - 2]; const [bx, bz] = hull[hull.length - 1];
+          if ((bx - ax) * (p[1] - az) - (bz - az) * (p[0] - ax) >= 0) hull.pop(); else break;
+        }
+        hull.push(p);
+      }
+      anchors.length = 0; anchors.push(...hull);
+    }
     let at = 0;
     const lineAt = (sj) => {
       while (at + 2 < anchors.length && anchors[at + 1][0] <= sj) at++;
@@ -305,15 +342,33 @@ export function simpleSpans(graph, rawDeck, measured = []) {
       if (!span[k]) span[k] = new Uint8Array(edges[k].s.length);
       span[k][i] = 1;
     };
+    const onPath = new Set(path.slice(A, B + 1).map(([k]) => k));
     for (let j = A; j <= B; j++) {
       const [k, i] = path[j];
       const z = known.get(`${k}:${i}`) ?? Math.max(lineAt(s[j]), g[j]);
       pinAt(k, i, z);
       // every road end meeting at a junction on the span at the deck's height
-      // (one held on its ground there pulled the junction, and the deck, down)
+      // (one held on its ground there pulled the junction, and the deck, down),
+      // ramped down from there to its ground at twice its class grade (held
+      // on the ground right from the junction it stood as a wall: two ramps
+      // merging onto a viaduct, one carried on with the deck, the other not)
       const e = edges[k];
       const node = i === 0 ? e.from : i === e.s.length - 1 ? e.to : undefined;
-      if (node !== undefined) for (const o of ends.get(node) || []) pinAt(o.k, o.end === 0 ? 0 : edges[o.k].s.length - 1, z);
+      if (node !== undefined) {
+        for (const o of ends.get(node) || []) {
+          const oe = edges[o.k]; const n = oe.s.length;
+          pinAt(o.k, o.end === 0 ? 0 : n - 1, z);
+          if (onPath.has(o.k) || rawDeck.has(o.k)) continue;
+          const fall = 2 * gradeLimitOf(oe.highway);
+          for (let j = 1; j < n - 1; j++) {
+            const ii = o.end === 0 ? j : n - 1 - j;
+            const gz = Number.isFinite(oe.g[ii]) ? oe.g[ii] : 0;
+            const zz = z - fall * Math.abs(oe.s[ii] - oe.s[o.end === 0 ? 0 : n - 1]);
+            if (zz <= gz + 0.05) break;
+            pinAt(o.k, ii, zz);
+          }
+        }
+      }
     }
     list.push({ edges: chain.map((c) => c.k), length: Math.round(L), from: [edges[path[A][0]].x[path[A][1]], edges[path[A][0]].y[path[A][1]], zA], to: [edges[path[B][0]].x[path[B][1]], edges[path[B][0]].y[path[B][1]], zB], osmLength: Math.round(s[b1] - s[b0]) });
   }

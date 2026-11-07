@@ -92,6 +92,7 @@ const DECK_CLEAR_M = 1.2;     // a deck over the water
 const DECK_SHORE_M = 0.8;     // ground this far over the deck level is land, not a shallow
 const DECK_LAND_NODES = 4;    // ... along this many of a deck's 2 m points together
 const DECK_ROAD_M = 3.5;      // a footway this near a bridge's road is on that bridge
+const DECK_LANE_OVERLAP_M = 0.5; // ... but not where its slab overlaps the road's lanes more than this
 const DECK_POST_M = 4;
 const WALL_WATER_M = 0.5;      // ground this little over the water is the water's side
 const WALL_INNER_LIFT_M = 0.5; // the deck's land edge over the highest ground along it
@@ -2588,8 +2589,9 @@ const WALK_ATTACH_CLEAR_M = 0.3;
 export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
   if (!groundAt) return [];
   const index = bridges?.length ? buildCarriagewayIndex(bridges) : null;
+  const layerByOwner = new Map((bridges || []).map((cw) => [cw.owner, Number.parseFloat(cw.tags?.layer)]));
   const least = seaZ + DECK_CLEAR_M;
-  return (paths || []).filter((p) => p.nodes.length > 1).map((path) => {
+  return (paths || []).filter((p) => p.nodes.length > 1).flatMap((path) => {
     const { nodes, half } = path;
     // one level over the water, so piers that join meet; up only on to real ground
     // (a real stretch of it: a point on a seawall's face isn't land to stand on)
@@ -2599,18 +2601,33 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
       for (const step of [-1, 1]) for (let k = i + step; k >= 0 && k < ground.length && ground[k] > least + DECK_SHORE_M; k += step) run++;
       return ground[i] > least + DECK_SHORE_M && run >= DECK_LAND_NODES;
     };
+    // (a road bridge of another mapped layer is not this path's: a low
+    // crossing under the road bridge, along the same line, was lifted on to
+    // the upper deck's median)
+    const ours = (hit) => { const l = layerByOwner.get(hit.owner); return !Number.isFinite(path.layer) || !Number.isFinite(l) || l === path.layer; };
+    const roadsAt = (q) => (index ? carriagewaysAt(index, q[0], q[1], DECK_ROAD_M).filter(ours) : []);
     const raw = nodes.map((q, i) => {
-      const road = index ? carriagewaysAt(index, q[0], q[1], DECK_ROAD_M)[0] : null;
+      const road = roadsAt(q)[0] || null;
       if (road) return road.z + CURB_H - WALK_H;
       return onLand(i) ? ground[i] : least;
     });
     let z = raw;
     for (let pass = 0; pass < 4; pass++) z = z.map((v, i) => (i === 0 || i === z.length - 1 ? v : (z[i - 1] + 2 * v + z[i + 1]) / 4));
-    const onBridge = nodes.some((q) => index && carriagewaysAt(index, q[0], q[1], DECK_ROAD_M).length);
-    const centre = nodes.map((q, i) => [q[0], q[1], z[i]]);
-    const flat = centre.map((q) => [q[0], q[1], q[2], 0]);
-    const points = offsetLine(flat, half).map((q) => [q[0], q[1], q[2]]);
-    return { points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood: !!path.wood, ramps: [false, false], caps: [true, true], highway: 'footway' };
+    const onBridge = nodes.some((q) => roadsAt(q).length);
+    // (not over the road's own lanes: a path mapped across a deck's lanes, on
+    // its layer, stood on the motorway as a slab; left out where it overlaps
+    // them by more than DECK_LANE_OVERLAP_M)
+    const inLanes = nodes.map((q) => !!index && carriagewaysAt(index, q[0], q[1], half - DECK_LANE_OVERLAP_M).filter(ours).length > 0);
+    const pieces = [];
+    let cur = [];
+    nodes.forEach((q, i) => { if (inLanes[i]) { if (cur.length > 1) pieces.push(cur); cur = []; } else cur.push(i); });
+    if (cur.length > 1) pieces.push(cur);
+    return pieces.map((idx) => {
+      const centre = idx.map((i) => [nodes[i][0], nodes[i][1], z[i]]);
+      const flat = centre.map((q) => [q[0], q[1], q[2], 0]);
+      const points = offsetLine(flat, half).map((q) => [q[0], q[1], q[2]]);
+      return { points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood: !!path.wood, ramps: [false, false], caps: [true, true], highway: 'footway' };
+    });
   });
 }
 

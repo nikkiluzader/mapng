@@ -55,6 +55,64 @@ const FORK_SHARE = 0.9;       // forking decks overlap: closer than this share o
 const FORK_FALL = 0.03;       // cross fall across a fork's one surface
 const RAW_DECK_RAMP_FACTOR = 2; // a deck that may not shape its approaches ramps up to this many times its class limit
 
+// The straightest profile along one edge between its two end heights that
+// stays inside the envelopes [L, U] (a taut string): straight lines between
+// the ends, bent only at the stations an envelope holds. What smoothing with
+// no pull to the ground converges to, but at once: smoothing sweeps spread a
+// change by about one station each, so a long deck that started on its
+// ground was still sagging toward it when the sweeps ran out (a 1.5 km
+// viaduct dipped to 2.6 m over the ground between abutments at 10 m).
+const TAUT_ANCHORS_MAX = 48;
+function tautProfile(Z, L, U, s, base, n, freeA = false, freeB = false, G = null) {
+  if (n < 3) return 0;
+  const anchors = [0, n - 1];
+  const zA = new Map([[0, Z[base]], [n - 1, Z[base + n - 1]]]);
+  // a free end (the road leaves the map there): nothing holds it, it is
+  // carried level from the nearest anchor inside (a viaduct cut by the map
+  // edge came down to the ground there, its deck through the terrain)
+  // (only from an anchor a clearance put there: with none yet, the lowest
+  // the envelopes allow at the end; a far junction's height carried flat
+  // stood a deck 3 m over the deck it forks from)
+  // (never under the ground at the map edge: a deck dived 6 m into a hillside there)
+  const clampAt = (i, z) => { const v = base + i; const lo = Math.max(L[v], G ? G[v] : -Infinity); return Math.min(Math.max(lo, U[v]), Math.max(lo, z)); };
+  const lowest = (i) => (Number.isFinite(L[base + i]) ? clampAt(i, L[base + i]) : Z[base + i]);
+  const carry = () => {
+    const inner = anchors.length >= 3;
+    if (freeA) zA.set(0, inner ? clampAt(0, zA.get(anchors[1])) : lowest(0));
+    if (freeB) zA.set(n - 1, inner ? clampAt(n - 1, zA.get(anchors[anchors.length - 2])) : lowest(n - 1));
+  };
+  let moved = 0;
+  for (let round = 0; ; round++) {
+    carry();
+    // straight lines between consecutive anchors; the worst violation of an envelope
+    let worst = 1e-4; let at = -1; let to = 0;
+    for (let k = 0; k + 1 < anchors.length; k++) {
+      const a = anchors[k]; const b = anchors[k + 1]; const za = zA.get(a); const zb = zA.get(b);
+      const span = s[b] - s[a] || 1;
+      for (let i = a + 1; i < b; i++) {
+        const v = base + i; const z = za + (zb - za) * ((s[i] - s[a]) / span);
+        const lo = L[v]; const hi = Math.max(lo, U[v]);
+        if (lo - z > worst) { worst = lo - z; at = i; to = lo; }
+        else if (z - hi > worst) { worst = z - hi; at = i; to = hi; }
+      }
+    }
+    if (at < 0 || round >= TAUT_ANCHORS_MAX) break;
+    let k = 0; while (anchors[k] < at) k++;
+    anchors.splice(k, 0, at); zA.set(at, to);
+  }
+  for (const i of [0, n - 1]) if ((i === 0 ? freeA : freeB) && anchors.length >= 2) { const v = base + i; moved = Math.max(moved, Math.abs(zA.get(i) - Z[v])); Z[v] = zA.get(i); }
+  for (let k = 0; k + 1 < anchors.length; k++) {
+    const a = anchors[k]; const b = anchors[k + 1]; const za = zA.get(a); const zb = zA.get(b);
+    const span = s[b] - s[a] || 1;
+    for (let i = a + 1; i < b; i++) {
+      const v = base + i;
+      const z = Math.min(Math.max(L[v], U[v]), Math.max(L[v], za + (zb - za) * ((s[i] - s[a]) / span)));
+      moved = Math.max(moved, Math.abs(z - Z[v])); Z[v] = z;
+    }
+  }
+  return moved;
+}
+
 // Allowed rise per station step of an edge: the class limit, or the
 // terrain's real slope over +-LONG_GRADE_M where steeper (a mountain road
 // keeps its slope; a short hollow or spike in the elevation data, steeper
@@ -251,6 +309,9 @@ export function* solveProfilesSteps(graph) {
   // split by how freely its two stations may move (a deck freely, a ground
   // road held by its ground), then held inside the envelopes
   const links = [];
+  // (fork links where one deck leads: link index -> 1 a leads (b moves), -1 b leads)
+  const linkLead = new Map();
+  const forkRank = (e) => (/_link$/.test(e.highway || '') ? 0 : 1) * 10 + (e.half || 0) / 10;
   edges.forEach((e, k) => { for (let i = 0; i + 1 < e.s.length; i++) links.push(off[k] + i, off[k] + i + 1, stepRise[k][i]); });
   for (const ends of meets) for (let a = 1; a < ends.length; a++) links.push(ends[0], ends[a], 0);
   // decks forking at a node are one surface until their lanes part: from
@@ -276,11 +337,19 @@ export function* solveProfilesSteps(graph) {
           const d = Math.hypot(B.x[iB(kb)] - xa, B.y[iB(kb)] - ya);
           if (d >= reach || kb === 0) { if (d >= reach) break; continue; }
           links.push(off[decks[a].edge] + iA(ka), off[decks[b].edge] + iB(kb), FORK_FALL * d + 0.02);
+          // the minor road (a ramp) follows the main one, never the main
+          // one the ramp: split both ways, the main deck kinked where the
+          // ramp parted from it (a 1 m drop in 3 m over the Han)
+          const ra = forkRank(A); const rb = forkRank(B);
+          if (ra !== rb) linkLead.set(links.length - 3, ra > rb ? 1 : -1);
         }
       }
     }
   }
   const freedomOf = (v) => 1 / (W[v] + 0.01);
+  // (a node where a road leaves the map: nothing beyond it holds a deck
+  // down; a tunnel road nobody bores stays to the ground there)
+  const freeEnd = (id) => nodes.get(id)?.kind === 'edgeOfMap';
   const projectNetwork = () => {
     let moved = 0;
     for (let pass = 0; pass < 4; pass++) {
@@ -290,7 +359,8 @@ export function* solveProfilesSteps(graph) {
         const d = Z[b] - Z[a];
         const excess = Math.abs(d) - rise;
         if (excess <= 1e-6) continue;
-        const fa = freedomOf(a); const fb = freedomOf(b); const sign = Math.sign(d);
+        const lead = linkLead.get(j);
+        const fa = lead === 1 ? 0 : freedomOf(a); const fb = lead === -1 ? 0 : freedomOf(b); const sign = Math.sign(d);
         const za = Math.min(U[a], Math.max(L[a], Z[a] + sign * excess * fa / (fa + fb)));
         const zb = Math.min(U[b], Math.max(L[b], Z[b] - sign * excess * fb / (fa + fb)));
         moved = Math.max(moved, Math.abs(za - Z[a]), Math.abs(zb - Z[b]));
@@ -349,10 +419,22 @@ export function* solveProfilesSteps(graph) {
     }
     for (let v = 0; v < N; v++) Z[v] = Math.min(U[v], Math.max(L[v], Z[v]));
     // smooth inside the envelopes; one height where ends meet
+    // a ramp's stations tied to the main deck it forks from (a lead link)
+    // as envelopes for its taut line: tied as a link alone, each sweep's
+    // straight line undid it and the ramp jumped 3 m where it parted
+    const followers = [];
+    for (const [j, lead] of linkLead) followers.push(lead === 1 ? [links[j + 1], links[j], links[j + 2]] : [links[j], links[j + 1], links[j + 2]]);
+    const FL = followers.length ? Float64Array.from(L) : L; const FU = followers.length ? Float64Array.from(U) : U;
     for (let sweep = 0; sweep < SWEEPS; sweep++) {
       let moved = 0;
+      for (const [f] of followers) { FL[f] = L[f]; FU[f] = U[f]; }
+      for (const [f, ld, rise] of followers) {
+        FL[f] = Math.max(FL[f], Z[ld] - rise); FU[f] = Math.max(FL[f], Math.min(FU[f], Z[ld] + rise));
+      }
       edges.forEach((e, k) => {
         const base = off[k];
+        // (a structure with no pull to its ground anywhere: straight between its ends, inside the envelopes)
+        if (W[base] === 0 && (e.bridge || e.tunnel)) { moved = Math.max(moved, tautProfile(Z, FL, FU, e.s, base, e.s.length, e.bridge && freeEnd(e.from), e.bridge && freeEnd(e.to), G)); return; }
         for (let i = 1; i + 1 < e.s.length; i++) {
           const v = base + i;
           const next = Math.min(U[v], Math.max(L[v], (W[v] * G[v] + SMOOTH * (Z[v - 1] + Z[v + 1])) / (W[v] + 2 * SMOOTH)));

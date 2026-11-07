@@ -66,15 +66,29 @@ function stationsAlong(xy, stationM) {
  *             projected vertices' ground)
  *   halfOf(segment) -> half width of its paved surface (m)
  *   isFreeEnd(x, y) -> true at the map edge (a road leaving the map)
+ *   clip(geometry) -> the parts of a road's geometry inside the map
+ *             (optional): points it adds on the map's edge carry cut: true.
+ *             Without it a road running on past the edge has its outside
+ *             vertices squashed onto the edge by project(), where unrelated
+ *             roads (both decks of a double-deck bridge, a street under it)
+ *             fell within JOIN_M of each other and became one junction.
  * Returns { nodes, edges, stats }:
  *   node { id, x, y, edges: [{ edge, end: 0 | 1 }], kind, layers, joint }
  *     kind: 'end' | 'edgeOfMap' | 'through' | 'joint' | 'junction'
  *   edge { id, seg, wayId, highway, layer, half, bridge, tunnel, covered,
  *          cutting, embankment, from, to, length, x, y, s, g, vertex }
  */
-export function buildStructureGraph(segments, { project, groundAt = null, halfOf = () => 3.5, isFreeEnd = () => false, stationM = STATION_M } = {}) {
+export function buildStructureGraph(segments, { project, groundAt = null, halfOf = () => 3.5, isFreeEnd = () => false, clip = null, stationM = STATION_M } = {}) {
   const nodes = new Map();
   const edges = [];
+  // each road's geometry inside the map, in one or more parts
+  const partsOf = segments.map((seg) => {
+    const g = seg.geometry || [];
+    return clip ? clip(g).filter((part) => part.length >= 2) : [g];
+  });
+  // a point clip() put on the map's edge belongs to its road alone (never
+  // joined by position: two roads leaving the map side by side would meet)
+  const rawKey = (p, segIndex) => (p.cut ? `cut:${segIndex}:${p.lat}:${p.lng}` : makeRoadNodeKey(p));
   // vertices of different roads within JOIN_M are one point (a shared OSM
   // vertex nudged a few cm by curve fitting or snapping on one road only:
   // by exact position a bridge and its approach never met)
@@ -86,9 +100,10 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
   // junction: the road under a kart track's bridge levelled up into the deck)
   const layerOf = (seg) => (Number.isFinite(seg.layer) ? seg.layer : (Number.parseInt((seg.tags || seg.sourceFeature?.tags || {}).layer, 10) || 0));
   const keyOf = (p, segIndex, end) => {
-    const key = makeRoadNodeKey(p);
+    const key = rawKey(p, segIndex);
     const known = canon.get(key);
     if (known) return known;
+    if (p.cut) { canon.set(key, key); return key; }
     const [x, y] = project(p.lat, p.lng);
     const cx = Math.floor(x); const cy = Math.floor(y);
     const layer = layerOf(segments[segIndex]);
@@ -105,9 +120,9 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
     cells.get(cell).push({ key, x, y, seg: segIndex, layer, end });
     return key;
   };
-  segments.forEach((seg, segIndex) => { const g = seg.geometry || []; g.forEach((p, i) => keyOf(p, segIndex, i === 0 || i === g.length - 1)); });
-  const nodeAt = (pt, x, y) => {
-    const key = canon.get(makeRoadNodeKey(pt)) || makeRoadNodeKey(pt);
+  partsOf.forEach((parts, segIndex) => { for (const g of parts) g.forEach((p, i) => keyOf(p, segIndex, i === 0 || i === g.length - 1)); });
+  const nodeAt = (pt, x, y, segIndex) => {
+    const key = canon.get(rawKey(pt, segIndex)) || rawKey(pt, segIndex);
     let node = nodes.get(key);
     if (!node) { node = { id: key, x, y, edges: [] }; nodes.set(key, node); }
     return node;
@@ -115,17 +130,18 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
   // split every segment at interior vertices another segment shares by
   // position, whatever its layer (a ramp joining a deck mid-way)
   const shared = new Map();
-  for (const seg of segments) {
-    for (const key of new Set((seg.geometry || []).map((p) => canon.get(makeRoadNodeKey(p))))) shared.set(key, (shared.get(key) || 0) + 1);
-  }
+  partsOf.forEach((parts, segIndex) => {
+    for (const key of new Set(parts.flat().map((p) => canon.get(rawKey(p, segIndex))))) shared.set(key, (shared.get(key) || 0) + 1);
+  });
   const pieces = [];
   segments.forEach((seg, segIndex) => {
-    const geom = seg.geometry || [];
-    let start = 0;
-    for (let i = 1; i < geom.length; i++) {
-      if (i === geom.length - 1 || (shared.get(canon.get(makeRoadNodeKey(geom[i]))) || 0) >= 2) {
-        pieces.push({ seg, segIndex, geom: geom.slice(start, i + 1) });
-        start = i;
+    for (const geom of partsOf[segIndex]) {
+      let start = 0;
+      for (let i = 1; i < geom.length; i++) {
+        if (i === geom.length - 1 || (shared.get(canon.get(rawKey(geom[i], segIndex))) || 0) >= 2) {
+          pieces.push({ seg, segIndex, geom: geom.slice(start, i + 1) });
+          start = i;
+        }
       }
     }
   });
@@ -166,8 +182,8 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
         g[i] = a >= 0 && b < g.length ? g[a] + (g[b] - g[a]) * ((st.s[i] - st.s[a]) / (st.s[b] - st.s[a] || 1)) : (a >= 0 ? g[a] : g[b]);
       }
     }
-    const from = nodeAt(geom[0], st.x[0], st.y[0]);
-    const to = nodeAt(geom[geom.length - 1], st.x[st.x.length - 1], st.y[st.y.length - 1]);
+    const from = nodeAt(geom[0], st.x[0], st.y[0], segIndex);
+    const to = nodeAt(geom[geom.length - 1], st.x[st.x.length - 1], st.y[st.y.length - 1], segIndex);
     edge.from = from.id; edge.to = to.id;
     from.edges.push({ edge: edge.id, end: 0 });
     to.edges.push({ edge: edge.id, end: 1 });

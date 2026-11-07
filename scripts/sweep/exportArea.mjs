@@ -38,7 +38,8 @@ const heightMap = new Float32Array(fs.readFileSync(path.join(dir, `${dem}.f32`))
 // as the app: fine terrain: roads onto its cut, then the light fine-mode
 // smoothing; coarse (30 m): the full smoothing
 // (RAW=1: as the app's raw terrain, the elevation left as fetched)
-const fine = dem === 'gpxz';
+// (GPXZ outside its lidar: the app smooths it as 30 m, and it is coarse)
+const fine = dem === 'gpxz' && !meta.gpxzSmooth;
 const raw = !!process.env.RAW;
 // (as the app's data pull: street widths from the buildings along them)
 // (corners rounded into arcs first, as terrain.js shapeRoads: without it wide
@@ -52,6 +53,7 @@ for (const v of heightMap) { if (v < minHeight) minHeight = v; if (v > maxHeight
 const terrainData = {
   width: meta.size, height: meta.size, minHeight, maxHeight, bounds: meta.bounds, heightMap, osmFeatures: osmRoads,
   processingMetersPerPixel: meta.mpp, raw,
+  coarseElevation: !fine && !raw,
 };
 
 // the base texture: the app's Game Texture (the recommended one users get),

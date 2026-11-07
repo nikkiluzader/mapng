@@ -18,6 +18,6 @@ for (const scene of STRUCTURE_SCENES) {
     const base = baseline[scene.name];
     assert.ok(base, `no baseline for "${scene.name}"`);
     for (const k of COUNTS) assert.ok(summary[k] <= base[k], `${k}: ${summary[k]} (baseline ${base[k]})`);
-    if (!scene.future) assert.ok(summary.decks + summary.tunnels > 0, 'a structure was built');
+    if (!scene.future && !scene.solverDeck) assert.ok(summary.decks + summary.tunnels > 0, 'a structure was built');
   });
 }

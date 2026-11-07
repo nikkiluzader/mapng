@@ -1773,8 +1773,8 @@ function lerpLatLng(a, b, t) {
  * Segments that cross the boundary are split and the crossing point added,
  * so roads meet the edge cleanly rather than jumping inward.
  */
-function clipGeometryToMargin(geometry, bounds) {
-  const lo = ROAD_EDGE_MARGIN, hi = 1 - ROAD_EDGE_MARGIN;
+function clipGeometryToMargin(geometry, bounds, margin = ROAD_EDGE_MARGIN) {
+  const lo = margin, hi = 1 - margin;
   const uvOf = pt => [
     (pt.lng  - bounds.west)  / (bounds.east  - bounds.west),
     (bounds.north - pt.lat)  / (bounds.north - bounds.south),
@@ -3240,7 +3240,10 @@ const isCutPaintLayer = (layerName) => typeof layerName === 'string'
  * carriageway (see roadMarkingCuts.js). A road ignores itself and the road
  * it simply continues into (an endpoint shared by exactly two roads).
  */
-function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, zones = []) {
+// another road's carriageway this far above or below (the solved road
+// heights) is a different level: a stacked deck, a road under a bridge
+const PAINT_CUT_LEVEL_M = 3;
+function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, zones = [], heightOf = null) {
   if (paintDecals.length === 0 || index.segments.length === 0) return;
   const ignoredBy = new Map();
   const ignoreSetFor = (owner) => {
@@ -3260,8 +3263,14 @@ function cutPaintAtOtherRoads(paintDecals, index, drivableRoads, ownersAtNode, z
     const ignore = ignoreSetFor(owner);
     const isLine = decal.__layer.startsWith('line_');
     const margin = isLine ? PAINT_CUT_MARGIN_M.line : PAINT_CUT_MARGIN_M.edge;
+    // (a carriageway on another level never cuts it: both decks of a
+    // double-deck bridge lost every lane line, each "under" the other)
+    const otherLevel = heightOf ? (o, x, y) => {
+      const zo = heightOf(o, x, y); const zs = heightOf(owner, x, y);
+      return zo !== null && zs !== null && Math.abs(zo - zs) > PAINT_CUT_LEVEL_M;
+    } : () => false;
     const runs = cutNodes(decal.nodes, (x, y) => (
-      isOnOtherCarriageway(index, x, y, margin, (o) => ignore.has(o))
+      isOnOtherCarriageway(index, x, y, margin, (o) => ignore.has(o) || otherLevel(o, x, y))
       || (isLine && isInZone(zones, x, y))
     ));
     if (runs.length === 1 && runs[0].length === decal.nodes.length) continue; // untouched
@@ -4979,8 +4988,17 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     // the bore carried on along a bridge still in the rock
     const bore = [...[...(approaches[0]?.rock || [])].reverse(), ...xy, ...(approaches[1]?.rock || [])];
     const gallery = path.idx.some((i) => parts[i].gallery);
+    // streets crossing over it (not on a bridge): an underpass, dug under
+    // them, never a gallery on the surface (a gallery at road level by a
+    // harbour slope lifted every street over it onto a deck)
+    let streetsOver = false;
+    for (const r of others) {
+      if (streetsOver) break;
+      if (r.bridgeRoad || r.bridge) continue;
+      for (let i = 0; i + 1 < xy.length && !streetsOver; i++) if (planCrossingPoints([xy[i], xy[i + 1]], r.xy).length) streetsOver = true;
+    }
     // (shaping off on fine elevation: portals at the survey's own portal faces)
-    const t = solveTunnel({ xy: bore, half, gallery }, { groundAt, approaches, isFreeEnd, squareSize, raw: !shape && !terrainData?.coarseElevation });
+    const t = solveTunnel({ xy: bore, half, gallery }, { groundAt, approaches, isFreeEnd, squareSize, streetsOver, raw: !shape && !terrainData?.coarseElevation });
     const osm = path.idx.map((i) => parts[i].osm);
     if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); return null; }
     t.osm = osm;
@@ -5618,6 +5636,12 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
       halfOf,
       isFreeEnd: (x, y) => Math.abs(x) >= graphEdge || Math.abs(y) >= graphEdge,
+      // (each road cut at the map's edge, the points added there marked:
+      // squashed onto the edge, roads leaving the map side by side met there)
+      clip: (geometry) => {
+        const own = new Set(geometry);
+        return clipGeometryToMargin(geometry, terrainData.bounds, 0).map((part) => part.map((p) => (own.has(p) ? p : { ...p, cut: true })));
+      },
     });
     // (bridges / tunnels switched off: those roads are plain roads)
     if (!includeBridges) for (const e of structureGraph.edges) e.bridge = false;
@@ -5974,7 +5998,27 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   const carriagewayIndex = buildCarriagewayIndex(carriageways);
   const junctionMarkings = generateJunctionMarkingDecals(terrainData, squareSize, { carriageways: carriagewayIndex });
   yield;
-  cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || []);
+  // the solved road heights (structure solver): a road's height at (x, y), its nearest station
+  const solvedHeightOf = (() => {
+    const z = structureGraph?.profile?.z;
+    if (!z) return null;
+    const bySeg = new Map();
+    structureGraph.edges.forEach((e, k) => { if (!bySeg.has(e.seg)) bySeg.set(e.seg, []); bySeg.get(e.seg).push(k); });
+    return (owner, x, y) => {
+      const ks = bySeg.get(owner);
+      if (!ks) return null;
+      let best = Infinity; let zz = null;
+      for (const k of ks) {
+        const e = structureGraph.edges[k];
+        for (let i = 0; i < e.s.length; i++) {
+          const d = (e.x[i] - x) ** 2 + (e.y[i] - y) ** 2;
+          if (d < best) { best = d; zz = z[k][i]; }
+        }
+      }
+      return best < 400 ? zz : null;
+    };
+  })();
+  cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || [], solvedHeightOf);
   const mouths = cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, carriagewayIndex, { americas: markingStyle === 'americas' });
   if (mouths.length) getOrCreateSplineGroup('road_mouths').__items.push(...mouths);
   yield;
@@ -6052,7 +6096,8 @@ function buildDeckPaths(terrainData, squareSize) {
     const concrete = ['concrete', 'asphalt', 'paved', 'paving_stones'].includes(tags.surface);
     for (const piece of clipGeometryToMargin(f.geometry, terrainData.bounds)) {
       const nodes = resampleGeometryToSpacing(piece, 2).map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
-      out.push({ nodes, half, wood: !concrete && (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk' || !tags.surface) });
+      const layer = Number.parseFloat(tags.layer);
+      out.push({ nodes, half, wood: !concrete && (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk' || !tags.surface), ...(Number.isFinite(layer) ? { layer } : {}) });
     }
   }
   return out;
@@ -12039,8 +12084,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // piers and footbridges: decks clear of the ground (and sidewalks on road bridges)
       decks: buildDeckPaths(exportTerrainData, squareSize),
       // (a road bridge's own deck: its road's line, at the deck's height)
-      bridgeRoads: bridgeDecks.flatMap((d) => d.parts.filter((part) => part.xy?.length > 1).map((part, i) => ({
-        owner: `deck_${i}`, half: part.half || 4,
+      // (its layer: a path mapped on another layer, a low crossing under it, is not on it)
+      bridgeRoads: bridgeDecks.flatMap((d, di) => d.parts.filter((part) => part.xy?.length > 1).map((part, i) => ({
+        owner: `deck_${di}_${i}`, half: part.half || 4, tags: Number.isFinite(part.layer) ? { layer: String(part.layer) } : {},
         nodes: part.xy.map(([x, y]) => [x, y, deckHeightAt(part, x, y)]),
       }))),
       seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),

@@ -380,6 +380,13 @@ test('a pier stands over the water on posts, a bridge sidewalk at its deck', asy
   const road = street({ owner: 9, bridge: true, tags: {}, nodes: [[-50, 0, 12, 8], [50, 0, 12, 8]] });
   const [walk] = buildDeckRuns([{ nodes: [[-20, 5, 0], [0, 5, 0], [20, 5, 0]], half: 1 }], [road], { groundAt: () => 0, seaZ: 0 });
   assert.ok(Math.abs(walk.centre[1][2] - 12.05) < 0.01, `at the bridge's height: ${walk.centre[1][2]}`);
+  // a low crossing mapped a layer under the road bridge, on its line, is not on it
+  const upper = street({ owner: 8, bridge: true, tags: { layer: '2' }, nodes: [[-50, 0, 12, 8], [50, 0, 12, 8]] });
+  const [low] = buildDeckRuns([{ nodes: [[-20, 1, 0], [0, 1, 0], [20, 1, 0]], half: 1, layer: 1 }], [upper], { groundAt: () => -2, seaZ: 0 });
+  assert.ok(Math.abs(low.centre[1][2] - 1.2) < 0.01 && !low.onBridge, `under the upper deck: ${low.centre[1][2]}`);
+  // a path mapped across the deck's lanes on its layer: left out over them
+  const across = buildDeckRuns([{ nodes: Array.from({ length: 21 }, (_, i) => [-20 + i * 2, 1, 0]), half: 1 }], [road], { groundAt: () => 0, seaZ: 0 });
+  assert.equal(across.length, 0, 'no slab on the lanes');
   const s = street({ urban: false, tags: {}, nodes: [[-100, -60, 5, 8], [100, -60, 5, 8]] });
   const { meshes, deckAt } = buildSidewalkMeshes([s], { decks: [pier], groundAt: (x) => ground(x), seaZ: 0 });
   assert.ok(meshes.some((m) => m.material.some((q) => q.name === 'mapng_pier_wood')));

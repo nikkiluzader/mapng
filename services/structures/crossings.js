@@ -143,8 +143,15 @@ export function findCrossings(graph, { waterAt = null } = {}) {
     // (decks both: a bridge beside a street on the ground, a canal bridge by
     // the quay, is the composer's step, not a lift)
     const road = (e) => e.bridge && !PATH_CLASSES.has(e.highway);
+    // a street over a sunken road (layer under 0, covered or in a tunnel
+    // nobody bores) stacked on it is a deck over it too: lidar shows the
+    // lower level as the ground, and the upper street lay on it wherever
+    // no cross street ran under it (Upper over Lower Wacker)
+    const sunk = (e) => !e.bridge && (e.layer || 0) < 0 && !PATH_CLASSES.has(e.highway);
+    const indexed = (e) => road(e) || sunk(e);
+    const stacked = (A, B) => (road(A) && road(B)) || (sunk(B) && (A.layer || 0) >= 0 && !A.tunnel && !PATH_CLASSES.has(A.highway));
     edges.forEach((e, k) => {
-      if (!road(e)) return;
+      if (!indexed(e)) return;
       for (let i = 0; i < e.s.length; i++) {
         const key = `${Math.floor(e.x[i] / OVERLAP_CELL_M)},${Math.floor(e.y[i] / OVERLAP_CELL_M)}`;
         if (!cells.has(key)) cells.set(key, []);
@@ -156,7 +163,7 @@ export function findCrossings(graph, { waterAt = null } = {}) {
     // (running alongside: across each other is a crossing, found above)
     const dir = (e, i) => { const a = Math.max(0, i - 1); const b = Math.min(e.s.length - 1, i + 1); const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy) || 1; return [dx / L, dy / L]; };
     edges.forEach((A, ka) => {
-      if (!road(A)) return;
+      if (PATH_CLASSES.has(A.highway) || A.tunnel) return;
       for (let i = 0; i < A.s.length; i++) {
         const cx = Math.floor(A.x[i] / OVERLAP_CELL_M); const cy = Math.floor(A.y[i] / OVERLAP_CELL_M);
         const best = new Map();
@@ -165,7 +172,7 @@ export function findCrossings(graph, { waterAt = null } = {}) {
           for (let j = 0; j < list.length; j += 2) {
             const kb = list[j]; const B = edges[kb];
             // (each pair once, from the upper road's stations)
-            if (kb === ka || !(A.layer > B.layer)) continue;
+            if (kb === ka || !(A.layer > B.layer) || !stacked(A, B)) continue;
             const ib = list[j + 1];
             const d = Math.hypot(B.x[ib] - A.x[i], B.y[ib] - A.y[i]);
             if (d >= (A.half + B.half) * OVERLAP_SHARE) continue;

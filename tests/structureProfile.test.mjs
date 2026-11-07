@@ -27,6 +27,30 @@ for (const name of [
   });
 }
 
+test('profile: a viaduct cut by the map edge stays up to the edge', async () => {
+  const g = await solved('viaduct cut by the map edge at both ends');
+  const k = g.edges.findIndex((e) => e.highway === 'trunk');
+  const z = g.profile.z[k]; const e = g.edges[k];
+  const over = (i) => z[i] - e.g[i];
+  assert.ok(over(0) > 5 && over(z.length - 1) > 5, `ends ${over(0).toFixed(1)} / ${over(z.length - 1).toFixed(1)} m over the ground`);
+  for (let i = 0; i < z.length; i++) assert.ok(over(i) > 5, `deck ${over(i).toFixed(1)} m over the ground at x ${e.x[i].toFixed(0)}`);
+});
+
+test('profile: a street stacked over a covered lower road clears it along the overlap', async () => {
+  const g = await solved('street stacked over a covered lower road');
+  const lo = g.edges.findIndex((e) => e.highway === 'trunk');
+  const zl = g.profile.z[lo];
+  const lowAt = (x) => { const e = g.edges[lo]; let b = 0; for (let i = 0; i < e.x.length; i++) if (Math.abs(e.x[i] - x) < Math.abs(e.x[b] - x)) b = i; return zl[b]; };
+  g.edges.forEach((e, k) => {
+    if (e.highway !== 'secondary') return;
+    for (let i = 0; i < e.s.length; i++) {
+      if (Math.abs(e.x[i]) > 100) continue;
+      const gap = g.profile.z[k][i] - lowAt(e.x[i]);
+      assert.ok(gap > 5.5, `upper street ${gap.toFixed(1)} m over the lower road at x ${e.x[i].toFixed(0)}`);
+    }
+  });
+});
+
 test('profile: ground roads stay on the ground away from structures', async () => {
   const g = await solved('overpass on flat ground');
   const k = g.edges.findIndex((e) => e.highway === 'motorway');
@@ -145,4 +169,10 @@ test('decks forking at a node stay one surface while their lanes overlap', async
     for (let k = 0; k < 41; k++) { const d = Math.hypot(ramp.x[k] - main.x[i], ramp.y[k] - main.y[i]); if (d < bd) { bd = d; best = k; } }
     assert.ok(Math.abs(z[0][i] - z[1][best]) <= 0.03 * bd + 0.05, `step ${(z[0][i] - z[1][best]).toFixed(2)} m at ${main.x[i]} m`);
   }
+  // the ramp follows the main deck, never the main deck the ramp: the main
+  // deck stays one straight grade, the ramp within its class limit after
+  // parting (split both ways, both kinked where the lanes part)
+  const worst = (k) => { let w = 0; for (let i = 0; i + 1 < 41; i++) { const e = k ? ramp : main; w = Math.max(w, Math.abs(z[k][i + 1] - z[k][i]) / (e.s[i + 1] - e.s[i])); } return w; };
+  assert.ok(worst(0) <= 0.03, `main deck grade ${(worst(0) * 100).toFixed(1)}%`);
+  assert.ok(worst(1) <= 0.075, `ramp grade ${(worst(1) * 100).toFixed(1)}%`);
 });

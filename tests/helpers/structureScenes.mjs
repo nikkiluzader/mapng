@@ -197,6 +197,27 @@ export const STRUCTURE_SCENES = [
     ]),
   },
   {
+    name: 'viaduct cut by the map edge at both ends',
+    // an elevated road over one street, running off the map both ways
+    build: () => terrain(flat, [
+      way(1, [[-560, 20], [560, 20]], { highway: 'trunk', bridge: 'viaduct', layer: '2' }),
+      way(2, [[-100, -450], [-100, 450]], { highway: 'secondary' }),
+    ]),
+  },
+  {
+    name: 'street stacked over a covered lower road',
+    // (its deck is the solver's, built by the full export, not these passes)
+    solverDeck: true,
+    // a two-level street (the ground under both is the lower level): the
+    // upper street runs on top of the covered lower road for 300 m
+    build: () => terrain(flat, [
+      way(1, [[-400, 0], [-150, 0]], { highway: 'secondary' }),
+      way(2, [[-150, 0], [150, 0]], { highway: 'secondary' }),
+      way(3, [[150, 0], [400, 0]], { highway: 'secondary' }),
+      way(4, [[-140, 2], [140, 2]], { highway: 'trunk', tunnel: 'covered', covered: 'yes', layer: '-1' }),
+    ]),
+  },
+  {
     name: 'two crossings closer than a ramp',
     // one bridge over two parallel motorways 45 m apart
     build: () => terrain(flat, [

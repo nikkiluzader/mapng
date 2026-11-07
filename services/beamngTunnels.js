@@ -330,7 +330,7 @@ export function solveTunnel(path, opts) {
   // mapped as a tunnel, but too little ground over it: on a hillside (the
   // 30 m elevation smooths a cliff road's rock away) a gallery; under flat
   // ground (a city) cut and cover
-  if (crossSlope(path, opts.groundAt) > HILLSIDE_SLOPE) {
+  if (!opts.streetsOver && crossSlope(path, opts.groundAt) > HILLSIDE_SLOPE) {
     const gal = solveGallery(path, opts);
     return gal.ok ? gal : bored;
   }
