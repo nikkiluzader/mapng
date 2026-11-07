@@ -103,7 +103,14 @@ export function roadLinesFromDecals(groups) {
 }
 
 /** Steps where two carriageways meet: their end nodes at different heights. */
-export function checkJoints(carriageways) {
+// (the export trims roads this share of the map's width in from each edge)
+const EDGE_TRIM_SHARE = 0.015;
+export function checkJoints(carriageways, { worldSize = null } = {}) {
+  // two road ends both on the line where the export trims roads at the map's
+  // edge are not a joint: unrelated roads cut there side by side (a ground
+  // link and two layer-3 ramps, 18 m apart in height)
+  const trim = worldSize ? worldSize / 2 - EDGE_TRIM_SHARE * worldSize - 1 : Infinity;
+  const atTrim = (e) => Math.abs(e.x) >= trim || Math.abs(e.y) >= trim;
   const cells = new Map();
   const ends = [];
   carriageways.forEach((cw, ci) => {
@@ -126,6 +133,7 @@ export function checkJoints(carriageways) {
         for (const o of cells.get(`${cx + dx},${cy + dy}`) || []) {
           if (o.ci <= e.ci) continue;     // each pair once
           if (Math.hypot(o.x - e.x, o.y - e.y) > JOINT_REACH_M) continue;
+          if (atTrim(e) && atTrim(o)) continue;
           joints++;
           const dz = Math.abs(o.z - e.z);
           if (dz > JOINT_STEP_M) {
@@ -513,7 +521,7 @@ export function checkRoadSurface(lines, groundAt) {
 export function measureStructures({ carriageways = [], decks = [], tunnels = [], groundAt, grid }) {
   const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const result = {
-    joints: checkJoints(carriageways),
+    joints: checkJoints(carriageways, { worldSize: grid?.worldSize ?? null }),
     grades: checkGrades(carriageways),
     crossings: checkCrossings(carriageways),
     groundGaps: groundAt ? checkGroundGaps(carriageways, groundAt) : null,

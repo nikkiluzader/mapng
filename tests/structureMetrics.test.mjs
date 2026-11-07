@@ -98,3 +98,11 @@ test('road surface: a smooth road passes; a bump, a sideways tilt and a round ju
   // a bridge is not a ground road
   assert.equal(checkRoadSurface([line(bumpy, 0, 0, 200, 0, { bridge: true })], bumpy).kinks.points, 0);
 });
+
+test('joints: two road ends on the map-edge trim line are not a step', async () => {
+  const { checkJoints } = await import('../services/structures/metrics.js');
+  const road = (x, z) => ({ nodes: [[x * 100, 0, z], [x, 248.4, z]], highway: 'motorway_link', tags: {} });
+  const r = checkJoints([road(0, 10), road(0.2, 28)], { worldSize: 512 });
+  assert.equal(r.steps, 0);
+  assert.equal(checkJoints([road(0, 10), road(0.2, 28)]).steps, 1, 'without the map size it is still flagged');
+});

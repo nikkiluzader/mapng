@@ -77,8 +77,15 @@ function tautProfile(Z, L, U, idx, s, freeA = false, freeB = false, G = null) {
   // (never under the ground at the map edge: a deck dived 6 m into a hillside there)
   const clampAt = (i, z) => { const v = idx[i]; const lo = Math.max(L[v], G ? G[v] : -Infinity); return Math.min(Math.max(lo, U[v]), Math.max(lo, z)); };
   const lowest = (i) => (Number.isFinite(L[idx[i]]) ? clampAt(i, L[idx[i]]) : Z[idx[i]]);
+  // (both ends free and nothing inside holding it: level at the highest of
+  // the ground and the envelope under it, not a line between the grounds
+  // where it leaves the map: a plateau-to-plateau viaduct followed the
+  // valley side at 5 %, its two carriageways 16 m apart)
+  let level = -Infinity;
+  if (freeA && freeB) for (let i = 0; i < n; i++) level = Math.max(level, L[idx[i]], G ? G[idx[i]] : -Infinity);
   const carry = () => {
     const inner = anchors.length >= 3;
+    if (freeA && freeB && !inner && Number.isFinite(level)) { zA.set(0, clampAt(0, level)); zA.set(n - 1, clampAt(n - 1, level)); return; }
     if (freeA) zA.set(0, inner ? clampAt(0, zA.get(anchors[1])) : lowest(0));
     if (freeB) zA.set(n - 1, inner ? clampAt(n - 1, zA.get(anchors[anchors.length - 2])) : lowest(n - 1));
   };
@@ -439,7 +446,17 @@ export function* solveProfilesSteps(graph) {
   for (; rounds < OUTER_ROUNDS; rounds++) {
     // crossing requirements from the road below as it now is
     const seeds = waterSeeds.slice();
+    // (a crossing of two decks of one layer: after the first round the one
+    // standing higher there is over the other, fixed from then on; in the
+    // first round neither lifts)
     for (const c of crossings) {
+      if (!c.dynamic || c.decided) continue;
+      if (rounds === 0) continue;
+      c.upper = at(c.a, Z) >= at(c.b, Z) ? 'a' : 'b';
+      c.decided = true;
+    }
+    for (const c of crossings) {
+      if (c.dynamic && !c.decided) continue;
       const up = c[c.upper]; const dn = c[c.upper === 'a' ? 'b' : 'a'];
       // (over a tunnel road nobody built: it is on the ground, crossed level)
       if (graph.tunnelsPinned && edges[dn.edge].tunnel && !edges[dn.edge].external) continue;
@@ -538,11 +555,117 @@ export function* solveProfilesSteps(graph) {
     split = true;
   }
   if (split) clampGrades();
+  verticalCurves(graph, Z, L, U, off, pinned, held);
   const z = edges.map((e, k) => Z.slice(off[k], off[k] + e.s.length));
   const result = { z, rounds, residual: profileResidual(graph, z) };
   // (debug: the envelopes, for tools)
   if (globalThis.__MAPNG_STRUCT_DEBUG) Object.defineProperty(result, 'debug', { value: { L, U, off }, enumerable: false });
   return result;
+}
+
+// Vertical curves where a deck meets a road on the ground: the deck's grade
+// and the road's met at the joint in a corner (a crest or a sag of 10-15 %
+// change at a motorway's abutment, felt as a jolt); a parabola between the
+// two grades instead, as long as the change asks for (VC_M_PER_PCT per % of
+// it, VC_MIN_M..VC_MAX_M), as far as both roads reach, inside the envelopes.
+const VC_M_PER_PCT = 3;
+const VC_AT_JUNCTIONS = true;    // (curves at a junction too: the node kept, each side curved into it)
+const VC_MIN_M = 10;
+const VC_MAX_M = 60;
+const VC_GRADE_M = [6, 20];    // each side's grade read this far from the joint
+function verticalCurves(graph, Z, L, U, off, pinned, held) {
+  // (a pinned or held station is where another rule put it: never moved)
+  const fixedAt = (v) => pinned[v] || held[v];
+  const { edges, nodes } = graph;
+  const heldEdge = (k) => graph.fixed?.[k]?.some?.((x) => x);
+  // each side's stations from the node outwards: [v, s]
+  const side = ({ edge, end }) => {
+    const e = edges[edge]; const n = e.s.length; const out = [];
+    for (let j = 0; j < n; j++) { const i = end === 0 ? j : n - 1 - j; out.push([off[edge] + i, Math.abs(e.s[i] - e.s[end === 0 ? 0 : n - 1])]); }
+    return out;
+  };
+  const at = (S, d) => {
+    for (let k = 0; k + 1 < S.length; k++) {
+      if (S[k + 1][1] >= d) { const f = (d - S[k][1]) / ((S[k + 1][1] - S[k][1]) || 1); return Z[S[k][0]] + (Z[S[k + 1][0]] - Z[S[k][0]]) * f; }
+    }
+    return Z[S[S.length - 1][0]];
+  };
+  const slopeAt = (S, d) => { const d1 = Math.min(d + 4, S[S.length - 1][1]); const d0 = Math.max(0, d - 4); return (at(S, d1) - at(S, d0)) / ((d1 - d0) || 1); };
+  const gradeOf = (S) => {
+    const z0 = Z[S[0][0]];
+    const far = S.filter(([, d]) => d >= VC_GRADE_M[0] && d <= VC_GRADE_M[1]);
+    if (far.length < 2) return null;
+    let sdd = 0; let sdz = 0;
+    for (const [v, d] of far) { sdd += d * d; sdz += d * (Z[v] - z0); }
+    return sdz / (sdd || 1);
+  };
+  // the direction a road leaves the node in (to its station ~8 m out)
+  const dirOf = ({ edge, end }) => {
+    const e = edges[edge]; const n = e.s.length; const i0 = end === 0 ? 0 : n - 1;
+    let i = i0; while (i >= 0 && i < n && Math.abs(e.s[i] - e.s[i0]) < 8) i += end === 0 ? 1 : -1;
+    i = Math.max(0, Math.min(n - 1, i));
+    const dx = e.x[i] - e.x[i0]; const dy = e.y[i] - e.y[i0]; const l = Math.hypot(dx, dy) || 1;
+    return [dx / l, dy / l];
+  };
+  const hermite = (z0, m0, z1, m1, len, d) => {
+    const u = d / len; const u2 = u * u; const u3 = u2 * u;
+    return (2 * u3 - 3 * u2 + 1) * z0 + (u3 - 2 * u2 + u) * len * m0 + (-2 * u3 + 3 * u2) * z1 + (u3 - u2) * len * m1;
+  };
+  for (const node of nodes.values()) {
+    if (node.edges.length < 2) continue;
+    for (const p of node.edges) {
+      const ep = edges[p.edge];
+      if (!ep.bridge || ep.tunnel || ep.external || heldEdge(p.edge)) continue;
+      // its road: the ground road at the node most in line with it (going on through)
+      const dp = dirOf(p);
+      let q = null; let best = Infinity;
+      for (const o of node.edges) {
+        const eo = edges[o.edge];
+        if (o === p || eo.bridge || eo.tunnel || eo.external || heldEdge(o.edge)) continue;
+        const d = dirOf(o); const dot = dp[0] * d[0] + dp[1] * d[1];
+        if (dot < best) { best = dot; q = o; }
+      }
+      if (!q || best > -0.5) continue;   // (none going on: a side road meeting the deck's end)
+      const A = side(p); const B = side(q);
+      if (fixedAt(A[0][0]) || fixedAt(B[0][0])) continue;
+      const gA = gradeOf(A); const gB = gradeOf(B);
+      if (gA === null || gB === null) continue;
+      const change = Math.abs(gA + gB);   // (each measured away from the node: a straight line sums to 0)
+      if (change < 0.02) continue;
+      const h = Math.min(VC_MAX_M, Math.max(VC_MIN_M, change * 100 * VC_M_PER_PCT), 2 * A[A.length - 1][1], 2 * B[B.length - 1][1]) / 2;
+      const za = at(A, h); const zb = at(B, h); const sa = slopeAt(A, h); const sb = slopeAt(B, h);
+      if (node.edges.length === 2) {
+        // a plain joint: one cubic from h on the deck to h on the road, the
+        // node moving with it; along t (deck side negative) grades -sa, sb
+        for (const [S, sign] of [[A, -1], [B, 1]]) {
+          for (const [v, d] of S) {
+            if (d >= h) break;
+            if (fixedAt(v)) continue;
+            const t = sign * d + h;
+            const z = hermite(za, -sa, zb, sb, 2 * h, t);
+            Z[v] = Math.min(Math.max(L[v], U[v]), Math.max(L[v], z));
+          }
+        }
+      } else if (VC_AT_JUNCTIONS) {
+        // a junction: the node stays (the other roads meet it there), each
+        // side curves from it, leaving at the mean of the two grades
+        // (each side the curve's whole length: from a fixed node half of it turned too sharply)
+        const hj = Math.min(2 * h, A[A.length - 1][1], B[B.length - 1][1]);
+        const ja = slopeAt(A, hj); const jb = slopeAt(B, hj);
+        const z0 = Z[A[0][0]]; const m = (gA - gB) / 2;   // grade along the deck side, away from the node
+        for (const [S, m0, s1] of [[A, m, ja], [B, -m, jb]]) {
+          const z1 = at(S, hj);
+          for (const [v, d] of S) {
+            if (d === 0) continue;
+            if (d >= hj) break;
+            if (fixedAt(v)) continue;
+            const z = hermite(z0, m0, z1, s1, hj, d);
+            Z[v] = Math.min(Math.max(L[v], U[v]), Math.max(L[v], z));
+          }
+        }
+      }
+    }
+  }
 }
 
 /** Solve without yielding. */

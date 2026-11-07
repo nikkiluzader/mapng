@@ -171,16 +171,31 @@ function pointInBounds(pt, bounds) {
   );
 }
 
+// Whether the segment a-b crosses the bounds (Liang-Barsky clip in lat/lng).
+function segmentCrossesBounds(a, b, bounds) {
+  if (!a || !b) return false;
+  let t0 = 0; let t1 = 1;
+  const dx = b.lng - a.lng; const dy = b.lat - a.lat;
+  for (const [p, q] of [[-dx, a.lng - bounds.west], [dx, bounds.east - a.lng], [-dy, a.lat - bounds.south], [dy, bounds.north - a.lat]]) {
+    if (p === 0) { if (q < 0) return false; continue; }
+    const r = q / p;
+    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+  }
+  return true;
+}
+
 /**
- * Keep only OSM features whose geometry intersects the provided bounds.
- *
- * A feature is retained when at least one geometry point is in bounds.
+ * Keep only OSM features whose geometry intersects the provided bounds:
+ * a point in bounds, or a segment crossing them (a bridge's long span over a
+ * river with its vertices on either bank, outside the area, was dropped
+ * whole: Brooklyn Bridge in an export centred on the river).
  */
 function filterOSMFeaturesToBounds(features, bounds) {
   if (!Array.isArray(features)) return [];
   return features.filter((feature) => {
-    if (!Array.isArray(feature?.geometry) || feature.geometry.length === 0) return false;
-    return feature.geometry.some((pt) => pointInBounds(pt, bounds));
+    const g = feature?.geometry;
+    if (!Array.isArray(g) || g.length === 0) return false;
+    return g.some((pt, i) => pointInBounds(pt, bounds) || (i > 0 && segmentCrossesBounds(g[i - 1], pt, bounds)));
   });
 }
 
@@ -14351,3 +14366,4 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
 // (tests: the planting on its own)
 export { buildForestPlacements as __buildForestPlacements };
+export { filterOSMFeaturesToBounds as __filterOSMFeaturesToBounds };

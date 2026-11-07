@@ -99,30 +99,64 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
   // roads passing over each other that happened to fall that close were one
   // junction: the road under a kart track's bridge levelled up into the deck)
   const layerOf = (seg) => (Number.isFinite(seg.layer) ? seg.layer : (Number.parseInt((seg.tags || seg.sourceFeature?.tags || {}).layer, 10) || 0));
+  // one OSM node shared by roads passing through it on different layers is
+  // a crossing someone joined, not a junction (a frontage road and a
+  // level-4 ramp over it: the frontage network rode up 20 m): one node per
+  // layer of the roads passing through; a road ending there joins the
+  // nearest of them
+  const through = new Map();   // raw key -> Set of layers of roads passing through it
+  const usedBy = new Map();    // raw key -> Set of roads with a vertex there
+  partsOf.forEach((parts, segIndex) => {
+    const layer = layerOf(segments[segIndex]);
+    for (const g of parts) g.forEach((p, i) => {
+      if (p.cut) return;
+      const rk = rawKey(p, segIndex);
+      if (!usedBy.has(rk)) usedBy.set(rk, new Set());
+      usedBy.get(rk).add(segIndex);
+      if (i === 0 || i === g.length - 1) return;
+      const k = rawKey(p, segIndex);
+      if (!through.has(k)) through.set(k, new Set());
+      through.get(k).add(layer);
+    });
+  });
+  const layered = (p, segIndex, end) => {
+    const k = rawKey(p, segIndex);
+    const ls = through.get(k);
+    if (!ls || ls.size < 2) return k;
+    const own = layerOf(segments[segIndex]);
+    if (!end && ls.has(own)) return `${k}|L${own}`;
+    let best = null;
+    for (const l of ls) if (best === null || Math.abs(l - own) < Math.abs(best - own) || (Math.abs(l - own) === Math.abs(best - own) && l < best)) best = l;
+    return `${k}|L${best}`;
+  };
   const keyOf = (p, segIndex, end) => {
-    const key = rawKey(p, segIndex);
+    const key = layered(p, segIndex, end);
     const known = canon.get(key);
     if (known) return known;
     if (p.cut) { canon.set(key, key); return key; }
     const [x, y] = project(p.lat, p.lng);
     const cx = Math.floor(x); const cy = Math.floor(y);
     const layer = layerOf(segments[segIndex]);
+    // (an end that already meets another road at this very vertex is a
+    // junction of its own: not joined across layers to a vertex near it, a
+    // frontage links' meeting 0.45 m from a level-4 ramp's vertex over it)
+    const own = (usedBy.get(rawKey(p, segIndex))?.size || 0) >= 2;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (const c of cells.get(`${cx + dx},${cy + dy}`) || []) {
-          if (c.seg !== segIndex && Math.hypot(c.x - x, c.y - y) <= JOIN_M && (c.layer === layer || c.end || end)) { canon.set(key, c.key); return c.key; }
+          if (c.seg !== segIndex && Math.hypot(c.x - x, c.y - y) <= JOIN_M && (c.layer === layer || ((c.end || end) && !(own || c.own)))) { canon.set(key, c.key); return c.key; }
         }
       }
     }
     canon.set(key, key);
     const cell = `${cx},${cy}`;
     if (!cells.has(cell)) cells.set(cell, []);
-    cells.get(cell).push({ key, x, y, seg: segIndex, layer, end });
+    cells.get(cell).push({ key, x, y, seg: segIndex, layer, end, own });
     return key;
   };
   partsOf.forEach((parts, segIndex) => { for (const g of parts) g.forEach((p, i) => keyOf(p, segIndex, i === 0 || i === g.length - 1)); });
-  const nodeAt = (pt, x, y, segIndex) => {
-    const key = canon.get(rawKey(pt, segIndex)) || rawKey(pt, segIndex);
+  const nodeAt = (pt, x, y, segIndex, end) => {
+    const key = canon.get(layered(pt, segIndex, end)) || layered(pt, segIndex, end);
     let node = nodes.get(key);
     if (!node) { node = { id: key, x, y, edges: [] }; nodes.set(key, node); }
     return node;
@@ -131,21 +165,21 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
   // position, whatever its layer (a ramp joining a deck mid-way)
   const shared = new Map();
   partsOf.forEach((parts, segIndex) => {
-    for (const key of new Set(parts.flat().map((p) => canon.get(rawKey(p, segIndex))))) shared.set(key, (shared.get(key) || 0) + 1);
+    for (const key of new Set(parts.flatMap((g) => g.map((p, i) => canon.get(layered(p, segIndex, i === 0 || i === g.length - 1)))))) shared.set(key, (shared.get(key) || 0) + 1);
   });
   const pieces = [];
   segments.forEach((seg, segIndex) => {
     for (const geom of partsOf[segIndex]) {
       let start = 0;
       for (let i = 1; i < geom.length; i++) {
-        if (i === geom.length - 1 || (shared.get(canon.get(rawKey(geom[i], segIndex))) || 0) >= 2) {
-          pieces.push({ seg, segIndex, geom: geom.slice(start, i + 1) });
+        if (i === geom.length - 1 || (shared.get(canon.get(layered(geom[i], segIndex, false))) || 0) >= 2) {
+          pieces.push({ seg, segIndex, geom: geom.slice(start, i + 1), ends: [start === 0, i === geom.length - 1] });
           start = i;
         }
       }
     }
   });
-  pieces.forEach(({ seg, segIndex, geom }) => {
+  pieces.forEach(({ seg, segIndex, geom, ends }) => {
     if (geom.length < 2) return;
     const pts = geom.map((p) => project(p.lat, p.lng));
     if (pts.some((p) => !Number.isFinite(p[0]) || !Number.isFinite(p[1]))) return;
@@ -182,8 +216,8 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
         g[i] = a >= 0 && b < g.length ? g[a] + (g[b] - g[a]) * ((st.s[i] - st.s[a]) / (st.s[b] - st.s[a] || 1)) : (a >= 0 ? g[a] : g[b]);
       }
     }
-    const from = nodeAt(geom[0], st.x[0], st.y[0], segIndex);
-    const to = nodeAt(geom[geom.length - 1], st.x[st.x.length - 1], st.y[st.y.length - 1], segIndex);
+    const from = nodeAt(geom[0], st.x[0], st.y[0], segIndex, ends[0]);
+    const to = nodeAt(geom[geom.length - 1], st.x[st.x.length - 1], st.y[st.y.length - 1], segIndex, ends[1]);
     edge.from = from.id; edge.to = to.id;
     from.edges.push({ edge: edge.id, end: 0 });
     to.edges.push({ edge: edge.id, end: 1 });

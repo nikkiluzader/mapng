@@ -70,7 +70,9 @@ async function fetchOne({ name, lat, lng, size }) {
     if (r.ok) {
       const j = await r.json();
       resolutions = j.results.map((x) => ({ res: Number(x.resolution), src: x.data_source }));
-      const rs = resolutions.map((x) => x.res).filter(Number.isFinite).sort((a, b) => a - b);
+      // (as the app: water points left out where land was sampled too)
+      const landRes = resolutions.filter((x) => !/bathymetry|gebco|emod/i.test(String(x.src || '')));
+      const rs = landRes.map((x) => x.res).filter(Number.isFinite).sort((a, b) => a - b);
       const coarse = rs.filter((x) => x > 2).length;
       gpxzSmooth = coarse >= Math.ceil(rs.length / 2) && rs[Math.floor(rs.length / 2)] > 2;
     } else console.warn('points', r.status);

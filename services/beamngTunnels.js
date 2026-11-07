@@ -153,7 +153,7 @@ export function chainTunnelParts(parts) {
     const keys = group.flatMap((j) => [key(parts[j].xy[0]), key(parts[j].xy[parts[j].xy.length - 1])]);
     if (keys.some((k) => degree(k) > 2)) {
       const tree = splitBranches(parts, group, ends, key);
-      if (tree) trees.push(tree); else branched.push(group);
+      if (tree) { trees.push(tree); for (const i of tree.leftover || []) branched.push([i]); } else branched.push(group);
       continue;
     }
     // walk from an end of degree 1 (or anywhere on a loop)
@@ -182,7 +182,8 @@ export function chainTunnelParts(parts) {
 /**
  * A branching group of tunnel parts as its longest path (the main tunnel)
  * and the chains hanging off it: { main: path, branches: [path, its xy
- * starting at the junction] }, or null (a loop, or a branch off a branch).
+ * starting at the junction], leftover: [part indices of loops and branches
+ * off branches] }, or null.
  */
 function splitBranches(parts, group, ends, key) {
   // (a ramp counts for half its length: the carriageway is the main tunnel)
@@ -231,7 +232,8 @@ function splitBranches(parts, group, ends, key) {
       let at = far(o.i, o.at);
       for (;;) {
         const nx = nextAt(at, used);
-        if (nx.length !== 1) { if (nx.length > 1) return null; break; }
+        // (a fork further on: the chain stops there, what lies beyond is left over)
+        if (nx.length !== 1) break;
         steps.push(nx[0]);
         used.add(nx[0].i);
         at = far(nx[0].i, nx[0].at);
@@ -239,8 +241,10 @@ function splitBranches(parts, group, ends, key) {
       branches.push(asPath(steps));
     }
   }
-  if (group.some((i) => !used.has(i))) return null;
-  return { main, branches };
+  // loops and branches off branches are left over (roads on the ground),
+  // not the whole complex: a Monaco tunnel network with one loop in it
+  // left every one of its tunnels unbuilt
+  return { main, branches, leftover: group.filter((i) => !used.has(i)) };
 }
 
 /** A portal's height from the approach road's ground (Theil-Sen, as the bridges do). */

@@ -146,6 +146,17 @@ test('a ramp splitting off inside a tunnel: one group, the main path and its bra
   assert.deepEqual(trees[0].branches[0].xy[0], [0, 100], 'the branch starts at the junction');
 });
 
+test('a branch off a branch inside a tunnel: the main tunnel and its branch built, only the sub-branch left over', () => {
+  const main = [{ xy: [[0, -200], [0, 100]] }, { xy: [[0, 100], [0, 200]] }];
+  const ramp = [{ xy: [[0, 100], [20, 150]] }, { xy: [[20, 150], [30, 220]] }];
+  const sub = { xy: [[20, 150], [60, 180]] };
+  const { branched, trees } = chainTunnelParts([...main, ...ramp, sub]);
+  assert.equal(trees.length, 1, 'built as a tree');
+  assert.ok(trees[0].main.idx.length >= 2 && trees[0].branches.length >= 1, 'a main tunnel and a branch');
+  assert.equal(trees[0].leftover.length, branched.flat().length);
+  assert.ok(branched.flat().length <= 2, 'only the pieces past the fork are left over');
+});
+
 test('a ramp taken into the tunnel: the bore widens on its side out to the portal, then its own trench', () => {
   const flat = () => 10;
   const t = solveTunnel({ xy: road(-200, 200), half: 4 }, { groundAt: flat, approaches: [{ xy: road(-200, -600) }, { xy: road(200, 600) }] });

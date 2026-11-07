@@ -47,10 +47,17 @@ export function requiredSeparation(upper, lower) {
  * (upper 'a' | 'b'), or null when nothing says (same layer, same structure:
  * two ground roads crossing that OSM did not join, not a grade separation).
  */
+const SELF_CROSS_M = 40;
+const STACKED_NODE_M = 40;     // ... and this far from a node the two share       // a deck crossing itself this far along it: a spiral, one turn over the other
+
 export function crossingOrder(a, b) {
   if (a.layer !== b.layer) return { upper: a.layer > b.layer ? 'a' : 'b', rule: 'layer' };
   if (a.bridge !== b.bridge) return { upper: a.bridge ? 'a' : 'b', rule: 'bridge' };
   if (a.tunnel !== b.tunnel) return { upper: a.tunnel ? 'b' : 'a', rule: 'tunnel' };
+  // two decks of one layer crossing away from a node (a spiral ramp passing
+  // over itself, carriageways weaving through an interchange): one is over
+  // the other all the same, the solve picks which (profileSolve: dynamic)
+  if ((a.bridge && b.bridge && !a.external && !b.external) || (a === b && a.bridge)) return { upper: 'a', rule: 'stacked', dynamic: true };
   return null;
 }
 
@@ -109,10 +116,11 @@ export function findCrossings(graph, { waterAt = null } = {}) {
     for (let p = 0; p < list.length; p += 2) {
       for (let q = p + 2; q < list.length; q += 2) {
         const ea = list[p]; const eb = list[q];
-        if (ea === eb) continue;
         const A = edges[ea]; const B = edges[eb];
         const a0 = verts[ea][list[p + 1]]; const a1 = verts[ea][list[p + 1] + 1];
         const b0 = verts[eb][list[q + 1]]; const b1 = verts[eb][list[q + 1] + 1];
+        // (a road over itself: a spiral ramp, its turns far apart along it)
+        if (ea === eb && (!A.bridge || Math.abs(A.s[a0] - A.s[b0]) < SELF_CROSS_M)) continue;
         const hit = cross(A.x[a0], A.y[a0], A.x[a1], A.y[a1], B.x[b0], B.y[b0], B.x[b1], B.y[b1]);
         if (!hit) continue;
         const key = ea < eb ? `${ea}:${a0}:${eb}:${b0}` : `${eb}:${b0}:${ea}:${a0}`;
@@ -122,11 +130,14 @@ export function findCrossings(graph, { waterAt = null } = {}) {
         if (sharedNodes(A, B).some((n) => n && Math.hypot(n.x - x, n.y - y) < SHARED_NODE_M)) continue;
         const order = crossingOrder(A, B);
         if (!order) { unjoined++; continue; }
+        // (decks of one layer crossing near a node they share are merging
+        // there, not one over the other)
+        if (order.dynamic && sharedNodes(A, B).some((n) => n && Math.hypot(n.x - x, n.y - y) < STACKED_NODE_M)) continue;
         const [upper, lower] = order.upper === 'a' ? [A, B] : [B, A];
         crossings.push({
           a: { edge: ea, ...placeOn(A, A.s[a0] + (A.s[a1] - A.s[a0]) * hit.t) },
           b: { edge: eb, ...placeOn(B, B.s[b0] + (B.s[b1] - B.s[b0]) * hit.u) },
-          x, y, upper: order.upper, rule: order.rule, sep: requiredSeparation(upper, lower),
+          x, y, upper: order.upper, rule: order.rule, sep: requiredSeparation(upper, lower), ...(order.dynamic ? { dynamic: true } : {}),
         });
       }
     }

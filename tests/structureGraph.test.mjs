@@ -105,3 +105,16 @@ test('roads passing over and under each other are no junction, though their vert
   assert.equal(g.stats.multiLevelJunctions, 0);
   assert.equal(g.stats.joints, 2, 'the bridge still meets its approaches');
 });
+
+test('one OSM node shared by roads passing through it on different layers is a crossing, not a junction', () => {
+  // a ground street and a layer-4 ramp both pass through (0, 0); a layer-3
+  // link ends there: it joins the ramp (the nearest layer), the street stays apart
+  const g = buildStructureGraph([
+    seg([[-100, 0], [0, 0], [100, 0]], { highway: 'secondary' }, 0),
+    seg([[0, -100], [0, 0], [0, 100]], { highway: 'motorway_link', bridge: 'yes' }, 4),
+    seg([[-80, -80], [0, 0]], { highway: 'motorway_link', bridge: 'yes' }, 3),
+  ], { project });
+  assert.equal(g.stats.multiLevelJunctions, 1, 'the link joins the ramp only');
+  const street = g.edges.filter((e) => e.layer === 0);
+  for (const e of street) for (const id of [e.from, e.to]) assert.ok(g.nodes.get(id).edges.every(({ edge }) => g.edges[edge].layer === 0), 'the street meets no other layer');
+});

@@ -1342,9 +1342,15 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
       if (pointsResp.ok) {
         const pointsData = await pointsResp.json();
         if (pointsData.results && pointsData.results.length > 0) {
-          const resolutions = pointsData.results
-            .map((r) => Number(r?.resolution))
-            .filter((r) => Number.isFinite(r));
+          // (points on the water left out where land was sampled too: a sea
+          // floor model's 450 m says nothing of the land's data, and half a
+          // waterfront area over the river blurred Manhattan's 1 m lidar
+          // into the river bed, its streets under the sea)
+          const all = pointsData.results.filter((r) => Number.isFinite(Number(r?.resolution)));
+          const land = all.filter((r) => !/bathymetry|gebco|emod/i.test(String(r?.data_source || "")));
+          // (all of them on the water: nothing says the land is coarse, and
+          // water is flat; not smoothed)
+          const resolutions = land.map((r) => Number(r.resolution));
 
           if (resolutions.length > 0) {
             const coarseCount = resolutions.filter((r) => r > 2).length;

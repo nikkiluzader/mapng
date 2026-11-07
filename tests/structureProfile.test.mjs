@@ -213,3 +213,66 @@ test('profile: a deck mapped as two ways meeting mid-span is one line from rim t
   const low = Math.min(...z[0], ...z[1]);
   assert.ok(low > 98, `deck sags to ${low.toFixed(1)} m (rims at 100 m)`);
 });
+
+test('profile: two decks of one layer crossing: the higher one is over the other by the clearance', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  const line = (x0, y0, dx, dy, n, opts) => {
+    const x = []; const y = []; const s = [];
+    for (let i = 0; i < n; i++) { x.push(x0 + i * dx); y.push(y0 + i * dy); s.push(i * Math.hypot(dx, dy)); }
+    return { x: Float64Array.from(x), y: Float64Array.from(y), s: Float64Array.from(s), g: new Float64Array(n), layer: 2, half: 4, bridge: true, tunnel: false, highway: 'motorway_link', ...opts };
+  };
+  // A climbs to a deck pinned 16 m up at its far end; B, low, crosses it mid-way
+  const A = line(-200, 0, 4, 0, 101, { from: 'A0', to: 'A1' });
+  const B = line(0, -100, 0, 4, 51, { from: 'B0', to: 'B1' });
+  const nodes = new Map([['A0', { edges: [{ edge: 0, end: 0 }] }], ['A1', { edges: [{ edge: 0, end: 1 }] }], ['B0', { edges: [{ edge: 1, end: 0 }] }], ['B1', { edges: [{ edge: 1, end: 1 }] }]]);
+  const pins = [[0, 100, 16], [0, 0, 0], [1, 0, 1], [1, 50, 1]];
+  const crossings = [{ a: { edge: 1, i: 25, f: 0, s: 100 }, b: { edge: 0, i: 50, f: 0, s: 200 }, x: 0, y: 0, upper: 'a', rule: 'stacked', dynamic: true, sep: 6.5 }];
+  const { z } = solveProfiles({ edges: [A, B], nodes, pins, crossings: { crossings, water: [] } });
+  const gap = z[0][50] - z[1][25];
+  assert.ok(gap >= 6.4, `A over B by ${gap.toFixed(2)} m`);
+});
+
+test('profile: a viaduct off the map at both ends with nothing under it holding it is level, not along the slope', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // ground falling 60 m across 400 m under a deck leaving the map both ways
+  const n = 101; const x = []; const g = [];
+  for (let i = 0; i < n; i++) { x.push(-200 + i * 4); g.push(100 - 0.15 * i * 4 * (i < 50 ? 1 : 0.0) - (i >= 50 ? 30 : 0)); }
+  const e = { x: Float64Array.from(x), y: new Float64Array(n), s: Float64Array.from(x.map((_, i) => i * 4)), g: Float64Array.from(g), from: 'A', to: 'B', highway: 'motorway', layer: 1, half: 6, bridge: true, tunnel: false };
+  const nodes = new Map([['A', { kind: 'edgeOfMap', edges: [{ edge: 0, end: 0 }] }], ['B', { kind: 'edgeOfMap', edges: [{ edge: 0, end: 1 }] }]]);
+  const { z } = solveProfiles({ edges: [e], nodes, pins: [], crossings: { crossings: [], water: [] } });
+  const top = Math.max(...g);
+  assert.ok(Math.abs(z[0][0] - z[0][n - 1]) < 0.5, `ends ${z[0][0].toFixed(1)} / ${z[0][n - 1].toFixed(1)}`);
+  assert.ok(Math.min(...z[0]) >= top - 0.5, 'never under the highest ground along it');
+});
+
+test('profile: where a deck meets the road the grade turns over a vertical curve, not in a corner', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // the road on the ground rises 4 % away from the joint J; the deck rises
+  // 6 % from J the other way to a pin: a 10 % sag, felt as a jolt if it is a corner
+  const n = 41;
+  const road = { x: Float64Array.from({ length: n }, (_, i) => -i * 4), y: new Float64Array(n), s: Float64Array.from({ length: n }, (_, i) => i * 4), g: Float64Array.from({ length: n }, (_, i) => 10 + 0.04 * i * 4), from: 'J', to: 'R', highway: 'secondary', layer: 0, half: 4, bridge: false, tunnel: false };
+  const deck = { x: Float64Array.from({ length: n }, (_, i) => i * 4), y: new Float64Array(n), s: Float64Array.from({ length: n }, (_, i) => i * 4), g: new Float64Array(n).fill(0), from: 'J', to: 'D', highway: 'secondary', layer: 1, half: 4, bridge: true, tunnel: false };
+  const nodes = new Map([['J', { edges: [{ edge: 0, end: 0 }, { edge: 1, end: 0 }] }], ['R', { edges: [{ edge: 0, end: 1 }] }], ['D', { edges: [{ edge: 1, end: 1 }] }]]);
+  const { z } = solveProfiles({ edges: [road, deck], nodes, pins: [[1, 40, 10 + 0.06 * 160]], crossings: { crossings: [], water: [] } });
+  // the profile along road (reversed) then deck: grades per 4 m step, and their changes
+  const prof = [...Array.from(z[0]).reverse(), ...Array.from(z[1]).slice(1)];
+  let worst = 0;
+  for (let i = 1; i + 1 < prof.length; i++) worst = Math.max(worst, Math.abs((prof[i + 1] - prof[i]) - (prof[i] - prof[i - 1])) / 4);
+  assert.ok(worst <= 0.03, `grade turns ${(worst * 100).toFixed(1)} % in one 4 m step`);
+});
+
+test('profile: a deck ending at a junction curves into the road going on, the junction kept where it is', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  const n = 41;
+  const mk = (dx, dy, g, opts) => ({ x: Float64Array.from({ length: n }, (_, i) => i * 4 * dx), y: Float64Array.from({ length: n }, (_, i) => i * 4 * dy), s: Float64Array.from({ length: n }, (_, i) => i * 4), g: Float64Array.from({ length: n }, (_, i) => g(i * 4)), layer: 0, half: 4, bridge: false, tunnel: false, highway: 'secondary', ...opts });
+  const road = mk(-1, 0, (d) => 10 + 0.04 * d, { from: 'J', to: 'R' });
+  const deck = mk(1, 0, () => 0, { from: 'J', to: 'D', bridge: true, layer: 1 });
+  const sideRoad = mk(0, 1, () => 10, { from: 'J', to: 'S' });
+  const nodes = new Map([['J', { edges: [{ edge: 0, end: 0 }, { edge: 1, end: 0 }, { edge: 2, end: 0 }] }], ['R', { edges: [{ edge: 0, end: 1 }] }], ['D', { edges: [{ edge: 1, end: 1 }] }], ['S', { edges: [{ edge: 2, end: 1 }] }]]);
+  const { z } = solveProfiles({ edges: [road, deck, sideRoad], nodes, pins: [[1, 40, 10 + 0.06 * 160]], crossings: { crossings: [], water: [] } });
+  const prof = [...Array.from(z[0]).reverse(), ...Array.from(z[1]).slice(1)];
+  let worst = 0;
+  for (let i = 1; i + 1 < prof.length; i++) worst = Math.max(worst, Math.abs((prof[i + 1] - prof[i]) - (prof[i] - prof[i - 1])) / 4);
+  assert.ok(worst <= 0.035, `grade turns ${(worst * 100).toFixed(1)} % in one 4 m step`);
+  assert.ok(Math.abs(z[0][0] - z[2][0]) < 0.01 && Math.abs(z[1][0] - z[2][0]) < 0.01, 'the three roads still meet at one height');
+});
