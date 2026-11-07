@@ -60,6 +60,12 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 ## What's New (November 2026)
 
+**MapNG 0.2.10** (a fix release)
+
+- **Big coastal and lake-heavy levels run smoothly again:** water is a few big blocks per lake and one per pool instead of thousands of small ones (an 8 km St. Augustine went from 13,426 water objects to 4,390, and from 20-29 ms of render time a frame to about 2 ms)
+- **No plants under water:** the sea and lakes no longer hide fields of ferns; only a sparse few stay where you might see them from a road
+- **No fake land in the sea:** lidar records the water's surface, so open sea came out as flat ground at sea level; it now goes under the water, and nothing grows there
+
 **MapNG 0.2.9** ([update page](https://mapng.com/updates/0.2.9/))
 
 - **Desktop: downloads kept while you work.** Generate Data and Preview 3D save everything they download to disk; change a setting, generate again, and only what's new is fetched
