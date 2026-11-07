@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.2.9: Where Things Really Grow</title>
+<meta name="description" content="What's new in MapNG 0.2.9: the desktop app keeps your downloads and reads free lidar at full detail, ESA WorldCover land cover, dams, Untouched tunnels and the fixes from a big Tignes report.">
+<link rel="canonical" href="https://mapng.com/updates/0.2.9/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.2.9: where things really grow">
+<meta property="og:description" content="Downloads kept and full-detail lidar on desktop, real land cover, dams and tunnels.">
+<meta property="og:url" content="https://mapng.com/updates/0.2.9/">
+<meta property="og:image" content="https://mapng.com/updates/0.2.9/images/hero-devils-tower.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: the in-game shot with the title over it */
+  .hero { position: relative; color: #fff; background: #111 url(images/hero-devils-tower.jpg) center/cover no-repeat; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(70vh, 560px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.2.9</span></span>
+    <h1>Where things really grow</h1>
+    <p>The desktop app now keeps what it downloads while you change settings, and reads free lidar at full detail for big areas. Levels everywhere get real land cover: trees where trees grow, ground on unmapped land, snow, and a look that fits. Plus dams and tunnels.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+  <span class="credit">Devils Tower, Wyoming, at sunset: a 2 km MapNG level from free lidar, in BeamNG.drive 0.40</span>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#desktop">🖥️ Desktop</a>
+    <a href="#landcover">🌲 Land cover</a>
+    <a href="#dams">🏞️ Dams</a>
+    <a href="#tunnels">🚇 Untouched tunnels</a>
+    <a href="#more">🧹 More</a>
+    <a href="#thanks">🙏 Thanks</a>
+  </nav>
+
+  <p style="margin-top:28px">Most of this update started with one very detailed report from <b>Fizz_Mechanic</b> on Discord, about a 16&nbsp;km level of Tignes in the French Alps: forests far above the tree line, walls along the lake, a trench cut into the road by the dam, a road deck hanging off a cliff. Every point was fixed, and several turned into features every level now gets.</p>
+
+  <section id="desktop">
+    <div class="kicker">MapNG Desktop</div>
+    <h2>🖥️ Your downloads kept, and full-detail lidar</h2>
+    <h3>Change a setting without downloading it all again</h3>
+    <p>When you click <b>Generate Data</b> or <b>Preview 3D</b> in the desktop app, everything it downloads (elevation, satellite imagery, OpenStreetMap data, land cover) is now saved to disk. Change the processing size, the terrain choice or anything else, generate again, and only what's new is fetched.</p>
+    <table class="nums">
+      <thead><tr><th>4 km of Val d'Isère at 1 m</th><th>Time</th><th>Downloads</th></tr></thead>
+      <tbody>
+        <tr><td>First Generate Data</td><td class="n">48 s</td><td class="n">1,720</td></tr>
+        <tr><td>Again, after changing a setting</td><td class="n">28 s</td><td class="n">1</td></tr>
+      </tbody>
+    </table>
+    <p class="bts">The cache is cleared when the app starts, and OpenStreetMap data is fetched fresh after 30 minutes, so edits on OSM still show up. Each level's own saved data (for Update and Modify in My Levels) is kept apart, as before.</p>
+    <h3>Free lidar at full detail, for big areas</h3>
+    <figure><img src="images/lidar-detail.jpg" alt="Two hillshades of the same 600 m slope above Tignes: soft and blocky from 3.3 m lidar tiles, sharp with every boulder and gully from 0.8 m tiles" loading="lazy"><figcaption>Behind the scenes: the same 600&nbsp;m above Tignes from Mapterhorn's free lidar. Left, the 3.3&nbsp;m tiles a 16&nbsp;km area used to get; right, the 0.8&nbsp;m tiles the desktop app reads for it now.</figcaption></figure>
+    <p>Lidar comes as tiles, and the finer the tiles, the more of them a big area needs. The browser can only hold so many, so a big area steps down to coarser tiles. The desktop app has much more room: it now reads up to about 2.5&nbsp;GB of tiles against the browser's 290&nbsp;MB, so Fizz's 16&nbsp;km area at 1&nbsp;m gets about <b>0.8&nbsp;m lidar instead of 3.3&nbsp;m</b>. The hint under the elevation source tells you the detail your area will actually get, and on the website it says when the desktop app would read it finer.</p>
+  </section>
+
+  <section id="landcover">
+    <div class="kicker">Every level</div>
+    <h2>🌲 Real land cover, from ESA WorldCover</h2>
+    <p>OpenStreetMap is great at roads and buildings, but its woods are often drawn generously, and in the mountains they can reach far past where any tree grows. At Tignes that meant about 134,000 trees above 2,300&nbsp;m. MapNG now also reads <a href="https://esa-worldcover.org">ESA WorldCover</a>: a free, global map of what covers the ground, at 10&nbsp;m, made from Sentinel satellite imagery. It's read once while generating, alongside the map data.</p>
+    <figure><img src="images/trees-before-after.jpg" alt="The same mountainside above Val d'Isere in BeamNG: before, trees scattered over the whole slope and rock face; now, trees in the real forest patches with open meadows and rock between" loading="lazy"><figcaption>Val d'Isère, the same camera. Left, every mapped wood filled with trees; right, trees only where WorldCover sees tree cover.</figcaption></figure>
+    <ul>
+      <li><b>Trees where trees grow.</b> Trees filling a mapped wood, and trees spotted as canopy in the imagery, are planted only where WorldCover sees tree cover. Trees OpenStreetMap maps one by one always stand, exactly where they're mapped.</li>
+      <li><b>Mountain trees.</b> Untagged trees high in the mountains are now conifers, and slopes steeper than about 45° are painted as rock rather than streaks of grass.</li>
+      <li><b>Ground on unmapped land.</b> Wherever OSM maps no land use, which is most land outside towns, the terrain materials come from the land cover: grass, fields, forest floor, bare ground, rock on steep slopes. The grass billboards grow only on grass.</li>
+      <li><b>Snow</b> is painted on the game texture where WorldCover has snow and ice and the satellite image is actually white.</li>
+      <li><b>The regional look</b> follows what covers the land: a desert or dry upland where bare ground and scrub dominate, rock for high mountains, dry grass for open prairie and steppe. The 3D preview's trees now match the level too.</li>
+    </ul>
+    <div class="split" style="margin-top:18px">
+      <figure><img src="images/worldcover-devils-tower.jpg" alt="Satellite image of Devils Tower beside WorldCover's land cover: pine forest in green round the tower, grassland in yellow to the south" loading="lazy"><figcaption>Behind the scenes: Devils Tower from the satellite (left) and as WorldCover sees it (right): forest green, grassland yellow.</figcaption></figure>
+      <figure><img src="images/snow-grande-motte.jpg" alt="Satellite image of the Grande Motte beside MapNG's game texture, with snow painted only where the satellite shows snow patches" loading="lazy"><figcaption>The Grande Motte above Tignes: snow on the game texture (right) follows the patches the satellite shows (left).</figcaption></figure>
+    </div>
+    <div class="split narrow-img" style="margin-top:18px">
+      <figure><img src="images/progress-landcover.jpg" alt="The Processing Terrain card showing Loading land cover (ESA WorldCover) inside the Loading map data stage" loading="lazy"></figure>
+      <p>It shows up as its own step in the progress card, inside <b>Loading map data</b>, and takes about a second. If WorldCover can't be reached, MapNG gives it 20 seconds and then goes on without it, as before.</p>
+    </div>
+  </section>
+
+  <section id="dams">
+    <div class="kicker">Structures</div>
+    <h2>🏞️ Dams</h2>
+    <figure><img src="images/dam-arch.jpg" alt="The Barrage du Chevril at Tignes in BeamNG: a curved concrete arch dam across the gorge, with the road and guardrails along its crest" loading="lazy"><figcaption>The Barrage du Chevril at Tignes, a concrete arch about 160&nbsp;m tall across the gorge.</figcaption></figure>
+    <p>Lidar ground models remove man-made structures, and a dam is one: the Barrage du Chevril came out as the gorge underneath it. Dams mapped in OpenStreetMap are now built as concrete structures. A dam with a road on it is shaped as an arch round that road, with its downstream face flaring out the deeper it goes. The road is painted across the crest with guardrails on both sides, and the terrain is left exactly as the data has it.</p>
+    <figure><img src="images/dam-crest.jpg" alt="Driving view along the dam crest road with lane markings and guardrails on both sides" loading="lazy"><figcaption>Route du Barrage, along the crest.</figcaption></figure>
+  </section>
+
+  <section id="tunnels">
+    <div class="kicker">Terrain: Untouched</div>
+    <h2>🚇 Tunnels without digging</h2>
+    <div class="split">
+      <figure><img src="images/tunnel-untouched.jpg" alt="A tunnel portal in BeamNG with a large concrete headwall, wingwalls and an apron, the road running into the lit tunnel" loading="lazy"></figure>
+      <div>
+        <p>With the Terrain choice set to <b>Untouched</b>, MapNG doesn't change a single height, so tunnels used to stay as roads over the hill. On lidar, GPXZ or your own upload they're now built: the tube runs out to where the surveyed hillside meets the road, the ground opens only where it cuts into the tube, and a bigger headwall with a concrete apron hides the cut.</p>
+        <p>On the global 30&nbsp;m data those tunnels still go over the hill (their entrances would need digging), and the Terrain choice says so.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="more">
+    <div class="kicker">And more</div>
+    <h2>🧹 Smaller changes and fixes</h2>
+    <div class="polish">
+      <div><b>No lake walls</b>Lake beds are cut only near the water now: a bank inside a lake's outline stays a bank.</div>
+      <div><b>No false trenches</b>A road tagged as a tunnel that lidar shows at ground level stays a road, instead of digging a deep box.</div>
+      <div><b>Via ferratas</b>Climbing routes are no longer built as road decks hanging off cliffs.</div>
+      <div><b>Stale export warning</b>The Export step tells you when you've changed settings since generating, with a Generate again button.</div>
+      <div><b>Share &amp; load settings</b>Now a button in the top bar that opens a window.</div>
+      <div><b>Smoother progress</b>A slow map data source no longer freezes the bar between its counts.</div>
+      <div><b>OSM Pull</b>The Pull and Download buttons now link openstreetmap.org's API usage policy: one request per click, and following it is up to you.</div>
+    </div>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks</h2>
+    <p>Huge thanks to <b>Fizz_Mechanic</b> for the Tignes report behind most of this update. Land cover: © ESA WorldCover project / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium (<a href="https://esa-worldcover.org">ESA WorldCover</a>, CC&nbsp;BY&nbsp;4.0), read from the <a href="https://registry.opendata.aws/esa-worldcover-vito/">AWS Open Data</a> bucket. Lidar from <a href="https://mapterhorn.com">Mapterhorn</a> and the national surveys it gathers.</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p>Try a mountain, a desert or a dam you know and tell me what you see. Post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.2.8/">Previous update (0.2.8)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>
