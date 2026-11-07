@@ -10463,10 +10463,12 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
     // often drawn generously, and in the mountains far above the tree line
     // (Tignes: 144,000 trees above 2,250 m, most of them in the open).
     const worldSize = terrainData.width * squareSize;
-    const coverN = Math.min(4096, Math.max(64, Math.ceil(worldSize / 10)));
+    // (read while generating: terrainData.landCover; an older terrain without it reads it now)
+    let coverN = Math.min(4096, Math.max(64, Math.ceil(worldSize / 10)));
     let coverGrid = null;
     try {
-      coverGrid = terrainData.bounds ? await fetchWorldCoverGrid(terrainData.bounds, coverN, coverN) : null;
+      if (terrainData.landCover?.grid) ({ grid: coverGrid, n: coverN } = terrainData.landCover);
+      else if (terrainData.landCover !== null) coverGrid = terrainData.bounds ? await fetchWorldCoverGrid(terrainData.bounds, coverN, coverN) : null;
     } catch (error) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Land cover (WorldCover) unavailable; trees follow OSM alone.`, error?.message || error);
     }

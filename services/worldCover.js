@@ -131,3 +131,37 @@ export function plantAllowed(cls, kind, u) {
   // scatter: anything but rock, snow, water and tundra
   return !(cls === WC.BARE || cls === WC.SNOW || cls === WC.WATER || cls === WC.MOSS);
 }
+
+/**
+ * Read the land cover once while generating (Generate Data / Preview 3D) and
+ * keep it with the terrain: terrainData.landCover = { grid, n } (n x n cells
+ * over the bounds, about 10 m each, row 0 north), or null when it can't be
+ * read (the level is made without it). Everything after reads this copy: the
+ * ground textures and materials, grass, and the trees in the preview and the
+ * level.
+ */
+export async function attachLandCover(terrainData, { onProgress, signal } = {}) {
+  if (!terrainData?.bounds || !terrainData.width) return null;
+  const mpp = Number(terrainData.processingMetersPerPixel) || 1;
+  const worldSize = terrainData.width * mpp;
+  const n = Math.min(4096, Math.max(64, Math.ceil(worldSize / 10)));
+  try {
+    onProgress?.('Loading land cover (ESA WorldCover)…');
+    const grid = await fetchWorldCoverGrid(terrainData.bounds, n, n, { signal });
+    terrainData.landCover = { grid, n };
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    console.warn('[WorldCover] land cover unavailable; the level is made without it.', error?.message || error);
+    terrainData.landCover = null;
+  }
+  return terrainData.landCover;
+}
+
+/** The land cover class at world (x, y) metres (terrain centre origin), 0 without one. */
+export function landCoverAt(landCover, worldSize, x, y) {
+  if (!landCover?.grid) return 0;
+  const { grid, n } = landCover;
+  const c = Math.min(n - 1, Math.max(0, Math.floor((x / worldSize + 0.5) * n)));
+  const r = Math.min(n - 1, Math.max(0, Math.floor((0.5 - y / worldSize) * n)));
+  return grid[r * n + c];
+}

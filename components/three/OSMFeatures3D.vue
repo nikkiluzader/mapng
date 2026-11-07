@@ -112,6 +112,8 @@ const workerTerrain = (data) => {
     minHeight: data.minHeight, maxHeight: data.maxHeight,
     metersPerPixel: data.metersPerPixel, processingMetersPerPixel: data.processingMetersPerPixel,
     osmFeatures: data.osmFeatures,
+    // (the trees follow the land cover, as in the level)
+    landCover: data.landCover ? toRaw(data.landCover) : null,
   };
 };
 

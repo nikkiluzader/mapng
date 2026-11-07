@@ -2055,6 +2055,60 @@ export function paintSteepRock(ctx, canvas, terrainData) {
   return painted / (canvas.width * canvas.height);
 }
 
+// Permanent snow and glaciers: where ESA WorldCover (read while generating:
+// terrainData.landCover) has snow and ice within a cell, and the satellite
+// image itself is snow-white there (its 10 m cells painted alone came out
+// as white squares, and a 2021 snowfield can be summer gravel in the
+// imagery). The shape is the image's; the land cover keeps white roofs, salt
+// and sand from turning to snow.
+const SNOW = [[238, 241, 245], [228, 233, 239], [245, 247, 249], [220, 226, 233]];
+export function paintLandCoverSnow(ctx, canvas, terrainData, satellite) {
+  const lc = terrainData?.landCover;
+  if (!lc?.grid || lc.grid.length !== lc.n * lc.n || !(satellite?.width > 0)) return 0;
+  const { grid, n } = lc;
+  const snowNear = (r, c) => {
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const rr = r + dr; const cc = c + dc;
+      if (rr >= 0 && cc >= 0 && rr < n && cc < n && grid[rr * n + cc] === 70) return true;
+    }
+    return false;
+  };
+  const hash = (x, y) => { let k = (x * 374761393 + y * 668265263) | 0; k = Math.imul(k ^ (k >>> 13), 1274126177); return ((k ^ (k >>> 16)) >>> 0) / 4294967296; };
+  let painted = 0;
+  const STRIP = 256;
+  const tmp = document.createElement("canvas");
+  tmp.width = canvas.width;
+  const tctx = tmp.getContext("2d", { willReadFrequently: true });
+  for (let y0 = 0; y0 < canvas.height; y0 += STRIP) {
+    const rows = Math.min(STRIP, canvas.height - y0);
+    const r0 = Math.max(0, Math.floor((y0 / canvas.height) * n) - 1); const r1 = Math.min(n - 1, Math.floor(((y0 + rows) / canvas.height) * n) + 1);
+    let any = false;
+    for (let r = r0; r <= r1 && !any; r++) for (let c = 0; c < n; c++) if (grid[r * n + c] === 70) { any = true; break; }
+    if (!any) continue;
+    tmp.height = rows;
+    tctx.drawImage(satellite, 0, (y0 / canvas.height) * satellite.height, satellite.width, (rows / canvas.height) * satellite.height, 0, 0, canvas.width, rows);
+    const sat = tctx.getImageData(0, 0, canvas.width, rows).data;
+    const img = ctx.getImageData(0, y0, canvas.width, rows);
+    const d = img.data; let changed = false;
+    for (let ty = 0; ty < rows; ty++) {
+      const r = Math.min(n - 1, Math.floor(((y0 + ty + 0.5) / canvas.height) * n));
+      for (let tx = 0; tx < canvas.width; tx++) {
+        if (!snowNear(r, Math.min(n - 1, Math.floor(((tx + 0.5) / canvas.width) * n)))) continue;
+        const i = (ty * canvas.width + tx) * 4;
+        const sr = sat[i], sg = sat[i + 1], sb = sat[i + 2];
+        const lum = 0.3 * sr + 0.59 * sg + 0.11 * sb;
+        if (lum < 196 || Math.max(sr, sg, sb) - Math.min(sr, sg, sb) > 34) continue;   // not snow-white in the image
+        const c = SNOW[Math.floor(hash(tx, y0 + ty) * SNOW.length)];
+        d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2];
+        changed = true; painted++;
+      }
+    }
+    if (changed) ctx.putImageData(img, 0, y0);
+  }
+  tmp.width = 0;
+  return painted / (canvas.width * canvas.height);
+}
+
 export const generateGameTexture = async (terrainData, options = {}) => {
   const onProgress = options.onProgress;
   onProgress?.("Painting the game map texture...");
@@ -2210,6 +2264,8 @@ export const generateGameTexture = async (terrainData, options = {}) => {
 
   const steep = paintSteepRock(ctx, canvas, terrainData);
   if (steep) console.log(`[Game Texture] Steep ground (over ~45°) painted as rock: ${(steep * 100).toFixed(1)}% of the texture.`);
+  const snow = paintLandCoverSnow(ctx, canvas, terrainData, ground?.image || options.satelliteCanvas || null);
+  if (snow) console.log(`[Game Texture] Snow and ice (ESA WorldCover) painted: ${(snow * 100).toFixed(1)}% of the texture.`);
 
   const blob = await new Promise((r) => canvas.toBlob((b) => r(b || null), "image/png"));
   const url = blob ? URL.createObjectURL(blob) : "";

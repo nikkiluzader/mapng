@@ -689,6 +689,41 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
   areas.sort((p, q) => q.area - p.area);
   for (const { ring, matIdx } of areas) rasterizePolygon(layerMap, size, ring, matIdx);
 
+  // 1a. Ground no OSM area covers, from what really covers it (ESA
+  // WorldCover, 10 m, read while generating: terrainData.landCover): grass
+  // and fields Grass, woods, scrub, wetland and tundra a forest floor
+  // (DirtGrass), bare ground Dirt (rock on a slope over ~25°), snow and ice
+  // rock (no snow material ships); built-up, water and no data left to the
+  // satellite's vegetation (1b). Most land outside towns has no OSM area:
+  // the Alps above the woods, deserts, farmland.
+  const lc = terrainData.landCover;
+  if (lc?.grid && lc.grid.length === lc.n * lc.n) {
+    const { grid, n } = lc;
+    const hmLc = terrainData.heightMap?.length === size * size ? terrainData.heightMap : null;
+    const byClass = new Int16Array(256).fill(-1);
+    byClass[10] = 8; byClass[95] = 8; byClass[20] = 8; byClass[90] = 8; byClass[100] = 8;
+    byClass[30] = 1; byClass[40] = 1;
+    byClass[60] = 2; byClass[70] = 4;
+    let filled = 0;
+    for (let y = 0; y < size; y++) {
+      const gy = Math.min(n - 1, Math.floor(((size - 1 - y) / size) * n)) * n;   // (north-up)
+      const row = y * size;
+      for (let x = 0; x < size; x++) {
+        const k = row + x;
+        if (layerMap[k] !== 0) continue;
+        let m = byClass[grid[gy + Math.min(n - 1, Math.floor((x / size) * n))]];
+        if (m < 0) continue;
+        // (bare ground on a slope: scree and rock)
+        if (m === 2 && hmLc && x > 0 && y > 0 && x < size - 1 && y < size - 1) {
+          const gx = (hmLc[k + 1] - hmLc[k - 1]) / (2 * metersPerPixel); const gz = (hmLc[k + size] - hmLc[k - size]) / (2 * metersPerPixel);
+          if (gx * gx + gz * gz > 0.22) m = 4;
+        }
+        layerMap[k] = m; filled++;
+      }
+    }
+    if (filled) console.log(`[OSM Materials] Land cover (ESA WorldCover) on unmapped ground: ${(filled / (size * size) * 100).toFixed(1)}% of the terrain.`);
+  }
+
   // 1b. Ground no OSM area covers stays DefaultMaterial, where no grass
   // grows. Where the satellite shows vegetation there (unmapped lawns, woods
   // and fields: 93 % of the unmapped ground round a 16k Salt Lake County

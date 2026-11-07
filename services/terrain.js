@@ -1,3 +1,4 @@
+import { attachLandCover } from './worldCover.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
 import { fetchWord, replayingSources } from './sourceWording.js';
 import { parseRasterOrGridElevationFile, parseTifFile, parseTifFiles, parseGridFiles } from "./tifLoader.js";
@@ -2439,6 +2440,9 @@ export const fetchTerrainData = async (
     raw,
   };
 
+  // what covers the ground (ESA WorldCover), read once with the terrain
+  await attachLandCover(terrainData, { onProgress: (m) => onProgress?.(m), signal });
+
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, baseColor, onProgress };
     if (generateOSMTextureAsset) {
@@ -2796,6 +2800,9 @@ export const loadTerrainFromTif = async (
     raw,
   };
 
+  // what covers the ground (ESA WorldCover), read once with the terrain
+  await attachLandCover(terrainData, { onProgress: (m) => onProgress?.(m), signal });
+
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, onProgress };
     if (generateOSMTextureAsset) {
@@ -3027,6 +3034,9 @@ export const loadTerrainFromLaz = async (
     exportCropSize: null,
     raw,
   };
+
+  // what covers the ground (ESA WorldCover), read once with the terrain
+  await attachLandCover(terrainData, { onProgress: (m) => onProgress?.(m), signal });
 
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, onProgress };

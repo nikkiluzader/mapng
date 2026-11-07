@@ -1,3 +1,4 @@
+import { plantAllowed } from './worldCover.js';
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
@@ -697,6 +698,16 @@ const createTerrainMesh = async (data, maxMeshResolution = 1024, centerTextureTy
 };
 
 export const createOSMGroup = (data, options = {}) => {
+  // the land cover (ESA WorldCover, read while generating): trees and bushes
+  // in mapped woods and scrub only where the level plants them
+  const lcov = data?.landCover?.grid && data.landCover.grid.length === data.landCover.n * data.landCover.n ? data.landCover : null;
+  const previewCoverKeeps = (sx, sz, kind) => {
+    if (!lcov) return true;
+    const { grid, n } = lcov;
+    const c = Math.min(n - 1, Math.max(0, Math.floor((sx / SCENE_SIZE + 0.5) * n)));
+    const r = Math.min(n - 1, Math.max(0, Math.floor((sz / SCENE_SIZE + 0.5) * n)));
+    return plantAllowed(grid[r * n + c], kind, Math.random());
+  };
   // NOTE: This function is shared by both preview and export code paths.
   // Building geometry uses the unified lightweight pipeline everywhere.
   // Memory-budget options below remain primarily useful for preview callers.
@@ -1042,7 +1053,7 @@ export const createOSMGroup = (data, options = {}) => {
           for (let i = 0; i < count; i++) {
             const rx = minX + Math.random() * (maxX - minX),
               rz = minZ + Math.random() * (maxZ - minZ);
-            if (isPointInPolygon({ x: rx, z: rz }, points)) {
+            if (isPointInPolygon({ x: rx, z: rz }, points) && previewCoverKeeps(rx, rz, "wood")) {
               treesList.push({
                 pos: new THREE.Vector3(
                   rx,
@@ -1090,7 +1101,7 @@ export const createOSMGroup = (data, options = {}) => {
           for (let i = 0; i < count; i++) {
             const rx = minX + Math.random() * (maxX - minX),
               rz = minZ + Math.random() * (maxZ - minZ);
-            if (isPointInPolygon({ x: rx, z: rz }, points)) {
+            if (isPointInPolygon({ x: rx, z: rz }, points) && previewCoverKeeps(rx, rz, "bush")) {
               bushesList.push(
                 new THREE.Vector3(rx, getHeightAtScenePos(data, rx, rz), rz),
               );
