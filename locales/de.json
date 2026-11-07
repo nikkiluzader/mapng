@@ -710,15 +710,15 @@
     "beamngTitle": "BeamNG-Level-Export",
     "beamngBody": "Ein fahrbereites Level-ZIP für BeamNG.drive 0.40, gebaut aus dem echten Ort:",
     "beamngItems": [
-      "Gelände mit Materialien aus der OSM-Landnutzung bemalt, dazu eine 2x-Satelliten- oder Spieltextur (Wasser direkt aus dem Satellitenbild), die du vor dem Export nachbessern kannst",
-      "Ein regionaler Look je nach Ort: Gras, Bodendecker, Felsen und Wasser",
-      "Regionale Bäume aus BeamNGs eigenen Modellen, gewählt nach OSM-Tags und Klima",
+      "Gelände mit Materialien aus der OSM-Landnutzung und, wo OSM nichts kartiert, aus der ESA-WorldCover-Landbedeckung, mit einer 2x-Satelliten- oder Spiel-Basistextur (Wasser direkt aus dem Satellitenbild, Schnee wo die Landbedeckung ihn zeigt), die du vor dem Export ausbessern kannst",
+      "Ein regionaler Look nach Ort und Landbedeckung: Gras, Bodenbewuchs, Felsen und Wasser",
+      "Regionale Bäume aus BeamNGs eigenen Modellen, gewählt nach OSM-Tags und Klima, nur dort gepflanzt, wo WorldCover Baumbestand zeigt (einzeln kartierte OSM-Bäume stehen immer)",
       "Texturierte Gebäude mit BeamNGs Fassaden und Dächern",
       "DecalRoads mit echten Belägen, Markierungen nach Land, Zebrastreifen, Haltelinien, Parkstreifen und Seitenstreifen",
       "Erhöhte Gehwege mit Eckabrundungen und Rampen sowie Mittelinseln an geteilten Straßen",
       "Ampeln für jede Zufahrt, Verkehrsschilder und Straßenlaternen, die nachts leuchten",
       "Hydranten, Mülleimer, Bänke, Strommasten und Leitungen",
-      "Brücken mit berechneten Fahrbahnen, Pfeilern und angeglichenen Widerlagern",
+      "Brücken mit berechneten Fahrbahnen, Pfeilern und angeglichenen Widerlagern; Tunnel mit Portalen und Licht; Bogenstaumauern aus Beton mit Straße und Leitplanken auf der Krone",
       "KI-Verkehr auf dem Straßennetz, Straßennamen auf der Minikarte und Tankstellen",
       "Eine umgebende Hintergrundlandschaft und ein ausführlicher export_report.txt zur Fehlersuche",
       "Eine Prüfung „Wie schwer ist dieses Level?“ vor dem Export, mit BeamNGs Größen- und Präzisionsgrenzen (sie warnt nur)"
@@ -867,7 +867,7 @@
         },
         {
           "name": "ESA WorldCover",
-          "desc": "Globale Landbedeckung mit 10 m (2021, CC BY 4.0): Bäume werden nur gepflanzt, wo sie Baumbestand zeigt"
+          "desc": "Globale Landbedeckung mit 10 m (2021, CC BY 4.0), beim Generieren gelesen: Bäume nur dort, wo sie Baumbestand zeigt, Bodenmaterialien und Gras auf Land ohne OSM-Flächen, Schnee auf der Spieltextur und der regionale Look"
         },
         {
           "name": "USGS National Map",
@@ -925,7 +925,7 @@
         },
         {
           "name": "Electron",
-          "desc": "MapNG Desktop für Windows und Linux: eine mitgelieferte Node-Laufzeit zum Generieren und Exportieren auf allen CPU-Kernen, mit electron-updater für Updates, denen du zustimmst"
+          "desc": "MapNG Desktop für Windows und Linux: eine mitgelieferte Node-Laufzeit zum Generieren und Exportieren auf allen CPU-Kernen, mit electron-updater für Updates, denen du zustimmst, kostenloses Lidar in voller Auflösung für große Gebiete und ein Download-Cache, während du Einstellungen änderst"
         }
       ]
     }

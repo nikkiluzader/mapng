@@ -710,15 +710,15 @@
     "beamngTitle": "Eksport poziomu BeamNG",
     "beamngBody": "Gotowy do jazdy poziom ZIP dla BeamNG.drive 0.40, zbudowany z prawdziwego miejsca:",
     "beamngItems": [
-      "Teren malowany materiałami z użytkowania terenu OSM oraz tekstura bazowa 2x z satelity lub w stylu gry (woda prosto ze zdjęcia satelitarnego), którą możesz poprawić przed eksportem",
-      "Regionalny wygląd dobrany do miejsca: trawa, pokrycie gruntu, skały i woda",
-      "Regionalne drzewa z modeli BeamNG, wybierane według tagów OSM i klimatu",
+      "Teren malowany materiałami z użytkowania terenu OSM, a tam, gdzie OSM nic nie mapuje, z pokrycia terenu ESA WorldCover, z teksturą bazową 2x z satelity lub gry (woda prosto ze zdjęcia, śnieg tam, gdzie wskazuje pokrycie terenu), którą można poprawić przed eksportem",
+      "Regionalny wygląd dobrany do miejsca i tego, co pokrywa teren: trawa, roślinność, skały i woda",
+      "Regionalne drzewa z modeli BeamNG, dobrane według tagów OSM i klimatu, sadzone tylko tam, gdzie WorldCover widzi pokrywę drzew (drzewa mapowane w OSM pojedynczo zawsze stoją)",
       "Teksturowane budynki z fasadami i dachami BeamNG",
       "DecalRoads z prawdziwymi nawierzchniami, oznakowaniem według kraju, przejściami dla pieszych, liniami zatrzymania, pasami postojowymi i poboczami",
       "Podniesione chodniki z zaokrąglonymi narożnikami i rampami oraz pasy rozdziału na drogach dwujezdniowych",
       "Sygnalizacja dla każdego wlotu, znaki drogowe i latarnie świecące nocą",
       "Hydranty, kosze, ławki, słupy i linie energetyczne",
-      "Mosty z wyliczonymi pomostami, filarami i dopasowanymi przyczółkami",
+      "Mosty z wyliczonymi pomostami, filarami i wyrównanymi przyczółkami; tunele z portalami i oświetleniem; betonowe zapory łukowe z drogą i barierami na koronie",
       "Ruch AI na sieci dróg, nazwy ulic na minimapie i stacje paliw",
       "Otaczające tło terenu i szczegółowy export_report.txt do diagnozowania problemów",
       "Sprawdzenie „Jak ciężki jest ten poziom?” przed eksportem, z limitami rozmiaru i precyzji BeamNG (tylko ostrzega)"
@@ -867,7 +867,7 @@
         },
         {
           "name": "ESA WorldCover",
-          "desc": "Globalne pokrycie terenu w rozdzielczości 10 m (2021, CC BY 4.0): drzewa sadzone są tylko tam, gdzie widać pokrywę drzew"
+          "desc": "Globalne pokrycie terenu 10 m (2021, CC BY 4.0), odczytywane przy generowaniu: drzewa tylko tam, gdzie widać pokrywę drzew, materiały gruntu i trawa na terenie bez obszarów OSM, śnieg na teksturze gry i regionalny wygląd"
         },
         {
           "name": "USGS National Map",
@@ -925,7 +925,7 @@
         },
         {
           "name": "Electron",
-          "desc": "MapNG Desktop dla Windows i Linux: wbudowane środowisko Node do generowania i eksportu na wszystkich rdzeniach CPU, z electron-updater do aktualizacji, na które się zgadzasz"
+          "desc": "MapNG Desktop dla Windows i Linux: wbudowane środowisko Node do generowania i eksportu na wszystkich rdzeniach CPU, z electron-updater do aktualizacji, na które się zgadzasz, darmowy lidar w pełnej szczegółowości dla dużych obszarów i pamięć podręczna pobrań podczas zmiany ustawień"
         }
       ]
     }

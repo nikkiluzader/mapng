@@ -710,15 +710,15 @@
     "beamngTitle": "Export de niveau BeamNG",
     "beamngBody": "Un niveau ZIP prêt à rouler pour BeamNG.drive 0.40, construit à partir du vrai lieu :",
     "beamngItems": [
-      "Terrain peint avec des matériaux issus de l'occupation du sol OSM, et une texture de base satellite 2x ou de jeu (l'eau tirée de l'image satellite) à retoucher avant l'export",
-      "Un style régional choisi selon le lieu : herbe, couvre-sol, rochers et eau",
-      "Des arbres régionaux issus des modèles de BeamNG, choisis selon les tags OSM et le climat",
+      "Terrain peint avec les matériaux de l’occupation du sol OSM et, là où OSM ne cartographie rien, de l’occupation du sol ESA WorldCover, avec une texture de base 2x satellite ou Jeu (l’eau tirée de l’image satellite, la neige là où l’occupation du sol en montre) que tu peux retoucher avant l’export",
+      "Un style régional choisi d’après le lieu et ce qui couvre le sol : herbe, couvert végétal, rochers et eau",
+      "Des arbres régionaux issus des modèles de BeamNG, choisis selon les tags OSM et le climat, plantés seulement là où WorldCover voit un couvert arboré (les arbres qu’OSM cartographie un par un restent toujours)",
       "Des bâtiments texturés avec les façades et toits de BeamNG",
       "Des DecalRoads avec de vrais revêtements, des marquages par pays, passages piétons, lignes d'arrêt, places de stationnement et accotements",
       "Des trottoirs surélevés avec raccords d'angle et rampes, et des terre-pleins centraux sur les routes à chaussées séparées",
       "Des feux pour chaque approche, des panneaux et des lampadaires qui s'allument la nuit",
       "Bouches d'incendie, poubelles, bancs, poteaux et lignes électriques",
-      "Des ponts avec tabliers calculés, piles et culées raccordées",
+      "Des ponts aux tabliers calculés, avec piles et culées nivelées ; des tunnels avec portails et éclairage ; des barrages-voûtes en béton avec la route et les glissières sur le couronnement",
       "Trafic IA sur le réseau routier, noms de rues sur la minicarte et stations-service",
       "Un décor environnant et un export_report.txt détaillé pour le dépannage",
       "Une vérification « Quel est le poids de ce niveau ? » avant l'export, avec les limites de taille et de précision de BeamNG (simple avertissement)"
@@ -867,7 +867,7 @@
         },
         {
           "name": "ESA WorldCover",
-          "desc": "Occupation du sol mondiale à 10 m (2021, CC BY 4.0) : les arbres ne sont plantés que là où elle voit un couvert arboré"
+          "desc": "Occupation du sol mondiale à 10 m (2021, CC BY 4.0), lue à la génération : des arbres seulement là où elle voit un couvert arboré, matériaux de sol et herbe sur les terres qu’OSM ne cartographie pas, neige sur la texture de jeu et le style régional"
         },
         {
           "name": "USGS National Map",
@@ -925,7 +925,7 @@
         },
         {
           "name": "Electron",
-          "desc": "MapNG Desktop pour Windows et Linux : un runtime Node intégré pour générer et exporter sur tous les cœurs du processeur, avec electron-updater pour des mises à jour que vous acceptez"
+          "desc": "MapNG Desktop pour Windows et Linux : un runtime Node intégré pour générer et exporter sur tous les cœurs du processeur, avec electron-updater pour des mises à jour que vous acceptez, lidar gratuit en pleine résolution pour les grandes zones et un cache des téléchargements pendant que tu changes les réglages"
         }
       ]
     }

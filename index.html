@@ -80,9 +80,10 @@
           "sameAs": ["https://github.com/nikkiluzader/mapng"],
           "featureList": [
             "A playable BeamNG.drive level from any place on Earth, up to 16384 x 16384",
-            "Real elevation: 30 m global, USGS 1 m (USA), KRON86 (Poland), GPXZ with your own key, or your own LAZ/LAS, GeoTIFF, ASC and GML files",
+            "Real elevation: free national lidar where it exists (Mapterhorn) and the global 30 m elsewhere, USGS 1 m (USA), Poland's NMT, GPXZ with your own key, or your own LAZ/LAS, GeoTIFF, ASC and GML files",
+            "Land cover from ESA WorldCover: trees only where trees grow, ground and grass on unmapped land, and a regional look from what covers the land",
             "OpenStreetMap roads with real surfaces, lane markings, crosswalks, traffic signals, signs and street lamps",
-            "Textured buildings, regional trees, sidewalks, bridges and tunnels",
+            "Textured buildings, regional trees, sidewalks, bridges, tunnels and dams",
             "AI traffic on the road network and road names on the minimap",
             "Racetracks, sports grounds, swimming pools and fountains",
             "Batch tile grids and combined multi-tile levels",
@@ -95,7 +96,7 @@
           "@type": "SoftwareApplication",
           "@id": "https://mapng.com/#desktop",
           "name": "MapNG Desktop",
-          "description": "The MapNG app for Windows and Linux: big and dense maps without the browser memory limit, every CPU core, levels saved straight into BeamNG.drive's mods folder, and Update or Modify for your levels without downloading the data again.",
+          "description": "The MapNG app for Windows and Linux: big and dense maps without the browser memory limit, every CPU core, free lidar at full detail for big areas, downloads kept while you change settings, levels saved straight into BeamNG.drive's mods folder, and Update or Modify for your levels without downloading the data again.",
           "applicationCategory": "GameApplication",
           "operatingSystem": "Windows, Linux",
           "downloadUrl": "https://github.com/nikkiluzader/mapng/releases/latest",
@@ -128,7 +129,7 @@
           "name": "Can I convert real-world locations to BeamNG terrain?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. MapNG uses real elevation data (30 m global, USGS 1 m in the USA, KRON86 in Poland, GPXZ, or your own LAZ/GeoTIFF files) and OpenStreetMap data to build terrain and a complete level for any location on Earth."
+            "text": "Yes. MapNG uses real elevation data (free national lidar where it exists, the global 30 m elsewhere, USGS 1 m in the USA, Poland's NMT, GPXZ, or your own LAZ/GeoTIFF files) and OpenStreetMap data to build terrain and a complete level for any location on Earth."
           }
         },
         {
@@ -144,7 +145,7 @@
           "name": "Is MapNG free to use?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes, MapNG is free and open source under the MIT license, with no account. The Standard (30 m), USGS (1 m USA) and KRON86 (Poland) elevation sources are free. The optional GPXZ source needs your own API key, which has a free tier."
+            "text": "Yes, MapNG is free and open source under the MIT license, with no account. The free lidar, global 30 m, USGS (1 m USA) and Poland's NMT elevation sources are free. The optional GPXZ source needs your own API key, which has a free tier."
           }
         },
         {
@@ -152,7 +153,7 @@
           "name": "Is there a MapNG desktop app?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. MapNG Desktop for Windows and Linux is free from GitHub Releases. It has no browser memory limit and uses every CPU core, so big and dense maps export much faster. It saves levels straight into BeamNG.drive's mods folder, lists your MapNG levels, keeps the data each one was made from so Update and Modify rebuild it without downloading again, and updates itself when you agree to."
+            "text": "Yes. MapNG Desktop for Windows and Linux is free from GitHub Releases. It has no browser memory limit and uses every CPU core, so big and dense maps export much faster, reads free lidar at full detail for big areas, and keeps what it downloaded while you change settings and generate again. It saves levels straight into BeamNG.drive's mods folder, lists your MapNG levels, keeps the data each one was made from so Update and Modify rebuild it without downloading again, and updates itself when you agree to."
           }
         }
       ]
@@ -168,12 +169,12 @@
         <h2>Features</h2>
         <ul>
           <li>A playable BeamNG.drive level from any place on Earth, up to 16384 x 16384</li>
-          <li>Elevation: Standard 30 m global, USGS 1 m (USA), KRON86 (Poland), GPXZ with your own key, or your own LAZ/LAS, GeoTIFF, ASC and GML files</li>
-          <li>Terrain materials from OpenStreetMap land use, satellite or game-style ground textures</li>
-          <li>Textured buildings, regional trees, grass and rocks chosen from the location</li>
+          <li>Elevation: free national lidar where it exists and the global 30 m elsewhere, USGS 1 m (USA), Poland's NMT, GPXZ with your own key, or your own LAZ/LAS, GeoTIFF, ASC and GML files</li>
+          <li>Terrain materials from OpenStreetMap land use and ESA WorldCover land cover, satellite or game-style ground textures</li>
+          <li>Textured buildings; trees, grass and rocks chosen from the location and from what covers the land, with trees only where trees grow</li>
           <li>Roads with real surfaces and lane markings by country, crosswalks, stop bars, parking lanes, traffic signals, road signs and street lamps</li>
           <li>Raised sidewalks with curbs and ramps, median islands, hydrants, benches, utility poles and power lines</li>
-          <li>Bridges, overpasses and tunnels; AI traffic and road names on the minimap</li>
+          <li>Bridges, overpasses, tunnels and dams; AI traffic and road names on the minimap</li>
           <li>Racetracks, sports grounds, swimming pools and fountains</li>
           <li>GeoTIFF, GeoJSON, GLB and DAE exports, an interactive 3D preview, and shareable codes for your settings</li>
           <li>Batch mode for tile grids, and a combined BeamNG level stitched from a 2x2, 4x4 or 8x8 grid</li>
@@ -181,7 +182,7 @@
         <h2>How to make a BeamNG map from a real-world location</h2>
         <p>Select a location on the map or search by name, choose an output size (512 to 16384 px) and an elevation source, and generate. Check the terrain in the 3D preview, then export the BeamNG level and put the ZIP in your BeamNG.drive mods folder.</p>
         <h2>MapNG Desktop for Windows and Linux</h2>
-        <p>The free desktop app runs MapNG on your own computer: no browser memory limit, every CPU core, levels saved straight into BeamNG.drive's mods folder, and a list of your MapNG levels you can Update or Modify without downloading the data again. <a href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>.</p>
+        <p>The free desktop app runs MapNG on your own computer: no browser memory limit, every CPU core, free lidar at full detail for big areas, downloads kept while you change settings, levels saved straight into BeamNG.drive's mods folder, and a list of your MapNG levels you can Update or Modify without downloading the data again. <a href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>.</p>
         <p><strong>Please enable JavaScript to use MapNG.</strong></p>
         <p><a href="https://github.com/nikkiluzader/mapng">View on GitHub</a> · <a href="https://mapng.com/data.html">Your data</a></p>
       </div>

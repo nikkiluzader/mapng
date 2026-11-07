@@ -710,15 +710,15 @@
     "beamngTitle": "Exportación de nivel BeamNG",
     "beamngBody": "Un nivel ZIP listo para conducir en BeamNG.drive 0.40, creado a partir del lugar real:",
     "beamngItems": [
-      "Terreno pintado con materiales del uso del suelo de OSM y una textura base satelital 2x o de juego (el agua directamente de la imagen satelital) que puedes retocar antes de exportar",
-      "Un aspecto regional elegido según el lugar: hierba, cobertura del suelo, rocas y agua",
-      "Árboles regionales con los modelos de BeamNG, elegidos por etiquetas OSM y clima",
+      "Terreno con materiales del uso del suelo de OSM y, donde OSM no mapea nada, de la cobertura ESA WorldCover, con una textura base 2x de satélite o de juego (el agua directa de la imagen, la nieve donde la cobertura la indica) que puedes retocar antes de exportar",
+      "Un aspecto regional elegido por la ubicación y lo que cubre el terreno: hierba, vegetación baja, rocas y agua",
+      "Árboles regionales con los modelos de BeamNG, según etiquetas de OSM y el clima, plantados solo donde WorldCover ve cubierta arbórea (los árboles que OSM mapea uno a uno siempre se mantienen)",
       "Edificios texturizados con las fachadas y tejados de BeamNG",
       "DecalRoads con superficies reales, marcas viales por país, pasos de peatones, líneas de detención, carriles de estacionamiento y arcenes",
       "Aceras elevadas con esquinas curvas y rampas, y medianas en carreteras de calzadas separadas",
       "Semáforos para cada acceso, señales de tráfico y farolas que se encienden de noche",
       "Hidrantes, papeleras, bancos, postes y tendido eléctrico",
-      "Puentes con tableros calculados, pilares y estribos ajustados",
+      "Puentes con tableros calculados, pilares y estribos nivelados; túneles con portales y luces; presas de arco de hormigón con la carretera y guardarraíles en la coronación",
       "Tráfico IA en la red de carreteras, nombres de calles en el minimapa y gasolineras",
       "Un paisaje de fondo y un export_report.txt detallado para diagnosticar problemas",
       "Una comprobación «¿Cuánto pesa este nivel?» antes de exportar, con los límites de tamaño y precisión de BeamNG (solo avisa)"
@@ -867,7 +867,7 @@
         },
         {
           "name": "ESA WorldCover",
-          "desc": "Cobertura del suelo global a 10 m (2021, CC BY 4.0): solo se plantan árboles donde muestra cubierta arbórea"
+          "desc": "Cobertura del suelo global a 10 m (2021, CC BY 4.0), leída al generar: árboles solo donde muestra cubierta arbórea, materiales de suelo y hierba en terreno que OSM no mapea, nieve en la textura de juego y el aspecto regional"
         },
         {
           "name": "USGS National Map",
@@ -925,7 +925,7 @@
         },
         {
           "name": "Electron",
-          "desc": "MapNG Desktop para Windows y Linux: un entorno Node incluido para generar y exportar con todos los núcleos de la CPU, con electron-updater para actualizaciones que tú apruebas"
+          "desc": "MapNG Desktop para Windows y Linux: un entorno Node incluido para generar y exportar con todos los núcleos de la CPU, con electron-updater para actualizaciones que tú apruebas, lidar gratuito con todo su detalle en áreas grandes y una caché de descargas mientras cambias ajustes"
         }
       ]
     }

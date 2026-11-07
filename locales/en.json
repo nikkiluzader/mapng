@@ -710,15 +710,15 @@
     "beamngTitle": "BeamNG Level Export",
     "beamngBody": "A ready-to-drive level ZIP for BeamNG.drive 0.40, built from the real place:",
     "beamngItems": [
-      "Terrain painted with materials from OSM land use, and a 2x satellite or Game base texture (its water straight from the satellite image) you can touch up before export",
-      "A regional look chosen from the location: grass, ground cover, rocks and water",
-      "Regional trees from BeamNG's own models, picked from OSM tags and the local climate",
+      "Terrain painted with materials from OSM land use, and from ESA WorldCover land cover where OSM maps none, with a 2x satellite or Game base texture (its water straight from the satellite image, its snow where the land cover has it) you can touch up before export",
+      "A regional look chosen from the location and from what covers the land: grass, ground cover, rocks and water",
+      "Regional trees from BeamNG's own models, picked from OSM tags and the local climate, planted only where WorldCover sees tree cover (trees OSM maps one by one always stand)",
       "Textured buildings with BeamNG's facades and roofs",
       "DecalRoads with real surfaces, lane markings by country, crosswalks, stop bars, parking lanes and shoulders",
       "Raised sidewalks with curb returns and ramps, and median islands on divided roads",
       "Traffic signals for every approach, road signs, and street lamps that light up at night",
       "Hydrants, bins, benches, utility poles and power lines",
-      "Bridges with solved decks, piers and graded abutments",
+      "Bridges with solved decks, piers and graded abutments; tunnels with portals and lights; concrete arch dams with the road and guardrails along the crest",
       "AI traffic on the road network, road names on the minimap, and fuel stations",
       "A surrounding backdrop and a detailed export_report.txt for troubleshooting",
       "A \"How heavy is this level?\" check before you export, with BeamNG's size and precision limits (it only warns)"
@@ -867,7 +867,7 @@
         },
         {
           "name": "ESA WorldCover",
-          "desc": "Global 10 m land cover (2021, CC BY 4.0): trees are planted only where it sees tree cover"
+          "desc": "Global 10 m land cover (2021, CC BY 4.0), read while generating: trees only where it sees tree cover, ground materials and grass on land OSM doesn't map, snow on the game texture, and the regional look"
         },
         {
           "name": "USGS National Map",
@@ -925,7 +925,7 @@
         },
         {
           "name": "Electron",
-          "desc": "MapNG Desktop for Windows and Linux: a bundled Node runtime for generating and exporting on every CPU core, with electron-updater for updates you agree to"
+          "desc": "MapNG Desktop for Windows and Linux: a bundled Node runtime for generating and exporting on every CPU core, with electron-updater for updates you agree to, free lidar at full detail for big areas, and a download cache while you change settings"
         }
       ]
     }
