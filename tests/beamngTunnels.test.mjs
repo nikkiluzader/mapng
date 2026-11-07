@@ -352,3 +352,23 @@ test('another road beside a portal: its ground left alone, the headwall and wing
   assert.equal(tunnelGroundAt(t, q.x, q.y, q.z), before, 'cover over the tube under the street');
   assert.ok(before > q.z + t.crown, 'made up over the crown');
 });
+
+test('terrain left as surveyed (raw): the bore runs out to where the ground meets the road, its headwall bigger, an apron in front, holes along the mouth', () => {
+  // OSM's tunnel ends at the foot of each flank: the survey has the portal faces
+  const path = { xy: road(-232, 232), half: 3.5 };
+  const shaped = solveTunnel(path, { groundAt: ridge });
+  const raw = solveTunnel(path, { groundAt: ridge, raw: true });
+  assert.ok(shaped.ok && raw.ok);
+  const len = (t) => t.line[t.iN].s - t.line[t.iS].s;
+  assert.ok(len(raw) > len(shaped) + 10, `raw bore ${len(raw).toFixed(0)} m runs further out than the shaped one ${len(shaped).toFixed(0)} m`);
+  assert.equal(raw.raw, true);
+  assert.ok(raw.headHalf > shaped.headHalf && raw.headTop > shaped.headTop && raw.headDepth > shaped.headDepth, 'a bigger headwall');
+  // outside the bore the road is on the surveyed ground
+  raw.line.forEach((p, k) => { if (k < raw.iS || k > raw.iN) assert.ok(Math.abs(p.z - p.g) <= 1.01, `off the ground by ${(p.z - p.g).toFixed(2)} m at ${p.s.toFixed(0)}`); });
+  // the portal geometry carries an apron at road level in front of the face
+  const g = buildPortalGeometry(raw, 'S');
+  const pS = raw.line[raw.iS];
+  let apron = 0;
+  for (let k = 0; k < g.pos.length; k += 3) if (Math.abs(g.pos[k + 2] - pS.z) < 1e-6 && (g.pos[k + 1] - pS.y) * pS.ty + (g.pos[k] - pS.x) * pS.tx < -1) apron++;
+  assert.ok(apron >= 2, 'apron vertices out in front of the face');
+});

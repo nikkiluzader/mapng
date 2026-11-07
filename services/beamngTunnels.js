@@ -90,7 +90,11 @@ const CC_ARCH_M = 0.8;                 // ... and a shallow vault
 const CC_COVER_M = 0.8;                // ground over the roof
 const CC_HEAD_OVER_M = 0.3;            // headwall top over the street
 const CC_STREET_BEHIND_M = 16;         // the street behind a box's portal: its ground this far in
-const TRENCH_DONE_M = 0.25;            // the approach meets the ground again within this
+const TRENCH_DONE_M = 0.25;
+const RAW_PORTAL_OPEN_M = 0.5;
+const RAW_APRON_M = 2.5;                // ...and an apron slab this far out in front of the face
+const RAW_APRON_SQUARES = 2.5;
+const RAW_HEAD_GROW_M = 3;              // terrain shaping off: the headwall this much taller and wider each side           // terrain shaping off: a portal where the ground is no more than this over the road            // the approach meets the ground again within this
 const APPROACH_FIT_M = [4, 40];        // approach road samples a portal's height is fitted to
 const APPROACH_MAX_GRADE = 0.25;
 
@@ -456,7 +460,7 @@ function buildGalleryGeometry(t) {
   return [{ pos: T.pos, uv: T.uv, from: t.line[0].s, to: t.line[t.line.length - 1].s }];
 }
 
-function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1 }, cutCover) {
+function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false }, cutCover) {
   const st = stations(path.xy);
   const n = st.length;
   const L = st[n - 1].s;
@@ -528,8 +532,16 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   const c0 = z.findIndex((_, i) => covered(i));
   const c1 = n - 1 - [...z].reverse().findIndex((_, k) => covered(n - 1 - k));
   if (c0 < 0 || c1 <= c0) return { ok: false, reason: 'not under ground in the elevation data', length: L };
-  const iS = free[0] || bridged[0] ? 0 : c0;
-  const iN = free[1] || bridged[1] ? n - 1 : c1;
+  let iS = free[0] || bridged[0] ? 0 : c0;
+  let iN = free[1] || bridged[1] ? n - 1 : c1;
+  // the terrain left as it is (terrain shaping off, fine elevation): the
+  // tube runs on out to where the ground comes down to the road (the portal
+  // face the survey has; its concrete stands out of the slope, the portal
+  // holes keep the ground out of it) rather than a cutting dug to it
+  if (raw && !cutCover) {
+    while (iS > 0 && g[iS - 1] - z[iS - 1] > RAW_PORTAL_OPEN_M) iS--;
+    while (iN < n - 1 && g[iN + 1] - z[iN + 1] > RAW_PORTAL_OPEN_M) iN++;
+  }
   const tubeLength = st[iN].s - st[iS].s;
   if (st[c1].s - st[c0].s < MIN_TUBE_M) return { ok: false, reason: `bore only ${Math.round(st[c1].s - st[c0].s)} m under ground`, length: L };
   const exposed = [];
@@ -632,15 +644,18 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     portals: [!free[0], !free[1]],
     portalKind: [0, 1].map((e) => (free[e] ? 'edge' : bridged[e] ? 'bridge' : 'cut')),
     kind: cutCover ? 'cutcover' : 'bored',
+    // (terrain shaping off: the ground as surveyed, no backfill; tunnelHoleAt
+    // opens it wherever it dips into the tube)
+    raw: raw && !cutCover,
     W, wall, arch, crown, need,
     // headwall top over the road: a bore's tall face, a box's to the street
-    headTop: cutCover ? need + CC_HEAD_OVER_M : HEAD_TOP_M,
+    headTop: cutCover ? need + CC_HEAD_OVER_M : HEAD_TOP_M + (raw ? RAW_HEAD_GROW_M : 0),
     // per portal [start, end]: a box's headwall up to the street behind it
     // (Deck Park's east portals: the street 10.3 m over the road where the
     // freeway is sunk deeper; at the cover height the street behind was cut
     // down to a ragged wall of ground over the headwall)
     headTops: [0, 1].map((e) => {
-      if (!cutCover) return HEAD_TOP_M;
+      if (!cutCover) return HEAD_TOP_M + (raw ? RAW_HEAD_GROW_M : 0);
       const i0 = e === 0 ? iS : iN; const step = e === 0 ? 1 : -1;
       const behind = [];
       for (let k = 1; k * STEP_M <= CC_STREET_BEHIND_M; k++) {
@@ -665,6 +680,13 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   tunnel.wingT = Math.max(1.5, 1.5 * squareSize);
   tunnel.wingD = W + LINING_M + WING_GAP_M;
   tunnel.headHalf = Math.max(W + LINING_M + HEAD_SIDE_M, tunnel.wingD + tunnel.wingT + 1);
+  // the terrain as surveyed: bigger holes round the tube, so a headwall
+  // bigger all round (taller, wider, deeper) hides their ragged edges
+  if (tunnel.raw) {
+    tunnel.headHalf += RAW_HEAD_GROW_M;
+    tunnel.headDepth *= 2;
+    tunnel.stepAt = tunnel.headDepth / 2;
+  }
   for (const q of tunnel.line) { q.wl = W; q.wr = W; }
   tunnel.maxExtra = 0;
   tunnel.cuts = [];
@@ -1207,6 +1229,17 @@ export function tunnelHoleAt(t, x, y, lo, hi = lo) {
   // in front of the face nothing opens (the road runs on the ground there),
   // but for a grid square at a bridge's portal (the deck carries the road)
   const front = nearerPortalKind(t, n?.s ?? 0) === 'bridge' ? -1.5 * t.squareSize : 0.3;
+  // the ground as surveyed (terrain shaping off): no backfill over the tube,
+  // so wherever the ground dips into it, all along, it opens (from a little
+  // in front of the face: no teeth of ground left standing in the mouth)
+  if (t.raw) {
+    if (!n || n.into < -1.5 * t.squareSize) return false;
+    const ad = across(t, n);
+    if (ad > t.W + LINING_M + 2.5 * t.squareSize) return false;
+    // (in front of the face only as far as the portal's apron reaches)
+    if (n.into < -Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) + 0.5 * t.squareSize) return false;
+    return lo < n.z + t.crown + LINING_M + 1;
+  }
   if (!n || n.into < front || (n.into > t.headDepth + BACKFILL_M && !inExposed(t, n.s))) return false;
   if (across(t, n) > t.W + LINING_M + 0.5 * t.squareSize) return false;
   if (hi > n.z + headTopAt(t, n.s) + 0.5) return false;
@@ -1438,6 +1471,16 @@ export function buildPortalGeometry(t, end) {
     const out = [step * q.tx, step * q.ty, 0];
     T.tri(Z[0], Z[1], Z[2], [[0, 0], [0, 1], [1, 1]], () => out);
     T.tri(Z[0], Z[2], Z[3], [[0, 0], [1, 1], [1, 0]], () => out);
+  }
+  // the terrain as surveyed: an apron slab at road level out in front of the
+  // face, over the squares opened there (the ground standing up into the mouth)
+  if (t.raw) {
+    const L = Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize);
+    const at = (u, w) => [p.x + u * Lv[0] - w * tin[0], p.y + u * Lv[1] - w * tin[1], p.z];
+    const a = at(-hr, 0); const b = at(hl, 0); const cc = at(hl, L); const d = at(-hr, L);
+    const up = () => [0, 0, 1];
+    T.tri(a, b, cc, [[0, 0], [(hl + hr) / 4, 0], [(hl + hr) / 4, L / 4]], up);
+    T.tri(a, cc, d, [[0, 0], [(hl + hr) / 4, L / 4], [0, L / 4]], up);
   }
   return { pos: pos.concat(T.pos), uv: uv.concat(T.uv) };
 }

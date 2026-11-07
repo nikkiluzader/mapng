@@ -4974,7 +4974,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     // the bore carried on along a bridge still in the rock
     const bore = [...[...(approaches[0]?.rock || [])].reverse(), ...xy, ...(approaches[1]?.rock || [])];
     const gallery = path.idx.some((i) => parts[i].gallery);
-    const t = solveTunnel({ xy: bore, half, gallery }, { groundAt, approaches, isFreeEnd, squareSize });
+    // (shaping off on fine elevation: portals at the survey's own portal faces)
+    const t = solveTunnel({ xy: bore, half, gallery }, { groundAt, approaches, isFreeEnd, squareSize, raw: !shape && !terrainData?.coarseElevation });
     const osm = path.idx.map((i) => parts[i].osm);
     if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); return null; }
     t.osm = osm;
