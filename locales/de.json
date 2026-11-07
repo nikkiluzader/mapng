@@ -1358,7 +1358,9 @@
     "err_too_big": "Zu viele Daten für einen Export von openstreetmap.org (über 50.000 Punkte). Verkleinere das Gebiet oder speichere es aus JOSM.",
     "err_busy": "openstreetmap.org ist gerade ausgelastet. Versuche es in einer Minute erneut.",
     "err_network": "openstreetmap.org ist nicht erreichbar. Prüfe deine Verbindung oder nutze „Auf OSM“.",
-    "err_http": "openstreetmap.org konnte dieses Gebiet nicht herausgeben. Für Details mit der Maus darüberfahren."
+    "err_http": "openstreetmap.org konnte dieses Gebiet nicht herausgeben. Für Details mit der Maus darüberfahren.",
+    "policyNote": "Holen und Herunterladen senden pro Klick eine Anfrage an die API von openstreetmap.org, die zum Bearbeiten gedacht ist, nicht zum reinen Lesen. Du bist dafür verantwortlich, ihre Nutzungsrichtlinie einzuhalten.",
+    "policyLink": "OSM-API-Nutzungsrichtlinie"
   },
   "wizard": {
     "steps": "Schritte",

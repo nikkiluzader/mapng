@@ -74,6 +74,12 @@
       <p v-else class="flex items-start gap-1.5 leading-snug text-micro text-gray-400 dark:text-gray-500">
         <Info :size="11" class="shrink-0 mt-px" />{{ t('osmFile.limitNote') }}
       </p>
+      <!-- Pull and Download ask the OSM editing API once per click: its usage
+           policy is the user's to follow (OSMF API Usage Policy) -->
+      <p class="leading-snug text-micro text-gray-400 dark:text-gray-500">
+        {{ t('osmFile.policyNote') }}
+        <a href="https://operations.osmfoundation.org/policies/api/" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('osmFile.policyLink') }}</a>
+      </p>
       <label
         class="flex flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed px-3 py-3 text-center cursor-pointer transition-colors"
         :class="dragging ? 'border-brand bg-brand-50/60 dark:bg-brand/10 text-brand' : 'border-gray-300 dark:border-gray-600 hover:border-brand hover:text-brand'"

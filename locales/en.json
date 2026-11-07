@@ -1358,7 +1358,9 @@
     "err_too_big": "Too much data for one openstreetmap.org export (over 50,000 points). Make the area smaller, or save it from JOSM.",
     "err_busy": "openstreetmap.org is busy right now. Try again in a minute.",
     "err_network": "openstreetmap.org could not be reached. Check your connection, or use View on OSM.",
-    "err_http": "openstreetmap.org couldn't hand out this area. Hover for details."
+    "err_http": "openstreetmap.org couldn't hand out this area. Hover for details.",
+    "policyNote": "Pull and Download send one request per click to openstreetmap.org's API, which is meant for editing rather than read-only use. You are responsible for following its usage policy.",
+    "policyLink": "OSM API usage policy"
   },
   "wizard": {
     "steps": "Steps",

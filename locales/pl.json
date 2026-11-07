@@ -1358,7 +1358,9 @@
     "err_too_big": "Za dużo danych na jeden eksport z openstreetmap.org (ponad 50 000 punktów). Zmniejsz obszar albo zapisz go z JOSM.",
     "err_busy": "openstreetmap.org jest teraz zajęty. Spróbuj ponownie za minutę.",
     "err_network": "Nie można połączyć się z openstreetmap.org. Sprawdź połączenie albo użyj Zobacz w OSM.",
-    "err_http": "openstreetmap.org nie mógł wydać tego obszaru. Najedź kursorem, aby zobaczyć szczegóły."
+    "err_http": "openstreetmap.org nie mógł wydać tego obszaru. Najedź kursorem, aby zobaczyć szczegóły.",
+    "policyNote": "Pobierz teraz i Zapisz wysyłają jedno zapytanie na kliknięcie do API openstreetmap.org, przeznaczonego do edycji, a nie do samego odczytu. Odpowiadasz za przestrzeganie jego zasad korzystania.",
+    "policyLink": "Zasady korzystania z API OSM"
   },
   "wizard": {
     "steps": "Kroki",
