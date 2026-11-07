@@ -386,7 +386,10 @@ function gorgeArch(b, part, sArr, sp, L, groundAt, depth) {
   const springs = [Math.min(ga + 0.3, crown - 2), Math.min(gc + 0.3, crown - 2)];
   const La = c - a;
   if (La < 20) return;
-  const zOf = (t) => springs[0] + (springs[1] - springs[0]) * t + Math.max(0, crown - (springs[0] + springs[1]) / 2) * 4 * t * (1 - t);
+  // (its rib, 2.4 m deep, under the deck along the whole arch: the deck need not be level)
+  const zOf = (t) => Math.min(
+    springs[0] + (springs[1] - springs[0]) * t + Math.max(0, crown - (springs[0] + springs[1]) / 2) * 4 * t * (1 - t),
+    along(part, a + La * t, 0, sArr)[2] - depth - 0.15 - 1.2);
   const m = Math.max(16, Math.round(La / 4));
   const ribW = Math.max(3, half * 1.4);
   const pts = Array.from({ length: m + 1 }, (_, i) => { const t = i / m; const p = along(part, a + La * t, 0, sArr); return [p[0], p[1], zOf(t)]; });
@@ -500,10 +503,13 @@ function deckArch(b, part, sArr, sp, L, groundAt, depth, stone) {
   const g0 = groundAt(...along(part, sp.s0, 0, sArr).slice(0, 2)); const g1 = groundAt(...along(part, sp.s1, 0, sArr).slice(0, 2));
   const springs = [Math.min(g0 + 0.3, under(sp.s0) - 0.5), Math.min(g1 + 0.3, under(sp.s1) - 0.5)];
   const crownAt = under(sp.s0 + L / 2);
+  // (under the deck everywhere, not only at its crown: with one springing high (an island, a bank)
+  // and the other low, the parabola rose through a sloping deck at its quarter point, Bir-Hakeim)
+  const ribHalf = stone ? 0 : 0.6;
   const zOf = (t) => {
     const base = springs[0] + (springs[1] - springs[0]) * t;
     const lift = Math.max(0, crownAt - (springs[0] + springs[1]) / 2);
-    return base + lift * 4 * t * (1 - t);
+    return Math.min(base + lift * 4 * t * (1 - t), under(sp.s0 + L * t) - ribHalf);
   };
   if (crownAt - Math.max(...springs) < (stone ? 0.6 : 1.2)) return;
   if (stone) {

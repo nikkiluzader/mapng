@@ -276,3 +276,32 @@ test('profile: a deck ending at a junction curves into the road going on, the ju
   assert.ok(worst <= 0.035, `grade turns ${(worst * 100).toFixed(1)} % in one 4 m step`);
   assert.ok(Math.abs(z[0][0] - z[2][0]) < 0.01 && Math.abs(z[1][0] - z[2][0]) < 0.01, 'the three roads still meet at one height');
 });
+
+test('profile: a bridge over a river with an island keeps its clearance over the water, not over the island', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // banks at 10 m, water at 0, an island 9 m high mid-river; clearance 7 m
+  const n = 61;
+  const g = Array.from({ length: n }, (_, i) => (i < 5 || i > 55 ? 10 : i >= 27 && i <= 33 ? 9 : 0));
+  const deck = { x: Float64Array.from({ length: n }, (_, i) => i * 4), y: new Float64Array(n), s: Float64Array.from({ length: n }, (_, i) => i * 4), g: Float64Array.from(g), from: 'A', to: 'B', highway: 'secondary', layer: 1, half: 4, bridge: true, tunnel: false };
+  const nodes = new Map([['A', { edges: [{ edge: 0, end: 0 }] }], ['B', { edges: [{ edge: 0, end: 1 }] }]]);
+  const water = [{ edge: 0, i0: 5, i1: 55, need: 7 }];
+  const { z } = solveProfiles({ edges: [deck], nodes, pins: [[0, 0, 10], [0, 60, 10]], crossings: { crossings: [], water } });
+  const top = Math.max(...z[0]);
+  assert.ok(top < 9 + 7, `deck ${top.toFixed(1)} m: its water clearance stood on the island`);
+  for (let i = 5; i <= 55; i++) if (g[i] === 0) assert.ok(z[0][i] >= 7 - 0.05, `under its clearance over the water at ${i * 4} m`);
+});
+
+test('profile: a short bridge over a stream stays on its road line, no clearance hump', async () => {
+  const { solveProfiles } = await import('../services/structures/profileSolve.js');
+  // a road at 100 m crossing a 1 m deep ditch on a 16 m bridge
+  const n = 9;
+  const g = [100, 100, 99.4, 99.0, 99.0, 99.0, 99.4, 100, 100];
+  const deck = { x: Float64Array.from({ length: n }, (_, i) => i * 2), y: new Float64Array(n), s: Float64Array.from({ length: n }, (_, i) => i * 2), g: Float64Array.from(g), from: 'A', to: 'B', highway: 'track', layer: 1, half: 2, bridge: true, tunnel: false };
+  const nodes = new Map([['A', { edges: [{ edge: 0, end: 0 }] }], ['B', { edges: [{ edge: 0, end: 1 }] }]]);
+  const minor = { edge: 0, i0: 2, i1: 6, need: 2.5, minor: true };
+  const { z } = solveProfiles({ edges: [deck], nodes, pins: [[0, 0, 100], [0, 8, 100]], crossings: { crossings: [], water: [minor] } });
+  assert.ok(Math.max(...z[0]) <= 100.31, `stream bridge humped to ${Math.max(...z[0]).toFixed(2)} m`);
+  // the same run over a river keeps its clearance
+  const { z: zr } = solveProfiles({ edges: [deck], nodes, pins: [[0, 0, 100], [0, 8, 100]], crossings: { crossings: [], water: [{ ...minor, minor: false }] } });
+  assert.ok(Math.max(...zr[0]) > 102, 'a river run lost its clearance');
+});

@@ -270,3 +270,32 @@ test('an arch with its own outline inside the whole bridge\'s is drawn inside it
   styleDecks([deck], { outlines, groundAt: flat });
   for (const sp of deck.style.spans) assert.ok(sp.s0 >= 148 && sp.s1 <= 452, `span ${sp.s0.toFixed(0)}..${sp.s1.toFixed(0)}`);
 });
+
+test('deck arches under a rolling deck over an island: no rib or column into the lanes', async () => {
+  const { thinArchDecks } = await import('../services/bridgeStyles.js');
+  // decks rising and falling over a river with an island (springings at different heights): the old
+  // rib, a parabola to the deck's height at mid-arch only, rose 0.8-1.4 m through the road (Bir-Hakeim)
+  for (const c of [
+    { Lr: 216.8, a: 1.87, b: 3.69, c: 16.07, f: 1.25, i0: 111.2, i1: 148.1, ih: 12.32, half: 4.93 },
+    { Lr: 256.6, a: 3.45, b: 3.97, c: 17.54, f: 2.53, i0: 107.7, i1: 117.6, ih: 13.63, half: 5.65 },
+  ]) {
+    const road = (x) => c.c + c.a * Math.sin((x / c.Lr) * Math.PI * c.f) - c.b * (x / c.Lr);
+    const xy = []; for (let x = 0; x <= c.Lr; x += 2) xy.push([x, 0]);
+    const p = { xy, z: xy.map(([x]) => road(x)), half: c.half, structure: 'arch' };
+    const ground = (x) => (x < 4 || x > c.Lr - 4 ? road(x) - 0.2 : x > c.i0 && x < c.i1 ? c.ih : 0);
+    const deck = { parts: [p] };
+    styleDecks([deck], { groundAt: ground });
+    thinArchDecks([deck]);
+    const g = buildStyleGeometry(deck, { groundAt: ground, newBuilder: builder });
+    let n = 0;
+    for (const b of Object.values(g)) {
+      for (let i = 2; i < (b.pos || []).length; i += 3) {
+        const x = b.pos[i - 2]; const y = b.pos[i - 1];
+        if (Math.abs(y) >= c.half - 0.3 || x < 3 || x > c.Lr - 3) continue;
+        n++;
+        assert.ok(b.pos[i] <= road(x) + 0.05, `a vertex ${(b.pos[i] - road(x)).toFixed(2)} m over the road at x ${x.toFixed(1)}`);
+      }
+    }
+    assert.ok(n > 0, 'no arch built');
+  }
+});

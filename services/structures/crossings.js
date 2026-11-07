@@ -73,7 +73,7 @@ function cross(ax, ay, bx, by, cx, cy, dx, dy) {
 
 /**
  * Crossings and water runs of a structure graph (graph.js).
- *   waterAt(x, y) -> 0 land, 1 water, 2 ship channel (buildWaterLookup)
+ *   waterAt(x, y) -> 0 land, 0.5 stream / drain / ditch, 1 water, 2 ship channel (buildWaterLookup)
  * Returns { crossings, overlaps, unjoined, water, stats } (overlaps: as
  * crossings, decks of different layers alongside with their lanes overlapping):
  *   crossing { a: { edge, i, f, s }, b: { ... }, x, y, upper: 'a'|'b', rule, sep }
@@ -294,10 +294,10 @@ export function findCrossings(graph, { waterAt = null } = {}) {
   if (waterAt) {
     for (const e of edges) {
       if (!e.bridge) continue;
-      let i0 = -1; let channel = false;
+      let i0 = -1; let channel = false; let minor = true;
       for (let i = 0; i <= e.s.length; i++) {
         const w = i < e.s.length ? waterAt(e.x[i], e.y[i]) : 0;
-        if (w > 0) { if (i0 < 0) { i0 = i; channel = false; } if (w >= 2) channel = true; continue; }
+        if (w > 0) { if (i0 < 0) { i0 = i; channel = false; minor = true; } if (w >= 2) channel = true; if (w >= 1) minor = false; continue; }
         if (i0 >= 0) {
           const i1 = i - 1;
           const run = e.s[i1] - e.s[i0];
@@ -317,7 +317,7 @@ export function findCrossings(graph, { waterAt = null } = {}) {
             needs.push(Math.max(Math.min(need, reach), Math.min(need, WATER_CLEAR_FLOOR_M)));
           }
           need = Math.max(...needs);
-          water.push({ edge: e.id, i0, i1, s0: e.s[i0], s1: e.s[i1], run, channel, need, needs, wanted });
+          water.push({ edge: e.id, i0, i1, s0: e.s[i0], s1: e.s[i1], run, channel, minor, need, needs, wanted });
           i0 = -1;
         }
       }

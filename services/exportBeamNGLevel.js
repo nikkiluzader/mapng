@@ -3474,6 +3474,10 @@ const isBridgeRoad = (tags = {}) => (
 
 // Half widths (m) for linear waterways when deciding what a bridge is over.
 const WATERWAY_HALF_M = { river: 10, canal: 6, stream: 2, drain: 1, ditch: 1 };
+// small waterways: wetAt gives MINOR_WET over them (water, but no clearance
+// lift: a short bridge over a mountain stream is on its road's grade line)
+const MINOR_WATERWAYS = new Set(['stream', 'drain', 'ditch']);
+const MINOR_WET = 0.5;
 
 // Within this far of an OSM coastline its side decides land or sea (OSM draws
 // coastlines with the land on the left): river mouths and bays near the sea
@@ -3485,7 +3489,7 @@ const COAST_CELL_M = 256;
 const SHIP_CHANNEL_REACH_M = 150;
 
 /**
- * wetAt(x, y): 0 on land, 1 over OSM water (areas, rivers / streams by a
+ * wetAt(x, y): 0 on land, 0.5 over a stream / drain / ditch only, 1 over OSM water (areas, rivers by a
  * typical width, the sea by its coastline), 2 over a ship channel.
  */
 const WATER_AREA_NATURAL = new Set(['strait', 'bay']);
@@ -3520,7 +3524,8 @@ export function buildWaterLookup(terrainData, squareSize) {
     const ship = f.tags?.deep_draft === 'yes' || f.tags?.ship === 'yes';
     // Polygons assembled from relations need not repeat their first point:
     // anything but an open waterway line is an area.
-    if (half != null && !closed) add(box, { line: xy, half, ship });
+    // (a stream, drain or ditch: minor water, a bridge stays on its road's line over it)
+    if (half != null && !closed) add(box, { line: xy, half, ship, minor: MINOR_WATERWAYS.has(waterway) });
     else if (xy.length >= 3) add(box, { ring: xy, ship, holes: (f.holes || []).map((h) => h.map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0))) });
   }
   // ship-channel lines, coastline segments and mapped land (islands in the
@@ -3621,7 +3626,7 @@ export function buildWaterLookup(terrainData, squareSize) {
         const vx = q[i + 1][0] - q[i][0]; const vy = q[i + 1][1] - q[i][1];
         const L2 = vx * vx + vy * vy || 1e-9;
         const t = Math.max(0, Math.min(1, ((x - q[i][0]) * vx + (y - q[i][1]) * vy) / L2));
-        if (Math.hypot(q[i][0] + vx * t - x, q[i][1] + vy * t - y) < item.half) { wet = Math.max(wet, item.ship ? 2 : 1); break; }
+        if (Math.hypot(q[i][0] + vx * t - x, q[i][1] + vy * t - y) < item.half) { wet = Math.max(wet, item.ship ? 2 : item.minor ? MINOR_WET : 1); break; }
       }
     }
     if (wet === 0 && seaAt(x, y)

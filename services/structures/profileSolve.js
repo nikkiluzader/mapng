@@ -41,6 +41,7 @@ const W_STRUCTURE = 0;
 const SMOOTH = 0.35;          // pull toward the neighbours' average
 const TUNNEL_COVER_M = 7;     // road surface this far under the ground in a tunnel (tube + roof)
 const DECK_UNDER_M = 2.2;     // deck depth under its road surface
+const MINOR_CROWN_M = 0.3;    // a deck over a stream: this far over the line between its banks at most
 const OUTER_ROUNDS = 6;       // crossing requirements refreshed this often
 const SWEEPS = 120;           // smoothing sweeps per round (or until settled)
 const SETTLED_M = 0.005;
@@ -290,8 +291,25 @@ export function* solveProfilesSteps(graph) {
     if (seeds.length) heldReach = spread(seeds, -1, 1, false);
   }
   // fixed lower seeds: bridge runs over water
+  // (over a stream, drain or ditch only: no higher than the line between its
+  // banks, a small crown over it: a mountain road's short bridge over a gully
+  // stood 3.5 m over its grade for a 2.5 m clearance over a 1 m ditch)
+  const minorCap = (run, i) => {
+    if (!run.minor) return Infinity;
+    const e = edges[run.edge]; const n = e.s.length;
+    const a = Math.max(0, run.i0 - 1); const b = Math.min(n - 1, run.i1 + 1);
+    const t = b > a ? (e.s[i] - e.s[a]) / ((e.s[b] - e.s[a]) || 1) : 0;
+    return G[off[run.edge] + a] + (G[off[run.edge] + b] - G[off[run.edge] + a]) * t + MINOR_CROWN_M;
+  };
   const waterSeeds = pins.slice();
-  for (const run of water) for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, G[off[run.edge] + i] + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M]);
+  // (a run's clearance over its water: from the lowest ground along it, the
+  // water's surface, not each station's own ground: a run over an island
+  // stood the deck its clearance over the island, a 21 m peak mid-river)
+  for (const run of water) {
+    let surface = Infinity;
+    for (let i = run.i0; i <= run.i1; i++) surface = Math.min(surface, G[off[run.edge] + i]);
+    for (let i = run.i0; i <= run.i1; i++) waterSeeds.push([off[run.edge] + i, Math.min(surface + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M, minorCap(run, i))]);
+  }
 
   // station indices that are an edge's end at a node: held by the junction
   // value while grades are clamped (the clamp works inward from them)
@@ -709,7 +727,11 @@ export function profileResidual(graph, z) {
     if (e.tunnel && asStructure(e)) for (let i = 1; i + 1 < e.s.length; i++) cover = Math.max(cover, z[k][i] - (e.g[i] - TUNNEL_COVER_M));
   });
   for (const run of graph.crossings?.water || []) {
-    for (let i = run.i0; i <= run.i1; i++) water = Math.max(water, edges[run.edge].g[i] + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M - z[run.edge][i]);
+    // (from the water's surface: the lowest ground along the run, as the solve)
+    let surface = Infinity;
+    for (let i = run.i0; i <= run.i1; i++) surface = Math.min(surface, edges[run.edge].g[i]);
+    if (run.minor) continue;   // (a stream: no clearance asked, the solve's cap)
+    for (let i = run.i0; i <= run.i1; i++) water = Math.max(water, surface + (run.needs?.[i - run.i0] ?? run.need) + DECK_UNDER_M - z[run.edge][i]);
   }
   const r = (v) => Math.round(Math.max(0, v) * 1000) / 1000;
   return { joint: r(joint), crossing: r(crossing), grade: r(grade), water: r(water), cover: r(cover) };
