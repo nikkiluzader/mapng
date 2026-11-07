@@ -697,6 +697,7 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
   // satellite's vegetation (1b). Most land outside towns has no OSM area:
   // the Alps above the woods, deserts, farmland.
   const lc = terrainData.landCover;
+  let noGreen = null;   // ground under water: never painted grass below
   if (lc?.grid && lc.grid.length === lc.n * lc.n) {
     const { grid, n } = lc;
     const hmLc = terrainData.heightMap?.length === size * size ? terrainData.heightMap : null;
@@ -704,6 +705,9 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
     byClass[10] = 8; byClass[95] = 8; byClass[20] = 8; byClass[90] = 8; byClass[100] = 8;
     byClass[30] = 1; byClass[40] = 2;   // (fields as OSM farmland is painted: bare cultivated ground)
     byClass[60] = 2; byClass[70] = 4;
+    // (water: bare ground under it, which the satellite's greenery (1b) may
+    // not turn to grass: grass and weeds grew across the seabed)
+    byClass[80] = 0;
     let filled = 0;
     for (let y = 0; y < size; y++) {
       const gy = Math.min(n - 1, Math.floor(((size - 1 - y) / size) * n)) * n;   // (north-up)
@@ -711,8 +715,10 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
       for (let x = 0; x < size; x++) {
         const k = row + x;
         if (layerMap[k] !== 0) continue;
-        let m = byClass[grid[gy + Math.min(n - 1, Math.floor((x / size) * n))]];
+        const cls = grid[gy + Math.min(n - 1, Math.floor((x / size) * n))];
+        let m = byClass[cls];
         if (m < 0) continue;
+        if (cls === 80) { (noGreen ||= new Uint8Array(size * size))[k] = 1; continue; }
         // (bare ground on a slope: scree and rock)
         if (m === 2 && hmLc && x > 0 && y > 0 && x < size - 1 && y < size - 1) {
           const gx = (hmLc[k + 1] - hmLc[k - 1]) / (2 * metersPerPixel); const gz = (hmLc[k + size] - hmLc[k - size]) / (2 * metersPerPixel);
@@ -735,7 +741,7 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
       const my = Math.min(ms - 1, Math.floor((size - 1 - y) * scale)) * ms; // mask is north-up
       const row = y * size;
       for (let x = 0; x < size; x++) {
-        if (layerMap[row + x] === 0 && veg[my + Math.min(ms - 1, Math.floor(x * scale))]) layerMap[row + x] = 1;
+        if (layerMap[row + x] === 0 && !noGreen?.[row + x] && veg[my + Math.min(ms - 1, Math.floor(x * scale))]) layerMap[row + x] = 1;
       }
     }
   }

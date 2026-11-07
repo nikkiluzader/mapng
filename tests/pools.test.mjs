@@ -81,7 +81,8 @@ test('pool water blocks: one for a rectangle, small ones over a round pool reach
   const circle = Array.from({ length: 32 }, (_, i) => [20 + 4 * Math.cos((2 * Math.PI * i) / 32), 20 + 4 * Math.sin((2 * Math.PI * i) / 32)]);
   const [c] = planPools([area('c', circle, { leisure: 'swimming_pool' })], project);
   const cb = poolWaterBlocks(c);
-  assert.ok(cb.length > 1 && cb.length < 40, `blocks: ${cb.length}`);
+  // (with its deck round it: one block, its corners under the deck)
+  assert.equal(cb.length, 1, `blocks: ${cb.length}`);
   const under = (x, y) => cb.some((b) => {
     const dx = x - b.cx; const dy = y - b.cy;
     const s = dx * b.u[0] + dy * b.u[1]; const t = -dx * b.u[1] + dy * b.u[0];
@@ -90,9 +91,17 @@ test('pool water blocks: one for a rectangle, small ones over a round pool reach
   for (let x = 16.2; x <= 23.8; x += 0.2) for (let y = 16.2; y <= 23.8; y += 0.2) {
     if (Math.hypot(x - 20, y - 20) < 3.9) assert.ok(under(x, y), `water at (${x.toFixed(1)}, ${y.toFixed(1)})`);
   }
+  const inRect = (x, y, rect) => {
+    let inside = false;
+    for (let i = 0, j = rect.length - 1; i < rect.length; j = i++) {
+      const [xi, yi] = rect[i]; const [xj, yj] = rect[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
   for (const b of cb) for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
     const x = b.cx + (b.u[0] * sx * b.sx - b.u[1] * sy * b.sy) / 2; const y = b.cy + (b.u[1] * sx * b.sx + b.u[0] * sy * b.sy) / 2;
-    assert.ok(Math.hypot(x - 20, y - 20) < 4 + 0.75, `corner (${x.toFixed(2)}, ${y.toFixed(2)}) under the coping`);
+    assert.ok(inRect(x, y, c.deckRect), `corner (${x.toFixed(2)}, ${y.toFixed(2)}) under the deck`);
   }
 });
 

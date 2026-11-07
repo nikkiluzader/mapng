@@ -67,3 +67,31 @@ test('OSM trees with exact positions are never left out by the land cover; trees
   }
   assert.ok(all.every((p) => td.osmFeatures.slice(0, 2).some((f) => { const [x, y] = geoToWorldPoint(f.geometry[0].lat, f.geometry[0].lng, td, 1.7, 0); return Math.hypot(p.pos[0] - x, p.pos[1] - y) < 6; })), 'nothing but the mapped trees and their neighbours');
 });
+
+test('plants under water are left out, but for a sparse few near a road; a mapped tree always stands', async () => {
+  const { __buildForestPlacements } = await import('../services/exportBeamNGLevel.js');
+  const { getBeamNGBiomeById } = await import('../services/beamngBiomeCatalog.js');
+  const N = 257; const D = 0.004;
+  const td = {
+    width: N, height: N, heightMap: new Float32Array(N * N).fill(100), minHeight: 100, maxHeight: 100,
+    bounds: { south: 45 - D / 2, north: 45 + D / 2, west: 7 - D / 2, east: 7 + D / 2 },
+    osmFeatures: [
+      { id: 'n1', type: 'vegetation', tags: { natural: 'tree' }, geometry: [{ lat: 45.0005, lng: 7.0005 }] },
+      { id: 'w1', type: 'landuse', tags: { natural: 'wood' }, geometry: [
+        { lat: 44.9988, lng: 6.9988 }, { lat: 44.9988, lng: 7.0012 }, { lat: 45.0012, lng: 7.0012 }, { lat: 45.0012, lng: 6.9988 }, { lat: 44.9988, lng: 6.9988 }] },
+    ],
+  };
+  const { geoToWorldPoint } = await import('../services/terrainLookup.js');
+  const [tx, ty] = geoToWorldPoint(45.0005, 7.0005, td, 1.7, 0);
+  // everything under water; a road along y = 0
+  const water = { underWater: () => true, nearRoad: (x, y) => Math.abs(y) < 25 };
+  const quiet = console.log; console.log = () => {};
+  let out;
+  try { out = await __buildForestPlacements(td, 1.7, { includeTrees: true, includeRocks: false, water }, getBeamNGBiomeById('east_coast_usa')); } finally { console.log = quiet; }
+  const all = [...out.values()].flat();
+  assert.ok(all.some((p) => Math.hypot(p.pos[0] - tx, p.pos[1] - ty) < 0.05), 'the mapped tree stands');
+  assert.ok(out.underwater.dropped >= 5, `the wood's fill left out (${out.underwater.dropped})`);
+  const kept = all.filter((p) => Math.hypot(p.pos[0] - tx, p.pos[1] - ty) >= 0.05);
+  assert.ok(kept.every((p) => Math.abs(p.pos[1]) < 25), 'what stays is near the road');
+  assert.ok(kept.length <= 1, `sparse: ${kept.length} of ${kept.length + out.underwater.dropped}`);
+});

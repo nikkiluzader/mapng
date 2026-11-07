@@ -52,6 +52,8 @@ const LAKE_CELL_M = [2, 32];
 const WIDE_RIVER_M = 120;
 const AREA_FLAT_M = 1;
 const LAKE_TILE_OVERLAP_M = 0.5;
+// a bank this far over a lake's water hides a WaterBlock reaching under it
+const BANK_HIDES_M = 0.1;
 // Lake tile cells (m): a quarter of the old coarse cell within these, and
 // coarser where the outline is so big the grid would pass SHORE_GRID_MAX.
 const SHORE_CELL_M = [2, 4];
@@ -369,14 +371,17 @@ function mergeMask(wet, nx, ny, x0, y0, cell, out) {
 }
 /**
  * Rectangles covering a polygon: a grid of cells (a quarter of `cell` within
- * SHORE_CELL_M, coarser where the grid would pass SHORE_GRID_MAX across),
- * every one the outline touches kept, merged greedily. The water reaches the
- * shore everywhere, past it by at most one cell, and only where
- * keepOutside(x, y) at the cell's centre (the bank standing over the water
- * hides it; on flat ground a cell past the shore showed as a step of water
- * over the plaza, the fountain basins). Exported for tests.
+ * SHORE_CELL_M, coarser where the grid would pass SHORE_GRID_MAX across);
+ * every cell the outline touches is covered. A rectangle grows on over any
+ * cell where hidden(x, y) holds at its corners and centre (the bank stands
+ * over the water there and hides it), so a lake is a few big blocks reaching
+ * under its banks, not hundreds hugging the shore: each WaterBlock is drawn
+ * on its own, and 11,477 of them (an 8 km St. Augustine) took 20 ms a frame.
+ * Never past the shore where the ground is lower (a step of water over a
+ * plaza, the fountain basins); rectangles never overlap (two surfaces at one
+ * height flicker). Exported for tests.
  */
-export function tileOutline(poly, cell, keepOutside = () => true) {
+export function tileOutline(poly, cell, hidden = () => false) {
   const [x0, y0, x1, y1] = poly.box;
   const c = Math.min(cell, Math.max(SHORE_CELL_M[0], Math.min(SHORE_CELL_M[1], cell / 4), Math.max(x1 - x0, y1 - y0) / SHORE_GRID_MAX));
   const nx = Math.max(1, Math.ceil((x1 - x0) / c)); const ny = Math.max(1, Math.ceil((y1 - y0) / c));
@@ -391,24 +396,52 @@ export function tileOutline(poly, cell, keepOutside = () => true) {
       }
     }
   }
-  // (only the mask's edge cells can lie past the shore)
+  // a touched cell whose centre lies past the shore on low ground: left dry
+  // (only the mask's edge cells can)
   const edge = (i, j) => i === 0 || j === 0 || i === nx - 1 || j === ny - 1
     || !wet[j * nx + i - 1] || !wet[j * nx + i + 1] || !wet[(j - 1) * nx + i] || !wet[(j + 1) * nx + i];
   const drop = [];
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
     if (!wet[j * nx + i] || !edge(i, j)) continue;
     const x = x0 + (i + 0.5) * c; const y = y0 + (j + 0.5) * c;
-    if (!poly.contains(x, y) && !keepOutside(x, y)) drop.push(j * nx + i);
+    if (!poly.contains(x, y) && !hidden(x, y)) drop.push(j * nx + i);
   }
   for (const k of drop) wet[k] = 0;
-  return mergeMask(wet, nx, ny, x0, y0, c, []);
+  // may a rectangle cover cell k? the lake's own cells, and banks that hide it
+  // (worked out only for the cells a rectangle grows into)
+  const okMemo = new Int8Array(nx * ny).fill(-1);
+  const ok = (i, j) => {
+    const k = j * nx + i;
+    if (wet[k]) return true;
+    if (okMemo[k] < 0) {
+      const xa = x0 + i * c; const ya = y0 + j * c;
+      okMemo[k] = [[xa, ya], [xa + c, ya], [xa, ya + c], [xa + c, ya + c], [xa + c / 2, ya + c / 2]].every(([x, y]) => hidden(x, y)) ? 1 : 0;
+    }
+    return okMemo[k] === 1;
+  };
+  const used = new Uint8Array(nx * ny);
+  const free = (i, j) => !used[j * nx + i] && ok(i, j);
+  const out = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    if (!wet[j * nx + i] || used[j * nx + i]) continue;
+    // widest run along the row from here, then as tall as every row allows
+    // (and back up the rows above it, over hidden cells)
+    let iL = i; while (iL > 0 && free(iL - 1, j)) iL--;
+    let iR = i + 1; while (iR < nx && free(iR, j)) iR++;
+    const rowFree = (jj) => { for (let k = iL; k < iR; k++) if (!free(k, jj)) return false; return true; };
+    let jT = j + 1; while (jT < ny && rowFree(jT)) jT++;
+    let jB = j; while (jB > 0 && rowFree(jB - 1)) jB--;
+    for (let jj = jB; jj < jT; jj++) for (let k = iL; k < iR; k++) used[jj * nx + k] = 1;
+    out.push({ cx: x0 + ((iL + iR) / 2) * c, cy: y0 + ((jB + jT) / 2) * c, sx: (iR - iL) * c, sy: (jT - jB) * c });
+  }
+  return out;
 }
 
 /**
  * Lake tiles: [{ cx, cy, sx, sy, z, lake }] (WaterBlock rectangles, z the
  * water surface), plus stats and lakes [{ poly, level }] (carveLakeBeds).
  */
-export function planLakes({ features = [], toWorld, heightAt }) {
+export function planLakes({ features = [], toWorld, heightAt, seaZ = null }) {
   const tiles = [];
   const lakes = [];   // { poly, level } for carveLakeBeds
   const stats = { lakes: 0, dry: 0, tiles: 0, riverAreas: 0 };
@@ -432,11 +465,14 @@ export function planLakes({ features = [], toWorld, heightAt }) {
     // the lake's level: the median ground inside it
     const inside = groundInside(poly, heightAt);
     const level = inside[inside.length >> 1] + 0.05;
+    // at or under the sea plane: the sea is drawn there already (St. Augustine's
+    // tidal water: 1,978 blocks under it)
+    if (Number.isFinite(seaZ) && level <= seaZ + 0.02) { stats.underSea = (stats.underSea || 0) + 1; continue; }
     // tiles: every small cell the outline touches, merged (the water reaches
     // the shore; past it by at most one cell, and only where the bank stands
     // over the water and hides it)
     const area = Math.abs(poly.outer.reduce((a, p, i) => { const q = poly.outer[(i + 1) % poly.outer.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
-    const lakeTiles = tileOutline(poly, Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16)), (x, y) => heightAt(x, y) > level);
+    const lakeTiles = tileOutline(poly, Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16)), (x, y) => heightAt(x, y) > level + BANK_HIDES_M);
     if (!lakeTiles.length) continue;
     stats.lakes++;
     for (const tile of lakeTiles) tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: lakeIndex, name: t.name || null });
@@ -700,4 +736,57 @@ export function fillRemnants(heightMap, width, height, lowered, { rounds = 2, ke
     if (!next.length) break;
   }
   return { pixels: edits.size, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+}
+
+// ── The sea floor ────────────────────────────────────────────────────────────
+// Lidar measures the water's surface, not the bed: the open sea came out as
+// ground at sea level, 2 cm under the sea plane, a flat grassy "landmass"
+// out in the ocean (St. Augustine). Where the land cover (ESA WorldCover)
+// says water and the ground is within SEA_SURFACE_BAND_M of the sea, the
+// ground goes down under it, SEABED_DEPTH_M deep, deepening over
+// SEABED_RAMP_CELLS land cover cells (10 m each) from the shore. Lowered only.
+const SEA_SURFACE_BAND_M = 0.3;
+const SEABED_DEPTH_M = 2;
+const SEABED_RAMP_CELLS = 3;
+
+/**
+ * Edits that put the sea floor under the sea: grid { heightMap, width,
+ * height, minHeight } (raw heights, rows from the north as the export's
+ * heightmap), landCover { grid, n } (north-up), seaZ the sea surface in world
+ * z (raw - minHeight). Returns { pixels, apply(set) }.
+ */
+export function lowerSeabed(grid, landCover, seaZ) {
+  const { heightMap, width, height, minHeight = 0 } = grid;
+  const none = { pixels: 0, apply() {} };
+  if (!landCover?.grid || landCover.grid.length !== landCover.n * landCover.n || !Number.isFinite(seaZ)) return none;
+  const { grid: lc, n } = landCover;
+  // distance (in cells) from the nearest non-water cell, two chamfer passes
+  const D = new Float32Array(n * n);
+  const BIG = 1e9;
+  for (let i = 0; i < n * n; i++) D[i] = lc[i] === 80 ? BIG : 0;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const i = r * n + c; if (!D[i]) continue;
+    if (c > 0) D[i] = Math.min(D[i], D[i - 1] + 1);
+    if (r > 0) D[i] = Math.min(D[i], D[i - n] + 1);
+  }
+  for (let r = n - 1; r >= 0; r--) for (let c = n - 1; c >= 0; c--) {
+    const i = r * n + c; if (!D[i]) continue;
+    if (c < n - 1) D[i] = Math.min(D[i], D[i + 1] + 1);
+    if (r < n - 1) D[i] = Math.min(D[i], D[i + n] + 1);
+  }
+  const edits = new Map();
+  const top = seaZ + SEA_SURFACE_BAND_M;
+  for (let r = 0; r < height; r++) {
+    const lr = Math.min(n - 1, Math.floor((r / height) * n)) * n;
+    for (let c = 0; c < width; c++) {
+      const d = D[lr + Math.min(n - 1, Math.floor((c / width) * n))];
+      if (!d) continue;
+      const idx = r * width + c;
+      const z = heightMap[idx] - minHeight;
+      if (z > top) continue;
+      const target = seaZ - SEABED_DEPTH_M * Math.min(1, d / SEABED_RAMP_CELLS);
+      if (target < z) edits.set(idx, target + minHeight);
+    }
+  }
+  return { pixels: edits.size, apply(set) { for (const [idx, v] of edits) set(idx, v); } };
 }

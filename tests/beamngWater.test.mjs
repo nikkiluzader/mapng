@@ -80,15 +80,16 @@ test('lakes become a few rectangles inside the outline; riverbanks and dry lakes
   });
   assert.equal(stats.lakes, 1);
   assert.equal(stats.dry, 1);
-  assert.ok(tiles.length > 1);
+  assert.ok(tiles.length >= 1);
   assert.ok(tiles.every((t) => t.z < 11), 'the level is the ground inside the lake');
-  for (const t of tiles) {
-    assert.ok(!(t.cx - t.sx / 2 > 62 && t.cy - t.sy / 2 > 62), `no tile in the empty corner: ${JSON.stringify(t)}`);
-  }
-  const area = tiles.reduce((a, t) => a + t.sx * t.sy, 0);
-  assert.ok(tiles.length <= 4, `an L is two or three rectangles: ${tiles.length}`);
-  const lArea = 200 * 60 + 60 * 140;
-  assert.ok(area > lArea * 0.8 && area < lArea * 1.3, `tiles cover the pond: ${area.toFixed(0)} vs ${lArea}`);
+  // the empty corner is high ground: the water may reach under it (hidden),
+  // so the L is one or two blocks; every part of the pond is covered
+  assert.ok(tiles.length <= 2, `an L under high ground is one or two blocks: ${tiles.length}`);
+  const under = (x, y) => tiles.some((t) => Math.abs(x - t.cx) <= t.sx / 2 && Math.abs(y - t.cy) <= t.sy / 2);
+  for (let x = 1; x < 200; x += 7) for (let y = 1; y < 200; y += 7) if (x <= 60 || y <= 60) assert.ok(under(x, y), `pond covered at ${x},${y}`);
+  // and on low ground round it the water keeps to the outline
+  const low = planLakes({ features: [ring(L, { natural: 'water', water: 'pond' })], toWorld, heightAt: (x, y) => (x > 60 && y > 60 ? 5 : 10) });
+  for (const t of low.tiles) assert.ok(!(t.cx - t.sx / 2 > 62 && t.cy - t.sy / 2 > 62), `no water over the low corner: ${JSON.stringify(t)}`);
 });
 
 test('a steep stream drawn on a gully side slides onto the bed and never floats over its banks', () => {
@@ -214,8 +215,8 @@ test('lake tiles reach a diagonal shore everywhere where the bank is higher; on 
   // banks 2 m over the water: no gap at all, past the shore by one 4 m cell at most
   const banked = measure((x, y) => (inside(x, y) ? 1 : 3));
   assert.equal(banked.missed, 0, 'no gap between the water and the shore');
-  assert.ok(banked.past <= 4 * Math.SQRT2 + 0.5, `at most one 4 m cell past the shore: ${banked.past.toFixed(1)} m`);
-  assert.ok(banked.tiles.length < 600, `tiles: ${banked.tiles.length}`);
+  // (under a bank that hides it the water may reach on: a few big blocks, not hundreds)
+  assert.ok(banked.tiles.length <= 20, `a few blocks under hiding banks: ${banked.tiles.length}`);
   // flat ground: cells past the shore dropped, within half a cell either way
   const level = measure(() => 1);
   assert.ok(level.past <= 2 * Math.SQRT2 + 0.5, `half a cell past the shore at most: ${level.past.toFixed(1)} m`);
@@ -246,4 +247,22 @@ test('lake beds: a bank inside the outline is left, no wall along the shore', as
   assert.ok(worst <= 3, `no wall over the water: steepest step ${worst.toFixed(2)} m per metre`);
   // (the old cut took the whole 30 m of bank inside the outline down to the bed)
   assert.ok(at(29, 0) > 30, 'the top of the bank inside the outline stays');
+});
+
+test('the sea floor: where the land cover says water and the ground sits at the sea surface, it goes under the sea; land and high ground untouched', async () => {
+  const { lowerSeabed } = await import('../services/beamngWater.js');
+  // 100 x 100 heightmap; the east half is sea per the land cover, recorded at the
+  // water surface (z 0.02 with sea 0); a sandbar at 3 m in it; the west half land at 0.1
+  const W = 100; const hm = new Float32Array(W * W);
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) hm[r * W + c] = c >= 50 ? (c >= 80 && c < 85 ? 3 : 0.02) : 0.1;
+  const n = 20; const grid = new Uint8Array(n * n);
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) grid[r * n + c] = c >= 10 ? 80 : 30;
+  const res = lowerSeabed({ heightMap: hm, width: W, height: W, minHeight: 0 }, { grid, n }, 0);
+  res.apply((i, v) => { hm[i] = v; });
+  assert.ok(res.pixels > 0);
+  assert.ok(hm[50 * W + 95] <= -1.9, `open sea under the water: ${hm[50 * W + 95]}`);
+  assert.ok(hm[50 * W + 52] < 0 && hm[50 * W + 52] > -1.9, `the shore deepens gently: ${hm[50 * W + 52]}`);
+  assert.equal(hm[50 * W + 82], 3, 'ground well over the sea is left');
+  assert.ok(Math.abs(hm[50 * W + 20] - 0.1) < 1e-6, 'land is left');
+  assert.equal(lowerSeabed({ heightMap: hm, width: W, height: W }, null, 0).pixels, 0, 'no land cover: nothing');
 });

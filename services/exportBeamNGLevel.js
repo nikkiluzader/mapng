@@ -18,7 +18,7 @@ import { isCarportFeature, planCarports } from './beamngCarports.js';
 import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
 import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
-import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, planLakes, planRivers } from './beamngWater.js';
+import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
@@ -7041,6 +7041,7 @@ function shapingReportLines(sh, section) {
   }
   lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
   if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}`);
+  if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (the survey recorded the water's surface; WorldCover water within 0.3 m of the sea): ${sh.seabedPixels}`);
   if (sh.lidar === null || sh.lidar === undefined) lines.push('- Measured bridge heights (US lidar): off');
   else if (sh.lidar.skipped) lines.push(`- Measured bridge heights (US lidar): not used, ${sh.lidar.skipped}`);
   else {
@@ -7586,6 +7587,7 @@ function buildBeamNGExportReport({
     `- Forest placement groups: ${forestPlacements.size}`,
     `- Forest placement files: ${forestFiles.length}`,
     `- Forest placements total: ${forestPlacementCount}`,
+    ...(forestPlacements?.underwater ? [`- Left out under water (below the sea plane or a lake's surface): ${forestPlacements.underwater.dropped} trees, bushes and plants; ${forestPlacements.underwater.kept} kept, within ${UNDERWATER_ROAD_M} m of a road (one in ${UNDERWATER_KEEP})`] : []),
     ...(forestPlacements?.landCover ? [forestPlacements.landCover.used
       ? `- Left out by land cover (${forestPlacements.landCover.attribution}): ${forestPlacements.landCover.dropped.wood} trees (of mapped woods, or seen as canopy in the imagery) where it sees no tree cover, ${forestPlacements.landCover.dropped.bush} bushes on rock, snow or water, ${forestPlacements.landCover.dropped.scatter} scattered trees on bare ground`
       : '- Land cover (ESA WorldCover): unavailable, trees follow OSM alone'] : []),
@@ -10355,7 +10357,11 @@ function canopyPatches(cls, w, h, covered, minCells) {
 const OPEN_GROUND_CLEAR_M = 4;
 const TREELESS_GOLF = new Set(['bunker', 'green', 'tee', 'fairway', 'driving_range', 'water_hazard', 'lateral_water_hazard']);
 
-async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null }, biome, tick = async () => {}) {
+// a plant under water: kept one in this many, only near a road
+const UNDERWATER_KEEP = 30;
+const UNDERWATER_ROAD_M = 25;
+
+async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null, water = null }, biome, tick = async () => {}) {
   // (what the land cover left out, for the report: set when trees are planted)
   let landCover = null;
   // Buildings, water and open playing ground, for the scattered and canopy
@@ -10436,8 +10442,19 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
   // in one corner of a dense 2 km export, and BeamNG's forest cell tree
   // recursed on the pile until it overflowed the stack and crashed the load)
   const forestHalf = (terrainData.width * squareSize) / 2;
-  const pushPlacement = (placement, { priority = false } = {}) => {
+  // Under water (the sea plane, a lake's blocks): water is a surface a driver
+  // sees from the road, so what stands below it is left out, but for one in
+  // UNDERWATER_KEEP within UNDERWATER_ROAD_M of a drawn road (St. Augustine's
+  // tidal marsh, lidar under the sea plane: 119,531 ferns and bushes under
+  // the water). A tree OSM maps by itself always stands.
+  const underwater = { dropped: 0, kept: 0 };
+  const pushPlacement = (placement, { priority = false, mapped = false } = {}) => {
     if (!getManagedForestTemplate(biome, placement.type)) return;
+    if (!mapped && water?.underWater?.(placement.pos[0], placement.pos[1], placement.pos[2])) {
+      const nearRoad = water.nearRoad?.(placement.pos[0], placement.pos[1]);
+      if (!nearRoad || seededRandom(hashString(`uw:${Math.round(placement.pos[0] * 10)}:${Math.round(placement.pos[1] * 10)}`)) >= 1 / UNDERWATER_KEEP) { underwater.dropped++; return; }
+      underwater.kept++;
+    }
     if (!(Math.abs(placement.pos[0]) < forestHalf && Math.abs(placement.pos[1]) < forestHalf)) return;
     if (placed >= caps.forestTotal) return;
     const target = priority ? priorityPlacementsByType : regularPlacementsByType;
@@ -10550,7 +10567,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
           // building either (the mapped tree itself may stand by a wall)
           if (i > 0 ? inBuildingOrWater(placement.pos[0], placement.pos[1]) : inOpenOrWater(placement.pos[0], placement.pos[1])) continue;
           placement.scale = roundTo(choice.scale, 6);
-          pushPlacement(placement, { priority: isTreeRow });
+          pushPlacement(placement, { priority: isTreeRow, mapped: i === 0 });
         }
       }
       if (feature.type === 'landuse') {
@@ -10793,6 +10810,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
 
   // (for the report: what the land cover left out)
   if (landCover) placementsByType.landCover = landCover;
+  if (underwater.dropped || underwater.kept) placementsByType.underwater = underwater;
   return placementsByType;
 }
 
@@ -12255,6 +12273,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         features: exportTerrainData.osmFeatures || [],
         toWorld: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize, 0),
         heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+        // (lakes at or under the sea plane: the sea covers them)
+        seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),
       });
       // (no bed within LAKE_KEEP_M of a ground road's edge: its sidewalk and
       // quay stay on their ground)
@@ -12268,6 +12288,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const hmLake = heightMapEditor(exportTerrainData);
       beds.apply((idx, v) => hmLake.set(idx, v));
       lakePlan.stats.bedPixels = beds.pixels;
+      // the sea floor under the sea plane where the survey recorded the
+      // water's surface (any terrain choice: a measuring artifact, not shaping)
+      const seabed = lowerSeabed({
+        heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
+        minHeight: Number(exportTerrainData.minHeight) || 0,
+      }, exportTerrainData.landCover, -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0));
+      seabed.apply((idx, v) => hmLake.set(idx, v));
+      lakePlan.stats.seabedPixels = seabed.pixels;
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds skipped: ${err?.message || err}`);
       lakePlan = null;
@@ -12787,7 +12815,34 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       : 'no local records, the regional climate rule decides'}.`);
   }
   const forestPlacements = (includeTrees || includeRocks)
-    ? await buildForestPlacements(exportTerrainData, squareSize, { includeTrees, includeRocks, treeMix }, biome, tick)
+    ? await buildForestPlacements(exportTerrainData, squareSize, {
+      includeTrees, includeRocks, treeMix,
+      // (below the sea plane or a lake's water: left out, but for a sparse few seen from a road)
+      water: (() => {
+        const seaZ = -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0);
+        const tiles = lakePlan?.tiles || [];
+        const CELL = 64; const grid = new Map();
+        tiles.forEach((t, i) => {
+          for (let gx = Math.floor((t.cx - t.sx / 2) / CELL); gx <= Math.floor((t.cx + t.sx / 2) / CELL); gx++) {
+            for (let gy = Math.floor((t.cy - t.sy / 2) / CELL); gy <= Math.floor((t.cy + t.sy / 2) / CELL); gy++) {
+              const k = `${gx},${gy}`; if (!grid.has(k)) grid.set(k, []); grid.get(k).push(i);
+            }
+          }
+        });
+        const roadNear = buildClearanceIndex(groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })));
+        return {
+          underWater: (x, y, z) => {
+            if (includeWater !== false && z < seaZ) return true;
+            for (const i of grid.get(`${Math.floor(x / CELL)},${Math.floor(y / CELL)}`) || []) {
+              const t = tiles[i];
+              if (Math.abs(x - t.cx) <= t.sx / 2 && Math.abs(y - t.cy) <= t.sy / 2 && z < t.z) return true;
+            }
+            return false;
+          },
+          nearRoad: (x, y) => roadNear(x, y, UNDERWATER_ROAD_M),
+        };
+      })(),
+    }, biome, tick)
     : new Map();
   // (where a slow planting step spends its time, in the report's console log)
   const vegLap = (what) => console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Vegetation timing: ${what} at ${((performance.now() - vegT0) / 1000).toFixed(1)} s.`);
@@ -13363,6 +13418,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         skippedPieces: sg?.terrain?.skipped ?? 0,
         sidewalkGroundPixels: sidewalks.groundPixels || 0,
         lakeBedPixels: lakePlan?.stats?.bedPixels ?? null,
+        seabedPixels: lakePlan?.stats?.seabedPixels ?? null,
         underDeckBedPixels: underDeckBeds,
         levelledUnderDecks,
         lidar: lidar ? (lidar.skipped ? { skipped: lidar.skipped } : {

@@ -239,6 +239,15 @@ export function poolWaterBlocks(p) {
   const ring = p.kind === 'above' ? insetRing(p.ring, 0.12) : p.ring;
   const z = poolWaterLevel(p);
   const depth = p.kind === 'above' ? ABOVE_H : (p.lanes ? DEPTH.lanes : p.kind === 'wading' ? DEPTH.wading : DEPTH.deep) + 0.2;
+  // a pool with its deck round it: one block over its own frame's box (the
+  // deck, at least DECK_MIN_M wide in that frame and over the water, hides the
+  // corners); each WaterBlock is drawn on its own, and a curved pool's strips
+  // came to 13 a pool
+  if (p.kind !== 'above' && p.deckRect && p.box) {
+    const bx = p.box;
+    const [cx, cy] = frameAt(bx, (bx.s0 + bx.s1) / 2, (bx.t0 + bx.t1) / 2);
+    return [{ cx, cy, sx: bx.s1 - bx.s0, sy: bx.t1 - bx.t0, u: bx.u, z, depth }];
+  }
   return coverRing(ring, p.kind === 'above' ? { cap: 0.1, h: 0.25 } : { cap: COPING_M - 0.05, h: 0.4 }).map((b) => ({ ...b, z, depth }));
 }
 
