@@ -9,6 +9,7 @@ import { exportTer } from './exportTer.js';
 import { buildTerrainMaterials, isVegetationColor } from './osmTerrainMaterials.js';
 import { createOSMGroup, createSurroundingMeshes, SCENE_SIZE } from './export3d.js';
 import { planPools, poolFootprints, poolWaterBlocks, squareOpens, POOL_WATER_BLOCK } from './pools.js';
+import { planDams, damAt, damGuardrails, damTopGeometry } from './dams.js';
 import { planFountains, fountainFootprints, fountainWaterBlocks } from './fountains.js';
 import { streetIndex } from './buildingDetails.js';
 import { planPitches, pitchFootprints } from './sportsFields.js';
@@ -1022,7 +1023,7 @@ function getBridgeMaterialDefs() {
  * at the bridge's centre: visual mesh + a Colmesh-1 collision copy.
  * Returns [{ key, origin: [x, y, z], data, triangles }].
  */
-function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = []) {
+function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops = []) {
   const out = [];
   // one Collada shape (visual mesh + a Colmesh-1 collision copy), origin-relative
   const toDae = ({ positions: pos, uvs }, origin, material = BRIDGE_MATERIAL) => {
@@ -1076,6 +1077,16 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = []) {
       }
     }
     if (data || deckData) out.push({ key: `b${String(i + 1).padStart(3, '0')}`, origin, data, deckData, extras, style: deck.style || null, triangles: g.positions.length / 9 + extras.reduce((n, e) => n + e.triangles, 0) });
+  });
+  // other road surfaces built as decks are (a dam's crest top, services/dams.js):
+  // the road decals clip onto them
+  tops.forEach((g, i) => {
+    if (!g.positions.length) return;
+    let x = 0; let y = 0; let zMin = Infinity; const n = g.positions.length / 3;
+    for (let k = 0; k < g.positions.length; k += 3) { x += g.positions[k]; y += g.positions[k + 1]; zMin = Math.min(zMin, g.positions[k + 2]); }
+    const origin = [Math.round((x / n) * 100) / 100, Math.round((y / n) * 100) / 100, Math.round(zMin * 100) / 100];
+    const deckData = toDae(g, origin);
+    if (deckData) out.push({ key: `dam${String(i + 1).padStart(2, '0')}`, origin, data: null, deckData, extras: [], style: null, triangles: n / 3 });
   });
   return out;
 }
@@ -1246,7 +1257,7 @@ async function buildBuildingsOnWorkers(terrainData, features, project, options) 
   const slimRaceways = (options.raceways || []).map((cw) => ({ highway: cw.highway, nodes: cw.nodes, half: cw.half, tags: cw.tags, wayId: cw.wayId, oneWay: cw.oneWay }));
   for (const part of ['water', 'fields']) {
     items.unshift(JSON.stringify({
-      extras: part, features: ctx.features, raceways: slimRaceways, gateRoads: options.gateRoads || [],
+      extras: part, features: ctx.features, raceways: slimRaceways, gateRoads: options.gateRoads || [], dams: options.dams || null,
       maxBuildings: options.maxBuildings, buildingKeys: [...groups.keys()],
     }));
   }
@@ -1286,7 +1297,7 @@ async function buildBuildingsOnWorkers(terrainData, features, project, options) 
   return { count, stats, tileDaes, meshes, triangles };
 }
 
-async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [], gateRoads = [] } = {}) {
+async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null, { raceways = [], gateRoads = [], dams = null } = {}) {
   if (!terrainData.osmFeatures?.length) return null;
 
   // Buildings: textured walls / roofs from BeamNG's own trim sheets, built
@@ -1296,7 +1307,7 @@ async function generateOSMObjectsDAE(terrainData, worldSize, reportStats = null,
   // (a filling station's canopy: the game's pump island brings its own)
   const features = terrainData.osmFeatures.filter((f) => !isCarportFeature(f) && !fuelLayout(terrainData, squareSize).used.has(f.id));
   const project = (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
-  const buildOptions = { maxBuildings: caps.buildings, tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads };
+  const buildOptions = { maxBuildings: caps.buildings, tileM: buildingTileSize(worldSize), squareSize, groundAt: terrainGroundAt(terrainData, squareSize), drape: terrainDrape(terrainData, squareSize), raceways, gateRoads, dams };
   const parallel = await buildBuildingsOnWorkers(terrainData, features, project, buildOptions);
   let buildingCount; let buildingStats; let tileDaes; let meshCount; let triangles;
   if (parallel) {
@@ -1827,6 +1838,27 @@ function clipGeometryToMargin(geometry, bounds) {
 // on 1 m terrain lost its asphalt midway while its narrow lines drew; the
 // DecalRoad docs: split long, wide roads). DECAL_PIECE_AREA_M2 a piece.
 const DECAL_PIECE_AREA_M2 = 2400;
+/**
+ * A road's points cut where it steps onto or off a dam (dams.js), each piece
+ * sharing its end node with the next: the game's decal draws on a dam's crest
+ * object only as a piece of its own, as on a bridge deck.
+ */
+export function splitAtDams(points, dams, toWorld) {
+  if (!dams?.length || points.length < 3) return [points];
+  const on = points.map((pt) => { const [x, y] = toWorld(pt); return !!damAt(dams, x, y); });
+  if (!on.some(Boolean)) return [points];
+  const out = [];
+  let start = 0;
+  for (let i = 1; i < points.length; i++) {
+    if (on[i] === on[i - 1]) continue;
+    // (the piece on the dam takes the step's outer node too: its ends reach the rock)
+    const cut = on[i] ? i - 1 : i;
+    if (cut > start) { out.push(points.slice(start, cut + 1)); start = cut; }
+  }
+  out.push(points.slice(start));
+  return out.filter((p) => p.length >= 2);
+}
+
 function chunkPolyline(points, maxNodes = 250, { widthM = 0, spacingM = 0 } = {}) {
   if (widthM > 0 && spacingM > 0) maxNodes = Math.max(20, Math.min(maxNodes, Math.floor(DECAL_PIECE_AREA_M2 / (widthM * spacingM)) + 1));
   if (points.length <= maxNodes) return [points];
@@ -5105,6 +5137,9 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
   return out;
 }
 
+// a road on a dam's crest rides this far over its concrete top (dams.js)
+const DAM_ROAD_LIFT_M = 0.02;   // (as a deck's road: the decal captures only surfaces just under its nodes)
+
 // a cut-and-cover tunnel's trenches on fine elevation data: at most this deep
 // into the ground (solveExportTunnels' keepFitting)
 const CUTCOVER_MAX_DIG_M = 3;
@@ -5629,6 +5664,26 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         e.external = true;
         for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i])]);
       });
+      // dams (services/dams.js): a road along a dam's crest rides on it,
+      // pinned at the crest; the dam is its structure (no deck, no piers,
+      // the terrain under it as the data has it: classes 'dam')
+      if (opts.includeDams) {
+        structureGraph.dams = planDams(terrainData.osmFeatures || [], (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0), {
+          groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
+        });
+        if (structureGraph.dams.length) structureGraph.edges.forEach((e, k) => {
+          if (e.external || e.tunnel) return;
+          const at = new Uint8Array(e.s.length); let any = false;
+          for (let i = 0; i < e.s.length; i++) {
+            const d = damAt(structureGraph.dams, e.x[i], e.y[i]);
+            if (!d) continue;
+            at[i] = 1; any = true;
+            // (just over the crest top: the decals project down onto it, as onto a deck)
+            if (opts.structureSolver === 'v2') structureGraph.pins.push([k, i, d.crest + DAM_ROAD_LIFT_M]);
+          }
+          if (any) e.damAt = at;
+        });
+      }
       // measured deck heights (US lidar): each bridge measured along most of
       // it pinned where the survey found its surface
       if (opts.lidar?.grid && opts.structureSolver === 'v2') {
@@ -5792,6 +5847,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // Then further chunk each segment so no single DecalRoad is too long.
     const clippedSegments = clipGeometryToMargin(segmentFeature.geometry, terrainData.bounds)
       .map(s => easeTightNodes(resampleGeometryToSpacing(s, roadNodeSpacingM), styleHalfWidth))
+      // (a road on a dam's crest its own pieces there, as a bridge's way is:
+      // a piece reaching from the terrain onto the dam drew nothing on it)
+      .flatMap((s) => splitAtDams(s, structureGraph?.dams, (pt) => geoToWorldPoint(pt.lat, pt.lng, terrainData, squareSize, 0)))
       .flatMap(s => chunkPolyline(s, 250, { widthM: 2 * styleHalfWidth, spacingM: roadNodeSpacingM }));
 
     if (clippedSegments.length === 0) continue;
@@ -7161,8 +7219,8 @@ function buildDetailedReportSections(d) {
     section('Structures (solver)');
     lines.push('- Every road\'s height solved at once (joints level, crossings cleared, grade limits per class, bridges over water, tunnel cover), then each stretch classed from its height over the ground and its tags; the terrain is composed once from the result.');
     const cl = sgr.classes.stats;
-    const label = { deck: 'deck', embankment: 'embankment', boredTunnel: 'bored tunnel', cutAndCover: 'cut-and-cover', cutting: 'cutting', external: 'tunnel (today\'s builder)' };
-    for (const k of ['deck', 'embankment', 'cutting', 'cutAndCover', 'boredTunnel', 'external']) {
+    const label = { deck: 'deck', embankment: 'embankment', boredTunnel: 'bored tunnel', cutAndCover: 'cut-and-cover', cutting: 'cutting', external: 'tunnel (today\'s builder)', dam: 'on a dam (the dam its structure)' };
+    for (const k of ['deck', 'embankment', 'cutting', 'cutAndCover', 'boredTunnel', 'external', 'dam']) {
       if (cl.byKind[k]) lines.push(`  - ${label[k]}: ${cl.byKind[k]} stretch(es), ${formatNumber((cl.lengthByKind[k] || 0) / 1000, 2)} km`);
     }
     lines.push(`- Bridge tags over nothing (culverts, no deck): ${cl.culverts}; approaches carried on as decks where a fill would reach a road below: ${cl.carried || 0} station(s); untagged stretches that needed a deck: ${cl.untaggedDecks}`);
@@ -8144,10 +8202,12 @@ function gateObjects(gates, ground, free, startIndex = 0) {
   return objects;
 }
 
-function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skipAt = () => false, skipLineAt = () => false, gateWays = [], trackGates = [], gateFree = () => true } = {}) {
-  const features = terrainData.osmFeatures?.filter((feature) => (
+function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skipAt = () => false, skipLineAt = () => false, gateWays = [], trackGates = [], gateFree = () => true, extra = [] } = {}) {
+  // (extra: barriers the exporter adds, e.g. guardrails along a road on a
+  // dam; one with __zAt(x, y) stands on that surface, not the terrain)
+  const features = [...(terrainData.osmFeatures?.filter((feature) => (
     feature.type === 'barrier' && Array.isArray(feature.geometry) && feature.geometry.length >= 2
-  )) ?? [];
+  )) ?? []), ...extra];
 
   const objects = [];
   // the retaining walls' tops, for what is built on them
@@ -8296,7 +8356,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
         lng,
         x: world[0],
         y: world[1],
-        terrainZ: getTerrainHeightWorld(lat, lng, terrainData),
+        terrainZ: feature.__zAt ? feature.__zAt(world[0], world[1]) : getTerrainHeightWorld(lat, lng, terrainData),
         yaw,
       };
     };
@@ -11678,7 +11738,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sourceHeightMap = exportTerrainData.heightMap;
 
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
@@ -11727,7 +11787,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       skip: sg.shaping?.skip || null,
     });
     const hm = heightMapEditor(exportTerrainData);
-    composed.apply((idx, v) => hm.set(idx, v));
+    // (nothing composed inside a dam: the terrain there as the data has it)
+    const inDam = sg.dams?.length ? (() => {
+      const W = exportTerrainData.width; const H = exportTerrainData.height; const ws = W * squareSize;
+      return (idx) => damAt(sg.dams, ((idx % W) / (W - 1) - 0.5) * ws, (0.5 - Math.floor(idx / W) / (H - 1)) * ws);
+    })() : null;
+    composed.apply((idx, v) => { if (!inDam?.(idx)) hm.set(idx, v); });
     sg.terrain = { ...composed.stats, ms: Math.round(performance.now() - t0) };
     sg.terrain.surface = checkRoadSurface(sg.previewLines || [], (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize));
     if (globalThis.__MAPNG_STRUCT_DEBUG) globalThis.__MAPNG_STRUCT_DEBUG(sg, { decalRoads, groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
@@ -11884,6 +11949,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // the drawn ground roads (a deck's parapet standing on one at its height,
     // where the street climbs onto the deck, is left out)
     groundCarriageways.map((cw) => ({ xy: cw.nodes.map((nd) => [nd[0], nd[1]]), z: cw.nodes.map((nd) => nd[2]), half: cw.half })),
+    // dams' crest tops (their walls are in the building tiles)
+    (decalRoads.structureGraph?.dams || []).map((d) => damTopGeometry(d)),
   );
   if (bridgeDecks.length > 0) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridges: ${bridgeDecks.length} deck(s), ${decalRoads.bridges?.ramps ?? 0} approach embankment(s), ${bridgeDaes.reduce((n, d) => n + d.triangles, 0)} triangles, one object per bridge.`);
@@ -12406,6 +12473,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const osm = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport, {
       raceways: groundCarriageways.filter((cw) => cw.highway === 'raceway'),
       gateRoads: gateWaysOf(exportTerrainData, groundCarriageways, squareSize),
+      // (the dams the roads were pinned to: one crest for the road and the concrete)
+      dams: decalRoads.structureGraph?.dams || null,
     });
     osmDaeBlob = osm?.data || null;
     buildingTileDaes = osm?.tiles || [];
@@ -12469,6 +12538,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       gateWays,
       trackGates: buildingReport.stats?.trackGates || [],
       gateFree: (x, y) => !onDrawnRoad(x, y, 0.15) && !onAnyWay(x, y, 0.15),
+      // guardrails along roads on dams (services/dams.js), on the crest
+      extra: damGuardrails(decalRoads.structureGraph).map(({ pts, z }) => {
+        const b = exportTerrainData.bounds; const ws = exportTerrainData.width * squareSize;
+        return {
+          type: 'barrier', id: 'dam_rail', tags: { barrier: 'guard_rail' },
+          geometry: pts.map(([x, y]) => ({ lat: b.north - (0.5 - y / ws) * (b.north - b.south), lng: b.west + (x / ws + 0.5) * (b.east - b.west) })),
+          __zAt: (x, y) => { let best = Infinity; let zz = z[0]; pts.forEach(([px, py], i) => { const d = (px - x) ** 2 + (py - y) ** 2; if (d < best) { best = d; zz = z[i]; } }); return zz; },
+        };
+      }),
     })
     : [];
   const barrierFolderItems = buildBarrierFolderItems(barrierObjects);

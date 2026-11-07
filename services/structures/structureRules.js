@@ -32,9 +32,9 @@ export const STRUCTURE_RULES = [
 ];
 
 // Shortest run of each kind; a shorter one merges into a neighbour.
-export const MIN_RUN_M = { external: 0, deck: 10, embankment: 8, boredTunnel: 40, cutAndCover: 10, cutting: 8, ground: 6 };
+export const MIN_RUN_M = { external: 0, dam: 0, deck: 10, embankment: 8, boredTunnel: 40, cutAndCover: 10, cutting: 8, ground: 6 };
 // Which neighbour a short run joins: the higher ranked one.
-const RANK = { external: 9, deck: 6, boredTunnel: 5, cutAndCover: 4, embankment: 3, cutting: 2, ground: 1 };
+const RANK = { external: 9, dam: 8, deck: 6, boredTunnel: 5, cutAndCover: 4, embankment: 3, cutting: 2, ground: 1 };
 
 function matches(rule, st) {
   if (rule.tag && !st.tags[rule.tag]) return false;
@@ -124,6 +124,7 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
       // first metres off a junction): fill there, unless over a road or water
       if (kinds[i] === 'deck' && h < DECK_MIN_H && !st.overRoad && !st.overWater) kinds[i] = h >= 0.5 ? 'embankment' : 'ground';
       if (e.external) kinds[i] = 'external';   // placed by another builder (today's tunnels)
+      else if (e.damAt?.[i]) kinds[i] = 'dam';   // on a dam's crest (services/dams.js): the dam is its structure
     }
     // runs, then merge the short ones into their higher-ranked neighbour
     let runs = [];

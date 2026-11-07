@@ -1550,7 +1550,7 @@ export function buildingContext(features, project, raceways = []) {
  * (fountains, pools) or 'fields' (the rest). tileKeyPrefix keeps two parts'
  * tiles apart.
  */
-export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [], gateRoads = [], part = 'all', context = null, tileKeyPrefix = '' } = {}) {
+export function buildTexturedBuildings(features, project, { maxBuildings = 20000, tileM = BUILDING_TILE_M, squareSize = 1, groundAt = null, drape = null, raceways = [], gateRoads = [], dams: damPlan = null, part = 'all', context = null, tileKeyPrefix = '' } = {}) {
   const ctx = context || buildingContext(features, project, raceways);
   features = ctx.features;
   const meshes = [];
@@ -1922,8 +1922,9 @@ export function buildTexturedBuildings(features, project, { maxBuildings = 20000
   if (Object.keys(poolKinds).length) { stats.details.pools = poolKinds; stats.details.poolShapes = poolShapes; }
   // dams (services/dams.js): concrete over the gap the elevation data left
   const dams = [];
+  // (the exporter's plan when it has one: the roads were pinned to its crests)
   if (groundAt) {
-    for (const d of planDams(features, project, { groundAt })) {
+    for (const d of damPlan || planDams(features, project, { groundAt })) {
       const tile = tileFor(d.ring);
       if (!buildDam(new TeeBuilder(tile.fullB, tile.liteB), d, groundAt)) continue;
       dams.push({ name: d.name, crest: Math.round(d.crest * 10) / 10, gap: Math.round(d.gap) });

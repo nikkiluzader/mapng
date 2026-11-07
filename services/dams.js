@@ -17,7 +17,7 @@
 // as is a low weir across a river.
 // Pure geometry.
 
-import { signedArea, cleanRing, flat } from './fountains.js';
+import { signedArea, cleanRing, flat, inRing } from './fountains.js';
 
 const LINE_WIDTH_M = 8;
 const CREST_PERCENTILE = 0.85;
@@ -102,6 +102,87 @@ export function buildDam(m, d, groundAt) {
     walls++;
   }
   if (!walls) return null;
-  flat(m, 'smoothConcrete', ring, [], crest, CREST, 4);
+  // (the crest's top is its own object, damTopGeometry: road decals clip
+  // onto it as onto a bridge deck's surface, not onto the building tiles)
   return 'dam';
+}
+
+/** A dam's flat crest top as triangles: { positions: [x, y, z...], uvs: [u, v...] }. */
+// (the top in small triangles: a decal road captures the triangles under its
+// strip, and the outline's own triangulation, slivers hundreds of metres
+// long, took no road; a bridge deck's surface is in metre-scale pieces)
+const TOP_EDGE_M = 4;
+export function damTopGeometry(d, uvM = 4) {
+  const positions = []; const uvs = [];
+  const emit = (a, b, c) => {
+    for (const p of [a, b, c]) { positions.push(p[0], p[1], p[2]); uvs.push(p[0] / uvM, p[1] / uvM); }
+  };
+  const split = (a, b, c, depth = 0) => {
+    const ab = Math.hypot(b[0] - a[0], b[1] - a[1]); const bc = Math.hypot(c[0] - b[0], c[1] - b[1]); const ca = Math.hypot(a[0] - c[0], a[1] - c[1]);
+    const longest = Math.max(ab, bc, ca);
+    if (longest <= TOP_EDGE_M || depth > 24) { emit(a, b, c); return; }
+    const mid = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2, (p[2] + q[2]) / 2];
+    // (halving the longest edge keeps the triangles' winding)
+    if (longest === ab) { const m = mid(a, b); split(a, m, c, depth + 1); split(m, b, c, depth + 1); }
+    else if (longest === bc) { const m = mid(b, c); split(a, b, m, depth + 1); split(a, m, c, depth + 1); }
+    else { const m = mid(c, a); split(a, b, m, depth + 1); split(m, b, c, depth + 1); }
+  };
+  const m = { tri: (mat, a, b, c) => split(a, b, c) };
+  flat(m, 'top', d.ring, [], d.crest, CREST, uvM);
+  // a skirt round its edge, SKIRT_M deep: a perfectly flat top made an object
+  // with a box of no height, and the road decals over it drew nothing
+  const z0 = d.crest - SKIRT_M; const z1 = d.crest;
+  for (let i = 0; i < d.ring.length; i++) {
+    const a = d.ring[i]; const b = d.ring[(i + 1) % d.ring.length];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const quad = [[a[0], a[1], z0, 0, z0], [b[0], b[1], z0, L, z0], [b[0], b[1], z1, L, z1], [a[0], a[1], z0, 0, z0], [b[0], b[1], z1, L, z1], [a[0], a[1], z1, 0, z1]];
+    for (const [x, y, z, u, v] of quad) { positions.push(x, y, z); uvs.push(u / uvM, v / uvM); }
+  }
+  return { positions, uvs };
+}
+const SKIRT_M = 1;
+
+/** The dam (from planDams) whose outline holds (x, y), or null. */
+export function damAt(dams, x, y) {
+  for (const d of dams || []) {
+    let box = d.box;
+    if (!box) {
+      box = [Infinity, Infinity, -Infinity, -Infinity];
+      for (const [px, py] of d.ring) { box[0] = Math.min(box[0], px); box[1] = Math.min(box[1], py); box[2] = Math.max(box[2], px); box[3] = Math.max(box[3], py); }
+      Object.defineProperty(d, 'box', { value: box, enumerable: false });
+    }
+    if (x < box[0] || x > box[2] || y < box[1] || y > box[3]) continue;
+    if (inRing(x, y, d.ring)) return d;
+  }
+  return null;
+}
+
+const RAIL_OUT_M = 0.6;       // a guardrail this far past the road's drawn edge
+const RAIL_MIN_M = 8;         // shorter stretches on a dam get none
+
+/**
+ * Guardrails along both sides of every road stretch on a dam (structure
+ * solver classes 'dam'): [{ pts: [[x, y]...], z: [..] }], each line its
+ * road's edge + RAIL_OUT_M out, at the road's solved height.
+ */
+export function damGuardrails(graph) {
+  const z = graph?.profile?.z;
+  const out = [];
+  if (!z) return out;
+  for (const seg of graph.classes?.segments || []) {
+    if (seg.kind !== 'dam' || seg.s1 - seg.s0 < RAIL_MIN_M) continue;
+    const e = graph.edges[seg.edge];
+    const off = (e.half || 3.5) + RAIL_OUT_M;
+    for (const side of [1, -1]) {
+      const pts = []; const zz = [];
+      for (let i = seg.i0; i <= seg.i1; i++) {
+        const a = Math.max(seg.i0, i - 1); const b = Math.min(seg.i1, i + 1);
+        const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy) || 1;
+        pts.push([e.x[i] - (dy / L) * off * side, e.y[i] + (dx / L) * off * side]);
+        zz.push(z[seg.edge][i]);
+      }
+      out.push({ pts, z: zz });
+    }
+  }
+  return out;
 }

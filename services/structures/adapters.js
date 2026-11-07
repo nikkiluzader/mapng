@@ -150,10 +150,14 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
           if (dd < bestD) { bestD = dd; bz = zk[j] + (zk[j + 1] - zk[j]) * t; bk = t < 0.5 ? kindOf[acc.k][j] : kindOf[acc.k][j + 1]; }
         }
         node[2] = Math.round((bz + (bk === 'deck' ? deckLift : 0)) * 1000) / 1000;
-        if (bk === 'deck') onDeck = true;
+        // (a dam's crest too: without overObjects the game lays the decal on the terrain)
+        if (bk === 'deck' || bk === 'dam') onDeck = true;
         nodes++;
       }
       if (onDeck) d.overObjects = true;
+      // (its position with its first node: a decal over a dam's notch kept the
+      // ground's height there, 35 m under its road, and drew nowhere near it)
+      if (Array.isArray(d.position) && d.nodes[0]) d.position = [d.nodes[0][0], d.nodes[0][1], d.nodes[0][2]];
       decals++;
     }
   }

@@ -120,7 +120,8 @@ export function composeTerrain(graph, grid) {
   // ends that run into a tube (a tunnel's or another builder's stretch,
   // left to it): no corridor round them, a cutting's floor carried on past
   // the portal stood the terrain inside the tube
-  const TUBE = new Set(['boredTunnel', 'cutAndCover', 'external']);
+  // (a dam's crest: the dam is built over the ground, which stays as it is)
+  const TUBE = new Set(['boredTunnel', 'cutAndCover', 'external', 'dam']);
   // (a tube another builder builds: an unbuilt tunnel road stays on the
   // ground, its approach composed on into it)
   const BUILT = new Set(['external']);

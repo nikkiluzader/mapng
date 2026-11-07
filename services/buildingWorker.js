@@ -62,7 +62,7 @@ function buildExtras(item, shared) {
   const ctx = { features: item.features, streets, levelsHints: new Map(), businessTags: new Map(), hotelMain: new Map() };
   const built = buildTexturedBuildings(item.features, project, {
     maxBuildings: item.maxBuildings ?? Infinity, tileM: shared.tileM, squareSize: shared.squareSize, groundAt, drape,
-    raceways: item.raceways, gateRoads: item.gateRoads,
+    raceways: item.raceways, gateRoads: item.gateRoads, dams: item.dams,
     // ('water': fountains and pools, tiles 'x'; 'fields': pitches, stands, racetracks, lights, tiles 'y')
     part: item.extras, context: ctx, tileKeyPrefix: item.extras === 'water' ? 'x' : 'y',
   });
