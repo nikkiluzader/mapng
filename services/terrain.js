@@ -2341,6 +2341,9 @@ export const fetchTerrainData = async (
       elementCount: 0,
     };
   }
+  // what covers the ground (ESA WorldCover), with the map data
+  const landCoverRead = { bounds: finalBounds, width, processingMetersPerPixel: effectiveMetersPerPixel };
+  await attachLandCover(landCoverRead, { onProgress: (m) => onProgress?.(m), signal });
 
   // The shaping steps below run in one go on the page's own thread: without a
   // frame between a message and the work, the browser never drew the message
@@ -2438,6 +2441,7 @@ export const fetchTerrainData = async (
     processingMetersPerPixel: effectiveMetersPerPixel,
     flat,
     raw,
+    landCover: landCoverRead.landCover ?? null,
   };
 
   // what covers the ground (ESA WorldCover), read once with the terrain

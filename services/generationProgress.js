@@ -13,7 +13,7 @@
 // Overpass run creeps through its share instead. Stages a run skips (Raw
 // terrain: no ground filter, no road shaping; lidar: no ground filter) weigh 0.
 
-export const GENERATION_STAGES = ['prepare', 'source', 'tiles', 'repair', 'resample', 'satellite', 'osm', 'ground', 'roads', 'finalize', 'textures'];
+export const GENERATION_STAGES = ['prepare', 'source', 'tiles', 'repair', 'resample', 'satellite', 'osm', 'landcover', 'ground', 'roads', 'finalize', 'textures'];
 
 /**
  * The six stages the progress card shows (components/ui/StageLoader.vue),
@@ -27,7 +27,7 @@ export const GENERATION_STEP_GROUPS = [
   { key: 'prepare', members: ['prepare'] },
   { key: 'elevation', members: ['source', 'tiles', 'repair'] },
   { key: 'terrain', members: ['resample'] },
-  { key: 'mapData', members: ['satellite', 'osm'] },
+  { key: 'mapData', members: ['satellite', 'osm', 'landcover'] },
   { key: 'shaping', members: ['ground', 'roads'] },
   { key: 'textures', members: ['finalize', 'textures'] },
 ];
@@ -46,6 +46,8 @@ const stageSeconds = ({ px, includeOSM, upload, raw, flat, source, groundFilter 
     resample: 0.5 + 2.2 * px,
     satellite: upload ? 1 + 1 * px : 0,
     osm: includeOSM ? 2 + 0.3 * px : 0,
+    // (ESA WorldCover, range reads of a few 3° tiles: ~1-2 s; the uploads read it after the terrain, unweighted)
+    landcover: upload ? 0 : 1 + 0.15 * px,
     // (the ground filter: bare-earth and Copernicus grids fetched, then filtered; global 30 m only, never raw)
     ground: includeOSM && coarse && !raw && groundFilter ? 1.5 + 1.5 * px : 0,
     roads: includeOSM && !raw && !flat && smoothRoads ? 0.3 + 0.8 * px : 0,
@@ -68,6 +70,7 @@ export function classifyGenerationStatus(text) {
   if (/smoothing (\d+ )?roads|aligning roads/.test(s)) return 'roads';
   if (/ground under buildings|river water/.test(s)) return 'ground';
   if (/finaliz/.test(s)) return 'finalize';
+  if (/land cover|worldcover/.test(s)) return 'landcover';
   if (/openstreetmap|overpass|osm data|\bmirror|overture/.test(s)) return 'osm';
   if (/resampling heightmap|mapping (uploaded )?elevation/.test(s)) return 'resample';
   // (the global tiles: the terrain the source is filled from, with the satellite imagery)
@@ -120,8 +123,11 @@ export function createGenerationProgress({ resolution, includeOSM, upload = fals
     // silent stretches creep: ~85 % of the stage by its expected time, then on
     // slowly toward 99 % (an Overpass outage held the bar still for 45 s at 95 %)
     const t = expected > 0 ? (now() - stageStartedAt) / 1000 / expected : 0;
-    const creep = !counted && expected > 0 ? 0.9 * (1 - Math.exp(-2.3 * t)) + 0.09 * (1 - Math.exp(-t / 6)) : 0;
-    const fraction = Math.max(reported, creep);
+    const creep = expected > 0 ? 0.9 * (1 - Math.exp(-2.3 * t)) + 0.09 * (1 - Math.exp(-t / 6)) : 0;
+    // a stage that counts its own progress still moves between its counts,
+    // never past a quarter of what is left after the last one (a slow OSM
+    // server's "3/5" held both bars still for 20 s)
+    const fraction = counted ? Math.max(reported, Math.min(creep, reported + 0.25 * (1 - reported))) : Math.max(reported, creep);
     stageFraction = Math.max(stageFraction, Math.min(1, fraction));
     const pct = Math.floor(((doneBefore(index) + expected * Math.min(1, fraction)) / total) * 100);
     lastPct = Math.max(lastPct, Math.min(99, pct));

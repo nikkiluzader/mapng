@@ -12475,7 +12475,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let buildingTileDaes = [];
   const buildingReport = { dragGrade };
   if (includeBuildings) {
-    beginStep('buildings', `Building textured 3D buildings (${(exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building').length} OSM footprints)…`);
+    const damCount = (decalRoads.structureGraph?.dams || []).length;
+    beginStep('buildings', `Building textured 3D buildings (${(exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building').length} OSM footprints${damCount ? `, ${damCount} dam${damCount === 1 ? '' : 's'}` : ''})…`);
     await yield_();
     const osm = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport, {
       raceways: groundCarriageways.filter((cw) => cw.highway === 'raceway'),
@@ -12755,7 +12756,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     String(obj?.shapeName || '').toLowerCase().includes('eca_bld_wood_fence_a.dae')
   ));
 
-  const plants = [includeTrees && 'trees and bushes', includeRocks && 'rocks'].filter(Boolean).join(', ');
+  // (the trees follow the land cover read while generating; an old terrain reads it now)
+  const coverNote = exportTerrainData.landCover?.grid ? ' where the land cover (ESA WorldCover) has them' : exportTerrainData.landCover === null ? '' : ' (reading the land cover, ESA WorldCover)';
+  const plants = [includeTrees && `trees and bushes${coverNote}`, includeRocks && 'rocks'].filter(Boolean).join(', ');
   beginStep('vegetation', plants ? `Planting ${plants}, ground cover and props…` : 'Placing ground cover and props…');
   await yield_();
   // (the browser gets the thread back every ~50 ms: a heavily wooded 8 km

@@ -142,6 +142,8 @@ export function plantAllowed(cls, kind, u) {
  */
 export async function attachLandCover(terrainData, { onProgress, signal } = {}) {
   if (!terrainData?.bounds || !terrainData.width) return null;
+  // (read already, with the map data: kept, even when it failed)
+  if (terrainData.landCover !== undefined) return terrainData.landCover;
   const mpp = Number(terrainData.processingMetersPerPixel) || 1;
   const worldSize = terrainData.width * mpp;
   const n = Math.min(4096, Math.max(64, Math.ceil(worldSize / 10)));

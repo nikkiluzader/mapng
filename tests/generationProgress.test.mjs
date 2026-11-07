@@ -54,3 +54,33 @@ test('raw terrain and lidar skip the shaping stages; the global 30 m has them', 
   assert.equal(gpxz.ground, 0, 'GPXZ is never ground-filtered');
   assert.ok(gpxz.roads > 0 && gpxz.source > 0);
 });
+
+test('the land cover read is its own stage, in the map data, between OSM and the shaping', async () => {
+  const { GENERATION_STEP_GROUPS } = await import('../services/generationProgress.js');
+  assert.equal(classifyGenerationStatus('Loading land cover (ESA WorldCover)…'), 'landcover');
+  assert.ok(GENERATION_STEP_GROUPS.find((g) => g.key === 'mapData').members.includes('landcover'));
+  let t = 0;
+  const p = createGenerationProgress({ resolution: 4096, includeOSM: true, now: () => t });
+  p.update('Fetching OpenStreetMap data...');
+  t += 2000;
+  const a = p.update('Loading land cover (ESA WorldCover)…');
+  assert.equal(a.stage, 'landcover');
+  assert.ok(a.completed && /OpenStreetMap/.test(a.completed.step), 'the OSM stage closed');
+  t += 1000;
+  const b = p.update('Finding the ground under buildings and trees (GEDTM30 bare-earth model, Copernicus GLO-30)...');
+  assert.equal(b.stage, 'ground');
+  assert.ok(b.pct >= a.pct, 'never backwards');
+  // an upload reads it after the terrain: no weight, no stall
+  assert.equal(createGenerationProgress({ resolution: 4096, includeOSM: true, upload: true }).weights.landcover, 0);
+});
+
+test('a counting stage still creeps between its counts, but never far past the last one', () => {
+  let t = 0;
+  const p = createGenerationProgress({ resolution: 4096, includeOSM: true, now: () => t });
+  p.update('Fetching OpenStreetMap data...');
+  const a = p.update('Reading Overture Maps buildings 1/4');
+  t += 30000;
+  const b = p.tick();
+  assert.ok(b.stageFraction > a.stageFraction, 'moving while it waits');
+  assert.ok(b.stageFraction <= 0.25 + 0.25 * 0.75 + 1e-9, `not past a quarter of the rest (${b.stageFraction})`);
+});
