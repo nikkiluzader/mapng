@@ -1,4 +1,5 @@
 import { attachLandCover } from './worldCover.js';
+import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox } from './backgroundMask.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
 import { fetchWord, replayingSources } from './sourceWording.js';
 import { parseRasterOrGridElevationFile, parseTifFile, parseTifFiles, parseGridFiles } from "./tifLoader.js";
@@ -664,8 +665,8 @@ const SATELLITE_ANCESTOR_LEVELS = 4;
  * concurrent callers sharing it never interleave. `ancestorCache` (a Map)
  * shares ancestor downloads between sibling tiles of one mosaic.
  */
-const loadSatelliteTilePixels = async (ctx, z, tx, ty, signal, ancestorCache) => {
-  for (let step = 0; step <= SATELLITE_ANCESTOR_LEVELS && z - step >= 0; step++) {
+const loadSatelliteTilePixels = async (ctx, z, tx, ty, signal, ancestorCache, firstStep = 0) => {
+  for (let step = Math.min(firstStep, z); step <= SATELLITE_ANCESTOR_LEVELS && z - step >= 0; step++) {
     const az = z - step;
     const n = 2 ** az;
     const ax = Math.floor(tx / 2 ** step);
@@ -1875,7 +1876,11 @@ export const fetchTerrainData = async (
     lowerWater = true,
     // roads aligned, smoothed and levelled into the terrain (roadSnap.js, roadSmoother.js); off: left as they are
     smoothRoads = true,
+    // background areas (backgroundMask.js): no objects there, data at lower detail
+    backgroundMask = null,
   } = generationOptions || {};
+  const backgroundAt = backgroundMask ? backgroundLookup(backgroundMask, { n: 1024, metersAcross: resolution * (Number(processingMetersPerPixel) || 1) }) : null;
+  const skipBox = backgroundAt ? makeSkipBox(backgroundAt, backgroundMask.bounds) : null;
   // Normalize longitude to handle world wrapping
   const normalizedCenter = {
     lat: center.lat,
@@ -1940,14 +1945,18 @@ export const fetchTerrainData = async (
   let mapterhornInfo = null;
   if (!rawData && useMapterhorn && !flat) {
     try {
-      const mh = await fetchMapterhornRaw(fetchBounds, { metersPerPixel: effectiveMetersPerPixel, onProgress, signal });
+      const mh = await fetchMapterhornRaw(fetchBounds, {
+        metersPerPixel: effectiveMetersPerPixel, onProgress, signal,
+        // (background areas: tiles wholly inside them from 3 zooms up, the same lidar coarser)
+        ...(skipBox ? { coarseTile: (z, x, y) => skipBox(tileLatLngBox(z, x, y)) } : {}),
+      });
       if (mh?.tiles?.length) {
         rawData = { tiles: mh.tiles };
         rawDataSourceType = 'grid';
         mapterhornInfo = { zoom: mh.zoom, lidarFraction: mh.lidarFraction, metersPerPixel: mh.metersPerPixel };
         // (coarse national models, e.g. the US 10 m layer at z13-z14: smoothed like GPXZ's coarse datasets)
         shouldSmooth = mh.metersPerPixel > 4;
-        console.info(`[Mapterhorn] z${mh.zoom} (~${mh.metersPerPixel.toFixed(1)} m), lidar on ${Math.round(mh.lidarFraction * 100)}% of ${mh.tilesFetched} tiles.`);
+        console.info(`[Mapterhorn] z${mh.zoom} (~${mh.metersPerPixel.toFixed(1)} m), lidar on ${Math.round(mh.lidarFraction * 100)}% of ${mh.tilesFetched} tiles${mh.coarseTiles ? ` (${mh.coarseTiles} in background areas, coarser)` : ''}.`);
       } else {
         mapterhornInfo = { zoom: 12, lidarFraction: 0, fallbackReason: 'no_lidar' };
         onProgress?.('Mapterhorn has no lidar here. Using the global 30 m elevation...');
@@ -2120,6 +2129,7 @@ export const fetchTerrainData = async (
   let terrainTilesFailed = 0;
   let satTilesSucceeded = 0;
   let satTilesFailed = 0;
+  let satTilesCoarse = 0;
   await pMap(
     requests,
     async ({ tx, ty, type }) => {
@@ -2151,7 +2161,10 @@ export const fetchTerrainData = async (
         const drawX = (tx - satMinTileX) * TILE_SIZE;
         const drawY = (ty - satMinTileY) * TILE_SIZE;
 
-        const tilePixels = await loadSatelliteTilePixels(tempSatCtx, satelliteZoom, tx, ty, signal, satAncestorCache);
+        // (background areas: a tile wholly inside one comes from 3 zooms up, 1/64 the downloads)
+        const coarse = skipBox && skipBox(tileLatLngBox(satelliteZoom, tx, ty)) ? 3 : 0;
+        if (coarse) satTilesCoarse++;
+        const tilePixels = await loadSatelliteTilePixels(tempSatCtx, satelliteZoom, tx, ty, signal, satAncestorCache, coarse);
         if (tilePixels) {
           satTilesSucceeded++;
           for (let row = 0; row < TILE_SIZE; row++) {
@@ -2177,7 +2190,7 @@ export const fetchTerrainData = async (
     Math.max(1, Number(globalTileConcurrency || 20)),
     signal,
   );
-  console.log(`[Sat Tiles] ${satTilesSucceeded} ok / ${satTilesFailed} failed — canvas ${satCanvasWidth}x${satCanvasHeight}`);
+  console.log(`[Sat Tiles] ${satTilesSucceeded} ok / ${satTilesFailed} failed${satTilesCoarse ? ` (${satTilesCoarse} in background areas, from 3 zooms up)` : ''} — canvas ${satCanvasWidth}x${satCanvasHeight}`);
 
   if (!rawData && terrainTilesRequested > 0 && terrainTilesSucceeded === 0) {
     throw new Error(
@@ -2340,7 +2353,16 @@ export const fetchTerrainData = async (
   if (includeOSM) {
     signal?.throwIfAborted();
     onProgress?.(`${fetchWord()} OpenStreetMap data...`);
-    osmFeatures = shapeRoads(await fetchOSMData(finalBounds, { onStatus: onProgress, signal }));
+    osmFeatures = shapeRoads(await fetchOSMData(finalBounds, {
+      onStatus: onProgress, signal,
+      // (background areas: map tiles wholly inside them skipped, Overpass asked for the kept parts only)
+      ...(backgroundAt ? { skipBox, keptBoxes: keptBoxes(backgroundAt, backgroundMask.bounds) } : {}),
+    }));
+    if (backgroundAt) {
+      const before = osmFeatures.length;
+      osmFeatures = filterFeaturesByBackground(osmFeatures, backgroundAt, backgroundMask.bounds);
+      console.log(`[Background areas] ${Math.round(backgroundAt.fraction * 100)}% of the square: ${before - osmFeatures.length} of ${before} map features left out.`);
+    }
     osmRequestInfo = getLastOSMRequestInfo() || {
       ...getOSMQueryParameters(finalBounds),
       endpointUsed: null,
@@ -2492,6 +2514,8 @@ export const fetchTerrainData = async (
   }
 
   releaseCanvas(hybridSatelliteCanvas);
+  // (the export leaves objects out of the same areas)
+  if (backgroundMask) terrainData.backgroundMask = backgroundMask;
   return terrainData;
 };
 

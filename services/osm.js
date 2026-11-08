@@ -1017,18 +1017,20 @@ const fetchOverpassOrOverture = async (request, { onStatus, signal } = {}) => {
 };
 
 // (the status line only when the area is really read from MapNG's tiles)
-const fetchOsmFromManifestWithStatus = async (bounds, { onStatus, signal }) => {
+const fetchOsmFromManifestWithStatus = async (bounds, { onStatus, signal, skipBox }) => {
   const manifest = await getOsmTileManifest();
   if (!manifest || !planTileSources(manifest.archives, bounds)) return null;
   onStatus?.("Reading OpenStreetMap data from MapNG tiles...");
-  return fetchOsmFromManifest(bounds, { signal });
+  return fetchOsmFromManifest(bounds, { signal, skipBox });
 };
 
 // One box's raw OSM data: MapNG's own tiles first (one given source for
 // tests, setOsmTileSource, or the published archives, each tile from the
 // newest one covering it: osmTiles.js planTileSources), then Overpass or
 // Overture. -> { endpoint, data }
-const fetchOsmRaw = async (bounds, { onStatus, signal } = {}) => {
+// (skipBox / keptBoxes: background areas, backgroundMask.js: map tiles wholly
+// inside them skipped, Overpass asked for the kept boxes only)
+const fetchOsmRaw = async (bounds, { onStatus, signal, skipBox = null, keptBoxes = null } = {}) => {
   // An OSM file the user loaded (osmFile.js) wins over every server while it
   // covers any of the area: they loaded it to get exactly that data.
   const file = getLoadedOsmFile();
@@ -1045,15 +1047,15 @@ const fetchOsmRaw = async (bounds, { onStatus, signal } = {}) => {
   if (osmTileSource || cacheEndpointAvailable()) {
     try {
       const data = osmTileSource
-        ? (onStatus?.("Reading OpenStreetMap data from MapNG tiles..."), await fetchOsmFromTiles(osmTileSource, bounds, { signal }))
-        : await fetchOsmFromManifestWithStatus(bounds, { onStatus, signal });
+        ? (onStatus?.("Reading OpenStreetMap data from MapNG tiles..."), await fetchOsmFromTiles(osmTileSource, bounds, { signal, skipBox }))
+        : await fetchOsmFromManifestWithStatus(bounds, { onStatus, signal, skipBox });
       if (data) return { endpoint: "mapng-osm-tiles", data };
     } catch (tileError) {
       if (tileError?.name === "AbortError" || signal?.aborted) throw tileError;
       console.warn("[OSM] MapNG tiles unavailable, using Overpass:", tileError?.message || tileError);
     }
   }
-  return fetchOverpassOrOverture({ query: buildOverpassQuery(bounds), bounds }, { onStatus, signal });
+  return fetchOverpassOrOverture({ query: buildOverpassQuery(bounds, keptBoxes), bounds }, { onStatus, signal });
 };
 
 /**
@@ -1118,7 +1120,7 @@ export const mergeAcrossDateLine = (parts, refLng) => {
   return { ...(parts[0]?.data || {}), elements };
 };
 
-export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
+export const fetchOSMData = async (bounds, { onStatus, signal, skipBox = null, keptBoxes = null } = {}) => {
   console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
 
   const queryParams = getOSMQueryParameters(bounds);
@@ -1132,13 +1134,13 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
       const parts = [];
       const endpoints = [];
       for (const half of halves) {
-        const part = await fetchOsmRaw(half, { onStatus, signal });
+        const part = await fetchOsmRaw(half, { onStatus, signal, skipBox });
         parts.push({ data: part.data, osmIds: part.endpoint !== OVERTURE_ENDPOINT });
         endpoints.push(part.endpoint);
       }
       result = { endpoint: [...new Set(endpoints)].join(' + '), data: mergeAcrossDateLine(parts, (halves[0].west + halves[1].east + 360) / 2) };
     } else {
-      result = await fetchOsmRaw(bounds, { onStatus, signal });
+      result = await fetchOsmRaw(bounds, { onStatus, signal, skipBox, keptBoxes });
     }
     const { endpoint } = result;
     let { data } = result;
@@ -1190,4 +1192,47 @@ export const fetchOSMData = async (bounds, { onStatus, signal } = {}) => {
     };
     return [];
   }
+};
+// The drivable roads only, for "Keep road" in the background-areas editor
+// (before generating: a light query, not the full pull). Ways sharing a name or
+// ref become one choice. -> [{ id, name, lines: [[[lat, lng], ...], ...] }]
+const KEEPABLE_ROADS = "motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link";
+export const fetchOsmRoads = async (bounds, { signal } = {}) => {
+  const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
+  let data = null;
+  const file = getLoadedOsmFile();
+  if (file && osmFileCoverage(file.bounds, bounds).coverage !== "none") data = file.data;
+  if (!data && (osmTileSource || cacheEndpointAvailable())) {
+    try {
+      data = osmTileSource ? await fetchOsmFromTiles(osmTileSource, bounds, { signal }) : await fetchOsmFromManifestWithStatus(bounds, { signal });
+    } catch (e) {
+      if (e?.name === "AbortError" || signal?.aborted) throw e;
+      data = null;
+    }
+  }
+  if (!data) {
+    const query = `[out:json][timeout:30];\nway["highway"~"^(${KEEPABLE_ROADS})$"](${bbox});\nout body geom;`;
+    data = (await fetchOverpassOrOverture({ query, bounds }, { signal })).data;
+  }
+  const keep = new RegExp(`^(${KEEPABLE_ROADS})$`);
+  const roads = parseOverpassResponse(data, bounds).filter((f) => f.type === "road" && keep.test(f.tags?.highway || ""));
+  const groups = new Map();
+  for (const r of roads) {
+    const name = r.tags.name || r.tags.ref || "";
+    const key = name ? `n:${name}` : `w:${r.id}`;
+    const pts = [];
+    let last = null;
+    for (const p of r.geometry || []) {
+      // (about 15 m apart is plenty for a corridor hundreds of metres wide)
+      if (last && Math.abs(p.lat - last.lat) < 1.4e-4 && Math.abs(p.lng - last.lng) < 1.4e-4) continue;
+      pts.push([Number(p.lat.toFixed(6)), Number(p.lng.toFixed(6))]); last = p;
+    }
+    const tail = r.geometry?.[r.geometry.length - 1];
+    if (tail && last !== tail) pts.push([Number(tail.lat.toFixed(6)), Number(tail.lng.toFixed(6))]);
+    if (pts.length < 2) continue;
+    const g = groups.get(key) || { id: key, name: name || r.tags.highway, highway: r.tags.highway, lines: [] };
+    g.lines.push(pts);
+    groups.set(key, g);
+  }
+  return [...groups.values()];
 };

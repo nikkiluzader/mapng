@@ -111,7 +111,7 @@ async function pool(items, n, fn, signal) {
  * opts: { metersPerPixel, onProgress, signal, loadImage, concurrency }
  */
 export async function fetchMapterhornRaw(bounds, opts = {}) {
-  const { metersPerPixel = 1, onProgress, signal, loadImage = defaultLoadImage, concurrency = 12 } = opts;
+  const { metersPerPixel = 1, onProgress, signal, loadImage = defaultLoadImage, concurrency = 12, coarseTile = null } = opts;
   const url = (z, x, y) => `${MAPTERHORN_CACHE_URL}/${z}/${x}/${y}.webp`;
   const zTarget = mapterhornZoomFor(bounds, metersPerPixel);
   const cache = new Map();
@@ -140,11 +140,14 @@ export async function fetchMapterhornRaw(bounds, opts = {}) {
   const W = nx * TILE, H = ny * TILE;
   const mosaic = new Float32Array(W * H).fill(NO_DATA);
   const jobs = []; for (let ty = r.y0; ty <= r.y1; ty++) for (let tx = r.x0; tx <= r.x1; tx++) jobs.push([tx, ty]);
-  let done = 0, lidar = 0, deepest = 0;
+  let done = 0, lidar = 0, deepest = 0, coarseCount = 0;
   onProgress?.(`Fetching Mapterhorn lidar tiles (z${z}, ${jobs.length})...`);
   await pool(jobs, concurrency, async ([tx, ty]) => {
-    let heights = await get(z, tx, ty);
-    let step = 0;
+    // (background areas: from 3 zooms up, never coarser than the lidar's own z13)
+    const coarse = coarseTile?.(z, tx, ty) ? Math.max(0, Math.min(3, z - LIDAR_MIN_ZOOM)) : 0;
+    if (coarse) coarseCount++;
+    let heights = coarse ? null : await get(z, tx, ty);
+    let step = coarse ? coarse - 1 : 0;
     // missing at this zoom (the edge of a lidar survey): the nearest lidar ancestor, upsampled
     while (!heights && z - step - 1 >= LIDAR_MIN_ZOOM) {
       step++;
@@ -188,5 +191,5 @@ export async function fetchMapterhornRaw(bounds, opts = {}) {
   }
   // (zoom and metres per pixel of the deepest data found: tiles from coarser ancestors are upsampled into the mosaic)
   const k = Math.cos(((bounds.north + bounds.south) / 2) * Math.PI / 180);
-  return { tiles, zoom: deepest, lidarFraction: lidar / jobs.length, tilesFetched: jobs.length, metersPerPixel: (tileSizeM(deepest) / TILE) * k };
+  return { tiles, zoom: deepest, lidarFraction: lidar / jobs.length, tilesFetched: jobs.length, coarseTiles: coarseCount, metersPerPixel: (tileSizeM(deepest) / TILE) * k };
 }

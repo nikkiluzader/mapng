@@ -307,7 +307,7 @@
     </div>
 
     <!-- Center Crosshair -->
-    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none">
+    <div v-if="!boxLocked" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[400] pointer-events-none">
         <div class="w-8 h-8 text-brand drop-shadow-lg flex items-center justify-center">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="w-full h-full filter drop-shadow-md">
                 <line x1="12" y1="4" x2="12" y2="20" />
@@ -326,7 +326,7 @@
       @contextmenu.prevent
     >
       <div class="px-3 py-1 text-micro text-gray-500 dark:text-gray-400 font-mono">{{ formatLatLng(contextMenu.lat, contextMenu.lng) }}</div>
-      <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="centerSelectionHere">{{ t('map.centerHere') }}</button>
+      <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" v-if="!boxLocked" @click="centerSelectionHere">{{ t('map.centerHere') }}</button>
       <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="copyCoordinates">{{ copiedNotice ? t('map.copied') : t('map.copyCoordinates') }}</button>
     </div>
   </div>
@@ -353,6 +353,9 @@ import { addHotspotLayer } from '../../services/hotspotLayer.js';
 import { loadLidarCoverage, createLidarCoverageLayer } from '../../services/lidarCoverageLayer.js';
 import { daysSince } from '../../services/exportHotspots.js';
 import { WORLD_BOUNDS, minZoomForWidth, formatSelectionSize, formatLatLng, clampLng } from '../../services/mapView.js';
+import { useMainStore } from '../../stores/mainStore';
+import { useBackgroundEditor } from '../../composables/useBackgroundEditor.js';
+import { attachBackgroundLayer } from './backgroundLayer.js';
 
 // Fix Leaflet icon assets
 // @ts-ignore
@@ -398,6 +401,8 @@ const props = defineProps({
   batchGrid: { type: Array, default: () => [] },
   batchGridFollowsCenter: { type: Boolean, default: false },
   batchEditable: { type: Boolean, default: false },
+  // background areas drawn: the box stays put while the view pans and zooms
+  boxLocked: { type: Boolean, default: false },
 });
 
 const hasBatchGrid = computed(() => props.batchGrid && props.batchGrid.length > 0);
@@ -523,7 +528,7 @@ const activeSelectionSizeMeters = computed(() => {
 });
 
 const bounds = computed(() => {
-  const metricBounds = computeMetricSelectionBounds(currentCenter.value, activeSelectionSizeMeters.value);
+  const metricBounds = computeMetricSelectionBounds(props.boxLocked ? props.center : currentCenter.value, activeSelectionSizeMeters.value);
   if (!metricBounds) return null;
   const nw = L.latLng(metricBounds.north, metricBounds.west);
   const se = L.latLng(metricBounds.south, metricBounds.east);
@@ -644,6 +649,7 @@ const mapCenterUnchanged = (c) => lastMapCenter
 
 const handleMove = () => {
   if (isMovingProgrammatically.value) return;
+  if (props.boxLocked) return;
   if (!mapRef.value?.leafletObject) return;
   const map = mapRef.value.leafletObject;
   const c = map.getCenter();
@@ -701,6 +707,7 @@ const landingToleranceDeg = (zoom) => (1.5 * 360) / (256 * 2 ** zoom);
 
 const onMoveEnd = () => {
     isMovingProgrammatically.value = false;
+    if (props.boxLocked) return;
     // Ensure we sync final position
     if (mapRef.value?.leafletObject) {
         const map = mapRef.value.leafletObject;
@@ -858,6 +865,8 @@ const zoomToSelection = () => {
   const map = leafletMap.value;
   const b = exportAreaBounds.value;
   if (!map || !b) return;
+  // (locked: the box no longer follows the centre, so frame it)
+  if (props.boxLocked) { map.fitBounds([[b.south, b.west], [b.north, b.east]], { padding: [60, 60] }); return; }
   // Zoom only: the selection is the map centre, so moving the centre would move it.
   const zoom = map.getBoundsZoom([[b.south, b.west], [b.north, b.east]], false, L.point(120, 120));
   map.setZoom(Math.min(zoom, map.getMaxZoom() || 19));
@@ -1023,8 +1032,41 @@ const copyCoordinates = async () => {
 };
 const onKeydown = (e) => { if (e.key === 'Escape') closeContextMenu(); };
 
+// Background areas (Location step): the layer draws them and takes the clicks
+const store = useMainStore();
+const bgEditor = useBackgroundEditor();
+let bgLayer = null;
+watch(
+  () => [store.backgroundMask, store.backgroundTool, store.advancedMode, store.batchMode, store.backgroundDrawn, bgEditor.roadChoices.value, bgEditor.unmaskShape.value, selectionBounds.value],
+  () => bgLayer?.update(),
+);
+// Unlocked again: the box goes back under the crosshair where it was
+watch(() => props.boxLocked, (locked, was) => {
+  const map = mapRef.value?.leafletObject;
+  if (locked || !was || !map) return;
+  currentCenter.value = { lat: props.center.lat, lng: props.center.lng };
+  lastEmitted = currentCenter.value;
+  isMovingProgrammatically.value = true;
+  map.off('moveend', onMoveEnd); map.on('moveend', onMoveEnd);
+  programmaticTarget = { ...currentCenter.value };
+  map.setView([props.center.lat, props.center.lng], map.getZoom(), { animate: true });
+});
+
 const onMapReady = (map) => {
   leafletMap.value = map;
+  bgLayer = attachBackgroundLayer(map, {
+    getMask: () => store.backgroundMask,
+    getTool: () => store.backgroundTool,
+    getSelectionBounds: () => selectionBounds.value,
+    getMetersAcross: () => activeSelectionSizeMeters.value,
+    getRoadChoices: () => bgEditor.roadChoices.value,
+    getUnmask: () => ({ shape: bgEditor.unmaskShape.value, brushM: bgEditor.brushM.value, background: bgEditor.paintBackground.value }),
+    isActive: () => store.advancedMode && !hasBatchGrid.value && !store.batchMode && (store.backgroundDrawn || store.backgroundTool !== 'pan'),
+    edit: bgEditor.edit,
+    setHint: bgEditor.setHint,
+    t,
+  });
+  bgLayer.update();
   // (the dim outside the selection: above the tiles, under every overlay)
   map.createPane('mapngMask').style.zIndex = '350';
   map.getPane('mapngMask').style.pointerEvents = 'none';
@@ -1076,7 +1118,7 @@ const onMapReady = (map) => {
   mapResizeObserver.observe(map.getContainer());
 };
 let mapResizeObserver = null;
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); bgLayer?.destroy(); });
 const hotspotWhen = (dot) => {
   const days = daysSince(dot.lastDay);
   if (days === null) return '';

@@ -570,7 +570,8 @@ ipcMain.handle('terrain:generate', async (event, requested) => {
       ...saved,
       // (Raw terrain as the window has it now: the saved downloads are untouched,
       // so the terrain can be made either way)
-      generationOptions: { ...(saved.generationOptions || {}), raw: !!requested.generationOptions?.raw },
+      // Background areas too: as drawn now (they only leave things out of the saved data)
+      generationOptions: { ...(saved.generationOptions || {}), raw: !!requested.generationOptions?.raw, backgroundMask: requested.generationOptions?.backgroundMask || null },
       sources: { mode: 'replay', dir: path.join(projectDir, 'sources'), fallback: true },
     };
   } else {
@@ -783,12 +784,17 @@ async function rebuildLevel(sender, zipName, levelName) {
     fs.mkdirSync(jobDir, { recursive: true });
     const terrain = JSON.parse(fs.readFileSync(path.join(session, 'terrain.json'), 'utf8'));
     const linked = new Set();
-    for (const v of Object.values(terrain)) {
-      if (v && typeof v === 'object' && typeof v.$file === 'string') {
-        linkOrCopy(path.join(session, path.basename(v.$file)), path.join(jobDir, path.basename(v.$file)));
-        linked.add(v.$file);
+    // (every file the terrain points at, nested ones too: landCover.grid)
+    const linkRefs = (v) => {
+      if (Array.isArray(v)) v.forEach(linkRefs);
+      else if (v && typeof v === 'object') {
+        if (typeof v.$file === 'string') {
+          if (!linked.has(v.$file)) linkOrCopy(path.join(session, path.basename(v.$file)), path.join(jobDir, path.basename(v.$file)));
+          linked.add(v.$file);
+        } else Object.values(v).forEach(linkRefs);
       }
-    }
+    };
+    linkRefs(terrain);
     linkedFiles.set(jobId, linked);
     // (a texture painted after generating, and files the options point at)
     if (project && fs.existsSync(path.join(projectDir, 'overrides'))) {

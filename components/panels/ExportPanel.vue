@@ -497,7 +497,7 @@
     <Transition name="fade">
       <div
         v-if="isExportingBeamNGLevel"
-        class="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/25 dark:bg-black/60 backdrop-blur-sm"
+        class="fixed inset-0 z-[9999] flex items-center justify-center p-4 pb-28 overflow-y-auto bg-gray-900/10 dark:bg-black/25"
       >
         <!-- the stage card (components/ui/StageLoader.vue), fed by the exporter's
              phases (EXPORT_STEP_GROUPS) -->
@@ -513,6 +513,8 @@
           :elapsed-label="t('exportPanel.elapsed')"
           :cancellable="desktopApp"
           :cancel-label="t('levels.cancel')"
+          :settings="exportSettingsShown"
+          :settings-label="t('exportSettings.title')"
           @cancel="cancelDesktopExport"
         />
       </div>
@@ -551,6 +553,8 @@ import {
   Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy, BarChart3, Compass, Building2, Package
 } from 'lucide-vue-next';
 import StageLoader from '../ui/StageLoader.vue';
+import { rasterizeMask, backgroundFraction } from '../../services/backgroundMask.js';
+import { summarizeExportSettings, translateExportSettings } from '../../services/exportSettingsSummary.js';
 import TexturePaintModal from '../modals/TexturePaintModal.vue';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
 import { generateHeightmapBlob, generateTerBlob } from '../../services/batchExports';
@@ -691,6 +695,7 @@ const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 // Migrate legacy boolean mesh road setting if it exists
 // DecalRoads are the only road system; earlier choices (Road Architect, Mesh
 // Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
+const exportSettingsShown = ref([]);
 const beamNGRoadType = ref(localStorage.getItem('mapng_beamNGRoadType') === 'none' ? 'none' : 'decal');
 const beamNGLevelName = ref('');
 // (a level loaded back by "Modify" in My Levels keeps its own name:
@@ -1850,6 +1855,11 @@ const handleBeamNGLevelExport = async () => {
         console.log(`${BEAMNG_EXPORT_UI_LOG} Progress:`, { step, pct });
       },
     };
+    // (the progress window's "Settings used")
+    exportSettingsShown.value = translateExportSettings(summarizeExportSettings(levelOptions, {
+      backgroundPct: td?.backgroundMask ? Math.round(backgroundFraction(rasterizeMask(td.backgroundMask, 256)) * 100) : 0,
+      terrainMode: terrainMode.value, advanced, width: td?.width, metersPerPixel: resolveProcessingMetersPerPixel(td),
+    }), t);
 
     if (desktopApp) {
       lastExportOptions = Object.fromEntries(Object.entries(levelOptions).filter(([, v]) => typeof v !== 'function'));

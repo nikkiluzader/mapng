@@ -116,6 +116,7 @@
             :batch-grid="batchGridTiles"
             :batch-grid-follows-center="batchGridFollowsCenter"
             :batch-editable="batchMode && !batchRunning && !showBatchProgress"
+            :box-locked="store.boxLocked"
             @move="handleMapMove" 
             @zoom="store.setZoom"
             @batch-tile-drag="handleBatchTileDrag"
@@ -149,7 +150,7 @@
         
         <!-- Loading Overlay: the stage card (components/ui/StageLoader.vue), fed by
              services/generationProgress.js -->
-        <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center bg-gray-900/25 dark:bg-black/60 backdrop-blur-sm">
+        <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center p-4 pb-28 overflow-y-auto bg-gray-900/10 dark:bg-black/25">
           <StageLoader
             :title="t('app.processingTerrain')"
             :steps="generationSteps"
@@ -432,7 +433,9 @@ const processingMetersPerPixel = ref(
 
 const getEffectiveProcessingMpp = (value = processingMetersPerPixel.value) => normalizeProcessingMpp(value);
 
-const handleProcessingMetersPerPixelChange = (value) => {
+const handleProcessingMetersPerPixelChange = (value, { force = false } = {}) => {
+  // (background areas lock the box: its size too)
+  if (store.boxLocked && !force) return;
   const parsed = normalizeProcessingMpp(value);
   processingMetersPerPixel.value = parsed;
   localStorage.setItem('mapng_processing_mpp', String(parsed));
@@ -559,6 +562,7 @@ onUnmounted(() => {
 });
 
 const handleLocationChange = (newCenter) => {
+  if (store.boxLocked) return;
   setCenter(newCenter);
   terrainData.value = null;
   lastGenerationKey.value = null;
@@ -611,6 +615,8 @@ const buildGenerationKey = (c, res, osm, elevationSource, gpxzKey, uploadedEleva
     generationEdits: terrainGenerationOptions(store.advancedMode),
     // Include file identity so changing uploads always invalidates cached terrain.
     uploadedElevation: uploadSignature,
+    // (background areas change what is fetched and kept)
+    backgroundMask: store.backgroundActive ? store.backgroundMask : null,
   });
 };
 
@@ -658,7 +664,8 @@ const handleElevationFileSelected = async (fileOrFiles) => {
     const resolvedMeta = await parseSlotFiles(files);
     elevationSlots.value = [{ ...elevationSlots.value[0], meta: resolvedMeta }];
     const merged = rebuildMergedUpload();
-    if (isValidCenter(merged?.center)) store.setCenter(merged.center);
+    // (an upload picks its own area: background areas drawn for the old box go)
+    if (isValidCenter(merged?.center)) { store.clearBackgroundMask(); store.setCenter(merged.center, { force: true }); }
   } catch (e) {
     console.warn('[BYOD] Failed to read file metadata:', e);
     elevationSlots.value = [{ ...elevationSlots.value[0], error: e.message || 'Failed to read file' }];
@@ -918,6 +925,8 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         raw,
         useMapterhorn: normalizedSource === 'mapterhorn',
         ...generationEdits,
+        // (a plain copy: it goes to a worker / the desktop app)
+        ...(store.backgroundActive ? { backgroundMask: JSON.parse(JSON.stringify(store.backgroundMask)) } : {}),
       };
       // (the desktop app fetches and processes in a Node process: no 4 GB
       // window limit; the website does it here)
@@ -925,6 +934,8 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         ? await fetchTerrainDataOnDesktop(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, applyLoadingUpdate, signal, generationOptions)
         : await fetchTerrainData(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, undefined, applyLoadingUpdate, signal, generationOptions);
     }
+    // (the export leaves objects out of the same background areas)
+    if (data && store.backgroundActive && !uploadedElevationFile.value) data.backgroundMask = JSON.parse(JSON.stringify(store.backgroundMask));
     terrainData.value = data;
     lastGenerationKey.value = requestKey;
     warnIfOsmUnavailable(data);
@@ -1002,9 +1013,11 @@ const levelsSidebar = ref(null);
 const handleShowLevelOnMap = (level) => {
   if (!level?.center) return;
   switchTo2D();
-  setCenter({ lat: level.center.lat, lng: level.center.lng });
-  if (level.resolution) setResolution(level.resolution);
-  if (level.metersPerPixel) handleProcessingMetersPerPixelChange(level.metersPerPixel);
+  // (another area: background areas drawn for this box go)
+  store.clearBackgroundMask();
+  setCenter({ lat: level.center.lat, lng: level.center.lng }, { force: true });
+  if (level.resolution) setResolution(level.resolution, { force: true });
+  if (level.metersPerPixel) handleProcessingMetersPerPixelChange(level.metersPerPixel, { force: true });
 };
 
 /**
@@ -1024,10 +1037,12 @@ const handleModifyLevel = async (level) => {
   // (an uploaded elevation file takes another path: the level's own data wins)
   if (uploadedElevationFile.value) handleElevationFileClear();
   switchTo2D();
-  setCenter({ lat: info.center.lat, lng: info.center.lng });
-  if (info.resolution) setResolution(info.resolution);
+  // (the level's own background areas, or none)
+  store.setBackgroundMask(info.generationOptions?.backgroundMask || null);
+  setCenter({ lat: info.center.lat, lng: info.center.lng }, { force: true });
+  if (info.resolution) setResolution(info.resolution, { force: true });
   const mpp = Number(info.generationOptions?.processingMetersPerPixel) || 1;
-  handleProcessingMetersPerPixelChange(mpp);
+  handleProcessingMetersPerPixelChange(mpp, { force: true });
   lastGenerationKey.value = null;
   await nextTick();
   generateNextFromLevel(level.levelName, { center: info.center, resolution: info.resolution || resolution.value, mpp });

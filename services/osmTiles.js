@@ -110,7 +110,7 @@ export const planTileSources = (archivesList, bounds, z = TILE_ZOOM) => {
  * (each tile from the newest archive covering it), or null when the
  * manifest is missing or some tile isn't covered.
  */
-export const fetchOsmFromManifest = async (bounds, { signal } = {}) => {
+export const fetchOsmFromManifest = async (bounds, { signal, skipBox = null } = {}) => {
   const manifest = await loadManifest();
   const plan = manifest ? planTileSources(manifest.archives, bounds) : null;
   if (!plan) return null;
@@ -118,6 +118,8 @@ export const fetchOsmFromManifest = async (bounds, { signal } = {}) => {
     const archive = getOsmTileArchive(`/api/osm-tiles/${key}`);
     return tiles.map(async ({ x, y }) => {
       signal?.throwIfAborted?.();
+      // (wholly inside background areas: nothing there is kept)
+      if (skipBox?.(tileCorners(x, y, TILE_ZOOM))) return null;
       const tile = await archive.getZxy(TILE_ZOOM, x, y, signal);
       // (no tile: nothing of ours there, e.g. open sea; the archive covers it)
       return tile?.data ? decodeTile(tile.data) : null;
@@ -215,7 +217,7 @@ const decodeTile = async (bytes) => {
  * Overpass-shaped {elements} for bounds from the archive at `source`, or null
  * when the archive does not cover them.
  */
-export const fetchOsmFromTiles = async (source, bounds, { signal } = {}) => {
+export const fetchOsmFromTiles = async (source, bounds, { signal, skipBox = null } = {}) => {
   const archive = getOsmTileArchive(source);
   const header = await archive.getHeader();
   const covers = bounds.west >= header.minLon && bounds.east <= header.maxLon
@@ -226,6 +228,7 @@ export const fetchOsmFromTiles = async (source, bounds, { signal } = {}) => {
   const tiles = tilesCovering(bounds, z);
   const payloads = await Promise.all(tiles.map(async ({ x, y }) => {
     signal?.throwIfAborted?.();
+    if (skipBox?.(tileCorners(x, y, z))) return null;
     const tile = await archive.getZxy(z, x, y, signal);
     return tile?.data ? decodeTile(tile.data) : null;
   }));

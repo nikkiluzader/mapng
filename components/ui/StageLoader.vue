@@ -44,6 +44,23 @@
       <div class="text-gray-700 dark:text-white/80 truncate" :title="status">{{ status }}</div>
     </div>
 
+    <!-- The settings this run uses (export): closed until opened -->
+    <details v-if="settings?.length" class="stage-loader__settings mt-4 pt-3 border-t border-gray-200 dark:border-white/10" @toggle="settingsOpen = $event.target.open">
+      <summary class="flex items-center justify-between gap-3 cursor-pointer select-none font-display text-caption font-semibold uppercase tracking-[0.12em] hover:text-brand" :class="settingsOpen ? 'text-brand dark:text-brand-300' : 'text-gray-500 dark:text-white/50'">
+        <span>{{ settingsLabel }} ({{ settingCount }})</span>
+        <ChevronRight :size="14" class="transition-transform" :class="settingsOpen ? 'rotate-90' : ''" />
+      </summary>
+      <div class="mt-2 grid grid-cols-2 gap-x-4 max-h-60 overflow-y-auto pr-1">
+        <div v-for="group in settings" :key="group.title" class="min-w-0">
+          <div class="mt-2 mb-0.5 font-display text-nano font-semibold uppercase tracking-[0.14em] text-brand dark:text-brand-300">{{ group.title }}</div>
+          <div v-for="row in group.rows" :key="row.label" class="flex justify-between gap-2 py-0.5 border-b border-dashed border-gray-200 dark:border-white/10 text-micro">
+            <span class="text-gray-500 dark:text-white/50 truncate" :title="row.label">{{ row.label }}</span>
+            <span class="text-right truncate" :class="row.off ? 'text-gray-400 dark:text-white/35' : 'text-gray-800 dark:text-white/85'" :title="row.value">{{ row.value }}</span>
+          </div>
+        </div>
+      </div>
+    </details>
+
     <div class="mt-4 pt-3 border-t border-gray-200 dark:border-white/10 flex items-center justify-between gap-3">
       <button
         v-if="cancellable"
@@ -61,6 +78,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import '@fontsource-variable/noto-sans/wght-italic.css';
+import { ChevronRight } from 'lucide-vue-next';
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -75,6 +93,9 @@ const props = defineProps({
   elapsedLabel: { type: String, default: '' },
   cancellable: { type: Boolean, default: false },
   cancelLabel: { type: String, default: 'Cancel' },
+  // [{ title, rows: [{ label, value, off }] }]: the run's settings, shown in a closed section
+  settings: { type: Array, default: () => [] },
+  settingsLabel: { type: String, default: 'Settings used' },
 });
 defineEmits(['cancel']);
 
@@ -86,6 +107,8 @@ const activeIndex = computed(() => {
 });
 const activeStep = computed(() => visibleSteps.value[activeIndex.value]);
 const doneLines = computed(() => props.done.slice(-4));
+const settingsOpen = ref(false);
+const settingCount = computed(() => props.settings.reduce((n, g) => n + (g.rows?.length || 0), 0));
 
 // ---- smooth, paced progress ---------------------------------------------------
 // Reports come in bursts: a percent now and then, long silent steps, steps that
@@ -185,13 +208,17 @@ const formatDuration = (ms) => {
 
 <style scoped>
 /* the slanted bar of the game's loading screen */
+.stage-loader__settings > summary { list-style: none; }
+.stage-loader__settings > summary::-webkit-details-marker { display: none; }
 .stage-loader__track {
   height: 14px;
   background: #e5e7eb;
   clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
   overflow: hidden;
 }
-:global(.dark) .stage-loader__track { background: rgba(255, 255, 255, 0.08); }
+:global(.dark) .stage-loader__settings > summary { list-style: none; }
+.stage-loader__settings > summary::-webkit-details-marker { display: none; }
+.stage-loader__track { background: rgba(255, 255, 255, 0.08); }
 .stage-loader__fill {
   height: 100%;
   background: var(--brand);

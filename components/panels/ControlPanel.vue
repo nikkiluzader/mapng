@@ -19,7 +19,9 @@
     <!-- 1. Where: the place, how big and how detailed -->
     <div v-show="step === 1" class="space-y-5">
       <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
-        <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
+        <fieldset :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? t('backgroundAreas.lockedField') : null">
+          <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
+        </fieldset>
       </SettingSection>
 
       <!-- 2. How big and how detailed -->
@@ -95,24 +97,27 @@
           </div>
         </div>
 
-        <ResolutionSelector
-          v-else
-          :modelValue="resolution"
-          @update:modelValue="$emit('resolutionChange', $event)"
-          :label="t('controlPanel.resolutionOutputSize')"
-        >
-        </ResolutionSelector>
+        <fieldset v-else :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? t('backgroundAreas.lockedField') : null">
+          <ResolutionSelector
+            :modelValue="resolution"
+            @update:modelValue="$emit('resolutionChange', $event)"
+            :label="t('controlPanel.resolutionOutputSize')"
+          >
+          </ResolutionSelector>
+        </fieldset>
         <!-- (the website only: big maps belong in the desktop app) -->
         <p v-if="!desktopApp && Number(resolution) >= 4096" class="flex items-start gap-1.5 -mt-1 text-micro leading-snug text-gray-500 dark:text-gray-400">
           <Download :size="11" class="shrink-0 mt-px text-brand" />
           <span>{{ t('controlPanel.desktopHint') }} <a :href="DESKTOP_DOWNLOAD_URL" target="_blank" rel="noopener" class="text-brand hover:underline">{{ t('controlPanel.desktopHintLink') }}</a></span>
         </p>
 
-        <ProcessingResolutionInput
-          :model-value="processingMetersPerPixel"
-          :resolution="Number(resolution) || 0"
-          @update:model-value="(v) => $emit('update:processingMetersPerPixel', v)"
-        />
+        <fieldset :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''">
+          <ProcessingResolutionInput
+            :model-value="processingMetersPerPixel"
+            :resolution="Number(resolution) || 0"
+            @update:model-value="(v) => $emit('update:processingMetersPerPixel', v)"
+          />
+        </fieldset>
         <!-- A huge area at a coarse m per pixel: fine for the terrain (BeamNG
              spaces its squares out), but lots of OSM data is trouble -->
         <p v-if="bigArea && fetchOSM" class="flex items-start gap-1.5 text-micro leading-snug text-amber-700 dark:text-amber-300">
@@ -125,6 +130,14 @@
         </p>
 
       </SettingSection>
+
+      <!-- Background areas (advanced; not with an uploaded elevation file, which picks its own box) -->
+      <BackgroundAreas
+        v-if="store.advancedMode && !uploadedElevationFile"
+        :center="center"
+        :resolution="resolution"
+        :meters-per-pixel="processingMetersPerPixel"
+      />
 
       <!-- Surrounding Tiles (advanced mode) -->
       <SurroundingTiles
@@ -376,6 +389,7 @@ import CoordinatesInput from '../map/CoordinatesInput.vue';
 import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
 import SurroundingTiles from '../map/SurroundingTiles.vue';
+import BackgroundAreas from '../controls/BackgroundAreas.vue';
 import ExportPanel from './ExportPanel.vue';
 import { useMainStore } from '../../stores/mainStore';
 import GenerateActions from '../controls/GenerateActions.vue';

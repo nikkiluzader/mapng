@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed, shallowRef } from 'vue';
 import { loadBatchState } from '../services/batchJob';
 import { terrainMode, setTerrainMode } from '../composables/useTerrainMode.js';
+import { emptyMask, maskHasAreas } from '../services/backgroundMask.js';
 
 const DEFAULT_CENTER = { lat: 35.1983, lng: -111.6513 };
 
@@ -71,6 +72,23 @@ export const useMainStore = defineStore('main', () => {
   const previewMode = ref(false);
   const surroundingTilePositions = ref([]);
 
+  // --- Background areas (services/backgroundMask.js; Location step, advanced) ---
+  // While anything is drawn the area box is locked: the mask's outlines use the
+  // box's edges, and generate fetches for that exact square.
+  const backgroundMask = ref((() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mapng_background_mask') || 'null');
+      return saved && saved.version ? { ...emptyMask(), ...saved } : emptyMask();
+    } catch { return emptyMask(); }
+  })());
+  const backgroundTool = ref('pan');
+  const backgroundDrawn = computed(() => {
+    const m = backgroundMask.value;
+    return !!m.bounds && ((m.lines?.length || 0) > 0 || (m.paint?.length || 0) > 0 || maskHasAreas(m));
+  });
+  const backgroundActive = computed(() => advancedMode.value && !batchMode.value && backgroundDrawn.value);
+  const boxLocked = backgroundActive;
+
   // --- Batch Job State ---
   const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
   const batchGridRows = ref(parseInt(localStorage.getItem('mapng_batch_rows')) || 3);
@@ -100,7 +118,9 @@ export const useMainStore = defineStore('main', () => {
   const savedBatchState = ref(loadBatchState());
 
   // --- Actions ---
-  function setCenter(newCenter) {
+  // (force: opening a project or share code; it brings or clears its own mask)
+  function setCenter(newCenter, { force = false } = {}) {
+    if (boxLocked.value && !force) return;
     const safeCenter = sanitizeCenter(newCenter);
     center.value = safeCenter;
     localStorage.setItem('mapng_center', JSON.stringify(safeCenter));
@@ -111,7 +131,8 @@ export const useMainStore = defineStore('main', () => {
     localStorage.setItem('mapng_zoom', String(newZoom));
   }
 
-  function setResolution(newResolution) {
+  function setResolution(newResolution, { force = false } = {}) {
+    if (boxLocked.value && !force) return;
     resolution.value = newResolution;
     localStorage.setItem('mapng_resolution', String(newResolution));
   }
@@ -139,6 +160,15 @@ export const useMainStore = defineStore('main', () => {
       localStorage.setItem('theme', 'light');
     }
   }
+
+  function setBackgroundMask(mask) {
+    backgroundMask.value = mask && mask.version ? mask : emptyMask();
+    try {
+      if (backgroundDrawn.value || backgroundMask.value.roads?.length) localStorage.setItem('mapng_background_mask', JSON.stringify(backgroundMask.value));
+      else localStorage.removeItem('mapng_background_mask');
+    } catch { /* storage full or blocked */ }
+  }
+  function clearBackgroundMask() { setBackgroundMask(emptyMask()); backgroundTool.value = 'pan'; }
 
   function setBatchMode(value) {
     batchMode.value = value;
@@ -183,6 +213,13 @@ export const useMainStore = defineStore('main', () => {
     loadingStatus,
     previewMode,
     surroundingTilePositions,
+    backgroundMask,
+    backgroundTool,
+    backgroundDrawn,
+    backgroundActive,
+    boxLocked,
+    setBackgroundMask,
+    clearBackgroundMask,
     batchGridCols,
     batchGridRows,
     batchTileFollowCenter,

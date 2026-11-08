@@ -100,7 +100,10 @@ watch(request, async (req) => {
   preparing.value = true;
   try {
     const config = req.ctx.config ?? await currentSessionCode();
-    const r = await desktopApp.prepareReport(req.kind, { ...req.ctx, config, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' });
+    // (a plain copy: req.ctx sits in a ref, so its nested objects, e.g. the
+    // level's area, are reactive proxies IPC can't clone)
+    const ctx = JSON.parse(JSON.stringify({ ...req.ctx, config, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' }));
+    const r = await desktopApp.prepareReport(req.kind, ctx);
     token.value = r.token; preview.value = r.preview;
   } catch (error) {
     failed.value = String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');

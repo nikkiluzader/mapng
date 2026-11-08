@@ -91,14 +91,17 @@ export const OSM_FILTER = {
   ],
 };
 
-export const buildOverpassQuery = (bounds) => {
-  const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
-  const lines = [
+// (boxes: background areas leave only these parts of the square to ask for;
+// the same filters per box, joined in one union)
+export const buildOverpassQuery = (bounds, boxes = null) => {
+  const bboxes = (Array.isArray(boxes) && boxes.length ? boxes : [bounds])
+    .map((b) => `${b.south},${b.west},${b.north},${b.east}`);
+  const lines = bboxes.flatMap((bbox) => [
     ...OSM_FILTER.wayKeys.map((k) => `way["${k}"](${bbox});`),
     ...OSM_FILTER.wayTags.map(([k, v]) => `way["${k}"="${v}"](${bbox});`),
     ...OSM_FILTER.relationKeys.map((k) => `relation["${k}"](${bbox});`),
     ...OSM_FILTER.nodeTags.map(([k, v]) => `node["${k}"="${v}"](${bbox});`),
-  ];
+  ]);
   // Timeout 30 s matches the timeoutSec getOSMQueryParameters records into
   // export metadata; 128 MB maxsize (512 MB triggered server-side rejection).
   return `

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { backgroundLookup, filterFeaturesByBackground } from './backgroundMask.js';
 import { replayingSources } from './sourceWording.js';
 import JSZip from 'jszip';
 import { createZipCompressor, precompressZipEntries } from './zipCompress.js';
@@ -11772,6 +11773,30 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // on or around them
   let buildingConflicts = null;
   let boundedFeatures = filterOSMFeaturesToBounds(td.osmFeatures, td.bounds);
+  // Background areas (backgroundMask.js): the hills nobody drives keep their
+  // shape, without buildings, trees, props or roads wholly inside them
+  const bgMask = td.backgroundMask || options?.backgroundMask || null;
+  const bgLook = bgMask ? backgroundLookup(bgMask, { n: 2048 }) : null;
+  const bgAtWorld = (() => {
+    if (!bgLook) return () => false;
+    const b = td.bounds; const mb = bgMask.bounds; const ws = td.width * computeSquareSize(td);
+    return (x, y) => {
+      const lat = b.north - (0.5 - y / ws) * (b.north - b.south);
+      const lng = b.west + (x / ws + 0.5) * (b.east - b.west);
+      return bgLook((lng - mb.west) / (mb.east - mb.west), (mb.north - lat) / (mb.north - mb.south));
+    };
+  })();
+  // (a list of scene objects or spots, in place: those standing in background go)
+  const keepOutOfBackground = (list) => {
+    if (!bgLook || !Array.isArray(list)) return;
+    const kept = list.filter((o) => { const p = o?.position || o?.pos; return !(Array.isArray(p) && bgAtWorld(Number(p[0]), Number(p[1]))); });
+    list.length = 0; list.push(...kept);
+  };
+  if (bgLook && boundedFeatures?.length) {
+    const before = boundedFeatures.length;
+    boundedFeatures = filterFeaturesByBackground(boundedFeatures, bgLook, bgMask.bounds);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Background areas: ${Math.round(bgLook.fraction * 100)}% of the map; ${before - boundedFeatures.length} map feature(s) left out there.`);
+  }
   // sidewalks OSM leaves unmapped where it maps a crossing onto them
   if (includeSidewalks && boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);
@@ -12375,6 +12400,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     crosswalkZones: decalRoads.crosswalkZones || [],
     leftHandTraffic: !!exportTerrainData.roadRules?.leftHandTraffic,
   });
+  keepOutOfBackground(parkingSpots);
   // multi-storey car parks (beamngBuildings.js): a spot per bay on every
   // deck (their lines are painted in the mesh) and ceiling lights
   const garage = includeBuildings
@@ -12872,6 +12898,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     deckAt: sidewalks.deckAt,
     seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),
   });
+  // (none in background areas: lamps along a road that runs on into them)
+  keepOutOfBackground(streetFurnitureObjects);
   // floodlights over the sports fields and racetracks
   const sportsLights = sportsLightObjects(buildingReport.stats?.lightPlan, terrainGroundAt(exportTerrainData, squareSize));
   streetFurnitureObjects.push(...sportsLights.objects);
@@ -13023,7 +13051,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     for (let i = 0; i < list.length; i++) {
       if ((i & 4095) === 0) await tick();
       const { pos: [x, y, z] } = list[i];
-      if (!clearOf(x, y, margin) && !underDeck(x, y, z, z + reach)) kept.push(list[i]);
+      if (!clearOf(x, y, margin) && !underDeck(x, y, z, z + reach) && !bgAtWorld(x, y)) kept.push(list[i]);
     }
     vegetationCleared += list.length - kept.length;
     if (kept.length) forestPlacements.set(type, kept);
@@ -13035,6 +13063,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const propHalf = (terrainData.width * squareSize) / 2;
   const addPropPlacement = (type, x, y, z, yaw) => {
     if (!(Math.abs(x) < propHalf && Math.abs(y) < propHalf)) return;   // (on the map only)
+    if (bgAtWorld(x, y)) return;
     if (!forestPlacements.has(type)) forestPlacements.set(type, []);
     const list = forestPlacements.get(type);
     if (list.length >= caps.forestPerType) return;
