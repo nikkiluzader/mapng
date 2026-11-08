@@ -111,3 +111,20 @@ test('rock rules by land cover', async () => {
   assert.ok(steepRockFrom(30) > steepRockFrom(60));
   assert.ok(osmRockAllowed(60) && osmRockAllowed(0) && !osmRockAllowed(30) && !osmRockAllowed(10));
 });
+
+test('pale grey and lichen-grey ground on a slope away from towns is rock', async () => {
+  const { groundFromLandCover } = await import('../services/osmTexture.js');
+  const W = 8; const at = (c) => GROUND_CLASSES.indexOf(c);
+  const lc = (k) => ({ grid: new Uint8Array(4).fill(k), n: 2 });
+  const slope = { nz: new Float32Array(W * W).fill(0.9) };   // ~26°
+  let cls = new Uint8Array(W * W).fill(at('paved'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lc(30), slope, new Uint8Array(W * W).fill(1))[0]], 'rock');
+  cls = new Uint8Array(W * W).fill(at('grass'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lc(30), slope, new Uint8Array(W * W).fill(2))[0]], 'rock');
+  // in town a pale grey is a roof or a yard
+  cls = new Uint8Array(W * W).fill(at('paved'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lc(50), slope, new Uint8Array(W * W).fill(1))[0]], 'paved');
+  // ordinary green grass stays
+  cls = new Uint8Array(W * W).fill(at('grass'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lc(30), slope, new Uint8Array(W * W))[0]], 'grass');
+});

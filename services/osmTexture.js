@@ -2012,8 +2012,21 @@ export const satelliteGroundClasses = async (terrainData, source = null) => {
   const slope = cellSlopes(terrainData, w, h, processingMetersPerPixel);
   const sun = slope ? removeHillshade(rgba, slope) : null;
   if (sun) console.log(`[Ground classes] Terrain shading taken out of the satellite (sun from ${sun.az}° at ${sun.alt}°, r=${sun.r.toFixed(2)}).`);
+  // (bright cells, before the classes are smoothed: pale rock and scree read as grey "paved")
+  const bright = new Uint8Array(w * h);
+  // (1: bright, 2: pale, a washed-out grey-green: lichen on rock, which reads as grass)
+  // (pale against the image's own brightness: imagery runs dim or bright)
+  let meanL = 0;
+  for (let i = 0; i < w * h; i++) meanL += 0.3 * rgba[i * 4] + 0.59 * rgba[i * 4 + 1] + 0.11 * rgba[i * 4 + 2];
+  const paleL = Math.max(105, (1.15 * meanL) / (w * h));
+  for (let i = 0; i < w * h; i++) {
+    const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
+    const l = 0.3 * r + 0.59 * g + 0.11 * b; const mx = Math.max(r, g, b);
+    bright[i] = l > 150 ? 1 : (l > paleL && mx && (mx - Math.min(r, g, b)) / mx < 0.24 ? 2 : 0);
+  }
   const cls = classifyGroundGrid(rgba, w, h);
-  groundFromLandCover(cls, w, h, terrainData?.landCover, slope);
+  groundFromLandCover(cls, w, h, terrainData?.landCover, slope, bright);
+  osmRockOnBareGround(cls, w, h, terrainData);
   return { cls, w, h, image: satellite };
 };
 
@@ -2093,9 +2106,19 @@ export function removeHillshade(rgba, { nx, ny, nz }) {
   });
   if (fit.some((f) => !(f.a > 1))) return null;
   const target = fit.map((f) => f.a + Math.max(0, f.b) * mean);
+  // (per channel only in the shade, where the sky's blue is; sunlit ground
+  // is only darkened, all channels alike: per channel there turned pale
+  // scree green, Fizz_Mechanic's Chevril slide)
+  const { a: la, b: lb } = best;
+  const lTarget = la + lb * mean;
   for (let i = 0; i < n; i++) {
     const s = shadeAt(i);
     const j = i * 4;
+    if (s >= mean) {
+      const f = Math.max(0.6, lTarget / (la + lb * s));
+      rgba[j] *= f; rgba[j + 1] *= f; rgba[j + 2] *= f;
+      continue;
+    }
     for (let c = 0; c < 3; c++) {
       const f = Math.min(2, Math.max(0.6, target[c] / (fit[c].a + Math.max(0, fit[c].b) * s)));
       rgba[j + c] = Math.min(255, rgba[j + c] * f);
@@ -2117,7 +2140,31 @@ export function removeHillshade(rgba, { nx, ny, nz }) {
 // the cells taken out filled from their neighbours.
 const CANOPY_COVER = new Set([WC.TREES, WC.SHRUBS, WC.BUILT, WC.WETLAND, WC.MANGROVES]);
 const GREEN_COVER = new Set([WC.TREES, WC.SHRUBS, WC.GRASS, WC.CROPS, WC.BUILT, WC.WETLAND, WC.MANGROVES, WC.MOSS]);
-export function groundFromLandCover(cls, w, h, landCover, slope = null) {
+// OSM's rock, scree and glacier outlines, where the satellite shows bare
+// ground inside them (dry, soil, sand, grey): rock. The meadows OSM drew
+// them over stay green (Fizz_Mechanic: "something in between": the scree
+// slides were lost when the outlines were left out altogether).
+export function osmRockOnBareGround(cls, w, h, terrainData) {
+  const b = terrainData?.bounds; const feats = terrainData?.osmFeatures;
+  if (!b || !feats?.length || typeof document === "undefined") return 0;
+  const rocks = feats.filter((f) => OSM_ROCK.has(f?.tags?.natural) && f.geometry?.length >= 3);
+  if (!rocks.length) return 0;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#fff";
+  const px = (p) => [((p.lng - b.west) / (b.east - b.west)) * w, ((b.north - p.lat) / (b.north - b.south)) * h];
+  for (const f of rocks) {
+    ctx.beginPath();
+    for (const ring of [f.geometry, ...(f.holes || [])]) ring.forEach((p, i) => { const [x, y] = px(p); if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); });
+    ctx.fill("evenodd");
+  }
+  const m = ctx.getImageData(0, 0, w, h).data; c.width = 0;
+  let n = 0;
+  for (let i = 0; i < w * h; i++) if (m[i * 4] > 127 && cls[i] >= 2 && cls[i] <= 5) { cls[i] = 8; n++; }
+  return n;
+}
+
+export function groundFromLandCover(cls, w, h, landCover, slope = null, bright = null) {
   const lc = landCover?.grid?.length === landCover?.n * landCover?.n ? landCover : null;
   const T = 0, G = 1, DRY = 2, SOIL = 3, SAND = 4, PAVED = 5, WATER = 6, HOLE = 7, ROCK = 8;
   const near = (x, y, test, reach) => {
@@ -2137,6 +2184,11 @@ export function groundFromLandCover(cls, w, h, landCover, slope = null) {
         if ((slope && slope.nz[i] < 0.99) || (lc && !near(x, y, (k) => k === WC.WATER || k === 0, 2))) { cls[i] = HOLE; holes++; }   // (over ~8°)
         continue;
       }
+      // (pale grey or light sand on a slope over ~15°, away from towns: rock and scree)
+      // (and a pale grey-green on such a slope: lichen-covered rock)
+      if (lc && bright && bright[i] && slope && (((c === PAVED || c === SAND) && (c === PAVED && bright[i] === 1 || slope.nz[i] < 0.966))
+        || ((c === G || c === DRY) && bright[i] === 2 && slope.nz[i] < 0.966))
+        && !near(x, y, (k) => k === WC.BUILT, 1)) { cls[i] = ROCK; continue; }
       if (!lc) continue;
       const here = lc.grid[Math.min(lc.n - 1, Math.floor(((y + 0.5) / h) * lc.n)) * lc.n + Math.min(lc.n - 1, Math.floor(((x + 0.5) / w) * lc.n))];
       if (!here) continue;
