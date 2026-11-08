@@ -1949,21 +1949,22 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
       // Load satellite texture
       if (tileData.satelliteDataUrl) {
         try {
-          const tex = await new Promise((resolve, reject) => {
-            new THREE.TextureLoader().load(
-              tileData.satelliteDataUrl,
-              (t) => {
-                t.colorSpace = THREE.SRGBColorSpace;
-                t.generateMipmaps = false;
-                t.minFilter = THREE.LinearFilter;
-                t.magFilter = THREE.LinearFilter;
-                t.anisotropy = EXPORT_SURROUND_PROFILE.anisotropy;
-                resolve(t);
-              },
-              undefined,
-              reject,
-            );
+          // (an Image, not THREE.TextureLoader: that builds its <img> with
+          // document.createElementNS, which the desktop's Node export runner
+          // doesn't have, so every desktop backdrop came out untextured)
+          const img = await new Promise((resolve, reject) => {
+            const im = new Image();
+            im.onload = () => resolve(im);
+            im.onerror = reject;
+            im.src = tileData.satelliteDataUrl;
           });
+          const tex = new THREE.Texture(img);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.generateMipmaps = false;
+          tex.minFilter = THREE.LinearFilter;
+          tex.magFilter = THREE.LinearFilter;
+          tex.anisotropy = EXPORT_SURROUND_PROFILE.anisotropy;
+          tex.needsUpdate = true;
           mat.map = tex;
         } catch {
           // texture load failed, use solid color

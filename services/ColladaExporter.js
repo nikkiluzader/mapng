@@ -164,7 +164,9 @@ class ColladaExporter {
           image instanceof HTMLCanvasElement) ||
         (typeof OffscreenCanvas !== "undefined" &&
           image instanceof OffscreenCanvas) ||
-        (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap)
+        (typeof ImageBitmap !== "undefined" && image instanceof ImageBitmap) ||
+        // (the desktop's Node export runner: @napi-rs/canvas Image)
+        (typeof Image !== "undefined" && image instanceof Image)
       ) {
         canvas = canvas || document.createElement("canvas");
         ctx = ctx || canvas.getContext("2d");

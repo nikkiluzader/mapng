@@ -1632,6 +1632,8 @@ export function buildBackdropMaterialDefs(levelName, textureFiles = [], material
         diffuseMap: `levels/${levelName}/map_assets/custom_assets/terrain_backdrop/Textures/${tex.name}.${tex.ext}`,
         diffuseColor: [1, 1, 1, 1],
       }],
+      // (the seam strips' curtains over a height step are seen from either side)
+      doubleSided: true,
       translucentBlendOp: 'None',
     };
   }
@@ -1645,11 +1647,103 @@ export function buildBackdropMaterialDefs(levelName, textureFiles = [], material
       mapTo: matName,
       annotation: 'TERRAIN',
       Stages: [{ diffuseColor: [0.55, 0.5, 0.45, 1] }],
+      doubleSided: true,
       translucentBlendOp: 'None',
     };
   }
 
   return defs;
+}
+
+/**
+ * Strips that close the gap between the TerrainBlock and the backdrop's side
+ * tiles (BeamNG world coordinates, after the tiles' transform). The inner edge
+ * is the terrain's border, sample by sample at the heights the game decodes
+ * from terrain.ter (seam.zAt(column, rowFromNorth)), placed as the game places
+ * them: x = -half + i·squareSize, y = -half + j·squareSize (j from the south),
+ * so the east and north borders sit one square short of +half. The outer edge
+ * is the tile's own edge vertices, so the strip meets both without a crack.
+ * UVs follow the tile's edge, so each strip wears its tile's texture.
+ */
+export function buildBackdropSeamStrips(group, worldSize, seam) {
+  const { width: W, height: H, squareSize: sq, zAt } = seam;
+  const half = worldSize / 2;
+  const eps = Math.max(1e-3, sq * 0.05);
+  // side → which world axis runs along it, where the tile edge lies, the terrain border
+  const SIDES = {
+    W: { along: 0, across: 0, edge: -half, inner: (k) => [-half, -half + k * sq, zAt(0, H - 1 - k)], n: H },
+    E: { along: 1, across: 0, edge: half, inner: (k) => [-half + (W - 1) * sq, -half + k * sq, zAt(W - 1, H - 1 - k)], n: H },
+    S: { along: 0, across: 1, edge: -half, inner: (k) => [-half + k * sq, -half, zAt(k, H - 1)], n: W },
+    N: { along: 0, across: 1, edge: half, inner: (k) => [-half + k * sq, -half + (H - 1) * sq, zAt(k, 0)], n: W },
+  };
+  const out = [];
+  group.traverse((child) => {
+    if (!child.isMesh) return;
+    const pos = child.name.replace('terrain_', '');
+    const side = SIDES[pos];
+    if (!side) return;
+    const P = child.geometry.getAttribute('position');
+    const UV = child.geometry.getAttribute('uv');
+    if (!child.geometry.getAttribute('normal')) child.geometry.computeVertexNormals();
+    const NRM = child.geometry.getAttribute('normal');
+    const acrossAxis = side.across === 0 ? 0 : 1;
+    const alongAxis = acrossAxis === 0 ? 1 : 0;
+    // the tile's edge vertices along the seam, sorted, one per position
+    const edge = [];
+    const seen = new Set();
+    for (let i = 0; i < P.count; i++) {
+      const v = [P.getX(i), P.getY(i), P.getZ(i)];
+      if (Math.abs(v[acrossAxis] - side.edge) > eps) continue;
+      const key = Math.round(v[alongAxis] / eps);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      let nz = [NRM.getX(i), NRM.getY(i), NRM.getZ(i)];
+      if (nz[2] < 0) nz = nz.map((c) => -c);
+      edge.push({ a: v[alongAxis], p: v, uv: UV ? [UV.getX(i), UV.getY(i)] : [0, 0], n: nz });
+    }
+    if (edge.length < 2) return;
+    edge.sort((p, q) => p.a - q.a);
+    // (the tile edge's texture coordinates and normals at a point along the seam)
+    const along = (a, key) => {
+      if (a <= edge[0].a) return edge[0][key];
+      if (a >= edge[edge.length - 1].a) return edge[edge.length - 1][key];
+      let lo = 0, hi = edge.length - 1;
+      while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (edge[mid].a <= a) lo = mid; else hi = mid; }
+      const t = (a - edge[lo].a) / Math.max(1e-9, edge[hi].a - edge[lo].a);
+      return edge[lo][key].map((c, k) => c + t * (edge[hi][key][k] - c));
+    };
+    const inner = [];
+    for (let k = 0; k < side.n; k++) {
+      const p = side.inner(k);
+      inner.push({ a: p[alongAxis], p, uv: along(p[alongAxis], 'uv'), n: along(p[alongAxis], 'n') });
+    }
+    // zip the two edges by position along the seam
+    const verts = [];
+    const uvs = [];
+    const nrms = [];
+    // (every triangle facing up, counter-clockwise seen from above: the game draws
+    // one side, and a downward face showed as a dark line or not at all)
+    const tri = (x, y, z) => {
+      const cross = (y.p[0] - x.p[0]) * (z.p[1] - x.p[1]) - (y.p[1] - x.p[1]) * (z.p[0] - x.p[0]);
+      for (const v of cross >= 0 ? [x, y, z] : [x, z, y]) { verts.push(...v.p); uvs.push(...v.uv); nrms.push(...v.n); }
+    };
+    let i = 0, j = 0;
+    while (i < inner.length - 1 || j < edge.length - 1) {
+      const nextInner = i < inner.length - 1 ? inner[i + 1].a : Infinity;
+      const nextEdge = j < edge.length - 1 ? edge[j + 1].a : Infinity;
+      if (nextInner <= nextEdge) { tri(inner[i], inner[i + 1], edge[j]); i++; } else { tri(inner[i], edge[j + 1], edge[j]); j++; }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    // (lit as the ground beside it: the tile edge's normals, not the strip's own
+    // steep faces, which drew a dark line along the seam)
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrms, 3));
+    const mesh = new THREE.Mesh(geo, child.material);
+    mesh.name = `seam_${pos}`;
+    out.push(mesh);
+  });
+  return out;
 }
 
 /**
@@ -1752,6 +1846,39 @@ async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) 
     child.updateMatrix();
     child.matrixWorld.identity();
   });
+
+  // Tile to tile: each tile reads its own heights, so two tiles' shared edge
+  // could disagree by a little and show the sky through a hairline; vertices at
+  // the same spot get one height (their mean).
+  {
+    const at = new Map();
+    const q = Math.max(1e-3, worldSize * 1e-6);
+    surroundingGroup.traverse((child) => {
+      if (!child.isMesh) return;
+      const P = child.geometry.getAttribute('position');
+      for (let i = 0; i < P.count; i++) {
+        const key = `${Math.round(P.getX(i) / q)},${Math.round(P.getY(i) / q)}`;
+        let e = at.get(key);
+        if (!e) { e = { sum: 0, n: 0, refs: [] }; at.set(key, e); }
+        e.sum += P.getZ(i); e.n++; e.refs.push(P, i);
+      }
+    });
+    for (const e of at.values()) {
+      if (e.n < 2) continue;
+      const z = e.sum / e.n;
+      for (let k = 0; k < e.refs.length; k += 2) e.refs[k].setZ(e.refs[k + 1], z);
+    }
+    surroundingGroup.traverse((child) => { if (child.isMesh) child.geometry.getAttribute('position').needsUpdate = true; });
+  }
+
+  // The seam: a strip from the terrain's own border samples to each side tile's
+  // edge, so nothing shows between them (the terrain ends a square short on the
+  // east and north, and its edge bends at every sample where the tile's edge is
+  // straight between its vertices).
+  if (options.seam) {
+    const strips = buildBackdropSeamStrips(surroundingGroup, worldSize, options.seam);
+    for (const m of strips) scene.add(m);
+  }
 
   const result = new ColladaExporter().parse(scene, undefined, {
     textureDirectory: 'textures',
@@ -12678,6 +12805,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       elevationSource: backdropElevationSource,
       gpxzApiKey: backdropGpxzApiKey,
       onProgress: (text, fraction) => report(`Backdrop: ${String(text).replace(/\.\.\.$/, '…')}`, fraction),
+      // (the terrain's border as terrain.ter encodes it, for the seam strips)
+      seam: {
+        width: size, height: size, squareSize,
+        zAt: (i, r) => {
+          const h = exportTerrainData.heightMap[r * size + i];
+          const q = Math.max(0, Math.min(65535, Math.floor((h - terrainBase) * (65536 / terrainBlockMaxHeight))));
+          return terrainBlockZ + (q * terrainBlockMaxHeight) / 65536;
+        },
+      },
     });
     backdropDaeBlob = backdropResult?.daeBlob ?? null;
     backdropTextureFiles = backdropResult?.textureFiles ?? [];
@@ -14271,6 +14407,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       persistentId: generatePersistentId(),
       position: [0, 0, 0],
       shapeName: `/levels/${levelName}/map_assets/custom_assets/terrain_backdrop/terrain_backdrop.dae`,
+      // (drivable: the DAE has no collision mesh, so the default "Collision Mesh"
+      // left it with none; ~260k triangles in all, cheap enough as its own)
+      collisionType: 'Visible Mesh',
+      decalType: 'Visible Mesh',
       useInstanceRenderData: true,
     });
   }

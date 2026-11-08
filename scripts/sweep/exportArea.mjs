@@ -33,6 +33,11 @@ const dir = path.join(AREAS_DIR, area);
 if (!fs.existsSync(path.join(dir, `${dem}.f32`))) { console.error(`no ${dem}.f32 in ${dir} (fetch it: scripts/sweep/fetchArea.mjs)`); process.exit(2); }
 
 installCanvasPolyfill();
+// (BACKDROP=1: the backdrop loads images, so the desktop export runner's browser shims, as the app)
+if (process.env.BACKDROP === '1') {
+  const { installBrowserShims } = await import('../../desktop/runner/browserShims.mjs');
+  installBrowserShims({ assetsDir: new URL('../../public', import.meta.url).pathname });
+}
 const meta = JSON.parse(fs.readFileSync(path.join(dir, 'meta.json')));
 const osmFeatures = JSON.parse(fs.readFileSync(path.join(dir, 'osm.json')));
 const heightMap = new Float32Array(fs.readFileSync(path.join(dir, `${dem}.f32`)).buffer.slice(0));
@@ -84,7 +89,7 @@ if (process.env.TREEMIX !== 'climate') {
 const t0 = Date.now();
 const { blob, structureChecks } = await exportBeamNGLevel(terrainData, meta.center, {
   treeSpeciesMix,
-  baseTexture, pbrSource: 'osm', roadType: 'decal', includeBackdrop: false,
+  baseTexture, pbrSource: 'osm', roadType: 'decal', includeBackdrop: process.env.BACKDROP === '1',
   includeBuildings: true, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,
   ...(process.env.STRUCT ? { structureSolver: process.env.STRUCT } : {}),

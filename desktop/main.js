@@ -374,7 +374,13 @@ function exportSourcesFor(terrainId, jobDir) {
   } catch { /* a terrain from the page, or none */ }
   return replayDir && fs.existsSync(replayDir)
     ? { mode: 'replay', dir: replayDir, fallback: true, recordDir }
-    : { mode: 'record', dir: recordDir };
+    : freshExportSources(recordDir);
+}
+// (a new export: the shared download cache first, as Generate does, so the
+// backdrop's tiles and the bridge lidar aren't downloaded again for an area
+// exported before; the job's own set still goes to recordDir for the level)
+function freshExportSources(recordDir) {
+  return { mode: 'cache', dir: SOURCE_CACHE(), recordDir };
 }
 
 ipcMain.handle('job:run', async (event, jobId, job) => {
@@ -386,7 +392,7 @@ ipcMain.handle('job:run', async (event, jobId, job) => {
     return { cancelled: true };
   }
   const terrainId = typeof job.terrainData?.desktopTerrainId === 'string' ? job.terrainData.desktopTerrainId : null;
-  const sources = terrainId ? exportSourcesFor(terrainId, dir) : { mode: 'record', dir: path.join(dir, 'export-sources') };
+  const sources = terrainId ? exportSourcesFor(terrainId, dir) : freshExportSources(path.join(dir, 'export-sources'));
   // (saveProject gets this job too: its sources say which export downloads to keep)
   const fullJob = { ...job, outputDir, sources };
   fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify(fullJob));
@@ -813,7 +819,7 @@ async function rebuildLevel(sender, zipName, levelName) {
     const savedExport = path.join(projectDir, 'export-sources');
     const exportSources = replay && fs.existsSync(savedExport)
       ? { mode: 'replay', dir: savedExport, fallback: true, recordDir: path.join(jobDir, 'export-sources') }
-      : { mode: 'record', dir: path.join(jobDir, 'export-sources') };
+      : freshExportSources(path.join(jobDir, 'export-sources'));
     const job = { center: generate.center, terrainData: terrain, options, outputDir: outDir, sources: exportSources };
     fs.writeFileSync(path.join(jobDir, 'job.json'), JSON.stringify(job));
     const exp = spawnRunner(RUNNER, jobDir);
