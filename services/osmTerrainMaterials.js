@@ -17,6 +17,7 @@ import { TERRAIN_MATERIAL_LIBRARY } from './beamngTerrainMaterialLibrary.js';
 import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from './roadWidth.js';
 import { getEffectiveRoadLayer } from './roadNetwork.js';
 import { CURB_ONLY_M, sidewalkSides } from './beamngSidewalks.js';
+import { osmRockAllowed, steepRockFrom } from './worldCover.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–9 = BeamNG-referenced materials
@@ -700,6 +701,16 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
   let noGreen = null;   // ground under water: never painted grass below
   if (lc?.grid && lc.grid.length === lc.n * lc.n) {
     const { grid, n } = lc;
+    // (OSM's rock and scree areas only where the land cover is bare too:
+    // elsewhere left to it below, worldCover.js osmRockAllowed)
+    let unrocked = 0;
+    for (let y = 0; y < size; y++) {
+      const gy = Math.min(n - 1, Math.floor(((size - 1 - y) / size) * n)) * n;
+      for (let x = 0, k = y * size; x < size; x++, k++) {
+        if (layerMap[k] === 4 && !osmRockAllowed(grid[gy + Math.min(n - 1, Math.floor((x / size) * n))])) { layerMap[k] = 0; unrocked++; }
+      }
+    }
+    if (unrocked) console.log(`[OSM Materials] OSM rock areas over grass or woods (ESA WorldCover) left to the land cover: ${(unrocked / (size * size) * 100).toFixed(1)}% of the terrain.`);
     const hmLc = terrainData.heightMap?.length === size * size ? terrainData.heightMap : null;
     const byClass = new Int16Array(256).fill(-1);
     byClass[10] = 8; byClass[95] = 8; byClass[20] = 8; byClass[90] = 8; byClass[100] = 8;
@@ -841,16 +852,21 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
   // dirt-grass, lawn); the edge dithered between 42° and 48°.
   if (hm?.length === size * size) {
     const NATURAL = new Set([0, 1, 2, 8, 9]);
+    // (by the land cover: never on a wooded face, steeper on grass, worldCover.js steepRockFrom)
+    const cover = lc?.grid && lc.grid.length === lc.n * lc.n ? lc : null;
     let steepPx = 0;
     for (let y = 1; y < size - 1; y++) {
+      const gy = cover ? Math.min(cover.n - 1, Math.floor(((size - 1 - y) / size) * cover.n)) * cover.n : 0;
       for (let x = 1; x < size - 1; x++) {
         const k = y * size + x;
         if (!NATURAL.has(layerMap[k])) continue;
-        const gx = (hm[k + 1] - hm[k - 1]) / (2 * metersPerPixel), gy = (hm[k + size] - hm[k - size]) / (2 * metersPerPixel);
-        const g2 = gx * gx + gy * gy;
+        const gx = (hm[k + 1] - hm[k - 1]) / (2 * metersPerPixel), gy2 = (hm[k + size] - hm[k - size]) / (2 * metersPerPixel);
+        const g2 = gx * gx + gy2 * gy2;
         if (g2 < 0.81) continue;   // under 42°
+        const from = cover ? steepRockFrom(cover.grid[gy + Math.min(cover.n - 1, Math.floor((x / size) * cover.n))]) : 0.9;
+        if (from === Infinity) continue;
         let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177);
-        const t = 0.9 + 0.21 * (((n ^ (n >>> 16)) >>> 0) / 4294967296);
+        const t = from * (1 + 0.233 * (((n ^ (n >>> 16)) >>> 0) / 4294967296));
         if (g2 >= t * t) { layerMap[k] = 4; steepPx++; }
       }
     }

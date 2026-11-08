@@ -1,5 +1,6 @@
 import { buildRoadNetwork, getEffectiveRoadLayer, mergeLinearRoadSegments } from "./roadNetwork.js";
 import { racewayHalfWidth } from "./roadWidth.js";
+import { WC, steepRockFrom } from "./worldCover.js";
 
 // Colors aligned to OSM Carto style definitions
 // Source: https://github.com/gravitystorm/openstreetmap-carto (landcover.mss / water.mss)
@@ -1882,7 +1883,9 @@ export const generateOSMTexture = async (terrainData, options = {}) => {
 // classes and painted flat. Broad land use (residential, commercial, farmland
 // ...) is left to that classification: a suburb is lawns, trees, drives and
 // roofs, not one grey.
-export const GROUND_CLASSES = ['trees', 'grass', 'dry', 'soil', 'sand', 'paved', 'water', 'shadow'];
+export const GROUND_CLASSES = ['trees', 'grass', 'dry', 'soil', 'sand', 'paved', 'water', 'shadow', 'rock'];
+// ('rock' is never a pixel's own class: grey or bare ground where the land
+// cover says bare rock, snow and ice, or moss and lichen, see groundFromLandCover)
 // Tuned to BeamNG's own base colour maps (t_terrain_base_b: East Coast USA,
 // Italy, West Coast USA, Jungle Rock Island): dark, muted olive greens, grey-
 // brown open ground; the detail textures sit on them at 15-25 % strength,
@@ -1890,7 +1893,7 @@ export const GROUND_CLASSES = ['trees', 'grass', 'dry', 'soil', 'sand', 'paved',
 // grey reads as vegetation to the export's grass mask (isVegetationColor).
 const GROUND_COLORS = {
   trees: [63, 70, 39], grass: [82, 90, 49], dry: [109, 104, 76], soil: [126, 115, 97],
-  sand: [157, 141, 111], paved: [96, 95, 91], water: [90, 84, 74],
+  sand: [157, 141, 111], paved: [96, 95, 91], water: [90, 84, 74], rock: [128, 123, 113],
 };
 // (water is painted as its bed, muddy silt, not blue: BeamNG's own maps show
 // the ground under their water, and players disliked blue lakes and rivers.
@@ -1913,6 +1916,7 @@ export const GAME_COLORS = {
 // clearing in a mapped wood) and tells canopy from grass on its own
 const BROAD_LANDUSE = new Set(['residential', 'commercial', 'retail', 'industrial', 'education', 'military', 'farmland', 'farmyard', 'construction', 'brownfield', 'greenfield', 'religious', 'institutional']);
 const NATURAL_COVER = new Set(['forest', 'wood', 'scrub', 'heath', 'grass', 'meadow', 'grassland', 'shrubbery', 'trees']);
+const OSM_ROCK = new Set(['bare_rock', 'rock', 'scree', 'shingle', 'glacier', 'stone']);
 const leftToGround = (tags) => BROAD_LANDUSE.has(tags?.landuse) || BROAD_LANDUSE.has(tags?.amenity)
   || NATURAL_COVER.has(tags?.landuse) || NATURAL_COVER.has(tags?.natural) || NATURAL_COVER.has(tags?.landcover);
 
@@ -2004,8 +2008,166 @@ export const satelliteGroundClasses = async (terrainData, source = null) => {
   sctx.imageSmoothingEnabled = true;
   sctx.imageSmoothingQuality = "high";
   sctx.drawImage(satellite, 0, 0, w, h);
-  return { cls: classifyGroundGrid(sctx.getImageData(0, 0, w, h).data, w, h), w, h, image: satellite };
+  const rgba = sctx.getImageData(0, 0, w, h).data;
+  const slope = cellSlopes(terrainData, w, h, processingMetersPerPixel);
+  const sun = slope ? removeHillshade(rgba, slope) : null;
+  if (sun) console.log(`[Ground classes] Terrain shading taken out of the satellite (sun from ${sun.az}° at ${sun.alt}°, r=${sun.r.toFixed(2)}).`);
+  const cls = classifyGroundGrid(rgba, w, h);
+  groundFromLandCover(cls, w, h, terrainData?.landCover, slope);
+  return { cls, w, h, image: satellite };
 };
+
+// The terrain's surface normal at each class cell (east, north, up; unit),
+// from the heights about 4 m either side (the 1 m grid's own noise is not the
+// shading the imagery shows), or null without heights.
+function cellSlopes(terrainData, w, h, mpp) {
+  const hm = terrainData?.heightMap; const W = terrainData?.width; const H = terrainData?.height;
+  if (!hm || !(W > 8) || !(H > 8) || hm.length !== W * H) return null;
+  const R = Math.max(1, Math.round(4 / mpp));
+  const nx = new Float32Array(w * h); const ny = new Float32Array(w * h); const nz = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const hy = Math.min(H - 1 - R, Math.max(R, Math.floor(((y + 0.5) / h) * H)));
+    for (let x = 0; x < w; x++) {
+      const hx = Math.min(W - 1 - R, Math.max(R, Math.floor(((x + 0.5) / w) * W)));
+      const k = hy * W + hx;
+      const dzE = (hm[k + R] - hm[k - R]) / (2 * R * mpp);
+      const dzN = (hm[k - R * W] - hm[k + R * W]) / (2 * R * mpp);   // (row 0 is north)
+      const len = Math.hypot(dzE, dzN, 1);
+      const i = y * w + x;
+      nx[i] = -dzE / len; ny[i] = -dzN / len; nz[i] = 1 / len;
+    }
+  }
+  return { nx, ny, nz };
+}
+
+// Mountain imagery is shaded by its own relief: a north face in shadow came
+// out blue-black (classed as water and forest), a sunlit meadow pale (dry
+// grass, sand). The sun is found from the image itself (the direction whose
+// lighting of the terrain best matches the brightness) and the shading
+// divided out, so each cell is classed by its ground's colour. Flat ground
+// is left as it was; cast shadows are not modelled (the classes fill those
+// from their neighbours). -> { az, alt, r } or null (no clear relief shading).
+export function removeHillshade(rgba, { nx, ny, nz }) {
+  const n = nx.length;
+  const lum = new Float32Array(n);
+  let steep = 0;
+  for (let i = 0; i < n; i++) {
+    lum[i] = 0.3 * rgba[i * 4] + 0.59 * rgba[i * 4 + 1] + 0.11 * rgba[i * 4 + 2];
+    if (nz[i] < 0.97) steep++;   // (over ~14°)
+  }
+  if (steep < n * 0.05) return null;   // flat: nothing to take out
+  const stride = Math.max(1, Math.floor(n / 250000));
+  let best = null;
+  for (let alt = 20; alt <= 70; alt += 10) {
+    const ca = Math.cos((alt * Math.PI) / 180); const sa = Math.sin((alt * Math.PI) / 180);
+    for (let az = 0; az < 360; az += 10) {
+      const lx = Math.sin((az * Math.PI) / 180) * ca; const ly = Math.cos((az * Math.PI) / 180) * ca;
+      let m = 0, sS = 0, sL = 0, sSS = 0, sLL = 0, sSL = 0;
+      for (let i = 0; i < n; i += stride) {
+        const L = lum[i];
+        if (L > 225) continue;   // (snow: saturated, not shaded)
+        const s = Math.max(0, nx[i] * lx + ny[i] * ly + nz[i] * sa);
+        m++; sS += s; sL += L; sSS += s * s; sLL += L * L; sSL += s * L;
+      }
+      const cov = sSL / m - (sS / m) * (sL / m); const vs = sSS / m - (sS / m) ** 2; const vl = sLL / m - (sL / m) ** 2;
+      if (!(vs > 1e-6 && vl > 1e-6)) continue;
+      const r = cov / Math.sqrt(vs * vl);
+      if (!best || r > best.r) best = { az, alt, r, b: cov / vs, a: sL / m - (cov / vs) * (sS / m), mean: sS / m, lx, ly, lz: sa };
+    }
+  }
+  if (!best || best.r < 0.25 || !(best.b > 0) || !(best.a > 0)) return null;
+  const { mean, lx, ly, lz } = best;
+  // each channel fitted on its own along that sun: shade is lit by the blue
+  // sky, so its blue needs less lifting than its red (one factor for all
+  // three turned desert canyon shade green and alpine shade blue)
+  const shadeAt = (i) => Math.max(0, nx[i] * lx + ny[i] * ly + nz[i] * lz);
+  const fit = [0, 1, 2].map((c) => {
+    let m = 0, sS = 0, sV = 0, sSS = 0, sSV = 0;
+    for (let i = 0; i < n; i += stride) {
+      if (lum[i] > 225) continue;
+      const s = shadeAt(i); const v = rgba[i * 4 + c];
+      m++; sS += s; sV += v; sSS += s * s; sSV += s * v;
+    }
+    const b = (sSV / m - (sS / m) * (sV / m)) / Math.max(1e-6, sSS / m - (sS / m) ** 2);
+    return { a: sV / m - b * (sS / m), b };
+  });
+  if (fit.some((f) => !(f.a > 1))) return null;
+  const target = fit.map((f) => f.a + Math.max(0, f.b) * mean);
+  for (let i = 0; i < n; i++) {
+    const s = shadeAt(i);
+    const j = i * 4;
+    for (let c = 0; c < 3; c++) {
+      const f = Math.min(2, Math.max(0.6, target[c] / (fit[c].a + Math.max(0, fit[c].b) * s)));
+      rgba[j + c] = Math.min(255, rgba[j + c] * f);
+    }
+  }
+  return { az: best.az, alt: best.alt, r: best.r };
+}
+
+// The classes checked against what covers the ground (ESA WorldCover,
+// terrainData.landCover, 10 m) and the slope:
+// - canopy only where the land cover has trees, scrub, built-up (yard trees)
+//   or wetland within ~10 m: elsewhere it is shaded grass (Tignes: a third
+//   of the meadows above the tree line came out as forest), and no green
+//   at all on bare ground with no plants within ~10 m;
+// - grey ground on bare rock, snow and ice, or moss and lichen: rock (sand
+//   and soil too on bare ground over ~25°);
+// - water only on level ground, and with a land cover only near its water
+//   (shaded slopes in blue-grey came out as lakes);
+// the cells taken out filled from their neighbours.
+const CANOPY_COVER = new Set([WC.TREES, WC.SHRUBS, WC.BUILT, WC.WETLAND, WC.MANGROVES]);
+const GREEN_COVER = new Set([WC.TREES, WC.SHRUBS, WC.GRASS, WC.CROPS, WC.BUILT, WC.WETLAND, WC.MANGROVES, WC.MOSS]);
+export function groundFromLandCover(cls, w, h, landCover, slope = null) {
+  const lc = landCover?.grid?.length === landCover?.n * landCover?.n ? landCover : null;
+  const T = 0, G = 1, DRY = 2, SOIL = 3, SAND = 4, PAVED = 5, WATER = 6, HOLE = 7, ROCK = 8;
+  const near = (x, y, test, reach) => {
+    const { grid, n } = lc;
+    const c0 = Math.floor(((x + 0.5) / w) * n); const r0 = Math.floor(((y + 0.5) / h) * n);
+    for (let dr = -reach; dr <= reach; dr++) for (let dc = -reach; dc <= reach; dc++) {
+      const r = r0 + dr; const c = c0 + dc;
+      if (r >= 0 && c >= 0 && r < n && c < n && test(grid[r * n + c])) return true;
+    }
+    return false;
+  };
+  let holes = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x; const c = cls[i];
+      if (c === WATER) {
+        if ((slope && slope.nz[i] < 0.99) || (lc && !near(x, y, (k) => k === WC.WATER || k === 0, 2))) { cls[i] = HOLE; holes++; }   // (over ~8°)
+        continue;
+      }
+      if (!lc) continue;
+      const here = lc.grid[Math.min(lc.n - 1, Math.floor(((y + 0.5) / h) * lc.n)) * lc.n + Math.min(lc.n - 1, Math.floor(((x + 0.5) / w) * lc.n))];
+      if (!here) continue;
+      // (greens on bare ground with no plants near: desert varnish and grey-green gravel, Hoover's canyon)
+      if ((c === T || c === G) && (here === WC.BARE || here === WC.SNOW) && !near(x, y, (k) => GREEN_COVER.has(k), 1)) cls[i] = c === T ? SOIL : DRY;
+      else if (c === T && !near(x, y, (k) => CANOPY_COVER.has(k), 1)) cls[i] = G;
+      // (sand and soil only on a slope over ~25°: on the flat, bare ground is a desert's sand or dirt)
+      else if ((here === WC.BARE || here === WC.SNOW || here === WC.MOSS) && (c === PAVED || ((c === SAND || c === SOIL) && here !== WC.MOSS && slope && slope.nz[i] < 0.9))) cls[i] = ROCK;
+    }
+  }
+  // the holes from their neighbours' commonest class, grass where none
+  for (let pass = 0; holes && pass < 6; pass++) {
+    holes = 0;
+    const votes = new Uint16Array(GROUND_CLASSES.length);
+    const prev = cls.slice();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (prev[y * w + x] !== HOLE) continue;
+      votes.fill(0); let best = HOLE; let nb = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const yy = y + dy; const xx = x + dx;
+        if (yy < 0 || xx < 0 || yy >= h || xx >= w) continue;
+        const k = prev[yy * w + xx];
+        if (k !== HOLE && k !== WATER && ++votes[k] > nb) { nb = votes[k]; best = k; }
+      }
+      cls[y * w + x] = best;
+      if (best === HOLE) holes++;
+    }
+  }
+  if (holes) for (let i = 0; i < cls.length; i++) if (cls[i] === HOLE) cls[i] = G;
+  return cls;
+}
 
 // Water as the game map shows it: its own satellite pixels (generateGameTexture)
 const WATER_EXCLUDED = new Set(["dam", "weir", "dock", "boatyard", "lock_gate"]);
@@ -2026,6 +2188,8 @@ export function paintSteepRock(ctx, canvas, terrainData) {
   const mpp = Number(terrainData.processingMetersPerPixel) > 0 ? Number(terrainData.processingMetersPerPixel) : 1;
   const sx = W / canvas.width; const sy = H / canvas.height;
   const hash = (x, y) => { let n = (x * 374761393 + y * 668265263) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); return ((n ^ (n >>> 16)) >>> 0) / 4294967296; };
+  // (by the land cover: never on a wooded face, steeper on grass, worldCover.js steepRockFrom)
+  const lc = terrainData.landCover?.grid?.length === terrainData.landCover?.n ** 2 ? terrainData.landCover : null;
   let painted = 0;
   const STRIP = 256;
   for (let y0 = 0; y0 < canvas.height; y0 += STRIP) {
@@ -2034,12 +2198,14 @@ export function paintSteepRock(ctx, canvas, terrainData) {
     const d = img.data; let changed = false;
     for (let ty = 0; ty < rows; ty++) {
       const hy = Math.min(H - 2, Math.max(1, Math.floor((y0 + ty + 0.5) * sy)));
+      const lcRow = lc ? Math.min(lc.n - 1, Math.floor(((y0 + ty + 0.5) / canvas.height) * lc.n)) * lc.n : 0;
       for (let tx = 0; tx < canvas.width; tx++) {
         const hx = Math.min(W - 2, Math.max(1, Math.floor((tx + 0.5) * sx)));
         const k = hy * W + hx;
         const gx = (hm[k + 1] - hm[k - 1]) / (2 * mpp); const gy = (hm[k + W] - hm[k - W]) / (2 * mpp);
         const u = hash(tx, y0 + ty);
-        if (Math.hypot(gx, gy) < 0.9 + 0.21 * u) continue;   // tan 42°..48°
+        const from = lc ? steepRockFrom(lc.grid[lcRow + Math.min(lc.n - 1, Math.floor(((tx + 0.5) / canvas.width) * lc.n))]) : 0.9;
+        if (Math.hypot(gx, gy) < from * (1 + 0.233 * u)) continue;   // tan 42°..48° (grass 50°..56°)
         const i = (ty * canvas.width + tx) * 4;
         const r = d[i], g = d[i + 1], b = d[i + 2];
         // (natural colours only: green or brown, not the greys of roads, buildings and water)
@@ -2107,6 +2273,55 @@ export function paintLandCoverSnow(ctx, canvas, terrainData, satellite) {
   }
   tmp.width = 0;
   return painted / (canvas.width * canvas.height);
+}
+
+// The satellite's detail laid over a painted texture: each pixel scaled by
+// how much brighter or darker the image is there than its surroundings
+// (~8 m: paths, rocks, tufts, furrows; the relief's broad shading and the
+// imagery's colour casts drop out), and nudged toward the image's own colour
+// at ~30 m (tint: a greener meadow, a redder scree), its brightness kept. In
+// strips of rows against a 1/8-size copy: no texture-sized buffers.
+export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint = 0.3 } = {}) {
+  const W = canvas.width; const H = canvas.height;
+  const sw = satellite.naturalWidth || satellite.width; const sh = satellite.naturalHeight || satellite.height;
+  if (!(sw > 0) || !(sh > 0) || !(W > 16) || !(H > 16)) return null;
+  const lw = Math.max(8, Math.round(W / 8)); const lh = Math.max(8, Math.round(H / 8));
+  const low = document.createElement("canvas"); low.width = lw; low.height = lh;
+  const lctx = low.getContext("2d");
+  lctx.imageSmoothingEnabled = true; lctx.imageSmoothingQuality = "high";
+  lctx.drawImage(satellite, 0, 0, lw, lh);
+  const STRIP = 256;
+  const a = document.createElement("canvas"); a.width = W; a.height = STRIP;
+  const b = document.createElement("canvas"); b.width = W; b.height = STRIP;
+  const actx = a.getContext("2d", { willReadFrequently: true }); const bctx = b.getContext("2d", { willReadFrequently: true });
+  actx.imageSmoothingEnabled = true; actx.imageSmoothingQuality = "high";
+  bctx.imageSmoothingEnabled = true; bctx.imageSmoothingQuality = "high";
+  const lumOf = (d, i) => 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2];
+  for (let y0 = 0; y0 < H; y0 += STRIP) {
+    const rows = Math.min(STRIP, H - y0);
+    actx.clearRect(0, 0, W, STRIP); bctx.clearRect(0, 0, W, STRIP);
+    actx.drawImage(satellite, 0, (y0 / H) * sh, sw, (rows / H) * sh, 0, 0, W, rows);
+    bctx.drawImage(low, 0, (y0 / H) * lh, lw, (rows / H) * lh, 0, 0, W, rows);
+    const fine = actx.getImageData(0, 0, W, rows).data;
+    const broad = bctx.getImageData(0, 0, W, rows).data;
+    const img = ctx.getImageData(0, y0, W, rows); const d = img.data;
+    for (let i = 0; i < W * rows * 4; i += 4) {
+      const lb = lumOf(broad, i);
+      const ratio = Math.min(1.35, Math.max(0.7, (lumOf(fine, i) + 8) / (lb + 8)));
+      const f = 1 + detail * (ratio - 1);
+      // (the image's colour at ~30 m, at the painted brightness)
+      // (not over neutral greys: roads and buildings keep their grey, which the grass mask needs)
+      const pl = lumOf(d, i); const sc = lb > 4 ? pl / lb : 0;
+      const t = Math.abs(d[i] - d[i + 1]) < 6 && Math.abs(d[i + 1] - d[i + 2]) < 6 ? 0 : tint;
+      for (let c = 0; c < 3; c++) {
+        const v = d[i + c] * (1 - t) + broad[i + c] * sc * t;
+        d[i + c] = Math.max(0, Math.min(255, v * f));
+      }
+    }
+    ctx.putImageData(img, 0, y0);
+  }
+  low.width = 0; a.width = 0; b.width = 0;
+  return { detail, tint };
 }
 
 export const generateGameTexture = async (terrainData, options = {}) => {
@@ -2186,7 +2401,10 @@ export const generateGameTexture = async (terrainData, options = {}) => {
     palette: GAME_COLORS,
     baseColor: GAME_COLORS.defaultLanduse,
     // (with a satellite image, water is drawn from it below instead)
-    skipArea: satellite ? (tags, unmatched) => unmatched || leftToGround(tags) || isWaterArea(tags) : null,
+    // (and with a land cover, OSM's rock, scree and glacier outlines: the
+    // classes paint rock where the land cover is bare, the snow pass ice)
+    skipArea: satellite ? (tags, unmatched) => unmatched || leftToGround(tags) || isWaterArea(tags)
+      || (terrainData.landCover?.grid && OSM_ROCK.has(tags?.natural)) : null,
   });
 
   // gentle large-scale variation, then a fine grain: ground, not a vector map
@@ -2211,6 +2429,20 @@ export const generateGameTexture = async (terrainData, options = {}) => {
   ctx.fillStyle = ctx.createPattern(createNoisePattern("#808080"), "repeat");
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
+
+  const steep = paintSteepRock(ctx, canvas, terrainData);
+  if (steep) console.log(`[Game Texture] Steep ground (over ~45°) painted as rock: ${(steep * 100).toFixed(1)}% of the texture.`);
+  const snow = paintLandCoverSnow(ctx, canvas, terrainData, ground?.image || options.satelliteCanvas || null);
+  if (snow) console.log(`[Game Texture] Snow and ice (ESA WorldCover) painted: ${(snow * 100).toFixed(1)}% of the texture.`);
+
+  // (after the rock and snow, before the water, which is the image already)
+  // the satellite's fine detail and a little of its colour over the flat
+  // classes (Fizz_Mechanic: "a blend of satellite details and the game's
+  // texture"): ground with paths, rocks and tufts, still game colours
+  if (ground?.image && options.satelliteDetail !== false) {
+    const k = addSatelliteDetail(ctx, canvas, ground.image, { detail: options.detailStrength, tint: options.tintStrength });
+    if (k) console.log(`[Game Texture] Satellite detail blended in (detail ${k.detail}, colour ${k.tint}).`);
+  }
 
   // Water: the satellite's own pixels, not a paint (players disliked blue,
   // and a creek looks like the creek). Mapped water (areas, and streams at
@@ -2262,10 +2494,6 @@ export const generateGameTexture = async (terrainData, options = {}) => {
     mask.width = 0; wc.width = 0;
   }
 
-  const steep = paintSteepRock(ctx, canvas, terrainData);
-  if (steep) console.log(`[Game Texture] Steep ground (over ~45°) painted as rock: ${(steep * 100).toFixed(1)}% of the texture.`);
-  const snow = paintLandCoverSnow(ctx, canvas, terrainData, ground?.image || options.satelliteCanvas || null);
-  if (snow) console.log(`[Game Texture] Snow and ice (ESA WorldCover) painted: ${(snow * 100).toFixed(1)}% of the texture.`);
 
   const blob = await new Promise((r) => canvas.toBlob((b) => r(b || null), "image/png"));
   const url = blob ? URL.createObjectURL(blob) : "";

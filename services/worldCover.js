@@ -167,3 +167,26 @@ export function landCoverAt(landCover, worldSize, x, y) {
   const r = Math.min(n - 1, Math.max(0, Math.floor((0.5 - y / worldSize) * n)));
   return grid[r * n + c];
 }
+
+/**
+ * From what slope (gradient, rise over run) natural ground is painted rock,
+ * by its land cover, or Infinity for never: a wood or scrub on a steep face
+ * keeps its ground (the trees stand on it: in the Alps half the steep ground
+ * is forest), grass needs ~50° (alpine meadows hold to ~45°), the rest ~42°.
+ * The edge is dithered from there to ~1.23 x (42°..48°, 50°..56°).
+ */
+export function steepRockFrom(cls) {
+  if (cls === WC.TREES || cls === WC.SHRUBS || cls === WC.MANGROVES || cls === WC.WETLAND) return Infinity;
+  if (cls === WC.GRASS || cls === WC.CROPS) return 1.19;
+  return 0.9;
+}
+
+/**
+ * Whether an OSM rock area (bare_rock, scree, shingle, glacier) is painted
+ * where the land cover is cls: only on bare ground, snow, moss and lichen, or
+ * without data. Alpine OSM draws these generously (Fizz_Mechanic's Tignes:
+ * rock outlines over 24-63 % WorldCover grass).
+ */
+export function osmRockAllowed(cls) {
+  return !cls || cls === WC.BARE || cls === WC.SNOW || cls === WC.MOSS;
+}

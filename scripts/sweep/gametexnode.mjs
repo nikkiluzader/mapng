@@ -26,7 +26,21 @@ if (!fs.existsSync(satPng)) execFileSync('node', [`${REPO}/scripts/sweep/satelli
 const img = await loadImage(fs.readFileSync(satPng));
 const satelliteCanvas = createCanvas(img.width, img.height);
 satelliteCanvas.getContext('2d').drawImage(img, 0, 0);
-const terrainData = { width: meta.size, height: meta.size, bounds: meta.bounds, osmFeatures: fitTwinCarriageways(measureStreetWidths(roundRoadCorners(osm).features).features).features, processingMetersPerPixel: meta.mpp };
+// (as the app: the heights, for the shading taken out of the imagery and the
+// steep rock, and the land cover, ESA WorldCover, cached beside the area)
+const dem = fs.existsSync(dir + 'gpxz.f32') ? 'gpxz.f32' : 't30.f32';
+const heightMap = new Float32Array(fs.readFileSync(dir + dem).buffer.slice(0));
+let landCover = null;
+try {
+  const n = Math.min(4096, Math.max(64, Math.ceil((meta.size * meta.mpp) / 10)));
+  const lcf = `${dir}landcover_${n}.bin`;
+  if (!fs.existsSync(lcf)) {
+    const { fetchWorldCoverGrid } = await import('../../services/worldCover.js');
+    fs.writeFileSync(lcf, await fetchWorldCoverGrid(meta.bounds, n, n));
+  }
+  landCover = { grid: new Uint8Array(fs.readFileSync(lcf)), n };
+} catch (e) { console.warn('land cover unavailable:', e?.message || e); }
+const terrainData = { width: meta.size, height: meta.size, bounds: meta.bounds, heightMap, landCover, osmFeatures: fitTwinCarriageways(measureStreetWidths(roundRoadCorners(osm).features).features).features, processingMetersPerPixel: meta.mpp };
 const { blob } = await generateGameTexture(terrainData, { Roads: true, satelliteCanvas });
 fs.writeFileSync(pngOut, Buffer.from(await blob.arrayBuffer()));
 console.log(`game texture ${fs.statSync(pngOut).size} bytes -> ${pngOut}`);

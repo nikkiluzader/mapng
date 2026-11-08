@@ -52,3 +52,62 @@ test('dark asphalt with a green cast is paved, not canopy', () => {
   assert.equal(cls(56, 59, 51), 'paved');
   assert.equal(cls(40, 52, 32), 'trees', 'shaded canopy stays trees');
 });
+
+test('relief shading is taken out of the satellite before classing (sun found from the image)', async () => {
+  const { removeHillshade } = await import('../services/osmTexture.js');
+  // ridges running north-south, lit from the east at 40°: one green ground, shaded
+  const w = 64, h = 64, n = w * h;
+  const nx = new Float32Array(n), ny = new Float32Array(n), nz = new Float32Array(n);
+  const rgba = new Uint8ClampedArray(n * 4);
+  const L = [Math.sin(Math.PI / 2) * Math.cos(0.7), 0, Math.sin(0.7)];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; const slope = Math.sin(x / 3) * 0.8;   // dz/dx
+    const len = Math.hypot(slope, 0, 1); nx[i] = -slope / len; ny[i] = 0; nz[i] = 1 / len;
+    const s = Math.max(0, nx[i] * L[0] + nz[i] * L[2]);
+    const sky = [20, 26, 34];   // (shade is lit blue)
+    const base = [90, 120, 50];
+    for (let c = 0; c < 3; c++) rgba[i * 4 + c] = sky[c] + base[c] * s;
+    rgba[i * 4 + 3] = 255;
+  }
+  const spread = () => { let lo = 255, hi = 0; for (let i = 0; i < n; i++) { const g = rgba[i * 4 + 1]; lo = Math.min(lo, g); hi = Math.max(hi, g); } return hi - lo; };
+  const before = spread();
+  const sun = removeHillshade(rgba, { nx, ny, nz });
+  assert.ok(sun && sun.az >= 70 && sun.az <= 110, `sun from the east, got ${JSON.stringify(sun)}`);
+  assert.ok(spread() < before * 0.35, `shading mostly gone: ${before} -> ${spread()}`);
+  // flat ground is left alone
+  const flat = new Uint8ClampedArray([10, 20, 30, 255, 40, 50, 60, 255]);
+  assert.equal(removeHillshade(flat, { nx: new Float32Array(2), ny: new Float32Array(2), nz: new Float32Array([1, 1]) }), null);
+});
+
+test('ground classes checked against the land cover and slope', async () => {
+  const { groundFromLandCover } = await import('../services/osmTexture.js');
+  const W = 8; const at = (cls) => GROUND_CLASSES.indexOf(cls);
+  const lcOf = (k) => ({ grid: new Uint8Array(4).fill(k), n: 2 });
+  // canopy over WorldCover grass (above the tree line): grass; over trees: kept
+  let cls = new Uint8Array(W * W).fill(at('trees'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lcOf(30))[0]], 'grass');
+  cls = new Uint8Array(W * W).fill(at('trees'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lcOf(10))[0]], 'trees');
+  // grey on bare rock: rock; greens on bare ground with no plants: dry
+  cls = new Uint8Array(W * W).fill(at('paved'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lcOf(60))[0]], 'rock');
+  cls = new Uint8Array(W * W).fill(at('grass'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lcOf(60))[0]], 'dry');
+  // flat sand stays sand (a desert), water on a slope or far from water: its neighbours
+  cls = new Uint8Array(W * W).fill(at('sand'));
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lcOf(60), { nz: new Float32Array(W * W).fill(1) })[0]], 'sand');
+  cls = new Uint8Array(W * W).fill(at('grass')); cls[27] = at('water');
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lcOf(30))[27]], 'grass');
+  cls = new Uint8Array(W * W).fill(at('grass')); cls[27] = at('water');
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lcOf(80))[27]], 'water');
+  const steep = { nz: new Float32Array(W * W).fill(0.9) };
+  cls = new Uint8Array(W * W).fill(at('grass')); cls[27] = at('water');
+  assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, null, steep)[27]], 'grass');
+});
+
+test('rock rules by land cover', async () => {
+  const { steepRockFrom, osmRockAllowed } = await import('../services/worldCover.js');
+  assert.equal(steepRockFrom(10), Infinity);
+  assert.ok(steepRockFrom(30) > steepRockFrom(60));
+  assert.ok(osmRockAllowed(60) && osmRockAllowed(0) && !osmRockAllowed(30) && !osmRockAllowed(10));
+});
