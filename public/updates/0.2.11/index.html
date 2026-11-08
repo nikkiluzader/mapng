@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.2.11: Bridges, Built by Rules</title>
+<meta name="description" content="What's new in MapNG 0.2.11: bridges, overpasses and drawbridges rebuilt from general rules that work with any terrain and OpenStreetMap data, tested on more than 50 areas in all three terrain modes.">
+<link rel="canonical" href="https://mapng.com/updates/0.2.11/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.2.11: bridges, built by rules">
+<meta property="og:description" content="Better bridge ends, rivers and islands, divided roads on one deck, drawbridges with their towers, lit bridges.">
+<meta property="og:url" content="https://mapng.com/updates/0.2.11/">
+<meta property="og:image" content="https://mapng.com/updates/0.2.11/images/hero-golden-gate.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: the in-game shot with the title over it */
+  .hero { position: relative; color: #fff; background: #111 url(images/hero-golden-gate.jpg) center/cover no-repeat; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(70vh, 560px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+  /* diagrams (inline SVG): colours from the page tokens, both modes */
+  .dia { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 18px; }
+  .dia svg { width: 100%; height: auto; display: block; --d1: #2f6fd6; --d2: #e85d00; --d3: #3a9a4a; --dg: #b9cf9f; --dw: #9cc3e6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; } }
+  :root[data-theme="dark"] .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; }
+  .dia text { fill: var(--text); font: 13px "Noto Sans", sans-serif; }
+  .dia .sm { fill: var(--muted); font-size: 12px; }
+  .dia .box { fill: var(--surface-2); stroke: var(--border); }
+  .dia .boxb { fill: var(--brand-tint); stroke: var(--brand); }
+  .dia .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .refs figcaption a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.2.11</span></span>
+    <h1>Bridges, built by rules</h1>
+    <p>A long look at bridges, overpasses and interchanges: more than 50 test areas around the world, checked in all three terrain modes with plots, real photos and in-game drives. Bridge ends, rivers and islands, divided roads on one deck, drawbridges with their towers, and lights on bridges at night.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+  <span class="credit">The Golden Gate Bridge, its whole span on a 4 km MapNG level, in BeamNG.drive 0.40</span>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#grammar">🧩 Rules, not places</a>
+    <a href="#testing">🔬 How we check</a>
+    <a href="#water">🌊 Rivers and streams</a>
+    <a href="#divided">🛣️ Divided roads</a>
+    <a href="#drawbridges">🏰 Drawbridges</a>
+    <a href="#more">🧹 More</a>
+    <a href="#next">🧭 What's next</a>
+  </nav>
+
+  <p style="margin-top:28px">Bridges are where a generated map is easiest to get wrong. A bridge has to meet its road smoothly at both ends, clear what it crosses, stand on supports that don't block anything underneath, and look like the kind of bridge it is. All of that has to come from data that was never made with a driving game in mind.</p>
+  <div class="note"><b>An honest note:</b> bridges are clearly better in this update, but they're not perfect, and getting close to perfect will take weeks or even months of this kind of work. Every round of testing turns up something new. This page shows where things stand and how we're getting there.</div>
+
+  <section id="grammar">
+    <div class="kicker">The approach</div>
+    <h2>🧩 Rules, not special cases</h2>
+    <p>MapNG never has code for a particular place. There's no "Golden Gate" setting and no list of famous bridges. Instead we're building a <b>grammar</b>: general rules that read what every map has, OpenStreetMap tags and the elevation of the ground, and work out from them how a bridge should stand. A bridge over a river needs clearance over the water; a short bridge over a stream stays on its road's line; a building inside a bridge's outline is part of the bridge; two carriageways of one road on one deck are one surface. When a rule is fixed, every bridge in the world that fits it gets better at once.</p>
+    <div class="dia" role="img" aria-label="Diagram: OpenStreetMap tags and terrain everywhere feed the rules, which build the bridge; lidar and measured deck heights refine it where they exist; reference photos are only used for testing">
+      <svg viewBox="0 0 860 300">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" style="fill:var(--muted)"/></marker></defs>
+        <text x="10" y="22" style="font-weight:700">Everywhere</text>
+        <rect class="box" x="10" y="34" width="250" height="56" rx="8"/><text x="22" y="56">OpenStreetMap tags</text><text class="sm" x="22" y="76">bridge, layer, structure, movable, lit, outline</text>
+        <rect class="box" x="10" y="100" width="250" height="56" rx="8"/><text x="22" y="122">Terrain (any elevation source)</text><text class="sm" x="22" y="142">global 30 m, free lidar, your upload</text>
+        <rect class="boxb" x="330" y="60" width="200" height="72" rx="10"/><text x="348" y="90" style="font-weight:700">The rules (grammar)</text><text class="sm" x="348" y="112">the same for every bridge</text>
+        <rect class="box" x="600" y="60" width="250" height="72" rx="10"/><text x="618" y="90" style="font-weight:700">The bridge in your level</text><text class="sm" x="618" y="112">deck, ends, supports, towers, lights</text>
+        <path class="arrow" d="M260,62 C300,62 300,90 328,90"/><path class="arrow" d="M260,128 C300,128 300,104 328,104"/><path class="arrow" d="M530,96 L598,96"/>
+        <text x="10" y="196" style="font-weight:700">Where it exists</text>
+        <rect class="box" x="10" y="208" width="250" height="56" rx="8"/><text x="22" y="230">Measured deck heights</text><text class="sm" x="22" y="250">US lidar (USGS 3DEP), more to come</text>
+        <path class="arrow" d="M260,236 C320,236 330,160 400,134"/>
+        <text x="600" y="196" style="font-weight:700">Only for checking</text>
+        <rect class="box" x="600" y="208" width="250" height="56" rx="8"/><text x="618" y="230">Real photos</text><text class="sm" x="618" y="250">Wikimedia Commons, Mapillary</text>
+        <path class="arrow" d="M725,206 L725,136" style="stroke-dasharray:4 4"/>
+        <text class="sm" x="732" y="176">compared only</text>
+      </svg>
+    </div>
+    <p>The base rules always work from OpenStreetMap and the terrain alone, so a bridge anywhere gets a good result. Where more detailed data exists, it's used on top: lidar ground models, measured deck heights from US lidar, and later other national or continental datasets. The photos are only for us: they show what a bridge really looks like, so we can check the rules against it.</p>
+  </section>
+
+  <section id="testing">
+    <div class="kicker">Behind the scenes</div>
+    <h2>🔬 How we check bridges</h2>
+    <p>Every change is exported on <b>more than 50 test areas</b>: suspension and cable-stayed bridges, arches, drawbridges, stacked interchanges, mountain viaducts, river crossings and city overpasses, from San Francisco, New York, Louisville and St. Augustine to Paris, Rotterdam, the Alps, Norway, Lisbon, Istanbul, Seoul and Hong Kong. Each area is exported in all three terrain modes, <b>Ready to drive</b>, <b>Custom</b> and <b>Untouched</b>, on lidar and on the global 30&nbsp;m data. A full run takes about three hours.</p>
+    <ul>
+      <li><b>Bridge ends:</b> every place a deck meets its road is measured: the height step, how sharply the grade turns, and how far the road leaves its ground.</li>
+      <li><b>Side profiles</b> of every bridge over the land and water under it, and <b>top-down plots</b> of its supports.</li>
+      <li><b>A structure check</b> that flags any pier, arch, tower, cable or girder standing in a road's lanes or reaching into the headroom over it.</li>
+      <li><b>Real photos</b> of each bridge from several angles, from the bridge's own Wikimedia Commons category and Mapillary street-level images at both ends.</li>
+      <li><b>In-game checks</b> in BeamNG.drive from the water, from above and from the driver's seat, by day and by night.</li>
+    </ul>
+    <figure><img src="images/structure-sheet.jpg" alt="A structure sheet for the Bridge of Lions: a top-down plot with supports coloured by kind, the bridge's full side profile over the water, and true-scale zooms of the lift span" loading="lazy"><figcaption>One of the new structure sheets, for the Bridge of Lions: top-down with the supports by kind (tower piers in brown, steel in orange), the whole bridge's side profile, and true-scale zooms of its lift span. The header counts anything standing in a road below or in the lanes above.</figcaption></figure>
+  </section>
+
+  <section id="water">
+    <div class="kicker">Rivers, islands and streams</div>
+    <h2>🌊 Clearance over the water, not over the island</h2>
+    <p>A bridge over a river needs room for boats under it, so MapNG lifts the deck over the water by a clearance that depends on the river. The clearance was measured from the ground at every point along the crossing, so where a river had an island, the deck got its full clearance over the island too. The Pont de Bir-Hakeim in Paris crosses the Seine over the Île aux Cygnes, and came out with a 21&nbsp;m peak in the middle.</p>
+    <div class="dia" role="img" aria-label="Diagram: a river with an island. Before, the deck rose to a peak over the island; now it stays nearly level at its clearance over the water">
+      <svg viewBox="0 0 860 220">
+        <path d="M0,220 L0,95 L120,95 L150,178 L370,178 L395,112 L465,112 L490,178 L710,178 L740,95 L860,95 L860,220 z" style="fill:var(--dg)"/>
+        <path d="M141,152 L379,152 L370,178 L150,178 z M481,152 L719,152 L710,178 L490,178 z" style="fill:var(--dw)"/>
+        <path d="M120,92 L430,28 L740,92" style="fill:none;stroke:var(--d2);stroke-width:3;stroke-dasharray:7 5"/>
+        <path d="M120,92 C300,74 560,74 740,92" style="fill:none;stroke:var(--d1);stroke-width:4"/>
+        <text x="445" y="24" style="fill:var(--d2)">before: clearance over the island (a 21 m peak)</text>
+        <text x="180" y="112" style="fill:var(--d1)">now: clearance over the water</text>
+        <text class="sm" x="410" y="134">island</text><text class="sm" x="240" y="170">river</text><text class="sm" x="580" y="170">river</text>
+      </svg>
+    </div>
+    <p>The clearance is now measured from the water's surface, while the deck still keeps clear of the ground at every point. Bir-Hakeim is nearly level again.</p>
+    <figure><img src="images/birhakeim-profile.jpg" alt="Two long sections of the Pont de Bir-Hakeim: before, the deck rising to a sharp peak over the island; after, nearly level about 2 m over it" loading="lazy"><figcaption>Behind the scenes: Bir-Hakeim's long section before (a 21&nbsp;m peak over the island) and after (nearly level, about 2&nbsp;m over it).</figcaption></figure>
+    <h3>Arches under the deck</h3>
+    <p>The same bridge showed a second problem in game: its arches came up through the road. A deck arch was a curve that met the deck only at the middle of its span, so with one end standing on the island and the other in the water under a sloping deck, its rib rose up to 1.4&nbsp;m above the road. The arches now stay under the deck along their whole length.</p>
+    <figure><img src="images/birhakeim-arches.jpg" alt="Bir-Hakeim in BeamNG, before: white arch tops sticking up through the road; now: a clean road with the arches below" loading="lazy"></figure>
+    <figure><img src="images/arch-check.jpg" alt="Structure check plots: before, red points where the arches reach into the lanes; after, none" loading="lazy"><figcaption>The structure check: 1,095 points of arch inside the lanes before, none now.</figcaption></figure>
+    <div class="refs" style="margin-top:18px">
+      <figure><img src="images/ref-birhakeim.jpg" alt="Photo of the Pont de Bir-Hakeim across the Seine" loading="lazy"><figcaption>The real Pont de Bir-Hakeim. Photo: DXR, <a href="https://commons.wikimedia.org/wiki/File:Pont_de_Bir-Hakeim_and_view_on_the_16th_Arrondissement_of_Paris_140124_1.jpg">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by-sa/3.0">CC BY-SA 3.0</a>.</figcaption></figure>
+      <figure><img src="images/ref-ganter.jpg" alt="Photo of the Ganter Bridge on the Simplon Pass" loading="lazy"><figcaption>The Ganter Bridge on the Simplon Pass. Photo: rosmary, <a href="https://commons.wikimedia.org/wiki/File:Ganterbr%C3%BCcke_(14829574022).jpg">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by/2.0">CC BY 2.0</a>.</figcaption></figure>
+    </div>
+    <h3>Small streams</h3>
+    <p>Around the Ganter Bridge in the Swiss Alps, the big viaduct was fine, but the small bridges on the mountain roads each had a hump: a stream or a ditch got the same clearance as a river, so a short bridge over a 1&nbsp;m gully stood about 3.5&nbsp;m above its road. Streams, drains and ditches now keep a bridge on the line between its banks. The sharpest grade changes at those bridge ends dropped from 29% to about 5%.</p>
+    <figure><img src="images/ganter-streams.jpg" alt="Bridge end profiles at Ganter: before, humps of 1 to 3 m over small streams; after, smooth" loading="lazy"><figcaption>Behind the scenes: the worst bridge ends around Ganter before and after. Blue is the deck, black the road, green the ground.</figcaption></figure>
+  </section>
+
+  <section id="divided">
+    <div class="kicker">The Golden Gate</div>
+    <h2>🛣️ Divided roads on one bridge</h2>
+    <p>OpenStreetMap maps each direction of a divided road as its own line. On a bridge with a narrow median those lines are often closer together than the widths we draw, so the two carriageways overlapped. On the Golden Gate that put a median barrier and a row of hangers on the edge of a lane. Three general rules fix it:</p>
+    <ol class="callouts">
+      <li><b>Side by side, not on top of each other.</b> Where two one-way carriageways run alongside each other closer than their widths, both are narrowed to meet between them. Shoulders give way first, and lanes never go under 3&nbsp;m.</li>
+      <li><b>Cables at the outside.</b> On a suspension or cable-stayed bridge carrying both carriageways, the cable planes stand at the outer edges of the whole deck, with nothing in the median.</li>
+      <li><b>One surface.</b> The two decks are tied to one height where they run side by side, so there's no step between them.</li>
+    </ol>
+    <div class="dia" role="img" aria-label="Diagram of the Golden Gate deck in cross-section: before, two carriageways overlapping with the cables and hangers above one carriageway's lanes; now, two carriageways meeting at the middle with the cable planes outside both">
+      <svg viewBox="0 0 860 230">
+        <text x="20" y="22" style="font-weight:700;fill:var(--d2)">Before</text>
+        <text x="450" y="22" style="font-weight:700;fill:var(--d1)">Now</text>
+        <!-- before: two decks overlapping 2 m; cable plane of the lead deck over the other's lane -->
+        <rect x="40" y="150" width="200" height="12" rx="2" style="fill:var(--d1);opacity:.55"/>
+        <rect x="200" y="140" width="200" height="12" rx="2" style="fill:var(--d1);opacity:.85"/>
+        <line x1="40" y1="148" x2="40" y2="40" style="stroke:var(--d2);stroke-width:3"/>
+        <line x1="210" y1="138" x2="210" y2="40" style="stroke:var(--d2);stroke-width:3"/>
+        <line x1="400" y1="138" x2="400" y2="40" style="stroke:var(--d2);stroke-width:3"/>
+        <rect x="203" y="124" width="14" height="16" style="fill:var(--d2)"/>
+        <text class="sm" x="60" y="185">southbound 11.1 m</text><text class="sm" x="250" y="175">northbound 11.1 m</text>
+        <text x="220" y="70" style="fill:var(--d2)">hangers and barrier</text><text x="220" y="88" style="fill:var(--d2)">on a lane</text>
+        <text class="sm" x="150" y="210">2 m overlap</text>
+        <!-- now: two 9 m decks meeting; cable planes outside both -->
+        <rect x="470" y="140" width="180" height="12" rx="2" style="fill:var(--d1);opacity:.85"/>
+        <rect x="652" y="140" width="180" height="12" rx="2" style="fill:var(--d1);opacity:.85"/>
+        <line x1="462" y1="138" x2="462" y2="40" style="stroke:var(--d3);stroke-width:3"/>
+        <line x1="840" y1="138" x2="840" y2="40" style="stroke:var(--d3);stroke-width:3"/>
+        <text class="sm" x="500" y="175">southbound 9 m</text><text class="sm" x="690" y="175">northbound 9 m</text>
+        <text x="560" y="70" style="fill:var(--d3)">cable planes outside;</text><text x="560" y="88" style="fill:var(--d3)">one surface, no step</text>
+      </svg>
+    </div>
+    <p class="bts">Measured on the deck: lanes and headroom hit by bridge structure went from 78,900 sample points to 155, none of them within the headroom over the road.</p>
+    <figure><img src="images/gg-twin-step.jpg" alt="Driving on the Golden Gate in BeamNG: before, a small step between the carriageways; now, one road surface" loading="lazy"></figure>
+    <h3>Road paint on level decks, and sidewalks round the towers</h3>
+    <p>Two older bugs showed up here too. A perfectly level deck got no asphalt and no lane lines, because the game doesn't draw road decals on a completely flat object. Deck surfaces now get a thin hidden skirt, so every level deck has its road paint. And where a bridge's sidewalk swings out around a tower leg, past the edge of the deck, it used to drop to the water and climb back up. It now stays level.</p>
+    <figure><img src="images/gg-paint.jpg" alt="Before: a bare concrete deck; now: asphalt with lane lines and the hangers outside the road" loading="lazy"></figure>
+    <figure><img src="images/gg-sidewalk.jpg" alt="Before: a sidewalk dipping from the deck down to the sea and back; now: a level walkway round the tower legs" loading="lazy"></figure>
+    <figure><img src="images/golden-gate-deck.jpg" alt="Driving across the Golden Gate in BeamNG: three lanes each way, hangers at both edges, street lamps" loading="lazy"><figcaption>Across the Golden Gate on a 4&nbsp;km level, both ends on land.</figcaption></figure>
+  </section>
+
+  <section id="drawbridges">
+    <div class="kicker">The Bridge of Lions, St. Augustine</div>
+    <h2>🏰 Drawbridges and the buildings on bridges</h2>
+    <p>Some bridges carry buildings: a drawbridge's tower houses, a bridge tender's house, a toll booth. OpenStreetMap maps them as ordinary buildings, so MapNG built them as houses on the riverbed, with their roofs at the waterline under the deck. Now a small building inside a bridge's outline, or over the water against its deck, is part of the bridge. It stands at deck height on a pier of its own. A bridge's towers share one design, and where nothing is mapped they get a tower's proportions: two storeys and a pyramid roof. Anything that is mapped, like a height or a roof shape, still wins.</p>
+    <figure><img src="images/lions-before-after.jpg" alt="The Bridge of Lions in BeamNG: before, small roofs at the waterline under a plain deck; now, four towers on wide piers framing the lift span" loading="lazy"></figure>
+    <p>OpenStreetMap also says the middle span is a <b>bascule</b> (<code>bridge:movable=bascule</code>). Movable spans are now built as such: a bascule or lift span gets wide end piers out past the deck, which hold its counterweights in reality and its towers here, steel along its leaves, and no ordinary piers under them. A swing span gets its pivot pier.</p>
+    <div class="split">
+      <figure><img src="images/lions-towers.jpg" alt="The Bridge of Lions from the water: towers on their piers at the lift span, lamps along the deck" loading="lazy"></figure>
+      <figure><img src="images/lions-deck.jpg" alt="Driving onto the lift span between the towers" loading="lazy"></figure>
+    </div>
+    <div class="refs" style="margin-top:18px">
+      <figure><img src="images/ref-lions-bascule.jpg" alt="Photo of the Bridge of Lions with its bascule raised for a tall ship, the towers on their piers" loading="lazy"><figcaption>The real bascule, raised. Photo: Gary Leavens, <a href="https://commons.wikimedia.org/wiki/File:Bridge_of_Lions_opened_for_a_replica_pirate_ship_-_from_southwest_(2012).jpg">Wikimedia Commons</a>, <a href="https://creativecommons.org/licenses/by-sa/2.0">CC BY-SA 2.0</a>.</figcaption></figure>
+      <figure><img src="images/ref-lions-marina.jpg" alt="Photo of the Bridge of Lions from the marina, the towers at its centre" loading="lazy"><figcaption>From the marina. Photo: U.S. National Archives (NARA 7716685), <a href="https://commons.wikimedia.org/wiki/File:A1A_Scenic_and_Historic_Coastal_Byway_-_Docked_by_the_Bridge_of_Lions_-_NARA_-_7716685.jpg">Wikimedia Commons</a>, public domain.</figcaption></figure>
+    </div>
+    <h3>Lights on bridges</h3>
+    <p>Street lamps were only placed along roads on the ground, so every bridge was dark at night. A lit bridge now gets lamps on its parapet at the deck's height, by the same rule as the street: tagged <code>lit=yes</code>, or a main road in town. A bridge over water never looks like "town" on its own, so it counts as town when it lands near urban streets.</p>
+    <figure><img src="images/lions-lamps.jpg" alt="Lamps on the Bridge of Lions' parapet by day, and lighting the road at night" loading="lazy"></figure>
+    <p class="bts">Still missing here: the obelisk posts and the real colours, cream walls and red roofs. OpenStreetMap doesn't have them for this bridge yet, and MapNG won't invent them.</p>
+  </section>
+
+  <section id="more">
+    <div class="kicker">And more</div>
+    <h2>🧹 Everything else in this round</h2>
+    <div class="polish">
+      <div><b>Curved bridge ends</b>Where a deck meets its road, the grade change is spread over a smooth vertical curve instead of a corner, at plain joints and at junctions.</div>
+      <div><b>Crossings, not junctions</b>Roads that share a point in OSM but are on different layers cross over each other; same-layer decks and spiral ramps passing over themselves stack properly.</div>
+      <div><b>Bridges split mid-span</b>A bridge mapped as two pieces meeting in the middle is solved as one line, with no sag at the join.</div>
+      <div><b>River bridges kept</b>A bridge crossing an export's edge with no point inside it is kept (the Brooklyn Bridge had gone missing).</div>
+      <div><b>Waterfront lidar</b>Water points in lidar no longer make the land beside them look coarse.</div>
+      <div><b>Unbuilt tunnels</b>Tunnels that aren't built are treated as roads on the ground, not as decks stuck in a hillside.</div>
+      <div><b>Arch styles</b>Arches are picked from the bridge's shape and outline: one concrete arch across a gorge, a steel arch over the deck only where it's low over a long span.</div>
+      <div><b>Clearance over banks</b>A river mapped with its banks inside keeps the deck clear of the banks too.</div>
+    </div>
+    <table class="nums">
+      <thead><tr><th>Bridge ends past a limit (Ready to drive, lidar)</th><th>Before</th><th>After</th></tr></thead>
+      <tbody>
+        <tr><td>Brooklyn (Brooklyn Bridge, BQE)</td><td class="n">27</td><td class="n">19</td></tr>
+        <tr><td>Los Angeles four-level interchange</td><td class="n">28</td><td class="n">18</td></tr>
+        <tr><td>Atlanta "Spaghetti Junction"</td><td class="n">17</td><td class="n">12</td></tr>
+        <tr><td>Dallas High Five</td><td class="n">17</td><td class="n">8</td></tr>
+        <tr><td>Birmingham Gravelly Hill</td><td class="n">13</td><td class="n">8</td></tr>
+        <tr><td>Ganter Bridge area (worst grade change)</td><td class="n">29%</td><td class="n">5%</td></tr>
+      </tbody>
+    </table>
+    <p class="bts">A "limit" means a step over 10&nbsp;cm, a grade turning more than 3% in 4&nbsp;m, or a road more than 50&nbsp;cm off its ground. These are strict on purpose, so the remaining count is what's left to work on.</p>
+  </section>
+
+  <section id="next">
+    <div class="kicker">Where it stands</div>
+    <h2>🧭 What's good, and what's next</h2>
+    <ul>
+      <li><b>Ready to drive</b> is in good shape on lidar: decks clear what they cross, and the ends meet their roads smoothly almost everywhere. On the global 30&nbsp;m data it's good on most bridges, with rougher spots where that data is noisy (dense cities).</li>
+      <li><b>Untouched</b> builds the bridges themselves correctly, but by design it doesn't reshape the ground, so on coarse 30&nbsp;m data the approaches can still meet the terrain with a step.</li>
+      <li><b>Still on the list:</b> ramps lifted without a bridge tag that get a sharp crest; the noisy 30&nbsp;m surface data around some cities; bridge decorations and colours where OpenStreetMap has them; and a wider look at national bridge data (like the US National Bridge Inventory) as an extra layer.</li>
+    </ul>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks</h2>
+    <p>Thanks to everyone testing bridges and sending reports in the Discord. Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Measured deck heights from <a href="https://www.usgs.gov/3d-elevation-program">USGS 3DEP</a> lidar. Reference photos on this page are from <a href="https://commons.wikimedia.org">Wikimedia Commons</a>, credited under each one; we also compared our levels against street-level images from <a href="https://www.mapillary.com">Mapillary</a> contributors while testing.</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p>Try a bridge you know and tell me what you see: an end that jolts, a pier in a road, a bridge that should be an arch. Post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.2.9/">Previous update (0.2.9)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>

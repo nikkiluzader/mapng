@@ -45,7 +45,7 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **Buildings** textured with BeamNG's own facades and roofs
 - **Roads:** DecalRoads with real surfaces, lane markings by country, crosswalks, stop bars, parking lanes and shoulders; roads on the 30 m source are smoothed and levelled automatically
 - **Street detail:** traffic signals per approach, road signs, street lamps that light up at night, raised sidewalks with curb returns and ramps, median islands on divided roads, hydrants, bins, benches, utility poles and power lines
-- **Bridges, tunnels and dams** solved as one network with the roads and terrain: styled bridges (trusses, arches, suspension), lidar deck heights in the US, tunnel portals and lights (with the terrain Untouched, tunnels on lidar open only their entrances), concrete arch dams with the road and guardrails along the crest
+- **Bridges, tunnels and dams** solved as one network with the roads and terrain, from general rules that work with any terrain and OpenStreetMap data: smooth bridge ends, clearance over rivers and roads, styled bridges (trusses, arches, suspension, cable-stayed), drawbridges with their tower houses and lift spans, divided roads sharing one deck, lamps on lit bridges, lidar deck heights in the US, tunnel portals and lights (with the terrain Untouched, tunnels on lidar open only their entrances), concrete arch dams with the road and guardrails along the crest
 - **Venues:** racetracks with kerbs, walls and catch fences, sports grounds with surfaces, markings and seating, swimming pools and fountains, floodlights
 - **AI traffic** on the road network, road names on the minimap, fuel stations
 - **OpenStreetMap data** from MapNG's own copy, growing region by region toward the whole planet (fast and independent of Overpass outages), health-ranked Overpass mirrors elsewhere, or your own Overpass server; **Overture Maps** adds buildings and heights OpenStreetMap is missing, and is the backup source if every Overpass server is down
@@ -59,6 +59,16 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - 7 languages, light and dark mode
 
 ## What's New (November 2026)
+
+**MapNG 0.2.11** ([update page](https://mapng.com/updates/0.2.11/))
+
+- **Bridges, built by rules:** a long round of bridge, overpass and interchange work, tested on more than 50 areas in Ready to drive, Custom and Untouched with plots, real photos and in-game checks. Every fix is a general rule from OpenStreetMap and the terrain (no special cases for places); more detailed data is used where it exists. Better, not perfect: more rounds to come
+- **Bridge ends** meet their roads on smooth vertical curves; roads sharing a point on different layers cross instead of joining; spiral ramps and same-layer decks stack
+- **Rivers and streams:** clearance is measured from the water, not from an island in it (the Pont de Bir-Hakeim had a 21 m peak); short bridges over streams and ditches stay on their road's line; deck arches stay under the road
+- **Divided roads on one bridge:** two carriageways mapped closer than their widths are fitted side by side, tied to one height, with a suspension or cable-stayed bridge's cables outside both (the Golden Gate)
+- **Drawbridges and buildings on bridges:** tower houses inside a bridge's outline stand on their own piers at deck height; bascule and lift spans get their end piers, swing spans their pivot
+- **Lamps on lit bridges**, on the parapet at the deck's height
+- **Fixes:** road paint on perfectly level decks (it was missing), bridge sidewalks no longer drop to the water round tower legs, river bridges crossing the export's edge are kept
 
 **MapNG 0.2.10** (a fix release)
 
