@@ -580,7 +580,7 @@ export function* solveProfilesSteps(graph) {
   }
   if (split) clampGrades();
   verticalCurves(graph, Z, L, U, off, pinned, held);
-  tieTwinDecks(edges, Z, off, pinned, held);
+  tieTwinDecks(edges, Z, off, pinned, held, L, U, crossings);
   const z = edges.map((e, k) => Z.slice(off[k], off[k] + e.s.length));
   const result = { z, rounds, residual: profileResidual(graph, z) };
   // (debug: the envelopes, for tools)
@@ -596,17 +596,28 @@ export function* solveProfilesSteps(graph) {
 const TWIN_GAP_M = 1.2;        // edge to edge at most this apart (beyond: a median, decks of their own)
 const TWIN_COS = 0.95;
 const TWIN_EASE_M = 30;
+const TWIN_EASE_GRADE = 0.005; // the ease adds at most this much grade
 const TWIN_MAX_DZ_M = 1.5;     // more apart than this: not one surface (a ramp alongside at another level)
-function tieTwinDecks(edges, Z, off, pinned, held) {
+function tieTwinDecks(edges, Z, off, pinned, held, L, U, crossings = []) {
   const decks = edges.map((e, k) => k).filter((k) => edges[k].bridge && !edges[k].tunnel && edges[k].s.length > 1);
   if (decks.length < 2) return;
   const fixed = (v) => !!(pinned?.[v] || held?.[v]);
-  const target = new Map();   // station -> [sum, n] of partners' heights
-  const ease = (e, i) => Math.min(1, Math.min(e.s[i], e.s[e.s.length - 1] - e.s[i]) / TWIN_EASE_M);
+  // a road under another never lifted here (the one over it was solved for its height as it was: the
+  // upper deck's envelope knows nothing of a later lift under it)
+  const under = new Set();
+  for (const c of crossings) {
+    if (!c.upper) continue;
+    const dn = c[c.upper === 'a' ? 'b' : 'a'];
+    if (!dn || off[dn.edge] == null) continue;
+    under.add(off[dn.edge] + dn.i); under.add(off[dn.edge] + dn.i + 1);
+  }
+  const moves = [];
   for (const a of decks) {
     const ea = edges[a];
-    for (let i = 0; i < ea.s.length; i++) {
-      const ia = Math.min(i, ea.s.length - 2);
+    const n = ea.s.length;
+    const sum = new Float64Array(n); const cnt = new Uint16Array(n);
+    for (let i = 0; i < n; i++) {
+      const ia = Math.min(i, n - 2);
       const ux = ea.x[ia + 1] - ea.x[ia]; const uy = ea.y[ia + 1] - ea.y[ia]; const ul = Math.hypot(ux, uy) || 1;
       for (const b of decks) {
         if (b === a) continue;
@@ -626,22 +637,33 @@ function tieTwinDecks(edges, Z, off, pinned, held) {
         }
         if (!best || best.cos < TWIN_COS || best.d > ea.half + eb.half + TWIN_GAP_M || best.d < 0.5 * (ea.half + eb.half)) continue;
         const zb = Z[off[b] + best.j] + (Z[off[b] + best.j + 1] - Z[off[b] + best.j]) * best.t;
-        const va = off[a] + i;
-        if (Math.abs(zb - Z[va]) > TWIN_MAX_DZ_M) continue;
-        const w = Math.min(ease(ea, i), ease(eb, best.j));
-        const cur = target.get(va) || [0, 0, 0];
-        cur[0] += zb * w; cur[1] += w; cur[2] = Math.max(cur[2], w);
-        target.set(va, cur);
+        if (Math.abs(zb - Z[off[a] + i]) > TWIN_MAX_DZ_M) continue;
+        sum[i] += zb; cnt[i]++;
       }
     }
+    // eased in and out over TWIN_EASE_M wherever the pairing starts or stops (a deck's ends, or partway
+    // along where the two part): never a step at the edge of the paired stretch
+    let lastOff = -Infinity;
+    const toOff = new Float64Array(n).fill(Infinity);
+    for (let i = 0; i < n; i++) { if (!cnt[i]) lastOff = ea.s[i]; toOff[i] = ea.s[i] - lastOff; }
+    lastOff = Infinity;
+    for (let i = n - 1; i >= 0; i--) { if (!cnt[i]) lastOff = ea.s[i]; toOff[i] = Math.min(toOff[i], lastOff - ea.s[i]); }
+    for (let i = 0; i < n; i++) {
+      const v = off[a] + i;
+      if (!cnt[i] || fixed(v)) continue;
+      const mean = (Z[v] + sum[i] / cnt[i]) / 2;
+      // (eased over a length the step asks for: at most TWIN_EASE_GRADE of grade added)
+      const easeM = Math.max(TWIN_EASE_M, Math.abs(mean - Z[v]) / TWIN_EASE_GRADE);
+      const w = Math.min(1, Math.min(ea.s[i], ea.s[n - 1] - ea.s[i], toOff[i]) / easeM);
+      if (w <= 0) continue;
+      let z = Z[v] + (mean - Z[v]) * w;
+      if (under.has(v)) z = Math.min(z, Z[v]);
+      // (inside the envelopes: never under another road's clearance or over its own limits)
+      if (L && U) z = Math.min(Math.max(z, L[v]), Math.max(L[v], U[v]));
+      moves.push([v, z]);
+    }
   }
-  const next = new Map();
-  for (const [v, [sum, wsum, wmax]] of target) {
-    if (fixed(v) || wsum <= 0) continue;
-    const mean = (Z[v] + sum / wsum) / 2;
-    next.set(v, Z[v] + (mean - Z[v]) * wmax);
-  }
-  for (const [v, z] of next) Z[v] = z;
+  for (const [v, z] of moves) Z[v] = z;
 }
 
 // Vertical curves where a deck meets a road on the ground: the deck's grade
