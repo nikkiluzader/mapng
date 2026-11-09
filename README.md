@@ -52,6 +52,9 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **How heavy is this level?** Before you export, a card rates the level from its size, how far its corners are from the centre (BeamNG starts to jitter past about 30 km) and its building count. It only warns; you can always export
 - **Share your setup:** a short code or link for your settings (works for 24 hours), a long code that never expires, or a file. Whoever opens it sees exactly what it changes first, and your own keys and servers never go with it
 - **A step-by-step control panel:** Location, Sources, Generate, Export (batch: Location, Sources, What you get, Run), with your setup always shown above the buttons
+- **Background areas** (Advanced): shade the parts of the map you won't drive; they keep their shape but get no buildings, trees, grass or props and download at lower detail. A No smoothing brush keeps chosen roads exactly as the elevation data has them
+- **Exports that only redo what changed:** everything is downloaded at Generate and in a background data step (one download cache), Check level when nothing changed, and the slow steps reused when one setting did; export history in the desktop app
+- **3D preview** with Standard and Cinematic looks, sun shadows, and terrain views (Relief, Slope, Height, contour lines)
 - **Basic and Advanced modes:** Basic builds the BeamNG level with everything the map has. Advanced adds the Terrain choice (Ready to drive, Custom or Untouched), per-category level options (buildings, water, trees, bridges, tunnels), heightmap, texture and 3D model downloads, and surrounding tiles
 - **Your own OpenStreetMap data:** pull the area straight from openstreetmap.org (one request per click; its [API usage policy](https://operations.osmfoundation.org/policies/api/) is yours to follow), or drop in an `.osm` file, when the public servers are down or behind
 - **Batch mode** for tile grids up to 20×20, or a combined level stitched from a 2×2, 4×4 or 8×8 grid
@@ -59,6 +62,16 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - 7 languages, light and dark mode
 
 ## What's New (November 2026)
+
+**MapNG 0.2.12** ([update page](https://mapng.com/updates/0.2.12/))
+
+- **Background areas** (Advanced, Location step): draw lines and shade the parts of the map you won't drive, or keep only the roads you will; background keeps its shape but gets no buildings, trees, grass or props and downloads at lower detail. Picking a tool locks the box so you can zoom in to draw; drawings travel with saved settings and share codes. Plus a **No smoothing** brush for roads that keep the terrain as downloaded
+- **Water out to the horizon:** with the backdrop on, the lakes, ponds, reservoirs and rivers round the map are built out to its edges at the map's water levels
+- **Lake beds with real depths** (deeper away from the shore, reservoirs deepest at the dam); land below sea level that the open sea can't reach stays dry
+- **Mountains:** the Game texture without baked shading, its classes checked against WorldCover, rock and scree only where the satellite shows them; deserts keep their colours; avalanche galleries use the hillside as their back; forest density (Light to Very dense)
+- **Exports that only redo what changed:** the export downloads nothing (Generate and a background data step fill one cache); Check level instead of a rebuild when nothing changed; the backdrop, buildings and materials reused when one setting changed; export history and key-free saved projects in the desktop app
+- **3D preview:** a Cinematic look, working sun shadows (buildings and trees were lit four times over), real tree shapes at real sizes, a much lighter sky, terrain views (Relief, Slope, Height, contour lines), and the MapNG flag on the real summit (no more floating or hanging on the edge)
+- **Fixes:** the backdrop textured in desktop exports, drivable and seamless; translations complete again
 
 **MapNG 0.2.11** ([update page](https://mapng.com/updates/0.2.11/))
 

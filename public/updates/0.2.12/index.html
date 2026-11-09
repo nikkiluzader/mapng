@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.2.12: Lighter Levels, Smarter Exports</title>
+<meta name="description" content="What's new in MapNG 0.2.12: background areas you shade on the map, water out to the backdrop's edges, real lake depths, better mountains, exports that only redo what changed, and a 3D preview with working shadows, real trees and terrain views.">
+<link rel="canonical" href="https://mapng.com/updates/0.2.12/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.2.12: lighter levels, smarter exports">
+<meta property="og:description" content="Background areas, water to the horizon, real lake depths, mountains, Check level, and a 3D preview that pops.">
+<meta property="og:url" content="https://mapng.com/updates/0.2.12/">
+<meta property="og:image" content="https://mapng.com/updates/0.2.12/images/hero-chevril.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: the in-game shot with the title over it */
+  .hero { position: relative; color: #fff; background: #111 url(images/hero-chevril.jpg) center/cover no-repeat; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(70vh, 560px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+  /* diagrams (inline SVG): colours from the page tokens, both modes */
+  .dia { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 18px; }
+  .dia svg { width: 100%; height: auto; display: block; --d1: #2f6fd6; --d2: #e85d00; --d3: #3a9a4a; --dg: #b9cf9f; --dw: #9cc3e6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; } }
+  :root[data-theme="dark"] .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; }
+  .dia text { fill: var(--text); font: 13px "Noto Sans", sans-serif; }
+  .dia .sm { fill: var(--muted); font-size: 12px; }
+  .dia .box { fill: var(--surface-2); stroke: var(--border); }
+  .dia .boxb { fill: var(--brand-tint); stroke: var(--brand); }
+  .dia .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .refs figcaption a { color: var(--muted); }
+  .pair2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .pair2 { grid-template-columns: 1fr; } }
+  .stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font: 800 26px/1.1 "Overpass", sans-serif; color: var(--brand-ink); }
+  .stat span { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.2.12</span></span>
+    <h1>Lighter levels, smarter exports</h1>
+    <p>Shade the parts of the map you won't drive. Water that runs out to the horizon, lakes with real depths, and mountains that look like mountains. Exports that only redo what changed. And a 3D preview with working shadows, real trees and new ways to read the terrain.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+  <span class="credit">The valley below Lac du Chevril in the French Alps on a 2 km MapNG level: the village, the avalanche gallery on the D902 and the forest on the slopes, in BeamNG.drive 0.40</span>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#background">🗺️ Background areas</a>
+    <a href="#water">🌊 Water</a>
+    <a href="#mountains">🏔️ Mountains</a>
+    <a href="#exports">⚡ Smarter exports</a>
+    <a href="#preview">🎬 3D preview</a>
+    <a href="#more">🧹 More</a>
+  </nav>
+
+  <p style="margin-top:28px">This one is a big one. Much of it came straight from your reports in the Discord: Alpine maps that needed better lakes, rock and galleries, people who wanted to draw only the part of a map they'd drive, and a 3D preview that was overdue for some love. Here's what changed.</p>
+
+  <section id="background">
+    <div class="kicker">New in step 1 (Advanced)</div>
+    <h2>🗺️ Background areas: shade what you won't drive</h2>
+    <p>Most maps have parts you'll never drive: the far side of a ridge, a forest between two valleys, the hills round a town. Now you can tell MapNG. In <b>Location → Background areas</b>, draw a line or two across the box and shade the closed areas you don't need. Background keeps its real shape, so the level still looks right from the road, but it gets <b>no buildings, trees, grass or props</b>, and its data downloads at lower detail. Levels come out lighter and faster to build and to drive.</p>
+    <figure><img src="images/background-areas.jpg" alt="MapNG's 2D map over Tignes: one orange line drawn down the foot of a hillside, the hillside beyond it shaded as background, 41% of the map; the Background areas tools in the sidebar" loading="lazy"><figcaption>One line down the foot of the hillside, one click to shade it: 41% of this 2&nbsp;km map becomes background.</figcaption></figure>
+    <ol class="callouts">
+      <li><b>Draw line</b> from edge to edge, or a closed loop. The map's edge counts as part of an outline.</li>
+      <li><b>Shade area</b> makes a closed area background. Click again to make it drivable.</li>
+      <li><b>Keep road</b> the other way round: pick the roads you'll drive, and everything farther than the road width becomes background.</li>
+      <li><b>Unmask</b> paints background back to drivable with a brush, a box or a lasso.</li>
+    </ol>
+    <h3>No smoothing areas</h3>
+    <p>The same panel has a <b>No smoothing</b> brush: paint where roads should keep the terrain exactly as the elevation data has it, with no smoothing or levelling. Handy for rally stages, rough tracks and mountain roads where the bumps are the point.</p>
+    <figure><img src="images/no-smoothing-tool.jpg" alt="The No smoothing tool selected, with Brush, Box and Lasso shapes, and No smoothing or Smooth again" loading="lazy"></figure>
+    <div class="note"><b>Drawing tip:</b> picking a drawing tool locks the area box where it is, so you can zoom in and draw exactly where you want without the box following the crosshair. Hold <b>Space</b> and drag to move the map while a tool is picked. Your background areas are also saved with your settings and travel in share codes, so a friend gets your drawing too. (A very big drawing may not fit in a short code; the long code always carries it.)</div>
+  </section>
+
+  <section id="water">
+    <div class="kicker">Lakes, rivers and the sea</div>
+    <h2>🌊 Water out to the horizon</h2>
+    <p>With the <b>surrounding backdrop</b> on, the land carried on past your map, but its lakes stopped dead at the map's edge, and the backdrop showed the rest as a flat satellite photo. Now the lakes, ponds, reservoirs and rivers round the map are built out to the backdrop's edges too, at the same level as the map's own water. A lake that runs off the map simply carries on. (Turn water off, or draw background areas, and this is skipped.)</p>
+    <figure><img src="images/backdrop-lake.jpg" alt="In BeamNG: Lac du Chevril seen from its far end, one continuous water surface from the backdrop in the foreground to the dam and the village of Tignes-les-Brévières" loading="lazy"><figcaption>Lac du Chevril from its far end. Everything in the foreground is backdrop; the map itself starts round the middle of the lake. It's one water surface all the way to the dam.</figcaption></figure>
+    <div class="dia" role="img" aria-label="Diagram: the map square with a lake crossing its south edge. Before, water stopped at the edge; now the backdrop's water reaches 70 m into the map and carries on to the backdrop's edge, with rivers continuing too">
+      <svg viewBox="0 0 860 300">
+        <rect x="10" y="10" width="400" height="280" rx="8" class="box"/>
+        <text x="24" y="34" style="font-weight:700">Before</text>
+        <rect x="110" y="40" width="200" height="160" style="fill:none;stroke:var(--text);stroke-width:1.5;stroke-dasharray:6 4"/>
+        <text class="sm" x="118" y="58">your map</text>
+        <path d="M170,150 C175,130 220,128 250,140 L262,200 L160,200 Z" style="fill:var(--dw);stroke:var(--d1)"/>
+        <path d="M160,200 L262,200 L280,270 C240,282 180,282 150,262 Z" style="fill:none;stroke:var(--muted);stroke-dasharray:3 3"/>
+        <text class="sm" x="180" y="250">photo only</text>
+        <rect x="450" y="10" width="400" height="280" rx="8" class="boxb"/>
+        <text x="464" y="34" style="font-weight:700">Now</text>
+        <rect x="550" y="40" width="200" height="160" style="fill:none;stroke:var(--text);stroke-width:1.5;stroke-dasharray:6 4"/>
+        <text class="sm" x="558" y="58">your map</text>
+        <path d="M610,150 C615,130 660,128 690,140 L702,200 L600,200 Z" style="fill:var(--dw);stroke:var(--d1)"/>
+        <path d="M600,186 L700,186 L720,270 C680,282 620,282 590,262 Z" style="fill:var(--dw);stroke:var(--d1);opacity:.85"/>
+        <path d="M750,110 C790,120 800,150 840,160" style="fill:none;stroke:var(--d1);stroke-width:3"/>
+        <path d="M700,96 C720,100 740,106 750,110" style="fill:none;stroke:var(--d1);stroke-width:3"/>
+        <text class="sm" x="770" y="146">river</text>
+        <text class="sm" x="622" y="250">backdrop water</text>
+        <text class="sm" x="606" y="182">70 m overlap</text>
+      </svg>
+    </div>
+    <p class="bts">Behind the scenes: the water round the map is downloaded with the backdrop, planned the same way as the map's own (each lake at its level, rivers as river surfaces), and a lake crossing the edge takes the map's level and reaches 70&nbsp;m into the map, so no dry strip shows between the two.</p>
+
+    <h3>Lake beds with real depths</h3>
+    <p>Lakes used to be a shallow 1.5&nbsp;m pan under the water. Now a lake's bed gets deeper with distance from its shore, the way real lake beds do, with the maximum depth estimated from the slope of the land round it (or from OpenStreetMap's depth tags where they exist). Reservoirs know where their dam is and are deepest against it. Lac du Chevril comes out at 115&nbsp;m at its deepest. Big lakes beside a road tunnel no longer lose half their water either.</p>
+    <figure><img src="images/lake-bed.jpg" alt="Behind the scenes: Lac du Chevril's bed shaded by depth, deepest by the dam; and a west-east section showing the new deep V-shaped bed against the old 1.5 m pan" loading="lazy"><figcaption>Behind the scenes: Lac du Chevril's new bed by depth (dark is deep, deepest by the dam), and a section across it: the new bed in brown, the old 1.5&nbsp;m pan dashed.</figcaption></figure>
+
+    <h3>Land below sea level stays dry</h3>
+    <p>Dutch polders and other land behind dykes sit below sea level, and MapNG used to flood all of it with one sea plane at 0&nbsp;m. Now the sea only comes in where the open sea can actually reach, from the coastline or the map's open-water edges.</p>
+    <figure><img src="images/polder-sea.jpg" alt="Hillshade of the Zuidplaspolder in the Netherlands: before, almost all blue under water; after, dry land with its ditches and roads" loading="lazy"><figcaption>Behind the scenes: the Zuidplaspolder, where 99.6% of the ground is below sea level. Before: under water. Now: dry, as it is.</figcaption></figure>
+  </section>
+
+  <section id="mountains">
+    <div class="kicker">The Alps, and other high places</div>
+    <h2>🏔️ Mountains that look like mountains</h2>
+    <h3>The Game texture, rebuilt for mountains</h3>
+    <p>The <b>Game texture</b> (the base texture painted from land cover) had baked-in hill shading that fought with the game's own lighting, and big flat blotches of "rock" where the land-cover data guessed wrong. Now the shading is taken out, each class is checked against ESA WorldCover, rock and scree come back only where the satellite shows them, and the satellite's fine detail is blended in.</p>
+    <figure><img src="images/game-texture-tignes.jpg" alt="Four panels of Tignes from above: the satellite image; the old Game texture with flat olive grass and big grey blotches; a first pass; and the new texture with natural grass and rock where the satellite has it" loading="lazy"><figcaption>Tignes: the satellite, the old Game texture, a first pass, and now.</figcaption></figure>
+    <figure><img src="images/desert-colours.jpg" alt="The Hoover Dam area: before, washed-out beige with green blotches; now, the desert's red and tan colours" loading="lazy"><figcaption>Deserts keep their colours too: the Hoover Dam area before and now.</figcaption></figure>
+
+    <h3>Avalanche galleries</h3>
+    <p>Mountain roads often run through avalanche galleries: a roof over the road, open on the valley side, with the mountain behind. MapNG built the uphill side as a concrete wall standing in front of the hillside. Now the hillside itself is the gallery's back, graded up to its roof, as in the real thing. You can see one in the photo at the top of this page.</p>
+    <figure style="max-width:620px;margin-left:auto;margin-right:auto"><img src="images/gallery-section.png" alt="Cross-sections of a gallery on 15%, 50% and 120% hillsides: before, a concrete wall with the hillside cut away; now, the hillside graded up to the roof" loading="lazy"><figcaption>Behind the scenes: a gallery's cross-section on three hillsides, before and now. Black is the road, blue the concrete, brown the ground.</figcaption></figure>
+
+    <h3>Forest density</h3>
+    <p>In Advanced mode you can now choose how thick forests grow: <b>Light</b>, <b>Normal</b>, <b>Dense</b> or <b>Very dense</b>.</p>
+  </section>
+
+  <section id="exports">
+    <div class="kicker">Under the hood</div>
+    <h2>⚡ Exports that only redo what changed</h2>
+    <p>Exporting used to download things and rebuild everything every time, even when you'd only changed the tree density. Three changes fix that.</p>
+    <h3>1. The export downloads nothing</h3>
+    <p>Everything a level needs is fetched up front: the map data and land cover when you click <b>Generate</b>, and the extras your export settings ask for (the surrounding backdrop, the water round the map, measured bridge heights) in the background as soon as you pick them. It all goes into one download cache: up to 1.5&nbsp;GB in the browser, kept on disk in the desktop app. The export itself only processes, so it's faster, and it can't fail halfway through on a flaky download.</p>
+    <div class="dia" role="img" aria-label="Diagram: Generate and the background data step fill the download cache; the export reads only from the cache">
+      <svg viewBox="0 0 860 210">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker></defs>
+        <rect class="box" x="10" y="20" width="230" height="70" rx="10"/><text x="24" y="48" style="font-weight:700">Generate</text><text class="sm" x="24" y="70">terrain, map data, land cover</text>
+        <rect class="box" x="10" y="120" width="230" height="70" rx="10"/><text x="24" y="148" style="font-weight:700">Background data step</text><text class="sm" x="24" y="170">backdrop, water round the map, lidar</text>
+        <rect class="boxb" x="320" y="60" width="220" height="90" rx="12"/><text x="336" y="94" style="font-weight:700">Download cache</text><text class="sm" x="336" y="116">browser: up to 1.5 GB</text><text class="sm" x="336" y="134">desktop: on disk, kept</text>
+        <rect class="box" x="620" y="60" width="230" height="90" rx="12"/><text x="636" y="94" style="font-weight:700">Export</text><text class="sm" x="636" y="116">processing only,</text><text class="sm" x="636" y="134">no downloads</text>
+        <path class="arrow" d="M240,55 C280,55 290,90 318,95"/><path class="arrow" d="M240,155 C280,155 290,120 318,115"/><path class="arrow" d="M540,105 L618,105"/>
+      </svg>
+    </div>
+    <h3>2. Check level, and a step cache</h3>
+    <p>Click export again without changing anything and you now get <b>Check level</b> instead of a rebuild: it checks the zip you already have against your settings and tells you it's up to date (<b>Rebuild anyway</b> is there if you want it). Change one setting and the export reuses every slow step that setting doesn't touch: the surrounding backdrop, the buildings and the terrain materials are kept from the last export and only the rest is built again. <b>Modify</b> and <b>Update</b> in the desktop app's levels list work the same way.</p>
+    <div class="split narrow-img">
+      <figure><img src="images/check-level.jpg" alt="The export panel showing Check level: up to date, exported just now with these settings; Level checked: everything's there; Rebuild anyway; Download ready" loading="lazy"></figure>
+      <div class="dia" role="img" aria-label="Diagram: changing the tree density reuses the backdrop, buildings and materials; only the trees and what follows are built again" style="margin-top:0">
+        <svg viewBox="0 0 420 300">
+          <text x="10" y="22" style="font-weight:700">You change the tree density:</text>
+          <rect class="box" x="10" y="40" width="190" height="40" rx="8"/><text x="22" y="65">Backdrop</text><text class="sm" x="120" y="65">kept ✓</text>
+          <rect class="box" x="10" y="90" width="190" height="40" rx="8"/><text x="22" y="115">Buildings</text><text class="sm" x="120" y="115">kept ✓</text>
+          <rect class="box" x="10" y="140" width="190" height="40" rx="8"/><text x="22" y="165">Materials</text><text class="sm" x="120" y="165">kept ✓</text>
+          <rect class="boxb" x="220" y="40" width="190" height="40" rx="8"/><text x="232" y="65">Trees</text><text class="sm" x="320" y="65">rebuilt</text>
+          <rect class="boxb" x="220" y="90" width="190" height="40" rx="8"/><text x="232" y="115">Level files</text><text class="sm" x="320" y="115">rebuilt</text>
+          <text class="sm" x="10" y="214">The desktop app keeps these on disk</text>
+          <text class="sm" x="10" y="232">between runs, so they're reused even</text>
+          <text class="sm" x="10" y="250">after a restart.</text>
+        </svg>
+      </div>
+    </div>
+    <h3>3. Export history and cleaner saved projects</h3>
+    <p>The desktop app now keeps a history of your exports (<b>Last exports</b> in the levels list), with the settings each one used, and saved projects no longer store your API keys: the app's own keys are used when you rebuild or modify a level.</p>
+  </section>
+
+  <section id="preview">
+    <div class="kicker">The 3D preview</div>
+    <h2>🎬 A 3D preview that pops</h2>
+    <p>The preview had been neglected for a while apart from speed work. It's had a proper going-over.</p>
+    <figure><img src="images/preview-before-after.jpg" alt="The Tignes preview before (flat, dark sea, blobby trees) and now in Cinematic (bright lake water, soft shading, earth-coloured sides under the tile)" loading="lazy"><figcaption>Tignes in the preview: before, and now in Cinematic.</figcaption></figure>
+    <ul>
+      <li><b>Visual quality: Cinematic</b> (Scene settings) adds soft shadow in valleys and round buildings, a gentle glow, haze into the distance, richer colour, real lake water and earth-coloured sides under the map. <b>Standard</b> stays light for weaker graphics cards, and is picked automatically when there's no graphics card to speak of.</li>
+      <li><b>Shadows that work.</b> Buildings, trees and props were lit about four times too brightly and their shadows were a jumble; the terrain cast no shadows at all. Now one sun casts shadows from everything, mountains shade their valleys, and the shadows sharpen as you zoom in.</li>
+      <li><b>Real trees.</b> A short trunk under a full, lumpy crown, and tiered conifers, in natural greens and at real sizes (6 to 9&nbsp;m) instead of big gem-cut balls on 6&nbsp;m sticks.</li>
+      <li><b>Opens faster.</b> The sky image went from 20&nbsp;MB to 1.4&nbsp;MB (Standard) or 5.4&nbsp;MB (Cinematic), and in our tests opening the preview froze the page for less than half as long as before.</li>
+    </ul>
+    <div class="pair2">
+      <figure><img src="images/preview-shadows.jpg" alt="Close-up of buildings in the preview casting shadows across the ground" loading="lazy"><figcaption>Buildings throw their shadows again.</figcaption></figure>
+      <figure><img src="images/preview-trees.jpg" alt="Trees in the preview: before, gem-cut green balls on long sticks; now, rounded trees with short trunks" loading="lazy"><figcaption>Trees before and now.</figcaption></figure>
+    </div>
+    <h3>New: Terrain view</h3>
+    <p>To see the shape of the land you used to set the texture to None. Now <b>Scene settings → Terrain view</b> has proper options. <b>Relief</b> is plain clay lit by the sun: the shape and nothing else. <b>Slope</b> colours the ground by steepness, from flat green through yellow (12°) and red (30°) to purple (40° and up), so you can see at a glance where a car will climb. <b>Height</b> colours it from valley to summit. Add <b>contour lines</b> to any of them; the spacing is picked from your map's relief, with every fifth line bold.</p>
+    <figure><img src="images/terrain-views.jpg" alt="The same Tignes preview three ways: Relief with contour lines, Slope colours, and Height colours with contour lines" loading="lazy"><figcaption>Relief, Slope and Height on the same map. The ski slopes above town stand out in orange and red.</figcaption></figure>
+    <h3>The MapNG flag, on the summit</h3>
+    <p>Every level has a MapNG flag on its highest point, and the preview shows where it'll stand. Sometimes it floated in mid-air or hung on the edge of the map. It now ignores one- and two-pixel spikes in the elevation data (masts, odd lidar returns), and goes on the highest real hilltop inside the map instead of the edge where the land rises off it. In the level it stands exactly on the terrain.</p>
+    <div class="dia" role="img" aria-label="Diagram: a terrain profile rising to the map's edge, with a hill inside and a spike. The old flag went on the spike or the edge; the new one goes on the hill">
+      <svg viewBox="0 0 860 220">
+        <path d="M20,190 L120,170 C170,150 210,95 260,95 C310,95 340,150 400,150 L470,150 L474,40 L478,150 C560,140 700,90 840,30 L840,200 L20,200 Z" style="fill:var(--dg)"/>
+        <line x1="840" y1="10" x2="840" y2="210" style="stroke:var(--text);stroke-dasharray:6 4"/>
+        <text class="sm" x="760" y="214">map's edge</text>
+        <g style="stroke:var(--d2);stroke-width:2.5"><line x1="474" y1="40" x2="474" y2="8"/><line x1="836" y1="30" x2="836" y2="0"/></g>
+        <path d="M474,8 L494,14 L474,20 Z M836,0 L816,6 L836,12 Z" style="fill:var(--d2)"/>
+        <text x="500" y="22" style="fill:var(--d2)">before: a data spike…</text>
+        <text x="650" y="56" style="fill:var(--d2)">…or the edge</text>
+        <g style="stroke:var(--d1);stroke-width:3"><line x1="260" y1="95" x2="260" y2="50"/></g>
+        <path d="M260,50 L288,58 L260,66 Z" style="fill:var(--d1)"/>
+        <text x="150" y="40" style="fill:var(--d1);font-weight:700">now: the hilltop</text>
+      </svg>
+    </div>
+  </section>
+
+  <section id="more">
+    <div class="kicker">Everything else</div>
+    <h2>🧹 More fixes and polish</h2>
+    <div class="polish">
+      <div><b>Backdrop, fixed up</b>Textured in desktop exports again, its downloads cached, drivable (it has collision now), and no seam line where it meets the map.</div>
+      <div><b>Gorges and rivers</b>Forest shade under a mapped river in a gorge is no longer painted in as water on the Game texture.</div>
+      <div><b>Faster zips</b>Files that are already compressed are stored as they are instead of being squeezed again.</div>
+      <div><b>Translations</b>German, Spanish, French, Italian, Polish and Russian are complete again, including everything new on this page.</div>
+      <div><b>Share codes</b>Long and short codes carry every export setting, and now your background areas too.</div>
+      <div><b>Sea without land cover</b>Where no land-cover data exists, only a mapped coastline or sea lets the sea in.</div>
+    </div>
+    <figure><img src="images/backdrop-seam.jpg" alt="Where the map meets the backdrop: before, a pale seam line along the edge; after, none" loading="lazy"><figcaption>The seam where the map meets the backdrop, before and after.</figcaption></figure>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks</h2>
+    <p>Thanks to everyone testing and sending feedback in the Discord, especially Fizz_Mechanic for the long lists of Alpine reports and SailorSunny405 for the background-areas ideas. Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Land cover from <a href="https://esa-worldcover.org">ESA WorldCover</a>. Satellite imagery © Esri and its data providers. The preview sky is Kloofendal 48d Partly Cloudy (Pure Sky) from <a href="https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky">Poly Haven</a> (CC0).</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p>Try background areas on a big map, open the preview's Slope view on your favourite mountain road, and tell me what you see. Post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.2.11/">Previous update (0.2.11)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>
