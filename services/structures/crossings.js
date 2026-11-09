@@ -34,8 +34,29 @@ const ROAD_UNDER_PATH_DECK_M = 4.5 + 0.6;  // headroom over a road + a footbridg
 // racing cars and karts under a light deck, not trucks under a road bridge
 const RACEWAY_OVER_RACEWAY_M = 3 + 0.6;
 
+// Railways (services/railways.js), measured from the top of the rail.
+// Headroom over a track: a freight main line's loading gauge (US double-stack
+// container trains 6.15 m, plus room), more under a contact wire; light rail,
+// trams and subways run under a wire about 4.5 m up; a funicular's cars are
+// low. A railway's own deck under its rails: ballast, sleepers and girders.
+const RAIL_HEADROOM_M = { rail: 6.2, narrow_gauge: 5, light_rail: 4.8, tram: 4.8, subway: 4.8, monorail: 4.5, funicular: 3.5 };
+const RAIL_HEADROOM_WIRE_M = 6.8;      // heavy rail under a contact wire
+const RAIL_DECK_M = 2.9;               // a rail bridge from the top of its rail to its underside (0.65 m of track on a 2.2 m deck)
+const ROAD_DECK_M = 1.5;               // a road bridge from its surface to its underside (DECK_ROAD_CLEAR_M - 5 m headroom)
+const FOOTBRIDGE_DECK_M = 0.6;
+const railOf = (e) => (typeof e.highway === 'string' && e.highway.startsWith('railway:') ? e.highway.slice(8) : null);
+
 /** Vertical separation an `upper` edge needs over a `lower` one (deck top over road surface). */
 export function requiredSeparation(upper, lower) {
+  const railUp = railOf(upper); const railDown = railOf(lower);
+  if (railUp || railDown) {
+    // what runs below needs its headroom, what stands over it its deck
+    const headroom = railDown
+      ? (lower.electrified && (railDown === 'rail' || railDown === 'narrow_gauge') ? RAIL_HEADROOM_WIRE_M : RAIL_HEADROOM_M[railDown] ?? RAIL_HEADROOM_M.rail)
+      : PATH_CLASSES.has(lower.highway) ? 2.5 : 5;
+    const deck = railUp ? RAIL_DECK_M : PATH_CLASSES.has(upper.highway) ? FOOTBRIDGE_DECK_M : ROAD_DECK_M;
+    return headroom + deck;
+  }
   if (PATH_CLASSES.has(lower.highway)) return PATH_UNDER_M;
   if (PATH_CLASSES.has(upper.highway)) return ROAD_UNDER_PATH_DECK_M;
   if (upper.highway === 'raceway' && lower.highway === 'raceway') return RACEWAY_OVER_RACEWAY_M;

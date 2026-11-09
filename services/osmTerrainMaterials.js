@@ -18,6 +18,7 @@ import { buildUrbanRoadClassifier, estimateRoadCrossSection, isOneWayRoad } from
 import { getEffectiveRoadLayer } from './roadNetwork.js';
 import { CURB_ONLY_M, sidewalkSides } from './beamngSidewalks.js';
 import { osmRockAllowed, steepRockFrom } from './worldCover.js';
+import { railHalfWidth, railKindOf, undergroundRailIds } from './railways.js';
 
 // ── Material names ─────────────────────────────────────────────────────────
 // Index 0 = DefaultMaterial (satellite base), 1–9 = BeamNG-referenced materials
@@ -893,6 +894,8 @@ const GRASS_GROWING = new Set([1, 2, 8]);
 // Bare gravel this far past a road's paved edge (its sidewalk, if any): the
 // road's edge blend and grass billboards leaning in stay off the road.
 const ROAD_VERGE_M = 2.0;
+// ...and past a railway's ballast (its ditch, a cess path beside the track)
+const RAIL_VERGE_M = 1.0;
 
 /**
  * Paint every ground-level road's footprint over the layer map: asphalt (or
@@ -947,6 +950,18 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
     }
   };
   for (const sq of squares) rasterizePolygon(layerMap, size, sq.ring, sq.mat);
+  // railways on the ground (services/railways.js): gravel under the track bed
+  // and its ditches, so no grass grows up through the ballast; the roads
+  // crossing them are painted over it (a tram in its street: the street's)
+  const underground = undergroundRailIds(osmFeatures);
+  for (const feature of osmFeatures) {
+    if (feature.type !== 'railway' || !(feature.geometry?.length >= 2) || underground.has(feature.id)) continue;
+    const kind = railKindOf(feature.tags);
+    if (!kind || kind === 'tram' || kind === 'monorail') continue;
+    const layer = getEffectiveRoadLayer(feature.tags || {});
+    if (layer >= 1 || layer <= -1) continue;
+    paint({ pts: feature.geometry.map((pt) => toPx(pt.lat, pt.lng)) }, railHalfWidth(feature.tags) + RAIL_VERGE_M, 6);
+  }
   for (const road of roads) paint(road, road.halfWidthM + road.sidewalkM + ROAD_VERGE_M, 6, GRASS_GROWING);
   for (const road of roads) if (road.sidewalkM > 0) paint(road, road.halfWidthM + road.sidewalkM, 7);
   for (const road of roads) paint(road, road.halfWidthM, road.style.mat);

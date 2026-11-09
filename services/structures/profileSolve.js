@@ -1,3 +1,5 @@
+import { RAIL_GRADE_CEILING, RAIL_GRADE_LIMIT, RAIL_GROUND_BAND_M, railKindOfClass } from '../railways.js';
+
 // Structure solver, stage C: the vertical profile of every road at once
 // (refs/output/bridge-tunnel-plan.md).
 //
@@ -19,7 +21,8 @@ const GRADE_LIMIT = {
   tertiary: 0.12, tertiary_link: 0.12,
 };
 const GRADE_DEFAULT = 0.15;
-export const gradeLimit = (highway) => GRADE_LIMIT[highway] ?? GRADE_DEFAULT;
+// (a railway's class is 'railway:<kind>': its own limits, services/railways.js)
+export const gradeLimit = (highway) => GRADE_LIMIT[highway] ?? RAIL_GRADE_LIMIT[railKindOfClass(highway)] ?? GRADE_DEFAULT;
 // The steepest a road of each class follows its terrain where the terrain is
 // steeper than its limit (a mountain street climbs with its hillside; a
 // motorway ramp never climbs a 34% wall that bare-earth elevation shows
@@ -134,7 +137,8 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel)) {
   const g = (i) => (Number.isFinite(e.g[i]) ? e.g[i] : 0);
   // (a slope over less road than asked for, a short edge's, says nothing)
   const slope = (p, q, need) => { const span = e.s[q] - e.s[p]; return span >= need ? Math.abs(g(q) - g(p)) / span : 0; };
-  const ceiling = (GRADE_CEILING[e.highway] ?? GRADE_CEILING_DEFAULT) * 0.97;   // (a margin under the checks)
+  const rail = railKindOfClass(e.highway);
+  const ceiling = (GRADE_CEILING[e.highway] ?? RAIL_GRADE_CEILING[rail] ?? GRADE_CEILING_DEFAULT) * 0.97;   // (a margin under the checks)
   let a = 0; let b = 0; let a2 = 0; let b2 = 0;
   for (let i = 0; i + 1 < n; i++) {
     const ds = e.s[i + 1] - e.s[i];
@@ -148,7 +152,9 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel)) {
     // a hillside steeper than the class ceiling, as steep over +-HILLSIDE_M:
     // the road may run steeper than it, so a lift or cut near a structure
     // fades back to the ground (at the ceiling alone it never could)
-    const hill = terrain > ceiling && slope(a2, b2, HILLSIDE_M) >= 0.8 * terrain ? Math.min(HILLSIDE_MAX, terrain * HILLSIDE_FACTOR) : 0;
+    // (never a railway: it runs on a shelf at its own grade, in cuttings and
+    // on fills, where a mountain road follows its hillside)
+    const hill = !rail && terrain > ceiling && slope(a2, b2, HILLSIDE_M) >= 0.8 * terrain ? Math.min(HILLSIDE_MAX, terrain * HILLSIDE_FACTOR) : 0;
     out[i] = Math.max(lim, Math.min(terrain, ceiling), hill) * ds;
   }
   return out;
@@ -194,11 +200,18 @@ export function* solveProfilesSteps(graph) {
   const off = []; let N = 0;
   for (const e of edges) { off.push(N); N += e.s.length; }
   const G = new Float64Array(N); const W = new Float64Array(N); const edgeOf = new Int32Array(N);
+  // what each station is pulled to: its ground, or an edge's own target (a
+  // railway's ground with the dips it runs straight over filled: railTrack.js)
+  const P = new Float64Array(N);
   edges.forEach((e, k) => {
     for (let i = 0; i < e.s.length; i++) {
       const v = off[k] + i;
       G[v] = Number.isFinite(e.g[i]) ? e.g[i] : 0;
-      W[v] = asStructure(e) ? W_STRUCTURE : W_GROUND;
+      P[v] = e.target && Number.isFinite(e.target[i]) ? e.target[i] : G[v];
+      // (an edge may carry its own pull per station: a railway's, weaker than a
+      // street's so its profile runs smoother, full at a level crossing:
+      // railTrack.js)
+      W[v] = asStructure(e) ? W_STRUCTURE : e.weight ? e.weight[i] : W_GROUND;
       edgeOf[v] = k;
     }
   });
@@ -276,6 +289,7 @@ export function* solveProfilesSteps(graph) {
       banded.fill(1, off[k], off[k] + e.s.length);
     });
   }
+  const bandOf = edges.map((e) => (railKindOfClass(e.highway) ? RAIL_GROUND_BAND_M : GROUND_BAND_M));
   const U = spread(capSeeds, -1);
   // the highest a road can be and still reach the pinned roads at a steep
   // but drivable grade: a lift (a crossing far up a tunnel's approach) gives
@@ -464,7 +478,7 @@ export function* solveProfilesSteps(graph) {
     }
     return moved;
   };
-  const Z = Float64Array.from(G, (g, v) => Math.min(g, U[v]));
+  const Z = Float64Array.from(P, (g, v) => Math.min(g, U[v]));
   let L = new Float64Array(N).fill(-Infinity);
   let rounds = 0;
   for (; rounds < OUTER_ROUNDS; rounds++) {
@@ -505,11 +519,17 @@ export function* solveProfilesSteps(graph) {
     // the ground: it does not free a road from the band)
     for (let v = 0; v < N; v++) {
       if (!banded[v]) continue;
+      // (a railway's cuttings and fills reach further: a 2 % line across a
+      // valley stands on its embankment, not down in the valley)
+      const band = bandOf[edgeOf[v]];
       // (a road a lift or cap reaches, a ramp toward a crossing or a portal,
       // keeps its freedom: capped at the band it kinked)
-      if (L[v] > G[v] - GROUND_BAND_M || U[v] < G[v] + GROUND_BAND_M) continue;
-      L[v] = Math.max(L[v], G[v] - GROUND_BAND_M);
-      U[v] = Math.min(U[v], G[v] + GROUND_BAND_M);
+      // (round what it is pulled to: a railway's band is round its ground
+      // with the dips it runs over filled, so a hollow deeper than the band
+      // is crossed level, a viaduct over the data's gap, not dipped into)
+      if (L[v] > P[v] - band || U[v] < P[v] + band) continue;
+      L[v] = Math.max(L[v], P[v] - band);
+      U[v] = Math.min(U[v], P[v] + band);
     }
     // terrain shaping off: held stations on their ground, no-cut ones over it
     for (let v = 0; v < N; v++) {
@@ -542,7 +562,7 @@ export function* solveProfilesSteps(graph) {
         if (taut[k]) return;   // (solved as chains below)
         for (let i = 1; i + 1 < e.s.length; i++) {
           const v = base + i;
-          const next = Math.min(U[v], Math.max(L[v], (W[v] * G[v] + SMOOTH * (Z[v - 1] + Z[v + 1])) / (W[v] + 2 * SMOOTH)));
+          const next = Math.min(U[v], Math.max(L[v], (W[v] * P[v] + SMOOTH * (Z[v - 1] + Z[v + 1])) / (W[v] + 2 * SMOOTH)));
           moved = Math.max(moved, Math.abs(next - Z[v])); Z[v] = next;
         }
       });

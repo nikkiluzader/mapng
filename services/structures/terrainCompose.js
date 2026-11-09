@@ -166,6 +166,10 @@ export function composeTerrain(graph, grid) {
       const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy;
       if (L2 < 1e-9) continue;
       const core = e.half + SHOULDER_M;
+      // a railway's profile is the top of its rails: the ground under it is
+      // its formation, the track's depth lower (e.drop per station: none
+      // where a road crosses it at grade, services/railways.js)
+      const dropAt = (j) => (e.drop ? e.drop[j] : 0);
       // a raceway keeps its ground's banking (an oval's turns, 20-30 degrees
       // in the elevation data): across its core the surface tilts as the
       // terrain does there, not levelled into a shelf with a cliff each side
@@ -182,7 +186,7 @@ export function composeTerrain(graph, grid) {
       const offAt = (j) => {
         const [pc, pr] = toPixel(e.x[j], e.y[j]);
         const cc = Math.max(0, Math.min(width - 1, Math.round(pc))); const rr = Math.max(0, Math.min(height - 1, Math.round(pr)));
-        return Math.abs(zk[j] - (abutmentOff(kind, k, j)) - (raw(cc, rr) - minHeight));
+        return Math.abs(zk[j] - dropAt(j) - (abutmentOff(kind, k, j)) - (raw(cc, rr) - minHeight));
       };
       const off = Math.max(offAt(i), offAt(i + 1)) + 1;
       const reach = deck ? e.half + DECK_REACH_M : core + Math.min(SLOPE_MAX_M, Math.max(GROUND_BLEND_M, off * FILL_RUN + 2));
@@ -210,7 +214,7 @@ export function composeTerrain(graph, grid) {
           const u = Math.max(0, Math.min(1, uRaw));
           const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
           if (d > reach) continue;
-          let zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0);
+          let zc = zk[i] + (zk[i + 1] - zk[i]) * u - (abutment ? DECK_UNDER_M + DECK_ABUT_CLEAR_M : 0) - (dropAt(i) + (dropAt(i + 1) - dropAt(i)) * u);
           // (banked: the left of the line higher by bank per metre, out to the core's edge)
           if (bank) zc += bank * Math.max(-core, Math.min(core, (-(x - ax) * vy + (y - ay) * vx) / Math.sqrt(L2)));
           const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
