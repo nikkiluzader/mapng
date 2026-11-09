@@ -12,7 +12,9 @@
 
     <!-- dpr caps rendering at 2x device pixels: on 3-4x mobile/hiDPI screens the
          uncapped default more than doubles fragment work for no visible gain. -->
-    <TresCanvas v-else-if="!webGLRuntimeError" window-size :dpr="[1, 2]" :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="0.8" :renderer="{ logarithmicDepthBuffer: true }" power-preference="high-performance">
+    <!-- (Cinematic: the post-processing chain reads the depth buffer, which a
+         logarithmic one breaks: the canvas is made again when the choice changes) -->
+    <TresCanvas v-else-if="!webGLRuntimeError" :key="`canvas-${cinematic}`" window-size :dpr="[1, 2]" :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="cinematic ? activeSunPreset.exposure : 0.8" :renderer="{ logarithmicDepthBuffer: !cinematic }" power-preference="high-performance">
       <Suspense>
         <template #default>
           <TresGroup>
@@ -37,7 +39,17 @@
               :light-margin="50"
             />
 
-            <Environment :files="currentHdrFile" :background="true" :environment-intensity="activeSunPreset.environmentIntensity" />
+            <Environment :files="currentHdrFile" :background="true" :environment-intensity="cinematic ? activeSunPreset.cinematicEnvironment : activeSunPreset.environmentIntensity" />
+
+            <!-- the look: haze and sky fill, and the post-processing chain (Visual quality) -->
+            <SceneAtmosphere
+              v-if="cinematic"
+              :horizon="activeSunPreset.horizon"
+              :sky-color="activeSunPreset.skyFill"
+              :ground-color="activeSunPreset.groundFill"
+              :fill="activeSunPreset.fill"
+            />
+            <PostFX v-if="cinematic" :ao="true" :bloom="activeSunPreset.bloom" />
 
             <TerrainMesh
               :terrain-data="mergedTerrainData"
@@ -46,6 +58,8 @@
               :show-water="showWater"
               :water-level-offset-meters="waterLevelOffsetMeters"
               :wireframe="advancedMode && showWireframe"
+              :skirt="cinematic && !(advancedMode && showSurroundings)"
+              :lakes="cinematic"
             />
 
             <MapngFlag3D
@@ -122,6 +136,17 @@
         >
           <option v-for="p in presets" :key="p" :value="p">{{ p }}</option>
         </select>
+      </div>
+
+      <div class="space-y-2 mb-4">
+        <label class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+          <Sparkles :size="12" /> {{ t('preview.visualQuality') }}
+        </label>
+        <select v-model="visualQuality" :class="[SELECT_SM, 'appearance-none hover:bg-gray-50 dark:hover:bg-gray-700']">
+          <option value="cinematic">{{ t('preview.qualityCinematic') }}</option>
+          <option value="standard">{{ t('preview.qualityStandard') }}</option>
+        </select>
+        <p class="text-micro text-gray-400 dark:text-gray-500">{{ t(cinematic ? 'preview.qualityCinematicHint' : 'preview.qualityStandardHint') }}</p>
       </div>
 
       <div class="space-y-2 mb-4">
@@ -398,6 +423,7 @@ import {
   ChevronRight,
   Info,
   X,
+  Sparkles,
 } from "lucide-vue-next";
 
 const { t } = useI18n({ useScope: 'global' });
@@ -406,6 +432,8 @@ import MapngFlag3D from "./MapngFlag3D.vue";
 import OSMFeatures3D from "./OSMFeatures3D.vue";
 import CSMLight from "./CSMLight.vue";
 import SurroundingTerrain3D from "./SurroundingTerrain3D.vue";
+import PostFX from "./PostFX.vue";
+import SceneAtmosphere from "./SceneAtmosphere.vue";
 import { useMainStore } from "../../stores/mainStore";
 import { SELECT_SM, SELECT_XS } from "../base/controlStyles.js";
 
@@ -452,6 +480,13 @@ const SUN_PRESETS = {
     environmentIntensity: 0.03,
     lightColor: '#ffcd94',
     ambientColor: '#ffead1',
+    exposure: 0.88,
+    cinematicEnvironment: 0.21,
+    horizon: '#e9c9a8',
+    skyFill: '#ffd9b0',
+    groundFill: '#5a4632',
+    fill: 0.293,
+    bloom: 0.3,
   },
   "Mid Morning": {
     lightDirection: [-1, -0.45, -0.55],
@@ -460,6 +495,13 @@ const SUN_PRESETS = {
     environmentIntensity: 0.025,
     lightColor: '#ffe6bf',
     ambientColor: '#fff5e6',
+    exposure: 0.88,
+    cinematicEnvironment: 0.24,
+    horizon: '#c4d4e6',
+    skyFill: '#d6e6ff',
+    groundFill: '#6b5a44',
+    fill: 0.325,
+    bloom: 0.22,
   },
   Noon: {
     lightDirection: [0, -1, -0.08],
@@ -468,6 +510,13 @@ const SUN_PRESETS = {
     environmentIntensity: 0.02,
     lightColor: '#ffffff',
     ambientColor: '#f5f9ff',
+    exposure: 0.836,
+    cinematicEnvironment: 0.252,
+    horizon: '#c9d8ea',
+    skyFill: '#e2eeff',
+    groundFill: '#6e604c',
+    fill: 0.325,
+    bloom: 0.2,
   },
   Afternoon: {
     lightDirection: [0.9, -0.45, -0.45],
@@ -476,6 +525,13 @@ const SUN_PRESETS = {
     environmentIntensity: 0.022,
     lightColor: '#ffe3bf',
     ambientColor: '#fff1e0',
+    exposure: 0.88,
+    cinematicEnvironment: 0.24,
+    horizon: '#d6d2c8',
+    skyFill: '#ffe7c8',
+    groundFill: '#6b5640',
+    fill: 0.312,
+    bloom: 0.24,
   },
   Evening: {
     lightDirection: [0.9, -0.22, -0.25],
@@ -484,6 +540,13 @@ const SUN_PRESETS = {
     environmentIntensity: 0.02,
     lightColor: '#ff8c4a',
     ambientColor: '#ffc79c',
+    exposure: 0.924,
+    cinematicEnvironment: 0.18,
+    horizon: '#e8a77c',
+    skyFill: '#ffb98a',
+    groundFill: '#4a3626',
+    fill: 0.273,
+    bloom: 0.4,
   },
   Night: {
     lightDirection: [0.25, -0.08, -0.12],
@@ -492,6 +555,13 @@ const SUN_PRESETS = {
     environmentIntensity: 0.006,
     lightColor: '#86a9ff',
     ambientColor: '#9cb8ff',
+    exposure: 1.056,
+    cinematicEnvironment: 0.048,
+    horizon: '#1b2338',
+    skyFill: '#4a5f8f',
+    groundFill: '#151820',
+    fill: 0.163,
+    bloom: 0.5,
   },
 };
 
@@ -508,6 +578,22 @@ const meshQualityOptions = [
 // center-tile detail doesn't warrant re-downloading surrounding tiles.
 const surroundingQuality = computed(() => (meshQuality.value === 'full' ? 'high' : meshQuality.value));
 const preset = ref("Kloofendal Pure Sky");
+// Visual quality: Cinematic (ambient occlusion, bloom, grade, haze) or
+// Standard (as before: lighter on the GPU). The first time, Standard where
+// the GPU is a software one (no hardware acceleration), else Cinematic;
+// then as the user left it.
+const QUALITY_KEY = 'mapng_preview_quality';
+const softwareGpu = (() => {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl');
+    const info = gl?.getExtension('WEBGL_debug_renderer_info');
+    const name = String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl?.getParameter(gl.RENDERER) || '');
+    return /swiftshader|llvmpipe|software|basic render|microsoft basic/i.test(name);
+  } catch { return false; }
+})();
+const visualQuality = ref((() => { try { return localStorage.getItem(QUALITY_KEY) || (softwareGpu ? 'standard' : 'cinematic'); } catch { return 'cinematic'; } })());
+watch(visualQuality, (v) => { try { localStorage.setItem(QUALITY_KEY, v); } catch { /* private mode */ } });
+const cinematic = computed(() => visualQuality.value === 'cinematic');
 const sunPosition = ref("Mid Morning");
 // (the same choice as the export panel's Base Texture: composables/useBaseTexture.js;
 // a touched-up texture previews as hybrid)
@@ -608,6 +694,31 @@ watch(controlsRef, (ctrl) => {
     controls.screenSpacePanning = false;
   }
 }, { immediate: true });
+
+// A short fly-in when a terrain opens (Cinematic): the camera eases down
+// from high and far to its usual view. Not with reduced motion.
+let flyFrame = 0;
+const flyIn = () => {
+  const controls = controlsRef.value?.instance || controlsRef.value;
+  const camera = controls?.object;
+  if (!camera || !cinematic.value) return;
+  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  cancelAnimationFrame(flyFrame);
+  const from = new THREE.Vector3(-40, 150, 200); const to = new THREE.Vector3(...cameraPosition);
+  const t0 = performance.now(); const DUR = 1800;
+  const step = () => {
+    const k = Math.min(1, (performance.now() - t0) / DUR);
+    const e = 1 - Math.pow(1 - k, 3);
+    camera.position.lerpVectors(from, to, e);
+    controls.target.set(0, 0, 0);
+    controls.update();
+    if (k < 1) flyFrame = requestAnimationFrame(step);
+  };
+  step();
+};
+watch([controlsRef, () => props.terrainData], ([ctrl, td], [prevCtrl, prevTd] = []) => {
+  if (ctrl && td && (td !== prevTd || !prevCtrl)) requestAnimationFrame(flyIn);
+});
 
 const resetCamera = () => {
   if (controlsRef.value) {

@@ -448,7 +448,7 @@ const createTreeMesh = (type, unitsPerMeter, options = {}) => {
       );
       if (crownGeo.index) crownGeo = crownGeo.toNonIndexed();
       crownGeo.translate(0, 6.5 * unitsPerMeter, 0);
-      addColor(crownGeo, 0x064e3b);
+      addColor(crownGeo, 0x1f4f33);
       const merged = mergeGeometries([trunkGeo, crownGeo]);
       crownGeo.dispose();
       trunkGeo.dispose();
@@ -461,7 +461,7 @@ const createTreeMesh = (type, unitsPerMeter, options = {}) => {
       if (crownGeo.index) crownGeo = crownGeo.toNonIndexed();
       crownGeo.scale(1, 1.2, 1);
       crownGeo.translate(0, 7 * unitsPerMeter, 0);
-      addColor(crownGeo, 0x166534);
+      addColor(crownGeo, 0x3b6a2b);
       const merged = mergeGeometries([trunkGeo, crownGeo]);
       crownGeo.dispose();
       trunkGeo.dispose();
@@ -875,13 +875,23 @@ export const createOSMGroup = (data, options = {}) => {
     const roofMaterial =
       tags["roof:material"] || tags["building:roof:material"];
 
+    // (untagged buildings: a natural mix picked per building, not one beige
+    // and one dark red for the whole town; a tagged colour or material wins)
+    const pick = (list) => {
+      const key = `${tags.name || ''}|${tags['addr:housenumber'] || ''}|${tags['addr:street'] || ''}|${areaMeters.toFixed(1)}|${type}`;
+      let hsh = 2166136261;
+      for (let i = 0; i < key.length; i++) { hsh ^= key.charCodeAt(i); hsh = Math.imul(hsh, 16777619); }
+      return list[(hsh >>> 0) % list.length];
+    };
+    const WALL_MIX = [0xe9dfcd, 0xddd2bd, 0xd2c8b8, 0xe7d5b6, 0xc9bfb1, 0xefe8dc, 0xd8c3a5];
+    const ROOF_MIX = [0x6f6b67, 0x8b5c46, 0x5b5e63, 0x9a8f81, 0x7c4b3b, 0x7a7f86, 0x4f5156];
     let wallColor = parseO2WColor(
       tags["building:colour"] ||
         tags["building:color"] ||
         tags.colour ||
         tags.color,
       BUILDING_COLORS,
-      0xefd1a1,
+      pick(WALL_MIX),
     );
     if (
       wallMaterial &&
@@ -894,7 +904,7 @@ export const createOSMGroup = (data, options = {}) => {
     let roofColor = parseO2WColor(
       tags["roof:colour"] || tags["roof:color"] || tags["building:roof:colour"],
       ROOF_COLORS,
-      0x9b3131,
+      pick(ROOF_MIX),
     );
     if (
       roofMaterial &&
@@ -1281,13 +1291,33 @@ export const createOSMGroup = (data, options = {}) => {
 
       const combined = stampInstances(baseGeo, list, (tree) => {
         const seed = Math.abs((tree.pos.x * 123.45 + tree.pos.z * 678.9) % 1);
-        const s = 0.95 + seed * 0.1;
+        // (sizes vary as a wood's do: young and old trees side by side)
+        const s = 0.75 + Math.abs((tree.pos.x * 31.7 + tree.pos.z * 17.3) % 1) * 0.55;
         position.set(tree.pos.x, tree.pos.y, tree.pos.z);
         scale.set(s, s, s);
         quaternion.setFromAxisAngle(yAxis, seed * Math.PI * 2);
         return matrix.compose(position, quaternion, scale).clone();
       });
 
+      // (each tree's crown its own shade: a wood isn't one green; trunks stay brown)
+      if (combined?.attributes?.color) {
+        const per = baseGeo.attributes.position.count;
+        const col = combined.attributes.color.array;
+        const tmp = new THREE.Color();
+        list.forEach((tree, k) => {
+          const h = Math.abs((tree.pos.x * 91.3 + tree.pos.z * 47.9) % 1);
+          const light = 0.82 + h * 0.36;
+          const warm = Math.abs((tree.pos.x * 13.1 - tree.pos.z * 29.7) % 1) * 0.12;
+          for (let v = k * per; v < (k + 1) * per && v * 3 + 2 < col.length; v++) {
+            tmp.setRGB(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]);
+            if (tmp.g <= tmp.r) continue;   // (the trunk)
+            col[v * 3] = Math.min(1, tmp.r * light + warm * 0.6);
+            col[v * 3 + 1] = Math.min(1, tmp.g * light + warm * 0.3);
+            col[v * 3 + 2] = Math.min(1, tmp.b * light);
+          }
+        });
+        combined.attributes.color.needsUpdate = true;
+      }
       if (combined) {
         const treeMesh = new THREE.Mesh(
           combined,

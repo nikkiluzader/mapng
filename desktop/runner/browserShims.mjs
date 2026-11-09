@@ -263,7 +263,8 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
   fs.mkdirSync(dir, { recursive: true });
   if (recordDir) fs.mkdirSync(recordDir, { recursive: true });
   // (downloaded: misses that went online; missedUrls: the first few, for the log)
-  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [], downloadedUrls: [] };
+  // (stats.strict may be switched on later: the export job, after its data step)
+  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [], downloadedUrls: [], strict: !!strict };
   // (services/terrain.js skips the GPXZ request pacing while replaying)
   if (mode === 'replay') globalThis.__mapngReplayingSources = true;
   const inner = globalThis.fetch;
@@ -287,7 +288,7 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
         const body = meta.status === 204 || meta.status === 304 ? null : fs.readFileSync(bodyFile);
         return new Response(body, { status: meta.status, statusText: meta.statusText, headers: meta.headers });
       }
-      if (strict) throw new TypeError(`fetch refused: the export downloads nothing, and this is not in the download cache (${url})`);
+      if (stats.strict) throw new TypeError(`fetch refused: the export downloads nothing, and this is not in the download cache (${url})`);
       stats.downloaded++;
       if (stats.downloadedUrls.length < 20) stats.downloadedUrls.push(url.slice(0, 160));
       const live = await inner(input, init);

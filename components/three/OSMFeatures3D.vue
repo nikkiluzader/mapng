@@ -70,6 +70,8 @@ const applyVisibility = () => {
   };
   grp.traverse((child) => {
     if (child.isMesh && child.name in vis) child.visible = vis[child.name];
+    // (buildings and trees cast their shadows on the terrain, and on each other)
+    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
   });
 };
 

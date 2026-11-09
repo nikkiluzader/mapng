@@ -342,7 +342,12 @@
     "feature_barriers": "Bariery",
     "webglTitle": "Podgląd 3D niedostępny",
     "webglBody": "Twoja przeglądarka nie mogła uruchomić WebGL. Włącz w jej ustawieniach akcelerację sprzętową (GPU) albo spróbuj innej przeglądarki. Eksport nadal działa.",
-    "sun_MidMorning": "Przedpołudnie"
+    "sun_MidMorning": "Przedpołudnie",
+    "visualQuality": "Jakość obrazu",
+    "qualityCinematic": "Filmowa",
+    "qualityStandard": "Standardowa",
+    "qualityCinematicHint": "Miękkie cienie w dolinach i pod budynkami, mgiełka, żywsze kolory i prawdziwa woda w jeziorach. Wymaga przyzwoitej karty graficznej.",
+    "qualityStandardHint": "Prosta i lekka dla karty graficznej."
   },
   "exportPanel": {
     "osmMissing": "Brak jeszcze danych OpenStreetMap",

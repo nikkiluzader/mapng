@@ -7264,7 +7264,7 @@ function shapingReportLines(sh, section) {
   lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
   if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}`);
   for (const lk of (sh.lakeDepths || []).slice(0, 12)) {
-    lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there`);
+    lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'dam' ? 'a reservoir: against its dam, the floor rising away from it' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there`);
   }
   if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (the survey recorded the water's surface; WorldCover water within 0.3 m of the sea): ${sh.seabedPixels}`);
   if (sh.lidar === null || sh.lidar === undefined) lines.push('- Measured bridge heights (US lidar): off');
@@ -7534,7 +7534,7 @@ function buildDetailedReportSections(d) {
   const bored = tun?.tunnels || [];
   const left = tun?.skipped || [];
   lines.push(`- Tunnels built: ${bored.length} (${bored.filter((t) => t.kind === 'cutcover').length} cut and cover, ${bored.filter((t) => t.kind === 'gallery').length} galleries); tunnel=yes roads left on the ground: ${left.length}; portal hole squares: ${(tun?.holes || []).length}`);
-  lines.push('- Only drivable tunnel=yes roads are bored (building passages, culverts, galleries and covered ways stay as they were).');
+  lines.push('- Drivable tunnel=yes and tunnel=avalanche_protector roads are built (building passages, culverts and covered ways stay as they were).');
   lines.push('- A bored tunnel needs the ground over its road by the tube height + 1.5 m along most of it; short dips are filled over the tube.');
   lines.push('- One mapped under flat ground (a city deck, an underpass) is cut and cover: a box 0.8 m under the street, its approaches in trenches.');
   lines.push('- On a hillside without the rock over it (and tunnel=avalanche_protector) a gallery: a roof on valley-side columns, the hillside brought up to the roof as its back (backfilled where the slope is lower), the road where it is.');
@@ -12692,7 +12692,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const beds = !shapeExtras ? { pixels: 0, apply: () => {} } : carveLakeBeds(lakePlan.lakes, {
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
         worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
-      }, { keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false) });
+      }, {
+        keep: (x, y) => isOnOtherCarriageway(quayIndex, x, y, 0, () => false),
+        // (reservoirs: deepest against their dam)
+        dams: (exportTerrainData.osmFeatures || [])
+          .filter((f) => (f.tags?.waterway === 'dam' || f.tags?.man_made === 'dam') && f.geometry?.length > 1)
+          .map((f) => ({ line: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), height: f.tags.height ?? null })),
+      });
       const hmLake = heightMapEditor(exportTerrainData);
       beds.apply((idx, v) => hmLake.set(idx, v));
       lakePlan.stats.bedPixels = beds.pixels;

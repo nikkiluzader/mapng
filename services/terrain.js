@@ -1306,7 +1306,7 @@ const fetchGapFillSource = async ({
  *
  * @returns {{ data, smooth, rawArrayBuffers, hadChunkFailures } | null}
  */
-const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
+const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null } = {}) => {
   try {
     signal?.throwIfAborted();
     // 1. Probe rate limits if not already known
@@ -1443,6 +1443,13 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
       }
     }
 
+    // (background areas: a tile wholly inside them isn't asked for; the 30 m
+    // gap fill covers it, as it does a failed tile)
+    let skippedForBackground = 0;
+    if (skipBox) {
+      for (let i = requests.length - 1; i >= 0; i--) if (skipBox(requests[i])) { requests.splice(i, 1); skippedForBackground++; }
+      if (skippedForBackground) console.log(`[GPXZ] ${skippedForBackground} tile(s) wholly in background areas left out (30 m there).`);
+    }
     console.log(`[GPXZ] Split into ${requests.length} tiles (with overlap). Concurrency: ${concurrency}, global pace: ${Math.ceil(1000 / (Math.max(1, Number(gpxzRateLimitInfo?.rps) || 1) * 0.9))}ms/req`);
     onProgress?.(replayingSources() ? `Reading ${requests.length} saved GPXZ tiles...` : `Fetching ${requests.length} GPXZ tiles (${rateInfo?.plan || 'free'} plan, ${concurrency}x concurrent)...`);
 
@@ -1536,7 +1543,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal) => {
     );
 
     const validResults = results.filter((r) => r !== null);
-    const hadChunkFailures = validResults.length < requests.length;
+    const hadChunkFailures = validResults.length < requests.length || skippedForBackground > 0;
 
     if (validResults.length === 0) return null;
 
@@ -1918,7 +1925,7 @@ export const fetchTerrainData = async (
 
   if (useGPXZ && gpxzApiKey) {
     onProgress?.(`${fetchWord()} high-res GPXZ elevation data...`);
-    const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress, signal);
+    const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress, signal, { skipBox });
     if (gpxzResult) {
       rawData = gpxzResult.data;
       rawDataSourceType = "geotiff";

@@ -2023,6 +2023,8 @@ export const satelliteGroundClasses = async (terrainData, source = null) => {
     const r = rgba[i * 4], g = rgba[i * 4 + 1], b = rgba[i * 4 + 2];
     const l = 0.3 * r + 0.59 * g + 0.11 * b; const mx = Math.max(r, g, b);
     bright[i] = l > 150 ? 1 : (l > paleL && mx && (mx - Math.min(r, g, b)) / mx < 0.24 ? 2 : 0);
+    // (3: muted, a dull green under 40 % saturation: desert varnish and shaded rock, not leaves)
+    if (!bright[i] && mx && (mx - Math.min(r, g, b)) / mx < 0.4) bright[i] = 3;
   }
   const cls = classifyGroundGrid(rgba, w, h);
   groundFromLandCover(cls, w, h, terrainData?.landCover, slope, bright);
@@ -2167,6 +2169,16 @@ export function osmRockOnBareGround(cls, w, h, terrainData) {
 export function groundFromLandCover(cls, w, h, landCover, slope = null, bright = null) {
   const lc = landCover?.grid?.length === landCover?.n * landCover?.n ? landCover : null;
   const T = 0, G = 1, DRY = 2, SOIL = 3, SAND = 4, PAVED = 5, WATER = 6, HOLE = 7, ROCK = 8;
+  // (an arid scene: most of the classified ground bare; its dull greens in
+  // scrub are rock and soil, not plants: the image decides, not the place)
+  let bareCells = 0; let groundCells = 0;
+  for (let i = 0; i < cls.length; i++) {
+    const c = cls[i];
+    if (c === WATER || c === HOLE || c === PAVED) continue;
+    groundCells++;
+    if (c === DRY || c === SOIL || c === SAND || c === ROCK) bareCells++;
+  }
+  const arid = groundCells > 0 && bareCells / groundCells > 0.5;
   const near = (x, y, test, reach) => {
     const { grid, n } = lc;
     const c0 = Math.floor(((x + 0.5) / w) * n); const r0 = Math.floor(((y + 0.5) / h) * n);
@@ -2182,11 +2194,13 @@ export function groundFromLandCover(cls, w, h, landCover, slope = null, bright =
       const i = y * w + x; const c = cls[i];
       if (c === WATER) {
         if ((slope && slope.nz[i] < 0.99) || (lc && !near(x, y, (k) => k === WC.WATER || k === 0, 2))) { cls[i] = HOLE; holes++; }   // (over ~8°)
+        // (beside a town and not itself water: a bridge's deck or a dam's concrete in blue-grey)
+        else if (lc && near(x, y, (k) => k === WC.BUILT, 1) && !near(x, y, (k) => k === WC.WATER || k === 0, 0)) { cls[i] = HOLE; holes++; }
         continue;
       }
       // (pale grey or light sand on a slope over ~15°, away from towns: rock and scree)
       // (and a pale grey-green on such a slope: lichen-covered rock)
-      if (lc && bright && bright[i] && slope && (((c === PAVED || c === SAND) && (c === PAVED && bright[i] === 1 || slope.nz[i] < 0.966))
+      if (lc && bright && (bright[i] === 1 || bright[i] === 2) && slope && (((c === PAVED || c === SAND) && (c === PAVED && bright[i] === 1 || slope.nz[i] < 0.966))
         || ((c === G || c === DRY) && bright[i] === 2 && slope.nz[i] < 0.966))
         && !near(x, y, (k) => k === WC.BUILT, 1)) { cls[i] = ROCK; continue; }
       if (!lc) continue;
@@ -2194,6 +2208,10 @@ export function groundFromLandCover(cls, w, h, landCover, slope = null, bright =
       if (!here) continue;
       // (greens on bare ground with no plants near: desert varnish and grey-green gravel, Hoover's canyon)
       if ((c === T || c === G) && (here === WC.BARE || here === WC.SNOW) && !near(x, y, (k) => GREEN_COVER.has(k), 1)) cls[i] = c === T ? SOIL : DRY;
+      // (an arid scene's dull greens in scrub, with no trees, grass or crops near: rock and soil)
+      // (a desert's "grassland" and scrub are sparse: there too)
+      else if (arid && (c === T || c === G) && bright?.[i] === 3 && (here === WC.SHRUBS || here === WC.GRASS || here === WC.BARE)
+        && !near(x, y, (k) => k === WC.TREES || k === WC.CROPS || k === WC.WETLAND, 1)) cls[i] = c === T ? SOIL : DRY;
       else if (c === T && !near(x, y, (k) => CANOPY_COVER.has(k), 1)) cls[i] = G;
       // (sand and soil only on a slope over ~25°: on the flat, bare ground is a desert's sand or dirt)
       else if ((here === WC.BARE || here === WC.SNOW || here === WC.MOSS) && (c === PAVED || ((c === SAND || c === SOIL) && here !== WC.MOSS && slope && slope.nz[i] < 0.9))) cls[i] = ROCK;
@@ -2333,7 +2351,13 @@ export function paintLandCoverSnow(ctx, canvas, terrainData, satellite) {
 // imagery's colour casts drop out), and nudged toward the image's own colour
 // at ~30 m (tint: a greener meadow, a redder scree), its brightness kept. In
 // strips of rows against a 1/8-size copy: no texture-sized buffers.
-export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint = 0.3 } = {}) {
+// The tint toward the image's own colour by ground class (GROUND_CLASSES
+// order), where a class grid is given: bare ground takes most of its colour
+// from the image (a desert's red rock and dark volcanic ground came out one
+// pale beige at the flat 0.3), and some of its brightness; vegetation keeps
+// the painted greens; roads, buildings and water none.
+const BARE_TINT = { tint: [0.3, 0.3, 0.7, 0.7, 0.6, 0, 0, 0.5, 0.7], light: [0, 0, 0.4, 0.4, 0.3, 0, 0, 0.3, 0.45] };
+export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint = 0.3, classes = null } = {}) {
   const W = canvas.width; const H = canvas.height;
   const sw = satellite.naturalWidth || satellite.width; const sh = satellite.naturalHeight || satellite.height;
   if (!(sw > 0) || !(sh > 0) || !(W > 16) || !(H > 16)) return null;
@@ -2363,8 +2387,18 @@ export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint
       const f = 1 + detail * (ratio - 1);
       // (the image's colour at ~30 m, at the painted brightness)
       // (not over neutral greys: roads and buildings keep their grey, which the grass mask needs)
-      const pl = lumOf(d, i); const sc = lb > 4 ? pl / lb : 0;
-      const t = Math.abs(d[i] - d[i + 1]) < 6 && Math.abs(d[i + 1] - d[i + 2]) < 6 ? 0 : tint;
+      let pl = lumOf(d, i);
+      let tk = tint;
+      if (classes) {
+        const px = (i >> 2) % W; const py = y0 + (((i >> 2) / W) | 0);
+        const k = classes.cls[Math.min(classes.h - 1, (py * classes.h / H) | 0) * classes.w + Math.min(classes.w - 1, (px * classes.w / W) | 0)];
+        tk = BARE_TINT.tint[k] ?? tint;
+        // (bare ground: part of its brightness from the image too)
+        const lt = BARE_TINT.light[k] || 0;
+        if (lt > 0 && pl > 1) { const m = (pl + (lb - pl) * lt) / pl; d[i] *= m; d[i + 1] *= m; d[i + 2] *= m; pl = lumOf(d, i); }
+      }
+      const sc = lb > 4 ? pl / lb : 0;
+      const t = Math.abs(d[i] - d[i + 1]) < 6 && Math.abs(d[i + 1] - d[i + 2]) < 6 ? 0 : tk;
       for (let c = 0; c < 3; c++) {
         const v = d[i + c] * (1 - t) + broad[i + c] * sc * t;
         d[i + c] = Math.max(0, Math.min(255, v * f));
@@ -2492,7 +2526,7 @@ export const generateGameTexture = async (terrainData, options = {}) => {
   // classes (Fizz_Mechanic: "a blend of satellite details and the game's
   // texture"): ground with paths, rocks and tufts, still game colours
   if (ground?.image && options.satelliteDetail !== false) {
-    const k = addSatelliteDetail(ctx, canvas, ground.image, { detail: options.detailStrength, tint: options.tintStrength });
+    const k = addSatelliteDetail(ctx, canvas, ground.image, { detail: options.detailStrength, tint: options.tintStrength, classes: ground });
     if (k) console.log(`[Game Texture] Satellite detail blended in (detail ${k.detail}, colour ${k.tint}).`);
   }
 

@@ -2,6 +2,7 @@
 import { computed, shallowRef, reactive, watch, toRaw, markRaw, onUnmounted, ref } from 'vue';
 import * as THREE from 'three';
 import { useTresContext, useLoop } from '@tresjs/core';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const props = defineProps({
   terrainData: { required: true },
@@ -9,11 +10,18 @@ const props = defineProps({
   textureType: { default: 'satellite' },
   showWater: { default: true, type: Boolean },
   waterLevelOffsetMeters: { default: 0, type: Number },
-  wireframe: { default: false, type: Boolean }
+  wireframe: { default: false, type: Boolean },
+  // the look (Visual quality "Cinematic"): earth-coloured sides under the
+  // map's edges (a solid tile, not a sheet floating in the sky), and its
+  // lakes as water surfaces
+  skirt: { default: false, type: Boolean },
+  lakes: { default: false, type: Boolean },
 });
 
 const SCENE_SIZE = 100;
 const geometry = shallowRef(null);
+const skirtGeometry = shallowRef(null);
+const lakeGeometry = shallowRef(null);
 const waterMeshRef = ref(null);
 const waterCubeRenderTarget = shallowRef(null);
 const waterCubeCamera = shallowRef(null);
@@ -40,6 +48,7 @@ const lastReflectionCameraQuaternion = new THREE.Quaternion(Number.NaN, Number.N
 
 const waterNormalTexture = shallowRef(null);
 const waterNormalScale = markRaw(new THREE.Vector2(0.09, 0.07));
+const lakeNormalScale = markRaw(new THREE.Vector2(0.18, 0.14));
 
 // Build a small tileable normal map so the water catches directional light
 // and reflections even when the terrain beneath is dark/flat.
@@ -234,6 +243,98 @@ onBeforeRender(() => {
   lastReflectionCameraQuaternion.copy(activeCamera.quaternion);
 });
 
+// ── The tile's sides and its lakes (Visual quality "Cinematic") ─────────────
+// Sides: a quad strip from every edge vertex down to a base under the map's
+// lowest point, coloured topsoil to deep earth, and the base closing it.
+const SKIRT_TOP = new THREE.Color('#5a4838');
+const SKIRT_BOTTOM = new THREE.Color('#1c1611');
+function buildSkirt(vertices, widthSteps, heightSteps, upm, data) {
+  const cols = widthSteps + 1; const rows = heightSteps + 1;
+  const relief = (Number(data.maxHeight) - Number(data.minHeight)) * upm;
+  const base = -Math.max(1.2, Math.min(6, (Number.isFinite(relief) ? relief : 10) * 0.06 + 1));
+  const ring = [];
+  for (let c = 0; c < cols; c++) ring.push(c);                                   // north edge, west → east
+  for (let r = 1; r < rows; r++) ring.push(r * cols + cols - 1);                 // east edge, down
+  for (let c = cols - 2; c >= 0; c--) ring.push((rows - 1) * cols + c);          // south edge, east → west
+  for (let r = rows - 2; r > 0; r--) ring.push(r * cols);                        // west edge, up
+  const pos = []; const col = []; const idx = [];
+  const push = (x, y, z, k) => { pos.push(x, y, z); const c = SKIRT_BOTTOM.clone().lerp(SKIRT_TOP, k); col.push(c.r, c.g, c.b); return pos.length / 3 - 1; };
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length];
+    const ax = vertices[a * 3], ay = vertices[a * 3 + 1], az = vertices[a * 3 + 2];
+    const bx = vertices[b * 3], by = vertices[b * 3 + 1], bz = vertices[b * 3 + 2];
+    const at = push(ax, ay, az, 1); const bt = push(bx, by, bz, 1);
+    const ab = push(ax, ay, base, 0); const bb = push(bx, by, base, 0);
+    idx.push(at, ab, bt, bt, ab, bb);
+  }
+  // (the base under it all)
+  const h = SCENE_SIZE / 2;
+  const q = [push(-h, h, base, 0), push(h, h, base, 0), push(h, -h, base, 0), push(-h, -h, base, 0)];
+  idx.push(q[0], q[2], q[1], q[0], q[3], q[2]);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+// Lakes: each standing-water outline (OSM natural=water, reservoirs, wide
+// rivers) as a surface at its level (the median ground inside it: the data
+// records a lake's surface as its ground), a hair above the terrain.
+const isPreviewLake = (f) => {
+  const t = f?.tags || {};
+  if (f?.type !== 'water' || !(f.geometry?.length > 3)) return false;
+  if (t.amenity === 'fountain' || t.leisure === 'swimming_pool' || t.intermittent === 'yes' || t.seasonal === 'yes') return false;
+  return t.natural === 'water' || t.waterway === 'riverbank' || ['reservoir', 'basin'].includes(t.landuse) || !!t.water;
+};
+function buildLakes(data, upm) {
+  const feats = (data.osmFeatures || []).filter(isPreviewLake);
+  if (!feats.length || !data.bounds || !data.heightMap) return null;
+  const { north, south, east, west } = data.bounds;
+  const W = data.width; const H = data.height;
+  const toXY = (p) => [((p.lng - west) / (east - west)) * SCENE_SIZE - SCENE_SIZE / 2, -(((north - p.lat) / (north - south)) * SCENE_SIZE - SCENE_SIZE / 2)];
+  const groundAt = (u, v) => {
+    if (!(u >= 0 && u <= 1 && v >= 0 && v <= 1)) return NaN;
+    const x = Math.round(u * (W - 1)); const y = Math.round(v * (H - 1));
+    const h = data.heightMap[y * W + x];
+    return h < -10000 ? NaN : h;
+  };
+  const geos = [];
+  for (const f of feats) {
+    const ring = f.geometry.map(toXY);
+    // (the level: the median ground at points inside the outline)
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [x, y] of ring) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+    const inside = (x, y) => { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i]; const [xj, yj] = ring[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
+    const samples = [];
+    const step = Math.max((maxX - minX), (maxY - minY)) / 24;
+    for (let x = minX + step / 2; x < maxX && step > 0; x += step) for (let y = minY + step / 2; y < maxY; y += step) {
+      if (!inside(x, y)) continue;
+      const g = groundAt((x + SCENE_SIZE / 2) / SCENE_SIZE, (SCENE_SIZE / 2 - y) / SCENE_SIZE);
+      if (Number.isFinite(g)) samples.push(g);
+    }
+    if (samples.length < 3) continue;
+    samples.sort((a, b) => a - b);
+    const level = samples[samples.length >> 1];
+    const shape = new THREE.Shape(ring.map(([x, y]) => new THREE.Vector2(x, y)));
+    for (const hole of f.holes || []) if (hole?.length > 3) shape.holes.push(new THREE.Path(hole.map(toXY).map(([x, y]) => new THREE.Vector2(x, y))));
+    const g = new THREE.ShapeGeometry(shape);
+    g.translate(0, 0, (level - Number(data.minHeight || 0)) * upm + 0.03);
+    geos.push(g);
+  }
+  if (!geos.length) return null;
+  const merged = mergeGeometries(geos);
+  geos.forEach((g) => g.dispose());
+  if (!merged) return null;
+  // (uvs in scene units, for the ripple normal map's tiling)
+  const p = merged.attributes.position; const uv = new Float32Array(p.count * 2);
+  for (let i = 0; i < p.count; i++) { uv[i * 2] = p.getX(i) / 6; uv[i * 2 + 1] = p.getY(i) / 6; }
+  merged.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  merged.computeVertexNormals();
+  return merged;
+}
+
 // ── Full-resolution normal map ───────────────────────────────────────────────
 // Lighting detail decoupled from vertex density: a normal map computed from the
 // SOURCE heightmap gives per-pixel shading of the real data even where the mesh
@@ -419,6 +520,10 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
   }
 
   geometry.value = markRaw(geo);
+  if (skirtGeometry.value) skirtGeometry.value.dispose();
+  skirtGeometry.value = markRaw(buildSkirt(vertices, widthSteps, heightSteps, upm, data));
+  if (lakeGeometry.value) lakeGeometry.value.dispose();
+  lakeGeometry.value = (() => { try { const g = buildLakes(data, upm); return g ? markRaw(g) : null; } catch (e) { console.warn('[TerrainMesh] lakes not built:', e?.message || e); return null; } })();
 
   // Full-resolution lighting detail for the decimated mesh (see above).
   // Built from the residual against this exact stride, so it must rebuild
@@ -566,6 +671,8 @@ const texture = computed(() => {
 
 onUnmounted(() => {
   if (geometry.value) geometry.value.dispose();
+  skirtGeometry.value?.dispose();
+  lakeGeometry.value?.dispose();
   Object.values(textureCache).forEach(tex => {
     if (tex) tex.dispose();
   });
@@ -608,6 +715,28 @@ onUnmounted(() => {
         :env-map="waterEnvMap"
         :side="2"
         :depth-write="false"
+      />
+    </TresMesh>
+
+    <TresMesh v-if="skirt && skirtGeometry" :rotation="[-Math.PI / 2, 0, 0]" :geometry="skirtGeometry" receive-shadow>
+      <TresMeshStandardMaterial :vertex-colors="true" :roughness="0.95" :metalness="0" :side="2" />
+    </TresMesh>
+
+    <TresMesh v-if="lakes && lakeGeometry" :rotation="[-Math.PI / 2, 0, 0]" :geometry="lakeGeometry" :render-order="3" receive-shadow>
+      <TresMeshPhysicalMaterial
+        :color="0x1b5a73"
+        :roughness="0.08"
+        :metalness="0"
+        :clearcoat="0.6"
+        :clearcoat-roughness="0.1"
+        :env-map-intensity="1.4"
+        :normal-map="waterNormalTexture"
+        :normal-scale="lakeNormalScale"
+        :transparent="true"
+        :opacity="0.42"
+        :depth-write="false"
+        :polygon-offset="true"
+        :polygon-offset-factor="-2"
       />
     </TresMesh>
 

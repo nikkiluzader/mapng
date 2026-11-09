@@ -128,3 +128,29 @@ test('pale grey and lichen-grey ground on a slope away from towns is rock', asyn
   cls = new Uint8Array(W * W).fill(at('grass'));
   assert.equal(GROUND_CLASSES[groundFromLandCover(cls, W, W, lc(30), slope, new Uint8Array(W * W))[0]], 'grass');
 });
+
+test('an arid scene: dull greens in its scrub and grassland are bare ground; a green scene keeps them', async () => {
+  const { groundFromLandCover } = await import('../services/osmTexture.js');
+  const { WC } = await import('../services/worldCover.js');
+  const w = 40; const h = 40;
+  const landCover = { grid: new Uint8Array(4 * 4).fill(WC.SHRUBS), n: 4 };
+  // mostly dry ground with a patch of dark "trees" and "grass", muted (3)
+  const make = (bareShare) => {
+    const cls = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) cls[i] = (i % 100) < bareShare ? 2 : (i % 2 ? 0 : 1);
+    return cls;
+  };
+  const muted = new Uint8Array(w * h).fill(3);
+  const arid = make(80);
+  groundFromLandCover(arid, w, h, landCover, null, muted);
+  assert.equal([...arid].filter((c) => c === 0 || c === 1).length, 0, 'no greens left in the desert scrub');
+  const green = make(30);
+  const before = [...green].filter((c) => c === 0 || c === 1).length;
+  groundFromLandCover(green, w, h, landCover, null, muted);
+  assert.equal([...green].filter((c) => c === 0 || c === 1).length, before, 'a green scene keeps its scrub');
+  // saturated greens (real leaves) stay even in a desert
+  const leaves = make(80);
+  const n = [...leaves].filter((c) => c === 0 || c === 1).length;
+  groundFromLandCover(leaves, w, h, landCover, null, new Uint8Array(w * h));
+  assert.equal([...leaves].filter((c) => c === 0 || c === 1).length, n);
+});

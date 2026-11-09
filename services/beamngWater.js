@@ -505,6 +505,12 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null }) {
 // as it is. Cut to the bed regardless, it stood as a wall all along the shore
 // wherever the outline climbed the bank (Lac du Chevril, Tignes). The map's
 // edge is no shore: a lake running off the map deepens towards it.
+//
+// A reservoir is a flooded valley, deepest against its dam: a dam (OSM
+// waterway=dam / man_made=dam) along the outline is no shore either, its
+// depth there the dam's height tag less DAM_FREEBOARD_M, or where untagged
+// how far the valley falls below it on the air side; and the floor rises
+// away from the dam, to DAM_FAR_SHARE of that depth at the lake's far end.
 const LAKE_BED_M = 1.5;
 const LAKE_BED_EDGE_M = 0.3;
 const LAKE_BANK_M = 3;
@@ -517,6 +523,10 @@ const LAKE_SIZE_DEPTH = 0.15;
 const LAKE_DEPTH_MAX_M = 400;
 const RIVER_AREA_MAX_M = 4;
 const LAKE_GRID_CELLS = 4e6;    // the distance grid at most this many cells (a big lake on a coarser one)
+const DAM_REACH_M = 25;         // a dam this close to a lake's outline holds it
+const DAM_FREEBOARD_M = 4;      // the crest over the water
+const DAM_FAR_SHARE = 0.25;     // the floor at the far end: this share of the depth at the dam
+const DAM_AIR_READ_M = [30, 120]; // the valley below a dam read this far out on its air side
 const distToRing = (x, y, ring) => {
   let best = Infinity;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -608,7 +618,41 @@ export function shoreSlope(poly, level, groundAt) {
  * floating; kept ground counts as shore). Returns { pixels, lakes: [{ name,
  * depth, source, reach, slope }], apply(set) }: set(idx, raw).
  */
-export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
+const segDistXY = (x, y, a, b) => {
+  const dx = b[0] - a[0]; const dy = b[1] - a[1]; const L2 = dx * dx + dy * dy || 1e-9;
+  const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / L2));
+  return Math.hypot(a[0] + dx * t - x, a[1] + dy * t - y);
+};
+const lineDist = (x, y, line) => { let d = Infinity; for (let i = 0; i + 1 < line.length; i++) d = Math.min(d, segDistXY(x, y, line[i], line[i + 1])); return d; };
+
+/**
+ * A dam's depth against its lake: its height tag less the freeboard, else
+ * how far the valley falls below the lake's level on the dam's air side (the
+ * lowest ground DAM_AIR_READ_M out from it, away from the lake).
+ */
+export function damDepth(dam, poly, level, groundAt) {
+  const tagged = Number(String(dam.height ?? '').replace(',', '.').replace(/\s*m$/i, ''));
+  if (tagged > DAM_FREEBOARD_M + 1 && tagged < 400) return tagged - DAM_FREEBOARD_M;
+  let low = Infinity;
+  const line = dam.line;
+  for (let i = 0; i + 1 < line.length; i++) {
+    const a = line[i]; const b = line[i + 1];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (L < 1e-6) continue;
+    const nx = -(b[1] - a[1]) / L; const ny = (b[0] - a[0]) / L;
+    for (let s = 0; s <= L; s += 10) {
+      const x = a[0] + ((b[0] - a[0]) * s) / L; const y = a[1] + ((b[1] - a[1]) * s) / L;
+      // (the air side: the one whose first step leaves the lake)
+      const sgn = poly.contains(x + nx * 8, y + ny * 8) ? -1 : 1;
+      for (const r of DAM_AIR_READ_M) {
+        const g = groundAt(x + sgn * nx * r, y + sgn * ny * r);
+        if (Number.isFinite(g)) low = Math.min(low, g);
+      }
+    }
+  }
+  return Number.isFinite(low) && level - low > 2 ? level - low : null;
+}
+
+export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [] } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
   const sq = worldSize / Math.max(1, width - 1);
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -631,7 +675,11 @@ export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
     const c0 = Math.floor(pc0) - 2; const r0 = Math.floor(pr0) - 2; const c1 = Math.ceil(pc1) + 2; const r1 = Math.ceil(pr1) + 2;
     const k = Math.max(1, Math.ceil(Math.sqrt(((c1 - c0 + 1) * (r1 - r0 + 1)) / LAKE_GRID_CELLS)));
     const gw = Math.ceil((c1 - c0 + 1) / k); const gh = Math.ceil((r1 - r0 + 1) / k);
+    // the dams holding this lake (near its outline), and their depth
+    const lakeDams = (dams || []).filter((d) => d.line?.length > 1 && d.line.some(([x, y]) => poly.contains(x, y) || Math.min(distToRing(x, y, poly.outer)) < DAM_REACH_M));
+    const nearDam = (x, y) => lakeDams.some((d) => lineDist(x, y, d.line) < DAM_REACH_M);
     const seed = new Uint8Array(gw * gh);
+    const damSeed = new Uint8Array(gw * gh);
     const wet = new Uint8Array(gw * gh);
     for (let gy = 0; gy < gh; gy++) {
       for (let gx = 0; gx < gw; gx++) {
@@ -640,6 +688,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
         const [x, y] = toWorld(c, r);
         const inside = poly.contains(x, y);
         if (inside && !keep(x, y)) wet[gy * gw + gx] = 1;
+        else if (lakeDams.length && nearDam(x, y)) damSeed[gy * gw + gx] = 1;   // a dam: no shore
         else if (onMap) seed[gy * gw + gx] = 1;   // the shore (off the map: none)
       }
     }
@@ -652,9 +701,28 @@ export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
     const slope = tagged ? null : shoreSlope(poly, level, groundAt);
     let depth = tagged ?? (slope != null ? LAKE_SLOPE_SHARE * slope * reach : LAKE_BED_M);
     if (!tagged) depth = Math.min(depth, Math.max(LAKE_BED_M, LAKE_SIZE_DEPTH * Math.sqrt(area)), LAKE_DEPTH_MAX_M);
+    // a reservoir: its depth at the dam, the floor rising away from it
+    let damD = null; let damDist = null; let damFar = 0;
+    if (lakeDams.length && !lake.river) {
+      const ds = lakeDams.map((d) => damDepth(d, poly, level, groundAt)).filter((v) => v != null);
+      if (ds.length) {
+        damD = Math.min(LAKE_DEPTH_MAX_M, Math.max(...ds));
+        damDist = squaredDistanceGrid(damSeed, gw, gh);
+        for (let i = 0; i < gw * gh; i++) if (wet[i] && damDist[i] < 1e19) damFar = Math.max(damFar, Math.sqrt(damDist[i]));
+        if (!tagged) depth = Math.max(depth, damD);
+      }
+    }
     if (lake.river) depth = Math.min(depth, RIVER_AREA_MAX_M);
     depth = Math.max(LAKE_BED_M, depth);
-    report.push({ name: lake.tags?.name || null, depth, source: tagged ? 'osm' : slope != null ? 'slope' : 'none', reach, slope });
+    report.push({ name: lake.tags?.name || null, depth, source: tagged ? 'osm' : damD != null ? 'dam' : slope != null ? 'slope' : 'none', reach, slope, damDepth: damD });
+    // (the floor's share of the depth at a spot: 1 at the dam, DAM_FAR_SHARE at the far end)
+    const floorShare = (c, r) => {
+      if (!damDist || !(damFar > 0)) return 1;
+      const gx = Math.min(gw - 1, Math.max(0, Math.floor((c - c0) / k))); const gy = Math.min(gh - 1, Math.max(0, Math.floor((r - r0) / k)));
+      const v = damDist[gy * gw + gx];
+      const s = v >= 1e19 ? damFar : Math.sqrt(v);
+      return 1 - (1 - DAM_FAR_SHARE) * Math.min(1, s / damFar);
+    };
     const distAt = (c, r) => {
       const gx = Math.min(gw - 1, Math.max(0, Math.floor((c - c0) / k))); const gy = Math.min(gh - 1, Math.max(0, Math.floor((r - r0) / k)));
       const v = d2[gy * gw + gx];
@@ -674,7 +742,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
           : distAt(c, r);
         const t = reach > 0 ? Math.min(1, l / reach) : 0;
         const edge = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, l / LAKE_BANK_M);
-        let target = level - Math.max(edge, depth * t * (2 - t));
+        let target = level - Math.max(edge, depth * t * (2 - t) * floorShare(c, r));
         // (ground a little over the water: cut less and less, so the bank meets the bed without a step)
         if (above > LAKE_CUT_FULL_M) {
           const q = (above - LAKE_CUT_FULL_M) / (LAKE_CUT_TOP_M - LAKE_CUT_FULL_M);

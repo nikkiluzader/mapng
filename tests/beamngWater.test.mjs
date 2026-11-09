@@ -307,3 +307,30 @@ test('lake depth: from the shore slope in a valley, from an OSM depth tag, shall
   const off = run({ natural: 'water' }, [[-50, -150], [50, -150], [50, 260], [-50, 260], [-50, -150]]);
   assert.ok(off.at(0, 190) <= off.at(0, -100) + 1e-6, 'deeper towards the map edge than near the south shore');
 });
+
+test('a reservoir is deepest against its dam, its floor rising away from it; the dam is no shore', async () => {
+  const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
+  // a 400 m map at 2 m: a valley along y (sides 0.4 per m), water flat at 20 m
+  // for |x| < 50, a dam across it at y = -150 with the valley 60 m lower beyond
+  const N = 201; const SIZE = 400;
+  const g = (x, y) => (y < -155 ? -40 : 20) + Math.max(0, 0.4 * (Math.abs(x) - 50));
+  const hm = new Float32Array(N * N);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) hm[r * N + c] = g((c / (N - 1) - 0.5) * SIZE, (0.5 - r / (N - 1)) * SIZE);
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+  const ring = [[-50, -150], [50, -150], [50, 150], [-50, 150], [-50, -150]];
+  const plan = planLakes({ features: [{ type: 'water', tags: { natural: 'water', water: 'reservoir' }, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) }], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+  const level = plan.lakes[0].level;
+  const beds = carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 }, { dams: [{ line: [[-60, -152], [60, -152]], height: null }] });
+  beds.apply((idx, v) => { hm[idx] = v; });
+  assert.equal(beds.lakes[0].source, 'dam');
+  assert.ok(beds.lakes[0].damDepth > 55 && beds.lakes[0].damDepth < 65, `depth at the dam from the valley below: ${beds.lakes[0].damDepth}`);
+  // deep right against the dam (no shore there), shallower up the valley
+  assert.ok(at(0, -140) < level - 30, `by the dam: ${at(0, -140)}`);
+  assert.ok(at(0, 100) > at(0, -100), 'the floor rises away from the dam');
+  // a height tag wins
+  const hm2 = new Float32Array(N * N);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) hm2[r * N + c] = g((c / (N - 1) - 0.5) * SIZE, (0.5 - r / (N - 1)) * SIZE);
+  const tagged = carveLakeBeds(plan.lakes, { heightMap: hm2, width: N, height: N, worldSize: SIZE, minHeight: 0 }, { dams: [{ line: [[-60, -152], [60, -152]], height: '100' }] });
+  assert.equal(tagged.lakes[0].damDepth, 96);
+});

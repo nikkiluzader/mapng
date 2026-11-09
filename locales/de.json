@@ -342,7 +342,12 @@
     "feature_barriers": "Barrieren",
     "webglTitle": "3D-Vorschau nicht verfügbar",
     "webglBody": "Dein Browser konnte WebGL nicht starten. Schalte in seinen Einstellungen die Hardwarebeschleunigung (GPU) ein oder probiere einen anderen Browser. Exportieren funktioniert trotzdem.",
-    "sun_MidMorning": "Vormittag"
+    "sun_MidMorning": "Vormittag",
+    "visualQuality": "Darstellungsqualität",
+    "qualityCinematic": "Filmisch",
+    "qualityStandard": "Standard",
+    "qualityCinematicHint": "Weiche Schatten in Tälern und unter Gebäuden, Dunst, kräftigere Farben und echtes Seewasser. Braucht eine ordentliche Grafikkarte.",
+    "qualityStandardHint": "Schlicht und schonend für die Grafikkarte."
   },
   "exportPanel": {
     "osmMissing": "Noch keine OpenStreetMap-Daten",

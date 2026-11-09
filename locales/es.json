@@ -342,7 +342,12 @@
     "feature_barriers": "Barreras",
     "webglTitle": "Vista previa 3D no disponible",
     "webglBody": "Tu navegador no pudo iniciar WebGL. Activa la aceleración por hardware (GPU) en sus ajustes o prueba otro navegador. La exportación sigue funcionando.",
-    "sun_MidMorning": "Media mañana"
+    "sun_MidMorning": "Media mañana",
+    "visualQuality": "Calidad visual",
+    "qualityCinematic": "Cinemática",
+    "qualityStandard": "Estándar",
+    "qualityCinematicHint": "Sombras suaves en valles y bajo edificios, bruma, colores más vivos y agua real en los lagos. Necesita una tarjeta gráfica decente.",
+    "qualityStandardHint": "Sencilla y ligera para la tarjeta gráfica."
   },
   "exportPanel": {
     "osmMissing": "Aún no hay datos de OpenStreetMap",

@@ -2024,6 +2024,9 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       }).catch((err) => console.warn(`${BEAMNG_EXPORT_UI_LOG} Downloading ahead failed; the export fetches what it needs:`, err?.message || err));
     }
 
+    // (the runner runs the data step itself when this one didn't finish)
+    levelOptions.dataStepDone = !dataTd || !exportDataNeeds(dataTd, exportDataOptions.value) || exportDataState(dataTd, exportDataOptions.value)?.status === 'done';
+
     if (desktopApp) {
       lastExportOptions = Object.fromEntries(Object.entries(levelOptions).filter(([, v]) => typeof v !== 'function'));
       desktopExportAbort = new AbortController();

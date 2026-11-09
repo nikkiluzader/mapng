@@ -342,7 +342,12 @@
     "feature_barriers": "Barriere",
     "webglTitle": "Anteprima 3D non disponibile",
     "webglBody": "Il tuo browser non è riuscito ad avviare WebGL. Attiva l'accelerazione hardware (GPU) nelle sue impostazioni o prova un altro browser. L'esportazione funziona comunque.",
-    "sun_MidMorning": "Metà mattina"
+    "sun_MidMorning": "Metà mattina",
+    "visualQuality": "Qualità visiva",
+    "qualityCinematic": "Cinematica",
+    "qualityStandard": "Standard",
+    "qualityCinematicHint": "Ombre morbide nelle valli e sotto gli edifici, foschia, colori più ricchi e vera acqua nei laghi. Serve una scheda grafica discreta.",
+    "qualityStandardHint": "Semplice e leggera per la scheda grafica."
   },
   "exportPanel": {
     "osmMissing": "Ancora nessun dato OpenStreetMap",
