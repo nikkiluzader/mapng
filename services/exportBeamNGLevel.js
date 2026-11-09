@@ -30,6 +30,13 @@ import { placeBoats } from './boats.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData, cropHeightmap, cropOSMFeatures, adjustBounds } from './cropTerrain.js';
+import { stepHash, cachedStep, terrainFingerprint } from './stepCache.js';
+
+// (the build, in the step cache keys of steps whose code spans many modules:
+// a new build makes them again; no build constant (Node tests): those steps
+// aren't cached unless options.stepCodeVersion names the code)
+const STEP_CODE_BUILD = typeof __BUILD_HASH__ !== 'undefined' && typeof __BUILD_TIME__ !== 'undefined' ? `${__BUILD_HASH__}@${__BUILD_TIME__}` : null;
+const jsonOf = (v) => JSON.stringify(v, (k, x) => (x instanceof Map ? [...x.values()] : x instanceof Set ? [...x] : x));
 import { gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
@@ -1766,6 +1773,11 @@ export function buildBackdropSeamStrips(group, worldSize, seam) {
  */
 // The backdrop's downloads (services/exportData.js fetches the same ahead)
 export const BACKDROP_FETCH = Object.freeze({ fetchResolutionCap: 1024, includeSatellite: true, satelliteZoom: 15 });
+// (the backdrop's code, in its step cache key: a new version builds it again)
+let backdropCode = null;
+const BACKDROP_CODE = () => (backdropCode ||= stepHash(STEP_CACHE_VERSION, generateTerrainBackdropDAE.toString(), createSurroundingMeshes.toString(),
+  buildBackdropSeamStrips.toString(), buildBackdropMaterialDefs.toString(), JSON.stringify(BACKDROP_FETCH)));
+const STEP_CACHE_VERSION = 'steps-1';
 async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) {
   // Zoom 15 gives ~4m/px satellite imagery; 1024px cap avoids canvas-size
   // failures at large resolutions while still giving usable texture quality.
@@ -11945,6 +11957,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     report(step, 0, completed);
   };
   const finishProcessingLog = () => { closeStep(); };
+  // (steps taken from the step cache, unchanged since the last export)
+  const reusedSteps = [];
 
   beginStep('prepare', `Preparing ${terrainData.width}×${terrainData.height} terrain and ${Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures.length : 0} OSM features…`);
   await yield_();
@@ -12638,15 +12652,24 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   beginStep('materials', effectivePbrSource !== 'none'
     ? `Painting terrain materials from OSM land use (${size}×${size} layer map)…`
     : 'Writing the default terrain material…');
-  const pbrResult = effectivePbrSource !== 'none'
-    ? await buildTerrainMaterials(exportTerrainData, worldSize, levelName, biome, terrainBaseTexSize, {
+  // (kept in the step cache by everything it reads: the shaped terrain, the
+  // level's name and look, the base texture's vegetation, the parking bays)
+  const stepCode = options.stepCodeVersion || STEP_CODE_BUILD;
+  const materialBays = parkingSpots.filter((sp) => sp.ground && !sp.ground.inLot).map((sp) => sp.ground);
+  const materialsKey = effectivePbrSource !== 'none' && stepCode
+    ? stepHash('materials', STEP_CACHE_VERSION, stepCode, terrainFingerprint(exportTerrainData), worldSize, levelName, jsonOf(biome), terrainBaseTexSize,
+      effectivePbrSource, ArrayBuffer.isView(vegetationMask) ? vegetationMask : (vegetationMask?.data || vegetationMask?.mask || jsonOf(vegetationMask ?? null)), jsonOf(materialBays))
+    : null;
+  const { value: pbrResult, reused: materialsReused } = effectivePbrSource !== 'none'
+    ? await cachedStep(options.stepCache || null, materialsKey, () => buildTerrainMaterials(exportTerrainData, worldSize, levelName, biome, terrainBaseTexSize, {
         pbrSource: effectivePbrSource,
         imageCanvas,
         vegetationMask,
         groundClasses: exportTerrainData.groundClasses,
-        parkingBays: parkingSpots.filter((sp) => sp.ground && !sp.ground.inLot).map((sp) => sp.ground),
-      })
-    : null;
+        parkingBays: materialBays,
+      }))
+    : { value: null, reused: false };
+  if (materialsReused) { reusedSteps.push('materials'); console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Terrain materials reused from the last export (step cache).`); }
 
   // Standing water planned before the terrain is written: lakes whose
   // ground the elevation data records at the water's surface get a bed
@@ -12888,9 +12911,20 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let backdropMaterialNames = [];
   let backdropDiagnostics = null;
   if (includeBackdrop) {
-    beginStep('backdrop', `${replayingSources() ? 'Reading the saved' : 'Fetching the'} surrounding backdrop (${backdropElevationSource === 'global30m' ? 'global 30 m' : backdropElevationSource.toUpperCase()} elevation + satellite imagery, 8 tiles)…`);
+    // (its tiles are in the download cache: the export's data step fetched them)
+    beginStep('backdrop', `Building the surrounding backdrop (${backdropElevationSource === 'global30m' ? 'global 30 m' : backdropElevationSource.toUpperCase()} elevation + satellite imagery, 8 tiles)…`);
     await yield_();
-    const backdropResult = await generateTerrainBackdropDAE(exportTerrainData, worldSize, {
+    // The backdrop reads the map's footprint, its source and the terrain's
+    // border (the seam strips): kept in the step cache by those, a re-export
+    // that changed something else (trees, a name) reuses it
+    const border = new Uint16Array(4 * size);
+    for (let i = 0; i < size; i++) {
+      const q = (idx) => Math.max(0, Math.min(65535, Math.floor((exportTerrainData.heightMap[idx] - terrainBase) * (65536 / terrainBlockMaxHeight))));
+      border[i] = q(i); border[size + i] = q((size - 1) * size + i); border[2 * size + i] = q(i * size); border[3 * size + i] = q(i * size + size - 1);
+    }
+    const backdropKey = stepHash('backdrop', BACKDROP_CODE(), exportTerrainData.bounds, size, squareSize, worldSize, backdropElevationSource,
+      backdropElevationSource === 'gpxz' ? String(backdropGpxzApiKey || '').length : 0, terrainBlockZ, terrainBlockMaxHeight, border);
+    const { value: backdropResult, reused: backdropReused } = await cachedStep(options.stepCache || null, backdropKey, () => generateTerrainBackdropDAE(exportTerrainData, worldSize, {
       elevationSource: backdropElevationSource,
       gpxzApiKey: backdropGpxzApiKey,
       onProgress: (text, fraction) => report(`Backdrop: ${String(text).replace(/\.\.\.$/, '…')}`, fraction),
@@ -12903,7 +12937,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           return terrainBlockZ + (q * terrainBlockMaxHeight) / 65536;
         },
       },
-    });
+    }));
+    if (backdropReused) {
+      reusedSteps.push('backdrop');
+      report('Backdrop: the same as the last export\'s (nothing it reads changed)', 1);
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Backdrop reused from the last export (step cache).`);
+    }
     backdropDaeBlob = backdropResult?.daeBlob ?? null;
     backdropTextureFiles = backdropResult?.textureFiles ?? [];
     backdropMaterialNames = backdropResult?.materialNames ?? [];
@@ -12917,13 +12956,25 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const damCount = (decalRoads.structureGraph?.dams || []).length;
     beginStep('buildings', `Building textured 3D buildings (${(exportTerrainData.osmFeatures || []).filter((f) => f.type === 'building').length} OSM footprints${damCount ? `, ${damCount} dam${damCount === 1 ? '' : 's'}` : ''})…`);
     await yield_();
-    const osm = await generateOSMObjectsDAE(exportTerrainData, worldSize, buildingReport, {
+    const buildingInputs = {
       raceways: groundCarriageways.filter((cw) => cw.highway === 'raceway'),
       gateRoads: gateWaysOf(exportTerrainData, groundCarriageways, squareSize),
       // (the dams the roads were pinned to: one crest for the road and the concrete)
       dams: decalRoads.structureGraph?.dams || null,
       replace: bridgeTowerHouses,
+    };
+    // (kept in the step cache by the shaped terrain and these: a re-export
+    // that changed only trees or a name reuses the buildings)
+    const stepCode = options.stepCodeVersion || STEP_CODE_BUILD;
+    const buildingsKey = stepCode ? stepHash('buildings', STEP_CACHE_VERSION, stepCode, terrainFingerprint(exportTerrainData), worldSize, jsonOf(buildingInputs)) : null;
+    const { value: built, reused: buildingsReused } = await cachedStep(options.stepCache || null, buildingsKey, async () => {
+      const stats = { dragGrade };
+      const out = await generateOSMObjectsDAE(exportTerrainData, worldSize, stats, buildingInputs);
+      return out ? { data: out.data || null, tiles: out.tiles || [], report: stats } : { data: null, tiles: [], report: stats };
     });
+    const osm = built;
+    Object.assign(buildingReport, built?.report || {});
+    if (buildingsReused) { reusedSteps.push('buildings'); console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings reused from the last export (step cache).`); }
     osmDaeBlob = osm?.data || null;
     buildingTileDaes = osm?.tiles || [];
     buildingReport.tiles = buildingTileDaes.length;
@@ -14731,7 +14782,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   lastPct = 100;
   onProgress?.({ step: 'Done', pct: 100, elapsedMs: performance.now() - exportT0, completed: processingLog[processingLog.length - 1] ?? null });
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Completed exportBeamNGLevel`);
-  return { blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes };
+  return {
+    blob: zipBlob, filename: `${levelName}.zip`, structureChecks, ingameProbes,
+    // (for the export history: each step's time, and the steps reused from the last export)
+    steps: processingLog.map((e) => ({ step: e.step, ms: Math.round(e.durationMs) })),
+    reused: [...reusedSteps],
+  };
 }
 
 // (tests: the planting on its own)

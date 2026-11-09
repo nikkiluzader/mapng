@@ -506,7 +506,15 @@
       "dataRunning": "Téléchargement des environs et des hauteurs de ponts avant l'export… {pct} %",
       "dataDone": "Environs et hauteurs de ponts téléchargés : l'export les lit depuis le cache.",
       "dataFailed": "Téléchargement anticipé impossible ; l'export récupérera ce qu'il lui faut.",
-      "dataWaiting": "En attente des téléchargements…"
+      "dataWaiting": "En attente des téléchargements…",
+      "checkLevel": "Vérifier le niveau",
+      "levelUpToDate": "À jour : exporté {ago} avec ces réglages",
+      "justNow": "à l'instant",
+      "minutesAgo": "il y a {n} min",
+      "levelChecked": "Niveau vérifié : tout y est.",
+      "levelRebuilt": "Reconstruction : {problems}",
+      "nothingChanged": "Rien n'a changé depuis le dernier export.",
+      "rebuildAnyway": "Reconstruire quand même"
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -1096,7 +1104,15 @@
     "deleteWarnBody": "Supprimer déplace le ZIP du niveau hors de votre dossier de mods BeamNG, avec ses données enregistrées (dont Mettre à jour le reconstruit), vers la Corbeille. Il disparaît de BeamNG et de Mes niveaux ; vous pouvez restaurer les deux depuis la Corbeille.",
     "deleteWarnOnce": "Ce message n'apparaît qu'une fois : désormais Supprimer agit tout de suite. Survolez le bouton pour le relire.",
     "deleteWarnCancel": "Annuler",
-    "deleteWarnConfirm": "Supprimer"
+    "deleteWarnConfirm": "Supprimer",
+    "history": "Derniers exports",
+    "historyNone": "Aucun export enregistré pour l'instant.",
+    "historyFirst": "premier export",
+    "historyNoChange": "rien n'a changé",
+    "historyReused": "réutilisé : {list}",
+    "historyDownloaded": "{n} fichier(s) téléchargé(s) pendant l'export",
+    "historyKind_rebuild": "reconstruction",
+    "historyKind_refetch": "re-téléchargé"
   },
   "desktopWelcome": {
     "title": "Bienvenue dans MapNG Desktop",

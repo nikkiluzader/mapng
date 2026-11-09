@@ -177,7 +177,24 @@ export async function createZipCompressor(JSZip, { concurrency, inFlightBytes = 
  * entries compressed natively in all (0: JSZip compresses them, as before).
  * onProgress(fraction, name) as entries finish.
  */
+/**
+ * Entries already compressed (images, textures, archives) stored as they are:
+ * deflate barely shrinks them (a level's PNGs: 14.4 → 14.3 MB) and JSZip's
+ * JavaScript deflate spent most of the zip's time on them. BeamNG reads
+ * stored entries like any other. Returns how many.
+ */
+export function storeCompressedEntries(zip) {
+  let n = 0;
+  for (const f of Object.values(zip.files)) {
+    if (f.dir || !SKIP.test(f.name)) continue;
+    f.options = { ...(f.options || {}), compression: 'STORE' };
+    n++;
+  }
+  return n;
+}
+
 export async function precompressZipEntries(zip, JSZip, { onProgress, concurrency, inFlightBytes, compressor = null } = {}) {
+  storeCompressedEntries(zip);
   const c = compressor || await createZipCompressor(JSZip, { concurrency, inFlightBytes });
   if (!c) return 0;
   await c.drain();

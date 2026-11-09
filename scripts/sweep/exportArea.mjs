@@ -87,8 +87,10 @@ if (process.env.TREEMIX !== 'climate') {
 }
 
 const t0 = Date.now();
-const { blob, structureChecks } = await exportBeamNGLevel(terrainData, meta.center, {
-  treeSpeciesMix,
+// (STEP_CACHE=<dir>: the desktop runner's step cache, so a second run reuses what it can)
+const stepCache = process.env.STEP_CACHE ? (await import('../../desktop/runner/diskStepCache.mjs')).diskStepCache(process.env.STEP_CACHE) : null;
+const { blob, structureChecks, steps: stepTimes } = await exportBeamNGLevel(terrainData, meta.center, {
+  treeSpeciesMix, stepCache, ...(stepCache ? { stepCodeVersion: 'sweep' } : {}),
   baseTexture, pbrSource: 'osm', roadType: 'decal', includeBackdrop: process.env.BACKDROP === '1',
   includeBuildings: true, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,
@@ -123,3 +125,5 @@ fs.writeFileSync(out, Buffer.from(await blob.arrayBuffer()));
 if (structureChecks) fs.writeFileSync(out.replace(/\.zip$/, '.checks.json'), JSON.stringify(structureChecks, null, 1));
 if (args.includes('--fix-stubs')) execFileSync('node', [new URL('./fixStubs.mjs', import.meta.url).pathname, out], { stdio: 'inherit' });
 console.log(`exported ${area} (${dem}) in ${((Date.now() - t0) / 1000).toFixed(1)} s: ${out}`);
+// (STEPS=1: each export step's time)
+if (process.env.STEPS === '1') for (const st of stepTimes || []) console.log(`step ${(st.ms / 1000).toFixed(2).padStart(7)} s  ${st.step.slice(0, 90)}`);

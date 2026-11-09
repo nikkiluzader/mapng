@@ -506,7 +506,15 @@
       "dataRunning": "Downloading the surroundings and bridge heights ahead of the export… {pct}%",
       "dataDone": "Surroundings and bridge heights downloaded: the export reads them from the cache.",
       "dataFailed": "Couldn't download them ahead; the export will fetch what it needs.",
-      "dataWaiting": "Waiting for the downloads…"
+      "dataWaiting": "Waiting for the downloads…",
+      "checkLevel": "Check level",
+      "levelUpToDate": "Up to date: exported {ago} with these settings",
+      "justNow": "just now",
+      "minutesAgo": "{n} min ago",
+      "levelChecked": "Level checked: everything's there.",
+      "levelRebuilt": "Building it again: {problems}",
+      "nothingChanged": "Nothing changed since the last export.",
+      "rebuildAnyway": "Rebuild anyway"
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -1096,7 +1104,15 @@
     "deleteWarnBody": "Delete moves the level's ZIP out of your BeamNG mods folder, together with its saved data (what Update rebuilds it from), into the Recycle Bin (Trash on Linux). It disappears from BeamNG and from My Levels; you can restore both from the Recycle Bin.",
     "deleteWarnOnce": "This only shows once: from now on Delete works straight away. Hover the Delete button to read this again.",
     "deleteWarnCancel": "Cancel",
-    "deleteWarnConfirm": "Delete"
+    "deleteWarnConfirm": "Delete",
+    "history": "Last exports",
+    "historyNone": "No exports recorded yet.",
+    "historyFirst": "first export",
+    "historyNoChange": "nothing changed",
+    "historyReused": "reused: {list}",
+    "historyDownloaded": "downloaded {n} file(s) during the export",
+    "historyKind_rebuild": "rebuild",
+    "historyKind_refetch": "fetched again"
   },
   "desktopWelcome": {
     "title": "Welcome to MapNG Desktop",

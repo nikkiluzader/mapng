@@ -506,7 +506,15 @@
       "dataRunning": "Umgebung und Brückenhöhen werden vor dem Export heruntergeladen… {pct}%",
       "dataDone": "Umgebung und Brückenhöhen heruntergeladen: Der Export liest sie aus dem Cache.",
       "dataFailed": "Vorab-Download fehlgeschlagen; der Export holt, was er braucht.",
-      "dataWaiting": "Warte auf die Downloads…"
+      "dataWaiting": "Warte auf die Downloads…",
+      "checkLevel": "Level prüfen",
+      "levelUpToDate": "Aktuell: {ago} mit diesen Einstellungen exportiert",
+      "justNow": "gerade eben",
+      "minutesAgo": "vor {n} Min.",
+      "levelChecked": "Level geprüft: Alles ist da.",
+      "levelRebuilt": "Wird neu gebaut: {problems}",
+      "nothingChanged": "Seit dem letzten Export hat sich nichts geändert.",
+      "rebuildAnyway": "Trotzdem neu bauen"
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",
@@ -1096,7 +1104,15 @@
     "deleteWarnBody": "Löschen verschiebt die ZIP-Datei des Levels aus deinem BeamNG-Mods-Ordner zusammen mit den gespeicherten Daten (aus denen „Aktualisieren“ es neu baut) in den Papierkorb. Es verschwindet aus BeamNG und aus „Meine Level“; beides lässt sich aus dem Papierkorb wiederherstellen.",
     "deleteWarnOnce": "Das erscheint nur einmal: Ab jetzt löscht „Löschen“ sofort. Fahre mit der Maus über den Knopf, um es erneut zu lesen.",
     "deleteWarnCancel": "Abbrechen",
-    "deleteWarnConfirm": "Löschen"
+    "deleteWarnConfirm": "Löschen",
+    "history": "Letzte Exporte",
+    "historyNone": "Noch keine Exporte aufgezeichnet.",
+    "historyFirst": "erster Export",
+    "historyNoChange": "nichts geändert",
+    "historyReused": "wiederverwendet: {list}",
+    "historyDownloaded": "{n} Datei(en) während des Exports heruntergeladen",
+    "historyKind_rebuild": "neu gebaut",
+    "historyKind_refetch": "neu abgerufen"
   },
   "desktopWelcome": {
     "title": "Willkommen bei MapNG Desktop",

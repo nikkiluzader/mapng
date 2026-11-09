@@ -144,6 +144,24 @@
               <Trash2 :size="11" />{{ t('levels.delete') }}
             </button>
           </div>
+          <!-- the level's last exports (desktop/main.js export history): what changed, how long, what was reused -->
+          <button type="button" class="flex items-center gap-1 text-micro text-gray-500 dark:text-gray-400 hover:text-brand transition-colors" @click="toggleHistory(level)">
+            <History :size="11" />{{ t('levels.history') }}
+            <ChevronDown :size="11" class="transition-transform" :class="history[level.levelName] ? 'rotate-180' : ''" />
+          </button>
+          <div v-if="history[level.levelName]" class="space-y-1 pl-1 border-l-2 border-gray-200 dark:border-gray-700">
+            <p v-if="!history[level.levelName].length" class="pl-1.5 text-micro text-gray-400 dark:text-gray-500">{{ t('levels.historyNone') }}</p>
+            <div v-for="(h, i) in history[level.levelName]" :key="i" class="pl-1.5 text-micro leading-snug text-gray-600 dark:text-gray-300">
+              <div class="flex flex-wrap gap-x-1.5">
+                <span class="font-medium">{{ formatTime(h.at) }}</span>
+                <span v-if="h.kind !== 'export'" class="text-gray-400">{{ t(`levels.historyKind_${h.kind}`) }}</span>
+                <span>{{ h.seconds }} s</span>
+                <span v-if="h.reused?.length" class="text-emerald-700 dark:text-emerald-400">{{ t('levels.historyReused', { list: h.reused.map(stepName).join(', ') }) }}</span>
+              </div>
+              <div class="text-gray-500 dark:text-gray-400 [overflow-wrap:anywhere]">{{ changeText(h) }}</div>
+              <div v-if="h.downloaded" class="text-amber-700 dark:text-amber-300">{{ t('levels.historyDownloaded', { n: h.downloaded }) }}</div>
+            </div>
+          </div>
           <p v-if="messages[level.levelName]" class="text-micro leading-snug" :class="messages[level.levelName].error ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'">
             {{ messages[level.levelName].text }}
           </p>
@@ -180,9 +198,10 @@
 </template>
 
 <script setup>
+import { PERSONAL_STORAGE_KEYS } from '../../services/personalKeys.js';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { FolderOpen, Hammer, HardDrive, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
+import { ChevronDown, FolderOpen, Hammer, HardDrive, History, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { openReportDialog } from '../../composables/useReportDialog.js';
 
@@ -203,6 +222,29 @@ const folder = ref(null);
 const appVersion = ref(null);
 const loading = ref(false);
 const busy = reactive({});       // levelName → progress text
+// levelName → its last exports (open), from desktop/main.js's export history
+const history = reactive({});
+async function toggleHistory(level) {
+  if (history[level.levelName]) { delete history[level.levelName]; return; }
+  try { history[level.levelName] = (await desktopApp.levelHistory?.(level.levelName, 5)) || []; } catch { history[level.levelName] = []; }
+}
+// (setting names as the export panel says them, where it has them)
+const SETTING_WORDS = {
+  forestDensity: 'exportPanel.ui.forestDensity', includeTrees: 'exportPanel.treesBushes', includeBackdrop: 'exportPanel.includeBackdrop',
+  backdropElevationSource: 'exportPanel.includeBackdrop', baseTexture: 'exportPanel.baseTexture', levelName: 'exportPanel.levelName',
+  includeBuildings: 'exportPanel.ui.buildings', includeWater: 'exportPanel.water', includeRocks: 'exportPanel.rocks',
+  includeBridges: 'exportPanel.includeBridges', includeTunnels: 'exportPanel.includeTunnels', seaLevelOffset: 'exportPanel.seaLevelOffset',
+};
+const settingName = (k) => (SETTING_WORDS[k] ? t(SETTING_WORDS[k]) : k);
+const stepName = (k) => (['backdrop', 'buildings', 'materials'].includes(k) ? t(`exportSettings.${k}`) : k);
+const changeText = (h) => {
+  if (h.changed == null) return t('levels.historyFirst');
+  if (!h.changed.length) return t('levels.historyNoChange');
+  return h.changed.map((c) => `${settingName(c.setting)}: ${c.from ?? '—'} → ${c.to ?? '—'}`).join(' · ');
+};
+const formatTime = (iso) => {
+  try { return new Date(iso).toLocaleString(locale.value, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch { return iso; }
+};
 const messages = reactive({});   // levelName → { text, error }
 const anyBusy = computed(() => Object.keys(busy).length > 0);
 
@@ -244,7 +286,9 @@ async function rebuild(level) {
   delete messages[level.levelName];
   busy[level.levelName] = t('levels.starting');
   try {
-    const r = await desktopApp.rebuildLevel(level.zipName, level.levelName, (p) => { busy[level.levelName] = progressText(p); });
+    // (the window's own key and servers go along: a saved level never holds them)
+    const personal = { gpxzApiKey: localStorage.getItem('mapng_gpxzApiKey') || '', localStorage: Object.fromEntries(PERSONAL_STORAGE_KEYS.map((k) => [k, localStorage.getItem(k) || '']).filter(([, v]) => v)) };
+    const r = await desktopApp.rebuildLevel(level.zipName, level.levelName, (p) => { busy[level.levelName] = progressText(p); }, personal);
     if (r?.cancelled) messages[level.levelName] = { text: t('levels.cancelled') };
     else {
       // (and whether it stayed offline: from the saved data, or what it downloaded)

@@ -506,7 +506,15 @@
       "dataRunning": "Download dei dintorni e delle altezze dei ponti prima dell'esportazione… {pct}%",
       "dataDone": "Dintorni e altezze dei ponti scaricati: l'esportazione li legge dalla cache.",
       "dataFailed": "Download anticipato non riuscito; l'esportazione scaricherà ciò che serve.",
-      "dataWaiting": "In attesa dei download…"
+      "dataWaiting": "In attesa dei download…",
+      "checkLevel": "Controlla livello",
+      "levelUpToDate": "Aggiornato: esportato {ago} con queste impostazioni",
+      "justNow": "proprio ora",
+      "minutesAgo": "{n} min fa",
+      "levelChecked": "Livello controllato: c'è tutto.",
+      "levelRebuilt": "Lo ricostruisco: {problems}",
+      "nothingChanged": "Nulla è cambiato dall'ultima esportazione.",
+      "rebuildAnyway": "Ricostruisci comunque"
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -1096,7 +1104,15 @@
     "deleteWarnBody": "Elimina sposta lo ZIP del livello fuori dalla cartella mod di BeamNG, insieme ai dati salvati (da cui Aggiorna lo ricostruisce), nel Cestino. Sparisce da BeamNG e da I miei livelli; puoi ripristinare entrambi dal Cestino.",
     "deleteWarnOnce": "Questo messaggio appare una sola volta: d'ora in poi Elimina agisce subito. Passa il mouse sul pulsante per rileggerlo.",
     "deleteWarnCancel": "Annulla",
-    "deleteWarnConfirm": "Elimina"
+    "deleteWarnConfirm": "Elimina",
+    "history": "Ultime esportazioni",
+    "historyNone": "Nessuna esportazione registrata.",
+    "historyFirst": "prima esportazione",
+    "historyNoChange": "nulla è cambiato",
+    "historyReused": "riutilizzato: {list}",
+    "historyDownloaded": "{n} file scaricati durante l'esportazione",
+    "historyKind_rebuild": "ricostruzione",
+    "historyKind_refetch": "riscaricato"
   },
   "desktopWelcome": {
     "title": "Benvenuto in MapNG Desktop",

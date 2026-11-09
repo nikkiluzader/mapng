@@ -506,7 +506,15 @@
       "dataRunning": "Pobieranie otoczenia i wysokości mostów przed eksportem… {pct}%",
       "dataDone": "Otoczenie i wysokości mostów pobrane: eksport odczyta je z pamięci podręcznej.",
       "dataFailed": "Nie udało się pobrać wcześniej; eksport pobierze to, czego potrzebuje.",
-      "dataWaiting": "Czekam na pobieranie…"
+      "dataWaiting": "Czekam na pobieranie…",
+      "checkLevel": "Sprawdź poziom",
+      "levelUpToDate": "Aktualny: wyeksportowany {ago} z tymi ustawieniami",
+      "justNow": "przed chwilą",
+      "minutesAgo": "{n} min temu",
+      "levelChecked": "Poziom sprawdzony: wszystko jest.",
+      "levelRebuilt": "Budowanie od nowa: {problems}",
+      "nothingChanged": "Nic się nie zmieniło od ostatniego eksportu.",
+      "rebuildAnyway": "Zbuduj mimo to"
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -1096,7 +1104,15 @@
     "deleteWarnBody": "Usuń przenosi plik ZIP poziomu z folderu modów BeamNG, razem z zapisanymi danymi (z których Aktualizuj go odbudowuje), do Kosza. Znika z BeamNG i z Moich poziomów; oba można przywrócić z Kosza.",
     "deleteWarnOnce": "To okno pojawia się tylko raz: od teraz Usuń działa od razu. Najedź na przycisk, aby przeczytać to ponownie.",
     "deleteWarnCancel": "Anuluj",
-    "deleteWarnConfirm": "Usuń"
+    "deleteWarnConfirm": "Usuń",
+    "history": "Ostatnie eksporty",
+    "historyNone": "Brak zapisanych eksportów.",
+    "historyFirst": "pierwszy eksport",
+    "historyNoChange": "nic się nie zmieniło",
+    "historyReused": "użyte ponownie: {list}",
+    "historyDownloaded": "pobrano {n} plik(ów) podczas eksportu",
+    "historyKind_rebuild": "przebudowa",
+    "historyKind_refetch": "pobrane ponownie"
   },
   "desktopWelcome": {
     "title": "Witaj w MapNG Desktop",

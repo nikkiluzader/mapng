@@ -183,20 +183,33 @@
           <!-- Export button (in the wizard: in its bottom bar, buttonTarget) -->
           <Teleport defer :to="buttonTarget || 'body'" :disabled="!buttonTarget">
             <button
-              @click="handleBeamNGLevelExport"
+              @click="onBeamNGExportClick"
               :disabled="isAnyExporting"
               class="relative w-full flex items-center gap-3 p-3 bg-brand hover:bg-brand-500 border border-brand-500 rounded text-white transition-colors group disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <div class="flex items-center justify-center w-8 h-8 shrink-0">
-                <Loader2 v-if="isExportingBeamNGLevel" :size="20" class="animate-spin text-white" />
+                <Loader2 v-if="isExportingBeamNGLevel || levelCheck?.state === 'checking'" :size="20" class="animate-spin text-white" />
+                <ShieldCheck v-else-if="exportUpToDate" :size="20" class="text-white/90" />
                 <PackageOpen v-else :size="20" class="text-white/90" />
               </div>
-              <div class="text-left">
+              <div v-if="exportUpToDate && !isExportingBeamNGLevel" class="text-left">
+                <div class="text-xs font-semibold">{{ t('exportPanel.ui.checkLevel') }}</div>
+                <div class="text-micro text-white/90">{{ t('exportPanel.ui.levelUpToDate', { ago: exportedAgo }) }}</div>
+              </div>
+              <div v-else class="text-left">
                 <div class="text-xs font-semibold">{{ t('exportPanel.beamngLevelExport') }}</div>
                 <div class="text-micro text-white/90">{{ t('exportPanel.generatePlayableZip') }}</div>
               </div>
-              <Download v-if="!isAnyExporting" :size="10" class="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity text-white" />
+              <Download v-if="!isAnyExporting && !exportUpToDate" :size="10" class="absolute top-1 right-1 opacity-70 group-hover:opacity-100 transition-opacity text-white" />
             </button>
+
+            <!-- nothing changed since the last export: what the check found, and building it again anyway -->
+            <div v-if="(exportUpToDate || levelCheck) && !isExportingBeamNGLevel" class="flex items-center justify-between gap-2 px-0.5 text-caption">
+              <span v-if="levelCheck?.state === 'ok'" class="flex items-center gap-1 text-emerald-700 dark:text-emerald-400"><CheckCircle2 :size="12" />{{ t('exportPanel.ui.levelChecked') }}</span>
+              <span v-else-if="levelCheck?.state === 'rebuilding'" class="text-amber-700 dark:text-amber-300 [overflow-wrap:anywhere]">{{ t('exportPanel.ui.levelRebuilt', { problems: levelCheck.problems.join('; ') }) }}</span>
+              <span v-else class="text-gray-500 dark:text-gray-400">{{ t('exportPanel.ui.nothingChanged') }}</span>
+              <button v-if="exportUpToDate" type="button" class="shrink-0 underline text-gray-600 dark:text-gray-300 hover:text-brand" :disabled="isAnyExporting" @click="handleBeamNGLevelExport()">{{ t('exportPanel.ui.rebuildAnyway') }}</button>
+            </div>
 
             <a
               v-if="beamNGPendingDownloadUrl"
@@ -560,8 +573,9 @@ import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
-  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy, BarChart3, Compass, Building2, Package
+  Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy, BarChart3, Compass, Building2, Package, ShieldCheck
 } from 'lucide-vue-next';
+import { zipIndexOfBlob, levelZipProblems } from '../../services/zipIndex.js';
 import StageLoader from '../ui/StageLoader.vue';
 import { rasterizeMask, backgroundFraction } from '../../services/backgroundMask.js';
 import { summarizeExportSettings, translateExportSettings } from '../../services/exportSettingsSummary.js';
@@ -577,6 +591,7 @@ import { terrainMode, terrainShapingOptions, terrainGenerationOptions } from '..
 import { desktopApp, exportLevelOnDesktop, prefetchExportDataOnDesktop } from '../../services/platform/desktop.js';
 import { downloadExportData, ensureExportData, exportDataNeeds, exportDataState, onExportDataChange } from '../../services/exportData.js';
 import { withDownloadGuard } from '../../services/dataCache.js';
+import { pageStepCache } from '../../services/stepCache.js';
 import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../composables/useExportHotspots.js';
 import SettingSection from '../base/SettingSection.vue';
 import SettingCard from '../base/SettingCard.vue';
@@ -961,6 +976,82 @@ const _defaultPbrSource = localStorage.getItem('mapng_beamNGPbrSource')
   ?? (_legacyPbr === 'false' ? 'none' : 'osm');
 const beamNGPbrSource = ref(_defaultPbrSource);
 const showExportGeo = ref(localStorage.getItem('mapng_showExportGeo') !== 'false');
+
+// ---- "Level up to date": nothing changed since the last export --------------
+// Everything the level is made from, as one string: the terrain (by identity:
+// a new Generate is a new terrain), its touched-up texture, and every export
+// setting. While it matches the last export's, the button checks the level
+// instead of building it again ("Rebuild anyway" still builds).
+const terrainTokens = new WeakMap();
+let terrainTokenSeq = 0;
+const terrainToken = (td) => {
+  const raw = td ? toRaw(td) : null;
+  if (!raw) return null;
+  if (!terrainTokens.has(raw)) terrainTokens.set(raw, ++terrainTokenSeq);
+  return terrainTokens.get(raw);
+};
+const exportInputs = computed(() => JSON.stringify({
+  terrain: terrainToken(props.terrainData),
+  painted: paintedTick.value,
+  advanced: advancedMode.value,
+  terrainMode: terrainMode.value,
+  shaping: terrainShapingOptions(advancedMode.value),
+  name: beamNGLevelName.value.trim(),
+  baseTexture: beamNGBaseTexture.value, pbr: beamNGPbrSource.value, roads: beamNGRoadType.value,
+  backdrop: beamNGBackdropSource.value, gpxz: beamNGBackdropSource.value === 'gpxz' ? String(props.gpxzApiKey || '').length : 0,
+  buildings: beamNGIncludeBuildings.value, water: beamNGIncludeWater.value, trees: beamNGIncludeTrees.value,
+  forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value,
+  bridges: beamNGIncludeBridges.value, tunnels: beamNGIncludeTunnels.value, lidar: beamNGLidarDecks.value,
+  sea: beamNGSeaLevelOffset.value,
+}));
+// { inputs, at, filename, desktop: { path, size } | null, blob: Blob | null }
+const lastExport = ref(null);
+const exportUpToDate = computed(() => !!lastExport.value && lastExport.value.inputs === exportInputs.value);
+const levelCheck = ref(null);   // null | { state: 'checking' | 'ok' | 'rebuilding', problems }
+// (anything changed: the old level no longer matches; its zip let go)
+watch(exportInputs, () => { levelCheck.value = null; if (lastExport.value && !exportUpToDate.value) lastExport.value = null; });
+const agoTick = ref(Date.now());
+const agoTimer = setInterval(() => { agoTick.value = Date.now(); }, 30000);
+onUnmounted(() => clearInterval(agoTimer));
+const exportedAgo = computed(() => {
+  if (!lastExport.value) return '';
+  const min = Math.max(0, Math.round((agoTick.value - lastExport.value.at) / 60000));
+  return min < 1 ? t('exportPanel.ui.justNow') : t('exportPanel.ui.minutesAgo', { n: min });
+});
+
+/** "Check level": the last export looked over (its zip in the mods folder, or the one made in the page); rebuilt if anything is wrong. */
+async function checkLevel() {
+  const last = lastExport.value;
+  if (!last) return handleBeamNGLevelExport();
+  levelCheck.value = { state: 'checking', problems: [] };
+  let problems = [];
+  try {
+    if (desktopApp && last.desktop?.path && desktopApp.verifyLevel) {
+      const r = await desktopApp.verifyLevel(last.desktop.path, last.desktop.size);
+      problems = r?.ok ? [] : (r?.problems || ['the level could not be checked']);
+    } else if (last.blob) {
+      problems = levelZipProblems(await zipIndexOfBlob(last.blob));
+    } else {
+      problems = ['the exported level is no longer at hand'];
+    }
+  } catch (err) {
+    problems = [String(err?.message || err)];
+  }
+  if (!problems.length) {
+    levelCheck.value = { state: 'ok', problems: [] };
+    // (the same level offered again: in the page, its download; on the desktop, where it is)
+    if (last.desktop) beamNGDesktopSaved.value = { path: last.desktop.path, filename: last.filename };
+    else if (last.blob && !beamNGPendingDownloadUrl.value) {
+      beamNGPendingDownloadUrl.value = URL.createObjectURL(last.blob);
+      beamNGPendingDownloadName.value = last.filename;
+    }
+    return;
+  }
+  levelCheck.value = { state: 'rebuilding', problems };
+  console.warn(`${BEAMNG_EXPORT_UI_LOG} Check level found: ${problems.join('; ')}; building it again.`);
+  await handleBeamNGLevelExport({ keepCheck: true });
+}
+const onBeamNGExportClick = () => (exportUpToDate.value ? checkLevel() : handleBeamNGLevelExport());
 
 const THUMB_SIZE = 256;
 const satellitePreviewUrl = ref('');
@@ -1751,8 +1842,11 @@ const handleDAEExport = async () => {
   }
 };
 
-const handleBeamNGLevelExport = async () => {
+const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
   const startedAt = performance.now();
+  // (what this level is made from, as the export starts: "Level up to date" after it)
+  const inputsAtStart = exportInputs.value;
+  if (!keepCheck) levelCheck.value = null;
   console.log(`${BEAMNG_EXPORT_UI_LOG} Export requested`);
   console.log(`${BEAMNG_EXPORT_UI_LOG} Input terrainData:`, {
     hasTerrainData: !!props.terrainData,
@@ -1937,14 +2031,16 @@ const handleBeamNGLevelExport = async () => {
       if (saved?.cancelled) return;
       console.log(`${BEAMNG_EXPORT_UI_LOG} Desktop export written:`, saved);
       beamNGDesktopSaved.value = { path: saved.path, filename: saved.filename };
+      lastExport.value = { inputs: inputsAtStart, at: Date.now(), filename: saved.filename, desktop: { path: saved.path, size: saved.size }, blob: null };
       showExportOutcome('mapng-export-outcome-saved');
       notifyExportSuccess('beamng_level_zip', saved.filename);
       onLevelExported(props.center);
       return;
     }
 
-    // (under the download guard: anything still downloaded is logged, services/dataCache.js)
-    const { blob, filename } = await withDownloadGuard(() => exportBeamNGLevel(td, props.center, levelOptions));
+    // (under the download guard: anything still downloaded is logged, services/dataCache.js;
+    // the steps nothing changed for since the last export reused: services/stepCache.js)
+    const { blob, filename } = await withDownloadGuard(() => exportBeamNGLevel(td, props.center, { ...levelOptions, stepCache: pageStepCache() }));
 
     if (effectiveBackdropSource === 'gpxz' && !effectiveBackdropGpxzApiKey) {
       console.warn(`${BEAMNG_EXPORT_UI_LOG} GPXZ backdrop selected but no GPXZ key was passed to export.`);
@@ -1964,6 +2060,8 @@ const handleBeamNGLevelExport = async () => {
       throw new Error('BeamNG export did not return a valid filename.');
     }
     onLevelExported(props.center);
+    // (kept for "Check level" and downloading the same level again)
+    lastExport.value = { inputs: inputsAtStart, at: Date.now(), filename, desktop: null, blob };
 
     console.log(`${BEAMNG_EXPORT_UI_LOG} Triggering browser download...`, {
       filename,

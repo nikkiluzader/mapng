@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { installBrowserShims, installSourceRecorder } from './browserShims.mjs';
 import { reviveJobValue } from './jobFormat.mjs';
+import { diskStepCache } from './diskStepCache.mjs';
 import { appApiFetch, send, startMemoryReports } from './common.mjs';
 
 // (MAPNG_ASSETS: set by the app; the repo's public/ when run by hand)
@@ -39,8 +40,10 @@ async function main() {
   // game never sees half a zip: renamed when complete)
   fs.mkdirSync(job.outputDir, { recursive: true });
   let partial = null; let fd = null; let size = 0;
-  const { filename } = await exportBeamNGLevel(terrainData, job.center, {
+  const { filename, steps, reused } = await exportBeamNGLevel(terrainData, job.center, {
     ...job.options,
+    // (the steps nothing changed for since the last export, reused: services/stepCache.js)
+    stepCache: job.stepCacheDir ? diskStepCache(job.stepCacheDir) : null,
     onProgress: (p) => send({ type: 'progress', ...p }),
     zipSink: {
       write(chunk) {
@@ -61,7 +64,7 @@ async function main() {
     console.warn(`[Sources] the export downloaded ${sources.downloaded} file(s) its data step should have fetched:`);
     for (const u of sources.downloadedUrls) console.warn(`[Sources]   ${u}`);
   }
-  send({ type: 'done', path: out, filename, size, seconds: (Date.now() - started) / 1000, sources: { recorded: sources.recorded, replayed: sources.replayed, downloaded: sources.downloaded } });
+  send({ type: 'done', path: out, filename, size, seconds: (Date.now() - started) / 1000, steps, reused, sources: { recorded: sources.recorded, replayed: sources.replayed, downloaded: sources.downloaded, downloadedUrls: sources.downloadedUrls.slice(0, 5) } });
 }
 
 main().then(

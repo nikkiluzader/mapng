@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { findModsFolder } from './modsFolder.js';
-import { listMapngLevels, readZipFile } from './levelLibrary.js';
+import { listMapngLevels, readZipFile, zipEntries } from './levelLibrary.js';
 import { startUpdater } from './updater.js';
 import { pendingCrash, prepareReport, sendReport, startCrashReporter } from './crashReports.js';
 
@@ -282,6 +282,32 @@ function clearLeftovers() {
   } catch { /* none yet */ }
   pruneSessions(null);
   trimDownloadCache();
+  trimStepCache();
+  scrubSavedProjects();
+}
+
+// The export's step cache (runner/diskStepCache.mjs): steps an export can
+// reuse from the last one (the backdrop), one folder each, the least
+// recently used dropped past STEP_CACHE_BYTES.
+const STEP_CACHE = () => path.join(app.getPath('userData'), 'step-cache');
+const STEP_CACHE_BYTES = 4 * 1024 ** 3;
+function trimStepCache(cap = STEP_CACHE_BYTES) {
+  let dirs = [];
+  try { dirs = fs.readdirSync(STEP_CACHE(), { withFileTypes: true }).filter((d) => d.isDirectory()); } catch { return; }
+  let total = 0;
+  const entries = dirs.map((d) => {
+    const at = path.join(STEP_CACHE(), d.name);
+    let size = 0;
+    try { for (const f of fs.readdirSync(at)) size += fs.statSync(path.join(at, f)).size; } catch { /* gone */ }
+    total += size;
+    // (a half-written entry from a stopped export: always dropped)
+    return { at, size, used: d.name.includes('.partial-') ? 0 : fs.statSync(at).mtimeMs };
+  }).sort((a, b) => a.used - b.used);
+  for (const e of entries) {
+    if (total <= cap * 0.8 && e.used) break;
+    fs.rmSync(e.at, { recursive: true, force: true });
+    total -= e.size;
+  }
 }
 
 // The download cache is kept between runs (Generate, Preview and the export's
@@ -405,6 +431,17 @@ function exportSourcesFor(terrainId, jobDir) {
     ? { mode: 'replay', dir: replayDir, fallback: true, recordDir }
     : freshExportSources(recordDir);
 }
+function prefetchSourcesFor(terrainId) {
+  try {
+    const generate = JSON.parse(fs.readFileSync(path.join(sessionDirOf(terrainId), 'job.json'), 'utf8'));
+    if (generate.sources?.mode === 'replay') {
+      const saved = path.join(path.dirname(generate.sources.dir), 'export-sources');
+      fs.mkdirSync(saved, { recursive: true });
+      return { mode: 'replay', dir: saved, fallback: true, recordDir: saved };
+    }
+  } catch { /* a terrain from the page */ }
+  return { mode: 'cache', dir: SOURCE_CACHE() };
+}
 // (a new export: the shared download cache first, as Generate does, so the
 // backdrop's tiles and the bridge lidar aren't downloaded again for an area
 // exported before; the job's own set still goes to recordDir for the level)
@@ -423,7 +460,7 @@ ipcMain.handle('job:run', async (event, jobId, job) => {
   const terrainId = typeof job.terrainData?.desktopTerrainId === 'string' ? job.terrainData.desktopTerrainId : null;
   const sources = terrainId ? exportSourcesFor(terrainId, dir) : freshExportSources(path.join(dir, 'export-sources'));
   // (saveProject gets this job too: its sources say which export downloads to keep)
-  const fullJob = { ...job, outputDir, sources };
+  const fullJob = { ...job, outputDir, sources, stepCacheDir: STEP_CACHE() };
   fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify(fullJob));
   const child = spawnRunner(RUNNER, dir);
   running.set(jobId, child);
@@ -444,6 +481,7 @@ ipcMain.handle('job:run', async (event, jobId, job) => {
       child.on('exit', (code, signal) => {
         if (result) {
           try { result.project = saveProject(dir, fullJob, result); } catch (error) { console.error('project not saved:', error); }
+          recordExport({ kind: 'export', levelName: path.basename(result.filename, '.zip'), title: fullJob.options?.levelName, options: fullJob.options, result });
           notifyDone('MapNG: level ready', `${result.filename} is in BeamNG's mods folder.`);
           resolve(result);
         } else if (signal) {
@@ -493,6 +531,86 @@ const linkOrCopy = (from, to) => { try { fs.linkSync(from, to); } catch { fs.cop
  * texture) as overrides. Written beside and swapped in; replaces the
  * level's previous project.
  */
+// Personal settings (keys, the user's own Overpass server, GPXZ account
+// details) never go into a saved project: the window hands its current ones
+// to a rebuild or Modify instead (personalFromWindow). Same rule as the page's
+// services/personalKeys.js.
+const PERSONAL_NAME = /key|token|secret|password|auth|customOverpassUrl|overpassUrl|gpxzStatus/i;
+function withoutPersonal(value, depth = 0) {
+  if (value == null || typeof value !== 'object' || depth > 8) return value;
+  if (Array.isArray(value)) return value.map((v) => withoutPersonal(v, depth + 1));
+  const out = {};
+  for (const [k, v] of Object.entries(value)) if (!PERSONAL_NAME.test(k)) out[k] = withoutPersonal(v, depth + 1);
+  return out;
+}
+/** The window's personal settings for a generate: { gpxzApiKey, localStorage: { its personal entries } }. */
+function personalFromWindow(personal = {}) {
+  const storage = {};
+  for (const [k, v] of Object.entries(personal?.localStorage || {})) if (PERSONAL_NAME.test(k) && typeof v === 'string') storage[k] = v;
+  return { gpxzApiKey: typeof personal?.gpxzApiKey === 'string' ? personal.gpxzApiKey : '', localStorage: storage };
+}
+// Projects saved before the rule: their keys taken out (once, at start)
+function scrubSavedProjects() {
+  let names = [];
+  try { names = fs.readdirSync(PROJECTS()); } catch { return; }
+  for (const name of names) {
+    for (const file of ['generate.json', 'project.json']) {
+      const f = path.join(PROJECTS(), name, file);
+      try {
+        const text = fs.readFileSync(f, 'utf8');
+        const clean = JSON.stringify(withoutPersonal(JSON.parse(text)), null, 1);
+        if (clean !== text) fs.writeFileSync(f, clean);
+      } catch { /* none, or unreadable */ }
+    }
+  }
+}
+
+// ---- the export history (export-history.jsonl) -------------------------------
+// One line per finished export or rebuild: when, which level, how long, the
+// settings changed since that level's previous export, the slowest steps,
+// the steps reused from the last export, and anything the export still had
+// to download (should be none). The newest HISTORY_KEEP lines are kept; the
+// levels sidebar shows a level's last few (levels:history).
+const HISTORY = () => path.join(app.getPath('userData'), 'export-history.jsonl');
+const HISTORY_KEEP = 1000;
+// (what a setting's change means to compare: not the progress callback, the share code, the build)
+const HISTORY_SKIP = new Set(['onProgress', 'sessionCode', 'appVersion', 'platform', 'zipSink', 'stepCache', 'lidarProvider']);
+function historyOptions(options = {}) {
+  const out = {};
+  for (const [k, v] of Object.entries(withoutPersonal(options) || {})) {
+    if (HISTORY_SKIP.has(k) || typeof v === 'function' || (v && typeof v === 'object' && v.$file)) continue;
+    if (v == null || ['string', 'number', 'boolean'].includes(typeof v)) out[k] = v;
+  }
+  return out;
+}
+function readHistory() {
+  try { return fs.readFileSync(HISTORY(), 'utf8').split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch { return []; }
+}
+function recordExport({ kind, levelName, title, options, result }) {
+  try {
+    const all = readHistory();
+    const opts = historyOptions(options);
+    const prev = [...all].reverse().find((r) => r.levelName === levelName);
+    const changed = prev
+      ? Object.keys({ ...prev.options, ...opts }).filter((k) => JSON.stringify(prev.options?.[k]) !== JSON.stringify(opts[k])).map((k) => ({ setting: k, from: prev.options?.[k] ?? null, to: opts[k] ?? null }))
+      : null;
+    const steps = (result?.steps || []).slice().sort((a, b) => b.ms - a.ms).slice(0, 5);
+    all.push({
+      at: new Date().toISOString(), kind, levelName, title: title || levelName, appVersion: app.getVersion(),
+      seconds: Math.round((result?.seconds || 0) * 10) / 10, size: result?.size || null,
+      changed, slowest: steps, reused: result?.reused || [],
+      downloaded: result?.sources?.downloaded ?? null, downloadedUrls: result?.sources?.downloadedUrls || [],
+      options: opts,
+    });
+    fs.writeFileSync(HISTORY(), all.slice(-HISTORY_KEEP).map((r) => JSON.stringify(r)).join('\n') + '\n');
+  } catch (error) {
+    console.error('export history not written:', error);
+  }
+}
+ipcMain.handle('levels:history', (_event, levelName, limit = 5) => readHistory()
+  .filter((r) => r.levelName === String(levelName)).slice(-Math.max(1, Math.min(50, Number(limit) || 5))).reverse()
+  .map(({ options, ...r }) => r));
+
 function saveProject(jobDir, job, result) {
   const levelName = path.basename(result.filename, '.zip');
   const dir = projectDirOf(levelName);
@@ -510,7 +628,7 @@ function saveProject(jobDir, job, result) {
     // come along, so the new level can be rebuilt offline too)
     const replayedFrom = generate.sources?.mode === 'replay' ? generate.sources.dir : null;
     delete generate.sources;
-    fs.writeFileSync(path.join(tmp, 'generate.json'), JSON.stringify(generate, null, 1));
+    fs.writeFileSync(path.join(tmp, 'generate.json'), JSON.stringify(withoutPersonal(generate), null, 1));
     // (the replayed level's sources, and anything the replay had to download)
     for (const src of [replayedFrom, path.join(session, 'sources')]) {
       if (!src || !fs.existsSync(src)) continue;
@@ -560,7 +678,7 @@ function saveProject(jobDir, job, result) {
     sources,
     exportSources,
     center: job.center,
-    options: job.options,
+    options: withoutPersonal(job.options),
     overrides,
   }, null, 1));
   fs.rmSync(dir, { recursive: true, force: true });
@@ -601,8 +719,12 @@ ipcMain.handle('terrain:generate', async (event, requested) => {
     const projectDir = projectDirOf(String(requested.fromLevel));
     if (!readProject(String(requested.fromLevel))?.rebuildable) throw new Error('This level has no saved data to modify it from.');
     const saved = JSON.parse(fs.readFileSync(path.join(projectDir, 'generate.json'), 'utf8'));
+    const mine = personalFromWindow(requested);
     params = {
       ...saved,
+      // (the window's own key and servers: never saved with a level)
+      gpxzApiKey: mine.gpxzApiKey,
+      localStorage: { ...(saved.localStorage || {}), ...mine.localStorage },
       // (Raw terrain as the window has it now: the saved downloads are untouched,
       // so the terrain can be made either way)
       // Background areas too: as drawn now (they only leave things out of the saved data)
@@ -652,7 +774,10 @@ ipcMain.handle('data:prefetch', async (event, reqId, terrainId, options) => {
   if (!fs.existsSync(path.join(terrainDir, 'terrain.json'))) return { skipped: 'no saved terrain' };
   const dir = path.join(JOBS(), `prefetch-${reqId}`);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify({ terrainDir, options, sources: { mode: 'cache', dir: SOURCE_CACHE() } }));
+  // (a terrain made from a level's saved data ("Modify"): its backdrop and
+  // lidar from that level's saved export downloads, anything new kept there,
+  // where the export reads them back; otherwise the download cache)
+  fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify({ terrainDir, options, sources: prefetchSourcesFor(String(terrainId)) }));
   const child = spawnRunner(PREFETCHER, dir);
   try {
     return await new Promise((resolve, reject) => {
@@ -763,6 +888,33 @@ ipcMain.handle('levels:showData', async (_event, levelName) => {
   if (fs.existsSync(dir)) await shell.openPath(dir);
 });
 
+// "Check level" (the export panel, nothing changed since the last export):
+// the level's zip still in place, readable, holding a whole level, and the
+// same size it was written at. Resolves { ok, problems, changed }.
+ipcMain.handle('levels:verify', (_event, file, expectedSize) => {
+  const target = path.resolve(String(file || ''));
+  const folder = modsFolder();
+  if (!folder || path.dirname(target) !== path.resolve(folder) || !target.toLowerCase().endsWith('.zip')) return { ok: false, problems: ['the level is not in the mods folder'] };
+  if (!fs.existsSync(target)) return { ok: false, problems: ['the level\'s zip is gone from the mods folder'] };
+  const size = fs.statSync(target).size;
+  let entries = null;
+  try {
+    const fd = fs.openSync(target, 'r');
+    try { entries = zipEntries(fd, size); } finally { fs.closeSync(fd); }
+  } catch { entries = null; }
+  if (!entries) return { ok: false, problems: ['the zip can\'t be read'] };
+  const names = new Set(entries.map((e) => e.name));
+  const levels = [...names].map((n) => n.match(/^levels\/([^/]+)\/info\.json$/)?.[1]).filter(Boolean);
+  const problems = [];
+  if (levels.length !== 1) problems.push(levels.length ? 'the zip holds more than one level' : 'no level in the zip');
+  else for (const need of ['info.json', 'main/MissionGroup/items.level.json', 'art/terrains/terrain.ter', 'mapng.json']) {
+    if (!names.has(`levels/${levels[0]}/${need}`)) problems.push(`levels/${levels[0]}/${need} is missing`);
+  }
+  const changed = Number.isFinite(Number(expectedSize)) && Number(expectedSize) > 0 && Number(expectedSize) !== size;
+  if (changed) problems.push('the zip changed since it was exported');
+  return { ok: problems.length === 0, problems, changed };
+});
+
 ipcMain.handle('levels:showInFolder', (_event, zipName) => {
   const folder = modsFolder();
   const file = folder && path.join(folder, path.basename(String(zipName)));
@@ -797,7 +949,8 @@ const rebuilds = new Map();   // levelName → { children: Set }
  * today's code), else from its area fetched again. The new zip replaces the
  * old one only when it is complete.
  */
-async function rebuildLevel(sender, zipName, levelName) {
+async function rebuildLevel(sender, zipName, levelName, personal = {}) {
+  const mine = personalFromWindow(personal);
   const folder = modsFolder();
   if (!folder) throw new Error('No mods folder set.');
   const zip = path.join(folder, path.basename(zipName));
@@ -816,6 +969,9 @@ async function rebuildLevel(sender, zipName, levelName) {
     if (replay) {
       generate = JSON.parse(fs.readFileSync(path.join(projectDir, 'generate.json'), 'utf8'));
       generate.sources = { mode: 'replay', dir: path.join(projectDir, 'sources'), fallback: true };
+      // (the window's own key and servers: never saved with a level)
+      generate.gpxzApiKey = mine.gpxzApiKey;
+      generate.localStorage = { ...(generate.localStorage || {}), ...mine.localStorage };
     } else {
       const mpp = level.sizeMeters && level.resolution ? level.sizeMeters / level.resolution : 1;
       generate = {
@@ -869,6 +1025,7 @@ async function rebuildLevel(sender, zipName, levelName) {
     const options = {
       ...(project?.options || level.stamp?.options || {}),
       levelName: project?.options?.levelName || level.stamp?.options?.levelName || level.title || levelName,
+      ...((project?.options || level.stamp?.options || {}).backdropElevationSource === 'gpxz' ? { backdropGpxzApiKey: mine.gpxzApiKey } : {}),
       appVersion: app.getVersion(),
       platform: 'desktop',
     };
@@ -878,7 +1035,8 @@ async function rebuildLevel(sender, zipName, levelName) {
     const exportSources = replay && fs.existsSync(savedExport)
       ? { mode: 'replay', dir: savedExport, fallback: true, recordDir: path.join(jobDir, 'export-sources') }
       : freshExportSources(path.join(jobDir, 'export-sources'));
-    const job = { center: generate.center, terrainData: terrain, options, outputDir: outDir, sources: exportSources };
+    // (the step cache too: Update twice on one version reuses what didn't change)
+    const job = { center: generate.center, terrainData: terrain, options, outputDir: outDir, sources: exportSources, stepCacheDir: STEP_CACHE() };
     fs.writeFileSync(path.join(jobDir, 'job.json'), JSON.stringify(job));
     const exp = spawnRunner(RUNNER, jobDir);
     state.children.add(exp);
@@ -915,6 +1073,7 @@ async function rebuildLevel(sender, zipName, levelName) {
     } else {
       try { saveProject(jobDir, job, { ...final, filename: `${levelName}.zip` }); } catch (error) { console.error('project not saved:', error); }
     }
+    recordExport({ kind: replay ? 'rebuild' : 'refetch', levelName, title: level.title, options, result });
     fs.rmSync(jobDir, { recursive: true, force: true });
     linkedFiles.delete(jobId);
     notifyDone('MapNG: level rebuilt', `${level.title} is rebuilt with MapNG ${app.getVersion()}.`);
@@ -925,10 +1084,10 @@ async function rebuildLevel(sender, zipName, levelName) {
   }
 }
 
-ipcMain.handle('levels:rebuild', async (event, zipName, levelName) => {
+ipcMain.handle('levels:rebuild', async (event, zipName, levelName, personal) => {
   if (rebuilds.has(levelName)) throw new Error('That level is already being rebuilt.');
   try {
-    return await rebuildLevel(event.sender, String(zipName), String(levelName));
+    return await rebuildLevel(event.sender, String(zipName), String(levelName), personal);
   } catch (error) {
     if (error.cancelled) return { cancelled: true };
     throw error;

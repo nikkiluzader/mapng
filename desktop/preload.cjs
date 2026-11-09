@@ -56,16 +56,21 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
   // the levels sidebar: { folder, appVersion, levels: [...] }
   listLevels: () => ipcRenderer.invoke('levels:list'),
   showLevelInFolder: (zipName) => ipcRenderer.invoke('levels:showInFolder', zipName),
+  // "Check level": the exported zip in the mods folder looked over: { ok, problems, changed }
+  verifyLevel: (file, size) => ipcRenderer.invoke('levels:verify', file, size),
+  // a level's last exports, newest first: [{ at, kind, seconds, changed, slowest, reused, downloaded, ... }]
+  levelHistory: (levelName, limit) => ipcRenderer.invoke('levels:history', levelName, limit),
   showLevelData: (levelName) => ipcRenderer.invoke('levels:showData', levelName),
   // the level's zip and saved project to the Recycle Bin / Trash: resolves { ok }
   deleteLevel: (zipName, levelName) => ipcRenderer.invoke('levels:delete', zipName, levelName),
   // a level's saved settings for "Modify" ({ center, resolution, generationOptions, options, ... } or null)
   levelProject: (levelName) => ipcRenderer.invoke('levels:project', levelName),
   // resolves { ok, path, replayed, seconds, fromSaved, downloaded } or { cancelled }; onProgress({ phase, update })
-  rebuildLevel: (zipName, levelName, onProgress) => {
+  // (personal: the window's own key and servers, { gpxzApiKey, localStorage }: never saved with a level)
+  rebuildLevel: (zipName, levelName, onProgress, personal) => {
     const listener = (_event, name, progress) => { if (name === levelName) onProgress?.(progress); };
     ipcRenderer.on('levels:progress', listener);
-    return ipcRenderer.invoke('levels:rebuild', zipName, levelName).finally(() => ipcRenderer.removeListener('levels:progress', listener));
+    return ipcRenderer.invoke('levels:rebuild', zipName, levelName, personal).finally(() => ipcRenderer.removeListener('levels:progress', listener));
   },
   cancelRebuild: (levelName) => ipcRenderer.invoke('levels:cancel', levelName),
   // crash and problem reports (desktop/crashReports.js): pending crash on start,
