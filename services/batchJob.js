@@ -32,6 +32,9 @@ import {
 import { classifyError, runWithRetry } from './retryPolicy.js';
 import { createTaskQueue, createRateLimiter } from './taskQueues.js';
 import { installBatchFetchCache, clearBatchCache } from './batchCache.js';
+import { attachTreeSpecies } from './treeSpecies.js';
+import { downloadExportData } from './exportData.js';
+import { withDownloadGuard } from './dataCache.js';
 import { getBaseTextureSize } from './baseTextureSize.js';
 import { desktopApp, exportLevelOnDesktop } from './platform/desktop.js';
 
@@ -1524,6 +1527,14 @@ async function finalizeCombinedLevel(state, combined, report) {
     const options = buildCombinedExportOptions(state, combined, ({ step, pct }) => {
       report(`Combined level: ${step}`, pct);
     });
+    // The data step before the export (services/exportData.js): the combined
+    // terrain's tree mix, backdrop tiles and bridge lidar into the cache; the
+    // export after it only processes
+    await attachTreeSpecies(terrainData, { onProgress: (m) => report(`Combined level: ${m}`, 0) });
+    if (!desktopApp) {
+      await downloadExportData(terrainData, options, { onProgress: (text) => report(`Combined level: ${text}`, 0) })
+        .catch((err) => console.warn('[Batch] downloading ahead failed; the export fetches what it needs:', err?.message || err));
+    }
     if (desktopApp) {
       // (the desktop app: written into the BeamNG mods folder by its export
       // runner, which is not held to the window's ~4 GB of memory)
@@ -1532,7 +1543,7 @@ async function finalizeCombinedLevel(state, combined, report) {
       state.combinedSaved = { path: saved.path || '', filename: saved.filename || '' };
       return;
     }
-    const { blob, filename } = await exportBeamNGLevel(terrainData, center, options);
+    const { blob, filename } = await withDownloadGuard(() => exportBeamNGLevel(terrainData, center, options));
     if (!(blob instanceof Blob)) throw new Error('The level export returned no ZIP.');
     report('Downloading combined level ZIP…', 100);
     offerJobDownload(state, blob, filename || `MapNG_CombinedLevel_${new Date().toISOString().slice(0, 10)}.zip`);

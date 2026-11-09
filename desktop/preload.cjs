@@ -46,6 +46,13 @@ contextBridge.exposeInMainWorld('mapngDesktop', {
     });
   },
   cancelTerrain: (id) => ipcRenderer.invoke('terrain:cancel', id),
+  // the export's data step for a generated terrain: resolves { result, sources }; onProgress({ text, fraction })
+  prefetchExportData: (terrainId, options, onProgress) => {
+    const reqId = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const listener = (_event, id, progress) => { if (id === reqId) onProgress?.(progress); };
+    ipcRenderer.on('data:progress', listener);
+    return ipcRenderer.invoke('data:prefetch', reqId, terrainId, options).finally(() => ipcRenderer.removeListener('data:progress', listener));
+  },
   // the levels sidebar: { folder, appVersion, levels: [...] }
   listLevels: () => ipcRenderer.invoke('levels:list'),
   showLevelInFolder: (zipName) => ipcRenderer.invoke('levels:showInFolder', zipName),

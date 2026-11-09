@@ -502,7 +502,11 @@
       "forestDensityHint_light": "Fewer trees in woods: the fastest frame rate.",
       "forestDensityHint_normal": "About 54 trees a hectare in woods: open, and easy on the frame rate.",
       "forestDensityHint_dense": "Twice as many trees in woods, closer to a real forest. Lowers the frame rate in big woods.",
-      "forestDensityHint_veryDense": "Over three times as many trees in woods, like a real forest. Can cost a lot of frame rate in big woods."
+      "forestDensityHint_veryDense": "Over three times as many trees in woods, like a real forest. Can cost a lot of frame rate in big woods.",
+      "dataRunning": "Downloading the surroundings and bridge heights ahead of the export… {pct}%",
+      "dataDone": "Surroundings and bridge heights downloaded: the export reads them from the cache.",
+      "dataFailed": "Couldn't download them ahead; the export will fetch what it needs.",
+      "dataWaiting": "Waiting for the downloads…"
     },
     "weight": {
       "title": "How heavy is this level?",

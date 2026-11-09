@@ -502,7 +502,11 @@
       "forestDensityHint_light": "Weniger Bäume in Wäldern: die beste Bildrate.",
       "forestDensityHint_normal": "Etwa 54 Bäume pro Hektar in Wäldern: offen und schonend für die Bildrate.",
       "forestDensityHint_dense": "Doppelt so viele Bäume in Wäldern, näher an einem echten Wald. Senkt die Bildrate in großen Wäldern.",
-      "forestDensityHint_veryDense": "Über dreimal so viele Bäume in Wäldern, wie in einem echten Wald. Kann in großen Wäldern viel Bildrate kosten."
+      "forestDensityHint_veryDense": "Über dreimal so viele Bäume in Wäldern, wie in einem echten Wald. Kann in großen Wäldern viel Bildrate kosten.",
+      "dataRunning": "Umgebung und Brückenhöhen werden vor dem Export heruntergeladen… {pct}%",
+      "dataDone": "Umgebung und Brückenhöhen heruntergeladen: Der Export liest sie aus dem Cache.",
+      "dataFailed": "Vorab-Download fehlgeschlagen; der Export holt, was er braucht.",
+      "dataWaiting": "Warte auf die Downloads…"
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",

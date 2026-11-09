@@ -24,12 +24,12 @@ import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, low
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, splitLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
-import { fetchWorldCoverGrid, openWaterAtEdge, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
-import { fetchTreeSpeciesMix, TREE_MIX_CREDIT } from './treeSpecies.js';
+import { openWaterAtEdge, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
+import { TREE_MIX_CREDIT } from './treeSpecies.js';
 import { placeBoats } from './boats.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
-import { prepareCroppedTerrainData } from './cropTerrain.js';
+import { prepareCroppedTerrainData, cropHeightmap, cropOSMFeatures, adjustBounds } from './cropTerrain.js';
 import { gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
@@ -231,7 +231,7 @@ function computeSquareSize(terrainData) {
  * BeamNG TerrainBlock expects square power-of-two terrain dimensions.
  * Pick the largest power-of-two that fits within the source dimensions.
  */
-function computeBeamNGTerrainSize(width, height) {
+export function computeBeamNGTerrainSize(width, height) {
   const minDim = Math.floor(Math.min(width, height));
   if (!Number.isFinite(minDim) || minDim < 2) return minDim;
   return 2 ** Math.floor(Math.log2(minDim));
@@ -1764,6 +1764,8 @@ export function buildBackdropSeamStrips(group, worldSize, seam) {
  * ColladaExporter (each entry: { name, ext, data: Uint8Array, directory }).
  * Returns null if no surrounding data could be fetched.
  */
+// The backdrop's downloads (services/exportData.js fetches the same ahead)
+export const BACKDROP_FETCH = Object.freeze({ fetchResolutionCap: 1024, includeSatellite: true, satelliteZoom: 15 });
 async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) {
   // Zoom 15 gives ~4m/px satellite imagery; 1024px cap avoids canvas-size
   // failures at large resolutions while still giving usable texture quality.
@@ -1777,9 +1779,7 @@ async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) 
     options.onProgress?.(text, downloaded * 0.85);
   };
   const surroundingGroup = await createSurroundingMeshes(terrainData, onText, 128, {
-    fetchResolutionCap: 1024,
-    includeSatellite: true,
-    satelliteZoom: 15,
+    ...BACKDROP_FETCH,
     elevationSource: options.elevationSource || 'global30m',
     gpxzApiKey: options.gpxzApiKey || '',
     onDownloadProgress: ({ completedTotal, total }) => {
@@ -8019,11 +8019,39 @@ export async function defaultLidarProvider() {
 const isMovableBridge = (tags = {}) => tags.bridge === 'movable' || !!tags['bridge:movable'];
 
 /**
+ * What the export's downloads are made from, without the export: the terrain
+ * cropped to its square power of two (heights, bounds, OSM: no textures) and
+ * its features as the export filters them (to the bounds, out of background
+ * areas), with its square size. The export's data step
+ * (services/exportData.js) fetches the backdrop and the bridge survey from
+ * this, the same requests the export then finds in the cache.
+ */
+export function exportDataInputs(terrainData, options = {}) {
+  let td = terrainData;
+  const size = computeBeamNGTerrainSize(td.width, td.height);
+  if (td.width !== size || td.height !== size) {
+    const startX = Math.floor((td.width - size) / 2); const startY = Math.floor((td.height - size) / 2);
+    const heightMap = cropHeightmap(td.heightMap, td.width, td.height, startX, startY, size);
+    let minHeight = Infinity; let maxHeight = -Infinity;
+    for (let i = 0; i < heightMap.length; i++) { const h = heightMap[i]; if (h < minHeight) minHeight = h; if (h > maxHeight) maxHeight = h; }
+    if (minHeight === Infinity) minHeight = td.minHeight;
+    if (maxHeight === -Infinity) maxHeight = td.maxHeight;
+    const bounds = adjustBounds(td.bounds, td.width, td.height, startX, startY, size);
+    td = { ...td, width: size, height: size, heightMap, minHeight, maxHeight, bounds, osmFeatures: cropOSMFeatures(td.osmFeatures, bounds) };
+  }
+  let features = filterOSMFeaturesToBounds(td.osmFeatures, td.bounds);
+  const bgMask = td.backgroundMask || options.backgroundMask || null;
+  const bgLook = bgMask ? backgroundLookup(bgMask, { n: 2048 }) : null;
+  if (bgLook && features?.length) features = filterFeaturesByBackground(features, bgLook, bgMask.bounds);
+  return { terrainData: { ...td, osmFeatures: features }, squareSize: computeSquareSize(td) };
+}
+
+/**
  * Measured bridge heights (US lidar, lidarDecks.js): the survey along the
  * export's bridge ways, read before the roads are laid out (the solver takes
  * it as pins). Returns prepareSurvey's lookups or { skipped }.
  */
-async function prefetchLidarDecks(terrainData, squareSize, options, onProgress) {
+export async function prefetchLidarDecks(terrainData, squareSize, options, onProgress) {
   const { bounds, width } = terrainData; const ws = width * squareSize;
   const toLocal = (lat, lng) => [((lng - bounds.west) / (bounds.east - bounds.west) - 0.5) * ws, (0.5 - (bounds.north - lat) / (bounds.north - bounds.south)) * ws];
   const toGeo = (x, y) => [bounds.north - (0.5 - y / ws) * (bounds.north - bounds.south), bounds.west + (x / ws + 0.5) * (bounds.east - bounds.west)];
@@ -10791,15 +10819,12 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
     // often drawn generously, and in the mountains far above the tree line
     // (Tignes: 144,000 trees above 2,250 m, most of them in the open).
     const worldSize = terrainData.width * squareSize;
-    // (read while generating: terrainData.landCover; an older terrain without it reads it now)
+    // (read while generating: terrainData.landCover; the export downloads
+    // nothing, so a terrain without it plants by OSM alone)
     let coverN = Math.min(4096, Math.max(64, Math.ceil(worldSize / 10)));
     let coverGrid = null;
-    try {
-      if (terrainData.landCover?.grid) ({ grid: coverGrid, n: coverN } = terrainData.landCover);
-      else if (terrainData.landCover !== null) coverGrid = terrainData.bounds ? await fetchWorldCoverGrid(terrainData.bounds, coverN, coverN) : null;
-    } catch (error) {
-      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Land cover (WorldCover) unavailable; trees follow OSM alone.`, error?.message || error);
-    }
+    if (terrainData.landCover?.grid) ({ grid: coverGrid, n: coverN } = terrainData.landCover);
+    else console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} No land cover (WorldCover) with this terrain; trees follow OSM alone.`);
     const coverAt = (x, y) => {
       if (!coverGrid) return 0;
       const c = Math.min(coverN - 1, Math.max(0, Math.floor((x / worldSize + 0.5) * coverN)));
@@ -13198,10 +13223,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   };
   const vegT0 = performance.now();
   // what grows around here, as recorded (treeSpecies.js): an option when
-  // given (tests, cached test levels), else asked of iNaturalist; null when
-  // offline or too few records (the climate rule then)
+  // given (tests, cached test levels), else read with the terrain at
+  // Generate (attachTreeSpecies); null when offline or too few records (the
+  // climate rule then)
   const treeMix = includeTrees
-    ? (requestedTreeMix !== undefined ? requestedTreeMix : await fetchTreeSpeciesMix(exportTerrainData.bounds))
+    ? (requestedTreeMix !== undefined ? requestedTreeMix : (exportTerrainData.treeSpeciesMix ?? terrainData.treeSpeciesMix ?? null))
     : null;
   if (includeTrees) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tree species: ${treeMix

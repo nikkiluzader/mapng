@@ -256,11 +256,14 @@ const CACHE_OSM_MS = 30 * 60 * 1000;
 const cacheable = (status) => (status >= 200 && status < 300) || status === 404;
 const linkInto = (from, to) => { try { fs.linkSync(from, to); } catch { try { fs.copyFileSync(from, to); } catch { /* best effort */ } } };
 
-export function installSourceRecorder({ dir, mode = 'record', fallback = true, recordDir = null }) {
+// strict (the export's download guard in tests and checks: MAPNG_STRICT_NO_DOWNLOAD):
+// a request the cache can't answer fails instead of going online; otherwise it
+// goes online and is listed in stats.downloadedUrls for the log.
+export function installSourceRecorder({ dir, mode = 'record', fallback = true, recordDir = null, strict = false }) {
   fs.mkdirSync(dir, { recursive: true });
   if (recordDir) fs.mkdirSync(recordDir, { recursive: true });
   // (downloaded: misses that went online; missedUrls: the first few, for the log)
-  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [] };
+  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [], downloadedUrls: [] };
   // (services/terrain.js skips the GPXZ request pacing while replaying)
   if (mode === 'replay') globalThis.__mapngReplayingSources = true;
   const inner = globalThis.fetch;
@@ -278,11 +281,15 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
       const stale = meta && OSM_REQUEST.test(normalized) && !(Date.now() - (meta.savedAt || 0) < CACHE_OSM_MS);
       if (meta && !stale) {
         stats.replayed++;
+        // (recently used: the app trims the cache by this, desktop/main.js)
+        try { const now = new Date(); fs.utimesSync(metaFile, now, now); } catch { /* read-only */ }
         if (recordDir) { linkInto(metaFile, path.join(recordDir, `${key}.json`)); if (fs.existsSync(bodyFile)) linkInto(bodyFile, path.join(recordDir, `${key}.bin`)); }
         const body = meta.status === 204 || meta.status === 304 ? null : fs.readFileSync(bodyFile);
         return new Response(body, { status: meta.status, statusText: meta.statusText, headers: meta.headers });
       }
+      if (strict) throw new TypeError(`fetch refused: the export downloads nothing, and this is not in the download cache (${url})`);
       stats.downloaded++;
+      if (stats.downloadedUrls.length < 20) stats.downloadedUrls.push(url.slice(0, 160));
       const live = await inner(input, init);
       const recMeta = recordDir ? path.join(recordDir, `${key}.json`) : metaFile;
       const recBody = recordDir ? path.join(recordDir, `${key}.bin`) : bodyFile;

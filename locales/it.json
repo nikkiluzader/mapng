@@ -502,7 +502,11 @@
       "forestDensityHint_light": "Meno alberi nei boschi: il frame rate migliore.",
       "forestDensityHint_normal": "Circa 54 alberi per ettaro nei boschi: aperti e leggeri per il frame rate.",
       "forestDensityHint_dense": "Il doppio degli alberi nei boschi, più vicino a un bosco vero. Abbassa il frame rate nei boschi grandi.",
-      "forestDensityHint_veryDense": "Più del triplo degli alberi nei boschi, come un bosco vero. Può costare molto frame rate nei boschi grandi."
+      "forestDensityHint_veryDense": "Più del triplo degli alberi nei boschi, come un bosco vero. Può costare molto frame rate nei boschi grandi.",
+      "dataRunning": "Download dei dintorni e delle altezze dei ponti prima dell'esportazione… {pct}%",
+      "dataDone": "Dintorni e altezze dei ponti scaricati: l'esportazione li legge dalla cache.",
+      "dataFailed": "Download anticipato non riuscito; l'esportazione scaricherà ciò che serve.",
+      "dataWaiting": "In attesa dei download…"
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",

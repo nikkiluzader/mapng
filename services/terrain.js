@@ -1,4 +1,6 @@
 import { attachLandCover } from './worldCover.js';
+import { attachTreeSpecies } from './treeSpecies.js';
+import { loadDataImage } from './dataCache.js';
 import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox, rawWeightLookup } from './backgroundMask.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
 import { fetchWord, replayingSources } from './sourceWording.js';
@@ -1719,18 +1721,8 @@ async function pMap(items, mapper, concurrency, signal) {
   return results;
 }
 
-const loadImage = (url, signal) => {
-  return new Promise((resolve, reject) => {
-    if (signal?.aborted) { reject(signal.reason); return; }
-    const img = new Image();
-    img.crossOrigin = "Anonymous";
-    const onAbort = () => { img.src = ''; reject(signal.reason); };
-    signal?.addEventListener('abort', onAbort, { once: true });
-    img.onload = () => { signal?.removeEventListener('abort', onAbort); resolve(img); };
-    img.onerror = () => { signal?.removeEventListener('abort', onAbort); resolve(null); };
-    img.src = url;
-  });
-};
+// (through the download cache in the browser: services/dataCache.js)
+const loadImage = (url, signal) => loadDataImage(url, signal);
 
 const SAT_TEX_MAX_SIZE = 8192;
 
@@ -2492,6 +2484,8 @@ export const fetchTerrainData = async (
 
   // what covers the ground (ESA WorldCover), read once with the terrain
   await attachLandCover(terrainData, { onProgress: (m) => onProgress?.(m), signal });
+  // which trees grow here, for the export's woods (downloaded now: the export downloads nothing)
+  await attachTreeSpecies(terrainData, { onProgress: (m) => onProgress?.(m) });
 
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, baseColor, onProgress };
@@ -2854,6 +2848,8 @@ export const loadTerrainFromTif = async (
 
   // what covers the ground (ESA WorldCover), read once with the terrain
   await attachLandCover(terrainData, { onProgress: (m) => onProgress?.(m), signal });
+  // which trees grow here, for the export's woods (downloaded now: the export downloads nothing)
+  await attachTreeSpecies(terrainData, { onProgress: (m) => onProgress?.(m) });
 
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, onProgress };
@@ -3089,6 +3085,8 @@ export const loadTerrainFromLaz = async (
 
   // what covers the ground (ESA WorldCover), read once with the terrain
   await attachLandCover(terrainData, { onProgress: (m) => onProgress?.(m), signal });
+  // which trees grow here, for the export's woods (downloaded now: the export downloads nothing)
+  await attachTreeSpecies(terrainData, { onProgress: (m) => onProgress?.(m) });
 
   if (includeOSM && osmFeatures.length > 0) {
     const options = { Roads: true, onProgress };

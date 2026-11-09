@@ -812,3 +812,27 @@ test('without a biome the export picks the look from the location', async () => 
     restorePolyfills();
   }
 });
+
+test('the level export downloads nothing: map data comes from Generate and the data step', async () => {
+  const restorePolyfills = installCanvasPolyfill();
+  const appFetch = globalThis.fetch;
+  const outside = [];
+  // (the app's own files pass; anything on the network is a download)
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : String(input?.url || '');
+    if (/^https?:\/\//i.test(url) || /^\/api\//.test(url)) { outside.push(url); throw new Error(`network: ${url}`); }
+    return appFetch(input, init);
+  };
+  try {
+    const result = await exportBeamNGLevel(
+      makeTerrainData(),
+      { lat: 0.5, lng: 0.5 },
+      { roadType: 'decal', levelName: 'mapng_nodl', biomeId: 'west_coast_usa', baseTexture: 'none', pbrSource: 'osm', includeBuildings: true, includeBackdrop: false, includeWater: true, includeTrees: true, includeRocks: true, includeNativeBarriers: true },
+    );
+    assert.ok(result?.blob, 'the export finished');
+    assert.deepEqual(outside, [], `downloads during the export: ${outside.join(', ')}`);
+  } finally {
+    globalThis.fetch = appFetch;
+    restorePolyfills();
+  }
+});

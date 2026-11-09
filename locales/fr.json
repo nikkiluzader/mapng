@@ -502,7 +502,11 @@
       "forestDensityHint_light": "Moins d'arbres dans les bois : la meilleure fréquence d'images.",
       "forestDensityHint_normal": "Environ 54 arbres par hectare dans les bois : ouvert et léger pour les FPS.",
       "forestDensityHint_dense": "Deux fois plus d'arbres dans les bois, plus proche d'une vraie forêt. Réduit les FPS dans les grands bois.",
-      "forestDensityHint_veryDense": "Plus de trois fois plus d'arbres dans les bois, comme une vraie forêt. Peut coûter beaucoup de FPS dans les grands bois."
+      "forestDensityHint_veryDense": "Plus de trois fois plus d'arbres dans les bois, comme une vraie forêt. Peut coûter beaucoup de FPS dans les grands bois.",
+      "dataRunning": "Téléchargement des environs et des hauteurs de ponts avant l'export… {pct} %",
+      "dataDone": "Environs et hauteurs de ponts téléchargés : l'export les lit depuis le cache.",
+      "dataFailed": "Téléchargement anticipé impossible ; l'export récupérera ce qu'il lui faut.",
+      "dataWaiting": "En attente des téléchargements…"
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",

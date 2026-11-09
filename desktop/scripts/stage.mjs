@@ -37,7 +37,7 @@ const RUNNER_EXTERNAL = ['@napi-rs/canvas', 'laz-perf'];
 // (the export's worker threads, and the page's heightmap resampler worker,
 // which the runner starts as `new URL('./resamplerWorker.js', import.meta.url)`)
 const WORKER_MODULES = ['sidewalkPanels.js', 'daeWorker.js', 'buildingWorker.js', 'resamplerWorker.js'];
-const RUNNERS = ['exportJob.mjs', 'generateJob.mjs'];
+const RUNNERS = ['exportJob.mjs', 'generateJob.mjs', 'prefetchJob.mjs'];
 const gitHash = (() => { try { return execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: DESKTOP }).toString().trim(); } catch { return 'unknown'; } })();
 const BUILD_DEFINES = { __BUILD_HASH__: JSON.stringify(gitHash), __BUILD_TIME__: JSON.stringify(new Date().toISOString()) };
 const LAZ_PERF_VERSION = JSON.parse(fs.readFileSync(path.join(DESKTOP, '..', 'package.json'), 'utf8')).dependencies['laz-perf'].replace(/^[\^~]/, '');

@@ -142,6 +142,11 @@
                 <option value="gpxz" :disabled="!canUseGpxzBackdrop">GPXZ</option>
               </select>
             </SettingRow>
+            <p v-if="exportDataStatus && exportDataStatus.status !== 'idle'" class="text-caption leading-snug" :class="exportDataStatus.status === 'failed' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">
+              {{ exportDataStatus.status === 'running'
+                ? t('exportPanel.ui.dataRunning', { pct: Math.round((exportDataStatus.fraction || 0) * 100) })
+                : exportDataStatus.status === 'done' ? t('exportPanel.ui.dataDone') : t('exportPanel.ui.dataFailed') }}
+            </p>
           </SettingCard>
 
           <!-- How heavy the level will be (services/levelWeight.js): warnings, never a block -->
@@ -569,7 +574,9 @@ import { buildCommonTraceMetadata, downloadJsonFile } from '../../services/trace
 import { createWGS84ToLocal } from '../../services/geoUtils';
 import { exportBeamNGLevel, EXPORT_STEP_GROUPS } from '../../services/exportBeamNGLevel';
 import { terrainMode, terrainShapingOptions, terrainGenerationOptions } from '../../composables/useTerrainMode.js';
-import { desktopApp, exportLevelOnDesktop } from '../../services/platform/desktop.js';
+import { desktopApp, exportLevelOnDesktop, prefetchExportDataOnDesktop } from '../../services/platform/desktop.js';
+import { downloadExportData, ensureExportData, exportDataNeeds, exportDataState, onExportDataChange } from '../../services/exportData.js';
+import { withDownloadGuard } from '../../services/dataCache.js';
 import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../composables/useExportHotspots.js';
 import SettingSection from '../base/SettingSection.vue';
 import SettingCard from '../base/SettingCard.vue';
@@ -734,6 +741,45 @@ const levelWeight = computed(() => estimateLevelWeight({
 }));
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
+
+// The export's data step (services/exportData.js): the backdrop's tiles and
+// the bridges' lidar survey downloaded ahead, in the background, as soon as
+// these options ask for them; the export waits for it, then only processes.
+const exportDataOptions = computed(() => {
+  const source = beamNGBackdropSource.value === 'gpxz' && !canUseGpxzBackdrop.value ? 'global30m' : beamNGBackdropSource.value;
+  return {
+    includeBackdrop: source !== 'off',
+    backdropElevationSource: source,
+    backdropGpxzApiKey: source === 'gpxz' ? String(props.gpxzApiKey || '') : '',
+    roadType: hasOsmData.value ? beamNGRoadType.value : 'none',
+    includeBridges: !advancedMode.value || beamNGIncludeBridges.value,
+    lidarDecks: !advancedMode.value || beamNGLidarDecks.value,
+    backgroundMask: props.terrainData?.backgroundMask || null,
+  };
+});
+const runExportData = (terrainData, options, onProgress) => (desktopApp
+  ? prefetchExportDataOnDesktop(terrainData, options, onProgress)
+  : downloadExportData(terrainData, options, { onProgress }));
+const exportDataStatus = ref(null);
+const refreshExportDataStatus = () => {
+  const td = props.terrainData ? toRaw(props.terrainData) : null;
+  const st = td ? exportDataState(td, exportDataOptions.value) : null;
+  exportDataStatus.value = st ? { ...st } : null;
+};
+const offExportData = onExportDataChange(refreshExportDataStatus);
+onUnmounted(offExportData);
+let exportDataTimer = null;
+watch([() => props.terrainData, exportDataOptions], () => {
+  clearTimeout(exportDataTimer);
+  refreshExportDataStatus();
+  // (a moment after the last change: a source picked in passing isn't downloaded)
+  exportDataTimer = setTimeout(() => {
+    const td = props.terrainData ? toRaw(props.terrainData) : null;
+    if (!td || !exportDataNeeds(td, exportDataOptions.value)) return;
+    ensureExportData(td, exportDataOptions.value, { run: runExportData }).catch((err) => console.warn('[Export data] downloading ahead failed; the export will try again:', err?.message || err));
+  }, 1500);
+}, { immediate: true });
+onUnmounted(() => clearTimeout(exportDataTimer));
 const beamNGPendingDownloadUrl = ref('');
 const beamNGPendingDownloadName = ref('');
 // (desktop app: the level written into the mods folder, { path, filename })
@@ -1873,6 +1919,17 @@ const handleBeamNGLevelExport = async () => {
       terrainMode: terrainMode.value, advanced, width: td?.width, metersPerPixel: resolveProcessingMetersPerPixel(td),
     }), t);
 
+    // The data step first (usually done already, in the background): the
+    // export after it only processes what's in the cache
+    const dataTd = toRaw(props.terrainData);
+    if (dataTd && exportDataNeeds(dataTd, exportDataOptions.value)) {
+      beamNGProgressStep.value = t('exportPanel.ui.dataWaiting');
+      await ensureExportData(dataTd, exportDataOptions.value, {
+        run: runExportData,
+        onProgress: (text) => { beamNGProgressStep.value = `${t('exportPanel.ui.dataWaiting')} ${text}`; },
+      }).catch((err) => console.warn(`${BEAMNG_EXPORT_UI_LOG} Downloading ahead failed; the export fetches what it needs:`, err?.message || err));
+    }
+
     if (desktopApp) {
       lastExportOptions = Object.fromEntries(Object.entries(levelOptions).filter(([, v]) => typeof v !== 'function'));
       desktopExportAbort = new AbortController();
@@ -1886,7 +1943,8 @@ const handleBeamNGLevelExport = async () => {
       return;
     }
 
-    const { blob, filename } = await exportBeamNGLevel(td, props.center, levelOptions);
+    // (under the download guard: anything still downloaded is logged, services/dataCache.js)
+    const { blob, filename } = await withDownloadGuard(() => exportBeamNGLevel(td, props.center, levelOptions));
 
     if (effectiveBackdropSource === 'gpxz' && !effectiveBackdropGpxzApiKey) {
       console.warn(`${BEAMNG_EXPORT_UI_LOG} GPXZ backdrop selected but no GPXZ key was passed to export.`);

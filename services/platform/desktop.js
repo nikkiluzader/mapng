@@ -170,6 +170,20 @@ async function runDesktopExport(jobId, terrainData, center, rest, onProgress, si
   return result;
 }
 
+/**
+ * The export's data step on the desktop (services/exportData.js run): the
+ * downloads fetched by a runner into the app's download cache, which the
+ * export job reads. A terrain the desktop didn't generate has no saved
+ * session: its export downloads what it needs (and logs it).
+ */
+export async function prefetchExportDataOnDesktop(terrainData, options, onProgress) {
+  const terrainId = toRaw(terrainData)?.desktopTerrainId;
+  if (!desktopApp?.prefetchExportData || typeof terrainId !== 'string') return { skipped: 'not a desktop terrain' };
+  const plain = JSON.parse(JSON.stringify(toRaw(options) || {}));
+  const r = await desktopApp.prefetchExportData(terrainId, plain, (p) => onProgress?.(p?.text || '', p?.fraction || 0));
+  return r?.result ?? r;
+}
+
 // ---- Generate Data in Node --------------------------------------------------
 
 // (the page's settings the terrain services read: desktop/runner/common.mjs)

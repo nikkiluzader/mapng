@@ -10,6 +10,11 @@ import '@fontsource-variable/overpass';
 import '@fontsource-variable/overpass-mono';
 import 'leaflet/dist/leaflet.css';
 import './style.css';
+import { installDataCache } from './services/dataCache.js';
+
+// map data downloads kept in the browser (services/dataCache.js): a second
+// Generate, Preview or Export of an area reads them instead of the network
+installDataCache();
 
 const originalConsoleWarn = console.warn.bind(console);
 console.warn = (...args) => {

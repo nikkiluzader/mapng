@@ -129,3 +129,19 @@ async function fetchMixOver(bounds, minSpan, fetchImpl, timeoutMs) {
     if (timer) clearTimeout(timer);
   }
 }
+
+/**
+ * The local tree mix read while generating (Generate Data / Preview 3D), kept
+ * on the terrain as treeSpeciesMix: the export reads it and downloads
+ * nothing (null: no records here, or offline; the climate rule decides).
+ */
+export async function attachTreeSpecies(terrainData, { onProgress } = {}) {
+  if (!terrainData?.bounds || terrainData.treeSpeciesMix !== undefined) return terrainData;
+  onProgress?.('Reading which trees grow here (iNaturalist records)...');
+  try {
+    terrainData.treeSpeciesMix = await fetchTreeSpeciesMix(terrainData.bounds);
+  } catch {
+    terrainData.treeSpeciesMix = null;
+  }
+  return terrainData;
+}

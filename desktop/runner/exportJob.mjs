@@ -29,7 +29,10 @@ async function main() {
   const job = JSON.parse(fs.readFileSync(path.join(jobDir, 'job.json'), 'utf8'));
   // (the export's own downloads: US lidar for bridge heights, the backdrop;
   // recorded with the level, replayed by Update and Modify: main.js)
-  const sources = installSourceRecorder(job.sources || { dir: path.join(jobDir, 'export-sources'), mode: 'record' });
+  // (the export only processes: its downloads were fetched ahead by the data
+  // step, desktop/runner/prefetchJob.mjs, into the cache it reads here; what
+  // it still has to download is logged, refused under MAPNG_STRICT_NO_DOWNLOAD)
+  const sources = installSourceRecorder({ ...(job.sources || { dir: path.join(jobDir, 'export-sources'), mode: 'record' }), strict: process.env.MAPNG_STRICT_NO_DOWNLOAD === '1' });
   const terrainData = await reviveJobValue(job.terrainData, jobDir);
   const started = Date.now();
   // (the zip written to the file as it is made, beside the final name; the
@@ -54,6 +57,10 @@ async function main() {
   const out = path.join(job.outputDir, filename);
   fs.renameSync(partial, out);
   console.log(`[Sources] export ${job.sources?.mode || 'record'}: ${sources.recorded} recorded, ${sources.replayed} from saved data, ${sources.downloaded} downloaded`);
+  if (job.sources?.mode === 'cache' && sources.downloaded) {
+    console.warn(`[Sources] the export downloaded ${sources.downloaded} file(s) its data step should have fetched:`);
+    for (const u of sources.downloadedUrls) console.warn(`[Sources]   ${u}`);
+  }
   send({ type: 'done', path: out, filename, size, seconds: (Date.now() - started) / 1000, sources: { recorded: sources.recorded, replayed: sources.replayed, downloaded: sources.downloaded } });
 }
 

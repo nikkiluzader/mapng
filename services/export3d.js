@@ -1786,29 +1786,38 @@ const sampleSurroundingHeight = (tileData, u, v) => {
   return center;
 };
 
+/**
+ * The eight surrounding tiles' downloads (elevation + satellite) for data
+ * ({ bounds, width }): the same requests createSurroundingMeshes makes, so
+ * the export's data step (services/exportData.js) can fetch them ahead.
+ */
+export const fetchSurroundings = (data, onProgress, fetchOptions = {}) => {
+  const allPositions = POSITIONS.map(p => p.key);
+  const resolutionCap = fetchOptions.fetchResolutionCap ?? EXPORT_SURROUND_PROFILE.fetchResolutionCap;
+  const surroundResolution = Math.min(
+    Math.max(256, data.width || 1024),
+    resolutionCap,
+  );
+  const tileOptions = { useNativeTerrainGrid: true };
+  if (fetchOptions.includeSatellite !== undefined) tileOptions.includeSatellite = fetchOptions.includeSatellite;
+  if (fetchOptions.elevationSource) tileOptions.elevationSource = fetchOptions.elevationSource;
+  if (fetchOptions.gpxzApiKey) tileOptions.gpxzApiKey = fetchOptions.gpxzApiKey;
+  if (fetchOptions.onDownloadProgress) tileOptions.onDownloadProgress = fetchOptions.onDownloadProgress;
+  const satZoom = fetchOptions.satelliteZoom !== undefined ? fetchOptions.satelliteZoom : GLB_SURROUND_SAT_ZOOM;
+  return fetchSurroundingTiles(
+    data.bounds,
+    allPositions,
+    surroundResolution,
+    satZoom,
+    onProgress,
+    undefined,
+    tileOptions,
+  );
+};
+
 export const createSurroundingMeshes = async (data, onProgress, maxMeshResolution = 128, fetchOptions = {}) => {
   try {
-    const allPositions = POSITIONS.map(p => p.key);
-    const resolutionCap = fetchOptions.fetchResolutionCap ?? EXPORT_SURROUND_PROFILE.fetchResolutionCap;
-    const surroundResolution = Math.min(
-      Math.max(256, data.width || 1024),
-      resolutionCap,
-    );
-    const tileOptions = { useNativeTerrainGrid: true };
-    if (fetchOptions.includeSatellite !== undefined) tileOptions.includeSatellite = fetchOptions.includeSatellite;
-    if (fetchOptions.elevationSource) tileOptions.elevationSource = fetchOptions.elevationSource;
-    if (fetchOptions.gpxzApiKey) tileOptions.gpxzApiKey = fetchOptions.gpxzApiKey;
-    if (fetchOptions.onDownloadProgress) tileOptions.onDownloadProgress = fetchOptions.onDownloadProgress;
-    const satZoom = fetchOptions.satelliteZoom !== undefined ? fetchOptions.satelliteZoom : GLB_SURROUND_SAT_ZOOM;
-    const results = await fetchSurroundingTiles(
-      data.bounds,
-      allPositions,
-      surroundResolution,
-      satZoom,
-      onProgress,
-      undefined,
-      tileOptions,
-    );
+    const results = await fetchSurroundings(data, onProgress, fetchOptions);
 
     const latRad = ((data.bounds.north + data.bounds.south) / 2 * Math.PI) / 180;
     const metersPerDegree = 111320 * Math.cos(latRad);

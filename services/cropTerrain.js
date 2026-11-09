@@ -47,7 +47,7 @@ async function cropTextureBlob(blob, origWidth, origHeight, startX, startY, crop
   }
 }
 
-function cropHeightmap(heightMap, origWidth, origHeight, startX, startY, cropSize) {
+export function cropHeightmap(heightMap, origWidth, origHeight, startX, startY, cropSize) {
   const out = new Float32Array(cropSize * cropSize);
   for (let row = 0; row < cropSize; row++) {
     const srcRow = startY + row;
@@ -58,7 +58,7 @@ function cropHeightmap(heightMap, origWidth, origHeight, startX, startY, cropSiz
   return out;
 }
 
-function adjustBounds(bounds, origWidth, origHeight, startX, startY, cropSize) {
+export function adjustBounds(bounds, origWidth, origHeight, startX, startY, cropSize) {
   const lngPerPx = (bounds.east  - bounds.west)  / origWidth;
   const latPerPx = (bounds.north - bounds.south) / origHeight;
   return {
@@ -111,7 +111,7 @@ function clipRoadGeometryToBounds(geometry, bounds) {
   return segments;
 }
 
-function cropOSMFeatures(osmFeatures, bounds) {
+export function cropOSMFeatures(osmFeatures, bounds) {
   if (!Array.isArray(osmFeatures) || !bounds) return osmFeatures;
 
   const out = [];

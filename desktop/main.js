@@ -26,6 +26,7 @@ const DIST = RES ? path.join(RES, 'dist') : path.resolve(HERE, '..', 'dist');
 const RUNNER_DIR = RES ? path.join(RES, 'runner') : path.join(HERE, 'runner');
 const RUNNER = path.join(RUNNER_DIR, 'exportJob.mjs');
 const GENERATOR = path.join(RUNNER_DIR, 'generateJob.mjs');
+const PREFETCHER = path.join(RUNNER_DIR, 'prefetchJob.mjs');
 const NODE = process.env.MAPNG_NODE
   || (RES ? path.join(RES, 'node', process.platform === 'win32' ? 'node.exe' : 'bin/node') : 'node');
 
@@ -280,8 +281,36 @@ function clearLeftovers() {
     for (const d of fs.readdirSync(PROJECTS())) if (d.endsWith('.saving')) fs.rmSync(path.join(PROJECTS(), d), { recursive: true, force: true });
   } catch { /* none yet */ }
   pruneSessions(null);
-  // (the download cache is for one run of the app)
-  fs.rmSync(SOURCE_CACHE(), { recursive: true, force: true });
+  trimDownloadCache();
+}
+
+// The download cache is kept between runs (Generate, Preview and the export's
+// data step read it back), within DOWNLOAD_CACHE_BYTES: the least recently
+// used responses go first (runner/browserShims.mjs touches a file it serves).
+// A level's own saved downloads are hard links, untouched by this.
+const DOWNLOAD_CACHE_BYTES = 8 * 1024 ** 3;
+function trimDownloadCache(cap = DOWNLOAD_CACHE_BYTES) {
+  let names = [];
+  try { names = fs.readdirSync(SOURCE_CACHE()).filter((n) => n.endsWith('.json')); } catch { return; }
+  let total = 0;
+  const entries = [];
+  for (const n of names) {
+    const key = n.slice(0, -5);
+    try {
+      const meta = fs.statSync(path.join(SOURCE_CACHE(), n));
+      let size = meta.size;
+      try { size += fs.statSync(path.join(SOURCE_CACHE(), `${key}.bin`)).size; } catch { /* no body */ }
+      total += size;
+      entries.push({ key, size, used: meta.mtimeMs });
+    } catch { /* gone */ }
+  }
+  if (total <= cap) return;
+  entries.sort((a, b) => a.used - b.used);
+  for (const e of entries) {
+    if (total <= cap * 0.8) break;
+    for (const ext of ['.json', '.bin']) fs.rmSync(path.join(SOURCE_CACHE(), `${e.key}${ext}`), { force: true });
+    total -= e.size;
+  }
 }
 
 // ---- system usage (the page's memory monitor) -------------------------------
@@ -542,10 +571,10 @@ function saveProject(jobDir, job, result) {
 // ---- terrain generation (the page's Generate Data, in Node) -----------------
 
 const SESSIONS = () => path.join(app.getPath('userData'), 'terrain');
-// The downloads of this run's generates (runner/browserShims.mjs, mode
-// 'cache'): Generate Data / Preview 3D again after changing a setting reads
-// what it already fetched (elevation tiles, imagery, map data), only what's
-// new is downloaded. Temporary: emptied when the app starts.
+// The download cache (runner/browserShims.mjs, mode 'cache'): Generate Data /
+// Preview 3D and the export's data step read what was already fetched
+// (elevation tiles, imagery, map data, the backdrop, bridge lidar); only
+// what's new is downloaded. Kept between runs within DOWNLOAD_CACHE_BYTES.
 const SOURCE_CACHE = () => path.join(app.getPath('userData'), 'download-cache');
 const sessionDirOf = (id) => {
   if (!/^[\w-]{1,64}$/.test(id)) throw new Error('bad terrain id');
@@ -610,6 +639,35 @@ ipcMain.handle('terrain:generate', async (event, requested) => {
   } finally {
     exportUsage.delete(`gen:${id}`);
     generating.delete(id);
+  }
+});
+
+// The export's data step (runner/prefetchJob.mjs): a generated terrain's
+// backdrop tiles and bridge lidar downloaded into the download cache ahead of
+// the export, which then downloads nothing. One at a time per terrain and
+// options (the page joins a running one: services/exportData.js).
+ipcMain.handle('data:prefetch', async (event, reqId, terrainId, options) => {
+  if (!/^[\w-]{1,64}$/.test(String(reqId))) throw new Error('bad request id');
+  const terrainDir = sessionDirOf(String(terrainId));
+  if (!fs.existsSync(path.join(terrainDir, 'terrain.json'))) return { skipped: 'no saved terrain' };
+  const dir = path.join(JOBS(), `prefetch-${reqId}`);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'job.json'), JSON.stringify({ terrainDir, options, sources: { mode: 'cache', dir: SOURCE_CACHE() } }));
+  const child = spawnRunner(PREFETCHER, dir);
+  try {
+    return await new Promise((resolve, reject) => {
+      let done = null; let failure = null;
+      child.on('message', (msg) => {
+        if (msg?.type === 'progress') event.sender.send('data:progress', reqId, msg);
+        else if (msg?.type === 'done') done = msg;
+        else if (msg?.type === 'error') failure = msg;
+      });
+      child.on('error', (error) => reject(new Error(`could not start the download step (${NODE}): ${error.message}`)));
+      child.on('exit', (code) => (done ? resolve(done) : reject(new Error(failure?.message || `the download step ended with code ${code}; log: ${path.join(dir, 'export.log')}`))));
+    });
+  } finally {
+    // (a finished step's folder: its log only)
+    if (fs.existsSync(dir)) fs.rmSync(path.join(dir, 'job.json'), { force: true });
   }
 });
 

@@ -502,7 +502,11 @@
       "forestDensityHint_light": "Menos árboles en los bosques: la mejor tasa de fotogramas.",
       "forestDensityHint_normal": "Unos 54 árboles por hectárea en los bosques: abierto y ligero para los FPS.",
       "forestDensityHint_dense": "El doble de árboles en los bosques, más cerca de un bosque real. Baja los FPS en bosques grandes.",
-      "forestDensityHint_veryDense": "Más del triple de árboles en los bosques, como un bosque real. Puede costar muchos FPS en bosques grandes."
+      "forestDensityHint_veryDense": "Más del triple de árboles en los bosques, como un bosque real. Puede costar muchos FPS en bosques grandes.",
+      "dataRunning": "Descargando el entorno y las alturas de los puentes antes de exportar… {pct}%",
+      "dataDone": "Entorno y alturas de puentes descargados: la exportación los lee de la caché.",
+      "dataFailed": "No se pudieron descargar antes; la exportación descargará lo que necesite.",
+      "dataWaiting": "Esperando las descargas…"
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",

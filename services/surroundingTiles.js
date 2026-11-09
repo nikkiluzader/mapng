@@ -10,6 +10,7 @@
  */
 
 import { fetchWord, fetchedWord } from './sourceWording.js';
+import { loadDataImage } from './dataCache.js';
 import { project, TERRAIN_ZOOM, fetchTerrainData, repairTerrariumBlendedTiles, repairTerrariumNoDataTiles } from './terrain.js';
 import { encode } from 'fast-png';
 import JSZip from 'jszip';
@@ -61,17 +62,8 @@ export const POSITION_LABELS = {
 
 // --- Helpers ---
 
-const loadImage = (url, signal) =>
-  new Promise((resolve) => {
-    if (signal?.aborted) { resolve(null); return; }
-    const img = new Image();
-    img.crossOrigin = 'Anonymous';
-    const onAbort = () => { img.src = ''; resolve(null); };
-    signal?.addEventListener('abort', onAbort, { once: true });
-    img.onload = () => { signal?.removeEventListener('abort', onAbort); resolve(img); };
-    img.onerror = () => { signal?.removeEventListener('abort', onAbort); resolve(null); };
-    img.src = url;
-  });
+// (through the download cache in the browser: services/dataCache.js; aborted: null)
+const loadImage = (url, signal) => loadDataImage(url, signal).catch(() => null);
 
 /**
  * Compute adjacent tile bounds by shifting center bounds.
