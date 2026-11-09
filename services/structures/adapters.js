@@ -32,14 +32,16 @@ export function decksFromSolver(graph) {
   segs.forEach((s, idx) => {
     const e = edges[s.edge];
     const xy = []; const zz = [];
-    for (let i = s.i0; i <= s.i1; i++) { xy.push([e.x[i], e.y[i]]); zz.push(z[s.edge][i]); }
+    // (a railway's deck carries its track: the deck's top is the formation,
+    // the track's depth under the top of the rail, e.drop: services/railways.js)
+    for (let i = s.i0; i <= s.i1; i++) { xy.push([e.x[i], e.y[i]]); zz.push(z[s.edge][i] - (e.drop ? e.drop[i] : 0)); }
     // the lowest gap over a road crossing under it: thinner there, as the plain decks (structureDepth)
     let minGap = Infinity;
     for (const c of graph.crossings?.crossings || []) {
       const up = c[c.upper]; const low = c[c.upper === 'a' ? 'b' : 'a'];
       const at = up.i + up.f;
       if (up.edge !== s.edge || at < s.i0 || at > s.i1) continue;
-      const zUp = z[s.edge][up.i] + (z[s.edge][Math.min(up.i + 1, z[s.edge].length - 1)] - z[s.edge][up.i]) * up.f;
+      const zUp = z[s.edge][up.i] + (z[s.edge][Math.min(up.i + 1, z[s.edge].length - 1)] - z[s.edge][up.i]) * up.f - (e.drop ? e.drop[up.i] : 0);
       const zl = z[low.edge]; const zLow = zl[low.i] + (zl[Math.min(low.i + 1, zl.length - 1)] - zl[low.i]) * low.f;
       minGap = Math.min(minGap, zUp - zLow);
     }
@@ -48,6 +50,7 @@ export function decksFromSolver(graph) {
       ...(Number.isFinite(minGap) ? { minGap, depth: structureDepth(minGap) } : {}),
       paint: e.paint || undefined, bridgeKind: e.bridgeKind || undefined, movable: e.movable || undefined, wikidata: e.wikidata || undefined,
       osm: { id: e.wayId ?? null, name: null, highway: e.highway || null },
+      ...(e.rail ? { rail: e.rail } : {}),
       edge: s.edge, s0: s.s0, s1: s.s1,
     };
     const root = find(idx);

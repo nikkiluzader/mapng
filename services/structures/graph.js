@@ -194,6 +194,9 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
       seg: segIndex,
       wayId: seg.sourceFeature?.id ?? null,
       highway: seg.highway || tags.highway || '',
+      // a railway (services/railways.js): its kind, its class above is 'railway:<kind>'
+      rail: seg.rail || null,
+      electrified: !!seg.rail && !!tags.electrified && tags.electrified !== 'no',
       layer: Number.isFinite(seg.layer) ? seg.layer : (Number.parseInt(tags.layer, 10) || 0),
       half: halfOf(seg),
       ...structureOf(tags),

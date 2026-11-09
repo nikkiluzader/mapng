@@ -112,6 +112,10 @@ import {
   SIGNAL_POLE_SHAPE,
 } from './beamngSignals.js';
 import { planRaceways } from './racetracks.js';
+import { RAIL_DEPTH_M, railHalfWidth, railKindOf, railSegmentsFrom, streetRunningTest } from './railways.js';
+import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, buildTrackGeometry, crossingDecals, streetTramDecals, railMaterialDefs, RAIL_MATERIALS, TRAMLINE_MATERIAL, railwayStats } from './railTrack.js';
+// footways and other paths: a level crossing of one is a foot crossing
+const PATH_HIGHWAYS = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway']);
 import { POLE_SHAPE, POLE_SHAPE_HEIGHT_M, beamRotation } from './sportsLights.js';
 import {
   buildCurbedStreetClassifier, buildUrbanRoadClassifier,
@@ -1124,6 +1128,81 @@ function generateBridgeDAEs(decks, groundAt, roadLines, groundRoads = [], tops =
     if (deckData) out.push({ key: `dam${String(i + 1).padStart(2, '0')}`, origin, data: null, deckData, extras: [], style: null, triangles: n / 3 });
   });
   return out;
+}
+
+// A railway's track as Collada shapes, one per tile (railTrack.js): a mesh per
+// material and a Colmesh-1 of the ballast and the rails' tops.
+function railTileDae(tile) {
+  const origin = tile.origin;
+  const rel = (pos) => Float32Array.from(pos, (v, k) => v - origin[k % 3]);
+  const base00 = new THREE.Group();
+  base00.name = 'base00';
+  const start01 = new THREE.Group();
+  start01.name = 'start01';
+  const disposables = [];
+  for (const [material, part] of Object.entries(tile.parts)) {
+    if (!part.pos.length) continue;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(rel(part.pos), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(part.uv), 2));
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ name: material }));
+    mesh.name = `track_${material.replace(/^mapng_rail_/, '')}`;
+    start01.add(mesh);
+    disposables.push(geo);
+  }
+  if (tile.collision.pos.length) {
+    const colGeo = new THREE.BufferGeometry();
+    colGeo.setAttribute('position', new THREE.BufferAttribute(rel(tile.collision.pos), 3));
+    colGeo.name = 'Colmesh-1';
+    const collision = new THREE.Mesh(colGeo, new THREE.MeshBasicMaterial({ name: RAIL_MATERIALS.ballast }));
+    collision.name = 'Colmesh-1';
+    start01.add(collision);
+    disposables.push(colGeo);
+  }
+  base00.add(start01);
+  base00.updateMatrixWorld(true);
+  const result = new ColladaExporter().parse(base00, undefined, { version: '1.4.1', upAxis: 'Z_UP' });
+  for (const g of disposables) g.dispose();
+  return result?.data || null;
+}
+
+/**
+ * The railways of a solved structure graph built for the level: track tiles
+ * as Collada shapes, the level crossings' surfaces and the street trams as
+ * DecalRoads (the game's tram-rail decal), and the counts for the report.
+ */
+function buildLevelRailways(sg, terrainData, squareSize, levelName) {
+  const segs = sg.railSegments || [];
+  const tagsOf = (e) => segs[e.seg]?.tags || {};
+  const track = buildTrackGeometry(sg, { tagsOf });
+  const daes = [];
+  for (const tile of track.tiles) {
+    const data = railTileDae(tile);
+    if (data) daes.push({ key: tile.key, origin: tile.origin, data, triangles: tile.triangles });
+  }
+  const props = { renderPriority: 3, textureLength: 40, breakAngle: 1, detail: DECAL_ROAD_DETAIL };
+  const decals = [];
+  crossingDecals(sg, { tagsOf }).forEach((c, i) => {
+    const d = makeRoadDecal(c.nodes, `rail_crossing_${i + 1}`, 'railways', props, TRAMLINE_MATERIAL.name);
+    if (d) decals.push(d);
+  });
+  // trams in their streets: the railway features left out of the graph
+  const built = new Set(segs.filter((s) => s.rail).map((s) => s.sourceFeature?.id));
+  const toXY = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
+  const street = (terrainData.osmFeatures || []).filter((f) => f?.type === 'railway' && !built.has(f.id)
+    && ['tram', 'light_rail'].includes(railKindOf(f.tags)) && f.geometry?.length >= 2);
+  let streetTramM = 0;
+  streetTramDecals(street.map((f) => ({ xy: f.geometry.map(toXY), tags: f.tags || {} })), (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize))
+    .forEach((t, i) => {
+      for (let k = 1; k < t.nodes.length; k++) streetTramM += Math.hypot(t.nodes[k][0] - t.nodes[k - 1][0], t.nodes[k][1] - t.nodes[k - 1][1]);
+      const d = makeRoadDecal(t.nodes, `rail_tram_${i + 1}`, 'railways', props, TRAMLINE_MATERIAL.name);
+      if (d) decals.push(d);
+    });
+  return {
+    tiles: track.tiles, daes, decals,
+    stats: { ...railwayStats(sg, segs), ...track.stats, crossings: (sg.railCrossings || []).length + (sg.railUnjoined || []).length, streetTramKm: Math.round(streetTramM / 10) / 100, streetTramLines: street.length, levelName },
+  };
 }
 
 export const TUNNEL_MATERIAL = 'mapng_tunnel_concrete';
@@ -5019,7 +5098,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
   const others = [];
   drivableRoads.forEach((seg, segIndex) => {
     const tags = seg.sourceFeature?.tags || {};
-    if (!shouldGenerateDecalRoads(seg.highway, tags) || !Array.isArray(seg.geometry) || seg.geometry.length < 2) return;
+    // (a railway's segment: its tunnels are bored as a road's are)
+    if ((!seg.rail && !shouldGenerateDecalRoads(seg.highway, tags)) || !Array.isArray(seg.geometry) || seg.geometry.length < 2) return;
     const xy = toXY(seg.geometry);
     if (isBoredTunnelTag(tags) && !isBridgeRoad(tags)) {
       parts.push({
@@ -5623,6 +5703,8 @@ function buildPedestrianStreetDecals(terrainData, squareSize, carriageways = [],
 /** The paving materials the decal groups use, by name (for main.materials.json). */
 export function usedPavingMaterials(groups) {
   const byName = new Map(Object.values(PAVING_MATERIALS).map((p) => [p.material.name, p.material]));
+  // (the railways' tram-rail decal: level crossings and trams in their streets)
+  byName.set(TRAMLINE_MATERIAL.name, TRAMLINE_MATERIAL);
   const used = {};
   for (const group of groups) {
     for (const item of group.__items || []) {
@@ -5801,6 +5883,27 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     const driving = Number.isFinite(stable) && stable > 0 ? stable : cs.drivingHalfWidth;
     return driving + (cs.leftExtra + cs.rightExtra) / 2;
   };
+  // Railways (services/railways.js): graph edges of their own class beside
+  // the roads, so a rail bridge, a rail tunnel, a road bridge over a line and
+  // a level crossing come out of the one profile solve. Indexed after the
+  // roads: an edge's seg below drivableRoads.length is a road (the decals'
+  // owners), past it a railway. Only with the solver building the level.
+  let railSegs = [];
+  if (opts.structureSolver === 'v2' && opts.includeRailways !== false) {
+    try {
+      const project = (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0);
+      // (a tram in its street is drawn on the street, not built as a line of its own)
+      const streets = drivableRoads.map((seg) => ({ xy: seg.geometry.map((p) => project(p.lat, p.lng)), half: halfOf(seg) }));
+      // (a short untagged piece between two rail bridges is the same structure, as a road's)
+      const railFeatures = bridgeOverShortGaps(terrainData.osmFeatures.filter((f) => f?.type === 'railway' && f.geometry?.length >= 2));
+      railSegs = railSegmentsFrom(railFeatures, { streetRunning: streetRunningTest(streets, project) });
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Railways skipped: ${err?.message || err}`);
+      railSegs = [];
+    }
+  }
+  const graphSegments = railSegs.length ? [...drivableRoads, ...railSegs] : drivableRoads;
+  const graphHalfOf = (seg) => (seg.rail ? railHalfWidth(seg.tags) : halfOf(seg));
   // The structure solver (graph, crossings, profile, classes). Shadow mode
   // unless options.structureSolver asks for it: a failure here is logged
   // and skipped, never an export failure.
@@ -5809,10 +5912,10 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // The structure solver's road graph (stage A), built on the untouched
     // ground. Shadow mode: nothing reads it yet but the report.
     const graphEdge = (terrainData.width * squareSize) / 2 - 3;
-    structureGraph = buildStructureGraph(drivableRoads, {
+    structureGraph = buildStructureGraph(graphSegments, {
       project: (lat, lng) => geoToWorldPoint(lat, lng, terrainData, squareSize, 0),
       groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize),
-      halfOf,
+      halfOf: graphHalfOf,
       isFreeEnd: (x, y) => Math.abs(x) >= graphEdge || Math.abs(y) >= graphEdge,
       // (each road cut at the map's edge, the points added there marked:
       // squashed onto the edge, roads leaving the map side by side met there)
@@ -5824,6 +5927,14 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     // (bridges / tunnels switched off: those roads are plain roads)
     if (!includeBridges) for (const e of structureGraph.edges) e.bridge = false;
     if (!includeTunnels) for (const e of structureGraph.edges) e.tunnel = false;
+    // railways: their ground at the top of the rail, the formation under it,
+    // and the level crossings (railTrack.js)
+    if (railSegs.length) {
+      structureGraph.railSegments = graphSegments;
+      structureGraph.railCrossings = prepareRailEdges(structureGraph, { pathClasses: PATH_HIGHWAYS });
+      structureGraph.railUnjoined = unjoinedRailCrossings(structureGraph);
+      for (const c of structureGraph.railUnjoined) markUnjoinedCrossing(structureGraph, c);
+    }
     // stage B: crossings and their order, bridges over water (shadow mode too)
     structureGraph.crossings = findCrossings(structureGraph, { waterAt: buildWaterLookup(terrainData, squareSize) });
     // no bridges: nothing is lifted over anything, every road on its ground
@@ -5842,7 +5953,8 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   // tunnels a bridge meets (a portal takes the deck's height).
   const done = new Set();
   const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set() });
-  const early = includeTunnels ? yield* solveExportTunnels(drivableRoads, terrainData, squareSize, null, halfOf, { done, shape: shaping.tunnels }) : noTunnels();
+  // (railway tunnels too: their bores come from the same builder)
+  const early = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, null, graphHalfOf, { done, shape: shaping.tunnels }) : noTunnels();
   yield;
   // (structure solver v2: the decks come from the solver after the road
   // layout, so today's bridge passes are skipped)
@@ -5854,7 +5966,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
     ? noBridges()
     : solveExportBridges(drivableRoads, terrainData, squareSize, early.tunnels);
   yield;
-  const late = includeTunnels ? yield* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done, shape: shaping.tunnels }) : noTunnels();
+  const late = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, bridges, graphHalfOf, { done, shape: shaping.tunnels }) : noTunnels();
   yield;
   const tunnels = joinTunnelPhases(early, late);
   // The structure solver's profile and classes (stages C, D), after today's
@@ -5870,7 +5982,9 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         const t = opts.structureSolver === 'v2' ? tunnels.bySeg.get(e.seg) : null;
         if (!t) return;
         e.external = true;
-        for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i])]);
+        // (a railway's profile is the top of its rail: the tube's floor is its formation)
+        const lift = e.rail ? RAIL_DEPTH_M : 0;
+        for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i]) + lift]);
       });
       // dams (services/dams.js): a road along a dam's crest rides on it,
       // pinned at the crest; the dam is its structure (no deck, no piers,
@@ -7578,6 +7692,26 @@ function buildDetailedReportSections(d) {
     lines.push('');
     lines.push('Left on the ground (drawn over the terrain as before):');
     for (const k of left) lines.push(`  - ${describe(k.osm)} (way ${ways(k.osm) || 'n/a'}, ${formatNumber(k.length ?? 0, 0)} m): ${k.reason}`);
+  }
+
+  // ── Railways ───────────────────────────────────────────────────────────────
+  const rw = d.railways?.stats;
+  section('Railways');
+  if (!rw) {
+    lines.push('- No railway built (none in the map data, or the structure solver off). Active railway=rail, light_rail, subway (above ground), tram, narrow_gauge, monorail and funicular lines are built; abandoned, disused, razed, construction and proposed ones are not.');
+  } else {
+    lines.push('- Each line\'s height is solved with the roads (grade limits per kind: rail 2.5 %, narrow gauge and subway 4 %, light rail 6 %, tram 7 %, funicular none), bridges and tunnels from its tags and what it crosses; the track (rails, concrete or timber sleepers, gravel ballast) is laid on the solved profile, its formation shaped into the terrain.');
+    lines.push(`- Lines: ${rw.lines}; track: ${formatNumber(rw.trackKm, 2)} km (every track of a multi-track line counted), ${rw.sleepers} sleepers, ${rw.triangles} triangles in ${d.railways.daes.length} object(s)`);
+    for (const [kind, v] of Object.entries(rw.byKind)) {
+      const steep = rw.steepest[kind];
+      lines.push(`  - ${kind.replace(/_/g, ' ')}: ${v.lines} line(s), ${formatNumber(v.km, 2)} km, ${formatNumber(v.bridgeKm, 2)} km on bridges, ${formatNumber(v.tunnelKm, 2)} km in tunnels${steep ? `; steepest ${formatNumber(steep.grade * 100, 1)} % at (${formatNumber(steep.x, 0)}, ${formatNumber(steep.y, 0)})` : ''}`);
+    }
+    const sk = rw.structureKm || {};
+    lines.push(`- Along the lines: ${['ground', 'embankment', 'cutting', 'deck', 'external', 'boredTunnel', 'cutAndCover'].filter((k) => sk[k]).map((k) => `${{ ground: 'on the ground', embankment: 'embankment', cutting: 'cutting', deck: 'bridge', external: 'tunnel', boredTunnel: 'tunnel (unbuilt)', cutAndCover: 'cut and cover (unbuilt)' }[k]} ${formatNumber(sk[k], 2)} km`).join(', ') || 'n/a'}`);
+    lines.push(`- Rail bridges: ${rw.bridgeRuns} deck run(s)${rw.bridgeNames.length ? ` (${rw.bridgeNames.slice(0, 12).join(', ')}${rw.bridgeNames.length > 12 ? ', ...' : ''})` : ''}; their decks are listed under Bridges with [railway:<kind>]`);
+    lines.push(`- Rail tunnels: ${rw.tunnelRuns} run(s)${rw.tunnelNames.length ? ` (${rw.tunnelNames.slice(0, 12).join(', ')})` : ''}; built ones are listed under Tunnels. A light rail, tram or monorail line in a tunnel (a city's metro tunnel) is not built, nor a subway below ground.`);
+    lines.push(`- Level crossings: ${rw.roadCrossings} with roads, ${rw.pathCrossings} with paths (the road and the rails at one height, the crossing surfaced with the game's tram-rail decal); ${rw.unjoinedCrossings} where a road and a line pass through each other with no shared node (laid level, no ballast across the road)`);
+    lines.push(`- Trams in their streets (drawn on the street with the tram-rail decal, no track bed): ${rw.streetTramLines} line(s), ${formatNumber(rw.streetTramKm, 2)} km`);
   }
 
   // ── Buildings ──────────────────────────────────────────────────────────────
@@ -12210,6 +12344,20 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Structure solver v2 terrain: ${composed.stats.pixels} pixels in ${composed.stats.corridors} corridors, ${composed.stats.capped} held under decks, ${sg.terrain.ms} ms.`);
     await yield_();
   }
+  // Railways (services/railways.js, railTrack.js): the track on the solved
+  // profiles, the crossings' surfaces and the trams in their streets
+  let railways = null;
+  if (options.structureSolver === 'v2' && sg?.railSegments && sg.classes && sg.profile) {
+    try {
+      railways = buildLevelRailways(sg, exportTerrainData, squareSize, levelName);
+      if (railways.decals.length) decalRoads.push({ class: 'SimGroup', name: 'railways', persistentId: generatePersistentId(), __parent: 'Decal_Roads', __items: railways.decals });
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Railways: ${railways.stats.trackKm} km of track, ${railways.daes.length} object(s), ${railways.stats.triangles} triangles, ${railways.stats.crossings} level crossing(s), ${railways.stats.streetTramKm} km of tram in streets.`);
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Railway track skipped: ${err?.message || err}`);
+      railways = null;
+    }
+    await yield_();
+  }
   const bridgeDecks = decalRoads.bridges?.decks || [];
   // Tunnels likewise: no sidewalks, lamps or props inside, nothing standing
   // in a tube, a headwall or a cutting's walls (the hill over it is free).
@@ -13820,6 +13968,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
     zip.file(`${base}/map_assets/custom_assets/bridges/main.materials.json`, JSON.stringify(getBridgeMaterialDefs(), null, 2));
   }
+  if (railways?.daes.length > 0) {
+    zip.folder(`${base}/map_assets/custom_assets/railways`);
+    for (const { key, data } of railways.daes) {
+      zip.file(`${base}/map_assets/custom_assets/railways/track_${key}.dae`, await toZipBinary(data));
+    }
+    zip.file(`${base}/map_assets/custom_assets/railways/main.materials.json`, JSON.stringify(railMaterialDefs(), null, 2));
+  }
   if (tunnelDaes.length > 0) {
     zip.folder(`${base}/map_assets/custom_assets/tunnels`);
     for (const { key, data } of tunnelDaes) {
@@ -13951,6 +14106,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       structureChecks,
       bridgeDaes,
       tunnels: decalRoads.tunnels,
+      railways: railways ? { stats: railways.stats, daes: railways.daes.map((d) => ({ key: d.key, triangles: d.triangles })), decals: railways.decals.length } : null,
       tunnelDaes,
       tunnelLightSpacing: tunnelGroups.lightSpacing,
       groundAtWorld: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
@@ -14576,6 +14732,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         useInstanceRenderData: true,
       });
     }
+  }
+
+  // Railway track, one object per tile (railTrack.js): ballast and rails
+  // collide; no decal projects onto it.
+  for (const { key, origin } of railways?.daes || []) {
+    levelObjectItems.push({
+      __parent: 'level_objects', class: 'TSStatic', name: `railway_track_${key}`, persistentId: generatePersistentId(), position: origin,
+      shapeName: `/levels/${levelName}/map_assets/custom_assets/railways/track_${key}.dae`,
+      collisionType: 'Collision Mesh', decalType: 'None', prebuildCollisionData: 0, useInstanceRenderData: true,
+    });
   }
 
   // Overhead wires, one object per tile so the engine culls them by tile.

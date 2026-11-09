@@ -28,8 +28,11 @@ test('railKindOf: active lines in, lifecycle and underground subways out', () =>
   assert.equal(railKindOf({ railway: 'subway', tunnel: 'yes', layer: '-1' }), null);
   assert.equal(railKindOf({ railway: 'subway', layer: '-2' }), null);
   assert.equal(railKindOf({ railway: 'subway', bridge: 'viaduct', layer: '1' }), 'subway');
-  // a tunnel on a main line is built
+  // a tunnel on a main line is built; a city's light rail tunnel is not (a metro under the streets)
   assert.equal(railKindOf({ railway: 'rail', tunnel: 'yes' }), 'rail');
+  assert.equal(railKindOf({ railway: 'light_rail', tunnel: 'yes', layer: '-2' }), null);
+  assert.equal(railKindOf({ railway: 'light_rail', tunnel: 'building_passage' }), 'light_rail');
+  assert.equal(railKindOf({ railway: 'light_rail', layer: '-1' }), 'light_rail');
 });
 
 test('a railway way becomes a railway feature with its tags, clipped as a line', () => {

@@ -19,11 +19,17 @@ const RAIL_KIND_SET = new Set(RAIL_KINDS);
 const LIFECYCLE_FLAGS = ['abandoned', 'disused', 'razed', 'demolished', 'construction', 'proposed'];
 
 // A subway in its tunnel is underground for the whole of it: only where it
-// comes up (an elevated stretch, a cutting to a depot) is it built. A tunnel
-// mapped on a rail or light rail line is built (a short bore under a hill).
-const isUnderground = (tags) => {
+// comes up (an elevated stretch, a cutting to a depot) is it built. So are a
+// light rail's, a tram's and a monorail's tunnels: a city's metro tunnel,
+// stations and all, under the streets (a downtown light rail subway mapped
+// as light_rail, tunnel=yes, layer=-2), which no bore of ours stands for. A
+// main line's tunnel through a hill is built (a bore, as a road's).
+const URBAN_KINDS = new Set(['subway', 'light_rail', 'tram', 'monorail']);
+const isUnderground = (tags, kind) => {
   const tunnel = String(tags.tunnel ?? '').toLowerCase();
-  return (tunnel && tunnel !== 'no') || tags.location === 'underground' || (Number.parseInt(tags.layer, 10) || 0) < 0;
+  if (tunnel === 'yes' || tunnel === 'flooded' || tags.location === 'underground') return true;
+  // (a subway mapped on a layer below the ground, its tunnel tag left off)
+  return kind === 'subway' && (Number.parseInt(tags.layer, 10) || 0) < 0 && tunnel !== 'building_passage';
 };
 
 /** The railway kind of an OSM way's tags ('rail', 'tram', ...), or null when it is not one we build. */
@@ -32,7 +38,7 @@ export function railKindOf(tags = {}) {
   if (!RAIL_KIND_SET.has(kind)) return null;
   if (tags.area === 'yes') return null;
   if (LIFECYCLE_FLAGS.some((k) => tags[k] && tags[k] !== 'no')) return null;
-  if (kind === 'subway' && isUnderground(tags)) return null;
+  if (URBAN_KINDS.has(kind) && isUnderground(tags, kind)) return null;
   return kind;
 }
 
