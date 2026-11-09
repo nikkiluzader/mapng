@@ -47,6 +47,14 @@ export function useBackgroundEditor() {
     const run = pendingLock.value; pendingLock.value = null; run?.();
   }
   function cancelLock() { pendingLock.value = null; }
+  /** Lock the box where it is before anything is drawn (a drawing tool picked), after the same question. */
+  function requestPin(then) {
+    const run = () => { store.setBackgroundPinned(true); then?.(); };
+    if (store.boxLocked || dontAskLock.value) return run();
+    pendingLock.value = run;
+  }
+  /** Unlock a box locked with nothing drawn. */
+  function unpin() { store.setBackgroundPinned(false); store.backgroundTool = 'pan'; }
   function undo() {
     const last = history.value[history.value.length - 1];
     if (!last) return;
@@ -65,6 +73,6 @@ export function useBackgroundEditor() {
     setShape: (v) => { unmaskShape.value = v; remember('mapng_background_shape', v); },
     setBrush: (v) => { brushM.value = Number(v) || 150; remember('mapng_background_brush', brushM.value); },
     mask, tool, history, pendingLock, dontAskLock, roadChoices, roadStatus, hint, hintBad,
-    edit, confirmLock, cancelLock, undo, clearAll, setHint,
+    edit, confirmLock, cancelLock, requestPin, unpin, undo, clearAll, setHint,
   };
 }

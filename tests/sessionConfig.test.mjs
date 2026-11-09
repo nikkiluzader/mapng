@@ -55,3 +55,15 @@ test('the summary warns when GPXZ is needed and there is no key', () => {
   assert.equal(edits.valueKey, 'config.customList');
   assert.ok(!edits.params.list.includes('config.c_shapeRoads'));
 });
+
+test('session config: background areas travel with the settings (and empty ones do not)', async () => {
+  const { buildSessionConfig, encodeSessionCode, parseSessionText, describeSessionConfig } = await import('../services/sessionConfig.js');
+  const mem = new Map(); const storage = { getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) };
+  const mask = { version: 1, bounds: { north: 1, south: 0, east: 1, west: 0 }, lines: [[[0.1, 0.1], [0.9, 0.9]]], shade: [[0.2, 0.7]], unshade: [], roads: [], widthM: 300, paint: [], raw: [] };
+  const cfg = buildSessionConfig({ center: { lat: 0.5, lng: 0.5 }, resolution: 1024 }, storage, { backgroundMask: mask });
+  const back = await parseSessionText(await encodeSessionCode(cfg));
+  assert.deepEqual(back.backgroundMask, mask);
+  assert.ok(describeSessionConfig(back).some((r) => r.label === 'config.backgroundAreas'));
+  const none = buildSessionConfig({ center: { lat: 0.5, lng: 0.5 } }, storage, { backgroundMask: { version: 1, bounds: null, lines: [] } });
+  assert.equal(none.backgroundMask, undefined);
+});

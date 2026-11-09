@@ -80,7 +80,10 @@
 
     <p v-if="store.boxLocked" class="flex items-start gap-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-2.5 py-2 text-caption leading-snug text-gray-600 dark:text-gray-300">
       <Lock :size="12" class="shrink-0 mt-0.5 text-brand" />
-      <span>{{ t('backgroundAreas.locked') }}</span>
+      <span>
+        {{ store.backgroundDrawn ? t('backgroundAreas.locked') : t('backgroundAreas.lockedPinned') }}
+        <button v-if="!store.backgroundDrawn" type="button" class="ml-1 underline text-brand hover:text-brand-500" @click="unpin">{{ t('backgroundAreas.unlock') }}</button>
+      </span>
     </p>
 
     <Teleport to="body">
@@ -126,7 +129,7 @@ const props = defineProps({
 
 const { t } = useI18n();
 const store = useMainStore();
-const { unmaskShape, brushM, paintBackground, paintSmooth, setShape, setBrush, mask, tool, history, pendingLock, roadChoices, roadStatus, hint, hintBad, edit, confirmLock, cancelLock, undo, clearAll, setHint } = useBackgroundEditor();
+const { unmaskShape, brushM, paintBackground, paintSmooth, setShape, setBrush, mask, tool, history, pendingLock, roadChoices, roadStatus, hint, hintBad, edit, confirmLock, cancelLock, requestPin, unpin, undo, clearAll, setHint } = useBackgroundEditor();
 const dontAsk = ref(false);
 
 const TOOL = 'flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-default';
@@ -154,9 +157,16 @@ const selectionBounds = () => computeMetricSelectionBounds(props.center, sizeMet
 
 const HINTS = { pan: '', line: 'hintLine', bucket: 'hintBucket', erase: 'hintErase', road: 'hintRoad', unmask: 'hintUnmask', raw: 'hintRaw' };
 function pick(id) {
-  tool.value = tool.value === id && id !== 'pan' ? 'pan' : id;
-  setHint(HINTS[tool.value] ? t(`backgroundAreas.${HINTS[tool.value]}`) : '');
-  if (tool.value === 'road') loadRoads();
+  const next = tool.value === id && id !== 'pan' ? 'pan' : id;
+  const apply = () => {
+    tool.value = next;
+    setHint(HINTS[next] ? t(`backgroundAreas.${HINTS[next]}`) : '');
+    if (next === 'road') loadRoads();
+  };
+  // (a drawing tool locks the box where it is first: zooming and panning to
+  // draw no longer drag it along under the crosshair)
+  if (next !== 'pan' && !store.boxLocked) { requestPin(apply); return; }
+  apply();
 }
 
 let roadsKey = '';
@@ -228,6 +238,6 @@ function dropIfStale() {
 }
 onMounted(() => { window.addEventListener('keydown', onKey); dropIfStale(); });
 watch(() => store.backgroundActive, (on) => { if (on) dropIfStale(); });
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); tool.value = 'pan'; });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); tool.value = 'pan'; if (!store.backgroundDrawn) store.setBackgroundPinned(false); });
 defineExpose({ edit });
 </script>

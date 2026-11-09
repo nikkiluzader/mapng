@@ -78,7 +78,11 @@ export const withoutSecrets = withoutPersonal;
  * stored settings. Generated-terrain details (terrain, textureModes, osmQuery
  * ...) are left out: they describe a result, not a setting.
  */
-export function buildSessionConfig(runConfiguration, storage = globalThis.localStorage) {
+// (a background-areas mask worth carrying: drawn on a box, not empty)
+export const usableMask = (m) => !!(m && typeof m === 'object' && m.version && m.bounds
+  && ['lines', 'shade', 'unshade', 'roads', 'paint', 'raw'].some((k) => Array.isArray(m[k]) && m[k].length));
+
+export function buildSessionConfig(runConfiguration, storage = globalThis.localStorage, { backgroundMask = null } = {}) {
   const run = withoutSecrets(runConfiguration || {});
   const keep = ['schemaVersion', 'mode', 'center', 'zoom', 'resolution', 'includeOSM', 'elevationSource', 'useUSGS', 'useGPXZ', 'useKRON86', 'processingMetersPerPixel', 'rawTerrain'];
   const config = Object.fromEntries(keep.filter((k) => run[k] !== undefined).map((k) => [k, run[k]]));
@@ -86,6 +90,9 @@ export function buildSessionConfig(runConfiguration, storage = globalThis.localS
   config.mode = 'single';
   Object.assign(config, readDataSettings(storage));
   config.export = readExportSettings(storage);
+  // the background areas drawn in step 1 (lines, shaded areas, kept roads,
+  // Unmask and No smoothing strokes): they belong to this exact box
+  if (usableMask(backgroundMask)) config.backgroundMask = JSON.parse(JSON.stringify(backgroundMask));
   return config;
 }
 
@@ -174,6 +181,10 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
   if (typeof c.includeOSM === 'boolean') add('data', 'config.osm', { valueKey: c.includeOSM ? 'config.on' : 'config.off' });
   if (typeof c.rawTerrain === 'boolean') add('data', 'config.rawTerrain', { valueKey: c.rawTerrain ? 'config.on' : 'config.off' });
   if (typeof c.advancedMode === 'boolean') add('data', 'config.advancedMode', { valueKey: c.advancedMode ? 'config.on' : 'config.off' });
+  if (usableMask(c.backgroundMask)) {
+    const m = c.backgroundMask;
+    add('data', 'config.backgroundAreas', { valueKey: 'config.backgroundAreasValue', params: { lines: (m.lines || []).length, areas: (m.shade || []).length, roads: (m.roads || []).length, strokes: (m.paint || []).length + (m.raw || []).length } });
+  }
 
   const e = c.export;
   if (e && typeof e === 'object') {

@@ -373,7 +373,7 @@
 
 <script setup>
 import { DEFAULT_ELEVATION_SOURCE, initialElevationSource } from '../../services/elevationDefaults.js';
-import { ref, shallowRef, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch, toRaw } from 'vue';
 import { provideSectionGroup } from '../../composables/useSectionGroup.js';
 // Expand all / Collapse all for every section in this panel
 provideSectionGroup();
@@ -402,7 +402,7 @@ import RasterMetaCard from '../controls/RasterMetaCard.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
-import { applyStoredSettings, buildSessionConfig, describeSessionConfig, encodeSessionCode, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
+import { applyStoredSettings, usableMask, buildSessionConfig, describeSessionConfig, encodeSessionCode, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
 import ShareDialog from '../modals/ShareDialog.vue';
@@ -758,7 +758,7 @@ const triggerDownload = (blob, filename) => {
 // The whole control panel (data + export settings) as one config, never
 // with keys: services/sessionConfig.js. Copy gives a one-line "mapng:1:…"
 // code; Paste, Load and Ctrl+V on the map show what it would change first.
-const currentSessionConfig = () => buildSessionConfig({ ...buildRunConfiguration(), rawTerrain: store.rawTerrain }, localStorage);
+const currentSessionConfig = () => buildSessionConfig({ ...buildRunConfiguration(), rawTerrain: store.rawTerrain }, localStorage, { backgroundMask: store.backgroundActive ? toRaw(store.backgroundMask) : null });
 
 const copyRunConfiguration = async () => {
   try {
@@ -796,8 +796,16 @@ const applyPendingConfig = () => {
   pendingConfig.value = null;
   if (!config) return;
   try {
+    // (a config with an area replaces the background areas: the old ones
+    // lock the box to the old area; a config with its own puts them back)
+    const hasArea = config.center && Number.isFinite(Number(config.center.lat));
+    if (hasArea || usableMask(config.backgroundMask)) store.clearBackgroundMask();
     applyRunConfiguration(config);
     if (typeof config.advancedMode === 'boolean') store.setAdvancedMode(config.advancedMode);
+    if (usableMask(config.backgroundMask)) {
+      store.setAdvancedMode(true);   // (background areas are an Advanced step-1 tool)
+      store.setBackgroundMask(config.backgroundMask);
+    }
     if (typeof config.rawTerrain === 'boolean') store.setRawTerrain(config.rawTerrain);
     if (typeof config.gapFillSource === 'string' && config.gapFillSource) gapFillSource.value = normalizeGapFillSource(config.gapFillSource);
     if (typeof config.elevationUnitOverride === 'string' && config.elevationUnitOverride) elevationUnitOverride.value = config.elevationUnitOverride;
@@ -821,9 +829,19 @@ const sentConfig = ref(null);   // { id, link }
 const sendConfig = async () => {
   sendingConfig.value = true;
   try {
-    const { id } = await sendSessionCode(await encodeSessionCode(currentSessionConfig()));
+    // (mapng.com keeps codes up to 16 KB: a big background-areas drawing is
+    // left out of the short code, the long one still has it)
+    const cfg = currentSessionConfig();
+    let code = await encodeSessionCode(cfg);
+    let dropped = false;
+    if (code.length > 16000 && cfg.backgroundMask) {
+      const { backgroundMask: _drop, ...rest } = cfg;
+      code = await encodeSessionCode(rest);
+      dropped = true;
+    }
+    const { id } = await sendSessionCode(code);
     sentConfig.value = { id, link: shareLink(id) };
-    runConfigStatus.value = '';
+    runConfigStatus.value = dropped ? t('config.sentWithoutAreas') : '';
   } catch (error) {
     sentConfig.value = null;
     runConfigStatus.value = t('config.sendFailed', { reason: String(error?.message || error) });

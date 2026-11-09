@@ -87,7 +87,11 @@ export const useMainStore = defineStore('main', () => {
     return !!m.bounds && ((m.lines?.length || 0) > 0 || (m.paint?.length || 0) > 0 || (m.raw?.length || 0) > 0 || maskHasAreas(m));
   });
   const backgroundActive = computed(() => advancedMode.value && !batchMode.value && backgroundDrawn.value);
-  const boxLocked = backgroundActive;
+  // (also locked, with nothing drawn yet, once a drawing tool is picked: the
+  // map can then be zoomed and panned to draw without the box following it)
+  const backgroundPinned = ref(false);
+  const boxLocked = computed(() => backgroundActive.value || (backgroundPinned.value && advancedMode.value && !batchMode.value));
+  function setBackgroundPinned(v) { backgroundPinned.value = !!v; }
 
   // --- Batch Job State ---
   const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
@@ -168,7 +172,7 @@ export const useMainStore = defineStore('main', () => {
       else localStorage.removeItem('mapng_background_mask');
     } catch { /* storage full or blocked */ }
   }
-  function clearBackgroundMask() { setBackgroundMask(emptyMask()); backgroundTool.value = 'pan'; }
+  function clearBackgroundMask() { setBackgroundMask(emptyMask()); backgroundTool.value = 'pan'; backgroundPinned.value = false; }
 
   function setBatchMode(value) {
     batchMode.value = value;
@@ -218,6 +222,8 @@ export const useMainStore = defineStore('main', () => {
     backgroundDrawn,
     backgroundActive,
     boxLocked,
+    backgroundPinned,
+    setBackgroundPinned,
     setBackgroundMask,
     clearBackgroundMask,
     batchGridCols,
