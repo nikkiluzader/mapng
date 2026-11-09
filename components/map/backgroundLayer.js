@@ -3,7 +3,7 @@
 // mouse tools. Rules and raster: services/backgroundMask.js; state:
 // composables/useBackgroundEditor.js; tools: components/controls/BackgroundAreas.vue.
 import L from 'leaflet';
-import { rasterizeMask, makeProjector, snapLineEnds, openLines, roadLines } from '../../services/backgroundMask.js';
+import { rasterizeMask, rasterizeRaw, makeProjector, snapLineEnds, openLines, roadLines } from '../../services/backgroundMask.js';
 
 const N = 512;          // editor raster (cells across the square)
 const SNAP_PX = 14;     // line ends this close (screen px) to an edge or a line snap shut
@@ -46,7 +46,7 @@ export function attachBackgroundLayer(map, opts) {
   const lines = L.layerGroup();
   const roads = L.layerGroup();
   let drawingLine = null, drawingPts = null;
-  let raster = null, hoverRegion = -1, shown = false, space = false;
+  let raster = null, rawRaster = null, hoverRegion = -1, shown = false, space = false;
   let draft = null;         // the Unmask stroke being drawn: { shape, keep, pts, layer }
   let brushRing = null;     // the brush's outline under the mouse
 
@@ -67,6 +67,10 @@ export function attachBackgroundLayer(map, opts) {
       if (raster.bg[i]) {
         const x = i % N, y = (i / N) | 0, stripe = (x + y) % 9 < 2;
         d[o] = stripe ? 150 : 17; d[o + 1] = stripe ? 155 : 20; d[o + 2] = stripe ? 170 : 28; d[o + 3] = stripe ? 110 : 150;
+      } else if (rawRaster?.[i]) {
+        // No smoothing: violet, striped the other way
+        const x = i % N, y = (i / N) | 0, stripe = (x - y + N * 9) % 9 < 2;
+        d[o] = 168; d[o + 1] = 85; d[o + 2] = 247; d[o + 3] = stripe ? 120 : 55;
       } else if (closable && raster.labels[i] >= 0) {
         const hv = raster.labels[i] === hoverRegion;
         d[o] = 59; d[o + 1] = 130; d[o + 2] = 246; d[o + 3] = hv ? 90 : 28;
@@ -132,6 +136,7 @@ export function attachBackgroundLayer(map, opts) {
     const b = bounds();
     canvas.setBounds(b);
     raster = m?.bounds ? rasterizeMask(m, N, { metersAcross: getMetersAcross() }) : null;
+    rawRaster = m?.bounds && m.raw?.length ? rasterizeRaw(m, N, { metersAcross: getMetersAcross() }) : null;
     if (!raster) { const ctx = canvas.context(); ctx.clearRect(0, 0, N, N); }
     paint(); drawLines(); drawRoads(); applyTool();
   }
@@ -143,23 +148,29 @@ export function attachBackgroundLayer(map, opts) {
     const drawingTool = tool !== 'pan' && !space;
     if (drawingTool) map.dragging.disable(); else map.dragging.enable();
     // (Shift paints background with Unmask: not Leaflet's shift-drag box zoom)
-    if (tool === 'unmask') map.boxZoom.disable(); else map.boxZoom.enable();
+    const painting = tool === 'unmask' || tool === 'raw';
+    if (painting) map.boxZoom.disable(); else map.boxZoom.enable();
     map.getContainer().style.cursor = drawingTool ? (tool === 'erase' ? 'pointer' : 'crosshair') : '';
-    if (tool !== 'unmask' || space || getUnmask().shape !== 'brush') { brushRing?.remove(); brushRing = null; }
+    if (!painting || space || getUnmask().shape !== 'brush') { brushRing?.remove(); brushRing = null; }
   }
 
   // --- Unmask: brush strokes and shapes, kept (green) or background (dark) ---
   const pxPerM = () => boxPx() / Math.max(1, getMetersAcross() || ((bounds()?.north - bounds()?.south) * 111320) || 1);
-  const strokeStyle = (keep) => ({ pane: 'mapngBackground', color: keep ? '#22c55e' : '#1e293b', fillColor: keep ? '#22c55e' : '#1e293b', interactive: false });
+  // (No smoothing strokes: violet, or grey for "smooth again")
+  const strokeStyle = (keep, raw) => {
+    const c = raw ? (keep ? '#a855f7' : '#94a3b8') : (keep ? '#22c55e' : '#1e293b');
+    return { pane: 'mapngBackground', color: c, fillColor: c, interactive: false };
+  };
   function startDraft(e) {
     const u = getUnmask();
-    const keep = !(u.background || e.originalEvent.shiftKey);
-    const st = strokeStyle(keep);
+    const raw = getTool() === 'raw';
+    const keep = raw ? !(u.smoothAgain || e.originalEvent.shiftKey) : !(u.background || e.originalEvent.shiftKey);
+    const st = strokeStyle(keep, raw);
     let layer;
     if (u.shape === 'brush') layer = L.polyline([e.latlng], { ...st, weight: Math.max(2, 2 * u.brushM * pxPerM()), opacity: 0.45, lineCap: 'round', lineJoin: 'round' });
     else if (u.shape === 'rect') layer = L.rectangle(L.latLngBounds(e.latlng, e.latlng), { ...st, weight: 2, fillOpacity: 0.3 });
     else layer = L.polygon([e.latlng], { ...st, weight: 2, fillOpacity: 0.3 });
-    draft = { shape: u.shape, keep, r: u.brushM, pts: [e.latlng], start: e.latlng, layer: layer.addTo(map) };
+    draft = { shape: u.shape, keep, raw, r: u.brushM, pts: [e.latlng], start: e.latlng, layer: layer.addTo(map) };
     window.addEventListener('mouseup', commitDraft, { once: true });
   }
   function moveDraft(e) {
@@ -182,18 +193,24 @@ export function attachBackgroundLayer(map, opts) {
       if (d.pts.length < 3) { setHint(t('backgroundAreas.hintLassoDrag'), true); return; }
       op = { keep: d.keep, kind: 'poly', pts: d.pts.map(r7) };
     }
+    if (d.raw) {
+      const { keep, ...rest } = op;
+      edit((m) => { m.raw = [...(m.raw || []), { on: keep, ...rest }]; return m; }, { bounds: bounds() });
+      setHint(keep ? t('backgroundAreas.hintRawOn') : t('backgroundAreas.hintRawOff'));
+      return;
+    }
     edit((m) => { m.paint = [...(m.paint || []), op]; return m; }, { bounds: bounds() });
     setHint(d.keep ? t('backgroundAreas.hintUnmasked') : t('backgroundAreas.hintMasked'));
   }
   function moveRing(e) {
     const u = getUnmask();
-    if (getTool() !== 'unmask' || space || u.shape !== 'brush') return;
+    if ((getTool() !== 'unmask' && getTool() !== 'raw') || space || u.shape !== 'brush') return;
     if (!brushRing) brushRing = L.circle(e.latlng, { radius: u.brushM, pane: 'mapngBackground', color: '#ffffff', weight: 1.5, fill: false, dashArray: '4 4', interactive: false }).addTo(map);
     else { brushRing.setLatLng(e.latlng); brushRing.setRadius(u.brushM); }
   }
-  // the topmost Unmask stroke under a click (erase), or -1
-  function strokeAt(e) {
-    const paint = getMask()?.paint || [];
+  // the topmost Unmask (or No smoothing: list 'raw') stroke under a click (erase), or -1
+  function strokeAt(e, list = 'paint') {
+    const paint = getMask()?.[list] || [];
     const p = e.containerPoint;
     for (let i = paint.length - 1; i >= 0; i--) {
       const op = paint[i];
@@ -213,7 +230,7 @@ export function attachBackgroundLayer(map, opts) {
   }
   function onDown(e) {
     // (no native drag of a label or tile image: it would swallow the mouseup)
-    if (shown && !space && getTool() === 'unmask' && e.originalEvent.button === 0) { e.originalEvent.preventDefault(); startDraft(e); return; }
+    if (shown && !space && (getTool() === 'unmask' || getTool() === 'raw') && e.originalEvent.button === 0) { e.originalEvent.preventDefault(); startDraft(e); return; }
     if (!shown || space || getTool() !== 'line' || e.originalEvent.button !== 0) return;
     e.originalEvent.preventDefault();
     drawingPts = [e.latlng];
@@ -262,6 +279,8 @@ export function attachBackgroundLayer(map, opts) {
       let best = -1, bd = ERASE_PX;
       (m.lines || []).forEach((pts, i) => pts.forEach((p) => { const d = map.latLngToContainerPoint(p).distanceTo(e.containerPoint); if (d < bd) { bd = d; best = i; } }));
       if (best >= 0) { edit((mm) => { mm.lines.splice(best, 1); return mm; }); setHint(t('backgroundAreas.hintErased')); return; }
+      const r = strokeAt(e, 'raw');
+      if (r >= 0) { edit((mm) => { mm.raw.splice(r, 1); return mm; }); setHint(t('backgroundAreas.hintStrokeErased')); return; }
       const s = strokeAt(e);
       if (s >= 0) { edit((mm) => { mm.paint.splice(s, 1); return mm; }); setHint(t('backgroundAreas.hintStrokeErased')); }
       return;

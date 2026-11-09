@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { backgroundLookup, filterFeaturesByBackground } from './backgroundMask.js';
+import { backgroundLookup, filterFeaturesByBackground, rawWeightLookup } from './backgroundMask.js';
 import { replayingSources } from './sourceWording.js';
 import JSZip from 'jszip';
 import { createZipCompressor, precompressZipEntries } from './zipCompress.js';
@@ -5886,9 +5886,10 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       }
       // terrain shaping switched off somewhere: the stations held on their
       // ground, the bridges built as decks wherever they leave it
-      if (!allShaping(shaping)) {
-        // (the rim-to-rim line of a plain deck runs through its measured heights)
-        const plan = shapingPlan(structureGraph, shaping, { measured: structureGraph.pins });
+      if (!allShaping(shaping) || opts.rawAt) {
+        // (the rim-to-rim line of a plain deck runs through its measured heights;
+        // the roads in No smoothing areas held on their ground)
+        const plan = shapingPlan(structureGraph, shaping, { measured: structureGraph.pins, rawAt: opts.rawAt || null });
         structureGraph.fixed = plan.fixed;
         structureGraph.noCut = plan.noCut;
         // (each plain deck's span, rim to rim, pinned as today's tunnels are)
@@ -7208,6 +7209,7 @@ function shapingReportLines(sh, section) {
     : '- Some terrain shaping was switched off (advanced mode). Off means the export left those heights exactly as generated.');
   lines.push('', 'Data generation (before the export)');
   lines.push(`- Raw terrain: ${sh.rawTerrain ? 'on (no height blur, road snapping or road smoothing/levelling at generation; road curves kept)' : 'off (roads snapped, smoothed and levelled into the terrain at generation)'}`);
+  if (sh.rawAreas) lines.push('- No smoothing areas: drawn (in those areas the heights were kept as downloaded at generation, eased in over 20 m at their edges, and the export held the roads on that ground)');
   lines.push('', 'Structures built');
   lines.push(`- Bridges & overpasses: ${onOff(sh.includeBridges)}${sh.includeBridges ? ` (${sh.decksBuilt} deck(s) built)` : ' (bridge roads drawn on the ground; no road lifted over another)'}`);
   lines.push(`- Tunnels: ${onOff(sh.includeTunnels)}${sh.includeTunnels ? ` (${sh.tunnelsBuilt} built)` : ' (tunnel roads drawn over the ground)'}`);
@@ -7223,6 +7225,7 @@ function shapingReportLines(sh, section) {
   if (p) {
     const pct = p.stations ? ` (${((100 * p.fixedStations) / p.stations).toFixed(1)}%)` : '';
     lines.push(`- Road stations held exactly on the ground: ${p.fixedStations} of ${p.stations}${pct}; ordinary roads ${p.byRole.road}, bridge approaches ${p.byRole.bridge}, overpass approaches ${p.byRole.overpass}, tunnel roads and approaches ${p.byRole.tunnel}`);
+    if (p.rawAreaStations) lines.push(`- Of those, in No smoothing areas: ${p.rawAreaStations}`);
     lines.push(`- Bridge/overpass roads built as plain decks (no embankment or abutment fill; deck wherever the road is ${'>'}0.1 m over the ground, its ends on the ground): ${p.rawDecks} road(s), ${sh.rawDeckParts} deck stretch(es)`);
     const spans = p.spans || [];
     if (spans.length) {
@@ -11942,6 +11945,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // shape, without buildings, trees, props or roads wholly inside them
   const bgMask = td.backgroundMask || options?.backgroundMask || null;
   const bgLook = bgMask ? backgroundLookup(bgMask, { n: 2048 }) : null;
+  // No smoothing areas (the same mask's `raw` strokes): the roads there are
+  // held on the ground as generated, never levelled into it
+  const rawLook = bgMask ? rawWeightLookup(bgMask, { n: 2048 }) : null;
+  const rawAtWorld = rawLook ? (() => {
+    const b = td.bounds; const mb = bgMask.bounds; const ws = td.width * computeSquareSize(td);
+    return (x, y) => {
+      const lat = b.north - (0.5 - y / ws) * (b.north - b.south);
+      const lng = b.west + (x / ws + 0.5) * (b.east - b.west);
+      return rawLook.full((lng - mb.west) / (mb.east - mb.west), (mb.north - lat) / (mb.north - mb.south));
+    };
+  })() : null;
   const bgAtWorld = (() => {
     if (!bgLook) return () => false;
     const b = td.bounds; const mb = bgMask.bounds; const ws = td.width * computeSquareSize(td);
@@ -12095,7 +12109,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sourceHeightMap = exportTerrainData.heightMap;
 
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
@@ -13786,6 +13800,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       buildingConflicts,
       shaping: {
         rawTerrain: !!terrainData?.raw,
+        rawAreas: !!terrainData?.generationEdits?.rawAreas,
         includeBridges,
         includeTunnels,
         master: shapingOptions.terrain,

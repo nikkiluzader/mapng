@@ -225,3 +225,34 @@ test('cut and cover on fine data: built where its ramps are in the survey, left 
   assert.ok(withRamps.summary.tunnels > 0, 'with its ramps in the survey: built');
   assert.equal(atGrade.summary.tunnels, 0, 'the data shows the road at grade: left on the ground');
 });
+
+test('No smoothing areas: the ordinary roads there stay on their ground, the rest are still shaped', () => {
+  // the south half of the scene marked No smoothing
+  const rawAt = (x, y) => y < 0;
+  const { g } = run('track down through a steep gully', { rawAt });
+  const plan = g.shaping;
+  assert.ok(plan, 'a plan even with every switch on');
+  assert.ok(plan.stats.rawAreaStations > 0);
+  let west = 0;
+  g.edges.forEach((e, k) => {
+    if (e.bridge || e.tunnel) return;
+    for (let i = 0; i < e.s.length; i++) {
+      if (e.y[i] < 0) assert.ok(plan.fixed[k]?.[i], 'in the area: held');
+      if (e.y[i] < 0 && plan.fixed[k]?.[i]) { west++; assert.ok(offOnGround(g, k, i) < 1e-6, `edge ${k} station ${i} ${offOnGround(g, k, i).toFixed(3)} m off its ground`); }
+      if (e.y[i] >= 0) assert.ok(!plan.fixed[k]?.[i], 'north of the line: free to be shaped');
+    }
+  });
+  assert.ok(west > 0);
+});
+
+test('restoreRawAreas: the heights from before smoothing come back by the weight', async () => {
+  const { restoreRawAreas } = await import('../services/terrain.js');
+  const W = 5; const H = 3;
+  const smoothed = new Float32Array(W * H).fill(10);
+  const before = new Float32Array(W * H).fill(20);
+  const bounds = { north: 1, south: 0, west: 0, east: 1 };
+  // full on the west column, half at the middle, none to the east
+  const r = restoreRawAreas(smoothed, before, W, H, bounds, bounds, (u) => (u < 0.1 ? 1 : u < 0.6 ? 0.5 : 0));
+  assert.equal(smoothed[0], 20); assert.equal(smoothed[2], 15); assert.equal(smoothed[4], 10);
+  assert.deepEqual(r, { cells: 3, eased: 6 });
+});

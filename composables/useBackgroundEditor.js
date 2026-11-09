@@ -20,6 +20,8 @@ const readNum = (k, d) => { try { const v = Number(localStorage.getItem(k)); ret
 const unmaskShape = ref((() => { try { return localStorage.getItem('mapng_background_shape') || 'brush'; } catch { return 'brush'; } })());
 const brushM = ref(readNum('mapng_background_brush', 150));
 const paintBackground = ref(false);
+// No smoothing tool: false marks ground left unsmoothed, true smooths it again (also with Shift)
+const paintSmooth = ref(false);
 const remember = (k, v) => { try { localStorage.setItem(k, String(v)); } catch { /* blocked */ } };
 const hintBad = ref(false);
 
@@ -59,7 +61,7 @@ export function useBackgroundEditor() {
   function setHint(text, bad = false) { hint.value = text; hintBad.value = bad; }
 
   return {
-    unmaskShape, brushM, paintBackground,
+    unmaskShape, brushM, paintBackground, paintSmooth,
     setShape: (v) => { unmaskShape.value = v; remember('mapng_background_shape', v); },
     setBrush: (v) => { brushM.value = Number(v) || 150; remember('mapng_background_brush', brushM.value); },
     mask, tool, history, pendingLock, dontAskLock, roadChoices, roadStatus, hint, hintBad,

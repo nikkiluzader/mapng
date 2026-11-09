@@ -69,9 +69,12 @@ export function edgeRoles(graph) {
  * on the ground (`fixed`, Uint8Array or null) and whether it may not dig
  * below its ground (`noCut`), plus `skip(k, i)`: the composer leaves the
  * piece i..i+1 of edge k alone. `rawDeck`: edges built as decks wherever
- * they leave the ground. `stats` for the report.
+ * they leave the ground. `rawAt(x, y)`: true in a No smoothing area, where
+ * an ordinary road's stations are held on their ground whatever the
+ * switches (bridges, tunnels and their approaches are left to them).
+ * `stats` for the report.
  */
-export function shapingPlan(graph, sw, { measured = [] } = {}) {
+export function shapingPlan(graph, sw, { measured = [], rawAt = null } = {}) {
   const { edges } = graph;
   const roles = edgeRoles(graph);
   const shapes = (role) => (role === 'tunnel' ? sw.tunnels : role === 'overpass' ? sw.overpasses : role === 'bridge' ? sw.bridges : sw.roads);
@@ -88,7 +91,7 @@ export function shapingPlan(graph, sw, { measured = [] } = {}) {
   const fixed = edges.map(() => null);
   const noCut = edges.map(() => false);
   const rawDeck = new Set();
-  const stats = { fixedStations: 0, stations: 0, rawDecks: 0, byRole: { road: 0, bridge: 0, overpass: 0, tunnel: 0 } };
+  const stats = { fixedStations: 0, stations: 0, rawDecks: 0, rawAreaStations: 0, byRole: { road: 0, bridge: 0, overpass: 0, tunnel: 0 } };
   edges.forEach((e, k) => {
     const n = e.s.length;
     stats.stations += n;
@@ -114,8 +117,9 @@ export function shapingPlan(graph, sw, { measured = [] } = {}) {
       if (startRoles && e.s[i] <= APPROACH_M) near.push(...startRoles);
       if (endRoles && L - e.s[i] <= APPROACH_M) near.push(...endRoles);
       // (an approach to several structures is shaped if any of them is)
-      const hold = near.length ? !near.some((r) => shapes(r)) : !sw.roads;
+      const hold = near.length ? !near.some((r) => shapes(r)) : (!sw.roads || !!rawAt?.(e.x[i], e.y[i]));
       if (!hold) continue;
+      if (!near.length && sw.roads) stats.rawAreaStations++;
       if (!out) out = new Uint8Array(n);
       out[i] = 1;
       stats.fixedStations++;

@@ -1,5 +1,5 @@
 import { attachLandCover } from './worldCover.js';
-import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox } from './backgroundMask.js';
+import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox, rawWeightLookup } from './backgroundMask.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
 import { fetchWord, replayingSources } from './sourceWording.js';
 import { parseRasterOrGridElevationFile, parseTifFile, parseTifFiles, parseGridFiles } from "./tifLoader.js";
@@ -2420,6 +2420,13 @@ export const fetchTerrainData = async (
     const lowered = lowerRaisedWater(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel);
     if (lowered.cells) console.info(`[Terrain] Water brought down to its banks: ${lowered.cells} cells, up to ${lowered.maxDrop.toFixed(1)} m.`);
   }
+  // No smoothing areas (the Location step's No smoothing tool): the heights
+  // there before the roads are smoothed in, put back after (eased in at the
+  // edges); the rest of the map is smoothed as usual
+  const rawAreas = !flat && !raw && smoothRoads && osmFeatures.length > 0 && backgroundMask
+    ? rawWeightLookup(backgroundMask, { n: 1024, metersAcross: resolution * (Number(processingMetersPerPixel) || 1) })
+    : null;
+  const beforeRoads = rawAreas ? heightMap.slice() : null;
   if (!flat && !raw && smoothRoads && osmFeatures.length > 0) {
     if (fineRaster) {
       onProgress?.("Aligning roads with the terrain...");
@@ -2430,6 +2437,10 @@ export const fetchTerrainData = async (
     onProgress?.(`Smoothing ${roadCount} roads into the terrain (level across, smooth along, joined at junctions)...`);
     await letProgressPaint();
     smoothRoadsInHeightmap(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, { skipTracks: fineRaster, fine: fineRaster });
+  }
+  if (rawAreas) {
+    const restored = restoreRawAreas(heightMap, beforeRoads, width, height, finalBounds, backgroundMask.bounds, rawAreas);
+    console.info(`[Terrain] No smoothing areas: ${restored.cells} cells kept as downloaded (${restored.eased} eased at the edges).`);
   }
 
   // 6. Calculate Min/Max
@@ -2471,7 +2482,7 @@ export const fetchTerrainData = async (
     // city underpass's ramps)
     coarseElevation: !flat && !raw && (!rawData || shouldSmooth),
     // the generation passes asked for (the Terrain choice): the export panel says when they no longer match
-    generationEdits: { raw: !!raw, groundFilter: !!groundFilter, lowerWater: !!lowerWater, smoothRoads: !!smoothRoads },
+    generationEdits: { raw: !!raw, groundFilter: !!groundFilter, lowerWater: !!lowerWater, smoothRoads: !!smoothRoads, rawAreas: !!rawAreas },
     sourceGeoTiffs,
     processingMetersPerPixel: effectiveMetersPerPixel,
     flat,
@@ -3262,3 +3273,30 @@ export const addOSMToTerrain = async (
 
   return newTerrainData;
 };
+
+/**
+ * Put the heights from before road smoothing back where the No smoothing
+ * strokes ask (rawWeightLookup: 0..1 by mask (u, v)), blended by the weight.
+ * Rows run north to south. Returns { cells (weight 1), eased (between) }.
+ */
+export function restoreRawAreas(heightMap, before, width, height, bounds, maskBounds, weightAt) {
+  let cells = 0; let eased = 0;
+  const mb = maskBounds || bounds;
+  const lngSpan = mb.east - mb.west; const latSpan = mb.north - mb.south;
+  for (let y = 0; y < height; y++) {
+    // (the samples' grid as the road smoother's: geoUtils createGridProjector)
+    const lat = bounds.north - (y / Math.max(1, height - 1)) * (bounds.north - bounds.south);
+    const v = (mb.north - lat) / latSpan;
+    for (let x = 0; x < width; x++) {
+      const lng = bounds.west + (x / Math.max(1, width - 1)) * (bounds.east - bounds.west);
+      const w = weightAt((lng - mb.west) / lngSpan, v);
+      if (w <= 0) continue;
+      const i = y * width + x;
+      const a = heightMap[i]; const b = before[i];
+      if (a === NO_DATA_VALUE || b === NO_DATA_VALUE) continue;
+      heightMap[i] = a + (b - a) * w;
+      if (w >= 1) cells++; else eased++;
+    }
+  }
+  return { cells, eased };
+}

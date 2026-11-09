@@ -1060,7 +1060,7 @@ const onMapReady = (map) => {
     getSelectionBounds: () => selectionBounds.value,
     getMetersAcross: () => activeSelectionSizeMeters.value,
     getRoadChoices: () => bgEditor.roadChoices.value,
-    getUnmask: () => ({ shape: bgEditor.unmaskShape.value, brushM: bgEditor.brushM.value, background: bgEditor.paintBackground.value }),
+    getUnmask: () => ({ shape: bgEditor.unmaskShape.value, brushM: bgEditor.brushM.value, background: bgEditor.paintBackground.value, smoothAgain: bgEditor.paintSmooth.value }),
     isActive: () => store.advancedMode && !hasBatchGrid.value && !store.batchMode && (store.backgroundDrawn || store.backgroundTool !== 'pan'),
     edit: bgEditor.edit,
     setHint: bgEditor.setHint,

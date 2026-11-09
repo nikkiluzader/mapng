@@ -18,7 +18,7 @@
         <kbd class="font-mono text-nano opacity-60">{{ b.key }}</kbd>
       </button>
 
-      <div v-if="tool === 'unmask'" class="flex flex-col gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 p-2">
+      <div v-if="tool === 'unmask' || tool === 'raw'" class="flex flex-col gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 p-2">
         <div class="flex gap-1" role="group" :aria-label="t('backgroundAreas.shape')">
           <button
             v-for="s in shapeButtons" :key="s.id" type="button"
@@ -26,9 +26,13 @@
             @click="setShape(s.id)"
           ><component :is="s.icon" :size="13" />{{ s.label }}</button>
         </div>
-        <div class="flex gap-1" role="group" :aria-label="t('backgroundAreas.paintMode')">
+        <div v-if="tool === 'unmask'" class="flex gap-1" role="group" :aria-label="t('backgroundAreas.paintMode')">
           <button type="button" :class="[SEG, !paintBackground ? TOOL_ON : TOOL_OFF]" :aria-pressed="!paintBackground" @click="paintBackground = false">{{ t('backgroundAreas.modeKeep') }}</button>
           <button type="button" :class="[SEG, paintBackground ? TOOL_ON : TOOL_OFF]" :aria-pressed="paintBackground" @click="paintBackground = true">{{ t('backgroundAreas.modeBackground') }}</button>
+        </div>
+        <div v-else class="flex gap-1" role="group" :aria-label="t('backgroundAreas.paintMode')">
+          <button type="button" :class="[SEG, !paintSmooth ? TOOL_ON : TOOL_OFF]" :aria-pressed="!paintSmooth" @click="paintSmooth = false">{{ t('backgroundAreas.modeRaw') }}</button>
+          <button type="button" :class="[SEG, paintSmooth ? TOOL_ON : TOOL_OFF]" :aria-pressed="paintSmooth" @click="paintSmooth = true">{{ t('backgroundAreas.modeSmooth') }}</button>
         </div>
         <div v-if="unmaskShape === 'brush'" class="flex items-center justify-between gap-2 text-caption text-gray-600 dark:text-gray-300">
           <span>{{ t('backgroundAreas.brushSize') }}</span>
@@ -38,7 +42,7 @@
           />
           <span class="font-mono w-14 text-right">{{ brushM }} m</span>
         </div>
-        <p class="text-micro text-gray-500 dark:text-gray-400">{{ t('backgroundAreas.unmaskShift') }}</p>
+        <p class="text-micro text-gray-500 dark:text-gray-400">{{ t(tool === 'raw' ? 'backgroundAreas.rawShift' : 'backgroundAreas.unmaskShift') }}</p>
       </div>
 
       <div class="flex items-center justify-between gap-2 pl-1 text-caption text-gray-600 dark:text-gray-300">
@@ -71,6 +75,7 @@
     <div v-if="stats" class="rounded border border-gray-200 dark:border-gray-700 px-2.5 py-2 font-mono text-micro leading-relaxed text-gray-600 dark:text-gray-300">
       <div>{{ t('backgroundAreas.statShare', { bg: stats.bg, kept: stats.kept }) }}</div>
       <div>{{ t('backgroundAreas.statKm', { km: stats.km }) }}</div>
+      <div v-if="stats.raw">{{ t('backgroundAreas.statRaw', { pct: stats.raw }) }}</div>
     </div>
 
     <p v-if="store.boxLocked" class="flex items-start gap-1.5 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-2.5 py-2 text-caption leading-snug text-gray-600 dark:text-gray-300">
@@ -104,12 +109,12 @@
 <script setup>
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Mountain, Spline, PaintBucket, Eraser, Route, Undo2, Trash2, Lock, Hand, Paintbrush, Brush, Square, Lasso } from 'lucide-vue-next';
+import { Mountain, MountainSnow, Spline, PaintBucket, Eraser, Route, Undo2, Trash2, Lock, Hand, Paintbrush, Brush, Square, Lasso } from 'lucide-vue-next';
 import SettingSection from '../base/SettingSection.vue';
 import { CHECKBOX } from '../base/controlStyles.js';
 import { useMainStore } from '../../stores/mainStore';
 import { useBackgroundEditor } from '../../composables/useBackgroundEditor.js';
-import { rasterizeMask, backgroundFraction } from '../../services/backgroundMask.js';
+import { rasterizeMask, rasterizeRaw, backgroundFraction } from '../../services/backgroundMask.js';
 import { computeMetricSelectionBounds } from '../../services/uploadBounds';
 import { fetchOsmRoads } from '../../services/osm.js';
 
@@ -121,7 +126,7 @@ const props = defineProps({
 
 const { t } = useI18n();
 const store = useMainStore();
-const { unmaskShape, brushM, paintBackground, setShape, setBrush, mask, tool, history, pendingLock, roadChoices, roadStatus, hint, hintBad, edit, confirmLock, cancelLock, undo, clearAll, setHint } = useBackgroundEditor();
+const { unmaskShape, brushM, paintBackground, paintSmooth, setShape, setBrush, mask, tool, history, pendingLock, roadChoices, roadStatus, hint, hintBad, edit, confirmLock, cancelLock, undo, clearAll, setHint } = useBackgroundEditor();
 const dontAsk = ref(false);
 
 const TOOL = 'flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-default';
@@ -141,12 +146,13 @@ const toolButtons = computed(() => [
   { id: 'erase', icon: Eraser, label: t('backgroundAreas.toolErase'), key: 'E' },
   { id: 'road', icon: Route, label: t('backgroundAreas.toolRoad'), key: 'R' },
   { id: 'unmask', icon: Paintbrush, label: t('backgroundAreas.toolUnmask'), key: 'U' },
+  { id: 'raw', icon: MountainSnow, label: t('backgroundAreas.toolRaw'), key: 'N' },
 ]);
 
 const sizeMeters = computed(() => (Number(props.resolution) || 0) * (Number(props.metersPerPixel) || 1));
 const selectionBounds = () => computeMetricSelectionBounds(props.center, sizeMeters.value);
 
-const HINTS = { pan: '', line: 'hintLine', bucket: 'hintBucket', erase: 'hintErase', road: 'hintRoad', unmask: 'hintUnmask' };
+const HINTS = { pan: '', line: 'hintLine', bucket: 'hintBucket', erase: 'hintErase', road: 'hintRoad', unmask: 'hintUnmask', raw: 'hintRaw' };
 function pick(id) {
   tool.value = tool.value === id && id !== 'pan' ? 'pan' : id;
   setHint(HINTS[tool.value] ? t(`backgroundAreas.${HINTS[tool.value]}`) : '');
@@ -189,20 +195,22 @@ const stats = computed(() => {
   const r = rasterizeMask(mask.value, 256, { metersAcross: sizeMeters.value });
   const f = backgroundFraction(r);
   const km2 = (sizeMeters.value / 1000) ** 2;
-  return { bg: Math.round(f * 100), kept: Math.round((1 - f) * 100), km: (km2 * (1 - f)).toFixed(km2 * (1 - f) < 10 ? 1 : 0) };
+  const rawCells = mask.value.raw?.length ? rasterizeRaw(mask.value, 256, { metersAcross: sizeMeters.value }) : null;
+  let raw = 0; if (rawCells) { for (let i = 0; i < rawCells.length; i++) raw += rawCells[i]; raw = Math.max(raw ? 1 : 0, Math.round((100 * raw) / rawCells.length)); }
+  return { raw, bg: Math.round(f * 100), kept: Math.round((1 - f) * 100), km: (km2 * (1 - f)).toFixed(km2 * (1 - f) < 10 ? 1 : 0) };
 });
 const asideText = computed(() => (stats.value ? t('backgroundAreas.aside', { pct: stats.value.bg }) : t('backgroundAreas.asideNone')));
 
-// D / B / E / R / U / H while the map is the focus (not while typing)
-const KEYS = { h: 'pan', d: 'line', b: 'bucket', e: 'erase', r: 'road', u: 'unmask' };
+// D / B / E / R / U / N / H while the map is the focus (not while typing)
+const KEYS = { h: 'pan', d: 'line', b: 'bucket', e: 'erase', r: 'road', u: 'unmask', n: 'raw' };
 function onKey(e) {
   if (e.ctrlKey && e.key.toLowerCase() === 'z' && store.backgroundDrawn && !/input|textarea|select/i.test(e.target?.tagName || '')) { undo(); e.preventDefault(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey || /input|textarea|select/i.test(e.target?.tagName || '') || e.target?.isContentEditable) return;
   const id = KEYS[e.key.toLowerCase()];
   if (id && (tool.value !== 'pan' || store.backgroundDrawn || id !== 'pan')) pick(id);
   if (e.key === 'Escape' && tool.value !== 'pan') pick('pan');
-  // with Unmask: [ and ] size the brush, 1/2/3 pick the shape
-  if (tool.value === 'unmask') {
+  // with Unmask or No smoothing: [ and ] size the brush, 1/2/3 pick the shape
+  if (tool.value === 'unmask' || tool.value === 'raw') {
     if (e.key === '[' || e.key === ']') setBrush(Math.max(10, Math.min(1000, brushM.value + (e.key === ']' ? 1 : -1) * (brushM.value >= 200 ? 50 : 10))));
     const shape = { 1: 'brush', 2: 'rect', 3: 'lasso' }[e.key];
     if (shape) setShape(shape);

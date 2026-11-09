@@ -126,3 +126,28 @@ test('unmask strokes: a brush and a box carve kept ground out of the road mask, 
   assert.ok(!maskHasAreas(mask({ paint: [paint[0]] })));
   assert.ok(backgroundFraction(rasterizeMask(mask({ paint: [paint[2]] }), N)) > 0);
 });
+
+test('No smoothing strokes: their own raster, eased edges, smooth-again strokes, and no background', async () => {
+  const { rasterizeRaw, rawWeightLookup, maskHasRaw } = await import('../services/backgroundMask.js');
+  // a box over the middle quarter, then a "smooth again" box over its top-left corner
+  const raw = [
+    { on: true, kind: 'poly', pts: [ll(32, 32), ll(96, 32), ll(96, 96), ll(32, 96)] },
+    { on: false, kind: 'poly', pts: [ll(32, 32), ll(48, 32), ll(48, 48), ll(32, 48)] },
+  ];
+  const m = mask({ raw });
+  assert.ok(maskHasRaw(m));
+  assert.ok(!maskHasAreas(m), 'no background from No smoothing strokes');
+  assert.equal(backgroundLookup(m), null);
+  const r = rasterizeRaw(m, N);
+  assert.equal(r[64 * N + 64], 1);
+  assert.equal(r[40 * N + 40], 0, 'smoothed again');
+  assert.equal(r[10 * N + 10], 0);
+  // 12.8 km square: 100 m a cell; 300 m feather = 3 cells
+  const w = rawWeightLookup(m, { n: N, metersAcross: 12800, featherM: 300 });
+  assert.equal(w(64 / N, 64 / N), 1);
+  assert.ok(w.full(64 / N, 64 / N) && !w.full(20 / N, 64 / N));
+  const edge = w((96 + 1.5) / N, 64 / N);
+  assert.ok(edge > 0.05 && edge < 0.95, `eased at the edge: ${edge}`);
+  assert.equal(w((96 + 10) / N, 64 / N), 0);
+  assert.equal(rawWeightLookup(mask({ raw: [{ ...raw[0], on: false }] })), null);
+});

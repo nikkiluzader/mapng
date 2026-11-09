@@ -10,20 +10,31 @@
 //     unshade: [[lat, lng], ...],                            // areas made drivable again inside the corridor
 //     roads: [{ id, name, lines: [[[lat, lng], ...], ...] }], // roads kept to drive (one name, many ways)
 //     widthM: 300,                                           // corridor half-width
-//     paint: [{ keep, kind: 'brush'|'poly', r, pts: [[lat, lng]] }] }  // Unmask tool strokes, in order
+//     paint: [{ keep, kind: 'brush'|'poly', r, pts: [[lat, lng]] }],  // Unmask tool strokes, in order
+//     raw: [{ on, kind: 'brush'|'poly', r, pts: [[lat, lng]] }] }      // No smoothing strokes, in order
 //
 // Rules: the square's edge is part of every outline, so a line from edge to edge or a
 // loop closes areas; a line that closes nothing is "open" (shown with an X); the bucket
 // shades a closed area, and never the whole square. With roads kept, everything farther
 // than widthM from them is background unless unshaded. Last, the Unmask tool's strokes
 // (brush strokes r metres wide each side, or filled shapes) make ground kept (keep) or
-// background (!keep), each over what came before. Pure: no DOM, no Vue.
+// background (!keep), each over what came before.
+//
+// Apart from the background, the No smoothing tool's strokes (`raw`) mark ground where the
+// roads are not smoothed or levelled into the terrain: the elevation stays as downloaded
+// there (on: true), or smoothed again (on: false, over earlier strokes). They change no
+// objects and fetch nothing differently. Pure: no DOM, no Vue.
 
 export const MASK_VERSION = 1;
 const SLIVER = 12; // cells: areas this small (in line corners) don't count
 
 export function emptyMask() {
-  return { version: MASK_VERSION, bounds: null, lines: [], shade: [], unshade: [], roads: [], widthM: 300, paint: [] };
+  return { version: MASK_VERSION, bounds: null, lines: [], shade: [], unshade: [], roads: [], widthM: 300, paint: [], raw: [] };
+}
+
+/** True when No smoothing strokes leave any ground unsmoothed. */
+export function maskHasRaw(mask) {
+  return !!mask?.bounds && (mask.raw || []).some((p) => p.on !== false);
 }
 
 /** A kept road's polylines (lines, or one pts list). */
@@ -261,6 +272,53 @@ function nearestLabel(labels, walls, n, x, y) {
     }
   }
   return -1;
+}
+
+/** The No smoothing strokes on an n×n grid: 1 where the roads are left unsmoothed. */
+export function rasterizeRaw(mask, n = 512, { metersAcross = 0 } = {}) {
+  const out = new Uint8Array(n * n);
+  if (!mask?.bounds) return out;
+  const proj = makeProjector(mask.bounds, n);
+  if (!(metersAcross > 0)) metersAcross = (mask.bounds.north - mask.bounds.south) * 111320;
+  for (const p of mask.raw || []) {
+    const pts = (p.pts || []).map(proj.toCell);
+    const val = p.on === false ? 0 : 1;
+    if (p.kind === 'poly') fillPolygon(out, n, pts, val);
+    else brushStroke(out, n, pts, (Number(p.r) || 0) / (metersAcross / n), val);
+  }
+  return out;
+}
+
+/**
+ * How unsmoothed each spot is: (u, v) in 0..1 across the square (u east, v south) →
+ * 0 (smoothed as usual) .. 1 (as downloaded), eased over featherM metres outside each
+ * stroke's edge so the raw ground runs into the smoothed ground without a step. Null
+ * when nothing is marked.
+ */
+export function rawWeightLookup(mask, { n = 1024, metersAcross = 0, featherM = 20 } = {}) {
+  if (!maskHasRaw(mask)) return null;
+  if (!(metersAcross > 0)) metersAcross = (mask.bounds.north - mask.bounds.south) * 111320;
+  const cell = metersAcross / n;
+  const set = rasterizeRaw(mask, n, { metersAcross });
+  const d2 = squaredDistance(set, n);
+  const reach = Math.max(1e-6, featherM / cell);
+  const w = new Float32Array(n * n);
+  for (let i = 0; i < n * n; i++) {
+    const f = 1 - Math.sqrt(d2[i]) / reach;
+    w[i] = f <= 0 ? 0 : f >= 1 ? 1 : f * f * (3 - 2 * f);
+  }
+  const at = (u, v) => {
+    if (!(u >= 0 && u <= 1 && v >= 0 && v <= 1)) return 0;
+    const x = Math.min(n - 1, Math.max(0, u * n - 0.5)), y = Math.min(n - 1, Math.max(0, v * n - 0.5));
+    const x0 = Math.floor(x), y0 = Math.floor(y), x1 = Math.min(n - 1, x0 + 1), y1 = Math.min(n - 1, y0 + 1);
+    const fx = x - x0, fy = y - y0;
+    return (w[y0 * n + x0] * (1 - fx) + w[y0 * n + x1] * fx) * (1 - fy) + (w[y1 * n + x0] * (1 - fx) + w[y1 * n + x1] * fx) * fy;
+  };
+  at.full = (u, v) => {
+    if (!(u >= 0 && u <= 1 && v >= 0 && v <= 1)) return false;
+    return set[Math.min(n - 1, Math.floor(v * n)) * n + Math.min(n - 1, Math.floor(u * n))] === 1;
+  };
+  return at;
 }
 
 /** Share of the square that is background (0..1). */

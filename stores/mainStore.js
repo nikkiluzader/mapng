@@ -84,7 +84,7 @@ export const useMainStore = defineStore('main', () => {
   const backgroundTool = ref('pan');
   const backgroundDrawn = computed(() => {
     const m = backgroundMask.value;
-    return !!m.bounds && ((m.lines?.length || 0) > 0 || (m.paint?.length || 0) > 0 || maskHasAreas(m));
+    return !!m.bounds && ((m.lines?.length || 0) > 0 || (m.paint?.length || 0) > 0 || (m.raw?.length || 0) > 0 || maskHasAreas(m));
   });
   const backgroundActive = computed(() => advancedMode.value && !batchMode.value && backgroundDrawn.value);
   const boxLocked = backgroundActive;
