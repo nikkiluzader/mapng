@@ -311,7 +311,7 @@ export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () =>
         if (k > 0) archPier(out.concrete, part, sArr, sub.s0, groundAt, depthOf(part), false);
       }
     }
-    else if (st.type === 'arch' && (run.steel ?? (L >= THROUGH_ARCH_M && highClear(part, sArr, sp, groundAt) <= L * THROUGH_ARCH_LOW && straightRun(part, sArr, sp)))) arch(out.steel, part, sArr, sp, off, L);
+    else if (st.type === 'arch' && (run.steel ?? (L >= THROUGH_ARCH_M && highClear(part, sArr, sp, groundAt) <= L * THROUGH_ARCH_LOW && straightRun(part, sArr, sp)))) arch(out.steel, part, sArr, sp, off, L, run.hangDz);
     else if (st.type === 'suspension' || st.type === 'cable') {
       // one set of towers per crossing, drawn by its lead deck (once, on its main span)
       if ((st.crossing?.lead ?? deck) !== deck || sp !== mainSpan(deck).sp) continue;
@@ -509,10 +509,12 @@ function truss(b, part, sArr, sp, off, L) {
   }
 }
 
-function arch(b, part, sArr, sp, off, L) {
+function arch(b, part, sArr, sp, off, L, hangDz = [0, 0]) {
   const rise = Math.min(100, Math.max(8, L * ARCH_RISE));
   const m = Math.max(12, Math.round(L / 5));
   const sides = Array.isArray(off) ? [off[0], -off[1]] : [off, -off];
+  // (a side over a lower twin deck: its tie and hangers down at that deck)
+  const low = (p, k) => [p[0], p[1], p[2] + (hangDz?.[k] || 0)];
   const z0 = along(part, sp.s0, 0, sArr)[2]; const z1 = along(part, sp.s1, 0, sArr)[2];
   const rib = sides.map((o) => Array.from({ length: m + 1 }, (_, i) => {
     const t = i / m; const p = along(part, sp.s0 + L * t, o, sArr);
@@ -521,11 +523,11 @@ function arch(b, part, sArr, sp, off, L) {
   for (let k = 0; k < 2; k++) {
     for (let i = 0; i < m; i++) beam(b, rib[k][i], rib[k][i + 1], RIB[0], RIB[1]);
     // the tie along the deck edge
-    beam(b, along(part, sp.s0, sides[k], sArr), along(part, sp.s1, sides[k], sArr), CHORD[0], CHORD[1]);
+    beam(b, low(along(part, sp.s0, sides[k], sArr), k), low(along(part, sp.s1, sides[k], sArr), k), CHORD[0], CHORD[1]);
     // hangers from the rib down to the deck edge
     const nh = Math.max(2, Math.round(L / HANGER_M));
     for (let h = 1; h < nh; h++) {
-      const t = h / nh; const deckP = along(part, sp.s0 + L * t, sides[k], sArr);
+      const t = h / nh; const deckP = low(along(part, sp.s0 + L * t, sides[k], sArr), k);
       const top = [deckP[0], deckP[1], z0 + (z1 - z0) * t + rise * 4 * t * (1 - t) - RIB[1] / 2];
       beam(b, deckP, top, HANGER[0], HANGER[1]);
     }
@@ -695,6 +697,9 @@ export function linkArchCrossings(decks, { groundAt }) {
     const lead = g.reduce((a, b) => (b.z > a.z + 1 || (Math.abs(b.z - a.z) <= 1 && b.L > a.L) ? b : a));
     const own = lead.part.half + PARAPET_W_M + SIDE_GAP_M;
     let left = own; let right = own;
+    // (each side's hangers come down to the outermost deck on that side: the lower deck of a double deck
+    // mapped beside the upper one, not the upper's height out in the air beside its lanes)
+    const drop = [[], []];
     for (const r of g) {
       if (r === lead) continue;
       r.draw = false;
@@ -707,11 +712,13 @@ export function linkArchCrossings(decks, { groundAt }) {
         const P = along(lead.part, s, 0, lead.sArr); const Q = along(lead.part, Math.min(lead.sArr.at(-1), s + 1), 0, lead.sArr);
         const ul = Math.hypot(Q[0] - P[0], Q[1] - P[1]) || 1;
         const d = ((p[0] - P[0]) * -(Q[1] - P[1]) + (p[1] - P[1]) * (Q[0] - P[0])) / ul;   // + left
-        left = Math.max(left, Math.min(ARCH_TWIN_MAX_M, d + roff));
-        right = Math.max(right, Math.min(ARCH_TWIN_MAX_M, -d + roff));
+        if (d + roff > left) { left = Math.min(ARCH_TWIN_MAX_M, d + roff); drop[0].push(p[2] - P[2]); }
+        if (-d + roff > right) { right = Math.min(ARCH_TWIN_MAX_M, -d + roff); drop[1].push(p[2] - P[2]); }
       }
     }
     lead.offs = [left, right];
+    // (the mean height of the twin under that side's rib against the lead's road; 0 when the lead's own)
+    lead.hangDz = drop.map((v) => (v.length ? Math.min(0, v.reduce((a, b) => a + b, 0) / v.length) : 0));
   }
   return joined;
 }

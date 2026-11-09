@@ -183,7 +183,9 @@ const GROUND_BAND_M = 1.5;     // a surface this near our ground is the ground (
  * surface: OSM layer order). groundAt(x, y): our ground. Returns per point
  * z or NaN, after removing jumps steeper than maxGrade between neighbours.
  */
-export function deckProfile(grid, line, half, datum, groundAt, { rank = 0, maxGrade = 0.12, prior = null } = {}) {
+const DENSE_SHARE = 0.35;
+const HIDDEN_UNDER_M = 4;
+export function deckProfile(grid, line, half, datum, groundAt, { rank = 0, above = 0, maxGrade = 0.12, prior = null } = {}) {
   const out = new Float64Array(line.length).fill(NaN);
   for (let i = 0; i < line.length; i++) {
     const [x, y] = line[i];
@@ -206,14 +208,35 @@ export function deckProfile(grid, line, half, datum, groundAt, { rank = 0, maxGr
     // the top of each surface's points: a deck is the highest return of its slab (rails, cars under ~2 m
     // stand on it, not over it: their points sit in the same run when close, the run's lower quartile is
     // the road)
-    const decks = surfaces
+    const kept = surfaces
       .filter((s) => s.length >= MIN_SURFACE_PTS)
-      .map((s) => s[Math.floor(s.length * 0.25)])
-      .filter((z) => !(Number.isFinite(g) && z < g + GROUND_BAND_M));
+      .map((s) => ({ z: s[Math.floor(s.length * 0.25)], n: s.length }))
+      .filter(({ z }) => !(Number.isFinite(g) && z < g + GROUND_BAND_M));
+    // (rank, above: one for the whole line, or one per station)
+    const at = (v) => (Array.isArray(v) || ArrayBuffer.isView(v) ? v[i] ?? 0 : v);
+    // another deck stacked over this one here: the survey saw that one (a double deck's lower level shows
+    // only through gaps, a few points): not measured
+    // ... but the few points that come through between its beams, aggregated along the way (the
+    // continuity check drops strays): the highest cluster at least HIDDEN_UNDER_M under the dense deck
+    // over it (Fort Duquesne's lower deck: 1-3 points a station at 18 m under the upper deck's 25 m)
+    if (at(above) > 0) {
+      const all = surfaces.map((q) => ({ z: q[Math.floor(q.length * 0.25)], n: q.length })).filter(({ z }) => !(Number.isFinite(g) && z < g + GROUND_BAND_M));
+      // (the deck over it: the densest surface, not an arch or truss over that)
+      const top = all.length ? all.reduce((a, b) => (b.n > a.n ? b : a)).z : -Infinity;
+      const under = all.filter((d) => d.z < top - HIDDEN_UNDER_M);
+      if (Number.isFinite(top) && under.length) out[i] = under[under.length - 1].z;
+      continue;
+    }
+    // a deck is a dense surface; an arch, a truss or a gantry over it is sparse (the Fort Duquesne
+    // Bridge's arch, 220 points a station against its deck's 820, was taken for its upper deck)
+    const most = Math.max(0, ...kept.map((d) => d.n));
+    const decks = kept.filter((d) => d.n >= DENSE_SHARE * most).map((d) => d.z);
     if (!decks.length) continue;
     let z;
     if (prior && Number.isFinite(prior[i])) z = decks.reduce((a, b) => (Math.abs(b - prior[i]) < Math.abs(a - prior[i]) ? b : a));
-    else z = decks[Math.min(rank, decks.length - 1)];
+    // rank: decks stacked under this one here; none: the lowest dense surface, else the highest (the
+    // ones under it are hidden by it, or beside it where both show)
+    else z = at(rank) > 0 ? decks[decks.length - 1] : decks[0];
     out[i] = z;
   }
   // continuity: a station off the median of its neighbours by more than the grade allows is dropped
@@ -302,14 +325,22 @@ export async function fetchSurvey({ lines, toGeo, toLocal, zAbs, index, fetchImp
 const MIN_COVER = 0.6;         // a bridge measured at fewer of its stations keeps the inferred profile ...
 const PARTIAL_RUN = 5;         // ... but for runs of this many stations in a row ...
 const PARTIAL_CLEAR_M = 2;     // ... each measured this far over the ground
-/** Runs [a, b] (inclusive) of measured stations, PARTIAL_RUN long or more, each PARTIAL_CLEAR_M over its ground. */
+/**
+ * Runs of measured stations each PARTIAL_CLEAR_M over its ground, gaps of up to PARTIAL_GAP unmeasured
+ * stations bridged (a lower deck read between the beams of the one over it: every other station), with
+ * PARTIAL_RUN measured stations or more: [[a, b]] (inclusive); pin only the measured ones in them.
+ */
+const PARTIAL_GAP = 2;
 export function clearRuns(z, groundAt) {
-  const out = []; let a = -1;
-  for (let i = 0; i <= z.length; i++) {
-    const ok = i < z.length && Number.isFinite(z[i]) && z[i] - groundAt(i) >= PARTIAL_CLEAR_M;
-    if (ok && a < 0) a = i;
-    if (!ok && a >= 0) { if (i - a >= PARTIAL_RUN) out.push([a, i - 1]); a = -1; }
+  const out = []; let a = -1; let last = -1; let n = 0;
+  const flush = () => { if (a >= 0 && n >= PARTIAL_RUN) out.push([a, last]); a = -1; n = 0; };
+  for (let i = 0; i < z.length; i++) {
+    const measured = Number.isFinite(z[i]);
+    const ok = measured && z[i] - groundAt(i) >= PARTIAL_CLEAR_M;
+    if (ok) { if (a < 0) a = i; last = i; n++; }
+    else if (measured || (a >= 0 && i - last > PARTIAL_GAP)) flush();   // (a station on the ground ends a run)
   }
+  flush();
   return out;
 }
 
@@ -325,14 +356,98 @@ export function clearRuns(z, groundAt) {
  * ground plus minHeight. Returns { pins: [[k, i, z]] (world z), bridges:
  * [{ k, wayId, stations, measured, pinned, meanLift, bridged }] }.
  */
+// Which measured surface a bridge way takes, per station: the number of other decks stacked right under it
+// there (lanes overlapping in plan, a lower layer), and over it (.above: hidden from the survey there). OSM's layer is only an order: the Fort Duquesne
+// Bridge's lower deck is layer 2 (the riverside paths under it layer 1), and rank = layer - 1 gave it the
+// upper deck's surface and the upper deck the arch's, both decks 10-15 m too high.
+const STACK_SHARE = 0.85;
+const STACK_PATHS = new Set(['footway', 'cycleway', 'path', 'steps', 'pedestrian', 'bridleway', 'corridor', 'platform']);
+export function stackRanks(graph) {
+  const cell = 16; const cells = new Map();
+  const bridgeEdge = (e) => e.bridge && !e.tunnel && !e.external && e.s.length >= 2;
+  graph.edges.forEach((e, k) => {
+    if (!bridgeEdge(e)) return;
+    for (let i = 0; i < e.s.length; i++) {
+      const key = `${Math.floor(e.x[i] / cell)},${Math.floor(e.y[i] / cell)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push(k, i);
+    }
+  });
+  const ranks = new Map(); const aboves = new Map();
+  graph.edges.forEach((e, k) => {
+    if (!bridgeEdge(e)) return;
+    const layer = Number(e.layer) || 0;
+    const r = new Int16Array(e.s.length); const up = new Int16Array(e.s.length);
+    for (let i = 0; i < e.s.length; i++) {
+      const cx = Math.floor(e.x[i] / cell); const cy = Math.floor(e.y[i] / cell);
+      const under = new Set(); const over = new Set();
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+        const list = cells.get(`${cx + dx},${cy + dy}`) || [];
+        for (let j = 0; j < list.length; j += 2) {
+          const kb = list[j]; if (kb === k || under.has(kb) || over.has(kb)) continue;
+          const o = graph.edges[kb];
+          // (a footway or cycleway along a deck lies at its level, not a deck under or over it)
+          if (STACK_PATHS.has(o.highway) || STACK_PATHS.has(e.highway)) continue;
+          const ol = Number(o.layer) || 0;
+          if (ol === layer) continue;
+          const ib = list[j + 1];
+          if (Math.hypot(o.x[ib] - e.x[i], o.y[ib] - e.y[i]) >= ((e.half || 4) + (o.half || 4)) * STACK_SHARE) continue;
+          (ol < layer ? under : over).add(kb);
+        }
+      }
+      // (decks in a chain of edges count once per level: the distinct layers)
+      r[i] = new Set([...under].map((kb) => Number(graph.edges[kb].layer) || 0)).size;
+      up[i] = new Set([...over].map((kb) => Number(graph.edges[kb].layer) || 0)).size;
+    }
+    ranks.set(k, r); aboves.set(k, up);
+  });
+  ranks.above = aboves;
+  return ranks;
+}
+
+// A lower deck reading the same surface as a higher-layer deck beside it within SAW_OTHER_M: it saw that
+// deck (a double deck mapped as two lines side by side, though one stands over the other); those stations
+// are read again as hidden (the few points under the deck over them)
+const SAW_OTHER_M = 25;
+const SAW_OTHER_DZ_M = 2;
 export function lidarPins(graph, survey, groundAtAbs, minHeight) {
   const pins = []; const bridges = [];
   const measuredZ = new Map();   // edge -> its stations' measured z (NaN where not), pinned edges only
+  const ranks = stackRanks(graph);
+  const lines = new Map(); const zs = new Map();
+  const read = (e, k, above) => deckProfile(survey.grid, lines.get(k), e.half || 4, survey.datum, groundAtAbs, { rank: ranks.get(k) || 0, above });
+  graph.edges.forEach((e, k) => {
+    if (!e.bridge || e.tunnel || e.external || e.s.length < 2 || e.movable) return;
+    lines.set(k, Array.from(e.s, (_, i) => [e.x[i], e.y[i]]));
+    zs.set(k, read(e, k, ranks.above.get(k) || 0));
+  });
+  // second pass: stations that saw a higher deck beside them
+  const measuredAt = [];
+  for (const [k, z] of zs) { const e = graph.edges[k]; for (let i = 0; i < z.length; i++) if (Number.isFinite(z[i])) measuredAt.push([k, e.x[i], e.y[i], z[i], Number(e.layer) || 0]); }
+  const cell = SAW_OTHER_M; const cells = new Map();
+  for (const m of measuredAt) { const key = `${Math.floor(m[1] / cell)},${Math.floor(m[2] / cell)}`; if (!cells.has(key)) cells.set(key, []); cells.get(key).push(m); }
+  for (const [k, z] of zs) {
+    const e = graph.edges[k]; const layer = Number(e.layer) || 0;
+    if (STACK_PATHS.has(e.highway)) continue;
+    let hidden = null;
+    for (let i = 0; i < z.length; i++) {
+      if (!Number.isFinite(z[i])) continue;
+      const cx = Math.floor(e.x[i] / cell); const cy = Math.floor(e.y[i] / cell);
+      let saw = false;
+      for (let dx = -1; dx <= 1 && !saw; dx++) for (let dy = -1; dy <= 1 && !saw; dy++) {
+        for (const [ko, x, y, zo, lo] of cells.get(`${cx + dx},${cy + dy}`) || []) {
+          if (ko === k || lo <= layer || STACK_PATHS.has(graph.edges[ko].highway)) continue;
+          if (Math.abs(zo - z[i]) < SAW_OTHER_DZ_M && Math.hypot(x - e.x[i], y - e.y[i]) < SAW_OTHER_M) { saw = true; break; }
+        }
+      }
+      if (saw) (hidden ||= Int16Array.from(ranks.above.get(k) || new Int16Array(z.length)))[i] = 1;
+    }
+    if (hidden) zs.set(k, read(e, k, hidden));
+  }
   graph.edges.forEach((e, k) => {
     if (!e.bridge || e.tunnel || e.external || e.s.length < 2) return;
     if (e.movable) { bridges.push({ k, wayId: e.wayId ?? null, stations: e.s.length, measured: 0, pinned: false, meanLift: null }); return; }
-    const line = Array.from(e.s, (_, i) => [e.x[i], e.y[i]]);
-    const z = deckProfile(survey.grid, line, e.half || 4, survey.datum, groundAtAbs, { rank: Math.max(0, (Number(e.layer) || 1) - 1) });
+    const line = lines.get(k); const z = zs.get(k);
     let measured = 0; let lift = 0;
     for (let i = 0; i < z.length; i++) if (Number.isFinite(z[i])) { measured++; lift += z[i] - groundAtAbs(line[i][0], line[i][1]); }
     const pinned = measured >= MIN_COVER * z.length;
@@ -345,10 +460,12 @@ export function lidarPins(graph, survey, groundAtAbs, minHeight) {
     // Expressway, measured at 40 of 78 stations, sank onto the street under it (Pittsburgh)
     let partial = 0;
     if (!pinned) {
-      for (const [a, b] of clearRuns(z, (i) => groundAtAbs(line[i][0], line[i][1]))) {
-        for (let i = a; i <= b; i++) pins.push([k, i, z[i] - minHeight]);
-        partial += b - a + 1;
+      for (const [a0, b0] of clearRuns(z, (i) => groundAtAbs(line[i][0], line[i][1]))) {
+        for (let i = a0; i <= b0; i++) if (Number.isFinite(z[i])) { pins.push([k, i, z[i] - minHeight]); partial++; }
       }
+    }
+    if (globalThis.process?.env?.MAPNG_LIDAR_DEBUG && String(e.wayId ?? '').includes(globalThis.process.env.MAPNG_LIDAR_DEBUG)) {
+      console.log('[lidar debug]', e.wayId, 'layer', e.layer, 'z', Array.from(z, (v, i) => (Number.isFinite(v) ? (v - groundAtAbs(line[i][0], line[i][1])).toFixed(1) : '.')).join(' '));
     }
     bridges.push({ k, wayId: e.wayId ?? null, stations: z.length, measured, pinned, partial, meanLift: measured ? lift / measured : null });
   });

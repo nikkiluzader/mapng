@@ -138,5 +138,9 @@ test('a bridge the survey saw along part of it: its runs clear of the ground pin
   const N = NaN;
   // ground at 0: a 6-station run 8 m up, a 3-station run (too short), a run at 1 m (the ground or a road under it)
   const z = [N, 8, 8, 8.1, 8.2, 8.2, 8.3, N, 9, 9, 9, N, 1, 1, 1, 1, 1, 1, N];
-  assert.deepEqual(clearRuns(z, () => 0), [[1, 6]]);
+  assert.deepEqual(clearRuns(z, () => 0), [[1, 10]], 'the run and the short one 1 gap after it joined');
+  // every other station read (a lower deck between the beams of the deck over it): one run
+  assert.deepEqual(clearRuns([5, N, 5, N, 5, N, 5, N, 5], () => 0), [[0, 8]]);
+  // a stray station: no run
+  assert.deepEqual(clearRuns([N, N, 9, N, N, N, 9, N], () => 0), []);
 });
