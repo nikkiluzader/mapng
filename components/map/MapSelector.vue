@@ -328,6 +328,16 @@
       <div class="px-3 py-1 text-micro text-gray-500 dark:text-gray-400 font-mono">{{ formatLatLng(contextMenu.lat, contextMenu.lng) }}</div>
       <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" v-if="!boxLocked" @click="centerSelectionHere">{{ t('map.centerHere') }}</button>
       <button type="button" role="menuitem" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700" @click="copyCoordinates">{{ copiedNotice ? t('map.copied') : t('map.copyCoordinates') }}</button>
+      <!-- Spawn and quicktravel points (single tile; components/controls/SpawnPoints.vue) -->
+      <template v-if="pointsActive()">
+        <div class="my-1 border-t border-gray-200 dark:border-gray-700"></div>
+        <button type="button" role="menuitem" data-testid="ctx-spawn-here" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2" :disabled="pointsEditor.full()" @click="addPointHere(true)">
+          <Star :size="12" class="text-amber-500" />{{ t('spawnPoints.spawnHere') }}
+        </button>
+        <button type="button" role="menuitem" data-testid="ctx-quicktravel-here" class="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2" :disabled="pointsEditor.full()" @click="addPointHere(false)">
+          <Navigation :size="12" class="text-brand" />{{ t('spawnPoints.quicktravelHere') }}
+        </button>
+      </template>
     </div>
   </div>
 </template>
@@ -341,7 +351,7 @@ import { useUsageStats } from '../../composables/useUsageStats.js';
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { LMap, LTileLayer, LRectangle, LMarker, LTooltip, LPolygon } from '@vue-leaflet/vue-leaflet';
-import { Layers, ChevronDown } from 'lucide-vue-next';
+import { Layers, ChevronDown, Star, Navigation } from 'lucide-vue-next';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getAdjacentBounds, POSITION_LABELS } from '../../services/surroundingTiles';
@@ -356,6 +366,8 @@ import { WORLD_BOUNDS, minZoomForWidth, formatSelectionSize, formatLatLng, clamp
 import { useMainStore } from '../../stores/mainStore';
 import { useBackgroundEditor } from '../../composables/useBackgroundEditor.js';
 import { attachBackgroundLayer } from './backgroundLayer.js';
+import { attachSpawnPointLayer } from './spawnPointLayer.js';
+import { usePointsEditor } from '../../composables/usePointsEditor.js';
 
 // Fix Leaflet icon assets
 // @ts-ignore
@@ -1034,6 +1046,23 @@ const onKeydown = (e) => { if (e.key === 'Escape') closeContextMenu(); };
 
 // Background areas (Location step): the layer draws them and takes the clicks
 const store = useMainStore();
+
+// Spawn and quicktravel points: a single tile's, on its map (not a batch job's)
+const pointsEditor = usePointsEditor();
+let pointLayer = null;
+const pointsActive = () => !store.batchMode && !hasBatchGrid.value;
+// the box a point must be in to be exported: the export area (or an upload's crop / coverage)
+const pointsBox = computed(() => uploadedCropBounds.value || (showUploadedCoverageBounds.value ? nativeCoverageBounds.value : selectionBounds.value));
+watch(
+  () => [store.points, store.pointTool, store.selectedPointId, store.batchMode, hasBatchGrid.value, pointsBox.value, locale.value],
+  () => pointLayer?.update(),
+);
+const addPointHere = (isDefault) => {
+  const m = contextMenu.value;
+  closeContextMenu();
+  if (!m) return;
+  pointsEditor.addPoint({ lat: m.lat, lng: m.lng, heading: 0, isDefault, name: isDefault ? t('spawnPoints.spawnName') : '' });
+};
 const bgEditor = useBackgroundEditor();
 let bgLayer = null;
 watch(
@@ -1067,6 +1096,17 @@ const onMapReady = (map) => {
     t,
   });
   bgLayer.update();
+  pointLayer = attachSpawnPointLayer(map, {
+    getPoints: () => store.points,
+    getBounds: () => pointsBox.value,
+    getTool: () => store.pointTool,
+    getSelected: () => store.selectedPointId,
+    setSelected: (id) => { store.selectedPointId = id; },
+    isActive: pointsActive,
+    editor: pointsEditor,
+    t,
+  });
+  pointLayer.update();
   // (the dim outside the selection: above the tiles, under every overlay)
   map.createPane('mapngMask').style.zIndex = '350';
   map.getPane('mapngMask').style.pointerEvents = 'none';
@@ -1078,11 +1118,11 @@ const onMapReady = (map) => {
   addMapTools(map);
   map.on('contextmenu', (e) => {
     copiedNotice.value = false;
-    // (kept inside the map: the menu is ~200 × 100 px)
+    // (kept inside the map: the menu is ~220 × 100 px, 170 with the point items)
     const size = map.getSize();
     contextMenu.value = {
-      x: Math.min(e.containerPoint.x, size.x - 200),
-      y: Math.min(e.containerPoint.y, size.y - 100),
+      x: Math.min(e.containerPoint.x, size.x - 220),
+      y: Math.min(e.containerPoint.y, size.y - (pointsActive() ? 170 : 100)),
       lat: e.latlng.lat,
       lng: clampLng(e.latlng.lng),
     };
@@ -1118,7 +1158,7 @@ const onMapReady = (map) => {
   mapResizeObserver.observe(map.getContainer());
 };
 let mapResizeObserver = null;
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); bgLayer?.destroy(); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); bgLayer?.destroy(); pointLayer?.destroy(); });
 const hotspotWhen = (dot) => {
   const days = daysSince(dot.lastDay);
   if (days === null) return '';
@@ -1203,6 +1243,16 @@ onMounted(() => {
 }
 .dark .mapng-keys { background: rgba(31, 41, 55, 0.92); color: #d1d5db; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.12); }
 .dark .mapng-keys kbd { color: #e5e7eb; background: #374151; border-color: #4b5563; }
+/* Spawn and quicktravel points (spawnPointLayer.js) */
+.mapng-point-icon { background: none; border: 0; }
+.mapng-point-pin { width: 32px; height: 32px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45)); cursor: grab; }
+.mapng-point-pin.is-outside { opacity: 0.85; }
+.mapng-point-handle span {
+  display: block; width: 14px; height: 14px; border-radius: 9999px; background: #fff;
+  border: 3px solid var(--brand); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45); cursor: crosshair;
+}
+.mapng-point-tip-warn { color: #dc2626; font-weight: 600; }
+.leaflet-container.mapng-placing-point, .leaflet-container.mapng-placing-point.leaflet-grab { cursor: copy; }
 /* The selection's size, pinned above its top edge */
 .mapng-selection-size { pointer-events: none; }
 .mapng-selection-size span {

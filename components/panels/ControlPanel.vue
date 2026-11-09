@@ -131,6 +131,14 @@
 
       </SettingSection>
 
+      <!-- Spawn and quicktravel points (Basic too: where the car starts is a basic wish; not in a batch job) -->
+      <SpawnPoints
+        v-if="!store.batchMode"
+        :center="center"
+        :resolution="resolution"
+        :meters-per-pixel="processingMetersPerPixel"
+      />
+
       <!-- Background areas (advanced; not with an uploaded elevation file, which picks its own box) -->
       <BackgroundAreas
         v-if="store.advancedMode && !uploadedElevationFile"
@@ -390,6 +398,7 @@ import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
 import SurroundingTiles from '../map/SurroundingTiles.vue';
 import BackgroundAreas from '../controls/BackgroundAreas.vue';
+import SpawnPoints from '../controls/SpawnPoints.vue';
 import ExportPanel from './ExportPanel.vue';
 import { useMainStore } from '../../stores/mainStore';
 import GenerateActions from '../controls/GenerateActions.vue';
