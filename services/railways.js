@@ -34,12 +34,70 @@ const isUnderground = (tags, kind) => {
 
 /** The railway kind of an OSM way's tags ('rail', 'tram', ...), or null when it is not one we build. */
 export function railKindOf(tags = {}) {
+  const kind = activeRailKind(tags);
+  if (!kind) return null;
+  if (URBAN_KINDS.has(kind) && isUnderground(tags, kind)) return null;
+  return kind;
+}
+
+/**
+ * The kind of an active railway line, underground or not ('rail', 'subway'...),
+ * or null. The data step keeps every active line (a city's metro in its
+ * tunnel too: what joins a station's untagged track to the tunnels either
+ * side of it, railSegmentsFrom); railKindOf picks the ones built.
+ */
+export function activeRailKind(tags = {}) {
   const kind = String(tags.railway ?? '').toLowerCase();
   if (!RAIL_KIND_SET.has(kind)) return null;
   if (tags.area === 'yes') return null;
   if (LIFECYCLE_FLAGS.some((k) => tags[k] && tags[k] !== 'no')) return null;
-  if (URBAN_KINDS.has(kind) && isUnderground(tags, kind)) return null;
   return kind;
+}
+
+// A city line's short piece with no tunnel tag between two of its tunnels
+// is underground with them (a metro station's track mapped untagged under a
+// downtown street, a building passage at its platforms): as long as this at
+// most, joined at each end to nothing but tunnels (or such pieces).
+const TUNNEL_GAP_MAX_M = 400;
+
+/**
+ * The ids of the railway features underground: city lines (subway, light
+ * rail, tram, monorail) in their tunnels, and the short untagged pieces
+ * between such tunnels.
+ */
+export function undergroundRailIds(features = []) {
+  const rail = features.filter((f) => f?.type === 'railway' && activeRailKind(f.tags) && f.geometry?.length >= 2);
+  const under = new Set(rail.filter((f) => URBAN_KINDS.has(activeRailKind(f.tags)) && isUnderground(f.tags, activeRailKind(f.tags))).map((f) => f.id));
+  if (!under.size) return under;
+  const key = (p) => `${p.lat},${p.lng}`;
+  const at = new Map();
+  for (const f of rail) for (const p of [f.geometry[0], f.geometry[f.geometry.length - 1]]) {
+    if (!at.has(key(p))) at.set(key(p), []);
+    at.get(key(p)).push(f);
+  }
+  const lengthM = (g) => {
+    let m = 0;
+    for (let i = 1; i < g.length; i++) {
+      const dy = (g[i].lat - g[i - 1].lat) * 111320;
+      const dx = (g[i].lng - g[i - 1].lng) * 111320 * Math.cos((g[i].lat * Math.PI) / 180);
+      m += Math.hypot(dx, dy);
+    }
+    return m;
+  };
+  for (let pass = 0; pass < 6; pass++) {
+    let changed = false;
+    for (const f of rail) {
+      if (under.has(f.id) || !URBAN_KINDS.has(activeRailKind(f.tags))) continue;
+      if ((f.tags.bridge && f.tags.bridge !== 'no') || lengthM(f.geometry) > TUNNEL_GAP_MAX_M) continue;
+      const ends = [f.geometry[0], f.geometry[f.geometry.length - 1]].map((p) => (at.get(key(p)) || []).filter((o) => o !== f));
+      // (both ends in tunnels: a piece running out to a dead end or the map's
+      // edge from a portal is the line coming up, above ground)
+      if (!ends.every((list) => list.length && list.every((o) => under.has(o.id)))) continue;
+      under.add(f.id); changed = true;
+    }
+    if (!changed) break;
+  }
+  return under;
 }
 
 // The tags a rail line keeps through the data step (and the R2 tiles' tag
@@ -80,6 +138,10 @@ export const BALLAST_TOP_HALF_M = 1.7;
 // crossing) down to the formation (the terrain under the ballast): rail
 // 0.17 m + sleeper 0.2 m + ballast under it 0.3 m.
 export const RAIL_DEPTH_M = 0.65;
+// The top of the rail over the ground the elevation data shows along a line:
+// a survey sees the line's ballast and sleepers, a little under the rails,
+// not its formation (which lies RAIL_DEPTH_M down, under the ballast).
+export const RAIL_OVER_GROUND_M = 0.2;
 
 /** Gauge in metres from OSM gauge=* (mm; '1435;1520' takes the first), standard gauge without one. */
 export function gaugeOf(tags = {}) {
@@ -115,12 +177,12 @@ export function railHalfWidth(tags = {}) {
  * in a street (streetRunning(feature) true) are left out: they are drawn on
  * their street's surface, not built as a line of their own.
  */
-export function railSegmentsFrom(features = [], { streetRunning = () => false } = {}) {
+export function railSegmentsFrom(features = [], { streetRunning = () => false, underground = undergroundRailIds(features) } = {}) {
   const out = [];
   for (const f of features) {
     if (f?.type !== 'railway' || !Array.isArray(f.geometry)) continue;
     const kind = railKindOf(f.tags);
-    if (!kind) continue;
+    if (!kind || underground.has(f.id)) continue;
     const geometry = f.geometry.filter((p) => p && Number.isFinite(Number(p.lat)) && Number.isFinite(Number(p.lng)));
     if (geometry.length < 2) continue;
     if (streetRunning(f, kind)) continue;

@@ -10,7 +10,7 @@ import {
   OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture, fetchOvertureBuildingRecords, mergeOvertureBuildings,
 } from "./overtureTiles.js";
 import { getLoadedOsmFile, osmFileCoverage } from "./osmFile.js";
-import { railKindOf } from "./railways.js";
+import { activeRailKind } from "./railways.js";
 
 const OVERTURE_ENDPOINT = "overture-maps";
 // (the user's own OSM file: osmFile.js)
@@ -448,9 +448,10 @@ export const parseOverpassResponse = (data, bounds) => {
 
     // an active railway (services/railways.js): a line of its own, kept with
     // all its tags (bridge, tunnel, layer, gauge, electrified, tracks, usage,
-    // service, name); a street way that carries a tram on it is its road
-    // as well, below
-    if (railKindOf(tags)) {
+    // service, name), a city's metro in its tunnel too (the export builds
+    // what is above ground); a street way that carries a tram on it is its
+    // road as well, below
+    if (activeRailKind(tags)) {
       rawFeatures.push({ id: tags.highway ? `${id}_rail` : id.toString(), type: "railway", geometry: w.nodes, tags });
       if (!tags.highway) continue;
     }

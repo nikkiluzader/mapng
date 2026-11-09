@@ -10,7 +10,7 @@
 // line; West Coast USA's railway is one mesh made for its own route.
 // Nothing here knows about any place.
 
-import { BALLAST_TOP_HALF_M, RAIL_DEPTH_M, STANDARD_GAUGE_M, TRACK_SPACING_M, gaugeOf, tracksOf } from './railways.js';
+import { BALLAST_TOP_HALF_M, RAIL_DEPTH_M, RAIL_OVER_GROUND_M, STANDARD_GAUGE_M, TRACK_SPACING_M, gaugeOf, tracksOf } from './railways.js';
 
 // ── Level crossings and the formation under the track ─────────────────────
 
@@ -19,14 +19,19 @@ const CROSSING_RAMP_M = 8;       // the formation drops back to the track's dept
 
 /**
  * Railway edges of a structure graph made ready for the solve:
- *   - their ground is where the top of the rail stands when the formation
- *     lies on the untouched ground (g + RAIL_DEPTH_M): on flat land a line
- *     sits on the ground, not sunk into a ditch with its rails at ground level;
+ *   - their ground is where the top of the rail stands over the ground the
+ *     elevation data shows (g + RAIL_OVER_GROUND_M: the survey sees the
+ *     ballast, a little under the rails);
+ *   - e.target: what the solve pulls them to (railGroundTargets);
+ *   - e.weight per station: how hard (W_RAIL, weaker than a street's, so
+ *     the line runs smoother; a street's at a level crossing, so the road and
+ *     the line meet at the line's height, not the road's);
  *   - e.drop per station, the formation under the top of the rail
  *     (RAIL_DEPTH_M), none at a level crossing (a road meeting the line at a
  *     node of both: the road and the rails at one height, no trench dug
  *     across the road), easing back in over CROSSING_RAMP_M;
- *   - e.crossingAt per station: 1 inside a crossing's surface.
+ *   - e.crossingAt per station (1 inside a crossing's surface) and
+ *     e.crossingZones, the crossings' extents along the edge [[s0, s1]...].
  * Returns the level crossings [{ node, x, y, rail: [edge], road: [edge], half, path }]
  * (path: every road there is a footway or another path).
  */
@@ -36,9 +41,11 @@ export function prepareRailEdges(graph, { pathClasses = new Set() } = {}) {
   if (!edges.some((e) => e.rail)) return crossings;
   for (const e of edges) {
     if (!e.rail) continue;
-    for (let i = 0; i < e.g.length; i++) e.g[i] += RAIL_DEPTH_M;
+    for (let i = 0; i < e.g.length; i++) e.g[i] += RAIL_OVER_GROUND_M;
     e.drop = new Float32Array(e.s.length).fill(RAIL_DEPTH_M);
     e.crossingAt = new Uint8Array(e.s.length);
+    e.crossingZones = [];
+    e.weight = new Float32Array(e.s.length).fill(W_RAIL);
   }
   railGroundTargets(graph);
   for (const node of nodes.values()) {
@@ -51,10 +58,17 @@ export function prepareRailEdges(graph, { pathClasses = new Set() } = {}) {
       rail: rail.map(({ edge }) => edge), road: road.map(({ edge }) => edge),
       half, path: road.every(({ edge }) => pathClasses.has(edges[edge].highway)),
     });
-    for (const { edge, end } of rail) markCrossing(edges[edge], end, half);
+    for (const { edge, end } of rail) {
+      const e = edges[edge];
+      markCrossing(e, end === 0 ? 0 : e.s[e.s.length - 1], half);
+    }
   }
   return crossings;
 }
+
+// A railway station's pull to its target, against a street's 1
+// (structures/profileSolve.js W_GROUND)
+const W_RAIL = 0.2;
 
 // How wide a dip in the ground a line runs straight over (each side of a
 // station, m): a main line holds its grade across a hollow, a stream's valley
@@ -147,12 +161,16 @@ export function railGroundTargets(graph) {
   });
 }
 
-function markCrossing(e, end, half) {
-  const n = e.s.length; const s0 = end === 0 ? 0 : e.s[n - 1];
+// A crossing at arc length s0 along a rail edge, a road of half width
+// `half` across it: its surface, the formation up to the rails' top there
+// and easing back down past it, the line held at its height as hard as the road.
+function markCrossing(e, s0, half) {
+  const n = e.s.length;
   const zone = half + CROSSING_PAD_M;
+  e.crossingZones.push([Math.max(0, s0 - zone), Math.min(e.s[n - 1], s0 + zone)]);
   for (let i = 0; i < n; i++) {
     const d = Math.abs(e.s[i] - s0);
-    if (d <= zone) e.crossingAt[i] = 1;
+    if (d <= zone) { e.crossingAt[i] = 1; e.weight[i] = 1; }
     const drop = RAIL_DEPTH_M * Math.max(0, Math.min(1, (d - zone) / CROSSING_RAMP_M));
     if (drop < e.drop[i]) e.drop[i] = drop;
   }
@@ -216,14 +234,7 @@ function segHit(ax, ay, bx, by, cx, cy, dx, dy) {
 export function markUnjoinedCrossing(graph, c) {
   const e = graph.edges[c.rail];
   if (!e?.drop) return;
-  const half = graph.edges[c.road]?.half || 3;
-  const zone = half + CROSSING_PAD_M;
-  for (let i = 0; i < e.s.length; i++) {
-    const d = Math.abs(e.s[i] - c.s);
-    if (d <= zone) e.crossingAt[i] = 1;
-    const drop = RAIL_DEPTH_M * Math.max(0, Math.min(1, (d - zone) / CROSSING_RAMP_M));
-    if (drop < e.drop[i]) e.drop[i] = drop;
-  }
+  markCrossing(e, c.s, graph.edges[c.road]?.half || 3);
 }
 
 // ── Track geometry ───────────────────────────────────────────────────────
@@ -232,7 +243,7 @@ export function markUnjoinedCrossing(graph, c) {
 const RAIL_H_M = 0.17;
 const RAIL_HEAD_HALF_M = 0.036;
 const SLEEPER_TOP_M = RAIL_H_M;          // sleepers under the rails
-const SLEEPER_D_M = 0.2;
+const SLEEPER_SHOW_BURY_M = 0.03;      // its long faces this far down into the ballast
 const SLEEPER_HALF_W_M = 0.13;           // along the track
 const SLEEPER_HALF_L_M = 1.3;            // across it (2.6 m sleepers on standard gauge)
 export const SLEEPER_EVERY_M = 0.6;
@@ -376,21 +387,38 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
       const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy) || 1;
       nx[i] = -dy / L; ny[i] = dx / L;
     }
-    const at = (i, o, dz) => [e.x[i] + nx[i] * o, e.y[i] + ny[i] * o, zk[i] - dz];
-    const cross = e.crossingAt || new Uint8Array(n);
+    // a point at arc length sv between stations i and i + 1, offset o to the
+    // left of the line and dz under the top of the rail
+    const at = (i, sv, o, dz) => {
+      const f = (sv - e.s[i]) / ((e.s[i + 1] - e.s[i]) || 1);
+      let ux = nx[i] + (nx[i + 1] - nx[i]) * f; let uy = ny[i] + (ny[i + 1] - ny[i]) * f;
+      const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+      return [e.x[i] + (e.x[i + 1] - e.x[i]) * f + ux * o, e.y[i] + (e.y[i + 1] - e.y[i]) * f + uy * o, zk[i] + (zk[i + 1] - zk[i]) * f - dz];
+    };
+    // the level crossings along it: no ballast, sleepers or rails inside one
+    // (cut exactly at its ends: whole 4 m pieces left 0.5 m of ballast in the road)
+    const zones = e.crossingZones || [];
+    const outside = (sa, sb) => {
+      let parts = [[sa, sb]];
+      for (const [za, zb] of zones) {
+        parts = parts.flatMap(([p, q]) => (zb <= p || za >= q ? [[p, q]] : [[p, Math.min(q, za)], [Math.max(p, zb), q]].filter(([u, v]) => v - u > 1e-3)));
+      }
+      return parts;
+    };
     stats.edges++;
     stats.trackKm += (nTracks * e.s[n - 1]) / 1000;
     for (let i = 0; i + 1 < n; i++) {
       if (e.s[i + 1] - e.s[i] < 1e-3) continue;
       const t = tileOf((e.x[i] + e.x[i + 1]) / 2, (e.y[i] + e.y[i + 1]) / 2);
-      const v0 = e.s[i] / BALLAST_UV_M; const v1 = e.s[i + 1] / BALLAST_UV_M;
       if (e.rail === 'monorail') {
         // the beam: its top and both sides
         const part = partOf(t, RAIL_MATERIALS.beam);
-        const L0 = at(i, BEAM_HALF_M, 0); const L1 = at(i + 1, BEAM_HALF_M, 0);
-        const R0 = at(i, -BEAM_HALF_M, 0); const R1 = at(i + 1, -BEAM_HALF_M, 0);
-        const LB0 = at(i, BEAM_HALF_M, BEAM_D_M); const LB1 = at(i + 1, BEAM_HALF_M, BEAM_D_M);
-        const RB0 = at(i, -BEAM_HALF_M, BEAM_D_M); const RB1 = at(i + 1, -BEAM_HALF_M, BEAM_D_M);
+        const s0 = e.s[i]; const s1 = e.s[i + 1];
+        const v0 = s0 / BALLAST_UV_M; const v1 = s1 / BALLAST_UV_M;
+        const L0 = at(i, s0, BEAM_HALF_M, 0); const L1 = at(i, s1, BEAM_HALF_M, 0);
+        const R0 = at(i, s0, -BEAM_HALF_M, 0); const R1 = at(i, s1, -BEAM_HALF_M, 0);
+        const LB0 = at(i, s0, BEAM_HALF_M, BEAM_D_M); const LB1 = at(i, s1, BEAM_HALF_M, BEAM_D_M);
+        const RB0 = at(i, s0, -BEAM_HALF_M, BEAM_D_M); const RB1 = at(i, s1, -BEAM_HALF_M, BEAM_D_M);
         const uv = (w) => [[0, v0], [w, v0], [w, v1], [0, v1]];
         for (const [q, w] of [[[R0, R1, L1, L0], 0.45], [[L0, L1, LB1, LB0], 0.75], [[RB0, RB1, R1, R0], 0.75]]) {
           quad(part, ...q, uv(w));
@@ -398,37 +426,37 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
         }
         continue;
       }
-      if (cross[i] && cross[i + 1]) continue;
-      // the ballast: one bed under all the tracks, its shoulders down into the formation
-      {
+      for (const [s0, s1] of outside(e.s[i], e.s[i + 1])) {
+        const v0 = s0 / BALLAST_UV_M; const v1 = s1 / BALLAST_UV_M;
+        // the ballast: one bed under all the tracks, its shoulders down into the formation
         const top = Math.max(...offsets.map(Math.abs)) + BALLAST_TOP_HALF_M * scale;
         const fall = (RAIL_DEPTH_M - BALLAST_TOP_M) + BALLAST_BURY_M;
         const foot = top + fall * BALLAST_SLOPE;
-        const part = partOf(t, RAIL_MATERIALS.ballast);
+        const bed = partOf(t, RAIL_MATERIALS.ballast);
         const rows = [[foot, BALLAST_TOP_M + fall], [top, BALLAST_TOP_M], [-top, BALLAST_TOP_M], [-foot, BALLAST_TOP_M + fall]];
         for (let r = 0; r + 1 < rows.length; r++) {
           const [oa, da] = rows[r]; const [ob, db] = rows[r + 1];
-          const a0 = at(i, oa, da); const a1 = at(i + 1, oa, da); const b0 = at(i, ob, db); const b1 = at(i + 1, ob, db);
+          const a0 = at(i, s0, oa, da); const a1 = at(i, s1, oa, da); const b0 = at(i, s0, ob, db); const b1 = at(i, s1, ob, db);
           const ua = oa / BALLAST_UV_M; const ub = ob / BALLAST_UV_M;
           // (a: the left of b; counter-clockwise seen from above)
-          quad(part, a0, b0, b1, a1, [[ua, v0], [ub, v0], [ub, v1], [ua, v1]]);
+          quad(bed, a0, b0, b1, a1, [[ua, v0], [ub, v0], [ub, v1], [ua, v1]]);
           quad(t.collision, a0, b0, b1, a1);
         }
-      }
-      // the rails: each head's top and both sides, down to the sleepers
-      for (const o of offsets) {
-        for (const side of [-1, 1]) {
-          const c = o + (side * gauge) / 2;
-          const part = partOf(t, RAIL_MATERIALS.steel);
-          const L0 = at(i, c + RAIL_HEAD_HALF_M, 0); const L1 = at(i + 1, c + RAIL_HEAD_HALF_M, 0);
-          const R0 = at(i, c - RAIL_HEAD_HALF_M, 0); const R1 = at(i + 1, c - RAIL_HEAD_HALF_M, 0);
-          const LB0 = at(i, c + RAIL_HEAD_HALF_M, RAIL_H_M); const LB1 = at(i + 1, c + RAIL_HEAD_HALF_M, RAIL_H_M);
-          const RB0 = at(i, c - RAIL_HEAD_HALF_M, RAIL_H_M); const RB1 = at(i + 1, c - RAIL_HEAD_HALF_M, RAIL_H_M);
-          const uv = [[0, v0], [0.05, v0], [0.05, v1], [0, v1]];
-          quad(part, L0, R0, R1, L1, uv);
-          quad(part, LB0, L0, L1, LB1, uv);
-          quad(part, R0, RB0, RB1, R1, uv);
-          quad(t.collision, L0, R0, R1, L1);
+        // the rails: each head's top and both sides, down to the sleepers
+        const steel = partOf(t, RAIL_MATERIALS.steel);
+        for (const o of offsets) {
+          for (const side of [-1, 1]) {
+            const c = o + (side * gauge) / 2;
+            const L0 = at(i, s0, c + RAIL_HEAD_HALF_M, 0); const L1 = at(i, s1, c + RAIL_HEAD_HALF_M, 0);
+            const R0 = at(i, s0, c - RAIL_HEAD_HALF_M, 0); const R1 = at(i, s1, c - RAIL_HEAD_HALF_M, 0);
+            const LB0 = at(i, s0, c + RAIL_HEAD_HALF_M, RAIL_H_M); const LB1 = at(i, s1, c + RAIL_HEAD_HALF_M, RAIL_H_M);
+            const RB0 = at(i, s0, c - RAIL_HEAD_HALF_M, RAIL_H_M); const RB1 = at(i, s1, c - RAIL_HEAD_HALF_M, RAIL_H_M);
+            const uv = [[0, v0], [0.05, v0], [0.05, v1], [0, v1]];
+            quad(steel, L0, R0, R1, L1, uv);
+            quad(steel, LB0, L0, L1, LB1, uv);
+            quad(steel, R0, RB0, RB1, R1, uv);
+            quad(t.collision, L0, R0, R1, L1);
+          }
         }
       }
     }
@@ -437,7 +465,7 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
     let j = 0;
     for (let s = SLEEPER_EVERY_M / 2; s < e.s[n - 1]; s += SLEEPER_EVERY_M) {
       while (j + 1 < n - 1 && e.s[j + 1] < s) j++;
-      if (cross[j] || cross[j + 1]) continue;
+      if (zones.some(([za, zb]) => s > za - SLEEPER_HALF_W_M && s < zb + SLEEPER_HALF_W_M)) continue;
       const f = (s - e.s[j]) / ((e.s[j + 1] - e.s[j]) || 1);
       const x = e.x[j] + (e.x[j + 1] - e.x[j]) * f; const y = e.y[j] + (e.y[j + 1] - e.y[j]) * f;
       const zz = zk[j] + (zk[j + 1] - zk[j]) * f;
@@ -446,7 +474,10 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
       const t = tileOf(x, y);
       const part = partOf(t, sleeper);
       const hw = SLEEPER_HALF_W_M; const hl = SLEEPER_HALF_L_M * scale;
-      const zt = zz - SLEEPER_TOP_M; const zb = zt - SLEEPER_D_M;
+      // (only what shows over the ballast: its top and its two long faces down
+      // into the ballast; its ends and the rest of its depth are buried, and
+      // left out they took 40 % of a level's track triangles)
+      const zt = zz - SLEEPER_TOP_M; const zb = zz - BALLAST_TOP_M - SLEEPER_SHOW_BURY_M;
       for (const o of offsets) {
         const cx = x + lx * o; const cy = y + ly * o;
         const corner = (a, b, zh) => [cx + tx * a + lx * b, cy + ty * a + ly * b, zh];
@@ -454,10 +485,8 @@ export function buildTrackGeometry(graph, { tagsOf = () => ({}) } = {}) {
         const BR = (zh) => corner(-hw, -hl, zh); const FR = (zh) => corner(hw, -hl, zh);
         const FL = (zh) => corner(hw, hl, zh); const BL = (zh) => corner(-hw, hl, zh);
         quad(part, BR(zt), FR(zt), FL(zt), BL(zt), [[0, 0], [0.13, 0], [0.13, 1.3], [0, 1.3]]);
-        quad(part, FR(zb), FL(zb), FL(zt), FR(zt), [[0, 0], [1.3, 0], [1.3, 0.1], [0, 0.1]]);
-        quad(part, BL(zb), BR(zb), BR(zt), BL(zt), [[0, 0], [1.3, 0], [1.3, 0.1], [0, 0.1]]);
-        quad(part, BR(zb), FR(zb), FR(zt), BR(zt), [[0, 0], [0.13, 0], [0.13, 0.1], [0, 0.1]]);
-        quad(part, FL(zb), BL(zb), BL(zt), FL(zt), [[0, 0], [0.13, 0], [0.13, 0.1], [0, 0.1]]);
+        quad(part, FR(zb), FL(zb), FL(zt), FR(zt), [[0, 0], [1.3, 0], [1.3, 0.05], [0, 0.05]]);
+        quad(part, BL(zb), BR(zb), BR(zt), BL(zt), [[0, 0], [1.3, 0], [1.3, 0.05], [0, 0.05]]);
         stats.sleepers++;
       }
     }
@@ -506,35 +535,39 @@ export function crossingDecals(graph, { tagsOf = () => ({}) } = {}) {
   if (!z) return [];
   const out = [];
   graph.edges.forEach((e, k) => {
-    if (!e.rail || !e.crossingAt || e.rail === 'monorail') return;
+    if (!e.rail || !e.crossingZones?.length || e.rail === 'monorail') return;
     const tags = tagsOf(e) || {};
     const gauge = gaugeOf(tags);
     const width = TRAMLINE_WIDTH_M * (gauge / STANDARD_GAUGE_M);
     const nTracks = tracksOf(tags);
     const scale = Math.max(0.7, gauge / STANDARD_GAUGE_M);
     const n = e.s.length;
-    for (let i = 0; i < n;) {
-      if (!e.crossingAt[i]) { i++; continue; }
-      let j = i; while (j + 1 < n && e.crossingAt[j + 1]) j++;
-      // (a station past each end: the decal reaches over the road's edge)
-      const a = Math.max(0, i - 1); const b = Math.min(n - 1, j + 1);
-      if (b > a) {
-        for (let t = 0; t < nTracks; t++) {
-          const o = (t - (nTracks - 1) / 2) * TRACK_SPACING_M * scale;
-          const pts = [];
-          for (let q = a; q <= b; q++) {
-            const qa = Math.max(0, q - 1); const qb = Math.min(n - 1, q + 1);
-            const dx = e.x[qb] - e.x[qa]; const dy = e.y[qb] - e.y[qa]; const L = Math.hypot(dx, dy) || 1;
-            pts.push([e.x[q] - (dy / L) * o, e.y[q] + (dx / L) * o, z[k][q]]);
-          }
-          out.push({ nodes: densify(pts).map((p) => [p[0], p[1], Math.round(p[2] * 1000) / 1000, width]), edge: k });
+    // a point at arc length sv, offset o to the left
+    const at = (sv, o) => {
+      let i = 0; while (i + 2 < n && e.s[i + 1] < sv) i++;
+      const f = Math.max(0, Math.min(1, (sv - e.s[i]) / ((e.s[i + 1] - e.s[i]) || 1)));
+      const dx = e.x[i + 1] - e.x[i]; const dy = e.y[i + 1] - e.y[i]; const L = Math.hypot(dx, dy) || 1;
+      return [e.x[i] + dx * f - (dy / L) * o, e.y[i] + dy * f + (dx / L) * o, z[k][i] + (z[k][i + 1] - z[k][i]) * f];
+    };
+    for (const [za, zb] of e.crossingZones) {
+      // (a little past each end: over the road's edge, onto the ballast's end)
+      const s0 = Math.max(0, za - CROSSING_DECAL_OVER_M); const s1 = Math.min(e.s[n - 1], zb + CROSSING_DECAL_OVER_M);
+      if (s1 - s0 < 1) continue;
+      const steps = Math.max(1, Math.ceil((s1 - s0) / DECAL_STEP_M));
+      for (let t = 0; t < nTracks; t++) {
+        const o = (t - (nTracks - 1) / 2) * TRACK_SPACING_M * scale;
+        const nodes = [];
+        for (let q = 0; q <= steps; q++) {
+          const p = at(s0 + ((s1 - s0) * q) / steps, o);
+          nodes.push([p[0], p[1], Math.round(p[2] * 1000) / 1000, width]);
         }
+        out.push({ nodes, edge: k });
       }
-      i = j + 1;
     }
   });
   return out;
 }
+const CROSSING_DECAL_OVER_M = 0.3;
 
 /**
  * Trams running in a street, drawn on its surface: the game's tram-rail

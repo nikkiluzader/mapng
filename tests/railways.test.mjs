@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { parseOverpassResponse } from '../services/osm.js';
 import { OSM_FILTER, buildOverpassQuery } from '../services/overpassQuery.js';
-import { railKindOf, railHalfWidth, gaugeOf, tracksOf, railSegmentsFrom, streetRunningTest } from '../services/railways.js';
+import { railKindOf, railHalfWidth, gaugeOf, tracksOf, railSegmentsFrom, streetRunningTest, undergroundRailIds } from '../services/railways.js';
 
 const line = (id, tags, pts) => ({ type: 'way', id, tags, geometry: pts.map(([lng, lat]) => ({ lat, lon: lng })) });
 const bounds = { north: 1, south: 0, east: 1, west: 0 };
@@ -42,7 +42,9 @@ test('a railway way becomes a railway feature with its tags, clipped as a line',
     line(2, { railway: 'disused' }, [[0.1, 0.1], [0.9, 0.1]]),
     line(3, { railway: 'subway', tunnel: 'yes', layer: '-1' }, [[0.1, 0.2], [0.9, 0.2]]),
   ] }, bounds);
-  const rail = features.filter((f) => f.type === 'railway');
+  // (the subway in its tunnel is kept as data: the export builds what is above ground)
+  const rail = features.filter((f) => f.type === 'railway' && f.tags.railway === 'rail');
+  assert.equal(features.filter((f) => f.type === 'railway').length, 2);
   assert.equal(rail.length, 1);
   assert.deepEqual(rail[0].tags, tags);
   assert.ok(rail[0].geometry.every((p) => p.lng >= 0 && p.lng <= 1), 'clipped to the map');
@@ -91,4 +93,19 @@ test('rail segments for the structure graph; street-running trams left to the st
   assert.equal(segs[0].highway, 'railway:rail');
   assert.equal(segs[0].rail, 'rail');
   assert.equal(segs[0].layer, 1);
+});
+
+test('a city line\'s untagged station track between two of its tunnels is underground with them', () => {
+  const ll = (x, y) => ({ lat: y / 111320, lng: x / 111320 });
+  const f = (id, tags, pts) => ({ id: String(id), type: 'railway', tags, geometry: pts.map(([x, y]) => ll(x, y)) });
+  const features = [
+    f(1, { railway: 'light_rail', tunnel: 'yes', layer: '-1' }, [[-500, 0], [-100, 0]]),
+    f(2, { railway: 'light_rail' }, [[-100, 0], [100, 0]]),                       // the station, untagged
+    f(3, { railway: 'light_rail', tunnel: 'yes', layer: '-1' }, [[100, 0], [500, 0]]),
+    f(4, { railway: 'light_rail' }, [[500, 0], [900, 0]]),                        // out of the portal, above ground
+    f(5, { railway: 'rail' }, [[-100, 300], [100, 300]]),
+  ];
+  const under = undergroundRailIds(features);
+  assert.deepEqual([...under].sort(), ['1', '2', '3']);
+  assert.deepEqual(railSegmentsFrom(features).map((s) => s.sourceFeature.id), ['4', '5']);
 });

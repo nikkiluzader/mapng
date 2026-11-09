@@ -37,10 +37,6 @@ const GRADE_CEILING = {
 const GRADE_CEILING_DEFAULT = 0.25;
 
 const W_GROUND = 1;           // pull of a ground road's station to its ground
-// A railway's: weaker, its profile smoother than a street's through the
-// ground's ups and downs (and pulled to its target: the ground with the dips
-// it runs straight over filled, railTrack.js)
-const W_RAIL_GROUND = 0.2;
 // A tagged bridge / tunnel station: no pull to the ground at all (even a
 // tiny one summed over a long deck sagged it toward the ground below, a
 // crest at each end); held only by smoothing, joints and envelopes.
@@ -212,7 +208,10 @@ export function* solveProfilesSteps(graph) {
       const v = off[k] + i;
       G[v] = Number.isFinite(e.g[i]) ? e.g[i] : 0;
       P[v] = e.target && Number.isFinite(e.target[i]) ? e.target[i] : G[v];
-      W[v] = asStructure(e) ? W_STRUCTURE : railKindOfClass(e.highway) ? W_RAIL_GROUND : W_GROUND;
+      // (an edge may carry its own pull per station: a railway's, weaker than a
+      // street's so its profile runs smoother, full at a level crossing:
+      // railTrack.js)
+      W[v] = asStructure(e) ? W_STRUCTURE : e.weight ? e.weight[i] : W_GROUND;
       edgeOf[v] = k;
     }
   });

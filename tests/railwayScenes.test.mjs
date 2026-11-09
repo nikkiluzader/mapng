@@ -118,6 +118,11 @@ test('a level crossing: road and rails at one height, no ballast bed dug across 
   for (const t of tiles) {
     const p = t.parts[RAIL_MATERIALS.concrete]?.pos || [];
     for (let q = 0; q < p.length; q += 3) assert.ok(Math.abs(p[q]) > half + 0.5 - 0.15, `sleeper at x ${p[q].toFixed(2)} inside the road`);
+    // nor ballast or rails: cut at the crossing's end, not at the station before it
+    for (const m of [RAIL_MATERIALS.ballast, RAIL_MATERIALS.steel]) {
+      const b = t.parts[m]?.pos || [];
+      for (let q = 0; q < b.length; q += 3) assert.ok(Math.abs(b[q]) >= half + 0.8 - 0.02, `${m} at x ${b[q].toFixed(2)} inside the road`);
+    }
   }
   const stats = railwayStats(sg, sg.railSegments);
   assert.equal(stats.roadCrossings, 1);
@@ -148,6 +153,27 @@ test('track geometry: rails at the top of the rail, sleepers and ballast under t
   assert.ok(Math.abs(railTop - zr) < 0.05, `rails on the profile (${railTop} vs ${zr})`);
   assert.ok(ballastLow < zr - RAIL_DEPTH_M, 'ballast down into the formation');
   assert.ok(beam > 0, 'the monorail\'s beam');
+});
+
+test('a main line tunnel under a hill is bored by the tunnel builder, its formation on the tube floor', () => {
+  // a 40 m hill across y = 0; the line in a tunnel under it
+  const td = sceneTerrain((x, y) => 10 + 40 * Math.exp(-((y / 150) ** 2)), [
+    rail(1, [[0, -450], [0, -200]], { railway: 'rail' }),
+    rail(2, [[0, -200], [0, 200]], { railway: 'rail', tunnel: 'yes', layer: '-1' }),
+    rail(3, [[0, 200], [0, 450]], { railway: 'rail' }),
+  ]);
+  const groups = quiet(() => generateDecalRoads(td, SQ, { structureSolver: 'v2' }));
+  const sg = groups.structureGraph;
+  assert.equal(groups.tunnels.tunnels.length, 1, 'one bore');
+  const k = sg.edges.findIndex((e) => e.rail && e.tunnel);
+  assert.ok(sg.classes.segments.some((s) => s.edge === k && s.kind === 'external'), 'the tunnel builder\'s');
+  const t = groups.tunnels.tunnels[0];
+  const mid = t.line[Math.floor((t.iS + t.iN) / 2)];
+  const { z } = zAt(sg, k, mid.x, mid.y);
+  assert.ok(Math.abs(z - RAIL_DEPTH_M - mid.z) < 0.3, `top of rail ${z.toFixed(2)} on a floor at ${mid.z.toFixed(2)}`);
+  assert.ok(steepest(sg, k) <= 0.031, `grade in the bore ${steepest(sg, k)}`);
+  const stats = railwayStats(sg, sg.railSegments);
+  assert.ok(stats.tunnelRuns >= 1 && stats.byKind.rail.tunnelKm > 0.3, JSON.stringify(stats.byKind));
 });
 
 test('a tram down the middle of a street is drawn on it, not built as a line of its own', () => {

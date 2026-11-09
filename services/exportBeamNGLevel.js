@@ -112,7 +112,7 @@ import {
   SIGNAL_POLE_SHAPE,
 } from './beamngSignals.js';
 import { planRaceways } from './racetracks.js';
-import { RAIL_DEPTH_M, railHalfWidth, railKindOf, railSegmentsFrom, streetRunningTest } from './railways.js';
+import { RAIL_DEPTH_M, railHalfWidth, railKindOf, railSegmentsFrom, streetRunningTest, undergroundRailIds } from './railways.js';
 import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, buildTrackGeometry, crossingDecals, streetTramDecals, railMaterialDefs, RAIL_MATERIALS, TRAMLINE_MATERIAL, railwayStats } from './railTrack.js';
 // footways and other paths: a level crossing of one is a foot crossing
 const PATH_HIGHWAYS = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway']);
@@ -1190,7 +1190,8 @@ function buildLevelRailways(sg, terrainData, squareSize, levelName) {
   // trams in their streets: the railway features left out of the graph
   const built = new Set(segs.filter((s) => s.rail).map((s) => s.sourceFeature?.id));
   const toXY = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
-  const street = (terrainData.osmFeatures || []).filter((f) => f?.type === 'railway' && !built.has(f.id)
+  const underground = undergroundRailIds(terrainData.osmFeatures || []);
+  const street = (terrainData.osmFeatures || []).filter((f) => f?.type === 'railway' && !built.has(f.id) && !underground.has(f.id)
     && ['tram', 'light_rail'].includes(railKindOf(f.tags)) && f.geometry?.length >= 2);
   let streetTramM = 0;
   streetTramDecals(street.map((f) => ({ xy: f.geometry.map(toXY), tags: f.tags || {} })), (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize))
