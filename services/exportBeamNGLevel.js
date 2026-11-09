@@ -31,6 +31,7 @@ import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData, cropHeightmap, cropOSMFeatures, adjustBounds } from './cropTerrain.js';
 import { stepHash, cachedStep, terrainFingerprint } from './stepCache.js';
+import { backdropHeightSampler, planBackdropWater, insidePart } from './backdropWater.js';
 
 // (the build, in the step cache keys of steps whose code spans many modules:
 // a new build makes them again; no build constant (Node tests): those steps
@@ -1904,6 +1905,8 @@ async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) 
     textureFiles: result.textures ?? [],
     materialNames: [...materialNames],
     diagnostics: surroundingGroup.userData?.surroundingDiagnostics ?? null,
+    // (the tiles' elevations, coarse: the water carried out over the backdrop)
+    heights: surroundingGroup.userData?.surroundingHeights ?? null,
   };
 }
 
@@ -7668,6 +7671,7 @@ function buildDetailedReportSections(d) {
   const ws = d.waterObjects?.stats;
   if (ws?.sea?.blocks != null) lines.push(`- Sea: ${ws.sea.blocks} WaterBlocks in place of the sea-level plane (ground or a cut below sea level the open sea doesn't reach stays dry; no water in a tunnel's trenches, none deeper than its roof over the tube)`);
   if (ws?.pools?.poolBlocks || ws?.pools?.fountainBlocks) lines.push(`- Pool and fountain water: ${ws.pools.poolBlocks} WaterBlocks in ${ws.pools.pools} pools, ${ws.pools.fountainBlocks} in ${ws.pools.fountains} fountains (clear, pale blue, slow ripples; each reaching under its coping or rim)`);
+  if (ws?.backdrop) lines.push(`- Water over the backdrop (the lakes, ponds and rivers round the map): ${ws.backdrop.blocks} lake WaterBlocks in ${ws.backdrop.lakes} lakes, ${ws.backdrop.rivers} rivers`);
   if (ws?.lakes?.riverAreas) lines.push(`- Wide or tidal rivers as area water (WaterBlocks at the river's level, no River ribbon in them): ${ws.lakes.riverAreas}`);
   if (ws?.lakes?.clippedOverTunnels) lines.push(`- Lake tiles held over a tunnel's roof: ${ws.lakes.clippedOverTunnels}`);
   if (ws?.rivers?.nodesClippedOverTunnels) lines.push(`- River nodes held over a tunnel's roof (or left out over its trench): ${ws.rivers.nodesClippedOverTunnels}`);
@@ -12916,6 +12920,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   let backdropTextureFiles = [];
   let backdropMaterialNames = [];
   let backdropDiagnostics = null;
+  let backdropHeights = null;
   if (includeBackdrop) {
     // (its tiles are in the download cache: the export's data step fetched them)
     beginStep('backdrop', `Building the surrounding backdrop (${backdropElevationSource === 'global30m' ? 'global 30 m' : backdropElevationSource.toUpperCase()} elevation + satellite imagery, 8 tiles)…`);
@@ -12953,6 +12958,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     backdropTextureFiles = backdropResult?.textureFiles ?? [];
     backdropMaterialNames = backdropResult?.materialNames ?? [];
     backdropDiagnostics = backdropResult?.diagnostics ?? null;
+    backdropHeights = backdropResult?.heights ?? null;
   }
 
   let osmDaeBlob = null;
@@ -13023,6 +13029,33 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     : [buildSeaLevelWaterPlane(exportTerrainData, biome, seaLevelOffset)];
   waterStats.sea = seaAsBlocks ? { blocks: seaObjects.length } : { plane: true };
   waterStats.pools = {};
+  // the water out over the backdrop (the lakes, ponds and rivers round the
+  // map, from the data step), unless water is off or background areas are drawn
+  let backdropWater = null;
+  if (includeWater && includeBackdrop && backdropHeights?.length && options.surroundingWater?.length && !bgMask) {
+    try {
+      const ws = exportTerrainData.width * squareSize;
+      const backdropAt = backdropHeightSampler(backdropHeights, { bounds: exportTerrainData.bounds, worldSize: ws, minHeight: Number(exportTerrainData.minHeight) || 0 });
+      const groundAt = (x, y) => (Math.abs(x) <= ws / 2 && Math.abs(y) <= ws / 2 ? getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) : backdropAt(x, y));
+      const around = planBackdropWater({ features: options.surroundingWater, bounds: exportTerrainData.bounds, worldSize: ws, groundAt, mapLakes: lakePlan?.lakes || [], seaZ });
+      // (a lake crossing the edge: the map's blocks for it end where the backdrop's begin)
+      if (lakePlan && around.mapTrim.size) {
+        lakePlan.tiles = lakePlan.tiles.flatMap((t) => (around.mapTrim.has(t.lake) ? [insidePart(t, around.innerHalf)].filter(Boolean) : [t]));
+      }
+      // (the backdrop's ground under them is its 30 m lake surface, centimetres
+      // down: read as deep, murky water, not the photo through a film of it;
+      // one depth for all: the map's terrain the depth reads stops at its edge)
+      const blocks = buildWaterBlockObjects(exportTerrainData, squareSize, biome, {}, [], { tiles: around.tiles, stats: {} })
+        .map((o) => ({ ...o, clarity: 0, depthGradientMax: 2, waterFogDensity: 4, scale: [o.scale[0], o.scale[1], 12] }));
+      const rivers = buildRiverObjects(exportTerrainData, squareSize, biome, [], {}, [], { rivers: around.rivers, stats: {} })
+        .map((o) => ({ ...o, name: `backdrop_${o.name}` }));
+      backdropWater = [...blocks, ...rivers];
+      waterStats.backdrop = { lakes: around.stats.lakes, blocks: blocks.length, rivers: rivers.length };
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water over the backdrop: ${blocks.length} lake WaterBlocks (${around.stats.lakes} lakes), ${rivers.length} rivers.`);
+    } catch (err) {
+      console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Water over the backdrop skipped: ${err?.message || err}`);
+    }
+  }
   const waterObjects = [
     ...seaObjects,
     ...(includeBuildings ? buildPoolWaterObjects(exportTerrainData, squareSize, biome, waterStats.pools) : []),
@@ -13034,6 +13067,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         ]
       : []),
   ];
+  if (backdropWater) waterObjects.push(...backdropWater);
   Object.defineProperty(waterObjects, 'stats', { value: waterStats, enumerable: false });
   if (includeWater) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water: ${waterStats.lakes.tiles ?? 0} lake tiles in ${waterStats.lakes.lakes ?? 0} lakes (${waterStats.lakes.riverAreas ?? 0} of them wide or tidal rivers), ${waterStats.rivers.pieces ?? 0} rivers; left out ${waterStats.rivers.dry ?? 0} dry washes, ${waterStats.rivers.underground ?? 0} culverts, ${waterStats.rivers.otherKinds ?? 0} drains/ditches, ${waterStats.lakes.dry ?? 0} dry lakes; ${waterStats.rivers.cutAtRoads ?? 0} cut at roads.`);

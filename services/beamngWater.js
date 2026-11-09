@@ -51,7 +51,7 @@ const LAKE_CELL_M = [2, 32];
 // middle 80 % within AREA_FLAT_M). A sloping one stays a ribbon.
 const WIDE_RIVER_M = 120;
 const AREA_FLAT_M = 1;
-const LAKE_TILE_OVERLAP_M = 0.5;
+export const LAKE_TILE_OVERLAP_M = 0.5;
 // a bank this far over a lake's water hides a WaterBlock reaching under it
 const BANK_HIDES_M = 0.1;
 // Lake tile cells (m): a quarter of the old coarse cell within these, and

@@ -769,6 +769,7 @@ const exportDataOptions = computed(() => {
     roadType: hasOsmData.value ? beamNGRoadType.value : 'none',
     includeBridges: !advancedMode.value || beamNGIncludeBridges.value,
     lidarDecks: !advancedMode.value || beamNGLidarDecks.value,
+    includeWater: hasOsmData.value && (!advancedMode.value || beamNGIncludeWater.value),
     backgroundMask: props.terrainData?.backgroundMask || null,
   };
 });
@@ -2016,13 +2017,16 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     // The data step first (usually done already, in the background): the
     // export after it only processes what's in the cache
     const dataTd = toRaw(props.terrainData);
+    let dataResult = null;
     if (dataTd && exportDataNeeds(dataTd, exportDataOptions.value)) {
       beamNGProgressStep.value = t('exportPanel.ui.dataWaiting');
-      await ensureExportData(dataTd, exportDataOptions.value, {
+      dataResult = await ensureExportData(dataTd, exportDataOptions.value, {
         run: runExportData,
         onProgress: (text) => { beamNGProgressStep.value = `${t('exportPanel.ui.dataWaiting')} ${text}`; },
-      }).catch((err) => console.warn(`${BEAMNG_EXPORT_UI_LOG} Downloading ahead failed; the export fetches what it needs:`, err?.message || err));
+      }).catch((err) => { console.warn(`${BEAMNG_EXPORT_UI_LOG} Downloading ahead failed; the export fetches what it needs:`, err?.message || err); return null; });
     }
+    // (the lakes and rivers round the map, for the water out over the backdrop)
+    if (dataResult?.surroundWater?.length) levelOptions.surroundingWater = dataResult.surroundWater;
 
     // (the runner runs the data step itself when this one didn't finish)
     levelOptions.dataStepDone = !dataTd || !exportDataNeeds(dataTd, exportDataOptions.value) || exportDataState(dataTd, exportDataOptions.value)?.status === 'done';

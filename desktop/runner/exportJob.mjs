@@ -47,9 +47,10 @@ async function main() {
     const { exportDataNeeds, downloadExportData } = await import('../../services/exportData.js');
     if (exportDataNeeds(terrainData, job.options || {})) {
       send({ type: 'progress', step: 'Downloading what the level needs (surroundings, bridge heights)…', pct: 0 });
-      await downloadExportData(terrainData, job.options || {}, {
+      const r = await downloadExportData(terrainData, job.options || {}, {
         onProgress: (text) => send({ type: 'progress', step: text, pct: 0 }),
-      }).catch((err) => console.warn(`[Sources] the data step failed (${err?.message || err}); the export fetches what it needs`));
+      }).catch((err) => { console.warn(`[Sources] the data step failed (${err?.message || err}); the export fetches what it needs`); return null; });
+      if (r?.surroundWater?.length && job.options) job.options.surroundingWater = r.surroundWater;
       console.log(`[Sources] data step before the export: ${sources.downloaded} downloaded, ${sources.replayed} from the cache`);
       sources.downloaded = 0; sources.downloadedUrls.length = 0;
     }

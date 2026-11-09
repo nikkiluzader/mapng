@@ -1532,8 +1532,9 @@ async function finalizeCombinedLevel(state, combined, report) {
     // export after it only processes
     await attachTreeSpecies(terrainData, { onProgress: (m) => report(`Combined level: ${m}`, 0) });
     if (!desktopApp) {
-      await downloadExportData(terrainData, options, { onProgress: (text) => report(`Combined level: ${text}`, 0) })
-        .catch((err) => console.warn('[Batch] downloading ahead failed; the export fetches what it needs:', err?.message || err));
+      const r = await downloadExportData(terrainData, options, { onProgress: (text) => report(`Combined level: ${text}`, 0) })
+        .catch((err) => { console.warn('[Batch] downloading ahead failed; the export fetches what it needs:', err?.message || err); return null; });
+      if (r?.surroundWater?.length) options.surroundingWater = r.surroundWater;
     }
     if (desktopApp) {
       // (the desktop app: written into the BeamNG mods folder by its export

@@ -1873,6 +1873,15 @@ export const createSurroundingMeshes = async (data, onProgress, maxMeshResolutio
       tiles: {},
     };
     group.userData.surroundingDiagnostics = diagnosticsSummary;
+    // (the tiles' elevations, coarse, for what stands on the backdrop: the
+    // water carried out over it; at most 256 samples a side)
+    group.userData.surroundingHeights = Object.entries(results || {}).filter(([, td]) => td?.heightMap && td.width > 1).map(([pos, td]) => {
+      const step = Math.max(1, Math.ceil(Math.max(td.width, td.height) / 256));
+      const w = Math.ceil(td.width / step); const h = Math.ceil(td.height / step);
+      const hm = new Float32Array(w * h);
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) hm[y * w + x] = td.heightMap[Math.min(td.height - 1, y * step) * td.width + Math.min(td.width - 1, x * step)];
+      return { pos, bounds: { ...td.bounds }, width: w, height: h, heightMap: hm };
+    });
 
     if (!results || Object.keys(results).length === 0) {
       console.warn('[DAE/GLB Surroundings] No results returned from fetch');

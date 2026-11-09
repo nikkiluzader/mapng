@@ -11,6 +11,13 @@
 // prefetchLidarDecks), so nothing here decides what to download.
 import { exportDataInputs, prefetchLidarDecks, BACKDROP_FETCH } from './exportBeamNGLevel.js';
 import { fetchSurroundings } from './export3d.js';
+import { fetchOsmWater } from './osm.js';
+
+// (the backdrop's area: the map and the eight tiles round it, each the map's size)
+export const backdropBounds = (b) => {
+  const la = b.north - b.south; const lo = b.east - b.west;
+  return { north: b.north + la, south: b.south - la, east: b.east + lo, west: b.west - lo };
+};
 
 /**
  * What the export will download for these options ({ includeBackdrop,
@@ -25,12 +32,15 @@ export function exportDataNeeds(terrainData, options = {}) {
   const lidar = options.roadType !== 'none' && options.includeBridges !== false && options.lidarDecks !== false
     && (options.structureSolver ?? 'v2') === 'v2'
     && (terrainData.osmFeatures || []).some((f) => f?.type === 'road' && f.tags?.bridge && f.tags.bridge !== 'no');
+  // the water carried out over the backdrop: lakes, ponds, rivers round the
+  // map (not with water off, nor where the user drew background areas)
+  const water = !!backdrop && options.includeWater !== false && !(terrainData.backgroundMask || options.backgroundMask);
   if (!backdrop && !lidar) return null;
   const b = terrainData.bounds;
   const key = [b.north, b.south, b.east, b.west].map((v) => Number(v).toFixed(6)).join(',')
-    + `|${terrainData.width}x${terrainData.height}|${backdrop ? backdrop.source : '-'}|${lidar ? 'lidar' : '-'}`
+    + `|${terrainData.width}x${terrainData.height}|${backdrop ? backdrop.source : '-'}|${lidar ? 'lidar' : '-'}|${water ? 'water' : '-'}`
     + `|${terrainData.backgroundMask ? JSON.stringify(terrainData.backgroundMask).length : 0}`;
-  return { backdrop, lidar, key };
+  return { backdrop, lidar, water, key };
 }
 
 /**
@@ -42,10 +52,10 @@ export async function downloadExportData(terrainData, options = {}, { onProgress
   const needs = exportDataNeeds(terrainData, options);
   if (!needs) return { backdrop: false, lidar: null };
   const { terrainData: td, squareSize } = exportDataInputs(terrainData, options);
-  const parts = (needs.backdrop ? 1 : 0) + (needs.lidar ? 1 : 0);
+  const parts = (needs.backdrop ? 1 : 0) + (needs.lidar ? 1 : 0) + (needs.water ? 1 : 0);
   let done = 0;
   const step = (text, f) => onProgress?.(text, (done + Math.max(0, Math.min(1, f || 0))) / parts);
-  const out = { backdrop: false, lidar: null };
+  const out = { backdrop: false, lidar: null, surroundWater: null };
   if (needs.backdrop) {
     step('Downloading the surroundings (elevation and satellite, 8 tiles)…', 0);
     await fetchSurroundings(td, (text) => step(`Surroundings: ${String(text).replace(/\.\.\.$/, '…')}`, 0), {
@@ -64,6 +74,16 @@ export async function downloadExportData(terrainData, options = {}, { onProgress
       out.lidar = r?.skipped ? { skipped: r.skipped } : { dataset: r.dataset, nodes: r.nodes, bytes: r.bytes };
     } catch (err) {
       out.lidar = { skipped: String(err?.message || err) };
+    }
+    done++;
+  }
+  if (needs.water) {
+    step('Downloading the lakes and rivers round the map…', 0);
+    try {
+      out.surroundWater = await fetchOsmWater(backdropBounds(td.bounds));
+    } catch (err) {
+      console.warn('[Export data] the water round the map could not be read:', err?.message || err);
+      out.surroundWater = null;
     }
     done++;
   }

@@ -95,10 +95,25 @@ if (process.env.TREEMIX !== 'climate') {
 }
 
 const t0 = Date.now();
+// (BACKDROP=1: the water round the map too, as the app's data step fetches it; cached beside the area)
+let surroundingWater = null;
+if (process.env.BACKDROP === '1') {
+  const f = path.join(dir, 'backdrop_water.json');
+  if (fs.existsSync(f)) surroundingWater = JSON.parse(fs.readFileSync(f, 'utf8'));
+  else {
+    try {
+      const { fetchOsmWater } = await import('../../services/osm.js');
+      const { backdropBounds } = await import('../../services/exportData.js');
+      const { exportDataInputs } = await import('../../services/exportBeamNGLevel.js');
+      surroundingWater = await fetchOsmWater(backdropBounds(exportDataInputs(terrainData).terrainData.bounds));
+      fs.writeFileSync(f, JSON.stringify(surroundingWater));
+    } catch (e) { console.warn('no backdrop water:', e?.message || e); }
+  }
+}
 // (STEP_CACHE=<dir>: the desktop runner's step cache, so a second run reuses what it can)
 const stepCache = process.env.STEP_CACHE ? (await import('../../desktop/runner/diskStepCache.mjs')).diskStepCache(process.env.STEP_CACHE) : null;
 const { blob, structureChecks, steps: stepTimes } = await exportBeamNGLevel(terrainData, meta.center, {
-  treeSpeciesMix, stepCache, ...(stepCache ? { stepCodeVersion: 'sweep' } : {}),
+  treeSpeciesMix, stepCache, ...(stepCache ? { stepCodeVersion: 'sweep' } : {}), ...(surroundingWater ? { surroundingWater } : {}),
   baseTexture, pbrSource: 'osm', roadType: 'decal', includeBackdrop: process.env.BACKDROP === '1',
   includeBuildings: true, includeWater: true, seaLevelOffset: 0,
   includeTrees: true, includeRocks: false, includeNativeBarriers: true,

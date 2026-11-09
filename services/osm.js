@@ -1197,6 +1197,35 @@ export const fetchOSMData = async (bounds, { onStatus, signal, skipBox = null, k
 // (before generating: a light query, not the full pull). Ways sharing a name or
 // ref become one choice. -> [{ id, name, lines: [[[lat, lng], ...], ...] }]
 const KEEPABLE_ROADS = "motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|track|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link";
+/**
+ * The standing and running water around a map (the export's data step: lakes,
+ * ponds, reservoirs, wide rivers' outlines, rivers and streams, coastlines),
+ * for the water carried out over the backdrop. Only those: the land around
+ * the map isn't wanted. Features as parseOverpassResponse makes them, not
+ * cut at the map's edge (bounds is the whole backdrop's).
+ */
+const WATER_FEATURE = (f) => f && (f.type === 'water' || f.type === 'coastline');
+export const fetchOsmWater = async (bounds, { signal } = {}) => {
+  const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
+  let data = null;
+  const file = getLoadedOsmFile();
+  if (file && osmFileCoverage(file.bounds, bounds).coverage === "full") data = file.data;
+  if (!data && (osmTileSource || cacheEndpointAvailable())) {
+    try {
+      data = osmTileSource ? await fetchOsmFromTiles(osmTileSource, bounds, { signal }) : await fetchOsmFromManifestWithStatus(bounds, { signal });
+    } catch (e) {
+      if (e?.name === "AbortError" || signal?.aborted) throw e;
+      data = null;
+    }
+  }
+  if (!data) {
+    const query = `[out:json][timeout:60];\n(\n  way["natural"="water"](${bbox});\n  relation["natural"="water"](${bbox});\n  way["water"](${bbox});\n  relation["water"](${bbox});\n  way["landuse"~"^(reservoir|basin)$"](${bbox});\n  relation["landuse"~"^(reservoir|basin)$"](${bbox});\n  way["waterway"~"^(riverbank|river|canal|stream|dock)$"](${bbox});\n  way["natural"="coastline"](${bbox});\n);\nout body geom;`;
+    data = (await fetchOverpassOrOverture({ query, bounds }, { signal })).data;
+  }
+  return parseOverpassResponse(data, bounds).filter(WATER_FEATURE)
+    .map((f) => ({ id: f.id, type: f.type, tags: f.tags || {}, geometry: f.geometry, ...(f.holes?.length ? { holes: f.holes } : {}) }));
+};
+
 export const fetchOsmRoads = async (bounds, { signal } = {}) => {
   const bbox = `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
   let data = null;
