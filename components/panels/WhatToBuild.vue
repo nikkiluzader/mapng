@@ -147,7 +147,9 @@ const props = defineProps({
   safeCaps: { type: Boolean, default: true },
 });
 defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps']);
-const { t } = useI18n();
+const { t, te } = useI18n();
+// (a feature's small hint, where it has one: asking for a missing key logs a warning)
+const detailOf = (id) => { const k = `build.detail_${id}`; return te(k) || te(k, 'en') ? t(k) : ''; };
 const FOREST_DENSITY_KEYS = ['light', 'normal', 'dense', 'veryDense'];
 
 // A small switch (role="switch"), the panel's one on/off control here.
@@ -182,7 +184,7 @@ const groups = computed(() => {
     const items = g.items.map((it) => {
       const tags = (tagCounts.value[it.id] || []).map((x) => ({ ...x, on: !left.has(x.tag) }));
       const total = tags.reduce((n, x) => n + x.count, 0);
-      return { id: it.id, on: !off.has(it.id), tags, detail: total ? total.toLocaleString() : t(`build.detail_${it.id}`, '') };
+      return { id: it.id, on: !off.has(it.id), tags, detail: total ? total.toLocaleString() : detailOf(it.id) };
     });
     return { id: g.id, items, onCount: items.filter((i) => i.on).length };
   });

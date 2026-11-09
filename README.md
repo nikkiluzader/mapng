@@ -55,13 +55,26 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **Background areas** (Advanced): shade the parts of the map you won't drive; they keep their shape but get no buildings, trees, grass or props and download at lower detail. A No smoothing brush keeps chosen roads exactly as the elevation data has them
 - **Exports that only redo what changed:** everything is downloaded at Generate and in a background data step (one download cache), Check level when nothing changed, and the slow steps reused when one setting did; export history in the desktop app
 - **3D preview** with Standard and Cinematic looks, sun shadows, and terrain views (Relief, Slope, Height, contour lines)
-- **Basic and Advanced modes:** Basic builds the BeamNG level with everything the map has. Advanced adds the Terrain choice (Ready to drive, Custom or Untouched), per-category level options (buildings, water, trees, bridges, tunnels), heightmap, texture and 3D model downloads, and surrounding tiles
+- **What to build:** switch any feature of the level on or off before you export. Basic has four presets (Everything, Clean driving, Roads only, Scenery only); Advanced has a switch for each of 32 features, single OpenStreetMap tags, and the 2D map coloured by group
+- **Spawn and quicktravel points:** pick where the car starts and add places to jump to from BeamNG's big map
+- **Railways** with their bridges, tunnels and level crossings (tracks only for now)
+- **Basic and Advanced modes:** Basic builds the BeamNG level from a preset. Advanced adds the Terrain choice (Ready to drive, Custom or Untouched), every feature switch and fine-tuning (forest density, measured bridge heights), heightmap, texture and 3D model downloads, and surrounding tiles
 - **Your own OpenStreetMap data:** pull the area straight from openstreetmap.org (one request per click; its [API usage policy](https://operations.osmfoundation.org/policies/api/) is yours to follow), or drop in an `.osm` file, when the public servers are down or behind
 - **Batch mode** for tile grids up to 20×20, or a combined level stitched from a 2×2, 4×4 or 8×8 grid
 - Stage-by-stage progress like BeamNG's loading screen, with finished steps and timings, and a detailed `export_report.txt` in every level for troubleshooting
 - 7 languages, light and dark mode
 
 ## What's New (November 2026)
+
+**MapNG 0.2.13** ([update page](https://mapng.com/updates/0.2.13/))
+
+- **What to build** (Export step): one card with a switch for everything MapNG makes. Basic picks a preset (Everything, Clean driving, Roads only, Scenery only); Advanced switches 32 features in 9 groups, can leave out single OpenStreetMap tags, colours the 2D map by group, and has a Fine-tuning tab (forest density, measured bridge heights, build everything). The choice travels in share codes and is listed in `export_report.txt`
+- **Spawn and quicktravel points** (Location step): place pins on the map; the starred one is where the car starts, the rest are Quicktravel points with photos. Points move onto the nearest road, bridges and tunnels included, and face along it
+- **Railways (phase 1):** rail, light rail, tram, narrow gauge, monorail and funicular lines with rails, sleepers and a gravel bed, their own bridges and tunnels, and level crossings flush with the road
+- **Tunnels that open onto bridges** meet the deck; buildings over a portal are lifted clear of it
+- **Rivers:** no stripes on wide rivers with terrain edits off; rivers and pools that meet share one level
+- **Bridges:** double-deck bridges read right from the lidar survey; one arch or truss over a bridge mapped as several ways; partly surveyed bridges no longer sag onto the street below
+- **Polish:** cars face along the road at MapNG spawn points; the donate prompt shows at most once a day (a heart in the top bar opens it); Esc closes the Share dialog
 
 **MapNG 0.2.12** ([update page](https://mapng.com/updates/0.2.12/))
 
