@@ -493,7 +493,16 @@
       "terrainSummary_custom": "Terrain: Custom. Only the edits you picked are made.",
       "terrainSummary_untouched": "Terrain: Untouched. The elevation is used exactly as downloaded.",
       "terrainChangeHere": "Change it under Terrain, in the elevation section above.",
-      "terrainRegenerate": "The Terrain choice changed since this terrain was generated: Generate Data again to apply it."
+      "terrainRegenerate": "The Terrain choice changed since this terrain was generated: Generate Data again to apply it.",
+      "forestDensity": "Forest density",
+      "forestDensity_light": "Light",
+      "forestDensity_normal": "Normal",
+      "forestDensity_dense": "Dense",
+      "forestDensity_veryDense": "Very dense",
+      "forestDensityHint_light": "Fewer trees in woods: the fastest frame rate.",
+      "forestDensityHint_normal": "About 54 trees a hectare in woods: open, and easy on the frame rate.",
+      "forestDensityHint_dense": "Twice as many trees in woods, closer to a real forest. Lowers the frame rate in big woods.",
+      "forestDensityHint_veryDense": "Over three times as many trees in woods, like a real forest. Can cost a lot of frame rate in big woods."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -1252,7 +1261,8 @@
     "saveFile": "Save to file",
     "loadFile": "Load file",
     "buildEverything": "Build everything",
-    "shareDialogTitle": "Share & load settings"
+    "shareDialogTitle": "Share & load settings",
+    "forestDensity": "Forest density"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1435,7 +1445,11 @@
     "texNone": "none",
     "texPainted": "Painted",
     "background": "Background areas",
-    "backgroundPct": "{value}% of the map"
+    "backgroundPct": "{value}% of the map",
+    "forestDensity": "Forest density",
+    "forest_light": "Light",
+    "forest_dense": "Dense",
+    "forest_veryDense": "Very dense"
   },
   "backgroundAreas": {
     "title": "Background areas",
@@ -1498,6 +1512,14 @@
     "hintLassoDrag": "Hold the mouse and draw around the area.",
     "hintUnmasked": "Unmasked: that ground is kept.",
     "hintMasked": "Painted as background.",
-    "hintStrokeErased": "Unmask stroke removed."
+    "hintStrokeErased": "Unmask stroke removed.",
+    "toolRaw": "No smoothing",
+    "hintRaw": "Paint where roads should stay exactly as the elevation data has them, with no smoothing or levelling. Brush by hand, drag a box, or draw a lasso.",
+    "rawShift": "Hold Shift to smooth again instead. [ ] size the brush, 1 2 3 pick the shape, Space pans.",
+    "modeRaw": "No smoothing",
+    "modeSmooth": "Smooth again",
+    "hintRawOn": "Roads here keep the terrain as downloaded.",
+    "hintRawOff": "Roads here are smoothed again.",
+    "statRaw": "No smoothing on {pct}% of the square"
   }
 }
