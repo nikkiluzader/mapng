@@ -163,6 +163,25 @@ test('base: OSM source_tags pass through, filtered like the live Overpass query'
   assert.deepEqual(ways.map((w) => w.tags), [{ leisure: 'park', name: 'Arroyo Park' }], 'ESA land cover is too coarse to use');
 });
 
+test('base: a bridge listed in the infrastructure layer is not a second road', () => {
+  // Overture lists each bridge as an infrastructure feature carrying the road's OSM tags; the road
+  // itself is a transportation segment. Read as a way too, every bridge came through twice.
+  const base = decodeMvt(encodeMvt({
+    infrastructure: [
+      { type: 2, props: { id: 'br1', subtype: 'bridge', class: 'bridge', source_tags: JSON.stringify({ highway: 'unclassified', bridge: 'yes' }) }, parts: [[[1000, 2000], [1400, 2000]]] },
+      { type: 2, props: { id: 'pl1', subtype: 'power', class: 'power_line', source_tags: JSON.stringify({ power: 'line' }) }, parts: [[[0, 100], [900, 100]]] },
+    ],
+  }));
+  const roads = decodeMvt(encodeMvt({ segment: [{ type: 2, props: ROAD_PROPS, parts: [[[1000, 2000], [1400, 2000]]] }] }));
+  const { elements } = buildElements({
+    base: collectFeatures([{ z: Z, x: X, y: Y, layers: base }]),
+    transportation: collectFeatures([{ z: Z, x: X, y: Y, layers: roads }]),
+  });
+  const ways = elements.filter((e) => e.type === 'way');
+  assert.equal(ways.filter((w) => w.tags.highway).length, 1, 'the road once');
+  assert.ok(ways.some((w) => w.tags.power === 'line'), 'other infrastructure lines stay');
+});
+
 test('fetchOSMData falls back to Overture when every Overpass server fails', async () => {
   const { fetchOSMData, getLastOSMRequestInfo } = await import('../services/osm.js');
   const tiles = {

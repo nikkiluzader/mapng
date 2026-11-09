@@ -69,6 +69,7 @@ export function requiredSeparation(upper, lower) {
  * two ground roads crossing that OSM did not join, not a grade separation).
  */
 const SELF_CROSS_M = 40;
+const STACKED_PARALLEL_COS = Math.cos((20 * Math.PI) / 180);   // decks of one layer crossing flatter than this: the same deck twice
 const STACKED_NODE_M = 40;     // ... and this far from a node the two share       // a deck crossing itself this far along it: a spiral, one turn over the other
 
 export function crossingOrder(a, b) {
@@ -154,6 +155,14 @@ export function findCrossings(graph, { waterAt = null } = {}) {
         // (decks of one layer crossing near a node they share are merging
         // there, not one over the other)
         if (order.dynamic && sharedNodes(A, B).some((n) => n && Math.hypot(n.x - x, n.y - y) < STACKED_NODE_M)) continue;
+        // (... and two crossing almost parallel are one bridge drawn twice (a duplicate way, a bridge
+        // outline beside its road), not one over the other: asked to clear each other by 6.5 m, sharing
+        // their ends, they climbed 38 m and took 989 m of Val d'Isère's streets up with them)
+        if (order.dynamic && ea !== eb) {
+          const ax = A.x[a1] - A.x[a0]; const ay = A.y[a1] - A.y[a0]; const bx = B.x[b1] - B.x[b0]; const by = B.y[b1] - B.y[b0];
+          const cos = Math.abs(ax * bx + ay * by) / ((Math.hypot(ax, ay) || 1) * (Math.hypot(bx, by) || 1));
+          if (cos > STACKED_PARALLEL_COS) { unjoined++; continue; }
+        }
         const [upper, lower] = order.upper === 'a' ? [A, B] : [B, A];
         crossings.push({
           a: { edge: ea, ...placeOn(A, A.s[a0] + (A.s[a1] - A.s[a0]) * hit.t) },

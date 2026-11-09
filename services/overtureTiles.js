@@ -572,6 +572,10 @@ export const buildElements = (recordsByTheme) => {
       } else if (theme === 'base') {
         const tags = baseTags(rec.layer, p);
         if (!tags || !keepWay(tags)) continue;
+        // (the infrastructure layer lists each bridge as a feature of its own, with the road's OSM
+        // tags: the road again, half a metre beside the transportation segment. Roads come from
+        // the transportation theme alone)
+        if (tags.highway) continue;
         for (const line of rec.whole || joinPieces(rec.pieces)) if (line.length > 1) addWay(tags, line);
       }
     }

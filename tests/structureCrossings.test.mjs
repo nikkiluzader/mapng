@@ -74,3 +74,24 @@ test('roads of different layers alongside, lanes overlapping: held apart; across
   assert.equal(b.crossings.length, 1);
   assert.equal(b.overlaps.length, 0);
 });
+
+test('a bridge drawn twice (a duplicate way beside its road) is one deck, not two stacked', async () => {
+  const { sceneWay, sceneTerrain } = await import('./helpers/structureScenes.mjs');
+  // a 30 m bridge on a street, and a second bridge way lying 0.5 m beside it,
+  // crossing it at a flat angle (as map data sometimes holds a bridge twice)
+  const build = () => sceneTerrain(() => 100, [
+    sceneWay(1, [[-200, 0], [-15, 0]], { highway: 'unclassified' }),
+    sceneWay(2, [[-15, 0], [15, 0]], { highway: 'unclassified', bridge: 'yes', layer: '1' }),
+    sceneWay(3, [[15, 0], [200, 0]], { highway: 'unclassified' }),
+    sceneWay(4, [[-15, 0.5], [15, -0.5]], { highway: 'unclassified', bridge: 'yes', layer: '1' }),
+  ]);
+  const log = console.log; console.log = () => {};
+  let g;
+  try { g = (await runStructureScene({ name: 'duplicate bridge', build })).groups.structureGraph; } finally { console.log = log; }
+  assert.equal(g.crossings.crossings.filter((c) => c.rule === 'stacked').length, 0);
+  // nothing climbs: every road stays within a metre of the flat ground
+  const z = g.profile.z;
+  let lift = 0;
+  g.edges.forEach((e, k) => { for (let i = 0; i < e.g.length; i++) lift = Math.max(lift, Math.abs(z[k][i] - e.g[i])); });
+  assert.ok(lift < 1, `lifted ${lift.toFixed(2)} m`);
+});
