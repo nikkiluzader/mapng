@@ -476,29 +476,47 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null }) {
     if (!lakeTiles.length) continue;
     stats.lakes++;
     for (const tile of lakeTiles) tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: lakeIndex, name: t.name || null });
-    lakes.push({ poly, level });
+    lakes.push({ poly, level, tags: t, river, area });
     lakeIndex++;
   }
   stats.tiles = tiles.length;
   return { tiles, stats, lakes };
 }
 
-// A bed under standing water: elevation data that records a water body's
-// surface as its ground (lidar off canals, harbours, ponds) left the terrain
-// level with the water, which then never showed (Amsterdam's canals: water
-// 5 cm over the ground). Inside each lake the ground near its level is
-// lowered to LAKE_BED_M under it, sloping up to LAKE_BED_EDGE_M under it over
-// LAKE_BANK_M from the shore. Ground already deeper is left; nothing raised.
+// A bed under standing water. Elevation data records a lake's surface as its
+// ground (lidar, the global 30 m), so the terrain stood level with the water,
+// which then never showed, and every lake was a puddle. The bed follows
+// GLOBathy (Khazaei et al. 2022, the global lakes bathymetry): depth grows
+// with the distance from the shore, to the lake's greatest depth at the point
+// farthest from any shore; rounded here (t(2 - t) of the distance share, not
+// a straight cone) so the middle is a basin, not a spike. The greatest depth:
+// the lake's own OSM depth tag (depth / maxdepth / depth:max) when mapped,
+// else from the land round it (Hollister & Milstead 2010, the method GLOBathy
+// built on): the hillside's median slope at the shore carried on under the
+// water, LAKE_SLOPE_SHARE of it at the deepest point. Capped by the lake's
+// size (LAKE_SIZE_DEPTH of the square root of its area: a pond stays a pond)
+// and, for rivers drawn as area water, at RIVER_AREA_MAX_M.
+//
+// At the shore the bed starts LAKE_BED_EDGE_M under the water, LAKE_BED_M by
+// LAKE_BANK_M out at least. Ground already deeper is left; nothing is raised.
 // Only ground near the water is cut: up to LAKE_CUT_FULL_M over the level
 // fully, the cut fading out by LAKE_CUT_TOP_M; higher ground inside the
 // outline (a reservoir's bank, its drawdown ring, an island's slope) is left
 // as it is. Cut to the bed regardless, it stood as a wall all along the shore
-// wherever the outline climbed the bank (Lac du Chevril, Tignes).
+// wherever the outline climbed the bank (Lac du Chevril, Tignes). The map's
+// edge is no shore: a lake running off the map deepens towards it.
 const LAKE_BED_M = 1.5;
 const LAKE_BED_EDGE_M = 0.3;
 const LAKE_BANK_M = 3;
 const LAKE_CUT_FULL_M = 0.5;
 const LAKE_CUT_TOP_M = 2.5;
+const LAKE_SLOPE_SHARE = 0.5;   // with the rounded profile: the bed leaves the shore at the hillside's own slope
+const LAKE_SLOPE_READ_M = [8, 40];  // the hillside read this far out from the shore
+const LAKE_SLOPE_MAX = 1.2;
+const LAKE_SIZE_DEPTH = 0.15;
+const LAKE_DEPTH_MAX_M = 400;
+const RIVER_AREA_MAX_M = 4;
+const LAKE_GRID_CELLS = 4e6;    // the distance grid at most this many cells (a big lake on a coarser one)
 const distToRing = (x, y, ring) => {
   let best = Infinity;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -509,43 +527,164 @@ const distToRing = (x, y, ring) => {
   }
   return best;
 };
+
+/** A depth in metres from an OSM tag ("12", "12 m", "40 ft"), or null. */
+export function tagDepthM(tags = {}) {
+  for (const k of ['maxdepth', 'depth:max', 'depth']) {
+    const v = String(tags[k] ?? '').trim().toLowerCase();
+    const m = /^([0-9]+(?:[.,][0-9]+)?)\s*(m|ft|')?$/.exec(v);
+    if (!m) continue;
+    const n = Number(m[1].replace(',', '.')) * (m[2] === 'ft' || m[2] === "'" ? 0.3048 : 1);
+    if (n > 0 && n < 2000) return n;
+  }
+  return null;
+}
+
+// Squared distance (cells) from every cell to the nearest seed: Felzenszwalb
+// & Huttenlocher's exact transform, rows then columns.
+function squaredDistanceGrid(seed, w, h) {
+  const INF = 1e20;
+  const g = new Float64Array(w * h);
+  for (let i = 0; i < w * h; i++) g[i] = seed[i] ? 0 : INF;
+  const n = Math.max(w, h);
+  const f = new Float64Array(n); const d = new Float64Array(n); const v = new Int32Array(n); const z = new Float64Array(n + 1);
+  const pass = (len, get, put) => {
+    for (let q = 0; q < len; q++) f[q] = get(q);
+    let k = 0; v[0] = 0; z[0] = -INF; z[1] = INF;
+    for (let q = 1; q < len; q++) {
+      let sq = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      while (sq <= z[k]) { k--; sq = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+      k++; v[k] = q; z[k] = sq; z[k + 1] = INF;
+    }
+    k = 0;
+    for (let q = 0; q < len; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+    for (let q = 0; q < len; q++) put(q, d[q]);
+  };
+  for (let y = 0; y < h; y++) pass(w, (x) => g[y * w + x], (x, val) => { g[y * w + x] = val; });
+  for (let x = 0; x < w; x++) pass(h, (y) => g[y * w + x], (y, val) => { g[y * w + x] = val; });
+  return g;
+}
+
+/**
+ * The lake's greatest depth from the land round it: the median slope of the
+ * ground rising from the water's level, LAKE_SLOPE_READ_M out from the shore,
+ * read along the outline. groundAt(x, y) → world z, or NaN off the map.
+ */
+export function shoreSlope(poly, level, groundAt) {
+  const ring = poly.outer;
+  let per = 0;
+  for (let i = 0; i < ring.length; i++) { const a = ring[i]; const b = ring[(i + 1) % ring.length]; per += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+  const step = Math.max(5, per / 400);
+  const slopes = [];
+  let carry = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]; const b = ring[(i + 1) % ring.length];
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (L < 1e-6) continue;
+    const tx = (b[0] - a[0]) / L; const ty = (b[1] - a[1]) / L;
+    for (let s = carry; s < L; s += step) {
+      const x = a[0] + tx * s; const y = a[1] + ty * s;
+      // (the outward side: the normal whose first step leaves the outline)
+      let nx = ty; let ny = -tx;
+      if (poly.contains(x + nx * 2, y + ny * 2)) { nx = -nx; ny = -ny; }
+      const [r0, r1] = LAKE_SLOPE_READ_M;
+      const g0 = groundAt(x + nx * r0, y + ny * r0); const g1 = groundAt(x + nx * r1, y + ny * r1);
+      if (!Number.isFinite(g0) || !Number.isFinite(g1)) continue;
+      slopes.push(Math.max(0, (Math.max(g0, g1) - level) / r1));
+    }
+    carry = ((carry - L) % step + step) % step;
+  }
+  if (!slopes.length) return null;
+  slopes.sort((p, q) => p - q);
+  return Math.min(LAKE_SLOPE_MAX, slopes[slopes.length >> 1]);
+}
+
 /**
  * Terrain edits for lake beds. grid: { heightMap, width, height, worldSize,
  * minHeight } (raw heights; world z = raw - minHeight; world x, y centred,
- * y north). keep(x, y): ground left as it is (a road and its sidewalks: a
- * canal's outline often reaches the quay, and a bed under it left the
- * sidewalks floating). Returns { pixels, apply(set) }: set(idx, raw).
+ * y north). lakes: planLakes' [{ poly, level, tags, river, area }].
+ * keep(x, y): ground left as it is (a road and its sidewalks: a canal's
+ * outline often reaches the quay, and a bed under it left the sidewalks
+ * floating; kept ground counts as shore). Returns { pixels, lakes: [{ name,
+ * depth, source, reach, slope }], apply(set) }: set(idx, raw).
  */
 export function carveLakeBeds(lakes, grid, { keep = () => false } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
+  const sq = worldSize / Math.max(1, width - 1);
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
   const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const groundAt = (x, y) => {
+    const [c, r] = toPixel(x, y);
+    if (!(c >= 0 && r >= 0 && c <= width - 1 && r <= height - 1)) return NaN;
+    const c0 = Math.min(width - 2, Math.floor(c)); const r0 = Math.min(height - 2, Math.floor(r));
+    const fc = c - c0; const fr = r - r0; const at = (cc, rr) => heightMap[rr * width + cc] - minHeight;
+    return (at(c0, r0) * (1 - fc) + at(c0 + 1, r0) * fc) * (1 - fr) + (at(c0, r0 + 1) * (1 - fc) + at(c0 + 1, r0 + 1) * fc) * fr;
+  };
   const edits = new Map();
-  for (const { poly, level } of lakes || []) {
+  const report = [];
+  for (const lake of lakes || []) {
+    const { poly, level } = lake;
     const [x0, y0, x1, y1] = poly.box;
-    const [c0, r0] = toPixel(x0, y1); const [c1, r1] = toPixel(x1, y0);
-    for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
-      for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
+    const [pc0, pr0] = toPixel(x0, y1); const [pc1, pr1] = toPixel(x1, y0);
+    // the lake's box, padded so the shore round it is in it, on a grid of
+    // k pixels a cell (1 unless the lake is very big)
+    const c0 = Math.floor(pc0) - 2; const r0 = Math.floor(pr0) - 2; const c1 = Math.ceil(pc1) + 2; const r1 = Math.ceil(pr1) + 2;
+    const k = Math.max(1, Math.ceil(Math.sqrt(((c1 - c0 + 1) * (r1 - r0 + 1)) / LAKE_GRID_CELLS)));
+    const gw = Math.ceil((c1 - c0 + 1) / k); const gh = Math.ceil((r1 - r0 + 1) / k);
+    const seed = new Uint8Array(gw * gh);
+    const wet = new Uint8Array(gw * gh);
+    for (let gy = 0; gy < gh; gy++) {
+      for (let gx = 0; gx < gw; gx++) {
+        const c = c0 + gx * k + (k - 1) / 2; const r = r0 + gy * k + (k - 1) / 2;
+        const onMap = c >= 0 && r >= 0 && c <= width - 1 && r <= height - 1;
+        const [x, y] = toWorld(c, r);
+        const inside = poly.contains(x, y);
+        if (inside && !keep(x, y)) wet[gy * gw + gx] = 1;
+        else if (onMap) seed[gy * gw + gx] = 1;   // the shore (off the map: none)
+      }
+    }
+    const d2 = squaredDistanceGrid(seed, gw, gh);
+    let reach = 0;
+    for (let i = 0; i < gw * gh; i++) if (wet[i] && d2[i] < 1e19) reach = Math.max(reach, Math.sqrt(d2[i]));
+    reach *= k * sq;
+    const area = lake.area || 0;
+    const tagged = tagDepthM(lake.tags);
+    const slope = tagged ? null : shoreSlope(poly, level, groundAt);
+    let depth = tagged ?? (slope != null ? LAKE_SLOPE_SHARE * slope * reach : LAKE_BED_M);
+    if (!tagged) depth = Math.min(depth, Math.max(LAKE_BED_M, LAKE_SIZE_DEPTH * Math.sqrt(area)), LAKE_DEPTH_MAX_M);
+    if (lake.river) depth = Math.min(depth, RIVER_AREA_MAX_M);
+    depth = Math.max(LAKE_BED_M, depth);
+    report.push({ name: lake.tags?.name || null, depth, source: tagged ? 'osm' : slope != null ? 'slope' : 'none', reach, slope });
+    const distAt = (c, r) => {
+      const gx = Math.min(gw - 1, Math.max(0, Math.floor((c - c0) / k))); const gy = Math.min(gh - 1, Math.max(0, Math.floor((r - r0) / k)));
+      const v = d2[gy * gw + gx];
+      return v >= 1e19 ? reach : Math.sqrt(v) * k * sq;
+    };
+    for (let r = Math.max(0, Math.floor(pr0)); r <= Math.min(height - 1, Math.ceil(pr1)); r++) {
+      for (let c = Math.max(0, Math.floor(pc0)); c <= Math.min(width - 1, Math.ceil(pc1)); c++) {
         const [x, y] = toWorld(c, r);
         if (!poly.contains(x, y) || keep(x, y)) continue;
         const idx = r * width + c;
         const ground = heightMap[idx] - minHeight;
-        if (ground < level - LAKE_BED_M) continue;
         const above = ground - level;
         if (above >= LAKE_CUT_TOP_M) continue;
-        const d = Math.min(distToRing(x, y, poly.outer), ...poly.holes.map((h) => distToRing(x, y, h)));
-        const depth = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, d / LAKE_BANK_M);
-        let target = level - depth;
+        // (near the shore the exact distance to the outline: the grid's cell centres are a cell off it)
+        const l = distAt(c, r) < 4 * k * sq
+          ? Math.min(distToRing(x, y, poly.outer), ...poly.holes.map((hh) => distToRing(x, y, hh)))
+          : distAt(c, r);
+        const t = reach > 0 ? Math.min(1, l / reach) : 0;
+        const edge = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, l / LAKE_BANK_M);
+        let target = level - Math.max(edge, depth * t * (2 - t));
         // (ground a little over the water: cut less and less, so the bank meets the bed without a step)
         if (above > LAKE_CUT_FULL_M) {
-          const k = (above - LAKE_CUT_FULL_M) / (LAKE_CUT_TOP_M - LAKE_CUT_FULL_M);
-          target += (ground - target) * k * k * (3 - 2 * k);
+          const q = (above - LAKE_CUT_FULL_M) / (LAKE_CUT_TOP_M - LAKE_CUT_FULL_M);
+          target += (ground - target) * q * q * (3 - 2 * q);
         }
         if (target < ground) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
       }
     }
   }
-  return { pixels: edits.size, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
+  return { pixels: edits.size, lakes: report, indices: () => edits.keys(), apply(set) { for (const [idx, v] of edits) set(idx, v); } };
 }
 
 // Water hidden in the ground: under a bridge deck the elevation data often

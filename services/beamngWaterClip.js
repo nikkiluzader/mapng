@@ -304,6 +304,29 @@ export function clipRiverNodes(nodes, zones) {
 }
 
 /**
+ * A lake tile ({ cx, cy, sx, sy, z }) cut where the dry zones cross it: the
+ * zone test is by the box's half diagonal, so a big tile (a big lake's rows
+ * merge into strips near a kilometre long) was left out whole for one trench
+ * by its shore (Lac du Chevril: 20 of its 33 strips). A tile a zone touches
+ * is halved across its longer side, again and again, down to PIECE_M; the
+ * halves no zone touches come back whole. A tile no zone touches comes back
+ * as it is.
+ */
+const PIECE_M = 8;
+export function splitLakeTile(tile, zones) {
+  const floorOf = (t) => waterFloorIn(zones, t.cx - t.sx / 2, t.cy - t.sy / 2, t.cx + t.sx / 2, t.cy + t.sy / 2);
+  const out = [];
+  const visit = (t) => {
+    const f = floorOf(t);
+    if (f === -Infinity || Math.max(t.sx, t.sy) <= PIECE_M) { out.push(t); return; }
+    if (t.sx >= t.sy) { const h = t.sx / 2; visit({ ...t, cx: t.cx - h / 2, sx: h }); visit({ ...t, cx: t.cx + h / 2, sx: h }); }
+    else { const h = t.sy / 2; visit({ ...t, cy: t.cy - h / 2, sy: h }); visit({ ...t, cy: t.cy + h / 2, sy: h }); }
+  };
+  visit(tile);
+  return out;
+}
+
+/**
  * A lake tile ({ cx, cy, sx, sy, z }, full depth `depth`) over the dry
  * zones: its depth there, 0 to leave it out.
  */

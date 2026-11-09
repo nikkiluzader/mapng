@@ -266,3 +266,44 @@ test('the sea floor: where the land cover says water and the ground sits at the 
   assert.ok(Math.abs(hm[50 * W + 20] - 0.1) < 1e-6, 'land is left');
   assert.equal(lowerSeabed({ heightMap: hm, width: W, height: W }, null, 0).pixels, 0, 'no land cover: nothing');
 });
+
+test('lake depth: from the shore slope in a valley, from an OSM depth tag, shallow for river areas, deepening off the map edge', async () => {
+  const { planLakes, carveLakeBeds, tagDepthM } = await import('../services/beamngWater.js');
+  assert.equal(tagDepthM({ depth: '12' }), 12);
+  assert.equal(tagDepthM({ maxdepth: '40 ft' }), 12.192);
+  assert.equal(tagDepthM({ 'depth:max': '7,5 m' }), 7.5);
+  assert.equal(tagDepthM({ depth: 'deep' }), null);
+  // a 400 m map at 2 m; a V valley along y, sides rising 0.4 m per m from x = 0;
+  // the data records the water flat at 20 m where the valley floor is under it (|x| < 50)
+  const N = 201; const SIZE = 400;
+  const valley = (x) => Math.max(20, 20 + 0.4 * (Math.abs(x) - 50));
+  const build = () => { const hm = new Float32Array(N * N); for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) hm[r * N + c] = valley((c / (N - 1) - 0.5) * SIZE); return hm; };
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const lakeRing = [[-50, -150], [50, -150], [50, 150], [-50, 150], [-50, -150]];
+  const run = (tags, ring = lakeRing) => {
+    const hm = build();
+    const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+    const plan = planLakes({ features: [{ type: 'water', tags, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) }], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+    const beds = carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 });
+    beds.apply((idx, v) => { hm[idx] = v; });
+    return { at, level: plan.lakes[0]?.level, beds };
+  };
+  // the slope (0.4) carried under the water: half of it times the 50 m to the shore = 10 m deep in the middle
+  const v = run({ natural: 'water' });
+  assert.equal(v.beds.lakes[0].source, 'slope');
+  assert.ok(Math.abs(v.beds.lakes[0].slope - 0.4) < 0.05, `slope ${v.beds.lakes[0].slope}`);
+  assert.ok(Math.abs(v.at(0, 0) - (v.level - v.beds.lakes[0].depth)) < 0.3, 'deepest in the middle');
+  assert.ok(v.beds.lakes[0].depth > 8 && v.beds.lakes[0].depth < 12, `depth ${v.beds.lakes[0].depth}`);
+  assert.ok(v.at(-40, 0) > v.at(-20, 0) && v.at(-20, 0) > v.at(0, 0) - 1e-6, 'deepening away from the shore');
+  assert.ok(v.at(-48, 0) > v.level - 1.6, 'shallow at the shore');
+  // tagged: its own depth
+  const t = run({ natural: 'water', depth: '25' });
+  assert.equal(t.beds.lakes[0].source, 'osm');
+  assert.ok(Math.abs(t.at(0, 0) - (t.level - 25)) < 0.3);
+  // a river drawn as area water: never deep
+  const r = run({ natural: 'water', water: 'river' });
+  if (r.beds.lakes.length) assert.ok(r.beds.lakes[0].depth <= 4 && r.at(0, 0) >= r.level - 4.01);
+  // running off the map's north edge: no shore there, deeper towards it
+  const off = run({ natural: 'water' }, [[-50, -150], [50, -150], [50, 260], [-50, 260], [-50, -150]]);
+  assert.ok(off.at(0, 190) <= off.at(0, -100) + 1e-6, 'deeper towards the map edge than near the south shore');
+});

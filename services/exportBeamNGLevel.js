@@ -21,7 +21,7 @@ import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
 import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
 import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
-import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
+import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, splitLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
 import { fetchWorldCoverGrid, openWaterAtEdge, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
@@ -7214,7 +7214,7 @@ function shapingReportLines(sh, section) {
   lines.push(`- At bridges over water and valleys (approach embankments, abutment fill, ground kept clear under the deck): ${onOff(sh.bridges)}`);
   lines.push(`- At overpasses over roads (the same, for decks over another road): ${onOff(sh.overpasses)}`);
   lines.push(`- At tunnels (portal cuttings, headwall backfill, cut-and-cover cover): ${onOff(sh.tunnels)} (portal holes always open: they change no height)`);
-  lines.push(`- Sidewalks, lake beds and car parks (ground under curbs and slabs, lake beds, multi-storey car park decks): ${onOff(sh.extras)}`);
+  lines.push(`- Sidewalks, lake beds and car parks (ground under curbs and slabs, lake beds deepening away from the shore, multi-storey car park decks): ${onOff(sh.extras)}`);
   lines.push('', 'What the switches did here');
   const p = sh.plan;
   if (p) {
@@ -7245,6 +7245,9 @@ function shapingReportLines(sh, section) {
   }
   lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
   if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}`);
+  for (const lk of (sh.lakeDepths || []).slice(0, 12)) {
+    lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there`);
+  }
   if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (the survey recorded the water's surface; WorldCover water within 0.3 m of the sea): ${sh.seabedPixels}`);
   if (sh.lidar === null || sh.lidar === undefined) lines.push('- Measured bridge heights (US lidar): off');
   else if (sh.lidar.skipped) lines.push(`- Measured bridge heights (US lidar): not used, ${sh.lidar.skipped}`);
@@ -9883,10 +9886,24 @@ function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZ
   Object.assign(stats, lakeStats);
   // over a tunnel: no deeper than its roof, none over its trench
   stats.clippedOverTunnels = 0;
-  return tiles.map((tile) => ({ tile, depth: clipLakeTile(tile, LAKE_BLOCK_DEPTH_M, dryZones) }))
+  // (deep enough to reach the lake's bed under it: carveLakeBeds digs real
+  // depths now, and a block shallower than its bed left dry water under it)
+  const bedDepth = (tile) => {
+    let low = Infinity;
+    for (let i = 0; i <= 6; i++) for (let j = 0; j <= 6; j++) {
+      const g = getTerrainHeightAtWorldXY(tile.cx + (i / 6 - 0.5) * tile.sx, tile.cy + (j / 6 - 0.5) * tile.sy, terrainData, squareSize);
+      if (Number.isFinite(g)) low = Math.min(low, g);
+    }
+    return Number.isFinite(low) ? Math.max(LAKE_BLOCK_DEPTH_M, Math.ceil(tile.z - low + 1)) : LAKE_BLOCK_DEPTH_M;
+  };
+  // (a long strip cut where a tunnel's trench or tube crosses it, not left out whole)
+  const pieces = dryZones?.length ? tiles.flatMap((tile) => splitLakeTile(tile, dryZones)) : tiles;
+  stats.splitForTunnels = pieces.length - tiles.length;
+  return pieces.map((tile) => { const want = bedDepth(tile); return { tile, want, depth: clipLakeTile(tile, want, dryZones) }; })
     .filter(({ depth }) => depth > 0)
-    .map(({ tile, depth }, index) => {
-      if (depth < LAKE_BLOCK_DEPTH_M) stats.clippedOverTunnels++;
+    .map(({ tile, depth, want }, index) => {
+      if (depth < want) stats.clippedOverTunnels++;
+      stats.deepestBlock = Math.max(stats.deepestBlock || 0, depth);
       return { tile, depth, index };
     })
     .map(({ tile, depth, index }) => ({
@@ -12598,6 +12615,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const hmLake = heightMapEditor(exportTerrainData);
       beds.apply((idx, v) => hmLake.set(idx, v));
       lakePlan.stats.bedPixels = beds.pixels;
+      lakePlan.stats.lakeDepths = (beds.lakes || []).slice().sort((p, q) => q.depth - p.depth);
+      if (beds.lakes?.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds: ${beds.lakes.map((lk) => `${lk.name || 'lake'} ${lk.depth.toFixed(1)} m (${lk.source})`).slice(0, 8).join(', ')}.`);
       // the sea floor under the sea plane where the survey recorded the
       // water's surface (any terrain choice: a measuring artifact, not shaping)
       const seabed = lowerSeabed({
@@ -13751,6 +13770,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         skippedPieces: sg?.terrain?.skipped ?? 0,
         sidewalkGroundPixels: sidewalks.groundPixels || 0,
         lakeBedPixels: lakePlan?.stats?.bedPixels ?? null,
+        lakeDepths: lakePlan?.stats?.lakeDepths ?? null,
         seabedPixels: lakePlan?.stats?.seabedPixels ?? null,
         underDeckBedPixels: underDeckBeds,
         levelledUnderDecks,

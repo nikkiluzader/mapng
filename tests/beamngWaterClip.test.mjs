@@ -96,3 +96,19 @@ test('open water at the map edge: the sea in long runs, not a polder ditch', asy
   assert.equal(at(1, 0.5), false);       // east edge: fields
   assert.equal(openWaterAtEdge(null, 1000), null);
 });
+
+test('a long lake strip is cut where a trench crosses it, not left out whole', async () => {
+  const { splitLakeTile, clipLakeTile } = await import('../services/beamngWaterClip.js');
+  // a trench zone along x = 300 (north–south), 10 m each side (no grid: every zone is checked)
+  const zones = [{ a: [300, -100], b: [300, 100], half: 10, top: Infinity, box: [290, -100, 310, 100] }];
+  const strip = { cx: 0, cy: 0, sx: 960, sy: 4.5, z: 10 };
+  assert.equal(clipLakeTile(strip, 6, zones), 0, 'whole, the strip is left out');
+  const pieces = splitLakeTile(strip, zones);
+  const kept = pieces.filter((p) => clipLakeTile(p, 6, zones) > 0);
+  const keptLen = kept.reduce((sum, p) => sum + p.sx, 0);
+  assert.ok(keptLen > 900, `most of the strip kept: ${keptLen} m`);
+  assert.ok(kept.every((p) => p.cx + p.sx / 2 <= 290 || p.cx - p.sx / 2 >= 310), 'nothing kept over the trench');
+  assert.ok(pieces.length <= 20, `only cut near the trench: ${pieces.length} pieces`);
+  const far = { cx: 0, cy: 500, sx: 960, sy: 4.5, z: 10 };
+  assert.deepEqual(splitLakeTile(far, zones), [far]);
+});
