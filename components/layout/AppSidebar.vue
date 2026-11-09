@@ -38,6 +38,17 @@
       >
         <RotateCw :size="18" />
       </BaseButton>
+      <!-- Support MapNG (Ko-fi: components/modals/SupportTipModal.vue) -->
+      <BaseButton
+        size="sm"
+        variant="ghost"
+        class="text-gray-400 hover:text-brand transition-colors p-1 rounded-full hover:bg-orange-50 dark:hover:bg-gray-800"
+        :title="t('support.cardTitle')"
+        :aria-label="t('support.cardTitle')"
+        @click="$emit('show-support')"
+      >
+        <Heart :size="18" />
+      </BaseButton>
       <BaseButton
         size="sm"
         variant="ghost"
@@ -115,7 +126,7 @@ import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
 import ModeToggle from '../ui/ModeToggle.vue';
 import { getSupportedLocales, setI18nLanguage } from '../../i18n';
-import { CircleHelp, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, Share2 } from 'lucide-vue-next';
+import { CircleHelp, Heart, Sun, Moon, Code, Download, RotateCw, Globe, Github, MessageCircle, Mail, Database, Shield, Share2 } from 'lucide-vue-next';
 import { openShareDialog } from '../../composables/useShareDialog.js';
 
 const { t, locale } = useI18n({ useScope: 'global' });
@@ -166,7 +177,7 @@ defineProps({
   buildDevTime: { type: String, default: 'n/a' },
 });
 
-defineEmits(['show-about', 'show-disclaimer', 'show-stack', 'toggle-dark', 'set-batch-mode']);
+defineEmits(['show-about', 'show-support', 'show-disclaimer', 'show-stack', 'toggle-dark', 'set-batch-mode']);
 
 const handleLocaleChange = (event) => {
   setI18nLanguage(event.target.value);

@@ -8,6 +8,7 @@
 // crash reports), and as a short send code (services/shareCodes.js).
 import { PERSONAL_STORAGE_KEYS, withoutPersonal } from './personalKeys.js';
 import { sanitizePoints, pointLabel } from './spawnPoints.js';
+import { sanitizeContentOff, sanitizeExcludeTags, PRESET_IDS } from './buildContent.js';
 
 /** Export-panel settings: [name in the config, localStorage key, kind, default]. */
 export const EXPORT_FIELDS = [
@@ -33,7 +34,18 @@ export const EXPORT_FIELDS = [
   ['shapeDetail', 'mapng_beamNGShapeDetail', 'bool', true],
   ['backdrop', 'mapng_beamNGBackdropSource', ['off', 'global30m', 'usgs1m', 'gpxz'], 'off'],
   ['seaLevelOffset', 'mapng_beamNGSeaLevelOffset', 'number', 0],
+  // What to build (composables/useBuildContent.js): features switched off beyond the seven
+  // above, OSM tags left out one by one, and the preset basic mode builds
+  ['contentOff', 'mapng_beamNGContentOff', 'contentList', []],
+  ['excludeTags', 'mapng_beamNGExcludeTags', 'tagList', []],
+  ['basicPreset', 'mapng_beamNGBasicPreset', PRESET_IDS, 'all'],
 ];
+const LIST_KINDS = { contentList: sanitizeContentOff, tagList: sanitizeExcludeTags };
+/** Whether a field holds a list (stored as JSON; not counted in the settings stats). */
+export const isListField = ([, , kind]) => Object.hasOwn(LIST_KINDS, kind);
+// (not counted in the settings stats: public/data.html lists every counted setting)
+const NOT_COUNTED = new Set(['contentOff', 'excludeTags', 'basicPreset']);
+export const isCountedField = (field) => !NOT_COUNTED.has(field[0]) && !isListField(field);
 
 /** Data-part settings kept outside the run configuration: [name, key, kind, default]. */
 export const DATA_FIELDS = [
@@ -50,6 +62,7 @@ const readKey = (storage, key) => { try { return storage.getItem(key); } catch {
 function readField(storage, [, key, kind, fallback]) {
   const raw = readKey(storage, key);
   if (raw == null || raw === '') return fallback;
+  if (LIST_KINDS[kind]) { try { return LIST_KINDS[kind](JSON.parse(raw)); } catch { return fallback; } }
   if (kind === 'bool') return raw !== 'false' && raw !== '0';
   if (kind === 'number') { const n = Number(raw); return Number.isFinite(n) ? n : fallback; }
   if (Array.isArray(kind)) return kind.includes(raw) ? raw : fallback;
@@ -57,6 +70,7 @@ function readField(storage, [, key, kind, fallback]) {
 }
 
 function validValue([, , kind], value) {
+  if (LIST_KINDS[kind]) return Array.isArray(value);
   if (kind === 'bool') return typeof value === 'boolean';
   if (kind === 'number') return Number.isFinite(Number(value));
   if (Array.isArray(kind)) return kind.includes(value);
@@ -133,7 +147,8 @@ export function applyStoredSettings(config, storage = globalThis.localStorage) {
   const exp = config?.export && typeof config.export === 'object' ? config.export : null;
   if (exp) {
     for (const field of EXPORT_FIELDS) {
-      if (field[0] in exp && validValue(field, exp[field[0]])) write(field[1], exp[field[0]]);
+      if (!(field[0] in exp) || !validValue(field, exp[field[0]])) continue;
+      write(field[1], LIST_KINDS[field[2]] ? JSON.stringify(LIST_KINDS[field[2]](exp[field[0]])) : exp[field[0]]);
     }
   }
   for (const field of DATA_FIELDS) {
@@ -225,11 +240,18 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
   const e = c.export;
   if (e && typeof e === 'object') {
     if (e.baseTexture) add('export', 'config.baseTexture', { valueKey: `config.tex_${e.baseTexture}` });
+    // (basic mode builds its preset: the advanced switches below only for an advanced config, or an old one that doesn't say)
+    const advanced = c.advancedMode !== false;
     const content = ['buildings', 'water', 'trees', 'rocks', 'roads'].filter((k) => (k === 'roads' ? e.roads !== 'none' : e[k] !== false));
-    add('export', 'config.content', { valueKey: 'config.list', params: { list: content.length ? content.map((k) => `config.c_${k}`) : ['config.nothing'] } });
-    if (e.trees !== false && e.forestDensity && e.forestDensity !== 'normal') add('export', 'config.forestDensity', { valueKey: `exportPanel.ui.forestDensity_${e.forestDensity}` });
+    if (advanced) add('export', 'config.content', { valueKey: 'config.list', params: { list: content.length ? content.map((k) => `config.c_${k}`) : ['config.nothing'] } });
+    if (!advanced && e.basicPreset) add('export', 'config.basicPreset', { valueKey: `build.preset_${e.basicPreset}` });
+    const offList = sanitizeContentOff(e.contentOff);
+    if (advanced && offList.length) add('export', 'config.contentOff', { valueKey: 'config.list', params: { list: offList.map((id) => `build.item_${id}`) } });
+    const tagList = sanitizeExcludeTags(e.excludeTags);
+    if (advanced && tagList.length) add('export', 'config.excludeTags', { value: tagList.slice(0, 6).join(', ') + (tagList.length > 6 ? ` +${tagList.length - 6}` : '') });
+    if (advanced && e.trees !== false && e.forestDensity && e.forestDensity !== 'normal') add('export', 'config.forestDensity', { valueKey: `exportPanel.ui.forestDensity_${e.forestDensity}` });
     const structures = ['bridges', 'tunnels', 'measuredBridgeHeights'].filter((k) => e[k] !== false);
-    add('export', 'config.structures', { valueKey: 'config.list', params: { list: structures.length ? structures.map((k) => `config.c_${k}`) : ['config.nothing'] } });
+    if (advanced) add('export', 'config.structures', { valueKey: 'config.list', params: { list: structures.length ? structures.map((k) => `config.c_${k}`) : ['config.nothing'] } });
     if (e.terrainEdits) {
       const custom = e.terrainEdits === 'custom'
         ? ['shapeRoads', 'shapeBridges', 'shapeOverpasses', 'shapeTunnels', 'shapeExtras', 'shapeDetail'].filter((k) => e[k] !== false).map((k) => `config.c_${k}`)
@@ -240,7 +262,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     }
     if (e.backdrop) add('export', 'config.backdrop', { valueKey: e.backdrop === 'off' ? 'config.off' : `config.source_${e.backdrop}` });
     // (shown like the panel's "Build everything" box, the opposite of safe caps)
-    if (typeof e.safeCaps === 'boolean') add('export', 'config.buildEverything', { valueKey: e.safeCaps ? 'config.off' : 'config.on' });
+    if (advanced && typeof e.safeCaps === 'boolean') add('export', 'config.buildEverything', { valueKey: e.safeCaps ? 'config.off' : 'config.on' });
   }
   return rows;
 }

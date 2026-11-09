@@ -3,7 +3,7 @@
 // list of setting → value from the allowed lists below, never a location,
 // level name, key or anything free-form. The server (hotspotsObject.js)
 // only adds 1 to each pair's total and refuses anything not listed here.
-import { EXPORT_FIELDS } from './sessionConfig.js';
+import { EXPORT_FIELDS, isCountedField } from './sessionConfig.js';
 
 const ON_OFF = ['on', 'off'];
 
@@ -19,7 +19,7 @@ export const USAGE_FIELDS = {
   rawTerrain: ON_OFF,
   seaLevelOffset: ['zero', 'changed'],
   ...Object.fromEntries(EXPORT_FIELDS
-    .filter(([name]) => name !== 'seaLevelOffset')
+    .filter((f) => f[0] !== 'seaLevelOffset' && isCountedField(f))
     .map(([name, , kind]) => [name, Array.isArray(kind) ? kind : ON_OFF])),
 };
 
@@ -43,8 +43,9 @@ export function usageFromConfig(config, platform, { uploaded = false } = {}) {
     rawTerrain: onOff(!!c.advancedMode && !!c.rawTerrain),
     seaLevelOffset: Number(e.seaLevelOffset) ? 'changed' : 'zero',
   };
-  for (const [name, , kind] of EXPORT_FIELDS) {
-    if (name === 'seaLevelOffset' || !(name in e)) continue;
+  for (const field of EXPORT_FIELDS) {
+    const [name, , kind] = field;
+    if (name === 'seaLevelOffset' || !isCountedField(field) || !(name in e)) continue;
     out[name] = Array.isArray(kind) ? e[name] : onOff(e[name] !== false);
   }
   return validUsage(out);

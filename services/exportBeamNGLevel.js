@@ -144,6 +144,7 @@ import {
   getWaterProfile,
 } from './beamngBiomeCatalog.js';
 import { resolveRegionalBiome } from './beamngRegion.js';
+import { contentExportOptions, contentOn, filterOsmByTags } from './buildContent.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
 
@@ -2198,6 +2199,11 @@ const NO_CAPS = Object.freeze(Object.fromEntries(Object.keys(SAFE_CAPS).map((k) 
 let caps = SAFE_CAPS;
 /** Safe caps on (the default) or off (everything built); returns the caps in force. */
 export function setSafeCaps(on = true) { caps = on ? SAFE_CAPS : NO_CAPS; return caps; }
+// Road paint switched off in What to build (services/buildContent.js): lane
+// lines and stop bars (markings), crosswalk paint (crosswalks); set once per
+// export, as the caps are. The crosswalks' zones stay: kerb ramps meet them.
+let paintOn = { markings: true, crosswalks: true };
+export function setPaintSwitches({ markings = true, crosswalks = true } = {}) { paintOn = { markings, crosswalks }; return paintOn; }
 // BeamNG builds a level's DecalRoads in one pass at load, and past ~800k
 // nodes in all that pass draws nothing: a single-tile 8 km export at 8 m/px
 // (926k nodes over 1913 km of decal layers) loaded with every road
@@ -2868,6 +2874,7 @@ function isLikelyUnmarkedRoad(tags = {}) {
  * Decide if this highway class should get white/yellow lane line decals.
  */
 function shouldUseLaneMarkings(highway, tags = {}) {
+  if (!paintOn.markings) return false;
   if (!MAJOR_ROAD_MARKINGS.has(highway) && !MINOR_MARKED_HIGHWAYS.has(highway)) return false;
   return !isLikelyUnmarkedRoad(tags);
 }
@@ -6492,6 +6499,7 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
 
   const decals = [];
   const pushLine = (baseName, cx, cy, dirX, dirY, fromM, toM, lineWidth) => {
+    if ((baseName === 'jm_stopline' && !paintOn.markings) || (baseName === 'jm_crosswalk' && !paintOn.crosswalks)) return;
     const nodes = [
       nodeAt(cx + dirX * fromM, cy + dirY * fromM, lineWidth),
       nodeAt(cx + dirX * toM, cy + dirY * toM, lineWidth),
@@ -6615,9 +6623,9 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
     if (style === 'lines' || style === 'lines:paired') {
       for (const side of [-1, 1]) pushLine('jm_crosswalk', cx + perp[0] * CROSSWALK_LINE_GAP_HALF_M * side, cy + perp[1] * CROSSWALK_LINE_GAP_HALF_M * side, dir[0], dir[1], -half, half, CROSSWALK_LINE_WIDTH_M);
     } else {
-      const decal = makeRoadDecal([nodeAt(a[0], a[1], CROSSWALK_ZEBRA_WIDTH_M), nodeAt(b[0], b[1], CROSSWALK_ZEBRA_WIDTH_M)], sanitizeBeamNGObjectName(`jm_zebra_${decals.length + 1}`), 'junction_markings', {
+      const decal = paintOn.crosswalks ? makeRoadDecal([nodeAt(a[0], a[1], CROSSWALK_ZEBRA_WIDTH_M), nodeAt(b[0], b[1], CROSSWALK_ZEBRA_WIDTH_M)], sanitizeBeamNGObjectName(`jm_zebra_${decals.length + 1}`), 'junction_markings', {
         material: ZEBRA_CROSSING_MATERIAL, renderPriority: 1, breakAngle: 1, textureLength: CROSSWALK_ZEBRA_REPEAT_M,
-      });
+      }) : null;
       if (decal) decals.push(decal);
       if (style.startsWith('ladder')) {
         for (const side of [-1, 1]) pushLine('jm_crosswalk', cx + perp[0] * (CROSSWALK_ZEBRA_WIDTH_M / 2 + 0.1) * side, cy + perp[1] * (CROSSWALK_ZEBRA_WIDTH_M / 2 + 0.1) * side, dir[0], dir[1], -half, half, CROSSWALK_LINE_WIDTH_M);
@@ -6819,7 +6827,8 @@ function walkBackFromEnd(geometry, fromEnd, setbackM, terrainData, squareSize) {
  */
 export function generateTurnArrowDecals(terrainData, squareSize) {
   const features = terrainData.osmFeatures || [];
-  if (!features.length) return [];
+  // (lane markings switched off: no arrows either)
+  if (!features.length || !paintOn.markings) return [];
 
   const roads = features.filter((f) =>
     f?.type === 'road' &&
@@ -7980,6 +7989,18 @@ function buildBeamNGExportReport({
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
     `- Forest density: ${options?.forestDensity || 'normal'} (×${forestDensityMultiplier(options?.forestDensity)} the base tree rates; woods ~${Math.round(36 * forestDensityMultiplier(options?.forestDensity))} trees/ha)`,
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
+    `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}`,
+    ...(() => {
+      // What to build (services/buildContent.js): the features switched off and the OSM left out for them
+      const cf = options?.contentFilter;
+      if (!cf || (!cf.off.length && !cf.tags.length)) return ['- What to build: everything'];
+      const top = Object.entries(cf.byTag || {}).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, n]) => `${k} ${n}`).join(', ');
+      return [
+        `- What to build, switched off: ${cf.off.length ? cf.off.join(', ') : 'none'}`,
+        ...(cf.userTags.length ? [`- OSM tags left out one by one: ${cf.userTags.join(', ')}`] : []),
+        `- OSM features left out for them: ${cf.removed}${top ? ` (${top})` : ''}`,
+      ];
+    })(),
     '',
     'Generated Content',
     `- Terrain materials written: ${terrainMaterialCount}`,
@@ -9457,7 +9478,7 @@ function nearestDeckRoad(carriageways, x, y) {
   return best;
 }
 
-function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], deckCarriageways = [], deckParts = [], props = null, underDeck = () => false, deckAt = () => null, seaZ = -Infinity } = {}) {
+function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriageways = [], deckCarriageways = [], deckParts = [], props = null, underDeck = () => false, deckAt = () => null, seaZ = -Infinity, roadLamps = true } = {}) {
   const profile = getStreetFurnitureProfile(biome);
   if (!profile) return [];
 
@@ -9599,14 +9620,15 @@ function buildStreetFurnitureObjects(terrainData, squareSize, biome, { carriagew
   const midLat = (terrainData.bounds.north + terrainData.bounds.south) / 2;
   const midLng = (terrainData.bounds.east + terrainData.bounds.west) / 2;
   const northAmerica = midLat > 24 && midLng > -170 && midLng < -50;
-  const generatedLamps = generateRoadLamps(carriageways, osmLampSpots, LAMP_LIMIT - lampCount, { litStreets: !northAmerica });
+  // (street lamps switched off in What to build: none placed along the roads either)
+  const generatedLamps = roadLamps ? generateRoadLamps(carriageways, osmLampSpots, LAMP_LIMIT - lampCount, { litStreets: !northAmerica }) : [];
   for (let i = 0; i < generatedLamps.length; i++) {
     const lamp = generatedLamps[i];
     addLamp(lamp.x, lamp.y, lamp.facing, `street_lamp_gen_${i}`, lampFor(lamp.highway));
   }
   // ... and along lit bridges (the same rule: lit=yes, or an urban main road), on the parapet's top at
   // the deck's height, the arm over the road (the ground pass keeps off decks: no lamp on the river bed)
-  const deckLamps = deckCarriageways.length ? generateRoadLamps(deckCarriageways, osmLampSpots, LAMP_LIMIT - lampCount, { litStreets: !northAmerica }) : [];
+  const deckLamps = roadLamps && deckCarriageways.length ? generateRoadLamps(deckCarriageways, osmLampSpots, LAMP_LIMIT - lampCount, { litStreets: !northAmerica }) : [];
   for (let i = 0; i < deckLamps.length; i++) {
     const lamp = deckLamps[i];
     // (the solved deck's own centreline, height and width: the carriageways' nodes are not at its height)
@@ -12039,6 +12061,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
 
   setSafeCaps(safeCaps !== false);
+  setPaintSwitches({ markings: contentOn(options, 'markings'), crosswalks: contentOn(options, 'crosswalks') });
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Start exportBeamNGLevel`);
   console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Input summary:`, {
     center,
@@ -12138,6 +12161,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
 
   beginStep('prepare', `Preparing ${terrainData.width}×${terrainData.height} terrain and ${Array.isArray(terrainData?.osmFeatures) ? terrainData.osmFeatures.length : 0} OSM features…`);
   await yield_();
+
+  // What to build (services/buildContent.js): the OSM features of every
+  // feature switched off, and the tags left out one by one, gone from the
+  // export's data before anything is built
+  const contentChoice = contentExportOptions(options.contentOff, options.excludeTags);
+  const contentFilter = filterOsmByTags(terrainData?.osmFeatures, contentChoice.excludeTags);
+  if (contentFilter.removed) {
+    terrainData = { ...terrainData, osmFeatures: contentFilter.features };
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} What to build: ${contentChoice.contentOff.length} feature(s) off; ${contentFilter.removed} OSM features left out (${Object.entries(contentFilter.byTag).slice(0, 8).map(([k, n]) => `${k} ${n}`).join(', ')}).`);
+  }
+  const built = (id) => contentOn(options, id);
 
   // BeamNG TerrainBlock expects square power-of-two terrain dimensions.
   // Center-crop everything (heightmap, bounds, textures) so terrain, texture,
@@ -12324,7 +12358,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sourceHeightMap = exportTerrainData.heightMap;
 
   const decalRoads = includeRoads
-    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
+    ? await generateDecalRoadsYielding(exportTerrainData, squareSize, yield_, { raisedFootways: includeSidewalks, structureSolver: options.structureSolver, includeBridges, includeTunnels, includeDams: includeBuildings && options.includeDams !== false, includeRailways: options.includeRailways !== false, shaping: shapingOptions, lidar: lidar?.grid ? lidar : null, rawAt: rawAtWorld })
     : [];
   // Bridges: decks for the bridge roads; nothing ground-bound (sidewalks,
   // props, lamps) is built along them, nothing tall stands up into them.
@@ -12688,6 +12722,12 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       maxPoles: caps.poles,
     })
     : { hydrants: [], bins: [], benches: [], poles: [], wires: [] };
+  // What to build: the ones switched off (placed along the streets as well as mapped)
+  if (!built('hydrants')) streetProps.hydrants = [];
+  if (!built('bins')) streetProps.bins = [];
+  if (!built('benches')) streetProps.benches = [];
+  if (!built('poles')) { streetProps.poles = []; streetProps.wires = []; }
+  if (!built('lamps')) for (const pole of streetProps.poles) pole.lamp = false;
   // A wire passing just under (or through) a deck is left out.
   streetProps.wires = streetProps.wires.filter((w) => !w.some(([x, y, z]) => underDeck(x, y, z - 1.5, z + 1.5)));
   const powerWireDaes = generatePowerWireDAEs(streetProps.wires);
@@ -12755,7 +12795,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
   }
   // Curve warnings and chevrons from the road geometry (services/curveWarningSigns.js).
-  const curveWarnings = includeRoads
+  // (signs switched off in What to build: none)
+  const curveWarnings = includeRoads && built('signs')
     ? placeCurveWarnings({
       carriageways: groundCarriageways,
       heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
@@ -13396,9 +13437,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const sidewalksDae = sidewalkTileDaes.length > 0;
   // signs off the drawn roads (onto the verge, the sidewalk or the median)
   // and on the finished ground (settleSigns)
-  const settled = settleSigns([...buildRoadSignProps(exportTerrainData, squareSize, {
+  // (signs switched off in What to build: no speed signs placed along the roads either)
+  const settled = settleSigns([...(built('signs') ? buildRoadSignProps(exportTerrainData, squareSize, {
     style: getMarkingStyle(exportTerrainData.roadRules),
-  }).props, ...calming.signs, ...curveWarnings.props], {
+  }).props : []), ...calming.signs, ...curveWarnings.props], {
     index: buildCarriagewayIndex(groundCarriageways),
     groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
   });
@@ -13429,6 +13471,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     underDeck,
     deckAt: sidewalks.deckAt,
     seaZ: -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0),
+    roadLamps: built('lamps'),
   });
   // (none in background areas: lamps along a road that runs on into them)
   keepOutOfBackground(streetFurnitureObjects);
@@ -13615,7 +13658,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   vegLap('kept off roads, props added');
   const forestFiles = serializeForestFiles(forestPlacements);
   vegLap('forest files written');
-  const groundCoverObjects = buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, biome);
+  // (grass and ground cover switched off in What to build: none)
+  const groundCoverObjects = built('groundCover') ? buildGroundCoverObjects(exportTerrainData, squareSize, includeTrees, biome) : [];
   const managedForestItemData = cloneManagedItemData(Array.from(forestPlacements.keys()), biome);
   vegLap('ground cover and item data done');
 
@@ -13816,7 +13860,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // (each spot's turn the other way round: the game reads a site's
     // rotation mirrored from ours, its parked cars sat across their bays,
     // our own stall lines being drawn from ours)
-    parkingSpots: sampleSiteSpots(parkingSpots).map((sp) => ({ ...sp, rot: siteRotation(sp.rot) })),
+    // (parked cars switched off in What to build: no spots for traffic to fill; the bays stay painted)
+    parkingSpots: built('parkedCars') ? sampleSiteSpots(parkingSpots).map((sp) => ({ ...sp, rot: siteRotation(sp.rot) })) : [],
     zones: roadNameZones,
   }));
 
@@ -14125,6 +14170,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     center,
     options: {
       ...options,
+      contentFilter: { off: contentChoice.contentOff, tags: contentChoice.excludeTags, userTags: options.excludeTags || [], removed: contentFilter.removed, byTag: contentFilter.byTag },
       baseTexture,
       includeBuildings,
       includeBackdrop,

@@ -268,21 +268,6 @@
         <button type="button" class="mt-1 text-brand hover:underline" @click="step = 4">{{ t('wizard.toExport') }}</button>
       </div>
 
-      <div class="p-3 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="text-xs font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
-            <p class="text-caption text-orange-700/90 dark:text-orange-300/90 leading-relaxed mt-1">{{ t('support.cardBody') }}</p>
-          </div>
-          <button
-            type="button"
-            @click="$emit('showSupport')"
-            class="shrink-0 px-3 py-1.5 text-caption font-semibold bg-brand hover:bg-brand-500 text-white rounded-lg transition-colors"
-          >
-            {{ t('support.donate') }}
-          </button>
-        </div>
-      </div>
 
     </div>
 
@@ -429,6 +414,7 @@ import { computeGridBounds } from '../../services/batchJob.js';
 import GenerateSummary from '../ui/GenerateSummary.vue';
 import { terrainMode, setTerrainMode, terrainGenerationOptions } from '../../composables/useTerrainMode.js';
 import { reloadTerrainSettings } from '../../composables/useTerrainMode.js';
+import { reloadContentSettings } from '../../composables/useBuildContent.js';
 
 const { t } = useI18n({ useScope: 'global' });
 
@@ -568,7 +554,7 @@ const step = ref(1);
 // back to look at Location doesn't untick it; with terrain made, Location and
 // Sources are done; Generate is ticked while the terrain matches the settings)
 const furthestStep = ref(1);
-watch(step, (n) => { furthestStep.value = Math.max(furthestStep.value, n); });
+watch(step, (n) => { furthestStep.value = Math.max(furthestStep.value, n); store.exportStepOpen = n === 4; }, { immediate: true });
 const wizardSteps = computed(() => [
   { key: 'where', label: t('panelSteps.where'), done: furthestStep.value > 1 || !!props.terrainData },
   { key: 'built', label: t('panelSteps.builtFrom'), done: furthestStep.value > 2 || !!props.terrainData },
@@ -825,6 +811,7 @@ const applyPendingConfig = () => {
     if (applyStoredSettings(config, localStorage)) {
       // (the code's terrain edits went into the old keys: the Terrain choice reads them back)
       reloadTerrainSettings();
+      reloadContentSettings();
       if (config.export.baseTexture) setBaseTexture(config.export.baseTexture);
       exportPanelKey.value += 1;
     }

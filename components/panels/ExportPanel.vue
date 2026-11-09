@@ -75,54 +75,15 @@
             </SettingRow>
           </SettingCard>
 
-          <!-- What the level contains (basic mode builds everything the map has) -->
-          <SettingCard
-            :title="t('exportPanel.ui.cardContent')"
-            :note="!hasOsmData ? t('exportPanel.ui.noOsmNote') : (!advancedMode ? t('exportPanel.ui.basicContentNote') : '')"
-            :note-tone="!hasOsmData ? 'warn' : 'muted'"
-          >
-            <SettingRow
-              check
-              :model-value="beamNGRoadType === 'decal'"
-              @update:model-value="beamNGRoadType = $event ? 'decal' : 'none'"
-              :label="t('exportPanel.roads')"
-              :hint="t('exportPanel.ui.roadsHint')"
-              :disabled="!hasOsmData"
-            />
-            <template v-if="advancedMode">
-              <SettingRow check v-model="beamNGIncludeBuildings" :label="t('exportPanel.ui.buildings')" :hint="t('exportPanel.exportBuildings')" :disabled="!hasOsmData" />
-              <SettingRow check v-model="beamNGIncludeTrees" :label="t('exportPanel.treesBushes')" :hint="t('exportPanel.nativeForest')" :disabled="!hasOsmData" />
-              <SettingRow indent :label="t('exportPanel.ui.forestDensity')" :hint="t(`exportPanel.ui.forestDensityHint_${beamNGForestDensity}`)" :disabled="!hasOsmData || !beamNGIncludeTrees">
-                <select v-model="beamNGForestDensity" :class="SELECT_XS" :disabled="!hasOsmData || !beamNGIncludeTrees">
-                  <option v-for="k in FOREST_DENSITY_KEYS" :key="k" :value="k">{{ t(`exportPanel.ui.forestDensity_${k}`) }}</option>
-                </select>
-              </SettingRow>
-              <SettingRow check v-model="beamNGIncludeRocks" :label="t('exportPanel.rocks')" :hint="t('exportPanel.quarryRock')" :disabled="!hasOsmData" />
-              <SettingRow check v-model="beamNGIncludeWater" :label="t('exportPanel.water')" :hint="t('exportPanel.lakesRivers')" :disabled="!hasOsmData" />
-              <SettingRow
-                check
-                :model-value="!beamNGSafeCaps"
-                @update:model-value="beamNGSafeCaps = !$event"
-                :label="t('exportPanel.ui.buildEverything')"
-                :hint="t('exportPanel.ui.buildEverythingHint')"
-              />
-            </template>
-          </SettingCard>
-
-          <!-- Bridges and tunnels, and how bridge decks get their height -->
-          <SettingCard v-if="advancedMode" :title="t('exportPanel.structuresHeading')" :note="!hasOsmData ? t('exportPanel.ui.needsOsm') : ''" note-tone="warn">
-            <SettingRow check v-model="beamNGIncludeBridges" :label="t('exportPanel.includeBridges')" :hint="t('exportPanel.includeBridgesHint')" :disabled="!hasOsmData" />
-            <SettingRow
-              check
-              indent
-              v-model="beamNGLidarDecks"
-              :label="t('exportPanel.lidarDecks')"
-              :hint="t('exportPanel.ui.lidarDecksHint')"
-              :disabled="!hasOsmData || !beamNGIncludeBridges"
-              :disabled-reason="hasOsmData ? t('exportPanel.ui.needsBridges') : ''"
-            />
-            <SettingRow check v-model="beamNGIncludeTunnels" :label="t('exportPanel.includeTunnels')" :hint="t('exportPanel.includeTunnelsHint')" :disabled="!hasOsmData" />
-          </SettingCard>
+          <!-- What to build: presets, features in groups, (Advanced) Fine-tuning: WhatToBuild.vue -->
+          <WhatToBuild
+            :advanced="advancedMode"
+            :has-osm-data="hasOsmData"
+            :osm-features="osmFeaturesRaw"
+            v-model:forest-density="beamNGForestDensity"
+            v-model:lidar-decks="beamNGLidarDecks"
+            v-model:safe-caps="beamNGSafeCaps"
+          />
 
           <!-- Terrain: chosen once, in the elevation section (TerrainChoice); here only what this level gets -->
           <SettingCard v-if="advancedMode" :title="t('exportPanel.ui.cardTerrain')">
@@ -596,6 +557,8 @@ import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../compo
 import SettingSection from '../base/SettingSection.vue';
 import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
+import WhatToBuild from './WhatToBuild.vue';
+import { legacyOn, isBuilt, contentOptions } from '../../composables/useBuildContent.js';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
 import { currentSessionCode, currentSessionConfigValue, openReportDialog } from '../../composables/useReportDialog.js';
@@ -706,28 +669,31 @@ const beamNGBackdropSource = ref(
   localStorage.getItem('mapng_beamNGBackdropSource')
   || (legacyIncludeBackdrop === 'true' ? 'global30m' : 'off')
 );
-const beamNGIncludeBuildings = ref(localStorage.getItem('mapng_beamNGIncludeBuildings') !== 'false');
-const beamNGIncludeWater = ref(localStorage.getItem('mapng_beamNGIncludeWater') !== 'false');
+const beamNGIncludeBuildings = legacyOn.buildings;
+const beamNGIncludeWater = legacyOn.water;
 // Structures and the export's terrain shaping (advanced mode; basic builds
 // and shapes everything). Off, the export leaves those heights as generated.
 const storedOn = (key) => localStorage.getItem(key) !== 'false';
-const beamNGIncludeBridges = ref(storedOn('mapng_beamNGIncludeBridges'));
-const beamNGIncludeTunnels = ref(storedOn('mapng_beamNGIncludeTunnels'));
+const beamNGIncludeBridges = legacyOn.bridges;
+const beamNGIncludeTunnels = legacyOn.tunnels;
 const beamNGLidarDecks = ref(storedOn('mapng_beamNGLidarDecks'));
 const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
-const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
+const beamNGIncludeTrees = legacyOn.trees;
 // how thick woods stand (advanced; basic: normal): exportBeamNGLevel FOREST_DENSITY
 const FOREST_DENSITY_KEYS = ['light', 'normal', 'dense', 'veryDense'];
 const storedForestDensity = localStorage.getItem('mapng_beamNGForestDensity');
 const beamNGForestDensity = ref(FOREST_DENSITY_KEYS.includes(storedForestDensity) ? storedForestDensity : 'normal');
-const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') !== 'false');
+const beamNGIncludeRocks = legacyOn.rocks;
 // content caps (buildings, fences, lamps, trees ...): off builds everything the map has
 const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 // Migrate legacy boolean mesh road setting if it exists
 // DecalRoads are the only road system; earlier choices (Road Architect, Mesh
 // Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
 const exportSettingsShown = ref([]);
-const beamNGRoadType = ref(localStorage.getItem('mapng_beamNGRoadType') === 'none' ? 'none' : 'decal');
+// (roads on/off is What to build's "Road surfaces": composables/useBuildContent.js keeps the old key)
+const beamNGRoadType = computed({ get: () => (legacyOn.roadSurfaces.value ? 'decal' : 'none'), set: (v) => { legacyOn.roadSurfaces.value = v !== 'none'; } });
+const built = (id) => isBuilt(advancedMode.value, id);
+const osmFeaturesRaw = computed(() => { const f = props.terrainData?.osmFeatures; return Array.isArray(f) ? toRaw(f) : []; });
 const beamNGLevelName = ref('');
 // (a level loaded back by "Modify" in My Levels keeps its own name:
 // services/exportSettings.js)
@@ -752,7 +718,7 @@ const levelWeight = computed(() => estimateLevelWeight({
   metersPerPixel: resolveProcessingMetersPerPixel(props.terrainData),
   buildings: buildingFootprints.value,
   safeCaps: !advancedMode.value || beamNGSafeCaps.value,
-  includeBuildings: hasOsmData.value && (!advancedMode.value || beamNGIncludeBuildings.value),
+  includeBuildings: hasOsmData.value && built('buildings'),
 }));
 const isCustomUploadTerrain = computed(() => !!props.terrainData?.elevationUnitApplied);
 const canUseGpxzBackdrop = computed(() => props.elevationSource === 'gpxz' && !!props.gpxzApiKey);
@@ -766,10 +732,10 @@ const exportDataOptions = computed(() => {
     includeBackdrop: source !== 'off',
     backdropElevationSource: source,
     backdropGpxzApiKey: source === 'gpxz' ? String(props.gpxzApiKey || '') : '',
-    roadType: hasOsmData.value ? beamNGRoadType.value : 'none',
-    includeBridges: !advancedMode.value || beamNGIncludeBridges.value,
+    roadType: hasOsmData.value && built('roadSurfaces') ? 'decal' : 'none',
+    includeBridges: built('bridges'),
     lidarDecks: !advancedMode.value || beamNGLidarDecks.value,
-    includeWater: hasOsmData.value && (!advancedMode.value || beamNGIncludeWater.value),
+    includeWater: hasOsmData.value && built('water'),
     backgroundMask: props.terrainData?.backgroundMask || null,
   };
 });
@@ -1004,6 +970,7 @@ const exportInputs = computed(() => JSON.stringify({
   forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value,
   bridges: beamNGIncludeBridges.value, tunnels: beamNGIncludeTunnels.value, lidar: beamNGLidarDecks.value,
   sea: beamNGSeaLevelOffset.value,
+  content: contentOptions(advancedMode.value),
   // (points change only the spawns and their photos, but the level made is another)
   points: store.points,
 }));
@@ -1119,11 +1086,7 @@ watch(showExport3D, (v) => localStorage.setItem('mapng_showExport3D', String(v))
 watch(showExportBeamNG, (v) => localStorage.setItem('mapng_showExportBeamNG', String(v)));
 watch(beamNGPbrSource, (v) => localStorage.setItem('mapng_beamNGPbrSource', v));
 watch(beamNGBackdropSource, (v) => localStorage.setItem('mapng_beamNGBackdropSource', v));
-watch(beamNGIncludeBuildings, (v) => localStorage.setItem('mapng_beamNGIncludeBuildings', String(v)));
-watch(beamNGIncludeBridges, (v) => localStorage.setItem('mapng_beamNGIncludeBridges', String(v)));
-watch(beamNGIncludeTunnels, (v) => localStorage.setItem('mapng_beamNGIncludeTunnels', String(v)));
 watch(beamNGLidarDecks, (v) => localStorage.setItem('mapng_beamNGLidarDecks', String(v)));
-watch(beamNGIncludeWater, (v) => localStorage.setItem('mapng_beamNGIncludeWater', String(v)));
 watch(beamNGSeaLevelOffset, (v) => {
   const normalized = normalizeBeamNGSeaLevelOffset(v);
   if (normalized !== v) {
@@ -1132,11 +1095,8 @@ watch(beamNGSeaLevelOffset, (v) => {
   }
   localStorage.setItem('mapng_beamNGSeaLevelOffset', String(normalized));
 });
-watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
 watch(beamNGForestDensity, (v) => localStorage.setItem('mapng_beamNGForestDensity', v));
-watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
 watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String(v)));
-watch(beamNGRoadType, (v) => localStorage.setItem('mapng_beamNGRoadType', v));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
 watch(
@@ -1925,7 +1885,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       effectiveBaseTexture = resolveBeamNGBaseTexture(td, 'hybrid');
     }
     const effectivePbrSource = hasOsmData.value ? beamNGPbrSource.value : 'none';
-    const effectiveRoadType = hasOsmData.value ? beamNGRoadType.value : 'none';
+    const effectiveRoadType = hasOsmData.value && built('roadSurfaces') ? 'decal' : 'none';
     // Custom elevation uploads can now include the surrounding backdrop too: it
     // is fetched from the chosen external source (global 30 m / USGS 1 m / GPXZ)
     // around the upload's geographic bounds and scaled by the processing
@@ -1937,25 +1897,28 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     // Basic mode ignores the (hidden) per-category boxes: buildings, trees,
     // rocks and water whenever OSM data exists.
     const advanced = advancedMode.value;
-    const effectiveIncludeBuildings = hasOsmData.value && (!advanced || beamNGIncludeBuildings.value);
-    const effectiveIncludeWater = hasOsmData.value && (!advanced || beamNGIncludeWater.value);
+    // (What to build: composables/useBuildContent.js; basic builds its preset)
+    const effectiveIncludeBuildings = hasOsmData.value && built('buildings');
+    const effectiveIncludeWater = hasOsmData.value && built('water');
     // Flat terrain sits at height 0; place the water plane just below ground
     // (−1 m) so it doesn't flood the whole level. Matches the 3D preview default.
     const effectiveSeaLevelOffset = props.terrainData?.flat
       ? -1
       : normalizeBeamNGSeaLevelOffset(beamNGSeaLevelOffset.value);
-    const effectiveIncludeTrees = hasOsmData.value && (!advanced || beamNGIncludeTrees.value);
-    const effectiveIncludeRocks = hasOsmData.value && (!advanced || beamNGIncludeRocks.value);
+    const effectiveIncludeTrees = hasOsmData.value && built('trees');
+    const effectiveIncludeRocks = hasOsmData.value && built('rocks');
     // structures and terrain shaping: all on in basic mode
     const structureOptions = {
-      includeBridges: !advanced || beamNGIncludeBridges.value,
-      includeTunnels: !advanced || beamNGIncludeTunnels.value,
+      includeBridges: built('bridges'),
+      includeTunnels: built('tunnels'),
       // ('all': every edit; 'custom': the chosen ones; 'none': the master is off)
       // (the Terrain choice: composables/useTerrainMode.js; basic always shapes everything)
       ...terrainShapingOptions(advanced),
       // measured bridge heights from the US lidar survey where it covers the map
       lidarDecks: !advanced || beamNGLidarDecks.value,
     };
+    // the rest of What to build: features switched off, OSM tags left out (services/buildContent.js)
+    const content = contentOptions(advanced);
     const effectiveBackdropGpxzApiKey = effectiveBackdropSource === 'gpxz' ? String(props.gpxzApiKey || '') : '';
 
     console.log(`${BEAMNG_EXPORT_UI_LOG} Effective export options:`, {
@@ -1981,6 +1944,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     // (the whole control panel as one line, for the report: services/sessionConfig.js)
     const sessionCode = await currentSessionCode();
     const levelOptions = {
+      ...content,
       sessionCode,
       baseTexture: effectiveBaseTexture,
       includeBackdrop: effectiveIncludeBackdrop,

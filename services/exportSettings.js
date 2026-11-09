@@ -5,6 +5,8 @@
 // with, ready to change. Keys: components/panels/ExportPanel.vue.
 import { setBaseTexture } from '../composables/useBaseTexture.js';
 import { reloadTerrainSettings } from '../composables/useTerrainMode.js';
+import { reloadContentSettings } from '../composables/useBuildContent.js';
+import { sanitizeContentOff, sanitizeExcludeTags } from './buildContent.js';
 
 export const PENDING_LEVEL_NAME_KEY = 'mapng_pendingLevelName';
 
@@ -34,6 +36,10 @@ export function exportSettingsFor(options = {}) {
     mapng_beamNGIncludeTunnels: on(options.includeTunnels),
     mapng_beamNGLidarDecks: on(options.lidarDecks),
   };
+  // What to build: the features off beyond the seven above, and the OSM tags left out one by one
+  const OWN_KEYS = new Set(['roadSurfaces', 'buildings', 'trees', 'rocks', 'water', 'bridges', 'tunnels']);
+  out.mapng_beamNGContentOff = JSON.stringify(sanitizeContentOff(options.contentOff).filter((id) => !OWN_KEYS.has(id)));
+  out.mapng_beamNGExcludeTags = JSON.stringify(sanitizeExcludeTags(options.excludeTags));
   if (Number.isFinite(Number(options.seaLevelOffset))) out.mapng_beamNGSeaLevelOffset = String(Number(options.seaLevelOffset));
   // Terrain edits: none, all, or the chosen ones
   const edits = SHAPE_EDITS.map(([k]) => options[k] !== false);
@@ -50,6 +56,7 @@ export function applyExportSettings(options = {}, levelName = '') {
   }
   // (the level's terrain edits: the Terrain choice reads them back)
   reloadTerrainSettings();
+  reloadContentSettings();
   // (a touched-up texture isn't kept with the level: its source look instead)
   const base = options.baseTexture === 'painted' ? 'hybrid' : options.baseTexture;
   if (base) setBaseTexture(base);

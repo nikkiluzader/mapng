@@ -14,6 +14,7 @@
       :build-dev-hash="buildDevHash"
       :build-dev-time="buildDevTime"
       @show-about="showAbout = true"
+      @show-support="openSupportTip('manual')"
       @show-disclaimer="showDisclaimer = true"
       @show-stack="showStackInfo = true"
       @toggle-dark="store.toggleDarkMode"
@@ -355,9 +356,7 @@ let batchLiveState = null;
 
 const KOFI_URL = 'https://ko-fi.com/nikluz';
 const TIP_LAST_SHOWN_KEY = 'mapng_tip_last_shown_at';
-const TIP_SINGLE_COUNT_KEY = 'mapng_tip_single_export_count';
 const TIP_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-const TIP_SINGLE_EXPORT_INTERVAL = 3;
 
 const markTipShownNow = () => {
   localStorage.setItem(TIP_LAST_SHOWN_KEY, String(Date.now()));
@@ -377,15 +376,11 @@ const handleSupportTipClose = () => {
   showSupportTip.value = false;
 };
 
+// (after a finished export, at most once a day: TIP_COOLDOWN_MS; the header's heart opens it any time)
 const maybePromptSupportAfterSingleExport = () => {
-  const currentCount = Number(localStorage.getItem(TIP_SINGLE_COUNT_KEY) || '0');
-  const nextCount = Number.isFinite(currentCount) ? currentCount + 1 : 1;
-  localStorage.setItem(TIP_SINGLE_COUNT_KEY, String(nextCount));
-  const shouldPrompt = (nextCount === 1 || nextCount % TIP_SINGLE_EXPORT_INTERVAL === 0) && canAutoShowTip();
-  if (shouldPrompt) {
-    openSupportTip('single');
-    markTipShownNow();
-  }
+  if (!canAutoShowTip()) return;
+  openSupportTip('single');
+  markTipShownNow();
 };
 
 const maybePromptSupportAfterBatchComplete = () => {

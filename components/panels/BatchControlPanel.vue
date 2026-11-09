@@ -244,21 +244,6 @@
           </BaseButton>
       </div>
 
-      <div class="p-2.5 rounded-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/10 border border-orange-200 dark:border-orange-800">
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <p class="text-caption font-semibold text-orange-700 dark:text-orange-300">{{ t('support.cardTitle') }}</p>
-              <p class="text-micro text-orange-700/90 dark:text-orange-300/90 mt-1 leading-relaxed">{{ t('support.cardBody') }}</p>
-            </div>
-            <button
-              type="button"
-              @click="$emit('showSupport')"
-              class="shrink-0 px-2.5 py-1 text-micro font-semibold bg-brand hover:bg-brand-500 text-white rounded transition-colors"
-            >
-              {{ t('support.donate') }}
-            </button>
-          </div>
-        </div>
 
 
     </div>

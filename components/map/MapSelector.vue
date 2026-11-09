@@ -367,6 +367,8 @@ import { useMainStore } from '../../stores/mainStore';
 import { useBackgroundEditor } from '../../composables/useBackgroundEditor.js';
 import { attachBackgroundLayer } from './backgroundLayer.js';
 import { attachSpawnPointLayer } from './spawnPointLayer.js';
+import { attachContentLayer } from './contentLayer.js';
+import { colourMap, advancedOff } from '../../composables/useBuildContent.js';
 import { usePointsEditor } from '../../composables/usePointsEditor.js';
 
 // Fix Leaflet icon assets
@@ -1050,6 +1052,8 @@ const store = useMainStore();
 // Spawn and quicktravel points: a single tile's, on its map (not a batch job's)
 const pointsEditor = usePointsEditor();
 let pointLayer = null;
+let contentLayer = null;
+watch(() => [colourMap.value, store.advancedMode, store.exportStepOpen, store.batchMode, store.terrainData, advancedOff.value], () => contentLayer?.update());
 const pointsActive = () => !store.batchMode && !hasBatchGrid.value;
 // the box a point must be in to be exported: the export area (or an upload's crop / coverage)
 const pointsBox = computed(() => uploadedCropBounds.value || (showUploadedCoverageBounds.value ? nativeCoverageBounds.value : selectionBounds.value));
@@ -1107,6 +1111,13 @@ const onMapReady = (map) => {
     t,
   });
   pointLayer.update();
+  // What to build's "Colour the map by group": step 4, advanced, the generated area's OSM
+  contentLayer = attachContentLayer(map, {
+    getFeatures: () => store.terrainData?.osmFeatures || null,
+    isShown: () => colourMap.value && store.advancedMode && store.exportStepOpen && !store.batchMode && !!store.terrainData?.osmFeatures?.length,
+    isOn: (id) => !advancedOff.value.includes(id),
+  });
+  contentLayer.update();
   // (the dim outside the selection: above the tiles, under every overlay)
   map.createPane('mapngMask').style.zIndex = '350';
   map.getPane('mapngMask').style.pointerEvents = 'none';
@@ -1158,7 +1169,7 @@ const onMapReady = (map) => {
   mapResizeObserver.observe(map.getContainer());
 };
 let mapResizeObserver = null;
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); bgLayer?.destroy(); pointLayer?.destroy(); });
+onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); bgLayer?.destroy(); pointLayer?.destroy(); contentLayer?.remove(); });
 const hotspotWhen = (dot) => {
   const days = daysSince(dot.lastDay);
   if (days === null) return '';

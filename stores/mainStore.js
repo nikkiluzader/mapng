@@ -111,6 +111,9 @@ export const useMainStore = defineStore('main', () => {
     } catch { /* storage full or blocked */ }
   }
 
+  // the Export step open (the 2D map's "Colour the map by group" shows only there: components/map/contentLayer.js)
+  const exportStepOpen = ref(false);
+
   // --- Batch Job State ---
   const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
   const batchGridRows = ref(parseInt(localStorage.getItem('mapng_batch_rows')) || 3);
@@ -230,6 +233,7 @@ export const useMainStore = defineStore('main', () => {
     isDarkMode,
     batchMode,
     terrainData,
+    exportStepOpen,
     lastGenerationKey,
     isLoading,
     loadingStatus,
