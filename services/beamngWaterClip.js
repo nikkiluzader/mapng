@@ -18,6 +18,7 @@ const MIN_DEPTH_M = 0.25;      // water shallower than this is left out (a River
 const SEA_CELL_M = 64;         // the sea's blocks away from tunnels ...
 const NEAR_CELL_M = 8;         // ... and near them
 const NEAR_PAD_M = 24;         // "near": within this of a dry zone
+const REACH_CELL_M = 16;       // what the open sea reaches is traced on cells this size
 const FRAME_M = 4000;          // the sea runs on past the map's edge this far
 
 /**
@@ -138,7 +139,49 @@ function mergeCells(cells) {
  * zones, plus a frame past the map's edges where it meets the sea there.
  * heightAt(x, y): the exported ground. Returns [{ cx, cy, sx, sy, z, depth }].
  */
-export function planSeaBlocks({ size, seaZ, heightAt, zones, minZ }) {
+/**
+ * Whether the heightmap (row-major W x H, absolute heights) has ground below
+ * sea level that the open sea can't reach: a polder, Death Valley, a basin
+ * behind a dyke. A single sea plane floods it all; the sea as blocks
+ * (planSeaBlocks) fills only what is joined to the map's edge where it is
+ * open water (seaAt). Tested on cells of about cellPx samples (row 0 north),
+ * each wet when any sample in it is below.
+ */
+export function hasInlandBelowSea(heightMap, W, H, seaLevel, cellPx, { seaAt = null } = {}) {
+  if (!heightMap || !(W > 0) || !(H > 0)) return false;
+  const c = Math.max(1, Math.round(cellPx));
+  const nx = Math.ceil(W / c); const ny = Math.ceil(H / c);
+  const wet = new Uint8Array(nx * ny);
+  let any = 0;
+  for (let y = 0; y < H; y++) {
+    const row = y * W; const cy = Math.floor(y / c) * nx;
+    for (let x = 0; x < W; x++) {
+      if (heightMap[row + x] < seaLevel) { const k = cy + Math.floor(x / c); if (!wet[k]) { wet[k] = 1; any++; } }
+    }
+  }
+  if (!any) return false;
+  const reached = new Uint8Array(nx * ny);
+  const stack = [];
+  // (seaAt(u, v): open water at that fraction of the map, west to east and north to south)
+  const seed = (k) => {
+    if (!wet[k] || reached[k]) return;
+    if (seaAt) { const i = k % nx; const j = (k - i) / nx; if (!seaAt(((i + 0.5) * c) / W, ((j + 0.5) * c) / H)) return; }
+    reached[k] = 1; stack.push(k);
+  };
+  for (let i = 0; i < nx; i++) { seed(i); seed((ny - 1) * nx + i); }
+  for (let j = 0; j < ny; j++) { seed(j * nx); seed(j * nx + nx - 1); }
+  let n = stack.length;
+  while (stack.length) {
+    const k = stack.pop(); const i = k % nx; const j = (k - i) / nx;
+    if (i > 0) { const q = k - 1; if (wet[q] && !reached[q]) { reached[q] = 1; stack.push(q); n++; } }
+    if (i < nx - 1) { const q = k + 1; if (wet[q] && !reached[q]) { reached[q] = 1; stack.push(q); n++; } }
+    if (j > 0) { const q = k - nx; if (wet[q] && !reached[q]) { reached[q] = 1; stack.push(q); n++; } }
+    if (j < ny - 1) { const q = k + nx; if (wet[q] && !reached[q]) { reached[q] = 1; stack.push(q); n++; } }
+  }
+  return n < any;
+}
+
+export function planSeaBlocks({ size, seaZ, heightAt, zones, minZ, seaAt = null }) {
   const half = size / 2;
   const floorDepth = Math.max(10, seaZ - minZ + 5);
   // near a dry zone: fine cells
@@ -151,20 +194,28 @@ export function planSeaBlocks({ size, seaZ, heightAt, zones, minZ }) {
     }
     return false;
   };
-  // the sea is what the open water reaches: wet SEA_CELL_M cells joined to
-  // the map's edge (the coarse test the sea has always used: the DEM shows a
-  // river under sea level only here and there). A road cutting or a basin
-  // inland under sea level is no sea: Norfolk's sunk loop ramp filled with it.
-  const nR = Math.ceil(size / SEA_CELL_M);
+  // the sea is what the open water reaches: wet REACH_CELL_M cells joined to
+  // the map's edge (coarse: the DEM shows a river under sea level only here
+  // and there; fine enough that a dyke's crest parts a polder from the sea,
+  // which 64 m cells leaked across). A road cutting or a basin inland under
+  // sea level is no sea: Norfolk's sunk loop ramp filled with it.
+  const nR = Math.ceil(size / REACH_CELL_M);
   const reached = new Uint8Array(nR * nR);
+  const wetR = new Uint8Array(nR * nR);
   {
-    const wetR = new Uint8Array(nR * nR);
     for (let j = 0; j < nR; j++) for (let i = 0; i < nR; i++) {
-      if (wet(-half + i * SEA_CELL_M, -half + j * SEA_CELL_M, SEA_CELL_M)) wetR[j * nR + i] = 1;
+      if (wet(-half + i * REACH_CELL_M, -half + j * REACH_CELL_M, REACH_CELL_M)) wetR[j * nR + i] = 1;
     }
+    // (from the edge cells that are open water, seaAt(x, y) given: a polder
+    // the map's edge cuts through is ground under sea level, not the sea)
+    const open = (idx) => {
+      if (!seaAt) return true;
+      const i = idx % nR; const j = (idx - i) / nR;
+      return seaAt(-half + (i + 0.5) * REACH_CELL_M, -half + (j + 0.5) * REACH_CELL_M);
+    };
     const stack = [];
     for (let k = 0; k < nR; k++) for (const idx of [k, (nR - 1) * nR + k, k * nR, k * nR + nR - 1]) {
-      if (wetR[idx] && !reached[idx]) { reached[idx] = 1; stack.push(idx); }
+      if (wetR[idx] && !reached[idx] && open(idx)) { reached[idx] = 1; stack.push(idx); }
     }
     while (stack.length) {
       const idx = stack.pop();
@@ -177,9 +228,18 @@ export function planSeaBlocks({ size, seaZ, heightAt, zones, minZ }) {
       }
     }
   }
-  const reachedIn = (x0, y0) => {
-    const i = Math.floor((x0 + half) / SEA_CELL_M); const j = Math.floor((y0 + half) / SEA_CELL_M);
-    return i >= 0 && j >= 0 && i < nR && j < nR && reached[j * nR + i] === 1;
+  // over a cell [x0, x0 + cell): 1 when the sea reaches into it, 2 when it
+  // also holds ground under sea level the sea doesn't reach (a polder behind
+  // its dyke: such a cell is built of the small cells, not one block)
+  const reachedIn = (x0, y0, cell = SEA_CELL_M) => {
+    const i0 = Math.max(0, Math.floor((x0 + half) / REACH_CELL_M)); const j0 = Math.max(0, Math.floor((y0 + half) / REACH_CELL_M));
+    const i1 = Math.min(nR - 1, Math.ceil((x0 + cell + half) / REACH_CELL_M) - 1); const j1 = Math.min(nR - 1, Math.ceil((y0 + cell + half) / REACH_CELL_M) - 1);
+    let r = 0; let dry = false;
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+      const k = j * nR + i;
+      if (reached[k]) r = 1; else if (wetR[k]) dry = true;
+    }
+    return r && dry ? 2 : r;
   };
   // a cell's depth: the full sea, clipped over a tube, 0 over a trench
   const depthIn = (x0, y0, cell) => {
@@ -195,14 +255,15 @@ export function planSeaBlocks({ size, seaZ, heightAt, zones, minZ }) {
   for (let j = 0; j < nC; j++) {
     for (let i = 0; i < nC; i++) {
       const x0 = -half + i * SEA_CELL_M; const y0 = -half + j * SEA_CELL_M;
-      if (near(x0, y0, x0 + SEA_CELL_M, y0 + SEA_CELL_M)) {
+      const reach = reachedIn(x0, y0);
+      if (reach === 2 || (reach && near(x0, y0, x0 + SEA_CELL_M, y0 + SEA_CELL_M))) {
         for (let b = 0; b < sub; b++) for (let a = 0; a < sub; a++) {
           const fx = x0 + a * NEAR_CELL_M; const fy = y0 + b * NEAR_CELL_M;
-          if (!reachedIn(fx, fy) || !wet(fx, fy, NEAR_CELL_M)) continue;
+          if (reachedIn(fx, fy, NEAR_CELL_M) !== 1 || !wet(fx, fy, NEAR_CELL_M)) continue;
           const d = depthIn(fx, fy, NEAR_CELL_M);
           if (d > 0) fine.set(`${i * sub + a},${j * sub + b}`, d);
         }
-      } else if (reachedIn(x0, y0)) {
+      } else if (reach) {
         coarse.set(`${i},${j}`, floorDepth);
         if (i === 0) edgeWet.w++; if (i === nC - 1) edgeWet.e++;
         if (j === 0) edgeWet.s++; if (j === nC - 1) edgeWet.n++;

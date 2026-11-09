@@ -190,3 +190,37 @@ export function steepRockFrom(cls) {
 export function osmRockAllowed(cls) {
   return !cls || cls === WC.BARE || cls === WC.SNOW || cls === WC.MOSS;
 }
+
+/**
+ * Where the map's edge is open water, by the land cover: (u, v) -> bool, u
+ * west to east and v north to south (0..1), for points on the edge. Water or
+ * no data (the open sea) in a run of at least minRunM along that edge: the
+ * sea, an estuary, a tidal river; a polder's ditch crossing the edge (a few
+ * metres of water at its 6 m below sea level) is not. Null without a land cover.
+ */
+export function openWaterAtEdge(landCover, worldSize, minRunM = 200) {
+  if (!landCover?.grid || landCover.grid.length !== landCover.n * landCover.n || !(worldSize > 0)) return null;
+  const { grid, n } = landCover;
+  const minRun = Math.max(1, Math.ceil((minRunM / worldSize) * n));
+  const water = (k) => k === WC.WATER || k === 0;
+  const runs = (get) => {
+    const out = new Uint8Array(n);
+    for (let i = 0; i < n;) {
+      if (!water(get(i))) { i++; continue; }
+      let j = i; while (j < n && water(get(j))) j++;
+      if (j - i >= minRun) out.fill(1, i, j);
+      i = j;
+    }
+    return out;
+  };
+  const north = runs((i) => grid[i]); const south = runs((i) => grid[(n - 1) * n + i]);
+  const west = runs((i) => grid[i * n]); const east = runs((i) => grid[i * n + n - 1]);
+  return (u, v) => {
+    const c = Math.min(n - 1, Math.max(0, Math.floor(u * n))); const r = Math.min(n - 1, Math.max(0, Math.floor(v * n)));
+    const d = Math.min(u, 1 - u, v, 1 - v);
+    if (d === v) return !!north[c];
+    if (d === 1 - v) return !!south[c];
+    if (d === u) return !!west[r];
+    return !!east[r];
+  };
+}

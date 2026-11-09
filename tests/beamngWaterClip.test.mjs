@@ -61,3 +61,38 @@ test('rivers and lakes over a tunnel are held over its roof', () => {
   assert.ok(clipLakeTile({ cx: 0, cy: 0, sx: 10, sy: 10, z: 0 }, 6, zones) < 6);
   assert.equal(clipLakeTile({ cx: 300, cy: 0, sx: 10, sy: 10, z: 0 }, 6, zones), 6);
 });
+
+test('a polder behind its dyke stays dry; the sea in front of it is water', async () => {
+  const { planSeaBlocks, hasInlandBelowSea } = await import('../services/beamngWaterClip.js');
+  // 512 m map, x from -256: sea (-5 m) west of x = -100, a 40 m dyke (+3 m), a polder (-4 m) east of it
+  const ground = (x) => (x < -100 ? -5 : x < -60 ? 3 : -4);
+  // (open water only out west: the polder runs off the map's other edges, as real ones do)
+  const blocks = planSeaBlocks({ size: 512, seaZ: 0, heightAt: (x) => ground(x), zones: [], minZ: -5, seaAt: (x) => x < -100 });
+  const wetAt = (x, y) => blocks.some((b) => Math.abs(x - b.cx) <= b.sx / 2 && Math.abs(y - b.cy) <= b.sy / 2);
+  assert.ok(wetAt(-200, 0), 'the sea is water');
+  assert.ok(!wetAt(0, 0) && !wetAt(200, 100), 'the polder is dry');
+  assert.ok(!wetAt(-40, 0), 'no water within ~16 m behind the dyke');
+  // the heightmap test: 128 x 128 at 4 m
+  const W = 128; const hm = new Float32Array(W * W);
+  for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) hm[y * W + x] = ground(-256 + x * 4);
+  const seaAt = (u) => u < 156 / 512;
+  assert.equal(hasInlandBelowSea(hm, W, W, 0, 4, { seaAt }), true);
+  assert.equal(hasInlandBelowSea(hm, W, W, 0, 4), false);   // (without knowing the sea, every edge is: as before)
+  // no polder (all the low ground joins the sea), or nothing below sea level: one plane will do
+  for (let i = 0; i < hm.length; i++) if (hm[i] === -4) hm[i] = 2;
+  assert.equal(hasInlandBelowSea(hm, W, W, 0, 4, { seaAt }), false);
+  assert.equal(hasInlandBelowSea(new Float32Array(W * W).fill(5), W, W, 0, 4), false);
+});
+
+test('open water at the map edge: the sea in long runs, not a polder ditch', async () => {
+  const { openWaterAtEdge } = await import('../services/worldCover.js');
+  const n = 100; const grid = new Uint8Array(n * n).fill(40);   // fields, 1 km square: 10 m cells
+  for (let r = 0; r < n; r++) for (let c = 0; c < 30; c++) grid[r * n + c] = 80;    // the sea along the west, 300 m deep
+  grid[50] = 80; grid[51] = 80;                                                       // a 20 m ditch crossing the north edge
+  const at = openWaterAtEdge({ grid, n }, 1000);
+  assert.equal(at(0, 0.5), true);        // west edge: the sea
+  assert.equal(at(0.1, 0), true);        // north edge over the sea
+  assert.equal(at(0.505, 0), false);     // the ditch
+  assert.equal(at(1, 0.5), false);       // east edge: fields
+  assert.equal(openWaterAtEdge(null, 1000), null);
+});

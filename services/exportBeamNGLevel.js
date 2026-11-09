@@ -21,10 +21,10 @@ import { placeTrafficCalming } from './trafficCalming.js';
 import { placeBollards } from './bollards.js';
 import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
 import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
-import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile } from './beamngWaterClip.js';
+import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
 import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
-import { fetchWorldCoverGrid, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
+import { fetchWorldCoverGrid, openWaterAtEdge, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
 import { fetchTreeSpeciesMix, TREE_MIX_CREDIT } from './treeSpecies.js';
 import { placeBoats } from './boats.js';
 import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
@@ -9910,7 +9910,7 @@ function buildWaterBlockObjects(terrainData, squareSize, biome, stats = {}, dryZ
  * plane where a tunnel reaches under sea level: none over its trenches, none
  * deeper than its roof over the tube.
  */
-function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dryZones, tunnels, sourceHeightMap = terrainData.heightMap) {
+function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dryZones, tunnels, sourceHeightMap = terrainData.heightMap, seaAtUV = null) {
   const waterProfile = getWaterProfile(biome);
   const minHeight = Number(terrainData?.minHeight);
   const seaZ = (Number.isFinite(minHeight) ? -minHeight : 0) + (Number(seaLevelOffset) || 0);
@@ -9925,6 +9925,8 @@ function buildSeaBlockObjects(terrainData, squareSize, biome, seaLevelOffset, dr
     ),
     zones: dryZones,
     minZ: Math.min(0, ...tunnels.flatMap((t) => t.line.map((p) => p.z))),
+    // (world x east, y north from the centre -> the map's fractions)
+    seaAt: seaAtUV ? (x, y) => { const size = terrainData.width * squareSize; return seaAtUV(x / size + 0.5, 0.5 - y / size); } : null,
   });
   return blocks.map((b, index) => ({
     ...structuredClone(WATER_BLOCK_TEMPLATE),
@@ -12859,9 +12861,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const hm = exportTerrainData.heightMap;
     for (let i = 0; i < hm.length && !cutBelowSea; i++) cutBelowSea = hm[i] < seaAbs && sourceHeightMap[i] >= seaAbs;
   }
-  const seaAsBlocks = (tunnelList.length > 0 && tunnelsBelow(tunnelList, seaZ)) || cutBelowSea;
+  // (and ground below sea level the sea can't reach, a polder or a desert
+  // basin: the plane flooded it; the blocks fill only what joins the edge)
+  // (where the edge is open water: the land cover's water or no data, the
+  // open sea, in runs of 200 m or more; not a polder's ditch)
+  const seaAtUV = openWaterAtEdge(exportTerrainData.landCover, exportTerrainData.width * squareSize);
+  const inlandBelowSea = !cutBelowSea && hasInlandBelowSea(sourceHeightMap, exportTerrainData.width, exportTerrainData.height,
+    seaZ + (Number(exportTerrainData.minHeight) || 0), 16 / squareSize, { seaAt: seaAtUV });
+  if (inlandBelowSea) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground below sea level the sea doesn't reach: the sea as blocks, not one plane.`);
+  const seaAsBlocks = (tunnelList.length > 0 && tunnelsBelow(tunnelList, seaZ)) || cutBelowSea || inlandBelowSea;
   const seaObjects = seaAsBlocks
-    ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList, sourceHeightMap)
+    ? buildSeaBlockObjects(exportTerrainData, squareSize, biome, seaLevelOffset, dryZones, tunnelList, sourceHeightMap, seaAtUV)
     : [buildSeaLevelWaterPlane(exportTerrainData, biome, seaLevelOffset)];
   waterStats.sea = seaAsBlocks ? { blocks: seaObjects.length } : { plane: true };
   waterStats.pools = {};
