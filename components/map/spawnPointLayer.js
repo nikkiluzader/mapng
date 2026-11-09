@@ -68,6 +68,7 @@ export function attachSpawnPointLayer(map, opts) {
         markers.get(q.id)?.setIcon(iconFor({ ...q, heading }, false, true));
         handle._mapngHeading = heading;
       });
+      handle.on('mousedown', (e) => L.DomEvent.stopPropagation(e));
       handle.on('dragend', () => {
         const id = getSelected();
         if (id && Number.isFinite(handle?._mapngHeading)) editor.updatePoint(id, { heading: handle._mapngHeading });
@@ -93,15 +94,18 @@ export function attachSpawnPointLayer(map, opts) {
       if (!m) {
         m = L.marker([p.lat, p.lng], { draggable: true, keyboard: false, riseOnHover: true });
         m.on('click', (e) => { L.DomEvent.stop(e); setSelected(p.id); });
-        m.on('dragstart', () => setSelected(p.id));
+        // (while dragged the pin keeps its icon: a new icon element mid-drag
+        // ends the drag, and selecting it re-renders the pins)
+        m.on('dragstart', () => { m._mapngDragging = true; setSelected(p.id); });
         m.on('drag', () => { if (handle && getSelected() === p.id) handle.setLatLng(handleLatLng({ ...p, ...latLngOf(m), heading: currentHeading(p.id) })); });
-        m.on('dragend', () => editor.updatePoint(p.id, latLngOf(m)));
+        m.on('dragend', () => { m._mapngDragging = false; editor.updatePoint(p.id, latLngOf(m)); });
         // (a press on a pin is the pin's, not a new point's)
         m.on('mousedown', (e) => L.DomEvent.stopPropagation(e));
         m.bindTooltip('', { direction: 'top', offset: [0, -14] });
         group.addLayer(m);
         markers.set(p.id, m);
       }
+      if (m._mapngDragging) return;
       m.setLatLng([p.lat, p.lng]);
       m.setIcon(iconFor(p, outside, p.id === sel));
       m.setTooltipContent(tip);

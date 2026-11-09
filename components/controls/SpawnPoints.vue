@@ -131,7 +131,8 @@ function onKey(e) {
   if (store.batchMode) return;
   if (e.key === 'p' || e.key === 'P') { editor.setTool(!store.pointTool); e.preventDefault(); return; }
   if (e.key === 'Escape' && store.pointTool) { editor.setTool(false); return; }
-  if ((e.key === 'Delete' || e.key === 'Backspace') && store.selectedPointId) { editor.removePoint(store.selectedPointId); e.preventDefault(); }
+  // (Delete only: Backspace is too easy to press meaning something else)
+  if (e.key === 'Delete' && store.selectedPointId) { editor.removePoint(store.selectedPointId); e.preventDefault(); }
 }
 onMounted(() => window.addEventListener('keydown', onKey));
 onBeforeUnmount(() => { window.removeEventListener('keydown', onKey); editor.setTool(false); });
