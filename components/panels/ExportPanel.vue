@@ -1004,6 +1004,8 @@ const exportInputs = computed(() => JSON.stringify({
   forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value,
   bridges: beamNGIncludeBridges.value, tunnels: beamNGIncludeTunnels.value, lidar: beamNGLidarDecks.value,
   sea: beamNGSeaLevelOffset.value,
+  // (points change only the spawns and their photos, but the level made is another)
+  points: store.points,
 }));
 // { inputs, at, filename, desktop: { path, size } | null, blob: Blob | null }
 const lastExport = ref(null);
@@ -1998,6 +2000,8 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       elevationSource: props.elevationSource,
       requestedResolution: props.resolution,
       requestedProcessingMetersPerPixel: resolveProcessingMetersPerPixel(td),
+      // the spawn and quicktravel points from step 1 (services/spawnPoints.js), a plain copy
+      points: JSON.parse(JSON.stringify(toRaw(store.points) || [])),
       onProgress: ({ step, pct, elapsedMs, completed, phase, phaseFraction, phaseWeights }) => {
         beamNGProgressStep.value = step;
         beamNGProgressPct.value  = pct;

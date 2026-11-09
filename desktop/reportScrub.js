@@ -6,7 +6,8 @@ import os from 'node:os';
 
 // never in a report: keys, tokens, passwords (GPXZ / Overpass keys live in the options)
 const SECRET_KEY_RE = /key|token|secret|password|auth/i;
-const LOCATION_KEY_RE = /^(center|centre|lat|lng|lon|latitude|longitude|bounds|bbox)$/i;
+// (points: the user's spawn and quicktravel points, named places on the map)
+const LOCATION_KEY_RE = /^(center|centre|lat|lng|lon|latitude|longitude|bounds|bbox|points|backgroundMask)$/i;
 
 /** Export options with secrets removed (and location fields, when the user unticks the location). */
 export function cleanOptions(options, { keepLocation = true } = {}) {

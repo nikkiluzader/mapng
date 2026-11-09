@@ -728,7 +728,7 @@ ipcMain.handle('terrain:generate', async (event, requested) => {
       // (Raw terrain as the window has it now: the saved downloads are untouched,
       // so the terrain can be made either way)
       // Background areas too: as drawn now (they only leave things out of the saved data)
-      generationOptions: { ...(saved.generationOptions || {}), raw: !!requested.generationOptions?.raw, backgroundMask: requested.generationOptions?.backgroundMask || null },
+      generationOptions: { ...(saved.generationOptions || {}), raw: !!requested.generationOptions?.raw, backgroundMask: requested.generationOptions?.backgroundMask || null, points: requested.generationOptions?.points || null },
       sources: { mode: 'replay', dir: path.join(projectDir, 'sources'), fallback: true },
     };
   } else {

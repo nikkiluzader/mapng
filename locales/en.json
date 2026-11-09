@@ -1296,7 +1296,11 @@
     "forestDensity": "Forest density",
     "backgroundAreas": "Background areas",
     "backgroundAreasValue": "{lines} lines, {areas} shaded areas, {roads} kept roads, {strokes} brush strokes",
-    "sentWithoutAreas": "Background areas were too big for a short code and were left out: Copy the long code to share them."
+    "sentWithoutAreas": "Background areas were too big for a short code and were left out: Copy the long code to share them.",
+    "sentWithoutPoints": "Background areas and points were too big for a short code and were left out: Copy the long code to share them.",
+    "points": "Spawn & quicktravel points",
+    "pointsValue": "{n} points (automatic spawn)",
+    "pointsValueDefault": "{n} points (spawn: {name})"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1459,6 +1463,8 @@
     "baseTexture": "Base texture",
     "materials": "Ground materials from OSM",
     "levelName": "Level name",
+    "points": "Spawn & quicktravel points",
+    "pointsWithDefault": "{value}",
     "on": "on",
     "off": "off",
     "srcMapterhorn": "Best free (lidar + 30 m)",
