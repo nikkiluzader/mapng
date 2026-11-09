@@ -7,6 +7,7 @@
 // "mapng:1:<deflated base64url>" (Copy / Paste, Ctrl+V on the map, export and
 // crash reports), and as a short send code (services/shareCodes.js).
 import { PERSONAL_STORAGE_KEYS, withoutPersonal } from './personalKeys.js';
+import { sanitizePoints, pointLabel } from './spawnPoints.js';
 
 /** Export-panel settings: [name in the config, localStorage key, kind, default]. */
 export const EXPORT_FIELDS = [
@@ -82,7 +83,7 @@ export const withoutSecrets = withoutPersonal;
 export const usableMask = (m) => !!(m && typeof m === 'object' && m.version && m.bounds
   && ['lines', 'shade', 'unshade', 'roads', 'paint', 'raw'].some((k) => Array.isArray(m[k]) && m[k].length));
 
-export function buildSessionConfig(runConfiguration, storage = globalThis.localStorage, { backgroundMask = null } = {}) {
+export function buildSessionConfig(runConfiguration, storage = globalThis.localStorage, { backgroundMask = null, points = null } = {}) {
   const run = withoutSecrets(runConfiguration || {});
   const keep = ['schemaVersion', 'mode', 'center', 'zoom', 'resolution', 'includeOSM', 'elevationSource', 'useUSGS', 'useGPXZ', 'useKRON86', 'processingMetersPerPixel', 'rawTerrain'];
   const config = Object.fromEntries(keep.filter((k) => run[k] !== undefined).map((k) => [k, run[k]]));
@@ -93,7 +94,34 @@ export function buildSessionConfig(runConfiguration, storage = globalThis.localS
   // the background areas drawn in step 1 (lines, shaded areas, kept roads,
   // Unmask and No smoothing strokes): they belong to this exact box
   if (usableMask(backgroundMask)) config.backgroundMask = JSON.parse(JSON.stringify(backgroundMask));
+  // the spawn and quicktravel points (services/spawnPoints.js): geographic,
+  // so they travel with or without a box
+  const kept = sanitizePoints(points);
+  if (kept.length) config.points = kept;
   return config;
+}
+
+/** A config's points, checked (a pasted code is someone else's data), or null when it has none. */
+export const configPoints = (config) => (Array.isArray(config?.points) ? sanitizePoints(config.points) : null);
+
+/**
+ * The code for mapng.com's short send codes, which hold up to `limit`
+ * characters: a big background-areas drawing is left out first, then the
+ * points. Returns { code, dropped: [...names left out] }.
+ */
+export async function encodeSessionCodeWithin(config, limit = 16000) {
+  let cfg = config;
+  let code = await encodeSessionCode(cfg);
+  const dropped = [];
+  for (const key of ['backgroundMask', 'points']) {
+    if (code.length <= limit) break;
+    if (cfg[key] === undefined) continue;
+    const { [key]: _drop, ...rest } = cfg;
+    cfg = rest;
+    dropped.push(key);
+    code = await encodeSessionCode(cfg);
+  }
+  return { code, dropped };
 }
 
 /** Put a config's `export` (and data extras) into storage: the panels read it from there. */
@@ -184,6 +212,14 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
   if (usableMask(c.backgroundMask)) {
     const m = c.backgroundMask;
     add('data', 'config.backgroundAreas', { valueKey: 'config.backgroundAreasValue', params: { lines: (m.lines || []).length, areas: (m.shade || []).length, roads: (m.roads || []).length, strokes: (m.paint || []).length + (m.raw || []).length } });
+  }
+
+  const points = configPoints(c);
+  if (points?.length) {
+    const i = points.findIndex((p) => p.isDefault);
+    add('data', 'config.points', i >= 0
+      ? { valueKey: 'config.pointsValueDefault', params: { n: points.length, name: pointLabel(points[i], i) } }
+      : { valueKey: 'config.pointsValue', params: { n: points.length } });
   }
 
   const e = c.export;

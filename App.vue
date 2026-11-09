@@ -927,6 +927,9 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         ...generationEdits,
         // (a plain copy: it goes to a worker / the desktop app)
         ...(store.backgroundActive ? { backgroundMask: JSON.parse(JSON.stringify(store.backgroundMask)) } : {}),
+        // (the desktop app keeps these with the level's project, so Modify
+        // brings the points back; they never change the terrain made)
+        ...(desktopApp && store.points.length ? { points: JSON.parse(JSON.stringify(store.points)) } : {}),
       };
       // (the desktop app fetches and processes in a Node process: no 4 GB
       // window limit; the website does it here)
@@ -1039,6 +1042,9 @@ const handleModifyLevel = async (level) => {
   switchTo2D();
   // (the level's own background areas, or none)
   store.setBackgroundMask(info.generationOptions?.backgroundMask || null);
+  // (and its spawn and quicktravel points: as last exported, its mapng.json, else as generated)
+  const levelPoints = info.options?.points || info.generationOptions?.points;
+  if (Array.isArray(levelPoints)) store.setPoints(levelPoints);
   setCenter({ lat: info.center.lat, lng: info.center.lng }, { force: true });
   if (info.resolution) setResolution(info.resolution, { force: true });
   const mpp = Number(info.generationOptions?.processingMetersPerPixel) || 1;

@@ -31,6 +31,8 @@ import { GROUND_CLASSES, satelliteGroundClasses } from './osmTexture.js';
 import { SHAPE_IMPOSTER_FILES } from './beamngTreeLibrary.js';
 import { prepareCroppedTerrainData, cropHeightmap, cropOSMFeatures, adjustBounds } from './cropTerrain.js';
 import { stepHash, cachedStep, terrainFingerprint } from './stepCache.js';
+import { sanitizePoints, planSpawnPoints, spawnReportLines } from './spawnPoints.js';
+import { renderSpawnPreviews } from './spawnPreview.js';
 import { backdropHeightSampler, planBackdropWater, insidePart } from './backdropWater.js';
 
 // (the build, in the step cache keys of steps whose code spans many modules:
@@ -58,7 +60,7 @@ import { prepareSurvey, lidarPins } from './lidarDecks.js';
 import { buildLampGlowDAE, lampGlowMaterialDef, LAMP_GLOW_SHAPE, buildFloodGlowDAE, floodGlowMaterialDef, FLOOD_GLOW_SHAPE } from './lampGlow.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
-import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
+import { decksFromSolver, applySolvedHeights, roadLinesFromSolver, solvedHeightAt } from './structures/adapters.js';
 import { checkJoints, checkGrades, checkCrossings, checkRoadSurface } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
@@ -405,13 +407,14 @@ function computeSpawnRotationMatrix(ptA, ptB) {
   const len = Math.sqrt(dx * dx + dy * dy);
   if (len < 1e-10) return [1, 0, 0, 0, 1, 0, 0, 0, 1];
 
-  const nx = dx / len; // normalized east
-  const ny = dy / len; // normalized north
+  // (a vehicle spawned at a sphere faces the sphere's -Y, its JBeam forward:
+  // the sphere's +Y points back down the road, so the car faces ptA -> ptB;
+  // measured in game 2026-11-09, the old +Y-forward matrix spawned it facing
+  // backwards in its lane)
+  const nx = -dx / len;
+  const ny = -dy / len;
 
-  // Rotation matrix: vehicle forward aligns with road tangent (nx, ny) in XY plane.
-  // Row 0: right vector (ny, -nx, 0)
-  // Row 1: forward vector (nx, ny, 0) — BeamNG +Y forward
-  // Row 2: up vector (0, 0, 1)
+  // Rotation matrix rows: right (ny, -nx, 0), +Y (nx, ny, 0), up (0, 0, 1).
   return [
     Math.round(ny * 1e6) / 1e6, Math.round(-nx * 1e6) / 1e6, 0,
     Math.round(nx * 1e6) / 1e6, Math.round(ny * 1e6) / 1e6,  0,
@@ -499,8 +502,9 @@ function findRoadSpawn(carriageways, groundAt, covered = () => false, { leftHand
       best = {
         score,
         position: [roundTo(x + fy * lane, 2), roundTo(y - fx * lane, 2), roundTo(z + 0.5, 2)],
-        // rows: right, forward (BeamNG +Y), up
-        rotationMatrix: [roundTo(fy, 6), roundTo(-fx, 6), 0, roundTo(fx, 6), roundTo(fy, 6), 0, 0, 0, 1],
+        // rows: right, +Y, up; the car faces the sphere's -Y, so +Y points
+        // back (f): with +Y along f it sat in its lane facing against traffic
+        rotationMatrix: [roundTo(-fy, 6), roundTo(fx, 6), 0, roundTo(-fx, 6), roundTo(-fy, 6), 0, 0, 0, 1],
       };
     }
   }
@@ -7764,6 +7768,7 @@ function buildBeamNGExportReport({
   mapngFlagFiles,
   didCropToSquare,
   detail = null,
+  spawnReport = null,
 }) {
   const minHeight = Number(terrainData?.minHeight);
   const maxHeight = Number(terrainData?.maxHeight);
@@ -7882,6 +7887,7 @@ function buildBeamNGExportReport({
     }
   }
 
+  reportLines.push(...spawnReportLines(spawnReport));
   reportLines.push('');
   reportLines.push('OSM Analysis');
   reportLines.push(`- Source OSM features before bounds filter: ${originalOsmSummary.total}`);
@@ -11787,6 +11793,10 @@ function stampOptions(options) {
     if (v == null || ['string', 'number', 'boolean'].includes(typeof v)) out[k] = v;
     else if (Array.isArray(v) && v.length <= 32 && v.every((x) => x == null || ['string', 'number', 'boolean'].includes(typeof x))) out[k] = v;
   }
+  // (the spawn and quicktravel points are objects, kept by name: Rebuild and
+  // Modify in the desktop levels sidebar read them back from here)
+  const points = sanitizePoints(options?.points);
+  if (points.length) out.points = points;
   return out;
 }
 
@@ -13565,6 +13575,45 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // levels and rebuild them with a later version (its levels sidebar)
   zip.file(`${base}/mapng.json`, JSON.stringify(mapngLevelStamp({ terrainData, center, options, levelName, worldSize }), null, 1));
 
+  // The user's spawn and quicktravel points (services/spawnPoints.js), on
+  // the roads as drawn now: decks and tunnel roads at their solved heights.
+  // Without points the level keeps the automatic spawn exactly as before.
+  const solvedSpawnRoads = options.structureSolver === 'v2' && sg?.classes && sg?.profile?.z;
+  const tunnelOwners = decalRoads.tunnels?.bySeg;
+  const spawnSurfaceAt = solvedSpawnRoads
+    ? (cw, x, y) => (cw.tunnel || tunnelOwners?.has?.(cw.owner) ? null : solvedHeightAt(sg, cw.owner, x, y))
+    : null;
+  const spawnPlan = planSpawnPoints(options.points, {
+    bounds: exportTerrainData.bounds,
+    project: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize),
+    carriageways: decalRoads.carriageways || [],
+    groundAt: terrainGroundAt(exportTerrainData, squareSize),
+    leftHandTraffic: resolvedRightHandDrive,
+    autoSpawn: { position: spawnPosition, rotationMatrix: spawnRotationMatrix },
+    // (v2: each road as the solver drew it, decks included; tunnel roads
+    // come from today's builder and keep their own heights)
+    surfaceAt: spawnSurfaceAt,
+  });
+  if (spawnPlan.used) {
+    // their photos: the base texture round each point (spawnPreview.js); a
+    // point whose photo failed shows the level's preview.png
+    const shots = await renderSpawnPreviews(texBlob, spawnPlan.previews, {
+      worldSize,
+      roads: baseTexture === 'none' ? decalRoads.carriageways : null,
+    });
+    const made = new Set();
+    for (const { file, blob } of shots) {
+      zip.file(`${base}/${file}`, blob instanceof Uint8Array ? blob : new Uint8Array(await blob.arrayBuffer()));
+      made.add(file);
+    }
+    for (const e of spawnPlan.spawnPoints) if (e.preview !== 'preview.png' && !made.has(e.preview)) e.preview = 'preview.png';
+    for (const line of spawnReportLines(spawnPlan.report)) if (line) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Points: ${line.replace(/^- /, '')}`);
+    console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Spawn and quicktravel points: ${spawnPlan.spheres.length} spawn sphere(s), ${shots.length} preview photo(s).`);
+  }
+  // (the camera bookmark and the in-game probes start where the car does)
+  spawnPosition = spawnPlan.spheres[0].position;
+  spawnRotationMatrix = spawnPlan.spheres[0].rotationMatrix;
+
   zip.file(`${base}/info.json`, JSON.stringify({
     authors: 'mapng',
     biome: biome?.label || biome?.id || 'mapng',
@@ -13576,12 +13625,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     suitablefor: 'Freeroam, testing, and world-building',
     // BeamNG displays this as map dimensions in km; provide real-world meters.
     size: [worldSizeMeters, worldSizeMeters],
-    spawnPoints: [{
-      name: 'Default',
-      objectname: 'spawn_default',
-      preview: 'preview.png',
-      translationId: 'Default Spawnpoint',
-    }],
+    // (the default first; without user points, today's single entry)
+    spawnPoints: spawnPlan.spawnPoints,
     title: levelDisplayName,
     supportsTraffic,
     supportsTimeOfDay: true,
@@ -13958,6 +14003,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     backdropDiagnostics,
     mapngFlagFiles,
     didCropToSquare,
+    spawnReport: spawnPlan.report,
     detail: {
       jobLog,
       buildingReport,
@@ -14738,16 +14784,18 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // fallback), 3 m above the terrain surface at that point.
   // rotationMatrix: 9-element flat row-major matrix aligning the vehicle with
   // the road tangent direction at the spawn point.
-  const playerDropPointItems = [{
+  // The user's points add a sphere each (spawnPlan, by info.json); the
+  // default one is always spawn_default.
+  const playerDropPointItems = spawnPlan.spheres.map((sp) => ({
       __parent: 'PlayerDropPoints',
       class: 'SpawnSphere',
       dataBlock: 'SpawnSphereMarker',
-      name: 'spawn_default',
+      name: sp.name,
       persistentId: generatePersistentId(),
-      position: spawnPosition,
-      rotationMatrix: spawnRotationMatrix,
+      position: sp.position,
+      rotationMatrix: sp.rotationMatrix,
       radius: 5,
-    }];
+    }));
 
   zip.file(`${base}/main/MissionGroup/PlayerDropPoints/items.level.json`, toNDJSON(playerDropPointItems));
 

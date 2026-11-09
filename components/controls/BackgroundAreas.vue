@@ -160,6 +160,8 @@ function pick(id) {
   const next = tool.value === id && id !== 'pan' ? 'pan' : id;
   const apply = () => {
     tool.value = next;
+    // (one mouse tool at a time: the points' Place tool lets go)
+    if (next !== 'pan') store.pointTool = false;
     setHint(HINTS[next] ? t(`backgroundAreas.${HINTS[next]}`) : '');
     if (next === 'road') loadRoads();
   };

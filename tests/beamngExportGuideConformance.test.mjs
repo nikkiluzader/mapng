@@ -232,6 +232,40 @@ test('guide §10.7/10.8: info.json spawn + preview coupling', async () => {
   });
 });
 
+test('spawn points: user points become SpawnSpheres + info.json entries, the default as spawn_default', async () => {
+  const restore = installCanvasPolyfill();
+  try {
+    // the road runs (0.8, 0.2) → (0.2, 0.8) in lat/lng; one point beside it, one off it, one outside
+    const zip = await exportZip({ points: [
+      { id: 'q1', name: 'Field', lat: 0.85, lng: 0.85, heading: 45 },
+      { id: 'd1', name: 'Start here', lat: 0.5, lng: 0.5, heading: 300, isDefault: true },
+      { id: 'o1', name: 'Elsewhere', lat: 3, lng: 3, heading: 0 },
+    ] });
+    const info = JSON.parse(await readText(zip, 'info.json'));
+    assert.equal(info.defaultSpawnPointName, 'spawn_default');
+    assert.deepEqual(info.spawnPoints.map((e) => [e.translationId, e.objectname]), [['Start here', 'spawn_default'], ['Field', 'spawn_mapng_q1']]);
+    for (const e of info.spawnPoints) assert.ok(zip.file(`${BASE}/${e.preview}`), `preview ${e.preview} must exist`);
+    const drops = parseNDJSON(await readText(zip, 'main/MissionGroup/PlayerDropPoints/items.level.json'));
+    assert.deepEqual(drops.map((o) => o.name), ['spawn_default', 'spawn_mapng_q1']);
+    for (const o of drops) {
+      assert.equal(o.class, 'SpawnSphere');
+      assert.equal(o.dataBlock, 'SpawnSphereMarker');
+      assert.ok(o.position.every(Number.isFinite));
+    }
+    // the default faces along the road (south-east or north-west), the off-road one its arrow
+    const [r] = drops; const fx = r.rotationMatrix[3]; const fy = r.rotationMatrix[4];
+    assert.ok(Math.abs(Math.abs(fx) - Math.abs(fy)) < 0.05 && fx * fy < 0, `along the diagonal road: ${fx}, ${fy}`);
+    const q = drops[1];
+    // (aimed north-east: the car faces the sphere's -Y, so its +Y row points south-west)
+    assert.ok(Math.abs(q.rotationMatrix[3] + Math.SQRT1_2) < 1e-3 && Math.abs(q.rotationMatrix[4] + Math.SQRT1_2) < 1e-3);
+    const report = await readText(zip, 'export_report.txt');
+    assert.match(report, /Start here \(default spawn\): on /);
+    assert.match(report, /Elsewhere: skipped, outside the map/);
+    const stamp = JSON.parse(await readText(zip, 'mapng.json'));
+    assert.equal(stamp.options.points.length, 3);
+  } finally { restore(); }
+});
+
 // ── §10.9 — exactly one LevelInfo "theLevelInfo" using globalEnviromentMap ────
 test('guide §10.9: exactly one theLevelInfo with globalEnviromentMap spelling', async () => {
   await withZip(async (zip) => {

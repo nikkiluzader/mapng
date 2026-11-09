@@ -3,6 +3,7 @@ import { ref, computed, shallowRef } from 'vue';
 import { loadBatchState } from '../services/batchJob';
 import { terrainMode, setTerrainMode } from '../composables/useTerrainMode.js';
 import { emptyMask, maskHasAreas } from '../services/backgroundMask.js';
+import { sanitizePoints, POINTS_STORAGE_KEY } from '../services/spawnPoints.js';
 
 const DEFAULT_CENTER = { lat: 35.1983, lng: -111.6513 };
 
@@ -92,6 +93,23 @@ export const useMainStore = defineStore('main', () => {
   const backgroundPinned = ref(false);
   const boxLocked = computed(() => backgroundActive.value || (backgroundPinned.value && advancedMode.value && !batchMode.value));
   function setBackgroundPinned(v) { backgroundPinned.value = !!v; }
+
+  // --- Spawn and quicktravel points (services/spawnPoints.js; Location step) ---
+  // An export setting: geographic, independent of the box, never a reason to
+  // generate again. Kept as { version, points } so the format can grow.
+  const points = ref((() => {
+    try { return sanitizePoints(JSON.parse(localStorage.getItem(POINTS_STORAGE_KEY) || 'null')?.points); } catch { return []; }
+  })());
+  const pointTool = ref(false);          // placing points on the 2D map
+  const selectedPointId = ref(null);
+  function setPoints(list) {
+    points.value = sanitizePoints(list);
+    if (selectedPointId.value && !points.value.some((p) => p.id === selectedPointId.value)) selectedPointId.value = null;
+    try {
+      if (points.value.length) localStorage.setItem(POINTS_STORAGE_KEY, JSON.stringify({ version: 1, points: points.value }));
+      else localStorage.removeItem(POINTS_STORAGE_KEY);
+    } catch { /* storage full or blocked */ }
+  }
 
   // --- Batch Job State ---
   const batchGridCols = ref(parseInt(localStorage.getItem('mapng_batch_cols')) || 3);
@@ -218,6 +236,10 @@ export const useMainStore = defineStore('main', () => {
     previewMode,
     surroundingTilePositions,
     backgroundMask,
+    points,
+    pointTool,
+    selectedPointId,
+    setPoints,
     backgroundTool,
     backgroundDrawn,
     backgroundActive,

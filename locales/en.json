@@ -1296,7 +1296,11 @@
     "forestDensity": "Forest density",
     "backgroundAreas": "Background areas",
     "backgroundAreasValue": "{lines} lines, {areas} shaded areas, {roads} kept roads, {strokes} brush strokes",
-    "sentWithoutAreas": "Background areas were too big for a short code and were left out: Copy the long code to share them."
+    "sentWithoutAreas": "Background areas were too big for a short code and were left out: Copy the long code to share them.",
+    "sentWithoutPoints": "Background areas and points were too big for a short code and were left out: Copy the long code to share them.",
+    "points": "Spawn & quicktravel points",
+    "pointsValue": "{n} points (automatic spawn)",
+    "pointsValueDefault": "{n} points (spawn: {name})"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1459,6 +1463,8 @@
     "baseTexture": "Base texture",
     "materials": "Ground materials from OSM",
     "levelName": "Level name",
+    "points": "Spawn & quicktravel points",
+    "pointsWithDefault": "{value}",
     "on": "on",
     "off": "off",
     "srcMapterhorn": "Best free (lidar + 30 m)",
@@ -1484,6 +1490,31 @@
     "forest_light": "Light",
     "forest_dense": "Dense",
     "forest_veryDense": "Very dense"
+  },
+  "spawnPoints": {
+    "title": "Spawn & quicktravel points",
+    "intro": "Pick where the car starts and add places to jump to. In BeamNG they show in the big map's Points of Interest under Quicktravel Points, each with a photo.",
+    "place": "Place point",
+    "placeHint": "Click the map to drop a point; drag before letting go to aim it. Drag a pin to move it, or the white handle at its arrow to turn it.",
+    "empty": "Automatic: the car starts on a road near the middle of the map.",
+    "aside": "{n}",
+    "asideAuto": "Auto",
+    "name": "Name",
+    "pointN": "Point {n}",
+    "heading": "Heading (0° = north)",
+    "setDefault": "Start here (the level's spawn)",
+    "unsetDefault": "Back to the automatic spawn",
+    "spawnTag": "Spawn: the car starts here",
+    "remove": "Remove",
+    "clear": "Remove all",
+    "count": "{n} of {max}",
+    "outside": "Outside the map: not exported",
+    "noDefault": "No point is the spawn (★): the car starts on a road near the middle, as without points.",
+    "snapNote": "Each point moves onto the nearest drivable road when exported (bridges and tunnels too) and faces along it; away from roads it stays where placed and faces its arrow.",
+    "spawnHere": "Spawn here",
+    "quicktravelHere": "Add quicktravel point here",
+    "spawnName": "Spawn",
+    "aimHandle": "Drag to aim"
   },
   "backgroundAreas": {
     "title": "Background areas",

@@ -12,6 +12,11 @@
 // the street widths measured between the buildings (an A/B check). --fix-stubs puts
 // real images where the headless canvas left stubs, so the level loads clean
 // in game. STRUCT=v1|v2|v2-terrain picks the structure solver.
+// Spawn and quicktravel points go in EXPORT_OPTS too, as the app's step 1
+// keeps them (services/spawnPoints.js): EXPORT_OPTS='{"points":[{"name":"Pit",
+// "lat":..,"lng":..,"heading":90,"isDefault":true}]}'. SHIMS=1 draws with the
+// desktop runner's real canvas (as BACKDROP=1 does) so their preview photos
+// are real JPEGs, not stubs.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -35,7 +40,7 @@ if (!fs.existsSync(path.join(dir, `${dem}.f32`))) { console.error(`no ${dem}.f32
 
 installCanvasPolyfill();
 // (BACKDROP=1: the backdrop loads images, so the desktop export runner's browser shims, as the app)
-if (process.env.BACKDROP === '1') {
+if (process.env.BACKDROP === '1' || process.env.SHIMS === '1') {
   const { installBrowserShims } = await import('../../desktop/runner/browserShims.mjs');
   installBrowserShims({ assetsDir: new URL('../../public', import.meta.url).pathname });
 }
@@ -139,7 +144,8 @@ const { blob, structureChecks, steps: stepTimes } = await exportBeamNGLevel(terr
     return { index, lp: await createLazPerf(), fetchImpl };
   } } : {}),
   // extra export options as JSON, e.g. EXPORT_OPTS='{"shapeTerrain":false}'
-  ...(process.env.EXPORT_OPTS ? JSON.parse(process.env.EXPORT_OPTS) : {}),
+  // (or EXPORT_OPTS=@file.json: the options in a file)
+  ...(process.env.EXPORT_OPTS ? JSON.parse(process.env.EXPORT_OPTS.startsWith('@') ? fs.readFileSync(process.env.EXPORT_OPTS.slice(1), 'utf8') : process.env.EXPORT_OPTS) : {}),
   levelName, elevationSource: 'upload', requestedResolution: meta.size, requestedProcessingMetersPerPixel: meta.mpp,
   onProgress: ({ step, pct }) => { if (process.stderr.isTTY) process.stderr.write(`\r[${pct}%] ${String(step).slice(0, 70).padEnd(70)}`); },
 });

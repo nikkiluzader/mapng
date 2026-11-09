@@ -131,6 +131,14 @@
 
       </SettingSection>
 
+      <!-- Spawn and quicktravel points (Basic too: where the car starts is a basic wish; not in a batch job) -->
+      <SpawnPoints
+        v-if="!store.batchMode"
+        :center="center"
+        :resolution="resolution"
+        :meters-per-pixel="processingMetersPerPixel"
+      />
+
       <!-- Background areas (advanced; not with an uploaded elevation file, which picks its own box) -->
       <BackgroundAreas
         v-if="store.advancedMode && !uploadedElevationFile"
@@ -390,6 +398,7 @@ import ElevationSourceSelector from '../map/ElevationSourceSelector.vue';
 import ResolutionSelector from '../map/ResolutionSelector.vue';
 import SurroundingTiles from '../map/SurroundingTiles.vue';
 import BackgroundAreas from '../controls/BackgroundAreas.vue';
+import SpawnPoints from '../controls/SpawnPoints.vue';
 import ExportPanel from './ExportPanel.vue';
 import { useMainStore } from '../../stores/mainStore';
 import GenerateActions from '../controls/GenerateActions.vue';
@@ -402,7 +411,7 @@ import RasterMetaCard from '../controls/RasterMetaCard.vue';
 import { checkUSGSStatus, probeGPXZLimits } from '../../services/terrain';
 import { downloadJsonFile } from '../../services/traceability';
 import { buildRunConfiguration as buildRunConfigurationBase } from '../../services/runConfiguration';
-import { applyStoredSettings, usableMask, buildSessionConfig, describeSessionConfig, encodeSessionCode, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
+import { applyStoredSettings, usableMask, buildSessionConfig, describeSessionConfig, encodeSessionCode, encodeSessionCodeWithin, configPoints, fetchSharedCode, looksLikeSessionCode, parseSessionText, sendSessionCode, shareIdFrom, shareLink } from '../../services/sessionConfig.js';
 import { setBaseTexture } from '../../composables/useBaseTexture.js';
 import SessionConfigDialog from '../modals/SessionConfigDialog.vue';
 import ShareDialog from '../modals/ShareDialog.vue';
@@ -758,7 +767,7 @@ const triggerDownload = (blob, filename) => {
 // The whole control panel (data + export settings) as one config, never
 // with keys: services/sessionConfig.js. Copy gives a one-line "mapng:1:…"
 // code; Paste, Load and Ctrl+V on the map show what it would change first.
-const currentSessionConfig = () => buildSessionConfig({ ...buildRunConfiguration(), rawTerrain: store.rawTerrain }, localStorage, { backgroundMask: store.backgroundActive ? toRaw(store.backgroundMask) : null });
+const currentSessionConfig = () => buildSessionConfig({ ...buildRunConfiguration(), rawTerrain: store.rawTerrain }, localStorage, { backgroundMask: store.backgroundActive ? toRaw(store.backgroundMask) : null, points: toRaw(store.points) });
 
 const copyRunConfiguration = async () => {
   try {
@@ -806,6 +815,9 @@ const applyPendingConfig = () => {
       store.setAdvancedMode(true);   // (background areas are an Advanced step-1 tool)
       store.setBackgroundMask(config.backgroundMask);
     }
+    // (a config with points brings its own; one without leaves the user's: they are geographic, and kept outside the box)
+    const points = configPoints(config);
+    if (points) store.setPoints(points);
     if (typeof config.rawTerrain === 'boolean') store.setRawTerrain(config.rawTerrain);
     if (typeof config.gapFillSource === 'string' && config.gapFillSource) gapFillSource.value = normalizeGapFillSource(config.gapFillSource);
     if (typeof config.elevationUnitOverride === 'string' && config.elevationUnitOverride) elevationUnitOverride.value = config.elevationUnitOverride;
@@ -831,17 +843,11 @@ const sendConfig = async () => {
   try {
     // (mapng.com keeps codes up to 16 KB: a big background-areas drawing is
     // left out of the short code, the long one still has it)
-    const cfg = currentSessionConfig();
-    let code = await encodeSessionCode(cfg);
-    let dropped = false;
-    if (code.length > 16000 && cfg.backgroundMask) {
-      const { backgroundMask: _drop, ...rest } = cfg;
-      code = await encodeSessionCode(rest);
-      dropped = true;
-    }
+    // (then the points, if it is still too big)
+    const { code, dropped } = await encodeSessionCodeWithin(currentSessionConfig(), 16000);
     const { id } = await sendSessionCode(code);
     sentConfig.value = { id, link: shareLink(id) };
-    runConfigStatus.value = dropped ? t('config.sentWithoutAreas') : '';
+    runConfigStatus.value = dropped.includes('points') ? t('config.sentWithoutPoints') : dropped.length ? t('config.sentWithoutAreas') : '';
   } catch (error) {
     sentConfig.value = null;
     runConfigStatus.value = t('config.sendFailed', { reason: String(error?.message || error) });

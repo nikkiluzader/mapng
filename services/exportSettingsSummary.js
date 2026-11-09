@@ -55,6 +55,11 @@ export function summarizeExportSettings(opts = {}, ctx = {}) {
     toggle('materials', opts.pbrSource === 'osm'),
   ];
   if (opts.levelName) output.push(row('levelName', { text: String(opts.levelName) }));
+  // (the spawn and quicktravel points from step 1: services/spawnPoints.js)
+  if (Array.isArray(opts.points) && opts.points.length) {
+    const def = opts.points.find((p) => p?.isDefault);
+    output.push(row('points', def ? { t: 'pointsWithDefault', text: `${opts.points.length} · ${def.name || '★'}` } : { text: String(opts.points.length) }));
+  }
 
   return [
     { key: 'groupTerrain', rows: terrain },
