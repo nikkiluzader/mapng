@@ -10,6 +10,7 @@ import {
   OVERTURE_ATTRIBUTION, OVERTURE_RELEASE, fetchOsmFromOverture, fetchOvertureBuildingRecords, mergeOvertureBuildings,
 } from "./overtureTiles.js";
 import { getLoadedOsmFile, osmFileCoverage } from "./osmFile.js";
+import { railKindOf } from "./railways.js";
 
 const OVERTURE_ENDPOINT = "overture-maps";
 // (the user's own OSM file: osmFile.js)
@@ -445,6 +446,14 @@ export const parseOverpassResponse = (data, bounds) => {
     const w = ways[id];
     const tags = w.tags;
 
+    // an active railway (services/railways.js): a line of its own, kept with
+    // all its tags (bridge, tunnel, layer, gauge, electrified, tracks, usage,
+    // service, name); a street way that carries a tram on it is its road
+    // as well, below
+    if (railKindOf(tags)) {
+      rawFeatures.push({ id: tags.highway ? `${id}_rail` : id.toString(), type: "railway", geometry: w.nodes, tags });
+      if (!tags.highway) continue;
+    }
     // (a via ferrata is a cable-protected climbing route up a rock face, not a
     // road or a path: built as one, its 'bridge' pieces became a road deck on
     // pillars hanging off the cliff, Via Ferrata Le Roc de Tovière, Tignes)
@@ -526,7 +535,7 @@ export const parseOverpassResponse = (data, bounds) => {
       continue;
     }
     const isLinearWaterway = f.type === "water" && !!f.tags?.waterway && f.tags?.area !== "yes" && !isClosedRing(f.geometry);
-    if (f.type === "road" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || isLinearWaterway) {
+    if (f.type === "road" || f.type === "railway" || f.type === "barrier" || f.type === "coastline" || f.type === "power_line" || f.type === "cliff" || isLinearWaterway) {
       const clippedSegments = clipLineString(f.geometry, bounds);
       clippedSegments.forEach((segment, index) => {
         if (segment.length > 1) {
