@@ -2542,6 +2542,38 @@ export const generateGameTexture = async (terrainData, options = {}) => {
     mctx2.globalCompositeOperation = "source-in";
     mctx2.imageSmoothingQuality = "high";
     mctx2.drawImage(ground.image, 0, 0, mask.width, mask.height);
+    // (not the near-black: a river under trees or in a gorge's shade is
+    // shadow in the image, pasted as a black streak; kept where the land
+    // cover has water or town, a dark reservoir or canal is water)
+    const lcw = terrainData.landCover?.grid?.length === terrainData.landCover?.n ** 2 ? terrainData.landCover : null;
+    if (lcw) {
+      const { grid, n } = lcw;
+      const wet = new Uint8Array(n * n);
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+        // (built-up too: a city's canals are under 10 m and class as town)
+        if (grid[r * n + c] !== WC.WATER && grid[r * n + c] !== WC.BUILT && grid[r * n + c] !== 0) continue;
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+          const rr = r + dr; const cc = c + dc;
+          if (rr >= 0 && cc >= 0 && rr < n && cc < n) wet[rr * n + cc] = 1;
+        }
+      }
+      let dropped = 0;
+      for (let y0 = 0; y0 < mask.height; y0 += 256) {
+        const rows = Math.min(256, mask.height - y0);
+        const im = mctx2.getImageData(0, y0, mask.width, rows); const d = im.data; let changed = false;
+        for (let ty = 0; ty < rows; ty++) {
+          const rr = Math.min(n - 1, Math.floor(((y0 + ty + 0.5) / mask.height) * n)) * n;
+          for (let tx = 0; tx < mask.width; tx++) {
+            const i = (ty * mask.width + tx) * 4;
+            if (!d[i + 3] || 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2] >= 40) continue;
+            if (wet[rr + Math.min(n - 1, Math.floor(((tx + 0.5) / mask.width) * n))]) continue;
+            d[i + 3] = 0; changed = true; dropped++;
+          }
+        }
+        if (changed) mctx2.putImageData(im, 0, y0);
+      }
+      if (dropped) console.log(`[Game Texture] Shadowed water left to the ground (no water in the land cover): ${(dropped / (mask.width * mask.height) * 100).toFixed(2)}% of the texture.`);
+    }
     ctx.drawImage(mask, 0, 0);
     mask.width = 0; wc.width = 0;
   }
