@@ -394,21 +394,55 @@ export function solveGallery(path, { groundAt, squareSize = 1 }) {
   };
 }
 
-// The ground a gallery wants: its floor under the roof and the wall, the
-// rock cut back over the roof on the uphill side, the valley side only cut
-// down (1:1) where it stands over the road.
+// The ground a gallery wants. Under the roof: the road's floor. On the
+// uphill side there is no wall: the hillside itself is the back of the
+// gallery, coming up from the walkway's edge to the roof's top within
+// GAL_BANK_M, level over the roof's edge, then eased back into the hillside
+// over GAL_BLEND_M (filled where it stood lower: a gallery on a gentle slope
+// is backfilled, never a roof standing on its own; where the rock stood far
+// higher, cut back no steeper than FACE_SLOPE). Past either end the fill
+// eases out along the road the same way. The valley side is only cut down
+// (1:1) where it stands over the road.
+const GAL_BANK_M = 1.2;                // the walkway's edge to the roof's top, sideways
+const GAL_BLEND_M = 10;                // the backfill eased into the hillside over this
+/** How far a gallery's roof reaches from its line (the wider, uphill side). */
+export const galleryRoofHalf = (t) => t.W + 0.5 + GAL_BANK_M + GAL_WALL_T;
 function galleryGroundAt(t, x, y, h) {
   const n = nearestOnTunnel(t, x, y, t.W + GAL_WALL_T + 60);
-  if (!n || n.beyond) return h;
+  if (!n) return h;
+  const inner = t.W + 0.5;
+  const bankEnd = inner + GAL_BANK_M;
+  const crest = bankEnd + GAL_WALL_T + 0.5;   // (level to here: the roof's edge buried)
+  const ease = (f) => f * f * (3 - 2 * f);
+  if (n.beyond) {
+    // past an end: only the uphill fill, easing out along the road too
+    const end = n.s <= t.line[0].s + 1e-6 ? 0 : t.line.length - 1;
+    const p = t.line[end];
+    const out = end === 0 ? -1 : 1;
+    const along = ((x - p.x) * p.tx + (y - p.y) * p.ty) * out;
+    const side = (x - p.x) * p.ty - (y - p.y) * p.tx;     // + right of travel (lateral()'s sign)
+    if ((Math.sign(side) || 1) !== t.uphill || Math.abs(side) <= inner) return h;
+    const top = p.z + t.headTop * Math.min(1, (Math.abs(side) - inner) / GAL_BANK_M);
+    const f = ease(Math.min(1, (Math.max(0, Math.abs(side) - crest) + Math.max(0, along)) / GAL_BLEND_M));
+    return Math.max(h, top + (h - top) * f);
+  }
   const ad = Math.abs(n.d);
-  const edge = t.W + 0.5 + GAL_WALL_T;
+  if ((Math.sign(n.d) || 1) === t.uphill) {
+    if (ad <= inner) return n.z;
+    const top = n.z + t.headTop;
+    if (ad <= bankEnd) return n.z + t.headTop * ((ad - inner) / GAL_BANK_M);
+    const over = Math.max(0, ad - crest);
+    const face = Math.min(h, top + FACE_SLOPE * over);   // the rock cut back where it stands higher
+    if (over >= GAL_BLEND_M) return face;
+    return Math.max(top + (h - top) * ease(over / GAL_BLEND_M), face);
+  }
+  const edge = inner + GAL_WALL_T;
   if (ad <= edge) return n.z;
-  if ((Math.sign(n.d) || 1) === t.uphill) return Math.min(h, n.z + t.headTop + FACE_SLOPE * (ad - edge));
   // valley side: no ground over the road showing between the columns
   return Math.min(h, n.z + Math.max(0, ad - edge - GAL_VALLEY_CLEAR_M));
 }
 
-/** A gallery as triangles: roof slab, uphill wall, valley-side columns and beam; pieces like a tube's. */
+/** A gallery as triangles: roof slab, valley-side columns and beam (the hillside is its back); pieces like a tube's. */
 function buildGalleryGeometry(t) {
   const T = makeTris();
   const inner = t.W + 0.5;
@@ -439,9 +473,16 @@ function buildGalleryGeometry(t) {
       T.tri(a, c, d, [[0, 0], [1, 1], [0, 1]], want);
     }
   };
-  const wallU = up * (inner + GAL_WALL_T / 2);
-  strip(-inner - GAL_WALL_T, inner + GAL_WALL_T, GAL_H, GAL_H + GAL_ROOF_M);             // roof
-  strip(wallU - GAL_WALL_T / 2, wallU + GAL_WALL_T / 2, -0.5, GAL_H);                    // uphill wall
+  // the roof, its uphill edge run into the bank (no wall: the hillside
+  // is the gallery's back, galleryGroundAt); with the terrain left as it
+  // was (shaping off: t.keepWall) a concrete wall instead
+  const roofDown = inner + GAL_WALL_T;
+  const roofUp = t.keepWall ? roofDown : inner + GAL_BANK_M + GAL_WALL_T;
+  strip(up > 0 ? -roofDown : -roofUp, up > 0 ? roofUp : roofDown, GAL_H, GAL_H + GAL_ROOF_M);
+  if (t.keepWall) {
+    const wallU = up * (inner + GAL_WALL_T / 2);
+    strip(wallU - GAL_WALL_T / 2, wallU + GAL_WALL_T / 2, -0.5, GAL_H);
+  }
   const beamU = -up * (inner + GAL_WALL_T / 2);
   strip(beamU - GAL_WALL_T / 2, beamU + GAL_WALL_T / 2, GAL_H - 0.8, GAL_H);             // valley beam
   // columns under the beam

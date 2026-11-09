@@ -69,6 +69,41 @@ test('tunnel=avalanche_protector is a gallery whatever the ground', () => {
   assert.equal(t.kind, 'gallery');
 });
 
+test('a gallery has no uphill wall: the hillside comes up to its roof, backfilled on a gentle slope and run out past the ends', () => {
+  const gentle = (x) => 50 - 0.1 * x;                 // uphill to the left (-x), far too low for the roof
+  const t = solveTunnel({ xy: road(-60, 60), half: 3, gallery: true }, { groundAt: gentle });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.uphill, -1);
+  const inner = t.W + 0.5;
+  const top = 50 + t.headTop;
+  // the road and walkway on the floor
+  assert.ok(Math.abs(tunnelGroundAt(t, -(inner - 0.1), 0, gentle(-(inner - 0.1))) - 50) < 0.3);
+  // the bank meets the roof's top just past the walkway, and stays up over the roof's edge
+  assert.ok(tunnelGroundAt(t, -(inner + 1.3), 0, gentle(-(inner + 1.3))) > top - 0.3);
+  assert.ok(tunnelGroundAt(t, -(inner + 2), 0, gentle(-(inner + 2))) > top - 0.1, 'level over the roof edge');
+  // backfill falls 1:1 back to the natural slope
+  const far = -(inner + 1.2 + 25);
+  assert.ok(Math.abs(tunnelGroundAt(t, far, 0, gentle(far)) - gentle(far)) < 1e-6);
+  // past the north end, beside the road: the fill falls along the road too; on the road nothing is filled
+  const bx = -(inner + 1.3);
+  const z63 = tunnelGroundAt(t, bx, 63, gentle(bx)); const z66 = tunnelGroundAt(t, bx, 66, gentle(bx));
+  assert.ok(z63 < top - 0.5 && z66 < z63 && z66 > gentle(bx) + 0.3, `${z63} ${z66}`);
+  assert.equal(tunnelGroundAt(t, bx, 72, gentle(bx)), gentle(bx));
+  assert.equal(tunnelGroundAt(t, 0, 63, gentle(0)), gentle(0));
+  // the valley side is never raised
+  assert.ok(tunnelGroundAt(t, inner + 5, 0, gentle(inner + 5)) <= gentle(inner + 5));
+  // no wall: nothing of the mesh below the roof on the uphill side past the walkway
+  const pos = buildTubeGeometry(t)[0].pos;
+  for (let i = 0; i < pos.length; i += 3) {
+    if (pos[i] < -(inner - 0.01) && Math.abs(pos[i + 1]) < 55) assert.ok(pos[i + 2] >= 50 + 5.2 - 0.6, `mesh at x ${pos[i].toFixed(2)} z ${pos[i + 2].toFixed(2)}`);
+  }
+  // terrain left as it was (shaping off): the concrete back wall
+  const walled = buildTubeGeometry({ ...t, keepWall: true })[0].pos;
+  let low = 0;
+  for (let i = 0; i < walled.length; i += 3) if (walled[i] < -(inner - 0.01) && walled[i + 2] < 51) low++;
+  assert.ok(low > 0, 'the wall stands on the uphill side');
+});
+
 test('the spike ridge: portals on the flanks, the road under the hill', () => {
   const t = spikeTunnel();
   assert.equal(t.ok, true, t.reason);

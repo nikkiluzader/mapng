@@ -80,6 +80,7 @@ import {
 import {
   solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, tunnelReach,
   hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
+  galleryRoofHalf,
 } from './beamngTunnels.js';
 import {
   PROP_HYDRANT, PROP_BINS, PROP_SHAPES, US_SIGN_SHAPES, STREET_LIGHT_SHAPES, SIGNAL_MAST, POWER_WIRE_MATERIAL, getPowerWireMaterialDefs,
@@ -5227,6 +5228,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     return (t.cuts || []).some((cut) => cut.line.some((q) => Math.hypot(q.x - x, q.y - y) < reach));
   };
   const gradeOne = (t) => {
+    // (a gallery left ungraded has no hillside brought up to its roof: its concrete back wall instead)
+    if (t.kind === 'gallery' && !shape) t.keepWall = true;
     const [c0, r0, c1, r1] = pixelBox(t);
     let changed = 0;
     for (let br = r0; br <= r1; br += BLOCK) {
@@ -7519,7 +7522,7 @@ function buildDetailedReportSections(d) {
   lines.push('- Only drivable tunnel=yes roads are bored (building passages, culverts, galleries and covered ways stay as they were).');
   lines.push('- A bored tunnel needs the ground over its road by the tube height + 1.5 m along most of it; short dips are filled over the tube.');
   lines.push('- One mapped under flat ground (a city deck, an underpass) is cut and cover: a box 0.8 m under the street, its approaches in trenches.');
-  lines.push('- On a hillside without the rock over it (and tunnel=avalanche_protector) a gallery: a roof on an uphill wall and valley-side columns, the road where it is.');
+  lines.push('- On a hillside without the rock over it (and tunnel=avalanche_protector) a gallery: a roof on valley-side columns, the hillside brought up to the roof as its back (backfilled where the slope is lower), the road where it is.');
   lines.push('- Ramps joining inside a tunnel share its bore: it widens on their side to the portal; past the shared cutting they climb out in their own trench.');
   if (bored.length) lines.push(`- Ceiling lights every ${formatNumber(d.tunnelLightSpacing ?? 8, 1)} m (every 4 m within 30 m of a portal), on day and night`);
   const describe = (osm) => [...new Set((osm || []).map((o) => `${o.name || 'unnamed'} [${o.highway || '?'}]`))].join(', ') || 'n/a';
@@ -7540,7 +7543,7 @@ function buildDetailedReportSections(d) {
     lines.push('');
     lines.push(`Tunnel ${t.key}: ${describe(t.osm)}`);
     lines.push(`  - OSM way(s): ${ways(t.osm) || 'n/a'}`);
-    lines.push(`  - ${t.kind === 'cutcover' ? 'Cut-and-cover box' : t.kind === 'gallery' ? `Gallery (roof on a wall ${t.uphill > 0 ? 'right' : 'left'}, columns on the valley side)` : 'Bore'} ${formatNumber(t.tubeLength, 1)} m of ${formatNumber(t.length, 1)} m mapped; inside width ${formatNumber(2 * t.W, 1)} m${t.maxExtra > 0 ? ` (up to ${formatNumber(2 * t.W + t.maxExtra, 1)} m where ramps join)` : ''}, crown ${formatNumber(t.crown, 2)} m over the road`);
+    lines.push(`  - ${t.kind === 'cutcover' ? 'Cut-and-cover box' : t.kind === 'gallery' ? `Gallery (hillside ${t.uphill > 0 ? 'right' : 'left'} up to the roof, columns on the valley side)` : 'Bore'} ${formatNumber(t.tubeLength, 1)} m of ${formatNumber(t.length, 1)} m mapped; inside width ${formatNumber(2 * t.W, 1)} m${t.maxExtra > 0 ? ` (up to ${formatNumber(2 * t.W + t.maxExtra, 1)} m where ramps join)` : ''}, crown ${formatNumber(t.crown, 2)} m over the road`);
     for (const br of t.branches || []) lines.push(`  - Ramp ${describe(br.osm)}: in the bore and its cutting for ${formatNumber(br.absorbed, 0)} m${br.trench > 0 ? `, then its own trench ${formatNumber(br.trench, 0)} m` : ''}`);
     const kind = { cut: 'cutting + wingwalls', bridge: 'meets a bridge', edge: 'map edge, no portal' };
     lines.push(`  - Portal A (${kind[t.portalKind[0]]}) at (${formatNumber(a.x, 1)}, ${formatNumber(a.y, 1)}) road ${formatNumber(a.z + minH, 2)} m; portal B (${kind[t.portalKind[1]]}) at (${formatNumber(b.x, 1)}, ${formatNumber(b.y, 1)}) road ${formatNumber(b.z + minH, 2)} m`);
@@ -12674,6 +12677,16 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           const c = Math.round(x / squareSize + n / 2); const r = Math.round(y / squareSize + n / 2);
           if (c >= 0 && c < n && r >= 0 && r < n) terLayerMap[r * n + c] = asphaltLayer;
         }
+        // the bank up to the roof on the uphill side: rock, no grass growing up through the roof
+        const rockLayer = (pbrResult?.materialNames || []).indexOf('ROCK');
+        if (rockLayer >= 0) {
+          for (let d = t.W + squareSize / 2; d <= galleryRoofHalf(t); d += squareSize / 2) {
+            const u = d * t.uphill;
+            const [x, y] = [p.x + u * p.ty, p.y - u * p.tx];
+            const c = Math.round(x / squareSize + n / 2); const r = Math.round(y / squareSize + n / 2);
+            if (c >= 0 && c < n && r >= 0 && r < n) terLayerMap[r * n + c] = rockLayer;
+          }
+        }
       }
     }
   }
@@ -13205,6 +13218,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ...groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })),
     ...(decalRoads.pedestrianStreets || []).map((way) => ({ points: way.nodes, half: way.half })),
     ...[...sidewalks.runs, ...(sidewalks.walkRuns || [])].map((run) => ({ points: run.points, half: run.width })),
+    // nothing under a gallery's roof (its road, the walkway, the bank up to the roof)
+    ...(decalRoads.tunnels?.tunnels || []).filter((t) => t.kind === 'gallery')
+      .map((t) => ({ points: t.line.map((p) => [p.x, p.y]), half: galleryRoofHalf(t) })),
   ]);
   let vegetationCleared = 0;
   for (const [type, list] of forestPlacements) {
