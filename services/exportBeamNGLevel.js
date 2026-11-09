@@ -42,6 +42,7 @@ import { gradeGarageFootprints } from './buildingFoundations.js';
 import { ColladaExporter } from './ColladaExporter.js';
 import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
 import { geoToWorldPoint, getTerrainHeightWorld, terrainDrape, terrainGroundAt } from './terrainLookup.js';
+import { pickFlagCell } from './flagPlacement.js';
 import { BUILDING_LITE_FROM_M, buildingTileScene } from './buildingTiles.js';
 import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
@@ -7959,25 +7960,19 @@ function buildCubemapMaterialDefs(levelName) {
 /**
  * Find the highest sampled terrain point and return world-space [x,y,z].
  */
+// The flag at the map's summit (services/flagPlacement.js: spikes and the
+// map's edges left out), on a terrain vertex as the game draws it (samples
+// squareSize apart from minus half the extent, rows from the south), its
+// foot 10 cm into the ground.
 function findHighestTerrainPoint(terrainData, squareSize) {
   const { width, height, heightMap, minHeight } = terrainData;
-  let bestIndex = 0;
-  let bestHeight = -Infinity;
-  for (let i = 0; i < heightMap.length; i++) {
-    if (heightMap[i] > bestHeight) {
-      bestHeight = heightMap[i];
-      bestIndex = i;
-    }
-  }
-  const x = bestIndex % width;
-  const y = Math.floor(bestIndex / width);
-  const worldSize = width * squareSize;
-  const u = width > 1 ? x / (width - 1) : 0.5;
-  const v = height > 1 ? y / (height - 1) : 0.5;
+  const cell = pickFlagCell(terrainData);
+  if (!cell) return [0, 0, 0];
+  const j = height - 1 - cell.row;
   return [
-    roundTo((u - 0.5) * worldSize, 3),
-    roundTo((0.5 - v) * worldSize, 3),
-    roundTo(bestHeight - minHeight + 0.25, 3),
+    roundTo((cell.col - width / 2) * squareSize, 3),
+    roundTo((j - height / 2) * squareSize, 3),
+    roundTo(heightMap[cell.row * width + cell.col] - (Number(minHeight) || 0) - 0.1, 3),
   ];
 }
 

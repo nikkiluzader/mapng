@@ -347,7 +347,13 @@
     "qualityCinematic": "Cinématique",
     "qualityStandard": "Standard",
     "qualityCinematicHint": "Ombres douces dans les vallées et sous les bâtiments, brume, couleurs plus riches et vraie eau dans les lacs. Demande une carte graphique correcte.",
-    "qualityStandardHint": "Simple et légère pour la carte graphique."
+    "qualityStandardHint": "Simple et légère pour la carte graphique.",
+    "terrainView": "Vue du terrain",
+    "view_normal": "Texture",
+    "view_relief": "Relief",
+    "view_slope": "Pente",
+    "view_elevation": "Altitude",
+    "contours": "Courbes de niveau (tous les {m} m)"
   },
   "exportPanel": {
     "osmMissing": "Pas encore de données OpenStreetMap",
@@ -1287,7 +1293,10 @@
     "loadFile": "Charger un fichier",
     "buildEverything": "Tout construire",
     "shareDialogTitle": "Partager et charger les réglages",
-    "forestDensity": "Densité des forêts"
+    "forestDensity": "Densité des forêts",
+    "backgroundAreas": "Zones d’arrière-plan",
+    "backgroundAreasValue": "{lines} lignes, {areas} zones ombrées, {roads} routes gardées, {strokes} coups de pinceau",
+    "sentWithoutAreas": "Les zones d’arrière-plan étaient trop grandes pour un code court et n’y sont pas : copiez le code long pour les partager."
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
@@ -1545,6 +1554,8 @@
     "modeSmooth": "Lisser à nouveau",
     "hintRawOn": "Ici, les routes gardent le terrain tel que téléchargé.",
     "hintRawOff": "Ici, les routes sont à nouveau lissées.",
-    "statRaw": "Sans lissage sur {pct} % du carré"
+    "statRaw": "Sans lissage sur {pct} % du carré",
+    "lockedPinned": "Le cadre est verrouillé ici pour zoomer et vous déplacer en dessinant (maintenez Espace et faites glisser pour bouger la carte avec un outil choisi).",
+    "unlock": "Déverrouiller"
   }
 }

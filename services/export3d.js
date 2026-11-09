@@ -1,6 +1,6 @@
 import { plantAllowed } from './worldCover.js';
 import * as THREE from "three";
-import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import JSZip from "jszip";
 import { textures } from "./textureGenerator.js";
@@ -396,6 +396,87 @@ const createTrafficSignMesh = (signType, unitsPerMeter) => {
   const merged = mergeGeometries(parts);
   parts.forEach((p) => p.dispose());
   return merged;
+};
+
+// The preview's trees: indexed, smooth-shaded shapes that read as trees from
+// above and close up (a short trunk under a lumpy three-lobe crown; a tiered
+// spruce), in muted greens darker underneath for volume. 6-9 m tall as most
+// trees are: the export's lollipops (6 m bare trunk, gem-cut crown) stood
+// out over the satellite photo, larger than houses.
+const PREVIEW_TREE_COLORS = { trunk: 0x4a3a2c, deciduous: 0x3b5626, coniferous: 0x24402a, palm: 0x40662e };
+const lobeGeometry = (radius, [cx, cy, cz], squash, seed, detail = 1) => {
+  const ico = new THREE.IcosahedronGeometry(1, detail);
+  ico.deleteAttribute('normal'); ico.deleteAttribute('uv');
+  const g = mergeVertices(ico);
+  ico.dispose();
+  const a = g.attributes.position;
+  for (let i = 0; i < a.count; i++) {
+    const x = a.getX(i); const y = a.getY(i); const z = a.getZ(i);
+    // (deterministic lumps: no two lobes alike)
+    const n = 1 + 0.16 * Math.sin(x * 5.1 + seed) * Math.cos(z * 4.3 - seed * 1.7) + 0.08 * Math.sin(y * 6.7 + seed * 2.3);
+    a.setXYZ(i, cx + x * radius * n, cy + y * radius * n * squash, cz + z * radius * n);
+  }
+  return g;
+};
+const shadeCrown = (geo, colorHex, yMin, yMax) => {
+  const a = geo.attributes.position; const col = new Float32Array(a.count * 3); const c = new THREE.Color(colorHex);
+  for (let i = 0; i < a.count; i++) {
+    // (darker towards the crown's underside: the shade inside a tree)
+    const t = THREE.MathUtils.clamp((a.getY(i) - yMin) / Math.max(1e-6, yMax - yMin), 0, 1);
+    const k = 0.62 + 0.38 * t;
+    col[i * 3] = c.r * k; col[i * 3 + 1] = c.g * k; col[i * 3 + 2] = c.b * k;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+};
+const solidColor = (geo, colorHex) => {
+  const c = new THREE.Color(colorHex); const n = geo.attributes.position.count; const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+};
+const indexedOnly = (g) => { for (const k of Object.keys(g.attributes)) if (k !== 'position') g.deleteAttribute(k); return g.index ? g : mergeVertices(g); };
+export const createPreviewTreeGeometry = (type, unitsPerMeter) => {
+  const m = unitsPerMeter;
+  if (type === 'palm') {
+    let g = createTreeMesh('palm', m, { lightweightVegetationMode: true });
+    if (!g) return null;
+    g.computeVertexNormals();
+    const idx = new (g.attributes.position.count > 65535 ? Uint32Array : Uint16Array)(g.attributes.position.count);
+    for (let i = 0; i < idx.length; i++) idx[i] = i;
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    return g;
+  }
+  const trunkTop = (type === 'coniferous' ? 2.4 : 3.6) * m;
+  const trunk = indexedOnly(new THREE.CylinderGeometry(0.12 * m, 0.2 * m, trunkTop, 5, 1, true));
+  trunk.translate(0, trunkTop / 2, 0);
+  trunk.computeVertexNormals();
+  solidColor(trunk, PREVIEW_TREE_COLORS.trunk);
+  const parts = [];
+  if (type === 'coniferous') {
+    // (three tiers, each a cone, narrowing to the tip)
+    const tiers = [[2.1, 4.4, 1.3], [1.55, 3.7, 3.4], [1.0, 3.0, 5.4]];
+    tiers.forEach(([r, h, y0], k) => {
+      const c = indexedOnly(new THREE.ConeGeometry(r * m, h * m, 7, 1, false));
+      c.rotateY(k * 0.45);
+      c.translate(0, (y0 + h / 2) * m, 0);
+      c.computeVertexNormals();
+      parts.push(c);
+    });
+    const crown = mergeGeometries(parts);
+    shadeCrown(crown, PREVIEW_TREE_COLORS.coniferous, 1.3 * m, 8.4 * m);
+    const g = mergeGeometries([trunk, crown]);
+    parts.forEach((x) => x.dispose()); crown.dispose(); trunk.dispose();
+    return g;
+  }
+  // deciduous: a main lobe and two smaller ones off it
+  parts.push(lobeGeometry(2.35 * m, [0, 5.0 * m, 0], 0.88, 0.7));
+  parts.push(lobeGeometry(1.65 * m, [0.95 * m, 6.15 * m, -0.45 * m], 0.9, 2.1, 0));
+  parts.push(lobeGeometry(1.5 * m, [-1.0 * m, 5.55 * m, 0.75 * m], 0.9, 4.4, 0));
+  parts.forEach((x) => x.computeVertexNormals());
+  const crown = mergeGeometries(parts);
+  shadeCrown(crown, PREVIEW_TREE_COLORS.deciduous, 3.0 * m, 7.6 * m);
+  const g = mergeGeometries([trunk, crown]);
+  parts.forEach((x) => x.dispose()); crown.dispose(); trunk.dispose();
+  return g;
 };
 
 const createTreeMesh = (type, unitsPerMeter, options = {}) => {
@@ -1279,20 +1360,50 @@ export const createOSMGroup = (data, options = {}) => {
     return geo;
   };
 
+  // (indexed geometry with its own normals, stamped as it is: the preview's trees)
+  const stampIndexed = (base, instances, getMat) => {
+    const bp = base.attributes.position; const bn = base.attributes.normal; const bc = base.attributes.color; const bi = base.index;
+    const n = bp.count; const m = bi.count; const N = instances.length;
+    const pos = new Float32Array(n * N * 3); const nor = new Float32Array(n * N * 3); const col = new Float32Array(n * N * 3);
+    const idx = new (n * N > 65535 ? Uint32Array : Uint16Array)(m * N);
+    const v = new THREE.Vector3(); const nm = new THREE.Matrix3();
+    for (let i = 0; i < N; i++) {
+      const mat = getMat(instances[i]);
+      nm.getNormalMatrix(mat);
+      const off = i * n * 3;
+      for (let k = 0; k < n; k++) {
+        v.fromBufferAttribute(bp, k).applyMatrix4(mat);
+        pos[off + k * 3] = v.x; pos[off + k * 3 + 1] = v.y; pos[off + k * 3 + 2] = v.z;
+        v.fromBufferAttribute(bn, k).applyMatrix3(nm).normalize();
+        nor[off + k * 3] = v.x; nor[off + k * 3 + 1] = v.y; nor[off + k * 3 + 2] = v.z;
+        col[off + k * 3] = bc.getX(k); col[off + k * 3 + 1] = bc.getY(k); col[off + k * 3 + 2] = bc.getZ(k);
+      }
+      for (let k = 0; k < m; k++) idx[i * m + k] = bi.getX(k) + i * n;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+    geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    return geo;
+  };
+
   if (treesList.length > 0) {
     const types = ["deciduous", "coniferous", "palm"];
     types.forEach((type) => {
       const list = treesList.filter((t) => t.type === type);
       if (list.length === 0) return;
-      const baseGeo = createTreeMesh(type, unitsPerMeter, {
-        lightweightVegetationMode,
-      });
+      const baseGeo = lightweightVegetationMode
+        ? createPreviewTreeGeometry(type, unitsPerMeter)
+        : createTreeMesh(type, unitsPerMeter, { lightweightVegetationMode });
       if (!baseGeo) return;
 
-      const combined = stampInstances(baseGeo, list, (tree) => {
+      const combined = (lightweightVegetationMode ? stampIndexed : stampInstances)(baseGeo, list, (tree) => {
         const seed = Math.abs((tree.pos.x * 123.45 + tree.pos.z * 678.9) % 1);
         // (sizes vary as a wood's do: young and old trees side by side)
-        const s = 0.75 + Math.abs((tree.pos.x * 31.7 + tree.pos.z * 17.3) % 1) * 0.55;
+        const s = lightweightVegetationMode
+          ? 0.8 + Math.abs((tree.pos.x * 31.7 + tree.pos.z * 17.3) % 1) * 0.4
+          : 0.75 + Math.abs((tree.pos.x * 31.7 + tree.pos.z * 17.3) % 1) * 0.55;
         position.set(tree.pos.x, tree.pos.y, tree.pos.z);
         scale.set(s, s, s);
         quaternion.setFromAxisAngle(yAxis, seed * Math.PI * 2);
@@ -1306,8 +1417,8 @@ export const createOSMGroup = (data, options = {}) => {
         const tmp = new THREE.Color();
         list.forEach((tree, k) => {
           const h = Math.abs((tree.pos.x * 91.3 + tree.pos.z * 47.9) % 1);
-          const light = 0.82 + h * 0.36;
-          const warm = Math.abs((tree.pos.x * 13.1 - tree.pos.z * 29.7) % 1) * 0.12;
+          const light = lightweightVegetationMode ? 0.78 + h * 0.3 : 0.82 + h * 0.36;
+          const warm = Math.abs((tree.pos.x * 13.1 - tree.pos.z * 29.7) % 1) * (lightweightVegetationMode ? 0.04 : 0.12);
           for (let v = k * per; v < (k + 1) * per && v * 3 + 2 < col.length; v++) {
             tmp.setRGB(col[v * 3], col[v * 3 + 1], col[v * 3 + 2]);
             if (tmp.g <= tmp.r) continue;   // (the trunk)
@@ -1323,7 +1434,7 @@ export const createOSMGroup = (data, options = {}) => {
           combined,
           new THREE.MeshStandardMaterial({
             vertexColors: true,
-            roughness: 0.8,
+            roughness: lightweightVegetationMode ? 0.95 : 0.8,
           }),
         );
         treeMesh.castShadow = true;

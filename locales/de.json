@@ -347,7 +347,13 @@
     "qualityCinematic": "Filmisch",
     "qualityStandard": "Standard",
     "qualityCinematicHint": "Weiche Schatten in Tälern und unter Gebäuden, Dunst, kräftigere Farben und echtes Seewasser. Braucht eine ordentliche Grafikkarte.",
-    "qualityStandardHint": "Schlicht und schonend für die Grafikkarte."
+    "qualityStandardHint": "Schlicht und schonend für die Grafikkarte.",
+    "terrainView": "Geländeansicht",
+    "view_normal": "Textur",
+    "view_relief": "Relief",
+    "view_slope": "Steigung",
+    "view_elevation": "Höhe",
+    "contours": "Höhenlinien (alle {m} m)"
   },
   "exportPanel": {
     "osmMissing": "Noch keine OpenStreetMap-Daten",
@@ -1287,7 +1293,10 @@
     "loadFile": "Datei laden",
     "buildEverything": "Alles bauen",
     "shareDialogTitle": "Einstellungen teilen & laden",
-    "forestDensity": "Walddichte"
+    "forestDensity": "Walddichte",
+    "backgroundAreas": "Hintergrundbereiche",
+    "backgroundAreasValue": "{lines} Linien, {areas} schattierte Flächen, {roads} behaltene Straßen, {strokes} Pinselstriche",
+    "sentWithoutAreas": "Die Hintergrundbereiche waren für einen Kurzcode zu groß und fehlen darin: Kopiere den langen Code, um sie zu teilen."
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",
@@ -1545,6 +1554,8 @@
     "modeSmooth": "Wieder glätten",
     "hintRawOn": "Straßen hier behalten das Gelände wie heruntergeladen.",
     "hintRawOff": "Straßen hier werden wieder geglättet.",
-    "statRaw": "Nicht geglättet: {pct}% des Quadrats"
+    "statRaw": "Nicht geglättet: {pct}% des Quadrats",
+    "lockedPinned": "Der Bereichsrahmen ist hier fixiert, damit du zum Zeichnen zoomen und verschieben kannst (Leertaste halten und ziehen, um die Karte mit gewähltem Werkzeug zu bewegen).",
+    "unlock": "Lösen"
   }
 }

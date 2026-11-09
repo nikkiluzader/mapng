@@ -347,7 +347,13 @@
     "qualityCinematic": "Cinemática",
     "qualityStandard": "Estándar",
     "qualityCinematicHint": "Sombras suaves en valles y bajo edificios, bruma, colores más vivos y agua real en los lagos. Necesita una tarjeta gráfica decente.",
-    "qualityStandardHint": "Sencilla y ligera para la tarjeta gráfica."
+    "qualityStandardHint": "Sencilla y ligera para la tarjeta gráfica.",
+    "terrainView": "Vista del terreno",
+    "view_normal": "Textura",
+    "view_relief": "Relieve",
+    "view_slope": "Pendiente",
+    "view_elevation": "Altura",
+    "contours": "Curvas de nivel (cada {m} m)"
   },
   "exportPanel": {
     "osmMissing": "Aún no hay datos de OpenStreetMap",
@@ -1287,7 +1293,10 @@
     "loadFile": "Cargar archivo",
     "buildEverything": "Crear todo",
     "shareDialogTitle": "Compartir y cargar ajustes",
-    "forestDensity": "Densidad del bosque"
+    "forestDensity": "Densidad del bosque",
+    "backgroundAreas": "Zonas de fondo",
+    "backgroundAreasValue": "{lines} líneas, {areas} zonas sombreadas, {roads} carreteras conservadas, {strokes} pinceladas",
+    "sentWithoutAreas": "Las zonas de fondo eran demasiado grandes para un código corto y no se incluyeron: copia el código largo para compartirlas."
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",
@@ -1545,6 +1554,8 @@
     "modeSmooth": "Suavizar de nuevo",
     "hintRawOn": "Aquí las carreteras conservan el terreno tal como se descargó.",
     "hintRawOff": "Aquí las carreteras se vuelven a suavizar.",
-    "statRaw": "Sin suavizar en el {pct}% del cuadrado"
+    "statRaw": "Sin suavizar en el {pct}% del cuadrado",
+    "lockedPinned": "El recuadro está fijado aquí para que puedas hacer zoom y moverte al dibujar (mantén Espacio y arrastra para mover el mapa con una herramienta elegida).",
+    "unlock": "Desbloquear"
   }
 }

@@ -22,21 +22,14 @@
               :args="cameraArgs"
               :position="cameraPosition"
             />
-            <!-- 2048 per cascade: 4×4096² depth maps cost ~256 MB of GPU memory
-                 plus four full-res shadow passes per frame — far beyond what a
-                 100-unit preview scene needs. -->
-            <CSMLight
+            <!-- one sun, its shadow box following the camera's target -->
+            <SunLight
               :light-direction="activeSunPreset.lightDirection"
-              :cascades="4"
-              :shadow-map-size="2048"
-              :max-far="500"
+              :shadow-map-size="cinematic ? 4096 : 2048"
               :light-intensity="activeSunPreset.lightIntensity"
               :ambient-intensity="activeSunPreset.ambientIntensity"
               :light-color="activeSunPreset.lightColor"
               :ambient-color="activeSunPreset.ambientColor"
-              :shadow-bias="0.00045"
-              :shadow-normal-bias="0.035"
-              :light-margin="50"
             />
 
             <Environment :files="currentHdrFile" :background="true" :environment-intensity="cinematic ? activeSunPreset.cinematicEnvironment : activeSunPreset.environmentIntensity" />
@@ -55,6 +48,8 @@
               :terrain-data="mergedTerrainData"
               :quality="meshQuality"
               :texture-type="textureType"
+              :terrain-view="terrainView"
+              :contours="showContours"
               :show-water="showWater"
               :water-level-offset-meters="waterLevelOffsetMeters"
               :wireframe="advancedMode && showWireframe"
@@ -267,6 +262,44 @@
           </button>
         </div>
 
+        <!-- terrain view: the land's shape instead of its photo (terrainView.js) -->
+        <label class="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 pt-1">
+          <Mountain :size="12" /> {{ t('preview.terrainView') }}
+        </label>
+        <div class="flex flex-wrap gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 border border-gray-200 dark:border-gray-700">
+          <button
+            v-for="v in TERRAIN_VIEWS"
+            :key="v"
+            @click="terrainView = v"
+            :class="[
+              'flex-1 min-w-[3.75rem] px-2 text-xs py-1.5 rounded transition-colors',
+              terrainView === v
+                ? 'bg-brand text-white shadow-sm font-medium'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white dark:hover:bg-gray-700',
+            ]"
+          >
+            {{ t(`preview.view_${v}`) }}
+          </button>
+        </div>
+        <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer">
+          <input type="checkbox" v-model="showContours" class="accent-brand" />
+          {{ t('preview.contours', { m: contourStep }) }}
+        </label>
+        <div v-if="terrainView === 'slope'" class="space-y-0.5">
+          <div class="flex h-2 rounded overflow-hidden">
+            <div v-for="b in SLOPE_BANDS" :key="b.deg" class="flex-1" :style="{ background: b.color }" />
+          </div>
+          <div class="flex text-micro text-gray-400">
+            <span v-for="b in SLOPE_BANDS" :key="b.deg" class="flex-1">{{ b.deg }}°</span>
+          </div>
+        </div>
+        <div v-else-if="terrainView === 'elevation'" class="space-y-0.5">
+          <div class="h-2 rounded" :style="{ background: `linear-gradient(to right, ${ELEVATION_RAMP.join(', ')})` }" />
+          <div class="flex justify-between text-micro text-gray-400">
+            <span>{{ Math.round(terrainData.minHeight) }} m</span><span>{{ Math.round(terrainData.maxHeight) }} m</span>
+          </div>
+        </div>
+
         <!-- wireframe and 3D features -->
         <div class="space-y-3 pt-2">
           <!-- Surroundings + wireframe: advanced mode -->
@@ -424,13 +457,15 @@ import {
   Info,
   X,
   Sparkles,
+  Mountain,
 } from "lucide-vue-next";
 
 const { t } = useI18n({ useScope: 'global' });
 import TerrainMesh from "./TerrainMesh.vue";
 import MapngFlag3D from "./MapngFlag3D.vue";
 import OSMFeatures3D from "./OSMFeatures3D.vue";
-import CSMLight from "./CSMLight.vue";
+import SunLight from "./SunLight.vue";
+import { TERRAIN_VIEWS, SLOPE_BANDS, ELEVATION_RAMP, contourInterval } from "./terrainView.js";
 import SurroundingTerrain3D from "./SurroundingTerrain3D.vue";
 import PostFX from "./PostFX.vue";
 import SceneAtmosphere from "./SceneAtmosphere.vue";
@@ -469,7 +504,7 @@ onErrorCaptured((err) => {
 });
 
 const hdrPresets = {
-  "Kloofendal Pure Sky": "kloofendal_48d_partly_cloudy_puresky_4k.hdr",
+  "Kloofendal Pure Sky": "kloofendal_48d_partly_cloudy_puresky_2k.hdr",
 };
 
 const SUN_PRESETS = {
@@ -612,6 +647,13 @@ const previewTextureFor = (value) => {
   return previewHas('hybrid') ? 'hybrid' : 'satellite';
 };
 const textureType = ref(previewTextureFor(sharedBaseTexture.value));
+// the terrain view and contour lines (remembered)
+const readPref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+const terrainView = ref(TERRAIN_VIEWS.includes(readPref('mapng_preview_terrain_view', 'normal')) ? readPref('mapng_preview_terrain_view', 'normal') : 'normal');
+const showContours = ref(readPref('mapng_preview_contours', '0') === '1');
+watch(terrainView, (v) => { try { localStorage.setItem('mapng_preview_terrain_view', v); } catch { /* not kept */ } });
+watch(showContours, (v) => { try { localStorage.setItem('mapng_preview_contours', v ? '1' : '0'); } catch { /* not kept */ } });
+const contourStep = computed(() => contourInterval((Number(props.terrainData?.maxHeight) || 0) - (Number(props.terrainData?.minHeight) || 0)));
 // (only a click changes the shared choice; a fallback shown here does not)
 const pickTexture = (value) => { textureType.value = value; setBaseTexture(value); };
 watch(sharedBaseTexture, (value) => { const next = previewTextureFor(value); if (next !== textureType.value) textureType.value = next; });
@@ -668,7 +710,9 @@ watch(() => props.terrainData?.flat, (flat) => {
 
 const presets = Object.keys(hdrPresets);
 const sunPositionOptions = Object.keys(SUN_PRESETS);
-const currentHdrFile = computed(() => `/hdr/${hdrPresets[preset.value]}`);
+// (the sky: 2K for Cinematic, 1K for Standard: the light it gives is blurred
+// anyway, and turning it into a cube is the biggest part of the first open)
+const currentHdrFile = computed(() => `/hdr/${hdrPresets[preset.value]}`.replace('_2k.hdr', cinematic.value ? '_2k.hdr' : '_1k.hdr'));
 const activeSunPreset = computed(() => SUN_PRESETS[sunPosition.value] || SUN_PRESETS.Noon);
 
 // Blender-style "infinite zoom": stock OrbitControls dollies a fraction of the

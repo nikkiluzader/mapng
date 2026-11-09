@@ -347,7 +347,13 @@
     "qualityCinematic": "Filmowa",
     "qualityStandard": "Standardowa",
     "qualityCinematicHint": "Miękkie cienie w dolinach i pod budynkami, mgiełka, żywsze kolory i prawdziwa woda w jeziorach. Wymaga przyzwoitej karty graficznej.",
-    "qualityStandardHint": "Prosta i lekka dla karty graficznej."
+    "qualityStandardHint": "Prosta i lekka dla karty graficznej.",
+    "terrainView": "Widok terenu",
+    "view_normal": "Tekstura",
+    "view_relief": "Rzeźba",
+    "view_slope": "Nachylenie",
+    "view_elevation": "Wysokość",
+    "contours": "Poziomice (co {m} m)"
   },
   "exportPanel": {
     "osmMissing": "Brak jeszcze danych OpenStreetMap",
@@ -1287,7 +1293,10 @@
     "loadFile": "Wczytaj plik",
     "buildEverything": "Buduj wszystko",
     "shareDialogTitle": "Udostępnij i wczytaj ustawienia",
-    "forestDensity": "Gęstość lasu"
+    "forestDensity": "Gęstość lasu",
+    "backgroundAreas": "Obszary tła",
+    "backgroundAreasValue": "{lines} linii, {areas} zacienionych obszarów, {roads} zachowanych dróg, {strokes} pociągnięć pędzla",
+    "sentWithoutAreas": "Obszary tła były za duże na krótki kod i zostały pominięte: skopiuj długi kod, aby je udostępnić."
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
@@ -1545,6 +1554,8 @@
     "modeSmooth": "Wygładź znowu",
     "hintRawOn": "Drogi tutaj zachowują teren taki, jak pobrany.",
     "hintRawOff": "Drogi tutaj są znowu wygładzane.",
-    "statRaw": "Bez wygładzania na {pct}% kwadratu"
+    "statRaw": "Bez wygładzania na {pct}% kwadratu",
+    "lockedPinned": "Ramka obszaru jest tu zablokowana, więc możesz przybliżać i przesuwać mapę podczas rysowania (przytrzymaj Spację i przeciągnij, aby przesunąć mapę z wybranym narzędziem).",
+    "unlock": "Odblokuj"
   }
 }

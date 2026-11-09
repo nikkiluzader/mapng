@@ -347,7 +347,13 @@
     "qualityCinematic": "Cinematic",
     "qualityStandard": "Standard",
     "qualityCinematicHint": "Soft shadows in valleys and under buildings, haze, richer colour and real lake water. Needs a decent graphics card.",
-    "qualityStandardHint": "Plain and light on the graphics card."
+    "qualityStandardHint": "Plain and light on the graphics card.",
+    "terrainView": "Terrain view",
+    "view_normal": "Texture",
+    "view_relief": "Relief",
+    "view_slope": "Slope",
+    "view_elevation": "Height",
+    "contours": "Contour lines (every {m} m)"
   },
   "exportPanel": {
     "osmMissing": "No OpenStreetMap data yet",
@@ -1287,7 +1293,10 @@
     "loadFile": "Load file",
     "buildEverything": "Build everything",
     "shareDialogTitle": "Share & load settings",
-    "forestDensity": "Forest density"
+    "forestDensity": "Forest density",
+    "backgroundAreas": "Background areas",
+    "backgroundAreasValue": "{lines} lines, {areas} shaded areas, {roads} kept roads, {strokes} brush strokes",
+    "sentWithoutAreas": "Background areas were too big for a short code and were left out: Copy the long code to share them."
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1545,6 +1554,8 @@
     "modeSmooth": "Smooth again",
     "hintRawOn": "Roads here keep the terrain as downloaded.",
     "hintRawOff": "Roads here are smoothed again.",
-    "statRaw": "No smoothing on {pct}% of the square"
+    "statRaw": "No smoothing on {pct}% of the square",
+    "lockedPinned": "The area box is locked here so you can zoom and pan to draw (hold Space and drag to move the map with a tool picked).",
+    "unlock": "Unlock"
   }
 }

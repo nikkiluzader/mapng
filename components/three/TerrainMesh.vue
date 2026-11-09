@@ -3,6 +3,7 @@ import { computed, shallowRef, reactive, watch, toRaw, markRaw, onUnmounted, ref
 import * as THREE from 'three';
 import { useTresContext, useLoop } from '@tresjs/core';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { TERRAIN_VIEWS, terrainViewUniforms, terrainViewPatch, contourInterval } from './terrainView.js';
 
 const props = defineProps({
   terrainData: { required: true },
@@ -16,9 +17,23 @@ const props = defineProps({
   // lakes as water surfaces
   skirt: { default: false, type: Boolean },
   lakes: { default: false, type: Boolean },
+  // how the terrain is drawn (terrainView.js): 'normal' (its texture),
+  // 'relief', 'slope', 'elevation'; contour lines over any of them
+  terrainView: { default: 'normal', type: String },
+  contours: { default: false, type: Boolean },
 });
 
 const SCENE_SIZE = 100;
+
+// the terrain views: one shader patch, switched by its uniforms
+const tvUniforms = terrainViewUniforms();
+const tvPatch = terrainViewPatch(tvUniforms);
+const terrainMaterialRef = shallowRef(null);
+watch(terrainMaterialRef, (m) => {
+  if (!m || m.onBeforeCompile === tvPatch) return;
+  m.onBeforeCompile = tvPatch;
+  m.needsUpdate = true;
+});
 const geometry = shallowRef(null);
 const skirtGeometry = shallowRef(null);
 const lakeGeometry = shallowRef(null);
@@ -532,6 +547,19 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
   const normalMapSize = NORMAL_MAP_SIZE_BY_QUALITY[props.quality] ?? NORMAL_MAP_SIZE_BY_QUALITY.medium;
   terrainNormalTexture.value = buildTerrainNormalTexture(data, normalMapSize, stride);
 
+  // the drawn surface's height at a scene point (x, z), as the vertices were
+  // made (their footprint heights, bilinear between them): the flag stands
+  // on it after the vertex arrays below are freed
+  geo.userData.heightAtScene = (x, z) => {
+    const fc = THREE.MathUtils.clamp(((x + SCENE_SIZE / 2) / SCENE_SIZE) * (data.width - 1) / stride, 0, widthSteps);
+    const fr = THREE.MathUtils.clamp(((z + SCENE_SIZE / 2) / SCENE_SIZE) * (data.height - 1) / stride, 0, heightSteps);
+    const c0 = Math.min(widthSteps - 1, Math.floor(fc)); const r0 = Math.min(heightSteps - 1, Math.floor(fr));
+    const tx = fc - c0; const ty = fr - r0;
+    const at = (c, r) => sampleFootprintHeight(Math.min(c * stride, data.width - 1), Math.min(r * stride, data.height - 1));
+    const h = (at(c0, r0) * (1 - tx) + at(c0 + 1, r0) * tx) * (1 - ty) + (at(c0, r0 + 1) * (1 - tx) + at(c0 + 1, r0 + 1) * tx) * ty;
+    return (h - data.minHeight) * upm * EXAGGERATION;
+  };
+
   // After 2 frames the WebGL renderer has uploaded the buffer to GPU.
   // Null the CPU-side TypedArrays to free the ArrayBuffer (~50-130 MB at
   // max mesh resolution, plus up to ~100 MB of Uint32 index at 'full').
@@ -686,6 +714,16 @@ onUnmounted(() => {
   }
   disposeWaterReflection();
 });
+
+watch([() => props.terrainView, () => props.contours, () => props.terrainData, unitsPerMeter], () => {
+  const d = props.terrainData;
+  const minH = Number(d?.minHeight) || 0; const maxH = Number(d?.maxHeight) || minH + 1;
+  tvUniforms.uView.value = Math.max(0, TERRAIN_VIEWS.indexOf(props.terrainView));
+  tvUniforms.uContour.value = props.contours ? 1 : 0;
+  tvUniforms.uInterval.value = contourInterval(maxH - minH);
+  tvUniforms.uUpm.value = Number(unitsPerMeter.value) || 1;
+  tvUniforms.uMinH.value = minH; tvUniforms.uMaxH.value = maxH;
+}, { immediate: true });
 </script>
 
 <template>
@@ -743,13 +781,16 @@ onUnmounted(() => {
     <TresMesh
       :rotation="[-Math.PI / 2, 0, 0]"
       :position="[0, 0, 0]"
+      name="mapng_terrain"
       :render-order="2"
       receive-shadow
+      cast-shadow
       :geometry="geometry"
     >
       <!-- key includes normal-map presence: toggling USE_NORMALMAP needs a
            shader recompile, which Three only does on a fresh material. -->
       <TresMeshStandardMaterial
+        ref="terrainMaterialRef"
         :key="`${texture ? 'tex' : 'clay'}-${terrainNormalTexture ? 'nm' : 'flat'}`"
         :map="texture"
         :normal-map="terrainNormalTexture"

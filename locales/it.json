@@ -347,7 +347,13 @@
     "qualityCinematic": "Cinematica",
     "qualityStandard": "Standard",
     "qualityCinematicHint": "Ombre morbide nelle valli e sotto gli edifici, foschia, colori più ricchi e vera acqua nei laghi. Serve una scheda grafica discreta.",
-    "qualityStandardHint": "Semplice e leggera per la scheda grafica."
+    "qualityStandardHint": "Semplice e leggera per la scheda grafica.",
+    "terrainView": "Vista del terreno",
+    "view_normal": "Texture",
+    "view_relief": "Rilievo",
+    "view_slope": "Pendenza",
+    "view_elevation": "Quota",
+    "contours": "Curve di livello (ogni {m} m)"
   },
   "exportPanel": {
     "osmMissing": "Ancora nessun dato OpenStreetMap",
@@ -1287,7 +1293,10 @@
     "loadFile": "Carica file",
     "buildEverything": "Costruisci tutto",
     "shareDialogTitle": "Condividi e carica impostazioni",
-    "forestDensity": "Densità dei boschi"
+    "forestDensity": "Densità dei boschi",
+    "backgroundAreas": "Aree di sfondo",
+    "backgroundAreasValue": "{lines} linee, {areas} aree ombreggiate, {roads} strade mantenute, {strokes} pennellate",
+    "sentWithoutAreas": "Le aree di sfondo erano troppo grandi per un codice breve e sono state escluse: copia il codice lungo per condividerle."
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
@@ -1545,6 +1554,8 @@
     "modeSmooth": "Leviga di nuovo",
     "hintRawOn": "Qui le strade mantengono il terreno come scaricato.",
     "hintRawOff": "Qui le strade vengono di nuovo levigate.",
-    "statRaw": "Senza levigatura sul {pct}% del quadrato"
+    "statRaw": "Senza levigatura sul {pct}% del quadrato",
+    "lockedPinned": "Il riquadro è bloccato qui così puoi zoomare e spostarti per disegnare (tieni premuto Spazio e trascina per muovere la mappa con uno strumento scelto).",
+    "unlock": "Sblocca"
   }
 }
