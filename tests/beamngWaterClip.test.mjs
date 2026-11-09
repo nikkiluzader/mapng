@@ -112,3 +112,12 @@ test('a long lake strip is cut where a trench crosses it, not left out whole', a
   const far = { cx: 0, cy: 500, sx: 960, sy: 4.5, z: 10 };
   assert.deepEqual(splitLakeTile(far, zones), [far]);
 });
+
+test('no land cover and no mapped sea: an inland basin below sea level gets no sea from its edge', async () => {
+  const { planSeaBlocks } = await import('../services/beamngWaterClip.js');
+  // a 512 m map, all of it 6 m under sea level (a polder), nothing open water
+  const size = 512;
+  const r = planSeaBlocks({ size, seaZ: 0, heightAt: () => -6, zones: [], minZ: -6, seaAt: () => false });
+  const area = (r.blocks || r).reduce?.((a, b) => a + (b.sx || 0) * (b.sy || 0), 0) ?? 0;
+  assert.ok(area < size * size * 0.01, `flooded ${area} m²`);
+});

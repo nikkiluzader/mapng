@@ -56,10 +56,18 @@ if (fine && !raw) osmRoads = snapRoadsToTerrain(heightMap, meta.size, meta.size,
 if (!raw) smoothRoadsInHeightmap(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, { skipTracks: fine, fine });
 let minHeight = Infinity; let maxHeight = -Infinity;
 for (const v of heightMap) { if (v < minHeight) minHeight = v; if (v > maxHeight) maxHeight = v; }
+// (the land cover, as the app attaches at Generate: WorldCover, cached beside the area's data)
+const landCoverFile = path.join(dir, 'landcover.bin');
+const lcN = Math.ceil(meta.size * meta.mpp / 10);
+if (!fs.existsSync(landCoverFile)) {
+  try { const { fetchWorldCoverGrid } = await import('../../services/worldCover.js'); fs.writeFileSync(landCoverFile, await fetchWorldCoverGrid(meta.bounds, lcN, lcN)); } catch (e) { console.warn('no land cover:', e?.message || e); }
+}
+const landCover = fs.existsSync(landCoverFile) ? { grid: new Uint8Array(fs.readFileSync(landCoverFile)), n: lcN } : null;
 const terrainData = {
   width: meta.size, height: meta.size, minHeight, maxHeight, bounds: meta.bounds, heightMap, osmFeatures: osmRoads,
   processingMetersPerPixel: meta.mpp, raw,
   coarseElevation: !fine && !raw,
+  landCover,
 };
 
 // the base texture: the app's Game Texture (the recommended one users get),

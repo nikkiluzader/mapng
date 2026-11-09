@@ -7666,7 +7666,7 @@ function buildDetailedReportSections(d) {
   lines.push(`- Water objects: ${(d.waterObjects || []).length}`);
   listCounts(countBy(d.waterObjects || [], (o) => o.class));
   const ws = d.waterObjects?.stats;
-  if (ws?.sea?.blocks != null) lines.push(`- Sea: ${ws.sea.blocks} WaterBlocks in place of the sea-level plane (a tunnel reaches under sea level: no water in its trenches, none deeper than its roof over the tube)`);
+  if (ws?.sea?.blocks != null) lines.push(`- Sea: ${ws.sea.blocks} WaterBlocks in place of the sea-level plane (ground or a cut below sea level the open sea doesn't reach stays dry; no water in a tunnel's trenches, none deeper than its roof over the tube)`);
   if (ws?.pools?.poolBlocks || ws?.pools?.fountainBlocks) lines.push(`- Pool and fountain water: ${ws.pools.poolBlocks} WaterBlocks in ${ws.pools.pools} pools, ${ws.pools.fountainBlocks} in ${ws.pools.fountains} fountains (clear, pale blue, slow ripples; each reaching under its coping or rim)`);
   if (ws?.lakes?.riverAreas) lines.push(`- Wide or tidal rivers as area water (WaterBlocks at the river's level, no River ribbon in them): ${ws.lakes.riverAreas}`);
   if (ws?.lakes?.clippedOverTunnels) lines.push(`- Lake tiles held over a tunnel's roof: ${ws.lakes.clippedOverTunnels}`);
@@ -13009,7 +13009,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // basin: the plane flooded it; the blocks fill only what joins the edge)
   // (where the edge is open water: the land cover's water or no data, the
   // open sea, in runs of 200 m or more; not a polder's ditch)
-  const seaAtUV = openWaterAtEdge(exportTerrainData.landCover, exportTerrainData.width * squareSize);
+  // (no land cover, WorldCover unreachable: the map's own coastline or sea
+  // decides; none mapped, nothing comes in from the edge: an inland polder or
+  // basin stays dry rather than flooded by a ditch at the edge)
+  const hasMappedSea = (exportTerrainData.osmFeatures || []).some((f) => f?.type === 'coastline' || ['sea', 'ocean'].includes(String(f?.tags?.place || '').toLowerCase()) || f?.tags?.natural === 'bay');
+  const seaAtUV = openWaterAtEdge(exportTerrainData.landCover, exportTerrainData.width * squareSize) ?? (hasMappedSea ? null : () => false);
   const inlandBelowSea = !cutBelowSea && hasInlandBelowSea(sourceHeightMap, exportTerrainData.width, exportTerrainData.height,
     seaZ + (Number(exportTerrainData.minHeight) || 0), 16 / squareSize, { seaAt: seaAtUV });
   if (inlandBelowSea) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Ground below sea level the sea doesn't reach: the sea as blocks, not one plane.`);
