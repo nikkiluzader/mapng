@@ -93,3 +93,29 @@ test('a carriageway never slides onto the one beside it', () => {
   const { features } = snapRoadsToTerrain(hm, N, N, bounds, [a, b], 1, isGroundLevelRoad);
   for (const p of features[0].geometry) assert.ok(xAt(p.lng) < X_BENCH + 2.5, `node at x=${xAt(p.lng).toFixed(2)}`);
 });
+
+// Flat farmland: a crowned road (0.15 m) with a 1 m hedge bank along its
+// west edge and a ditch along its east, in fields with fine tilling ridges.
+// The field 8 m away is "flatter" than the road, but there is no hillside:
+// the road stays on its mapped line.
+function farmland(roadX) {
+  const hm = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const d = x - roadX;
+    let h = 50 + 0.01 * x + 0.03 * Math.sin(x * 1.7 + y * 0.3);          // 1 % regional tilt, plough ridges
+    if (Math.abs(d) <= 3) h += 0.15 * (1 - (d / 3) ** 2);                 // crown
+    if (d < -3 && d >= -6) h += 1.0 * (1 - Math.abs(d + 4.5) / 1.5);      // hedge bank
+    if (d > 3 && d <= 5) h -= 0.5 * (1 - Math.abs(d - 4) / 1);            // ditch
+    hm[y * N + x] = h;
+  }
+  return hm;
+}
+
+test('on flat land a road is not pulled into the field beside it', () => {
+  for (const drawnAt of [200, 201.5, 198.5]) {
+    const r = road('r', drawnAt);
+    const { features, stats } = snapRoadsToTerrain(farmland(200), N, N, bounds, [r], 1, isGroundLevelRoad);
+    assert.equal(stats.movedRoads, 0, `drawn at ${drawnAt}`);
+    assert.equal(features[0], r);
+  }
+});

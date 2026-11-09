@@ -50,6 +50,15 @@ const LEVEL_PER_M = 0.15;
 // motorway's flat median and the next carriageway are as flat as the road:
 // I-295 slid 8 m onto its express lanes).
 const NEIGHBOUR_REACH_M = 30;
+// A bench exists only on a hillside. Where the ground does not slope across
+// the road (measured wide, past the verges: HILLSIDE_REACH_M each side), there
+// is none to find, and "the flattest strip nearby" is just the field beside
+// the road: flatter than a crowned road between a hedge bank and a ditch
+// (Normandy farmland: roads slid up to 8 m into the fields, zigzagging).
+// Devils Tower's monument road rides a 15 % side slope; flat country is
+// under 3 %.
+const HILLSIDE_REACH_M = 16;
+const HILLSIDE_MIN_SLOPE = 0.06;
 const CLEAR_HIGHWAYS_SKIP = new Set(['footway', 'path', 'cycleway', 'bridleway', 'steps', 'pedestrian', 'corridor', 'elevator', 'proposed', 'construction', 'abandoned', 'razed']);
 const NODE_POINT_TYPES = new Set(['street_furniture', 'traffic_calming']);
 
@@ -188,6 +197,21 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
         return gap;
     };
 
+    // Whether the ground slopes across the road here: the heights a wide reach
+    // out on each side (two reaches, the gentler counts: one bank or building
+    // edge is not a hillside). Off the raster on a side: not judged a hillside.
+    const hillPx = HILLSIDE_REACH_M / metersPerPixel;
+    const onHillside = (x, y, nx, ny, halfPx) => {
+        let slope = Infinity;
+        for (const reach of [halfPx + hillPx, halfPx + hillPx * 0.6]) {
+            const a = sampleHeight(heightMap, width, height, x + nx * reach, y + ny * reach);
+            const b = sampleHeight(heightMap, width, height, x - nx * reach, y - ny * reach);
+            if (a === NO_DATA_VALUE || b === NO_DATA_VALUE) return false;
+            slope = Math.min(slope, Math.abs(a - b) / (2 * reach * metersPerPixel));
+        }
+        return slope >= HILLSIDE_MIN_SLOPE;
+    };
+
     const movedNodes = new Map();
     const allOffsets = [];
     const out = osmFeatures.map((f, fi) => {
@@ -225,6 +249,7 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
         let off = S.map(({ x, y, nx, ny }) => {
             const c0 = crossSectionCost(heightMap, width, height, x, y, nx, ny, halfPx, 0);
             if (!Number.isFinite(c0)) return 0;
+            if (!onHillside(x, y, nx, ny, halfPx)) return 0;
             const z0 = sampleHeight(heightMap, width, height, x, y);
             const segs = neighboursOf(fi, x, y);
             const gap0 = Math.min(0, clearance(segs, halfPx, x, y));
