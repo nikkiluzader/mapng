@@ -56,7 +56,12 @@ for (const p of todo) {
 }
 if (!plan.length) process.exit(0);
 const sources = [...new Set(plan.flatMap(({ p }) => p.sources || []))];
-const comment = batch.changesetComment || `Fix ${[...new Set(plan.flatMap(({ changed }) => changed))].join(', ')} on ${plan.map(({ p }) => p.name || `${p.type} ${p.id}`).join(', ')}`;
+// (the batch's comment names only what this upload changes: {names} is filled from the plan, a skipped
+// proposal left out; a comment without it is used only when every proposal is in the upload)
+const names = [...new Set(plan.map(({ p }) => String(p.name || `${p.type} ${p.id}`).replace(/\s*\(.*\)\s*$/, '')))].join(', ');
+const auto = `Fix ${[...new Set(plan.flatMap(({ changed }) => changed))].join(', ')} on ${names}`;
+const comment = batch.changesetComment?.includes('{names}') ? batch.changesetComment.replace('{names}', names)
+  : batch.changesetComment && plan.length === batch.proposals.length ? batch.changesetComment : auto;
 const tags = {
   comment: `${comment}. Found in a MapNG level review (AI-assisted); each edit checked by a person against the listed sources and photos.`,
   created_by: 'MapNG maintenance scripts',
