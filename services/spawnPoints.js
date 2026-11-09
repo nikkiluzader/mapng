@@ -158,7 +158,7 @@ const roadName = (cw) => {
  * keeps to on a two-way road, facing along it in the direction nearer the
  * arrow; on a one-way road it faces the way's direction.
  */
-export function snapToCarriageway(x, y, headingDeg, carriageways, { leftHandTraffic = false } = {}) {
+export function snapToCarriageway(x, y, headingDeg, carriageways, { leftHandTraffic = false, surfaceAt = null } = {}) {
   const h = (Number(headingDeg) || 0) * Math.PI / 180;
   const ax = Math.sin(h); const ay = Math.cos(h);
   let best = null;
@@ -190,10 +190,14 @@ export function snapToCarriageway(x, y, headingDeg, carriageways, { leftHandTraf
   const sign = oneWay || dot >= 0 ? 1 : -1;
   const fx = tx * sign; const fy = ty * sign;
   const lane = oneWay ? 0 : (half / 2) * (leftHandTraffic ? -1 : 1);
+  // (the structure solver's roads are drawn at its solved heights, decks
+  // included, while their carriageways keep the heights they were laid at:
+  // the exporter says which surface is drawn there)
+  const drawn = surfaceAt ? surfaceAt(cw, best.px, best.py, best.pz) : null;
   return {
     x: best.px + fy * lane,
     y: best.py - fx * lane,
-    z: best.pz,
+    z: Number.isFinite(drawn) ? drawn : best.pz,
     heading: normHeading(Math.atan2(fx, fy) * 180 / Math.PI),
     road: roadName(cw),
     highway: cw.highway || null,
@@ -208,7 +212,8 @@ export function snapToCarriageway(x, y, headingDeg, carriageways, { leftHandTraf
  *
  * ctx: { bounds (the export's), project(lat, lng) -> [x, y], carriageways,
  * groundAt(x, y) (the terrain's height, for points off the roads),
- * leftHandTraffic, autoSpawn: { position, rotationMatrix } (today's spawn) }.
+ * surfaceAt(cw, x, y, nodeZ) (snapToCarriageway), leftHandTraffic,
+ * autoSpawn: { position, rotationMatrix } (today's spawn) }.
  *
  * Returns { spheres, spawnPoints, previews, report, used }:
  *  - spheres: the SpawnSpheres ({ name, position, rotationMatrix });
@@ -218,7 +223,7 @@ export function snapToCarriageway(x, y, headingDeg, carriageways, { leftHandTraf
  *  - used: false without points (the level as before: the automatic spawn).
  */
 export function planSpawnPoints(points, ctx = {}) {
-  const { bounds, project, carriageways = [], groundAt = () => 0, leftHandTraffic = false, autoSpawn = null } = ctx;
+  const { bounds, project, carriageways = [], groundAt = () => 0, leftHandTraffic = false, autoSpawn = null, surfaceAt = null } = ctx;
   const list = sanitizePoints(points);
   const auto = {
     sphere: { name: DEFAULT_SPAWN_OBJECT, position: autoSpawn?.position || [0, 0, 0], rotationMatrix: autoSpawn?.rotationMatrix || [1, 0, 0, 0, 1, 0, 0, 0, 1] },
@@ -236,7 +241,7 @@ export function planSpawnPoints(points, ctx = {}) {
       return;
     }
     const [x, y] = project(p.lat, p.lng);
-    const snap = snapToCarriageway(x, y, p.heading, carriageways, { leftHandTraffic });
+    const snap = snapToCarriageway(x, y, p.heading, carriageways, { leftHandTraffic, surfaceAt });
     const at = snap
       ? { x: snap.x, y: snap.y, z: snap.z, heading: snap.heading }
       : { x, y, z: groundAt(x, y), heading: p.heading };

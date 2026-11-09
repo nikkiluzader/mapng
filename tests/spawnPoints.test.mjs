@@ -152,3 +152,16 @@ test('settings summary: a points row only when there are points', () => {
   assert.equal(rows({}).includes('points'), false);
   assert.equal(rows({ points: [{ name: 'A', isDefault: true }] }).includes('points'), true);
 });
+
+test('snap: the solver\'s drawn height wins over the height a road was laid at (v2 decks)', async () => {
+  const { solvedHeightAt } = await import('../services/structures/adapters.js');
+  // one graph edge for road 7: a deck rising 12 → 18 m over 100 m, its carriageway still laid at the ground's 10 m
+  const graph = { edges: [{ seg: 7, s: [0, 50, 100], x: [0, 0, 0], y: [-50, 0, 50] }], profile: { z: [[12, 15, 18]] } };
+  assert.equal(solvedHeightAt(graph, 7, 1, 25), 16.5);
+  assert.equal(solvedHeightAt(graph, 8, 1, 25), null);
+  const laid = { highway: 'primary', half: 5, bridge: true, owner: 7, nodes: line(0, -50, 0, 50, 10) };
+  const snap = snapToCarriageway(1, 25, 0, [laid], { surfaceAt: (cw, x, y) => solvedHeightAt(graph, cw.owner, x, y) });
+  assert.ok(Math.abs(snap.z - 16.5) < 1e-9);
+  // without a solved height (a tunnel road), the laid height stands
+  assert.equal(snapToCarriageway(1, 25, 0, [laid], { surfaceAt: () => null }).z, 10);
+});

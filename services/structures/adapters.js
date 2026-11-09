@@ -83,6 +83,30 @@ export function roadLinesFromSolver(graph) {
 }
 
 /**
+ * The solved road surface of drivable segment `seg` at world (x, y): the
+ * profile height at the nearest point of that road's graph edges, as
+ * applySolvedHeights puts its decals (a deck's top, a levelled road's
+ * grade), or null when the graph has no such road. The carriageways keep
+ * the heights they were laid at; this is the height drawn.
+ */
+export function solvedHeightAt(graph, seg, x, y) {
+  const z = graph?.profile?.z;
+  const edges = graph?.edges;
+  if (!z || !Array.isArray(edges)) return null;
+  let best = Infinity; let bz = null;
+  edges.forEach((e, k) => {
+    if (e.seg !== seg || !z[k]) return;
+    for (let j = 0; j + 1 < e.s.length; j++) {
+      const vx = e.x[j + 1] - e.x[j]; const vy = e.y[j + 1] - e.y[j]; const L2 = vx * vx + vy * vy || 1e-9;
+      const t = Math.max(0, Math.min(1, ((x - e.x[j]) * vx + (y - e.y[j]) * vy) / L2));
+      const dd = (e.x[j] + vx * t - x) ** 2 + (e.y[j] + vy * t - y) ** 2;
+      if (dd < best) { best = dd; bz = z[k][j] + (z[k][j + 1] - z[k][j]) * t; }
+    }
+  });
+  return Number.isFinite(bz) ? bz : null;
+}
+
+/**
  * Set every road decal's node heights from the solved profile: each node to
  * the nearest station of its road's graph edges. A decal with any node on a
  * deck stretch projects onto objects (the deck). Decals carry their road

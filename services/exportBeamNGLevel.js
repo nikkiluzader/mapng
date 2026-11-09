@@ -59,7 +59,7 @@ import { prepareSurvey, lidarPins } from './lidarDecks.js';
 import { buildLampGlowDAE, lampGlowMaterialDef, LAMP_GLOW_SHAPE, buildFloodGlowDAE, floodGlowMaterialDef, FLOOD_GLOW_SHAPE } from './lampGlow.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
 import { shapingSwitches, allShaping, shapingPlan, rawDeckClasses } from './structures/shaping.js';
-import { decksFromSolver, applySolvedHeights, roadLinesFromSolver } from './structures/adapters.js';
+import { decksFromSolver, applySolvedHeights, roadLinesFromSolver, solvedHeightAt } from './structures/adapters.js';
 import { checkJoints, checkGrades, checkCrossings, checkRoadSurface } from './structures/metrics.js';
 import { buildRoadNetwork, getEffectiveRoadLayer, makeRoadNodeKey, mergeLinearRoadSegments } from './roadNetwork.js';
 import { createBeamNGLinkFileRegistry } from './beamngLinkFiles.js';
@@ -13528,6 +13528,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // The user's spawn and quicktravel points (services/spawnPoints.js), on
   // the roads as drawn now: decks and tunnel roads at their solved heights.
   // Without points the level keeps the automatic spawn exactly as before.
+  const solvedSpawnRoads = options.structureSolver === 'v2' && sg?.classes && sg?.profile?.z;
+  const tunnelOwners = decalRoads.tunnels?.bySeg;
+  const spawnSurfaceAt = solvedSpawnRoads
+    ? (cw, x, y) => (cw.tunnel || tunnelOwners?.has?.(cw.owner) ? null : solvedHeightAt(sg, cw.owner, x, y))
+    : null;
   const spawnPlan = planSpawnPoints(options.points, {
     bounds: exportTerrainData.bounds,
     project: (lat, lng) => geoToWorldPoint(lat, lng, exportTerrainData, squareSize),
@@ -13535,6 +13540,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     groundAt: terrainGroundAt(exportTerrainData, squareSize),
     leftHandTraffic: resolvedRightHandDrive,
     autoSpawn: { position: spawnPosition, rotationMatrix: spawnRotationMatrix },
+    // (v2: each road as the solver drew it, decks included; tunnel roads
+    // come from today's builder and keep their own heights)
+    surfaceAt: spawnSurfaceAt,
   });
   if (spawnPlan.used) {
     // their photos: the base texture round each point (spawnPreview.js); a
