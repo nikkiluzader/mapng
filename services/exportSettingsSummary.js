@@ -43,6 +43,8 @@ export function summarizeExportSettings(opts = {}, ctx = {}) {
   const objects = [
     toggle('buildings', !!opts.includeBuildings),
     toggle('trees', !!opts.includeTrees),
+    ...(opts.includeTrees && opts.forestDensity && opts.forestDensity !== 'normal'
+      ? [row('forestDensity', { t: `forest_${opts.forestDensity}` })] : []),
     toggle('rocks', !!opts.includeRocks),
     toggle('water', !!opts.includeWater),
     row('backdrop', opts.includeBackdrop ? { t: SOURCE_KEYS[opts.backdropElevationSource] || 'on' } : { t: 'off' }, !opts.includeBackdrop),

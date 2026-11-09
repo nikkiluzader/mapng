@@ -92,6 +92,11 @@
             <template v-if="advancedMode">
               <SettingRow check v-model="beamNGIncludeBuildings" :label="t('exportPanel.ui.buildings')" :hint="t('exportPanel.exportBuildings')" :disabled="!hasOsmData" />
               <SettingRow check v-model="beamNGIncludeTrees" :label="t('exportPanel.treesBushes')" :hint="t('exportPanel.nativeForest')" :disabled="!hasOsmData" />
+              <SettingRow indent :label="t('exportPanel.ui.forestDensity')" :hint="t(`exportPanel.ui.forestDensityHint_${beamNGForestDensity}`)" :disabled="!hasOsmData || !beamNGIncludeTrees">
+                <select v-model="beamNGForestDensity" :class="SELECT_XS" :disabled="!hasOsmData || !beamNGIncludeTrees">
+                  <option v-for="k in FOREST_DENSITY_KEYS" :key="k" :value="k">{{ t(`exportPanel.ui.forestDensity_${k}`) }}</option>
+                </select>
+              </SettingRow>
               <SettingRow check v-model="beamNGIncludeRocks" :label="t('exportPanel.rocks')" :hint="t('exportPanel.quarryRock')" :disabled="!hasOsmData" />
               <SettingRow check v-model="beamNGIncludeWater" :label="t('exportPanel.water')" :hint="t('exportPanel.lakesRivers')" :disabled="!hasOsmData" />
               <SettingRow
@@ -689,6 +694,10 @@ const beamNGIncludeTunnels = ref(storedOn('mapng_beamNGIncludeTunnels'));
 const beamNGLidarDecks = ref(storedOn('mapng_beamNGLidarDecks'));
 const beamNGSeaLevelOffset = ref(normalizeBeamNGSeaLevelOffset(localStorage.getItem('mapng_beamNGSeaLevelOffset')));
 const beamNGIncludeTrees = ref(localStorage.getItem('mapng_beamNGIncludeTrees') !== 'false');
+// how thick woods stand (advanced; basic: normal): exportBeamNGLevel FOREST_DENSITY
+const FOREST_DENSITY_KEYS = ['light', 'normal', 'dense', 'veryDense'];
+const storedForestDensity = localStorage.getItem('mapng_beamNGForestDensity');
+const beamNGForestDensity = ref(FOREST_DENSITY_KEYS.includes(storedForestDensity) ? storedForestDensity : 'normal');
 const beamNGIncludeRocks = ref(localStorage.getItem('mapng_beamNGIncludeRocks') !== 'false');
 // content caps (buildings, fences, lamps, trees ...): off builds everything the map has
 const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
@@ -984,6 +993,7 @@ watch(beamNGSeaLevelOffset, (v) => {
   localStorage.setItem('mapng_beamNGSeaLevelOffset', String(normalized));
 });
 watch(beamNGIncludeTrees, (v) => localStorage.setItem('mapng_beamNGIncludeTrees', String(v)));
+watch(beamNGForestDensity, (v) => localStorage.setItem('mapng_beamNGForestDensity', v));
 watch(beamNGIncludeRocks, (v) => localStorage.setItem('mapng_beamNGIncludeRocks', String(v)));
 watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String(v)));
 watch(beamNGRoadType, (v) => localStorage.setItem('mapng_beamNGRoadType', v));
@@ -1816,6 +1826,7 @@ const handleBeamNGLevelExport = async () => {
       includeWater: effectiveIncludeWater,
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
+      forestDensity: advanced ? beamNGForestDensity.value : 'normal',
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       ...structureOptions,
@@ -1837,6 +1848,7 @@ const handleBeamNGLevelExport = async () => {
       includeWater: effectiveIncludeWater,
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
+      forestDensity: advanced ? beamNGForestDensity.value : 'normal',
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       ...structureOptions,

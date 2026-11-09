@@ -16,6 +16,7 @@ export const EXPORT_FIELDS = [
   ['buildings', 'mapng_beamNGIncludeBuildings', 'bool', true],
   ['water', 'mapng_beamNGIncludeWater', 'bool', true],
   ['trees', 'mapng_beamNGIncludeTrees', 'bool', true],
+  ['forestDensity', 'mapng_beamNGForestDensity', ['light', 'normal', 'dense', 'veryDense'], 'normal'],
   ['rocks', 'mapng_beamNGIncludeRocks', 'bool', true],
   ['safeCaps', 'mapng_beamNGSafeCaps', 'bool', true],
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],
@@ -179,6 +180,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     if (e.baseTexture) add('export', 'config.baseTexture', { valueKey: `config.tex_${e.baseTexture}` });
     const content = ['buildings', 'water', 'trees', 'rocks', 'roads'].filter((k) => (k === 'roads' ? e.roads !== 'none' : e[k] !== false));
     add('export', 'config.content', { valueKey: 'config.list', params: { list: content.length ? content.map((k) => `config.c_${k}`) : ['config.nothing'] } });
+    if (e.trees !== false && e.forestDensity && e.forestDensity !== 'normal') add('export', 'config.forestDensity', { valueKey: `exportPanel.ui.forestDensity_${e.forestDensity}` });
     const structures = ['bridges', 'tunnels', 'measuredBridgeHeights'].filter((k) => e[k] !== false);
     add('export', 'config.structures', { valueKey: 'config.list', params: { list: structures.length ? structures.map((k) => `config.c_${k}`) : ['config.nothing'] } });
     if (e.terrainEdits) {

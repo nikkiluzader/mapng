@@ -7786,6 +7786,7 @@ function buildBeamNGExportReport({
     `- Include native barriers: ${formatBool(options?.includeNativeBarriers)}`,
     `- Safe caps on content: ${options?.safeCaps === false ? 'No (everything in the map built)' : `Yes (at most ${Object.entries(SAFE_CAPS).map(([k, v]) => `${v} ${k}`).join(', ')})`}`,
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
+    `- Forest density: ${options?.forestDensity || 'normal'} (×${forestDensityMultiplier(options?.forestDensity)} the base tree rates; woods ~${Math.round(36 * forestDensityMultiplier(options?.forestDensity))} trees/ha)`,
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     '',
     'Generated Content',
@@ -10100,6 +10101,13 @@ function makeForestPlacement(type, point, terrainData, squareSize, seed, scaleMi
 // near-world-sized grass render radius below they made dense vegetation areas
 // GPU-bound. 1.5/1.0 keeps coverage convincing at a fraction of the cost.
 const BEAMNG_TREE_DENSITY_MULTIPLIER = 1.5;
+// The Forest density setting (advanced): how many trees a wood, a canopy patch
+// or a park's scatter gets, as a multiplier of the base rates. 'normal' is the
+// 1.5 above (about 54 trees a hectare in a wood); real woods stand thicker,
+// 'dense' and 'veryDense' come closer at a frame-rate cost. Mapped single
+// trees and bushes keep their copies whatever the setting.
+export const FOREST_DENSITY = Object.freeze({ light: 1, normal: BEAMNG_TREE_DENSITY_MULTIPLIER, dense: 3, veryDense: 5 });
+export const forestDensityMultiplier = (key) => FOREST_DENSITY[key] ?? BEAMNG_TREE_DENSITY_MULTIPLIER;
 const BEAMNG_GRASS_DENSITY_MULTIPLIER = 1.0;
 // (the forest placement ceilings are in SAFE_CAPS: at 12,000 per type and
 // 3,600 per polygon, big forests came out thin)
@@ -10650,7 +10658,7 @@ const TREELESS_GOLF = new Set(['bunker', 'green', 'tee', 'fairway', 'driving_ran
 const UNDERWATER_KEEP = 30;
 const UNDERWATER_ROAD_M = 25;
 
-async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null, water = null }, biome, tick = async () => {}) {
+async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null, water = null, forestDensity = 'normal' }, biome, tick = async () => {}) {
   // (what the land cover left out, for the report: set when trees are planted)
   let landCover = null;
   // Buildings, water and open playing ground, for the scattered and canopy
@@ -10720,8 +10728,14 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
 
   const regularPlacementsByType = new Map();
   const priorityPlacementsByType = new Map();
-  const treeDensityMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER;
-  const bushDensityMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER;
+  // (woods, canopy patches, scrub and the parks' scatter by the setting; a
+  // mapped tree's or bush's copies by the base rate)
+  const treeDensityMultiplier = forestDensityMultiplier(forestDensity);
+  // (undergrowth thickens up to 'dense' only; a park's or yard's scatter
+  // never past 'normal': more there is a wood, not a park)
+  const bushDensityMultiplier = Math.min(treeDensityMultiplier, FOREST_DENSITY.dense);
+  const scatterDensityMultiplier = Math.min(treeDensityMultiplier, FOREST_DENSITY.normal);
+  const pointCopyMultiplier = BEAMNG_TREE_DENSITY_MULTIPLIER;
   /**
    * Add a forest placement to priority or regular buckets with hard caps.
    */
@@ -10837,8 +10851,8 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
         const pointCopies = isTreeRow
           ? 1
           : isBush
-            ? Math.max(1, Math.round(bushDensityMultiplier))
-            : Math.max(1, Math.round(treeDensityMultiplier));
+            ? Math.max(1, Math.round(pointCopyMultiplier))
+            : Math.max(1, Math.round(pointCopyMultiplier));
         const jitterMeters = isBush ? 2.2 : 5.5;
         for (let i = 0; i < pointCopies; i++) {
           const cloneSeed = seed + i * 97.13;
@@ -10882,7 +10896,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
         if (scatter > 0) {
           const centre = centroidOf(feature);
           const urban = isUrbanPlace({ id: `area:${feature.id}`, geometry: [centre] });
-          const placements = sampleAreaPlacements(feature, terrainData, squareSize, 'area_tree', scatter * treeDensityMultiplier,
+          const placements = sampleAreaPlacements(feature, terrainData, squareSize, 'area_tree', scatter * scatterDensityMultiplier,
             caps.forestPerArea, 1, 1, hashString(`${feature.id}:scatter`));
           placements.forEach((placement, idx) => {
             if (inBuildingOrWater(placement.pos[0], placement.pos[1])) return;
@@ -11774,6 +11788,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // off: no content caps (buildings, barriers, lamps, trees ...): SAFE_CAPS
     safeCaps = true,
     includeTrees = true,
+    // trees in woods, canopy and scrub: a key of FOREST_DENSITY
+    forestDensity = 'normal',
     includeRocks = false,
     backdropElevationSource = 'global30m',
     backdropGpxzApiKey = '',
@@ -13180,7 +13196,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   const forestPlacements = (includeTrees || includeRocks)
     ? await buildForestPlacements(exportTerrainData, squareSize, {
-      includeTrees, includeRocks, treeMix,
+      includeTrees, includeRocks, treeMix, forestDensity,
       // (below the sea plane or a lake's water: left out, but for a sparse few seen from a road)
       water: (() => {
         const seaZ = -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0);
@@ -13734,6 +13750,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       includeNativeBarriers,
       safeCaps,
       includeTrees,
+      forestDensity,
       includeRocks,
       requestedPbrSource: pbrSource,
       terrainMaterialNames: pbrResult?.materialNames ?? ['DefaultMaterial'],

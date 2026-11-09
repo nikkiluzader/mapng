@@ -66,6 +66,12 @@
         <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.treesBushes') }}</span>
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeTrees" :disabled="!includeOSM" @change="update('includeTrees', $event.target.checked)" />
       </label>
+      <div class="flex items-center justify-between gap-2 pl-3" :class="{ 'opacity-50': !includeOSM || !model.includeTrees }">
+        <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.ui.forestDensity') }}</span>
+        <select :value="model.forestDensity || 'normal'" @change="update('forestDensity', $event.target.value)" :disabled="!includeOSM || !model.includeTrees" :class="SELECT_XS">
+          <option v-for="k in ['light', 'normal', 'dense', 'veryDense']" :key="k" :value="k">{{ t(`exportPanel.ui.forestDensity_${k}`) }}</option>
+        </select>
+      </div>
       <label class="flex items-center justify-between gap-2 cursor-pointer" :class="{ 'opacity-50': !includeOSM }">
         <span class="text-caption text-gray-600 dark:text-gray-400">{{ t('exportPanel.rocks') }}</span>
         <input type="checkbox" :class="CHECKBOX" :checked="model.includeRocks" :disabled="!includeOSM" @change="update('includeRocks', $event.target.checked)" />

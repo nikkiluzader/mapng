@@ -27,6 +27,7 @@ export function exportSettingsFor(options = {}) {
     mapng_beamNGIncludeBuildings: on(options.includeBuildings),
     mapng_beamNGIncludeWater: on(options.includeWater),
     mapng_beamNGIncludeTrees: on(options.includeTrees),
+    mapng_beamNGForestDensity: ['light', 'normal', 'dense', 'veryDense'].includes(options.forestDensity) ? options.forestDensity : 'normal',
     mapng_beamNGIncludeRocks: on(options.includeRocks),
     mapng_beamNGSafeCaps: on(options.safeCaps),
     mapng_beamNGIncludeBridges: on(options.includeBridges),

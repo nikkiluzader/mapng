@@ -501,6 +501,7 @@ const DEFAULT_LEVEL_OPTIONS = {
   backdropSource: 'off',
   includeBuildings: true,
   includeTrees: true,
+  forestDensity: 'normal',
   includeRocks: false,
   includeWater: true,
   // (as a single tile's level: structures, measured bridge heights, content caps)

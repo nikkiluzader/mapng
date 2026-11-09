@@ -1222,6 +1222,7 @@ const DEFAULT_COMBINED_LEVEL_OPTIONS = {
   backdropSource: 'off',
   includeBuildings: true,
   includeTrees: true,
+  forestDensity: 'normal',
   includeRocks: false,
   includeWater: true,
   // (as a single tile's level: structures, measured bridge heights, content caps)
@@ -1488,6 +1489,7 @@ function buildCombinedExportOptions(state, combined, onProgress) {
     includeWater: lo.includeWater,
     seaLevelOffset: lo.seaLevelOffset,
     includeTrees: lo.includeTrees,
+    forestDensity: lo.forestDensity || 'normal',
     includeRocks: lo.includeRocks,
     includeBridges: lo.includeBridges,
     includeTunnels: lo.includeTunnels,
