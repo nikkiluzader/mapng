@@ -1200,8 +1200,10 @@ function buildLevelRailways(sg, terrainData, squareSize, levelName) {
       const d = makeRoadDecal(t.nodes, `rail_tram_${i + 1}`, 'railways', props, TRAMLINE_MATERIAL.name);
       if (d) decals.push(d);
     });
+  // (the track bed's lines, for what keeps off it: trees, bushes, rocks)
+  const lines = sg.edges.filter((e) => e.rail).map((e) => ({ points: Array.from(e.s, (_, i) => [e.x[i], e.y[i]]), half: e.half + 1 }));
   return {
-    tiles: track.tiles, daes, decals,
+    tiles: track.tiles, daes, decals, lines,
     stats: { ...railwayStats(sg, segs), ...track.stats, crossings: (sg.railCrossings || []).length + (sg.railUnjoined || []).length, streetTramKm: Math.round(streetTramM / 10) / 100, streetTramLines: street.length, levelName },
   };
 }
@@ -13513,6 +13515,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     ...groundCarriageways.map((cw) => ({ points: cw.nodes, half: cw.half })),
     ...(decalRoads.pedestrianStreets || []).map((way) => ({ points: way.nodes, half: way.half })),
     ...[...sidewalks.runs, ...(sidewalks.walkRuns || [])].map((run) => ({ points: run.points, half: run.width })),
+    // nor on a railway's track bed and its ditches (railTrack.js)
+    ...(railways?.lines || []),
     // nothing under a gallery's roof (its road, the walkway, the bank up to the roof)
     ...(decalRoads.tunnels?.tunnels || []).filter((t) => t.kind === 'gallery')
       .map((t) => ({ points: t.line.map((p) => [p.x, p.y]), half: galleryRoofHalf(t) })),
