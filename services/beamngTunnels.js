@@ -517,12 +517,17 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   const need = crown + LINING_M + (cutCover ? CC_COVER_M : MIN_COVER_M); // ground over the road
   const g = st.map((p) => groundAt(p.x, p.y));
   const free = [isFreeEnd(st[0].x, st[0].y), isFreeEnd(st[n - 1].x, st[n - 1].y)];
-  const bridged = [0, 1].map((e) => Number.isFinite(approaches[e]?.deckZ));
+  // (onBridge: a bridge whose deck is solved after the tunnels, its height
+  // still unknown: the portal's height from the ground as at a road end)
+  const bridged = [0, 1].map((e) => Number.isFinite(approaches[e]?.deckZ) || !!approaches[e]?.onBridge);
   // a box sunk below a bridge's deck: no way down to it
   if (cutCover && (bridged[0] || bridged[1])) return { ok: false, reason: 'a bridge meets a cut-and-cover tunnel', length: L };
   const endZ = [0, n - 1].map((i, e) => {
     const a = approaches[e];
     if (a && Number.isFinite(a.deckZ)) return a.deckZ;
+    // (onto a bridge: the ground out along it may be the river under the
+    // deck; at least under the hill at the tunnel's end by the cover)
+    if (a?.onBridge) return Math.max(fitApproachHeight(a.xy, groundAt) ?? -Infinity, g[i] - need);
     return fitApproachHeight(a?.xy, groundAt) ?? g[i];
   });
 
@@ -621,7 +626,7 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   const trenchMax = cutCover ? need / MAX_GRADE + 60 : TRENCH_MAX_M;
   const extend = (e) => {
     const a = approaches[e];
-    if (!a?.xy || a.xy.length < 2 || Number.isFinite(a.deckZ) || free[e]) return [];
+    if (!a?.xy || a.xy.length < 2 || Number.isFinite(a.deckZ) || a.onBridge || free[e]) return [];
     const ap = stations(a.xy).slice(1);
     const z0 = e === 0 ? z[0] : z[n - 1];
     const out = [];
@@ -629,7 +634,8 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // a bridge over the approach: the road stays a deck's clearance under the
     // ground there, then climbs (a depressed freeway goes on under the
     // ramps crossing it before it rises)
-    const unders = (a.under || []).map((u) => ({ s: u, cap: groundAt(...stationXY(ap, u)) - UNDER_BRIDGE_M }));
+    // (terrain shaping off: the ground left as it is, the bridge clears the road on it)
+    const unders = (raw ? [] : a.under || []).map((u) => ({ s: u, cap: groundAt(...stationXY(ap, u)) - UNDER_BRIDGE_M }));
     for (const p of ap) {
       if (p.s > trenchMax) break;
       const gr = groundAt(p.x, p.y);

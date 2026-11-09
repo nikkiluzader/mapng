@@ -291,11 +291,17 @@ export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () =>
   for (const m of deck.movableSpans || []) movableSpan(out, deck.parts[m.part], m, groundAt, depthOf(deck.parts[m.part]));
   const st = deck.style;
   if (!st) return out;
-  for (const sp of archRuns(deck, st)) {
+  // (arches and trusses: the plan linkArchCrossings made, one structure over a crossing's twin decks)
+  const plan = st.plan || archRuns(deck, st).map((sp) => ({ sp, draw: true, offs: null }));
+  for (const run of plan) {
+    const sp = run.sp;
     const part = sp.virtual || deck.parts[sp.part];
     const sArr = arcs(part.xy);
-    const off = part.half + PARAPET_W_M + SIDE_GAP_M;
+    const own = part.half + PARAPET_W_M + SIDE_GAP_M;
+    const off = run.offs || [own, own];
     const L = sp.s1 - sp.s0;
+    // a twin of a crossing whose lead draws the one structure over both: nothing of its own
+    if (run.draw === false) continue;
     if (st.type === 'truss') {
       // spans of TRUSS_MAX_M at most, a pier between them
       const n = Math.max(1, Math.ceil(L / TRUSS_MAX_M));
@@ -305,7 +311,7 @@ export function buildStyleGeometry(deck, { groundAt, newBuilder, depthOf = () =>
         if (k > 0) archPier(out.concrete, part, sArr, sub.s0, groundAt, depthOf(part), false);
       }
     }
-    else if (st.type === 'arch' && L >= THROUGH_ARCH_M && highClear(part, sArr, sp, groundAt) <= L * THROUGH_ARCH_LOW) arch(out.steel, part, sArr, sp, off, L);
+    else if (st.type === 'arch' && (run.steel ?? (L >= THROUGH_ARCH_M && highClear(part, sArr, sp, groundAt) <= L * THROUGH_ARCH_LOW && straightRun(part, sArr, sp)))) arch(out.steel, part, sArr, sp, off, L);
     else if (st.type === 'suspension' || st.type === 'cable') {
       // one set of towers per crossing, drawn by its lead deck (once, on its main span)
       if ((st.crossing?.lead ?? deck) !== deck || sp !== mainSpan(deck).sp) continue;
@@ -348,6 +354,32 @@ function highClear(part, sArr, sp, groundAt) {
   return c.sort((a, b) => a - b)[6];
 }
 
+// two parts meeting end to end carry on straight: headings over ~30 m either side of the joint within
+const CARRY_ON_DEG = 20;
+function carriesOn(a, b, fwd) {
+  const head = (xy, fromEnd) => {
+    const pts = fromEnd ? [...xy].reverse() : xy;
+    let k = 1; let L = 0;
+    for (; k < pts.length - 1 && L < 30; k++) L += Math.hypot(pts[k][0] - pts[k - 1][0], pts[k][1] - pts[k - 1][1]);
+    const d = [pts[0][0] - pts[k][0], pts[0][1] - pts[k][1]]; const n = Math.hypot(...d) || 1;
+    return [d[0] / n, d[1] / n];   // pointing at the joint
+  };
+  const ha = head(a.xy, true);                    // a arrives at its end
+  const hb = head(b.xy, !fwd);                    // b leaves the joint: pointing at it, so reversed
+  return -(ha[0] * hb[0] + ha[1] * hb[1]) >= Math.cos((CARRY_ON_DEG * Math.PI) / 180);
+}
+// a steel arch's or truss's run is straight: the line within this of its chord (a bowed rib on a curve
+// cut across the lanes)
+const STRAIGHT_DEV = 0.02; const STRAIGHT_MIN_M = 6;
+function straightRun(part, sArr, sp) {
+  const L = sp.s1 - sp.s0;
+  const a = along(part, sp.s0, 0, sArr); const c = along(part, sp.s1, 0, sArr);
+  const ux = c[0] - a[0]; const uy = c[1] - a[1]; const ul = Math.hypot(ux, uy) || 1;
+  let dev = 0;
+  for (let k = 1; k < 16; k++) { const p = along(part, sp.s0 + (L * k) / 16, 0, sArr); dev = Math.max(dev, Math.abs(((p[0] - a[0]) * uy - (p[1] - a[1]) * ux) / ul)); }
+  return dev <= Math.max(STRAIGHT_MIN_M, STRAIGHT_DEV * L);
+}
+
 /**
  * An arch style's spans with spans of parts joined end to end (a bridge mapped as two ways meeting
  * mid-span) as one: { virtual: a part of both, s0, s1 }. Drawn per way, each half sprang from the river
@@ -363,7 +395,10 @@ function archRuns(deck, st) {
   for (const a of info) {
     if (used.has(a)) continue;
     // a run: a's span to its part's end, on into a span from the next part's start (or end, the other way)
-    const b = a.atEnd && info.find((o) => o !== a && !used.has(o) && ((o.atStart && near(end(a.part, true), end(o.part, false))) || (o.atEnd && near(end(a.part, true), end(o.part, true)))));
+    // (only a way carrying straight on: a ramp curving off the span's end joined to it made a steel arch
+    // follow the ramp's curve, its ties cutting straight across it: the West End Bridge, Pittsburgh)
+    const b = a.atEnd && info.find((o) => o !== a && !used.has(o) && ((o.atStart && near(end(a.part, true), end(o.part, false))) || (o.atEnd && near(end(a.part, true), end(o.part, true))))
+      && carriesOn(a.part, o.part, o.atStart && near(end(a.part, true), end(o.part, false))));
     if (!b) { out.push(a.sp); continue; }
     used.add(a); used.add(b);
     const fwd = near(end(a.part, true), end(b.part, false));
@@ -448,7 +483,8 @@ function truss(b, part, sArr, sp, off, L) {
   // deeper with its span (a 290 m span 7.5 m deep read as a fence)
   const H = through ? Math.max(THROUGH_H_M, Math.min(18, L / 10)) : PONY_H_M;
   const n = Math.max(3, Math.round(L / PANEL_M));
-  const sides = [off, -off];
+  // (off: [left, right] from the centre line, or one for both)
+  const sides = Array.isArray(off) ? [off[0], -off[1]] : [off, -off];
   const B = sides.map((o) => Array.from({ length: n + 1 }, (_, i) => { const p = along(part, sp.s0 + (L * i) / n, o, sArr); return [p[0], p[1], p[2] - 0.45]; }));
   const T = B.map((row) => row.map((p) => [p[0], p[1], p[2] + H]));
   for (let k = 0; k < 2; k++) {
@@ -476,7 +512,7 @@ function truss(b, part, sArr, sp, off, L) {
 function arch(b, part, sArr, sp, off, L) {
   const rise = Math.min(100, Math.max(8, L * ARCH_RISE));
   const m = Math.max(12, Math.round(L / 5));
-  const sides = [off, -off];
+  const sides = Array.isArray(off) ? [off[0], -off[1]] : [off, -off];
   const z0 = along(part, sp.s0, 0, sArr)[2]; const z1 = along(part, sp.s1, 0, sArr)[2];
   const rib = sides.map((o) => Array.from({ length: m + 1 }, (_, i) => {
     const t = i / m; const p = along(part, sp.s0 + L * t, o, sArr);
@@ -600,6 +636,84 @@ function movableSpan(out, part, m, groundAt, depth) {
       beam(out.steel, [a[0], a[1], a[2] - LEAF_FASCIA_M / 2 - 0.1], [b[0], b[1], b[2] - LEAF_FASCIA_M / 2 - 0.1], 0.12, LEAF_FASCIA_M);
     }
   }
+}
+
+// ── crossings of steel arches and through trusses ───────────────────────────
+
+// A bridge mapped as a way per carriageway or per deck (Pittsburgh's Fort Duquesne Bridge: its upper and
+// lower decks two ways side by side; the West End Bridge's two directions) is one arch or one truss over
+// them all, not one per way: drawn per way, two arches crossed each other over the river. Steel runs of
+// one type, parallel and side by side (or stacked) over the same stretch, are grouped; the highest (then
+// longest) draws the structure with its ribs or trusses outside the outer edges of the group, the others
+// none (their piers still left out under it).
+const ARCH_TWIN_SHARE = 0.6;  // this share of a run's samples beside the lead, within CORRIDOR_M
+const ARCH_TWIN_MAX_M = 40;   // a rib at most this far out from the lead's centre line
+export function linkArchCrossings(decks, { groundAt }) {
+  const runs = [];
+  for (const deck of decks) {
+    const st = deck.style;
+    if (!st || (st.type !== 'arch' && st.type !== 'truss')) continue;
+    st.plan = archRuns(deck, st).map((sp) => {
+      const part = sp.virtual || deck.parts[sp.part];
+      const sArr = arcs(part.xy);
+      const L = sp.s1 - sp.s0;
+      const steel = (st.type === 'truss' ? L >= PONY_SPAN_M : L >= THROUGH_ARCH_M && highClear(part, sArr, sp, groundAt) <= L * THROUGH_ARCH_LOW)
+        && straightRun(part, sArr, sp);
+      const run = { sp, draw: true, offs: null, steel, type: st.type, part, sArr, L };
+      if (steel) {
+        run.pts = Array.from({ length: 9 }, (_, k) => along(part, sp.s0 + (L * k) / 8, 0, sArr));
+        run.z = run.pts.reduce((t, p) => t + p[2], 0) / run.pts.length;
+        const a = run.pts[0]; const c = run.pts[8]; const ul = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+        run.dir = [(c[0] - a[0]) / ul, (c[1] - a[1]) / ul];
+        runs.push(run);
+      }
+      return run;
+    });
+  }
+  // (b beside a: its samples within CORRIDOR_M of a's span, laterally)
+  const beside = (a, b) => {
+    if (a.type !== b.type || Math.abs(a.dir[0] * b.dir[0] + a.dir[1] * b.dir[1]) < CORRIDOR_COS) return false;
+    let n = 0;
+    for (const [x, y] of b.pts) {
+      const s = nearestS(a.part, a.sArr, x, y);
+      if (s < a.sp.s0 - 5 || s > a.sp.s1 + 5) continue;
+      const q = along(a.part, s, 0, a.sArr);
+      if (Math.hypot(q[0] - x, q[1] - y) <= CORRIDOR_M) n++;
+    }
+    return n >= ARCH_TWIN_SHARE * b.pts.length;
+  };
+  const parent = runs.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  for (let i = 0; i < runs.length; i++) for (let j = i + 1; j < runs.length; j++) {
+    if (beside(runs[i], runs[j]) || beside(runs[j], runs[i])) parent[find(i)] = find(j);
+  }
+  const groups = new Map();
+  runs.forEach((r, i) => { const k = find(i); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
+  let joined = 0;
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    const lead = g.reduce((a, b) => (b.z > a.z + 1 || (Math.abs(b.z - a.z) <= 1 && b.L > a.L) ? b : a));
+    const own = lead.part.half + PARAPET_W_M + SIDE_GAP_M;
+    let left = own; let right = own;
+    for (const r of g) {
+      if (r === lead) continue;
+      r.draw = false;
+      joined++;
+      const roff = r.part.half + PARAPET_W_M + SIDE_GAP_M;
+      for (let k = 0; k <= 16; k++) {
+        const p = along(r.part, r.sp.s0 + (r.L * k) / 16, 0, r.sArr);
+        const s = nearestS(lead.part, lead.sArr, p[0], p[1]);
+        if (s < lead.sp.s0 || s > lead.sp.s1) continue;
+        const P = along(lead.part, s, 0, lead.sArr); const Q = along(lead.part, Math.min(lead.sArr.at(-1), s + 1), 0, lead.sArr);
+        const ul = Math.hypot(Q[0] - P[0], Q[1] - P[1]) || 1;
+        const d = ((p[0] - P[0]) * -(Q[1] - P[1]) + (p[1] - P[1]) * (Q[0] - P[0])) / ul;   // + left
+        left = Math.max(left, Math.min(ARCH_TWIN_MAX_M, d + roff));
+        right = Math.max(right, Math.min(ARCH_TWIN_MAX_M, -d + roff));
+      }
+    }
+    lead.offs = [left, right];
+  }
+  return joined;
 }
 
 // ── suspension and cable-stayed ──────────────────────────────────────────────

@@ -80,7 +80,7 @@ const bboxOf = (ring) => {
   return [x0, y0, x1, y1];
 };
 // A polygon with holes as a point test.
-const makePolygon = (outer, holes = []) => {
+export const makePolygon = (outer, holes = []) => {
   const box = bboxOf(outer);
   return {
     outer, holes, box,
@@ -99,6 +99,16 @@ function groundInside(poly, heightAt) {
   return inside.sort((a, b) => a - b);
 }
 const isRiverbank = (t = {}) => RIVERBANK_WATER.has(norm(t.water)) || norm(t.waterway) === 'riverbank';
+// a lake, pond or reservoir outline planLakes tiles (a fountain's basin or a
+// pool is built with it: services/fountains.js, pools.js; the sea, docks and
+// marinas are the sea's)
+const isLakeWater = (t = {}) => {
+  if (t.waterway) return false;
+  if (norm(t.amenity) === 'fountain' || norm(t.leisure) === 'swimming_pool') return false;
+  if (['sea', 'ocean'].includes(norm(t.place)) || norm(t.natural) === 'bay' || ['dock', 'harbour'].includes(norm(t.water)) || norm(t.leisure) === 'marina') return false;
+  return norm(t.natural) === 'water' ? (!t.water || LAKE_WATER.has(norm(t.water))) : ['reservoir', 'basin'].includes(norm(t.landuse));
+};
+const isStandingWater = (t = {}) => isLakeWater(t) && !isDry(t);
 // Some point inside at least r from every shore (holes included).
 function hasRoom(poly, r) {
   const [x0, y0, x1, y1] = poly.box;
@@ -202,7 +212,13 @@ export function planRivers({ features = [], toWorld, heightAt, roads = [] }) {
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 3) || !isClosed(f.geometry)) continue;
     const t = f.tags || {};
-    if (!isRiverbank(t)) continue;
+    // (standing water, drawn as blocks: no ribbon over it either; the Ohio's
+    // centreline lay its length over the Emsworth Pool's outline, a second
+    // surface 0.2 m over the pool's in a band down the river)
+    if (!isRiverbank(t)) {
+      if (isStandingWater(t)) areas.push(makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng)))));
+      continue;
+    }
     const poly = makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng))));
     outlines.push(poly);
     if (!isDry(t) && isRiverArea(t, poly, heightAt)) areas.push(poly);
@@ -437,6 +453,51 @@ export function tileOutline(poly, cell, hidden = () => false) {
   return out;
 }
 
+// Water outlines that meet: within JOIN_TOUCH_M of each other at some vertex,
+// their levels within JOIN_LEVEL_M (a dam between a reservoir and the river
+// under it is a real step: not joined), and not overlapping deeper than the
+// touch (one inside another is a lake on an island, or a mapping overlap:
+// tiled apart as before). Returns groups of lake indices.
+const JOIN_TOUCH_M = 3;
+const JOIN_LEVEL_M = 1;
+export function joinTouchingWater(lakes) {
+  const parent = lakes.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const near = (a, b) => a.box[0] <= b.box[2] + JOIN_TOUCH_M && b.box[0] <= a.box[2] + JOIN_TOUCH_M
+    && a.box[1] <= b.box[3] + JOIN_TOUCH_M && b.box[1] <= a.box[3] + JOIN_TOUCH_M;
+  // (a vertex of a on b's shore, or one deep inside it)
+  const relation = (a, b) => {
+    let touch = false;
+    const rings = [b.outer, ...b.holes];
+    for (const [x, y] of a.outer) {
+      if (x < b.box[0] - JOIN_TOUCH_M || x > b.box[2] + JOIN_TOUCH_M || y < b.box[1] - JOIN_TOUCH_M || y > b.box[3] + JOIN_TOUCH_M) continue;
+      const d = Math.min(...rings.map((r) => distToRing(x, y, r)));
+      if (d <= JOIN_TOUCH_M) touch = true;
+      else if (b.contains(x, y)) return 'overlap';
+    }
+    return touch ? 'touch' : null;
+  };
+  for (let i = 0; i < lakes.length; i++) {
+    for (let j = i + 1; j < lakes.length; j++) {
+      const a = lakes[i]; const b = lakes[j];
+      if (Math.abs(a.level - b.level) > JOIN_LEVEL_M || !near(a.poly, b.poly)) continue;
+      const ab = relation(a.poly, b.poly); const ba = relation(b.poly, a.poly);
+      if (ab === 'overlap' || ba === 'overlap' || (!ab && !ba)) continue;
+      parent[find(i)] = find(j);
+    }
+  }
+  const groups = new Map();
+  lakes.forEach((_, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(i); });
+  return [...groups.values()];
+}
+// Outlines that meet edge to edge as one tiling outline: every ring is
+// crossed even-odd by tileOutline's scan lines (a shared edge is crossed
+// twice, so its two sides join), contains() is any member's.
+export function unionOutline(polys) {
+  const box = [Math.min(...polys.map((p) => p.box[0])), Math.min(...polys.map((p) => p.box[1])), Math.max(...polys.map((p) => p.box[2])), Math.max(...polys.map((p) => p.box[3]))];
+  return { outer: [], holes: polys.flatMap((p) => [p.outer, ...p.holes]), box, contains: (x, y) => polys.some((p) => p.contains(x, y)) };
+}
+
 /**
  * Lake tiles: [{ cx, cy, sx, sy, z, lake }] (WaterBlock rectangles, z the
  * water surface), plus stats and lakes [{ poly, level }] (carveLakeBeds).
@@ -445,17 +506,11 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null }) {
   const tiles = [];
   const lakes = [];   // { poly, level } for carveLakeBeds
   const stats = { lakes: 0, dry: 0, tiles: 0, riverAreas: 0 };
-  let lakeIndex = 0;
   for (const f of features) {
     if (f.type !== 'water' || !(f.geometry?.length > 3) || !isClosed(f.geometry)) continue;
     const t = f.tags || {};
     const river = isRiverbank(t);
-    if (t.waterway && !river) continue;
-    // (a fountain's basin or a pool is built with it: services/fountains.js, pools.js)
-    if (norm(t.amenity) === 'fountain' || norm(t.leisure) === 'swimming_pool') continue;
-    if (['sea', 'ocean'].includes(norm(t.place)) || norm(t.natural) === 'bay' || ['dock', 'harbour'].includes(norm(t.water)) || norm(t.leisure) === 'marina') continue;
-    const isLake = river || (norm(t.natural) === 'water' ? (!t.water || LAKE_WATER.has(norm(t.water))) : ['reservoir', 'basin'].includes(norm(t.landuse)));
-    if (!isLake) continue;
+    if (!river && !isLakeWater(t)) continue;
     if (river && isDry(t)) continue;
     if (isDry(t)) { stats.dry++; continue; }
     const poly = makePolygon(f.geometry.map((p) => toWorld(p.lat, p.lng)), (f.holes || []).map((h) => h.map((p) => toWorld(p.lat, p.lng))));
@@ -468,16 +523,34 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null }) {
     // at or under the sea plane: the sea is drawn there already (St. Augustine's
     // tidal water: 1,978 blocks under it)
     if (Number.isFinite(seaZ) && level <= seaZ + 0.02) { stats.underSea = (stats.underSea || 0) + 1; continue; }
+    const area = Math.abs(poly.outer.reduce((a, p, i) => { const q = poly.outer[(i + 1) % poly.outer.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+    lakes.push({ poly, level, tags: t, river, area });
+  }
+  // Water bodies that meet (the Allegheny, the Monongahela and the Ohio's
+  // Emsworth Pool at Pittsburgh's Point: three outlines, one pool) stand at
+  // one level, the lowest of theirs, and are tiled as one outline: each
+  // planned alone, the Ohio came out 0.16 m under the other two and their
+  // blocks overlapped along the seam in a stair-stepped line
+  const groups = joinTouchingWater(lakes);
+  for (const members of groups) {
+    const level = Math.min(...members.map((k) => lakes[k].level));
+    for (const k of members) lakes[k].level = level;
+    const poly = members.length === 1 ? lakes[members[0]].poly : unionOutline(members.map((k) => lakes[k].poly));
     // tiles: every small cell the outline touches, merged (the water reaches
     // the shore; past it by at most one cell, and only where the bank stands
     // over the water and hides it)
-    const area = Math.abs(poly.outer.reduce((a, p, i) => { const q = poly.outer[(i + 1) % poly.outer.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0)) / 2;
+    const area = members.reduce((n, k) => n + lakes[k].area, 0);
     const lakeTiles = tileOutline(poly, Math.min(LAKE_CELL_M[1], Math.max(LAKE_CELL_M[0], Math.sqrt(area) / 16)), (x, y) => heightAt(x, y) > level + BANK_HIDES_M);
     if (!lakeTiles.length) continue;
-    stats.lakes++;
-    for (const tile of lakeTiles) tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: lakeIndex, name: t.name || null });
-    lakes.push({ poly, level, tags: t, river, area });
-    lakeIndex++;
+    stats.lakes += members.length;
+    if (members.length > 1) stats.joined = (stats.joined || 0) + members.length;
+    // (each tile is the lake's whose outline holds its centre: the backdrop's
+    // hand-over at the map's edge trims a lake's own tiles)
+    const owner = (tile) => members.find((k) => lakes[k].poly.contains(tile.cx, tile.cy)) ?? members[0];
+    for (const tile of lakeTiles) {
+      const k = owner(tile);
+      tiles.push({ ...tile, sx: tile.sx + LAKE_TILE_OVERLAP_M, sy: tile.sy + LAKE_TILE_OVERLAP_M, z: level, lake: k, name: lakes[k].tags.name || null });
+    }
   }
   stats.tiles = tiles.length;
   return { tiles, stats, lakes };
@@ -652,7 +725,12 @@ export function damDepth(dam, poly, level, groundAt) {
   return Number.isFinite(low) && level - low > 2 ? level - low : null;
 }
 
-export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [] } = {}) {
+// terrain shaping off (shallow): only the survey's flat water surface is cut,
+// to at most this under the water (the water showed nowhere over it: water
+// and ground at one height flickered in stripes the length of Pittsburgh's
+// rivers); no bank is cut
+export const SHALLOW_BED_M = 1.5;
+export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shallow = false } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
   const sq = worldSize / Math.max(1, width - 1);
   const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
@@ -714,6 +792,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [] } = {
     }
     if (lake.river) depth = Math.min(depth, RIVER_AREA_MAX_M);
     depth = Math.max(LAKE_BED_M, depth);
+    if (shallow) depth = Math.min(depth, SHALLOW_BED_M);
     report.push({ name: lake.tags?.name || null, depth, source: tagged ? 'osm' : damD != null ? 'dam' : slope != null ? 'slope' : 'none', reach, slope, damDepth: damD });
     // (the floor's share of the depth at a spot: 1 at the dam, DAM_FAR_SHARE at the far end)
     const floorShare = (c, r) => {
@@ -735,7 +814,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [] } = {
         const idx = r * width + c;
         const ground = heightMap[idx] - minHeight;
         const above = ground - level;
-        if (above >= LAKE_CUT_TOP_M) continue;
+        if (above >= (shallow ? LAKE_CUT_FULL_M : LAKE_CUT_TOP_M)) continue;
         // (near the shore the exact distance to the outline: the grid's cell centres are a cell off it)
         const l = distAt(c, r) < 4 * k * sq
           ? Math.min(distToRing(x, y, poly.outer), ...poly.holes.map((hh) => distToRing(x, y, hh)))
@@ -744,7 +823,7 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [] } = {
         const edge = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, l / LAKE_BANK_M);
         let target = level - Math.max(edge, depth * t * (2 - t) * floorShare(c, r));
         // (ground a little over the water: cut less and less, so the bank meets the bed without a step)
-        if (above > LAKE_CUT_FULL_M) {
+        if (!shallow && above > LAKE_CUT_FULL_M) {
           const q = (above - LAKE_CUT_FULL_M) / (LAKE_CUT_TOP_M - LAKE_CUT_FULL_M);
           target += (ground - target) * q * q * (3 - 2 * q);
         }

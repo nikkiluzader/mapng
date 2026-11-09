@@ -52,7 +52,8 @@ import { solveProfilesSteps } from './structures/profileSolve.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { addFineGroundDetail } from './terrainDetail.js';
-import { styleDecks, linkCrossings, thinArchDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
+import { findPortalBuildings, portalBuildingTags } from './portalBuildings.js';
+import { styleDecks, linkCrossings, linkArchCrossings, thinArchDecks, buildStyleGeometry, PAINTS as BRIDGE_PAINTS } from './bridgeStyles.js';
 import { prepareSurvey, lidarPins } from './lidarDecks.js';
 import { buildLampGlowDAE, lampGlowMaterialDef, LAMP_GLOW_SHAPE, buildFloodGlowDAE, floodGlowMaterialDef, FLOOD_GLOW_SHAPE } from './lampGlow.js';
 import { resolveBuildingRoadConflicts } from './buildingRoadConflicts.js';
@@ -5063,6 +5064,13 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     if (!best) return null;
     if (early && best.r.bridgeRoad) return { defer: true };
     usedByApproach.add(best.r);
+    // a bridge road with no deck solved yet (structure solver v2 builds the
+    // decks after the tunnels): the portal opens onto the bridge (the Fort
+    // Pitt Tunnel onto its bridge's decks, the Liberty Tunnel onto the
+    // Liberty Bridge); no cutting, and no approach eased down to the river
+    // under the deck (its 'fill' dropped the tunnel with shaping off and its
+    // road climbed the hill instead); the solver joins the deck to the portal
+    if (best.r.bridgeRoad && !best.r.bridge) return { xy: best.line.map(([x, y]) => [x, y]), onBridge: true };
     if (best.r.bridge) {
       // OSM often joins tunnel and bridge metres inside the rock: the bore
       // runs on along the bridge while the ground stays over its deck
@@ -5090,7 +5098,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
       const prev = line[Math.max(0, line.length - 4)];
       const dl = Math.hypot(tip[0] - prev[0], tip[1] - prev[1]) || 1;
       const heading = [(tip[0] - prev[0]) / dl, (tip[1] - prev[1]) / dl];
-      const next = others.filter((r) => !used.has(r) && !r.bridge
+      // (never on along a bridge: the approach ends where the road goes onto one)
+      const next = others.filter((r) => !used.has(r) && !r.bridge && !r.bridgeRoad
         && (Math.hypot(r.xy[0][0] - tip[0], r.xy[0][1] - tip[1]) < TUNNEL_TOUCH_M || Math.hypot(r.xy[r.xy.length - 1][0] - tip[0], r.xy[r.xy.length - 1][1] - tip[1]) < TUNNEL_TOUCH_M))
         .map((r) => {
           const piece = Math.hypot(r.xy[0][0] - tip[0], r.xy[0][1] - tip[1]) < TUNNEL_TOUCH_M ? r.xy : [...r.xy].reverse();
@@ -5147,7 +5156,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     if (approaches.some((a) => a?.defer)) return undefined;   // meets a bridge: after the bridges
     // bridge roads crossing an approach: where (arc length from the tunnel's end)
     for (const a of approaches) {
-      if (!a?.xy || Number.isFinite(a.deckZ)) continue;
+      if (!a?.xy || Number.isFinite(a.deckZ) || a.onBridge) continue;
       const sAlong = [0];
       for (let i = 1; i < a.xy.length; i++) sAlong.push(sAlong[i - 1] + Math.hypot(a.xy[i][0] - a.xy[i - 1][0], a.xy[i][1] - a.xy[i - 1][1]));
       a.under = [];
@@ -5178,7 +5187,7 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
     const osm = path.idx.map((i) => parts[i].osm);
     if (!t.ok) { out.skipped.push({ osm, reason: t.reason, length: t.length }); return null; }
     t.osm = osm;
-    t.approachKinds = approaches.map((a) => (!a ? null : Number.isFinite(a.deckZ) ? `bridge (${(a.rock || []).length} rock pts)` : `road ${Math.round(pathLength(a.xy))} m`));
+    t.approachKinds = approaches.map((a) => (!a ? null : Number.isFinite(a.deckZ) ? `bridge (${(a.rock || []).length} rock pts)` : a.onBridge ? 'bridge (deck solved later)' : `road ${Math.round(pathLength(a.xy))} m`));
     t.key = `t${String(out.tunnels.length + 1).padStart(3, '0')}`;
     t.groundBefore = t.line.map((p) => p.g);
     t.branches = [];
@@ -5358,6 +5367,8 @@ export function cutCoverDig(t) {
 // terrain shaping at tunnels off: a tunnel is built only where its road
 // outside the portals runs within this of the ground (no cutting needed)
 const RAW_TUNNEL_FIT_M = 1;
+const RAW_TUNNEL_HUMP_M = 10;
+const RAW_TUNNEL_FIT_MAX_M = 4;
 
 /**
  * Whether a solved tunnel fits the ground as it is: a cut-and-cover box
@@ -5367,12 +5378,31 @@ const RAW_TUNNEL_FIT_M = 1;
  */
 export function tunnelGroundMisfit(t) {
   if (t.kind === 'cutcover') return { ok: false, reason: 'a cut-and-cover box needs the ground dug out and covered (terrain shaping at tunnels is off)', worst: null };
+  // (each station's misfit the least within RAW_TUNNEL_HUMP_M along the road:
+  // a street crossing over the approach, which the elevation keeps as ground
+  // over the road, needs no cutting; the busway out of the Mount Washington
+  // Transit Tunnel under East Carson Street read 8 m)
+  const off = (p) => (Number.isFinite(p.z) && Number.isFinite(p.g) ? Math.abs(p.z - p.g) : 0);
   let worst = 0;
+  let at = null;
   t.line.forEach((p, k) => {
     if (k >= t.iS && k <= t.iN) return;
-    if (Number.isFinite(p.z) && Number.isFinite(p.g)) worst = Math.max(worst, Math.abs(p.z - p.g));
+    let m = off(p);
+    for (let j = k - 1; j >= 0 && m > 0 && Math.abs(t.line[j].s - p.s) <= RAW_TUNNEL_HUMP_M; j--) m = Math.min(m, off(t.line[j]));
+    for (let j = k + 1; j < t.line.length && m > 0 && Math.abs(t.line[j].s - p.s) <= RAW_TUNNEL_HUMP_M; j++) m = Math.min(m, off(t.line[j]));
+    if (m > worst) { worst = m; at = p; }
   });
-  return worst <= RAW_TUNNEL_FIT_M
+  if (globalThis.process?.env?.MAPNG_TUNNEL_PROFILE && worst > RAW_TUNNEL_FIT_M) {
+    console.log('[tunnel misfit]', JSON.stringify({ osm: t.osm, iS: t.iS, iN: t.iN, kinds: t.approachKinds, portalKind: t.portalKind, worst, at: at && { x: at.x, y: at.y, s: at.s, z: at.z, g: at.g }, line: t.line.filter((_, k) => k % 5 === 0 || k === t.iS || k === t.iN).map((p) => [Math.round(p.s), +p.z.toFixed(1), +p.g.toFixed(1), p.kind]) }));
+  }
+  // (a long bore deep under a hill: an approach a little off its ground is
+  // far less wrong than its road laid over the hill instead, the Mount
+  // Washington Transit Tunnel's busway up a 295 % slope: the tolerance grows
+  // with the cover, to RAW_TUNNEL_FIT_MAX_M under ten times that)
+  let cover = 0;
+  for (let k = t.iS; k <= t.iN; k++) { const p = t.line[k]; if (Number.isFinite(p?.g) && Number.isFinite(p?.z)) cover = Math.max(cover, p.g - p.z); }
+  const tolerance = Math.max(RAW_TUNNEL_FIT_M, Math.min(RAW_TUNNEL_FIT_MAX_M, cover / 10));
+  return worst <= tolerance
     ? { ok: true, reason: null, worst }
     : { ok: false, reason: `its approach would need ${worst.toFixed(1)} m of cutting or fill (terrain shaping at tunnels is off)`, worst };
 }
@@ -7266,7 +7296,7 @@ function shapingReportLines(sh, section) {
     if (sh.tunnelsNotFitting.length > 15) lines.push(`  - … ${sh.tunnelsNotFitting.length - 15} more`);
   }
   lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
-  if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}`);
+  if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}${sh.extras ? '' : ' (shaping off: only the survey\'s flat water surface, at most 1.5 m under the water, so the water shows over it)'}`);
   for (const lk of (sh.lakeDepths || []).slice(0, 12)) {
     lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'dam' ? 'a reservoir: against its dam, the floor rising away from it' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there`);
   }
@@ -7275,7 +7305,7 @@ function shapingReportLines(sh, section) {
   else if (sh.lidar.skipped) lines.push(`- Measured bridge heights (US lidar): not used, ${sh.lidar.skipped}`);
   else {
     const d = sh.lidar.datum;
-    lines.push(`- Measured bridge heights (US lidar, USGS 3DEP ${sh.lidar.dataset}): ${sh.lidar.pinned} of ${sh.lidar.bridges} bridge stretches pinned at ${sh.lidar.stations} stations; ${sh.lidar.bridged ?? 0} more (movable spans, or measured along under 60% of their length) laid straight between measured neighbours, the rest kept the inferred profile`);
+    lines.push(`- Measured bridge heights (US lidar, USGS 3DEP ${sh.lidar.dataset}): ${sh.lidar.pinned} of ${sh.lidar.bridges} bridge stretches pinned at ${sh.lidar.stations} stations; ${sh.lidar.bridged ?? 0} more (movable spans, or measured along under 60% of their length) laid straight between measured neighbours, ${sh.lidar.partlyPinned ?? 0} more pinned along their measured runs clear of the ground (5 stations or more, 2 m over it), the rest kept the inferred profile`);
     lines.push(`  - Survey: ${sh.lidar.nodes} octree nodes, ${(sh.lidar.bytes / 1e6).toFixed(1)} MB, ${sh.lidar.points} points; tied to the terrain from its ground points: ${d.scale === 1 ? 'metres' : 'feet'}, ${d.offset >= 0 ? '+' : ''}${d.offset.toFixed(2)} m, spread ${d.spread.toFixed(2)} m over ${d.n} samples`);
     if (sh.lidar.partial.length) lines.push(`  - Not pinned (OSM way, stations measured/total): ${sh.lidar.partial.slice(0, 20).join(', ')}${sh.lidar.partial.length > 20 ? ', …' : ''}`);
   }
@@ -12360,6 +12390,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     wetAt: buildWaterLookup(exportTerrainData, squareSize),
   }) : [];
   const bridgeTowerHouses = bridgeTowers.length ? new Map(bridgeTowers.map((t) => [t.f, { ...t.f, tags: towerHouseTags(t) }])) : null;
+  // buildings over tunnel portals (services/portalBuildings.js): on the portal, the bores opening under
+  // them, not walls down to the road across the mouth
+  const portalBuildings = tunnelList.length ? findPortalBuildings({
+    buildings: (exportTerrainData.osmFeatures || [])
+      .filter((f) => f.type === 'building' && f.geometry?.length > 2 && !bridgeTowerHouses?.has(f))
+      .map((f) => ({ f, ring: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)) })),
+    tunnels: tunnelList,
+    groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
+  }) : [];
+  if (portalBuildings.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings over tunnel portals: ${portalBuildings.length}, raised onto the portals.`);
+  const liftedBuildings = bridgeTowerHouses || portalBuildings.length ? new Map([...(bridgeTowerHouses || []), ...portalBuildings.map((pb) => [pb.f, { ...pb.f, tags: portalBuildingTags(pb) }])]) : null;
   for (const t of bridgeTowers) (t.deck.towers ||= []).push(t);
   if (bridgeTowers.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge tower houses: ${bridgeTowers.length} (${bridgeTowers.filter((t) => t.pier).length} on piers of their own).`);
   linkCrossings(bridgeDecks, { roads: groundCarriageways.map((cw) => ({ xy: cw.nodes, half: cw.half })) });
@@ -12368,6 +12409,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (styledBridges) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge styles: ${bridgeDecks.filter((d) => d.style).map((d) => d.style.type).join(', ')}.`);
   // sidewalks mapped on a bridge: its deck wide enough, the parapets outside them
   if (includeSidewalks) widenDecksForSidewalks(bridgeDecks, buildDeckPaths(exportTerrainData, squareSize));
+  // (a bridge mapped as a way per carriageway or deck: one steel arch or truss over them all; after the
+  // widths are final, its ribs outside the outer edges)
+  const archTwins = linkArchCrossings(bridgeDecks, { groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize) });
+  if (archTwins) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge arches/trusses over twin decks: ${archTwins} run(s) drawn under their crossing's one structure.`);
   const bridgeDaes = generateBridgeDAEs(
     bridgeDecks,
     (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
@@ -12687,8 +12732,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       // quay stay on their ground)
       // (a deck's road no quay: the bed runs on under the bridge)
       const quayIndex = buildCarriagewayIndex(riverRoads().map((r) => ({ nodes: r.points, half: (r.half || 3) + LAKE_KEEP_M })));
-      // (terrain shaping off: the water stands on the ground as generated)
-      const beds = !shapeExtras ? { pixels: 0, apply: () => {} } : carveLakeBeds(lakePlan.lakes, {
+      // (terrain shaping off: only the survey's flat water surface cut a
+      // little under the water, as the sea floor below is: a measuring
+      // artifact, not shaping; water and ground at one height flickered)
+      const beds = carveLakeBeds(lakePlan.lakes, {
         heightMap: exportTerrainData.heightMap, width: exportTerrainData.width, height: exportTerrainData.height,
         worldSize: exportTerrainData.width * squareSize, minHeight: Number(exportTerrainData.minHeight) || 0,
       }, {
@@ -12697,6 +12744,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         dams: (exportTerrainData.osmFeatures || [])
           .filter((f) => (f.tags?.waterway === 'dam' || f.tags?.man_made === 'dam') && f.geometry?.length > 1)
           .map((f) => ({ line: f.geometry.map((p) => geoToWorldPoint(p.lat, p.lng, exportTerrainData, squareSize, 0)), height: f.tags.height ?? null })),
+        shallow: !shapeExtras,
       });
       const hmLake = heightMapEditor(exportTerrainData);
       beds.apply((idx, v) => hmLake.set(idx, v));
@@ -12968,7 +13016,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       gateRoads: gateWaysOf(exportTerrainData, groundCarriageways, squareSize),
       // (the dams the roads were pinned to: one crest for the road and the concrete)
       dams: decalRoads.structureGraph?.dams || null,
-      replace: bridgeTowerHouses,
+      replace: liftedBuildings,
     };
     // (kept in the step cache by the shaped terrain and these: a re-export
     // that changed only trees or a name reuses the buildings)
@@ -13943,6 +13991,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           bridges: lidar.result?.bridges?.length ?? 0, pinned: lidar.result?.bridges?.filter((b) => b.pinned).length ?? 0,
           stations: lidar.result?.pins?.length ?? 0,
           bridged: lidar.result?.bridges?.filter((b) => b.bridged).length ?? 0,
+          partlyPinned: lidar.result?.bridges?.filter((b) => !b.pinned && b.partial > 0).length ?? 0,
           partial: (lidar.result?.bridges || []).filter((b) => !b.pinned).map((b) => `${b.wayId ?? '?'} ${b.measured}/${b.stations}`),
         }) : null,
         residual: sg?.profile?.residual || null,

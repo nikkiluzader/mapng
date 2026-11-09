@@ -299,7 +299,19 @@ export async function fetchSurvey({ lines, toGeo, toLocal, zAbs, index, fetchImp
   return null;
 }
 
-const MIN_COVER = 0.6;         // a bridge measured at fewer of its stations keeps the inferred profile
+const MIN_COVER = 0.6;         // a bridge measured at fewer of its stations keeps the inferred profile ...
+const PARTIAL_RUN = 5;         // ... but for runs of this many stations in a row ...
+const PARTIAL_CLEAR_M = 2;     // ... each measured this far over the ground
+/** Runs [a, b] (inclusive) of measured stations, PARTIAL_RUN long or more, each PARTIAL_CLEAR_M over its ground. */
+export function clearRuns(z, groundAt) {
+  const out = []; let a = -1;
+  for (let i = 0; i <= z.length; i++) {
+    const ok = i < z.length && Number.isFinite(z[i]) && z[i] - groundAt(i) >= PARTIAL_CLEAR_M;
+    if (ok && a < 0) a = i;
+    if (!ok && a >= 0) { if (i - a >= PARTIAL_RUN) out.push([a, i - 1]); a = -1; }
+  }
+  return out;
+}
 
 /**
  * Pins for the structure solver from a survey: every bridge edge of the
@@ -328,7 +340,17 @@ export function lidarPins(graph, survey, groundAtAbs, minHeight) {
       for (let i = 0; i < z.length; i++) if (Number.isFinite(z[i])) pins.push([k, i, z[i] - minHeight]);
       measuredZ.set(k, z);
     }
-    bridges.push({ k, wayId: e.wayId ?? null, stations: z.length, measured, pinned, meanLift: measured ? lift / measured : null });
+    // under MIN_COVER: still its measured runs that stand clear of the ground (no misread of the ground
+    // or a road under it), the solver's profile between them; left unpinned, the North Shore
+    // Expressway, measured at 40 of 78 stations, sank onto the street under it (Pittsburgh)
+    let partial = 0;
+    if (!pinned) {
+      for (const [a, b] of clearRuns(z, (i) => groundAtAbs(line[i][0], line[i][1]))) {
+        for (let i = a; i <= b; i++) pins.push([k, i, z[i] - minHeight]);
+        partial += b - a + 1;
+      }
+    }
+    bridges.push({ k, wayId: e.wayId ?? null, stations: z.length, measured, pinned, partial, meanLift: measured ? lift / measured : null });
   });
   for (const b of bridgeUnpinnedRuns(graph, bridges, measuredZ)) pins.push(...b.map(([k, i, z]) => [k, i, z - minHeight]));
   return { pins, bridges };

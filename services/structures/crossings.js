@@ -159,8 +159,14 @@ export function findCrossings(graph, { waterAt = null } = {}) {
     // lower level as the ground, and the upper street lay on it wherever
     // no cross street ran under it (Upper over Lower Wacker)
     const sunk = (e) => !e.bridge && (e.layer || 0) < 0 && !PATH_CLASSES.has(e.highway);
-    const indexed = (e) => road(e) || sunk(e);
-    const stacked = (A, B) => (road(A) && road(B)) || (sunk(B) && (A.layer || 0) >= 0 && !A.tunnel && !PATH_CLASSES.has(A.highway));
+    // a street on the ground right under a bridge running along it (Pittsburgh's Lacock Street under the
+    // North Shore Expressway, its centre line within 2 m of the deck's): the deck over it too; only truly
+    // under it (centre lines within half the wider road), a quay street beside a bridge is the composer's
+    const ground = (e) => !e.bridge && !e.tunnel && (e.layer || 0) >= 0 && !PATH_CLASSES.has(e.highway);
+    const indexed = (e) => road(e) || sunk(e) || ground(e);
+    const stacked = (A, B) => (road(A) && road(B)) || (sunk(B) && (A.layer || 0) >= 0 && !A.tunnel && !PATH_CLASSES.has(A.highway))
+      || (road(A) && ground(B));
+    const under = (A, B) => ground(B) && !B.bridge;
     edges.forEach((e, k) => {
       if (!indexed(e)) return;
       for (let i = 0; i < e.s.length; i++) {
@@ -186,7 +192,7 @@ export function findCrossings(graph, { waterAt = null } = {}) {
             if (kb === ka || !(A.layer > B.layer) || !stacked(A, B)) continue;
             const ib = list[j + 1];
             const d = Math.hypot(B.x[ib] - A.x[i], B.y[ib] - A.y[i]);
-            if (d >= (A.half + B.half) * OVERLAP_SHARE) continue;
+            if (d >= (under(A, B) ? Math.max(A.half, B.half) * 0.5 : (A.half + B.half) * OVERLAP_SHARE)) continue;
             if (!best.has(kb) || d < best.get(kb)[1]) best.set(kb, [ib, d]);
           }
         }

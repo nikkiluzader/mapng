@@ -6,7 +6,8 @@
 //
 // Writes <out>/<levelName>.zip (default scratch/sweep) and, beside it,
 // <levelName>.checks.json (the export's structure checks). EXPORT_OPTS (JSON)
-// adds export options (structures, terrain shaping); RAW=1 skips the data
+// adds export options (structures, terrain shaping); PREPROCESSED=1 takes the OSM as the app's
+// data step left it (an area made from the desktop app's terrain cache); RAW=1 skips the data
 // pull's road snapping and smoothing (the app's raw terrain); NOWIDTH=1 skips
 // the street widths measured between the buildings (an A/B check). --fix-stubs puts
 // real images where the headless canvas left stubs, so the level loads clean
@@ -50,8 +51,9 @@ const raw = !!process.env.RAW;
 // (as the app's data pull: street widths from the buildings along them)
 // (corners rounded into arcs first, as terrain.js shapeRoads: without it wide
 // roads kinked at every OSM vertex and lost wedges of asphalt there)
-const rounded = roundRoadCorners(osmFeatures).features;
-let osmRoads = process.env.NOWIDTH ? rounded : fitTwinCarriageways(measureStreetWidths(rounded).features).features;
+// (PREPROCESSED=1: the OSM is the app's own data-step output, corners, widths and twin carriageways already done)
+const rounded = process.env.PREPROCESSED ? osmFeatures : roundRoadCorners(osmFeatures).features;
+let osmRoads = process.env.NOWIDTH || process.env.PREPROCESSED ? rounded : fitTwinCarriageways(measureStreetWidths(rounded).features).features;
 if (fine && !raw) osmRoads = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, isGroundLevelRoad).features;
 if (!raw) smoothRoadsInHeightmap(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, { skipTracks: fine, fine });
 let minHeight = Infinity; let maxHeight = -Infinity;
