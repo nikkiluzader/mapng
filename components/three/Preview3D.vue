@@ -7,7 +7,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
       <p class="text-sm font-semibold text-gray-300">{{ t('preview.webglTitle') }}</p>
-      <p class="text-xs text-gray-500 max-w-xs">{{ t('preview.webglBody') }}</p>
+      <p class="text-xs text-gray-500 max-w-xs">{{ t(isDesktopApp ? 'preview.webglBodyDesktop' : 'preview.webglBody') }}</p>
     </div>
 
     <!-- dpr caps rendering at 2x device pixels: on 3-4x mobile/hiDPI screens the
@@ -448,6 +448,7 @@ import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { useI18n } from 'vue-i18n';
 import * as THREE from "three";
 import { terrainView, showContours } from '../../composables/useTerrainView.js';
+import { desktopApp } from '../../services/platform/desktop.js';
 import IdleRender from './IdleRender.vue';
 import { TresCanvas } from "@tresjs/core";
 import { OrbitControls, Environment } from "@tresjs/cientos";
@@ -651,6 +652,7 @@ const previewTextureFor = (value) => {
 };
 const textureType = ref(previewTextureFor(sharedBaseTexture.value));
 // the terrain view and contour lines (remembered)
+const isDesktopApp = !!desktopApp;
 const readPref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 // (the terrain view and the contour lines: one choice with the 2D preview, composables/useTerrainView.js)
 const contourStep = computed(() => contourInterval((Number(props.terrainData?.maxHeight) || 0) - (Number(props.terrainData?.minHeight) || 0)));

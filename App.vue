@@ -160,6 +160,7 @@
         <div v-if="isLoading" class="absolute inset-0 z-50 flex items-center justify-center p-4 pb-28 overflow-y-auto bg-gray-900/10 dark:bg-black/25">
           <StageLoader
             :title="t('app.processingTerrain')"
+            :finished="loadingFinished"
             :steps="generationSteps"
             :active-stage="loadingStage"
             :active-fraction="loadingStageFraction"
@@ -966,6 +967,12 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       alert(t('app.error.fetchTerrain'));
     }
   } finally {
+    // (done: the card runs on to 100 % before it goes)
+    if (lastGenerationKey.value === requestKey && terrainData.value && isLoading.value) {
+      loadingFinished.value = true;
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      loadingFinished.value = false;
+    }
     isLoading.value = false;
     loadingProgressPercent.value = null;
     loadingProgressDetail.value = '';
@@ -1057,6 +1064,8 @@ const handleModifyLevel = async (level) => {
 const openPreviewAfterGenerate = () => { if (viewMode.value !== 'preview3d') viewMode.value = 'preview2d'; };
 // (no terrain: nothing to preview)
 watch(terrainData, (data) => { if (!data && viewMode.value !== 'location') viewMode.value = 'location'; });
+
+const loadingFinished = ref(false);
 
 const switchTo2D = () => {
   previewMode.value = false;

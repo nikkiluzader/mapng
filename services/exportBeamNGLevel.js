@@ -12853,7 +12853,9 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // next one is allocated, which is critical for 4096+ terrain grids.
 
   await yield_();
-  beginStep('texture', `Generating the ${baseTexture} base texture for the ${size}×${size} terrain…`);
+  // (the texture by the name the export panel gives it)
+  const baseTextureName = { osm: 'OSM', game: 'Game', hybrid: 'satellite hybrid', satellite: 'satellite', painted: 'touched-up', none: 'plain' }[baseTexture] || baseTexture;
+  beginStep('texture', `Generating the ${baseTextureName} base texture for the ${size}×${size} terrain…`);
   await yield_();
   // The base texture may be finer than the grid (2× up to 4096 grids, as
   // west_coast_usa: 2048 grid, 4096 base). Use that size only when the chosen
@@ -15187,7 +15189,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     const current = zipCurrentFile && !zipCurrentFile.endsWith('/')
       ? ` ${zipCurrentFile.replace(`levels/${levelName}/`, '')} (${formatBytes(zipEntryBytes.get(zipCurrentFile) || 0)})`
       : '';
-    report(`Compressing the level ZIP (${formatBytes(zipTotalBytes)}, ${zipEntries.length} files):${current}…`, fraction);
+    report(`Compressing the level ZIP (${formatBytes(zipTotalBytes)}, ${zipEntries.length} files)${current ? `:${current}` : ''}…`, fraction);
   };
   // Stream the archive to disk (OPFS) when available so the ~1 GB output never
   // has to accumulate in the JS heap; fall back to the in-memory blob elsewhere.

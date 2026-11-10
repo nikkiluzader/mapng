@@ -38,10 +38,10 @@
     <!-- Latest lines: finished steps, then what is running now -->
     <div class="mt-3 h-[88px] flex flex-col justify-end gap-0.5 overflow-hidden text-xs leading-snug">
       <div v-for="(line, i) in doneLines" :key="i" class="flex justify-between gap-3 text-gray-400 dark:text-white/45">
-        <span class="min-w-0 flex-1 truncate" :title="line.step">{{ line.step }}</span>
+        <span class="min-w-0 flex-1 truncate" :title="tidy(line.step)">{{ tidy(line.step) }}</span>
         <span class="font-mono shrink-0">{{ formatDuration(line.durationMs) }}</span>
       </div>
-      <div class="text-gray-700 dark:text-white/80 truncate" :title="status">{{ status }}</div>
+      <div class="text-gray-700 dark:text-white/80 truncate" :title="tidy(status)">{{ tidy(status) }}</div>
     </div>
 
     <!-- The settings this run uses (export): closed until opened -->
@@ -96,6 +96,10 @@ const props = defineProps({
   // [{ title, rows: [{ label, value, off }] }]: the run's settings, shown in a closed section
   settings: { type: Array, default: () => [] },
   settingsLabel: { type: String, default: 'Settings used' },
+  // the run is done: the card runs on to 100 % (a few tenths of a second) before
+  // whoever shows it takes it away, where it used to vanish wherever its eased
+  // number had got to (74 % on a four-second run)
+  finished: { type: Boolean, default: false },
 });
 defineEmits(['cancel']);
 
@@ -141,6 +145,7 @@ const secondsPerWeight = () => {
 };
 
 const recompute = () => {
+  if (props.finished) { target = 1; targetStage = 1; return; }
   const now = performance.now();
   if (props.activeStage !== trackedStage) {
     // (a later stage: the earlier one is done; the bar starts over for the new card stage)
@@ -180,8 +185,10 @@ const animate = () => {
   recompute();
   // ease: about half the gap closed every quarter second, and never faster
   // than 25 points a second (a stage that ends early slides on, not jumps)
-  const k = 1 - Math.exp(-dt * 2.8);
-  shown.value = Math.max(shown.value, shown.value + Math.min((target - shown.value) * k, 0.25 * dt));
+  const k = 1 - Math.exp(-dt * (props.finished ? 14 : 2.8));
+  // (done: to the end briskly, whatever is left of it)
+  shown.value = props.finished ? Math.min(1, shown.value + Math.max((1 - shown.value) * k, 2.5 * dt))
+    : Math.max(shown.value, shown.value + Math.min((target - shown.value) * k, 0.25 * dt));
   const stepKey = activeStep.value?.key ?? null;
   if (stepKey !== lastStepKey) { lastStepKey = stepKey; shownStage.value = 0; }
   shownStage.value = Math.max(shownStage.value, shownStage.value + (targetStage - shownStage.value) * k);
@@ -190,13 +197,16 @@ const animate = () => {
 onMounted(() => { frame = requestAnimationFrame(animate); });
 onBeforeUnmount(() => cancelAnimationFrame(frame));
 // (a report jumps the targets at once; the frame loop eases toward them)
-watch(() => [props.activeStage, props.activeFraction, props.pct], recompute);
+watch(() => [props.activeStage, props.activeFraction, props.pct, props.finished], recompute);
 // (a new card stage: its bar starts over in the same update as its name, not
 // a frame later with the old stage's fill under the new name)
 watch(() => activeStep.value?.key ?? null, (key) => { lastStepKey = key; shownStage.value = 0; targetStage = 0; }, { flush: 'sync' });
 
-const shownPct = computed(() => Math.min(99, Math.floor(shown.value * 100)));
+const shownPct = computed(() => (props.finished && shown.value >= 0.999 ? 100 : Math.min(99, Math.floor(shown.value * 100))));
 const shownStageFraction = computed(() => shownStage.value);
+
+// (the reports come from many places: three dots or the ellipsis character; one kind shown)
+const tidy = (text) => String(text ?? '').replace(/\.{3}/g, '…');
 
 const formatDuration = (ms) => {
   if (!Number.isFinite(ms)) return '';

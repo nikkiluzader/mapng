@@ -526,6 +526,7 @@
              phases (EXPORT_STEP_GROUPS) -->
         <StageLoader
           :title="t('exportPanel.exportingBeamng')"
+          :finished="exportFinished"
           :steps="exportSteps"
           :active-stage="beamNGPhase"
           :active-fraction="beamNGPhaseFraction"
@@ -711,6 +712,7 @@ watch(beamNGBaseTexturePreference, (preferred) => {
 // the export uses it, and the next Generate paints at the same setting.
 const gameTextureBlend = ref(readGameTextureBlend());
 const paintedGameTextureBlend = ref(gameTextureBlend.value);
+const exportFinished = ref(false);
 const isRepaintingGameTexture = ref(false);
 // Live: the texture painted once at 0, 50 and 100 % (the first time the slider
 // is touched), then cross-faded as it moves, so it follows the hand. Larger
@@ -1988,6 +1990,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
   }
 
   isExportingBeamNGLevel.value = true;
+  let exportSucceeded = false;
   beamNGProgressStep.value = 'Preparing…';
   beamNGProgressPct.value  = 0;
   beamNGProgressDone.value = [];
@@ -2142,6 +2145,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       desktopExportAbort = new AbortController();
       const saved = await exportLevelOnDesktop(td, props.center, levelOptions, { signal: desktopExportAbort.signal });
       if (saved?.cancelled) return;
+      exportSucceeded = true;
       console.log(`${BEAMNG_EXPORT_UI_LOG} Desktop export written:`, saved);
       beamNGDesktopSaved.value = { path: saved.path, filename: saved.filename };
       lastExport.value = { inputs: inputsAtStart, at: Date.now(), filename: saved.filename, desktop: { path: saved.path, size: saved.size }, blob: null };
@@ -2195,6 +2199,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       beamNGPendingDownloadName.value = filename;
       console.warn(`${BEAMNG_EXPORT_UI_LOG} Auto-download fallback blocked risk detected; awaiting explicit anchor click.`);
     }
+    exportSucceeded = true;
   } catch (error) {
     // Message inline: copied console logs collapse the object to "Object".
     console.error(`${BEAMNG_EXPORT_UI_LOG} Failed to export BeamNG level: ${error?.name || 'Error'}: ${error?.message || error}`, {
@@ -2209,6 +2214,8 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
   } finally {
     desktopExportAbort = null;
     clearInterval(elapsedTimer);
+    // (done: the card runs on to 100 % before it goes)
+    if (exportSucceeded) { exportFinished.value = true; await new Promise((resolve) => setTimeout(resolve, 450)); exportFinished.value = false; }
     isExportingBeamNGLevel.value = false;
     beamNGProgressStep.value = '';
     beamNGProgressPct.value  = 0;
