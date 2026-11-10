@@ -13034,8 +13034,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   if (terLayerMap && asphaltLayer >= 0) {
     const n = exportTerrainData.width;
     for (const t of (decalRoads.tunnels?.tunnels || []).filter((q) => q.kind === 'gallery')) {
+      // (every half square along the line, not only at its stations: 2 m
+      // apart, they left every other row of a 1 m grid as grass, growing
+      // in stripes across the road)
+      const along = [];
       for (let i = 0; i + 1 < t.line.length; i++) {
-        const p = t.line[i];
+        const a = t.line[i]; const b = t.line[i + 1];
+        const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (squareSize / 2)));
+        for (let k = 0; k < steps; k++) along.push({ x: a.x + ((b.x - a.x) * k) / steps, y: a.y + ((b.y - a.y) * k) / steps, tx: a.tx, ty: a.ty });
+      }
+      along.push(t.line[t.line.length - 1]);
+      for (const p of along) {
         for (let d = -t.W; d <= t.W; d += squareSize / 2) {
           const [x, y] = [p.x + d * p.ty, p.y - d * p.tx];
           const c = Math.round(x / squareSize + n / 2); const r = Math.round(y / squareSize + n / 2);

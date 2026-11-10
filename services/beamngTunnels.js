@@ -366,6 +366,10 @@ const GAL_ROOF_M = 0.7;
 const GAL_WALL_T = 0.6;
 const GAL_COLUMN_EVERY_M = 5;
 const GAL_COLUMN_M = 0.6;
+const GAL_RIB_M = 0.45;                // pilasters and roof beams stand out this far
+const GAL_BENCH_SLOPE = 0.07;           // the survey level across the lanes within this: the road's bench is in it
+const GAL_VERGE_M = 2;                 // the valley side's verge: level with the road this far out, then falling away
+const GAL_VERGE_FALL = 0.5;            // ...at this slope at most (fill)
 const GAL_VALLEY_CLEAR_M = 3;          // the valley side's ground kept down to the road this far past the columns
 
 /** The ground's slope across a path (median over its stations, rise per metre). */
@@ -387,9 +391,6 @@ export function solveGallery(path, { groundAt, squareSize = 1 }) {
   if (L < 10) return { ok: false, reason: `short (${Math.round(L)} m)`, length: L };
   const W = path.half + WALKWAY_M;
   const g = st.map((p) => groundAt(p.x, p.y));
-  // the road where it is, smoothed; its ends on the ground (it runs on
-  // over the terrain beyond them)
-  const z = smoothPinned(g, STEP_M, SMOOTH_SIGMA_M);
   // the uphill side (+1 right of travel, -1 left): where the ground is higher
   const D = W + 12;
   let rise = 0;
@@ -397,12 +398,41 @@ export function solveGallery(path, { groundAt, squareSize = 1 }) {
     const [xr, yr] = lateral(p, D); const [xl, yl] = lateral(p, -D);
     rise += groundAt(xr, yr) - groundAt(xl, yl);
   }
+  const uphill = rise >= 0 ? 1 : -1;
+  // The road's height. Where the survey holds the road's bench (level across
+  // the lanes) the road is where it is. Under a roof a fine survey often has
+  // no bench: the roof is taken out of the ground model and the hillside
+  // drawn straight through, from the slope above to the verge on the valley
+  // side, 1 to 2 m over the real road at the centre line (Tignes, D 87A: a
+  // cantilevered roof, the verge level with the road). There the height is
+  // carried through from the stations that have a bench (the ends always),
+  // kept between the valley-side ground and the centre line's.
+  const lane = Math.max(1.5, path.half * 0.8);
+  const bench = st.map((p, i) => {
+    if (i === 0 || i === n - 1) return true;
+    const [xr, yr] = lateral(p, lane); const [xl, yl] = lateral(p, -lane);
+    return Math.abs(groundAt(xr, yr) - groundAt(xl, yl)) / (2 * lane) <= GAL_BENCH_SLOPE;
+  });
+  const zRaw = g.slice();
+  let unbenched = 0;
+  for (let i = 1; i < n - 1; i++) {
+    if (bench[i]) continue;
+    unbenched++;
+    let a = i - 1; while (!bench[a]) a--;
+    let b = i + 1; while (!bench[b]) b++;
+    const carried = g[a] + ((g[b] - g[a]) * (st[i].s - st[a].s)) / (st[b].s - st[a].s);
+    const [xv, yv] = lateral(st[i], -uphill * (W + GAL_VERGE_M));
+    const valley = groundAt(xv, yv);
+    zRaw[i] = Math.min(Math.max(carried, Math.min(valley, g[i])), g[i]);
+  }
+  // smoothed; its ends on the ground (it runs on over the terrain beyond them)
+  const z = smoothPinned(zRaw, STEP_M, SMOOTH_SIGMA_M);
   const line = st.map((p, i) => ({ ...p, z: z[i], g: g[i], kind: 'tube', wl: W, wr: W }));
   return {
     ok: true, kind: 'gallery', line, iS: 0, iN: n - 1,
     portals: [false, false], portalKind: ['edge', 'edge'],
     W, wall: GAL_H, arch: 0, crown: GAL_H, need: GAL_H + GAL_ROOF_M, headTop: GAL_H + GAL_ROOF_M,
-    uphill: rise >= 0 ? 1 : -1,
+    uphill, unbenched,
     length: L, tubeLength: L, fill: 0, short: 0, dips: [], exposed: [], squareSize,
     headDepth: 0, stepAt: 0, wingT: GAL_WALL_T, wingD: W, headHalf: W + GAL_WALL_T + 1,
     wings: { [-1]: new Map(), [1]: new Map() }, maxExtra: 0, cuts: [],
@@ -443,9 +473,12 @@ function galleryGroundAt(t, x, y, h) {
   }
   const ad = Math.abs(n.d);
   if ((Math.sign(n.d) || 1) === t.uphill) {
-    if (ad <= inner) return n.z;
+    // (level under the wall and a square behind it: the bank rising from the
+    // walkway's edge stood through the wall's foot in teeth on the terrain's grid)
+    const foot = Math.min(bankEnd - 0.1, inner + (t.squareSize || 1) + 0.05);
+    if (ad <= foot) return n.z;
     const top = n.z + t.headTop;
-    if (ad <= bankEnd) return n.z + t.headTop * ((ad - inner) / GAL_BANK_M);
+    if (ad <= bankEnd) return n.z + t.headTop * ((ad - foot) / (bankEnd - foot));
     const over = Math.max(0, ad - crest);
     const face = Math.min(h, top + FACE_SLOPE * over);   // the rock cut back where it stands higher
     if (over >= GAL_BLEND_M) return face;
@@ -453,8 +486,12 @@ function galleryGroundAt(t, x, y, h) {
   }
   const edge = inner + GAL_WALL_T;
   if (ad <= edge) return n.z;
-  // valley side: no ground over the road showing between the columns
-  return Math.min(h, n.z + Math.max(0, ad - edge - GAL_VALLEY_CLEAR_M));
+  // valley side: no ground over the road showing between the columns; a
+  // verge level with the road, then falling away (never a drop at the
+  // lane's edge where the ground below was lower)
+  const out = ad - edge;
+  const clear = Math.min(h, n.z + Math.max(0, out - GAL_VALLEY_CLEAR_M));
+  return Math.max(clear, n.z - Math.max(0, out - GAL_VERGE_M) * GAL_VERGE_FALL);
 }
 
 /** A gallery as triangles: roof slab, valley-side columns and beam (the hillside is its back); pieces like a tube's. */
@@ -494,28 +531,36 @@ function buildGalleryGeometry(t) {
   const roofDown = inner + GAL_WALL_T;
   const roofUp = t.keepWall ? roofDown : inner + GAL_BANK_M + GAL_WALL_T;
   strip(up > 0 ? -roofDown : -roofUp, up > 0 ? roofUp : roofDown, GAL_H, GAL_H + GAL_ROOF_M);
-  if (t.keepWall) {
-    const wallU = up * (inner + GAL_WALL_T / 2);
-    strip(wallU - GAL_WALL_T / 2, wallU + GAL_WALL_T / 2, -0.5, GAL_H);
-  }
+  // the uphill wall: concrete from the road's edge to the roof, in front of
+  // the bank (avalanche galleries stand on a retaining wall against the
+  // slope, ribbed with pilasters that carry the roof's beams: Tignes D 87A)
+  const wallU = up * (inner + GAL_WALL_T / 2);
+  strip(wallU - GAL_WALL_T / 2, wallU + GAL_WALL_T / 2, -0.5, GAL_H);
   const beamU = -up * (inner + GAL_WALL_T / 2);
   strip(beamU - GAL_WALL_T / 2, beamU + GAL_WALL_T / 2, GAL_H - 0.8, GAL_H);             // valley beam
-  // columns under the beam
+  // a box at a station: offsets u0..u1 across, ±h along, heights v0..v1 (its four sides and underside)
+  const box = (p, u0, u1, h, v0, v1) => {
+    const c = (a, u, v) => { const [x, y] = lateral(p, u); return [x + p.tx * a, y + p.ty * a, p.z + v]; };
+    const o = c(0, (u0 + u1) / 2, (v0 + v1) / 2);
+    const want = (cc) => [cc[0] - o[0], cc[1] - o[1], cc[2] - o[2]];
+    const quad = (A, B, C, D) => { T.tri(A, B, C, [[0, 0], [1, 0], [1, 1]], want); T.tri(A, C, D, [[0, 0], [1, 1], [0, 1]], want); };
+    quad(c(-h, u0, v0), c(h, u0, v0), c(h, u0, v1), c(-h, u0, v1));
+    quad(c(h, u1, v0), c(-h, u1, v0), c(-h, u1, v1), c(h, u1, v1));
+    quad(c(-h, u1, v0), c(-h, u0, v0), c(-h, u0, v1), c(-h, u1, v1));
+    quad(c(h, u0, v0), c(h, u1, v0), c(h, u1, v1), c(h, u0, v1));
+    quad(c(-h, u0, v0), c(-h, u1, v0), c(h, u1, v0), c(h, u0, v0));
+  };
+  // every GAL_COLUMN_EVERY_M: a column under the valley beam, a pilaster on
+  // the wall and a beam under the roof between them
+  const h = GAL_COLUMN_M / 2;
+  const wallFace = up * inner;
   let next = 0;
   for (const p of t.line) {
     if (p.s < next) continue;
     next = p.s + GAL_COLUMN_EVERY_M;
-    const [cx, cy] = lateral(p, beamU);
-    const h = GAL_COLUMN_M / 2;
-    const ux = [p.tx * h, p.ty * h]; const vx = [p.ty * h, -p.tx * h];
-    const c = (a, b, v) => [cx + ux[0] * a + vx[0] * b, cy + ux[1] * a + vx[1] * b, p.z + v];
-    const o = [cx, cy, p.z + GAL_H / 2];
-    const want = (cc) => [cc[0] - o[0], cc[1] - o[1], 0];
-    for (const [a0, b0, a1, b1] of [[-1, -1, 1, -1], [1, -1, 1, 1], [1, 1, -1, 1], [-1, 1, -1, -1]]) {
-      const A = c(a0, b0, -0.5); const B = c(a1, b1, -0.5); const C = c(a1, b1, GAL_H - 0.8); const D = c(a0, b0, GAL_H - 0.8);
-      T.tri(A, B, C, [[0, 0], [1, 0], [1, 1]], want);
-      T.tri(A, C, D, [[0, 0], [1, 1], [0, 1]], want);
-    }
+    box(p, beamU - h, beamU + h, h, -0.5, GAL_H - 0.8);
+    box(p, Math.min(wallFace, wallFace - up * GAL_RIB_M), Math.max(wallFace, wallFace - up * GAL_RIB_M), h, -0.5, GAL_H - GAL_RIB_M);
+    box(p, Math.min(wallFace, beamU), Math.max(wallFace, beamU), h, GAL_H - GAL_RIB_M, GAL_H);
   }
   return [{ pos: T.pos, uv: T.uv, from: t.line[0].s, to: t.line[t.line.length - 1].s }];
 }

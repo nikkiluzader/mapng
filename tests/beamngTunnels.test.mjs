@@ -69,7 +69,7 @@ test('tunnel=avalanche_protector is a gallery whatever the ground', () => {
   assert.equal(t.kind, 'gallery');
 });
 
-test('a gallery has no uphill wall: the hillside comes up to its roof, backfilled on a gentle slope and run out past the ends', () => {
+test('a gallery: a ribbed wall uphill, the hillside brought up to its roof behind it, backfilled on a gentle slope and run out past the ends', () => {
   const gentle = (x) => 50 - 0.1 * x;                 // uphill to the left (-x), far too low for the roof
   const t = solveTunnel({ xy: road(-60, 60), half: 3, gallery: true }, { groundAt: gentle });
   assert.equal(t.ok, true, t.reason);
@@ -92,11 +92,17 @@ test('a gallery has no uphill wall: the hillside comes up to its roof, backfille
   assert.equal(tunnelGroundAt(t, 0, 63, gentle(0)), gentle(0));
   // the valley side is never raised
   assert.ok(tunnelGroundAt(t, inner + 5, 0, gentle(inner + 5)) <= gentle(inner + 5));
-  // no wall: nothing of the mesh below the roof on the uphill side past the walkway
+  // the uphill wall stands at the walkway's edge, in front of the bank (0.6 m thick):
+  // nothing of the mesh below the roof behind it, in the hillside
   const pos = buildTubeGeometry(t)[0].pos;
+  let wall = 0;
   for (let i = 0; i < pos.length; i += 3) {
-    if (pos[i] < -(inner - 0.01) && Math.abs(pos[i + 1]) < 55) assert.ok(pos[i + 2] >= 50 + 5.2 - 0.6, `mesh at x ${pos[i].toFixed(2)} z ${pos[i + 2].toFixed(2)}`);
+    if (pos[i] < -(inner + 0.61) && Math.abs(pos[i + 1]) < 55) assert.ok(pos[i + 2] >= 50 + 5.2 - 0.6, `mesh at x ${pos[i].toFixed(2)} z ${pos[i + 2].toFixed(2)}`);
+    if (pos[i] < -(inner - 0.01) && pos[i + 2] < 51) wall++;
   }
+  assert.ok(wall > 0, 'the uphill wall');
+  // its pilasters stand out into the gallery, never past the walkway's edge into the lanes
+  for (let i = 0; i < pos.length; i += 3) if (pos[i + 2] < 50 + 4) assert.ok(Math.abs(pos[i]) >= t.W - 1e-6, `mesh in the lanes at x ${pos[i].toFixed(2)}`);
   // terrain left as it was (shaping off): the concrete back wall
   const walled = buildTubeGeometry({ ...t, keepWall: true })[0].pos;
   let low = 0;
@@ -461,4 +467,21 @@ test('a lid on one side only (a hillside) is no low box', () => {
   const hill = (x, y) => (Math.abs(y) <= 50 ? 10 + Math.max(0, x) * 1.5 : 10);
   const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: hill, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });
   assert.ok(!t.low, 'not a low box');
+});
+
+test('a gallery where the survey has no road bench (the roof taken out, the slope drawn through): the road carried through from its ends', () => {
+  // the hillside rises to the right (+x) at 35 %; a level bench for the road only outside y = -80..80;
+  // the verge on the valley side is level with the road, which falls from 12 m to 10 m
+  const roadZ = (y) => 11 - y / 100;
+  const g = (x, y) => (Math.abs(y) > 80 ? (Math.abs(x) <= 6 ? roadZ(y) : roadZ(y) + (x > 0 ? 0.35 * (x - 6) : 0.5 * (x + 6)))
+    : (x <= -6 ? roadZ(y) + 0.5 * (x + 6) : roadZ(y) + 0.35 * (x + 6)));
+  const t = solveTunnel({ xy: road(-100, 100), half: 4, gallery: true }, { groundAt: g });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.uphill, 1);
+  assert.ok(t.unbenched > 50, `${t.unbenched} stations without a bench`);
+  // the survey's centre line stands 2.1 m over the real road there; the road is within 0.3 m of the real one
+  for (const p of t.line) assert.ok(Math.abs(p.z - roadZ(p.y)) < 0.3, `road ${p.z.toFixed(2)} at y ${p.y}, really ${roadZ(p.y).toFixed(2)}`);
+  // the valley side: a verge level with the road, no drop at the lane's edge
+  const edge = t.W + 0.5 + 0.6;
+  assert.ok(Math.abs(tunnelGroundAt(t, -(edge + 1.5), 0, g(-(edge + 1.5), 0) - 3) - roadZ(0)) < 0.3, 'verge');
 });
