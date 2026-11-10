@@ -480,8 +480,9 @@ function geoToTerrainPx(lat, lng, bounds, size) {
   const normX = (lng - bounds.west)  / (bounds.east  - bounds.west);
   const normY = (lat - bounds.south) / (bounds.north - bounds.south);
   return {
-    px: Math.max(0, Math.min(size - 1, Math.round(normX * (size - 1)))),
-    py: Math.max(0, Math.min(size - 1, Math.round(normY * (size - 1)))),
+    // (the game's grid, services/terrainLookup.js: sample c at c squares from the west / south edge)
+    px: Math.max(0, Math.min(size - 1, Math.round(normX * size))),
+    py: Math.max(0, Math.min(size - 1, Math.round(normY * size))),
   };
 }
 
@@ -782,7 +783,7 @@ function buildOSMLayerMap(terrainData, worldSize, vegetationMask = null, { groun
   // the ground under them is still grass or bare (a lot OSM mapped only by
   // its aisles; a mapped lot is painted already, gravel lots stay gravel)
   if (parkingBays.length) {
-    const toLayer = (v) => (v / worldSize + 0.5) * (size - 1);
+    const toLayer = (v) => (v / worldSize + 0.5) * size;
     const soft = new Set([0, 1, 7, 8, LAWN]);   // (7: the generic concrete of commercial land)
     for (const { corners, surface } of parkingBays) {
       const mat = bayMaterial(surface);

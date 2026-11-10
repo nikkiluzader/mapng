@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gradeSidewalkGround, checkSidewalkGround } from '../services/beamngSidewalks.js';
 
-// a 200 m grid at 1 m, flat at 10 m; a road along y = 0 standing 3 m up on
+// a 200 m grid at 1 m (200 squares: a sample on every whole metre), flat at 10 m; a road along y = 0 standing 3 m up on
 // an embankment, a 2 m sidewalk on its left (north) edge
-const N = 201; const SIZE = 200;
+const N = 200; const SIZE = 200;
 const grid = () => ({ heightMap: new Float32Array(N * N).fill(10), width: N, height: N, worldSize: SIZE, minHeight: 0 });
 const groundAt = (g) => (x, y) => {
-  const c = Math.round((x / SIZE + 0.5) * (N - 1)); const r = Math.round((0.5 - y / SIZE) * (N - 1));
+  // (the game's grid: sample c at (c - N / 2) squares, rows from the south)
+  const c = Math.round((x / SIZE + 0.5) * N); const r = Math.round((0.5 - y / SIZE) * N - 1);
   return g.heightMap[r * N + c] - g.minHeight;
 };
 const road = { nodes: [[-80, 0, 13], [80, 0, 13]], half: 3.5, owner: 1, highway: 'residential' };

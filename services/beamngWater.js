@@ -747,8 +747,8 @@ export const SHALLOW_BED_M = 1.5;
 export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shallow = false } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
   const sq = worldSize / Math.max(1, width - 1);
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const groundAt = (x, y) => {
     const [c, r] = toPixel(x, y);
     if (!(c >= 0 && r >= 0 && c <= width - 1 && r <= height - 1)) return NaN;
@@ -941,8 +941,8 @@ const HIDDEN_BANK_MAX_M = 4;
  */
 export function carveWaterUnderDecks({ rivers = [], lakes = [] }, grid, covered, keep = () => false, keepUnder = keep) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const edits = new Map();
   const lower = (idx, target) => {
     if (target < heightMap[idx] - minHeight) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
@@ -1009,8 +1009,8 @@ const LEVEL_PAST_M = 2;       // levelled this far past its sides (the dam's edg
  */
 export function levelUnderDecks(decks, grid, keep = () => false, extra = 0.4, wet = () => true) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
-  const px = worldSize / (width - 1);
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  const px = worldSize / width;
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
   const at = (x, y) => {
     const [c, r] = toPixel(x, y);
     const ci = Math.round(c); const ri = Math.round(r);

@@ -8,8 +8,11 @@ export function getTerrainHeightWorld(lat, lng, terrainData) {
   const sanitizeHeight = (h) => (Number.isFinite(h) && h > -10000 ? h : minHeight);
   const u = Math.max(0, Math.min(1, (lng - bounds.west) / (bounds.east - bounds.west)));
   const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
-  const fx = u * (width - 1);
-  const fy = v * (height - 1);
+  // on the game's grid, as terrainGroundAt below (the level is width squares wide, sample c at
+  // (c - width / 2) squares, rows from the south): the (width - 1)-span lookup this was drifted
+  // up to a square across the map, and at 10 m squares on a hillside stood trees 5 m in the air
+  const fx = Math.max(0, Math.min(width - 1, u * width));
+  const fy = Math.max(0, Math.min(height - 1, v * height - 1));
   const c0 = Math.min(width - 1, Math.floor(fx));
   const c1 = Math.min(width - 1, c0 + 1);
   const r0 = Math.min(height - 1, Math.floor(fy));

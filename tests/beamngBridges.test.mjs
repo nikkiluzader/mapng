@@ -168,15 +168,16 @@ test('the ground at an abutment meets the deck: a flat pad, filled under its end
   const { gradeAbutments } = await import('../services/exportBeamNGLevel.js');
   // 400 m map at 2 m a pixel, ground sloping across the road (y); a deck along
   // +x ending at x = 0 at 3 m, rising to 6 m by x = -100, over ground 1.5 m up
-  const w = 201; const sq = 2; const size = w * sq;
+  const w = 200; const sq = 2; const size = w * sq;
   const heightMap = new Float32Array(w * w);
-  const toWorld = (c, r) => [((c / (w - 1)) - 0.5) * size, (0.5 - r / (w - 1)) * size];
+  // (the game's grid: sample c at (c - w / 2) squares, rows from the south)
+  const toWorld = (c, r) => [((c / w) - 0.5) * size, (0.5 - (r + 1) / w) * size];
   for (let r = 0; r < w; r++) for (let c = 0; c < w; c++) heightMap[r * w + c] = 3 + 0.1 * toWorld(c, r)[1] + (toWorld(c, r)[0] < 0 ? 1.5 : 0);
   const terrainData = { width: w, height: w, heightMap, minHeight: 0, maxHeight: 100 };
   const part = { xy: [[-100, 0], [-50, 0], [0, 0]], z: [6, 4.5, 3], half: 4 };
   const graded = gradeAbutments(terrainData, sq, [{ parts: [part], abutments: [[0, 0]] }]);
   assert.ok(graded > 0);
-  const at = (x, y) => terrainData.heightMap[Math.round((0.5 - y / size) * (w - 1)) * w + Math.round((x / size + 0.5) * (w - 1))];
+  const at = (x, y) => terrainData.heightMap[Math.round((0.5 - y / size) * w - 1) * w + Math.round((x / size + 0.5) * w)];
   for (const y of [-4, 0, 4]) assert.ok(Math.abs(at(2, y) - 3) < 1e-6, `flat pad across the road at y ${y}: ${at(2, y).toFixed(2)}`);
   assert.ok(Math.abs(at(-2, 0) - (3 + 0.03 - 0.05)) < 0.05, `filled up under the deck's end: ${at(-2, 0).toFixed(2)}`);
   for (let x = -28; x <= -4; x += 2) assert.ok(at(x, 0) <= 3 - 0.03 * x - 0.14, `under the deck at x ${x}: ${at(x, 0).toFixed(2)}`);

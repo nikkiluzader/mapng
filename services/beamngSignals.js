@@ -66,8 +66,9 @@ export function geoToWorld(lat, lng, terrainData, squareSize, zOffset = 2.5) {
   const u = Math.max(0, Math.min(1, (lng - bounds.west) / (bounds.east - bounds.west)));
   const v = Math.max(0, Math.min(1, (bounds.north - lat) / (bounds.north - bounds.south)));
 
-  const fx = u * (width - 1);
-  const fy = v * (height - 1);
+  // (the game's grid: services/terrainLookup.js)
+  const fx = Math.max(0, Math.min(width - 1, u * width));
+  const fy = Math.max(0, Math.min(height - 1, v * height - 1));
   const c0 = Math.min(width - 1, Math.floor(fx));
   const c1 = Math.min(width - 1, c0 + 1);
   const r0 = Math.min(height - 1, Math.floor(fy));

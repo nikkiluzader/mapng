@@ -20,9 +20,11 @@ function terrain(height, features, { coarse = false } = {}) {
   const hm = new Float32Array(N * N);
   let min = Infinity; let max = -Infinity;
   for (let r = 0; r < N; r++) {
-    const y = (0.5 - r / (N - 1)) * SIZE;
+    // (the game's grid: sample c at (c - N / 2) squares of a level N squares wide, rows from the
+    // south; the scene's SIZE metres span the level's bounds)
+    const y = ((N - 1 - r) / N - 0.5) * SIZE;
     for (let c = 0; c < N; c++) {
-      const x = (c / (N - 1) - 0.5) * SIZE;
+      const x = (c / N - 0.5) * SIZE;
       const h = height(x, y);
       hm[r * N + c] = h;
       if (h < min) min = h; if (h > max) max = h;

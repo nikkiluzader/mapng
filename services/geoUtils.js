@@ -43,8 +43,12 @@ export const createGridProjector = (bounds, width, height) => {
     const lngSpan = bounds.east - bounds.west;
     const latSpan = bounds.north - bounds.south;
     return (lat, lng) => ({
-        x: ((lng - bounds.west) / lngSpan) * (width - 1),
-        y: ((bounds.north - lat) / latSpan) * (height - 1),
+        // the game's grid (services/terrainLookup.js): a level is `width` squares across its
+        // bounds, sample c at c squares from the west edge, rows counted from the south. The
+        // (width - 1)-span mapping this was drifted up to a square across the map (measured in
+        // game at 10 m squares: 3.7 m of height on a hillside).
+        x: ((lng - bounds.west) / lngSpan) * width,
+        y: ((bounds.north - lat) / latSpan) * height - 1,
     });
 };
 

@@ -327,9 +327,11 @@ export function checkThroughDecks(decks, groundAt) {
 export function checkSpikes(decks, tunnels, grid) {
   const { heightMap, width, height, worldSize } = grid || {};
   if (!heightMap || !width || !height || !worldSize) return { pixels: 0, spikes: 0, worst: null };
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
-  const pxPerM = (width - 1) / worldSize;
+  // (the game's grid, as terrainCompose.js)
+  const sq = worldSize / width;
+  const toPixel = (x, y) => [x / sq + width / 2, (height - 1) - (y / sq + height / 2)];
+  const toWorld = (c, r) => [(c - width / 2) * sq, ((height - 1 - r) - height / 2) * sq];
+  const pxPerM = 1 / sq;
   const lines = [];
   for (const deck of decks || []) for (const part of deck.parts || []) if (part.xy?.length) lines.push({ pts: part.xy, reach: (part.half || 0) + SPIKE_REACH_M });
   for (const t of tunnels || []) if (t.line?.length) lines.push({ pts: t.line.map((p) => [p.x, p.y]), reach: (t.headHalf || t.W || 0) + SPIKE_REACH_M });

@@ -328,12 +328,14 @@ test('roads are carved where the export draws them, even on a 16 km map far nort
   };
   const N = 16384;
   const project = createGridProjector(bounds, N, N);
-  // The export (geoToWorldPoint) and the heightmap grid are linear in lat/lng.
+  // The export (geoToWorldPoint) and the heightmap grid are linear in lat/lng; the game draws
+  // sample c at c squares from the west edge of a level N squares wide, rows from the south
+  // (measured in game), so a road is carved at the samples the game draws under it.
   for (const [u, v] of [[0.5, 0.5], [0.02, 0.98], [0.98, 0.02], [0.98, 0.98]]) {
     const lat = bounds.north - v * (bounds.north - bounds.south);
     const lng = bounds.west + u * (bounds.east - bounds.west);
     const p = project(lat, lng);
-    assert.ok(Math.abs(p.x - u * (N - 1)) < 0.01 && Math.abs(p.y - v * (N - 1)) < 0.01, `(${u}, ${v}) → ${p.x}, ${p.y}`);
+    assert.ok(Math.abs(p.x - u * N) < 0.01 && Math.abs(p.y - (v * N - 1)) < 0.01, `(${u}, ${v}) → ${p.x}, ${p.y}`);
   }
 });
 

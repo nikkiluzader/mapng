@@ -374,8 +374,9 @@ function geoToWorld(lat, lng, terrainData, squareSize, zOffset = 3) {
   // Bilinear interpolation — matches BeamNG's own terrain height calculation,
   // preventing spawn/road positions from landing inside terrain peaks that fall
   // between heightmap samples.
-  const fx = u * (width - 1);
-  const fy = v * (height - 1);
+  // (the game's grid: services/terrainLookup.js)
+  const fx = Math.max(0, Math.min(width - 1, u * width));
+  const fy = Math.max(0, Math.min(height - 1, v * height - 1));
   const c0 = Math.min(width - 1, Math.floor(fx));
   const c1 = Math.min(width - 1, c0 + 1);
   const r0 = Math.min(height - 1, Math.floor(fy));
@@ -3946,8 +3947,8 @@ function sinkRoadsUnderDecks(terrainData, squareSize, sinks, lowerRoads, tunnels
   const { width, height, minHeight } = terrainData;
   const hm = heightMapEditor(terrainData);
   const worldSize = width * squareSize;
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const near = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1.5;
   const touching = (tip, used) => lowerRoads.filter((r) => !used.has(r) && (near(r.xy[0], tip) || near(r.xy[r.xy.length - 1], tip)));
   const outward = (r, tip) => (near(r.xy[0], tip) ? r.xy : [...r.xy].reverse());
@@ -4584,8 +4585,8 @@ const HUMP_END_M = 15;          // no cut this near a deck part's end (its appro
 function cutBridgeHumps(terrainData, squareSize, parts, lowerRoads, groundAt) {
   const { width, height, minHeight } = terrainData;
   const worldSize = width * squareSize;
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const median = (v) => { const q = [...v].sort((m, n) => m - n); return q[q.length >> 1]; };
   // the line through the real ground either side of the deck at (x, y),
   // deck normal n: its height at offset d along n
@@ -4910,8 +4911,8 @@ export function gradeAbutments(terrainData, squareSize, decks) {
   const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
   const hm = heightMapEditor(terrainData, { keepGround: true });
   const worldSize = width * squareSize;
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const smooth = (t) => t * t * (3 - 2 * t);
   const ends = [];
   for (const deck of decks) {
@@ -5010,8 +5011,8 @@ function raiseApproachEmbankments(terrainData, squareSize, ramps) {
   const maxHeight = Number.isFinite(terrainData.maxHeight) ? terrainData.maxHeight : Infinity;
   const hm = heightMapEditor(terrainData, { keepGround: true });
   const worldSize = width * squareSize;
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   // One ramp: false (and nothing raised) when it would have to hold back for
   // another road or bridge anywhere: all or nothing, never a ridge or a step.
   const apply = (ramp, write) => {
@@ -5332,8 +5333,8 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
   const { width, height, minHeight } = terrainData;
   const hm = heightMapEditor(terrainData);
   const worldSize = width * squareSize;
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const pixelBox = (t) => {
     const [x0, y0, x1, y1] = tunnelReach(t);
     const [c0, r1] = toPixel(x0, y0);
@@ -12453,7 +12454,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     // (nothing composed inside a dam: the terrain there as the data has it)
     const inDam = sg.dams?.length ? (() => {
       const W = exportTerrainData.width; const H = exportTerrainData.height; const ws = W * squareSize;
-      return (idx) => damAt(sg.dams, ((idx % W) / (W - 1) - 0.5) * ws, (0.5 - Math.floor(idx / W) / (H - 1)) * ws);
+      return (idx) => damAt(sg.dams, ((idx % W) / W - 0.5) * ws, (0.5 - (Math.floor(idx / W) + 1) / H) * ws);
     })() : null;
     composed.apply((idx, v) => { if (!inDam?.(idx)) hm.set(idx, v); });
     sg.terrain = { ...composed.stats, ms: Math.round(performance.now() - t0) };
@@ -12513,7 +12514,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           const L = Math.hypot(bx - ax, by - ay); const n = Math.max(1, Math.ceil(L / (squareSize * 0.5)));
           for (let k = 0; k <= n; k++) {
             const x = ax + ((bx - ax) * k) / n; const y = ay + ((by - ay) * k) / n;
-            const cc = (x / worldSize + 0.5) * (W - 1); const rr = (0.5 - y / worldSize) * (H - 1); const rp = reach / squareSize;
+            const cc = (x / worldSize + 0.5) * W; const rr = ((0.5 - y / worldSize) * H - 1); const rp = reach / squareSize;
             for (let r = Math.max(0, Math.floor(rr - rp)); r <= Math.min(H - 1, Math.ceil(rr + rp)); r++) {
               for (let c = Math.max(0, Math.floor(cc - rp)); c <= Math.min(W - 1, Math.ceil(cc + rp)); c++) if (Math.hypot(c - cc, r - rr) <= rp) covered[r * W + c] = 1;
             }
@@ -12597,7 +12598,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       for (const i of beds.indices()) loweredUnderDecks.add(i);
       underDeckBeds = beds.pixels;
       // single pixels left standing among the lowered ones (shards on the banks)
-      const toW = (c, r) => [((c / (W - 1)) - 0.5) * worldSize, (0.5 - r / (H - 1)) * worldSize];
+      const toW = (c, r) => [((c / W) - 0.5) * worldSize, (0.5 - (r + 1) / H) * worldSize];
       const rem = fillRemnants(exportTerrainData.heightMap, W, H, loweredUnderDecks, {
         keep: (c, r) => { const [x, y] = toW(c, r); return isOnOtherCarriageway(bedKeep, x, y, 0, () => false); },
       });

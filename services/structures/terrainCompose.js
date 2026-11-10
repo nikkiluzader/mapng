@@ -71,8 +71,22 @@ export function composeTerrain(graph, grid) {
   const { heightMap, width, height, worldSize, minHeight = 0, keep = null, tube = null, skip = null } = grid;
   const z = graph.profile?.z;
   const segments = graph.classes?.segments || [];
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
+  // the game's grid (services/terrainLookup.js terrainGroundAt): sample c at (c - W/2) squares,
+  // rows from the south. The old (W - 1)-span mapping drifted up to a square across the map:
+  // centimetres at 1 m squares, at 10 m a road's bench cut 10 m beside the road.
+  const squareM = worldSize / Math.max(1, width);
+  const toPixel = (x, y) => [x / squareM + width / 2, (height - 1) - (y / squareM + height / 2)];
+  const xOfCol = (c) => (c - width / 2) * squareM;
+  const yOfRow = (r) => ((height - 1 - r) - height / 2) * squareM;
   const raw = (c, r) => heightMap[r * width + c];
+  // On a coarse grid (a big map at 4, 10 m squares) a corridor sized in metres falls between the
+  // grid's points: one point at the road's height, its neighbours left on the hillside, and the
+  // triangles between them a row of teeth along the road. The flat shoulder is at least one
+  // square (the points round the pavement's triangles are then all on the road) and a side slope
+  // or blend at least two. At 1 m squares nothing changes.
+  const shoulderM = Math.max(SHOULDER_M, squareM);
+  const blendM = Math.max(GROUND_BLEND_M, 2 * squareM);
+  const slopeMinM = Math.max(SLOPE_MIN_M, 2 * squareM);
   const tiles = new Map();
   const tileFor = (c, r) => {
     const key = Math.floor(c / TILE) * 65536 + Math.floor(r / TILE);
@@ -165,7 +179,7 @@ export function composeTerrain(graph, grid) {
       const ax = e.x[i]; const ay = e.y[i]; const bx = e.x[i + 1]; const by = e.y[i + 1];
       const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy;
       if (L2 < 1e-9) continue;
-      const core = e.half + SHOULDER_M;
+      const core = e.half + (kind === 'deck' ? SHOULDER_M : shoulderM);
       // a railway's profile is the top of its rails: the ground under it is
       // its formation, the track's depth lower (e.drop per station: none
       // where a road crosses it at grade, services/railways.js)
@@ -189,13 +203,13 @@ export function composeTerrain(graph, grid) {
         return Math.abs(zk[j] - dropAt(j) - (abutmentOff(kind, k, j)) - (raw(cc, rr) - minHeight));
       };
       const off = Math.max(offAt(i), offAt(i + 1)) + 1;
-      const reach = deck ? e.half + DECK_REACH_M : core + Math.min(SLOPE_MAX_M, Math.max(GROUND_BLEND_M, off * FILL_RUN + 2));
+      const reach = deck ? e.half + DECK_REACH_M : core + Math.min(SLOPE_MAX_M, Math.max(blendM, off * FILL_RUN + 2));
       const [c0, r0] = toPixel(Math.min(ax, bx) - reach, Math.max(ay, by) + reach);
       const [c1, r1] = toPixel(Math.max(ax, bx) + reach, Math.min(ay, by) - reach);
       stats.corridors++;
       const cBox0 = Math.max(0, Math.floor(c0)); const cBox1 = Math.min(width - 1, Math.ceil(c1));
       for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
-        const y = (0.5 - r / (height - 1)) * worldSize;
+        const y = yOfRow(r);
         let cFrom = cBox0; let cTo = cBox1;
         // (only the row's crossing of the corridor, a pixel either side; a
         // piece at a portal keeps its whole box, whose pixels past the
@@ -203,12 +217,12 @@ export function composeTerrain(graph, grid) {
         if (!planes.length) {
           const span = capsuleSpan(ax, ay, bx, by, reach, y);
           if (!span) continue;
-          cFrom = Math.max(cBox0, Math.floor((span[0] / worldSize + 0.5) * (width - 1)) - 1);
-          cTo = Math.min(cBox1, Math.ceil((span[1] / worldSize + 0.5) * (width - 1)) + 1);
+          cFrom = Math.max(cBox0, Math.floor(span[0] / squareM + width / 2) - 1);
+          cTo = Math.min(cBox1, Math.ceil(span[1] / squareM + width / 2) + 1);
         }
         let tileKey = -1; let t = null;
         for (let c = cFrom; c <= cTo; c++) {
-          const x = ((c / (width - 1)) - 0.5) * worldSize;
+          const x = xOfCol(c);
           const uRaw = ((x - ax) * vx + (y - ay) * vy) / L2;
           if (planes.length && planes.some(([px, py, dx, dy]) => (x - px) * dx + (y - py) * dy > 0 && Math.hypot(x - px, y - py) < PORTAL_PLANE_M)) { left.add(r * width + c); continue; }
           const u = Math.max(0, Math.min(1, uRaw));
@@ -228,9 +242,9 @@ export function composeTerrain(graph, grid) {
             continue;
           }
           const h0 = raw(c, r) - minHeight;
-          let slope = GROUND_BLEND_M;
+          let slope = blendM;
           if (kind === 'embankment' || kind === 'cutting' || Math.abs(zc - h0) > 0.5) {
-            slope = Math.min(SLOPE_MAX_M, Math.max(SLOPE_MIN_M, Math.abs(zc - h0) * (zc > h0 ? FILL_RUN : CUT_RUN)));
+            slope = Math.min(SLOPE_MAX_M, Math.max(slopeMinM, Math.abs(zc - h0) * (zc > h0 ? FILL_RUN : CUT_RUN)));
           }
           const tt = d <= core ? 0 : (d - core) / slope;
           if (tt >= 1) continue;

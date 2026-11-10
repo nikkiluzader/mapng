@@ -16,8 +16,9 @@
  * Row 0 = north (top of heightMap).
  */
 function geoToHeightMapPx(lat, lng, bounds, size) {
-  const col = (lng - bounds.west)  / (bounds.east  - bounds.west)  * (size - 1);
-  const py  = (lat - bounds.south) / (bounds.north - bounds.south) * (size - 1);
+  // (the game's grid: services/terrainLookup.js)
+  const col = (lng - bounds.west)  / (bounds.east  - bounds.west)  * size;
+  const py  = (lat - bounds.south) / (bounds.north - bounds.south) * size;
   const row = (size - 1) - py; // flip: py=0 (south) → row = size-1
   return {
     col: Math.max(0, Math.min(size - 1, col)),

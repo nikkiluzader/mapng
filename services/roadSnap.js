@@ -134,8 +134,8 @@ export function snapRoadsToTerrain(heightMap, width, height, bounds, osmFeatures
 
     const project = createGridProjector(bounds, width, height);
     const unproject = (x, y) => ({
-        lng: bounds.west + (x / (width - 1)) * (bounds.east - bounds.west),
-        lat: bounds.north - (y / (height - 1)) * (bounds.north - bounds.south),
+        lng: bounds.west + (x / width) * (bounds.east - bounds.west),
+        lat: bounds.north - ((y + 1) / height) * (bounds.north - bounds.south),
     });
     const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
 

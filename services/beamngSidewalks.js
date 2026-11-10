@@ -2769,10 +2769,10 @@ export function lowerUnderWallDecks(decks, grid, set) {
   let pixels = 0;
   for (const { ring, under } of decks || []) {
     const xs = ring.map((q) => q[0]); const ys = ring.map((q) => q[1]);
-    const col = (x) => (x / worldSize + 0.5) * (width - 1); const row = (y) => (0.5 - y / worldSize) * (height - 1);
+    const col = (x) => (x / worldSize + 0.5) * width; const row = (y) => ((0.5 - y / worldSize) * height - 1);
     for (let r = Math.max(0, Math.floor(row(Math.max(...ys)))); r <= Math.min(height - 1, Math.ceil(row(Math.min(...ys)))); r++) {
       for (let c = Math.max(0, Math.floor(col(Math.min(...xs)))); c <= Math.min(width - 1, Math.ceil(col(Math.max(...xs)))); c++) {
-        const x = ((c / (width - 1)) - 0.5) * worldSize; const y = (0.5 - r / (height - 1)) * worldSize;
+        const x = ((c / width) - 0.5) * worldSize; const y = (0.5 - (r + 1) / height) * worldSize;
         let inside = false;
         for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
           const a = ring[i]; const b = ring[j];
@@ -3702,8 +3702,8 @@ class PixelClaims {
 
 export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () => false } = {}) {
   const { heightMap, width, height, worldSize, minHeight = 0 } = grid;
-  const toPixel = (x, y) => [(x / worldSize + 0.5) * (width - 1), (0.5 - y / worldSize) * (height - 1)];
-  const toWorld = (c, r) => [((c / (width - 1)) - 0.5) * worldSize, (0.5 - r / (height - 1)) * worldSize];
+  const toPixel = (x, y) => [(x / worldSize + 0.5) * width, ((0.5 - y / worldSize) * height - 1)];
+  const toWorld = (c, r) => [((c / width) - 0.5) * worldSize, (0.5 - (r + 1) / height) * worldSize];
   const index = buildCarriagewayIndex(carriageways);
   const onRoad = (x, y) => isOnOtherCarriageway(index, x, y, GROUND_ROAD_MARGIN_M, () => false);
   // per pixel: the best claim (smallest distance out past a slab; inside a
@@ -3733,7 +3733,7 @@ export function gradeSidewalkGround(runs, carriageways, grid, { overhead = () =>
       const [c1, r1] = toPixel(Math.max(...xs), Math.min(...ys));
       for (let r = Math.max(0, Math.floor(r0)); r <= Math.min(height - 1, Math.ceil(r1)); r++) {
         for (let c = Math.max(0, Math.floor(c0)); c <= Math.min(width - 1, Math.ceil(c1)); c++) {
-          const x = ((c / (width - 1)) - 0.5) * worldSize; const y = (0.5 - r / (height - 1)) * worldSize;
+          const x = ((c / width) - 0.5) * worldSize; const y = (0.5 - (r + 1) / height) * worldSize;
           const t = ((x - ax) * dx + (y - ay) * dy) / L2;
           if (t < 0 || t > 1) continue;
           const o = (x - ax) * nx + (y - ay) * ny;   // out from the curb line

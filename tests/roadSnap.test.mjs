@@ -13,9 +13,11 @@ const bounds = (() => {
   const dLng = 200 / (111320 * Math.cos((45 * Math.PI) / 180));
   return { north: 45 + dLat, south: 45 - dLat, east: 8 + dLng, west: 8 - dLng };
 })();
-const lngAt = (x) => bounds.west + (x / (N - 1)) * (bounds.east - bounds.west);
-const latAt = (y) => bounds.north - (y / (N - 1)) * (bounds.north - bounds.south);
-const xAt = (lng) => ((lng - bounds.west) / (bounds.east - bounds.west)) * (N - 1);
+// (the game's grid, services/geoUtils.js createGridProjector: column x at x squares from the
+// west edge of a level N squares wide, rows counted from the south)
+const lngAt = (x) => bounds.west + (x / N) * (bounds.east - bounds.west);
+const latAt = (y) => bounds.north - ((y + 1) / N) * (bounds.north - bounds.south);
+const xAt = (lng) => ((lng - bounds.west) / (bounds.east - bounds.west)) * N;
 
 function hillWithBench() {
   const hm = new Float32Array(N * N);
