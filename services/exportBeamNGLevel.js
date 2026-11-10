@@ -90,7 +90,7 @@ import {
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
 } from './beamngBridges.js';
 import {
-  solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, tunnelReach,
+  solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
   hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
   galleryRoofHalf,
 } from './beamngTunnels.js';
@@ -12996,6 +12996,38 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     let capped = 0;
     for (const [idx, cap] of decalRoads.tunnels.mouth) if (hmMouth.at(idx) > cap + 0.02) { hmMouth.set(idx, cap); capped++; }
     if (capped) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tunnel mouths: ${capped} grid point(s) brought back down to the road.`);
+  }
+  // ...and the ground standing in a low box's mouth opened again on the
+  // terrain as it is now: the holes were found before the roads' ground was
+  // composed, which ran a ramp from the road up to the lid through the first
+  // metres of the box (0.3 to 0.9 m of ground across the lane 4 to 8 m in:
+  // Tignes, Val Claret and Lavachet)
+  {
+    const lowBoxes = (decalRoads.tunnels?.tunnels || []).filter((t) => t.gradedCover);
+    if (lowBoxes.length) {
+      const W = exportTerrainData.width; const Hh = exportTerrainData.height; const hmap = exportTerrainData.heightMap;
+      const mh0 = Number(exportTerrainData.minHeight) || 0;
+      const holes = new Set(decalRoads.tunnels.holes || []);
+      let opened = 0;
+      for (const t of lowBoxes) {
+        const [x0, y0, x1, y1] = tunnelReach(t);
+        const c0 = Math.max(0, Math.floor(x0 / squareSize + W / 2) - 1); const c1 = Math.min(W - 2, Math.ceil(x1 / squareSize + W / 2) + 1);
+        const r0 = Math.max(1, Math.floor(Hh / 2 - y1 / squareSize) - 1); const r1 = Math.min(Hh - 1, Math.ceil(Hh / 2 - y0 / squareSize) + 1);
+        for (let r = r0; r <= r1; r++) {
+          for (let c = c0; c <= c1; c++) {
+            const idx = (Hh - 1 - r) * W + c;
+            if (holes.has(idx)) continue;
+            const x = (c + 0.5 - W / 2) * squareSize; const y = (Hh / 2 - r - 0.5) * squareSize;
+            const corners = [hmap[r * W + c], hmap[r * W + c + 1], hmap[(r - 1) * W + c], hmap[(r - 1) * W + c + 1]];
+            if (lowMouthHoleAt(t, x, y, Math.min(...corners) - mh0)) { holes.add(idx); opened++; t.holes = (t.holes || 0) + 1; }
+          }
+        }
+      }
+      if (opened) {
+        decalRoads.tunnels.holes = [...holes];
+        console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tunnel mouths: ${opened} more square(s) opened inside the low boxes' faces.`);
+      }
+    }
   }
 
   // Sports fields graded (terrain shaping on): the ground under each field to

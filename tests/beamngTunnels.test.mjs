@@ -417,12 +417,12 @@ test('terrain left as surveyed (raw): the bore runs out to where the ground meet
   assert.ok(raw.headHalf > shaped.headHalf && raw.headTop > shaped.headTop && raw.headDepth > shaped.headDepth, 'a bigger headwall');
   // outside the bore the road is on the surveyed ground
   raw.line.forEach((p, k) => { if (k < raw.iS || k > raw.iN) assert.ok(Math.abs(p.z - p.g) <= 1.01, `off the ground by ${(p.z - p.g).toFixed(2)} m at ${p.s.toFixed(0)}`); });
-  // the portal geometry carries an apron at road level in front of the face
+  // the portal geometry carries an apron in front of the face, on the road's own grade
   const g = buildPortalGeometry(raw, 'S');
   const pS = raw.line[raw.iS];
   let apron = 0;
   const ap = g.apron?.pos || [];
-  for (let k = 0; k < ap.length; k += 3) if (Math.abs(ap[k + 2] - pS.z) < 1e-6 && (ap[k + 1] - pS.y) * pS.ty + (ap[k] - pS.x) * pS.tx < -1) apron++;
+  for (let k = 0; k < ap.length; k += 3) if (Math.abs(ap[k + 2] - pS.z) < 0.6 && (ap[k + 1] - pS.y) * pS.ty + (ap[k] - pS.x) * pS.tx < -1) apron++;
   assert.ok(apron >= 2, 'apron vertices out in front of the face, its own part (it takes the road decal)');
   assert.equal(buildPortalGeometry(shaped, 'S').apron, null, 'shaped tunnels: no apron');
 });
@@ -492,4 +492,51 @@ test('a gallery on a coarse survey (no road bench anywhere, a smooth slope): the
   assert.equal(t.ok, true, t.reason);
   assert.equal(t.unbenched, 0);
   for (const p of t.line) assert.ok(Math.abs(p.z - slope(0, p.y)) < 0.2, `road ${p.z.toFixed(2)} at y ${p.y}`);
+});
+
+test('a low box whose grade meets the face over the road in front: the ground made up to it, the apron on it, no step', () => {
+  // the road level at 10 m in front of the lid and 12 m behind it, the tagged way's ends 20 m out
+  const roadZ = (y) => (y < -50 ? 10 : y > 50 ? 12 : 10 + (2 * (y + 50)) / 100);
+  const g = (x, y) => (Math.abs(y) <= 50 ? roadZ(y) + 5.5 : roadZ(y));
+  const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: g, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.low, true);
+  const zAt = (y) => t.line.reduce((a, b) => (Math.abs(b.y - y) < Math.abs(a.y - y) ? b : a)).z;
+  assert.ok(zAt(-51) - 10 > 0.1, `the grade at the face ${zAt(-51).toFixed(2)}: over the road in front (what this test is about)`);
+  // the ground in front of the face is the road's line, and the apron lies on it
+  const { h } = grade(t, g);
+  for (const y of [-56, -54, -52]) assert.ok(Math.abs(h(0, y) - zAt(y)) < 0.08, `ground ${h(0, y).toFixed(2)} vs road line ${zAt(y).toFixed(2)} at y ${y}`);
+  const ap = buildPortalGeometry(t, 'S').apron.pos;
+  for (let k = 0; k < ap.length; k += 3) if (ap[k + 2] > 9.5) assert.ok(Math.abs(ap[k + 2] - zAt(ap[k + 1])) < 0.08, `apron ${ap[k + 2].toFixed(2)} at y ${ap[k + 1].toFixed(1)}`);
+  // eased back to the ground further out: no step along the centre line (1 m apart)
+  for (let y = -68; y < -51; y++) assert.ok(Math.abs(h(0, y + 1) - h(0, y)) <= 0.08, `step ${(h(0, y + 1) - h(0, y)).toFixed(2)} at y ${y}`);
+});
+
+test('a portal\'s frame never stands out of the road inside it (a box on a grade: no sill across the lane)', () => {
+  // the road climbing 6 % through the lid
+  const roadZ = (y) => 10 + 0.06 * (y + 70);
+  const g = (x, y) => (Math.abs(y) <= 50 ? roadZ(y) + 5.5 : roadZ(y));
+  const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: g, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });
+  assert.equal(t.ok, true, t.reason);
+  const zAt = (y) => { let a = t.line[0]; for (const p of t.line) if (Math.abs(p.y - y) < Math.abs(a.y - y)) a = p; return a.z + (y - a.y) * 0.06; };
+  for (const end of ['S', 'N']) {
+    const pos = buildPortalGeometry(t, end).pos;
+    for (let k = 0; k < pos.length; k += 3) {
+      if (Math.abs(pos[k]) > t.W + 0.7) continue;                     // (the opening's own corners: the sill spans the lanes between them)
+      const over = pos[k + 2] - zAt(pos[k + 1]);
+      assert.ok(over <= 0.02 || over > 3, `portal ${end}: frame ${over.toFixed(2)} m over the road at y ${pos[k + 1].toFixed(1)}`);
+    }
+  }
+});
+
+test('ground left standing inside a low box is opened: only under the roof, never the lid over it', async () => {
+  const { lowMouthHoleAt } = await import('../services/beamngTunnels.js');
+  const g = lidGround();
+  const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: g, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });
+  const yIn = (m) => t.line[t.iS].y + m;
+  assert.equal(lowMouthHoleAt(t, 0, yIn(5), 10.8), true, 'a ramp of ground 0.8 m over the road, 5 m in');
+  assert.equal(lowMouthHoleAt(t, 0, yIn(5), 15.5), false, 'the lid over the box stays');
+  assert.equal(lowMouthHoleAt(t, 0, yIn(20), 10.8), true, 'and as far in as it stands');
+  assert.equal(lowMouthHoleAt(t, 0, yIn(-3), 10.8), false, 'in front of the face: the road is on the ground there');
+  assert.equal(lowMouthHoleAt(t, 12, yIn(5), 10.8), false, 'beside the box');
 });

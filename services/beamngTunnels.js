@@ -91,7 +91,9 @@ const LOW_WALL_M = 3.4;
 const LOW_ARCH_M = 0.8;
 const LOW_COVER_M = 0;
 const LOW_MOUTH_IN_M = 8;
-const LOW_MOUTH_OUT_M = 8;           // ... and this far out past its apron the carriageway is cleared to the road            // a low box's mouth: this far in from its face
+const LOW_MOUTH_OUT_M = 8;
+const LOW_CEILING_CLEAR_M = 0.3;        // ground this far under the ceiling or lower stands in the box
+const LOW_MOUTH_FILL_M = 1;            // ground this much under the road in a mouth is made up to it           // ... and this far out past its apron the carriageway is cleared to the road            // a low box's mouth: this far in from its face
 const LOW_FILL_M = 0.8;              // a lid this much lower than the box is raised over it
 const CC_WALL_M = 5;                   // box walls ...
 const CC_ARCH_M = 0.8;                 // ... and a shallow vault
@@ -1349,9 +1351,20 @@ export function tunnelGroundAt(t, x, y, h) {
   // is looked at: the only road in front of the face, inside the box's
   // width, is the one going in
   if (t.gradedCover) {
-    const m = nearestOnTunnel(t, x, y, t.W + LINING_M + 2 * t.squareSize);
-    if (m && !m.beyond && m.into < 0 && m.into > -(Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) + LOW_MOUTH_OUT_M)
-      && across(t, m) <= t.W + LINING_M + t.squareSize) return Math.min(h, m.z);
+    const m = nearestOnTunnel(t, x, y, Math.max(t.W + LINING_M, (t.wingD || 0) + (t.wingT || 0)) + 2 * t.squareSize);
+    // (where a wingwall stands, out to a square behind its back: the ground
+    // rising from the lane's edge stood through the wall's face in teeth)
+    const side = Math.sign(m?.d) || 1;
+    const reach = m && t.wings?.[side]?.has(m.i) ? wingDAt(t, m.i, side) + t.wingT + t.squareSize : t.W + LINING_M + t.squareSize;
+    // Ground under the road's line there (the box's grade runs from the
+    // tagged way's ends, and meets the face a few decimetres over the road
+    // in front of it: the apron stood 0.4 m proud of the road, a step a car
+    // crashed on) is made up to the line
+    const mouth = Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) + LOW_MOUTH_OUT_M;
+    if (m && !m.beyond && m.into < 0 && m.into > -mouth && across(t, m) <= reach) {
+      if (h >= m.z) return m.z;
+      return m.z - h > LOW_MOUTH_FILL_M ? h : m.z;
+    }
   }
   // another road's ground beside the tunnel stays as it is (one crossing
   // over the tube still gets the cover over it: Deck Park's west streets,
@@ -1467,6 +1480,21 @@ export function tunnelHoleAt(t, x, y, lo, hi = lo) {
   if (across(t, n) > t.W + LINING_M + 0.5 * t.squareSize) return false;
   if (hi > n.z + headTopAt(t, n.s) + 0.5) return false;
   return lo < n.z + t.crown + LINING_M + 1;
+}
+
+/**
+ * Ground standing inside a low box, under its roof (the ramp the roads'
+ * composed ground runs up to the lid through its first metres, 12 m in at
+ * Tignes): the squares to open on the terrain as finally graded. The lid over
+ * the roof is never opened.
+ */
+export function lowMouthHoleAt(t, x, y, lo) {
+  if (!t.gradedCover) return false;
+  const n = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + LINING_M + t.squareSize * 2);
+  if (!n || n.beyond || n.into < 0) return false;
+  if (across(t, n) > t.W + LINING_M + 0.5 * t.squareSize) return false;
+  // (clearly in the clear space: ground within the roof slab's thickness is the lid, hidden in the concrete)
+  return lo < n.z + t.crown - LOW_CEILING_CLEAR_M;
 }
 
 /** Is (x, y, z..zTop) inside a tunnel's structure (tube, headwalls, wingwalls)? */
@@ -1661,8 +1689,16 @@ export function buildPortalGeometry(t, end) {
   shape.lineTo(hl, headTop);
   shape.lineTo(-hr, headTop);
   shape.closePath();
+  // The opening's sill (the frame under the road, level at the face's
+  // height) kept under the road for the frame's whole depth into the
+  // tunnel: where the road falls away going in (a low box on a grade, its
+  // frame metres deep) the sill stood up to 0.35 m out of the floor, a step
+  // across the lane inside the portal
+  let sill = 0;
+  for (let k = i, into = end === 'S' ? 1 : -1; k >= 0 && k < t.line.length && Math.abs(t.line[k].s - p.s) <= t.headDepth + STEP_M; k += into) sill = Math.min(sill, t.line[k].z - p.z);
+  sill = Math.max(sill - 0.05, HEAD_BOTTOM_M + 0.2);
   const hole = new THREE.Path();
-  outer.forEach(([u, v], k) => (k ? hole.lineTo(u + c, Math.max(v, 0)) : hole.moveTo(u + c, Math.max(v, 0))));
+  outer.forEach(([u, v], k) => (k ? hole.lineTo(u + c, Math.max(v, sill)) : hole.moveTo(u + c, Math.max(v, sill))));
   hole.closePath();
   shape.holes.push(hole);
   const g = new THREE.ExtrudeGeometry(shape, { depth: t.headDepth, bevelEnabled: false });
@@ -1688,16 +1724,23 @@ export function buildPortalGeometry(t, end) {
     const corner = (k, d, v) => { const q = t.line[k]; const [x, y] = lateral(q, side * (d + extraAt(t, q, side))); return [x, y, q.z + v]; };
     const sec = (k) => { const d = wingDAt(t, k, side); return [corner(k, d, WING_BOTTOM_M), corner(k, d, top(k)), corner(k, d + t.wingT, top(k)), corner(k, d + t.wingT, WING_BOTTOM_M)]; };
     const centre = (k) => { const q = t.line[k]; const [x, y] = lateral(q, side * (wingDAt(t, k, side) + extraAt(t, q, side) + t.wingT / 2)); return [x, y, q.z + top(k) / 2]; };
+    // (the texture laid along the wall and up it by each corner's own
+    // height: mapped as a rectangle per panel, a wall whose top slopes had
+    // its concrete's stains sheared into a saw-tooth from panel to panel)
+    let u0 = 0;
     for (let r = 0; r + 1 < run.length; r++) {
       const A = sec(run[r]); const B = sec(run[r + 1]); const o = centre(run[r]);
       const want = (c) => [c[0] - o[0], c[1] - o[1], c[2] - o[2]];
+      const u1 = u0 + Math.hypot(B[0][0] - A[0][0], B[0][1] - A[0][1]) / 4;
       for (let f = 0; f < 3; f++) {   // inner face, top, outer face
         const a = A[f]; const b = A[f + 1]; const c = B[f]; const d = B[f + 1];
-        const Lu = Math.hypot(c[0] - a[0], c[1] - a[1]) / 4;
-        const Hv = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]) / 4;
-        T.tri(a, b, c, [[0, 0], [0, Hv], [Lu, 0]], want);
-        T.tri(b, d, c, [[0, Hv], [Lu, Hv], [Lu, 0]], want);
+        const up = (lo, hi) => Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) / 4;
+        const va = f === 2 ? up(A[3], a) : 0; const vb = f === 2 ? 0 : up(a, b);
+        const vc = f === 2 ? up(B[3], c) : 0; const vd = f === 2 ? 0 : up(c, d);
+        T.tri(a, b, c, [[u0, va], [u0, vb], [u1, vc]], want);
+        T.tri(b, d, c, [[u0, vb], [u1, vd], [u1, vc]], want);
       }
+      u0 = u1;
     }
     const Z = sec(run[run.length - 1]);
     const q = t.line[run[run.length - 1]];
@@ -1713,7 +1756,11 @@ export function buildPortalGeometry(t, end) {
   let apron = null;
   if (t.raw) {
     const L = Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize);
-    const at = (u, w, dz = 0) => [p.x + u * Lv[0] - w * tin[0], p.y + u * Lv[1] - w * tin[1], p.z + dz];
+    // (the slab on the road's own grade out from the face, not level at the
+    // face's height: its outer edge stood over a road falling away from it)
+    const q = t.line[clamp(i + step * Math.max(1, Math.round(L / STEP_M)), 0, t.line.length - 1)];
+    const grade = q !== p ? clamp((q.z - p.z) / Math.max(1e-6, Math.abs(q.s - p.s)), -MAX_GRADE, MAX_GRADE) : 0;
+    const at = (u, w, dz = 0) => [p.x + u * Lv[0] - w * tin[0], p.y + u * Lv[1] - w * tin[1], p.z + grade * w + dz];
     const A = makeTris();
     const up = () => [0, 0, 1];
     const nu = Math.max(1, Math.ceil((hl + hr) / 3)); const nw = Math.max(1, Math.ceil(L / 3));
