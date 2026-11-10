@@ -84,7 +84,7 @@ import { smoothLine } from './lineSmoothing.js';
 import { buildPlazaMeshes, courtyardPathHalf, courtyardPaved, getPlazaMaterialDefs, isCourtyard, isPlaza, plazaSurface } from './plazas.js';
 import { buildSidewalkMeshesParallel, cornerPatches, inferCrossingSidewalks, buildWallDeckMesh, gutterLines, isCurbedClass, lowerUnderWallDecks, checkSidewalkGround, CURB_ONLY_M, ZEBRA_CROSSING_MATERIAL, gradeSidewalkGround, getSidewalkMaterialDefs, SIDEWALK_MATERIALS, sidewalkFootways, streetSides, DEFAULT_SIDEWALK_LOOK } from './beamngSidewalks.js';
 import { buildRoadNameZones } from './roadNameZones.js';
-import { placeStreetProps, POLE_LAMP_REACH_M, POLE_TYPES, hash01 as propHash } from './streetProps.js';
+import { placeStreetProps, POLE_LAMP_REACH_M, POLE_TYPES, hash01 as propHash, roadsidePolesRegion } from './streetProps.js';
 import {
   solveBridgeDecks, widenDecksForSidewalks, deckHeightAt, buildDeckGeometry, hitsDeck, alongDeck, newBridgeBuilder, deckDepthOf, deckEdges,
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
@@ -7816,6 +7816,7 @@ function buildDetailedReportSections(d) {
   const sp = d.streetProps || {};
   const mp = d.mappedStreetProps || {};
   lines.push(`- Street props placed: ${(sp.hydrants || []).length} hydrants, ${(sp.bins || []).length} bins, ${(sp.benches || []).length} benches, ${(sp.poles || []).length} utility poles, ${(sp.wires || []).length} power line spans`);
+  if (sp.countryPoles === false) lines.push('- Utility poles: only the ones OpenStreetMap maps. Pole lines along country roads are added where they are the norm (North America, Japan, Australia, New Zealand), not here.');
   lines.push(`- Mapped in OSM: ${(mp.hydrants || []).length} hydrants, ${(mp.bins || []).length} bins`);
   const sig = d.signalData || {};
   lines.push(`- Traffic signals: ${(sig.instances || []).length} signal instances, ${(sig.controllers || []).length} controllers, ${(sig.sequences || []).length} sequences, ${(d.trafficSignalObjects || []).length} signal objects`);
@@ -12717,11 +12718,14 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       mapped: mappedStreetProps,
       heightAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
       townPoles: center.lat > 24 && center.lng > -170 && center.lng < -50,
+      countryPoles: roadsidePolesRegion(center.lat, center.lng),
       isBlocked: underDeck,
       lat: center.lat, lon: center.lng,
       maxPoles: caps.poles,
     })
     : { hydrants: [], bins: [], benches: [], poles: [], wires: [] };
+  // (for the report: whether pole lines were added along country roads here)
+  streetProps.countryPoles = includeRoads && roadsidePolesRegion(center.lat, center.lng);
   // What to build: the ones switched off (placed along the streets as well as mapped)
   if (!built('hydrants')) streetProps.hydrants = [];
   if (!built('bins')) streetProps.bins = [];

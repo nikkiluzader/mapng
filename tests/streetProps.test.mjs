@@ -124,3 +124,20 @@ test('a street split into separate OSM ways at junctions still gets one line', (
   const elmWires = wires.filter((w) => Math.abs(w[0][1]) < 10 && Math.abs(w[w.length - 1][1]) < 10);
   assert.equal(elmWires.length, (along.length - 1) * 3, 'wired across both junctions');
 });
+
+test('pole lines along country roads: added where they are the norm, mapped ones everywhere', async () => {
+  const { placeStreetProps, roadsidePolesRegion } = await import('../services/streetProps.js');
+  assert.equal(roadsidePolesRegion(35.2, -111.6), true, 'Arizona');
+  assert.equal(roadsidePolesRegion(35.7, 139.7), true, 'Tokyo');
+  assert.equal(roadsidePolesRegion(-37.8, 145), true, 'Melbourne');
+  assert.equal(roadsidePolesRegion(49.3, 0.95), false, 'Normandy');
+  assert.equal(roadsidePolesRegion(45.45, 6.98), false, 'the Alps');
+  // a kilometre of country lane
+  const lane = { owner: 'w1', wayId: 'w1', highway: 'unclassified', urban: false, half: 2.5, nodes: Array.from({ length: 51 }, (_, i) => [i * 20, 0, 10, 5]) };
+  const here = placeStreetProps({ carriageways: [lane], countryPoles: true });
+  assert.ok(here.poles.length > 15, `${here.poles.length} poles`);
+  const mappedPole = Object.assign([500, 30, 10], { tags: { power: 'pole' }, id: 'n1' });
+  const there = placeStreetProps({ carriageways: [lane], countryPoles: false, mapped: { poles: [mappedPole] } });
+  assert.equal(there.poles.length, 1, 'only the mapped pole');
+  assert.equal(there.wires.length, 0);
+});

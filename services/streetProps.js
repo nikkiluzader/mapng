@@ -377,11 +377,27 @@ export function buildChains(carriageways) {
  *   mapped: { hydrants, bins, benches: [[x, y]], powerLines: [[[x, y, z]...]], poles: [[x, y, z]] }
  *   heightAt(x, y): terrain height
  *   townPoles: wooden poles with cobra-head lamps along unlit town streets (North America)
+ *   countryPoles: pole lines added along country roads (roadsidePolesRegion; mapped ones always)
  *   isBlocked(x, y, z, zTop): no pole there (under a bridge deck)
  *   lat, lon: the export's place (the region's poles, choosePoleType)
  * Returns { hydrants, bins, benches: [{ x, y, z, yaw }], poles: [{ x, y, z, yaw, lamp, type }], wires }.
  */
-export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, heightAt = () => 0, townPoles = false, isBlocked = () => false, lat = 0, lon = 0, maxPoles = MAX_POLES } = {}) {
+/**
+ * Whether pole lines along country roads are the norm here (wooden poles and
+ * wires beside most rural roads): North America, Japan, Australia and New
+ * Zealand. Elsewhere, Europe above all, distribution lines are buried or
+ * cross the fields, and a pole line added along every country road is wrong
+ * far more often than right (Normandy: 48 poles on a kilometre of lanes that
+ * have none). Poles and lines OSM maps are built everywhere.
+ */
+export function roadsidePolesRegion(lat, lon) {
+  if (lat > 24 && lon > -170 && lon < -50) return true;            // North America
+  if (lat > 24 && lat < 46 && lon > 123 && lon < 146) return true;  // Japan
+  if (lat < -10 && lat > -48 && lon > 112) return true;             // Australia, New Zealand
+  return false;
+}
+
+export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, heightAt = () => 0, townPoles = false, countryPoles = true, isBlocked = () => false, lat = 0, lon = 0, maxPoles = MAX_POLES } = {}) {
   const index = buildCarriagewayIndex(carriageways);
   const byOwner = new Map(carriageways.map((cw) => [cw.owner, cw]));
   const swZ = sidewalkHeightLookup(runs);
@@ -452,7 +468,7 @@ export function placeStreetProps({ carriageways = [], runs = [], mapped = {}, he
     const cls = String(cw.highway ?? '').replace(/_link$/, '');
     // Town: unlit streets only (lit ones have street lamps), and only where
     // wooden poles with cobra heads are the look (North America).
-    return cw.urban ? townPoles && TOWN_POLE_CLASSES.has(cls) && !isLitRoad(cw) : POLE_CLASSES.has(cls);
+    return cw.urban ? townPoles && TOWN_POLE_CLASSES.has(cls) && !isLitRoad(cw) : countryPoles && POLE_CLASSES.has(cls);
   };
   for (const chain of buildChains(carriageways.filter(eligible))) {
     if (poles.length >= maxPoles) break;
