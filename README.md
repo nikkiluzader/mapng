@@ -67,6 +67,12 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 ## What's New (November 2026)
 
+**MapNG 0.2.15** ([update page](https://mapng.com/updates/0.2.15/)): fixes
+
+- **Big maps with coarse terrain** (a 20 km map at 10 m squares): trees, props and the terrain shaped under roads now sit where the game draws the ground; roads get a proper flat bench
+- **Switchback roads** no longer leave pieces far under the ground; a ramp's bridge beside a wide bridge is level with it; lanes counted in OpenStreetMap keep their full width
+- **What to build:** rivers, lakes and sea are three switches, and there is a Footbridges switch
+
 **MapNG 0.2.14** ([update page](https://mapng.com/updates/0.2.14/))
 
 - **Three views, one Generate button:** Location (the world map), 2D preview and 3D preview. Generate opens the 2D preview; the 3D scene is only built when you open its tab
