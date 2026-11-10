@@ -52,6 +52,23 @@
               </button>
             </SettingRow>
             <SettingRow
+              v-if="beamNGBaseTexture === 'game'"
+              indent
+              :label="t('exportPanel.gameTextureBlend')"
+              :hint="isRepaintingGameTexture ? t('exportPanel.gameTextureBlendRepainting') : t('exportPanel.gameTextureBlendHint')"
+            >
+              <input
+                type="range" min="0" max="100" step="5"
+                v-model.number="gameTextureBlend"
+                :disabled="isRepaintingGameTexture || isAnyExporting"
+                :aria-label="t('exportPanel.gameTextureBlend')"
+                class="w-28 accent-brand disabled:opacity-50"
+                @change="applyGameTextureBlend"
+              />
+              <Loader2 v-if="isRepaintingGameTexture" :size="12" class="animate-spin text-brand" />
+              <span v-else class="w-9 text-right text-xs tabular-nums text-gray-600 dark:text-gray-300">{{ gameTextureBlend }}%</span>
+            </SettingRow>
+            <SettingRow
               check
               :model-value="beamNGPbrSource === 'osm'"
               @update:model-value="beamNGPbrSource = $event ? 'osm' : 'none'"
@@ -557,6 +574,7 @@ import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../compo
 import SettingSection from '../base/SettingSection.vue';
 import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
+import { readGameTextureBlend, writeGameTextureBlend, repaintGameTexture } from '../../services/gameTextureBlend.js';
 import WhatToBuild from './WhatToBuild.vue';
 import { legacyOn, isBuilt, contentOptions } from '../../composables/useBuildContent.js';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
@@ -664,6 +682,29 @@ watch(beamNGBaseTexturePreference, (preferred) => {
   const resolved = resolveBeamNGBaseTexture(props.terrainData, preferred);
   if (resolved === preferred) beamNGBaseTexture.value = resolved;
 });
+// Game texture: how much of the satellite image it takes (services/gameTextureBlend.js).
+// Released, the slider repaints the texture in place: the 3D preview shows it,
+// the export uses it, and the next Generate paints at the same setting.
+const gameTextureBlend = ref(readGameTextureBlend());
+const paintedGameTextureBlend = ref(gameTextureBlend.value);
+const isRepaintingGameTexture = ref(false);
+const applyGameTextureBlend = async () => {
+  if (isRepaintingGameTexture.value || gameTextureBlend.value === paintedGameTextureBlend.value) return;
+  const wanted = gameTextureBlend.value;
+  writeGameTextureBlend(wanted);
+  isRepaintingGameTexture.value = true;
+  try {
+    if (await repaintGameTexture(props.terrainData, wanted, { from: toRaw(props.terrainData) })) paintedGameTextureBlend.value = wanted;
+  } catch (err) {
+    console.error('[Game Texture] repaint failed:', err);
+    gameTextureBlend.value = paintedGameTextureBlend.value;
+    writeGameTextureBlend(paintedGameTextureBlend.value);
+  } finally {
+    isRepaintingGameTexture.value = false;
+    // (moved again while it painted: paint that)
+    if (gameTextureBlend.value !== paintedGameTextureBlend.value) applyGameTextureBlend();
+  }
+};
 const legacyIncludeBackdrop = localStorage.getItem('mapng_beamNGIncludeBackdrop');
 const beamNGBackdropSource = ref(
   localStorage.getItem('mapng_beamNGBackdropSource')

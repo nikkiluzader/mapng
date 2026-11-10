@@ -1,5 +1,6 @@
 import { buildRoadNetwork, getEffectiveRoadLayer, mergeLinearRoadSegments } from "./roadNetwork.js";
 import { racewayHalfWidth } from "./roadWidth.js";
+import { readGameTextureBlend, gameTextureBlendStrength } from './gameTextureBlend.js';
 import { WC, steepRockFrom } from "./worldCover.js";
 
 // Colors aligned to OSM Carto style definitions
@@ -2370,7 +2371,13 @@ export function paintLandCoverSnow(ctx, canvas, terrainData, satellite) {
 const SHADE_DARK = [40, 85];   // the image's brightness (0-255, at ~30 m): no trust under the first, full over the second
 const SHADE_CAST = 0.2;
 const BARE_TINT = { tint: [0.3, 0.3, 0.7, 0.7, 0.6, 0, 0, 0.5, 0.7], light: [0, 0, 0.4, 0.4, 0.3, 0, 0, 0.3, 0.45] };
-export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint = 0.3, classes = null } = {}) {
+// strength: all of it scaled (the export panel's "Satellite detail" slider:
+// 1 the default look, 0 none, 2 at most; detail, tint and the bare ground's
+// brightness each kept within what still reads as painted ground)
+export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint = 0.3, classes = null, strength = 1 } = {}) {
+  if (!(strength > 0)) return null;
+  detail = Math.min(1.2, detail * strength);
+  tint = Math.min(0.9, tint * strength);
   const W = canvas.width; const H = canvas.height;
   const sw = satellite.naturalWidth || satellite.width; const sh = satellite.naturalHeight || satellite.height;
   if (!(sw > 0) || !(sh > 0) || !(W > 16) || !(H > 16)) return null;
@@ -2413,9 +2420,9 @@ export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint
         const dark = Math.min(1, Math.max(0, (lb - SHADE_DARK[0]) / (SHADE_DARK[1] - SHADE_DARK[0])));
         const cast = Math.min(1, Math.max(0, 1 - (broad[i + 2] - broad[i]) / (SHADE_CAST * (lb + 8))));
         const trust = dark * cast;
-        tk = (BARE_TINT.tint[k] ?? tint) * trust;
+        tk = (BARE_TINT.tint[k] != null ? Math.min(0.95, BARE_TINT.tint[k] * strength) : tint) * trust;
         // (bare ground: part of its brightness from the image too)
-        const lt = (BARE_TINT.light[k] || 0) * trust;
+        const lt = Math.min(0.9, (BARE_TINT.light[k] || 0) * strength) * trust;
         if (lt > 0 && pl > 1) { const m = (pl + (lb - pl) * lt) / pl; d[i] *= m; d[i + 1] *= m; d[i + 2] *= m; pl = lumOf(d, i); }
       }
       const sc = lb > 4 ? pl / lb : 0;
@@ -2547,8 +2554,9 @@ export const generateGameTexture = async (terrainData, options = {}) => {
   // classes (Fizz_Mechanic: "a blend of satellite details and the game's
   // texture"): ground with paths, rocks and tufts, still game colours
   if (ground?.image && options.satelliteDetail !== false) {
-    const k = addSatelliteDetail(ctx, canvas, ground.image, { detail: options.detailStrength, tint: options.tintStrength, classes: ground });
-    if (k) console.log(`[Game Texture] Satellite detail blended in (detail ${k.detail}, colour ${k.tint}).`);
+    const blend = options.satelliteBlend ?? readGameTextureBlend();
+    const k = addSatelliteDetail(ctx, canvas, ground.image, { detail: options.detailStrength, tint: options.tintStrength, classes: ground, strength: gameTextureBlendStrength(blend) });
+    console.log(k ? `[Game Texture] Satellite detail blended in at ${blend} % (detail ${k.detail.toFixed(2)}, colour ${k.tint.toFixed(2)}).` : `[Game Texture] Satellite detail off (${blend} %): the game's colours only.`);
   }
 
   // Water: the satellite's own pixels, not a paint (players disliked blue,
