@@ -67,6 +67,11 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 ## What's New (November 2026)
 
+**MapNG 0.2.16** ([update page](https://mapng.com/updates/0.2.16/)): fixes
+
+- **Junctions on hills:** no ridge or flat pad across the main road, no steep ramp beside the junction; a side road leaves the main road's edge at its slope
+- **Backup map data:** a notice after Generate when OpenStreetMap's servers did not answer and the map was built from Overture (no lane counts, rougher bridges); MapNG's own map tiles survive a failed request
+
 **MapNG 0.2.15** ([update page](https://mapng.com/updates/0.2.15/)): fixes
 
 - **Big maps with coarse terrain** (a 20 km map at 10 m squares): trees, props and the terrain shaped under roads now sit where the game draws the ground; roads get a proper flat bench
