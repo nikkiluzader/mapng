@@ -59,7 +59,9 @@ const raw = !!process.env.RAW;
 // (PREPROCESSED=1: the OSM is the app's own data-step output, corners, widths and twin carriageways already done)
 const rounded = process.env.PREPROCESSED ? osmFeatures : roundRoadCorners(osmFeatures).features;
 let osmRoads = process.env.NOWIDTH || process.env.PREPROCESSED ? rounded : fitTwinCarriageways(measureStreetWidths(rounded).features).features;
-if (fine && !raw) osmRoads = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, isGroundLevelRoad).features;
+// (how far the lidar road snap moved the roads goes into the checks: a snap that wanders shows there)
+let snapStats = null;
+if (fine && !raw) { const snapped = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, isGroundLevelRoad); osmRoads = snapped.features; snapStats = snapped.stats; }
 if (!raw) smoothRoadsInHeightmap(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, { skipTracks: fine, fine });
 let minHeight = Infinity; let maxHeight = -Infinity;
 for (const v of heightMap) { if (v < minHeight) minHeight = v; if (v > maxHeight) maxHeight = v; }
@@ -153,7 +155,7 @@ if (process.stderr.isTTY) process.stderr.write('\n');
 fs.mkdirSync(outDir, { recursive: true });
 const out = path.join(outDir, `${levelName}.zip`);
 fs.writeFileSync(out, Buffer.from(await blob.arrayBuffer()));
-if (structureChecks) fs.writeFileSync(out.replace(/\.zip$/, '.checks.json'), JSON.stringify(structureChecks, null, 1));
+if (structureChecks) fs.writeFileSync(out.replace(/\.zip$/, '.checks.json'), JSON.stringify({ ...structureChecks, ...(snapStats ? { roadSnap: snapStats } : {}) }, null, 1));
 if (args.includes('--fix-stubs')) execFileSync('node', [new URL('./fixStubs.mjs', import.meta.url).pathname, out], { stdio: 'inherit' });
 console.log(`exported ${area} (${dem}) in ${((Date.now() - t0) / 1000).toFixed(1)} s: ${out}`);
 // (STEPS=1: each export step's time)

@@ -486,6 +486,35 @@
     "overpass",
     "coarse-data"
    ]
+  },
+  {
+   "name": "normandy_flat",
+   "lat": 49.2975,
+   "lng": 0.9725,
+   "size": 1024,
+   "dem": "gpxz",
+   "categories": [
+    "rural",
+    "flat-lidar",
+    "roundabout"
+   ],
+   "smoke": true,
+   "note": "flat farmland on 1 m lidar: the road snap must leave roads on their mapped line (zigzags, 2026-11)"
+  },
+  {
+   "name": "val_disere",
+   "lat": 45.449,
+   "lng": 6.979,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "mountain",
+    "old-town",
+    "tunnel",
+    "hillside"
+   ],
+   "smoke": true,
+   "note": "steep alpine village, short bridges, a 335 m tunnel under the streets (a 989 m runaway deck, 2026-11)"
   }
  ]
 }

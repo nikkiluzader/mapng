@@ -5,7 +5,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { AREAS_DIR, REPO } from './env.mjs';
-const { createCanvas, Image, loadImage } = await import(process.env.NAPI_CANVAS || '@napi-rs/canvas');
+// (NAPI_CANVAS: the package's index.js, or its folder)
+const napiPath = process.env.NAPI_CANVAS && fs.existsSync(process.env.NAPI_CANVAS) && fs.statSync(process.env.NAPI_CANVAS).isDirectory() ? `${process.env.NAPI_CANVAS}/index.js` : process.env.NAPI_CANVAS;
+const { createCanvas, Image, loadImage } = await import(napiPath || '@napi-rs/canvas');
 
 globalThis.document = { createElement: (tag) => { if (tag !== 'canvas') throw new Error(tag); const c = createCanvas(1, 1); return c; } };
 globalThis.Image = Image;
