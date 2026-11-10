@@ -370,3 +370,34 @@ test('a road down a hill steeper than its class allows: one even grade down it, 
   }
   assert.ok(steepest < 0.2, `steepest ${(steepest * 100).toFixed(1)}% on a 14% hill`);
 });
+
+test('a through road changing grade at a junction: a vertical curve through it, no corner', async () => {
+  const { sceneTerrain, sceneWay } = await import('./helpers/structureScenes.mjs');
+  // going east the ground falls at 4% to the junction and at 13% after it (two ways meeting there), a side street from the south
+  const h = (x) => 200 - (x <= 100 ? 0.04 * (x - 100) : 0.13 * (x - 100));
+  const td = sceneTerrain((x) => h(x), [
+    sceneWay(1, [[-450, 0], [100, 0]], { highway: 'secondary' }),
+    sceneWay(2, [[100, 0], [450, 0]], { highway: 'secondary' }),
+    sceneWay(3, [[100, 0], [100, -300]], { highway: 'residential' }),
+  ], { coarse: true });
+  const log = console.log; console.log = () => {};
+  let g;
+  try { g = generateDecalRoads(td, SQ, { structureSolver: 'v2' }).structureGraph; } finally { console.log = log; }
+  // each arm's fall over its first 6 m from the junction, away from it
+  const away = [];
+  g.edges.forEach((e, k) => {
+    if (e.highway !== 'secondary') return;
+    const n = e.s.length; const z = g.profile.z[k];
+    const end = Math.hypot(e.x[0] - 100, e.y[0]) < Math.hypot(e.x[n - 1] - 100, e.y[n - 1]) ? 0 : n - 1;
+    const step = end === 0 ? 1 : -1; let i = end + step; while (i + step >= 0 && i + step < n && Math.abs(e.s[i] - e.s[end]) < 6) i += step;
+    away.push((z[i] - z[end]) / Math.abs(e.s[i] - e.s[end]));
+  });
+  assert.equal(away.length, 2);
+  // (a straight line through the node sums to 0; the ground's corner is 9%)
+  assert.ok(Math.abs(away[0] + away[1]) < 0.035, `the grade turns ${(Math.abs(away[0] + away[1]) * 100).toFixed(1)}% within 6 m either side of the junction`);
+  // the side street still ends on the junction's one height
+  const ends = [];
+  g.edges.forEach((e, k) => { const n = e.s.length; for (const i of [0, n - 1]) if (Math.hypot(e.x[i] - 100, e.y[i]) < 0.5) ends.push(g.profile.z[k][i]); });
+  assert.equal(ends.length, 3);
+  assert.ok(Math.max(...ends) - Math.min(...ends) < 0.01, `the roads meet ${(Math.max(...ends) - Math.min(...ends)).toFixed(2)} m apart`);
+});

@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-11-10",
- "commit": "29108a5",
+ "commit": "f06d37a",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -77,7 +77,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 3
+   "seconds": 2
   },
   "normandy_flat@t30/untouched": {
    "steps": 0,
@@ -173,7 +173,7 @@
    "maxDeckLen": 1102,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 27
+   "seconds": 29
   },
   "naldo@gpxz/noshape": {
    "steps": 0,
@@ -199,7 +199,7 @@
    "maxDeckLen": 1128,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 29
+   "seconds": 31
   },
   "naldo@gpxz/ready": {
    "steps": 0,
@@ -225,7 +225,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 31
+   "seconds": 32
   },
   "naldo@t30/noshape": {
    "steps": 0,
@@ -249,7 +249,7 @@
    "maxDeckLen": 1139,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 28
+   "seconds": 30
   },
   "naldo@t30/untouched": {
    "steps": 0,
@@ -273,7 +273,7 @@
    "maxDeckLen": 1169,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 27
+   "seconds": 28
   },
   "naldo@t30/ready": {
    "steps": 0,
@@ -285,8 +285,8 @@
    "spikes": 25,
    "bumps": 16,
    "cross": 71,
-   "junctions": 2,
-   "creases": 754,
+   "junctions": 1,
+   "creases": 757,
    "swFloat": 6,
    "swBuried": 0,
    "lintErrors": 0,
@@ -297,7 +297,7 @@
    "maxDeckLen": 1098,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 29
+   "seconds": 33
   },
   "kingst@gpxz/noshape": {
    "steps": 0,
@@ -347,7 +347,7 @@
    "maxDeckLen": 505,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 36
+   "seconds": 40
   },
   "kingst@gpxz/ready": {
    "steps": 0,
@@ -397,7 +397,7 @@
    "maxDeckLen": 536,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 40
+   "seconds": 41
   },
   "kingst@t30/noshape": {
    "steps": 0,
@@ -421,7 +421,7 @@
    "maxDeckLen": 512,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 41
+   "seconds": 43
   },
   "kingst@t30/ready": {
    "steps": 0,
@@ -445,7 +445,7 @@
    "maxDeckLen": 491,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 43
+   "seconds": 42
   },
   "deckpark_g@gpxz/untouched": {
    "steps": 4,
@@ -469,7 +469,7 @@
    "maxDeckLen": 571,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 34
+   "seconds": 38
   },
   "deckpark_g@gpxz/noshape": {
    "steps": 3,
@@ -495,7 +495,7 @@
    "maxDeckLen": 561,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 38
+   "seconds": 40
   },
   "deckpark_g@gpxz/ready": {
    "steps": 0,
@@ -521,7 +521,7 @@
    "maxDeckLen": 560,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 42
+   "seconds": 45
   },
   "deckpark_g@t30/noshape": {
    "steps": 0,
@@ -593,7 +593,7 @@
    "maxDeckLen": 597,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 40
+   "seconds": 41
   },
   "zion@gpxz/ready": {
    "steps": 0,
@@ -619,7 +619,7 @@
    "maxDeckLen": 50,
    "tunnels": 1,
    "tunnelsLeft": 0,
-   "seconds": 4
+   "seconds": 5
   },
   "zion@gpxz/noshape": {
    "steps": 0,
@@ -645,7 +645,7 @@
    "maxDeckLen": 59,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 2
+   "seconds": 3
   },
   "zion@gpxz/untouched": {
    "steps": 1,
@@ -741,7 +741,7 @@
    "maxDeckLen": 182,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 3
+   "seconds": 2
   },
   "stelvio@gpxz/untouched": {
    "steps": 0,
@@ -803,7 +803,7 @@
    "cross": 7,
    "junctions": 1,
    "creases": 261,
-   "swFloat": 22,
+   "swFloat": 28,
    "swBuried": 19,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -813,7 +813,7 @@
    "maxDeckLen": 21,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 5
+   "seconds": 4
   },
   "stelvio@t30/untouched": {
    "steps": 0,
@@ -871,10 +871,10 @@
    "groundGaps": 0,
    "thruDeck": 0,
    "spikes": 0,
-   "bumps": 12,
+   "bumps": 11,
    "cross": 7,
    "junctions": 1,
-   "creases": 221,
+   "creases": 222,
    "swFloat": 20,
    "swBuried": 8,
    "lintErrors": 0,
@@ -909,7 +909,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 12
+   "seconds": 10
   },
   "w_sf_russian@gpxz/noshape": {
    "steps": 0,
@@ -935,22 +935,22 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 11
+   "seconds": 12
   },
   "w_sf_russian@gpxz/ready": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 824,
+   "steepGround": 810,
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 5,
    "spikes": 5,
-   "bumps": 17,
+   "bumps": 15,
    "cross": 404,
-   "junctions": 22,
+   "junctions": 18,
    "creases": 1136,
-   "swFloat": 3810,
-   "swBuried": 1730,
+   "swFloat": 3851,
+   "swBuried": 1733,
    "snapMovedPct": 2,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -1009,22 +1009,22 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 11
+   "seconds": 10
   },
   "w_sf_russian@t30/ready": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 860,
+   "steepGround": 857,
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 5,
    "spikes": 4,
-   "bumps": 21,
-   "cross": 407,
-   "junctions": 28,
-   "creases": 644,
-   "swFloat": 3790,
-   "swBuried": 1528,
+   "bumps": 19,
+   "cross": 404,
+   "junctions": 23,
+   "creases": 641,
+   "swFloat": 3845,
+   "swBuried": 1530,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 3,
@@ -1033,7 +1033,7 @@
    "maxDeckLen": 175,
    "tunnels": 0,
    "tunnelsLeft": 1,
-   "seconds": 11
+   "seconds": 14
   },
   "w_barcelona@gpxz/noshape": {
    "steps": 0,
@@ -1081,7 +1081,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 18
+   "seconds": 17
   },
   "w_barcelona@gpxz/ready": {
    "steps": 0,
@@ -1141,9 +1141,9 @@
    "spikes": 0,
    "bumps": 0,
    "cross": 12,
-   "junctions": 4,
+   "junctions": 3,
    "creases": 54,
-   "swFloat": 550,
+   "swFloat": 549,
    "swBuried": 209,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -1153,7 +1153,7 @@
    "maxDeckLen": 0,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 16
   },
   "w_barcelona@t30/untouched": {
    "steps": 0,
@@ -1232,16 +1232,16 @@
   "w_amsterdam@gpxz/ready": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 2,
+   "steepGround": 1,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 46,
+   "thruDeck": 47,
    "spikes": 327,
-   "bumps": 9,
-   "cross": 70,
+   "bumps": 7,
+   "cross": 72,
    "junctions": 1,
-   "creases": 82,
-   "swFloat": 199,
+   "creases": 83,
+   "swFloat": 196,
    "swBuried": 3140,
    "snapMovedPct": 0,
    "snapP90cm": 0,
@@ -1277,7 +1277,7 @@
    "maxDeckLen": 151,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 15
   },
   "w_amsterdam@t30/untouched": {
    "steps": 0,
@@ -1325,22 +1325,22 @@
    "maxDeckLen": 396,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 14
   },
   "val_disere@gpxz/ready": {
    "steps": 0,
    "steepStruct": 0,
-   "steepGround": 393,
+   "steepGround": 386,
    "shortX": 0,
    "groundGaps": 7,
    "thruDeck": 8,
    "spikes": 17,
-   "bumps": 16,
+   "bumps": 17,
    "cross": 59,
    "junctions": 7,
-   "creases": 665,
+   "creases": 668,
    "swFloat": 249,
-   "swBuried": 169,
+   "swBuried": 168,
    "snapMovedPct": 14,
    "snapP90cm": 100,
    "lintErrors": 0,
@@ -1454,17 +1454,17 @@
   "val_disere@t30/ready": {
    "steps": 0,
    "steepStruct": 1,
-   "steepGround": 388,
+   "steepGround": 392,
    "shortX": 0,
    "groundGaps": 0,
    "thruDeck": 0,
    "spikes": 103,
    "bumps": 14,
-   "cross": 97,
-   "junctions": 6,
-   "creases": 374,
-   "swFloat": 261,
-   "swBuried": 352,
+   "cross": 98,
+   "junctions": 8,
+   "creases": 372,
+   "swFloat": 283,
+   "swBuried": 354,
    "lintErrors": 0,
    "lintWarnings": 1,
    "decks": 2,
@@ -1473,7 +1473,7 @@
    "maxDeckLen": 17,
    "tunnels": 2,
    "tunnelsLeft": 0,
-   "seconds": 10
+   "seconds": 11
   },
   "gt_chevril@gpxz/untouched": {
    "steps": 2,
@@ -1497,7 +1497,7 @@
    "maxDeckLen": 24,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 8
+   "seconds": 6
   },
   "gt_chevril@gpxz/noshape": {
    "steps": 3,
@@ -1523,7 +1523,7 @@
    "maxDeckLen": 24,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 7
+   "seconds": 8
   },
   "gt_chevril@gpxz/ready": {
    "steps": 1,
@@ -1534,10 +1534,10 @@
    "thruDeck": 0,
    "spikes": 159,
    "bumps": 13,
-   "cross": 69,
+   "cross": 70,
    "junctions": 3,
    "creases": 1285,
-   "swFloat": 134,
+   "swFloat": 138,
    "swBuried": 84,
    "snapMovedPct": 19,
    "snapP90cm": 104,
@@ -1602,16 +1602,16 @@
   "gt_chevril@t30/ready": {
    "steps": 0,
    "steepStruct": 54,
-   "steepGround": 685,
+   "steepGround": 682,
    "shortX": 0,
    "groundGaps": 4,
    "thruDeck": 3,
    "spikes": 209,
    "bumps": 36,
    "cross": 254,
-   "junctions": 6,
+   "junctions": 4,
    "creases": 1087,
-   "swFloat": 1434,
+   "swFloat": 1435,
    "swBuried": 939,
    "lintErrors": 0,
    "lintWarnings": 1,
@@ -1621,7 +1621,7 @@
    "maxDeckLen": 85,
    "tunnels": 2,
    "tunnelsLeft": 1,
-   "seconds": 10
+   "seconds": 9
   },
   "gt_tignes@gpxz/noshape": {
    "steps": 0,

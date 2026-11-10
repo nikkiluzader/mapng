@@ -91,5 +91,33 @@ export function findSideArms(graph, plain = () => true) {
   return out;
 }
 
+/**
+ * The junctions with a road going on through: [{ a, b, others }], a and b the
+ * two arms most nearly in line ({ edge, end }; of several such pairs the
+ * widest road's), others the rest of the arms there. Every arm a road on the
+ * ground (plain).
+ */
+export function findThroughJunctions(graph, plain = () => true) {
+  const out = [];
+  if (!graph.nodes?.values) return out;
+  for (const node of graph.nodes.values()) {
+    if (node.edges.length < 3) continue;
+    const arms = node.edges.map((a) => ({ edge: a.edge, end: a.end, dir: graph.edges[a.edge].s.length >= 2 ? dirOf(graph.edges[a.edge], a.end) : null }));
+    if (new Set(arms.map((a) => a.edge)).size !== arms.length || arms.some((a) => !a.dir || !plain(a.edge))) continue;
+    let best = null;
+    for (let a = 0; a < arms.length; a++) {
+      for (let b = a + 1; b < arms.length; b++) {
+        const dot = arms[a].dir[0] * arms[b].dir[0] + arms[a].dir[1] * arms[b].dir[1];
+        if (dot > THROUGH_COS) continue;
+        const width = graph.edges[arms[a].edge].half + graph.edges[arms[b].edge].half;
+        if (!best || width > best.width + 1e-6 || (Math.abs(width - best.width) <= 1e-6 && dot < best.dot)) best = { a, b, dot, width };
+      }
+    }
+    if (!best) continue;
+    out.push({ a: arms[best.a], b: arms[best.b], others: arms.filter((_, i) => i !== best.a && i !== best.b) });
+  }
+  return out;
+}
+
 export const sideArmStation = stationAt;
 export const sideArmFromEnd = fromEnd;

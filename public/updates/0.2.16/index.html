@@ -10,7 +10,7 @@
 <meta property="og:title" content="MapNG 0.2.16: smoother junctions on hills">
 <meta property="og:description" content="No ridges across the road at junctions on hills, side roads that leave at the main road's slope, and a clear notice when a map was built from backup map data.">
 <meta property="og:url" content="https://mapng.com/updates/0.2.16/">
-<meta property="og:image" content="https://mapng.com/updates/0.2.16/images/junction-before-after.jpg">
+<meta property="og:image" content="https://mapng.com/updates/0.2.16/images/junction-grade.jpg">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <style>
@@ -161,14 +161,17 @@
     <div class="kicker">Roads</div>
     <h2>🛣️ No more ridges across the road at junctions</h2>
     <p>On a hill, a junction could come out with a flat pad across the main road, a short steep ramp beside it, and the side road's trench cut into the main road's near lane. It happened at every terrain resolution; on a map made at 0.25 m per pixel it showed as a sharp ridge.</p>
-    <p>There were four causes, and all four are fixed:</p>
+    <p>There were five causes, and all five are fixed:</p>
     <ul>
       <li><b>Road smoothing</b> averaged a road's height by counting its points, not by distance. Points are closer together near corners, so the road stepped beside every junction on a slope.</li>
       <li><b>A wide road's levelled strip</b> reached past the junction at the wrong height and left a pad across it (0.5 m off on the tester's 12 % hill).</li>
       <li><b>A road steeper than its class allows</b> was held to its limit along most of the hill and then let go at three times that for the last metres before the junction. It now follows the hill at one even grade.</li>
+      <li><b>A main road changing grade at a junction</b> did it in a corner, because its two halves were worked out as two roads. It now gets a rounded curve through the junction, about 3 m of road per percent of change.</li>
       <li><b>A side road</b> started dropping from the main road's centre line. It now stays on the main road's surface across its lanes and leaves the edge at the main road's slope.</li>
     </ul>
-    <figure><img src="images/junction-before-after.jpg" alt="The terrain at one T-junction on a hill, from above, before and after: before, a flat band across the main road at the junction and the side road's strip cut into the main road's lane; after, the main road's contour lines run evenly through the junction and the side road begins at its edge. Below, the height along the main road: before, a level shelf at the junction followed by a steeper drop; after, one even line." loading="lazy"><figcaption>One junction on the tester's map, from above (orange: contour lines every 0.25 m), and the height along the main road through it. Over 66 test exports, junctions with a bump or dip went from 237 to 219 and tilted road cross-sections from 13,244 to 13,005.</figcaption></figure>
+    <figure><img src="images/junction-grade.jpg" alt="Line chart of how steep the main road is along 80 m through one junction. In 0.2.15 the road runs at 7 %, flattens to 2.5 % just before the junction, jumps to 21 % for 25 m after it and drops back to 7 %. In 0.2.16 it rises evenly from 7 % to 16 % over about 30 m and then eases off." loading="lazy"><figcaption>How steep the main road is through one junction on the tester's map (terrain measured from the exported level). 0.2.15 went 7 %, 2.5 %, 21 %, 7 % within 30 m; 0.2.16 eases from 7 % to 16 %, which is how steep the hill is there.</figcaption></figure>
+    <figure><img src="images/junction-before-after.jpg" alt="The terrain at the same T-junction from above, before and after: before, a flat band across the main road at the junction and the side road's strip cut into the main road's lane; after, the main road's contour lines run evenly through the junction and the side road begins at its edge. Below, the height along the main road." loading="lazy"><figcaption>The same junction from above (orange: contour lines every 0.25 m), and the height along the main road. Over 66 test exports, junctions with a bump or dip went from 237 to 208 and tilted road cross-sections from 13,244 to 13,006.</figcaption></figure>
+    <figure><img src="images/junction-in-game.jpg" alt="Driver's view in BeamNG.drive on the main road just before the junction, heading downhill: the asphalt runs smoothly through the junction and the road is in view beyond it" loading="lazy"><figcaption>The junction in BeamNG.drive 0.40 with 0.2.16, heading downhill: no pad, no ridge, and the road stays in view past the junction. Measured in game: no height step over 5 cm in the main road's lanes.</figcaption></figure>
     <div class="note"><b>Good to know:</b> a road down a hill that is steeper than its class would be built now follows the hill instead of cutting deep into it. On very steep terrain that means a steep road, as the elevation data has it.</div>
   </section>
 

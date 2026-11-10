@@ -69,7 +69,7 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 **MapNG 0.2.16** ([update page](https://mapng.com/updates/0.2.16/)): fixes
 
-- **Junctions on hills:** no ridge or flat pad across the main road, no steep ramp beside the junction; a side road leaves the main road's edge at its slope
+- **Junctions on hills:** no ridge or flat pad across the main road, no steep ramp beside the junction, a rounded curve where the main road changes grade there; a side road leaves the main road's edge at its slope
 - **Backup map data:** a notice after Generate when OpenStreetMap's servers did not answer and the map was built from Overture (no lane counts, rougher bridges); MapNG's own map tiles survive a failed request
 
 **MapNG 0.2.15** ([update page](https://mapng.com/updates/0.2.15/)): fixes

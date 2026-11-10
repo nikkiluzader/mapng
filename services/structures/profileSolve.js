@@ -1,4 +1,4 @@
-import { findSideArms, sideArmFromEnd, sideArmStation, throughSurface } from './sideArms.js';
+import { findSideArms, findThroughJunctions, sideArmFromEnd, sideArmStation, throughSurface } from './sideArms.js';
 import { RAIL_GRADE_CEILING, RAIL_GRADE_LIMIT, RAIL_GROUND_BAND_M, railKindOfClass } from '../railways.js';
 
 // Structure solver, stage C: the vertical profile of every road at once
@@ -607,6 +607,7 @@ export function* solveProfilesSteps(graph) {
   }
   if (split) clampGrades();
   verticalCurves(graph, Z, L, U, off, pinned, held);
+  roundThroughJunctions(graph, Z, L, U, off, pinned, held, asStructure);
   seatSideArms(graph, Z, L, U, off, pinned, held, asStructure);
   tieTwinDecks(edges, Z, off, pinned, held, L, U, crossings);
   const z = edges.map((e, k) => Z.slice(off[k], off[k] + e.s.length));
@@ -794,6 +795,85 @@ function verticalCurves(graph, Z, L, U, off, pinned, held) {
             Z[v] = Math.min(Math.max(L[v], U[v]), Math.max(L[v], z));
           }
         }
+      }
+    }
+  }
+}
+
+// A road going on through a junction (sideArms.js) with a different grade
+// either side of it: a vertical curve through the node, as verticalCurves
+// lays at a deck's end, VC_M_PER_PCT of road per percent of grade change.
+// Its two arms are solved as two roads, each with its own grade allowance,
+// and met at the node in a corner: 7% into a junction and 16% out of it, a
+// crest a car went light over. The node moves with the curve; the other
+// roads meeting there follow it, the move faded out along them.
+const VC_JUNCTION_MIN = 0.02;        // grade changes under this are left
+const VC_JUNCTION_FOLLOW_M = 20;     // the other arms take up the node's move over this far
+function roundThroughJunctions(graph, Z, L, U, off, pinned, held, asStructure) {
+  const { edges } = graph;
+  const fixedAt = (v) => pinned[v] || held[v];
+  const put = (v, z) => { Z[v] = Math.min(Math.max(L[v], U[v]), Math.max(L[v], z)); };
+  const side = ({ edge, end }) => {
+    const e = edges[edge]; const n = e.s.length; const out = [];
+    for (let j = 0; j < n; j++) { const i = sideArmStation(e, end, j); out.push([off[edge] + i, sideArmFromEnd(e, end, i)]); }
+    return out;
+  };
+  const at = (S, d) => {
+    for (let k = 0; k + 1 < S.length; k++) {
+      if (S[k + 1][1] >= d) { const f = (d - S[k][1]) / ((S[k + 1][1] - S[k][1]) || 1); return Z[S[k][0]] + (Z[S[k + 1][0]] - Z[S[k][0]]) * f; }
+    }
+    return Z[S[S.length - 1][0]];
+  };
+  const slopeAt = (S, d) => { const d1 = Math.min(d + 4, S[S.length - 1][1]); const d0 = Math.max(0, d - 4); return (at(S, d1) - at(S, d0)) / ((d1 - d0) || 1); };
+  const gradeOf = (S) => {
+    const z0 = Z[S[0][0]];
+    const far = S.filter(([, d]) => d >= VC_GRADE_M[0] && d <= VC_GRADE_M[1]);
+    if (far.length < 2) return null;
+    let sdd = 0; let sdz = 0;
+    for (const [v, d] of far) { sdd += d * d; sdz += d * (Z[v] - z0); }
+    return sdz / (sdd || 1);
+  };
+  const hermite = (z0, m0, z1, m1, len, d) => {
+    const u = d / len; const u2 = u * u; const u3 = u2 * u;
+    return (2 * u3 - 3 * u2 + 1) * z0 + (u3 - 2 * u2 + u) * len * m0 + (-2 * u3 + 3 * u2) * z1 + (u3 - u2) * len * m1;
+  };
+  // (not beside a structure: a road that meets a deck or a tunnel at its other end is that
+  // structure's approach, ramped to it; a curve cut into it left pits by a freeway lid's walls)
+  const structNode = new Set();
+  for (const e of edges) if (asStructure(e) || e.external) { structNode.add(e.from); structNode.add(e.to); }
+  const approach = ({ edge }) => structNode.has(edges[edge].from) || structNode.has(edges[edge].to);
+  for (const j of findThroughJunctions(graph, seatable(graph, asStructure))) {
+    if ([j.a, j.b, ...j.others].some(approach)) continue;
+    const A = side(j.a); const B = side(j.b); const others = j.others.map(side);
+    const all = [A, B, ...others];
+    // (nothing held or pinned at the node or along the curve)
+    if (all.some((S) => fixedAt(S[0][0]))) continue;
+    const gA = gradeOf(A); const gB = gradeOf(B);
+    if (gA === null || gB === null) continue;
+    const change = Math.abs(gA + gB);   // (each measured away from the node: a straight line sums to 0)
+    if (change < VC_JUNCTION_MIN) continue;
+    // (never past an arm's middle: its other end may be curved too)
+    const h = Math.min(VC_MAX_M, Math.max(VC_MIN_M, change * 100 * VC_M_PER_PCT), A[A.length - 1][1], B[B.length - 1][1]) / 2;
+    if (!(h >= 2)) continue;
+    if ([A, B].some((S) => S.some(([v, d]) => d < h && fixedAt(v)))) continue;
+    const za = at(A, h); const zb = at(B, h); const sa = slopeAt(A, h); const sb = slopeAt(B, h);
+    const before = Z[A[0][0]];
+    // one cubic from h out on one arm to h out on the other (along it the grades are -sa, then sb)
+    for (const [S, sign] of [[A, -1], [B, 1]]) {
+      for (const [v, d] of S) {
+        if (d >= h) break;
+        put(v, hermite(za, -sa, zb, sb, 2 * h, sign * d + h));
+      }
+    }
+    // (the node is one height: both arms' ends, as the envelopes left them)
+    const node = (Z[A[0][0]] + Z[B[0][0]]) / 2; Z[A[0][0]] = node; Z[B[0][0]] = node;
+    const delta = node - before;
+    for (const S of others) {
+      const reach = Math.min(VC_JUNCTION_FOLLOW_M, S[S.length - 1][1] / 2);
+      for (const [v, d] of S) {
+        if (d > 0 && d >= reach) break;
+        if (d === 0) { Z[v] = node; continue; }
+        if (!fixedAt(v)) put(v, Z[v] + delta * (1 - d / reach));
       }
     }
   }
