@@ -14,7 +14,7 @@
          uncapped default more than doubles fragment work for no visible gain. -->
     <!-- (Cinematic: the post-processing chain reads the depth buffer, which a
          logarithmic one breaks: the canvas is made again when the choice changes) -->
-    <TresCanvas v-else-if="!webGLRuntimeError" :key="`canvas-${cinematic}`" window-size :dpr="[1, 2]" :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="cinematic ? activeSunPreset.exposure : 0.8" :renderer="{ logarithmicDepthBuffer: !cinematic }" power-preference="high-performance">
+    <TresCanvas v-else-if="!webGLRuntimeError" :key="`canvas-${cinematic}`" window-size :dpr="cinematic ? [1, 1.5] : [1, 2]" :clear-color="textureType === 'none' ? '#87CEEB' : '#000000'" shadows :tone-mapping="THREE.ACESFilmicToneMapping" :tone-mapping-exposure="cinematic ? activeSunPreset.exposure : 0.8" :renderer="{ logarithmicDepthBuffer: !cinematic }" power-preference="high-performance">
       <Suspense>
         <template #default>
           <TresGroup>
@@ -43,6 +43,7 @@
               :fill="activeSunPreset.fill"
             />
             <PostFX v-if="cinematic" :ao="true" :bloom="activeSunPreset.bloom" />
+            <IdleRender v-else />
 
             <TerrainMesh
               :terrain-data="mergedTerrainData"
@@ -446,6 +447,8 @@ import { ref, computed, reactive, watch, onErrorCaptured } from "vue";
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { useI18n } from 'vue-i18n';
 import * as THREE from "three";
+import { terrainView, showContours } from '../../composables/useTerrainView.js';
+import IdleRender from './IdleRender.vue';
 import { TresCanvas } from "@tresjs/core";
 import { OrbitControls, Environment } from "@tresjs/cientos";
 import {
@@ -649,10 +652,7 @@ const previewTextureFor = (value) => {
 const textureType = ref(previewTextureFor(sharedBaseTexture.value));
 // the terrain view and contour lines (remembered)
 const readPref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
-const terrainView = ref(TERRAIN_VIEWS.includes(readPref('mapng_preview_terrain_view', 'normal')) ? readPref('mapng_preview_terrain_view', 'normal') : 'normal');
-const showContours = ref(readPref('mapng_preview_contours', '0') === '1');
-watch(terrainView, (v) => { try { localStorage.setItem('mapng_preview_terrain_view', v); } catch { /* not kept */ } });
-watch(showContours, (v) => { try { localStorage.setItem('mapng_preview_contours', v ? '1' : '0'); } catch { /* not kept */ } });
+// (the terrain view and the contour lines: one choice with the 2D preview, composables/useTerrainView.js)
 const contourStep = computed(() => contourInterval((Number(props.terrainData?.maxHeight) || 0) - (Number(props.terrainData?.minHeight) || 0)));
 // (only a click changes the shared choice; a fallback shown here does not)
 const pickTexture = (value) => { textureType.value = value; setBaseTexture(value); };

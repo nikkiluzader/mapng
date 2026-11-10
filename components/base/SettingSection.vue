@@ -1,7 +1,7 @@
 <template>
   <!-- A collapsible section of the sidebar: one look for every section of the
        control and export panels (icon, title, chevron), open state remembered. -->
-  <section class="space-y-2">
+  <section ref="root" class="space-y-2" data-setting-section>
     <div class="flex items-center gap-2">
       <button
         type="button"
@@ -71,6 +71,9 @@ watch(own, (v) => {
 });
 // Expand all / Collapse all from the panel (provideSectionGroup)
 const group = useSectionGroup();
-if (group) watch(() => group.signal.value, (cmd) => { if (!cmd) return; own.value = cmd.open; emit('update:open', cmd.open); });
+// (only the sections on screen: the wizard keeps every step mounted, and a
+// step's buttons are for that step)
+const root = ref(null);
+if (group) watch(() => group.signal.value, (cmd) => { if (!cmd || !root.value || root.value.offsetParent === null) return; own.value = cmd.open; emit('update:open', cmd.open); });
 defineExpose({ open });
 </script>

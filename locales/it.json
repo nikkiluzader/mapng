@@ -42,8 +42,25 @@
     "batchJob": "Job batch"
   },
   "view": {
-    "map2d": "Mappa 2D",
-    "preview3d": "Anteprima 3D"
+    "location": "Posizione",
+    "preview2d": "Anteprima 2D",
+    "preview3d": "Anteprima 3D",
+    "needsData": "Prima genera"
+  },
+  "preview2d": {
+    "texture": "Texture",
+    "features": "Cosa verrà costruito",
+    "noFeatures": "Nessun dato di mappa per quest'area: niente da disegnare.",
+    "hint": "Scorri per lo zoom, trascina per spostare. Passa su un elemento per vedere cos'è.",
+    "fit": "Adatta all'area",
+    "built": "Verrà costruito",
+    "notBuilt": "Disattivato: non costruito",
+    "backdrop": "Sfondo (riquadri circostanti)",
+    "backdropDownloading": "Sfondo: download… {pct}%",
+    "backdropLoading": "Sfondo: lettura dei riquadri scaricati…",
+    "backdropFailed": "Sfondo: download non riuscito. L'esportazione riproverà.",
+    "backdropWaiting": "Sfondo: non ancora scaricato.",
+    "backdropQuality": "Immagine dello sfondo: {quality}, circa {mpp} m per pixel."
   },
   "mobile": {
     "desktopRequired": "Serve un computer desktop",
@@ -472,7 +489,8 @@
     "beamngTerrain": "Terreno BeamNG",
     "gameTexture": "Texture di gioco",
     "gameTextureBlend": "Dettaglio satellitare",
-    "gameTextureBlendHint": "Quanto dettaglio e colore dell'immagine satellitare prende la texture di gioco. 0%: solo i colori del gioco. Rilascia il cursore per ridipingere.",
+    "gameTextureBlendHint": "Quanto dettaglio e colore dell'immagine satellitare prende la texture di gioco. 0%: solo i colori del gioco.",
+    "gameTextureBlendPreparing": "Dipingo l'anteprima dal vivo una volta (qualche secondo)…",
     "gameTextureBlendRepainting": "Ridipingo la texture…",
     "desktopFailed": "L’esportazione non è terminata.",
     "desktopShowLog": "Mostra log",
@@ -507,7 +525,7 @@
       "terrainSummary_custom": "Terreno: Personalizzato. Solo i ritocchi scelti.",
       "terrainSummary_untouched": "Terreno: Intatto. L'altitudine è usata esattamente come scaricata.",
       "terrainChangeHere": "Cambialo in Terreno, nella sezione altitudine qui sopra.",
-      "terrainRegenerate": "La scelta del Terreno è cambiata dalla generazione: genera di nuovo i dati per applicarla.",
+      "terrainRegenerate": "La scelta del Terreno è cambiata da quando questo terreno è stato generato: genera di nuovo per applicarla.",
       "forestDensity": "Densità dei boschi",
       "forestDensity_light": "Bassa",
       "forestDensity_normal": "Normale",
@@ -528,7 +546,16 @@
       "levelChecked": "Livello controllato: c'è tutto.",
       "levelRebuilt": "Lo ricostruisco: {problems}",
       "nothingChanged": "Nulla è cambiato dall'ultima esportazione.",
-      "rebuildAnyway": "Ricostruisci comunque"
+      "rebuildAnyway": "Ricostruisci comunque",
+      "backdropImagery": "Immagine dello sfondo",
+      "backdropImagery_standard": "Standard",
+      "backdropImagery_high": "Alta",
+      "backdropImagery_veryhigh": "Molto alta",
+      "backdropImageryHint": "Immagine satellitare a circa {mpp} m per pixel: {n} riquadri da scaricare, texture da {px} px.",
+      "backdropImageryOwn": "Questa sorgente dello sfondo sceglie da sé l'immagine.",
+      "backdropImagerySlow": "{n} riquadri d'immagine: su un'area grande il download può richiedere tempo.",
+      "backdropImageryLimitedWeb": "Troppo grande per una scheda del browser a questa qualità: ridotta a circa {mpp} m per pixel. L'app desktop ha più margine.",
+      "backdropImageryLimitedDesktop": "Troppo grande da comporre a questa qualità: ridotta a circa {mpp} m per pixel."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -560,8 +587,8 @@
     "suggestedSquareExport": "Esportazione quadrata suggerita: {size} x {size} px.",
     "switchToSquareCrop": "Passa a Ritaglio quadrato per scegliere un'area di esportazione con lato potenza di due all'interno della copertura caricata.",
     "dragMapToPositionCrop": "Trascina la mappa per posizionare il riquadro di ritaglio dentro la copertura caricata.",
-    "previewOutOfDate": "L'anteprima non è aggiornata — riesegui Anteprima 3D per applicare le modifiche.",
-    "previewOutOfDatePanel": "L'anteprima 3D non è aggiornata. Riesegui Anteprima 3D per applicare.",
+    "previewOutOfDate": "L'anteprima non è aggiornata. Genera di nuovo per applicare le modifiche.",
+    "previewOutOfDatePanel": "L'anteprima non è aggiornata. Genera di nuovo.",
     "processingResolutionLabel": "Risoluzione di elaborazione (metri per pixel)",
     "processingResolutionCoverage": "Copre {km} × {km} km a {px} px ({mpp} m per pixel)",
     "processingResolutionCoverageTile": "Ogni tessera copre {km} × {km} km a {px} px ({mpp} m per pixel)",
@@ -636,14 +663,11 @@
   },
   "generateActions": {
     "processing": "Elaborazione in corso...",
-    "preview3d": "Anteprima 3D",
-    "usingCachedData": "Utilizzo dati in cache",
     "usingUploadedElevation": "Utilizzo dei dati di altitudine caricati",
-    "viewBeforeDownload": "Visualizza prima del download",
     "dataReady": "Dati pronti",
     "downloadBelow": "Vai a Esporta",
-    "generateData": "Genera dati",
-    "skip3dGetFiles": "Salta vista 3D, ottieni file"
+    "generate": "Genera",
+    "generateHint": "Terreno e dati della mappa, poi un'anteprima"
   },
   "mapSelector": {
     "moveTile": "Sposta {label}",
@@ -1220,7 +1244,7 @@
   "config": {
     "copied": "Impostazioni copiate come codice. Incollalo in MapNG (Ctrl+V sulla mappa) per usarle.",
     "invalid": "Questo non è un codice di impostazioni di MapNG.",
-    "applied": "Impostazioni applicate. Premi Anteprima 3D o Genera dati per crearle.",
+    "applied": "Impostazioni applicate. Premi Genera per costruirle.",
     "dialogTitle": "Usare queste impostazioni?",
     "dialogIntro": "Queste impostazioni imposterebbero:",
     "dialogNote": "Le tue chiavi e i tuoi server (come una chiave GPXZ) non sono mai in un codice di impostazioni e restano come sono.",
@@ -1386,7 +1410,9 @@
     "reset": "Ripristina",
     "resetTitle": "Riporta questa sezione ai valori predefiniti",
     "changedTitle": "Modificato rispetto ai valori predefiniti",
-    "more": "Altro"
+    "more": "Altro",
+    "expandAll": "Espandi tutto",
+    "collapseAll": "Comprimi tutto"
   },
   "osmFile": {
     "title": "Usa il tuo file OSM",
@@ -1431,7 +1457,7 @@
     "run": "Avvia",
     "exportLocked": "Genera prima il terreno",
     "review": "Riepilogo",
-    "reviewHint": "L'anteprima 3D mostra il terreno prima dell'esportazione; Genera dati va dritto alle opzioni del livello. Fai clic su una riga per cambiarla.",
+    "reviewHint": "Genera recupera il terreno e i dati della mappa, poi apre un'anteprima. Fai clic su una riga per cambiarla.",
     "runHint": "Avvia genera ed esporta tutti i riquadri in una volta, senza anteprima nel mezzo. Fai clic su una riga per cambiarla.",
     "generated": "Terreno pronto: corrisponde a queste impostazioni.",
     "generatedStale": "Impostazioni cambiate dalla generazione: genera di nuovo per usarle.",
@@ -1673,9 +1699,9 @@
     "groupAll": "{group}: tutto",
     "tagsN": "{n} tag",
     "showTags": "Mostra tag OSM",
-    "colourMap": "Colora la mappa per gruppo",
-    "colourMapIn3d": "I colori sono disegnati sulla mappa 2D. Sei nell'anteprima 3D.",
-    "show2dMap": "Mostra la mappa 2D",
+    "colourMap": "Mostra nell'anteprima 2D",
+    "colourMapIn3d": "Ciò che verrà costruito è disegnato nell'anteprima 2D.",
+    "show2dMap": "Apri l'anteprima 2D",
     "tagsLeftOut": "{n} tag OSM esclusi.",
     "keepAllTags": "Mantieni tutti",
     "offInFeatures": "{what}: disattivato in Elementi",

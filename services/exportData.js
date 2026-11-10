@@ -12,6 +12,7 @@
 import { exportDataInputs, prefetchLidarDecks, BACKDROP_FETCH } from './exportBeamNGLevel.js';
 import { fetchSurroundings } from './export3d.js';
 import { fetchOsmWater } from './osm.js';
+import { backdropImageryFetch } from './backdropImagery.js';
 
 // (the backdrop's area: the map and the eight tiles round it, each the map's size)
 export const backdropBounds = (b) => {
@@ -27,7 +28,8 @@ export const backdropBounds = (b) => {
 export function exportDataNeeds(terrainData, options = {}) {
   if (!terrainData?.bounds || !terrainData?.width) return null;
   const backdrop = options.includeBackdrop
-    ? { source: options.backdropElevationSource || 'global30m', gpxz: options.backdropElevationSource === 'gpxz' ? String(options.backdropGpxzApiKey || '') : '' }
+    ? { source: options.backdropElevationSource || 'global30m', gpxz: options.backdropElevationSource === 'gpxz' ? String(options.backdropGpxzApiKey || '') : '',
+      imagery: backdropImageryFetch({ quality: options.backdropImagery, bounds: terrainData.bounds, stitchLimit: options.backdropStitchLimit }) }
     : null;
   const lidar = options.roadType !== 'none' && options.includeBridges !== false && options.lidarDecks !== false
     && (options.structureSolver ?? 'v2') === 'v2'
@@ -38,7 +40,7 @@ export function exportDataNeeds(terrainData, options = {}) {
   if (!backdrop && !lidar) return null;
   const b = terrainData.bounds;
   const key = [b.north, b.south, b.east, b.west].map((v) => Number(v).toFixed(6)).join(',')
-    + `|${terrainData.width}x${terrainData.height}|${backdrop ? backdrop.source : '-'}|${lidar ? 'lidar' : '-'}|${water ? 'water' : '-'}`
+    + `|${terrainData.width}x${terrainData.height}|${backdrop ? `${backdrop.source}:${JSON.stringify(backdrop.imagery)}` : '-'}|${lidar ? 'lidar' : '-'}|${water ? 'water' : '-'}`
     + `|${terrainData.backgroundMask ? JSON.stringify(terrainData.backgroundMask).length : 0}`;
   return { backdrop, lidar, water, key };
 }
@@ -60,6 +62,7 @@ export async function downloadExportData(terrainData, options = {}, { onProgress
     step('Downloading the surroundings (elevation and satellite, 8 tiles)…', 0);
     await fetchSurroundings(td, (text) => step(`Surroundings: ${String(text).replace(/\.\.\.$/, '…')}`, 0), {
       ...BACKDROP_FETCH,
+      ...needs.backdrop.imagery,
       elevationSource: needs.backdrop.source,
       gpxzApiKey: needs.backdrop.gpxz,
       onDownloadProgress: ({ completedTotal, total }) => { if (total > 0) step('Downloading the surroundings…', completedTotal / total); },
@@ -97,6 +100,28 @@ const runs = new Map();   // key → { promise, state: { status, text, fraction,
 const listeners = new Set();
 const emit = () => { for (const fn of listeners) fn(); };
 
+/**
+ * The backdrop's eight tiles as the data step downloaded them, read back from
+ * the cache: { NW: { bounds, satelliteDataUrl, heightMap, width, height }, … }.
+ * The 2D preview draws these (what the export will build its backdrop from),
+ * so it asks only once the step is done: the same requests, answered from
+ * the cache. Null when these options have no backdrop.
+ */
+const backdropTilesOf = new Map();
+export async function loadBackdropTiles(terrainData, options = {}) {
+  const needs = exportDataNeeds(terrainData, options);
+  if (!needs?.backdrop) return null;
+  const { terrainData: td } = exportDataInputs(terrainData, options);
+  // (kept for this data step: reopening the preview shows them at once)
+  const have = backdropTilesOf.get(needs.key);
+  if (have) return have;
+  const tiles = fetchSurroundings(td, undefined, { ...BACKDROP_FETCH, ...needs.backdrop.imagery, elevationSource: needs.backdrop.source, gpxzApiKey: needs.backdrop.gpxz });
+  backdropTilesOf.clear();           // (one terrain's backdrop at a time: eight pictures and heightmaps)
+  backdropTilesOf.set(needs.key, tiles);
+  tiles.catch(() => backdropTilesOf.delete(needs.key));
+  return tiles;
+}
+
 /** Watch the data step's state (the export panel's line under Surroundings). Returns unsubscribe. */
 export function onExportDataChange(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
@@ -132,4 +157,4 @@ export function ensureExportData(terrainData, options, { run = downloadExportDat
 }
 
 /** Forget finished data steps (a new terrain). */
-export function resetExportData() { runs.clear(); emit(); }
+export function resetExportData() { runs.clear(); backdropTilesOf.clear(); emit(); }

@@ -55,17 +55,20 @@
               v-if="beamNGBaseTexture === 'game'"
               indent
               :label="t('exportPanel.gameTextureBlend')"
-              :hint="isRepaintingGameTexture ? t('exportPanel.gameTextureBlendRepainting') : t('exportPanel.gameTextureBlendHint')"
+              :hint="isRepaintingGameTexture ? t('exportPanel.gameTextureBlendRepainting') : isPreparingBlend ? t('exportPanel.gameTextureBlendPreparing') : t('exportPanel.gameTextureBlendHint')"
             >
               <input
-                type="range" min="0" max="100" step="5"
+                type="range" min="0" max="100" step="1"
                 v-model.number="gameTextureBlend"
                 :disabled="isRepaintingGameTexture || isAnyExporting"
                 :aria-label="t('exportPanel.gameTextureBlend')"
                 class="w-28 accent-brand disabled:opacity-50"
+                @pointerdown="prepareLiveBlend"
+                @focus="prepareLiveBlend"
+                @input="onGameTextureBlendInput"
                 @change="applyGameTextureBlend"
               />
-              <Loader2 v-if="isRepaintingGameTexture" :size="12" class="animate-spin text-brand" />
+              <Loader2 v-if="isRepaintingGameTexture || isPreparingBlend" :size="12" class="animate-spin text-brand" />
               <span v-else class="w-9 text-right text-xs tabular-nums text-gray-600 dark:text-gray-300">{{ gameTextureBlend }}%</span>
             </SettingRow>
             <SettingRow
@@ -120,6 +123,25 @@
                 <option value="gpxz" :disabled="!canUseGpxzBackdrop">GPXZ</option>
               </select>
             </SettingRow>
+            <!-- how fine a satellite picture the backdrop gets (services/backdropImagery.js) -->
+            <SettingRow
+              v-if="beamNGBackdropSource !== 'off'"
+              indent
+              :label="t('exportPanel.ui.backdropImagery')"
+              :hint="backdropImageryHint"
+              :disabled="beamNGBackdropSource !== 'global30m'"
+              :disabled-reason="t('exportPanel.ui.backdropImageryOwn')"
+            >
+              <select v-model="beamNGBackdropImagery" :class="SELECT_XS" :disabled="beamNGBackdropSource !== 'global30m'">
+                <option v-for="id in BACKDROP_IMAGERY_IDS" :key="id" :value="id">{{ t(`exportPanel.ui.backdropImagery_${id}`) }}</option>
+              </select>
+            </SettingRow>
+            <p v-if="beamNGBackdropSource === 'global30m' && backdropPlan.limited" class="pl-4 text-caption leading-snug text-amber-700 dark:text-amber-300">
+              {{ t(desktopApp ? 'exportPanel.ui.backdropImageryLimitedDesktop' : 'exportPanel.ui.backdropImageryLimitedWeb', { mpp: backdropPlan.metresPerPixel.toFixed(1) }) }}
+            </p>
+            <p v-else-if="beamNGBackdropSource === 'global30m' && backdropPlan.tiles > BACKDROP_MANY_TILES" class="pl-4 text-caption leading-snug text-amber-700 dark:text-amber-300">
+              {{ t('exportPanel.ui.backdropImagerySlow', { n: backdropPlan.tiles.toLocaleString() }) }}
+            </p>
             <p v-if="exportDataStatus && exportDataStatus.status !== 'idle'" class="text-caption leading-snug" :class="exportDataStatus.status === 'failed' ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'">
               {{ exportDataStatus.status === 'running'
                 ? t('exportPanel.ui.dataRunning', { pct: Math.round((exportDataStatus.fraction || 0) * 100) })
@@ -547,7 +569,7 @@
 </style>
 
 <script setup>
-import { ref, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
+import { ref, shallowRef, computed, watch, nextTick, onUnmounted, toRaw } from 'vue';
 import { useMainStore } from '../../stores/mainStore';
 import { useI18n } from 'vue-i18n';
 import {
@@ -574,7 +596,9 @@ import { openHotspotPrivacy, reportExport, useExportHotspots } from '../../compo
 import SettingSection from '../base/SettingSection.vue';
 import SettingCard from '../base/SettingCard.vue';
 import SettingRow from '../base/SettingRow.vue';
-import { readGameTextureBlend, writeGameTextureBlend, repaintGameTexture } from '../../services/gameTextureBlend.js';
+import { BACKDROP_APPLIED_KEY } from '../../services/exportSettings.js';
+import { BACKDROP_IMAGERY_IDS, backdropImageryId, backdropImageryPlan, WEB_STITCH_LIMIT_PX, DESKTOP_STITCH_LIMIT_PX } from '../../services/backdropImagery.js';
+import { readGameTextureBlend, writeGameTextureBlend, repaintGameTexture, canBlendLive, prepareBlendAnchors, composeBlend, commitGameTextureCanvas } from '../../services/gameTextureBlend.js';
 import WhatToBuild from './WhatToBuild.vue';
 import { legacyOn, isBuilt, contentOptions } from '../../composables/useBuildContent.js';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
@@ -688,13 +712,53 @@ watch(beamNGBaseTexturePreference, (preferred) => {
 const gameTextureBlend = ref(readGameTextureBlend());
 const paintedGameTextureBlend = ref(gameTextureBlend.value);
 const isRepaintingGameTexture = ref(false);
+// Live: the texture painted once at 0, 50 and 100 % (the first time the slider
+// is touched), then cross-faded as it moves, so it follows the hand. Larger
+// textures than the anchors may take are repainted when the slider is let go.
+const blendAnchors = shallowRef(null);
+const isPreparingBlend = ref(false);
+let blendFrame = 0;
+const drawLiveBlend = () => {
+  blendFrame = 0;
+  const td = toRaw(props.terrainData); const anchors = blendAnchors.value;
+  if (!anchors || !td?.gameTextureCanvas || td.gameTextureCanvas.width !== anchors.size) return;
+  composeBlend(anchors, gameTextureBlend.value, td.gameTextureCanvas);
+  paintedGameTextureBlend.value = gameTextureBlend.value;
+  store.textureRevision++;
+};
+const prepareLiveBlend = async () => {
+  const td = props.terrainData;
+  if (blendAnchors.value || isPreparingBlend.value || isRepaintingGameTexture.value || !canBlendLive(td)) return;
+  isPreparingBlend.value = true;
+  try {
+    const anchors = await prepareBlendAnchors(td, { from: toRaw(td), paintedPct: paintedGameTextureBlend.value });
+    if (props.terrainData !== td) return;   // (another terrain since)
+    blendAnchors.value = anchors;
+    // (moved while they were painted: show where it is now)
+    if (anchors && gameTextureBlend.value !== paintedGameTextureBlend.value) drawLiveBlend();
+  } catch (err) {
+    console.error('[Game Texture] live blend unavailable, repainting on release:', err);
+  } finally { isPreparingBlend.value = false; }
+};
+const onGameTextureBlendInput = () => {
+  if (blendAnchors.value) { if (!blendFrame) blendFrame = requestAnimationFrame(drawLiveBlend); } else prepareLiveBlend();
+};
+watch(() => props.terrainData, () => { blendAnchors.value = null; paintedGameTextureBlend.value = readGameTextureBlend(); gameTextureBlend.value = paintedGameTextureBlend.value; });
 const applyGameTextureBlend = async () => {
-  if (isRepaintingGameTexture.value || gameTextureBlend.value === paintedGameTextureBlend.value) return;
   const wanted = gameTextureBlend.value;
   writeGameTextureBlend(wanted);
+  // (live: the canvas is already there; its file follows)
+  if (blendAnchors.value) {
+    if (blendFrame) { cancelAnimationFrame(blendFrame); drawLiveBlend(); }
+    await commitGameTextureCanvas(props.terrainData);
+    store.textureRevision++;
+    return;
+  }
+  if (isPreparingBlend.value) return;   // (the anchors draw it when they are ready)
+  if (isRepaintingGameTexture.value || wanted === paintedGameTextureBlend.value) return;
   isRepaintingGameTexture.value = true;
   try {
-    if (await repaintGameTexture(props.terrainData, wanted, { from: toRaw(props.terrainData) })) paintedGameTextureBlend.value = wanted;
+    if (await repaintGameTexture(props.terrainData, wanted, { from: toRaw(props.terrainData) })) { paintedGameTextureBlend.value = wanted; store.textureRevision++; }
   } catch (err) {
     console.error('[Game Texture] repaint failed:', err);
     gameTextureBlend.value = paintedGameTextureBlend.value;
@@ -705,11 +769,41 @@ const applyGameTextureBlend = async () => {
     if (gameTextureBlend.value !== paintedGameTextureBlend.value) applyGameTextureBlend();
   }
 };
+onUnmounted(() => { if (blendFrame) cancelAnimationFrame(blendFrame); });
 const legacyIncludeBackdrop = localStorage.getItem('mapng_beamNGIncludeBackdrop');
-const beamNGBackdropSource = ref(
-  localStorage.getItem('mapng_beamNGBackdropSource')
-  || (legacyIncludeBackdrop === 'true' ? 'global30m' : 'off')
-);
+// The backdrop starts Off with every terrain: choosing one starts its download
+// at once, so it is never chosen for the user. The one exception: settings
+// just applied that ask for it (a level being modified, a share code), which
+// leave BACKDROP_APPLIED_KEY for the next terrain.
+const takeAppliedBackdrop = () => {
+  try {
+    if (localStorage.getItem(BACKDROP_APPLIED_KEY) !== '1') return 'off';
+    return localStorage.getItem('mapng_beamNGBackdropSource') || (legacyIncludeBackdrop === 'true' ? 'global30m' : 'off');
+  } catch { return 'off'; }
+};
+const beamNGBackdropSource = ref(takeAppliedBackdrop());
+// (the panel opens with its terrain: the applied settings were for this one)
+if (props.terrainData) { try { localStorage.removeItem(BACKDROP_APPLIED_KEY); } catch { /* private mode */ } }
+watch(() => props.terrainData, (td, was) => {
+  if (!td || td === was) return;
+  beamNGBackdropSource.value = takeAppliedBackdrop();
+  try { localStorage.removeItem(BACKDROP_APPLIED_KEY); } catch { /* private mode */ }
+});
+// The backdrop's satellite imagery: Standard is what it has always been; finer
+// costs downloads and memory. A browser tab is held to a smaller stitched
+// picture than the desktop app (services/backdropImagery.js).
+const beamNGBackdropImagery = ref(backdropImageryId(localStorage.getItem('mapng_beamNGBackdropImagery')));
+watch(beamNGBackdropImagery, (v) => localStorage.setItem('mapng_beamNGBackdropImagery', v));
+const backdropStitchLimit = desktopApp ? DESKTOP_STITCH_LIMIT_PX : WEB_STITCH_LIMIT_PX;
+const BACKDROP_MANY_TILES = 600;
+const backdropPlan = computed(() => backdropImageryPlan({ quality: beamNGBackdropImagery.value, bounds: props.terrainData?.bounds, stitchLimit: backdropStitchLimit, mapSize: props.terrainData?.width }));
+const backdropImageryHint = computed(() => {
+  const p = backdropPlan.value;
+  return p.metresPerPixel ? t('exportPanel.ui.backdropImageryHint', { mpp: p.metresPerPixel.toFixed(1), n: p.tiles.toLocaleString(), px: p.textureSize }) : '';
+});
+watch(backdropPlan, (p) => { store.backdropImagery = p; }, { immediate: true });
+// (the 2D preview draws the surrounding tiles when a backdrop is chosen)
+watch(beamNGBackdropSource, (v) => { store.backdropSource = v || 'off'; }, { immediate: true });
 const beamNGIncludeBuildings = legacyOn.buildings;
 const beamNGIncludeWater = legacyOn.water;
 // Structures and the export's terrain shaping (advanced mode; basic builds
@@ -773,6 +867,8 @@ const exportDataOptions = computed(() => {
     includeBackdrop: source !== 'off',
     backdropElevationSource: source,
     backdropGpxzApiKey: source === 'gpxz' ? String(props.gpxzApiKey || '') : '',
+    backdropImagery: source === 'global30m' ? beamNGBackdropImagery.value : 'standard',
+    backdropStitchLimit,
     roadType: hasOsmData.value && built('roadSurfaces') ? 'decal' : 'none',
     includeBridges: built('bridges'),
     lidarDecks: !advancedMode.value || beamNGLidarDecks.value,
@@ -792,6 +888,7 @@ const refreshExportDataStatus = () => {
 const offExportData = onExportDataChange(refreshExportDataStatus);
 onUnmounted(offExportData);
 let exportDataTimer = null;
+watch(exportDataOptions, (o) => { store.exportDataOptions = o; }, { immediate: true });
 watch([() => props.terrainData, exportDataOptions], () => {
   clearTimeout(exportDataTimer);
   refreshExportDataStatus();
@@ -1253,12 +1350,8 @@ watch(
     if (!hasOsm && beamNGBaseTexture.value === 'osm') {
       beamNGBaseTexture.value = resolveBeamNGBaseTexture(props.terrainData, 'hybrid');
     }
-    // Custom elevation uploads default to the global 30 m backdrop rather than
-    // 'off', so an uploaded map gets surrounding terrain out of the box. Users
-    // can still switch it to USGS/GPXZ or turn it back off.
-    if (isCustom && beamNGBackdropSource.value === 'off') {
-      beamNGBackdropSource.value = 'global30m';
-    }
+    // (an uploaded map used to get the 30 m backdrop by itself; choosing a
+    // backdrop starts its download now, so it starts Off like any other)
     if (beamNGBackdropSource.value === 'gpxz' && !gpxzAllowed) {
       beamNGBackdropSource.value = 'global30m';
     }
@@ -1969,6 +2062,8 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       includeBackdrop: effectiveIncludeBackdrop,
       backdropElevationSource: effectiveBackdropSource,
       backdropGpxzApiKey: effectiveBackdropGpxzApiKey,
+      backdropImagery: effectiveBackdropSource === 'global30m' ? beamNGBackdropImagery.value : 'standard',
+      backdropStitchLimit,
       includeBuildings: effectiveIncludeBuildings,
       includeWater: effectiveIncludeWater,
       seaLevelOffset: effectiveSeaLevelOffset,
@@ -1991,6 +2086,8 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       includeBackdrop: effectiveIncludeBackdrop,
       backdropElevationSource: effectiveBackdropSource,
       backdropGpxzApiKey: effectiveBackdropGpxzApiKey,
+      backdropImagery: effectiveBackdropSource === 'global30m' ? beamNGBackdropImagery.value : 'standard',
+      backdropStitchLimit,
       includeBuildings: effectiveIncludeBuildings,
       pbrSource: effectivePbrSource,
       includeWater: effectiveIncludeWater,

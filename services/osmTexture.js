@@ -2667,6 +2667,8 @@ export const generateGameTexture = async (terrainData, options = {}) => {
   }
 
 
+  // (canvasOnly: the slider's anchor paintings, never shown or saved themselves)
+  if (options.canvasOnly) return { url: "", canvas, blob: null };
   const blob = await new Promise((r) => canvas.toBlob((b) => r(b || null), "image/png"));
   const url = blob ? URL.createObjectURL(blob) : "";
   console.log(`[Game Texture] ${canvas.width}x${canvas.height}, ${satellite ? "ground classified from satellite" : "no satellite: grass ground"}, blob=${blob ? `${(blob.size / 1024).toFixed(0)} KB` : "null"}`);

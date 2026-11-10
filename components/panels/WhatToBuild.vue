@@ -35,6 +35,7 @@
 
     <!-- Features (Advanced) -->
     <template v-if="advanced && contentTab === 'features'">
+      <SectionToggleAll @set="setAllGroups" />
       <div class="divide-y divide-gray-100 dark:divide-gray-700/60 -mx-1">
         <div v-for="g in groups" :key="g.id" class="px-1">
           <div class="flex items-center gap-1.5 min-h-[30px]">
@@ -79,11 +80,11 @@
         <span v-if="excludeTags.length" class="text-micro text-gray-500 dark:text-gray-400">{{ t('build.tagsLeftOut', { n: excludeTags.length }) }}
           <button type="button" class="underline hover:text-brand" @click="excludeTags = []">{{ t('build.keepAllTags') }}</button></span>
       </div>
-      <!-- the colours are drawn on the 2D map: said only to someone who asked
-           for them and is looking at the 3D preview, with the way there -->
-      <p v-if="colourMap && store.previewMode" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption leading-snug text-gray-600 dark:text-gray-300" role="status">
+      <!-- the features are drawn on the 2D preview: said to someone who has
+           them switched on and is looking at another view, with the way there -->
+      <p v-if="colourMap && store.viewMode !== 'preview2d'" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption leading-snug text-gray-600 dark:text-gray-300" role="status">
         <span>{{ t('build.colourMapIn3d') }}</span>
-        <button type="button" class="font-semibold text-brand hover:underline" @click="store.previewMode = false">{{ t('build.show2dMap') }}</button>
+        <button type="button" class="font-semibold text-brand hover:underline" @click="store.viewMode = 'preview2d'">{{ t('build.show2dMap') }}</button>
       </p>
     </template>
 
@@ -137,6 +138,7 @@ import { computed, reactive, defineComponent, h } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ChevronRight } from 'lucide-vue-next';
 import SettingCard from '../base/SettingCard.vue';
+import SectionToggleAll from '../base/SectionToggleAll.vue';
 import { useMainStore } from '../../stores/mainStore';
 import { CONTENT_GROUPS, PRESET_IDS, osmTagCounts } from '../../services/buildContent.js';
 import { GROUP_COLOURS } from '../../services/buildContentColours.js';
@@ -180,6 +182,8 @@ const Switch = defineComponent({
 
 const open = reactive({});
 const tagsOpen = reactive({});
+// (Expand all / Collapse all: every group; collapsing closes the tag lists under them too)
+const setAllGroups = (on) => { for (const g of CONTENT_GROUPS) open[g.id] = on; if (!on) for (const k of Object.keys(tagsOpen)) tagsOpen[k] = false; };
 const activePreset = computed(() => (props.advanced ? advancedPreset.value : basicPreset.value));
 const pickPreset = (p) => { if (props.advanced) applyPreset(p); else basicPreset.value = p; };
 

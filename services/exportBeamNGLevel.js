@@ -115,6 +115,7 @@ import {
   SIGNAL_POLE_SHAPE,
 } from './beamngSignals.js';
 import { planRaceways } from './racetracks.js';
+import { backdropImageryFetch } from './backdropImagery.js';
 import { RAIL_DEPTH_M, railHalfWidth, railKindOf, railSegmentsFrom, streetRunningTest, undergroundRailIds } from './railways.js';
 import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, buildTrackGeometry, crossingDecals, streetTramDecals, railMaterialDefs, RAIL_MATERIALS, TRAMLINE_MATERIAL, railwayStats } from './railTrack.js';
 // footways and other paths: a level crossing of one is a foot crossing
@@ -1882,6 +1883,7 @@ async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) 
   };
   const surroundingGroup = await createSurroundingMeshes(terrainData, onText, 128, {
     ...BACKDROP_FETCH,
+    ...backdropImageryFetch({ quality: options.imagery, bounds: terrainData.bounds, stitchLimit: options.stitchLimit }),
     elevationSource: options.elevationSource || 'global30m',
     gpxzApiKey: options.gpxzApiKey || '',
     onDownloadProgress: ({ completedTotal, total }) => {
@@ -12050,6 +12052,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     includeRocks = false,
     backdropElevationSource = 'global30m',
     backdropGpxzApiKey = '',
+    // the backdrop's satellite imagery (services/backdropImagery.js) and the stitched
+    // picture's limit where the export runs (a browser tab's; none given: the canvas's)
+    backdropImagery = 'standard',
+    backdropStitchLimit = 0,
     // DecalRoads are the recommended road system: the community MapNG guide
     // calls Road Architect unstable for serious editing, and the single-tile UI
     // already defaults to 'decal'. Keep all entry points aligned on that.
@@ -13251,10 +13257,13 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       border[i] = q(i); border[size + i] = q((size - 1) * size + i); border[2 * size + i] = q(i * size); border[3 * size + i] = q(i * size + size - 1);
     }
     const backdropKey = stepHash('backdrop', BACKDROP_CODE(), exportTerrainData.bounds, size, squareSize, worldSize, backdropElevationSource,
-      backdropElevationSource === 'gpxz' ? String(backdropGpxzApiKey || '').length : 0, terrainBlockZ, terrainBlockMaxHeight, border);
+      backdropElevationSource === 'gpxz' ? String(backdropGpxzApiKey || '').length : 0, terrainBlockZ, terrainBlockMaxHeight, border,
+      JSON.stringify(backdropImageryFetch({ quality: backdropImagery, bounds: exportTerrainData.bounds, stitchLimit: backdropStitchLimit })));
     const { value: backdropResult, reused: backdropReused } = await cachedStep(options.stepCache || null, backdropKey, () => generateTerrainBackdropDAE(exportTerrainData, worldSize, {
       elevationSource: backdropElevationSource,
       gpxzApiKey: backdropGpxzApiKey,
+      imagery: backdropImagery,
+      stitchLimit: backdropStitchLimit,
       onProgress: (text, fraction) => report(`Backdrop: ${String(text).replace(/\.\.\.$/, '…')}`, fraction),
       // (the terrain's border as terrain.ter encodes it, for the seam strips)
       seam: {

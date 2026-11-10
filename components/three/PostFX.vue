@@ -19,6 +19,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { useIdleRender } from './useIdleRender.js';
 
 const props = defineProps({
   ao: { type: Boolean, default: true },
@@ -120,10 +121,14 @@ watch(() => [props.vibrance, props.contrast, props.vignette], () => {
   grade.uniforms.vignette.value = props.vignette;
 });
 
+// (only the frames worth drawing: useIdleRender.js)
+const { shouldDraw } = useIdleRender(renderer, () => [props.ao, props.bloom, props.vibrance, props.contrast, props.vignette, sizes.width.value, sizes.height.value]);
+
 // (the camera Tres renders with can be replaced: the passes follow it)
 const registration = render(({ renderer: r, scene: s, camera: cam }) => {
-  if (!composer) { if (r && s && cam) r.render(s, cam); return; }
   const c = cam || camera.value;
+  if (!shouldDraw(c)) return;
+  if (!composer) { if (r && s && cam) r.render(s, cam); return; }
   for (const p of composer.passes) { if ('camera' in p && p.camera !== c) p.camera = c; }
   composer.render();
 });

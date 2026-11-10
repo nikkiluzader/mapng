@@ -329,7 +329,7 @@
           :gpxz-api-key="gpxzApiKey"
           :has-custom-elevation="!!uploadedElevationFile"
           @generate="(preview) => $emit('generate', preview, fetchOSM, elevationSource, gpxzApiKey, elevationUnitOverride, metersPerPixel, gapFillSource)"
-          @ready="step = 4"
+          @ready="step = 4; if (store.viewMode === 'location' && terrainData) store.viewMode = 'preview2d'"
         />
       </template>
       <!-- (ExportPanel teleports its export button here) -->

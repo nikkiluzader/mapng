@@ -12,25 +12,18 @@
       {{ t('overpassStatus.chip') }}
     </button>
     <BaseButton
+      v-for="tab in TABS" :key="tab.id"
       size="sm"
       variant="ghost"
       class="view-tab"
-      :class="!previewMode ? 'view-tab--active' : 'view-tab--inactive'"
-      @click="$emit('switch-2d')"
+      :class="viewMode === tab.id ? 'view-tab--active' : 'view-tab--inactive'"
+      :disabled="tab.needsData && !canPreview"
+      :title="tab.needsData && !canPreview ? t('view.needsData') : ''"
+      :aria-pressed="viewMode === tab.id"
+      @click="$emit('switch', tab.id)"
     >
-      <Globe :size="16" />
-      {{ t('view.map2d') }}
-    </BaseButton>
-    <BaseButton
-      size="sm"
-      variant="ghost"
-      class="view-tab"
-      :class="previewMode ? 'view-tab--active' : 'view-tab--inactive'"
-      :disabled="!canPreview"
-      @click="$emit('switch-3d')"
-    >
-      <Layers :size="16" />
-      {{ t('view.preview3d') }}
+      <component :is="tab.icon" :size="16" />
+      {{ t(tab.label) }}
     </BaseButton>
   </div>
 </template>
@@ -64,16 +57,24 @@
 <script setup>
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
-import { Globe, Layers, Info } from 'lucide-vue-next';
+import { Globe, Layers, Info, Map as MapIcon } from 'lucide-vue-next';
 import { useOverpassStatus } from '../../composables/useOverpassStatus.js';
 
 const { t } = useI18n({ useScope: 'global' });
 const { down: osmDown, dismissed: osmDismissed } = useOverpassStatus();
 
+// Location: the world map, where the area is chosen. The two previews show the
+// generated area: flat with what will be built, and in 3D.
+const TABS = [
+  { id: 'location', label: 'view.location', icon: Globe },
+  { id: 'preview2d', label: 'view.preview2d', icon: MapIcon, needsData: true },
+  { id: 'preview3d', label: 'view.preview3d', icon: Layers, needsData: true },
+];
+
 defineProps({
-  previewMode: { type: Boolean, default: false },
+  viewMode: { type: String, default: 'location' },
   canPreview: { type: Boolean, default: false },
 });
 
-defineEmits(['switch-2d', 'switch-3d']);
+defineEmits(['switch']);
 </script>

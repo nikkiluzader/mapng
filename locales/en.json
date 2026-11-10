@@ -42,8 +42,25 @@
     "batchJob": "Batch job"
   },
   "view": {
-    "map2d": "2D map",
-    "preview3d": "3D preview"
+    "location": "Location",
+    "preview2d": "2D preview",
+    "preview3d": "3D preview",
+    "needsData": "Generate first"
+  },
+  "preview2d": {
+    "texture": "Texture",
+    "features": "What will be built",
+    "noFeatures": "No map data for this area: nothing to draw.",
+    "hint": "Scroll to zoom, drag to move. Hover a feature to see what it is.",
+    "fit": "Fit the area",
+    "built": "Will be built",
+    "notBuilt": "Switched off: not built",
+    "backdrop": "Backdrop (surrounding tiles)",
+    "backdropDownloading": "Backdrop: downloading… {pct}%",
+    "backdropLoading": "Backdrop: reading the downloaded tiles…",
+    "backdropFailed": "Backdrop: the download failed. The export will try again.",
+    "backdropWaiting": "Backdrop: not downloaded yet.",
+    "backdropQuality": "Backdrop imagery: {quality}, about {mpp} m per pixel."
   },
   "mobile": {
     "desktopRequired": "Desktop required",
@@ -472,7 +489,8 @@
     "beamngTerrain": "BeamNG terrain",
     "gameTexture": "Game Texture",
     "gameTextureBlend": "Satellite detail",
-    "gameTextureBlendHint": "How much of the satellite image's detail and colour the Game texture takes. 0%: the game's own colours only. Release the slider to repaint.",
+    "gameTextureBlendHint": "How much of the satellite image's detail and colour the Game texture takes. 0%: the game's own colours only.",
+    "gameTextureBlendPreparing": "Painting the live preview once (a few seconds)…",
     "gameTextureBlendRepainting": "Repainting the texture…",
     "desktopFailed": "The export did not finish.",
     "desktopShowLog": "Show log",
@@ -507,7 +525,7 @@
       "terrainSummary_custom": "Terrain: Custom. Only the edits you picked are made.",
       "terrainSummary_untouched": "Terrain: Untouched. The elevation is used exactly as downloaded.",
       "terrainChangeHere": "Change it under Terrain, in the elevation section above.",
-      "terrainRegenerate": "The Terrain choice changed since this terrain was generated: Generate Data again to apply it.",
+      "terrainRegenerate": "The Terrain choice changed since this terrain was generated: Generate again to apply it.",
       "forestDensity": "Forest density",
       "forestDensity_light": "Light",
       "forestDensity_normal": "Normal",
@@ -528,7 +546,16 @@
       "levelChecked": "Level checked: everything's there.",
       "levelRebuilt": "Building it again: {problems}",
       "nothingChanged": "Nothing changed since the last export.",
-      "rebuildAnyway": "Rebuild anyway"
+      "rebuildAnyway": "Rebuild anyway",
+      "backdropImagery": "Backdrop imagery",
+      "backdropImagery_standard": "Standard",
+      "backdropImagery_high": "High",
+      "backdropImagery_veryhigh": "Very high",
+      "backdropImageryHint": "Satellite picture at about {mpp} m per pixel: {n} image tiles to download, {px} px textures.",
+      "backdropImageryOwn": "This backdrop source picks its own imagery.",
+      "backdropImagerySlow": "{n} image tiles: the download can take a while on a large area.",
+      "backdropImageryLimitedWeb": "Too large for a browser tab at this quality: stepped down to about {mpp} m per pixel. The desktop app has more room.",
+      "backdropImageryLimitedDesktop": "Too large to stitch at this quality: stepped down to about {mpp} m per pixel."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -560,8 +587,8 @@
     "suggestedSquareExport": "Suggested square export: {size} x {size} px.",
     "switchToSquareCrop": "Switch to Square Crop to choose a power-of-two export area inside the uploaded coverage.",
     "dragMapToPositionCrop": "Drag the map to position the crop box inside the uploaded coverage.",
-    "previewOutOfDate": "Preview is out of date — re-run Preview 3D to apply your changes.",
-    "previewOutOfDatePanel": "3D preview is out of date. Re-run Preview 3D to apply.",
+    "previewOutOfDate": "Preview is out of date. Generate again to apply your changes.",
+    "previewOutOfDatePanel": "The preview is out of date. Generate again to apply.",
     "processingResolutionLabel": "Processing resolution (meters per pixel)",
     "processingResolutionCoverage": "Covers {km} × {km} km at {px} px ({mpp} m per pixel)",
     "processingResolutionCoverageTile": "Each tile covers {km} × {km} km at {px} px ({mpp} m per pixel)",
@@ -636,14 +663,11 @@
   },
   "generateActions": {
     "processing": "Processing...",
-    "preview3d": "Preview 3D",
-    "usingCachedData": "Using cached data",
     "usingUploadedElevation": "Using uploaded elevation data",
-    "viewBeforeDownload": "View before download",
     "dataReady": "Data ready",
     "downloadBelow": "Go to Export",
-    "generateData": "Generate Data",
-    "skip3dGetFiles": "Skip 3D view, get files"
+    "generate": "Generate",
+    "generateHint": "Terrain and map data, then a preview"
   },
   "mapSelector": {
     "moveTile": "Move {label}",
@@ -1220,7 +1244,7 @@
   "config": {
     "copied": "Settings copied as a code. Paste it into MapNG (Ctrl+V on the map) to use them.",
     "invalid": "That isn't a MapNG settings code.",
-    "applied": "Settings applied. Press Preview 3D or Generate Data to build them.",
+    "applied": "Settings applied. Press Generate to build them.",
     "dialogTitle": "Use these settings?",
     "dialogIntro": "These settings would set:",
     "dialogNote": "Your own keys and servers (like a GPXZ key) are never in a settings code and stay as they are.",
@@ -1386,7 +1410,9 @@
     "reset": "Reset",
     "resetTitle": "Put this section back to the defaults",
     "changedTitle": "Changed from the defaults",
-    "more": "More"
+    "more": "More",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all"
   },
   "osmFile": {
     "title": "Use your own OSM file",
@@ -1431,7 +1457,7 @@
     "run": "Run",
     "exportLocked": "Generate the terrain first",
     "review": "Review",
-    "reviewHint": "Preview 3D shows the terrain before you export; Generate Data goes straight to the level options. Click a line to change it.",
+    "reviewHint": "Generate gets the terrain and the map data, then opens a preview. Click a line to change it.",
     "runHint": "Start generates and exports every tile in one go, with nothing to preview in between. Click a line to change it.",
     "generated": "Terrain ready: it matches these settings.",
     "generatedStale": "Settings changed since generating: generate again to use them.",
@@ -1673,9 +1699,9 @@
     "groupAll": "{group}: all",
     "tagsN": "{n} tags",
     "showTags": "Show OSM tags",
-    "colourMap": "Colour the map by group",
-    "colourMapIn3d": "The colours are drawn on the 2D map. You're in the 3D preview.",
-    "show2dMap": "Show the 2D map",
+    "colourMap": "Show on the 2D preview",
+    "colourMapIn3d": "What will be built is drawn on the 2D preview.",
+    "show2dMap": "Open the 2D preview",
     "tagsLeftOut": "{n} OSM tags left out.",
     "keepAllTags": "Keep all",
     "offInFeatures": "{what} are off in Features",

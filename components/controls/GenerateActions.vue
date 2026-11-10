@@ -1,61 +1,36 @@
 <template>
-  <div class="grid grid-cols-2 gap-3">
-    <BaseButton
-      block
-      variant="primary"
-      size="lg"
-      prominent
-      :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
-      @click="$emit('generate', true)"
-    >
-      <span v-if="isGenerating" class="animate-pulse text-xs">{{ t('generateActions.processing') }}</span>
-      <template v-else-if="isCached">
-        <div class="flex items-center gap-2">
-          <Mountain :size="16" />
-          <span>{{ t('generateActions.preview3d') }}</span>
-        </div>
-        <span class="text-micro font-normal opacity-90">{{ t('generateActions.usingCachedData') }}</span>
-      </template>
-      <template v-else>
-        <div class="flex items-center gap-2">
-          <Mountain :size="16" />
-          <span>{{ t('generateActions.preview3d') }}</span>
-        </div>
-        <span class="text-micro font-normal opacity-90">{{ hasCustomElevation ? t('generateActions.usingUploadedElevation') : t('generateActions.viewBeforeDownload') }}</span>
-      </template>
-    </BaseButton>
-
-    <BaseButton
-      block
-      variant="secondary"
-      size="lg"
-      prominent
-      :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
-      @click="isCached ? $emit('ready') : $emit('generate', false)"
-    >
-      <span v-if="isGenerating" class="animate-pulse text-xs">{{ t('generateActions.processing') }}</span>
-      <template v-else-if="isCached">
-        <div class="flex items-center gap-2">
-          <CircleCheck :size="16" />
-          <span>{{ t('generateActions.dataReady') }}</span>
-        </div>
-        <span class="text-micro font-normal text-emerald-600 dark:text-emerald-400">{{ t('generateActions.downloadBelow') }}</span>
-      </template>
-      <template v-else>
-        <div class="flex items-center gap-2">
-          <FileDown :size="16" />
-          <span>{{ t('generateActions.generateData') }}</span>
-        </div>
-        <span class="text-micro font-normal text-gray-500 dark:text-gray-400">{{ t('generateActions.skip3dGetFiles') }}</span>
-      </template>
-    </BaseButton>
-  </div>
+  <!-- One button. Not generated yet: Generate (the terrain and the map data,
+       then the 2D preview opens). Generated: on to Export. -->
+  <BaseButton
+    block
+    variant="primary"
+    size="lg"
+    prominent
+    :disabled="isGenerating || (useGPXZ && !gpxzApiKey)"
+    @click="isCached ? $emit('ready') : $emit('generate', false)"
+  >
+    <span v-if="isGenerating" class="animate-pulse text-xs">{{ t('generateActions.processing') }}</span>
+    <template v-else-if="isCached">
+      <div class="flex items-center gap-2">
+        <CircleCheck :size="16" />
+        <span>{{ t('generateActions.dataReady') }}</span>
+      </div>
+      <span class="text-micro font-normal opacity-90">{{ t('generateActions.downloadBelow') }}</span>
+    </template>
+    <template v-else>
+      <div class="flex items-center gap-2">
+        <Mountain :size="16" />
+        <span>{{ t('generateActions.generate') }}</span>
+      </div>
+      <span class="text-micro font-normal opacity-90">{{ hasCustomElevation ? t('generateActions.usingUploadedElevation') : t('generateActions.generateHint') }}</span>
+    </template>
+  </BaseButton>
 </template>
 
 <script setup>
 import { useI18n } from 'vue-i18n';
 import BaseButton from '../base/BaseButton.vue';
-import { Mountain, CircleCheck, FileDown } from 'lucide-vue-next';
+import { Mountain, CircleCheck } from 'lucide-vue-next';
 
 const { t } = useI18n({ useScope: 'global' });
 

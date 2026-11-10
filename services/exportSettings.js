@@ -49,11 +49,20 @@ export function exportSettingsFor(options = {}) {
   return out;
 }
 
+// Set when settings that ask for a backdrop are applied (a level's, a share code's):
+// the one case where a new terrain does not start with the backdrop off.
+export const BACKDROP_APPLIED_KEY = 'mapng_beamNGBackdropApplied';
+
 /** Store the options for the export panel, and the level's name for its name box. */
 export function applyExportSettings(options = {}, levelName = '') {
   for (const [key, value] of Object.entries(exportSettingsFor(options))) {
     try { localStorage.setItem(key, value); } catch { /* private mode */ }
   }
+  // (a level's own backdrop is asked for: the export panel keeps it for the next terrain,
+  // where it otherwise starts every terrain with the backdrop off)
+  try {
+    if (options.includeBackdrop) localStorage.setItem(BACKDROP_APPLIED_KEY, '1'); else localStorage.removeItem(BACKDROP_APPLIED_KEY);
+  } catch { /* private mode */ }
   // (the level's terrain edits: the Terrain choice reads them back)
   reloadTerrainSettings();
   reloadContentSettings();

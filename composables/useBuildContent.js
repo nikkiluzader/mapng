@@ -37,7 +37,8 @@ export const excludeTags = ref(sanitizeExcludeTags(readList(TAGS_KEY)));
 export const basicPreset = ref(PRESET_IDS.includes(read(PRESET_KEY)) ? read(PRESET_KEY) : 'all');
 // views (per viewer, not in codes): the OSM tag rows, the 2D map coloured by group (step 4 only), the card's tab
 export const showOsmTags = ref(read('mapng_contentShowTags') === 'true');
-export const colourMap = ref(read('mapng_contentColourMap') === 'true');
+// (the features drawn on the 2D preview: on unless switched off)
+export const colourMap = ref(read('mapng_contentColourMap') !== 'false');
 export const contentTab = ref(read('mapng_contentTab') === 'tune' ? 'tune' : 'features');
 
 for (const l of LEGACY) watch(legacyOn[l.id], (on) => write(l.key, l.put(on)));

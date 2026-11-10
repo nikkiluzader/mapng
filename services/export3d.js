@@ -1944,6 +1944,9 @@ export const fetchSurroundings = (data, onProgress, fetchOptions = {}) => {
   if (fetchOptions.elevationSource) tileOptions.elevationSource = fetchOptions.elevationSource;
   if (fetchOptions.gpxzApiKey) tileOptions.gpxzApiKey = fetchOptions.gpxzApiKey;
   if (fetchOptions.onDownloadProgress) tileOptions.onDownloadProgress = fetchOptions.onDownloadProgress;
+  // (the backdrop's imagery quality: services/backdropImagery.js)
+  if (fetchOptions.satelliteSize) tileOptions.satelliteSize = fetchOptions.satelliteSize;
+  if (fetchOptions.maxStitchPx) tileOptions.maxStitchPx = fetchOptions.maxStitchPx;
   const satZoom = fetchOptions.satelliteZoom !== undefined ? fetchOptions.satelliteZoom : GLB_SURROUND_SAT_ZOOM;
   return fetchSurroundingTiles(
     data.bounds,

@@ -99,11 +99,17 @@ const terrariumHeight = (r, g, b) => {
  * Strategy: compare each sample to the median of its 8-neighbour hood and
  * replace only when the deviation is implausibly large.
  */
-const suppressHeightSpikes = (heightMap, width, height) => {
+export const suppressHeightSpikes = (heightMap, width, height) => {
   if (!heightMap || width < 3 || height < 3) return 0;
 
   const out = new Float32Array(heightMap);
-  const neighbors = new Float32Array(8);
+  // (two small scratch arrays for the whole run: sorting a fresh array twice for
+  // every sample, a million a tile, held the page for 11 s of a 15 s backdrop)
+  const sorted = new Float64Array(8);
+  const dev = new Float64Array(8);
+  const insertionSort = (a, n) => {
+    for (let i = 1; i < n; i++) { const v = a[i]; let j = i - 1; while (j >= 0 && a[j] > v) { a[j + 1] = a[j]; j--; } a[j + 1] = v; }
+  };
   let replaced = 0;
 
   for (let y = 1; y < height - 1; y++) {
@@ -112,30 +118,38 @@ const suppressHeightSpikes = (heightMap, width, height) => {
       const value = heightMap[idx];
       if (!Number.isFinite(value) || value === NO_DATA_VALUE) continue;
 
-      let count = 0;
+      let count = 0; let lo = Infinity; let hi = -Infinity;
       for (let oy = -1; oy <= 1; oy++) {
+        const row = (y + oy) * width + x;
         for (let ox = -1; ox <= 1; ox++) {
           if (ox === 0 && oy === 0) continue;
-          const n = heightMap[(y + oy) * width + (x + ox)];
+          const n = heightMap[row + ox];
           if (!Number.isFinite(n) || n === NO_DATA_VALUE) continue;
-          neighbors[count++] = n;
+          sorted[count++] = n;
+          if (n < lo) lo = n;
+          if (n > hi) hi = n;
         }
       }
 
       if (count < 5) continue;
 
-      const sorted = Array.from(neighbors.subarray(0, count)).sort((a, b) => a - b);
+      // Hard sanity limits for obvious decode artifacts.
+      const isAbsurd = value > 12000 || value < -12000;
+      // (nearly every sample: it lies among its neighbours and they agree within
+      // the 8 m the test allows at least, so it cannot be a spike; no median needed)
+      if (!isAbsurd && value >= lo && value <= hi && hi - lo <= 8) continue;
+
+      insertionSort(sorted, count);
       const median = sorted[Math.floor(count / 2)];
 
       // Robust local spread estimate (median absolute deviation).
-      const deviations = sorted.map((n) => Math.abs(n - median)).sort((a, b) => a - b);
-      const mad = deviations[Math.floor(deviations.length / 2)] || 0;
+      for (let i = 0; i < count; i++) dev[i] = Math.abs(sorted[i] - median);
+      insertionSort(dev, count);
+      const mad = dev[Math.floor(count / 2)] || 0;
       // Aggressive enough for single-pixel Terrarium speckles while still
       // preserving meaningful local relief in backdrop tiles.
       const robustDelta = Math.max(8, mad * 6);
 
-      // Hard sanity limits for obvious decode artifacts.
-      const isAbsurd = value > 12000 || value < -12000;
       if (isAbsurd || Math.abs(value - median) > robustDelta) {
         out[idx] = median;
         replaced++;
@@ -333,6 +347,8 @@ export const fetchSurroundingTiles = async (
     // canvas limit. Each zoom step down halves the canvas dimension; without
     // this a large/high-zoom backdrop throws a DOMException at getContext/
     // drawImage time and the download spins forever near the end.
+    // (maxStitchPx: a browser tab's share of memory, under the canvas's own limit)
+    const stitchLimit = Math.min(MAX_CANVAS_DIM, Number(options?.maxStitchPx) > 0 ? Number(options.maxStitchPx) : MAX_CANVAS_DIM);
     let effSatZoom = satelliteZoom;
     while (effSatZoom > 0) {
       const nw = project(combined.north, combined.west, effSatZoom);
@@ -343,7 +359,7 @@ export const fetchSurroundingTiles = async (
       sMaxTY = Math.floor(se.y / TILE_SIZE);
       const w = (sMaxTX - sMinTX + 1) * TILE_SIZE;
       const h = (sMaxTY - sMinTY + 1) * TILE_SIZE;
-      if (w <= MAX_CANVAS_DIM && h <= MAX_CANVAS_DIM) break;
+      if (w <= stitchLimit && h <= stitchLimit) break;
       effSatZoom -= 1;
     }
     if (effSatZoom !== satelliteZoom) {
@@ -576,6 +592,8 @@ export const fetchSurroundingTiles = async (
       }
     }
 
+    // (a turn for the page between tiles: the map and the panel stay live while they are cut)
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const spikeReplacements = suppressHeightSpikes(heightMap, outputWidth, outputHeight);
     // Recompute min/max after cleanup so downstream consumers don't use stale
     // extrema caused by removed outliers.
@@ -585,9 +603,11 @@ export const fetchSurroundingTiles = async (
 
     let satelliteDataUrl = null;
     if (includeSatellite && sCanvas) {
+      // (satelliteSize: the picture finer than the tile's height grid, services/backdropImagery.js)
+      const satSize = Number(options?.satelliteSize) > 0 ? Math.round(Number(options.satelliteSize)) : 0;
       const outSat = document.createElement('canvas');
-      outSat.width = outputWidth;
-      outSat.height = outputHeight;
+      outSat.width = satSize || outputWidth;
+      outSat.height = satSize || outputHeight;
       const outCtx = outSat.getContext('2d');
 
       const tl = project(bounds.north, bounds.west, satelliteZoom);
@@ -597,7 +617,7 @@ export const fetchSurroundingTiles = async (
       const srcW = br.x - tl.x;
       const srcH = br.y - tl.y;
 
-      outCtx.drawImage(sCanvas, srcX, srcY, srcW, srcH, 0, 0, outputWidth, outputHeight);
+      outCtx.drawImage(sCanvas, srcX, srcY, srcW, srcH, 0, 0, outSat.width, outSat.height);
       satelliteDataUrl = outSat.toDataURL('image/jpeg', 0.85);
     }
 

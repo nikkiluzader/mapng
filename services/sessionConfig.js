@@ -149,6 +149,8 @@ export function applyStoredSettings(config, storage = globalThis.localStorage) {
     for (const field of EXPORT_FIELDS) {
       if (!(field[0] in exp) || !validValue(field, exp[field[0]])) continue;
       write(field[1], LIST_KINDS[field[2]] ? JSON.stringify(LIST_KINDS[field[2]](exp[field[0]])) : exp[field[0]]);
+      // (a code that asks for a backdrop: kept for the next terrain, services/exportSettings.js)
+      if (field[1] === 'mapng_beamNGBackdropSource') { if (exp[field[0]] !== 'off') write('mapng_beamNGBackdropApplied', '1'); else { try { storage.removeItem?.('mapng_beamNGBackdropApplied'); } catch { /* private mode */ } } }
     }
   }
   for (const field of DATA_FIELDS) {

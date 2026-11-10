@@ -51,6 +51,8 @@
 
     <!-- this step's settings -->
     <div ref="scroller" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar bg-gray-50/50 dark:bg-gray-800/50 p-5">
+      <!-- Expand all / Collapse all, for a step with sections to fold -->
+      <SectionToggleAll v-if="group && sectionCount > 1" class="-mt-2 mb-3" @set="group.setAll" />
       <slot :step="modelValue" />
       <div class="flex items-center justify-between pt-5">
         <button
@@ -76,7 +78,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
+import SectionToggleAll from '../base/SectionToggleAll.vue';
+import { useSectionGroup } from '../../composables/useSectionGroup.js';
 import { useI18n } from 'vue-i18n';
 import { Check, ChevronLeft, ChevronRight, Lock } from 'lucide-vue-next';
 
@@ -101,6 +105,27 @@ const nextOpen = computed(() => {
 });
 // (a new step starts at its top)
 watch(() => props.modelValue, () => { if (scroller.value) scroller.value.scrollTop = 0; }, { flush: 'post' });
+
+// The sections on screen in this step (a step with one or none needs no buttons).
+// Counted from the page: sections come and go with the mode and the data.
+const group = useSectionGroup();
+const sectionCount = ref(0);
+const countSections = () => {
+  const el = scroller.value; if (!el) return;
+  let n = 0;
+  for (const sec of el.querySelectorAll('[data-setting-section]')) if (sec.offsetParent !== null) n++;
+  sectionCount.value = n;
+};
+let observer = null;
+onMounted(() => {
+  countSections();
+  if (typeof MutationObserver !== 'undefined' && scroller.value) {
+    observer = new MutationObserver(() => countSections());
+    observer.observe(scroller.value, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
+  }
+});
+onBeforeUnmount(() => observer?.disconnect());
+watch(() => props.modelValue, countSections, { flush: 'post' });
 
 defineExpose({ scroller });
 </script>

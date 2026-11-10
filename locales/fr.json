@@ -42,8 +42,25 @@
     "batchJob": "Tâche par lot"
   },
   "view": {
-    "map2d": "Carte 2D",
-    "preview3d": "Aperçu 3D"
+    "location": "Lieu",
+    "preview2d": "Aperçu 2D",
+    "preview3d": "Aperçu 3D",
+    "needsData": "Générez d'abord"
+  },
+  "preview2d": {
+    "texture": "Texture",
+    "features": "Ce qui sera construit",
+    "noFeatures": "Pas de données de carte pour cette zone : rien à dessiner.",
+    "hint": "Molette pour zoomer, glisser pour déplacer. Survolez un élément pour voir ce que c'est.",
+    "fit": "Ajuster à la zone",
+    "built": "Sera construit",
+    "notBuilt": "Désactivé : non construit",
+    "backdrop": "Arrière-plan (tuiles voisines)",
+    "backdropDownloading": "Arrière-plan : téléchargement… {pct} %",
+    "backdropLoading": "Arrière-plan : lecture des tuiles téléchargées…",
+    "backdropFailed": "Arrière-plan : le téléchargement a échoué. L'export réessaiera.",
+    "backdropWaiting": "Arrière-plan : pas encore téléchargé.",
+    "backdropQuality": "Image de l'arrière-plan : {quality}, environ {mpp} m par pixel."
   },
   "mobile": {
     "desktopRequired": "Ordinateur requis",
@@ -472,7 +489,8 @@
     "beamngTerrain": "Terrain BeamNG",
     "gameTexture": "Texture de jeu",
     "gameTextureBlend": "Détail satellite",
-    "gameTextureBlendHint": "Part du détail et de la couleur de l'image satellite reprise par la texture de jeu. 0 % : seulement les couleurs du jeu. Relâchez le curseur pour repeindre.",
+    "gameTextureBlendHint": "Part du détail et de la couleur de l'image satellite reprise par la texture de jeu. 0 % : seulement les couleurs du jeu.",
+    "gameTextureBlendPreparing": "Peinture de l'aperçu en direct, une seule fois (quelques secondes)…",
     "gameTextureBlendRepainting": "Texture en cours de peinture…",
     "desktopFailed": "L'export n'a pas abouti.",
     "desktopShowLog": "Voir le journal",
@@ -507,7 +525,7 @@
       "terrainSummary_custom": "Terrain : Personnalisé. Seules les retouches choisies sont faites.",
       "terrainSummary_untouched": "Terrain : Intact. L'altitude est utilisée telle que téléchargée.",
       "terrainChangeHere": "À changer sous Terrain, dans la section altitude ci-dessus.",
-      "terrainRegenerate": "Le choix de Terrain a changé depuis la génération : générez les données à nouveau pour l'appliquer.",
+      "terrainRegenerate": "Le choix du Terrain a changé depuis la génération de ce terrain : générez à nouveau pour l'appliquer.",
       "forestDensity": "Densité des forêts",
       "forestDensity_light": "Faible",
       "forestDensity_normal": "Normale",
@@ -528,7 +546,16 @@
       "levelChecked": "Niveau vérifié : tout y est.",
       "levelRebuilt": "Reconstruction : {problems}",
       "nothingChanged": "Rien n'a changé depuis le dernier export.",
-      "rebuildAnyway": "Reconstruire quand même"
+      "rebuildAnyway": "Reconstruire quand même",
+      "backdropImagery": "Image de l'arrière-plan",
+      "backdropImagery_standard": "Standard",
+      "backdropImagery_high": "Haute",
+      "backdropImagery_veryhigh": "Très haute",
+      "backdropImageryHint": "Image satellite à environ {mpp} m par pixel : {n} tuiles d'image à télécharger, textures de {px} px.",
+      "backdropImageryOwn": "Cette source d'arrière-plan choisit sa propre image.",
+      "backdropImagerySlow": "{n} tuiles d'image : le téléchargement peut être long sur une grande zone.",
+      "backdropImageryLimitedWeb": "Trop grand pour un onglet de navigateur à cette qualité : ramené à environ {mpp} m par pixel. L'application de bureau a plus de marge.",
+      "backdropImageryLimitedDesktop": "Trop grand à assembler à cette qualité : ramené à environ {mpp} m par pixel."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -560,8 +587,8 @@
     "suggestedSquareExport": "Export carré suggéré : {size} x {size} px.",
     "switchToSquareCrop": "Passez en Recadrage carré pour choisir une zone d'export en puissance de deux dans la zone importée.",
     "dragMapToPositionCrop": "Faites glisser la carte pour placer le cadre de recadrage dans la zone importée.",
-    "previewOutOfDate": "L'aperçu n'est plus à jour — relancez Aperçu 3D pour appliquer vos modifications.",
-    "previewOutOfDatePanel": "L'aperçu 3D n'est plus à jour. Relancez Aperçu 3D pour appliquer.",
+    "previewOutOfDate": "L'aperçu n'est plus à jour. Générez à nouveau pour appliquer vos modifications.",
+    "previewOutOfDatePanel": "L'aperçu n'est plus à jour. Générez à nouveau.",
     "processingResolutionLabel": "Résolution de traitement (mètres par pixel)",
     "processingResolutionCoverage": "Couvre {km} × {km} km à {px} px ({mpp} m par pixel)",
     "processingResolutionCoverageTile": "Chaque tuile couvre {km} × {km} km à {px} px ({mpp} m par pixel)",
@@ -636,14 +663,11 @@
   },
   "generateActions": {
     "processing": "Traitement...",
-    "preview3d": "Aperçu 3D",
-    "usingCachedData": "Données en cache utilisées",
     "usingUploadedElevation": "Données d'élévation importées utilisées",
-    "viewBeforeDownload": "Voir avant de télécharger",
     "dataReady": "Données prêtes",
     "downloadBelow": "Aller à l'export",
-    "generateData": "Générer les données",
-    "skip3dGetFiles": "Ignorer la vue 3D, récupérer les fichiers"
+    "generate": "Générer",
+    "generateHint": "Terrain et données de carte, puis un aperçu"
   },
   "mapSelector": {
     "moveTile": "Déplacer {label}",
@@ -1220,7 +1244,7 @@
   "config": {
     "copied": "Réglages copiés sous forme de code. Collez-le dans MapNG (Ctrl+V sur la carte) pour les utiliser.",
     "invalid": "Ce n'est pas un code de réglages MapNG.",
-    "applied": "Réglages appliqués. Cliquez sur Aperçu 3D ou Générer les données pour les construire.",
+    "applied": "Paramètres appliqués. Appuyez sur Générer pour les construire.",
     "dialogTitle": "Utiliser ces réglages ?",
     "dialogIntro": "Ces réglages définiraient :",
     "dialogNote": "Vos propres clés et serveurs (comme une clé GPXZ) ne font jamais partie d'un code de réglages et restent inchangés.",
@@ -1386,7 +1410,9 @@
     "reset": "Réinitialiser",
     "resetTitle": "Remettre cette section aux valeurs par défaut",
     "changedTitle": "Modifié par rapport aux valeurs par défaut",
-    "more": "Plus"
+    "more": "Plus",
+    "expandAll": "Tout déplier",
+    "collapseAll": "Tout replier"
   },
   "osmFile": {
     "title": "Utiliser votre propre fichier OSM",
@@ -1431,7 +1457,7 @@
     "run": "Lancer",
     "exportLocked": "Générez d'abord le terrain",
     "review": "Récapitulatif",
-    "reviewHint": "L'aperçu 3D montre le terrain avant l'export ; Générer les données passe directement aux options du niveau. Cliquez sur une ligne pour la modifier.",
+    "reviewHint": "Générer récupère le terrain et les données de carte, puis ouvre un aperçu. Cliquez sur une ligne pour la modifier.",
     "runHint": "Démarrer génère et exporte toutes les tuiles d'un coup, sans aperçu entre les deux. Cliquez sur une ligne pour la modifier.",
     "generated": "Terrain prêt : il correspond à ces réglages.",
     "generatedStale": "Réglages modifiés depuis la génération : générez à nouveau pour les utiliser.",
@@ -1673,9 +1699,9 @@
     "groupAll": "{group} : tout",
     "tagsN": "{n} tags",
     "showTags": "Afficher les tags OSM",
-    "colourMap": "Colorer la carte par groupe",
-    "colourMapIn3d": "Les couleurs s'affichent sur la carte 2D. Vous êtes dans l'aperçu 3D.",
-    "show2dMap": "Afficher la carte 2D",
+    "colourMap": "Afficher sur l'aperçu 2D",
+    "colourMapIn3d": "Ce qui sera construit est dessiné sur l'aperçu 2D.",
+    "show2dMap": "Ouvrir l'aperçu 2D",
     "tagsLeftOut": "{n} tags OSM exclus.",
     "keepAllTags": "Tout garder",
     "offInFeatures": "{what} : désactivé dans Éléments",

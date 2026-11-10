@@ -70,7 +70,27 @@ export const useMainStore = defineStore('main', () => {
   const lastGenerationKey = ref(null);
   const isLoading = ref(false);
   const loadingStatus = ref("Initializing...");
-  const previewMode = ref(false);
+  // Which view is over the map: 'location' (the world map, where the area is
+  // chosen), 'preview2d' (the generated area flat, with what will be built) or
+  // 'preview3d'. Generate opens the 2D preview; the 3D scene is only built
+  // when its tab is opened.
+  const viewMode = ref('location');
+  // (the 3D preview as a switch, for the code that knows two views)
+  const previewMode = computed({
+    get: () => viewMode.value === 'preview3d',
+    set: (on) => { viewMode.value = on ? 'preview3d' : 'location'; },
+  });
+  // (bumped when a texture of the terrain is repainted in place: the terrain is a
+  // shallow ref, so the previews watch this)
+  const textureRevision = ref(0);
+  // (the export's backdrop choice, 'off' or its elevation source: the 2D preview draws
+  // the surrounding tiles when one is chosen; the export panel keeps it up to date)
+  // (the export's data-step options, as the export panel has them: the 2D preview asks the
+  // data step for the backdrop it downloaded)
+  const exportDataOptions = shallowRef(null);
+  // (the backdrop's imagery as planned for this terrain: quality, metres a pixel…; the 2D preview says it)
+  const backdropImagery = shallowRef(null);
+  const backdropSource = ref((() => { try { return localStorage.getItem('mapng_beamNGBackdropSource') || 'off'; } catch { return 'off'; } })());
   const surroundingTilePositions = ref([]);
 
   // --- Background areas (services/backgroundMask.js; Location step, advanced) ---
@@ -238,6 +258,11 @@ export const useMainStore = defineStore('main', () => {
     isLoading,
     loadingStatus,
     previewMode,
+    viewMode,
+    textureRevision,
+    backdropSource,
+    exportDataOptions,
+    backdropImagery,
     surroundingTilePositions,
     backgroundMask,
     points,

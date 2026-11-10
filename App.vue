@@ -94,16 +94,15 @@
         <MemoryWidget />
       </div>
       <ViewTabs
-        :preview-mode="previewMode"
+        :view-mode="viewMode"
         :can-preview="!!terrainData"
-        @switch-2d="switchTo2D"
-        @switch-3d="previewMode = true"
+        @switch="(mode) => { viewMode = mode; }"
       />
 
       <!-- Views -->
       <div class="flex-1 relative w-full h-full">
         <!-- Map View -->
-        <div :class="['absolute inset-0 transition-all duration-500', previewMode ? 'opacity-0 invisible' : 'opacity-100 visible']">
+        <div :class="['absolute inset-0 transition-all duration-500', viewMode !== 'location' ? 'opacity-0 invisible' : 'opacity-100 visible']">
           <MapSelector 
             :center="center" 
             :zoom="zoom" 
@@ -124,15 +123,22 @@
           />
         </div>
         
-        <!-- 3D Preview View -->
-        <div :class="['absolute inset-0 transition-all duration-500 bg-black', previewMode ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
+        <!-- the settings changed since this was generated: said over either preview -->
           <div
-            v-if="previewStale && previewMode && terrainData"
-            class="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/95 text-white text-sm font-medium shadow-lg pointer-events-none"
+            v-if="previewStale && viewMode !== 'location' && terrainData"
+            class="absolute top-4 left-1/2 -translate-x-1/2 z-[700] flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-500/95 text-white text-sm font-medium shadow-lg pointer-events-none"
           >
             <AlertTriangle :size="15" class="shrink-0" />
             {{ t('controlPanel.previewOutOfDate') }}
           </div>
+
+        <!-- 2D preview: the generated area flat, with what will be built -->
+        <div :class="['absolute inset-0 transition-all duration-500', viewMode === 'preview2d' ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
+          <Preview2D v-if="terrainData && viewMode === 'preview2d'" :terrain-data="terrainData" />
+        </div>
+
+        <!-- 3D Preview View -->
+        <div :class="['absolute inset-0 transition-all duration-500 bg-black', previewMode ? 'opacity-100 visible' : 'opacity-0 invisible pointer-events-none']">
           <Suspense>
             <template #default>
               <Preview3D 
@@ -208,7 +214,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from './stores/mainStore';
@@ -224,6 +230,7 @@ import BatchControlPanel from './components/panels/BatchControlPanel.vue';
 import BatchProgressModal from './components/modals/BatchProgressModal.vue';
 import MapSelector from './components/map/MapSelector.vue';
 import Preview3D from './components/three/Preview3D.vue';
+import Preview2D from './components/map/Preview2D.vue';
 import AppSidebar from './components/layout/AppSidebar.vue';
 import LevelsSidebar from './components/layout/LevelsSidebar.vue';
 import DesktopWelcome from './components/modals/DesktopWelcome.vue';
@@ -275,6 +282,7 @@ const {
   isLoading,
   loadingStatus,
   previewMode,
+  viewMode,
   surroundingTilePositions,
   batchGridCols,
   batchGridRows,
@@ -822,7 +830,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
 
     if (requestKey === lastGenerationKey.value) {
       // Exact match — skip fetch entirely, just switch view if needed
-      if (showPreview) previewMode.value = true;
+      openPreviewAfterGenerate();
       return;
     }
 
@@ -836,10 +844,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
         terrainData.value = updatedData;
         lastGenerationKey.value = requestKey;
         warnIfOsmUnavailable(updatedData);
-        if (showPreview) {
-          loadingStatus.value = t('app.status.rendering3d');
-          previewMode.value = true;
-        }
+        openPreviewAfterGenerate();
       } catch (error) {
         console.error("Failed to add OSM data:", error);
         alert(t('app.error.fetchOsm'));
@@ -938,10 +943,7 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     lastGenerationKey.value = requestKey;
     warnIfOsmUnavailable(data);
     
-    if (showPreview) {
-      applyLoadingUpdate(t('app.status.rendering3d'));
-        previewMode.value = true;
-    }
+    openPreviewAfterGenerate();
   } catch (error) {
     if (error.name === 'AbortError') {
       console.log("Terrain generation cancelled.");
@@ -1049,6 +1051,12 @@ const handleModifyLevel = async (level) => {
   generateNextFromLevel(level.levelName, { center: info.center, resolution: info.resolution || resolution.value, mpp });
   await handleGenerate(false, info.includeOSM, 'default', '', 'auto', mpp);
 };
+
+// Generated: the 2D preview opens (what was asked for, flat, with what will be
+// built). Someone already looking at the 3D preview keeps it.
+const openPreviewAfterGenerate = () => { if (viewMode.value !== 'preview3d') viewMode.value = 'preview2d'; };
+// (no terrain: nothing to preview)
+watch(terrainData, (data) => { if (!data && viewMode.value !== 'location') viewMode.value = 'location'; });
 
 const switchTo2D = () => {
   previewMode.value = false;

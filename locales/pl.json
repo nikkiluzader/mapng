@@ -42,8 +42,25 @@
     "batchJob": "Zadanie wsadowe"
   },
   "view": {
-    "map2d": "Mapa 2D",
-    "preview3d": "Podgląd 3D"
+    "location": "Lokalizacja",
+    "preview2d": "Podgląd 2D",
+    "preview3d": "Podgląd 3D",
+    "needsData": "Najpierw wygeneruj"
+  },
+  "preview2d": {
+    "texture": "Tekstura",
+    "features": "Co zostanie zbudowane",
+    "noFeatures": "Brak danych mapy dla tego obszaru: nie ma czego rysować.",
+    "hint": "Przewijaj, aby przybliżyć, przeciągaj, aby przesunąć. Najedź na obiekt, aby zobaczyć, czym jest.",
+    "fit": "Dopasuj do obszaru",
+    "built": "Zostanie zbudowane",
+    "notBuilt": "Wyłączone: nie zostanie zbudowane",
+    "backdrop": "Tło (sąsiednie kafle)",
+    "backdropDownloading": "Tło: pobieranie… {pct}%",
+    "backdropLoading": "Tło: odczyt pobranych kafli…",
+    "backdropFailed": "Tło: pobieranie nie powiodło się. Eksport spróbuje ponownie.",
+    "backdropWaiting": "Tło: jeszcze nie pobrane.",
+    "backdropQuality": "Obraz tła: {quality}, ok. {mpp} m na piksel."
   },
   "mobile": {
     "desktopRequired": "Wymagany komputer",
@@ -472,7 +489,8 @@
     "beamngTerrain": "Teren BeamNG",
     "gameTexture": "Tekstura gry",
     "gameTextureBlend": "Szczegóły z satelity",
-    "gameTextureBlendHint": "Ile szczegółów i koloru ze zdjęcia satelitarnego przejmuje tekstura gry. 0%: tylko kolory gry. Puść suwak, aby przemalować.",
+    "gameTextureBlendHint": "Ile szczegółów i koloru ze zdjęcia satelitarnego przejmuje tekstura gry. 0%: tylko kolory gry.",
+    "gameTextureBlendPreparing": "Maluję podgląd na żywo, jeden raz (kilka sekund)…",
     "gameTextureBlendRepainting": "Przemalowywanie tekstury…",
     "desktopFailed": "Eksport się nie zakończył.",
     "desktopShowLog": "Pokaż log",
@@ -507,7 +525,7 @@
       "terrainSummary_custom": "Teren: Własne. Tylko wybrane poprawki.",
       "terrainSummary_untouched": "Teren: Nietknięty. Wysokości dokładnie tak, jak pobrane.",
       "terrainChangeHere": "Zmień w sekcji Teren, w części o wysokościach powyżej.",
-      "terrainRegenerate": "Wybór terenu zmienił się od wygenerowania: wygeneruj dane ponownie, aby go zastosować.",
+      "terrainRegenerate": "Wybór Terenu zmienił się od wygenerowania tego terenu: wygeneruj ponownie, aby go zastosować.",
       "forestDensity": "Gęstość lasu",
       "forestDensity_light": "Rzadki",
       "forestDensity_normal": "Normalny",
@@ -528,7 +546,16 @@
       "levelChecked": "Poziom sprawdzony: wszystko jest.",
       "levelRebuilt": "Budowanie od nowa: {problems}",
       "nothingChanged": "Nic się nie zmieniło od ostatniego eksportu.",
-      "rebuildAnyway": "Zbuduj mimo to"
+      "rebuildAnyway": "Zbuduj mimo to",
+      "backdropImagery": "Obraz tła",
+      "backdropImagery_standard": "Standardowa",
+      "backdropImagery_high": "Wysoka",
+      "backdropImagery_veryhigh": "Bardzo wysoka",
+      "backdropImageryHint": "Zdjęcie satelitarne ok. {mpp} m na piksel: {n} kafli do pobrania, tekstury {px} px.",
+      "backdropImageryOwn": "To źródło tła samo wybiera obraz.",
+      "backdropImagerySlow": "{n} kafli obrazu: na dużym obszarze pobieranie może potrwać.",
+      "backdropImageryLimitedWeb": "Za duże dla karty przeglądarki w tej jakości: zmniejszono do ok. {mpp} m na piksel. Aplikacja na komputer ma więcej miejsca.",
+      "backdropImageryLimitedDesktop": "Za duże do złożenia w tej jakości: zmniejszono do ok. {mpp} m na piksel."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -560,8 +587,8 @@
     "suggestedSquareExport": "Sugerowany kwadratowy eksport: {size} x {size} px.",
     "switchToSquareCrop": "Przełącz na Kwadratowe przycięcie, aby wybrać obszar eksportu o boku będącym potęgą dwójki w granicach przesłanego pokrycia.",
     "dragMapToPositionCrop": "Przeciągnij mapę, aby ustawić ramkę przycięcia w granicach przesłanego pokrycia.",
-    "previewOutOfDate": "Podgląd jest nieaktualny — uruchom ponownie Podgląd 3D, aby zastosować zmiany.",
-    "previewOutOfDatePanel": "Podgląd 3D jest nieaktualny. Uruchom ponownie Podgląd 3D, aby zastosować zmiany.",
+    "previewOutOfDate": "Podgląd jest nieaktualny. Wygeneruj ponownie, aby zastosować zmiany.",
+    "previewOutOfDatePanel": "Podgląd jest nieaktualny. Wygeneruj ponownie.",
     "processingResolutionLabel": "Rozdzielczość przetwarzania (metry na piksel)",
     "processingResolutionCoverage": "Obejmuje {km} × {km} km przy {px} px ({mpp} m na piksel)",
     "processingResolutionCoverageTile": "Każdy kafelek obejmuje {km} × {km} km przy {px} px ({mpp} m na piksel)",
@@ -636,14 +663,11 @@
   },
   "generateActions": {
     "processing": "Przetwarzanie...",
-    "preview3d": "Podgląd 3D",
-    "usingCachedData": "Używanie danych z pamięci podręcznej",
     "usingUploadedElevation": "Używane są przesłane dane wysokości",
-    "viewBeforeDownload": "Wyświetl przed pobraniem",
     "dataReady": "Dane gotowe",
     "downloadBelow": "Przejdź do eksportu",
-    "generateData": "Wygeneruj dane",
-    "skip3dGetFiles": "Pomiń widok 3D, pobierz pliki"
+    "generate": "Generuj",
+    "generateHint": "Teren i dane mapy, potem podgląd"
   },
   "mapSelector": {
     "moveTile": "Przesuń {label}",
@@ -1220,7 +1244,7 @@
   "config": {
     "copied": "Ustawienia skopiowane jako kod. Wklej go w MapNG (Ctrl+V na mapie), aby ich użyć.",
     "invalid": "To nie jest kod ustawień MapNG.",
-    "applied": "Ustawienia zastosowane. Naciśnij Podgląd 3D lub Wygeneruj dane, aby je zbudować.",
+    "applied": "Ustawienia zastosowane. Naciśnij Generuj, aby je zbudować.",
     "dialogTitle": "Użyć tych ustawień?",
     "dialogIntro": "Te ustawienia zmienią:",
     "dialogNote": "Twoje klucze i serwery (np. klucz GPXZ) nigdy nie trafiają do kodu ustawień i pozostają bez zmian.",
@@ -1386,7 +1410,9 @@
     "reset": "Przywróć",
     "resetTitle": "Przywróć domyślne ustawienia tej sekcji",
     "changedTitle": "Zmienione względem domyślnych",
-    "more": "Więcej"
+    "more": "Więcej",
+    "expandAll": "Rozwiń wszystko",
+    "collapseAll": "Zwiń wszystko"
   },
   "osmFile": {
     "title": "Użyj własnego pliku OSM",
@@ -1431,7 +1457,7 @@
     "run": "Uruchom",
     "exportLocked": "Najpierw wygeneruj teren",
     "review": "Podsumowanie",
-    "reviewHint": "Podgląd 3D pokazuje teren przed eksportem; Generuj dane przechodzi od razu do opcji poziomu. Kliknij wiersz, aby go zmienić.",
+    "reviewHint": "Generowanie pobiera teren i dane mapy, a potem otwiera podgląd. Kliknij wiersz, aby go zmienić.",
     "runHint": "Start generuje i eksportuje wszystkie kafelki za jednym razem, bez podglądu po drodze. Kliknij wiersz, aby go zmienić.",
     "generated": "Teren gotowy: zgadza się z tymi ustawieniami.",
     "generatedStale": "Ustawienia zmieniły się od generowania: wygeneruj ponownie, aby ich użyć.",
@@ -1673,9 +1699,9 @@
     "groupAll": "{group}: wszystko",
     "tagsN": "Tagi: {n}",
     "showTags": "Pokaż tagi OSM",
-    "colourMap": "Pokoloruj mapę według grup",
-    "colourMapIn3d": "Kolory są rysowane na mapie 2D. Jesteś w podglądzie 3D.",
-    "show2dMap": "Pokaż mapę 2D",
+    "colourMap": "Pokaż na podglądzie 2D",
+    "colourMapIn3d": "To, co zostanie zbudowane, jest narysowane na podglądzie 2D.",
+    "show2dMap": "Otwórz podgląd 2D",
     "tagsLeftOut": "Pominięte tagi OSM: {n}.",
     "keepAllTags": "Zachowaj wszystkie",
     "offInFeatures": "{what}: wyłączone w Obiektach",

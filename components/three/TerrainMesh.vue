@@ -2,6 +2,7 @@
 import { computed, shallowRef, reactive, watch, toRaw, markRaw, onUnmounted, ref } from 'vue';
 import * as THREE from 'three';
 import { useTresContext, useLoop } from '@tresjs/core';
+import { useMainStore } from '../../stores/mainStore';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TERRAIN_VIEWS, terrainViewUniforms, terrainViewPatch, contourInterval } from './terrainView.js';
 
@@ -576,6 +577,7 @@ watch([() => props.terrainData?.heightMap, () => props.quality], () => {
   }));
 }, { immediate: true });
 
+const mainStore = useMainStore();
 const textureCache = reactive({
   satellite: null,
   osm: null,
@@ -687,9 +689,13 @@ watch(() => props.terrainData?.hybridTextureUrl, (url) => {
 
 // Game Texture: from its URL, or its canvas without freeing it (the BeamNG
 // export reads terrainData.gameTextureCanvas)
-watch(() => [props.terrainData?.gameTextureUrl, props.terrainData?.gameTextureCanvas], ([url, canvas]) => {
+// (repainted in place, the export panel's Satellite detail slider: the store's textureRevision says so)
+watch(() => [props.terrainData?.gameTextureUrl, props.terrainData?.gameTextureCanvas, mainStore.textureRevision], () => {
+  const url = props.terrainData?.gameTextureUrl; const canvas = props.terrainData?.gameTextureCanvas;
   if (textureCache.game) textureCache.game.dispose();
-  textureCache.game = url ? loadTexture(url) : (canvas ? loadCanvasTexture(canvas, () => {}) : null);
+  // (repainted in place: the canvas is ahead of its file while the slider moves)
+  const live = mainStore.textureRevision > 0 && !!canvas;
+  textureCache.game = live ? loadCanvasTexture(canvas, () => {}) : url ? loadTexture(url) : (canvas ? loadCanvasTexture(canvas, () => {}) : null);
 }, { immediate: true });
 
 // The currently active texture is just a lookup in our cache

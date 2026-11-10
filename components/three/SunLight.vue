@@ -42,6 +42,9 @@ watch(renderer, (r) => {
   if (!r) return;
   r.shadowMap.enabled = true;
   r.shadowMap.type = THREE.PCFSoftShadowMap;
+  // (shipped builds: no waiting on each shader's compile log, which holds the first frames
+  // while the driver compiles; the dev server keeps the checks and their messages)
+  if (!import.meta.env.DEV) r.debug.checkShaderErrors = false;
 }, { immediate: true });
 watch(() => props.lightDirection, setDir);
 watch(() => props.lightColor, (c) => light.color.set(c));
