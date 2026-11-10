@@ -2367,6 +2367,8 @@ export function paintLandCoverSnow(ctx, canvas, terrainData, satellite) {
 // from the image (a desert's red rock and dark volcanic ground came out one
 // pale beige at the flat 0.3), and some of its brightness; vegetation keeps
 // the painted greens; roads, buildings and water none.
+const SHADE_DARK = [40, 85];   // the image's brightness (0-255, at ~30 m): no trust under the first, full over the second
+const SHADE_CAST = 0.2;
 const BARE_TINT = { tint: [0.3, 0.3, 0.7, 0.7, 0.6, 0, 0, 0.5, 0.7], light: [0, 0, 0.4, 0.4, 0.3, 0, 0, 0.3, 0.45] };
 export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint = 0.3, classes = null } = {}) {
   const W = canvas.width; const H = canvas.height;
@@ -2403,9 +2405,17 @@ export function addSatelliteDetail(ctx, canvas, satellite, { detail = 0.75, tint
       if (classes) {
         const px = (i >> 2) % W; const py = y0 + (((i >> 2) / W) | 0);
         const k = classes.cls[Math.min(classes.h - 1, (py * classes.h / H) | 0) * classes.w + Math.min(classes.w - 1, (px * classes.w / W) | 0)];
-        tk = BARE_TINT.tint[k] ?? tint;
+        // (in shadow the image has the sky's colour, not the ground's: dark and
+        // blue there, its tint scaled up to the painted brightness turned shaded
+        // rock and scree teal. The darker and the bluer the image, the less of
+        // its colour and brightness is taken: none under SHADE_DARK[0] or with
+        // blue over red by SHADE_CAST of its brightness)
+        const dark = Math.min(1, Math.max(0, (lb - SHADE_DARK[0]) / (SHADE_DARK[1] - SHADE_DARK[0])));
+        const cast = Math.min(1, Math.max(0, 1 - (broad[i + 2] - broad[i]) / (SHADE_CAST * (lb + 8))));
+        const trust = dark * cast;
+        tk = (BARE_TINT.tint[k] ?? tint) * trust;
         // (bare ground: part of its brightness from the image too)
-        const lt = BARE_TINT.light[k] || 0;
+        const lt = (BARE_TINT.light[k] || 0) * trust;
         if (lt > 0 && pl > 1) { const m = (pl + (lb - pl) * lt) / pl; d[i] *= m; d[i + 1] *= m; d[i + 2] *= m; pl = lumOf(d, i); }
       }
       const sc = lb > 4 ? pl / lb : 0;
