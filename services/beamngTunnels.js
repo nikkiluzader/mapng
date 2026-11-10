@@ -844,6 +844,8 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     portalKind: [0, 1].map((e) => (free[e] ? 'edge' : bridged[e] ? 'bridge' : 'cut')),
     kind: cutCover ? 'cutcover' : 'bored',
     ...(low ? { low: true } : {}),
+    // (a box from the surface down: a flat slab roof)
+    ...(low || cutCover ? { flat: true } : {}),
     // (terrain shaping off: the ground as surveyed, no backfill; tunnelHoleAt
     // opens it wherever it dips into the tube)
     raw: (raw && !cutCover) || low,
@@ -1496,7 +1498,17 @@ export function hitsTunnel(tunnels, x, y, z, zTop = z) {
 
 // One ring of the section, [u (right of travel), v (up)], closed by its
 // floor / bottom edge.
-function ring(a, b0, wall, rise, K = 16) {
+function ring(a, b0, wall, rise, K = 16, flat = false) {
+  // (a box: a flat slab over the walls, the same points along it as an arch
+  // has, so a bore and a box share the tube's strips. Boxes built from the
+  // surface down are rectangular the world over: Tignes's underpasses,
+  // Phoenix's Deck Park tunnel, the I-90 lids)
+  if (flat) {
+    const out = [[-a, b0], [-a, wall + rise]];
+    for (let k = 1; k < K; k++) out.push([-a + (2 * a * k) / K, wall + rise]);
+    out.push([a, wall + rise], [a, b0]);
+    return out;
+  }
   const out = [[-a, b0], [-a, wall]];
   for (let k = 1; k < K; k++) {
     const th = Math.PI - (Math.PI * k) / K;
@@ -1543,7 +1555,7 @@ export function buildTubeGeometry(t) {
     if (!sections.has(p)) {
       const wl = p.wl ?? t.W; const wr = p.wr ?? t.W;
       const a = (wl + wr) / 2;
-      sections.set(p, { c: (wr - wl) / 2, loops: [ring(a, 0, t.wall, t.arch), ring(a + LINING_M, -LINING_M, t.wall, t.arch + LINING_M)] });
+      sections.set(p, { c: (wr - wl) / 2, loops: [ring(a, 0, t.wall, t.arch, 16, !!t.flat), ring(a + LINING_M, -LINING_M, t.wall, t.arch + LINING_M, 16, !!t.flat)] });
     }
     return sections.get(p);
   };
@@ -1638,7 +1650,7 @@ export function buildPortalGeometry(t, end) {
   // widths left / right of "into" (a ramp joining widens one side)
   const wl = end === 'S' ? p.wl ?? t.W : p.wr ?? t.W;
   const wr = end === 'S' ? p.wr ?? t.W : p.wl ?? t.W;
-  const outer = ring((wl + wr) / 2 + LINING_M, -LINING_M, t.wall, t.arch + LINING_M);
+  const outer = ring((wl + wr) / 2 + LINING_M, -LINING_M, t.wall, t.arch + LINING_M, 16, !!t.flat);
   const c = (wl - wr) / 2;
   // (left of "into" is the line's left at its start, its right at its end)
   const sideL = end === 'S' ? -1 : 1;
