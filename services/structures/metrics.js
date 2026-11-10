@@ -390,6 +390,7 @@ const CROSS_SLOPE_MAX = 0.08;     // tilt across the road
 const CROSS_HUMP_M = 0.2;         // centre off the line between the two edges
 const JUNCTION_RING_M = 12;       // compare a junction's centre with this far out
 const JUNCTION_BUMP_M = 0.25;
+const SIDE_TWIST_M = 12;          // (terrainCompose.js SIDE_WARP_M)
 // A crease just outside a road's edge: the ground's slope changing sharply
 // between 1-4 m and 4-8 m out (a smoothed corridor sunk into a crest or
 // raised over a sag meets the untouched terrain in a line).
@@ -431,7 +432,37 @@ export function checkRoadSurface(lines, groundAt) {
   const kinks = []; const cross = []; const bumps = []; const creases = [];
   let kinkPts = 0; let crossPts = 0; let creasePts = 0;
   const ground = lines.filter((cw) => !isStructure(cw) && (cw.nodes || []).length >= 2);
-  for (const cw of ground) {
+  // ground-road ends by the point they meet at
+  const ends = new Map();
+  ground.forEach((cw, li) => {
+    const n = cw.nodes;
+    for (const [node, fromStart] of [[n[0], true], [n[n.length - 1], false]]) {
+      const key = `${Math.round(node[0])},${Math.round(node[1])}`;
+      if (!ends.has(key)) ends.set(key, []);
+      ends.get(key).push({ li, fromStart, x: node[0], y: node[1] });
+    }
+  });
+  // a side road at its through road (structures/sideArms.js): under that
+  // road's lanes and SIDE_TWIST_M past them its ground is tilted across on
+  // purpose, to the through road's grade; no tilt is counted there
+  const sideSkip = ground.map(() => [0, 0]);
+  for (const list of ends.values()) {
+    if (list.length < 3) continue;
+    const dirs = list.map((e) => {
+      const n = ground[e.li].nodes; const a = e.fromStart ? n[0] : n[n.length - 1];
+      let total = 0; for (let i = 1; i < n.length; i++) total += Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]);
+      const b = along(n, e.fromStart ? Math.min(total, 8) : Math.max(0, total - 8));
+      const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      return L > 1e-6 ? [(b[0] - a[0]) / L, (b[1] - a[1]) / L] : null;
+    });
+    if (dirs.some((d) => !d)) continue;
+    const through = new Set();
+    for (let a = 0; a < list.length; a++) for (let b = a + 1; b < list.length; b++) if (dirs[a][0] * dirs[b][0] + dirs[a][1] * dirs[b][1] <= -0.7) { through.add(a); through.add(b); }
+    if (!through.size || through.size === list.length) continue;
+    const half = Math.max(...[...through].map((a) => ground[list[a].li].half || 3));
+    list.forEach((e, a) => { if (!through.has(a) && ![...through].some((t) => dirs[a][0] * dirs[t][0] + dirs[a][1] * dirs[t][1] >= 0.7)) sideSkip[e.li][e.fromStart ? 0 : 1] = half + SIDE_TWIST_M; });
+  }
+  for (const [gi, cw] of ground.entries()) {
     const n = cw.nodes;
     const s = [0];
     for (let i = 1; i < n.length; i++) s.push(s[i - 1] + Math.hypot(n[i][0] - n[i - 1][0], n[i][1] - n[i - 1][1]));
@@ -467,21 +498,13 @@ export function checkRoadSurface(lines, groundAt) {
         const change = Math.abs((h8 - h4) / 4 - (h4 - h1) / 3);
         if (change > CREASE_SLOPE_CHANGE) creases.push({ change, x: p[0] + side * nx * (half + 4), y: p[1] + side * ny * (half + 4), road: roadName(cw) });
       }
-      if (tilt > CROSS_SLOPE_MAX || Math.abs(hump) > CROSS_HUMP_M) {
-        cross.push({ bad: Math.max(tilt / CROSS_SLOPE_MAX, Math.abs(hump) / CROSS_HUMP_M), tilt, hump, x: p[0], y: p[1], road: roadName(cw) });
+      const twisted = at < sideSkip[gi][0] || total - at < sideSkip[gi][1];
+      if ((!twisted && tilt > CROSS_SLOPE_MAX) || Math.abs(hump) > CROSS_HUMP_M) {
+        cross.push({ bad: Math.max(twisted ? 0 : tilt / CROSS_SLOPE_MAX, Math.abs(hump) / CROSS_HUMP_M), tilt, hump, x: p[0], y: p[1], road: roadName(cw) });
       }
     }
   }
   // junctions: ground-road ends meeting three or more at a point
-  const ends = new Map();
-  ground.forEach((cw, li) => {
-    const n = cw.nodes;
-    for (const [node, fromStart] of [[n[0], true], [n[n.length - 1], false]]) {
-      const key = `${Math.round(node[0])},${Math.round(node[1])}`;
-      if (!ends.has(key)) ends.set(key, []);
-      ends.get(key).push({ li, fromStart, x: node[0], y: node[1] });
-    }
-  });
   let junctions = 0;
   for (const list of ends.values()) {
     if (new Set(list.map((e) => e.li)).size < 3) continue;

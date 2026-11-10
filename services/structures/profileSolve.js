@@ -1,3 +1,4 @@
+import { findSideArms, sideArmFromEnd, sideArmStation, throughSurface } from './sideArms.js';
 import { RAIL_GRADE_CEILING, RAIL_GRADE_LIMIT, RAIL_GROUND_BAND_M, railKindOfClass } from '../railways.js';
 
 // Structure solver, stage C: the vertical profile of every road at once
@@ -53,6 +54,8 @@ const LONG_GRADE_M = 30;      // the terrain's own slope, over this far either s
 const HILLSIDE_M = 100;       // ... and over this far: as steep there, a real hillside
 const HILLSIDE_FACTOR = 1.5;  // a road on a hillside may run this much steeper (back down to it)
 const HILLSIDE_MAX = 0.35;
+const HILLSIDE_LONG = 1.1;    // a hillside is no steeper than this times the slope over +-HILLSIDE_M
+const HILLSIDE_GAIN = 1.5;    // grade allowed per grade the hillside is over the class ceiling
 const GROUND_BAND_M = 6;      // an untagged road's free fill / cut for grades
 const UNDER_FREE_M = 3;       // a road under a deck is cleared from at most this over its ground
 const PIN_REACH_FACTOR = 2.5; // a lift reaches no higher than this many times the grade limit climbs from a pinned road
@@ -154,7 +157,11 @@ function allowedRise(e, structure = !!(e.bridge || e.tunnel)) {
     // fades back to the ground (at the ceiling alone it never could)
     // (never a railway: it runs on a shelf at its own grade, in cuttings and
     // on fills, where a mountain road follows its hillside)
-    const hill = !rail && terrain > ceiling && slope(a2, b2, HILLSIDE_M) >= 0.8 * terrain ? Math.min(HILLSIDE_MAX, terrain * HILLSIDE_FACTOR) : 0;
+    // (growing with how far the hillside is over the ceiling, never switched
+    // on at a threshold: a trunk road down a 14% hill was held to 7% along
+    // 230 m and let go at 21% over the last 24 m, a ramp across its junction)
+    const hillside = Math.min(terrain, slope(a2, b2, HILLSIDE_M) * HILLSIDE_LONG);
+    const hill = !rail && hillside > ceiling ? Math.min(HILLSIDE_MAX, hillside * HILLSIDE_FACTOR, ceiling + (hillside - ceiling) * HILLSIDE_GAIN) : 0;
     out[i] = Math.max(lim, Math.min(terrain, ceiling), hill) * ds;
   }
   return out;
@@ -600,6 +607,7 @@ export function* solveProfilesSteps(graph) {
   }
   if (split) clampGrades();
   verticalCurves(graph, Z, L, U, off, pinned, held);
+  seatSideArms(graph, Z, L, U, off, pinned, held, asStructure);
   tieTwinDecks(edges, Z, off, pinned, held, L, U, crossings);
   const z = edges.map((e, k) => Z.slice(off[k], off[k] + e.s.length));
   const result = { z, rounds, residual: profileResidual(graph, z) };
@@ -788,6 +796,43 @@ function verticalCurves(graph, Z, L, U, off, pinned, held) {
         }
       }
     }
+  }
+}
+
+// A side road's stations under its through road's lanes (sideArms.js) take
+// the through road's surface; the change where it leaves the lanes fades out
+// along it at SEAT_FADE_GRADE (within SEAT_FADE_M).
+const SEAT_FADE_GRADE = 0.03;
+const SEAT_FADE_M = [8, 60];
+/** Which edges may be seated: roads on the ground, nothing held on them. */
+export const seatable = (graph, asStructure = structureFor(graph)) => (k) => {
+  const e = graph.edges[k];
+  return !asStructure(e) && !e.bridge && !e.tunnel && !e.external && !railKindOfClass(e.highway) && e.highway !== 'raceway'
+    && !graph.fixed?.[k]?.some?.((x) => x) && !graph.noCut?.[k];
+};
+function seatSideArms(graph, Z, L, U, off, pinned, held, asStructure) {
+  const { edges } = graph;
+  const fixedAt = (v) => pinned[v] || held[v];
+  const zOf = (k, i) => Z[off[k] + i];
+  const put = (v, z) => { if (!fixedAt(v)) Z[v] = Math.min(Math.max(L[v], U[v]), Math.max(L[v], z)); };
+  for (const arm of findSideArms(graph, seatable(graph, asStructure))) {
+    const e = edges[arm.edge]; const n = e.s.length; const base = off[arm.edge];
+    const at = (j) => sideArmStation(e, arm.end, j);
+    // (read before any is written: the through road's own stations are never moved here)
+    const targets = [];
+    for (let j = 1; j <= arm.under; j++) { const i = at(j); targets.push(throughSurface(graph, arm.mains, zOf, e.x[i], e.y[i])?.z); }
+    if (targets.some((t) => !Number.isFinite(t))) continue;
+    const edge = at(arm.under); const delta = targets[arm.under - 1] - Z[base + edge];
+    const reach = sideArmFromEnd(e, arm.end, edge);
+    const fade = Math.min(SEAT_FADE_M[1], Math.max(SEAT_FADE_M[0], Math.abs(delta) / SEAT_FADE_GRADE), Math.max(0, (e.s[n - 1] - e.s[0]) - reach));
+    for (let j = arm.under; j < n; j++) {
+      const i = at(j); const f = fade > 0 ? 1 - (sideArmFromEnd(e, arm.end, i) - reach) / fade : (j === arm.under ? 1 : 0);
+      if (f <= 0) break;
+      // (its far end is another junction's: never moved)
+      if (j === n - 1) break;
+      put(base + i, Z[base + i] + delta * f);
+    }
+    for (let j = 1; j < arm.under; j++) put(base + at(j), targets[j - 1]);
   }
 }
 

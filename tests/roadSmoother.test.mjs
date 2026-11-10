@@ -433,3 +433,22 @@ test('no rings or steps where roads meet on a slope (lane change and a side stre
   // (a plain road edge here: ~0.04 m; the old rings: 0.45 m)
   assert.ok(worst < 0.2, `crease of ${worst.toFixed(3)} m at ${wx},${wy} near the junction`);
 });
+
+test('a T-junction on a hill: the through road keeps its even grade across it', () => {
+  // a wide road straight down a 12% slope (two ways meeting at the junction, a vertex 3 m either
+  // side of it as a rounded corner leaves), a side street joining from the south
+  const mpp = 1;
+  const bounds = makeBounds(W, H, mpp);
+  const hm = new Float32Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) hm[y * W + x] = 0.12 * x;
+  const at = (x, y) => ({ lat: latAtPy(bounds, y), lng: lngAtPx(bounds, x) });
+  const roads = [
+    { type: 'road', id: 'a', tags: { highway: 'trunk' }, geometry: [at(20, 128), at(125, 128), at(128, 128)] },
+    { type: 'road', id: 'b', tags: { highway: 'trunk' }, geometry: [at(128, 128), at(131, 128), at(235, 128)] },
+    { type: 'road', id: 'c', tags: { highway: 'residential' }, geometry: [at(128, 128), at(128, 131), at(128, 230)] },
+  ];
+  smoothRoadsInHeightmap(hm, W, H, bounds, roads, mpp);
+  let worst = 0;
+  for (let y = 124; y <= 132; y++) for (let x = 112; x <= 144; x++) worst = Math.max(worst, Math.abs(hm[y * W + x] - 0.12 * x));
+  assert.ok(worst < 0.08, `the road's lanes within 16 m of the junction are up to ${worst.toFixed(2)} m off its grade`);
+});

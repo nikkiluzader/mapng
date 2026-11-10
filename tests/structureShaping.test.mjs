@@ -309,3 +309,64 @@ test('solved heights on a switchback: a decal keeps to its own arm past a knot o
     assert.ok(Math.abs(z - want) < 1.2, `node (${x}, ${y}): ${z.toFixed(1)} m, its road is at ${want.toFixed(1)} m`);
   });
 });
+
+test('a T-junction on a steepening hill: no jump in the through road\'s grade, its lanes its own, the side road leaving at its grade', async () => {
+  const { sceneTerrain, sceneWay } = await import('./helpers/structureScenes.mjs');
+  // going east the ground falls at 4%, steepening to 14% over 200 m, then 14% on: steeper than a
+  // trunk road's limit. A side street joins from the south where it is 14%.
+  const h = (x) => { const t = x + 250; return 200 - (t <= 0 ? 0.04 * t : t <= 200 ? 0.04 * t + 0.1 * t * t / 400 : 18 + 0.14 * (t - 200)); };
+  const td = sceneTerrain((x) => h(x), [
+    sceneWay(1, [[-450, 0], [100, 0]], { highway: 'trunk' }),
+    sceneWay(2, [[100, 0], [450, 0]], { highway: 'trunk' }),
+    sceneWay(3, [[100, 0], [100, -300]], { highway: 'residential' }),
+  ], { coarse: true });
+  const log = console.log; console.log = () => {};
+  let g; let composed;
+  try {
+    g = generateDecalRoads(td, SQ, { structureSolver: 'v2' }).structureGraph;
+    composed = composeTerrain(g, { heightMap: td.heightMap, width: td.width, height: td.height, worldSize: td.width * SQ, minHeight: td.minHeight, skip: g.shaping?.skip || null });
+  } finally { console.log = log; }
+  // along each trunk edge: the grade over 10 m never changes by more than 4% from one 10 m to the next
+  const zAt = (e, z, s) => { let i = 0; while (i + 2 < e.s.length && e.s[i + 1] < s) i++; return z[i] + (z[i + 1] - z[i]) * ((s - e.s[i]) / ((e.s[i + 1] - e.s[i]) || 1)); };
+  let trunks = 0;
+  g.edges.forEach((e, k) => {
+    if (e.highway !== 'trunk') return;
+    trunks++;
+    const z = g.profile.z[k]; const total = e.s[e.s.length - 1]; let last = null;
+    for (let s = 0; s + 10 <= total; s += 10) {
+      const grade = (zAt(e, z, s + 10) - zAt(e, z, s)) / 10;
+      if (last !== null) assert.ok(Math.abs(grade - last) < 0.04, `grade ${(last * 100).toFixed(1)}% then ${(grade * 100).toFixed(1)}% at ${s.toFixed(0)} m of a trunk edge`);
+      last = grade;
+    }
+  });
+  assert.ok(trunks >= 2);
+  // the trunk road's south lane beside the junction: its own surface, level across (the ground falls along x only)
+  for (const x of [92, 96, 100, 104, 108]) {
+    const centre = composed.heightAt(x, 0); const lane = composed.heightAt(x, -5);
+    assert.ok(Math.abs(lane - centre) < 0.1, `at x ${x}: the lane ${lane.toFixed(2)} m, the centre line ${centre.toFixed(2)} m`);
+  }
+  // 3 m past the trunk road's edge the side street's surface still falls with it, edge to edge
+  const edgeY = -(g.edges.find((e) => e.highway === 'trunk').half + 3);
+  const fall = composed.heightAt(98, edgeY) - composed.heightAt(102, edgeY);
+  assert.ok(fall > 0.25, `the side street 3 m off the lanes is level across (${fall.toFixed(2)} m over 4 m) where the trunk road falls 0.56 m`);
+});
+
+test('a road down a hill steeper than its class allows: one even grade down it, no sawtooth', async () => {
+  const { sceneTerrain, sceneWay } = await import('./helpers/structureScenes.mjs');
+  // going east: 4%, then 160 m at 14% (twice a trunk road's limit), then 5%
+  const h = (x) => 200 - (x <= -250 ? 0.04 * (x + 250) : x <= -90 ? 0.14 * (x + 250) : 22.4 + 0.05 * (x + 90));
+  const td = sceneTerrain((x) => h(x), [sceneWay(1, [[-450, 0], [450, 0]], { highway: 'trunk' })], { coarse: true });
+  const log = console.log; console.log = () => {};
+  let g;
+  try { g = generateDecalRoads(td, SQ, { structureSolver: 'v2' }).structureGraph; } finally { console.log = log; }
+  const e = g.edges[0]; const z = g.profile.z[0];
+  const zAt = (s) => { let i = 0; while (i + 2 < e.s.length && e.s[i + 1] < s) i++; return z[i] + (z[i + 1] - z[i]) * ((s - e.s[i]) / ((e.s[i + 1] - e.s[i]) || 1)); };
+  // (held to its 7% limit along part of the hill and let go at 21% beside it, the road ran 14, 11, 7, 16, 21, 15%)
+  let steepest = 0;
+  for (let s = 0; s + 10 <= e.s[e.s.length - 1]; s += 10) {
+    const grade = (zAt(s + 10) - zAt(s)) / 10;
+    steepest = Math.max(steepest, Math.abs(grade));
+    if (s >= 230 && s <= 330) assert.ok(Math.abs(grade + 0.14) < 0.03, `${(grade * 100).toFixed(1)}% at ${s} m, on the hill's even 14%`);
+  }
+  assert.ok(steepest < 0.2, `steepest ${(steepest * 100).toFixed(1)}% on a 14% hill`);
+});

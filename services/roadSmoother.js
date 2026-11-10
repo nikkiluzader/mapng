@@ -34,6 +34,18 @@ const SEAM_BLUR_RANGE_M = 0.5;
 // A seam: two claims of at least this road weight (in 1/255: 0.5) on one
 // pixel, more than SEAM_MIN_DZ_M apart in height. Flags in roadCount's top bits.
 const SEAM_MIN_W8 = 128;
+// A side road ending on a through road (two other arms carrying on in line
+// through the node, within THROUGH_COS of straight): the through road keeps
+// its own surface across the junction. The side road's strip claims the
+// ground under the through road's lanes at SIDE_ARM_W only (below a tie, so
+// it never averages in), and its profile is pinned to the through road's
+// surface where it leaves those lanes, not at the node on the centre line.
+// Averaged in at full weight, a side street's level strip stood as a shelf
+// across a trunk road on a 12% hill, a 0.5 m step at its edge.
+const THROUGH_COS = -0.7;
+const SIDE_ARM_W = 0.45;
+const FORK_COS = 0.7;      // (an arm this close to a through arm's direction is a slip road forking from it: no side road)
+const ARM_DIR_M = 10;
 const SEAM_MIN_DZ_M = 0.02;
 const SEAM_FLAG = 0x80;
 const NEAR_SEAM = 0x40;
@@ -204,6 +216,47 @@ function smooth1DArray(arr, windowSize) {
     return result;
 }
 
+/**
+ * The same box average, over a length of road instead of a count of samples:
+ * the mean of the profile (straight between its samples) from halfM before
+ * each sample to halfM after it, the profile carried on past its ends by the
+ * same reflection. Samples are not evenly spaced (every vertex of the road is
+ * one, and a rounded corner has one every metre): averaged by count, a
+ * sample 3 m from a junction was smoothed as if 5 m from it, and stood
+ * 0.25 m off the grade its road arrived with, three passes over: a step
+ * across the road beside every junction on a hill.
+ */
+function smoothProfileByLength(arr, cumLenM, halfM) {
+    const n = arr.length;
+    const L = cumLenM[n - 1];
+    for (let i = 0; i < n; i++) if (arr[i] === NO_DATA_VALUE || !Number.isFinite(arr[i])) return null;
+    if (!(L > 0)) return null;
+    const half = Math.min(halfM, L);
+    // the integral of the profile from its start to each sample
+    const I = new Float64Array(n);
+    for (let i = 1; i < n; i++) I[i] = I[i - 1] + (arr[i] + arr[i - 1]) / 2 * (cumLenM[i] - cumLenM[i - 1]);
+    let k = 0;
+    const within = (x) => {
+        if (x <= 0) return 0;
+        if (x >= L) return I[n - 1];
+        while (k + 1 < n - 1 && cumLenM[k + 1] < x) k++;
+        while (k > 0 && cumLenM[k] > x) k--;
+        const ds = cumLenM[k + 1] - cumLenM[k];
+        if (!(ds > 0)) return I[k];
+        const d = x - cumLenM[k];
+        const zx = arr[k] + (arr[k + 1] - arr[k]) * (d / ds);
+        return I[k] + (arr[k] + zx) / 2 * d;
+    };
+    const integral = (x) => {
+        if (x < 0) return 2 * arr[0] * x + within(-x);
+        if (x > L) return 2 * arr[n - 1] * (x - L) + within(2 * L - x);
+        return within(x);
+    };
+    const result = new Float32Array(n);
+    for (let i = 0; i < n; i++) result[i] = (integral(cumLenM[i] + half) - integral(cumLenM[i] - half)) / (2 * half);
+    return result;
+}
+
 export function isGroundLevelRoad(feature) {
     if (feature?.type !== 'road') return false;
     const tags = feature.tags || {};
@@ -298,8 +351,10 @@ function buildCorridorProfiles(corridors, heightMap, width, height, project, met
         liftOverCliffs(zOrig, cumLenM);
 
         let zSmooth = zOrig;
+        // (as wide as the old window of samples was on evenly spaced ones)
+        const halfWindowM = (Math.floor(windowSamples / 2) + 0.5) * SAMPLE_SPACING_M;
         for (let pass = 0; pass < tuning.passes; pass++) {
-            zSmooth = smooth1DArray(zSmooth, windowSamples);
+            zSmooth = smoothProfileByLength(zSmooth, cumLenM, halfWindowM) || smooth1DArray(zSmooth, windowSamples);
         }
 
         profiles.push({ corridor, points, zOrig, zSmooth, cumLenM, bridgeAtStart, bridgeAtEnd });
@@ -433,6 +488,93 @@ function pinJunctionElevations(profiles, tuning = TUNING.coarse) {
 }
 
 /**
+ * Side roads at their through roads (see THROUGH_COS). In place: each side
+ * arm's profile re-pinned to the through road's surface at the edge of its
+ * lanes. Returns, per profile, how far from its start / end (metres along
+ * it) its strip lies under a through road's lanes: { start, end }.
+ */
+function seatSideRoads(profiles, halfWidths, metersPerPixel, tuning) {
+    const arms = new Map();
+    profiles.forEach((p, k) => {
+        const n = p.points.length;
+        for (const atEnd of [false, true]) {
+            const key = atEnd ? p.corridor.endKey : p.corridor.startKey;
+            // (a loop meeting itself: left as it is)
+            if (p.corridor.startKey === p.corridor.endKey) continue;
+            const i0 = atEnd ? n - 1 : 0; const step = atEnd ? -1 : 1;
+            let i = i0;
+            while (i + step >= 0 && i + step < n && Math.abs(p.cumLenM[i] - p.cumLenM[i0]) < ARM_DIR_M) i += step;
+            const dx = p.points[i].x - p.points[i0].x; const dy = p.points[i].y - p.points[i0].y; const l = Math.hypot(dx, dy);
+            if (!(l > 0)) continue;
+            const list = arms.get(key) || [];
+            list.push({ k, atEnd, dx: dx / l, dy: dy / l });
+            arms.set(key, list);
+        }
+    });
+    const under = new Map();
+    for (const list of arms.values()) {
+        if (list.length < 3) continue;
+        const through = new Set();
+        for (let a = 0; a < list.length; a++) {
+            for (let b = a + 1; b < list.length; b++) {
+                if (list[a].dx * list[b].dx + list[a].dy * list[b].dy <= THROUGH_COS) { through.add(a); through.add(b); }
+            }
+        }
+        if (through.size === 0 || through.size === list.length) continue;
+        const mains = [...through].map((a) => list[a]);
+        // the through road's surface under a point: [distance from its centre line (px), height, its half width (m)]
+        const surfaceAt = (x, y) => {
+            let best = null;
+            for (const m of mains) {
+                const p = profiles[m.k]; const n = p.points.length;
+                const i0 = m.atEnd ? n - 1 : 0; const step = m.atEnd ? -1 : 1;
+                for (let i = i0; i + step >= 0 && i + step < n && Math.abs(p.cumLenM[i] - p.cumLenM[i0]) < 80; i += step) {
+                    const a = p.points[i]; const b = p.points[i + step];
+                    const za = p.zSmooth[i]; const zb = p.zSmooth[i + step];
+                    if (za === NO_DATA_VALUE || zb === NO_DATA_VALUE) continue;
+                    const { t, dist } = pointLineProjection(x, y, a.x, a.y, b.x, b.y);
+                    if (!best || dist < best[0]) best = [dist, za + t * (zb - za), halfWidths[m.k]];
+                }
+            }
+            return best;
+        };
+        list.forEach((arm, a) => {
+            if (through.has(a)) return;
+            if (mains.some((m) => arm.dx * m.dx + arm.dy * m.dy >= FORK_COS)) return;
+            const p = profiles[arm.k]; const { zSmooth, cumLenM, points } = p; const n = points.length;
+            const i0 = arm.atEnd ? n - 1 : 0; const step = arm.atEnd ? -1 : 1;
+            const from = (i) => Math.abs(cumLenM[i] - cumLenM[i0]);
+            const total = cumLenM[n - 1];
+            // the first station clear of the through road's lanes (never past the arm's middle)
+            let edge = -1; let zEdge = 0;
+            for (let i = i0 + step; i >= 0 && i < n && from(i) <= total / 2; i += step) {
+                const s = surfaceAt(points[i].x, points[i].y);
+                if (!s) break;
+                if (s[0] * metersPerPixel >= s[2]) { edge = i; zEdge = s[1]; break; }
+            }
+            if (edge < 0 || zSmooth[edge] === NO_DATA_VALUE || zSmooth[i0] === NO_DATA_VALUE) return;
+            const reach = from(edge);
+            // beyond the edge: the correction tapered out; inside: the through road's surface under each station
+            const delta = zEdge - zSmooth[edge];
+            const ramp = Math.min(tuning.ramp, total / 2 - reach);
+            for (let i = edge; i >= 0 && i < n; i += step) {
+                const f = ramp > 0 ? 1 - (from(i) - reach) / ramp : (i === edge ? 1 : 0);
+                if (f <= 0) break;
+                if (zSmooth[i] !== NO_DATA_VALUE) zSmooth[i] += delta * f;
+            }
+            for (let i = i0 + step; i !== edge; i += step) {
+                const s = surfaceAt(points[i].x, points[i].y);
+                if (s && zSmooth[i] !== NO_DATA_VALUE) zSmooth[i] = s[1];
+            }
+            const u = under.get(arm.k) || { start: 0, end: 0 };
+            if (arm.atEnd) u.end = reach; else u.start = reach;
+            under.set(arm.k, u);
+        });
+    }
+    return under;
+}
+
+/**
  * Modifies the heightMap in-place so the terrain under roads follows a
  * smoothed, junction-consistent elevation profile.
  *
@@ -474,6 +616,8 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
     if (profiles.length === 0) return;
 
     pinJunctionElevations(profiles, tuning);
+    const halfWidths = profiles.map((p) => corridorHalfWidthMeters(p.corridor, isUrbanRoad));
+    const underThrough = seatSideRoads(profiles, halfWidths, metersPerPixel, tuning);
 
     // Global accumulators. roadZ is the target height, roadW the strongest
     // claim any corridor has on the pixel (quantized to 1/255 — the weight only
@@ -493,12 +637,15 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
     const endpointCounts = new Map();
     for (const p of profiles) for (const k of [p.corridor.startKey, p.corridor.endKey]) endpointCounts.set(k, (endpointCounts.get(k) || 0) + 1);
 
-    for (const profile of profiles) {
-        const { corridor, points, zSmooth, bridgeAtStart, bridgeAtEnd } = profile;
+    for (let pk = 0; pk < profiles.length; pk++) {
+        const profile = profiles[pk];
+        const { corridor, points, zSmooth, cumLenM, bridgeAtStart, bridgeAtEnd } = profile;
+        const side = underThrough.get(pk);
+        const totalLenM = cumLenM[cumLenM.length - 1];
         const sharedStart = (endpointCounts.get(corridor.startKey) || 0) >= 2;
         const sharedEnd = (endpointCounts.get(corridor.endKey) || 0) >= 2;
 
-        const radiusMeters = corridorHalfWidthMeters(corridor, isUrbanRoad);
+        const radiusMeters = halfWidths[pk];
         // The core is flat. We add an extra margin for feathering back to the terrain.
         const radiusPx = Math.max(1, (radiusMeters + tuning.feather) / metersPerPixel);
         const coreRadiusPx = Math.max(1, radiusMeters / metersPerPixel);
@@ -515,14 +662,34 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
         const zMap = new Map();
         const dMap = new Map();
 
+        // The ground past a shared end (not one at a bridge: its approach keeps
+        // its fill to the abutment) is
+        // the first / last segment's alone, as its fading cap: the segments
+        // behind it, within the strip's reach of the end, stop at the end's
+        // line too. A road wider than its samples are apart (a trunk road's
+        // 8 m half width, a sample every 5 m or less) laid its second
+        // segment's round end past the junction at full weight and at that
+        // segment's height, which tied with the road carrying on: a pad
+        // across every junction of a wide road, 0.5 m off on a 12% hill.
+        const nPts = points.length;
+        const reachM = radiusMeters + tuning.feather;
+        const endLine = (a, b) => { const dx = b.x - a.x; const dy = b.y - a.y; const l = Math.hypot(dx, dy) || 1; return { x: a.x, y: a.y, dx: dx / l, dy: dy / l }; };
+        const startLine = sharedStart && !bridgeAtStart ? endLine(points[0], points[1]) : null;
+        const finishLine = sharedEnd && !bridgeAtEnd ? endLine(points[nPts - 1], points[nPts - 2]) : null;
+
         for (let i = 0; i < points.length - 1; i++) {
             const p1 = points[i];
             const p2 = points[i + 1];
             const z1 = zSmooth[i];
+            const behindStart = startLine && i > 0 && cumLenM[i] <= reachM ? startLine : null;
+            const behindFinish = finishLine && i < nPts - 2 && totalLenM - cumLenM[i + 1] <= reachM ? finishLine : null;
             const z2 = zSmooth[i + 1];
 
             if (z1 === NO_DATA_VALUE || z2 === NO_DATA_VALUE) continue;
             hasRoads = true;
+            // (a side road's stretch under its through road's lanes: a weak claim, and no carrying on past its end)
+            const sideStart = !!side && side.start > 0; const sideEnd = !!side && side.end > 0;
+            const weak = (sideStart && cumLenM[i + 1] <= side.start + 1e-3) || (sideEnd && totalLenM - cumLenM[i] <= side.end + 1e-3);
 
             const minX = Math.max(0, Math.floor(Math.min(p1.x, p2.x) - radiusPx));
             const maxX = Math.min(width - 1, Math.ceil(Math.max(p1.x, p2.x) + radiusPx));
@@ -533,6 +700,8 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
                 for (let x = minX; x <= maxX; x++) {
                     const { t, dist } = pointLineProjection(x, y, p1.x, p1.y, p2.x, p2.y);
                     if (dist > radiusPx) continue;
+                    if (behindStart && (x - behindStart.x) * behindStart.dx + (y - behindStart.y) * behindStart.dy < 0) continue;
+                    if (behindFinish && (x - behindFinish.x) * behindFinish.dx + (y - behindFinish.y) * behindFinish.dy < 0) continue;
                     // (a road meeting a bridge ends square there: its rounded
                     // end reached on under the deck and lifted the road
                     // passing below toward the approach's height)
@@ -542,6 +711,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
                         const along = ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / (((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2) || 1);
                         if ((bridgeAtStart && first && along < 0) || (bridgeAtEnd && last && along > 1)) continue;
                         inCap = (sharedStart && first && along < 0) || (sharedEnd && last && along > 1);
+                        if (inCap && ((first && along < 0 && sideStart) || (last && along > 1 && sideEnd))) continue;
                     }
 
                     let w = 1.0;
@@ -562,6 +732,7 @@ export function smoothRoadsInHeightmap(heightMap, width, height, bounds, osmFeat
                         const f = (dist - coreRadiusPx) / (radiusPx - coreRadiusPx);
                         w = 0.5 * (1 + Math.cos(Math.PI * f));
                     }
+                    if (weak) w *= SIDE_ARM_W;
 
                     const idx = y * width + x;
                     const prevW = wMap.get(idx) || 0;

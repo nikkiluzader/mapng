@@ -9,6 +9,9 @@
 // comes out flat instead of a round bump. Edits live in sparse tiles (a
 // full-grid buffer is 1 GiB at 16k). Nothing here knows about any place.
 
+import { findSideArms, sideArmFromEnd, sideArmStation, throughSurface } from './sideArms.js';
+import { seatable } from './profileSolve.js';
+
 const TILE = 64;
 const SHOULDER_M = 1;          // flat past the paved half width before the slope
 const GROUND_BLEND_M = 4;      // a road at ground level blends back over this far
@@ -23,6 +26,9 @@ const DECK_REACH_M = 1.5;      // past a deck's half width
 const ABUTMENT_M = 8;
 const CORE_STEP_M = 2;          // road cores this far apart in height are on two levels
 const CORE_OUTER = 0.6;         // ...where the lower road may take the upper's outer core only
+const SIDE_WARP_M = 12;         // a side road leaves its through road's edge at that road's grade across it, level again this far on
+const SIDE_WARP_MAX = 0.2;
+const SIDE_SQUARE_M = 15;       // a side road's pieces this far past its through road's edge never reach back behind it
 const DECK_ABUT_CLEAR_M = 0.3;  // abutment fill stops this far under the deck's underside          // a deck end on fill rests on it this far: no cap there
 
 const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
@@ -165,6 +171,62 @@ export function composeTerrain(graph, grid) {
   // proud
   const left = new Set();
   const abutmentOff = (kind, k, j) => (kind === 'deck' && toAbutment[k][j] < ABUTMENT_M ? DECK_UNDER_M : 0);
+  // a side road's pieces under its through road's lanes (sideArms.js): the
+  // through road's surface there, so any other road's core wins the pixel
+  const yields = new Map();
+  const warps = new Map();
+  const squareEnds = new Map();
+  for (const arm of findSideArms(graph, seatable(graph))) {
+    const e = graph.edges[arm.edge];
+    let set = yields.get(arm.edge);
+    if (!set) { set = new Uint8Array(e.s.length); yields.set(arm.edge, set); }
+    for (let j = 0; j + 1 <= arm.under; j++) set[Math.min(sideArmStation(e, arm.end, j), sideArmStation(e, arm.end, j + 1))] = 1;
+    // past the lanes its surface is twisted to the through road's grade
+    // where it leaves them, level again SIDE_WARP_M on: level across from
+    // the edge, a side street's strip stood 0.4-0.7 m proud of a 13% trunk
+    // road at one corner and as far under it at the other
+    if (z && arm.under + 1 < e.s.length) {
+      const i0 = sideArmStation(e, arm.end, arm.under); const i1 = sideArmStation(e, arm.end, arm.under + 1);
+      const a = Math.min(i0, i1); const b = Math.max(i0, i1);
+      const dx = e.x[b] - e.x[a]; const dy = e.y[b] - e.y[a]; const L = Math.hypot(dx, dy);
+      if (L > 1e-6) {
+        // (to the left of the edge's own direction, as the banking below)
+        const nx = -dy / L; const ny = dx / L; const h = Math.max(1, e.half);
+        const zOf = (k, i) => z[k][i];
+        const l = throughSurface(graph, arm.mains, zOf, e.x[i0] + nx * h, e.y[i0] + ny * h);
+        const r = throughSurface(graph, arm.mains, zOf, e.x[i0] - nx * h, e.y[i0] - ny * h);
+        if (l && r) {
+          const tilt = Math.max(-SIDE_WARP_MAX, Math.min(SIDE_WARP_MAX, (l.z - r.z) / (2 * h)));
+          let w = warps.get(arm.edge);
+          if (!w) { w = new Float32Array(e.s.length); warps.set(arm.edge, w); }
+          const reach = sideArmFromEnd(e, arm.end, i0);
+          // (under the lanes too: its strip past the through road's shoulder is still that road's grade)
+          for (let j = 0; j < e.s.length; j++) {
+            const i = sideArmStation(e, arm.end, j); const t = (sideArmFromEnd(e, arm.end, i) - reach) / SIDE_WARP_M;
+            if (t >= 1) break;
+            w[i] += tilt * (1 - smoothstep(t));
+          }
+        }
+      }
+    }
+    // (the pieces clear of the lanes end square toward them, at the line across the first clear station: no
+    // round end back over the outer lane, nor the next pieces' round ends, a road's width behind them)
+    if (arm.under + 1 < e.s.length) {
+      const i0 = sideArmStation(e, arm.end, arm.under); const i1 = sideArmStation(e, arm.end, arm.under + 1);
+      const dx = e.x[i1] - e.x[i0]; const dy = e.y[i1] - e.y[i0]; const L = Math.hypot(dx, dy);
+      if (L > 1e-6) {
+        const reach = sideArmFromEnd(e, arm.end, i0);
+        let list = squareEnds.get(arm.edge);
+        if (!list) { list = []; squareEnds.set(arm.edge, list); }
+        const pieces = new Set();
+        for (let j = arm.under; j + 1 < e.s.length; j++) {
+          if (sideArmFromEnd(e, arm.end, sideArmStation(e, arm.end, j)) - reach > SIDE_SQUARE_M) break;
+          pieces.add(Math.min(sideArmStation(e, arm.end, j), sideArmStation(e, arm.end, j + 1)));
+        }
+        list.push({ px: e.x[i0], py: e.y[i0], dx: dx / L, dy: dy / L, pieces });
+      }
+    }
+  }
   graph.edges.forEach((e, k) => {
     const zk = z[k];
     for (let i = 0; i + 1 < e.s.length; i++) {
@@ -173,6 +235,8 @@ export function composeTerrain(graph, grid) {
       // terrain shaping switched off for this piece (structures/shaping.js)
       if (skip && skip(k, i)) { stats.skipped = (stats.skipped || 0) + 1; continue; }
       const planes = portalPlanes[k];
+      const yielding = !!yields.get(k)?.[i];
+      const squares = (squareEnds.get(k) || []).filter((q) => q.pieces.has(i));
       // a deck's ends on fill are abutments: fill under the deck (below)
       const abutment = kind === 'deck' && Math.min(toAbutment[k][i], toAbutment[k][i + 1]) < ABUTMENT_M;
       const deck = kind === 'deck' && !abutment;
@@ -188,6 +252,8 @@ export function composeTerrain(graph, grid) {
       // in the elevation data): across its core the surface tilts as the
       // terrain does there, not levelled into a shelf with a cliff each side
       let bank = 0;
+      const warp = warps.get(k);
+      if (warp && !deck) bank = (warp[i] + warp[i + 1]) / 2;
       if (e.highway === 'raceway' && !deck) {
         const L = Math.sqrt(L2); const nx = -vy / L; const ny = vx / L;
         const mx = (ax + bx) / 2; const my = (ay + by) / 2; const o = e.half * 0.7;
@@ -225,6 +291,7 @@ export function composeTerrain(graph, grid) {
           const x = xOfCol(c);
           const uRaw = ((x - ax) * vx + (y - ay) * vy) / L2;
           if (planes.length && planes.some(([px, py, dx, dy]) => (x - px) * dx + (y - py) * dy > 0 && Math.hypot(x - px, y - py) < PORTAL_PLANE_M)) { left.add(r * width + c); continue; }
+          if (squares.length && squares.some((q) => (x - q.px) * q.dx + (y - q.py) * q.dy < 0)) continue;
           const u = Math.max(0, Math.min(1, uRaw));
           const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
           if (d > reach) continue;
@@ -266,7 +333,8 @@ export function composeTerrain(graph, grid) {
           // (inside any road core beats every side slope, and among cores the
           // nearer centreline wins outright: a wide road must not take a
           // narrower road's own surface just because its core reaches)
-          const out = abutment ? Math.max(1e-3, d - core) : (d <= core ? -1000 + d : d - core);
+          // (a side road's piece under its through road's lanes: over every side slope, under every other core)
+          const out = abutment ? Math.max(1e-3, d - core) : (d <= core ? (yielding ? -400 : -1000) + d : d - core);
           // two road cores overlapping at clearly different heights: the lower
           // road keeps its whole drawn width (the upper stands behind a wall)
           // (only in the upper road's outer margin: its centre stays its own)
