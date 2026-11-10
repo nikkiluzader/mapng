@@ -547,6 +547,52 @@
    ],
    "smoke": false,
    "note": "Lac de Tignes and the resort: a natural lake with gentle shores, short tunnels"
+  },
+  {
+   "name": "gal_simplon",
+   "lat": 46.2547,
+   "lng": 8.0489,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "gallery",
+    "mountain"
+   ]
+  },
+  {
+   "name": "gal_rogers",
+   "lat": 51.3252,
+   "lng": -117.4637,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "gallery",
+    "mountain",
+    "twin-carriageway"
+   ]
+  },
+  {
+   "name": "gal_japan158",
+   "lat": 36.2068,
+   "lng": 137.6059,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "gallery",
+    "mountain"
+   ]
+  },
+  {
+   "name": "lid_mercer",
+   "lat": 47.5897,
+   "lng": -122.233,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "lid",
+    "tunnel",
+    "motorway"
+   ]
   }
  ]
 }

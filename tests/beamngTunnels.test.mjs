@@ -485,3 +485,11 @@ test('a gallery where the survey has no road bench (the roof taken out, the slop
   const edge = t.W + 0.5 + 0.6;
   assert.ok(Math.abs(tunnelGroundAt(t, -(edge + 1.5), 0, g(-(edge + 1.5), 0) - 3) - roadZ(0)) < 0.3, 'verge');
 });
+
+test('a gallery on a coarse survey (no road bench anywhere, a smooth slope): the road stays at the centre line\'s height', () => {
+  const slope = (x, y) => 100 - y / 100 + 0.35 * x;
+  const t = solveTunnel({ xy: road(-100, 100), half: 4, gallery: true }, { groundAt: slope });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.unbenched, 0);
+  for (const p of t.line) assert.ok(Math.abs(p.z - slope(0, p.y)) < 0.2, `road ${p.z.toFixed(2)} at y ${p.y}`);
+});

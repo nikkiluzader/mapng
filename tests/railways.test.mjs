@@ -109,3 +109,18 @@ test('a city line\'s untagged station track between two of its tunnels is underg
   assert.deepEqual([...under].sort(), ['1', '2', '3']);
   assert.deepEqual(railSegmentsFrom(features).map((s) => s.sourceFeature.id), ['4', '5']);
 });
+
+test('a main line tunnel passing under the whole map (every end on the map\'s edge) is underground: not built', async () => {
+  const { undergroundRailIds, railSegmentsFrom } = await import('../services/railways.js');
+  const bounds = { north: 51.01, south: 51.0, west: -117.01, east: -117.0 };
+  const way = (id, pts, tags) => ({ id, type: 'railway', tags: { railway: 'rail', ...tags }, geometry: pts.map(([lat, lng]) => ({ lat, lng })) });
+  // edge to edge, in two pieces
+  const through = [way('t1', [[51.0, -117.006], [51.005, -117.005]], { tunnel: 'yes' }), way('t2', [[51.005, -117.005], [51.01, -117.004]], { tunnel: 'yes' })];
+  // a tunnel with a portal on the map: open track runs on from it
+  const portal = [way('p1', [[51.002, -117.01], [51.003, -117.007]], { tunnel: 'yes' }), way('p2', [[51.003, -117.007], [51.004, -117.002]], {})];
+  const feats = [...through, ...portal];
+  assert.deepEqual([...undergroundRailIds(feats, bounds)].sort(), ['t1', 't2']);
+  assert.deepEqual(railSegmentsFrom(feats, { bounds }).map((s) => s.sourceFeature.id).sort(), ['p1', 'p2']);
+  // (no bounds given: as before)
+  assert.equal(undergroundRailIds(feats).size, 0);
+});

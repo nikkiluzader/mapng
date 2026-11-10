@@ -953,7 +953,7 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
   // railways on the ground (services/railways.js): gravel under the track bed
   // and its ditches, so no grass grows up through the ballast; the roads
   // crossing them are painted over it (a tram in its street: the street's)
-  const underground = undergroundRailIds(osmFeatures);
+  const underground = undergroundRailIds(osmFeatures, bounds);
   for (const feature of osmFeatures) {
     if (feature.type !== 'railway' || !(feature.geometry?.length >= 2) || underground.has(feature.id)) continue;
     const kind = railKindOf(feature.tags);

@@ -1196,7 +1196,7 @@ function buildLevelRailways(sg, terrainData, squareSize, levelName) {
   // trams in their streets: the railway features left out of the graph
   const built = new Set(segs.filter((s) => s.rail).map((s) => s.sourceFeature?.id));
   const toXY = (p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0);
-  const underground = undergroundRailIds(terrainData.osmFeatures || []);
+  const underground = undergroundRailIds(terrainData.osmFeatures || [], terrainData.bounds);
   const street = (terrainData.osmFeatures || []).filter((f) => f?.type === 'railway' && !built.has(f.id) && !underground.has(f.id)
     && ['tram', 'light_rail'].includes(railKindOf(f.tags)) && f.geometry?.length >= 2);
   let streetTramM = 0;
@@ -5958,7 +5958,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       const streets = drivableRoads.map((seg) => ({ xy: seg.geometry.map((p) => project(p.lat, p.lng)), half: halfOf(seg) }));
       // (a short untagged piece between two rail bridges is the same structure, as a road's)
       const railFeatures = bridgeOverShortGaps(terrainData.osmFeatures.filter((f) => f?.type === 'railway' && f.geometry?.length >= 2));
-      railSegs = railSegmentsFrom(railFeatures, { streetRunning: streetRunningTest(streets, project) });
+      railSegs = railSegmentsFrom(railFeatures, { streetRunning: streetRunningTest(streets, project), bounds: terrainData.bounds });
     } catch (err) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Railways skipped: ${err?.message || err}`);
       railSegs = [];

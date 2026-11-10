@@ -368,6 +368,7 @@ const GAL_COLUMN_EVERY_M = 5;
 const GAL_COLUMN_M = 0.6;
 const GAL_RIB_M = 0.45;                // pilasters and roof beams stand out this far
 const GAL_BENCH_SLOPE = 0.07;           // the survey level across the lanes within this: the road's bench is in it
+const GAL_BENCH_OUT_M = 10;            // ...looked for this far outside each end too
 const GAL_VERGE_M = 2;                 // the valley side's verge: level with the road this far out, then falling away
 const GAL_VERGE_FALL = 0.5;            // ...at this slope at most (fill)
 const GAL_VALLEY_CLEAR_M = 3;          // the valley side's ground kept down to the road this far past the columns
@@ -407,12 +408,18 @@ export function solveGallery(path, { groundAt, squareSize = 1 }) {
   // cantilevered roof, the verge level with the road). There the height is
   // carried through from the stations that have a bench (the ends always),
   // kept between the valley-side ground and the centre line's.
+  // (only where the survey shows the road at all: a bench at the gallery's
+  // ends or just outside them. A coarse survey holds no bench anywhere, a
+  // smooth slope through the road and its approaches alike: there the
+  // centre line's height stays the road's, half in cut and half on fill)
   const lane = Math.max(1.5, path.half * 0.8);
-  const bench = st.map((p, i) => {
-    if (i === 0 || i === n - 1) return true;
+  const level = (p) => {
     const [xr, yr] = lateral(p, lane); const [xl, yl] = lateral(p, -lane);
     return Math.abs(groundAt(xr, yr) - groundAt(xl, yl)) / (2 * lane) <= GAL_BENCH_SLOPE;
-  });
+  };
+  const outside = (p, sgn) => ({ ...p, x: p.x + sgn * p.tx * GAL_BENCH_OUT_M, y: p.y + sgn * p.ty * GAL_BENCH_OUT_M });
+  const surveyed = level(st[0]) || level(st[n - 1]) || level(outside(st[0], -1)) || level(outside(st[n - 1], 1));
+  const bench = st.map((p, i) => !surveyed || i === 0 || i === n - 1 || level(p));
   const zRaw = g.slice();
   let unbenched = 0;
   for (let i = 1; i < n - 1; i++) {

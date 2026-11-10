@@ -60,14 +60,56 @@ export function activeRailKind(tags = {}) {
 // most, joined at each end to nothing but tunnels (or such pieces).
 const TUNNEL_GAP_MAX_M = 400;
 
+// A tunnel passing under the whole map: a main line's tunnel (any kind's)
+// whose every end lies on the map's edge has no portal on the map. How deep
+// it runs is in no data: its height came from the mountainside at the map's
+// edges, and the valley between was bridged 60 m up (Rogers Pass, the
+// Connaught and Mount Macdonald tunnels). Underground for the whole map,
+// not built.
+const EDGE_TOL_M = 3;
+function throughTunnelIds(rail, bounds) {
+  const out = new Set();
+  if (!bounds) return out;
+  const tagged = (f) => { const t = String(f.tags?.tunnel ?? '').toLowerCase(); return (t && t !== 'no') || f.tags?.location === 'underground'; };
+  const tunnels = rail.filter(tagged);
+  if (!tunnels.length) return out;
+  const key = (p) => `${p.lat},${p.lng}`;
+  const ends = (f) => [f.geometry[0], f.geometry[f.geometry.length - 1]];
+  const at = new Map();
+  for (const f of rail) for (const p of ends(f)) { if (!at.has(key(p))) at.set(key(p), []); at.get(key(p)).push(f); }
+  const midLat = (bounds.north + bounds.south) / 2;
+  const onEdge = (p) => Math.min(Math.abs(p.lat - bounds.north), Math.abs(p.lat - bounds.south)) * 111320 <= EDGE_TOL_M
+    || Math.min(Math.abs(p.lng - bounds.east), Math.abs(p.lng - bounds.west)) * 111320 * Math.cos((midLat * Math.PI) / 180) <= EDGE_TOL_M
+    || p.lat > bounds.north || p.lat < bounds.south || p.lng > bounds.east || p.lng < bounds.west;
+  const seen = new Set();
+  for (const start of tunnels) {
+    if (seen.has(start)) continue;
+    // the tunnel features joined end to end
+    const chain = []; const queue = [start]; seen.add(start);
+    let portal = false;
+    while (queue.length) {
+      const f = queue.pop(); chain.push(f);
+      for (const p of ends(f)) {
+        const others = (at.get(key(p)) || []).filter((o) => o !== f);
+        // (an end on open track, or a dead end inside the map: a portal there)
+        if (others.some((o) => !tagged(o)) || (!others.length && !onEdge(p))) portal = true;
+        for (const o of others) if (tagged(o) && !seen.has(o)) { seen.add(o); queue.push(o); }
+      }
+    }
+    if (!portal) for (const f of chain) out.add(f.id);
+  }
+  return out;
+}
+
 /**
  * The ids of the railway features underground: city lines (subway, light
  * rail, tram, monorail) in their tunnels, and the short untagged pieces
  * between such tunnels.
  */
-export function undergroundRailIds(features = []) {
+export function undergroundRailIds(features = [], bounds = null) {
   const rail = features.filter((f) => f?.type === 'railway' && activeRailKind(f.tags) && f.geometry?.length >= 2);
   const under = new Set(rail.filter((f) => URBAN_KINDS.has(activeRailKind(f.tags)) && isUnderground(f.tags, activeRailKind(f.tags))).map((f) => f.id));
+  for (const id of throughTunnelIds(rail, bounds)) under.add(id);
   if (!under.size) return under;
   const key = (p) => `${p.lat},${p.lng}`;
   const at = new Map();
@@ -177,7 +219,7 @@ export function railHalfWidth(tags = {}) {
  * in a street (streetRunning(feature) true) are left out: they are drawn on
  * their street's surface, not built as a line of their own.
  */
-export function railSegmentsFrom(features = [], { streetRunning = () => false, underground = undergroundRailIds(features) } = {}) {
+export function railSegmentsFrom(features = [], { streetRunning = () => false, bounds = null, underground = undergroundRailIds(features, bounds) } = {}) {
   const out = [];
   for (const f of features) {
     if (f?.type !== 'railway' || !Array.isArray(f.geometry)) continue;
