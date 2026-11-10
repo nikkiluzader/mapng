@@ -47,8 +47,17 @@ const FACE_SLOPE = 4;                  // the rock cut back over / beside a head
 const FACE_REACH_M = 60;               // to the natural ground (a cliff over a portal)
 const WING_GAP_M = 1.5;                // trench floor past the lining before the wingwall
 const WING_BOTTOM_M = -1;
+const CUT_BACK_GENTLE_M = 4;           // over a wingwall the ground is cut back 1 to 1 this far out...
+const CUT_BACK_STEEP = 2;              // ...then this steep (a rock face stays a rock face)
+const WING_FLANK_M = 12;               // a wingwall this far out goes on only while the road itself is in a cut
 const WING_MIN_M = 0.4;                // a wingwall lower than this ends
 const TRENCH_MAX_M = 400;              // the cutting / fill runs out at most this far (bored)
+const APPROACH_TREND_M = 20;           // the ground's own grade read this far ahead along an approach
+const APPROACH_LAND_STATIONS = 3;       // stations on the ground kept at an approach's end (the trench meets the street over them)
+const APPROACH_STUB = 2;                // stations of an approach kept at least (the portal's flanks)
+const APPROACH_NEAR_GROUND_M = 1;      // an approach within this of the ground may follow it
+const APPROACH_CATCH_UP = 0.04;        // on steep ground an approach runs this much steeper than it, to land on it
+const APPROACH_FOLLOW_MAX = 0.14;      // an approach follows ground running up to this steep
 const APPROACH_LAND_GRADE = 0.12;      // an approach still off the ground there lands at this grade
 const UNDER_BRIDGE_M = 6.5;            // an approach under a bridge stays this far under the ground there ...
 const UNDER_BRIDGE_FLAT_M = 10;        // ... this far either side of it
@@ -786,10 +795,31 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // ramps crossing it before it rises)
     // (terrain shaping off: the ground left as it is, the bridge clears the road on it)
     const unders = (raw ? [] : a.under || []).map((u) => ({ s: u, cap: groundAt(...stationXY(ap, u)) - UNDER_BRIDGE_M }));
-    for (const p of ap) {
+    // The road eases back to the ground no steeper than MAX_GRADE, measured
+    // against the ground's own run: a mountain road climbing away from its
+    // portal at 10 % is on the ground all the way, and a limit under that
+    // left the "approach" ever deeper under the hillside, a cutting 250 m
+    // long with a wall along it (Tunnel du Glattier). Where the ground ahead
+    // runs steeper than MAX_GRADE the road may follow it (to APPROACH_FOLLOW_MAX).
+    const grounds = ap.map((p) => groundAt(p.x, p.y));
+    const ahead = Math.max(1, Math.round(APPROACH_TREND_M / STEP_M));
+    let zPrev = z0; let sPrev = 0;
+    for (let k = 0; k < ap.length; k++) {
+      const p = ap[k];
       if (p.s > trenchMax) break;
-      const gr = groundAt(p.x, p.y);
-      let zz = clamp(gr, z0 - MAX_GRADE * p.s, z0 + MAX_GRADE * p.s);
+      const gr = grounds[k];
+      const j = Math.min(ap.length - 1, k + ahead);
+      const trend = j > k ? Math.abs(grounds[j] - gr) / (ap[j].s - p.s) : 0;
+      // (ground running steeper than the tunnel's grade: the road follows it,
+      // and a little steeper still, to come back onto it; on gentler ground
+      // it climbs out of its trench at MAX_GRADE as before)
+      // (only a road near the ground: one deep in a trench of its own, the
+      // hillside steep above it, climbs out at MAX_GRADE as before)
+      const near = Math.abs(gr - zPrev) < APPROACH_NEAR_GROUND_M + MAX_GRADE * (p.s - sPrev);
+      const limit = near && trend > MAX_GRADE ? Math.min(APPROACH_FOLLOW_MAX, trend + APPROACH_CATCH_UP) : MAX_GRADE;
+      let zz = clamp(gr, zPrev - limit * (p.s - sPrev), zPrev + limit * (p.s - sPrev));
+      if (Math.abs(zz - gr) < 1e-6) zz = gr;   // (on the ground exactly, not a rounding error off it)
+      zPrev = zz; sPrev = p.s;
       for (const u of unders) zz = Math.min(zz, Math.max(u.cap + MAX_GRADE * Math.max(0, Math.abs(p.s - u.s) - UNDER_BRIDGE_FLAT_M), z0 - MAX_GRADE * p.s));
       out.push({ x: p.x, y: p.y, s: p.s, tx: p.tx, ty: p.ty, z: zz, g: gr, kind: 'cut' });
       calm = Math.abs(gr - zz) < TRENCH_DONE_M ? calm + 1 : 0;
@@ -800,6 +830,13 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // to land on it, rather than ending at a wall (Queen Creek: 33 m up)
     // (eased in along the whole approach: clamped near the end only, a
     // ground falling faster than that grade cut the road off at the portal)
+    // (the stretch that proved the road is back on the ground is no cutting:
+    // kept, its floor was dug a lane wider than the road into the hillside
+    // beside a mountain road's bench; a short stub stays for the portal's flanks)
+    let keepTo = out.length;
+    while (keepTo > APPROACH_STUB && Math.abs(out[keepTo - 1].g - out[keepTo - 1].z) < TRENCH_DONE_M) keepTo--;
+    // (a few stations on the ground kept: the trench meets the street over them)
+    out.length = Math.max(Math.min(out.length, APPROACH_STUB), Math.min(out.length, keepTo + APPROACH_LAND_STATIONS));
     const last = out[out.length - 1];
     if (last && Math.abs(last.g - last.z) > TRENCH_DONE_M) {
       const miss = last.g - last.z;
@@ -1014,6 +1051,8 @@ const across = (t, n) => Math.max(0, Math.abs(n.d) - extraAt(t, t.line[n.i], Mat
 // within ABSORB_MAX_M of its walls; past that the ramp climbs out in a trench
 // of its own.
 const ABSORB_MAX_M = 24;
+const OPEN_GROUND_M = 0.5;         // ground between a branch and the tunnel's road under this over the road: open, no wall
+const SURFACE_BESIDE_BORE_M = 3;   // a surface road this far in past a portal is beside the bore, not joining its cutting
 const BRANCH_TRENCH_MAX_M = 400;
 
 /**
@@ -1032,6 +1071,17 @@ export function absorbBranch(t, branch, { groundAt }) {
     const b = st[k];
     const n = nearestOnTunnel(t, b.x, b.y, t.W + ABSORB_MAX_M + 10);
     if (!n || n.beyond) break;
+    // (out of its own tunnel, the branch is a road on the surface: beside the
+    // bore it runs over the hill or round it, not in it. A one-way tunnel
+    // whose other direction goes round outside had its bore widened to take
+    // that road in, 33 m wide: Tunnel du Glattier)
+    if (b.s >= branch.tunnelLength && n.into > SURFACE_BESIDE_BORE_M) break;
+    // (and where no ground stands between it and the tunnel's road, there is
+    // no cutting wall to move: two roads side by side on open ground)
+    if (b.s >= branch.tunnelLength && k > 0) {
+      const q = t.line[n.i];
+      if (groundAt((b.x + q.x) / 2, (b.y + q.y) / 2) - n.z < OPEN_GROUND_M) break;
+    }
     const side = Math.sign(n.d) || 1;
     const need = Math.abs(n.d) + branch.half + WALKWAY_M;
     if (need - t.W > ABSORB_MAX_M) {
@@ -1191,6 +1241,11 @@ function wingTops(t, groundAt) {
         const [x, y] = lateral(p, side * (wingDAt(t, i, side) + extraAt(t, p, side) + t.wingT + 1));
         cap = Math.min(cap, groundAt(x, y) - p.z);
         if (cap < WING_MIN_M) break;
+        // (a wall belongs to a cutting. Past the portal's own flank, a road
+        // whose ground is at road level is on a hillside bench, not in a cut:
+        // the slope above it is the hill. The wall ran on 250 m along a
+        // mountain road's uphill side: Tunnel du Glattier)
+        if (Math.abs(p.s - t.line[i0].s) > WING_FLANK_M && groundAt(p.x, p.y) - p.z < WING_MIN_M) break;
         wings[side].set(i, cap);
       }
     }
@@ -1400,7 +1455,11 @@ export function tunnelGroundAt(t, x, y, h) {
     const wd = wingDAt(t, n.i, Math.sign(n.d) || 1);
     if (ad <= wd + t.wingT / 2) return n.z;
     const r = Math.max(0, ad - wd - t.wingT);
-    return clamp(h, n.z - r, n.z + top + r);
+    // (over the wall the ground is cut back at 1 to 1 for a few metres, then
+    // steeply: a rock face steeper than 1 to 1 never met that slope, and a
+    // slice was cut out of it as far as the grading reached)
+    const up = Math.min(r, CUT_BACK_GENTLE_M) + Math.max(0, r - CUT_BACK_GENTLE_M) * CUT_BACK_STEEP;
+    return clamp(h, n.z - r, n.z + top + up);
   }
   // Behind a headwall the ground meets its top: raised to it behind a
   // cutting's, and a cliff cut back to it, then rising FACE_SLOPE to 1 above

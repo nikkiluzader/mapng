@@ -540,3 +540,22 @@ test('ground left standing inside a low box is opened: only under the roof, neve
   assert.equal(lowMouthHoleAt(t, 0, yIn(-3), 10.8), false, 'in front of the face: the road is on the ground there');
   assert.equal(lowMouthHoleAt(t, 12, yIn(5), 10.8), false, 'beside the box');
 });
+
+test('a mountain road climbing away from its portal on the ground has no long cutting', () => {
+  // a road running north at 10 %, a 14 m spur across it between
+  // y = -30 and 30: the tunnel is the spur; outside it the road is on the ground
+  // (through the spur at 4 %, as a tunnel is built)
+  const base = (y) => (Math.abs(y) <= 30 ? 0.04 * y : Math.sign(y) * (1.2 + 0.1 * (Math.abs(y) - 30)));
+  const ground = (x, y) => 100 + base(y) + 14 * Math.exp(-((y / 14) ** 2));
+  const line = (y0, y1) => { const pts = []; const n = Math.ceil(Math.abs(y1 - y0) / 10); for (let i = 0; i <= n; i++) pts.push([0, y0 + ((y1 - y0) * i) / n]); return pts; };
+  const t = solveTunnel({ xy: line(-30, 30), half: 4 }, { groundAt: ground, approaches: [{ xy: line(-30, -380) }, { xy: line(30, 380) }] });
+  assert.equal(t.ok, true, t.reason);
+  const sS = t.line[t.iS].s; const sN = t.line[t.iN].s;
+  const before = sS - t.line[0].s; const after = t.line[t.line.length - 1].s - sN;
+  // (held to the tunnel's own grade, the uphill approach fell ever further
+  // under the hillside: a cutting 250 m long with a wall along it. Tester report, 0.2.16)
+  assert.ok(before < 110 && after < 110, `approaches ${before.toFixed(0)} m and ${after.toFixed(0)} m`);
+  // and the ground beside the road 170 m on is not graded for it
+  assert.equal(tunnelGroundAt(t, 6, 200, ground(6, 200)), ground(6, 200));
+  assert.equal(tunnelGroundAt(t, 6, -200, ground(6, -200)), ground(6, -200));
+});

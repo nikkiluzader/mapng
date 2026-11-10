@@ -9,7 +9,7 @@
 //   ... --save                                       record the results as the new baselines
 //   ... --json out.json                              all rows
 //   ... --matrix                                     each area on every terrain quality it has data for
-//                                                    (1 m lidar, global 30 m) x every Terrain choice
+//                                                    (1 m lidar, Mapterhorn lidar, global 30 m) x every Terrain choice
 //                                                    (ready, noshape, untouched): MATRIX below. Its own
 //                                                    baselines (tests/fixtures/areaMatrixBaselines.json),
 //                                                    one per cell, and a table per area at the end.
@@ -44,7 +44,11 @@ const MATRIX = {
   noshape: { EXPORT_OPTS: JSON.stringify({ shapeRoads: false, shapeBridges: false, shapeOverpasses: false, shapeTunnels: false, shapeExtras: false }) },
   untouched: { RAW: '1', EXPORT_OPTS: JSON.stringify({ shapeTerrain: false }) },
 };
-const DEMS = ['gpxz', 't30'];
+// (mh: Mapterhorn lidar, what the app's default "Best free" source gives most people; fetched per
+// area with fetchMapterhorn.mjs. The two lidar sources differ: a tunnel built on one was left on
+// the ground on the other)
+const DEMS = ['gpxz', 'mh', 't30'];
+const DEM_LABEL = { gpxz: '1 m lidar', mh: 'Mapterhorn', t30: '30 m' };
 const jobsArg = args.includes('--jobs') ? Math.max(1, Number(args[args.indexOf('--jobs') + 1]) || 1) : (MATRIX_MODE ? 3 : 1);
 const catalogue = areas();
 let list;
@@ -145,7 +149,7 @@ if (MATRIX_MODE) {
     const rows = cells.filter((c) => c.a === a && results[c.key]);
     if (!rows.length) continue;
     console.log(`\n${a.name}\n  ${'terrain / setting'.padEnd(18)}${cols.map((c) => c.padStart(13)).join('')}`);
-    for (const c of rows) console.log(`  ${`${c.dem === 'gpxz' ? '1 m lidar' : '30 m'} / ${c.setting}`.padEnd(18)}${cols.map((k) => String(results[c.key][k] ?? '-').padStart(13)).join('')}`);
+    for (const c of rows) console.log(`  ${`${DEM_LABEL[c.dem] || c.dem} / ${c.setting}`.padEnd(18)}${cols.map((k) => String(results[c.key][k] ?? '-').padStart(13)).join('')}`);
   }
   console.log('');
 }

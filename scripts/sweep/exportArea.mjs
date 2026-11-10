@@ -2,7 +2,7 @@
 // Export one test area headless, the way the app does (roads conditioned into
 // the terrain as terrain.js does, then exportBeamNGLevel).
 //
-//   node scripts/sweep/exportArea.mjs <area> [gpxz|t30] [levelName] [--out dir] [--fix-stubs]
+//   node scripts/sweep/exportArea.mjs <area> [gpxz|t30|mh] [levelName] [--out dir] [--fix-stubs]
 //
 // Writes <out>/<levelName>.zip (default scratch/sweep) and, beside it,
 // <levelName>.checks.json (the export's structure checks). EXPORT_OPTS (JSON)
@@ -34,7 +34,7 @@ const args = process.argv.slice(2);
 const pos = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--out');
 const [area, dem = 'gpxz', levelName = `sw_${area}`] = pos;
 const outDir = args.includes('--out') ? args[args.indexOf('--out') + 1] : OUT_DIR;
-if (!area) { console.error('usage: exportArea.mjs <area> [gpxz|t30] [levelName] [--out dir] [--fix-stubs]'); process.exit(2); }
+if (!area) { console.error('usage: exportArea.mjs <area> [gpxz|t30|mh] [levelName] [--out dir] [--fix-stubs]'); process.exit(2); }
 const dir = path.join(AREAS_DIR, area);
 if (!fs.existsSync(path.join(dir, `${dem}.f32`))) { console.error(`no ${dem}.f32 in ${dir} (fetch it: scripts/sweep/fetchArea.mjs)`); process.exit(2); }
 
@@ -51,7 +51,7 @@ const heightMap = new Float32Array(fs.readFileSync(path.join(dir, `${dem}.f32`))
 // smoothing; coarse (30 m): the full smoothing
 // (RAW=1: as the app's raw terrain, the elevation left as fetched)
 // (GPXZ outside its lidar: the app smooths it as 30 m, and it is coarse)
-const fine = dem === 'gpxz' && !meta.gpxzSmooth;
+const fine = (dem === 'gpxz' && !meta.gpxzSmooth) || (dem === 'mh' && !(meta.mh?.metersPerPixel > 4));
 const raw = !!process.env.RAW;
 // (as the app's data pull: street widths from the buildings along them)
 // (corners rounded into arcs first, as terrain.js shapeRoads: without it wide
