@@ -4757,6 +4757,8 @@ const exportHeightMaps = new WeakSet();
 // keepGround: remember each pixel's height before this editor's first
 // change (ground(idx)); the others write straight through (a Map of every
 // pixel the terrain composer touches took 4 s of a dense 8 km export).
+const LOW_MOUTH_CAP_M = 12;
+
 function heightMapEditor(terrainData, { keepGround = false } = {}) {
   const before = keepGround ? new Map() : null;
   return {
@@ -5101,7 +5103,7 @@ const pathLength = (xy) => xy.reduce((n, p, i) => (i ? n + Math.hypot(p[0] - xy[
  * height (and gets no cutting).
  */
 function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, halfOf, { done = new Set(), shape = true } = {}) {
-  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set() };
+  const out = { bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map() };
   // before the bridges are solved (bridges null): a tunnel meeting a bridge
   // road waits for them
   const early = !bridges;
@@ -5364,6 +5366,17 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
             // over the tube itself (inside its portals): the tunnel's alone
             const on = t.portals[0] || t.portals[1] ? nearestOnTunnel(t, x, y, t.headHalf) : null;
             if (on && on.into >= 0 && !on.beyond) out.tube.add(idx);
+            // the open stretch in front of a face, across the road and its walkways, is the tunnel's too,
+            // cut or not: where the ground already stood at the road (a low box's mouth, its lid ending a
+            // few metres out), a neighbouring corridor's fill was composed across it, 3 to 5 m of ground
+            // in the carriageway (Tignes)
+            else if (on && on.into < 0 && !on.beyond && Math.abs(on.d) <= t.W + 1) {
+              out.graded.add(idx);
+              // (a low box's mouth, on the lanes: nothing built later stands above the road going in.
+              // A car park's aisle beside the portal, on the lid in the survey, had its ground composed
+              // onto the lane's edge)
+              if (t.gradedCover && on.into > -LOW_MOUTH_CAP_M && Math.abs(on.d) <= t.W) out.mouth.set(idx, Math.min(out.mouth.get(idx) ?? Infinity, on.z + minHeight));
+            }
           }
         }
       }
@@ -5438,6 +5451,10 @@ function* solveExportTunnels(drivableRoads, terrainData, squareSize, bridges, ha
   }
   out.holes = [...holes];
   if (globalThis.__MAPNG_TUNNEL_DEBUG) globalThis.__MAPNG_TUNNEL_DEBUG(out, { groundAt, toWorld, toPixel, bridges, width, height, hmAt: (idx) => hm.at(idx) - minHeight });
+  // (MAPNG_TUNNEL_DUMP=1: each built tunnel's solved line, for diagnosing its portals)
+  if (globalThis.process?.env?.MAPNG_TUNNEL_DUMP) {
+    for (const t of out.tunnels) console.log('[tunnel dump]', JSON.stringify({ osm: t.osm?.[0]?.tags?.name || t.osm?.[0]?.id, kind: t.kind, low: !!t.low, raw: !!t.raw, iS: t.iS, iN: t.iN, portals: t.portals, portalKind: t.portalKind, headDepth: t.headDepth, stepAt: t.stepAt, line: t.line.map((q) => [Math.round(q.x * 10) / 10, Math.round(q.y * 10) / 10, Math.round(q.s), q.kind, Math.round(q.z * 10) / 10, Number.isFinite(q.g) ? Math.round(q.g * 10) / 10 : null]) }));
+  }
   console.log(`[BeamNG Export] Tunnels: ${out.tunnels.length} bored (${out.tunnels.map((t) => `${Math.round(t.tubeLength)} m`).join(', ')}), ${out.skipped.length} left on the ground, ${out.holes.length} portal hole square(s).`);
   return out;
 }
@@ -5514,6 +5531,7 @@ function joinTunnelPhases(a, b) {
     skipped: [...a.skipped, ...b.skipped],
     holes: [...new Set([...a.holes, ...b.holes])],
     graded: new Set([...(a.graded || []), ...(b.graded || [])]),
+    mouth: new Map([...(a.mouth || []), ...(b.mouth || [])]),
     tube: new Set([...(a.tube || []), ...(b.tube || [])]),
   };
 }
@@ -5996,7 +6014,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   // Then the bridges (the road nodes on a bridge ride on its deck), then the
   // tunnels a bridge meets (a portal takes the deck's height).
   const done = new Set();
-  const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set() });
+  const noTunnels = () => ({ bySeg: new Map(), tunnels: [], skipped: [], holes: [], graded: new Set(), tube: new Set(), mouth: new Map() });
   // (railway tunnels too: their bores come from the same builder)
   const early = includeTunnels ? yield* solveExportTunnels(graphSegments, terrainData, squareSize, null, graphHalfOf, { done, shape: shaping.tunnels }) : noTunnels();
   yield;
@@ -12969,6 +12987,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       console.warn(`${BEAMNG_EXPORT_SERVICE_LOG} Lake beds skipped: ${err?.message || err}`);
       lakePlan = null;
     }
+  }
+
+  // Tunnel mouths: the lanes in front of a low box's face no higher than the
+  // road going in, whatever was graded over them since
+  if (decalRoads.tunnels?.mouth?.size) {
+    const hmMouth = heightMapEditor(exportTerrainData);
+    let capped = 0;
+    for (const [idx, cap] of decalRoads.tunnels.mouth) if (hmMouth.at(idx) > cap + 0.02) { hmMouth.set(idx, cap); capped++; }
+    if (capped) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tunnel mouths: ${capped} grid point(s) brought back down to the road.`);
   }
 
   // Sports fields graded (terrain shaping on): the ground under each field to

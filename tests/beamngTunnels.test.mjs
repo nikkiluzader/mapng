@@ -420,3 +420,45 @@ test('terrain left as surveyed (raw): the bore runs out to where the ground meet
   assert.ok(apron >= 2, 'apron vertices out in front of the face, its own part (it takes the road decal)');
   assert.equal(buildPortalGeometry(shaped, 'S').apron, null, 'shaped tunnels: no apron');
 });
+
+// A low box: an underpass of a few metres under a lid (a piste, a lawn), the
+// road level through it. Fine elevation shows the lid's top as the ground.
+const lidGround = ({ notch = 0 } = {}) => (x, y) => {
+  // the road at 10 m along x = 0; a 5.5 m lid over it from y = -50 to 50,
+  // its faces vertical; `notch`: the lid's last metres cut down to the road
+  // along the centre line (what road smoothing leaves), 2 m either side
+  const under = Math.abs(y) <= 50;
+  if (!under) return 10;
+  if (notch && Math.abs(x) <= 2 && Math.abs(y) > 50 - notch) return 10;
+  return 15.5;
+};
+
+test('a low lid over a level road is a low box: the road where it is, nothing dug', () => {
+  const g = lidGround();
+  const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: g, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.low, true);
+  assert.notEqual(t.kind, 'cutcover');
+  for (const p of t.line) assert.ok(Math.abs(p.z - 10) < 0.2, `road at ${p.z.toFixed(2)} m, y ${p.y}`);
+  // the faces at the lid's ends
+  assert.ok(Math.abs(Math.abs(t.line[t.iS].y) - 50) <= 3 && Math.abs(Math.abs(t.line[t.iN].y) - 50) <= 3, `faces at ${t.line[t.iS].y}, ${t.line[t.iN].y}`);
+  // the mouth in front of each face: at the road across the lanes
+  const { h } = grade(t, g);
+  for (const y of [-56, -53, 53, 56]) for (const x of [-4, -2, 0, 2, 4]) assert.ok(h(x, y) <= 10.05, `ground ${h(x, y).toFixed(2)} at ${x}, ${y}`);
+  // the lid beside the box left standing
+  assert.equal(h(30, 0), 15.5);
+});
+
+test('a low box reaches the real face where the lid\'s end is notched along the centre line', () => {
+  const g = lidGround({ notch: 8 });
+  const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: g, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });
+  assert.equal(t.ok, true, t.reason);
+  assert.equal(t.low, true);
+  assert.ok(Math.abs(t.line[t.iS].y) >= 47 && Math.abs(t.line[t.iN].y) >= 47, `faces at ${t.line[t.iS].y}, ${t.line[t.iN].y}: not 8 m inside the lid`);
+});
+
+test('a lid on one side only (a hillside) is no low box', () => {
+  const hill = (x, y) => (Math.abs(y) <= 50 ? 10 + Math.max(0, x) * 1.5 : 10);
+  const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: hill, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });
+  assert.ok(!t.low, 'not a low box');
+});

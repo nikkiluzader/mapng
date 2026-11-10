@@ -85,6 +85,14 @@ const stationXY = (st, u) => {
 // Cut-and-cover: a tunnel OSM maps under flat ground (a city deck park, an
 // underpass) is a box sunk below the street, its approaches in a trench.
 // Elevation data shows no trench (Deck Park, Phoenix: flat at street level).
+// A low box at the road's own level (solveTunnel): clear height LOW_WALL_M +
+// LOW_ARCH_M under a slab, the surface right over it.
+const LOW_WALL_M = 3.4;
+const LOW_ARCH_M = 0.8;
+const LOW_COVER_M = 0;
+const LOW_MOUTH_IN_M = 8;
+const LOW_MOUTH_OUT_M = 8;           // ... and this far out past its apron the carriageway is cleared to the road            // a low box's mouth: this far in from its face
+const LOW_FILL_M = 0.8;              // a lid this much lower than the box is raised over it
 const CC_WALL_M = 5;                   // box walls ...
 const CC_ARCH_M = 0.8;                 // ... and a shallow vault
 const CC_COVER_M = 0.8;                // ground over the roof
@@ -331,6 +339,13 @@ export function solveTunnel(path, opts) {
   if (path.gallery) return solveGallery(path, opts);
   const bored = solveTunnelAs(path, opts, false);
   if (bored.ok || !/not under ground|bore only/.test(bored.reason)) return bored;
+  // too little ground for a bore's arch, but a hump of a few metres all along
+  // the road, at its own level: a concrete box under a ski piste, a lawn, a
+  // square (fine elevation shows the lid's top as the ground: Tignes and Val
+  // d'Isère's underpasses stand 5 to 8 m over their roads). A low box, the
+  // road where it is, nothing dug
+  const lowBox = solveTunnelAs(...overTheStep(path, opts), 'low');
+  if (lowBox.ok) return lowBox;
   // mapped as a tunnel, but too little ground over it: on a hillside (the
   // 30 m elevation smooths a cliff road's rock away) a gallery; under flat
   // ground (a city) cut and cover
@@ -505,17 +520,91 @@ function buildGalleryGeometry(t) {
   return [{ pos: T.pos, uv: T.uv, from: t.line[0].s, to: t.line[t.line.length - 1].s }];
 }
 
-function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false }, cutCover) {
+// A low box's lid often runs on past the end of the mapped tunnel way (the
+// way ends inside the portal, or the lid's slab reaches out over the road):
+// the survey's step down to the road lies a few metres out along the
+// approach. The path taken out to just past that step, the approach
+// shortened by as much, so the box's face stands where the ground comes down
+// (left short, the approach road climbed the lid's edge: a mound in the mouth).
+const LOW_STEP_REACH_M = 30;           // the step looked for this far out
+const LOW_STEP_M = 1.5;                // ground this much over the lowest out there: still the lid
+function overTheStep(path, opts) {
+  const approaches = [...(opts.approaches || [null, null])];
+  let xy = path.xy;
+  for (const e of [0, 1]) {
+    const a = approaches[e];
+    if (a && (Number.isFinite(a.deckZ) || a.onBridge)) continue;
+    // (no approach line, or a short one: the way ends at a junction under
+    // the lid. The tunnel's own direction carried on: the box only follows
+    // it while the lid stands over the road)
+    let line = a?.xy?.length >= 2 ? a.xy : null;
+    const reachOf = (pts) => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return L; };
+    const synthetic = !line || reachOf(line) < 8;
+    if (synthetic) {
+      const end = e === 0 ? xy[0] : xy[xy.length - 1];
+      const back = e === 0 ? xy[Math.min(xy.length - 1, 2)] : xy[Math.max(0, xy.length - 3)];
+      const L = Math.hypot(end[0] - back[0], end[1] - back[1]);
+      if (!(L > 0.5)) continue;
+      const ux = (end[0] - back[0]) / L; const uy = (end[1] - back[1]) / L;
+      line = [end, [end[0] + ux * LOW_STEP_REACH_M, end[1] + uy * LOW_STEP_REACH_M]];
+    }
+    const ap = stations(line).filter((p) => p.s <= LOW_STEP_REACH_M);
+    if (ap.length < 3) continue;
+    // (the highest ground across the carriageway: the data pull's road
+    // smoothing has often cut a notch through the lid's edge along the
+    // centre line, the lid still standing 3 to 5 m over the rest of the road)
+    // (... and the middle one of five across, not the highest: an approach
+    // in a trench has walls beside it all the way out, a lid covers the road)
+    const side = Math.max(1.5, (path.half || 3) * 0.9);
+    const g = ap.map((p) => [-1, -0.5, 0, 0.5, 1].map((f) => (f ? opts.groundAt(...lateral(p, f * side)) : opts.groundAt(p.x, p.y))).sort((u, v) => u - v)[2]);
+    const ref = Math.min(...g);
+    if (!(Math.max(g[0], g[1] ?? -Infinity) - ref > LOW_STEP_M)) continue;
+    let k = 0;
+    for (let i = 0; i < ap.length; i++) if (g[i] > ref + LOW_STEP_M) k = i;
+    const cut = Math.min(ap.length - 1, k + 1);
+    if (cut < 1) continue;
+    // (the lid still up at the end of the reach: no step found, nothing added)
+    if (k >= ap.length - 1) continue;
+    const added = ap.slice(1, cut + 1).map((p) => [p.x, p.y]);
+    xy = e === 0 ? [...added.reverse(), ...xy] : [...xy, ...added];
+    // (the approach from the new end on: what is left of its line)
+    const from = ap[cut];
+    if (synthetic) { approaches[e] = null; continue; }
+    const rest = a.xy.filter((q, i) => {
+      let acc = 0;
+      for (let j = 1; j <= i; j++) acc += Math.hypot(a.xy[j][0] - a.xy[j - 1][0], a.xy[j][1] - a.xy[j - 1][1]);
+      return acc > from.s + 1e-6;
+    });
+    approaches[e] = rest.length >= 1 ? { ...a, xy: [[from.x, from.y], ...rest] } : null;
+  }
+  return xy === path.xy ? [path, opts] : [{ ...path, xy }, { ...opts, approaches }];
+}
+
+function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = () => false, squareSize = 1, raw = false }, mode) {
+  // mode: false a bore, true a cut-and-cover box sunk under the street, 'low' a low box at the road's own level
+  const cutCover = mode === true;
+  const low = mode === 'low';
   const st = stations(path.xy);
   const n = st.length;
   const L = st[n - 1].s;
   if (L < MIN_TUBE_M) return { ok: false, reason: `short (${Math.round(L)} m)`, length: L };
   const W = path.half + WALKWAY_M;
-  const wall = cutCover ? CC_WALL_M : WALL_M;
-  const arch = cutCover ? CC_ARCH_M : archRise(W);
+  const wall = cutCover ? CC_WALL_M : low ? LOW_WALL_M : WALL_M;
+  const arch = cutCover ? CC_ARCH_M : low ? LOW_ARCH_M : archRise(W);
   const crown = wall + arch;                   // inner crown over the road
-  const need = crown + LINING_M + (cutCover ? CC_COVER_M : MIN_COVER_M); // ground over the road
-  const g = st.map((p) => groundAt(p.x, p.y));
+  const need = crown + LINING_M + (cutCover ? CC_COVER_M : low ? LOW_COVER_M : MIN_COVER_M); // ground over the road
+  // (a low box: the lid as it stands across the lanes, the lower of its two sides
+  // (or the centre line, if higher). The data pull's road smoothing cuts a notch through a lid's
+  // end along the centre line, a few metres wide, and the box then stopped
+  // short of the real portal, a street on the lid left hanging over the open
+  // road)
+  // (a lid stands on both sides of the lanes: a hillside, high on one side only, is not one)
+  const lidAt = (p) => {
+    const side = Math.max(1.5, (path.half || 3) * 0.9);
+    const at = (f) => groundAt(...lateral(p, f * side));
+    return Math.max(groundAt(p.x, p.y), Math.min(Math.max(at(-1), at(-0.5)), Math.max(at(0.5), at(1))));
+  };
+  const g = st.map((p) => (low ? lidAt(p) : groundAt(p.x, p.y)));
   const free = [isFreeEnd(st[0].x, st[0].y), isFreeEnd(st[n - 1].x, st[n - 1].y)];
   // (onBridge: a bridge whose deck is solved after the tunnels, its height
   // still unknown: the portal's height from the ground as at a road end)
@@ -528,7 +617,8 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // (onto a bridge: the ground out along it may be the river under the
     // deck; at least under the hill at the tunnel's end by the cover)
     if (a?.onBridge) return Math.max(fitApproachHeight(a.xy, groundAt) ?? -Infinity, g[i] - need);
-    return fitApproachHeight(a?.xy, groundAt) ?? g[i];
+    // (the road's own ground at the end, not the lid beside it)
+    return fitApproachHeight(a?.xy, groundAt) ?? groundAt(st[i].x, st[i].y);
   });
 
   // At a free end (the map's edge cuts the tunnel) the road's height is not
@@ -565,7 +655,9 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     // The straight grade between the portals, lowered under the hill where it
     // would come too close to the surface, as far as the grade allows.
     z = st.map((p) => endZ[0] + ((endZ[1] - endZ[0]) * p.s) / (L || 1));
-    z = z.map((v, i) => Math.min(v, g[i] - need));
+    // (a low box: the road where it is between its ends, never dug down for cover:
+    // under flat ground that is cut and cover's job)
+    if (!low) z = z.map((v, i) => Math.min(v, g[i] - need));
     z[0] = endZ[0];
     z[n - 1] = endZ[1];
     for (let i = 1; i < n; i++) z[i] = Math.max(z[i], z[i - 1] - MAX_GRADE * (st[i].s - st[i - 1].s));
@@ -578,7 +670,8 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   // tube runs on to the map's edge. Where a bridge meets the tunnel the bore
   // runs out to it (out of a cliff face onto the bridge): the stretch with
   // thin cover there is left exposed, never filled.
-  const covered = (i) => g[i] - z[i] >= need - 1e-6;
+  // (a low box: a lid up to LOW_FILL_M lower than the box counts, made up with fill over it)
+  const covered = (i) => g[i] - z[i] >= need - (low ? LOW_FILL_M : 0) - 1e-6;
   const c0 = z.findIndex((_, i) => covered(i));
   const c1 = n - 1 - [...z].reverse().findIndex((_, k) => covered(n - 1 - k));
   if (c0 < 0 || c1 <= c0) return { ok: false, reason: 'not under ground in the elevation data', length: L };
@@ -588,7 +681,8 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   // tube runs on out to where the ground comes down to the road (the portal
   // face the survey has; its concrete stands out of the slope, the portal
   // holes keep the ground out of it) rather than a cutting dug to it
-  if (raw && !cutCover) {
+  // (a low box too, whatever the setting: the survey holds its portal faces, steps of 5 m at the lid's ends)
+  if ((raw && !cutCover) || low) {
     while (iS > 0 && g[iS - 1] - z[iS - 1] > RAW_PORTAL_OPEN_M) iS--;
     while (iN < n - 1 && g[iN + 1] - z[iN + 1] > RAW_PORTAL_OPEN_M) iN++;
   }
@@ -615,7 +709,9 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   const tooDeep = dips.find((dip) => dip.depth > MAX_FILL_M && (dip.length > NOTCH_M || dip.depth > NOTCH_FILL_M));
   // the profile, for diagnosing a tunnel left on the ground
   const profile = () => st.map((p, i) => ({ s: p.s, x: p.x, y: p.y, z: z[i], g: g[i] }));
-  if (short / (c1 - c0 + 1) > MAX_SHORT_SHARE) return { ok: false, reason: 'mostly not under ground in the elevation data', length: L, profile: profile() };
+  // (a low box under a lid a little lower than it all along is still under it: only a real gap counts)
+  const shortCount = low ? dips.reduce((m, dip) => m + (dip.depth > LOW_FILL_M ? dip.to - dip.from + 1 : 0), 0) : short;
+  if (shortCount / (c1 - c0 + 1) > MAX_SHORT_SHARE) return { ok: false, reason: 'mostly not under ground in the elevation data', length: L, profile: profile() };
   if (tooDeep) return { ok: false, reason: `needs ${tooDeep.depth.toFixed(1)} m of fill over it for ${Math.round(tooDeep.length)} m`, length: L, profile: profile() };
 
   // The line: approach cutting (from the outside in) + the path + the other
@@ -695,17 +791,23 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
     portals: [!free[0], !free[1]],
     portalKind: [0, 1].map((e) => (free[e] ? 'edge' : bridged[e] ? 'bridge' : 'cut')),
     kind: cutCover ? 'cutcover' : 'bored',
+    ...(low ? { low: true } : {}),
     // (terrain shaping off: the ground as surveyed, no backfill; tunnelHoleAt
     // opens it wherever it dips into the tube)
-    raw: raw && !cutCover,
+    raw: (raw && !cutCover) || low,
+    // (a low box with terrain shaping on: the survey's portal faces, but the
+    // ground over it graded and closed as over any tube; holes at the mouths only)
+    ...(low && !raw ? { gradedCover: true } : {}),
     W, wall, arch, crown, need,
     // headwall top over the road: a bore's tall face, a box's to the street
-    headTop: cutCover ? need + CC_HEAD_OVER_M : HEAD_TOP_M + (raw ? RAW_HEAD_GROW_M : 0),
+    // (a low box: its headwall just over the lid, not a bore's tall face standing out of a lawn)
+    headTop: cutCover ? need + CC_HEAD_OVER_M : low ? need + CC_HEAD_OVER_M + RAW_HEAD_GROW_M : HEAD_TOP_M + (raw ? RAW_HEAD_GROW_M : 0),
     // per portal [start, end]: a box's headwall up to the street behind it
     // (Deck Park's east portals: the street 10.3 m over the road where the
     // freeway is sunk deeper; at the cover height the street behind was cut
     // down to a ragged wall of ground over the headwall)
     headTops: [0, 1].map((e) => {
+      if (low) return need + CC_HEAD_OVER_M + RAW_HEAD_GROW_M;
       if (!cutCover) return HEAD_TOP_M + (raw ? RAW_HEAD_GROW_M : 0);
       const i0 = e === 0 ? iS : iN; const step = e === 0 ? 1 : -1;
       const behind = [];
@@ -742,7 +844,7 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   tunnel.maxExtra = 0;
   tunnel.cuts = [];
   tunnel.wings = wingTops(tunnel, groundAt);
-  tunnel.windows = cutCover ? [] : findWindows(tunnel, groundAt);
+  tunnel.windows = cutCover || low ? [] : findWindows(tunnel, groundAt);
   return tunnel;
 }
 
@@ -1186,6 +1288,17 @@ function cutsGroundAt(t, x, y, h) {
  */
 export function tunnelGroundAt(t, x, y, h) {
   if (t.kind === 'gallery') return galleryGroundAt(t, x, y, h);
+  // a low box's mouth: the survey's step often lies a few metres out from
+  // the face, or meets it at an angle, and what stood between them stayed as
+  // a mound in the carriageway. In front of the face, across the box's own
+  // width, the ground comes down to the road. Before the other roads' ground
+  // is looked at: the only road in front of the face, inside the box's
+  // width, is the one going in
+  if (t.gradedCover) {
+    const m = nearestOnTunnel(t, x, y, t.W + LINING_M + 2 * t.squareSize);
+    if (m && !m.beyond && m.into < 0 && m.into > -(Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) + LOW_MOUTH_OUT_M)
+      && across(t, m) <= t.W + LINING_M + t.squareSize) return Math.min(h, m.z);
+  }
   // another road's ground beside the tunnel stays as it is (one crossing
   // over the tube still gets the cover over it: Deck Park's west streets,
   // their ground low behind the headwalls, had squares opened down to the box)
@@ -1283,14 +1396,18 @@ export function tunnelHoleAt(t, x, y, lo, hi = lo) {
   // the ground as surveyed (terrain shaping off): no backfill over the tube,
   // so wherever the ground dips into it, all along, it opens (from a little
   // in front of the face: no teeth of ground left standing in the mouth)
-  if (t.raw) {
+  // (a low box with its cover graded: this rule at its mouths only, the first
+  // metres in and the apron in front, where the survey's step meets the face
+  // at an angle and left a mound in the opening; the normal rule further in)
+  if (t.raw && (!t.gradedCover || (n && n.into < LOW_MOUTH_IN_M))) {
     // (out in front of the face as far as the apron reaches, less half a square)
     if (!n || n.into < -Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) + 0.5 * t.squareSize) return false;
     const ad = across(t, n);
     if (ad > t.W + LINING_M + 2.5 * t.squareSize) return false;
     // (in front of the face only as far as the portal's apron reaches)
     if (n.into < -Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) + 0.5 * t.squareSize) return false;
-    return lo < n.z + t.crown + LINING_M + 1;
+    // (a low box's lid is the surface: only ground truly in the box opens, not the metre over it)
+    return lo < n.z + t.crown + LINING_M + (t.low ? 0 : 1);
   }
   if (!n || n.into < front || (n.into > t.headDepth + BACKFILL_M && !inExposed(t, n.s))) return false;
   if (across(t, n) > t.W + LINING_M + 0.5 * t.squareSize) return false;
