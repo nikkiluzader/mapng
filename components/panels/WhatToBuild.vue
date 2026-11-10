@@ -79,6 +79,12 @@
         <span v-if="excludeTags.length" class="text-micro text-gray-500 dark:text-gray-400">{{ t('build.tagsLeftOut', { n: excludeTags.length }) }}
           <button type="button" class="underline hover:text-brand" @click="excludeTags = []">{{ t('build.keepAllTags') }}</button></span>
       </div>
+      <!-- the colours are drawn on the 2D map: said only to someone who asked
+           for them and is looking at the 3D preview, with the way there -->
+      <p v-if="colourMap && store.previewMode" class="flex flex-wrap items-center gap-x-2 gap-y-1 text-caption leading-snug text-gray-600 dark:text-gray-300" role="status">
+        <span>{{ t('build.colourMapIn3d') }}</span>
+        <button type="button" class="font-semibold text-brand hover:underline" @click="store.previewMode = false">{{ t('build.show2dMap') }}</button>
+      </p>
     </template>
 
     <!-- Fine-tuning (Advanced) -->
@@ -131,6 +137,7 @@ import { computed, reactive, defineComponent, h } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { ChevronRight } from 'lucide-vue-next';
 import SettingCard from '../base/SettingCard.vue';
+import { useMainStore } from '../../stores/mainStore';
 import { CONTENT_GROUPS, PRESET_IDS, osmTagCounts } from '../../services/buildContent.js';
 import { GROUP_COLOURS } from '../../services/buildContentColours.js';
 import {
@@ -148,6 +155,7 @@ const props = defineProps({
 });
 defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps']);
 const { t, te } = useI18n();
+const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)
 const detailOf = (id) => { const k = `build.detail_${id}`; return te(k) || te(k, 'en') ? t(k) : ''; };
 const FOREST_DENSITY_KEYS = ['light', 'normal', 'dense', 'veryDense'];

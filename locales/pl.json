@@ -1674,6 +1674,8 @@
     "tagsN": "Tagi: {n}",
     "showTags": "Pokaż tagi OSM",
     "colourMap": "Pokoloruj mapę według grup",
+    "colourMapIn3d": "Kolory są rysowane na mapie 2D. Jesteś w podglądzie 3D.",
+    "show2dMap": "Pokaż mapę 2D",
     "tagsLeftOut": "Pominięte tagi OSM: {n}.",
     "keepAllTags": "Zachowaj wszystkie",
     "offInFeatures": "{what}: wyłączone w Obiektach",

@@ -1674,6 +1674,8 @@
     "tagsN": "{n} tags",
     "showTags": "Show OSM tags",
     "colourMap": "Colour the map by group",
+    "colourMapIn3d": "The colours are drawn on the 2D map. You're in the 3D preview.",
+    "show2dMap": "Show the 2D map",
     "tagsLeftOut": "{n} OSM tags left out.",
     "keepAllTags": "Keep all",
     "offInFeatures": "{what} are off in Features",

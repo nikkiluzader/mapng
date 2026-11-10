@@ -1674,6 +1674,8 @@
     "tagsN": "{n} Tags",
     "showTags": "OSM-Tags anzeigen",
     "colourMap": "Karte nach Gruppe einfärben",
+    "colourMapIn3d": "Die Farben werden auf der 2D-Karte gezeigt. Du bist in der 3D-Vorschau.",
+    "show2dMap": "2D-Karte zeigen",
     "tagsLeftOut": "{n} OSM-Tags ausgelassen.",
     "keepAllTags": "Alle behalten",
     "offInFeatures": "{what}: unter „Features“ ausgeschaltet",
