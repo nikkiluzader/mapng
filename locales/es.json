@@ -721,7 +721,7 @@
     "subtitle": "Mapas reales para BeamNG.drive",
     "hero": "MapNG convierte cualquier lugar real en un nivel jugable de BeamNG.drive: terreno, texturas, carreteras con marcas y semáforos, edificios, puentes, vegetación y más, creado en tu navegador o en la app de escritorio gratuita para Windows y Linux.",
     "whatTitle": "¿Qué hace?",
-    "whatBody": "Elige un lugar y una fuente de elevación, genera el terreno y revísalo en la vista previa 3D. Después exporta un nivel completo de BeamNG en ZIP, creado con datos reales de elevación y de OpenStreetMap, o lleva los datos GeoTIFF y GeoJSON a tu propio flujo de trabajo. El modo por lotes procesa cuadrículas enteras de teselas y puede unirlas en un nivel grande.",
+    "whatBody": "Elige un lugar y una fuente de elevación y genera. La vista previa 2D muestra lo que se construirá, con vistas de relieve, pendiente y altura; la vista previa 3D te deja mirar alrededor. Después exporta un nivel de BeamNG completo en ZIP hecho con elevación real y datos de OpenStreetMap, o llévate datos GeoTIFF y GeoJSON a tu propio flujo de trabajo. El modo por lotes procesa cuadrículas enteras de teselas y puede unirlas en un nivel grande.",
     "elevationTitle": "Fuentes de elevación",
     "elevationItems": [
       "Global 30 m (AWS Terrain Tiles, sobre todo SRTM): el respaldo donde no hay lidar, o por sí solo; carreteras suavizadas y niveladas y ríos bajo sus orillas, automáticamente; edificios, árboles y viaductos eliminados automáticamente",
@@ -732,8 +732,9 @@
       "Terreno plano",
       "Tus propios archivos: nubes de puntos LAZ/LAS, GeoTIFF, ASC, GML/XML (también comprimidos en ZIP), en capas y reproyectados, con huecos rellenados desde el global de 30 m o GPXZ y uniones fundidas"
     ],
-    "previewTitle": "Vista previa 3D",
+    "previewTitle": "Vistas previas 2D y 3D",
     "previewItems": [
+      "Vista previa 2D: lo que se construirá, por grupos, con vistas de relieve, pendiente y altura y curvas de nivel",
       "Iluminación HDR y sombras en cascada",
       "Satélite, OSM, híbrida, textura del juego o terreno liso",
       "Edificios, árboles, arbustos y barreras 3D desde OSM",

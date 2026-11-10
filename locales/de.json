@@ -721,7 +721,7 @@
     "subtitle": "Echte Orte als BeamNG.drive-Karten",
     "hero": "MapNG macht aus jedem realen Ort ein spielbares BeamNG.drive-Level: Gelände, Texturen, Straßen mit Markierungen und Ampeln, Gebäude, Brücken, Vegetation und mehr, erstellt im Browser oder in der kostenlosen Desktop-App für Windows und Linux.",
     "whatTitle": "Was macht es?",
-    "whatBody": "Wähle einen Ort und eine Höhendatenquelle, generiere das Gelände und prüfe es in der 3D-Vorschau. Exportiere dann ein komplettes BeamNG-Level als ZIP aus echten Höhen- und OpenStreetMap-Daten, oder nimm GeoTIFF- und GeoJSON-Daten in deinen eigenen Workflow mit. Der Batch-Modus verarbeitet ganze Tile-Raster und kann sie zu einem großen Level zusammensetzen.",
+    "whatBody": "Wähle einen Ort und eine Höhenquelle und generiere. Die 2D-Vorschau zeigt, was gebaut wird, mit Relief-, Neigungs- und Höhenansicht; in der 3D-Vorschau kannst du dich umsehen. Exportiere dann ein vollständiges BeamNG-Level als ZIP aus echten Höhen- und OpenStreetMap-Daten oder nimm GeoTIFF- und GeoJSON-Daten in deinen eigenen Arbeitsablauf. Der Stapelmodus verarbeitet ganze Kachelraster und kann sie zu einem großen Level zusammenfügen.",
     "elevationTitle": "Höhendatenquellen",
     "elevationItems": [
       "Global 30 m (AWS Terrain Tiles, überwiegend SRTM): der Ersatz, wo es kein Lidar gibt, oder allein; Straßen automatisch geglättet und eingeebnet, Flüsse unter ihren Ufern; Gebäude, Bäume und Hochstraßen automatisch herausgerechnet",
@@ -732,8 +732,9 @@
       "Flaches Gelände",
       "Eigene Uploads: LAZ/LAS-Punktwolken, GeoTIFF, ASC, GML/XML (auch gezippt), geschichtet und reprojiziert, Lücken aus den globalen 30 m oder GPXZ gefüllt, Nähte überblendet"
     ],
-    "previewTitle": "3D-Vorschau",
+    "previewTitle": "2D- und 3D-Vorschau",
     "previewItems": [
+      "2D-Vorschau: was gebaut wird, nach Gruppen, mit Relief-, Neigungs- und Höhenansicht und Höhenlinien",
       "HDR-Licht und kaskadierte Schatten",
       "Satellit, OSM, Hybrid, Spieltextur oder schlichtes Gelände",
       "3D-Gebäude, Bäume, Büsche und Barrieren aus OSM",

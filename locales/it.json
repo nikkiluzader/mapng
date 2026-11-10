@@ -721,7 +721,7 @@
     "subtitle": "Mappe reali per BeamNG.drive",
     "hero": "MapNG trasforma qualsiasi luogo reale in un livello giocabile di BeamNG.drive: terreno, texture, strade con segnaletica e semafori, edifici, ponti, vegetazione e altro, creato nel browser o nell'app desktop gratuita per Windows e Linux.",
     "whatTitle": "Cosa fa?",
-    "whatBody": "Scegli un luogo e una fonte di altitudine, genera il terreno e controllalo nell'anteprima 3D. Poi esporta un livello BeamNG completo in ZIP, costruito da dati reali di altitudine e di OpenStreetMap, oppure porta i dati GeoTIFF e GeoJSON nel tuo flusso di lavoro. La modalità batch elabora intere griglie di tessere e può unirle in un unico grande livello.",
+    "whatBody": "Scegli un luogo e una sorgente di elevazione e genera. L'anteprima 2D mostra ciò che verrà costruito, con viste di rilievo, pendenza e altezza; l'anteprima 3D ti fa guardare intorno. Poi esporta un livello BeamNG completo in ZIP, costruito da elevazione reale e dati OpenStreetMap, o porta dati GeoTIFF e GeoJSON nel tuo flusso di lavoro. La modalità batch elabora intere griglie di riquadri e può unirle in un unico grande livello.",
     "elevationTitle": "Fonti di altitudine",
     "elevationItems": [
       "Globale 30 m (AWS Terrain Tiles, soprattutto SRTM): il ripiego dove non c'è lidar, o da solo; strade levigate e livellate e fiumi sotto le sponde, automaticamente; edifici, alberi e viadotti tolti automaticamente",
@@ -732,8 +732,9 @@
       "Terreno piatto",
       "I tuoi file: nuvole di punti LAZ/LAS, GeoTIFF, ASC, GML/XML (anche in ZIP), a strati e riproiettati, con lacune colmate dal globale 30 m o GPXZ e giunzioni sfumate"
     ],
-    "previewTitle": "Anteprima 3D",
+    "previewTitle": "Anteprime 2D e 3D",
     "previewItems": [
+      "Anteprima 2D: ciò che verrà costruito, per gruppo, con viste di rilievo, pendenza e altezza e curve di livello",
       "Illuminazione HDR e ombre a cascata",
       "Satellite, OSM, ibrida, Texture di gioco o terreno semplice",
       "Edifici, alberi, cespugli e barriere 3D da OSM",

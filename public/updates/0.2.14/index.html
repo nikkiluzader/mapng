@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.2.14: See It Before You Build It</title>
+<meta name="description" content="What's new in MapNG 0.2.14: a 2D preview of everything that will be built, terrain views, the backdrop and a live satellite-detail slider; underpasses and avalanche galleries built properly; faster backdrops and a lighter 3D preview.">
+<link rel="canonical" href="https://mapng.com/updates/0.2.14/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.2.14: see it before you build it">
+<meta property="og:description" content="A 2D preview of what will be built, terrain views, a live texture slider, real underpasses and galleries, and faster backdrops.">
+<meta property="og:url" content="https://mapng.com/updates/0.2.14/">
+<meta property="og:image" content="https://mapng.com/updates/0.2.14/images/hero-underpass.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: the in-game shot with the title over it */
+  .hero { position: relative; color: #fff; background: #111 url(images/hero-underpass.jpg) center/cover no-repeat; }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(70vh, 560px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+  /* diagrams (inline SVG): colours from the page tokens, both modes */
+  .dia { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 18px; }
+  .dia svg { width: 100%; height: auto; display: block; --d1: #2f6fd6; --d2: #e85d00; --d3: #3a9a4a; --dg: #b9cf9f; --dw: #9cc3e6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; } }
+  :root[data-theme="dark"] .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; }
+  .dia text { fill: var(--text); font: 13px "Noto Sans", sans-serif; }
+  .dia .sm { fill: var(--muted); font-size: 12px; }
+  .dia .box { fill: var(--surface-2); stroke: var(--border); }
+  .dia .boxb { fill: var(--brand-tint); stroke: var(--brand); }
+  .dia .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .refs figcaption a { color: var(--muted); }
+  .pair2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .pair2 { grid-template-columns: 1fr; } }
+  .stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font: 800 26px/1.1 "Overpass", sans-serif; color: var(--brand-ink); }
+  .stat span { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.2.14</span></span>
+    <h1>See it before you build it</h1>
+    <p>Generate now opens a 2D preview of the level: everything that will be built, drawn over your texture, with relief, slope and height views. Underpasses and avalanche galleries are built properly. Backdrops are three times faster, and the 3D preview stops working when you stop moving.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+  <span class="credit">The D 87A underpass at Tignes, France, on a MapNG level in BeamNG.drive 0.40: a road that used to be left on top of its own lid</span>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#views">🗺️ Three views</a>
+    <a href="#preview2d">🔎 2D preview</a>
+    <a href="#backdrop">🏞️ Backdrop</a>
+    <a href="#slider">🎚️ Satellite detail</a>
+    <a href="#tunnels">🚇 Underpasses</a>
+    <a href="#galleries">🏔️ Galleries</a>
+    <a href="#speed">⚡ Faster</a>
+    <a href="#fixes">🧰 Fixes</a>
+  </nav>
+
+  <p style="margin-top:28px">This one is about seeing what you will get. Most of it came from testers: a long list from one tester's alpine and rally maps, and a string of "what if the map showed me…" questions while the fixes were being checked.</p>
+
+  <section id="views">
+    <div class="kicker">New layout</div>
+    <h2>🗺️ Three views, one Generate button</h2>
+    <p>"Preview 3D" and "Generate Data" were two buttons for one job. Now there is one: <b>Generate</b>. Over the map are three tabs: <b>Location</b> (the world map, where you choose the area), <b>2D preview</b> and <b>3D preview</b>. Generate opens the 2D preview.</p>
+    <div class="pair2">
+      <figure><img src="images/generate-one-button.jpg" alt="MapNG's Generate step: a review of the area, resolution, elevation and terrain settings, one orange Generate button, and three tabs over the map: Location, 2D preview and 3D preview" loading="lazy"><figcaption>One button. The two previews unlock once there is something to preview.</figcaption></figure>
+      <figure><img src="images/preview2d.jpg" alt="The 2D preview after generating: downtown Flagstaff under the Game texture with roads, buildings, parking and trees drawn in their group colours, a legend, and a tooltip naming a road under the cursor" loading="lazy"><figcaption>Where Generate lands you: the area flat, with everything that will be built.</figcaption></figure>
+    </div>
+    <div class="dia" role="img" aria-label="Diagram: Generate fetches the terrain and map data once, opens the 2D preview at once, and builds the 3D scene only when its tab is opened">
+      <svg viewBox="0 0 860 170">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker></defs>
+        <rect class="boxb" x="10" y="50" width="170" height="70" rx="12"/><text x="26" y="80" style="font-weight:700">Generate</text><text class="sm" x="26" y="102">terrain + map data</text>
+        <rect class="box" x="270" y="50" width="230" height="70" rx="10"/><text x="286" y="80" style="font-weight:700">2D preview</text><text class="sm" x="286" y="102">opens at once, light to draw</text>
+        <rect class="box" x="600" y="50" width="250" height="70" rx="10"/><text x="616" y="80" style="font-weight:700">3D preview</text><text class="sm" x="616" y="102">built when you open its tab</text>
+        <path class="arrow" d="M180,85 L268,85"/><path class="arrow" d="M500,85 L598,85"/>
+        <text class="sm" x="520" y="74">on demand</text>
+      </svg>
+    </div>
+    <p class="bts">Why: the 3D scene is the heaviest thing MapNG shows, and many exports never needed it. Now only those who open it pay for it.</p>
+  </section>
+
+  <section id="preview2d">
+    <div class="kicker">New</div>
+    <h2>🔎 The 2D preview</h2>
+    <p>The generated area under the base texture you chose, and over it <b>what will be built</b>, in the colour of its group. Switch a feature off in What to build and it fades on the map as you click. Hover anything to see what it is and whether it will be built. Scroll to zoom, drag to move.</p>
+    <h3>Terrain views</h3>
+    <p>The 3D preview's terrain views work here too, and the choice is shared between the two: <b>Relief</b> (the shape alone), <b>Slope</b> (what a car can climb, at a glance), <b>Height</b>, and <b>contour lines</b> over any of them.</p>
+    <figure><img src="images/preview2d-terrain-views.jpg" alt="Four views of Mars Hill, Flagstaff in the 2D preview: relief shading, slope coloured from green to red, height coloured from green valleys to pale summits, and the Game texture with pale contour lines" loading="lazy"><figcaption>Mars Hill, Flagstaff. Slope is the quickest way to spot a road that came out too steep, before you export.</figcaption></figure>
+    <h3>Something looks off in the map data?</h3>
+    <p><b>Edit in OpenStreetMap</b> (bottom right) opens OpenStreetMap's editor on the spot you are looking at. Most odd results trace back to how something is mapped; fixing it there fixes it for everyone.</p>
+    <div class="note">The switch in What to build is now <b>Show on the 2D preview</b>, on by default, in Basic mode too. The Location map no longer draws the features: it is for choosing areas.</div>
+  </section>
+
+  <section id="backdrop">
+    <div class="kicker">New</div>
+    <h2>🏞️ The backdrop, where you can see it</h2>
+    <p>Choose a backdrop in the export panel and its eight surrounding tiles appear around your map in the 2D preview: the pictures and terrain the export downloaded, read back from the cache. Nothing extra is fetched for the preview, and a checkbox hides them.</p>
+    <div class="pair2">
+      <figure><img src="images/backdrop-preview.jpg" alt="The 2D preview zoomed out: the map in the middle with its coloured features, and eight satellite tiles around it outlined with dashed lines" loading="lazy"><figcaption>The map and its eight backdrop tiles.</figcaption></figure>
+      <figure><img src="images/backdrop-relief.jpg" alt="The same view in Relief: the map and all eight backdrop tiles as shaded terrain" loading="lazy"><figcaption>Terrain views cover the backdrop too.</figcaption></figure>
+    </div>
+    <h3>Backdrop imagery quality</h3>
+    <div class="split narrow-img">
+      <figure><img src="images/backdrop-quality.jpg" alt="The export panel's Surroundings card: Include backdrop set to 30 m global, Backdrop imagery set to High, and a line saying about 2.0 m per pixel, 64 image tiles to download, 1024 px textures" loading="lazy"></figure>
+      <div>
+        <p>The backdrop is seen from a distance, so its picture has always been coarser than the map's own. Now it says so, and you can choose: <b>Standard</b> (as before), <b>High</b> or <b>Very high</b>. The panel shows the metres per pixel and how many image tiles that means.</p>
+        <p>A large area at a fine quality is a big picture to hold in memory. A browser tab is stepped down to what it can hold, and tells you; the <b>desktop app has more room</b>.</p>
+      </div>
+    </div>
+    <div class="note">Choosing a backdrop starts its download right away, so <b>the backdrop now starts Off with every new terrain</b>. A level you Modify, or a share code that asks for one, still brings its own.</div>
+  </section>
+
+  <section id="slider">
+    <div class="kicker">New · asked for by a tester</div>
+    <h2>🎚️ Satellite detail, on a slider</h2>
+    <p>The Game texture paints the ground in the game's own colours and blends in the satellite image's fine detail. How much is now yours to set: <b>0%</b> is the game's colours alone, <b>50%</b> is the look it has had, <b>100%</b> takes twice the detail and colour.</p>
+    <figure><img src="images/satellite-detail-slider.jpg" alt="The same patch of the 2D preview at Satellite detail 0, 50 and 100 percent: flat painted colours at 0, more texture and varied colour toward 100" loading="lazy"><figcaption>The same patch at 0, 50 and 100%.</figcaption></figure>
+    <h3>Behind the scenes: why it follows your hand</h3>
+    <p>Painting the texture takes seconds, so a slider that repainted on every move would lag. The first time you touch it, MapNG paints the texture at 0% and 100% (it already has 50%). Every setting between is two of those three cross-faded, which takes a few milliseconds.</p>
+    <div class="dia" role="img" aria-label="Diagram: three paintings at 0, 50 and 100 percent; a setting of 30 percent is the 0 and 50 percent paintings mixed 40 to 60">
+      <svg viewBox="0 0 860 190">
+        <rect class="box" x="30" y="30" width="150" height="80" rx="10"/><text x="46" y="62" style="font-weight:700">Painted at 0%</text><text class="sm" x="46" y="84">game colours only</text>
+        <rect class="box" x="355" y="30" width="150" height="80" rx="10"/><text x="371" y="62" style="font-weight:700">Painted at 50%</text><text class="sm" x="371" y="84">the look so far</text>
+        <rect class="box" x="680" y="30" width="150" height="80" rx="10"/><text x="696" y="62" style="font-weight:700">Painted at 100%</text><text class="sm" x="696" y="84">twice the detail</text>
+        <line x1="105" y1="150" x2="755" y2="150" style="stroke:var(--border);stroke-width:4;stroke-linecap:round"/>
+        <line x1="105" y1="150" x2="300" y2="150" style="stroke:var(--d2);stroke-width:4;stroke-linecap:round"/>
+        <circle cx="300" cy="150" r="9" style="fill:var(--d2)"/>
+        <text x="262" y="180" style="font-weight:700">30%</text><text class="sm" x="302" y="180">= 40% of the first + 60% of the second, in about 15 ms</text>
+        <line x1="105" y1="112" x2="105" y2="142" style="stroke:var(--muted);stroke-dasharray:3 3"/><line x1="430" y1="112" x2="430" y2="142" style="stroke:var(--muted);stroke-dasharray:3 3"/><line x1="755" y1="112" x2="755" y2="142" style="stroke:var(--muted);stroke-dasharray:3 3"/>
+      </svg>
+    </div>
+    <p class="bts">Both previews follow the slider. Textures larger than 4096 px a side are repainted when you let go instead, since the live version keeps three copies in memory.</p>
+  </section>
+
+  <section id="tunnels">
+    <div class="kicker">Fix · reported at Tignes and Val d'Isère</div>
+    <h2>🚇 Underpasses under a lid</h2>
+    <p>A road that passes under a ski piste, a lawn or a freeway park is mapped as a tunnel, but there is only a few metres of ground over it: too little to bore through. On fine lidar data MapNG used to give up and leave the road <b>on top of its own lid</b>. Now it builds what is really there: a low concrete box with a flat roof, the road where it is, nothing dug.</p>
+    <figure><img src="images/tunnel-d87a_south-before-after.jpg" alt="The D 87A underpass at Tignes, before and after: before, the road climbs through a notch cut in the ground with jagged terrain either side; after, a wide flat-roofed concrete portal with the road running level into it" loading="lazy"><figcaption>D 87A, Tignes. Before: the road climbs over the lid through a notch. After: it goes under.</figcaption></figure>
+    <div class="pair2">
+      <figure><img src="images/tunnel-crouze_east-before-after.jpg" alt="Chemin de Crouze, before and after: a steep ramp up a grassy bank becomes a level road into a concrete box portal" loading="lazy"><figcaption>Chemin de Crouze: a ramp up the bank, now a portal.</figcaption></figure>
+      <figure><img src="images/tunnel-lavachet-before-after.jpg" alt="Route de Lavachet, before and after: a cutting through a hill becomes a box portal with wingwalls and daylight at the far end" loading="lazy"><figcaption>Route de Lavachet.</figcaption></figure>
+    </div>
+    <h3>Checked against the real ones</h3>
+    <figure><img src="images/tignes-portals-real.jpg" alt="Eight street-level photos of the real underpass portals at Tignes: rectangular concrete boxes with flat lintels, beamed slab roofs and lit interiors" loading="lazy"><figcaption>The real portals: rectangular boxes with flat lintels. The same is true of Phoenix's Deck Park tunnel and the I-90 lids near Seattle, so boxes built from the surface down now get a flat roof everywhere; bored tunnels keep their arch. Photos: Mapillary contributors, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.</figcaption></figure>
+    <h3>Behind the scenes: measured, not eyeballed</h3>
+    <p>Two steps at these portals got past screenshots and were found by a tester driving in: a concrete apron sitting 0.4 m above the road, and a sill inside the opening. So the driving surface is now <b>measured in game</b>: a ray cast down every half metre along each tunnel, on the centre line and 1.2 m either side.</p>
+    <table class="nums">
+      <tr><th>Tunnel</th><th>Biggest change between points 0.5 m apart</th><th>Highest surface over the road line</th></tr>
+      <tr><td>Val Claret</td><td class="n">0.02 m (was 0.90)</td><td class="n">0.08 m (was 1.08)</td></tr>
+      <tr><td>Route de Lavachet</td><td class="n">0.07 m (was 0.80)</td><td class="n">0.05 m (was 1.03)</td></tr>
+      <tr><td>D 87A</td><td class="n">0.03 m</td><td class="n">0.05 m</td></tr>
+      <tr><td>Chemin de Crouze</td><td class="n">0.06 m</td><td class="n">0.05 m</td></tr>
+    </table>
+    <div class="note">The same rule built Phoenix's Deck Park freeway tunnels (about 830 m each) on lidar, which were never tuned for. Still open: freeway lids where the US survey has the lid removed are left as open cuttings with the cross streets on decks.</div>
+  </section>
+
+  <section id="galleries">
+    <div class="kicker">Fix · reported at Tignes</div>
+    <h2>🏔️ Avalanche galleries</h2>
+    <p>A gallery is a roof over a road on a mountainside. Fine lidar surveys take the roof out of the ground model and draw the hillside straight through, so the road ended up 1.5 to 2 m too high with a saw-toothed edge. And grass grew on the carriageway.</p>
+    <figure><img src="images/gallery-before-after-real.jpg" alt="The D 87A avalanche gallery at Tignes in four views, each before, after, and the real place: before, grass on the road and bare hillside under a plain roof; after, clean asphalt, a ribbed concrete wall and roof beams; the photos show the same ribbed wall and beams" loading="lazy"><figcaption>Before, after, and the real gallery. Photos: Mapillary contributors, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.</figcaption></figure>
+    <h3>Behind the scenes</h3>
+    <p>Where the survey shows a level road bench, the road is where it is. Where it does not (under the roof), the road's height is carried through from the stretches that have one, kept between the valley-side ground and the centre line. The valley side gets a verge level with the road.</p>
+    <figure><img src="images/gallery-sections.jpg" alt="Plots of the gallery before and after: a top-down hillshade, a long section and eight cross sections. Before, the red road line sits above the valley-side bench and one lane edge saw-tooths; after, the road runs on a steady grade at the level of the bench" loading="lazy"><figcaption>Cross sections along the gallery: grey is the survey, green the exported ground, red the road. Before, the road rides up the drawn-through slope; after, it sits on the bench.</figcaption></figure>
+    <figure><img src="images/galleries-world.jpg" alt="Street-level photos of avalanche galleries on the Simplon pass in Switzerland, Rogers Pass in Canada, Route 158 in Japan and the Axenstrasse in Switzerland: a concrete wall on the uphill side, columns on the valley side, beams under the roof" loading="lazy"><figcaption>Checked on four more galleries in Switzerland, Canada and Japan: a wall uphill, columns on the valley side, beams under the roof. Photos: Mapillary contributors, <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA 4.0</a>.</figcaption></figure>
+  </section>
+
+  <section id="speed">
+    <div class="kicker">Performance</div>
+    <h2>⚡ Faster, and quieter when idle</h2>
+    <div class="stat">
+      <div><b>15 s → 4.5 s</b><span>for a backdrop to be ready (1 km map, 30 m global)</span></div>
+      <div><b>6 s → 0.1 s</b><span>the longest the page froze while it was made</span></div>
+      <div><b>about 1/10</b><span>of the 3D preview's drawing while nothing moves</span></div>
+      <div><b>15 ms</b><span>for the texture to follow the Satellite detail slider</span></div>
+    </div>
+    <h3>The backdrop</h3>
+    <p>Choosing a backdrop used to freeze the map twice for six seconds. It looked like a slow download; it was one small filter that removes spikes from the surrounding terrain, sorting a fresh list twice for every one of a million samples a tile. It now gives the same result, sample for sample, in a fraction of the time.</p>
+    <div class="dia" role="img" aria-label="Bar chart: backdrop ready after 15.3 seconds before, of which about 11 seconds was the spike filter, and 4.5 seconds now">
+      <svg viewBox="0 0 860 150">
+        <text x="10" y="42" style="font-weight:700">Before</text>
+        <rect x="90" y="24" width="207" height="28" rx="4" style="fill:var(--d1)"/><rect x="297" y="24" width="533" height="28" rx="4" style="fill:var(--d2)"/>
+        <text x="100" y="43" style="fill:#fff;font-weight:600">downloads, cutting</text><text x="310" y="43" style="fill:#fff;font-weight:600">spike filter: about 11 s, the page frozen</text>
+        <text x="10" y="102" style="font-weight:700">Now</text>
+        <rect x="90" y="84" width="197" height="28" rx="4" style="fill:var(--d1)"/><rect x="287" y="84" width="20" height="28" rx="4" style="fill:var(--d2)"/>
+        <text class="sm" x="318" y="103">4.5 s in all, the map stays live</text>
+        <text class="sm" x="90" y="138">0 s</text><text class="sm" x="430" y="138">7 s</text><text class="sm" x="800" y="138">15 s</text>
+      </svg>
+    </div>
+    <h3>The 3D preview</h3>
+    <p>The preview drew every frame whether or not anything moved, and in Cinematic quality that is the dearest thing the window does. It now draws every frame while you move the view or change a setting, and a few a second while it sits still. Cinematic's pixel density is capped at 1.5×.</p>
+    <h3>Progress cards</h3>
+    <p>The Processing Terrain and Exporting cards now run on to 100% before they close; they used to vanish wherever their number had got to (74% on a four-second generate). Measured on a run each: the percentage never goes backwards, the biggest jump is 8 points.</p>
+  </section>
+
+  <section id="fixes">
+    <div class="kicker">From testers' maps</div>
+    <h2>🧰 Fixes</h2>
+    <h3>Roads that zigzagged across flat fields</h3>
+    <p>On flat land with 1 m lidar, a step that pulls hillside roads onto their real benches was chasing ditches and field edges instead. It now only works on hillsides.</p>
+    <figure><img src="images/road-snap-before-after.jpg" alt="Top-down plot of a rally road in Normandy before and after: before, the road line wanders off the mapped line into the fields; after, it follows the mapped line" loading="lazy"><figcaption>A rally road in Normandy: the mapped line, and where the road was put. Before and after.</figcaption></figure>
+    <h3>Phantom bridges at Val d'Isère</h3>
+    <p>With OpenStreetMap's servers down, map data comes from a fallback source that lists some bridges twice. The duplicates were read as roads and stacked over their own originals: a 989 m "skyway" over the town. Each bridge is now read once.</p>
+    <div class="pair2">
+      <figure><img src="images/valdisere-skyway-before-after.jpg" alt="Val d'Isère from the air, before and after: before, a long elevated deck on tall piers runs over the town; after, the road is on the ground" loading="lazy"><figcaption>The skyway, gone.</figcaption></figure>
+      <figure><img src="images/valdisere-ramp-before-after.jpg" alt="A roundabout at Val d'Isère, before and after: before, a spiral of ramps climbs over it; after, a plain roundabout" loading="lazy"><figcaption>And the spiral over the roundabout.</figcaption></figure>
+    </div>
+    <h3>Lakes</h3>
+    <p>Big lakes met their shores at a wall, and their beds showed the satellite's water colour through shallow water. Shores now ease down to the waterline, beds are painted as beds, and depth comes from the steeper shores.</p>
+    <div class="pair2">
+      <figure><img src="images/lake-shore-before-after.jpg" alt="The shore of Lac du Chevril with the water hidden, before and after: before, a vertical step at the waterline; after, the bank slopes down to the bed" loading="lazy"><figcaption>Lac du Chevril's shore with the water hidden.</figcaption></figure>
+      <figure><img src="images/lake-bed-before-after.jpg" alt="A lake bed from above, before and after: before, patchy blue-green satellite colour; after, an even grey-brown bed" loading="lazy"><figcaption>The bed, painted as a bed.</figcaption></figure>
+    </div>
+    <h3>Teal rock in the shadows</h3>
+    <figure><img src="images/texture-shadow-before-after.jpg" alt="A mountainside on the Game texture, before and after: before, blue-green patches where the satellite image was in shadow; after, grey rock" loading="lazy"><figcaption>In shadow the satellite image has the sky's colour, not the ground's. The Game texture no longer takes its colour from there.</figcaption></figure>
+    <div class="polish" style="margin-top:22px">
+      <div><b>Utility poles</b>Poles along country roads are only added where they are the norm (North America, Japan, Australia and New Zealand). Mapped poles are always built.</div>
+      <div><b>Deep rail tunnels</b>A railway tunnel that passes under the whole map with no portal on it is left underground. It used to be bridged across the valley, 62 m up at Rogers Pass.</div>
+      <div><b>Export hotspots</b>The glow uses one fixed scale for the whole world: a place keeps its colour however you pan or zoom.</div>
+      <div><b>Expand all / Collapse all</b>On every step of the panel that has sections, and its own pair over What to build's groups.</div>
+      <div><b>Desktop</b>If 3D graphics cannot start, the message now speaks of your computer, not "your browser".</div>
+      <div><b>Wording</b>One kind of ellipsis in the progress cards; "Downloaded ahead" for the export's data step.</div>
+    </div>
+    <figure><img src="images/expand-collapse.jpg" alt="Three views of the panel: the Location step with all five sections collapsed and Expand all and Collapse all at the top right, the Export step collapsed, and What to build with its own pair over the feature groups" loading="lazy"><figcaption>Expand all / Collapse all, the same two quiet buttons everywhere.</figcaption></figure>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks</h2>
+    <p>Thanks to the tester who spent hours in the Alps and Normandy and wrote the list this update works through, and to everyone sending feedback in the Discord. Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Street-level reference photos from <a href="https://www.mapillary.com/">Mapillary</a> contributors (CC BY-SA 4.0). Backdrop imagery © Esri.</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p>Generate your home town, switch the 2D preview to Slope, and tell me what you see. Post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.2.13/">Previous update (0.2.13)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>

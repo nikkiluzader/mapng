@@ -721,7 +721,7 @@
     "subtitle": "Des cartes réelles pour BeamNG.drive",
     "hero": "MapNG transforme n'importe quel lieu réel en niveau jouable pour BeamNG.drive : terrain, textures, routes avec marquages et feux, bâtiments, ponts, végétation et plus encore, construit dans votre navigateur ou dans l'application de bureau gratuite pour Windows et Linux.",
     "whatTitle": "Que fait-il ?",
-    "whatBody": "Choisissez un lieu et une source d'élévation, générez le terrain et vérifiez-le dans l'aperçu 3D. Exportez ensuite un niveau BeamNG complet en ZIP, construit à partir de vraies données d'élévation et d'OpenStreetMap, ou utilisez les données GeoTIFF et GeoJSON dans votre propre workflow. Le mode par lot traite des grilles entières de tuiles et peut les assembler en un grand niveau.",
+    "whatBody": "Choisissez un lieu et une source d'altitude, puis générez. L'aperçu 2D montre ce qui sera construit, avec des vues relief, pente et hauteur ; l'aperçu 3D permet de regarder autour. Exportez ensuite un niveau BeamNG complet en ZIP, construit à partir d'altitudes réelles et des données OpenStreetMap, ou emportez des données GeoTIFF et GeoJSON dans votre propre flux de travail. Le mode par lots traite des grilles entières de tuiles et peut les assembler en un grand niveau.",
     "elevationTitle": "Sources d'élévation",
     "elevationItems": [
       "Global 30 m (AWS Terrain Tiles, surtout SRTM) : le relais là où il n'y a pas de lidar, ou seul ; routes lissées et nivelées et rivières sous leurs berges, automatiquement; bâtiments, arbres et viaducs retirés automatiquement",
@@ -732,8 +732,9 @@
       "Terrain plat",
       "Vos propres fichiers : nuages de points LAZ/LAS, GeoTIFF, ASC, GML/XML (aussi zippés), superposés et reprojetés, trous comblés par le global 30 m ou GPXZ et raccords fondus"
     ],
-    "previewTitle": "Aperçu 3D",
+    "previewTitle": "Aperçus 2D et 3D",
     "previewItems": [
+      "Aperçu 2D : ce qui sera construit, par groupe, avec vues relief, pente et hauteur et courbes de niveau",
       "Éclairage HDR et ombres en cascade",
       "Satellite, OSM, hybride, Texture de jeu ou terrain nu",
       "Bâtiments, arbres, buissons et barrières 3D depuis OSM",

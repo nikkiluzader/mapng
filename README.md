@@ -15,7 +15,7 @@ Real-world maps for BeamNG.drive.
 
 ## What MapNG Does
 
-MapNG turns any real-world location into a playable BeamNG.drive level. Pick a place, choose an elevation source, generate the terrain, check it in the 3D preview, and export a level ZIP with real terrain, textured buildings, roads with lane markings and traffic signals, sidewalks, bridges, regional trees and AI traffic. You can also export GeoTIFF and GeoJSON data, and batch mode processes whole grids of tiles. It runs in your browser with no account, or as a free desktop app for Windows and Linux.
+MapNG turns any real-world location into a playable BeamNG.drive level. Pick a place, choose an elevation source, generate the terrain, check it in the 2D and 3D previews, and export a level ZIP with real terrain, textured buildings, roads with lane markings and traffic signals, sidewalks, bridges, regional trees and AI traffic. You can also export GeoTIFF and GeoJSON data, and batch mode processes whole grids of tiles. It runs in your browser with no account, or as a free desktop app for Windows and Linux.
 
 It is built for driving and modding, not survey-grade reconstruction. The result depends on the elevation source and on how well OpenStreetMap covers the area.
 
@@ -25,7 +25,7 @@ The same MapNG, running on your own computer. Free, from [GitHub Releases](https
 
 - **Big and dense maps.** No browser memory limit: generating and exporting run in their own processes and use every CPU core. A dense 8 km Manhattan level that took 34 minutes at the start of the desktop work exports in under 5 minutes.
 - **Full-detail free lidar.** The desktop app reads Mapterhorn's free lidar at full detail for much bigger areas than the browser can hold (about 2.5 GB of tiles against the browser's 290 MB): a 16 km area at 1 m gets about 0.8 m lidar instead of 3.3 m. The hint under the elevation source says the detail your area will actually get.
-- **Downloads kept while you work.** Generate Data and Preview 3D save everything they download (elevation, satellite, OpenStreetMap, land cover) to disk, so changing a setting and generating again only fetches what's new. The cache is cleared when the app starts, and OpenStreetMap data is fetched fresh after 30 minutes.
+- **Downloads kept while you work.** Generate saves everything it downloads (elevation, satellite, OpenStreetMap, land cover) to disk, so changing a setting and generating again only fetches what's new. The cache is cleared when the app starts, and OpenStreetMap data is fetched fresh after 30 minutes.
 - **Straight into the game.** Levels are saved directly into BeamNG.drive's `mods` folder (found automatically, or pick it), ready to drive.
 - **My Levels.** A sidebar on the right lists the MapNG levels in your mods folder, with their size, date and MapNG version. **Update** remakes a level with the current version from the data it was made from, with the same settings, so it gets every fix since. **Modify** loads it back in with its settings to change and export again. You can also show it on the map, show it in the mods folder, open its saved data, or **Delete** it (to the Recycle Bin or Trash). Levels from before the desktop app are updated by fetching their area again.
 - **Saved downloads.** Each level keeps what was downloaded for it (terrain, satellite, OpenStreetMap, bridge-height lidar) in the app's data folder (`%APPDATA%\MapNG\projects` on Windows), never in the level zip. Update and Modify read it instead of downloading again, so they work offline and use no GPXZ calls. **Show saved data** opens a level's folder; deleting a level removes it too.
@@ -54,7 +54,8 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **A step-by-step control panel:** Location, Sources, Generate, Export (batch: Location, Sources, What you get, Run), with your setup always shown above the buttons
 - **Background areas** (Advanced): shade the parts of the map you won't drive; they keep their shape but get no buildings, trees, grass or props and download at lower detail. A No smoothing brush keeps chosen roads exactly as the elevation data has them
 - **Exports that only redo what changed:** everything is downloaded at Generate and in a background data step (one download cache), Check level when nothing changed, and the slow steps reused when one setting did; export history in the desktop app
-- **3D preview** with Standard and Cinematic looks, sun shadows, and terrain views (Relief, Slope, Height, contour lines)
+- **2D preview:** the generated area flat, with everything that will be built drawn over it by group, terrain views (Relief, Slope, Height, contour lines), the backdrop's surrounding tiles, and a button straight into OpenStreetMap's editor
+- **3D preview** with Standard and Cinematic looks, sun shadows, and the same terrain views
 - **What to build:** switch any feature of the level on or off before you export. Basic has four presets (Everything, Clean driving, Roads only, Scenery only); Advanced has a switch for each of 32 features, single OpenStreetMap tags, and the 2D map coloured by group
 - **Spawn and quicktravel points:** pick where the car starts and add places to jump to from BeamNG's big map
 - **Railways** with their bridges, tunnels and level crossings (tracks only for now)
@@ -65,6 +66,18 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - 7 languages, light and dark mode
 
 ## What's New (November 2026)
+
+**MapNG 0.2.14** ([update page](https://mapng.com/updates/0.2.14/))
+
+- **Three views, one Generate button:** Location (the world map), 2D preview and 3D preview. Generate opens the 2D preview; the 3D scene is only built when you open its tab
+- **2D preview:** the generated area under your base texture with everything that will be built drawn over it in its group's colour (faint where switched off); hover a feature to see what it is. Terrain views (Relief, Slope, Height, contour lines) as in the 3D preview, and **Edit in OpenStreetMap** opens the editor where you are looking
+- **Backdrop in the preview:** the eight surrounding tiles as the export downloaded them, with a toggle. A new **Backdrop imagery** quality (Standard, High, Very high) shows what it will download; a browser tab is held to what its memory allows, the desktop app has more room. The backdrop now starts Off with every terrain
+- **Satellite detail slider** for the Game texture (0 %: the game's own colours; 100 %: twice the satellite's detail and colour), live in both previews
+- **Underpasses under a lid** (a piste, a lawn, a freeway park) are built as concrete boxes with a flat roof and clear, level portals, where a fine lidar survey used to leave them as a road over the lid. Measured in game: no step over 7 cm along any of the tested tunnels
+- **Avalanche galleries:** the road level through them (it stood up to 2 m high where the survey has the roof removed), a ribbed wall on the uphill side, roof beams, no grass on the carriageway
+- **Faster:** a backdrop is ready in about 4.5 s (15 s before, with two 6 s freezes); the 3D preview draws only when something changes; progress cards run on to 100 %
+- **Fixes from testers:** roads no longer zigzag across flat fields; phantom bridges from doubled map data are gone; lakes meet their shores without a wall and have beds; no teal rock in shadows; utility poles along country roads only where they are the norm; deep rail tunnels passing under the whole map are no longer bridged across the valley; the export hotspots glow uses one fixed scale
+- **Expand all / Collapse all** on every step of the panel and in What to build
 
 **MapNG 0.2.13** ([update page](https://mapng.com/updates/0.2.13/))
 
@@ -104,7 +117,7 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 **MapNG 0.2.9** ([update page](https://mapng.com/updates/0.2.9/))
 
-- **Desktop: downloads kept while you work.** Generate Data and Preview 3D save everything they download to disk; change a setting, generate again, and only what's new is fetched
+- **Desktop: downloads kept while you work.** Generate saves everything it downloads to disk; change a setting, generate again, and only what's new is fetched
 - **Desktop: full-detail free lidar** for big areas (16 km at 1 m: about 0.8 m lidar instead of 3.3 m), and the elevation hint says what your area actually gets
 - **Land cover from ESA WorldCover:** trees only where trees grow, ground materials and grass on land OSM doesn't map, snow on the game texture, the 3D preview's trees match the level, and the regional look follows what covers the land
 - **Mountains:** untagged trees high up are conifers, slopes over about 45° are rock, lakes no longer get walls along their shores
@@ -280,7 +293,7 @@ npm run build
 
 ### Desktop app (development)
 
-The desktop app lives in `desktop/` (Electron). It loads the built page, and runs Generate Data and the level export in a bundled Node runtime.
+The desktop app lives in `desktop/` (Electron). It loads the built page, and runs Generate and the level export in a bundled Node runtime.
 
 ```bash
 npm run build                 # the page (dist/)
@@ -297,7 +310,7 @@ Releases are built by `.github/workflows/desktop-release.yml` when a `vX.Y.Z` ta
 1. Pick a location on the map or search by name.
 2. Choose an output size, a processing scale (m/px) and an elevation source.
 3. Keep Include OSM features on for roads, buildings, vegetation and everything built from them (turn on MapNG OSM coverage in the Map layers box to see where MapNG has its own copy).
-4. Generate the terrain and check it in the 3D preview.
+4. Generate. The 2D preview opens: check what will be built, the slope and the relief; open the 3D preview for a look round.
 5. Export the BeamNG level and put the ZIP in your BeamNG.drive `mods` folder (the desktop app saves it there for you).
 6. For larger areas, switch to Batch job mode and process a tile grid, or stitch one into a combined level.
 

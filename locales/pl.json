@@ -721,7 +721,7 @@
     "subtitle": "Prawdziwe miejsca jako mapy BeamNG.drive",
     "hero": "MapNG zamienia dowolne prawdziwe miejsce w grywalny poziom BeamNG.drive: teren, tekstury, drogi z oznakowaniem i sygnalizacją, budynki, mosty, roślinność i więcej, tworzone w przeglądarce albo w darmowej aplikacji desktopowej dla Windows i Linux.",
     "whatTitle": "Co robi?",
-    "whatBody": "Wybierz miejsce i źródło wysokości, wygeneruj teren i sprawdź go w podglądzie 3D. Następnie wyeksportuj kompletny poziom BeamNG jako ZIP, zbudowany z prawdziwych danych wysokościowych i OpenStreetMap, albo przenieś dane GeoTIFF i GeoJSON do własnej pracy. Tryb wsadowy przetwarza całe siatki kafelków i potrafi złożyć je w jeden duży poziom.",
+    "whatBody": "Wybierz miejsce i źródło wysokości, a potem wygeneruj. Podgląd 2D pokazuje, co zostanie zbudowane, z widokami rzeźby, nachylenia i wysokości; w podglądzie 3D można się rozejrzeć. Następnie wyeksportuj kompletny poziom BeamNG w ZIP, zbudowany z prawdziwych wysokości i danych OpenStreetMap, albo zabierz dane GeoTIFF i GeoJSON do własnej pracy. Tryb wsadowy przetwarza całe siatki kafli i może połączyć je w jeden duży poziom.",
     "elevationTitle": "Źródła wysokości",
     "elevationItems": [
       "Globalne 30 m (AWS Terrain Tiles, głównie SRTM): zastępstwo tam, gdzie nie ma lidaru, lub samodzielnie; drogi automatycznie wygładzane i wyrównywane, rzeki poniżej brzegów; budynki, drzewa i wiadukty usuwane automatycznie",
@@ -732,8 +732,9 @@
       "Płaski teren",
       "Własne pliki: chmury punktów LAZ/LAS, GeoTIFF, ASC, GML/XML (także spakowane w ZIP), warstwowo i z reprojekcją, luki uzupełniane z globalnych 30 m lub GPXZ, z wygładzonymi szwami"
     ],
-    "previewTitle": "Podgląd 3D",
+    "previewTitle": "Podglądy 2D i 3D",
     "previewItems": [
+      "Podgląd 2D: co zostanie zbudowane, według grup, z widokami rzeźby, nachylenia i wysokości oraz poziomicami",
       "Oświetlenie HDR i kaskadowe cienie",
       "Satelita, OSM, hybryda, tekstura gry albo sam teren",
       "Budynki, drzewa, krzewy i bariery 3D z OSM",
