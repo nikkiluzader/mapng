@@ -29,10 +29,14 @@ let manifestFailedAt = 0;
 const loadManifest = () => {
   if (manifestPromise) return manifestPromise;
   if (Date.now() - manifestFailedAt < MANIFEST_RETRY_MS) return Promise.resolve(null);
-  manifestPromise = fetch(MANIFEST_URL)
+  // (asked twice before giving up for MANIFEST_RETRY_MS: one failed request left every area on
+  // Overpass for five minutes)
+  const once = () => fetch(MANIFEST_URL)
     .then((r) => (r.ok ? r.json() : null))
     .then((m) => (Array.isArray(m?.archives) ? m : null))
-    .catch(() => null)
+    .catch(() => null);
+  manifestPromise = once()
+    .then((m) => m || new Promise((resolve) => setTimeout(resolve, 800)).then(once))
     .then((m) => {
       if (!m) { manifestFailedAt = Date.now(); manifestPromise = null; }
       return m;
@@ -105,6 +109,22 @@ export const planTileSources = (archivesList, bounds, z = TILE_ZOOM) => {
   return [...byKey.entries()].map(([key, tiles]) => ({ key, tiles }));
 };
 
+// One tile, asked again after a failed read: an area is thirty tiles and more, each its own
+// request, and one dropped connection or one answer that was not the archive's bytes threw the
+// whole area over to Overpass (and, with Overpass down, to Overture).
+const TILE_TRIES = 3;
+const TILE_RETRY_MS = 600;
+export const readTile = async (archive, x, y, signal) => {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await archive.getZxy(TILE_ZOOM, x, y, signal);
+    } catch (error) {
+      if (error?.name === 'AbortError' || signal?.aborted || attempt >= TILE_TRIES) throw error;
+      await new Promise((resolve) => setTimeout(resolve, TILE_RETRY_MS * attempt));
+    }
+  }
+};
+
 /**
  * Overpass-shaped {elements} for bounds from MapNG's published archives
  * (each tile from the newest archive covering it), or null when the
@@ -120,7 +140,7 @@ export const fetchOsmFromManifest = async (bounds, { signal, skipBox = null } = 
       signal?.throwIfAborted?.();
       // (wholly inside background areas: nothing there is kept)
       if (skipBox?.(tileCorners(x, y, TILE_ZOOM))) return null;
-      const tile = await archive.getZxy(TILE_ZOOM, x, y, signal);
+      const tile = await readTile(archive, x, y, signal);
       // (no tile: nothing of ours there, e.g. open sea; the archive covers it)
       return tile?.data ? decodeTile(tile.data) : null;
     });

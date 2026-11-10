@@ -40,6 +40,8 @@ let osmTileSource = import.meta.env?.VITE_OSM_TILES_URL || null;
 export const setOsmTileSource = (source) => { osmTileSource = source || null; };
 
 let lastOSMRequestInfo = null;
+// why MapNG's own tiles were not the source of the last pull (null: they were, or were never asked)
+let mapngTilesNote = null;
 
 export const getOSMQueryParameters = (bounds) => ({
   endpointCandidates: [...OVERPASS_ENDPOINTS],
@@ -1060,8 +1062,12 @@ const fetchOsmRaw = async (bounds, { onStatus, signal, skipBox = null, keptBoxes
         ? (onStatus?.("Reading OpenStreetMap data from MapNG tiles..."), await fetchOsmFromTiles(osmTileSource, bounds, { signal, skipBox }))
         : await fetchOsmFromManifestWithStatus(bounds, { onStatus, signal, skipBox });
       if (data) return { endpoint: "mapng-osm-tiles", data };
+      // (why the tiles were passed over goes into the request's record and the export report:
+      // a map built from Overture inside the tiles' coverage could not be explained without it)
+      mapngTilesNote = "not used: no manifest, or the area is not wholly inside the published archives";
     } catch (tileError) {
       if (tileError?.name === "AbortError" || signal?.aborted) throw tileError;
+      mapngTilesNote = `failed: ${String(tileError?.message || tileError).slice(0, 200)}`;
       console.warn("[OSM] MapNG tiles unavailable, using Overpass:", tileError?.message || tileError);
     }
   }
@@ -1131,6 +1137,7 @@ export const mergeAcrossDateLine = (parts, refLng) => {
 };
 
 export const fetchOSMData = async (bounds, { onStatus, signal, skipBox = null, keptBoxes = null } = {}) => {
+  mapngTilesNote = null;
   console.log(`[OSM] Fetching data for bounds: N:${bounds.north}, S:${bounds.south}, E:${bounds.east}, W:${bounds.west}`);
 
   const queryParams = getOSMQueryParameters(bounds);
@@ -1173,6 +1180,7 @@ export const fetchOSMData = async (bounds, { onStatus, signal, skipBox = null, k
     lastOSMRequestInfo = {
       ...queryParams,
       endpointUsed: endpoint,
+      ...(mapngTilesNote && endpoint !== "mapng-osm-tiles" ? { mapngTiles: mapngTilesNote } : {}),
       elementCount: data.elements?.length || 0,
       ...(endpoint === OVERTURE_ENDPOINT
         ? { overtureRelease: OVERTURE_RELEASE, attribution: OVERTURE_ATTRIBUTION }

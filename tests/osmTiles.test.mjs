@@ -122,3 +122,19 @@ test('a covered area reads MapNG tiles even with the user\'s own Overpass server
     globalThis.localStorage = origStorage;
   }
 });
+
+test('a tile whose read fails is asked again; an abort is not', async () => {
+  const { readTile } = await import('../services/osmTiles.js');
+  let calls = 0;
+  const flaky = { getZxy: async () => { calls++; if (calls < 3) throw new TypeError('fetch failed'); return { data: new Uint8Array([1]) }; } };
+  assert.deepEqual([...(await readTile(flaky, 1, 2)).data], [1]);
+  assert.equal(calls, 3);
+  // (never working: the error comes out after the third try)
+  let dead = 0;
+  await assert.rejects(readTile({ getZxy: async () => { dead++; throw new TypeError('fetch failed'); } }, 1, 2), /fetch failed/);
+  assert.equal(dead, 3);
+  let aborted = 0;
+  const abort = Object.assign(new Error('stop'), { name: 'AbortError' });
+  await assert.rejects(readTile({ getZxy: async () => { aborted++; throw abort; } }, 1, 2), /stop/);
+  assert.equal(aborted, 1);
+});

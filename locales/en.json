@@ -6,6 +6,11 @@
     "reopen": "Using backup map data. Click for details",
     "chip": "Backup map data"
   },
+  "backupData": {
+    "title": "This map was built from backup data.",
+    "body": "OpenStreetMap's servers did not answer, so the roads and buildings came from Overture Maps. It has no lane counts (wide roads can come out as two lanes) and marks bridges only roughly (some come out short or missing). Generate again later for the full detail.",
+    "dismiss": "Close"
+  },
   "common": {
     "cancel": "Cancel",
     "close": "Close"
