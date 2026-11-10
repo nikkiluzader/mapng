@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "mapng",
-  "main": "worker.js",
+  "main": "worker/index.js",
   "compatibility_date": "2026-05-28",
   "preview_urls": true,
   "assets": {

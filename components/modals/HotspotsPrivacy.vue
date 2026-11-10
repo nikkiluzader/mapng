@@ -1,6 +1,6 @@
 <template>
   <!-- What sharing export areas sends, where it is kept, and what it is used for
-       (composables/useExportHotspots.js; worker side: hotspotsObject.js) -->
+       (composables/useExportHotspots.js; worker side: worker/hotspots.js) -->
   <Teleport to="body">
     <div v-if="privacyOpen" class="fixed inset-0 z-[10001] flex items-center justify-center bg-black/60 backdrop-blur-sm" @click.self="privacyOpen = false">
       <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 w-[calc(100vw-2rem)] max-w-lg max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden" role="dialog" aria-modal="true" :aria-label="t('hotspots.privacy.title')">

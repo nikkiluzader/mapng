@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { USAGE_FIELDS, usageFromConfig, validUsage } from '../services/usageStats.js';
 import { buildSessionConfig } from '../services/sessionConfig.js';
-import { ExportHotspots } from '../hotspotsObject.js';
+import { ExportHotspots } from '../worker/hotspots.js';
 
 const storage = (init = {}) => { const m = new Map(Object.entries(init)); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)) }; };
 const run = { center: { lat: 30.1, lng: -81.4 }, resolution: 4096, includeOSM: true, elevationSource: 'default', processingMetersPerPixel: 1, rawTerrain: true };

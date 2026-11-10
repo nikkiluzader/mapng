@@ -822,7 +822,7 @@ const applyPendingConfig = () => {
   }
 };
 
-// Send: mapng.com keeps the code 24 hours under a short code (shareCodes.js)
+// Send: mapng.com keeps the code 24 hours under a short code (worker/shareCodes.js)
 const sendingConfig = ref(false);
 const sentConfig = ref(null);   // { id, link }
 const sendConfig = async () => {

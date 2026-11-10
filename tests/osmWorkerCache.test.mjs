@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import worker from '../worker.js';
+import worker from '../worker/index.js';
 import { fetchOSMData, getLastOSMRequestInfo } from '../services/osm.js';
 
 const GOOD = JSON.stringify({ elements: [{ type: 'node', id: 1, lat: 35.21, lon: -111.41, tags: { natural: 'tree' } }] });

@@ -694,7 +694,7 @@ export const parseOverpassResponse = (data, bounds) => {
 
 const MIRROR_HEALTH_KEY = "mapng_overpass_health_v1";
 const HEDGE_DELAY_MS = 6000;
-// Our Worker's edge cache (worker.js handleOsm) is tried first. A cache miss
+// Our Worker's edge cache (worker/index.js handleOsm) is tried first. A cache miss
 // waits on a mirror upstream, so it gets longer before direct mirrors start.
 const OSM_CACHE_PATH = "/api/osm";
 const CACHE_HEDGE_DELAY_MS = 25000;

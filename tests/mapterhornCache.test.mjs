@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { handleMapterhornTiles, parseMapterhornPath } from '../mapterhornCache.js';
+import { handleMapterhornTiles, parseMapterhornPath } from '../worker/mapterhornCache.js';
 
 function env() {
   const store = new Map(); let puts = 0;

@@ -1,7 +1,7 @@
 // Which settings people export with (opt in, separate from export hotspots;
 // public/data.html#usage). One report per finished level export: a flat
 // list of setting → value from the allowed lists below, never a location,
-// level name, key or anything free-form. The server (hotspotsObject.js)
+// level name, key or anything free-form. The server (worker/hotspots.js)
 // only adds 1 to each pair's total and refuses anything not listed here.
 import { EXPORT_FIELDS, isCountedField } from './sessionConfig.js';
 

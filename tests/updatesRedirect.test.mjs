@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker from '../worker.js';
-import { LATEST_UPDATE } from '../updates.js';
+import worker from '../worker/index.js';
+import { LATEST_UPDATE } from '../worker/updates.js';
 
 test('/updates/latest and /updates point at the newest update page', async () => {
   for (const path of ['/updates/latest', '/updates/latest/', '/updates', '/updates/']) {

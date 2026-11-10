@@ -2,7 +2,7 @@
 // page's ReportDialog.vue shows what's included first). Native crashes of
 // the app are caught by Electron's crash reporter and kept on this computer
 // (nothing is uploaded by it); after a crash, the next start offers to send
-// one. Reports go to mapng.com/api/crash (crashReports.js at the repo root):
+// one. Reports go to mapng.com/api/crash (worker/crashReports.js):
 // private storage for the developer. What a report holds: public/data.html.
 import { app, crashReporter, net } from 'electron';
 import fs from 'node:fs';

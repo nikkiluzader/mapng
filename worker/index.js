@@ -19,7 +19,7 @@
  * when the user agrees) into private storage (see crashReports.js).
  *
  * /api/hotspots counts opt-in export locations (coarse cells) and serves
- * them for the 2D map's hotspot overlay (see hotspotsObject.js).
+ * them for the 2D map's hotspot overlay (see hotspots.js).
  *
  * All other requests fall through to the static assets (dist/).
  */
@@ -29,14 +29,14 @@ import {
   OVERPASS_QUERY_VERSION,
   buildOverpassQuery,
   snapOsmBounds,
-} from './services/overpassQuery.js';
-import { handleHotspots, handleUsage } from './hotspotsObject.js';
+} from '../services/overpassQuery.js';
+import { handleHotspots, handleUsage } from './hotspots.js';
 import { handleCrashReports } from './crashReports.js';
 import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
 import { LATEST_UPDATE } from './updates.js';
 
-export { ExportHotspots } from './hotspotsObject.js';
+export { ExportHotspots } from './hotspots.js';
 
 const GPXZ_ORIGIN = 'https://api.gpxz.io';
 const NOMINATIM_OSM_ORIGIN = 'https://nominatim.openstreetmap.org';

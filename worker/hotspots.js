@@ -3,12 +3,12 @@
 // SQLite storage: per 0.05° cell the exports from the web app and from the
 // desktop app, and the day the cell was last seen. Nothing about who sent
 // them is stored; the short per-address limit below lives in memory only.
-import { HOTSPOT_PLATFORMS, isHotspotCell } from './services/exportHotspots.js';
-import { USAGE_FIELDS, validUsage } from './services/usageStats.js';
+import { HOTSPOT_PLATFORMS, isHotspotCell } from '../services/exportHotspots.js';
+import { USAGE_FIELDS, validUsage } from '../services/usageStats.js';
 
 const LIMIT_PER_HOUR = 30;   // reports one address may make in an hour
 
-// (asked over fetch, not RPC: no 'cloudflare:workers' import, so worker.js
+// (asked over fetch, not RPC: no 'cloudflare:workers' import, so index.js
 // still loads in Node for tests/osmWorkerCache.test.mjs)
 export class ExportHotspots {
   constructor(ctx) {

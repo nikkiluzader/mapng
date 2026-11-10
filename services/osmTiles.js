@@ -19,7 +19,7 @@ import { PMTiles } from 'pmtiles';
 
 const archives = new Map();   // url -> PMTiles
 
-// The Worker lists the published archives (worker.js handleOsmTiles, written
+// The Worker lists the published archives (worker/index.js handleOsmTiles, written
 // by scripts/publish-osm-tiles.py): [{ region, key, bounds: [w, s, e, n], built_at }].
 const MANIFEST_URL = '/api/osm-tiles/manifest';
 const MANIFEST_RETRY_MS = 5 * 60 * 1000;

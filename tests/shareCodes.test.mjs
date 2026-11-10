@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleShareCodes, normalizeShareId } from '../shareCodes.js';
+import { handleShareCodes, normalizeShareId } from '../worker/shareCodes.js';
 
 function fakeBucket() {
   const store = new Map();

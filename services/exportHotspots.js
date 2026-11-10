@@ -1,7 +1,7 @@
 // Export hotspots: where people export MapNG levels, for the 2D map overlay.
 // Opt in only. What is sent is the export's grid cell (0.05°, about 5 km),
 // never the exact spot, and the worker stores per cell only counts and the
-// day it was last seen (worker.js, ExportHotspots). Shared by the page, the
+// day it was last seen (worker/hotspots.js, ExportHotspots). Shared by the page, the
 // worker and the tests: keep it free of browser and Vue imports.
 
 export const HOTSPOT_CELL_DEG = 0.05;

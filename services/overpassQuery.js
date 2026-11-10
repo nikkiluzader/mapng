@@ -1,6 +1,6 @@
 /**
  * The Overpass query MapNG sends, shared by the browser (services/osm.js) and
- * the Cloudflare Worker's cached /api/osm endpoint (worker.js), so both ask
+ * the Cloudflare Worker's cached /api/osm endpoint (worker/index.js), so both ask
  * for exactly the same data.
  *
  * Bump OVERPASS_QUERY_VERSION whenever the query changes: it is part of the

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { handleCrashReports, reportSummary } from '../crashReports.js';
+import { handleCrashReports, reportSummary } from '../worker/crashReports.js';
 
 // an in-memory stand-in for the R2 bucket binding
 function fakeBucket() {

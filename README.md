@@ -132,7 +132,7 @@ This helps keep community resource hubs focused on curated, polished releases wh
 
 - **What is sent:** for each level you export, the ~5 km grid square (0.05°) it falls in and whether it came from the website or the desktop app. The square is computed in your browser or app; the exact location never leaves your computer.
 - **What is never sent:** no name, account, email or device ID; no level name, settings or map data; no exact coordinates.
-- **Where it is stored:** in MapNG's own Cloudflare account, in a SQLite-backed Cloudflare Durable Object that only the MapNG developer can access (`hotspotsObject.js`).
+- **Where it is stored:** in MapNG's own Cloudflare account, in a SQLite-backed Cloudflare Durable Object that only the MapNG developer can access (`worker/hotspots.js`).
 - **How it is stored:** one row per grid square with the web and desktop export counts and the date of the latest. Nothing links a row to a person. To stop spam, a hashed form of the sender's IP address is kept in memory only, to allow at most 30 reports an hour; it is never written to storage. Workers request logging is off.
 - **How it is used:** only for the hotspot overlay, which anyone can turn on, and for the developer to see where MapNG is used (for example, which regions get MapNG's own OSM tiles next).
 - **Never sold or shared:** the data is never sold, never shared with anyone and never used for advertising or tracking. It only appears as totals per square on the hotspot map.

@@ -11,7 +11,7 @@
 import { decodeTerrariumPixels } from './terrariumSampling.js';
 
 export const MAPTERHORN_TILE_URL = 'https://tiles.mapterhorn.com';
-// MapNG's own cache of the lidar tiles (worker.js /api/mapterhorn, kept in R2); Mapterhorn directly when it fails
+// MapNG's own cache of the lidar tiles (worker/mapterhornCache.js, /api/mapterhorn, kept in R2); Mapterhorn directly when it fails
 export const MAPTERHORN_CACHE_URL = '/api/mapterhorn';
 export const MAPTERHORN_ATTRIBUTION = '© Mapterhorn (mapterhorn.com/attribution) and its open-data sources';
 const TILE = 512;

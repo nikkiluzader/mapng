@@ -5,7 +5,7 @@
 //
 // Shared three ways: as JSON (Save / Load), as a one-line code
 // "mapng:1:<deflated base64url>" (Copy / Paste, Ctrl+V on the map, export and
-// crash reports), and as a short send code (services/shareCodes.js).
+// crash reports), and as a short send code (worker/shareCodes.js).
 import { PERSONAL_STORAGE_KEYS, withoutPersonal } from './personalKeys.js';
 import { sanitizePoints, pointLabel } from './spawnPoints.js';
 import { sanitizeContentOff, sanitizeExcludeTags, PRESET_IDS } from './buildContent.js';
@@ -269,7 +269,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
   return rows;
 }
 
-// ---- short send codes (mapng.com /api/share: shareCodes.js) --------------
+// ---- short send codes (mapng.com /api/share: worker/shareCodes.js) --------------
 
 const SHARE_CHARS = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
 /** "k7f-29q", "K7F29Q" or a "mapng.com/#K7F-29Q" link → "K7F29Q", or null. */

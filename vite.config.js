@@ -144,7 +144,7 @@ export default defineConfig({
         followRedirects: true,
         rewrite: (path) => path.replace(/^\/api\/kron86/, ''),
       },
-      // (on mapng.com this is the Worker's R2 cache of Mapterhorn's lidar tiles, mapterhornCache.js)
+      // (on mapng.com this is the Worker's R2 cache of Mapterhorn's lidar tiles, worker/mapterhornCache.js)
       '/api/mapterhorn': {
         target: 'https://tiles.mapterhorn.com',
         changeOrigin: true,
