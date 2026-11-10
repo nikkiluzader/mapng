@@ -592,10 +592,21 @@ const LAKE_CUT_TOP_M = 2.5;
 const LAKE_SLOPE_SHARE = 0.5;   // with the rounded profile: the bed leaves the shore at the hillside's own slope
 const LAKE_SLOPE_READ_M = [8, 40];  // the hillside read this far out from the shore
 const LAKE_SLOPE_MAX = 1.2;
+const LAKE_SLOPE_QUANTILE = 0.75;
 const LAKE_SIZE_DEPTH = 0.15;
 const LAKE_DEPTH_MAX_M = 400;
 const RIVER_AREA_MAX_M = 4;
 const LAKE_GRID_CELLS = 4e6;    // the distance grid at most this many cells (a big lake on a coarser one)
+// The bank over the water: elevation data often ends the hillside in a wall at
+// the waterline (a reservoir surveyed at low water and flattened there: Lac du
+// Chevril's shore dropped 10 m in 3 m, a vertical band all round the lake).
+// No bank stands steeper than this down to the water: the wall is cut back
+// into a slope until it meets the hillside. Lakes only (a river's quays are
+// walls), never a road or its sidewalks (keep), never a dam.
+const WALLED_WATER = new Set(['moat', 'basin', 'pool', 'reflecting_pool', 'canal', 'lock', 'harbour', 'wastewater']);
+const BANK_MAX_SLOPE = 1.5;     // about 56 degrees
+const BANK_FOOT_M = 0.5;        // this much over the water at the waterline stays (a low quay, a beach step)
+const BANK_REACH_M = 40;        // a wall is cut back at most this far from the water
 const DAM_REACH_M = 25;         // a dam this close to a lake's outline holds it
 const DAM_FREEBOARD_M = 4;      // the crest over the water
 const DAM_FAR_SHARE = 0.25;     // the floor at the far end: this share of the depth at the dam
@@ -679,7 +690,10 @@ export function shoreSlope(poly, level, groundAt) {
   }
   if (!slopes.length) return null;
   slopes.sort((p, q) => p - q);
-  return Math.min(LAKE_SLOPE_MAX, slopes[slopes.length >> 1]);
+  // (the steeper shores tell the basin's shape: the upper quartile, not the
+  // median. Half of a lake's shore is often a beach, a promenade or a delta,
+  // and Lac de Tignes, 40 m deep, came out at 13 m from its gentle resort side)
+  return Math.min(LAKE_SLOPE_MAX, slopes[Math.min(slopes.length - 1, Math.floor(slopes.length * LAKE_SLOPE_QUANTILE))]);
 }
 
 /**
@@ -750,7 +764,11 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     const [pc0, pr0] = toPixel(x0, y1); const [pc1, pr1] = toPixel(x1, y0);
     // the lake's box, padded so the shore round it is in it, on a grid of
     // k pixels a cell (1 unless the lake is very big)
-    const c0 = Math.floor(pc0) - 2; const r0 = Math.floor(pr0) - 2; const c1 = Math.ceil(pc1) + 2; const r1 = Math.ceil(pr1) + 2;
+    // (and, where banks are eased, by their reach)
+    // (not where the wall is the thing itself: a moat, a basin, a pool, a harbour or canal basin)
+    const easeBanks = !shallow && !lake.river && !WALLED_WATER.has(String(lake.tags?.water || '').toLowerCase());
+    const pad = 2 + (easeBanks ? Math.ceil(BANK_REACH_M / sq) : 0);
+    const c0 = Math.floor(pc0) - pad; const r0 = Math.floor(pr0) - pad; const c1 = Math.ceil(pc1) + pad; const r1 = Math.ceil(pr1) + pad;
     const k = Math.max(1, Math.ceil(Math.sqrt(((c1 - c0 + 1) * (r1 - r0 + 1)) / LAKE_GRID_CELLS)));
     const gw = Math.ceil((c1 - c0 + 1) / k); const gh = Math.ceil((r1 - r0 + 1) / k);
     // the dams holding this lake (near its outline), and their depth
@@ -828,6 +846,70 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
           target += (ground - target) * q * q * (3 - 2 * q);
         }
         if (target < ground) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
+      }
+    }
+    // the banks: from the cells truly under water outward, no ground over
+    // BANK_FOOT_M + BANK_MAX_SLOPE x its distance to the water
+    if (easeBanks) {
+      const under = new Uint8Array(gw * gh);
+      let any = false;
+      for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
+        if (!wet[gy * gw + gx]) continue;
+        const c = Math.round(c0 + gx * k + (k - 1) / 2); const r = Math.round(r0 + gy * k + (k - 1) / 2);
+        if (c < 0 || r < 0 || c > width - 1 || r > height - 1) continue;
+        if (heightMap[r * width + c] - minHeight - level < LAKE_CUT_FULL_M) { under[gy * gw + gx] = 1; any = true; }
+      }
+      if (any) {
+        // (outward from the water, nearest first: a cell stands at most
+        // BANK_MAX_SLOPE x the step over its lowest neighbour nearer the
+        // water, the waterline itself counting BANK_FOOT_M over the water)
+        const dw = squaredDistanceGrid(under, gw, gh);
+        const reachPx = Math.ceil(BANK_REACH_M / sq);
+        const cells = [];
+        const rA = Math.max(0, Math.floor(pr0) - reachPx); const rB = Math.min(height - 1, Math.ceil(pr1) + reachPx);
+        const cA = Math.max(0, Math.floor(pc0) - reachPx); const cB = Math.min(width - 1, Math.ceil(pc1) + reachPx);
+        const distPx = (c, r) => {
+          const gx = Math.min(gw - 1, Math.max(0, Math.floor((c - c0) / k))); const gy = Math.min(gh - 1, Math.max(0, Math.floor((r - r0) / k)));
+          const v = dw[gy * gw + gx];
+          return v >= 1e19 ? Infinity : Math.sqrt(v) * k;
+        };
+        for (let r = rA; r <= rB; r++) for (let c = cA; c <= cB; c++) {
+          const d = distPx(c, r);
+          if (d > 0 && d * sq <= BANK_REACH_M) cells.push([d, c, r]);
+        }
+        cells.sort((p, q) => p[0] - q[0]);
+        // heights as they stand for this pass: the water's cells at the foot, the rest as eased so far
+        const eased = new Map();
+        const standAt = (c, r) => {
+          if (c < cA || r < rA || c > cB || r > rB) return Infinity;
+          const d = distPx(c, r);
+          if (d === 0) return level + BANK_FOOT_M;
+          const idx = r * width + c;
+          // (a cell the bed's carve already lowered stands where the carve left it)
+          const carved = edits.get(idx);
+          return eased.get(idx) ?? (carved !== undefined ? carved - minHeight : heightMap[idx] - minHeight);
+        };
+        let count = 0;
+        for (const [d, c, r] of cells) {
+          const idx = r * width + c;
+          const carvedHere = edits.get(idx);
+          const ground = carvedHere !== undefined ? carvedHere - minHeight : heightMap[idx] - minHeight;
+          let cap = Infinity;
+          for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            if (!dr && !dc) continue;
+            if (!(distPx(c + dc, r + dr) < d)) continue;
+            cap = Math.min(cap, standAt(c + dc, r + dr) + BANK_MAX_SLOPE * Math.hypot(dc, dr) * sq);
+          }
+          if (!(ground > cap)) continue;
+          const [x, y] = toWorld(c, r);
+          // (a road, a dam: it stands, and the bank behind it is measured from it)
+          if (keep(x, y) || (lakeDams.length && nearDam(x, y))) continue;
+          eased.set(idx, cap);
+          const before = edits.get(idx);
+          if (before === undefined || cap + minHeight < before) { edits.set(idx, cap + minHeight); count++; }
+        }
+        const eased_ = count;
+        if (eased_) report[report.length - 1].banksEased = eased_;
       }
     }
   }

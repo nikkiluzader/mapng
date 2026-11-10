@@ -7428,7 +7428,7 @@ function shapingReportLines(sh, section) {
   lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
   if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}${sh.extras ? '' : ' (shaping off: only the survey\'s flat water surface, at most 1.5 m under the water, so the water shows over it)'}`);
   for (const lk of (sh.lakeDepths || []).slice(0, 12)) {
-    lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'dam' ? 'a reservoir: against its dam, the floor rising away from it' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there`);
+    lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'dam' ? 'a reservoir: against its dam, the floor rising away from it' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there${lk.banksEased ? `; ${lk.banksEased} grid point(s) of a wall at the waterline cut back into a bank` : ''}`);
   }
   if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (the survey recorded the water's surface; WorldCover water within 0.3 m of the sea): ${sh.seabedPixels}`);
   if (sh.lidar === null || sh.lidar === undefined) lines.push('- Measured bridge heights (US lidar): off');

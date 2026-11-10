@@ -1900,6 +1900,8 @@ const GROUND_COLORS = {
 // Kept under 40° hue so the export's grass mask never takes it for grass.)
 export const GAME_COLORS = {
   forest: "#3f4627", scrub: "#605d37", heath: "#66603f", grass: "#525a31", orchard: "#4b5a2e", farmland: "#7e7361",
+  // (a lake's bed under its water: silt and stone, a little darker and greyer than a river's mud)
+  lakeBed: "#56544d",
   water: "#5a544a", wetland: "#4a5430", swamp: "#3f4627", glacier: "#9aa3a5", mud: "#5e5446",
   bare: "#8f8676", sand: "#9d8d6f", dirt: "#7e7361", quarry: "#847a69",
   residential: "#555c35", commercial: "#62615c", industrial: "#5d5c58", retail: "#66655f",
@@ -2241,6 +2243,15 @@ export function groundFromLandCover(cls, w, h, landCover, slope = null, bright =
 
 // Water as the game map shows it: its own satellite pixels (generateGameTexture)
 const WATER_EXCLUDED = new Set(["dam", "weir", "dock", "boatyard", "lock_gate"]);
+// Standing water with a bed of its own (as beamngWater.js isStandingWater: not a river or stream, a
+// dock, a pool or a fountain, and not one that is dry part of the year)
+const LAKE_BED_WATER = new Set(["lake", "pond", "reservoir", "oxbow", "lagoon", "stream_pool", "yes"]);
+export const isLakeBedArea = (tags = {}) => {
+  if (!tags || tags.waterway || tags.amenity === "fountain" || tags.leisure === "swimming_pool" || tags.leisure === "marina") return false;
+  if (tags.intermittent === "yes" || tags.seasonal === "yes") return false;
+  if (tags.natural === "water") return !tags.water || LAKE_BED_WATER.has(String(tags.water).toLowerCase());
+  return tags.landuse === "reservoir";
+};
 const isWaterArea = (tags = {}) => !WATER_EXCLUDED.has(tags.waterway) && (
   tags.natural === "water" || !!tags.waterway || tags.landuse === "reservoir" || tags.landuse === "basin" || !!tags.water);
 
@@ -2610,6 +2621,31 @@ export const generateGameTexture = async (terrainData, options = {}) => {
     }
     ctx.drawImage(mask, 0, 0);
     mask.width = 0; wc.width = 0;
+    // Standing water that gets a real bed at export (lakes, ponds, reservoirs:
+    // beamngWater.js carveLakeBeds) is painted as that bed, not as the image's
+    // water: seen through the game's water, turquoise satellite pixels on the
+    // bottom of a 100 m deep lake looked wrong. Creeks and rivers keep the
+    // image (above). The shore's last metres fade into it.
+    let beds = 0;
+    for (const pass of [{ alpha: 0.55, grow: 3 }, { alpha: 1, grow: 0 }]) {
+      ctx.save();
+      ctx.globalAlpha = pass.alpha;
+      ctx.fillStyle = GAME_COLORS.lakeBed; ctx.strokeStyle = GAME_COLORS.lakeBed;
+      ctx.lineJoin = "round"; ctx.lineWidth = Math.max(1, pass.grow * METERS_TO_PX);
+      for (const f of terrainData.osmFeatures || []) {
+        if (!isLakeBedArea(f?.tags) || isUndergroundArea(f.tags) || !(f.geometry?.length >= 4)) continue;
+        ctx.beginPath();
+        f.geometry.forEach((p, i) => { const q = toPixel(p.lat, p.lng); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+        ctx.closePath();
+        for (const hole of f.holes || []) {
+          hole.forEach((p, i) => { const q = toPixel(p.lat, p.lng); if (i) ctx.lineTo(q.x, q.y); else ctx.moveTo(q.x, q.y); });
+          ctx.closePath();
+        }
+        if (pass.grow) ctx.stroke(); else { ctx.fill("evenodd"); beds++; }
+      }
+      ctx.restore();
+    }
+    if (beds) console.log(`[Game Texture] Lake beds painted: ${beds} (lakes, ponds and reservoirs; rivers and creeks keep the image).`);
   }
 
 

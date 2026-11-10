@@ -515,6 +515,38 @@
    ],
    "smoke": true,
    "note": "steep alpine village, short bridges, a 335 m tunnel under the streets (a 989 m runaway deck, 2026-11)"
+  },
+  {
+   "name": "gt_chevril",
+   "lat": 45.5,
+   "lng": 6.935,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "lake",
+    "mountain",
+    "hillside",
+    "reservoir",
+    "tunnel",
+    "gallery"
+   ],
+   "smoke": true,
+   "note": "Lac du Chevril: a reservoir surveyed at low water (a wall at the waterline), its dam, galleries along the D902"
+  },
+  {
+   "name": "gt_tignes",
+   "lat": 45.462,
+   "lng": 6.905,
+   "size": 2048,
+   "dem": "gpxz",
+   "categories": [
+    "lake",
+    "mountain",
+    "hillside",
+    "old-town"
+   ],
+   "smoke": false,
+   "note": "Lac de Tignes and the resort: a natural lake with gentle shores, short tunnels"
   }
  ]
 }

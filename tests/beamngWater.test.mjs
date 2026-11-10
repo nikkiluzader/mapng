@@ -334,3 +334,42 @@ test('a reservoir is deepest against its dam, its floor rising away from it; the
   const tagged = carveLakeBeds(plan.lakes, { heightMap: hm2, width: N, height: N, worldSize: SIZE, minHeight: 0 }, { dams: [{ line: [[-60, -152], [60, -152]], height: '100' }] });
   assert.equal(tagged.lakes[0].damDepth, 96);
 });
+
+test('lake banks: a wall at the waterline is cut back into a bank; a road, a moat and a river keep theirs', async () => {
+  const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
+  // a 200 m grid at 1 m: a lake recorded flat at 100 m west of x = 0; east of
+  // it the hillside starts 10 m up (a reservoir surveyed at low water) and
+  // climbs at 60 %
+  const N = 201; const SIZE = 200;
+  const build = () => {
+    const hm = new Float32Array(N * N);
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const x = (c / (N - 1) - 0.5) * SIZE; hm[r * N + c] = x <= 0 ? 100 : 110 + 0.6 * x; }
+    return hm;
+  };
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const ring = [[-90, -80], [0, -80], [0, 80], [-90, 80], [-90, -80]];
+  const feat = (tags) => ({ type: 'water', tags, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) });
+  const run = (tags, opts = {}, river = false) => {
+    const hm = build();
+    const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+    const plan = planLakes({ features: [feat(tags)], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+    if (river) plan.lakes[0].river = true;
+    const beds = carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 }, opts);
+    beds.apply((idx, v) => { hm[idx] = v; });
+    // the tallest step between neighbours along y = 0, from the water to 40 m up the bank
+    let step = 0;
+    for (let x = -3; x < 40; x++) step = Math.max(step, at(x + 1, 0) - at(x, 0));
+    return { step, at, report: beds.lakes[0] };
+  };
+  const lake = run({ natural: 'water', water: 'reservoir' });
+  assert.ok(lake.step < 2.6, `the bank climbs at most ${lake.step.toFixed(2)} m a metre`);
+  assert.ok(lake.report.banksEased > 0);
+  assert.ok(Math.abs(lake.at(60, 0) - (110 + 0.6 * 60)) < 1e-3, 'the hillside past the bank untouched');
+  // a road along the shore stands (and the wall under it)
+  const road = run({ natural: 'water', water: 'reservoir' }, { keep: (x) => x > 0 && x < 8 });
+  assert.ok(Math.abs(road.at(4, 0) - (110 + 0.6 * 4)) < 1e-3, 'kept ground untouched');
+  // walls that are the thing itself, a river's quay, and terrain edits off: left as the data has them
+  assert.ok(run({ natural: 'water', water: 'moat' }).step > 9);
+  assert.ok(run({ natural: 'water', water: 'reservoir' }, {}, true).step > 9);
+  assert.ok(run({ natural: 'water', water: 'reservoir' }, { shallow: true }).step > 9);
+});
