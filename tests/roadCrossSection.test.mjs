@@ -117,8 +117,9 @@ test('one road name, mixed lane counts: tagged ways keep their own width', async
   const paths = decals.filter((d) => d.material === 'road_invisible' && /Canyon/.test(d.name));
   const widthAt = (x) => paths.find((d) => d.nodes.some(([nx]) => Math.abs(nx - x) < 60))?.nodes[0][3];
   const m = 111320 * 0.001;
-  // World x = 0 at lng 0.005; driving width = lanes × 3.5 m, capped at 12 m.
+  // World x = 0 at lng 0.005; driving width = lanes × 3.5 m (a counted lane is never squeezed
+  // by the class maximum: that is for roads with no count).
   assert.equal(widthAt(-3 * m), 7, '2-lane way stays 2 lanes wide');
-  assert.equal(widthAt(1 * m), 12, '4-lane way is wide (secondary cap: 12 m)');
+  assert.equal(widthAt(1 * m), 14, '4-lane way is four lanes wide');
   assert.equal(widthAt(3 * m), 7, 'untagged way takes the corridor\'s usual width');
 });

@@ -109,6 +109,7 @@ export function solvedHeightAt(graph, seg, x, y) {
   return Number.isFinite(bz) ? bz : null;
 }
 
+const TRACK_JUMP_M = 4;   // a node this much farther from its station than its decal's nearest so far: look wider
 /**
  * Set every road decal's node heights from the solved profile: each node to
  * the nearest station of its road's graph edges. A decal with any node on a
@@ -142,7 +143,7 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
       const deckNode = edgeBlend ? new Uint8Array(d.nodes.length) : null;
       let ni = -1;
       // nodes run along the stations: search near the last match first
-      let lastK = -1; let lastI = 0;
+      let lastK = -1; let lastI = 0; let nearD = Infinity;
       const scan = (k, from, to, acc, node) => {
         const e = edges[k];
         for (let i = Math.max(0, from); i <= Math.min(e.s.length - 1, to); i++) {
@@ -162,7 +163,13 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
             acc.best = Infinity; scan(lastK, lastI - w, lastI + w, acc, node);
             const n = edges[lastK].s.length;
             const atEdge = (acc.i === Math.max(0, lastI - w) && acc.i > 0) || (acc.i === Math.min(n - 1, lastI + w) && acc.i < n - 1);
-            if (!atEdge || w > n) break;
+            // (or stuck on the arm behind a hairpin: the window's nearest station is a foot on the
+            // straight just left, not at its edge, while the road has turned away. A node much
+            // farther from its match than this decal's nodes have been (a paint line keeps its
+            // offset from the road's line) is on the next arm: on a switchback road whole pieces
+            // kept one arm's heights, 45 m under the ground at their far end)
+            const jumped = Math.sqrt(acc.best) > nearD + TRACK_JUMP_M;
+            if ((!atEdge && !jumped) || w > n) break;
             w *= 2;
           }
           // the end of this piece: the next piece may be nearer
@@ -172,7 +179,7 @@ export function applySolvedHeights(groups, graph, { deckLift = 0.02, skipOwners 
           for (const k of pieces) scan(k, 0, edges[k].s.length - 1, acc, node);
         }
         if (acc.best === Infinity) continue;
-        lastK = acc.k; lastI = acc.i;
+        lastK = acc.k; lastI = acc.i; nearD = Math.min(nearD, Math.sqrt(acc.best));
         // interpolate along the station line (snapping 2 m nodes to 4 m
         // stations made stair steps that measured steeper than the profile)
         const e = edges[acc.k]; const zk = z[acc.k];

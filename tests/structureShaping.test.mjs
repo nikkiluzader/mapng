@@ -256,3 +256,56 @@ test('restoreRawAreas: the heights from before smoothing come back by the weight
   assert.equal(smoothed[0], 20); assert.equal(smoothed[2], 15); assert.equal(smoothed[4], 10);
   assert.deepEqual(r, { cells: 3, eased: 6 });
 });
+
+test('a ramp\'s bridge beside a wide bridge over the same dip takes its deck height (no span of its own from the dip)', async () => {
+  const { simpleSpans } = await import('../services/structures/shaping.js');
+  // the main road north over a dip (floor 65 m at y 45, rims 72 and 71); 12 m east of it a
+  // one-lane ramp whose bridge OSM ends at y 50, over a flat bench in the dip (66 m, the ground
+  // a survey leaves under a wide bridge): on its own it would set down on the bench
+  const ground = (y) => (y <= 30 ? 72 : y <= 45 ? 72 - (y - 30) * (7 / 15) : y <= 60 ? 65 + (y - 45) * (6 / 15) : 71);
+  const bench = (y) => (y <= 30 ? 72 : y <= 42 ? 72 - (y - 30) * (6.6 / 12) : y <= 45 ? 65.4 + (y - 42) * 0.2 : y <= 75 ? 66 : y <= 90 ? 66 + (y - 75) * (5 / 15) : 71);
+  const edge = (from, to, x, y0, y1, extra = {}, gr = ground) => {
+    const ys = []; for (let y = y0; y <= y1 + 1e-9; y += 2.5) ys.push(y);
+    return { from, to, s: Float64Array.from(ys, (y) => y - y0), x: new Float64Array(ys.length).fill(x), y: Float64Array.from(ys), g: Float64Array.from(ys, gr), half: 10, layer: 1, highway: 'primary', ...extra };
+  };
+  const link = { half: 2.8, highway: 'primary_link' };
+  const build = () => ({ edges: [
+    edge('a', 'b', 0, -100, 30, { layer: 0 }), edge('b', 'c', 0, 30, 60, { bridge: true }), edge('c', 'd', 0, 60, 200, { layer: 0 }),
+    edge('p', 'q', 12, -100, 30, { layer: 0, ...link }, bench), edge('q', 'r', 12, 30, 50, { bridge: true, ...link }, bench), edge('r', 't', 12, 50, 200, { layer: 0, ...link }, bench),
+  ] });
+  const zAt = (graph, pins, k, y) => pins.find(([kk, i]) => kk === k && Math.abs(graph.edges[k].y[i] - y) < 1e-6)?.[2];
+  const graph = build();
+  const { pins } = simpleSpans(graph, new Set([1, 4]));
+  // over the dip the ramp is level with the main deck, on its bridge and on past OSM's end of it
+  for (const [k, y] of [[4, 35], [4, 45], [4, 50], [5, 55]]) {
+    const main = zAt(graph, pins, 1, y);
+    assert.ok(Math.abs(zAt(graph, pins, k, y) - main) < 0.05, `ramp at y ${y}: ${zAt(graph, pins, k, y)?.toFixed(2)} vs the main deck ${main?.toFixed(2)}`);
+  }
+  // a bridge on another layer beside it keeps its own span (down onto the bench)
+  const stacked = build(); stacked.edges[4].layer = 2;
+  const other = simpleSpans(stacked, new Set([1, 4]));
+  assert.ok(zAt(stacked, other.pins, 1, 50) - zAt(stacked, other.pins, 4, 50) > 2, 'another layer: not tied to the deck beside it');
+});
+
+test('solved heights on a switchback: a decal keeps to its own arm past a knot of stations at the hairpin', async () => {
+  const { applySolvedHeights } = await import('../services/structures/adapters.js');
+  // one road: east 200 m, a hairpin whose tip the map draws with 30 points on one spot, back west
+  // 12 m north; it climbs 0.1 m per metre. Stations every 4 m.
+  const xs = []; const ys = [];
+  for (let x = 0; x <= 200; x += 4) { xs.push(x); ys.push(0); }
+  for (let j = 0; j < 30; j++) { xs.push(206); ys.push(6); }
+  for (let x = 200; x >= 0; x -= 4) { xs.push(x); ys.push(12); }
+  const s = [0]; for (let i = 1; i < xs.length; i++) s.push(s[i - 1] + Math.hypot(xs[i] - xs[i - 1], ys[i] - ys[i - 1]));
+  const graph = { edges: [{ seg: 7, s: Float64Array.from(s), x: Float64Array.from(xs), y: Float64Array.from(ys), g: Float64Array.from(s, (v) => v * 0.1) }], profile: { z: [Float64Array.from(s, (v) => v * 0.1)] }, classes: { segments: [] } };
+  // the decal: the same line, a node every 2 m
+  const nodes = [];
+  for (let x = 100; x <= 200; x += 2) nodes.push([x, 0, 0, 7]);
+  nodes.push([206, 6, 0, 7]);
+  for (let x = 200; x >= 100; x -= 2) nodes.push([x, 12, 0, 7]);
+  applySolvedHeights([{ __items: [{ __owner: 7, name: 'dr', nodes }] }], graph);
+  const sTip = s[51 + 29];
+  nodes.forEach(([x, y, z]) => {
+    const want = (y === 0 ? x : y === 6 ? sTip : sTip + Math.hypot(6, 6) + (200 - x)) * 0.1;
+    assert.ok(Math.abs(z - want) < 1.2, `node (${x}, ${y}): ${z.toFixed(1)} m, its road is at ${want.toFixed(1)} m`);
+  });
+});

@@ -145,7 +145,7 @@ import {
   getWaterProfile,
 } from './beamngBiomeCatalog.js';
 import { resolveRegionalBiome } from './beamngRegion.js';
-import { contentExportOptions, contentOn, filterOsmByTags } from './buildContent.js';
+import { contentExportOptions, contentOn, filterOsmByTags, filterWaterKinds, filterFootBridges } from './buildContent.js';
 
 const BEAMNG_EXPORT_SERVICE_LOG = '[BeamNG Export Service]';
 
@@ -12197,6 +12197,22 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} What to build: ${contentChoice.contentOff.length} feature(s) off; ${contentFilter.removed} OSM features left out (${Object.entries(contentFilter.byTag).slice(0, 8).map(([k, n]) => `${k} ${n}`).join(', ')}).`);
   }
   const built = (id) => contentOn(options, id);
+  // (footbridges switched off: gone with their stretch of path)
+  {
+    const fb = filterFootBridges(terrainData?.osmFeatures, options);
+    if (fb.removed) {
+      terrainData = { ...terrainData, osmFeatures: fb.features };
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} What to build: ${fb.removed} footbridge(s) left out.`);
+    }
+  }
+  // (the water kinds switched off: rivers, lakes, the sea's coastline)
+  {
+    const w = filterWaterKinds(terrainData?.osmFeatures, options);
+    if (w.removed) {
+      terrainData = { ...terrainData, osmFeatures: w.features };
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} What to build: water left out: ${['rivers', 'lakes', 'sea'].filter((id) => !built(id)).join(', ')} (${w.removed} OSM features).`);
+    }
+  }
 
   // BeamNG TerrainBlock expects square power-of-two terrain dimensions.
   // Center-crop everything (heightmap, bounds, textures) so terrain, texture,
@@ -13385,7 +13401,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     }
   }
   const waterObjects = [
-    ...seaObjects,
+    ...(built('sea') ? seaObjects : []),
     ...(includeBuildings ? buildPoolWaterObjects(exportTerrainData, squareSize, biome, waterStats.pools) : []),
     ...(includeWater
       ? [

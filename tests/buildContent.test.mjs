@@ -60,6 +60,42 @@ test('tag counts per feature, most common first; features sorted into groups for
   assert.equal(itemOfFeature({ type: 'road', tags: { highway: 'steps' } }), 'steps');
 });
 
+test('water by kind: rivers, lakes and the sea are three switches', async () => {
+  const { waterKindOf, filterWaterKinds } = await import('../services/buildContent.js');
+  const w = (tags, type = 'water') => ({ type, tags });
+  const features = [
+    w({ waterway: 'stream' }), w({ natural: 'water', water: 'river' }), w({ waterway: 'riverbank' }),
+    w({ natural: 'water', water: 'pond' }), w({ landuse: 'reservoir' }), w({ natural: 'water' }),
+    w({ natural: 'coastline' }, 'coastline'), w({ waterway: 'dam' }), w({ leisure: 'swimming_pool' }), { type: 'road', tags: { highway: 'primary' } },
+  ];
+  assert.deepEqual(features.map(waterKindOf), ['river', 'river', 'river', 'lake', 'lake', 'lake', 'sea', null, null, null]);
+  // (the rivers off: the lakes, the coast, the dam and the road stay)
+  const r = filterWaterKinds(features, contentExportOptions(['rivers']));
+  assert.equal(r.removed, 3);
+  assert.ok(r.features.some((f) => f.tags.waterway === 'dam') && r.features.some((f) => f.tags.water === 'pond'));
+  assert.equal(filterWaterKinds(features, {}).features, features, 'nothing off: the same array back');
+  // (the old single option: off only when no inland water is built)
+  assert.equal(contentExportOptions(['rivers']).includeWater, undefined);
+  assert.equal(contentExportOptions(['rivers', 'lakes']).includeWater, false);
+  // (the old single switch in a stored list or a code: rivers and lakes)
+  assert.deepEqual(sanitizeContentOff(['water']).sort(), ['lakes', 'rivers']);
+  assert.equal(itemOfFeature(w({ waterway: 'stream' })), 'rivers');
+  assert.equal(itemOfFeature(w({ natural: 'water' })), 'lakes');
+});
+
+test('footbridges are their own switch: off, they go with their stretch of path', async () => {
+  const { filterFootBridges, footBridgeOf } = await import('../services/buildContent.js');
+  const features = [
+    { type: 'road', tags: { highway: 'footway', bridge: 'yes' } }, { type: 'road', tags: { highway: 'steps', bridge: 'viaduct' } },
+    { type: 'road', tags: { highway: 'footway' } }, { type: 'road', tags: { highway: 'primary', bridge: 'yes' } }, { type: 'road', tags: { highway: 'path', bridge: 'no' } },
+  ];
+  assert.deepEqual(features.map(footBridgeOf), [true, true, false, false, false]);
+  assert.equal(filterFootBridges(features, contentExportOptions(['footBridges'])).removed, 2);
+  assert.equal(filterFootBridges(features, {}).features, features);
+  assert.equal(itemOfFeature(features[0]), 'footBridges');
+  assert.equal(presetOf(['footBridges']), 'custom');
+});
+
 test('stored lists are cleaned: unknown ids and bad selectors dropped', () => {
   assert.deepEqual(sanitizeContentOff(['benches', 'nope', 'benches']), ['benches']);
   assert.deepEqual(sanitizeExcludeTags(['amenity=bench', 'bad', 'a=b=c', ' building=yes ', 'x=*']), ['amenity=bench', 'building=yes', 'x=*']);

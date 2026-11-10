@@ -130,6 +130,7 @@ const TRACK_LINE_SPORT = /motor|kart|motocross|supercross|enduro|bmx|speedway|au
 export const isRacingTrackLine = (tags = {}) => tags.leisure === 'track' && !tags.highway && tags.area !== 'yes' && TRACK_LINE_SPORT.test(String(tags.sport || '').toLowerCase());
 export const racewayHalfWidth = (tags = {}) => RACEWAY_HALF_M[racewayKind(tags)];
 
+const TAGGED_LANES_MAX = 10;
 /**
  * Estimate road half-width in meters from OSM tags and roadway class.
  *
@@ -152,8 +153,12 @@ export function estimateRoadHalfWidth(tags = {}, highway, isOneWay = false, fall
     lanesFromTotal || lanesFromDir || 0,
   );
   const estimatedHalf = (inferredLanes * getDefaultLaneWidthMeters(highway)) / 2;
+  // lanes counted by the mapper are kept: the class maximum is for roads with no count (a
+  // six-lane primary squeezed into 12 m had 2 m lanes), up to TAGGED_LANES_MAX of them
+  const tagged = Math.min(lanesFromTotal || lanesFromDir || 0, TAGGED_LANES_MAX);
+  const max = Math.max(limits.max, (tagged * getDefaultLaneWidthMeters(highway)) / 2);
 
-  return clamp(estimatedHalf || fallbackHalfWidth, limits.min, limits.max);
+  return clamp(estimatedHalf || fallbackHalfWidth, limits.min, max);
 }
 
 /**

@@ -24,6 +24,7 @@ const DIP_MIN_M = 0.5;    // shallower than this under the rims: no dip, the bri
 const RIM_FLAT_M = 8;     // the ground flatter than the class grade this far: the rim
 const RIM_DROP_M = 0.5;   // ... or fallen this far from its best: over the crest
 const OPEN_END_DROP_M = 2;   // a bridge's end this far under its other rim, with the map's edge beyond: it runs on out of the map
+const SIBLING_GAP_M = 1;     // a narrower deck within this of a wider one's edge is on the same structure
 const CROSSING_MIN_TOP_M = 3.8;   // a deck's top over a road under it, whatever the grade (3.4 m clear under a thin slab)
 
 /**
@@ -189,7 +190,24 @@ export function simpleSpans(graph, rawDeck, measured = []) {
   };
   const dirAt = (k, i, j) => { const e = edges[k]; const dx = e.x[j] - e.x[i]; const dy = e.y[j] - e.y[i]; const L = Math.hypot(dx, dy) || 1; return [dx / L, dy / L]; };
   const done = new Set();
-  for (const k0 of rawDeck) {
+  // the stations of the spans already laid, for a narrower deck edge to edge with one of them
+  // (a ramp's bridge beside the main road's over the same creek, a turn lane's link leaving a
+  // wide bridge): beside it, it is at that deck's height, not on a span of its own from the dip
+  // (only a deck on its layer: a ramp crossing over another bridge is not on it)
+  const laid = [];   // [x, y, z, half, chain]
+  const laidLayers = [];   // per laid chain: its layer
+  const besideLaid = (k, i, joined) => {
+    const e = edges[k]; let best = null; let bd = Infinity;
+    for (const p of laid) {
+      if (!joined.has(p[4])) continue;
+      const d = Math.hypot(p[0] - e.x[i], p[1] - e.y[i]);
+      if (d <= p[3] + (e.half || 0) + SIBLING_GAP_M && d < bd) { bd = d; best = p; }
+    }
+    return best ? best[2] : null;
+  };
+  // (the widest decks first: the narrower ones follow them)
+  const order = [...rawDeck].sort((p, q) => (edges[q].half || 0) - (edges[p].half || 0));
+  for (const k0 of order) {
     if (done.has(k0)) continue;
     // the chain of plain-deck edges through k0, in order
     let chain = [{ k: k0, end: 0 }];
@@ -302,9 +320,30 @@ export function simpleSpans(graph, rawDeck, measured = []) {
     // (the other side's rim found inside the map, short of its own edge)
     if (outB && A > 0 && g[A] - g[m] >= DIP_MIN_M && g[Math.max(B, b1)] < g[A] - OPEN_END_DROP_M) { B = path.length - 1; zBo = Math.max(g[A], g[B]); }
     else if (outA && B < path.length - 1 && g[B] - g[m] >= DIP_MIN_M && g[Math.min(A, b0)] < g[B] - OPEN_END_DROP_M) { A = 0; zAo = Math.max(g[B], g[A]); }
-    if (Math.min(zAo ?? g[A], zBo ?? g[B]) - g[m] < DIP_MIN_M) continue;
+    // beside a wider deck already laid
+    const sib = new Map(); let sibA = -1; let sibB = -1;
+    const myLayer = edges[k0].layer;
+    const joined = new Set();
+    laidLayers.forEach((layer, c) => { if (layer === myLayer) joined.add(c); });
+    const chainNo = laidLayers.length;
+    laidLayers.push(myLayer);
+    if (joined.size) {
+      for (let j = b0; j <= b1; j++) {
+        const z = besideLaid(path[j][0], path[j][1], joined);
+        if (z === null) continue;
+        sib.set(j, z); if (sibA < 0) sibA = j; sibB = j;
+      }
+      // (and on along its approach for as long as it runs beside that deck's span: the dip under
+      // both runs on past OSM's end of the bridge)
+      if (sib.has(b1)) for (let j = b1 + 1; j < path.length; j++) { const z = besideLaid(path[j][0], path[j][1], joined); if (z === null) break; sib.set(j, z); sibB = j; }
+      if (sib.has(b0)) for (let j = b0 - 1; j >= 0; j--) { const z = besideLaid(path[j][0], path[j][1], joined); if (z === null) break; sib.set(j, z); sibA = j; }
+    }
+    if (!sib.size && Math.min(zAo ?? g[A], zBo ?? g[B]) - g[m] < DIP_MIN_M) continue;
     A = Math.min(A, b0); B = Math.max(B, b1);
-    const zA = zAo ?? g[A]; const zB = zBo ?? g[B]; const L = s[B] - s[A] || 1;
+    // (a rim found beside the wider deck is the dip under it: the span ends where it leaves that
+    // deck, ramped down to its ground from there below)
+    if (sib.size) { if (A >= sibA) A = sibA; if (B <= sibB) B = sibB; }
+    const zA = sib.get(A) ?? zAo ?? g[A]; const zB = sib.get(B) ?? zBo ?? g[B]; const L = s[B] - s[A] || 1;
     // the rims and every measured station between them, in order along the span
     const anchors = [[s[A], zA]];
     // each road crossing under it: the deck lifted over it (the line runs
@@ -312,7 +351,7 @@ export function simpleSpans(graph, rawDeck, measured = []) {
     // between two lifts and back up, nor a lift's spike under the line)
     const lifts = [];
     for (let j = A + 1; j < B; j++) {
-      const key = `${path[j][0]}:${path[j][1]}`; const z = known.get(key); const low = under.get(key);
+      const key = `${path[j][0]}:${path[j][1]}`; const z = known.get(key) ?? sib.get(j); const low = under.get(key);
       if (Number.isFinite(z)) { anchors.push([s[j], z]); continue; }
       if (!low) continue;
       const rimLine = zA + ((zB - zA) * (s[j] - s[A])) / L;
@@ -346,11 +385,13 @@ export function simpleSpans(graph, rawDeck, measured = []) {
       if (!span[k]) span[k] = new Uint8Array(edges[k].s.length);
       span[k][i] = 1;
     };
+    const zEnd = (j) => (j === A ? zA : zB);
     const onPath = new Set(path.slice(A, B + 1).map(([k]) => k));
     for (let j = A; j <= B; j++) {
       const [k, i] = path[j];
-      const z = known.get(`${k}:${i}`) ?? Math.max(lineAt(s[j]), g[j]);
+      const z = known.get(`${k}:${i}`) ?? sib.get(j) ?? Math.max(lineAt(s[j]), g[j]);
       pinAt(k, i, z);
+      laid.push([edges[k].x[i], edges[k].y[i], z, edges[k].half || 0, chainNo]);
       // every road end meeting at a junction on the span at the deck's height
       // (one held on its ground there pulled the junction, and the deck, down),
       // ramped down from there to its ground at twice its class grade (held
@@ -372,6 +413,16 @@ export function simpleSpans(graph, rawDeck, measured = []) {
             pinAt(o.k, ii, zz);
           }
         }
+      }
+    }
+    // leaving the wider deck over low ground: down to its own ground at twice its class grade
+    for (const [end, dir] of [[A, -1], [B, 1]]) {
+      if (!sib.has(end)) continue;
+      const fall = 2 * lim;
+      for (let j = end + dir; j >= 0 && j < path.length; j += dir) {
+        const zz = zEnd(end) - fall * Math.abs(s[j] - s[end]);
+        if (zz <= g[j] + 0.05) break;
+        pinAt(path[j][0], path[j][1], zz);
       }
     }
     list.push({ edges: chain.map((c) => c.k), length: Math.round(L), from: [edges[path[A][0]].x[path[A][1]], edges[path[A][0]].y[path[A][1]], zA], to: [edges[path[B][0]].x[path[B][1]], edges[path[B][0]].y[path[B][1]], zB], osmLength: Math.round(s[b1] - s[b0]) });

@@ -807,7 +807,7 @@ watch(backdropPlan, (p) => { store.backdropImagery = p; }, { immediate: true });
 // (the 2D preview draws the surrounding tiles when a backdrop is chosen)
 watch(beamNGBackdropSource, (v) => { store.backdropSource = v || 'off'; }, { immediate: true });
 const beamNGIncludeBuildings = legacyOn.buildings;
-const beamNGIncludeWater = legacyOn.water;
+const beamNGIncludeWater = computed(() => ['rivers', 'lakes', 'sea'].map((id) => (built(id) ? 1 : 0)).join(''));
 // Structures and the export's terrain shaping (advanced mode; basic builds
 // and shapes everything). Off, the export leaves those heights as generated.
 const storedOn = (key) => localStorage.getItem(key) !== 'false';
@@ -874,7 +874,7 @@ const exportDataOptions = computed(() => {
     roadType: hasOsmData.value && built('roadSurfaces') ? 'decal' : 'none',
     includeBridges: built('bridges'),
     lidarDecks: !advancedMode.value || beamNGLidarDecks.value,
-    includeWater: hasOsmData.value && built('water'),
+    includeWater: hasOsmData.value && (built('rivers') || built('lakes')),
     backgroundMask: props.terrainData?.backgroundMask || null,
   };
 });
@@ -2036,7 +2036,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     const advanced = advancedMode.value;
     // (What to build: composables/useBuildContent.js; basic builds its preset)
     const effectiveIncludeBuildings = hasOsmData.value && built('buildings');
-    const effectiveIncludeWater = hasOsmData.value && built('water');
+    const effectiveIncludeWater = hasOsmData.value && (built('rivers') || built('lakes'));
     // Flat terrain sits at height 0; place the water plane just below ground
     // (−1 m) so it doesn't flood the whole level. Matches the 3D preview default.
     const effectiveSeaLevelOffset = props.terrainData?.flat

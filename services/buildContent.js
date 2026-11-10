@@ -26,6 +26,8 @@ export const CONTENT_GROUPS = [
   ] },
   { id: 'structures', items: [
     { id: 'bridges', option: { includeBridges: false } },
+    // (the bridges of footpaths, cycleways and steps: footBridgeOf below)
+    { id: 'footBridges' },
     { id: 'tunnels', option: { includeTunnels: false } },
     { id: 'dams', option: { includeDams: false } },
     { id: 'railways', tags: ['railway=rail', 'railway=light_rail', 'railway=subway', 'railway=tram', 'railway=narrow_gauge', 'railway=monorail', 'railway=funicular'], option: { includeRailways: false } },
@@ -57,7 +59,10 @@ export const CONTENT_GROUPS = [
     { id: 'rocks', option: { includeRocks: false } },
   ] },
   { id: 'water', items: [
-    { id: 'water', option: { includeWater: false } },
+    // (by kind, waterKindOf below: a region's lakes may be mapped well and its streams not)
+    { id: 'rivers' },
+    { id: 'lakes' },
+    { id: 'sea' },
     { id: 'pools', tags: ['leisure=swimming_pool'] },
   ] },
   { id: 'leisure', items: [
@@ -77,7 +82,7 @@ export const CONTENT_PRESETS = {
   all: [],
   clean: ['benches', 'bins', 'hydrants', 'poles', 'parkedCars', 'calming', 'gates'],
   roads: keepOnly(['roadSurfaces', 'markings', 'crosswalks', 'signals', 'signs', 'lamps', 'calming', 'bridges', 'tunnels', 'dams', 'railways']),
-  scenery: keepOnly(['trees', 'groundCover', 'rocks', 'water']),
+  scenery: keepOnly(['trees', 'groundCover', 'rocks', 'rivers', 'lakes', 'sea']),
 };
 export const PRESET_IDS = Object.keys(CONTENT_PRESETS);
 
@@ -93,7 +98,49 @@ export function presetOf(offIds = [], excludeTags = []) {
 
 /** Clean an off list / tag list from storage or a code: known ids only; selectors 'key=value' or 'key=*'. */
 export function sanitizeContentOff(list) {
-  return Array.isArray(list) ? [...new Set(list.filter((id) => BY_ID.has(id)))] : [];
+  if (!Array.isArray(list)) return [];
+  // (until 0.2.14 one switch, 'water': the inland water, rivers and lakes)
+  const ids = list.includes('water') ? [...list, 'rivers', 'lakes'] : list;
+  return [...new Set(ids.filter((id) => BY_ID.has(id)))];
+}
+
+const RIVER_WATER = new Set(['river', 'canal', 'stream', 'ditch', 'drain', 'stream_pool', 'rapids', 'lock', 'fish_pass']);
+const FLOWING = new Set(['river', 'stream', 'canal', 'ditch', 'drain', 'riverbank', 'tidal_channel', 'brook', 'wadi', 'flowline', 'rapids']);
+const WATER_WORKS = new Set(['dam', 'weir', 'lock_gate', 'sluice_gate', 'waterfall', 'boatyard', 'fuel', 'sanitary_dump_station', 'water_point', 'turning_point', 'milestone', 'security_lock', 'check_dam']);
+const SEA_PLACES = new Set(['sea', 'ocean']);
+/**
+ * The kind of a water feature, for the three water switches: 'river' (a
+ * waterway's line, a river's or canal's mapped area), 'sea' (the coastline,
+ * a mapped sea or bay), 'lake' (every other water area: lakes, ponds,
+ * reservoirs, basins); null for anything that is no water.
+ */
+export function waterKindOf(f) {
+  const t = f?.tags || {};
+  if (f?.type === 'coastline' || t.natural === 'coastline' || t.natural === 'bay' || t.natural === 'strait' || SEA_PLACES.has(String(t.place || '').toLowerCase())) return 'sea';
+  if (f?.type !== 'water') return null;
+  if (t.leisure === 'swimming_pool') return null;
+  const way = String(t.waterway || '').toLowerCase();
+  if (FLOWING.has(way) || RIVER_WATER.has(String(t.water || '').toLowerCase())) return 'river';
+  // (what stands in or beside the water is no water: a dam and a weir are the dams', built or not with them)
+  if (WATER_WORKS.has(way) && t.natural !== 'water' && !t.water) return null;
+  return 'lake';
+}
+const WATER_ITEM = { river: 'rivers', lake: 'lakes', sea: 'sea' };
+const FOOT_WAYS = new Set(['footway', 'path', 'cycleway', 'steps', 'bridleway', 'pedestrian', 'corridor']);
+/** A footbridge: a path, cycleway or flight of steps mapped as a bridge (no road's bridge). */
+export const footBridgeOf = (f) => f?.type === 'road' && FOOT_WAYS.has(f.tags?.highway) && !!f.tags?.bridge && f.tags.bridge !== 'no';
+/** The features left with the footbridges taken out (their stretch of path with them): { features, removed }. */
+export function filterFootBridges(features, options) {
+  if (!Array.isArray(features) || contentOn(options, 'footBridges')) return { features, removed: 0 };
+  const out = features.filter((f) => !footBridgeOf(f));
+  return { features: out, removed: features.length - out.length };
+}
+/** The features left once the water kinds switched off are taken out: { features, removed }. */
+export function filterWaterKinds(features, options) {
+  const off = ['river', 'lake', 'sea'].filter((k) => !contentOn(options, WATER_ITEM[k]));
+  if (!Array.isArray(features) || !off.length) return { features, removed: 0 };
+  const out = features.filter((f) => { const k = waterKindOf(f); return !k || !off.includes(k); });
+  return { features: out, removed: features.length - out.length };
 }
 const SELECTOR = /^[a-z0-9_:.-]{1,40}=(\*|[^=\s][^=]{0,60})$/i;
 export function sanitizeExcludeTags(list) {
@@ -114,6 +161,8 @@ export function contentExportOptions(offIds = [], userExcludeTags = []) {
     for (const t of it.tags || []) tags.add(t);
     Object.assign(options, it.option || {});
   }
+  // (the old one water option: off when no inland water is built)
+  if (off.includes('rivers') && off.includes('lakes')) options.includeWater = false;
   return { ...options, contentOff: off, excludeTags: [...tags] };
 }
 
@@ -200,12 +249,13 @@ const PATH_HIGHWAYS = new Set(['footway', 'path', 'cycleway', 'bridleway', 'pede
  */
 export function itemOfFeature(f) {
   const t = f?.tags || {};
+  if (footBridgeOf(f)) return 'footBridges';
   for (const it of TAGGED) if (matchParsed(t, it.exact, it.anyValue) && !(f.type === 'road' && it.id === 'railways')) return it.id;
   switch (f?.type) {
     case 'road': return PATH_HIGHWAYS.has(t.highway) ? 'paths' : 'roadSurfaces';
     case 'railway': return 'railways';
     case 'building': return 'buildings';
-    case 'water': case 'coastline': return 'water';
+    case 'water': case 'coastline': return WATER_ITEM[waterKindOf(f)] ?? 'lakes';
     case 'vegetation': return t.natural === 'bare_rock' || t.natural === 'scree' ? 'rocks' : t.landuse === 'grass' || t.landuse === 'meadow' || t.natural === 'grassland' ? 'groundCover' : 'trees';
     case 'barrier': return 'fences';
     case 'power_line': return 'poles';

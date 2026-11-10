@@ -1,8 +1,8 @@
 // What to build (step 4): which features the level gets, in one place for the
 // export panel, the 2D map's colouring and the share codes.
 //
-// Seven features keep the storage keys they always had (roads, buildings,
-// trees, rocks, water, bridges, tunnels: share codes, "Modify" in My Levels
+// Six features keep the storage keys they always had (roads, buildings,
+// trees, rocks, bridges, tunnels: share codes, "Modify" in My Levels
 // and the settings stats read them); the rest are a list of ids switched off
 // (mapng_beamNGContentOff). OSM tags left out one by one (the "Show OSM tags"
 // rows) are mapng_beamNGExcludeTags. Basic mode shows only the presets
@@ -20,19 +20,26 @@ const LEGACY = [
   ['buildings', 'mapng_beamNGIncludeBuildings'],
   ['trees', 'mapng_beamNGIncludeTrees'],
   ['rocks', 'mapng_beamNGIncludeRocks'],
-  ['water', 'mapng_beamNGIncludeWater'],
   ['bridges', 'mapng_beamNGIncludeBridges'],
   ['tunnels', 'mapng_beamNGIncludeTunnels'],
 ].map(([id, key, get = (v) => v !== 'false', put = (on) => String(on)]) => ({ id, key, get, put }));
 const LEGACY_IDS = new Set(LEGACY.map((l) => l.id));
 
 const OFF_KEY = 'mapng_beamNGContentOff';
+// Water was one switch with its own key until 0.2.14; now rivers, lakes and sea are three
+// features in the off list. The old key is still written (off when neither rivers nor lakes
+// are built: share codes and older versions read it) and, read as off, switches both off.
+const WATER_KEY = 'mapng_beamNGIncludeWater';
+const readOff = () => {
+  const list = readList(OFF_KEY);
+  return sanitizeContentOff(read(WATER_KEY) === 'false' ? [...(Array.isArray(list) ? list : []), 'rivers', 'lakes'] : list);
+};
 const TAGS_KEY = 'mapng_beamNGExcludeTags';
 const PRESET_KEY = 'mapng_beamNGBasicPreset';
 
 /** On/off of the seven features with their own key (refs; the export panel's beamNGInclude… settings). */
 export const legacyOn = Object.fromEntries(LEGACY.map((l) => [l.id, ref(l.get(read(l.key)))]));
-const extraOff = ref(sanitizeContentOff(readList(OFF_KEY)).filter((id) => !LEGACY_IDS.has(id)));
+const extraOff = ref(readOff().filter((id) => !LEGACY_IDS.has(id)));
 export const excludeTags = ref(sanitizeExcludeTags(readList(TAGS_KEY)));
 export const basicPreset = ref(PRESET_IDS.includes(read(PRESET_KEY)) ? read(PRESET_KEY) : 'all');
 // views (per viewer, not in codes): the OSM tag rows, the 2D map coloured by group (step 4 only), the card's tab
@@ -42,7 +49,7 @@ export const colourMap = ref(read('mapng_contentColourMap') !== 'false');
 export const contentTab = ref(read('mapng_contentTab') === 'tune' ? 'tune' : 'features');
 
 for (const l of LEGACY) watch(legacyOn[l.id], (on) => write(l.key, l.put(on)));
-watch(extraOff, (v) => write(OFF_KEY, JSON.stringify(v)), { deep: true });
+watch(extraOff, (v) => { write(OFF_KEY, JSON.stringify(v)); write(WATER_KEY, String(!(v.includes('rivers') && v.includes('lakes')))); }, { deep: true });
 watch(excludeTags, (v) => write(TAGS_KEY, JSON.stringify(v)), { deep: true });
 watch(basicPreset, (v) => write(PRESET_KEY, v));
 watch(showOsmTags, (v) => write('mapng_contentShowTags', String(v)));
@@ -92,7 +99,7 @@ export function setTagOn(tag, on) {
 /** Read everything back from storage (a share code or a loaded config just wrote it). */
 export function reloadContentSettings() {
   for (const l of LEGACY) legacyOn[l.id].value = l.get(read(l.key));
-  extraOff.value = sanitizeContentOff(readList(OFF_KEY)).filter((id) => !LEGACY_IDS.has(id));
+  extraOff.value = readOff().filter((id) => !LEGACY_IDS.has(id));
   excludeTags.value = sanitizeExcludeTags(readList(TAGS_KEY));
   basicPreset.value = PRESET_IDS.includes(read(PRESET_KEY)) ? read(PRESET_KEY) : 'all';
 }

@@ -37,7 +37,7 @@ export function exportSettingsFor(options = {}) {
     mapng_beamNGLidarDecks: on(options.lidarDecks),
   };
   // What to build: the features off beyond the seven above, and the OSM tags left out one by one
-  const OWN_KEYS = new Set(['roadSurfaces', 'buildings', 'trees', 'rocks', 'water', 'bridges', 'tunnels']);
+  const OWN_KEYS = new Set(['roadSurfaces', 'buildings', 'trees', 'rocks', 'bridges', 'tunnels']);
   out.mapng_beamNGContentOff = JSON.stringify(sanitizeContentOff(options.contentOff).filter((id) => !OWN_KEYS.has(id)));
   out.mapng_beamNGExcludeTags = JSON.stringify(sanitizeExcludeTags(options.excludeTags));
   if (Number.isFinite(Number(options.seaLevelOffset))) out.mapng_beamNGSeaLevelOffset = String(Number(options.seaLevelOffset));
