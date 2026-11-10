@@ -33,10 +33,10 @@ const makeSpot = (radius, blur) => {
 };
 
 /**
- * points: [{ lat, lon, weight }] with weight 0..1. Returns a Leaflet layer.
- * Options: radius, blur (px), minOpacity.
+ * points: [{ lat, lon, count }]. Returns a Leaflet layer.
+ * Options: radius, blur (px), minOpacity, full (the count drawn darkest).
  */
-export function heatLayer(points, { radius = 22, blur = 18, minOpacity = 0.25, maxZoom = 8, gradient = GRADIENT } = {}) {
+export function heatLayer(points, { radius = 22, blur = 18, minOpacity = 0.25, full = 100, gradient = GRADIENT } = {}) {
   const palette = makePalette(gradient);
   const spot = makeSpot(radius, blur);
   let map = null;
@@ -51,23 +51,30 @@ export function heatLayer(points, { radius = 22, blur = 18, minOpacity = 0.25, m
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.clearRect(0, 0, size.x, size.y);
     const pad = spot.r;
-    // As leaflet.heat: points summed per radius/2 screen cell, each weighed
-    // down by how far out the map is (so a lone export stays a faint spot and
-    // a busy city builds up), then drawn at that strength.
+    // Points summed per radius/2 cell. The cells are fixed to the world (the
+    // map's own pixel grid at this zoom), not to the window: panning never
+    // regroups them, so a place keeps its glow wherever it sits on screen.
+    // Strength is the number of exports in the cell on one fixed scale
+    // (`full` exports and more: the darkest), the same at every zoom and for
+    // every view, never relative to what happens to be visible.
     const cell = radius / 2;
-    const v = 1 / 2 ** Math.max(0, Math.min(maxZoom - map.getZoom(), 12));
+    const z = map.getZoom();
+    const origin = map.getPixelBounds().min;
     const grid = new Map();
     for (const p of points) {
-      const pt = map.latLngToContainerPoint([p.lat, p.lon]);
-      if (pt.x < -pad || pt.y < -pad || pt.x > size.x + pad || pt.y > size.y + pad) continue;
-      const key = `${Math.floor(pt.x / cell)},${Math.floor(pt.y / cell)}`;
+      const wp = map.project([p.lat, p.lon], z);
+      const x = wp.x - origin.x; const y = wp.y - origin.y;
+      if (x < -pad || y < -pad || x > size.x + pad || y > size.y + pad) continue;
+      const key = `${Math.floor(wp.x / cell)},${Math.floor(wp.y / cell)}`;
       const g = grid.get(key);
-      const w = p.weight * v;
-      if (!g) grid.set(key, { x: pt.x * w, y: pt.y * w, w });
-      else { g.x += pt.x * w; g.y += pt.y * w; g.w += w; }
+      const w = p.count;
+      if (!g) grid.set(key, { x: x * w, y: y * w, w });
+      else { g.x += x * w; g.y += y * w; g.w += w; }
     }
-    for (const g of grid.values()) {
-      ctx.globalAlpha = Math.min(1, Math.max(minOpacity, g.w));
+    const scale = Math.log1p(full);
+    // (faintest first: a busy cell's glow is never dimmed by a neighbour's)
+    for (const g of [...grid.values()].sort((u, v) => u.w - v.w)) {
+      ctx.globalAlpha = Math.min(1, minOpacity + (1 - minOpacity) * (Math.log1p(g.w) / scale));
       ctx.drawImage(spot.canvas, g.x / g.w - spot.r, g.y / g.w - spot.r);
     }
     const img = ctx.getImageData(0, 0, size.x, size.y);

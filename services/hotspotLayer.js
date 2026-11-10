@@ -74,12 +74,15 @@ export function addHotspotLayer(map, cells, text, onPick) {
   const renderer = L.canvas({ padding: 0.3, tolerance: 4 });
   const group = L.layerGroup().addTo(map);
   const live = cells.filter((c) => c.total > 0);
+  // (the glow's scale is fixed by the whole world's data, the busiest cell
+  // several times over for the cells that add up when zoomed out: never by
+  // the part of the map in view)
   const maxCell = live.reduce((m, c) => Math.max(m, c.total), 1);
-  const heat = heatLayer(live.map((c) => {
-    const lat = -90 + (c.y + 0.5) * 0.05;
-    const lon = -180 + (c.x + 0.5) * 0.05;
-    return { lat, lon, weight: Math.sqrt(c.total / maxCell) };
-  }));
+  const heat = heatLayer(live.map((c) => ({
+    lat: -90 + (c.y + 0.5) * 0.05,
+    lon: -180 + (c.x + 0.5) * 0.05,
+    count: c.total,
+  })), { full: Math.max(30, maxCell * 4) });
   let popup = null;
 
   const pick = (dot) => {
