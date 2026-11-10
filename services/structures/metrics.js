@@ -104,12 +104,13 @@ export function roadLinesFromDecals(groups) {
 
 /** Steps where two carriageways meet: their end nodes at different heights. */
 // (the export trims roads this share of the map's width in from each edge)
-const EDGE_TRIM_SHARE = 0.015;
+const EDGE_TRIM_SHARE = 0.015;   // (small maps)
+const EDGE_TRIM_M = 15;           // (the same distance on big ones: exportBeamNGLevel.js roadEdgeMarginFor)
 export function checkJoints(carriageways, { worldSize = null } = {}) {
   // two road ends both on the line where the export trims roads at the map's
   // edge are not a joint: unrelated roads cut there side by side (a ground
   // link and two layer-3 ramps, 18 m apart in height)
-  const trim = worldSize ? worldSize / 2 - EDGE_TRIM_SHARE * worldSize - 1 : Infinity;
+  const trim = worldSize ? worldSize / 2 - Math.min(EDGE_TRIM_SHARE * worldSize, EDGE_TRIM_M) - 1 : Infinity;
   const atTrim = (e) => Math.abs(e.x) >= trim || Math.abs(e.y) >= trim;
   const cells = new Map();
   const ends = [];

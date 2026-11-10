@@ -335,41 +335,77 @@ test('a reservoir is deepest against its dam, its floor rising away from it; the
   assert.equal(tagged.lakes[0].damDepth, 96);
 });
 
-test('lake banks: a wall at the waterline is cut back into a bank; a road, a moat and a river keep theirs', async () => {
+test('lake banks: the ground over the water is left exactly as surveyed, a wall at the waterline included', async () => {
   const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
   // a 200 m grid at 1 m: a lake recorded flat at 100 m west of x = 0; east of
   // it the hillside starts 10 m up (a reservoir surveyed at low water) and
-  // climbs at 60 %
+  // climbs at 60 %; the outline reaches 20 m up the bank
   const N = 201; const SIZE = 200;
-  const build = () => {
-    const hm = new Float32Array(N * N);
-    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) { const x = (c / (N - 1) - 0.5) * SIZE; hm[r * N + c] = x <= 0 ? 100 : 110 + 0.6 * x; }
-    return hm;
-  };
+  const ground = (x) => (x <= 0 ? 100 : 110 + 0.6 * x);
+  const hm = new Float32Array(N * N);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) hm[r * N + c] = ground((c / (N - 1) - 0.5) * SIZE);
   const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
-  const ring = [[-90, -80], [0, -80], [0, 80], [-90, 80], [-90, -80]];
-  const feat = (tags) => ({ type: 'water', tags, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) });
-  const run = (tags, opts = {}, river = false) => {
-    const hm = build();
-    const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
-    const plan = planLakes({ features: [feat(tags)], toWorld: (lat, lng) => [lng, lat], heightAt: at });
-    if (river) plan.lakes[0].river = true;
-    const beds = carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 }, opts);
-    beds.apply((idx, v) => { hm[idx] = v; });
-    // the tallest step between neighbours along y = 0, from the water to 40 m up the bank
-    let step = 0;
-    for (let x = -3; x < 40; x++) step = Math.max(step, at(x + 1, 0) - at(x, 0));
-    return { step, at, report: beds.lakes[0] };
-  };
-  const lake = run({ natural: 'water', water: 'reservoir' });
-  assert.ok(lake.step < 2.6, `the bank climbs at most ${lake.step.toFixed(2)} m a metre`);
-  assert.ok(lake.report.banksEased > 0);
-  assert.ok(Math.abs(lake.at(60, 0) - (110 + 0.6 * 60)) < 1e-3, 'the hillside past the bank untouched');
-  // a road along the shore stands (and the wall under it)
-  const road = run({ natural: 'water', water: 'reservoir' }, { keep: (x) => x > 0 && x < 8 });
-  assert.ok(Math.abs(road.at(4, 0) - (110 + 0.6 * 4)) < 1e-3, 'kept ground untouched');
-  // walls that are the thing itself, a river's quay, and terrain edits off: left as the data has them
-  assert.ok(run({ natural: 'water', water: 'moat' }).step > 9);
-  assert.ok(run({ natural: 'water', water: 'reservoir' }, {}, true).step > 9);
-  assert.ok(run({ natural: 'water', water: 'reservoir' }, { shallow: true }).step > 9);
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+  const ring = [[-90, -80], [20, -80], [20, 80], [-90, 80], [-90, -80]];
+  const plan = planLakes({ features: [{ type: 'water', tags: { natural: 'water', water: 'reservoir' }, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) }], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+  const beds = carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 });
+  beds.apply((idx, v) => { hm[idx] = v; });
+  // (cutting the bank back into a ramp lost the real shoreline: tester report, 0.2.16)
+  for (let x = 1; x <= 60; x++) assert.ok(Math.abs(at(x, 0) - ground(x)) < 1e-3, `the bank at ${x} m is as surveyed`);
+  assert.equal(beds.lakes[0].banksEased, undefined);
+  assert.ok(at(-40, 0) < 99, 'the bed under the water is cut');
+  // (and the bed starts shallow at the survey's waterline, not at the outline 20 m up the bank)
+  assert.ok(at(-1, 0) > 100 - 2 && at(-1, 0) < 100, `shallow at the waterline: ${at(-1, 0).toFixed(2)}`);
+});
+
+test('lake beds: no creases down the middle of a bay; a thin low seam in the water is cut with it', async () => {
+  const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
+  // a 300 m square lake recorded flat at 50 m in a 400 m grid at 1 m, banks
+  // climbing at 50 % round it; a seam 2 m wide and 1 m high runs across it
+  const N = 401; const SIZE = 400;
+  const hm = new Float32Array(N * N);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const x = (c / (N - 1) - 0.5) * SIZE; const y = (0.5 - r / (N - 1)) * SIZE;
+    const out = Math.max(Math.abs(x), Math.abs(y)) - 150;
+    hm[r * N + c] = out > 0 ? 50 + 0.5 * out : (Math.abs(y - 40) <= 1 ? 51 : 50);
+  }
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+  const ring = [[-150, -150], [150, -150], [150, 150], [-150, 150], [-150, -150]];
+  const plan = planLakes({ features: [{ type: 'water', tags: { natural: 'water', water: 'lake' }, geometry: ring.map(([x, y]) => ({ lat: y, lng: x })) }], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+  carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 }).apply((idx, v) => { hm[idx] = v; });
+  // the seam is gone: the bed runs through it
+  assert.ok(Math.abs(at(0, 40) - (at(0, 37) + at(0, 43)) / 2) < 0.2, `no ridge left at the seam: ${at(0, 40).toFixed(2)} between ${at(0, 37).toFixed(2)} and ${at(0, 43).toFixed(2)}`);
+  // along the diagonal (equally far from two shores: the old bed's crease) the slope turns gently
+  let worst = 0;
+  for (let x = -100; x <= 100; x++) {
+    // across the diagonal, at right angles to it
+    const k = (d) => at(x + d, x - d);
+    worst = Math.max(worst, Math.abs(k(2) - 2 * k(0) + k(-2)) / 4);
+  }
+  assert.ok(worst < 0.05, `the bed bends at most ${worst.toFixed(3)} m per m² across the diagonal`);
+});
+
+test('lake beds: a lake that arrives in pieces (cut along map tiles) is dug as one, no ridge along the seam', async () => {
+  const { planLakes, carveLakeBeds } = await import('../services/beamngWater.js');
+  // a 300 x 200 m lake recorded flat at 50 m in a 400 m grid at 1 m, banks
+  // climbing at 50 % round it; mapped as two outlines meeting at x = 0
+  const N = 401; const SIZE = 400;
+  const hm = new Float32Array(N * N);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const x = (c / (N - 1) - 0.5) * SIZE; const y = (0.5 - r / (N - 1)) * SIZE;
+    const out = Math.max(Math.abs(x) - 150, Math.abs(y) - 100);
+    hm[r * N + c] = out > 0 ? 50 + 0.5 * out : 50;
+  }
+  const toPixel = (x, y) => [Math.round((x / SIZE + 0.5) * (N - 1)), Math.round((0.5 - y / SIZE) * (N - 1))];
+  const at = (x, y) => { const [c, r] = toPixel(x, y); return hm[r * N + c]; };
+  const piece = (xa, xb) => ({ type: 'water', tags: { natural: 'water', water: 'lake' }, geometry: [[xa, -100], [xb, -100], [xb, 100], [xa, 100], [xa, -100]].map(([x, y]) => ({ lat: y, lng: x })) });
+  const plan = planLakes({ features: [piece(-150, 0), piece(0, 150)], toWorld: (lat, lng) => [lng, lat], heightAt: at });
+  assert.equal(plan.lakes.length, 2);
+  const beds = carveLakeBeds(plan.lakes, { heightMap: hm, width: N, height: N, worldSize: SIZE, minHeight: 0 });
+  beds.apply((idx, v) => { hm[idx] = v; });
+  assert.equal(beds.lakes.length, 1, 'one body of water in the report');
+  // (dug apart, the bed stood 0.3 m under the water all along x = 0)
+  assert.ok(at(0, 0) < at(-40, 0) + 0.5 && at(0, 0) < at(40, 0) + 0.5, `the seam is as deep as the bed beside it: ${at(0, 0).toFixed(2)} vs ${at(-40, 0).toFixed(2)} and ${at(40, 0).toFixed(2)}`);
+  assert.ok(at(0, 0) < 50 - 5, `and deep: ${at(0, 0).toFixed(2)}`);
 });

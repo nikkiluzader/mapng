@@ -2006,7 +2006,15 @@ async function generateTerrainBackdropDAE(terrainData, worldSize, options = {}) 
 // BeamNG's improvedSpline raises DecalRoad nodes that fall outside or too near
 // the TerrainBlock boundary high above the mesh.  Clipping to this inner margin
 // prevents those floating-road artifacts.
-const ROAD_EDGE_MARGIN = 0.015; // ≈ 15 m for a 1024-pixel terrain
+// It is a distance, about 15 m: as a fixed share of the map it left the last
+// 250 m of every road undrawn on a 16 km level. Set per export from the
+// level's size (setRoadEdgeMargin); small maps keep the 1.5 % they had.
+const ROAD_EDGE_MARGIN_MAX = 0.015; // ≈ 15 m for a 1024 m terrain
+const ROAD_EDGE_MARGIN_M = 15;
+let ROAD_EDGE_MARGIN = ROAD_EDGE_MARGIN_MAX;
+export const roadEdgeMarginFor = (worldSizeM) => (worldSizeM > 0
+  ? Math.min(ROAD_EDGE_MARGIN_MAX, ROAD_EDGE_MARGIN_M / worldSizeM) : ROAD_EDGE_MARGIN_MAX);
+export function setRoadEdgeMargin(worldSizeM) { ROAD_EDGE_MARGIN = roadEdgeMarginFor(worldSizeM); return ROAD_EDGE_MARGIN; }
 
 /**
  * Liang-Barsky clip of segment (u0,v0)→(u1,v1) against the axis-aligned box
@@ -6492,7 +6500,7 @@ export function generateJunctionMarkingDecals(terrainData, squareSize, { carriag
   }
 
   const { bounds } = terrainData;
-  const margin = ROAD_EDGE_MARGIN + 0.005;
+  const margin = ROAD_EDGE_MARGIN * 4 / 3;
   const insideMargin = (pt) => {
     const u = (pt.lng - bounds.west) / (bounds.east - bounds.west);
     const v = (bounds.north - pt.lat) / (bounds.north - bounds.south);
@@ -6873,7 +6881,7 @@ export function generateTurnArrowDecals(terrainData, squareSize) {
   }
 
   const { bounds } = terrainData;
-  const margin = ROAD_EDGE_MARGIN + 0.005;
+  const margin = ROAD_EDGE_MARGIN * 4 / 3;
   const insideMargin = (x, y) => {
     const worldSize = terrainData.width * squareSize;
     const u = x / worldSize + 0.5;
@@ -7449,7 +7457,7 @@ function shapingReportLines(sh, section) {
   lines.push(`- Ground under sidewalks graded: ${sh.sidewalkGroundPixels} grid point(s)`);
   if (sh.lakeBedPixels != null) lines.push(`- Lake bed grid points dug: ${sh.lakeBedPixels}${sh.extras ? '' : ' (shaping off: only the survey\'s flat water surface, at most 1.5 m under the water, so the water shows over it)'}`);
   for (const lk of (sh.lakeDepths || []).slice(0, 12)) {
-    lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'dam' ? 'a reservoir: against its dam, the floor rising away from it' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there${lk.banksEased ? `; ${lk.banksEased} grid point(s) of a wall at the waterline cut back into a bank` : ''}`);
+    lines.push(`  - ${lk.name || 'Unnamed lake'}: ${formatNumber(lk.depth, 1)} m at its deepest (${lk.source === 'osm' ? 'its OSM depth tag' : lk.source === 'dam' ? 'a reservoir: against its dam, the floor rising away from it' : lk.source === 'slope' ? `the shore's slope ${formatNumber(lk.slope * 100, 0)}% carried under the water` : 'no shore to read: the shallow bed'}), ${formatNumber(lk.reach, 0)} m from the nearest shore there`);
   }
   if (sh.seabedPixels) lines.push(`- Sea floor grid points lowered under the sea (the survey recorded the water's surface; WorldCover water within 0.3 m of the sea): ${sh.seabedPixels}`);
   if (sh.lidar === null || sh.lidar === undefined) lines.push('- Measured bridge heights (US lidar): off');
@@ -12349,6 +12357,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const size = exportTerrainData.width;
   const osmFeatureCount = Array.isArray(exportTerrainData.osmFeatures) ? exportTerrainData.osmFeatures.length : 0;
   const squareSize = computeSquareSize(exportTerrainData);
+  setRoadEdgeMargin(exportTerrainData.width * squareSize);
   const halfExtent = (size / 2) * squareSize;
   const worldSize = size * squareSize;
   const terrainHeightRange = exportTerrainData.maxHeight - exportTerrainData.minHeight;

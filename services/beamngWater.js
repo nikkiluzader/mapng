@@ -572,11 +572,15 @@ export function planLakes({ features = [], toWorld, heightAt, seaZ = null }) {
 //
 // At the shore the bed starts LAKE_BED_EDGE_M under the water, LAKE_BED_M by
 // LAKE_BANK_M out at least. Ground already deeper is left; nothing is raised.
-// Only ground near the water is cut: up to LAKE_CUT_FULL_M over the level
-// fully, the cut fading out by LAKE_CUT_TOP_M; higher ground inside the
-// outline (a reservoir's bank, its drawdown ring, an island's slope) is left
-// as it is. Cut to the bed regardless, it stood as a wall all along the shore
-// wherever the outline climbed the bank (Lac du Chevril, Tignes). The map's
+// Only the water is cut: ground inside the outline standing LAKE_CUT_FULL_M
+// or more over the level (a reservoir's bank, its drawdown ring, a beach, an
+// island's slope) is shore, left exactly as surveyed, and the bed deepens from
+// the survey's own waterline. Cut to the bed regardless, it stood as a wall
+// all along the shore wherever the outline climbed the bank (Lac du Chevril,
+// Tignes); cut back into a slope afterwards, the bank became one uniform ramp
+// and the real shoreline was lost. A thin low strip of ground in the water
+// (under LAKE_CUT_TOP_M, narrower than LAKE_THIN_M) is the survey's flaw and
+// is cut with the water. The map's
 // edge is no shore: a lake running off the map deepens towards it.
 //
 // A reservoir is a flooded valley, deepest against its dam: a dam (OSM
@@ -596,17 +600,12 @@ const LAKE_SLOPE_QUANTILE = 0.75;
 const LAKE_SIZE_DEPTH = 0.15;
 const LAKE_DEPTH_MAX_M = 400;
 const RIVER_AREA_MAX_M = 4;
+const LAKE_FLAT_M = 0.25;        // a lake's surface within this (10th to 90th percentile): recorded flat, its waterline known
+const LAKE_THIN_M = 6;          // dry ground inside a lake narrower than this, and low: the survey's flaw, not a bank
+const LAKE_SMOOTH_SHARE = 0.1;  // the bed's distance to the shore smoothed over this share of the lake's reach
+const LAKE_SMOOTH_MAX_CELLS = 80;
+const LAKE_NEAR_SMOOTH_M = 5;   // near the shore the distance smoothed over this much only
 const LAKE_GRID_CELLS = 4e6;    // the distance grid at most this many cells (a big lake on a coarser one)
-// The bank over the water: elevation data often ends the hillside in a wall at
-// the waterline (a reservoir surveyed at low water and flattened there: Lac du
-// Chevril's shore dropped 10 m in 3 m, a vertical band all round the lake).
-// No bank stands steeper than this down to the water: the wall is cut back
-// into a slope until it meets the hillside. Lakes only (a river's quays are
-// walls), never a road or its sidewalks (keep), never a dam.
-const WALLED_WATER = new Set(['moat', 'basin', 'pool', 'reflecting_pool', 'canal', 'lock', 'harbour', 'wastewater']);
-const BANK_MAX_SLOPE = 1.5;     // about 56 degrees
-const BANK_FOOT_M = 0.5;        // this much over the water at the waterline stays (a low quay, a beach step)
-const BANK_REACH_M = 40;        // a wall is cut back at most this far from the water
 const DAM_REACH_M = 25;         // a dam this close to a lake's outline holds it
 const DAM_FREEBOARD_M = 4;      // the crest over the water
 const DAM_FAR_SHARE = 0.25;     // the floor at the far end: this share of the depth at the dam
@@ -636,6 +635,27 @@ export function tagDepthM(tags = {}) {
 
 // Squared distance (cells) from every cell to the nearest seed: Felzenszwalb
 // & Huttenlocher's exact transform, rows then columns.
+/** A grid smoothed about a Gaussian of sigma cells (three box passes, edges held). */
+function blurGrid(src, w, h, sigma) {
+  const rad = Math.max(1, Math.round(Math.sqrt(4 * sigma * sigma + 1) / 2 - 0.5));
+  let a = Float32Array.from(src); let b = new Float32Array(w * h);
+  const pass = (from, to, len, lines, at) => {
+    for (let q = 0; q < lines; q++) {
+      let sum = 0;
+      for (let i = -rad; i <= rad; i++) sum += from[at(q, Math.min(len - 1, Math.max(0, i)))];
+      for (let i = 0; i < len; i++) {
+        to[at(q, i)] = sum / (2 * rad + 1);
+        sum += from[at(q, Math.min(len - 1, i + rad + 1))] - from[at(q, Math.max(0, i - rad))];
+      }
+    }
+  };
+  for (let n = 0; n < 3; n++) {
+    pass(a, b, w, h, (row, i) => row * w + i);
+    pass(b, a, h, w, (col, i) => i * w + col);
+  }
+  return a;
+}
+
 function squaredDistanceGrid(seed, w, h) {
   const INF = 1e20;
   const g = new Float64Array(w * h);
@@ -758,43 +778,101 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
   };
   const edits = new Map();
   const report = [];
-  for (const lake of lakes || []) {
-    const { poly, level } = lake;
+  // Outlines that meet edge to edge are one body of water (a big lake from
+  // map tiles arrives cut along the tiles' edges; a reservoir mapped in two
+  // parts): dug as one. Each piece dug alone took its neighbour for shore, and
+  // the bed climbed to the surface along every seam, a ridge straight across
+  // the lake (Lac du Chevril from Overture's tiles, two of them).
+  const list = (lakes || []).filter((lk) => lk?.poly);
+  const bodies = joinTouchingWater(list).map((members) => {
+    if (members.length === 1) return { ...list[members[0]], pieces: [list[members[0]].poly] };
+    const parts = members.map((i) => list[i]);
+    const biggest = parts.reduce((a, b) => ((b.area || 0) > (a.area || 0) ? b : a));
+    return {
+      poly: unionOutline(parts.map((m) => m.poly)), pieces: parts.map((m) => m.poly),
+      level: Math.min(...parts.map((m) => m.level)), tags: biggest.tags, river: parts.every((m) => m.river),
+      area: parts.reduce((n, m) => n + (m.area || 0), 0),
+    };
+  });
+  for (const lake of bodies) {
+    const { poly, level, pieces } = lake;
     const [x0, y0, x1, y1] = poly.box;
     const [pc0, pr0] = toPixel(x0, y1); const [pc1, pr1] = toPixel(x1, y0);
     // the lake's box, padded so the shore round it is in it, on a grid of
     // k pixels a cell (1 unless the lake is very big)
-    // (and, where banks are eased, by their reach)
-    // (not where the wall is the thing itself: a moat, a basin, a pool, a harbour or canal basin)
-    const easeBanks = !shallow && !lake.river && !WALLED_WATER.has(String(lake.tags?.water || '').toLowerCase());
-    const pad = 2 + (easeBanks ? Math.ceil(BANK_REACH_M / sq) : 0);
+    const pad = 2;
     const c0 = Math.floor(pc0) - pad; const r0 = Math.floor(pr0) - pad; const c1 = Math.ceil(pc1) + pad; const r1 = Math.ceil(pr1) + pad;
     const k = Math.max(1, Math.ceil(Math.sqrt(((c1 - c0 + 1) * (r1 - r0 + 1)) / LAKE_GRID_CELLS)));
     const gw = Math.ceil((c1 - c0 + 1) / k); const gh = Math.ceil((r1 - r0 + 1) / k);
+    const cell = k * sq;
     // the dams holding this lake (near its outline), and their depth
-    const lakeDams = (dams || []).filter((d) => d.line?.length > 1 && d.line.some(([x, y]) => poly.contains(x, y) || Math.min(distToRing(x, y, poly.outer)) < DAM_REACH_M));
+    const lakeDams = (dams || []).filter((d) => d.line?.length > 1 && d.line.some(([x, y]) => poly.contains(x, y) || Math.min(...pieces.map((pp) => distToRing(x, y, pp.outer))) < DAM_REACH_M));
     const nearDam = (x, y) => lakeDams.some((d) => lineDist(x, y, d.line) < DAM_REACH_M);
+    // The water is where the survey recorded it: inside the outline AND at
+    // the surface (under LAKE_CUT_FULL_M over it). Ground the outline
+    // overlaps (a bank, a beach, an islet the map does not draw) is shore:
+    // it is left exactly as surveyed, and the bed deepens from the survey's
+    // own waterline, so no wall is made and none has to be cut back.
+    // That needs a survey that recorded the water flat (lidar does, to the
+    // centimetre). Where its surface is rough (the global 30 m: a metre or
+    // two of noise) or falls along its length (a river drawn as area water),
+    // no one level says where the water is: the whole outline is water, and
+    // ground up to LAKE_CUT_TOP_M over the level is cut less and less.
+    let loose = !!lake.river;
+    if (!loose) {
+      const low = [];
+      const step = Math.max(1, Math.floor(Math.sqrt((gw * gh) / 40000)));
+      for (let gy = 0; gy < gh; gy += step) for (let gx = 0; gx < gw; gx += step) {
+        const c = Math.round(c0 + gx * k + (k - 1) / 2); const r = Math.round(r0 + gy * k + (k - 1) / 2);
+        if (c < 0 || r < 0 || c > width - 1 || r > height - 1) continue;
+        const [x, y] = toWorld(c, r);
+        if (!poly.contains(x, y)) continue;
+        const above = heightMap[r * width + c] - minHeight - level;
+        if (above < LAKE_CUT_TOP_M) low.push(above);
+      }
+      low.sort((p, q) => p - q);
+      if (low.length >= 8) loose = low[Math.floor(low.length * 0.9)] - low[Math.floor(low.length * 0.1)] > LAKE_FLAT_M;
+    }
     const seed = new Uint8Array(gw * gh);
     const damSeed = new Uint8Array(gw * gh);
     const wet = new Uint8Array(gw * gh);
+    const lowDry = new Uint8Array(gw * gh);   // inside, dry, but under LAKE_CUT_TOP_M over the water
+    const flaw = new Uint8Array(gw * gh);     // dry cells taken for water (the thin low strips below)
     for (let gy = 0; gy < gh; gy++) {
       for (let gx = 0; gx < gw; gx++) {
         const c = c0 + gx * k + (k - 1) / 2; const r = r0 + gy * k + (k - 1) / 2;
         const onMap = c >= 0 && r >= 0 && c <= width - 1 && r <= height - 1;
         const [x, y] = toWorld(c, r);
-        const inside = poly.contains(x, y);
-        if (inside && !keep(x, y)) wet[gy * gw + gx] = 1;
-        else if (lakeDams.length && nearDam(x, y)) damSeed[gy * gw + gx] = 1;   // a dam: no shore
-        else if (onMap) seed[gy * gw + gx] = 1;   // the shore (off the map: none)
+        const i = gy * gw + gx;
+        if (poly.contains(x, y) && !keep(x, y)) {
+          const above = onMap ? heightMap[Math.round(r) * width + Math.round(c)] - minHeight - level : 0;
+          if (above < LAKE_CUT_FULL_M || loose) wet[i] = 1;
+          else { seed[i] = 1; if (above < LAKE_CUT_TOP_M) lowDry[i] = 1; }
+        } else if (lakeDams.length && nearDam(x, y)) damSeed[i] = 1;   // a dam: no shore
+        else if (onMap) seed[i] = 1;   // the shore (off the map: none)
       }
+    }
+    // (a thin low strip of "ground" in the water is the survey's own flaw: a
+    // seam between two flights, a boat, a ripple. Under LAKE_THIN_M wide and
+    // low, it is water)
+    if (cell <= LAKE_THIN_M) {
+      const toWet = squaredDistanceGrid(wet, gw, gh);
+      const half = LAKE_THIN_M / 2 / cell;
+      const core = new Uint8Array(gw * gh);
+      for (let i = 0; i < gw * gh; i++) if (seed[i] && toWet[i] > half * half) core[i] = 1;
+      const toCore = squaredDistanceGrid(core, gw, gh);
+      for (let i = 0; i < gw * gh; i++) if (lowDry[i] && toCore[i] > (half + 1) * (half + 1)) { seed[i] = 0; wet[i] = 1; flaw[i] = 1; }
     }
     const d2 = squaredDistanceGrid(seed, gw, gh);
     let reach = 0;
     for (let i = 0; i < gw * gh; i++) if (wet[i] && d2[i] < 1e19) reach = Math.max(reach, Math.sqrt(d2[i]));
-    reach *= k * sq;
+    const reachCells = reach;
+    reach *= cell;
     const area = lake.area || 0;
     const tagged = tagDepthM(lake.tags);
-    const slope = tagged ? null : shoreSlope(poly, level, groundAt);
+    // (each piece's shore read on its own: a seam between two pieces is no shore, and flat)
+    const slopes = tagged ? [] : pieces.map((pp) => shoreSlope(pp, level, groundAt)).filter((v) => v != null);
+    const slope = slopes.length ? Math.max(...slopes) : null;
     let depth = tagged ?? (slope != null ? LAKE_SLOPE_SHARE * slope * reach : LAKE_BED_M);
     if (!tagged) depth = Math.min(depth, Math.max(LAKE_BED_M, LAKE_SIZE_DEPTH * Math.sqrt(area)), LAKE_DEPTH_MAX_M);
     // a reservoir: its depth at the dam, the floor rising away from it
@@ -812,104 +890,62 @@ export function carveLakeBeds(lakes, grid, { keep = () => false, dams = [], shal
     depth = Math.max(LAKE_BED_M, depth);
     if (shallow) depth = Math.min(depth, SHALLOW_BED_M);
     report.push({ name: lake.tags?.name || null, depth, source: tagged ? 'osm' : damD != null ? 'dam' : slope != null ? 'slope' : 'none', reach, slope, damDepth: damD });
+    // The distance to the shore has a crease wherever two shores are equally
+    // far (down the middle of every bay), and the bed took it: flat facets
+    // meeting in ridges. Away from the shore the distance is smoothed over
+    // LAKE_SMOOTH_SHARE of the lake's reach; at the shore it stays exact.
+    const dist = new Float32Array(gw * gh);
+    for (let i = 0; i < gw * gh; i++) dist[i] = d2[i] >= 1e19 ? reachCells : Math.sqrt(d2[i]);
+    const sigma = Math.min(LAKE_SMOOTH_MAX_CELLS, LAKE_SMOOTH_SHARE * reachCells);
+    const soft = sigma >= 1 ? blurGrid(dist, gw, gh, sigma) : dist;
+    // (and lightly near the shore: every jag of the waterline drew a streak down the bed)
+    const nearSigma = Math.min(sigma, LAKE_NEAR_SMOOTH_M / cell);
+    const near = nearSigma >= 1 ? blurGrid(dist, gw, gh, nearSigma) : dist;
+    const nearOver = Math.max(LAKE_BANK_M, 3 * nearSigma * cell);
+    let damSoft = null;
+    if (damDist && damFar > 0) {
+      const raw = new Float32Array(gw * gh);
+      for (let i = 0; i < gw * gh; i++) raw[i] = damDist[i] >= 1e19 ? damFar : Math.sqrt(damDist[i]);
+      damSoft = sigma >= 1 ? blurGrid(raw, gw, gh, sigma) : raw;
+    }
+    // (read between the cells' centres: a big lake's cells are several pixels wide)
+    const sample = (g, c, r) => {
+      const fx = Math.min(gw - 1, Math.max(0, (c - c0 - (k - 1) / 2) / k)); const fy = Math.min(gh - 1, Math.max(0, (r - r0 - (k - 1) / 2) / k));
+      const x0 = Math.min(gw - 2, Math.floor(fx)); const y0 = Math.min(gh - 2, Math.floor(fy));
+      if (x0 < 0 || y0 < 0) return g[0];
+      const tx = fx - x0; const ty = fy - y0;
+      return (g[y0 * gw + x0] * (1 - tx) + g[y0 * gw + x0 + 1] * tx) * (1 - ty) + (g[(y0 + 1) * gw + x0] * (1 - tx) + g[(y0 + 1) * gw + x0 + 1] * tx) * ty;
+    };
+    const cellOf = (c, r) => Math.min(gh - 1, Math.max(0, Math.floor((r - r0) / k))) * gw + Math.min(gw - 1, Math.max(0, Math.floor((c - c0) / k)));
     // (the floor's share of the depth at a spot: 1 at the dam, DAM_FAR_SHARE at the far end)
-    const floorShare = (c, r) => {
-      if (!damDist || !(damFar > 0)) return 1;
-      const gx = Math.min(gw - 1, Math.max(0, Math.floor((c - c0) / k))); const gy = Math.min(gh - 1, Math.max(0, Math.floor((r - r0) / k)));
-      const v = damDist[gy * gw + gx];
-      const s = v >= 1e19 ? damFar : Math.sqrt(v);
-      return 1 - (1 - DAM_FAR_SHARE) * Math.min(1, s / damFar);
-    };
-    const distAt = (c, r) => {
-      const gx = Math.min(gw - 1, Math.max(0, Math.floor((c - c0) / k))); const gy = Math.min(gh - 1, Math.max(0, Math.floor((r - r0) / k)));
-      const v = d2[gy * gw + gx];
-      return v >= 1e19 ? reach : Math.sqrt(v) * k * sq;
-    };
+    const floorShare = (c, r) => (damSoft ? 1 - (1 - DAM_FAR_SHARE) * Math.min(1, sample(damSoft, c, r) / damFar) : 1);
+    const blendOver = Math.max(LAKE_BANK_M, 2.5 * sigma * cell);
     for (let r = Math.max(0, Math.floor(pr0)); r <= Math.min(height - 1, Math.ceil(pr1)); r++) {
       for (let c = Math.max(0, Math.floor(pc0)); c <= Math.min(width - 1, Math.ceil(pc1)); c++) {
-        const [x, y] = toWorld(c, r);
-        if (!poly.contains(x, y) || keep(x, y)) continue;
         const idx = r * width + c;
         const ground = heightMap[idx] - minHeight;
+        // (the pixel's own height says whether it is water: a big lake's
+        // cells are several pixels wide; a flaw's cell is cut whole)
+        const gi = cellOf(c, r);
         const above = ground - level;
-        if (above >= (shallow ? LAKE_CUT_FULL_M : LAKE_CUT_TOP_M)) continue;
-        // (near the shore the exact distance to the outline: the grid's cell centres are a cell off it)
-        const l = distAt(c, r) < 4 * k * sq
-          ? Math.min(distToRing(x, y, poly.outer), ...poly.holes.map((hh) => distToRing(x, y, hh)))
-          : distAt(c, r);
-        const t = reach > 0 ? Math.min(1, l / reach) : 0;
-        const edge = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, l / LAKE_BANK_M);
+        if (loose ? above >= (shallow ? LAKE_CUT_FULL_M : LAKE_CUT_TOP_M)
+          : above >= LAKE_CUT_FULL_M && !(flaw[gi] && above < LAKE_CUT_TOP_M)) continue;
+        const [x, y] = toWorld(c, r);
+        if (!poly.contains(x, y) || keep(x, y)) continue;
+        const exact = sample(dist, c, r) * cell;
+        const wn = Math.min(1, exact / nearOver);
+        const ln = exact + (sample(near, c, r) * cell - exact) * wn * wn * (3 - 2 * wn);
+        const w = Math.min(1, exact / blendOver);
+        const l = ln + (sample(soft, c, r) * cell - ln) * w * w * (3 - 2 * w);
+        const t = reach > 0 ? Math.min(1, Math.max(0, l) / reach) : 0;
+        const edge = LAKE_BED_EDGE_M + (LAKE_BED_M - LAKE_BED_EDGE_M) * Math.min(1, exact / LAKE_BANK_M);
         let target = level - Math.max(edge, depth * t * (2 - t) * floorShare(c, r));
-        // (ground a little over the water: cut less and less, so the bank meets the bed without a step)
-        if (!shallow && above > LAKE_CUT_FULL_M) {
+        // (ground a little over a rough or falling water surface: cut less and less, so the bank meets the bed without a step)
+        if (loose && !shallow && above > LAKE_CUT_FULL_M) {
           const q = (above - LAKE_CUT_FULL_M) / (LAKE_CUT_TOP_M - LAKE_CUT_FULL_M);
           target += (ground - target) * q * q * (3 - 2 * q);
         }
         if (target < ground) edits.set(idx, Math.min(edits.get(idx) ?? Infinity, target + minHeight));
-      }
-    }
-    // the banks: from the cells truly under water outward, no ground over
-    // BANK_FOOT_M + BANK_MAX_SLOPE x its distance to the water
-    if (easeBanks) {
-      const under = new Uint8Array(gw * gh);
-      let any = false;
-      for (let gy = 0; gy < gh; gy++) for (let gx = 0; gx < gw; gx++) {
-        if (!wet[gy * gw + gx]) continue;
-        const c = Math.round(c0 + gx * k + (k - 1) / 2); const r = Math.round(r0 + gy * k + (k - 1) / 2);
-        if (c < 0 || r < 0 || c > width - 1 || r > height - 1) continue;
-        if (heightMap[r * width + c] - minHeight - level < LAKE_CUT_FULL_M) { under[gy * gw + gx] = 1; any = true; }
-      }
-      if (any) {
-        // (outward from the water, nearest first: a cell stands at most
-        // BANK_MAX_SLOPE x the step over its lowest neighbour nearer the
-        // water, the waterline itself counting BANK_FOOT_M over the water)
-        const dw = squaredDistanceGrid(under, gw, gh);
-        const reachPx = Math.ceil(BANK_REACH_M / sq);
-        const cells = [];
-        const rA = Math.max(0, Math.floor(pr0) - reachPx); const rB = Math.min(height - 1, Math.ceil(pr1) + reachPx);
-        const cA = Math.max(0, Math.floor(pc0) - reachPx); const cB = Math.min(width - 1, Math.ceil(pc1) + reachPx);
-        const distPx = (c, r) => {
-          const gx = Math.min(gw - 1, Math.max(0, Math.floor((c - c0) / k))); const gy = Math.min(gh - 1, Math.max(0, Math.floor((r - r0) / k)));
-          const v = dw[gy * gw + gx];
-          return v >= 1e19 ? Infinity : Math.sqrt(v) * k;
-        };
-        for (let r = rA; r <= rB; r++) for (let c = cA; c <= cB; c++) {
-          const d = distPx(c, r);
-          if (d > 0 && d * sq <= BANK_REACH_M) cells.push([d, c, r]);
-        }
-        cells.sort((p, q) => p[0] - q[0]);
-        // heights as they stand for this pass: the water's cells at the foot, the rest as eased so far
-        const eased = new Map();
-        const standAt = (c, r) => {
-          if (c < cA || r < rA || c > cB || r > rB) return Infinity;
-          const d = distPx(c, r);
-          if (d === 0) return level + BANK_FOOT_M;
-          const idx = r * width + c;
-          // (a cell the bed's carve already lowered stands where the carve left it)
-          const carved = edits.get(idx);
-          return eased.get(idx) ?? (carved !== undefined ? carved - minHeight : heightMap[idx] - minHeight);
-        };
-        let count = 0;
-        for (const [d, c, r] of cells) {
-          const idx = r * width + c;
-          const carvedHere = edits.get(idx);
-          const ground = carvedHere !== undefined ? carvedHere - minHeight : heightMap[idx] - minHeight;
-          let cap = Infinity;
-          for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-            if (!dr && !dc) continue;
-            if (!(distPx(c + dc, r + dr) < d)) continue;
-            cap = Math.min(cap, standAt(c + dc, r + dr) + BANK_MAX_SLOPE * Math.hypot(dc, dr) * sq);
-          }
-          if (!(ground > cap)) continue;
-          const [x, y] = toWorld(c, r);
-          // (a road, a dam: it stands, and the bank behind it is measured from it)
-          if (keep(x, y) || (lakeDams.length && nearDam(x, y))) continue;
-          eased.set(idx, cap);
-          const before = edits.get(idx);
-          if (before === undefined || cap + minHeight < before) { edits.set(idx, cap + minHeight); count++; }
-        }
-        const eased_ = count;
-        if (eased_) report[report.length - 1].banksEased = eased_;
       }
     }
   }
