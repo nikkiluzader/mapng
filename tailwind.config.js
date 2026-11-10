@@ -2,7 +2,7 @@
 // Design tokens follow BeamNG.drive's own UI (ui/ui-vue/src/styles, palette
 // v25.03.04): Noto Sans text, Overpass titles, Overpass Mono numbers, the
 // bng-orange ramp (its 400 is our #FF6600) and its 4/8/16 px corners.
-// Notes: refs/output/ui-consistency-plan.md
+// Notes: refs/output/history.md, "UI consistency pass"
 const FALLBACK = ['system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'];
 
 export default {

@@ -22,11 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-references/
 refs/
 scratch/
-tmp_unzip/
-.codex
-BASE_LEVEL.zip
 .claude
 .wrangler/
