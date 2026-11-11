@@ -29,7 +29,8 @@
               />
             </SettingRow>
             <SettingRow v-if="advancedMode" :label="t('exportPanel.viewDistance')" :hint="t('exportPanel.ui.viewDistanceHint')">
-              <select v-model.number="beamNGViewDistance" :class="SELECT_XS">
+              <select v-model="beamNGViewDistance" :class="SELECT_XS">
+                <option :value="AUTO_VIEW_DISTANCE">{{ t('exportPanel.ui.viewDistanceAuto', { km: autoViewDistanceKm }) }}</option>
                 <option v-for="m in VIEW_DISTANCES_M" :key="m" :value="m">{{ m / 1000 }} km</option>
               </select>
             </SettingRow>
@@ -582,7 +583,7 @@ import {
   Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy, BarChart3, Compass, Building2, Package, ShieldCheck
 } from 'lucide-vue-next';
 import { zipIndexOfBlob, levelZipProblems } from '../../services/zipIndex.js';
-import { VIEW_DISTANCES_M, DEFAULT_VIEW_DISTANCE_M, viewDistanceMeters } from '../../services/viewDistance.js';
+import { VIEW_DISTANCES_M, AUTO_VIEW_DISTANCE, viewDistanceChoice, autoViewDistance } from '../../services/viewDistance.js';
 import StageLoader from '../ui/StageLoader.vue';
 import { rasterizeMask, backgroundFraction } from '../../services/backgroundMask.js';
 import { summarizeExportSettings, translateExportSettings } from '../../services/exportSettingsSummary.js';
@@ -827,7 +828,9 @@ const FOREST_DENSITY_KEYS = ['light', 'normal', 'dense', 'veryDense'];
 const storedForestDensity = localStorage.getItem('mapng_beamNGForestDensity');
 const beamNGForestDensity = ref(FOREST_DENSITY_KEYS.includes(storedForestDensity) ? storedForestDensity : 'normal');
 // (how far the game draws: services/viewDistance.js)
-const beamNGViewDistance = ref(viewDistanceMeters(localStorage.getItem('mapng_beamNGViewDistance')));
+const beamNGViewDistance = ref(viewDistanceChoice(localStorage.getItem('mapng_beamNGViewDistance')));
+// (what Auto comes to for this map: its width, 4 km at least, 16 km at most)
+const autoViewDistanceKm = computed(() => autoViewDistance((Number(props.terrainData?.width) || 0) * resolveProcessingMetersPerPixel(props.terrainData)) / 1000);
 const beamNGIncludeRocks = legacyOn.rocks;
 // content caps (buildings, fences, lamps, trees ...): off builds everything the map has
 const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
@@ -1245,7 +1248,7 @@ watch(beamNGSeaLevelOffset, (v) => {
   localStorage.setItem('mapng_beamNGSeaLevelOffset', String(normalized));
 });
 watch(beamNGForestDensity, (v) => localStorage.setItem('mapng_beamNGForestDensity', v));
-watch(beamNGViewDistance, (v) => localStorage.setItem('mapng_beamNGViewDistance', String(viewDistanceMeters(v))));
+watch(beamNGViewDistance, (v) => localStorage.setItem('mapng_beamNGViewDistance', String(viewDistanceChoice(v))));
 watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String(v)));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
@@ -2082,7 +2085,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       forestDensity: advanced ? beamNGForestDensity.value : 'normal',
-      viewDistance: advanced ? viewDistanceMeters(beamNGViewDistance.value) : DEFAULT_VIEW_DISTANCE_M,
+      viewDistance: advanced ? viewDistanceChoice(beamNGViewDistance.value) : AUTO_VIEW_DISTANCE,
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       ...structureOptions,
@@ -2108,7 +2111,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       forestDensity: advanced ? beamNGForestDensity.value : 'normal',
-      viewDistance: advanced ? viewDistanceMeters(beamNGViewDistance.value) : DEFAULT_VIEW_DISTANCE_M,
+      viewDistance: advanced ? viewDistanceChoice(beamNGViewDistance.value) : AUTO_VIEW_DISTANCE,
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       ...structureOptions,

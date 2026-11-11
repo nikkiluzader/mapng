@@ -19,7 +19,7 @@ export const EXPORT_FIELDS = [
   ['water', 'mapng_beamNGIncludeWater', 'bool', true],
   ['trees', 'mapng_beamNGIncludeTrees', 'bool', true],
   ['forestDensity', 'mapng_beamNGForestDensity', ['light', 'normal', 'dense', 'veryDense'], 'normal'],
-  ['viewDistance', 'mapng_beamNGViewDistance', ['2000', '4000', '8000', '12000', '16000'], '4000'],   // metres: services/viewDistance.js
+  ['viewDistance', 'mapng_beamNGViewDistance', ['auto', '2000', '4000', '8000', '12000', '16000'], 'auto'],   // metres: services/viewDistance.js
   ['rocks', 'mapng_beamNGIncludeRocks', 'bool', true],
   ['safeCaps', 'mapng_beamNGSafeCaps', 'bool', true],
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],
@@ -253,7 +253,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     const tagList = sanitizeExcludeTags(e.excludeTags);
     if (advanced && tagList.length) add('export', 'config.excludeTags', { value: tagList.slice(0, 6).join(', ') + (tagList.length > 6 ? ` +${tagList.length - 6}` : '') });
     if (advanced && e.trees !== false && e.forestDensity && e.forestDensity !== 'normal') add('export', 'config.forestDensity', { valueKey: `exportPanel.ui.forestDensity_${e.forestDensity}` });
-    if (advanced && e.viewDistance && String(e.viewDistance) !== '4000') add('export', 'config.viewDistance', { value: `${Number(e.viewDistance) / 1000} km` });
+    if (advanced && e.viewDistance && String(e.viewDistance) !== 'auto') add('export', 'config.viewDistance', { value: `${Number(e.viewDistance) / 1000} km` });
     const structures = ['bridges', 'tunnels', 'measuredBridgeHeights'].filter((k) => e[k] !== false);
     if (advanced) add('export', 'config.structures', { valueKey: 'config.list', params: { list: structures.length ? structures.map((k) => `config.c_${k}`) : ['config.nothing'] } });
     if (e.terrainEdits) {

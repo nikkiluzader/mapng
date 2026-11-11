@@ -560,7 +560,8 @@
       "backdropImagerySlow": "{n} teselas de imagen: la descarga puede tardar en un área grande.",
       "backdropImageryLimitedWeb": "Demasiado grande para una pestaña del navegador con esta calidad: reducida a unos {mpp} m por píxel. La app de escritorio tiene más margen.",
       "backdropImageryLimitedDesktop": "Demasiado grande para componer con esta calidad: reducida a unos {mpp} m por píxel.",
-      "viewDistanceHint": "Hasta dónde dibuja el juego el nivel. Una distancia menor aligera los niveles grandes o densos. Por defecto: 4 km."
+      "viewDistanceHint": "Hasta dónde dibuja el juego el nivel. Auto sigue el tamaño del mapa (de 4 a 16 km). Una distancia menor es más ligera en un PC modesto.",
+      "viewDistanceAuto": "Auto ({km} km)"
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",

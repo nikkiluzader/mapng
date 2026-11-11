@@ -281,17 +281,20 @@ test('guide §10.9: exactly one theLevelInfo with globalEnviromentMap spelling',
 });
 
 // The export panel's View distance (services/viewDistance.js) is the LevelInfo's
-// visibleDistance: 4 km unless another of the four distances is chosen.
-test('view distance: LevelInfo visibleDistance follows the option, 4000 by default', async () => {
+// visibleDistance: it follows the map (this small one: 4 km) unless a distance is chosen.
+test('view distance: LevelInfo visibleDistance follows the map, or the chosen distance', async () => {
   const levelInfoOf = async (zip) => parseNDJSON(await readText(zip, 'main/MissionGroup/sky_and_sun/items.level.json')).find((o) => o.class === 'LevelInfo');
-  await withZip(async (zip) => { const li = await levelInfoOf(zip); assert.equal(li.visibleDistance, 4000); assert.equal(li.fogDensity, 0.0001); });
+  // (no choice: the distance that follows this map, with the light haze)
+  let auto = null;
+  await withZip(async (zip) => { const li = await levelInfoOf(zip); auto = li.visibleDistance; assert.ok([4000, 8000, 12000, 16000].includes(auto), String(auto)); assert.equal(li.fogDensity, 0.0001); });
   const restore = installCanvasPolyfill();
   try {
     const short = await levelInfoOf(await exportZip({ viewDistance: 2000 }));
     assert.equal(short.visibleDistance, 2000);
     assert.equal(short.fogDensity, 0.0003);       // (thicker fog hides the nearer far edge)
     assert.equal((await levelInfoOf(await exportZip({ viewDistance: 16000 }))).visibleDistance, 16000);
-    assert.equal((await levelInfoOf(await exportZip({ viewDistance: 12345 }))).visibleDistance, 4000);
+    assert.equal((await levelInfoOf(await exportZip({ viewDistance: 12345 }))).visibleDistance, auto);   // (not a choice: auto)
+    assert.equal((await levelInfoOf(await exportZip({ viewDistance: 4000 }))).visibleDistance, 4000);
   } finally { restore(); }
 });
 

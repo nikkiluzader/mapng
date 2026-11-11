@@ -560,7 +560,8 @@
       "backdropImagerySlow": "{n} Bildkacheln: Bei großen Gebieten kann der Download dauern.",
       "backdropImageryLimitedWeb": "In dieser Qualität zu groß für einen Browser-Tab: auf etwa {mpp} m pro Pixel reduziert. Die Desktop-App hat mehr Platz.",
       "backdropImageryLimitedDesktop": "In dieser Qualität zu groß zum Zusammensetzen: auf etwa {mpp} m pro Pixel reduziert.",
-      "viewDistanceHint": "Wie weit das Spiel das Level zeichnet. Eine kürzere Distanz entlastet bei großen oder dichten Levels. Standard: 4 km."
+      "viewDistanceHint": "Wie weit das Spiel das Level zeichnet. Auto richtet sich nach der Kartengröße (4 bis 16 km). Eine kürzere Distanz entlastet schwächere PCs.",
+      "viewDistanceAuto": "Auto ({km} km)"
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",

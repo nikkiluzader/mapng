@@ -560,7 +560,8 @@
       "backdropImagerySlow": "{n} tuiles d'image : le téléchargement peut être long sur une grande zone.",
       "backdropImageryLimitedWeb": "Trop grand pour un onglet de navigateur à cette qualité : ramené à environ {mpp} m par pixel. L'application de bureau a plus de marge.",
       "backdropImageryLimitedDesktop": "Trop grand à assembler à cette qualité : ramené à environ {mpp} m par pixel.",
-      "viewDistanceHint": "Jusqu'où le jeu affiche le niveau. Une distance plus courte allège les niveaux grands ou denses. Par défaut : 4 km."
+      "viewDistanceHint": "Jusqu'où le jeu affiche le niveau. Auto suit la taille de la carte (4 à 16 km). Une distance plus courte allège la charge sur un PC modeste.",
+      "viewDistanceAuto": "Auto ({km} km)"
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",

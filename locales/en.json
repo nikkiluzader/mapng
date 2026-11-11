@@ -565,7 +565,8 @@
       "backdropImagerySlow": "{n} image tiles: the download can take a while on a large area.",
       "backdropImageryLimitedWeb": "Too large for a browser tab at this quality: stepped down to about {mpp} m per pixel. The desktop app has more room.",
       "backdropImageryLimitedDesktop": "Too large to stitch at this quality: stepped down to about {mpp} m per pixel.",
-      "viewDistanceHint": "How far the game draws the level. A shorter distance is lighter on big or dense levels. 4 km is the default."
+      "viewDistanceHint": "How far the game draws the level. Auto follows the map's size (4 to 16 km). A shorter distance is lighter on a weaker PC.",
+      "viewDistanceAuto": "Auto ({km} km)"
     },
     "weight": {
       "title": "How heavy is this level?",

@@ -560,7 +560,8 @@
       "backdropImagerySlow": "{n} kafli obrazu: na dużym obszarze pobieranie może potrwać.",
       "backdropImageryLimitedWeb": "Za duże dla karty przeglądarki w tej jakości: zmniejszono do ok. {mpp} m na piksel. Aplikacja na komputer ma więcej miejsca.",
       "backdropImageryLimitedDesktop": "Za duże do złożenia w tej jakości: zmniejszono do ok. {mpp} m na piksel.",
-      "viewDistanceHint": "Jak daleko gra rysuje poziom. Mniejszy zasięg odciąża duże lub gęste poziomy. Domyślnie: 4 km."
+      "viewDistanceHint": "Jak daleko gra rysuje poziom. Auto dopasowuje się do rozmiaru mapy (od 4 do 16 km). Mniejszy zasięg odciąża słabszy komputer.",
+      "viewDistanceAuto": "Auto ({km} km)"
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",

@@ -7,7 +7,7 @@ import { setBaseTexture } from '../composables/useBaseTexture.js';
 import { reloadTerrainSettings } from '../composables/useTerrainMode.js';
 import { reloadContentSettings } from '../composables/useBuildContent.js';
 import { sanitizeContentOff, sanitizeExcludeTags } from './buildContent.js';
-import { viewDistanceMeters } from './viewDistance.js';
+import { viewDistanceChoice } from './viewDistance.js';
 
 export const PENDING_LEVEL_NAME_KEY = 'mapng_pendingLevelName';
 
@@ -31,7 +31,7 @@ export function exportSettingsFor(options = {}) {
     mapng_beamNGIncludeWater: on(options.includeWater),
     mapng_beamNGIncludeTrees: on(options.includeTrees),
     mapng_beamNGForestDensity: ['light', 'normal', 'dense', 'veryDense'].includes(options.forestDensity) ? options.forestDensity : 'normal',
-    mapng_beamNGViewDistance: String(viewDistanceMeters(options.viewDistance)),
+    mapng_beamNGViewDistance: String(viewDistanceChoice(options.viewDistance)),
     mapng_beamNGIncludeRocks: on(options.includeRocks),
     mapng_beamNGSafeCaps: on(options.safeCaps),
     mapng_beamNGIncludeBridges: on(options.includeBridges),
