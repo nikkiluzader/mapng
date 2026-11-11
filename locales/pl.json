@@ -561,7 +561,9 @@
       "backdropImageryLimitedWeb": "Za duże dla karty przeglądarki w tej jakości: zmniejszono do ok. {mpp} m na piksel. Aplikacja na komputer ma więcej miejsca.",
       "backdropImageryLimitedDesktop": "Za duże do złożenia w tej jakości: zmniejszono do ok. {mpp} m na piksel.",
       "viewDistanceHint": "Jak daleko gra rysuje poziom. Auto dopasowuje się do rozmiaru mapy (od 4 do 16 km). Mniejszy zasięg odciąża słabszy komputer.",
-      "viewDistanceAuto": "Auto ({km} km)"
+      "viewDistanceAuto": "Auto ({km} km)",
+      "assumeParking": "Zakładaj parkowanie przy ulicy",
+      "assumeParkingHint": "Włączone: ulice miejskie bez tagów parkowania dostają pas postojowy z każdej strony (ok. 2,3 m), jak wiele prawdziwych ulic. Wyłączone: tylko zmapowane parkowanie; te ulice wychodzą węższe."
     },
     "weight": {
       "title": "Jak ciężki jest ten poziom?",
@@ -1344,7 +1346,8 @@
     "contentOff": "Wyłączone",
     "excludeTags": "Pominięte tagi OSM",
     "basicPreset": "Co budować",
-    "viewDistance": "Zasięg widzenia"
+    "viewDistance": "Zasięg widzenia",
+    "assumeParking": "Zakładaj parkowanie przy ulicy"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
@@ -1536,7 +1539,8 @@
     "forest_light": "Rzadki",
     "forest_dense": "Gęsty",
     "forest_veryDense": "Bardzo gęsty",
-    "viewDistance": "Zasięg widzenia"
+    "viewDistance": "Zasięg widzenia",
+    "assumeParking": "Zakładaj parkowanie przy ulicy"
   },
   "spawnPoints": {
     "title": "Punkty startu i Quicktravel",
@@ -1740,6 +1744,7 @@
     "item_serviceRoads": "Drogi serwisowe",
     "detail_serviceRoads": "dojazdy, zaułki, alejki parkingowe",
     "item_tracks": "Drogi gruntowe",
-    "detail_tracks": "polne i leśne"
+    "detail_tracks": "polne i leśne",
+    "noAssumedParking": "bez zakładanego parkowania"
   }
 }

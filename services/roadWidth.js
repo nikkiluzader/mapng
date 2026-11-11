@@ -256,6 +256,27 @@ export function parseShoulderSideMeters(tags = {}, side) {
 }
 
 /**
+ * The features with no parking assumed: a street of the classes that get a
+ * default kerbside lane, with no parking tags of its own, is given
+ * parking:both=no, so every later step (widths, parked cars, paint) takes it
+ * as mapped that way. Fine-tuning's "Assume street parking" off; the export
+ * applies it to its own copy of the data. Tagged parking is left alone.
+ * Returns { features, changed }.
+ */
+export function withoutAssumedParking(features) {
+  if (!Array.isArray(features)) return { features, changed: 0 };
+  let changed = 0;
+  const out = features.map((f) => {
+    const t = f?.tags;
+    if (f?.type !== 'road' || !t || !PARKING_CLASSES.has(t.highway)) return f;
+    if (parseParkingSideMeters(t, 'left') !== null && parseParkingSideMeters(t, 'right') !== null) return f;
+    changed++;
+    return { ...f, tags: { ...t, 'parking:both': 'no', 'mapng:parking': 'not_assumed' } };
+  });
+  return changed ? { features: out, changed } : { features, changed: 0 };
+}
+
+/**
  * The parking on one side of a road ('left' | 'right' of its node order),
  * by the same rules as its cross-section: { orientation } when cars park in
  * that side's extra width (tagged, or the urban default lane), else null

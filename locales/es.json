@@ -561,7 +561,9 @@
       "backdropImageryLimitedWeb": "Demasiado grande para una pestaña del navegador con esta calidad: reducida a unos {mpp} m por píxel. La app de escritorio tiene más margen.",
       "backdropImageryLimitedDesktop": "Demasiado grande para componer con esta calidad: reducida a unos {mpp} m por píxel.",
       "viewDistanceHint": "Hasta dónde dibuja el juego el nivel. Auto sigue el tamaño del mapa (de 4 a 16 km). Una distancia menor es más ligera en un PC modesto.",
-      "viewDistanceAuto": "Auto ({km} km)"
+      "viewDistanceAuto": "Auto ({km} km)",
+      "assumeParking": "Suponer aparcamiento en la calle",
+      "assumeParkingHint": "Activado: las calles urbanas sin etiquetas de aparcamiento reciben un carril de aparcamiento a cada lado (unos 2,3 m), como muchas calles reales. Desactivado: solo el aparcamiento cartografiado; esas calles salen más estrechas."
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",
@@ -1344,7 +1346,8 @@
     "contentOff": "Desactivado",
     "excludeTags": "Etiquetas OSM excluidas",
     "basicPreset": "Qué crear",
-    "viewDistance": "Distancia de visión"
+    "viewDistance": "Distancia de visión",
+    "assumeParking": "Suponer aparcamiento en la calle"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",
@@ -1536,7 +1539,8 @@
     "forest_light": "Baja",
     "forest_dense": "Densa",
     "forest_veryDense": "Muy densa",
-    "viewDistance": "Distancia de visión"
+    "viewDistance": "Distancia de visión",
+    "assumeParking": "Suponer aparcamiento en la calle"
   },
   "spawnPoints": {
     "title": "Puntos de inicio y Quicktravel",
@@ -1740,6 +1744,7 @@
     "item_serviceRoads": "Vías de servicio",
     "detail_serviceRoads": "accesos, callejones, pasillos de aparcamiento",
     "item_tracks": "Pistas",
-    "detail_tracks": "caminos agrícolas y forestales"
+    "detail_tracks": "caminos agrícolas y forestales",
+    "noAssumedParking": "sin aparcamiento supuesto"
   }
 }

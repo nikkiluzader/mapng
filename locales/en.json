@@ -566,7 +566,9 @@
       "backdropImageryLimitedWeb": "Too large for a browser tab at this quality: stepped down to about {mpp} m per pixel. The desktop app has more room.",
       "backdropImageryLimitedDesktop": "Too large to stitch at this quality: stepped down to about {mpp} m per pixel.",
       "viewDistanceHint": "How far the game draws the level. Auto follows the map's size (4 to 16 km). A shorter distance is lighter on a weaker PC.",
-      "viewDistanceAuto": "Auto ({km} km)"
+      "viewDistanceAuto": "Auto ({km} km)",
+      "assumeParking": "Assume street parking",
+      "assumeParkingHint": "On: town streets with no parking tags get a parking lane each side (about 2.3 m), as many real streets have. Off: only mapped parking, so those streets come out narrower."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -1349,7 +1351,8 @@
     "contentOff": "Switched off",
     "excludeTags": "OSM tags left out",
     "basicPreset": "What to build",
-    "viewDistance": "View distance"
+    "viewDistance": "View distance",
+    "assumeParking": "Assume street parking"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1541,7 +1544,8 @@
     "forest_light": "Light",
     "forest_dense": "Dense",
     "forest_veryDense": "Very dense",
-    "viewDistance": "View distance"
+    "viewDistance": "View distance",
+    "assumeParking": "Assume street parking"
   },
   "spawnPoints": {
     "title": "Spawn & quicktravel points",
@@ -1745,6 +1749,7 @@
     "item_serviceRoads": "Service roads",
     "detail_serviceRoads": "driveways, alleys, car park aisles",
     "item_tracks": "Tracks",
-    "detail_tracks": "farm and forest tracks"
+    "detail_tracks": "farm and forest tracks",
+    "noAssumedParking": "no assumed parking"
   }
 }

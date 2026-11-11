@@ -561,7 +561,9 @@
       "backdropImageryLimitedWeb": "Troppo grande per una scheda del browser a questa qualità: ridotta a circa {mpp} m per pixel. L'app desktop ha più margine.",
       "backdropImageryLimitedDesktop": "Troppo grande da comporre a questa qualità: ridotta a circa {mpp} m per pixel.",
       "viewDistanceHint": "Fin dove il gioco disegna il livello. Auto segue le dimensioni della mappa (da 4 a 16 km). Una distanza minore è più leggera su un PC meno potente.",
-      "viewDistanceAuto": "Auto ({km} km)"
+      "viewDistanceAuto": "Auto ({km} km)",
+      "assumeParking": "Presumi parcheggio su strada",
+      "assumeParkingHint": "Attivo: le strade urbane senza tag di parcheggio ricevono una corsia di sosta per lato (circa 2,3 m), come molte strade reali. Disattivo: solo la sosta mappata; quelle strade risultano più strette."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -1344,7 +1346,8 @@
     "contentOff": "Disattivato",
     "excludeTags": "Tag OSM esclusi",
     "basicPreset": "Cosa costruire",
-    "viewDistance": "Distanza visiva"
+    "viewDistance": "Distanza visiva",
+    "assumeParking": "Presumi parcheggio su strada"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
@@ -1536,7 +1539,8 @@
     "forest_light": "Bassa",
     "forest_dense": "Fitta",
     "forest_veryDense": "Molto fitta",
-    "viewDistance": "Distanza visiva"
+    "viewDistance": "Distanza visiva",
+    "assumeParking": "Presumi parcheggio su strada"
   },
   "spawnPoints": {
     "title": "Punti di partenza e Quicktravel",
@@ -1740,6 +1744,7 @@
     "item_serviceRoads": "Strade di servizio",
     "detail_serviceRoads": "accessi, vicoli, corsie dei parcheggi",
     "item_tracks": "Sterrate",
-    "detail_tracks": "strade agricole e forestali"
+    "detail_tracks": "strade agricole e forestali",
+    "noAssumedParking": "nessuna sosta presunta"
   }
 }

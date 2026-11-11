@@ -107,6 +107,16 @@
         </div>
         <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.forestDensityHint_${forestDensity}`) }}</p>
       </section>
+      <section class="space-y-1.5 pt-1" :class="roadsBuilt ? '' : 'opacity-50'">
+        <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.group_roads') }}</h4>
+        <div class="flex items-start gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('exportPanel.ui.assumeParking') }}</div>
+            <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ roadsBuilt ? t('exportPanel.ui.assumeParkingHint') : t('build.offInFeatures', { what: t('build.item_roadSurfaces') }) }}</p>
+          </div>
+          <Switch :on="assumeParking && roadsBuilt" :label="t('exportPanel.ui.assumeParking')" :disabled="!roadsBuilt || !hasOsmData" @toggle="$emit('update:assumeParking', !assumeParking)" />
+        </div>
+      </section>
       <section class="space-y-1.5 pt-1" :class="bridgesBuilt ? '' : 'opacity-50'">
         <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.group_structures') }}</h4>
         <div class="flex items-start gap-2">
@@ -154,8 +164,9 @@ const props = defineProps({
   forestDensity: { type: String, default: 'normal' },
   lidarDecks: { type: Boolean, default: true },
   safeCaps: { type: Boolean, default: true },
+  assumeParking: { type: Boolean, default: true },
 });
-defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps']);
+defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking']);
 const { t, te } = useI18n();
 const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)
@@ -205,6 +216,7 @@ const toggleGroup = (g) => { const on = g.onCount === 0; for (const it of g.item
 
 const treesBuilt = computed(() => isBuilt(true, 'trees'));
 const bridgesBuilt = computed(() => isBuilt(true, 'bridges'));
+const roadsBuilt = computed(() => isBuilt(true, 'roadSurfaces'));
 const footer = computed(() => {
   const all = groups.value.flatMap((g) => g.items);
   const on = all.filter((i) => i.on).length;
@@ -212,6 +224,7 @@ const footer = computed(() => {
     t(`exportPanel.ui.forestDensity_${props.forestDensity}`).toLowerCase() + ' ' + t('build.forest'),
     props.lidarDecks ? t('build.measuredDecks') : null,
     props.safeCaps ? t('build.capped') : t('build.noCaps'),
+    props.assumeParking ? null : t('build.noAssumedParking'),
   ].filter(Boolean).join(' · ');
   return contentTab.value === 'features'
     ? t('build.footerFeatures', { on, of: all.length, tuned })

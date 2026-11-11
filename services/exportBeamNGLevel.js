@@ -122,18 +122,7 @@ import { prepareRailEdges, unjoinedRailCrossings, markUnjoinedCrossing, buildTra
 // footways and other paths: a level crossing of one is a foot crossing
 const PATH_HIGHWAYS = new Set(['footway', 'cycleway', 'path', 'pedestrian', 'steps', 'bridleway']);
 import { POLE_SHAPE, POLE_SHAPE_HEIGHT_M, beamRotation } from './sportsLights.js';
-import {
-  buildCurbedStreetClassifier, buildUrbanRoadClassifier,
-  estimateRoadCrossSection,
-  estimateRoadHalfWidth,
-  getDefaultLaneCount,
-  getDefaultLaneWidthMeters,
-  isOneWayRoad,
-  NON_DRIVEABLE_HIGHWAYS,
-  racewayKind,
-  streetParkingSide,
-  markShortSpans,
-} from './roadWidth.js';
+import { buildCurbedStreetClassifier, buildUrbanRoadClassifier, estimateRoadCrossSection, estimateRoadHalfWidth, getDefaultLaneCount, getDefaultLaneWidthMeters, isOneWayRoad, NON_DRIVEABLE_HIGHWAYS, racewayKind, streetParkingSide, markShortSpans, withoutAssumedParking } from './roadWidth.js';
 import {
   getBeamNGBiomeById,
   getGlobalEnvironmentMap,
@@ -8034,6 +8023,7 @@ function buildBeamNGExportReport({
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
     `- Forest density: ${options?.forestDensity || 'normal'} (×${forestDensityMultiplier(options?.forestDensity)} the base tree rates; woods ~${Math.round(36 * forestDensityMultiplier(options?.forestDensity))} trees/ha)`,
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
+    `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking !== false)}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
     `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}`,
     ...(() => {
@@ -12222,6 +12212,15 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} What to build: ${contentChoice.contentOff.length} feature(s) off; ${contentFilter.removed} OSM features left out (${Object.entries(contentFilter.byTag).slice(0, 8).map(([k, n]) => `${k} ${n}`).join(', ')}).`);
   }
   const built = (id) => contentOn(options, id);
+  // (Fine-tuning, "Assume street parking" off: town streets with no parking
+  // tags are built without the default parking lane a side: roadWidth.js)
+  if (options.assumeParking === false) {
+    const np = withoutAssumedParking(terrainData?.osmFeatures);
+    if (np.changed) {
+      terrainData = { ...terrainData, osmFeatures: np.features };
+      console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Street parking not assumed: ${np.changed} street(s) built at their driving width.`);
+    }
+  }
   // (footbridges switched off: gone with their stretch of path)
   {
     const fb = filterFootBridges(terrainData?.osmFeatures, options);

@@ -109,6 +109,7 @@
             v-model:forest-density="beamNGForestDensity"
             v-model:lidar-decks="beamNGLidarDecks"
             v-model:safe-caps="beamNGSafeCaps"
+            v-model:assume-parking="beamNGAssumeParking"
           />
 
           <!-- Terrain: chosen once, in the elevation section (TerrainChoice); here only what this level gets -->
@@ -834,6 +835,8 @@ const autoViewDistanceKm = computed(() => autoViewDistance((Number(props.terrain
 const beamNGIncludeRocks = legacyOn.rocks;
 // content caps (buildings, fences, lamps, trees ...): off builds everything the map has
 const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
+// (Fine-tuning: a parking lane a side on town streets with no parking tags; services/roadWidth.js)
+const beamNGAssumeParking = ref(storedOn('mapng_beamNGAssumeParking'));
 // Migrate legacy boolean mesh road setting if it exists
 // DecalRoads are the only road system; earlier choices (Road Architect, Mesh
 // Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
@@ -1118,7 +1121,7 @@ const exportInputs = computed(() => JSON.stringify({
   baseTexture: beamNGBaseTexture.value, pbr: beamNGPbrSource.value, roads: beamNGRoadType.value,
   backdrop: beamNGBackdropSource.value, gpxz: beamNGBackdropSource.value === 'gpxz' ? String(props.gpxzApiKey || '').length : 0,
   buildings: beamNGIncludeBuildings.value, water: beamNGIncludeWater.value, trees: beamNGIncludeTrees.value,
-  forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value,
+  forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value, parking: beamNGAssumeParking.value,
   view: beamNGViewDistance.value,
   bridges: beamNGIncludeBridges.value, tunnels: beamNGIncludeTunnels.value, lidar: beamNGLidarDecks.value,
   sea: beamNGSeaLevelOffset.value,
@@ -1250,6 +1253,7 @@ watch(beamNGSeaLevelOffset, (v) => {
 watch(beamNGForestDensity, (v) => localStorage.setItem('mapng_beamNGForestDensity', v));
 watch(beamNGViewDistance, (v) => localStorage.setItem('mapng_beamNGViewDistance', String(viewDistanceChoice(v))));
 watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String(v)));
+watch(beamNGAssumeParking, (v) => localStorage.setItem('mapng_beamNGAssumeParking', String(v)));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
 watch(
@@ -2088,6 +2092,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       viewDistance: advanced ? viewDistanceChoice(beamNGViewDistance.value) : AUTO_VIEW_DISTANCE,
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
+      assumeParking: !advanced || beamNGAssumeParking.value,
       ...structureOptions,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
@@ -2114,6 +2119,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       viewDistance: advanced ? viewDistanceChoice(beamNGViewDistance.value) : AUTO_VIEW_DISTANCE,
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
+      assumeParking: !advanced || beamNGAssumeParking.value,
       ...structureOptions,
       roadType: effectiveRoadType,
       levelName: beamNGLevelName.value.trim(),

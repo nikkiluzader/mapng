@@ -38,6 +38,8 @@ export function summarizeExportSettings(opts = {}, ctx = {}) {
     row('bridges', { t: opts.includeBridges === false ? 'off' : (opts.lidarDecks ? 'bridgesLidar' : 'on') }, opts.includeBridges === false),
     toggle('tunnels', opts.includeTunnels !== false),
     toggle('safeCaps', !!opts.safeCaps),
+    // (only when switched off: town streets without the assumed parking lanes)
+    ...(opts.assumeParking === false ? [toggle('assumeParking', false)] : []),
   ];
 
   const objects = [

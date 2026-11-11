@@ -230,7 +230,7 @@ async function toggleHistory(level) {
 }
 // (setting names as the export panel says them, where it has them)
 const SETTING_WORDS = {
-  forestDensity: 'exportPanel.ui.forestDensity', viewDistance: 'exportPanel.viewDistance', includeTrees: 'exportPanel.treesBushes', includeBackdrop: 'exportPanel.includeBackdrop',
+  forestDensity: 'exportPanel.ui.forestDensity', viewDistance: 'exportPanel.viewDistance', assumeParking: 'exportPanel.ui.assumeParking', includeTrees: 'exportPanel.treesBushes', includeBackdrop: 'exportPanel.includeBackdrop',
   backdropElevationSource: 'exportPanel.includeBackdrop', baseTexture: 'exportPanel.baseTexture', levelName: 'exportPanel.levelName',
   includeBuildings: 'exportPanel.ui.buildings', includeWater: 'exportPanel.water', includeRocks: 'exportPanel.rocks',
   includeBridges: 'exportPanel.includeBridges', includeTunnels: 'exportPanel.includeTunnels', seaLevelOffset: 'exportPanel.seaLevelOffset',

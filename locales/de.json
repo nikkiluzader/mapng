@@ -561,7 +561,9 @@
       "backdropImageryLimitedWeb": "In dieser Qualität zu groß für einen Browser-Tab: auf etwa {mpp} m pro Pixel reduziert. Die Desktop-App hat mehr Platz.",
       "backdropImageryLimitedDesktop": "In dieser Qualität zu groß zum Zusammensetzen: auf etwa {mpp} m pro Pixel reduziert.",
       "viewDistanceHint": "Wie weit das Spiel das Level zeichnet. Auto richtet sich nach der Kartengröße (4 bis 16 km). Eine kürzere Distanz entlastet schwächere PCs.",
-      "viewDistanceAuto": "Auto ({km} km)"
+      "viewDistanceAuto": "Auto ({km} km)",
+      "assumeParking": "Straßenparken annehmen",
+      "assumeParkingHint": "Ein: Ortsstraßen ohne Park-Tags erhalten je Seite einen Parkstreifen (ca. 2,3 m), wie viele echte Straßen. Aus: nur kartiertes Parken, diese Straßen werden schmaler."
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",
@@ -1344,7 +1346,8 @@
     "contentOff": "Ausgeschaltet",
     "excludeTags": "Ausgelassene OSM-Tags",
     "basicPreset": "Was gebaut wird",
-    "viewDistance": "Sichtweite"
+    "viewDistance": "Sichtweite",
+    "assumeParking": "Straßenparken annehmen"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",
@@ -1536,7 +1539,8 @@
     "forest_light": "Licht",
     "forest_dense": "Dicht",
     "forest_veryDense": "Sehr dicht",
-    "viewDistance": "Sichtweite"
+    "viewDistance": "Sichtweite",
+    "assumeParking": "Straßenparken annehmen"
   },
   "spawnPoints": {
     "title": "Start- & Quicktravel-Punkte",
@@ -1740,6 +1744,7 @@
     "item_serviceRoads": "Erschließungswege",
     "detail_serviceRoads": "Zufahrten, Gassen, Parkplatzwege",
     "item_tracks": "Wirtschaftswege",
-    "detail_tracks": "Feld- und Waldwege"
+    "detail_tracks": "Feld- und Waldwege",
+    "noAssumedParking": "kein angenommenes Parken"
   }
 }

@@ -561,7 +561,9 @@
       "backdropImageryLimitedWeb": "Trop grand pour un onglet de navigateur à cette qualité : ramené à environ {mpp} m par pixel. L'application de bureau a plus de marge.",
       "backdropImageryLimitedDesktop": "Trop grand à assembler à cette qualité : ramené à environ {mpp} m par pixel.",
       "viewDistanceHint": "Jusqu'où le jeu affiche le niveau. Auto suit la taille de la carte (4 à 16 km). Une distance plus courte allège la charge sur un PC modeste.",
-      "viewDistanceAuto": "Auto ({km} km)"
+      "viewDistanceAuto": "Auto ({km} km)",
+      "assumeParking": "Supposer du stationnement sur rue",
+      "assumeParkingHint": "Activé : les rues de ville sans balises de stationnement reçoivent une bande de stationnement de chaque côté (environ 2,3 m), comme beaucoup de rues réelles. Désactivé : seul le stationnement cartographié ; ces rues sont plus étroites."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -1344,7 +1346,8 @@
     "contentOff": "Désactivé",
     "excludeTags": "Tags OSM exclus",
     "basicPreset": "Que construire",
-    "viewDistance": "Distance d'affichage"
+    "viewDistance": "Distance d'affichage",
+    "assumeParking": "Supposer du stationnement sur rue"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
@@ -1536,7 +1539,8 @@
     "forest_light": "Faible",
     "forest_dense": "Dense",
     "forest_veryDense": "Très dense",
-    "viewDistance": "Distance d'affichage"
+    "viewDistance": "Distance d'affichage",
+    "assumeParking": "Supposer du stationnement sur rue"
   },
   "spawnPoints": {
     "title": "Points de départ et Quicktravel",
@@ -1740,6 +1744,7 @@
     "item_serviceRoads": "Voies de service",
     "detail_serviceRoads": "allées, ruelles, allées de parking",
     "item_tracks": "Chemins",
-    "detail_tracks": "chemins agricoles et forestiers"
+    "detail_tracks": "chemins agricoles et forestiers",
+    "noAssumedParking": "pas de stationnement supposé"
   }
 }
