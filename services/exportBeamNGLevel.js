@@ -7758,7 +7758,8 @@ function buildDetailedReportSections(d) {
     lines.push(`  - Portal A (${kind[t.portalKind[0]]}) at (${formatNumber(a.x, 1)}, ${formatNumber(a.y, 1)}) road ${formatNumber(a.z + minH, 2)} m; portal B (${kind[t.portalKind[1]]}) at (${formatNumber(b.x, 1)}, ${formatNumber(b.y, 1)}) road ${formatNumber(b.z + minH, 2)} m`);
     lines.push(`  - Ground over the road (before grading): ${formatNumber(minCover, 1)} to ${formatNumber(maxCover, 1)} m`);
     for (const dip of t.dips || []) lines.push(`  - Dip in the cover ${formatNumber(dip.length, 0)} m long at ${formatNumber(dip.s - t.line[t.iS].s, 0)} m in: filled up to ${formatNumber(dip.depth, 1)} m over the tube`);
-    for (const [s0, s1] of t.exposed || []) lines.push(`  - Exposed tube ${formatNumber(s1 - s0, 0)} m (thin cover where it meets a bridge; terrain opened, not filled)`);
+    for (const [s0, s1, kind] of (t.exposed || []).filter((e) => e[2] === 'air')) lines.push(`  - Standing in the open for ${formatNumber(s1 - s0, 0)} m (too little ground over it to cover: a gallery on a ledge; no cover made up, openings where the open air is beside it)`);
+    for (const [s0, s1] of (t.exposed || []).filter((e) => e[2] !== 'air')) lines.push(`  - Exposed tube ${formatNumber(s1 - s0, 0)} m (thin cover where it meets a bridge; terrain opened, not filled)`);
     if (t.windows?.length) lines.push(`  - Gallery windows: ${t.windows.length} (the cliff face close beside the bore), at ${t.windows.map((w) => `${formatNumber(w.s - t.line[t.iS].s, 0)} m (${w.side > 0 ? 'right' : 'left'}, ${formatNumber(w.face - t.W - LINING_M, 1)} m of rock)`).join(', ')}`);
     lines.push(`  - Terrain: ${t.gradedPixels ?? 0} grid points graded (cuttings, headwall backfill, cover), ${t.holes ?? 0} square(s) opened at the portals`);
     lines.push(`  - Lights: ${t.lights ?? 0}, zones: ${t.zones ?? 0}`);

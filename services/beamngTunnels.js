@@ -25,6 +25,7 @@ const MAX_FILL_M = 4;                  // cover made up with fill over the tube,
 const NOTCH_M = 60;                    // ... but a dip this short (a gully the line crosses,
 const NOTCH_FILL_M = 40;               // often just OSM a few m off a cliff face) is plugged this deep
 const MAX_SHORT_SHARE = 0.4;           // more of the tube than this short of cover: not a tunnel here
+const OPEN_RUN_BED_M = 1;             // a stretch too thinly covered to fill stands in the open as a gallery when the ground is this far over the road all along it
 export const MIN_TUBE_M = 20;          // a shorter bore is left on the ground
 const SMOOTH_SIGMA_M = 15;             // vertical curves on the profile
 const PORTAL_CURVE_SIGMA_M = 8;        // ... and on the whole road with its approaches (no V at a portal)
@@ -783,7 +784,25 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
   // (a low box under a lid a little lower than it all along is still under it: only a real gap counts)
   const shortCount = low ? dips.reduce((m, dip) => m + (dip.depth > LOW_FILL_M ? dip.to - dip.from + 1 : 0), 0) : short;
   if (shortCount / (c1 - c0 + 1) > MAX_SHORT_SHARE) return { ok: false, reason: 'mostly not under ground in the elevation data', length: L, profile: profile() };
-  if (tooDeep) return { ok: false, reason: `needs ${tooDeep.depth.toFixed(1)} m of fill over it for ${Math.round(tooDeep.length)} m`, length: L, profile: profile() };
+  // A stretch too thinly covered to fill, on a way that is a tunnel for most of
+  // its length: one OSM way often runs through bores and galleries in turn
+  // (the D 902 along Lac du Chevril: 1.3 km tagged tunnel=yes, 96 m of it a
+  // ledge with 5 m of ground over the road). Throwing the whole way out left
+  // the road drawn over the cliff. Where the road is still bedded in the
+  // ground along such a stretch, the tube stands in the open there: no cover
+  // made up, the ground in it opened, arcade openings where the open air is
+  // beside it; the rest is built as before. A road hanging in the air along
+  // the stretch (the data and the map disagree) is still left on the ground.
+  const deepDip = (dip) => dip.depth > MAX_FILL_M && (dip.length > NOTCH_M || dip.depth > NOTCH_FILL_M);
+  if (tooDeep) {
+    const bedded = (dip) => { for (let i = dip.from; i <= dip.to; i++) if (g[i] - z[i] < OPEN_RUN_BED_M) return false; return true; };
+    const deep = dips.filter(deepDip);
+    if (low || cutCover || !deep.every(bedded)) {
+      return { ok: false, reason: `needs ${tooDeep.depth.toFixed(1)} m of fill over it for ${Math.round(tooDeep.length)} m`, length: L, profile: profile() };
+    }
+    for (const dip of deep) { dip.open = true; exposed.push([st[dip.from].s, st[dip.to].s, 'air']); }
+    maxFill = dips.reduce((m, dip) => (dip.open ? m : Math.max(m, dip.depth)), 0);
+  }
 
   // The line: approach cutting (from the outside in) + the path + the other
   // approach; z on the approaches eases from the portal height back to the
@@ -923,8 +942,9 @@ function solveTunnelAs(path, { groundAt, approaches = [null, null], isFreeEnd = 
       return Math.max(need, street) + CC_HEAD_OVER_M;
     }),
     length: L, tubeLength, fill: maxFill, short,
-    dips: dips.map((dip) => ({ s: st[dip.from].s + s0, length: dip.length, depth: dip.depth })),
-    exposed: exposed.map(([a, b]) => [a + s0, b + s0]),
+    dips: dips.filter((dip) => !dip.open).map((dip) => ({ s: st[dip.from].s + s0, length: dip.length, depth: dip.depth })),
+    // ([from, to] along the line; a third entry 'air': a stretch standing in the open, not one meeting a bridge)
+    exposed: exposed.map(([a, b, kind]) => (kind ? [a + s0, b + s0, kind] : [a + s0, b + s0])),
     squareSize,
   };
   // headwall / wingwall / hole sizes follow the terrain grid: the step from
@@ -1010,7 +1030,8 @@ function findWindows(t, groundAt) {
     const open = (i) => {
       if (i < t.iS || i > t.iN) return false;
       const q = t.line[i];
-      if (inExposed(t, q.s) || (q.wl ?? t.W) !== t.W || (q.wr ?? t.W) !== t.W) return false;
+      // (not where the tube runs out onto a bridge; a stretch standing in the open is where a gallery's openings belong)
+      if (inBridgeExposed(t, q.s) || (q.wl ?? t.W) !== t.W || (q.wr ?? t.W) !== t.W) return false;
       // (and little over the roof: a gallery stands on a ledge, its roof near
       // the surface. A bore deep in the rock with a cliff face beside it has
       // windows, a few, as before: Zion-Mount Carmel's six stayed six)
@@ -1407,6 +1428,7 @@ function indexLine(line, cell = 16) {
 // in one of the tunnel's arcades (findWindows), pad m past its ends
 const arcadeAt = (t, s, pad = 0) => (t.arcades || []).find((a) => s >= a.s0 - pad && s <= a.s1 + pad);
 const inExposed = (t, s) => (t.exposed || []).some(([a, b]) => s >= a - 1e-6 && s <= b + 1e-6);
+const inBridgeExposed = (t, s) => (t.exposed || []).some(([a, b, kind]) => kind !== 'air' && s >= a - 1e-6 && s <= b + 1e-6);
 // the headwall top (over the road) at the portal nearer station s
 const headTopAt = (t, s) => (t.headTops ? (Math.abs(s - t.line[t.iS].s) <= Math.abs(t.line[t.iN].s - s) ? t.headTops[0] : t.headTops[1]) : t.headTop);
 const nearerPortalKind = (t, s) => (Math.abs(s - t.line[t.iS].s) <= Math.abs(t.line[t.iN].s - s) ? t.portalKind[0] : t.portalKind[1]);

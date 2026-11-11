@@ -634,3 +634,21 @@ test('a bore with the open air right beside it for a long way is an arcade there
   assert.equal(deep.arcades.length, 0);
   assert.ok(deep.windows.length >= 1 && deep.windows.length <= 4, `${deep.windows.length} windows`);
 });
+
+test('a tunnel way with one stretch too thinly covered to fill is built, that stretch standing in the open', () => {
+  // 600 m under 30 m of rock, but for 100 m in the middle only 4 m of ground
+  // over the road (a ledge on a cliff: the D 902 along Lac du Chevril, one
+  // tunnel=yes way through bores and galleries in turn)
+  const ledge = (over) => (x, y) => (Math.abs(y) > 300 ? 100 : Math.abs(y) < 50 ? 100 + over : 130);
+  const solve = (over) => solveTunnel({ xy: road(-300, 300), half: 4 }, { groundAt: ledge(over), approaches: [{ xy: road(-300, -500) }, { xy: road(300, 500) }] });
+  const t = solve(4);
+  assert.equal(t.ok, true, t.reason);
+  const air = (t.exposed || []).filter((e) => e[2] === 'air');
+  assert.equal(air.length, 1, JSON.stringify(t.exposed));
+  assert.ok(air[0][1] - air[0][0] > 80 && air[0][1] - air[0][0] < 130, `open for ${air[0][1] - air[0][0]} m`);
+  assert.ok(!t.dips.some((d) => d.depth > 4), 'no cover is made up over the open stretch');
+  // the road hanging in the air along the stretch (ground under it): the map and the data disagree, left on the ground as before
+  const hanging = solve(-3);
+  assert.equal(hanging.ok, false);
+  assert.match(hanging.reason, /of fill over it/);
+});
