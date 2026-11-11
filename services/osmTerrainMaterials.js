@@ -912,6 +912,19 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
   const isUrbanRoad = buildUrbanRoadClassifier(osmFeatures);
   const roads = [];
   const squares = [];
+  // Tunnel roads in the open air (terrainData.openTunnelRoads, from the
+  // export's tunnels): a tunnel way's first metres in the portal's cutting,
+  // before the bore begins, and a tunnel way left on the ground. Skipped
+  // with the tunnels, they stayed grass, and the ground cover grew through
+  // the road in every approach cutting (seen in game).
+  const open = terrainData.openTunnelRoads || {};
+  const onGroundIds = new Set(open.groundIds || []);
+  const toLayer = (v) => (v / worldSize + 0.5) * size;
+  for (const run of open.runs || []) {
+    const style = ROAD_STYLE[run.highway];
+    if (!style || !(run.pts?.length >= 2)) continue;
+    roads.push({ style, halfWidthM: Math.max(style.halfWidthM, run.halfM || 0), sidewalkM: 0, pts: run.pts.map(([x, y]) => ({ px: toLayer(x), py: toLayer(y) })) });
+  }
   for (const feature of osmFeatures) {
     if (feature.type !== 'road' || !feature.geometry?.length) continue;
     const tags = feature.tags || {};
@@ -926,8 +939,9 @@ function paintRoadFootprints(layerMap, terrainData, worldSize) {
     }
     // Bridges and tunnels are not on the ground: no asphalt in the river
     // under a bridge or across the hill over a tunnel.
+    // (a tunnel road the export left on the ground is a road on the ground)
     const layer = getEffectiveRoadLayer(tags);
-    if (layer >= 1 || layer <= -1) continue;
+    if ((layer >= 1 || layer <= -1) && !onGroundIds.has(feature.id)) continue;
     // Asphalt covers at least the whole carriageway the export paves
     // (parking lanes / shoulders included), so the tyres feel asphalt
     // wherever the decal shows it.

@@ -1534,7 +1534,10 @@ export function tunnelGroundAt(t, x, y, h) {
     // (1.5 squares deep: a grid point in it wherever the grid runs)
     if (f.r >= D.rF - 0.5 && f.r <= D.rF + t.squareSize && Math.abs(f.a) <= w.halfLen + 1) return f.z + w.sill - 0.3;
     if (f.r > D.rF + t.squareSize && f.r <= D.rF + WINDOW_LEDGE_M && Math.abs(f.a) <= w.halfLen + 1) return Math.min(out, f.z + w.sill - 0.3);
-    if (f.r < D.rF - 0.5 && Math.abs(f.a) <= D.plateHalf) return Math.min(Math.max(out, f.z + D.plateTop - 0.2), f.z + D.plateTop);
+    // (an arcade's opening stands in the open air: no ground brought up to a
+    // plate there; a grid point raised between lining and face hung a
+    // curtain of terrain in the opening)
+    if (f.r < D.rF - 0.5 && Math.abs(f.a) <= D.plateHalf) return w.arcade ? Math.min(out, f.z + D.plateTop) : Math.min(Math.max(out, f.z + D.plateTop - 0.2), f.z + D.plateTop);
     // no cover made up in front of the plate (beside it, it hugs its sides)
     if (Math.abs(f.a) <= D.plateHalf) return out;
   }

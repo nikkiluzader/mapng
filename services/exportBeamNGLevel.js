@@ -12964,6 +12964,23 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // (and the trees keep out of them)
   exportTerrainData.parkingBayRings = parkingSpots.filter((sp) => sp.ground).map((sp) => sp.ground.corners);
 
+  // Tunnel roads in the open air, for the material painter (which leaves
+  // tunnel ways out): each bore's line outside its portals, and the tunnel
+  // ways left on the ground.
+  {
+    const tun = decalRoads.tunnels || {};
+    const runs = [];
+    for (const t of tun.tunnels || []) {
+      const highway = t.osm?.[0]?.highway || 'unclassified';
+      const halfM = Math.max(0, (t.W || 0) - 1);
+      for (const [a, b] of [[0, t.iS], [t.iN, t.line.length - 1]]) {
+        if (b - a >= 1) runs.push({ highway, halfM, pts: t.line.slice(a, b + 1).map((p) => [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10]) });
+      }
+    }
+    const groundIds = [...new Set((tun.skipped || []).flatMap((sk) => (Array.isArray(sk.osm) ? sk.osm : [sk.osm])).map((o) => o?.id).filter((id) => id != null))];
+    exportTerrainData.openTunnelRoads = { runs, groundIds };
+  }
+
   beginStep('materials', effectivePbrSource !== 'none'
     ? `Painting terrain materials from OSM land use (${size}×${size} layer map)…`
     : 'Writing the default terrain material…');
@@ -12973,7 +12990,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   const materialBays = parkingSpots.filter((sp) => sp.ground && !sp.ground.inLot).map((sp) => sp.ground);
   const materialsKey = effectivePbrSource !== 'none' && stepCode
     ? stepHash('materials', STEP_CACHE_VERSION, stepCode, terrainFingerprint(exportTerrainData), worldSize, levelName, jsonOf(biome), terrainBaseTexSize,
-      effectivePbrSource, ArrayBuffer.isView(vegetationMask) ? vegetationMask : (vegetationMask?.data || vegetationMask?.mask || jsonOf(vegetationMask ?? null)), jsonOf(materialBays))
+      effectivePbrSource, ArrayBuffer.isView(vegetationMask) ? vegetationMask : (vegetationMask?.data || vegetationMask?.mask || jsonOf(vegetationMask ?? null)), jsonOf(materialBays), jsonOf(exportTerrainData.openTunnelRoads))
     : null;
   const { value: pbrResult, reused: materialsReused } = effectivePbrSource !== 'none'
     ? await cachedStep(options.stepCache || null, materialsKey, () => buildTerrainMaterials(exportTerrainData, worldSize, levelName, biome, terrainBaseTexSize, {

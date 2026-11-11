@@ -584,6 +584,15 @@ test('a bore with the open air right beside it for a long way is an arcade there
   assert.equal(tunnelGroundAt(t, 0, 0, mid.z + 2), mid.z + 2, 'low ground over the arcade is left');
   // ground standing in the tube along the arcade opens
   assert.equal(tunnelHoleAt(t, 0, 0, mid.z + 1), true);
+  // on the open side nothing is brought up into the openings: from the lining
+  // out past the face the ground stays as low as it lies (a grid point raised
+  // to a face plate there hung a curtain of terrain in every opening; seen in game)
+  for (let y = -80; y <= 80; y += 1) {
+    const here = t.line.reduce((b, p) => (Math.abs(p.y - y) < Math.abs(b.y - y) ? p : b));
+    for (let x = t.W + 0.25; x <= t.W + 5; x += 0.25) {
+      assert.ok(tunnelGroundAt(t, x, y, 20) <= here.z + 1.2, `ground at x ${x}, y ${y} raised to ${tunnelGroundAt(t, x, y, 20).toFixed(1)} (road ${here.z.toFixed(1)})`);
+    }
+  }
   // the ridge with no lake beside it: no arcade
   assert.equal(spikeTunnel().arcades.length, 0);
   // a bore deep in the rock with a cliff face beside it: windows, a few, no arcade
