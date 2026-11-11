@@ -159,3 +159,23 @@ test('a passing lane ends where its way ends, with no side road there', async ()
     assert.equal(widthAt(2.5 * m), 7, `2 lanes after (order ${order})`);
   }
 });
+
+test('a short bridge carries no assumed parking lanes; a long one and a tagged one stay as they are', async () => {
+  const { markShortSpans } = await import('../services/roadWidth.js');
+  const m = 1 / 111320;
+  const way = (id, len, tags) => ({ id, type: 'road', tags: { highway: 'residential', ...tags }, geometry: [{ lat: 0, lng: 0 }, { lat: 0, lng: len * m }] });
+  const project = (p) => [p.lng * 111320, p.lat * 111320];
+  const out = markShortSpans([
+    way('stream', 12.5, { bridge: 'yes' }), way('canal', 28, { bridge: 'yes' }), way('street', 12.5, {}),
+    way('tagged', 9, { bridge: 'yes', 'parking:both': 'lane' }), way('wide', 9, { bridge: 'yes', width: '11' }),
+  ], project);
+  const by = Object.fromEntries(out.map((f) => [f.id, f.tags]));
+  assert.equal(by.stream['parking:both'], 'no');
+  assert.equal(by.canal['parking:both'], undefined, 'a longer bridge is as wide as its street');
+  assert.equal(by.street['parking:both'], undefined, 'not a bridge');
+  assert.equal(by.tagged['parking:both'], 'lane', 'the mapper said so');
+  assert.equal(by.wide['parking:both'], undefined, 'its width is mapped');
+  // and so it is drawn at its lanes' width in a town
+  const half = (t) => estimateRoadCrossSection(t, 'residential', false, { urban: true }).carriagewayHalfWidth;
+  assert.ok(half(by.stream) < half(by.street) - 1.5, `bridge ${2 * half(by.stream)} m, street ${2 * half(by.street)} m`);
+});

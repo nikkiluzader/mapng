@@ -131,6 +131,7 @@ import {
   NON_DRIVEABLE_HIGHWAYS,
   racewayKind,
   streetParkingSide,
+  markShortSpans,
 } from './roadWidth.js';
 import {
   getBeamNGBiomeById,
@@ -12295,6 +12296,11 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     boundedFeatures = inferCrossingSidewalks(boundedFeatures, (p) => [((p.lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - p.lat) / (b.north - b.south)) * ws]);
     const n = boundedFeatures.filter((f, i) => f !== before[i]).length;
     if (n) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Sidewalks: ${n} untagged street way(s) given sidewalks where crossings end beside them.`);
+  }
+  // (a short bridge carries no parking lanes)
+  if (boundedFeatures?.length) {
+    const b = td.bounds; const ws = td.width * computeSquareSize(td);
+    boundedFeatures = markShortSpans(boundedFeatures, (p) => [((p.lng - b.west) / (b.east - b.west) - 0.5) * ws, (0.5 - (b.north - p.lat) / (b.north - b.south)) * ws]);
   }
   if (includeBuildings && boundedFeatures?.length) {
     const b = td.bounds; const ws = td.width * computeSquareSize(td);

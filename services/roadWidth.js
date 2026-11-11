@@ -572,3 +572,29 @@ export function buildUrbanRoadClassifier(osmFeatures = []) {
     return urban;
   };
 }
+
+// A short span carries no parked cars: a village street's 8 m bridge over
+// its stream came out 10.6 m wide, the street's two assumed parking lanes
+// carried across it (tester report). A bridge way this short with no parking,
+// width or lane tags of its own gets parking:both=no (the street on either
+// side keeps its lanes; a city's canal bridges, longer, stay as wide as
+// their streets).
+const SHORT_SPAN_M = 15;
+const SPAN_OWN_TAGS = ['width', 'width:carriageway', 'mapng:carriageway_width', 'parking:both', 'parking:left', 'parking:right', 'parking:lane:both', 'parking:lane:left', 'parking:lane:right'];
+
+/**
+ * The features with parking:both=no on short bridge ways that say nothing of
+ * their own width (copies; the rest as they were). project(p) -> [x, y] in metres.
+ */
+export function markShortSpans(features, project) {
+  return (features || []).map((f) => {
+    const t = f?.tags || {};
+    if (f?.type !== 'road' || !t.bridge || t.bridge === 'no' || !PARKING_CLASSES.has(t.highway) || !(f.geometry?.length >= 2)) return f;
+    if (SPAN_OWN_TAGS.some((k) => t[k] !== undefined)) return f;
+    const xy = f.geometry.map(project);
+    let length = 0;
+    for (let i = 1; i < xy.length; i++) length += Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]);
+    if (length > SHORT_SPAN_M) return f;
+    return { ...f, tags: { ...t, 'parking:both': 'no', 'mapng:parking_source': 'short span' } };
+  });
+}
