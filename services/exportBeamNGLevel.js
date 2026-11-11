@@ -7984,6 +7984,9 @@ function buildBeamNGExportReport({
     `- Terrain texture size: ${satelliteTexSize} x ${satelliteTexSize} px`,
     `- Height range min/max: ${formatNumber(minHeight, 2)} m / ${formatNumber(maxHeight, 2)} m`,
     `- Height difference: ${formatNumber(heightDiff, 2)} m`,
+    // (the game's terrain holds heights in 16 bits: the map's relief / 65535 is the smallest step it can
+    // make. Past about 10 mm every road is a fine staircase a force-feedback wheel feels: tester report)
+    `- Terrain height step: ${formatNumber((heightDiff / 65535) * 1000, 1)} mm (the game stores terrain heights in 16 bits, so the smallest step is the map's height difference / 65,535${heightDiff / 65535 > 0.01 ? '; over about 10 mm roads feel finely rough through a steering wheel: a map with less height difference, a smaller area or one without its highest peaks, is smoother' : ''})`,
     `- Scale: ${formatNumber(squareSize, 3)} m/px`,
     `- World size: ${formatNumber(worldSize, 2)} m x ${formatNumber(worldSize, 2)} m`,
     `- Total area: ${formatNumber(totalAreaM2, 2)} m^2 (${metersToKm2(totalAreaM2)} km^2)`,
