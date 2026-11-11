@@ -102,6 +102,11 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
+      // (Cloudflare's build machines allow 1024 open files; at Rollup's default
+      // of 20 files read at once, with every plugin's own reads, the build
+      // ran out and a random import "failed to resolve" (2026-11-11, every
+      // deploy since their image changed). 8 builds as fast and holds at 512)
+      maxParallelFileOps: 8,
       output: {
         manualChunks: {
           'three': ['three'],
