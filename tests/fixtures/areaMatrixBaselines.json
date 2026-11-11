@@ -1,7 +1,7 @@
 {
  "_note": "Area baselines for scripts/sweep/runSweep.mjs: re-record with --save after a change that improves an area (commit the file with it).",
  "recorded": "2026-11-11",
- "commit": "0df0994",
+ "commit": "db875b3",
  "areas": {
   "normandy_flat@gpxz/untouched": {
    "steps": 0,
@@ -1203,7 +1203,7 @@
    "maxDeckLen": 249,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 15
   },
   "w_amsterdam@gpxz/untouched": {
    "steps": 0,
@@ -1227,7 +1227,7 @@
    "maxDeckLen": 310,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 15
   },
   "w_amsterdam@gpxz/ready": {
    "steps": 0,
@@ -1235,14 +1235,14 @@
    "steepGround": 1,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 43,
-   "spikes": 373,
+   "thruDeck": 48,
+   "spikes": 232,
    "bumps": 7,
    "cross": 71,
    "junctions": 1,
-   "creases": 80,
+   "creases": 77,
    "swFloat": 170,
-   "swBuried": 3141,
+   "swBuried": 3135,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -1253,7 +1253,7 @@
    "maxDeckLen": 163,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 16
   },
   "w_amsterdam@t30/ready": {
    "steps": 0,
@@ -1261,14 +1261,14 @@
    "steepGround": 1,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 35,
-   "spikes": 287,
+   "thruDeck": 41,
+   "spikes": 199,
    "bumps": 12,
    "cross": 62,
    "junctions": 1,
-   "creases": 67,
-   "swFloat": 15,
-   "swBuried": 2555,
+   "creases": 61,
+   "swFloat": 16,
+   "swBuried": 2551,
    "lintErrors": 0,
    "lintWarnings": 3,
    "decks": 45,
@@ -1277,7 +1277,7 @@
    "maxDeckLen": 151,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 13
   },
   "w_amsterdam@t30/untouched": {
    "steps": 0,
@@ -1325,7 +1325,7 @@
    "maxDeckLen": 396,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 15
+   "seconds": 14
   },
   "val_disere@gpxz/ready": {
    "steps": 0,
@@ -2309,14 +2309,14 @@
    "steepGround": 2,
    "shortX": 0,
    "groundGaps": 0,
-   "thruDeck": 34,
-   "spikes": 418,
+   "thruDeck": 38,
+   "spikes": 244,
    "bumps": 6,
    "cross": 72,
    "junctions": 1,
-   "creases": 77,
+   "creases": 74,
    "swFloat": 22,
-   "swBuried": 3337,
+   "swBuried": 3334,
    "snapMovedPct": 0,
    "snapP90cm": 0,
    "lintErrors": 0,
@@ -2327,7 +2327,7 @@
    "maxDeckLen": 167,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 13
+   "seconds": 15
   },
   "w_amsterdam@mh/noshape": {
    "steps": 0,
@@ -2353,7 +2353,7 @@
    "maxDeckLen": 95,
    "tunnels": 0,
    "tunnelsLeft": 0,
-   "seconds": 14
+   "seconds": 13
   },
   "w_amsterdam@mh/untouched": {
    "steps": 0,

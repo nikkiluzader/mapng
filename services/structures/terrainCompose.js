@@ -29,6 +29,8 @@ const CORE_OUTER = 0.6;         // ...where the lower road may take the upper's 
 const SIDE_WARP_M = 12;         // a side road leaves its through road's edge at that road's grade across it, level again this far on
 const SIDE_WARP_MAX = 0.2;
 const SIDE_SQUARE_M = 15;       // a side road's pieces this far past its through road's edge never reach back behind it
+const WING_FILL_M = 15;          // a road's fill this near a deck's end has walled sides, not slopes
+const ABUT_FILL_MAX_M = 1.5;     // an abutment fills at most this deep: deeper is what the bridge crosses
 const DECK_ABUT_CLEAR_M = 0.3;  // abutment fill stops this far under the deck's underside          // a deck end on fill rests on it this far: no cap there
 
 const smoothstep = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
@@ -137,6 +139,19 @@ export function composeTerrain(graph, grid) {
     return out;
   });
 
+  // how far each station on the ground is from a deck's end along its road:
+  // the fill there stands behind the bridge's wingwalls (below)
+  const toDeck = graph.edges.map((e, k) => {
+    const out = new Float64Array(e.s.length).fill(Infinity);
+    const kinds = kindOf[k];
+    const deckAt = (id) => (nodeKinds.get(id) || []).some((kk) => kk === 'deck');
+    let last = deckAt(e.from) ? 0 : -Infinity;
+    for (let i = 0; i < kinds.length; i++) { if (kinds[i] === 'deck') { last = e.s[i]; continue; } out[i] = Math.min(out[i], e.s[i] - last); }
+    let next = deckAt(e.to) ? e.s[e.s.length - 1] : Infinity;
+    for (let i = kinds.length - 1; i >= 0; i--) { if (kinds[i] === 'deck') { next = e.s[i]; continue; } out[i] = Math.min(out[i], next - e.s[i]); }
+    return out;
+  });
+
   // ends that run into a tube (a tunnel's or another builder's stretch,
   // left to it): no corridor round them, a cutting's floor carried on past
   // the portal stood the terrain inside the tube
@@ -239,6 +254,7 @@ export function composeTerrain(graph, grid) {
       const squares = (squareEnds.get(k) || []).filter((q) => q.pieces.has(i));
       // a deck's ends on fill are abutments: fill under the deck (below)
       const abutment = kind === 'deck' && Math.min(toAbutment[k][i], toAbutment[k][i + 1]) < ABUTMENT_M;
+      const wingFill = kind !== 'deck' && Math.min(toDeck[k][i], toDeck[k][i + 1]) < WING_FILL_M;
       const deck = kind === 'deck' && !abutment;
       const ax = e.x[i]; const ay = e.y[i]; const bx = e.x[i + 1]; const by = e.y[i + 1];
       const vx = bx - ax; const vy = by - ay; const L2 = vx * vx + vy * vy;
@@ -309,6 +325,16 @@ export function composeTerrain(graph, grid) {
             continue;
           }
           const h0 = raw(c, r) - minHeight;
+          // An abutment's fill is the bank the deck's end rests on. Where the
+          // ground under it lies far below (the stream itself: a short
+          // bridge is all "end", ABUTMENT_M from one or the other), nothing
+          // is filled: the channel stays open under the deck and beside it.
+          // Filled, every small bridge was a dam with a mound round it, the
+          // deck's cap cutting a jagged notch through the mound.
+          if (abutment && zc - h0 > ABUT_FILL_MAX_M) {
+            if (d <= core && uRaw >= 0 && uRaw <= 1) { const cap = zc + DECK_ABUT_CLEAR_M - DECK_CLEAR_M; if (cap < t.cap[j]) t.cap[j] = cap; }
+            continue;
+          }
           let slope = blendM;
           // How far the side slope runs is set by how far the road stands off
           // the ground at its own edge on this side, not off the ground at
@@ -328,6 +354,12 @@ export function composeTerrain(graph, grid) {
           if (kind === 'embankment' || kind === 'cutting' || off2 > 0.5) {
             slope = Math.min(SLOPE_MAX_M, Math.max(slopeMinM, off2 * (zc > hEdge ? FILL_RUN : CUT_RUN)));
           }
+          // A road's fill beside a bridge's end stands behind wingwalls: no
+          // slope spreads from it. Spread at 1 in 2, the fill of a road 4 m
+          // over a stream ran 8 m up and down the channel on each side of
+          // the deck: a mound round every small bridge, damming the stream
+          // the bridge crosses.
+          if (wingFill && zc > hEdge) slope = slopeMinM;
           const tt = d <= core ? 0 : (d - core) / slope;
           if (tt >= 1) continue;
           // ground over a built tube is the tunnel's: only a road's own
