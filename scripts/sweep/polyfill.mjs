@@ -94,6 +94,12 @@ export function installCanvasPolyfill() {
         arrayBuffer: async () => new Uint8Array([0x44, 0x44, 0x53, 0x20]).buffer,
       };
     }
+    // (the country outlines: without them every area got no country, so the
+    // Americas' yellow centre lines and right-hand rules wherever it was)
+    if (url === '/country_rules.json') {
+      const raw = readFileSync(new URL('../../public/country_rules.json', import.meta.url), 'utf8');
+      return { ok: true, status: 200, json: async () => JSON.parse(raw), text: async () => raw };
+    }
     if (url === '/beamng_shape_materials.json') {
       const raw = readFileSync(new URL('../../public/beamng_shape_materials.json', import.meta.url), 'utf8');
       return { ok: true, status: 200, json: async () => JSON.parse(raw) };

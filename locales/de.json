@@ -1749,6 +1749,24 @@
     "detail_serviceRoads": "Zufahrten, Gassen, Parkplatzwege",
     "item_tracks": "Wirtschaftswege",
     "detail_tracks": "Feld- und Waldwege",
-    "noAssumedParking": "kein angenommenes Parken"
+    "noAssumedParking": "kein angenommenes Parken",
+    "trees": {
+      "title": "Bäume für dieses Gebiet",
+      "fromRecords": "Aus {count} Baumbeobachtungen in der Umgebung (iNaturalist).",
+      "fromClimate": "Keine Baumbeobachtungen in der Umgebung: nach dem Klima gewählt.",
+      "note": "Für Wälder und Bäume, die die Karte nicht benennt. Ein Baum mit Art in der Karte behält sie.",
+      "group_deciduous": "Laubbäume",
+      "group_conifer": "Nadelbäume",
+      "group_pine_west": "Westliche Kiefern",
+      "group_oak_west": "Westliche Eichen",
+      "group_palm": "Palmen",
+      "group_juniper": "Wacholder",
+      "group_tropical": "Tropische Bäume",
+      "group_live_oak": "Immergrüne Eichen",
+      "group_oak": "Eichen",
+      "group_eucalyptus": "Eukalyptus",
+      "group_cypress": "Zypressen",
+      "group_olive": "Olivenbäume"
+    }
   }
 }

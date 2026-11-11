@@ -1754,6 +1754,24 @@
     "detail_serviceRoads": "driveways, alleys, car park aisles",
     "item_tracks": "Tracks",
     "detail_tracks": "farm and forest tracks",
-    "noAssumedParking": "no assumed parking"
+    "noAssumedParking": "no assumed parking",
+    "trees": {
+      "title": "Trees picked for this area",
+      "fromRecords": "From {count} tree records around here (iNaturalist).",
+      "fromClimate": "No tree records around here: picked from the climate.",
+      "note": "For woods and trees the map doesn't name. A tree with a species in the map keeps it.",
+      "group_deciduous": "Broadleaves",
+      "group_conifer": "Conifers",
+      "group_pine_west": "Western pines",
+      "group_oak_west": "Western oaks",
+      "group_palm": "Palms",
+      "group_juniper": "Junipers",
+      "group_tropical": "Tropical trees",
+      "group_live_oak": "Live oaks",
+      "group_oak": "Oaks",
+      "group_eucalyptus": "Eucalyptus",
+      "group_cypress": "Cypresses",
+      "group_olive": "Olives"
+    }
   }
 }

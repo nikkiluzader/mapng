@@ -1749,6 +1749,24 @@
     "detail_serviceRoads": "подъезды, переулки, проезды парковок",
     "item_tracks": "Грунтовые дороги",
     "detail_tracks": "полевые и лесные",
-    "noAssumedParking": "без предполагаемой парковки"
+    "noAssumedParking": "без предполагаемой парковки",
+    "trees": {
+      "title": "Деревья, выбранные для этой области",
+      "fromRecords": "По {count} наблюдениям деревьев поблизости (iNaturalist).",
+      "fromClimate": "Наблюдений деревьев поблизости нет: выбраны по климату.",
+      "note": "Для лесов и деревьев, которые карта не называет. Дерево с видом на карте сохраняет его.",
+      "group_deciduous": "Лиственные",
+      "group_conifer": "Хвойные",
+      "group_pine_west": "Западные сосны",
+      "group_oak_west": "Западные дубы",
+      "group_palm": "Пальмы",
+      "group_juniper": "Можжевельники",
+      "group_tropical": "Тропические деревья",
+      "group_live_oak": "Вечнозелёные дубы",
+      "group_oak": "Дубы",
+      "group_eucalyptus": "Эвкалипты",
+      "group_cypress": "Кипарисы",
+      "group_olive": "Оливы"
+    }
   }
 }

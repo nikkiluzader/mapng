@@ -1749,6 +1749,24 @@
     "detail_serviceRoads": "allées, ruelles, allées de parking",
     "item_tracks": "Chemins",
     "detail_tracks": "chemins agricoles et forestiers",
-    "noAssumedParking": "pas de stationnement supposé"
+    "noAssumedParking": "pas de stationnement supposé",
+    "trees": {
+      "title": "Arbres choisis pour cette zone",
+      "fromRecords": "D'après {count} observations d'arbres aux alentours (iNaturalist).",
+      "fromClimate": "Aucune observation d'arbres aux alentours : choisis d'après le climat.",
+      "note": "Pour les bois et les arbres que la carte ne nomme pas. Un arbre dont l'espèce figure sur la carte la garde.",
+      "group_deciduous": "Feuillus",
+      "group_conifer": "Conifères",
+      "group_pine_west": "Pins de l'Ouest",
+      "group_oak_west": "Chênes de l'Ouest",
+      "group_palm": "Palmiers",
+      "group_juniper": "Genévriers",
+      "group_tropical": "Arbres tropicaux",
+      "group_live_oak": "Chênes verts",
+      "group_oak": "Chênes",
+      "group_eucalyptus": "Eucalyptus",
+      "group_cypress": "Cyprès",
+      "group_olive": "Oliviers"
+    }
   }
 }

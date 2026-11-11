@@ -1749,6 +1749,24 @@
     "detail_serviceRoads": "accesos, callejones, pasillos de aparcamiento",
     "item_tracks": "Pistas",
     "detail_tracks": "caminos agrícolas y forestales",
-    "noAssumedParking": "sin aparcamiento supuesto"
+    "noAssumedParking": "sin aparcamiento supuesto",
+    "trees": {
+      "title": "Árboles elegidos para esta zona",
+      "fromRecords": "A partir de {count} registros de árboles en los alrededores (iNaturalist).",
+      "fromClimate": "Sin registros de árboles en los alrededores: elegidos según el clima.",
+      "note": "Para bosques y árboles que el mapa no nombra. Un árbol con especie en el mapa la conserva.",
+      "group_deciduous": "Frondosas",
+      "group_conifer": "Coníferas",
+      "group_pine_west": "Pinos del oeste",
+      "group_oak_west": "Robles del oeste",
+      "group_palm": "Palmeras",
+      "group_juniper": "Enebros",
+      "group_tropical": "Árboles tropicales",
+      "group_live_oak": "Encinas",
+      "group_oak": "Robles",
+      "group_eucalyptus": "Eucaliptos",
+      "group_cypress": "Cipreses",
+      "group_olive": "Olivos"
+    }
   }
 }

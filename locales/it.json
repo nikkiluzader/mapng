@@ -1749,6 +1749,24 @@
     "detail_serviceRoads": "accessi, vicoli, corsie dei parcheggi",
     "item_tracks": "Sterrate",
     "detail_tracks": "strade agricole e forestali",
-    "noAssumedParking": "nessuna sosta presunta"
+    "noAssumedParking": "nessuna sosta presunta",
+    "trees": {
+      "title": "Alberi scelti per quest'area",
+      "fromRecords": "Da {count} osservazioni di alberi nei dintorni (iNaturalist).",
+      "fromClimate": "Nessuna osservazione di alberi nei dintorni: scelti in base al clima.",
+      "note": "Per i boschi e gli alberi che la mappa non nomina. Un albero con la specie nella mappa la mantiene.",
+      "group_deciduous": "Latifoglie",
+      "group_conifer": "Conifere",
+      "group_pine_west": "Pini dell'Ovest",
+      "group_oak_west": "Querce dell'Ovest",
+      "group_palm": "Palme",
+      "group_juniper": "Ginepri",
+      "group_tropical": "Alberi tropicali",
+      "group_live_oak": "Lecci",
+      "group_oak": "Querce",
+      "group_eucalyptus": "Eucalipti",
+      "group_cypress": "Cipressi",
+      "group_olive": "Ulivi"
+    }
   }
 }

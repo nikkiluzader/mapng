@@ -106,6 +106,23 @@
           >{{ t(`exportPanel.ui.forestDensity_${k}`) }}</button>
         </div>
         <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">{{ t(`exportPanel.ui.forestDensityHint_${forestDensity}`) }}</p>
+        <!-- Which trees this area gets (services/treeTable.js): shown, not yet chosen -->
+        <div v-if="trees && trees.rows.length" class="space-y-1 pt-1" data-testid="tree-table">
+          <div class="text-xs font-medium text-gray-800 dark:text-gray-100">{{ t('build.trees.title') }}</div>
+          <p class="text-caption leading-snug text-gray-500 dark:text-gray-400">
+            {{ trees.source === 'records' ? t('build.trees.fromRecords', { count: trees.records }) : t('build.trees.fromClimate') }}
+          </p>
+          <ul class="rounded border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
+            <li v-for="row in trees.rows" :key="row.group" class="px-2 py-1">
+              <div class="flex items-baseline justify-between gap-2 text-caption">
+                <span class="font-medium text-gray-800 dark:text-gray-100">{{ treeGroupName(row.group) }}</span>
+                <span class="tabular-nums text-gray-600 dark:text-gray-300">{{ treeShare(row.share) }}</span>
+              </div>
+              <div class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ row.models.map((m) => treeModelLabel(m.type)).join(', ') }}</div>
+            </li>
+          </ul>
+          <p class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.note') }}</p>
+        </div>
       </section>
       <section class="space-y-1.5 pt-1" :class="roadsBuilt ? '' : 'opacity-50'">
         <h4 class="text-micro font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ t('build.group_roads') }}</h4>
@@ -144,7 +161,8 @@
 </template>
 
 <script setup>
-import { computed, reactive, defineComponent, h } from 'vue';
+import { computed, reactive, defineComponent, h, toRaw } from 'vue';
+import { treeTable, treeModelLabel, sampleElevations } from '../../services/treeTable.js';
 import { useI18n } from 'vue-i18n';
 import { ChevronRight } from 'lucide-vue-next';
 import SettingCard from '../base/SettingCard.vue';
@@ -172,6 +190,19 @@ const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)
 const detailOf = (id) => { const k = `build.detail_${id}`; return te(k) || te(k, 'en') ? t(k) : ''; };
 const FOREST_DENSITY_KEYS = ['light', 'normal', 'dense', 'veryDense'];
+// (which trees this area gets: the export's own rules, counted; services/treeTable.js)
+const trees = computed(() => {
+  if (contentTab.value !== 'tune') return null;
+  const td = toRaw(store.terrainData);
+  const b = td?.bounds;
+  if (!b || !props.hasOsmData) return null;
+  return treeTable({
+    lat: (b.north + b.south) / 2, lon: (b.east + b.west) / 2,
+    mix: td.treeSpeciesMix ?? null, elevations: sampleElevations(td.heightMap),
+  });
+});
+const treeGroupName = (g) => { const k = `build.trees.group_${g}`; return te(k) || te(k, 'en') ? t(k) : g.replace(/_/g, ' '); };
+const treeShare = (s) => (s < 0.01 ? '<1%' : `${Math.round(s * 100)}%`);
 
 // A small switch (role="switch"), the panel's one on/off control here.
 const Switch = defineComponent({

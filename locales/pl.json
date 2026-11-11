@@ -1749,6 +1749,24 @@
     "detail_serviceRoads": "dojazdy, zaułki, alejki parkingowe",
     "item_tracks": "Drogi gruntowe",
     "detail_tracks": "polne i leśne",
-    "noAssumedParking": "bez zakładanego parkowania"
+    "noAssumedParking": "bez zakładanego parkowania",
+    "trees": {
+      "title": "Drzewa wybrane dla tego obszaru",
+      "fromRecords": "Na podstawie {count} obserwacji drzew w okolicy (iNaturalist).",
+      "fromClimate": "Brak obserwacji drzew w okolicy: wybrane według klimatu.",
+      "note": "Dla lasów i drzew, których mapa nie nazywa. Drzewo z gatunkiem na mapie go zachowuje.",
+      "group_deciduous": "Drzewa liściaste",
+      "group_conifer": "Drzewa iglaste",
+      "group_pine_west": "Sosny zachodnie",
+      "group_oak_west": "Dęby zachodnie",
+      "group_palm": "Palmy",
+      "group_juniper": "Jałowce",
+      "group_tropical": "Drzewa tropikalne",
+      "group_live_oak": "Dęby wiecznie zielone",
+      "group_oak": "Dęby",
+      "group_eucalyptus": "Eukaliptusy",
+      "group_cypress": "Cyprysy",
+      "group_olive": "Oliwki"
+    }
   }
 }
