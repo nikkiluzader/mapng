@@ -2,7 +2,9 @@
 // once whether to look for updates at all, and asks again before it
 // downloads one (Download / Later / Skip this version) and before it
 // restarts to install it. Nothing is fetched while the answer is no.
-import { app, BrowserWindow, dialog } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
+import { app, BrowserWindow, dialog, shell } from 'electron';
 import electronUpdater from 'electron-updater';
 
 const { autoUpdater } = electronUpdater;
@@ -15,6 +17,10 @@ const CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
  */
 export function startUpdater({ settings, busy, ready = () => true }) {
   // (only a packaged build updates; the Linux build only as an AppImage)
+  // (the Windows portable zip: no installer put it there, so there is no
+  // uninstaller beside the exe, and an update's installer would install a
+  // second copy elsewhere. It says a new version is out and where to get it.)
+  const portable = app.isPackaged && process.platform === 'win32' && !fs.existsSync(path.join(path.dirname(process.execPath), `Uninstall ${app.getName()}.exe`));
   const supported = app.isPackaged && (process.platform !== 'linux' || !!process.env.APPIMAGE);
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
@@ -77,13 +83,16 @@ export function startUpdater({ settings, busy, ready = () => true }) {
       : '';
     const { response } = await ask({
       message: `MapNG ${info.version} is available (you have ${app.getVersion()}).`,
-      detail: notes || 'See the release notes on GitHub.',
-      buttons: ['Download', 'Later', 'Skip this version'],
+      detail: portable
+        ? `${notes || 'See the release notes on GitHub.'}\n\nThis is the portable copy: it does not update itself. Download the new zip and unzip it over this folder (or beside it); your settings and levels are kept.`
+        : notes || 'See the release notes on GitHub.',
+      buttons: [portable ? 'Open the download page' : 'Download', 'Later', 'Skip this version'],
       defaultId: 0,
       cancelId: 1,
     });
     if (response === 2) settings.write({ skipVersion: info.version });
     if (response !== 0) { state = 'idle'; return; }
+    if (portable) { state = 'idle'; shell.openExternal('https://github.com/nikkiluzader/mapng/releases/latest'); return; }
     state = 'downloading';
     try {
       await autoUpdater.downloadUpdate();

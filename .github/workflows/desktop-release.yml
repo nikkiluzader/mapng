@@ -1,5 +1,5 @@
 # MapNG desktop: on a version tag (v0.1.0, matching desktop/package.json),
-# build the Windows installer and the Linux AppImage and attach them to a
+# build the Windows installer, the Windows portable zip and the Linux AppImage and attach them to a
 # draft GitHub Release (with the latest*.yml files the app's updater reads).
 # Publish the draft by hand once it is checked: users are offered it then.
 name: Desktop release
@@ -66,6 +66,7 @@ jobs:
           name: mapng-${{ matrix.platform }}
           path: |
             desktop/release/*.exe
+            desktop/release/*.zip
             desktop/release/*.AppImage
             desktop/release/latest*.yml
           if-no-files-found: error

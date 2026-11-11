@@ -42,14 +42,27 @@ win:
   target:
     - target: nsis
       arch: [x64]
+    # (the app as a plain folder in a zip, for people the installer fails
+    # for: unzip anywhere and run MapNG.exe. No installer, no uninstaller,
+    # and it does not update itself: updater.js tells it apart by the
+    # missing uninstaller and points at the download instead)
+    - target: zip
+      arch: [x64]
   # (unsigned for now: Windows SmartScreen warns on first run. On Linux,
   # editing the exe's icon and version needs wine: pass
   # -c.win.signAndEditExecutable=false there, as pack:win does)
-  artifactName: MapNG-Setup-${version}.${ext}
+  artifactName: MapNG-${version}-windows-portable.${ext}
 nsis:
-  # (per user, no admin prompt; the user may pick the folder)
+  # (the installer's own name: latest.yml, which the updater reads, names it)
+  artifactName: MapNG-Setup-${version}.${ext}
+  # The first page asks who to install for. "Only for me" (the default) needs
+  # no admin rights and goes under the user's own folders; "Anyone who uses
+  # this computer" asks for administrator rights and can then write to any
+  # folder. Per user only, a folder the user could not write to (one of
+  # their own choice on C:) failed at the uninstaller with "Error opening
+  # file for writing" and no way forward (tester report, 0.2.16).
   oneClick: false
-  perMachine: false
+  allowElevation: true
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   shortcutName: MapNG

@@ -8,6 +8,18 @@
   ShowUninstDetails show
 !macroend
 
+; Right after the app's files are copied, before the uninstaller is written:
+; if the app is not there, the folder could not be written to (the copy does
+; not say so itself, and the next thing the user saw was "Error opening file
+; for writing: Uninstall MapNG.exe" with Abort / Retry / Ignore). Say what
+; happened and what to do, then stop.
+!macro customFiles_x64
+  IfFileExists "$INSTDIR\${APP_EXECUTABLE_FILENAME}" mapngFilesWritten 0
+    MessageBox MB_OK|MB_ICONSTOP "MapNG could not write its files to:$\r$\n$INSTDIR$\r$\n$\r$\nWindows did not allow it. Run the installer again and either keep the folder it suggests, or choose $\"Anyone who uses this computer$\" on the first page (it asks for administrator rights and can then use any folder).$\r$\n$\r$\nNo installer at all: the portable zip on the same download page."
+    Quit
+  mapngFilesWritten:
+!macroend
+
 !macro customInstall
   DetailPrint ""
   DetailPrint "MapNG ${VERSION} is installed in:"
