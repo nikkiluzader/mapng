@@ -1058,7 +1058,11 @@ const handleModifyLevel = async (level) => {
   lastGenerationKey.value = null;
   await nextTick();
   generateNextFromLevel(level.levelName, { center: info.center, resolution: info.resolution || resolution.value, mpp });
-  await handleGenerate(false, info.includeOSM, 'default', '', 'auto', mpp);
+  // (the level's own source comes from its saved data, whatever is named here.
+  // The window's GPXZ key goes along, as Update sends it: with none, a GPXZ
+  // level used to come back on the 30 m)
+  const levelSource = info.useGPXZ ? 'gpxz' : info.useUSGS ? 'usgs' : info.useKRON86 ? 'kron86' : info.generationOptions?.useMapterhorn ? 'mapterhorn' : info.generationOptions?.flat ? 'none' : 'default';
+  await handleGenerate(false, info.includeOSM, levelSource, localStorage.getItem('mapng_gpxzApiKey') || '', 'auto', mpp);
 };
 
 // Generated: the 2D preview opens (what was asked for, flat, with what will be

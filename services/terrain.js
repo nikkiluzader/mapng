@@ -3,7 +3,7 @@ import { attachTreeSpecies } from './treeSpecies.js';
 import { loadDataImage } from './dataCache.js';
 import { backgroundLookup, filterFeaturesByBackground, makeSkipBox, keptBoxes, tileLatLngBox, rawWeightLookup } from './backgroundMask.js';
 import { fetchOSMData, getLastOSMRequestInfo, getOSMQueryParameters } from "./osm.js";
-import { fetchWord, replayingSources } from './sourceWording.js';
+import { fetchWord, replayingSources, gpxzUsable } from './sourceWording.js';
 import { parseRasterOrGridElevationFile, parseTifFile, parseTifFiles, parseGridFiles } from "./tifLoader.js";
 import { resolveNoDataValue, NODATA_AUTO, NODATA_FALLBACK } from "./nodataDetect.js";
 import { GAP_FILL_STANDARD, GAP_FILL_GPXZ, GAP_FILL_NONE } from "./gapFillSources.js";
@@ -1924,7 +1924,8 @@ export const fetchTerrainData = async (
   let gpxzChunkFailures = false;
   let sourceGeoTiffs = undefined;
 
-  if (useGPXZ && gpxzApiKey) {
+  // (with a key, or from a level's saved GPXZ downloads: sourceWording.js gpxzUsable)
+  if (gpxzUsable(useGPXZ, gpxzApiKey)) {
     onProgress?.(`${fetchWord()} high-res GPXZ elevation data...`);
     const gpxzResult = await fetchGPXZRaw(fetchBounds, gpxzApiKey, onProgress, signal, { skipBox });
     if (gpxzResult) {
