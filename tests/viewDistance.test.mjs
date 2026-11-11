@@ -35,7 +35,7 @@ test('view distance is saved, shared and shown only when not 4 km, and never cou
 
 test('a short view gets thicker fog; 4 km and over keep the light haze', async () => {
   const { fogDensityFor } = await import('../services/viewDistance.js');
-  assert.equal(fogDensityFor(2000), 0.0005);
+  assert.equal(fogDensityFor(2000), 0.0003);
   for (const d of [4000, 8000, 12000, 16000, undefined]) assert.equal(fogDensityFor(d), 0.0001, String(d));
 });
 

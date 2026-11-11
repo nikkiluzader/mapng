@@ -289,7 +289,7 @@ test('view distance: LevelInfo visibleDistance follows the option, 4000 by defau
   try {
     const short = await levelInfoOf(await exportZip({ viewDistance: 2000 }));
     assert.equal(short.visibleDistance, 2000);
-    assert.equal(short.fogDensity, 0.0005);       // (thicker fog hides the nearer far edge)
+    assert.equal(short.fogDensity, 0.0003);       // (thicker fog hides the nearer far edge)
     assert.equal((await levelInfoOf(await exportZip({ viewDistance: 16000 }))).visibleDistance, 16000);
     assert.equal((await levelInfoOf(await exportZip({ viewDistance: 12345 }))).visibleDistance, 4000);
   } finally { restore(); }

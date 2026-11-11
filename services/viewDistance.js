@@ -13,9 +13,12 @@ export const viewDistanceMeters = (v) => (VIEW_DISTANCES_M.includes(Number(v)) ?
 
 // Fog hides the far edge (the BeamNG docs: "use fog density to hide far
 // clipping"). MapNG's light haze does at 4 km and over; a shorter view gets a
-// thicker one, about a third of the scene's colour left at the edge.
+// thicker one. Seen in game (2026-11-11, sea to the horizon): at 2 km the sea
+// plane ends in a dark band; 0.0003 softens it and keeps a blue sky with
+// clouds, 0.0005 softened it no better and greyed the sky.
 export const BASE_FOG_DENSITY = 0.0001;
+export const SHORT_VIEW_FOG_DENSITY = 0.0003;
 export const fogDensityFor = (viewDistance) => {
   const d = viewDistanceMeters(viewDistance);
-  return d < DEFAULT_VIEW_DISTANCE_M ? Number((1 / d).toFixed(6)) : BASE_FOG_DENSITY;
+  return d < DEFAULT_VIEW_DISTANCE_M ? SHORT_VIEW_FOG_DENSITY : BASE_FOG_DENSITY;
 };
