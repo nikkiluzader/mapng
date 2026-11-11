@@ -1730,6 +1730,16 @@
     "capped": "con limiti",
     "noCaps": "senza limiti",
     "footerFeatures": "{on} di {of} attivi · regolazione fine: {tuned}",
-    "footerTune": "{on} di {of} elementi attivi in Elementi"
+    "footerTune": "{on} di {of} elementi attivi in Elementi",
+    "item_motorways": "Autostrade e superstrade",
+    "detail_motorways": "con gli svincoli",
+    "item_mainRoads": "Strade principali",
+    "detail_mainRoads": "da primarie a terziarie",
+    "item_streets": "Strade",
+    "detail_streets": "residenziali e minori",
+    "item_serviceRoads": "Strade di servizio",
+    "detail_serviceRoads": "accessi, vicoli, corsie dei parcheggi",
+    "item_tracks": "Sterrate",
+    "detail_tracks": "strade agricole e forestali"
   }
 }

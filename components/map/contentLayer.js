@@ -35,7 +35,7 @@ export function prepareContent(features) {
     if (!ok) continue;
     const closed = g.length > 3 && g[0].lat === g[g.length - 1].lat && g[0].lng === g[g.length - 1].lng;
     const kind = g.length === 1 ? 'point' : closed && (AREA_TYPES.has(f.type) || f.tags?.area === 'yes' || f.type === 'road' && f.tags?.area === 'yes') ? 'area' : 'line';
-    parts.push({ item, group: groupOfItem(item), kind, xy, feature: f, width: f.type === 'road' ? (item === 'paths' ? 1 : 2.5) : item === 'railways' ? 2 : 1.2 });
+    parts.push({ item, group: groupOfItem(item), kind, xy, feature: f, width: f.type === 'road' ? (item === 'paths' || item === 'tracks' || item === 'serviceRoads' ? 1 : item === 'motorways' ? 3.5 : 2.5) : item === 'railways' ? 2 : 1.2 });
   }
   // (areas first, lines over them, points on top)
   const order = { area: 0, line: 1, point: 2 };

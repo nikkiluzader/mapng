@@ -1730,6 +1730,16 @@
     "capped": "con límites",
     "noCaps": "sin límites",
     "footerFeatures": "{on} de {of} activos · ajuste fino: {tuned}",
-    "footerTune": "{on} de {of} elementos activos en Elementos"
+    "footerTune": "{on} de {of} elementos activos en Elementos",
+    "item_motorways": "Autopistas y vías rápidas",
+    "detail_motorways": "con sus enlaces",
+    "item_mainRoads": "Carreteras principales",
+    "detail_mainRoads": "primarias a terciarias",
+    "item_streets": "Calles",
+    "detail_streets": "residenciales y menores",
+    "item_serviceRoads": "Vías de servicio",
+    "detail_serviceRoads": "accesos, callejones, pasillos de aparcamiento",
+    "item_tracks": "Pistas",
+    "detail_tracks": "caminos agrícolas y forestales"
   }
 }

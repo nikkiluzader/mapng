@@ -17,6 +17,14 @@
 export const CONTENT_GROUPS = [
   { id: 'roads', items: [
     { id: 'roadSurfaces', option: { roadType: 'none' } },
+    // (by class, ROAD_CLASS_IDS: a motorway through the area left out, or only the
+    // main roads kept; asked for on Discord, 2026-11. Off: its ways leave the
+    // data, so its bridges, tunnels, paint and signs go with it)
+    { id: 'motorways', tags: ['highway=motorway', 'highway=motorway_link', 'highway=trunk', 'highway=trunk_link'] },
+    { id: 'mainRoads', tags: ['highway=primary', 'highway=primary_link', 'highway=secondary', 'highway=secondary_link', 'highway=tertiary', 'highway=tertiary_link'] },
+    { id: 'streets', tags: ['highway=residential', 'highway=unclassified', 'highway=living_street', 'highway=road'] },
+    { id: 'serviceRoads', tags: ['highway=service'] },
+    { id: 'tracks', tags: ['highway=track'] },
     { id: 'markings' },
     { id: 'crosswalks' },
     { id: 'signals', tags: ['highway=traffic_signals', 'crossing=traffic_signals'] },
@@ -76,12 +84,15 @@ export const CONTENT_ITEMS = CONTENT_GROUPS.flatMap((g) => g.items.map((it) => (
 export const CONTENT_IDS = CONTENT_ITEMS.map((it) => it.id);
 const BY_ID = new Map(CONTENT_ITEMS.map((it) => [it.id, it]));
 
+/** The road classes: each one's ways are drawn only while Road surfaces is on too. */
+export const ROAD_CLASS_IDS = ['motorways', 'mainRoads', 'streets', 'serviceRoads', 'tracks'];
+
 const keepOnly = (ids) => CONTENT_IDS.filter((id) => !ids.includes(id));
 /** Quick select: what each preset switches off. */
 export const CONTENT_PRESETS = {
   all: [],
   clean: ['benches', 'bins', 'hydrants', 'poles', 'parkedCars', 'calming', 'gates'],
-  roads: keepOnly(['roadSurfaces', 'markings', 'crosswalks', 'signals', 'signs', 'lamps', 'calming', 'bridges', 'tunnels', 'dams', 'railways']),
+  roads: keepOnly(['roadSurfaces', ...ROAD_CLASS_IDS, 'markings', 'crosswalks', 'signals', 'signs', 'lamps', 'calming', 'bridges', 'tunnels', 'dams', 'railways']),
   scenery: keepOnly(['trees', 'groundCover', 'rocks', 'rivers', 'lakes', 'sea']),
 };
 export const PRESET_IDS = Object.keys(CONTENT_PRESETS);

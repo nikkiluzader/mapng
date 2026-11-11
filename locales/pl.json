@@ -1730,6 +1730,16 @@
     "capped": "z limitami",
     "noCaps": "bez limitów",
     "footerFeatures": "{on} z {of} wł. · dostrajanie: {tuned}",
-    "footerTune": "W Obiektach włączono {on} z {of}"
+    "footerTune": "W Obiektach włączono {on} z {of}",
+    "item_motorways": "Autostrady i drogi ekspresowe",
+    "detail_motorways": "z łącznicami",
+    "item_mainRoads": "Drogi główne",
+    "detail_mainRoads": "od krajowych do powiatowych",
+    "item_streets": "Ulice",
+    "detail_streets": "osiedlowe i lokalne",
+    "item_serviceRoads": "Drogi serwisowe",
+    "detail_serviceRoads": "dojazdy, zaułki, alejki parkingowe",
+    "item_tracks": "Drogi gruntowe",
+    "detail_tracks": "polne i leśne"
   }
 }

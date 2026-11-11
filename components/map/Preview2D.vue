@@ -99,7 +99,7 @@ import { attachContentLayer } from './contentLayer.js';
 import { useMainStore } from '../../stores/mainStore';
 import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { colourMap, effectiveOff } from '../../composables/useBuildContent.js';
-import { CONTENT_GROUPS } from '../../services/buildContent.js';
+import { CONTENT_GROUPS, ROAD_CLASS_IDS } from '../../services/buildContent.js';
 import { GROUP_COLOURS } from '../../services/buildContentColours.js';
 import { terrainView, showContours } from '../../composables/useTerrainView.js';
 import { TERRAIN_VIEWS, SLOPE_BANDS, ELEVATION_RAMP, contourInterval } from '../three/terrainView.js';
@@ -357,7 +357,8 @@ onMounted(() => {
   content = attachContentLayer(map, {
     getFeatures: () => td()?.osmFeatures || null,
     isShown: () => colourMap.value && hasFeatures.value,
-    isOn: (id) => !off.value.includes(id),
+    // (a road class shows as built only while Road surfaces is on too)
+    isOn: (id) => !off.value.includes(id) && !(ROAD_CLASS_IDS.includes(id) && off.value.includes('roadSurfaces')),
   });
   content.update();
   map.on('mousemove', onMove);

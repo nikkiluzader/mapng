@@ -55,7 +55,8 @@ test('the tag filter leaves out only the features of the excluded kind', () => {
 test('tag counts per feature, most common first; features sorted into groups for the map', () => {
   const c = osmTagCounts([{ tags: { barrier: 'wall' } }, { tags: { barrier: 'fence' } }, { tags: { barrier: 'fence' } }]);
   assert.deepEqual(c.fences, [{ tag: 'barrier=fence', count: 2 }, { tag: 'barrier=wall', count: 1 }]);
-  assert.equal(itemOfFeature({ type: 'road', tags: { highway: 'primary', railway: 'tram' } }), 'roadSurfaces');
+  assert.equal(itemOfFeature({ type: 'road', tags: { highway: 'primary', railway: 'tram' } }), 'mainRoads');
+  assert.equal(itemOfFeature({ type: 'road', tags: { highway: 'raceway' } }), 'roadSurfaces');
   assert.equal(itemOfFeature({ type: 'building', tags: { building: 'yes' } }), 'buildings');
   assert.equal(itemOfFeature({ type: 'road', tags: { highway: 'steps' } }), 'steps');
 });
@@ -151,4 +152,20 @@ test('"Modify" in My Levels puts the choice back (own tags only)', async () => {
   assert.equal(s.mapng_beamNGIncludeBuildings, 'false');
   assert.deepEqual(JSON.parse(s.mapng_beamNGContentOff), ['benches']);
   assert.deepEqual(JSON.parse(s.mapng_beamNGExcludeTags), ['building=garage']);
+});
+
+test('road classes: each one leaves the data by its highway tags; Roads only keeps them all', async () => {
+  const { ROAD_CLASS_IDS, contentExportOptions: opts, filterOsmByTags: filter, CONTENT_PRESETS: presets, itemOfFeature: itemOf } = await import('../services/buildContent.js');
+  const roads = ['motorway', 'motorway_link', 'trunk', 'primary', 'tertiary_link', 'residential', 'unclassified', 'living_street', 'service', 'track', 'raceway', 'footway']
+    .map((highway) => ({ type: 'road', tags: { highway } }));
+  const left = (off) => filter(roads, opts(off, []).excludeTags).features.map((f) => f.tags.highway);
+  assert.deepEqual(left(['motorways']), ['primary', 'tertiary_link', 'residential', 'unclassified', 'living_street', 'service', 'track', 'raceway', 'footway']);
+  assert.deepEqual(left(['streets', 'serviceRoads', 'tracks']), ['motorway', 'motorway_link', 'trunk', 'primary', 'tertiary_link', 'raceway', 'footway']);
+  assert.deepEqual(left(['mainRoads']).filter((h) => /primary|secondary|tertiary/.test(h)), []);
+  assert.deepEqual(left([]).length, roads.length);
+  // presets: Roads only builds every class; Scenery only none of them
+  for (const id of ROAD_CLASS_IDS) { assert.ok(!presets.roads.includes(id), id); assert.ok(presets.scenery.includes(id), id); assert.ok(!presets.clean.includes(id), id); }
+  assert.equal(itemOf({ type: 'road', tags: { highway: 'motorway_link' } }), 'motorways');
+  assert.equal(itemOf({ type: 'road', tags: { highway: 'service' } }), 'serviceRoads');
+  assert.equal(itemOf({ type: 'road', tags: { highway: 'footway' } }), 'paths');
 });

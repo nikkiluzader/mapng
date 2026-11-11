@@ -1730,6 +1730,16 @@
     "capped": "begrenzt",
     "noCaps": "keine Obergrenzen",
     "footerFeatures": "{on} von {of} an · Feinabstimmung: {tuned}",
-    "footerTune": "{on} von {of} Features unter „Features“ an"
+    "footerTune": "{on} von {of} Features unter „Features“ an",
+    "item_motorways": "Autobahnen und Schnellstraßen",
+    "detail_motorways": "mit Auffahrten",
+    "item_mainRoads": "Hauptstraßen",
+    "detail_mainRoads": "Bundes- bis Kreisstraßen",
+    "item_streets": "Straßen",
+    "detail_streets": "Wohn- und Nebenstraßen",
+    "item_serviceRoads": "Erschließungswege",
+    "detail_serviceRoads": "Zufahrten, Gassen, Parkplatzwege",
+    "item_tracks": "Wirtschaftswege",
+    "detail_tracks": "Feld- und Waldwege"
   }
 }

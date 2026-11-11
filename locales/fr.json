@@ -1730,6 +1730,16 @@
     "capped": "plafonné",
     "noCaps": "sans plafond",
     "footerFeatures": "{on} sur {of} activés · réglages fins : {tuned}",
-    "footerTune": "{on} sur {of} éléments activés dans Éléments"
+    "footerTune": "{on} sur {of} éléments activés dans Éléments",
+    "item_motorways": "Autoroutes et voies rapides",
+    "detail_motorways": "avec leurs bretelles",
+    "item_mainRoads": "Routes principales",
+    "detail_mainRoads": "primaires à tertiaires",
+    "item_streets": "Rues",
+    "detail_streets": "résidentielles, routes mineures",
+    "item_serviceRoads": "Voies de service",
+    "detail_serviceRoads": "allées, ruelles, allées de parking",
+    "item_tracks": "Chemins",
+    "detail_tracks": "chemins agricoles et forestiers"
   }
 }

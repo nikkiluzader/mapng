@@ -1730,6 +1730,16 @@
     "capped": "с лимитами",
     "noCaps": "без ограничений",
     "footerFeatures": "{on} из {of} вкл. · тонкая настройка: {tuned}",
-    "footerTune": "В «Объектах» включено {on} из {of}"
+    "footerTune": "В «Объектах» включено {on} из {of}",
+    "item_motorways": "Автомагистрали и скоростные дороги",
+    "detail_motorways": "со съездами",
+    "item_mainRoads": "Главные дороги",
+    "detail_mainRoads": "от первичных до третичных",
+    "item_streets": "Улицы",
+    "detail_streets": "жилые и второстепенные",
+    "item_serviceRoads": "Служебные проезды",
+    "detail_serviceRoads": "подъезды, переулки, проезды парковок",
+    "item_tracks": "Грунтовые дороги",
+    "detail_tracks": "полевые и лесные"
   }
 }

@@ -1735,6 +1735,16 @@
     "capped": "capped",
     "noCaps": "no caps",
     "footerFeatures": "{on} of {of} on · fine-tuning: {tuned}",
-    "footerTune": "{on} of {of} features on in Features"
+    "footerTune": "{on} of {of} features on in Features",
+    "item_motorways": "Motorways and trunk roads",
+    "detail_motorways": "with their ramps",
+    "item_mainRoads": "Main roads",
+    "detail_mainRoads": "primary to tertiary",
+    "item_streets": "Streets",
+    "detail_streets": "residential, minor roads",
+    "item_serviceRoads": "Service roads",
+    "detail_serviceRoads": "driveways, alleys, car park aisles",
+    "item_tracks": "Tracks",
+    "detail_tracks": "farm and forest tracks"
   }
 }
