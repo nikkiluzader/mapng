@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.2.17: Mountain Roads, Galleries and a Quality Report</title>
+<meta name="description" content="MapNG 0.2.17: mountain lanes at their real width, avalanche galleries built as galleries, natural lake beds, cleaner tunnel mouths, a quality report that scores the elevation sources for any spot, and a portable Windows version that needs no installing.">
+<link rel="canonical" href="https://mapng.com/updates/0.2.17/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.2.17: mountain roads, galleries and a quality report">
+<meta property="og:description" content="Mountain lanes at their real width, avalanche galleries, natural lake beds, a quality report for the elevation sources, and a portable Windows version.">
+<meta property="og:url" content="https://mapng.com/updates/0.2.17/">
+<meta property="og:image" content="https://mapng.com/updates/0.2.17/images/gallery-outside.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: a plain band (a small release: no in-game shot) */
+  .hero { position: relative; color: #fff; background: linear-gradient(135deg, #1b1b22 0%, #2a1c12 60%, #7a3300 100%); }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(46vh, 360px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+  /* diagrams (inline SVG): colours from the page tokens, both modes */
+  .dia { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 18px; }
+  .dia svg { width: 100%; height: auto; display: block; --d1: #2f6fd6; --d2: #e85d00; --d3: #3a9a4a; --dg: #b9cf9f; --dw: #9cc3e6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; } }
+  :root[data-theme="dark"] .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; }
+  .dia text { fill: var(--text); font: 13px "Noto Sans", sans-serif; }
+  .dia .sm { fill: var(--muted); font-size: 12px; }
+  .dia .box { fill: var(--surface-2); stroke: var(--border); }
+  .dia .boxb { fill: var(--brand-tint); stroke: var(--brand); }
+  .dia .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .refs figcaption a { color: var(--muted); }
+  .pair2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .pair2 { grid-template-columns: 1fr; } }
+  .stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font: 800 26px/1.1 "Overpass", sans-serif; color: var(--brand-ink); }
+  .stat span { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.2.17</span></span>
+    <h1>Mountain roads, galleries and a quality report</h1>
+    <p>A big round of fixes from testers' mountain maps, a new report that scores the elevation sources for any spot, and a Windows version that needs no installing.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#mountain">Mountain roads</a><a href="#galleries">Galleries and tunnels</a><a href="#lakes">Lakes</a><a href="#report">Quality report</a><a href="#roads">Lanes and bridges</a><a href="#data">Map data</a><a href="#windows">Windows</a>
+  </nav>
+
+  <section id="mountain">
+    <div class="kicker">Roads</div>
+    <h2>⛰️ Mountain lanes at the width they really are</h2>
+    <p>A small mountain road is a narrow shelf cut into its hillside, and 1 m lidar shows that shelf. OpenStreetMap rarely says how wide such a road is, so MapNG drew every one at its class default: a 4 m village lane climbing in hairpins came out 8 m wide, cut 2 m into the hill above and filled 2 m over the slope below. Where two arms of a hairpin lie close, the fill of one met the cut of the other in a wall of ground.</p>
+    <ul>
+      <li><b>Width from the survey.</b> On fine elevation, a hillside road with no width or lane count in the map is drawn at the width of the shelf the lidar holds. Never wider than before, and no curb where the shelf leaves no room for one.</li>
+      <li><b>A road on its shelf leaves the hillside alone.</b> The slope beside a road is now sized from the road's own edge, so a road that already sits on its ground no longer pulls the hill above it down or the slope below it up.</li>
+      <li><b>Roads reach the map's edge.</b> On a big map roads stopped up to 246 m short of the edge (1.5 % of the map). The margin is now 15 m.</li>
+    </ul>
+    <figure><img src="images/hairpin-terrain.jpg" alt="Two maps of the same hairpin bends, coloured by how much the export changed the surveyed ground: before, wide dark red and blue bands (2 to 4 m of cutting and filling) along every arm of the hairpins; after, the bands along the small lane are narrow and pale" loading="lazy"><figcaption>Behind the scenes: how much MapNG changed the surveyed ground at a set of hairpins (red = cut away, blue = filled, up to 4 m). Left 0.2.16, right 0.2.17: the small lane on the right now barely touches its hillside.</figcaption></figure>
+    <div class="note"><b>Fine vibration on big mountain maps:</b> BeamNG stores terrain heights in 16 bits, so the smallest height step is the map's height difference divided by 65,535. On a 16 km Alpine map that is 40 mm, a fine staircase a force-feedback wheel can feel. No setting changes it; the export report now states the step and says when it is large. A smaller map, or one with less relief, has a smaller step.</div>
+  </section>
+
+  <section id="galleries">
+    <div class="kicker">Tunnels</div>
+    <h2>🏔️ Avalanche galleries are built as galleries</h2>
+    <p>Many mountain roads are mapped as one long tunnel that is really a row of avalanche galleries: a roof on columns, open to the valley. MapNG bored a closed tube through all of it and piled ground over the roof.</p>
+    <ul>
+      <li><b>Told apart by the ground.</b> Where the open air stands right beside the tube for a long way and the roof is near the surface, that stretch is opened as an arcade: an opening every 10 m with a pillar between, and no ground made up over the roof. A tunnel deep in the rock with a cliff beside it keeps its few windows, as before.</li>
+      <li><b>Gallery roofs as lidar sees them.</b> Bare-earth lidar cannot show an overhang, so a gallery roof appears as a slope down to the road. Thin-roofed stretches like that now count as galleries too.</li>
+      <li><b>No terrain hanging in the openings.</b> Ground was still raised between the tube and the open air at each opening, and hung across it like a curtain.</li>
+    </ul>
+    <figure><img src="images/gallery-outside.jpg" alt="In BeamNG.drive, seen from over the lake: a concrete gallery along the hillside with a row of arched openings, the slope above it left as it is" loading="lazy"><figcaption>A lakeside gallery mapped as a tunnel, in BeamNG.drive 0.40 with 0.2.17.</figcaption></figure>
+    <figure><img src="images/gallery-openings.jpg" alt="Inside the gallery, before and after: before, dark sheets of terrain hang in every opening; after, the openings are clear and show the lake" loading="lazy"><figcaption>Inside the same gallery. The dark sheets on the left were terrain.</figcaption></figure>
+    <h3>Cleaner tunnel mouths</h3>
+    <ul>
+      <li><b>No weeds through the road.</b> The first metres of a tunnel road lie in the open cutting in front of the portal. They were never painted as road on the terrain, so the ground cover grew through the asphalt.</li>
+      <li><b>No 250 m cutting on a climbing road.</b> A road that climbs away from its tunnel on the ground now follows the ground, instead of being held to the tunnel's grade in an ever deeper trench with a wall along it.</li>
+      <li><b>A road beside a one-way tunnel stays outside.</b> The other direction, running on the shelf outside, was taken into the tunnel as a ramp and the tube widened to 33 m over it.</li>
+      <li><b>A long underpass under a thin lid is built</b> instead of being left as a road on top of its own roof.</li>
+      <li><b>Buildings near a portal stay on the ground.</b> A large block with one corner over a tunnel mouth was lifted whole onto the portal and floated over its street. Only a building that really stands on the portal is lifted now.</li>
+    </ul>
+    <figure><img src="images/tunnel-mouth.jpg" alt="A tunnel portal before and after: before, plants grow all over the road in the cutting in front of the portal; after, clean asphalt runs to the portal" loading="lazy"><figcaption>The cutting in front of a portal, before and after.</figcaption></figure>
+    <figure><img src="images/portal-building.jpg" alt="Before: a brick building hangs in the air with a gap under it. After: a road runs into an underpass under a small building, the brick block standing on the ground beside it" loading="lazy"><figcaption>Left: a block floating over its street. Right: the same place, the block on the ground and the building that stands on the underpass on its roof.</figcaption></figure>
+  </section>
+
+  <section id="lakes">
+    <div class="kicker">Water</div>
+    <h2>🌊 Lake beds without ridges or walls</h2>
+    <p>Lidar records a lake as a flat sheet at the water's surface, so MapNG digs a bed under it. Two things went wrong on mountain reservoirs:</p>
+    <ul>
+      <li><b>Flat facets and straight ridges.</b> The bed's depth followed the raw distance to the shore, so it lay in flat faces meeting in ridges. The depth now follows a smoothed distance.</li>
+      <li><b>Pleated banks.</b> Every steep bank was cut back to one even ramp, up to 40 m from the water, which left the shore in pleats. Ground above the water is no longer touched at all: the water is where the survey recorded it.</li>
+      <li><b>One lake, one bed.</b> The backup map data cuts a big lake into pieces along its tiles. Each piece was dug as a lake of its own, with a ridge along every seam and depths of 199 m in the report. Touching pieces are one body of water now.</li>
+    </ul>
+    <figure><img src="images/lake-bed.jpg" alt="Hillshade of a reservoir's corner before and after: before, the lake bed is made of flat faces with sharp straight ridges between them and a stepped bank; after, the bed falls away smoothly from the natural shoreline" loading="lazy"><figcaption>Behind the scenes: the dug lake bed as a hillshade, shoreline in cyan. Left 0.2.16, right 0.2.17.</figcaption></figure>
+  </section>
+
+  <section id="report">
+    <div class="kicker">New</div>
+    <h2>📊 A quality report for the elevation sources</h2>
+    <div class="split narrow-img">
+      <figure><img src="images/quality-report-button.jpg" alt="The Elevation data source panel with the three comparison hillshades (Global 30 m, Mapterhorn, GPXZ) and a Save quality report link under them" loading="lazy"><figcaption>Under <b>Compare sources here</b> in step 2.</figcaption></figure>
+      <div>
+        <p><b>Compare sources here</b> already shows a hillshade of each elevation source at your spot. <b>Save quality report</b> now turns that into a page you can keep or post: each source gets a score out of 100 for how well its ground already holds the roads there, before MapNG shapes anything.</p>
+        <ul>
+          <li><b>Road bench:</b> on hillsides, is there a level strip a road wide where the map says the road is?</li>
+          <li><b>Level across</b> and <b>smooth along:</b> how much the ground leans across the lanes and ripples along them.</li>
+          <li><b>Detail:</b> the source's own resolution.</li>
+        </ul>
+      </div>
+    </div>
+    <figure><img src="images/quality-report.jpg" alt="The report page: a verdict sentence, three score tiles (Global 30 m 31, Mapterhorn 84, GPXZ 81), three hillshades with the roads drawn in green, yellow and red, a table of bars for each part of the score, and a line chart of the ground across one road for each source" loading="lazy"><figcaption>A report for a square in the French Alps: the 30 m data shows a plain slope where both lidar sources show the road's shelf.</figcaption></figure>
+    <p class="bts">The page is one self-contained file: no account, nothing loaded from anywhere. It measures every drivable road in a 512 m square in 2 m steps, and its last section says exactly how. GPXZ is included only if you added it to the comparison, so the report never uses one of your GPXZ calls on its own. It asks the map servers for that square's roads once per report.</p>
+  </section>
+
+  <section id="roads">
+    <div class="kicker">Roads</div>
+    <h2>🛣️ Lanes and bridges</h2>
+    <ul>
+      <li><b>A passing lane ends where it ends.</b> Stretches of one road with different lane counts were joined and painted from the first one's tags, so a 100 m passing lane could run on for 300 m, or vanish, depending on the order the data arrived in. Every stretch is now painted from its own lane count. City streets with turn-lane blocks benefit too.</li>
+      <li><b>Small bridges span their stream.</b> The stream under a short bridge was filled in as the bridge's abutment, a dam with a notch in it.</li>
+      <li><b>Village bridges are not parking lots.</b> A bridge up to 15 m long no longer carries the two parking lanes assumed on a town street: 6 m instead of 10.6 m. Longer bridges, such as a city's canal bridges, stay as wide as their streets.</li>
+    </ul>
+    <figure><img src="images/passing-lane.jpg" alt="Top-down drawing of a canyon road's paint before and after: before, the dashed third-lane line runs from a bridge round a bend for 300 m; after, it ends about 100 m after the bridge and the road is two lanes round the bend" loading="lazy"><figcaption>Behind the scenes: the paint on a canyon road. The map has three lanes only on the bridge and the 100 m after it.</figcaption></figure>
+    <figure><img src="images/small-bridge.jpg" alt="In BeamNG.drive: a small road bridge over an open stream channel" loading="lazy"><figcaption>A small bridge over its stream, the channel open under it.</figcaption></figure>
+  </section>
+
+  <section id="data">
+    <div class="kicker">Map data</div>
+    <h2>🗺️ Updating a level asks the map servers again when it should</h2>
+    <p>Updating or modifying a level rebuilds it from the downloads saved with it, so the map stays the one you made. But a level made while OpenStreetMap's servers were down was saved with the backup map data (no lane counts, rough bridges), and stayed on it through every update.</p>
+    <p>When a level's saved map data is the backup, an update now asks the servers again first. If they answer, the level gets real map data and keeps it; if they are still down, the saved data is used as before. Levels made from OpenStreetMap itself update from their saved map, as before.</p>
+    <p>Also: road segments the backup data cannot classify are no longer drawn as streets (one tester's map had 29 of them up a ski resort's slopes).</p>
+  </section>
+
+  <section id="windows">
+    <div class="kicker">Desktop</div>
+    <h2>🪟 Windows: a portable version, and a friendlier installer</h2>
+    <ul>
+      <li><b>Portable ZIP.</b> <code>MapNG-0.2.17-windows-portable.zip</code>: unzip it anywhere and run <code>MapNG.exe</code>. Nothing is installed. It tells you when a new version is out and opens the download page; it does not update itself.</li>
+      <li><b>Installer.</b> Its first page now asks who to install for. <b>Only for me</b> (the default) needs no administrator rights; <b>Anyone who uses this computer</b> asks for them and can then install to any folder. If the folder you chose cannot be written to, the installer says so and what to do, instead of failing with "Error opening file for writing".</li>
+    </ul>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks</h2>
+    <p>Almost everything here came from testers in the Discord who drove their own mountains and canyons, sent export reports and screenshots, and went back to compare versions. Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> and the <a href="https://overturemaps.org/">Overture Maps Foundation</a>. Elevation: Mapzen / AWS Terrain Tiles, <a href="https://mapterhorn.com/attribution">Mapterhorn and its open-data sources</a>, and GPXZ where you use it.</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p>Found something? Post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. The <code>export_report.txt</code> inside the level's ZIP helps a lot. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.2.16/">Previous update (0.2.16)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>

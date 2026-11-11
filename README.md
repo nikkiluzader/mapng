@@ -67,12 +67,17 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 ## What's New
 
-**MapNG 0.2.16** ([update page](https://mapng.com/updates/0.2.16/)): fixes
+**MapNG 0.2.17** ([update page](https://mapng.com/updates/0.2.17/)): mountain roads, galleries and a quality report
 
-- **Junctions on hills:** no ridge or flat pad across the main road, no steep ramp beside the junction, a rounded curve where the main road changes grade there; a side road leaves the main road's edge at its slope
-- **Backup map data:** a notice after Generate when OpenStreetMap's servers did not answer and the map was built from Overture (no lane counts, rougher bridges); MapNG's own map tiles survive a failed request
+- **Quality report:** "Save quality report" under "Compare sources here" scores each elevation source out of 100 for how well its ground holds the roads at that spot, as one self-contained page
+- **Mountain roads:** hillside lanes at the width of the shelf the lidar holds; a road on its shelf leaves the hillside alone; roads reach the edge of big maps
+- **Galleries and tunnels:** avalanche galleries mapped as one tunnel are built as galleries; cleaner tunnel mouths; buildings by a portal stay on the ground
+- **Lakes:** beds without ridges, facets or pleated banks; a lake cut into pieces by the backup data is one lake
+- **Lanes and bridges:** a passing lane ends where it ends; small bridges span their stream and carry no parking lanes
+- **Map data:** updating a level made from the backup map data asks the OpenStreetMap servers again
+- **Windows:** a portable ZIP that needs no installing; the installer can ask for administrator rights and says why when a folder cannot be written to
 
-**Earlier updates**, each with pictures: [0.2.15](https://mapng.com/updates/0.2.15/), [0.2.14](https://mapng.com/updates/0.2.14/), [0.2.13](https://mapng.com/updates/0.2.13/), [0.2.12](https://mapng.com/updates/0.2.12/), [0.2.11](https://mapng.com/updates/0.2.11/), [0.2.9](https://mapng.com/updates/0.2.9/), [0.2.8](https://mapng.com/updates/0.2.8/), [0.2.7](https://mapng.com/updates/0.2.7/), [0.2.6](https://mapng.com/updates/0.2.6/), [0.2.5](https://mapng.com/updates/0.2.5/). Every release with its notes is on the [releases page](https://github.com/nikkiluzader/mapng/releases).
+**Earlier updates**, each with pictures: [0.2.16](https://mapng.com/updates/0.2.16/), [0.2.15](https://mapng.com/updates/0.2.15/), [0.2.14](https://mapng.com/updates/0.2.14/), [0.2.13](https://mapng.com/updates/0.2.13/), [0.2.12](https://mapng.com/updates/0.2.12/), [0.2.11](https://mapng.com/updates/0.2.11/), [0.2.9](https://mapng.com/updates/0.2.9/), [0.2.8](https://mapng.com/updates/0.2.8/), [0.2.7](https://mapng.com/updates/0.2.7/), [0.2.6](https://mapng.com/updates/0.2.6/), [0.2.5](https://mapng.com/updates/0.2.5/). Every release with its notes is on the [releases page](https://github.com/nikkiluzader/mapng/releases).
 
 ## Important Notes
 
