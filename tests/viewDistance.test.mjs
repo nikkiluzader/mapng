@@ -5,11 +5,12 @@ import assert from 'node:assert/strict';
 
 test('a view distance is one of the four, else the default', async () => {
   const { viewDistanceMeters, VIEW_DISTANCES_M, DEFAULT_VIEW_DISTANCE_M } = await import('../services/viewDistance.js');
-  assert.deepEqual(VIEW_DISTANCES_M, [1000, 2000, 4000, 8000]);
+  assert.deepEqual(VIEW_DISTANCES_M, [2000, 4000, 8000, 12000, 16000]);
   assert.equal(DEFAULT_VIEW_DISTANCE_M, 4000);
   assert.equal(viewDistanceMeters('2000'), 2000);
   assert.equal(viewDistanceMeters(8000), 8000);
-  for (const bad of [undefined, null, '', 'far', 0, 3000, -1000]) assert.equal(viewDistanceMeters(bad), 4000, String(bad));
+  assert.equal(viewDistanceMeters('16000'), 16000);
+  for (const bad of [undefined, null, '', 'far', 0, 1000, 3000, -1000]) assert.equal(viewDistanceMeters(bad), 4000, String(bad));
 });
 
 test('view distance is saved, shared and shown only when not 4 km, and never counted', async () => {
@@ -24,12 +25,18 @@ test('view distance is saved, shared and shown only when not 4 km, and never cou
   assert.ok(field);
   assert.equal(isCountedField(field), false);       // (public/data.html lists every counted setting)
   const rows = (o) => summarizeExportSettings(o).flatMap((g) => g.rows);
-  assert.equal(rows({ viewDistance: 1000 }).find((r) => r.key === 'viewDistance')?.value.text, '1 km');
+  assert.equal(rows({ viewDistance: 2000 }).find((r) => r.key === 'viewDistance')?.value.text, '2 km');
   assert.ok(!rows({ viewDistance: 4000 }).some((r) => r.key === 'viewDistance'));
   assert.ok(!rows({}).some((r) => r.key === 'viewDistance'));
   const d = describeSessionConfig({ advancedMode: true, export: { viewDistance: '8000' } });
   assert.ok(d.some((r) => r.label === 'config.viewDistance' && r.value === '8 km'), JSON.stringify(d));
   assert.ok(!describeSessionConfig({ advancedMode: true, export: { viewDistance: '4000' } }).some((r) => r.label === 'config.viewDistance'));
+});
+
+test('a short view gets thicker fog; 4 km and over keep the light haze', async () => {
+  const { fogDensityFor } = await import('../services/viewDistance.js');
+  assert.equal(fogDensityFor(2000), 0.0005);
+  for (const d of [4000, 8000, 12000, 16000, undefined]) assert.equal(fogDensityFor(d), 0.0001, String(d));
 });
 
 test('every language has the view distance words', async () => {

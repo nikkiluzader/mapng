@@ -19,7 +19,7 @@ export const EXPORT_FIELDS = [
   ['water', 'mapng_beamNGIncludeWater', 'bool', true],
   ['trees', 'mapng_beamNGIncludeTrees', 'bool', true],
   ['forestDensity', 'mapng_beamNGForestDensity', ['light', 'normal', 'dense', 'veryDense'], 'normal'],
-  ['viewDistance', 'mapng_beamNGViewDistance', ['1000', '2000', '4000', '8000'], '4000'],   // metres: services/viewDistance.js
+  ['viewDistance', 'mapng_beamNGViewDistance', ['2000', '4000', '8000', '12000', '16000'], '4000'],   // metres: services/viewDistance.js
   ['rocks', 'mapng_beamNGIncludeRocks', 'bool', true],
   ['safeCaps', 'mapng_beamNGSafeCaps', 'bool', true],
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],

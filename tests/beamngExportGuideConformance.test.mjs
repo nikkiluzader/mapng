@@ -284,10 +284,13 @@ test('guide §10.9: exactly one theLevelInfo with globalEnviromentMap spelling',
 // visibleDistance: 4 km unless another of the four distances is chosen.
 test('view distance: LevelInfo visibleDistance follows the option, 4000 by default', async () => {
   const levelInfoOf = async (zip) => parseNDJSON(await readText(zip, 'main/MissionGroup/sky_and_sun/items.level.json')).find((o) => o.class === 'LevelInfo');
-  await withZip(async (zip) => assert.equal((await levelInfoOf(zip)).visibleDistance, 4000));
+  await withZip(async (zip) => { const li = await levelInfoOf(zip); assert.equal(li.visibleDistance, 4000); assert.equal(li.fogDensity, 0.0001); });
   const restore = installCanvasPolyfill();
   try {
-    assert.equal((await levelInfoOf(await exportZip({ viewDistance: 2000 }))).visibleDistance, 2000);
+    const short = await levelInfoOf(await exportZip({ viewDistance: 2000 }));
+    assert.equal(short.visibleDistance, 2000);
+    assert.equal(short.fogDensity, 0.0005);       // (thicker fog hides the nearer far edge)
+    assert.equal((await levelInfoOf(await exportZip({ viewDistance: 16000 }))).visibleDistance, 16000);
     assert.equal((await levelInfoOf(await exportZip({ viewDistance: 12345 }))).visibleDistance, 4000);
   } finally { restore(); }
 });

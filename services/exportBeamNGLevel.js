@@ -46,7 +46,7 @@ import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
 import { geoToWorldPoint, getTerrainHeightWorld, terrainDrape, terrainGroundAt } from './terrainLookup.js';
 import { pickFlagCell } from './flagPlacement.js';
 import { BUILDING_LITE_FROM_M, buildingTileScene } from './buildingTiles.js';
-import { viewDistanceMeters } from './viewDistance.js';
+import { viewDistanceMeters, fogDensityFor } from './viewDistance.js';
 import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
@@ -8034,7 +8034,7 @@ function buildBeamNGExportReport({
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
     `- Forest density: ${options?.forestDensity || 'normal'} (×${forestDensityMultiplier(options?.forestDensity)} the base tree rates; woods ~${Math.round(36 * forestDensityMultiplier(options?.forestDensity))} trees/ha)`,
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
-    `- View distance: ${viewDistanceMeters(options?.viewDistance)} m (LevelInfo visibleDistance)`,
+    `- View distance: ${viewDistanceMeters(options?.viewDistance)} m (LevelInfo visibleDistance; fog density ${fogDensityFor(options?.viewDistance)})`,
     `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}`,
     ...(() => {
       // What to build (services/buildContent.js): the features switched off and the OSM left out for them
@@ -14851,7 +14851,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         persistentId: generatePersistentId(),
         canvasClearColor: [0, 0, 0, 1],
         fogAtmosphereHeight: 1000,
-        fogDensity: 0.0001,
+        fogDensity: fogDensityFor(options?.viewDistance),
         fogDensityOffset: 0,
         globalEnviromentMap: useUniversalCubemap
           ? 'cubemap_Universal_cubemap_reflection'
