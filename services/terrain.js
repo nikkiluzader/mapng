@@ -26,6 +26,7 @@ import { fetchKron86GridForBounds, isWithinKron86Coverage } from "./kron86.js";
 import { fetchMapterhornRaw } from "./mapterhorn.js";
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from "./roadSmoother.js";
 import { snapRoadsToTerrain } from "./roadSnap.js";
+import { measureBenchWidths } from "./benchWidths.js";
 import { roundRoadCorners } from "./roadCurves.js";
 import { measureStreetWidths } from "./streetWidths.js";
 import { fitTwinCarriageways } from "./twinCarriageways.js";
@@ -2430,6 +2431,11 @@ export const fetchTerrainData = async (
     if (fineRaster) {
       onProgress?.("Aligning roads with the terrain...");
       await letProgressPaint();
+      // (first each hillside road's own width, from the bench the survey holds: a road drawn
+      // wider than its bench has no level place to be moved to)
+      const benches = measureBenchWidths(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel);
+      osmFeatures = benches.features;
+      if (benches.stats.measured) console.info(`[Roads] ${benches.stats.measured} hillside road(s) drawn at their bench's width (median ${benches.stats.medianM.toFixed(1)} m).`);
       osmFeatures = snapRoadsToTerrain(heightMap, width, height, finalBounds, osmFeatures, effectiveMetersPerPixel, isGroundLevelRoad).features;
     }
     const roadCount = osmFeatures.filter((f) => f?.type === 'road').length;

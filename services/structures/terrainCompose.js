@@ -310,8 +310,23 @@ export function composeTerrain(graph, grid) {
           }
           const h0 = raw(c, r) - minHeight;
           let slope = blendM;
-          if (kind === 'embankment' || kind === 'cutting' || Math.abs(zc - h0) > 0.5) {
-            slope = Math.min(SLOPE_MAX_M, Math.max(slopeMinM, Math.abs(zc - h0) * (zc > h0 ? FILL_RUN : CUT_RUN)));
+          // How far the side slope runs is set by how far the road stands off
+          // the ground at its own edge on this side, not off the ground at
+          // the pixel: on a hillside that grows with every metre out, so a
+          // road lying exactly on its bench still pulled the slope above it
+          // down (and the one below it up) by a quarter to a half of its
+          // height as far as the corridor reached, a band of cut and fill
+          // along every mountain road and a wall of ground between the arms
+          // of a hairpin.
+          let hEdge = h0;
+          if (d > core) {
+            const f = core / d; const qx = ax + vx * u; const qy = ay + vy * u;
+            const [pc, pr] = toPixel(qx + (x - qx) * f, qy + (y - qy) * f);
+            hEdge = raw(Math.max(0, Math.min(width - 1, Math.round(pc))), Math.max(0, Math.min(height - 1, Math.round(pr)))) - minHeight;
+          }
+          const off2 = Math.abs(zc - hEdge);
+          if (kind === 'embankment' || kind === 'cutting' || off2 > 0.5) {
+            slope = Math.min(SLOPE_MAX_M, Math.max(slopeMinM, off2 * (zc > hEdge ? FILL_RUN : CUT_RUN)));
           }
           const tt = d <= core ? 0 : (d - core) / slope;
           if (tt >= 1) continue;

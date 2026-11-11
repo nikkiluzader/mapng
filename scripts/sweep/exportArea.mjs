@@ -24,6 +24,7 @@ import { exportBeamNGLevel } from '../../services/exportBeamNGLevel.js';
 import { fetchTreeSpeciesMix } from '../../services/treeSpecies.js';
 import { isGroundLevelRoad, smoothRoadsInHeightmap } from '../../services/roadSmoother.js';
 import { snapRoadsToTerrain } from '../../services/roadSnap.js';
+import { measureBenchWidths } from '../../services/benchWidths.js';
 import { measureStreetWidths } from '../../services/streetWidths.js';
 import { roundRoadCorners } from '../../services/roadCurves.js';
 import { fitTwinCarriageways } from '../../services/twinCarriageways.js';
@@ -61,6 +62,7 @@ const rounded = process.env.PREPROCESSED ? osmFeatures : roundRoadCorners(osmFea
 let osmRoads = process.env.NOWIDTH || process.env.PREPROCESSED ? rounded : fitTwinCarriageways(measureStreetWidths(rounded).features).features;
 // (how far the lidar road snap moved the roads goes into the checks: a snap that wanders shows there)
 let snapStats = null;
+if (fine && !raw && !process.env.NOBENCH) { const b = measureBenchWidths(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp); osmRoads = b.features; if (b.stats.measured) console.log(`[Roads] ${b.stats.measured} hillside road(s) at their bench's width (median ${b.stats.medianM.toFixed(1)} m), of ${b.stats.roads}`); }
 if (fine && !raw) { const snapped = snapRoadsToTerrain(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, isGroundLevelRoad); osmRoads = snapped.features; snapStats = snapped.stats; }
 if (!raw) smoothRoadsInHeightmap(heightMap, meta.size, meta.size, meta.bounds, osmRoads, meta.mpp, { skipTracks: fine, fine });
 let minHeight = Infinity; let maxHeight = -Infinity;
