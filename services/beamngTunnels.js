@@ -69,6 +69,8 @@ const UNDER_BRIDGE_FLAT_M = 10;        // ... this far either side of it
 // shows where the rock is thin enough.
 const ARCADE_ROCK_M = 3;               // an arcade: the open air this close past the lining ...
 const ARCADE_COVER_M = 20;             // ... and the ground over the roof at most this much more than a bore needs
+const ARCADE_SLOPE_ROCK_M = 9;          // or this close, where the roof is thin: a gallery's roof in a survey is a slope
+const ARCADE_SLOPE_COVER_M = 6;        // smeared from its edge down to the road (bare-earth lidar draws no overhang)
 const ARCADE_MIN_RUN_M = 24;           // ... for at least this far
 const ARCADE_PITCH = 5;                // stations from one opening to the next (4 open, 1 pillar)
 const ARCADE_FILL_CLEAR_M = 4;         // no cover made up this far past an arcade's ends either
@@ -1013,18 +1015,27 @@ function findWindows(t, groundAt) {
       // windows, a few, as before: Zion-Mount Carmel's six stayed six)
       if (!(q.g - q.z < t.need + ARCADE_COVER_M)) return false;
       const f = faceAt(q, side, G.sill);
-      return f != null && f <= outer + ARCADE_ROCK_M;
+      if (f == null) return false;
+      if (f <= outer + ARCADE_ROCK_M) return true;
+      // (a thin roof, the ground falling from it to the road within a few
+      // metres on the open side: the survey's picture of a gallery roof,
+      // its edge a slope where the columns stand. The lakeside D 902: 9 to
+      // 13 m of "ground" over the road, the open air 6 to 8 m past the lining)
+      return f <= outer + ARCADE_SLOPE_ROCK_M && q.g - q.z < t.need + ARCADE_SLOPE_COVER_M;
     };
     for (let i = t.iS; i <= t.iN;) {
       if (!open(i)) { i++; continue; }
       let j = i; while (j + 1 <= t.iN && open(j + 1)) j++;
       if (t.line[j].s - t.line[i].s >= ARCADE_MIN_RUN_M) {
-        t.arcades.push({ side, i, j, s0: t.line[i].s, s1: t.line[j].s });
+        t.arcades.push({ side, i, j, s0: t.line[i].s, s1: t.line[j].s, rock: 0 });
         for (let k = i; k + G.segments <= j; k += ARCADE_PITCH) {
           const run = t.line.slice(k, k + G.segments + 1);
           const faces = run.map((q) => faceAt(q, side, G.sill));
           if (faces.some((f) => f == null)) continue;
           picked.push({ ...make(k, side, 'gallery', Math.max(...faces)), arcade: true });
+          // (how far out the ground is kept under the sill along this arcade: to its deepest face)
+          const arc = t.arcades[t.arcades.length - 1];
+          arc.rock = Math.max(arc.rock, Math.max(...faces) - outer);
         }
       }
       i = j + 1;
@@ -1521,7 +1532,7 @@ export function tunnelGroundAt(t, x, y, h) {
   // sill all along, between them too (a tooth of ground stood up through the
   // gallery beside every pillar)
   const arc = arcadeAt(t, n.s);
-  if (arc && Math.sign(n.d) === arc.side && ad > t.W && ad <= t.W + LINING_M + ARCADE_ROCK_M + WINDOW_LEDGE_M) out = Math.min(out, n.z + WINDOW_KINDS.gallery.sill - 0.3);
+  if (arc && Math.sign(n.d) === arc.side && ad > t.W && ad <= t.W + LINING_M + Math.max(ARCADE_ROCK_M, arc.rock || 0) + WINDOW_LEDGE_M) out = Math.min(out, n.z + WINDOW_KINDS.gallery.sill - 0.3);
   // gallery windows: the ground in front kept under the sill, the rock over
   // the face plate down to its top, and no fill made up in front of it
   for (const w of t.windows || []) {

@@ -541,6 +541,22 @@ test('ground left standing inside a low box is opened: only under the roof, neve
   assert.equal(lowMouthHoleAt(t, 12, yIn(5), 10.8), false, 'beside the box');
 });
 
+test('a thin roof sloping down to the road on the open side is a gallery roof as a survey draws it: an arcade', () => {
+  // bare-earth lidar has no overhang: a gallery's roof is ground 10 m over
+  // the road, its edge smeared into a slope down to road level 8 m further
+  // out (the lakeside D 902: its first 85 m stayed a closed tube)
+  const smear = (x, y) => (Math.abs(y) < 100 ? (x <= 6 ? Math.min(ridge(x, y), 30) : x < 14 ? 30 - (11 * (x - 6)) / 8 : 19) : ridge(x, y));
+  const t = solveTunnel({ xy: road(-400, 400), half: 4 }, { groundAt: smear, approaches: [{ xy: road(-400, -700) }, { xy: road(400, 700) }] });
+  assert.ok(t.ok, t.reason);
+  assert.equal(t.arcades.length, 1, 'one arcade along the thin-roofed stretch');
+  assert.equal(t.arcades[0].side, 1);
+  assert.ok(t.arcades[0].s1 - t.arcades[0].s0 > 150, `it runs ${Math.round(t.arcades[0].s1 - t.arcades[0].s0)} m`);
+  assert.ok(t.arcades[0].rock > 3, 'the ground is kept under the sill out to the smeared face');
+  // the same slope under a thick roof is a hillside over a bore: no arcade
+  const thick = (x, y) => (Math.abs(y) < 100 ? (x <= 6 ? Math.min(ridge(x, y), 45) : x < 14 ? 45 - (26 * (x - 6)) / 8 : 19) : ridge(x, y));
+  assert.equal(solveTunnel({ xy: road(-400, 400), half: 4 }, { groundAt: thick, approaches: [{ xy: road(-400, -700) }, { xy: road(400, 700) }] }).arcades.length, 0);
+});
+
 test('a mountain road climbing away from its portal on the ground has no long cutting', () => {
   // a road running north at 10 %, a 14 m spur across it between
   // y = -30 and 30: the tunnel is the spur; outside it the road is on the ground
