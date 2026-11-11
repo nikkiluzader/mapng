@@ -55,6 +55,8 @@ export function summarizeExportSettings(opts = {}, ctx = {}) {
     toggle('materials', opts.pbrSource === 'osm'),
   ];
   if (opts.levelName) output.push(row('levelName', { text: String(opts.levelName) }));
+  // (the view distance only when it is not the usual 4 km: services/viewDistance.js)
+  if (opts.viewDistance && Number(opts.viewDistance) !== 4000) output.push(row('viewDistance', { text: `${Number(opts.viewDistance) / 1000} km` }));
   // (the spawn and quicktravel points from step 1: services/spawnPoints.js)
   if (Array.isArray(opts.points) && opts.points.length) {
     const def = opts.points.find((p) => p?.isDefault);

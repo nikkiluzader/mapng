@@ -559,7 +559,8 @@
       "backdropImageryOwn": "Diese Kulissenquelle wählt ihr Bild selbst.",
       "backdropImagerySlow": "{n} Bildkacheln: Bei großen Gebieten kann der Download dauern.",
       "backdropImageryLimitedWeb": "In dieser Qualität zu groß für einen Browser-Tab: auf etwa {mpp} m pro Pixel reduziert. Die Desktop-App hat mehr Platz.",
-      "backdropImageryLimitedDesktop": "In dieser Qualität zu groß zum Zusammensetzen: auf etwa {mpp} m pro Pixel reduziert."
+      "backdropImageryLimitedDesktop": "In dieser Qualität zu groß zum Zusammensetzen: auf etwa {mpp} m pro Pixel reduziert.",
+      "viewDistanceHint": "Wie weit das Spiel das Level zeichnet. Eine kürzere Distanz entlastet bei großen oder dichten Levels. Standard: 4 km."
     },
     "weight": {
       "title": "Wie schwer ist dieses Level?",
@@ -578,7 +579,8 @@
       "buildingsCapped": "{count} Gebäude im Gebiet: {built} davon werden gebaut (Alles bauen ist aus).",
       "uncapped": "Alles bauen ist an: Bäume, Zäune, Laternen und Objekte sind auch nicht begrenzt. Dichte Vegetation senkt die FPS am stärksten."
     },
-    "downloadReady": "Download bereit: {name}"
+    "downloadReady": "Download bereit: {name}",
+    "viewDistance": "Sichtweite"
   },
   "controlPanel": {
     "resolutionOutputSize": "Auflösung (Ausgabegröße)",
@@ -1335,7 +1337,8 @@
     "pointsValueDefault": "{n} Punkte (Start: {name})",
     "contentOff": "Ausgeschaltet",
     "excludeTags": "Ausgelassene OSM-Tags",
-    "basicPreset": "Was gebaut wird"
+    "basicPreset": "Was gebaut wird",
+    "viewDistance": "Sichtweite"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",
@@ -1526,7 +1529,8 @@
     "forestDensity": "Walddichte",
     "forest_light": "Licht",
     "forest_dense": "Dicht",
-    "forest_veryDense": "Sehr dicht"
+    "forest_veryDense": "Sehr dicht",
+    "viewDistance": "Sichtweite"
   },
   "spawnPoints": {
     "title": "Start- & Quicktravel-Punkte",

@@ -559,7 +559,8 @@
       "backdropImageryOwn": "Cette source d'arrière-plan choisit sa propre image.",
       "backdropImagerySlow": "{n} tuiles d'image : le téléchargement peut être long sur une grande zone.",
       "backdropImageryLimitedWeb": "Trop grand pour un onglet de navigateur à cette qualité : ramené à environ {mpp} m par pixel. L'application de bureau a plus de marge.",
-      "backdropImageryLimitedDesktop": "Trop grand à assembler à cette qualité : ramené à environ {mpp} m par pixel."
+      "backdropImageryLimitedDesktop": "Trop grand à assembler à cette qualité : ramené à environ {mpp} m par pixel.",
+      "viewDistanceHint": "Jusqu'où le jeu affiche le niveau. Une distance plus courte allège les niveaux grands ou denses. Par défaut : 4 km."
     },
     "weight": {
       "title": "Quel est le poids de ce niveau ?",
@@ -578,7 +579,8 @@
       "buildingsCapped": "{count} bâtiments dans la zone : {built} sont construits (Tout construire est désactivé).",
       "uncapped": "Tout construire est activé : arbres, clôtures, lampadaires et objets ne sont pas plafonnés non plus. La végétation dense est ce qui fait le plus baisser les images par seconde."
     },
-    "downloadReady": "Téléchargement prêt : {name}"
+    "downloadReady": "Téléchargement prêt : {name}",
+    "viewDistance": "Distance d'affichage"
   },
   "controlPanel": {
     "resolutionOutputSize": "Résolution (taille de sortie)",
@@ -1335,7 +1337,8 @@
     "pointsValueDefault": "{n} points (départ : {name})",
     "contentOff": "Désactivé",
     "excludeTags": "Tags OSM exclus",
-    "basicPreset": "Que construire"
+    "basicPreset": "Que construire",
+    "viewDistance": "Distance d'affichage"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
@@ -1526,7 +1529,8 @@
     "forestDensity": "Densité des forêts",
     "forest_light": "Faible",
     "forest_dense": "Dense",
-    "forest_veryDense": "Très dense"
+    "forest_veryDense": "Très dense",
+    "viewDistance": "Distance d'affichage"
   },
   "spawnPoints": {
     "title": "Points de départ et Quicktravel",

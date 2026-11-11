@@ -559,7 +559,8 @@
       "backdropImageryOwn": "Esta fuente de telón de fondo elige su propia imagen.",
       "backdropImagerySlow": "{n} teselas de imagen: la descarga puede tardar en un área grande.",
       "backdropImageryLimitedWeb": "Demasiado grande para una pestaña del navegador con esta calidad: reducida a unos {mpp} m por píxel. La app de escritorio tiene más margen.",
-      "backdropImageryLimitedDesktop": "Demasiado grande para componer con esta calidad: reducida a unos {mpp} m por píxel."
+      "backdropImageryLimitedDesktop": "Demasiado grande para componer con esta calidad: reducida a unos {mpp} m por píxel.",
+      "viewDistanceHint": "Hasta dónde dibuja el juego el nivel. Una distancia menor aligera los niveles grandes o densos. Por defecto: 4 km."
     },
     "weight": {
       "title": "¿Cuánto pesa este nivel?",
@@ -578,7 +579,8 @@
       "buildingsCapped": "{count} edificios en la zona: se crean {built} (Crear todo está desactivado).",
       "uncapped": "Crear todo está activado: árboles, vallas, farolas y objetos tampoco tienen límite. La vegetación densa es lo que más baja los FPS."
     },
-    "downloadReady": "Descarga lista: {name}"
+    "downloadReady": "Descarga lista: {name}",
+    "viewDistance": "Distancia de visión"
   },
   "controlPanel": {
     "resolutionOutputSize": "Resolución (tamaño de salida)",
@@ -1335,7 +1337,8 @@
     "pointsValueDefault": "{n} puntos (inicio: {name})",
     "contentOff": "Desactivado",
     "excludeTags": "Etiquetas OSM excluidas",
-    "basicPreset": "Qué crear"
+    "basicPreset": "Qué crear",
+    "viewDistance": "Distancia de visión"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",
@@ -1526,7 +1529,8 @@
     "forestDensity": "Densidad del bosque",
     "forest_light": "Baja",
     "forest_dense": "Densa",
-    "forest_veryDense": "Muy densa"
+    "forest_veryDense": "Muy densa",
+    "viewDistance": "Distancia de visión"
   },
   "spawnPoints": {
     "title": "Puntos de inicio y Quicktravel",

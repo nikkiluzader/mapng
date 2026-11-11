@@ -280,6 +280,18 @@ test('guide §10.9: exactly one theLevelInfo with globalEnviromentMap spelling',
   });
 });
 
+// The export panel's View distance (services/viewDistance.js) is the LevelInfo's
+// visibleDistance: 4 km unless another of the four distances is chosen.
+test('view distance: LevelInfo visibleDistance follows the option, 4000 by default', async () => {
+  const levelInfoOf = async (zip) => parseNDJSON(await readText(zip, 'main/MissionGroup/sky_and_sun/items.level.json')).find((o) => o.class === 'LevelInfo');
+  await withZip(async (zip) => assert.equal((await levelInfoOf(zip)).visibleDistance, 4000));
+  const restore = installCanvasPolyfill();
+  try {
+    assert.equal((await levelInfoOf(await exportZip({ viewDistance: 2000 }))).visibleDistance, 2000);
+    assert.equal((await levelInfoOf(await exportZip({ viewDistance: 12345 }))).visibleDistance, 4000);
+  } finally { restore(); }
+});
+
 // ── Sky: 0.39+ celestial sky reads TimeOfDay place/date; one CloudLayer ──────
 test('sky: TimeOfDay carries the export location + date, matching info.json defaultDate', async () => {
   await withZip(async (zip) => {

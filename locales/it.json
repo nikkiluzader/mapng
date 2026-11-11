@@ -559,7 +559,8 @@
       "backdropImageryOwn": "Questa sorgente dello sfondo sceglie da sé l'immagine.",
       "backdropImagerySlow": "{n} riquadri d'immagine: su un'area grande il download può richiedere tempo.",
       "backdropImageryLimitedWeb": "Troppo grande per una scheda del browser a questa qualità: ridotta a circa {mpp} m per pixel. L'app desktop ha più margine.",
-      "backdropImageryLimitedDesktop": "Troppo grande da comporre a questa qualità: ridotta a circa {mpp} m per pixel."
+      "backdropImageryLimitedDesktop": "Troppo grande da comporre a questa qualità: ridotta a circa {mpp} m per pixel.",
+      "viewDistanceHint": "Fin dove il gioco disegna il livello. Una distanza minore alleggerisce i livelli grandi o densi. Predefinita: 4 km."
     },
     "weight": {
       "title": "Quanto è pesante questo livello?",
@@ -578,7 +579,8 @@
       "buildingsCapped": "{count} edifici nell'area: ne vengono costruiti {built} (Costruisci tutto è disattivato).",
       "uncapped": "Costruisci tutto è attivo: anche alberi, recinzioni, lampioni e oggetti non hanno limiti. La vegetazione fitta è ciò che abbassa di più gli FPS."
     },
-    "downloadReady": "Download pronto: {name}"
+    "downloadReady": "Download pronto: {name}",
+    "viewDistance": "Distanza visiva"
   },
   "controlPanel": {
     "resolutionOutputSize": "Risoluzione (dimensione output)",
@@ -1335,7 +1337,8 @@
     "pointsValueDefault": "{n} punti (partenza: {name})",
     "contentOff": "Disattivato",
     "excludeTags": "Tag OSM esclusi",
-    "basicPreset": "Cosa costruire"
+    "basicPreset": "Cosa costruire",
+    "viewDistance": "Distanza visiva"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
@@ -1526,7 +1529,8 @@
     "forestDensity": "Densità dei boschi",
     "forest_light": "Bassa",
     "forest_dense": "Fitta",
-    "forest_veryDense": "Molto fitta"
+    "forest_veryDense": "Molto fitta",
+    "viewDistance": "Distanza visiva"
   },
   "spawnPoints": {
     "title": "Punti di partenza e Quicktravel",

@@ -564,7 +564,8 @@
       "backdropImageryOwn": "This backdrop source picks its own imagery.",
       "backdropImagerySlow": "{n} image tiles: the download can take a while on a large area.",
       "backdropImageryLimitedWeb": "Too large for a browser tab at this quality: stepped down to about {mpp} m per pixel. The desktop app has more room.",
-      "backdropImageryLimitedDesktop": "Too large to stitch at this quality: stepped down to about {mpp} m per pixel."
+      "backdropImageryLimitedDesktop": "Too large to stitch at this quality: stepped down to about {mpp} m per pixel.",
+      "viewDistanceHint": "How far the game draws the level. A shorter distance is lighter on big or dense levels. 4 km is the default."
     },
     "weight": {
       "title": "How heavy is this level?",
@@ -583,7 +584,8 @@
       "buildingsCapped": "{count} buildings in the area: {built} of them are built (Build everything is off).",
       "uncapped": "Build everything is on: trees, fences, lamps and props aren't capped either. Dense foliage is what lowers the frame rate most."
     },
-    "downloadReady": "Download ready: {name}"
+    "downloadReady": "Download ready: {name}",
+    "viewDistance": "View distance"
   },
   "controlPanel": {
     "resolutionOutputSize": "Resolution (output size)",
@@ -1340,7 +1342,8 @@
     "pointsValueDefault": "{n} points (spawn: {name})",
     "contentOff": "Switched off",
     "excludeTags": "OSM tags left out",
-    "basicPreset": "What to build"
+    "basicPreset": "What to build",
+    "viewDistance": "View distance"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1531,7 +1534,8 @@
     "forestDensity": "Forest density",
     "forest_light": "Light",
     "forest_dense": "Dense",
-    "forest_veryDense": "Very dense"
+    "forest_veryDense": "Very dense",
+    "viewDistance": "View distance"
   },
   "spawnPoints": {
     "title": "Spawn & quicktravel points",

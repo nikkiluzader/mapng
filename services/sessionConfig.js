@@ -19,6 +19,7 @@ export const EXPORT_FIELDS = [
   ['water', 'mapng_beamNGIncludeWater', 'bool', true],
   ['trees', 'mapng_beamNGIncludeTrees', 'bool', true],
   ['forestDensity', 'mapng_beamNGForestDensity', ['light', 'normal', 'dense', 'veryDense'], 'normal'],
+  ['viewDistance', 'mapng_beamNGViewDistance', ['1000', '2000', '4000', '8000'], '4000'],   // metres: services/viewDistance.js
   ['rocks', 'mapng_beamNGIncludeRocks', 'bool', true],
   ['safeCaps', 'mapng_beamNGSafeCaps', 'bool', true],
   ['bridges', 'mapng_beamNGIncludeBridges', 'bool', true],
@@ -44,7 +45,7 @@ const LIST_KINDS = { contentList: sanitizeContentOff, tagList: sanitizeExcludeTa
 /** Whether a field holds a list (stored as JSON; not counted in the settings stats). */
 export const isListField = ([, , kind]) => Object.hasOwn(LIST_KINDS, kind);
 // (not counted in the settings stats: public/data.html lists every counted setting)
-const NOT_COUNTED = new Set(['contentOff', 'excludeTags', 'basicPreset']);
+const NOT_COUNTED = new Set(['contentOff', 'excludeTags', 'basicPreset', 'viewDistance']);
 export const isCountedField = (field) => !NOT_COUNTED.has(field[0]) && !isListField(field);
 
 /** Data-part settings kept outside the run configuration: [name, key, kind, default]. */
@@ -252,6 +253,7 @@ export function describeSessionConfig(config, { hasGpxzKey = false } = {}) {
     const tagList = sanitizeExcludeTags(e.excludeTags);
     if (advanced && tagList.length) add('export', 'config.excludeTags', { value: tagList.slice(0, 6).join(', ') + (tagList.length > 6 ? ` +${tagList.length - 6}` : '') });
     if (advanced && e.trees !== false && e.forestDensity && e.forestDensity !== 'normal') add('export', 'config.forestDensity', { valueKey: `exportPanel.ui.forestDensity_${e.forestDensity}` });
+    if (advanced && e.viewDistance && String(e.viewDistance) !== '4000') add('export', 'config.viewDistance', { value: `${Number(e.viewDistance) / 1000} km` });
     const structures = ['bridges', 'tunnels', 'measuredBridgeHeights'].filter((k) => e[k] !== false);
     if (advanced) add('export', 'config.structures', { valueKey: 'config.list', params: { list: structures.length ? structures.map((k) => `config.c_${k}`) : ['config.nothing'] } });
     if (e.terrainEdits) {

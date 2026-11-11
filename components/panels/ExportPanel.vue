@@ -28,6 +28,11 @@
                 class="w-44 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-brand focus:border-brand"
               />
             </SettingRow>
+            <SettingRow v-if="advancedMode" :label="t('exportPanel.viewDistance')" :hint="t('exportPanel.ui.viewDistanceHint')">
+              <select v-model.number="beamNGViewDistance" :class="SELECT_XS">
+                <option v-for="m in VIEW_DISTANCES_M" :key="m" :value="m">{{ m / 1000 }} km</option>
+              </select>
+            </SettingRow>
             <SettingRow :label="t('exportPanel.baseTexture')">
               <select v-model="beamNGBaseTexture" :class="SELECT_XS" @change="handleBeamNGBaseTextureChange">
                 <option value="none">{{ t('exportPanel.none') }}</option>
@@ -577,6 +582,7 @@ import {
   Download, ChevronDown, Loader2, Mountain, Box, Trees, Layers, Route, FileCode, FileJson, PackageOpen, Paintbrush, CheckCircle2, FolderOpen, AlertCircle, FileText, Flame, AlertTriangle, LifeBuoy, BarChart3, Compass, Building2, Package, ShieldCheck
 } from 'lucide-vue-next';
 import { zipIndexOfBlob, levelZipProblems } from '../../services/zipIndex.js';
+import { VIEW_DISTANCES_M, DEFAULT_VIEW_DISTANCE_M, viewDistanceMeters } from '../../services/viewDistance.js';
 import StageLoader from '../ui/StageLoader.vue';
 import { rasterizeMask, backgroundFraction } from '../../services/backgroundMask.js';
 import { summarizeExportSettings, translateExportSettings } from '../../services/exportSettingsSummary.js';
@@ -820,6 +826,8 @@ const beamNGIncludeTrees = legacyOn.trees;
 const FOREST_DENSITY_KEYS = ['light', 'normal', 'dense', 'veryDense'];
 const storedForestDensity = localStorage.getItem('mapng_beamNGForestDensity');
 const beamNGForestDensity = ref(FOREST_DENSITY_KEYS.includes(storedForestDensity) ? storedForestDensity : 'normal');
+// (how far the game draws: services/viewDistance.js)
+const beamNGViewDistance = ref(viewDistanceMeters(localStorage.getItem('mapng_beamNGViewDistance')));
 const beamNGIncludeRocks = legacyOn.rocks;
 // content caps (buildings, fences, lamps, trees ...): off builds everything the map has
 const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
@@ -1108,6 +1116,7 @@ const exportInputs = computed(() => JSON.stringify({
   backdrop: beamNGBackdropSource.value, gpxz: beamNGBackdropSource.value === 'gpxz' ? String(props.gpxzApiKey || '').length : 0,
   buildings: beamNGIncludeBuildings.value, water: beamNGIncludeWater.value, trees: beamNGIncludeTrees.value,
   forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value,
+  view: beamNGViewDistance.value,
   bridges: beamNGIncludeBridges.value, tunnels: beamNGIncludeTunnels.value, lidar: beamNGLidarDecks.value,
   sea: beamNGSeaLevelOffset.value,
   content: contentOptions(advancedMode.value),
@@ -1236,6 +1245,7 @@ watch(beamNGSeaLevelOffset, (v) => {
   localStorage.setItem('mapng_beamNGSeaLevelOffset', String(normalized));
 });
 watch(beamNGForestDensity, (v) => localStorage.setItem('mapng_beamNGForestDensity', v));
+watch(beamNGViewDistance, (v) => localStorage.setItem('mapng_beamNGViewDistance', String(viewDistanceMeters(v))));
 watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String(v)));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
@@ -2072,6 +2082,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       forestDensity: advanced ? beamNGForestDensity.value : 'normal',
+      viewDistance: advanced ? viewDistanceMeters(beamNGViewDistance.value) : DEFAULT_VIEW_DISTANCE_M,
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       ...structureOptions,
@@ -2097,6 +2108,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       seaLevelOffset: effectiveSeaLevelOffset,
       includeTrees: effectiveIncludeTrees,
       forestDensity: advanced ? beamNGForestDensity.value : 'normal',
+      viewDistance: advanced ? viewDistanceMeters(beamNGViewDistance.value) : DEFAULT_VIEW_DISTANCE_M,
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       ...structureOptions,

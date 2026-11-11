@@ -46,6 +46,7 @@ import { DAE_OPTIONS, describeScene, writeDae } from './daeWorker.js';
 import { geoToWorldPoint, getTerrainHeightWorld, terrainDrape, terrainGroundAt } from './terrainLookup.js';
 import { pickFlagCell } from './flagPlacement.js';
 import { BUILDING_LITE_FROM_M, buildingTileScene } from './buildingTiles.js';
+import { viewDistanceMeters } from './viewDistance.js';
 import { parallelMap, parallelThreads } from './parallel.js';
 import { measureStructures, roadLinesFromDecals } from './structures/metrics.js';
 import { buildStructureGraph } from './structures/graph.js';
@@ -8033,6 +8034,7 @@ function buildBeamNGExportReport({
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
     `- Forest density: ${options?.forestDensity || 'normal'} (×${forestDensityMultiplier(options?.forestDensity)} the base tree rates; woods ~${Math.round(36 * forestDensityMultiplier(options?.forestDensity))} trees/ha)`,
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
+    `- View distance: ${viewDistanceMeters(options?.viewDistance)} m (LevelInfo visibleDistance)`,
     `- Include sidewalks: ${formatBool(options?.includeSidewalks !== false)}`,
     ...(() => {
       // What to build (services/buildContent.js): the features switched off and the OSM left out for them
@@ -14856,7 +14858,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           : getGlobalEnvironmentMap(biome),
         gravity: -9.81,
         nearClip: 0.1,
-        visibleDistance: 4000,
+        // (the export panel's View distance: services/viewDistance.js)
+        visibleDistance: viewDistanceMeters(options?.viewDistance),
         // Depth bias tuned with visibleDistance to keep DecalRoad markings from
         // z-fighting the terrain (LevelInfo.md §decalBias).
         decalBias: 0.0005,
