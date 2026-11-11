@@ -541,6 +541,24 @@ test('ground left standing inside a low box is opened: only under the roof, neve
   assert.equal(lowMouthHoleAt(t, 12, yIn(5), 10.8), false, 'beside the box');
 });
 
+test('past the mouth, ground a hand\'s width under a low box\'s ceiling is raised onto the roof, not opened', async () => {
+  const { lowBoxSquareAt, nearestOnTunnel, LINING_M } = await import('../services/beamngTunnels.js');
+  const g = lidGround();
+  const t = solveTunnel({ xy: road(-70, 70), half: 4 }, { groundAt: g, approaches: [{ xy: road(-70, -200) }, { xy: road(70, 200) }] });
+  const yIn = (m) => t.line[t.iS].y + m;
+  const ceilingAt = (m) => nearestOnTunnel(t, 0, yIn(m)).z + t.crown;
+  // 30 m in, 0.5 m under the ceiling: the lid's own ground, raised to the roof's top
+  const deep = lowBoxSquareAt(t, 0, yIn(30), ceilingAt(30) - 0.5);
+  assert.ok(deep && deep.raise > ceilingAt(30) + LINING_M && deep.raise < ceilingAt(30) + LINING_M + 0.2, JSON.stringify(deep));
+  // the same height in the mouth is the ramp: opened, as before
+  assert.equal(lowBoxSquareAt(t, 0, yIn(5), ceilingAt(5) - 0.5), 'open');
+  // deep in but well inside the clear space: real ground in the box, opened
+  assert.equal(lowBoxSquareAt(t, 0, yIn(30), ceilingAt(30) - 2.5), 'open');
+  // the lid over the roof, and ground beside the box: left alone
+  assert.equal(lowBoxSquareAt(t, 0, yIn(30), ceilingAt(30) + 1), null);
+  assert.equal(lowBoxSquareAt(t, 12, yIn(30), ceilingAt(30) - 0.5), null);
+});
+
 test('a thin roof sloping down to the road on the open side is a gallery roof as a survey draws it: an arcade', () => {
   // bare-earth lidar has no overhang: a gallery's roof is ground 10 m over
   // the road, its edge smeared into a slope down to road level 8 m further

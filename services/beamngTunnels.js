@@ -109,6 +109,7 @@ const LOW_COVER_M = 0;
 const LOW_MOUTH_IN_M = 8;
 const LOW_MOUTH_OUT_M = 8;
 const LOW_CEILING_CLEAR_M = 0.3;        // ground this far under the ceiling or lower stands in the box
+const LOW_LID_RAISE_M = 0.8;            // past the mouth, ground this close under the ceiling is the lid's own: raised onto the roof, not opened
 const LOW_MOUTH_FILL_M = 1;            // ground this much under the road in a mouth is made up to it           // ... and this far out past its apron the carriageway is cleared to the road            // a low box's mouth: this far in from its face
 const LOW_FILL_M = 1.8;              // a lid this much lower than the box is raised over it (a long underpass under a thin lid: 0.8 left Val d'Isère's 335 m bus tunnel a road on top of its own roof)
 const CC_WALL_M = 5;                   // box walls ...
@@ -1620,6 +1621,26 @@ export function lowMouthHoleAt(t, x, y, lo) {
   if (across(t, n) > t.W + LINING_M + 0.5 * t.squareSize) return false;
   // (clearly in the clear space: ground within the roof slab's thickness is the lid, hidden in the concrete)
   return lo < n.z + t.crown - LOW_CEILING_CLEAR_M;
+}
+
+/**
+ * What becomes of a terrain square over a low box whose lowest corner is at
+ * `lo`: 'open' (ground standing in the clear space: a hole), { raise: z }
+ * (its corners brought up onto the roof), or null (the lid, left alone).
+ *
+ * Past the mouth the cover over a low box can sit a hand's width under the
+ * ceiling (Val d'Isère's Tunnel des Téléphériques on lidar: 0.3 to 0.5 m
+ * under it, 40 to 100 m in). Opened, those squares were holes in the ground
+ * over the middle of the tunnel (Fizz_Mechanic, 0.2.17); they are part of
+ * the lid, so they go up onto the roof instead. In the mouth itself the ramp
+ * of ground is opened whatever its height, as before.
+ */
+export function lowBoxSquareAt(t, x, y, lo) {
+  if (!lowMouthHoleAt(t, x, y, lo)) return null;
+  const n = nearestOnTunnel(t, x, y, t.W + (t.maxExtra || 0) + LINING_M + t.squareSize * 2);
+  const ceiling = n.z + t.crown;
+  if (n.into > LOW_MOUTH_IN_M && lo >= ceiling - LOW_LID_RAISE_M) return { raise: ceiling + LINING_M + 0.05 };
+  return 'open';
 }
 
 /** Is (x, y, z..zTop) inside a tunnel's structure (tube, headwalls, wingwalls)? */

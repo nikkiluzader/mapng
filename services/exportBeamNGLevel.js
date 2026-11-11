@@ -91,7 +91,7 @@ import {
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
 } from './beamngBridges.js';
 import {
-  solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
+  lowBoxSquareAt, solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
   hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
   galleryRoofHalf,
 } from './beamngTunnels.js';
@@ -13080,6 +13080,10 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const mh0 = Number(exportTerrainData.minHeight) || 0;
       const holes = new Set(decalRoads.tunnels.holes || []);
       let opened = 0;
+      // (past the mouth, ground a hand's width under the ceiling is the lid's:
+      // raised onto the roof, not opened: beamngTunnels.js lowBoxSquareAt)
+      const raises = new Map();
+      const raiseTo = (i, z) => { if (!(raises.get(i) >= z)) raises.set(i, z); };
       for (const t of lowBoxes) {
         const [x0, y0, x1, y1] = tunnelReach(t);
         const c0 = Math.max(0, Math.floor(x0 / squareSize + W / 2) - 1); const c1 = Math.min(W - 2, Math.ceil(x1 / squareSize + W / 2) + 1);
@@ -13090,9 +13094,17 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
             if (holes.has(idx)) continue;
             const x = (c + 0.5 - W / 2) * squareSize; const y = (Hh / 2 - r - 0.5) * squareSize;
             const corners = [hmap[r * W + c], hmap[r * W + c + 1], hmap[(r - 1) * W + c], hmap[(r - 1) * W + c + 1]];
-            if (lowMouthHoleAt(t, x, y, Math.min(...corners) - mh0)) { holes.add(idx); opened++; t.holes = (t.holes || 0) + 1; }
+            const what = lowBoxSquareAt(t, x, y, Math.min(...corners) - mh0);
+            if (what === 'open') { holes.add(idx); opened++; t.holes = (t.holes || 0) + 1; }
+            else if (what?.raise != null) { const z = what.raise + mh0; raiseTo(r * W + c, z); raiseTo(r * W + c + 1, z); raiseTo((r - 1) * W + c, z); raiseTo((r - 1) * W + c + 1, z); }
           }
         }
+      }
+      if (raises.size) {
+        const hmLid = heightMapEditor(exportTerrainData);
+        let raised = 0;
+        for (const [i, z] of raises) if (hmLid.at(i) < z) { hmLid.set(i, z); raised++; }
+        if (raised) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Tunnel lids: ${raised} grid point(s) just under a low box's ceiling raised onto its roof.`);
       }
       if (opened) {
         decalRoads.tunnels.holes = [...holes];
