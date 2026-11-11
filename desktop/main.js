@@ -171,6 +171,14 @@ function createWindow() {
       });
       return;
     }
+    // (the elevation sources' quality report: the same, as a web page)
+    if (/^mapng-elevation-quality-.*\.html$/i.test(name)) {
+      item.setSaveDialogOptions({
+        defaultPath: path.join(app.getPath('downloads'), name),
+        filters: [{ name: 'Web page', extensions: ['html'] }],
+      });
+      return;
+    }
     if (!BATCH_FILE.test(name)) return;
     const dir = batchFolder();
     fs.mkdirSync(dir, { recursive: true });
