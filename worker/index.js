@@ -132,6 +132,9 @@ const OSM_TILES_MANIFEST_KEY = 'osm/manifest.json';
 const OSM_TILES_KEY_RE = /^osm\/[A-Za-z0-9._-]+\.pmtiles$/;
 const OSM_TILES_RANGE_TTL_S = 30 * 24 * 3600;
 const OSM_TILES_MANIFEST_TTL_S = 300;
+// (the planet build's progress, for public/planet.html: scripts/planet/planet.py progress)
+const OSM_TILES_PROGRESS_KEY = 'osm/planet-progress.json';
+const OSM_TILES_PROGRESS_TTL_S = 60;
 
 async function handleOsmTiles(request, url, env, ctx) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -147,6 +150,17 @@ async function handleOsmTiles(request, url, env, ctx) {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': `public, max-age=${OSM_TILES_MANIFEST_TTL_S}`,
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
+  if (path === 'progress') {
+    const object = await env.OSM_TILES.get(OSM_TILES_PROGRESS_KEY);
+    if (!object) return jsonResponse({ blocks: [] }, 200, { 'Cache-Control': `public, max-age=${OSM_TILES_PROGRESS_TTL_S}` });
+    return new Response(object.body, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': `public, max-age=${OSM_TILES_PROGRESS_TTL_S}`,
         'Access-Control-Allow-Origin': '*',
       },
     });

@@ -56,13 +56,23 @@ MANY_TILES = 64       # a feature whose box covers more tiles goes only where it
 COORD_DIGITS = 7      # Overpass precision
 
 
-def load_filter():
+# Tags that say nothing about the map: an object carrying only these is left
+# out of a --all build (they come back as tags of the objects that keep them).
+META_KEYS = {"created_by", "source", "note", "fixme", "FIXME", "comment", "attribution"}
+
+
+def meaningful(tags):
+    return any(k not in META_KEYS and not k.startswith("source:") for k in tags)
+
+
+def load_filter(everything=False):
     out = subprocess.run(
         ["node", "-e", "import('./services/overpassQuery.js').then((m) => console.log(JSON.stringify(m.OSM_FILTER)))"],
         cwd=REPO, check=True, capture_output=True, text=True,
     )
     f = json.loads(out.stdout)
     return {
+        "all": everything,
         "way_keys": set(f["wayKeys"]),
         "way_tags": {tuple(t) for t in f["wayTags"]},
         "relation_keys": set(f["relationKeys"]),
@@ -93,6 +103,42 @@ def tile_range(coords, z):
     x0, y0 = tile_xy(max(lats), min(lons), z)   # north-west
     x1, y1 = tile_xy(min(lats), max(lons), z)   # south-east
     return x0, y0, x1, y1
+
+
+def tile_frac(lat, lon, z):
+    lat = max(-85.0511, min(85.0511, lat))
+    n = 1 << z
+    return (lon + 180.0) / 360.0 * n, (1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n
+
+
+def line_tiles(coords, z):
+    """The tiles a line really passes through (each segment walked across
+    the tile grid), not its bounding box: one long border way's box covers
+    tens of thousands of tiles it never enters."""
+    n = 1 << z
+    out = set()
+    prev = None
+    for lat, lon in coords:
+        fx, fy = tile_frac(lat, lon, z)
+        fx, fy = min(n - 1e-9, max(0.0, fx)), min(n - 1e-9, max(0.0, fy))
+        out.add((int(fx), int(fy)))
+        if prev is not None:
+            px, py = prev
+            dx, dy = fx - px, fy - py
+            # (a segment over half the world wide crosses the antimeridian:
+            # only its ends count)
+            if abs(dx) <= n / 2 and (int(px) != int(fx) or int(py) != int(fy)):
+                ts = [0.0, 1.0]
+                if dx:
+                    ts += [(gx - px) / dx for gx in range(int(min(px, fx)) + 1, int(max(px, fx)) + 1)]
+                if dy:
+                    ts += [(gy - py) / dy for gy in range(int(min(py, fy)) + 1, int(max(py, fy)) + 1)]
+                ts.sort()
+                for t0, t1 in zip(ts, ts[1:]):
+                    tm = (t0 + t1) / 2
+                    out.add((int(px + dx * tm), int(py + dy * tm)))
+        prev = (fx, fy)
+    return out
 
 
 def e7(value):
@@ -386,7 +432,8 @@ class RelationPass(osmium.SimpleHandler):
 
     def relation(self, r):
         tags = tags_dict(r.tags)
-        if not any(k in tags for k in self.flt["relation_keys"]):
+        keep = meaningful(tags) if self.flt.get("all") else any(k in tags for k in self.flt["relation_keys"])
+        if not keep:
             return
         members = [(m.type, m.ref, m.role) for m in r.members]
         self.relations.append((r.id, tags, members))
@@ -416,7 +463,10 @@ class WayNodePass(osmium.SimpleHandler):
         # Look the filter's keys up rather than iterating every tag of every
         # node: pyosmium's tag iterator crashed (segfault / SystemError) part
         # way through the Florida extract, and this is faster anyway.
-        if not any(n.tags.get(k) == v for k, v in self.flt["node_tags"]):
+        if self.flt.get("all"):
+            if not meaningful(tags_dict(n.tags)):
+                return
+        elif not any(n.tags.get(k) == v for k, v in self.flt["node_tags"]):
             return
         if not n.location.valid():
             return
@@ -427,8 +477,11 @@ class WayNodePass(osmium.SimpleHandler):
 
     def way(self, w):
         tags = tags_dict(w.tags)
-        matches = any(k in tags for k in self.flt["way_keys"]) or any(
-            (k, v) in self.flt["way_tags"] for k, v in tags.items())
+        if self.flt.get("all"):
+            matches = meaningful(tags)
+        else:
+            matches = any(k in tags for k in self.flt["way_keys"]) or any(
+                (k, v) in self.flt["way_tags"] for k, v in tags.items())
         is_member = w.id in self.member_ways
         if not matches and not is_member:
             return
@@ -494,7 +547,13 @@ def ring_coords(ring):
     return [(lat, lon) for lon, lat in ring.coords]
 
 
-def emit_relations(relations, way_geom, node_loc, tiles, id_offset=0):
+def emit_relations(relations, way_geom, node_loc, tiles, id_offset=0, area_keys=None):
+    # area_keys (--all builds): only big areas carrying one of these keys are
+    # cut into per-tile pieces (land cover the app draws: forests, lakes,
+    # parks). Every other big relation (countries, states, time zones, postal
+    # areas, islands) keeps just the member ways touching each tile, as an
+    # Overpass bbox query answers: cut up, a country would put a piece with all
+    # its tags into every one of its millions of tiles.
     # (negative ids for cut pieces; planet blocks each get their own range, so
     # pieces from neighbouring blocks never share an id in the browser's merge)
     next_synthetic = [-1 - id_offset]
@@ -533,6 +592,8 @@ def emit_relations(relations, way_geom, node_loc, tiles, id_offset=0):
             counts["relation_whole"] += 1
             continue
 
+        if is_area and area_keys is not None and not any(k in tags for k in area_keys):
+            is_area = False
         area = assemble_area(members, way_geom) if is_area else None
         if area is not None:
             # Cut at tile edges; every piece is a standalone multipolygon relation.
@@ -570,21 +631,21 @@ def emit_relations(relations, way_geom, node_loc, tiles, id_offset=0):
 
         # Large non-area relation: per tile, only the members that touch it.
         per_tile = defaultdict(list)
+        # (the owner also adds the members that cross blocks holding none of
+        # the relation's points)
+        mine, held = tiles.owner(all_coords) if tiles.reaches_out(x0, y0, x1, y1) else (False, set())
         for m, coords in member_json:
-            mx0, my0, mx1, my1 = tiles.clamp(*tile_range(coords, tiles.z))
-            for x in range(mx0, mx1 + 1):
-                for y in range(my0, my1 + 1):
-                    per_tile[(x, y)].append(m)
-        if tiles.reaches_out(x0, y0, x1, y1):
-            # (the owner also adds the members that cross blocks holding none
-            # of the relation's points)
-            mine, held = tiles.owner(all_coords)
-            if mine:
-                for m, coords in member_json:
-                    if m[0] != "w":
-                        continue
-                    for xy in tiles.outer_tiles(*tile_range(coords, tiles.z), held, shape_of(coords, {"highway": "line"})):
+            for xy in line_tiles(coords, tiles.z):
+                if tiles.inside(xy):
+                    per_tile[xy].append(m)
+                elif mine and m[0] == "w":
+                    b = tiles.block_of_tile(*xy)
+                    if b is not None and b not in held:
                         per_tile[xy].append(m)
+        if os.environ.get("OSMTILES_DEBUG") and len(per_tile) > 2000:
+            print(f"DEBUG big member-split relation {rid}: {len(per_tile)} tiles, {len(member_json)} members, "
+                  f"{len(dumps(tags))} tag bytes, type={tags.get('type')} {tags.get('boundary') or tags.get('route') or ''} {tags.get('name', '')[:40]}",
+                  file=sys.stderr, flush=True)
         for xy, ms in per_tile.items():
             el = ["r", rid, tags, ms]
             tiles.add_to(xy, dumps(el))
@@ -645,13 +706,15 @@ def main():
                     help="JSON list of every leaf block key (z-x-y) of the planet: features reaching into\n                    blocks that hold none of their points are written there too, as <output>.side")
     ap.add_argument("--block", default=None,
                     help="z/x/y: keep only the tiles inside this lower-zoom tile (planet blocks)")
+    ap.add_argument("--all", action="store_true",
+                    help="every object with a meaningful tag, not just OSM_FILTER (the app filters on reading)")
     args = ap.parse_args()
     block = tuple(int(v) for v in args.block.split("/")) if args.block else None
     # a block's own range of negative ids for cut pieces (its PMTiles tile id x 1e8)
     id_offset = zxy_to_tileid(*block) * 100_000_000 if block else 0
 
     t0 = time.time()
-    flt = load_filter()
+    flt = load_filter(args.all)
     rel = RelationPass(flt)
     if args.opl:
         apply_opl(args.input, rel, kinds="r")
@@ -672,7 +735,8 @@ def main():
         wn.apply_file(args.input, locations=True, idx=args.index)
     print(f"nodes: {wn.counts['node']}, ways: {wn.counts['way']} ({time.time() - t0:.0f}s)", file=sys.stderr)
 
-    rc = emit_relations(rel.relations, wn.way_geom, wn.node_loc, tiles, id_offset)
+    rc = emit_relations(rel.relations, wn.way_geom, wn.node_loc, tiles, id_offset,
+                        area_keys=flt["relation_keys"] if args.all else None)
     print(f"relations: {dict(rc)} ({time.time() - t0:.0f}s)", file=sys.stderr)
 
     if block and leaves:

@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG Planet Build</title>
+<meta name="description" content="Live progress of MapNG's own copy of OpenStreetMap for the whole planet: which parts of the world are built, which are being built now, and which are still waiting.">
+<link rel="canonical" href="https://mapng.com/planet.html">
+<meta property="og:title" content="MapNG: planet map data, build progress">
+<meta property="og:description" content="A live map of MapNG's own OpenStreetMap copy being built for the whole planet.">
+<meta property="og:url" content="https://mapng.com/planet.html">
+<meta property="og:image" content="https://mapng.com/og-image.jpg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --built: #15803d; --running: #ff6600; --waiting: #7a7a86; --live: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --built: #22a355; --running: #ff7a1f; --waiting: #8d8d99; --live: #60a5fa;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --built: #22a355; --running: #ff7a1f; --waiting: #8d8d99; --live: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  header.top { background: linear-gradient(90deg, #ff6600, #f59e0b); color: #fff; }
+  header.top .wrap { padding-top: 20px; padding-bottom: 36px; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; opacity: .95; }
+  .brand img { width: 22px; height: 22px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; }
+  h1 { font-size: clamp(28px, 5vw, 40px); line-height: 1.15; margin: 22px 0 10px; letter-spacing: -0.01em; }
+  .lede { font-size: 18px; max-width: 680px; margin: 0; color: rgba(255,255,255,.95); }
+  main { padding: 0 0 64px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: -22px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; }
+  .stat .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); line-height: 1.25; }
+  .stat .k { font-size: 13px; color: var(--muted); }
+  .overall { margin-top: 14px; height: 10px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
+  .overall span { display: block; height: 100%; width: 0; background: var(--built); transition: width .6s; }
+  .status { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
+  .status.stale { color: var(--brand-ink); font-weight: 600; }
+  section { margin-top: 36px; }
+  h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
+  p, li { color: var(--text-2); }
+  #map { height: clamp(300px, 72vw, 620px); border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); z-index: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 14px; }
+  .legend li { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); }
+  .sw { width: 16px; height: 16px; border-radius: 3px; border: 2px solid; flex: none; }
+  .sw.built { border-color: var(--built); background: color-mix(in srgb, var(--built) 45%, transparent); }
+  .sw.running { border-color: var(--running); background: color-mix(in srgb, var(--running) 60%, transparent); }
+  .sw.waiting { border-color: var(--waiting); background: color-mix(in srgb, var(--waiting) 12%, transparent); }
+  .sw.live { border-color: var(--live); border-style: dashed; background: transparent; }
+  .regions { display: grid; gap: 10px; margin-top: 12px; }
+  .region { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; }
+  .region .n { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .region .name { font-weight: 600; color: var(--text); }
+  .region .name small { font-weight: 400; color: var(--brand-ink); margin-left: 6px; }
+  .region .pct { font-variant-numeric: tabular-nums; color: var(--text-2); font-size: 14px; }
+  .region .bar { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  .region .bar span { display: block; height: 100%; background: var(--built); border-radius: 3px; transition: width .6s; }
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 10px 14px; color: var(--text); font-size: 15px; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+  .leaflet-container { font: inherit; font-size: 13px; }
+  @keyframes pulse { 50% { fill-opacity: .25; } }
+  .blk-running { animation: pulse 1.6s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .blk-running { animation: none; } .overall span, .region .bar span { transition: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <h1>Planet map data: build progress</h1>
+    <p class="lede">MapNG is building its own copy of OpenStreetMap for the whole planet, so roads, buildings and everything else load fast anywhere, without waiting on the public OpenStreetMap servers. This page shows how far the build has got.</p>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="stats">
+    <div class="stat"><div class="v" id="s-pct">…</div><div class="k">of the planet's data built</div></div>
+    <div class="stat"><div class="v" id="s-blocks">…</div><div class="k">blocks built</div></div>
+    <div class="stat"><div class="v" id="s-running">…</div><div class="k">being built right now</div></div>
+    <div class="stat"><div class="v" id="s-left">…</div><div class="k" id="s-left-k">time left (rough)</div></div>
+  </div>
+  <div class="overall" role="progressbar" aria-label="Planet build progress" aria-valuemin="0" aria-valuemax="100" id="overall"><span id="overall-bar"></span></div>
+  <p class="status" id="status">Loading the latest progress…</p>
+
+  <section id="map-section">
+    <h2>The map</h2>
+    <div id="map"></div>
+    <ul class="legend">
+      <li><span class="sw built"></span>Built</li>
+      <li><span class="sw running"></span>Being built now</li>
+      <li><span class="sw waiting"></span>Waiting</li>
+      <li><span class="sw live"></span>Already in MapNG today (earlier, smaller set)</li>
+    </ul>
+    <p>Each rectangle is one block of the build. Blocks are small where there is a lot of map data (cities, most of Europe) and large where there is little (oceans, deserts, the far north). Tap a block for its details.</p>
+  </section>
+
+  <section id="order">
+    <h2>Build order</h2>
+    <p>Regions are built in this order. The percentage counts the amount of map data, not land area.</p>
+    <div class="regions" id="regions"></div>
+  </section>
+
+  <section id="about">
+    <h2>What this is</h2>
+    <p>MapNG reads <a href="https://www.openstreetmap.org/">OpenStreetMap</a> to know where roads, buildings, rivers, forests and railways are. The public servers that hand out this data are often overloaded, so MapNG is making its own copy that it can serve by itself.</p>
+    <p>The build starts from the official planet file (<span id="src-date">a recent weekly snapshot</span>, about 90 GB), cuts the world into about 800 blocks, and turns each block into small map tiles. Every block is built twice and kept only if both results are identical. This copy keeps every tagged object in OpenStreetMap, not only the parts MapNG draws today, so new features will not need a rebuild.</p>
+    <p class="note"><b>Built is not yet live.</b> Built blocks are sitting on the build machine. They go live in MapNG after the build, together with an app update that reads them. Until then MapNG uses the smaller set outlined in blue on the map where it has one, and the public servers everywhere else.</p>
+    <p>The snapshot is a fixed point in time: edits made to OpenStreetMap after that date are not in it. Keeping the copy up to date with daily changes is planned for after the first full build.</p>
+  </section>
+
+  <footer>
+    <p>Map data and map tiles © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, available under the Open Database License. This page refreshes itself every minute; the build reports every five minutes.</p>
+    <p><a href="/">Back to MapNG</a></p>
+  </footer>
+</main>
+
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script>
+(() => {
+  const REGION_NAMES = {
+    'north-america': 'North America', 'europe': 'Europe', 'australia': 'Australia and New Zealand', 'asia': 'Asia',
+    'africa': 'Africa', 'south-america': 'South America', 'elsewhere': 'Everywhere else (oceans, islands, polar regions)',
+  };
+  const STATE_NAMES = { w: 'Waiting', r: 'Being built now', b: 'Built', e: 'No map data here' };
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  const fmt = (n) => Number(n).toLocaleString('en-US');
+
+  const map = L.map('map', { worldCopyJump: true, minZoom: 0, maxZoom: 9, zoomSnap: 0.25 });
+  // (the whole inhabited world on any screen, phones included)
+  map.fitBounds([[-58, -168], [74, 178]]);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19,
+  }).addTo(map);
+  const blockLayer = L.layerGroup().addTo(map);
+  const liveLayer = L.layerGroup().addTo(map);
+
+  const tileBounds = (z, x, y) => {
+    const n = 2 ** z;
+    const lat = (ty) => Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180 / Math.PI;
+    return [[lat(y + 1), x / n * 360 - 180], [lat(y), (x + 1) / n * 360 - 180]];
+  };
+  const gb = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.max(mb, 1)} MB`);
+
+  const drawBlocks = (doc) => {
+    blockLayer.clearLayers();
+    const style = {
+      w: { color: css('--waiting'), weight: 1, opacity: 0.55, fillOpacity: 0.06 },
+      r: { color: css('--running'), weight: 2, opacity: 1, fillOpacity: 0.6, className: 'blk-running' },
+      b: { color: css('--built'), weight: 1, opacity: 0.9, fillOpacity: 0.42 },
+    };
+    // (running blocks last, so their outline is never under a neighbour's)
+    const order = { w: 0, b: 1, r: 2 };
+    const blocks = doc.blocks.filter((b) => style[b[3]]).sort((a, b) => order[a[3]] - order[b[3]]);
+    for (const [z, x, y, state, region, mb] of blocks) {
+      const rect = L.rectangle(tileBounds(z, x, y), style[state]);
+      const tip = document.createElement('div');
+      const title = document.createElement('b');
+      title.textContent = STATE_NAMES[state];
+      tip.append(title, document.createElement('br'),
+        `${REGION_NAMES[doc.order[region]] || ''}`, document.createElement('br'),
+        `Block ${z}/${x}/${y}, ${gb(mb)} of source data`);
+      rect.bindPopup(tip);
+      rect.addTo(blockLayer);
+    }
+  };
+
+  const drawRegions = (doc) => {
+    const box = document.getElementById('regions');
+    box.textContent = '';
+    const sums = doc.order.map(() => ({ total: 0, done: 0, running: 0 }));
+    for (const [, , , state, region, mb] of doc.blocks) {
+      sums[region].total += mb;
+      if (state === 'b' || state === 'e') sums[region].done += mb;
+      if (state === 'r') sums[region].running += 1;
+    }
+    doc.order.forEach((key, i) => {
+      const s = sums[i];
+      if (!s.total) return;
+      const pct = s.done >= s.total ? 100 : Math.min(99, Math.floor(s.done / s.total * 100));
+      const row = document.createElement('div');
+      row.className = 'region';
+      const n = document.createElement('span'); n.className = 'n'; n.textContent = `${i + 1}.`;
+      const name = document.createElement('span'); name.className = 'name'; name.textContent = REGION_NAMES[key] || key;
+      if (s.running) { const now = document.createElement('small'); now.textContent = 'building now'; name.append(now); }
+      const p = document.createElement('span'); p.className = 'pct'; p.textContent = pct === 100 ? 'Built' : `${pct}%`;
+      const bar = document.createElement('div'); bar.className = 'bar';
+      const fill = document.createElement('span'); fill.style.width = `${s.done / s.total * 100}%`;
+      bar.append(fill);
+      row.append(n, name, p, bar);
+      box.append(row);
+    });
+  };
+
+  const drawLive = async () => {
+    try {
+      const r = await fetch('/api/osm-tiles/manifest');
+      if (!r.ok) return;
+      const m = await r.json();
+      liveLayer.clearLayers();
+      for (const a of m.archives || []) {
+        for (const ring of a.coverage || []) {
+          L.polygon(ring.map(([lon, lat]) => [lat, lon]), {
+            color: css('--live'), weight: 2, dashArray: '6 5', fill: false, interactive: false,
+          }).addTo(liveLayer);
+        }
+      }
+    } catch { /* the outline is an extra; the page works without it */ }
+  };
+
+  const ago = (iso) => {
+    const min = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
+    if (min < 1) return { min, text: 'just now' };
+    if (min < 90) return { min, text: `${min} minute${min === 1 ? '' : 's'} ago` };
+    const h = Math.round(min / 60);
+    return { min, text: h < 48 ? `${h} hours ago` : `${Math.round(h / 24)} days ago` };
+  };
+
+  const sourceDate = (name) => {
+    const m = /planet-(\d\d)(\d\d)(\d\d)/.exec(name || '');
+    if (!m) return '';
+    const d = new Date(Date.UTC(2000 + Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  };
+
+  const refresh = async () => {
+    const status = document.getElementById('status');
+    try {
+      const r = await fetch('/api/osm-tiles/progress', { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      const doc = await r.json();
+      if (!doc.blocks || !doc.blocks.length) {
+        ['s-pct', 's-blocks', 's-running', 's-left'].forEach((id) => set(id, '–'));
+        status.textContent = 'No build is reporting progress right now.';
+        return;
+      }
+      const real = doc.blocks.filter((b) => b[3] !== 'e');
+      const built = real.filter((b) => b[3] === 'b').length;
+      const running = real.filter((b) => b[3] === 'r').length;
+      const done = doc.phase === 'done';
+      const pct = done ? 100 : Math.min(99.9, doc.done_mb / Math.max(1, doc.total_mb) * 100);
+      set('s-pct', `${pct.toFixed(pct < 10 ? 1 : 0)}%`);
+      set('s-blocks', `${fmt(built)} / ${fmt(real.length)}`);
+      set('s-running', String(running));
+      if (done) { set('s-left', 'Done'); set('s-left-k', 'every block is built'); }
+      else if (doc.phase === 'cutting') { set('s-left', '–'); set('s-left-k', 'still cutting the planet into blocks'); }
+      else if (doc.hours_left != null) {
+        const h = doc.hours_left;
+        set('s-left', h < 1 ? '< 1 hour' : h < 48 ? `~${Math.round(h)} hours` : `~${Math.round(h / 24)} days`);
+        set('s-left-k', 'left at the current pace (rough)');
+      } else { set('s-left', '…'); set('s-left-k', 'time left: measuring the pace'); }
+      document.getElementById('overall-bar').style.width = `${pct}%`;
+      document.getElementById('overall').setAttribute('aria-valuenow', String(Math.round(pct)));
+      const when = ago(doc.updated);
+      const stale = when.min > 30 && !done;
+      status.className = stale ? 'status stale' : 'status';
+      status.textContent = stale
+        ? `The build last reported ${when.text}. It may be paused or restarting.`
+        : `${gb(doc.done_mb)} of ${gb(doc.total_mb)} of source data built. Last report: ${when.text}.`;
+      const date = sourceDate(doc.source);
+      if (date) set('src-date', `the snapshot of ${date}`);
+      drawBlocks(doc);
+      drawRegions(doc);
+    } catch {
+      status.className = 'status stale';
+      status.textContent = 'Could not load the progress right now. This page will try again in a minute.';
+    }
+  };
+
+  refresh();
+  drawLive();
+  setInterval(refresh, 60000);
+})();
+</script>
+</body>
+</html>

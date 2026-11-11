@@ -3,10 +3,12 @@
 MapNG's OSM tiles for the whole planet, built in blocks on one PC.
 
     planet.py filter  <planet.osm.pbf> <workdir>     prefilter to what MapNG reads
-    planet.py split   <workdir>                       cut into blocks that fit in memory
+    planet.py split   <workdir> [--source planet.osm.pbf --all]
+                                                      cut into blocks that fit in memory
     planet.py build   <workdir> [--jobs N]            build every block twice, keep identical ones
     planet.py merge   <workdir> [--group-zoom 3]      join blocks into a few archives to publish
     planet.py status  <workdir>
+    planet.py progress <workdir> [--upload] [--watch]  the public progress file (mapng.com/planet.html)
 
 Pause: touch <workdir>/STOP. Builds already running finish; no new block
 starts. Remove the file and rerun build to continue.
@@ -25,6 +27,14 @@ filtered extract is under --max-mb (memory: the builder needs roughly
 8-10x the filtered pbf). Each block is built twice and kept only if both
 archives are identical tile by tile (a silent corrupt tile happened once on
 this machine); a mismatch is rebuilt, then reported.
+
+--all (given to split with --source, remembered in the state): no tag filter
+at all. The planet file itself is cut into blocks and every object with a
+meaningful tag goes into the tiles (build-osm-tiles.py --all); the app
+filters when it reads.
+
+Build order: continent by continent (CONTINENTS), so the places most people
+ask for are ready first.
 
 State lives in <workdir>/state.json, so every step can be stopped and resumed.
 Needs the conda env "osmtiles" (python 3.12, osmium-tool, pyosmium,
@@ -259,6 +269,12 @@ def cmd_split(args):
     wd = args.workdir
     st = load_state(wd)
     src = os.path.join(wd, "filtered.osm.pbf")
+    if args.source:
+        src = os.path.abspath(args.source)
+        st["planet"] = src
+    if args.all:
+        st["all"] = True
+    save_state(wd, st)
     blocks = st["blocks"]
     n = 1 << START_ZOOM
     first = [(START_ZOOM, x, y) for x in range(n) for y in range(n)]
@@ -277,7 +293,7 @@ def cmd_split(args):
                 blocks[bkey(z, x, y)] = {"z": z, "x": x, "y": y, "state": "extracted"}
             save_state(wd, st)
             log(f"  pass done: {len([b for b in first if bkey(*b) in blocks])}/{len(first)} blocks ({time.time() - t0:.0f} s)")
-        if not args.keep_filtered:
+        if not args.keep_filtered and not args.source:
             os.remove(src)
             log(f"deleted {src}; {free_gb():.0f} GB free")
     while True:
@@ -329,6 +345,29 @@ def tiles_equal(a, b):
         return True, n
 
 
+# Build order (the user's, 2026-11-11). Rough boxes (west, south, east, north),
+# first match wins, tested on a block's centre; RANK is the order built in.
+CONTINENTS = [
+    ("north-america", (-170, 7, -52, 84)),
+    ("south-america", (-93, -57, -30, 13)),
+    ("europe", (-25, 35, 60, 72)),
+    ("africa", (-20, -36, 35, 38)),
+    ("africa", (35, -36, 52, 12)),
+    ("australia", (110, -50, 180, -9)),
+    ("asia", (25, -11, 180, 82)),
+]
+RANK = ["north-america", "europe", "australia", "asia", "africa", "south-america", "elsewhere"]
+
+
+def continent_of(b):
+    w, s, e, n = tile_bbox(b["z"], b["x"], b["y"])
+    lon, lat = (w + e) / 2, (s + n) / 2
+    for name, (cw, cs, ce, cn) in CONTINENTS:
+        if cw <= lon < ce and cs <= lat < cn:
+            return name
+    return "elsewhere"
+
+
 def group_of(b, gz):
     k = b["z"] - gz
     return (gz, b["x"] >> k, b["y"] >> k) if k >= 0 else (b["z"], b["x"], b["y"])
@@ -338,7 +377,7 @@ def file_bytes(path):
     return open(path, "rb").read() if os.path.exists(path) else b""
 
 
-def build_block(wd, b):
+def build_block(wd, b, everything=False):
     key = bkey(b["z"], b["x"], b["y"])
     if os.path.exists(os.path.join(wd, "STOP")):
         # (pause: blocks already running finish; new ones wait for the next run)
@@ -360,7 +399,7 @@ def build_block(wd, b):
         a, c = os.path.join(tmp, "a.pmtiles"), os.path.join(tmp, "b.pmtiles")
         for out in (a, c):
             r = run(["/usr/bin/time", "-f", "%M", PY, BUILDER, opl, out, "--opl", "--block", f"{b['z']}/{b['x']}/{b['y']}",
-                     "--blocks", os.path.join(wd, "leaves.json")])
+                     "--blocks", os.path.join(wd, "leaves.json")] + (["--all"] if everything else []))
             outs.append(int(r.stderr.strip().splitlines()[-1]) // 1024)   # peak MB
         if not os.path.exists(a) and not os.path.exists(c):
             shutil.rmtree(tmp)
@@ -393,7 +432,9 @@ def cmd_build(args):
     # neighbours are built (features crossing into it come from their owner
     # blocks' side files), and a sweep finishes neighbours close together, so
     # the publisher uploads while the rest builds
-    todo.sort(key=lambda b: (group_of(b, START_ZOOM)[1], group_of(b, START_ZOOM)[2], -b.get("mb", 0)))
+    # (continent first: North America, Europe, Australia, Asia, Africa, South
+    # America, then the rest)
+    todo.sort(key=lambda b: (RANK.index(continent_of(b)), group_of(b, START_ZOOM)[1], group_of(b, START_ZOOM)[2], -b.get("mb", 0)))
     if args.only:
         todo = [b for b in todo if bkey(b["z"], b["x"], b["y"]) in args.only.split(",")]
     # every leaf block (the builder writes features into neighbours that hold
@@ -402,7 +443,7 @@ def cmd_build(args):
     json.dump(leaves, open(os.path.join(wd, "leaves.json"), "w"))
     log(f"building {len(todo)} blocks, {args.jobs} at a time")
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
-        futs = {pool.submit(build_block, wd, b): b for b in todo}
+        futs = {pool.submit(build_block, wd, b, bool(st.get("all"))): b for b in todo}
         for f in as_completed(futs):
             b = futs[f]
             key = bkey(b["z"], b["x"], b["y"])
@@ -616,20 +657,88 @@ def cmd_status(args):
         print(f"{k:9s} {len(v):4d}{extra}")
 
 
+# ── public progress (public/planet.html) ───────────────────────────────────
+
+PROGRESS_KEY = "r2:mapng-osm/osm/planet-progress.json"     # served at /api/osm-tiles/progress (worker/index.js)
+
+
+def progress_doc(wd):
+    """What the progress page draws: every leaf block with its state, and
+    totals by amount of data. Nothing about this PC (no paths, no names)."""
+    st = load_state(wd)
+    tmp = os.path.join(wd, "tmp")
+    running = set(os.listdir(tmp)) if os.path.isdir(tmp) else set()
+    letter = {"ready": "w", "failed": "w", "mismatch": "w", "built": "b", "merged": "b", "empty": "e"}
+    blocks, total, done = [], 0.0, 0.0
+    for key, b in sorted(st["blocks"].items()):
+        if b["state"] not in letter:
+            continue                                # (split into smaller blocks, or not cut yet)
+        state = letter[b["state"]]
+        if state == "w" and key in running:
+            state = "r"
+        mb = b.get("mb", 0)
+        total += mb
+        done += mb if state in ("b", "e") else 0
+        blocks.append([b["z"], b["x"], b["y"], state, RANK.index(continent_of(b)), round(mb)])
+    cutting = any(b["state"] == "extracted" for b in st["blocks"].values()) or not blocks
+    # pace from the build's own history (a sample per run of this command)
+    hp = os.path.join(wd, "progress-history.json")
+    hist = json.load(open(hp)) if os.path.exists(hp) else []
+    now = time.time()
+    hist.append([round(now), round(done)])
+    hist = [h for h in hist if h[1] <= done][-2000:]
+    json.dump(hist, open(hp, "w"))
+    hours_left = None
+    older = [h for h in hist if 1200 <= now - h[0] <= 3 * 3600]
+    if older and done > older[0][1] and not cutting:
+        rate = (done - older[0][1]) / (now - older[0][0])
+        hours_left = round((total - done) / rate / 3600, 1)
+    return {
+        "updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "source": os.path.basename(st.get("planet", "")),
+        "everything": bool(st.get("all")),
+        "phase": "cutting" if cutting else ("done" if done >= total else "building"),
+        "order": RANK,
+        "total_mb": round(total), "done_mb": round(done), "hours_left": hours_left,
+        "blocks": blocks,                           # [z, x, y, w(aiting) | r(unning) | b(uilt) | e(mpty), continent, MB]
+    }
+
+
+def cmd_progress(args):
+    while True:
+        try:
+            doc = progress_doc(args.workdir)
+            out = os.path.join(args.workdir, "planet-progress.json")
+            json.dump(doc, open(out + ".tmp", "w"), separators=(",", ":"))
+            os.replace(out + ".tmp", out)
+            if args.upload:
+                run([os.path.join(REPO, "scripts", "r2.sh"), "copyto", out, PROGRESS_KEY])
+            log(f"progress: {doc['phase']}, {doc['done_mb']}/{doc['total_mb']} MB, {len(doc['blocks'])} blocks" + (", uploaded" if args.upload else ""))
+        except Exception as e:                      # (network blip, state file mid-write: next round)
+            log(f"progress: {e}")
+        if not args.watch:
+            break
+        time.sleep(args.every)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("filter"); p.add_argument("planet"); p.add_argument("workdir"); p.add_argument("--delete-planet", action="store_true")
     p = sub.add_parser("split"); p.add_argument("workdir"); p.add_argument("--max-mb", type=float, default=600); p.add_argument("--batch", type=int, default=16); p.add_argument("--keep-filtered", action="store_true")
+    p.add_argument("--source", help="cut this file instead of <workdir>/filtered.osm.pbf (it is kept)")
+    p.add_argument("--all", action="store_true", help="no tag filter: build every block with build-osm-tiles.py --all")
     p = sub.add_parser("build"); p.add_argument("workdir"); p.add_argument("--jobs", type=int, default=4); p.add_argument("--retry", action="store_true"); p.add_argument("--only")
     p = sub.add_parser("merge"); p.add_argument("workdir"); p.add_argument("--group-zoom", type=int, default=3); p.add_argument("--delete-built", action="store_true")
     p = sub.add_parser("publish"); p.add_argument("workdir"); p.add_argument("--watch", action="store_true")
     p = sub.add_parser("status"); p.add_argument("workdir")
+    p = sub.add_parser("progress"); p.add_argument("workdir"); p.add_argument("--upload", action="store_true")
+    p.add_argument("--watch", action="store_true"); p.add_argument("--every", type=int, default=300)
     args = ap.parse_args()
-    roots = [args.workdir] + ([args.planet] if getattr(args, "planet", None) else [])
-    if args.cmd != "status":
+    roots = [args.workdir] + [p for p in (getattr(args, "planet", None), getattr(args, "source", None)) if p]
+    if args.cmd not in ("status", "progress"):
         start_cache_trimmer(*roots)
-    {"filter": cmd_filter, "split": cmd_split, "build": cmd_build, "merge": cmd_merge, "publish": cmd_publish, "status": cmd_status}[args.cmd](args)
+    {"filter": cmd_filter, "split": cmd_split, "build": cmd_build, "merge": cmd_merge, "publish": cmd_publish, "status": cmd_status, "progress": cmd_progress}[args.cmd](args)
 
 
 if __name__ == "__main__":
