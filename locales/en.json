@@ -698,7 +698,12 @@
     "groupMap": "Map",
     "groupShow": "Show on map",
     "groupSharing": "Sharing",
-    "darkMap": "Dark map"
+    "darkMap": "Dark map",
+    "heightMap": "Height colours",
+    "reliefMap": "Shaded relief",
+    "slopeMap": "Slope",
+    "heightRange": "{lo} m to {hi} m on screen",
+    "slopeKey": "Pale: flat · yellow: 8° · orange: 15° · red: 25° · purple: 35° and over"
   },
   "memoryWidget": {
     "mem": "MEM",

@@ -693,7 +693,12 @@
     "groupMap": "Karte",
     "groupShow": "Auf der Karte zeigen",
     "groupSharing": "Teilen",
-    "darkMap": "Dunkle Karte"
+    "darkMap": "Dunkle Karte",
+    "heightMap": "Höhenfarben",
+    "reliefMap": "Schummerung",
+    "slopeMap": "Hangneigung",
+    "heightRange": "{lo} m bis {hi} m im Bild",
+    "slopeKey": "Hell: flach · gelb: 8° · orange: 15° · rot: 25° · violett: ab 35°"
   },
   "memoryWidget": {
     "mem": "MEM",

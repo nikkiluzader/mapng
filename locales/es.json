@@ -693,7 +693,12 @@
     "groupMap": "Mapa",
     "groupShow": "Mostrar en el mapa",
     "groupSharing": "Compartir",
-    "darkMap": "Mapa oscuro"
+    "darkMap": "Mapa oscuro",
+    "heightMap": "Colores de altura",
+    "reliefMap": "Relieve sombreado",
+    "slopeMap": "Pendiente",
+    "heightRange": "De {lo} m a {hi} m en pantalla",
+    "slopeKey": "Claro: llano · amarillo: 8° · naranja: 15° · rojo: 25° · morado: 35° o más"
   },
   "memoryWidget": {
     "mem": "MEM",

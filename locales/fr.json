@@ -693,7 +693,12 @@
     "groupMap": "Carte",
     "groupShow": "Afficher sur la carte",
     "groupSharing": "Partage",
-    "darkMap": "Carte sombre"
+    "darkMap": "Carte sombre",
+    "heightMap": "Couleurs d'altitude",
+    "reliefMap": "Relief ombré",
+    "slopeMap": "Pente",
+    "heightRange": "De {lo} m à {hi} m à l'écran",
+    "slopeKey": "Clair : plat · jaune : 8° · orange : 15° · rouge : 25° · violet : 35° et plus"
   },
   "memoryWidget": {
     "mem": "MEM",

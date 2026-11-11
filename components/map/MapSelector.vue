@@ -254,6 +254,21 @@
                 <input type="radio" v-model="selectedLayer" value="dark" class="accent-brand" />
                 <span>{{ t('mapSelector.darkMap') }}</span>
             </label>
+            <!-- The land's shape, drawn here from the elevation tiles (services/reliefTileLayer.js) -->
+            <label :class="PANEL_ROW">
+                <input type="radio" v-model="selectedLayer" value="height" class="accent-brand" />
+                <span>{{ t('mapSelector.heightMap') }}</span>
+            </label>
+            <p v-if="selectedLayer === 'height' && heightRange" class="pl-7 text-caption text-gray-500 dark:text-gray-400">{{ t('mapSelector.heightRange', { lo: heightRange[0], hi: heightRange[1] }) }}</p>
+            <label :class="PANEL_ROW">
+                <input type="radio" v-model="selectedLayer" value="relief" class="accent-brand" />
+                <span>{{ t('mapSelector.reliefMap') }}</span>
+            </label>
+            <label :class="PANEL_ROW">
+                <input type="radio" v-model="selectedLayer" value="slope" class="accent-brand" />
+                <span>{{ t('mapSelector.slopeMap') }}</span>
+            </label>
+            <p v-if="selectedLayer === 'slope'" class="pl-7 text-caption text-gray-500 dark:text-gray-400">{{ t('mapSelector.slopeKey') }}</p>
 
             <p :class="PANEL_HEADING" class="pt-2">{{ t('mapSelector.groupShow') }}</p>
             <label :class="PANEL_ROW" :title="t('controlPanel.osmCoverageHint')">
@@ -361,6 +376,7 @@ import { useOsmCoverage } from '../../composables/useOsmCoverage.js';
 import { useExportHotspots } from '../../composables/useExportHotspots.js';
 import { addHotspotLayer } from '../../services/hotspotLayer.js';
 import { loadLidarCoverage, createLidarCoverageLayer } from '../../services/lidarCoverageLayer.js';
+import { RELIEF_MODES, createReliefLayer } from '../../services/reliefTileLayer.js';
 import { daysSince } from '../../services/exportHotspots.js';
 import { WORLD_BOUNDS, minZoomForWidth, formatSelectionSize, formatLatLng, clampLng } from '../../services/mapView.js';
 import { useMainStore } from '../../stores/mainStore';
@@ -467,7 +483,7 @@ const initialZoom = props.zoom;
 const currentCenter = ref(props.center);
 const currentZoom = ref(props.zoom);
 // Remembered across reloads.
-const MAP_LAYERS = ['osm', 'satellite', 'topo', 'dark'];
+const MAP_LAYERS = ['osm', 'satellite', 'topo', 'dark', ...RELIEF_MODES];
 const readStored = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const writeStored = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage blocked */ } };
 const storedLayer = readStored('mapng_mapLayer');
@@ -475,8 +491,8 @@ const selectedLayer = ref(MAP_LAYERS.includes(storedLayer) ? storedLayer : 'osm'
 // Names on satellite imagery (default on). The OSM and topo maps have their
 // own names, and the dark base never does: labels go only where missing.
 const satelliteNames = ref(readStored('mapng_satelliteLabels') !== 'false');
-const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'dark'));
-watch(selectedLayer, (v) => writeStored('mapng_mapLayer', v));
+const showLabels = computed(() => (selectedLayer.value === 'satellite' ? satelliteNames.value : selectedLayer.value === 'dark' || RELIEF_MODES.includes(selectedLayer.value)));
+watch(selectedLayer, (v) => { writeStored('mapng_mapLayer', v); syncReliefLayer(); });
 const layerPanelOpen = ref(readStored('mapng_layerPanelOpen') !== 'false');
 watch(layerPanelOpen, (v) => writeStored('mapng_layerPanelOpen', String(v)));
 const PANEL_ROW = 'flex items-center gap-2 p-1 hover:bg-gray-50 dark:hover:bg-gray-700 rounded cursor-pointer';
@@ -520,7 +536,22 @@ const ESRI_REFERENCE_ATTRIBUTION = 'Labels &copy; <a href="https://www.esri.com/
 const DARK_URL = `${ESRI_TILES}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`;
 const DARK_ATTRIBUTION = '&copy; <a href="https://www.esri.com/">Esri</a>, HERE, Garmin &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
-const labelLayers = computed(() => (selectedLayer.value !== 'satellite'
+// Height colours, shaded relief and slope: drawn here from the elevation tiles
+// (services/reliefTileLayer.js), so they are not <l-tile-layer>s. Names go on
+// top as on satellite imagery (the light reference set).
+const heightRange = ref(null);
+let reliefLayer = null;
+const syncReliefLayer = () => {
+  const map = leafletMap.value;
+  if (!map) return;
+  if (reliefLayer) { map.removeLayer(reliefLayer); reliefLayer = null; }
+  heightRange.value = null;
+  if (!RELIEF_MODES.includes(selectedLayer.value)) return;
+  reliefLayer = createReliefLayer(L, selectedLayer.value, { ...ONE_WORLD, zIndex: 1, onRange: (lo, hi) => { heightRange.value = [lo, hi]; } });
+  reliefLayer.addTo(map);
+};
+
+const labelLayers = computed(() => (selectedLayer.value === 'dark'
   ? [{ url: `${ESRI_LABEL_TILES}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`, maxNativeZoom: 16, opacity: 1 }]
   : [
     // Each layer only where it helps (fewer tiles on Esri's 6-connection host):
@@ -1083,6 +1114,7 @@ watch(() => props.boxLocked, (locked, was) => {
 
 const onMapReady = (map) => {
   leafletMap.value = map;
+  syncReliefLayer();
   bgLayer = attachBackgroundLayer(map, {
     getMask: () => store.backgroundMask,
     getTool: () => store.backgroundTool,
