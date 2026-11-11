@@ -57,6 +57,8 @@ export const getOSMQueryParameters = (bounds) => ({
   },
 });
 
+// (a side request, the quality report's small square, puts back what the last real pull recorded)
+export const restoreLastOSMRequestInfo = (info) => { lastOSMRequestInfo = info; };
 export const getLastOSMRequestInfo = () => {
   return lastOSMRequestInfo ? { ...lastOSMRequestInfo } : null;
 };

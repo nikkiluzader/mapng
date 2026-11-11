@@ -50,6 +50,13 @@
               <span v-if="cell.detail" class="truncate text-gray-500 dark:text-gray-400">{{ cell.detail }}</span>
             </figure>
           </div>
+          <!-- the comparison as a page to keep or share: each source scored on this square's roads -->
+          <div v-if="compareOpen && canReport" class="mt-1.5 flex items-center gap-2">
+            <button type="button" data-testid="compare-report" class="text-brand hover:underline disabled:opacity-50" :disabled="reportBusy" @click="saveQualityReport">
+              {{ reportBusy ? t('map.compareReportBusy') : t('map.compareReport') }}
+            </button>
+            <span v-if="reportNote" class="text-gray-500 dark:text-gray-400">{{ reportNote }}</span>
+          </div>
         </div>
 
         <!-- Default -->
@@ -315,7 +322,10 @@ const checkGpxzHere = async () => {
 watch(() => [props.center?.lat, props.center?.lng], () => { if (gpxzProbe.value !== 'loading') gpxzProbe.value = null; });
 
 // ── Compare here ──
-const COMPARE_SIDE_M = 512, COMPARE_PX = 192;
+// (1 m cells: the quality report measures road benches on the same heights the pictures show)
+const COMPARE_SIDE_M = 512, COMPARE_PX = 512;
+// heights behind each picture, for the report (not reactive: three 1 MB arrays)
+const compareHeights = {};
 const compareOpen = ref(false);
 const compare = ref({});           // key -> { url, state, note, detail }
 let compareAbort = null;
@@ -328,17 +338,18 @@ const centerPoint = () => ({ lat: Number(props.center?.lat), lng: Number(props.c
 const setCell = (key, v) => { compare.value = { ...compare.value, [key]: v }; };
 const loadCompare = async () => {
   compareAbort?.abort(); compareAbort = new AbortController(); const signal = compareAbort.signal;
-  const c = centerPoint(); compare.value = {};
+  const c = centerPoint(); compare.value = {}; for (const k of Object.keys(compareHeights)) delete compareHeights[k]; reportNote.value = '';
   const cell = COMPARE_SIDE_M / COMPARE_PX;
   setCell('standard', { state: 'loading' }); setCell('mapterhorn', { state: 'loading' });
   standardPatch(c, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal })
-    .then((h) => setCell('standard', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: '~30 m' }))
+    .then((h) => { compareHeights.standard = { h, res: 30 }; setCell('standard', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: '~30 m' }); })
     .catch(() => { if (!signal.aborted) setCell('standard', { note: t('map.compareFailed') }); });
   try {
     const p = probe.value?.reachable ? probe.value : await probeMapterhorn(boxAround(c, 0.6), { signal });
     if (!p.zoom) setCell('mapterhorn', { note: t('map.compareNoLidar') });
     else {
       const h = await mapterhornPatch(c, p.zoom, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal });
+      compareHeights.mapterhorn = { h, res: p.metersPerPixel };
       setCell('mapterhorn', { url: hillshadeDataUrl(h, COMPARE_PX, cell), detail: `~${fmtRes(p.metersPerPixel)} m · ${t('map.compareFree')}` });
     }
   } catch { if (!signal.aborted) setCell('mapterhorn', { note: t('map.compareFailed') }); }
@@ -347,8 +358,50 @@ const loadGpxzCompare = async () => {
   const c = centerPoint(); setCell('gpxz', { state: 'loading' });
   try {
     const h = await gpxzPatch(c, localGpxzApiKey.value, { sideM: COMPARE_SIDE_M, px: COMPARE_PX, signal: compareAbort?.signal });
+    compareHeights.gpxz = { h, res: 1 };
     setCell('gpxz', { url: hillshadeDataUrl(h, COMPARE_PX, COMPARE_SIDE_M / COMPARE_PX), detail: t('map.compareOneCall') });
   } catch { setCell('gpxz', { note: t('map.compareFailed') }); }
+};
+// The quality report: this square's roads (one map data request) measured on
+// every source the comparison has loaded; saved as one HTML page. GPXZ is in
+// it only when the user added it to the comparison (no call is made for it here).
+const reportBusy = ref(false);
+const reportNote = ref('');
+const canReport = computed(() => compareCells.value.some((c) => c.url));
+const saveQualityReport = async () => {
+  if (reportBusy.value) return;
+  reportBusy.value = true; reportNote.value = '';
+  try {
+    const c = centerPoint();
+    const [{ fetchOSMData, getLastOSMRequestInfo, restoreLastOSMRequestInfo }, { roadsInPatch, compareSources, qualityReportHtml }] = await Promise.all([import('../../services/osm.js'), import('../../services/sourceQuality.js')]);
+    const dLat = COMPARE_SIDE_M / 2 / 111320, dLng = dLat / Math.cos((c.lat * Math.PI) / 180);
+    // (this small pull is not the map's: what the last real one recorded is put back after it)
+    const lastInfo = getLastOSMRequestInfo();
+    let features; let osmSource = '';
+    try {
+      features = await fetchOSMData({ north: c.lat + dLat, south: c.lat - dLat, east: c.lng + dLng, west: c.lng - dLng }, { signal: compareAbort?.signal });
+      osmSource = getLastOSMRequestInfo()?.endpointUsed || '';
+    } finally { restoreLastOSMRequestInfo(lastInfo); }
+    const roads = roadsInPatch(features, c, COMPARE_SIDE_M);
+    const sources = compareCells.value.map((cell) => {
+      const got = compareHeights[cell.key];
+      return { key: cell.key, label: cell.label, detail: cell.detail || '', note: cell.note || '', nativeResM: got?.res ?? NaN, heights: cell.url && got ? got.h : null, px: COMPARE_PX, cellM: COMPARE_SIDE_M / COMPARE_PX, image: cell.url || null };
+    });
+    const result = compareSources(sources, roads, COMPARE_SIDE_M);
+    const html = qualityReportHtml(result, {
+      center: c, sideM: COMPARE_SIDE_M, roadCount: roads.length, generatedAt: new Date().toISOString().slice(0, 10),
+      appVersion: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '', osmSource,
+    });
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = `mapng-elevation-quality-${c.lat.toFixed(4)}_${c.lng.toFixed(4)}.html`;
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    reportNote.value = result.verdict;
+  } catch (e) {
+    console.warn('[Quality report]', e);
+    reportNote.value = t('map.compareReportFailed');
+  } finally { reportBusy.value = false; }
 };
 const toggleCompare = () => { compareOpen.value = !compareOpen.value; if (compareOpen.value) loadCompare(); else compareAbort?.abort(); };
 watch(() => [props.center?.lat, props.center?.lng], () => { if (compareOpen.value) { compareOpen.value = false; compareAbort?.abort(); } });
