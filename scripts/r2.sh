@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# rclone against MapNG's R2 bucket, using ~/.config/mapng/r2.env (never
-# committed; see refs/output/osm-data-sources.md). Credentials go to rclone via
+# rclone against MapNG's R2 bucket, using the R2_* lines of
+# ~/.config/mapng/mapng.env (never committed; see refs/output/osm-data-sources.md;
+# the file's other keys are not read). Credentials go to rclone via
 # environment variables only, so they never land on a command line or in an
 # rclone.conf.
 #
 #   scripts/r2.sh lsf r2:mapng-osm
 #   scripts/r2.sh copyto local.pmtiles r2:mapng-osm/osm/name.pmtiles --progress
 set -euo pipefail
-ENV_FILE="${MAPNG_R2_ENV:-$HOME/.config/mapng/r2.env}"
+ENV_FILE="${MAPNG_R2_ENV:-$HOME/.config/mapng/mapng.env}"
 RCLONE="${RCLONE:-$(command -v rclone || echo "$HOME/.local/bin/rclone")}"
 [ -r "$ENV_FILE" ] || { echo "missing $ENV_FILE" >&2; exit 1; }
 set -a
 # shellcheck disable=SC1090
-. "$ENV_FILE"
+. <(grep -E '^(export[[:space:]]+)?R2_[A-Z_]+=' "$ENV_FILE")
 set +a
 export RCLONE_CONFIG_R2_TYPE=s3
 export RCLONE_CONFIG_R2_PROVIDER=Cloudflare

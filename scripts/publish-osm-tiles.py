@@ -20,7 +20,7 @@ planet now covers); the objects themselves are deleted separately.
   bbox also covers neighbouring areas the archive has no data for.
 - Replaces the manifest entry with the same region; other regions are kept.
 
-Uses scripts/r2.sh (credentials in ~/.config/mapng/r2.env).
+Uses scripts/r2.sh (credentials in ~/.config/mapng/mapng.env).
 """
 import argparse
 import json
