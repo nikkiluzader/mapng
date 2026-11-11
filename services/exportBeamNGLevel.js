@@ -2640,6 +2640,16 @@ function getDecalMergeStyleKey(segment) {
     tags.ref || '',
     tags.oneway || '',
     tags.surface || '',
+    // (one lane layout per drawn piece: a merged run is painted from its
+    // first way's tags, so a 100 m passing lane joined to the two-lane road
+    // after it carried its third lane on to the next side road, or lost it,
+    // by the order the ways came in)
+    tags.lanes || '',
+    tags['lanes:forward'] || '',
+    tags['lanes:backward'] || '',
+    tags['lanes:both_ways'] || '',
+    tags.width || '',
+    tags['mapng:carriageway_width'] || '',
     // (a drawbridge span stays its own segment: the structure solver keeps
     // the whole bridge low by it)
     tags.bridge === 'movable' || (!!tags['bridge:movable'] && tags['bridge:movable'] !== 'no'),

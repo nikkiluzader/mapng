@@ -123,3 +123,39 @@ test('one road name, mixed lane counts: tagged ways keep their own width', async
   assert.equal(widthAt(1 * m), 14, '4-lane way is four lanes wide');
   assert.equal(widthAt(3 * m), 7, 'untagged way takes the corridor\'s usual width');
 });
+
+test('a passing lane ends where its way ends, with no side road there', async () => {
+  const { generateDecalRoads } = await import('../services/exportBeamNGLevel.js');
+  // A canyon road as OSM cuts it at a lane change: 2 lanes, 3 lanes for a
+  // stretch, 2 lanes again, the ways meeting at plain nodes. Joined into one
+  // run and painted from its first way, the third lane ran the whole road
+  // (or was lost), by the order the ways came in.
+  const way = (id, lanes, a, b) => ({
+    id, type: 'road', geometry: [{ lat: 0.005, lng: a }, { lat: 0.005, lng: b }],
+    tags: { highway: 'secondary', name: 'Canyon Road', lanes },
+  });
+  const size = 64;
+  const m = 111320 * 0.001;
+  for (const order of [[0, 1, 2], [1, 0, 2], [2, 1, 0]]) {
+    const ways = [way('a', '2', 0.001, 0.004), way('b', '3', 0.004, 0.006), way('c', '2', 0.006, 0.009)];
+    const td = {
+      width: size, height: size, minHeight: 0, maxHeight: 50,
+      heightMap: new Float32Array(size * size).fill(10),
+      bounds: { north: 0.01, south: 0, west: 0, east: 0.01 },
+      metersPerPixel: (0.01 * 111320) / size,
+      osmFeatures: order.map((i) => ways[i]),
+    };
+    const decals = [];
+    const walk = (items) => items.forEach((it) => { if (it.class === 'DecalRoad') decals.push(it); if (it.__items) walk(it.__items); });
+    walk(generateDecalRoads(td, td.metersPerPixel));
+    const lane = decals.filter((d) => d.material === 'm_line_white_discontinue');
+    assert.ok(lane.length > 0, `the 3-lane way has its lane line (order ${order})`);
+    // (world x = 0 at lng 0.005: the 3-lane way runs from -1 m to +1 m)
+    for (const d of lane) for (const [x] of d.nodes) assert.ok(Math.abs(x) < 1 * m + 2, `lane line at x ${x.toFixed(0)} is on the 3-lane way (order ${order})`);
+    const paths = decals.filter((d) => d.material === 'road_invisible' && /Canyon/.test(d.name));
+    const widthAt = (x) => paths.find((d) => d.nodes.some(([nx]) => Math.abs(nx - x) < 20))?.nodes.find(([nx]) => Math.abs(nx - x) < 20)?.[3];
+    assert.equal(widthAt(-2.5 * m), 7, `2 lanes before (order ${order})`);
+    assert.equal(widthAt(0), 10.5, `3 lanes on the stretch (order ${order})`);
+    assert.equal(widthAt(2.5 * m), 7, `2 lanes after (order ${order})`);
+  }
+});
