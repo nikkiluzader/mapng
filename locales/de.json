@@ -274,7 +274,7 @@
     "usingSelected": "verwende ausgewählte Koordinaten",
     "reading": "Datei wird gelesen...",
     "unsupportedCrsUsingSelected": "CRS nicht unterstützt, verwende ausgewählte Koordinaten",
-    "noGeoMetadata": "Keine Geometadaten - verwende ausgewählte Koordinaten",
+    "noGeoMetadata": "Diese Datei enthält keinen Ort: sie wird auf den in der Karte gewählten Bereich gelegt",
     "elevationUnits": "Höheneinheiten",
     "auto": "Auto",
     "meters": "Meter",

@@ -274,7 +274,7 @@
     "usingSelected": "używam wybranych współrzędnych",
     "reading": "Czytanie pliku...",
     "unsupportedCrsUsingSelected": "CRS nieobsługiwany, używam wybranych współrzędnych",
-    "noGeoMetadata": "Brak metadanych geoprzestrzennych - używam wybranych współrzędnych",
+    "noGeoMetadata": "Ten plik nie zawiera położenia: zostanie dopasowany do obszaru wybranego na mapie",
     "elevationUnits": "Jednostki wysokości",
     "auto": "Auto",
     "meters": "Metry",
