@@ -67,6 +67,11 @@ const UNDER_BRIDGE_FLAT_M = 10;        // ... this far either side of it
 // wall look out through a short passage to the face (Zion–Mount Carmel's
 // galleries onto Pine Creek canyon). OSM does not map them; the elevation
 // shows where the rock is thin enough.
+const ARCADE_ROCK_M = 3;               // an arcade: the open air this close past the lining ...
+const ARCADE_COVER_M = 20;             // ... and the ground over the roof at most this much more than a bore needs
+const ARCADE_MIN_RUN_M = 24;           // ... for at least this far
+const ARCADE_PITCH = 5;                // stations from one opening to the next (4 open, 1 pillar)
+const ARCADE_FILL_CLEAR_M = 4;         // no cover made up this far past an arcade's ends either
 const WINDOW_ROCK_M = 12;              // rock between the lining and the open air, at most
 const WINDOW_SPACING_M = 70;           // windows at least this far apart
 const WINDOW_END_CLEAR_M = 40;         // ... and this far inside the portals
@@ -988,22 +993,59 @@ function findWindows(t, groundAt) {
       floor: k.floor, sill: k.sill, spring: k.spring ?? t.wall, rise: k.rise,
     };
   };
+  // Arcades: where the open air stands right beside the lining for a long
+  // way (a road on a ledge over a lake, its "tunnel" in the map an avalanche
+  // gallery for that stretch: a roof on columns, open to the valley), the
+  // wall on that side is opened all along, a walk-in opening every
+  // ARCADE_PITCH stations with a pillar between. Their stretches are kept as
+  // t.arcades: no cover is made up over them (tunnelGroundAt), the box
+  // stands out of the slope as a gallery does.
+  const picked = [];
+  t.arcades = [];
+  const G = WINDOW_KINDS.gallery;
+  for (const side of [-1, 1]) {
+    const open = (i) => {
+      if (i < t.iS || i > t.iN) return false;
+      const q = t.line[i];
+      if (inExposed(t, q.s) || (q.wl ?? t.W) !== t.W || (q.wr ?? t.W) !== t.W) return false;
+      // (and little over the roof: a gallery stands on a ledge, its roof near
+      // the surface. A bore deep in the rock with a cliff face beside it has
+      // windows, a few, as before: Zion-Mount Carmel's six stayed six)
+      if (!(q.g - q.z < t.need + ARCADE_COVER_M)) return false;
+      const f = faceAt(q, side, G.sill);
+      return f != null && f <= outer + ARCADE_ROCK_M;
+    };
+    for (let i = t.iS; i <= t.iN;) {
+      if (!open(i)) { i++; continue; }
+      let j = i; while (j + 1 <= t.iN && open(j + 1)) j++;
+      if (t.line[j].s - t.line[i].s >= ARCADE_MIN_RUN_M) {
+        t.arcades.push({ side, i, j, s0: t.line[i].s, s1: t.line[j].s });
+        for (let k = i; k + G.segments <= j; k += ARCADE_PITCH) {
+          const run = t.line.slice(k, k + G.segments + 1);
+          const faces = run.map((q) => faceAt(q, side, G.sill));
+          if (faces.some((f) => f == null)) continue;
+          picked.push({ ...make(k, side, 'gallery', Math.max(...faces)), arcade: true });
+        }
+      }
+      i = j + 1;
+    }
+  }
+  const inArcade = (sAt) => t.arcades.some((a) => sAt >= a.s0 - WINDOW_SPACING_M / 2 && sAt <= a.s1 + WINDOW_SPACING_M / 2);
   const candidates = [];
   for (let i = t.iS; i < t.iN; i++) {
     for (const side of [-1, 1]) {
       const face = fits(i, side, 'window');
-      if (face != null) candidates.push({ i, side, face });
+      if (face != null && !inArcade(t.line[i].s)) candidates.push({ i, side, face });
     }
   }
   candidates.sort((a, b) => a.face - b.face);
-  const picked = [];
   for (const c of candidates) {
     const w = make(c.i, c.side, 'window', c.face);
     if (picked.some((q) => Math.abs(q.s - w.s) < WINDOW_SPACING_M)) continue;
     picked.push(w);
   }
   // the one nearest a portal opens up into the walk-in gallery (where it fits)
-  const byPortal = [...picked].sort((a, b) => Math.min(a.s - sS, sN - a.s) - Math.min(b.s - sS, sN - b.s));
+  const byPortal = picked.filter((w) => !w.arcade).sort((a, b) => Math.min(a.s - sS, sN - a.s) - Math.min(b.s - sS, sN - b.s));
   for (const w of byPortal) {
     const shift = (WINDOW_KINDS.gallery.segments - WINDOW_KINDS.window.segments) / 2;
     const face = fits(w.i - shift, w.side, 'gallery');
@@ -1350,6 +1392,8 @@ function indexLine(line, cell = 16) {
   };
 }
 
+// in one of the tunnel's arcades (findWindows), pad m past its ends
+const arcadeAt = (t, s, pad = 0) => (t.arcades || []).find((a) => s >= a.s0 - pad && s <= a.s1 + pad);
 const inExposed = (t, s) => (t.exposed || []).some(([a, b]) => s >= a - 1e-6 && s <= b + 1e-6);
 // the headwall top (over the road) at the portal nearer station s
 const headTopAt = (t, s) => (t.headTops ? (Math.abs(s - t.line[t.iS].s) <= Math.abs(t.line[t.iN].s - s) ? t.headTops[0] : t.headTops[1]) : t.headTop);
@@ -1473,6 +1517,11 @@ export function tunnelGroundAt(t, x, y, h) {
     if (kind === 'cut' && n.into < t.headDepth + BACKFILL_M && ad <= t.headHalf + 1) out = Math.max(out, n.z + headTop);
     out = Math.min(out, n.z + headTop + FACE_SLOPE * (Math.max(0, n.into - t.headDepth) + Math.max(0, ad - t.headHalf)));
   }
+  // along an arcade, on its open side: the ground kept under the openings'
+  // sill all along, between them too (a tooth of ground stood up through the
+  // gallery beside every pillar)
+  const arc = arcadeAt(t, n.s);
+  if (arc && Math.sign(n.d) === arc.side && ad > t.W && ad <= t.W + LINING_M + ARCADE_ROCK_M + WINDOW_LEDGE_M) out = Math.min(out, n.z + WINDOW_KINDS.gallery.sill - 0.3);
   // gallery windows: the ground in front kept under the sill, the rock over
   // the face plate down to its top, and no fill made up in front of it
   for (const w of t.windows || []) {
@@ -1492,6 +1541,8 @@ export function tunnelGroundAt(t, x, y, h) {
   // over the bore: made up to the cover where the ground falls short (cut and
   // cover), 1:1 slopes down beside it; never over an exposed stretch
   if (inExposed(t, n.s)) return out;
+  // (nor over an arcade: a gallery's roof stands in the open)
+  if (arcadeAt(t, n.s, ARCADE_FILL_CLEAR_M)) return out;
   const outer = t.W + LINING_M;
   if (ad > outer + 2 + t.need) return out;
   return Math.max(out, n.z + t.need - Math.max(0, ad - outer - 2));
@@ -1535,7 +1586,8 @@ export function tunnelHoleAt(t, x, y, lo, hi = lo) {
     // (a low box's lid is the surface: only ground truly in the box opens, not the metre over it)
     return lo < n.z + t.crown + LINING_M + (t.low ? 0 : 1);
   }
-  if (!n || n.into < front || (n.into > t.headDepth + BACKFILL_M && !inExposed(t, n.s))) return false;
+  // (an arcade has no cover made up over it either: ground in the tube there opens, as in an exposed stretch)
+  if (!n || n.into < front || (n.into > t.headDepth + BACKFILL_M && !inExposed(t, n.s) && !arcadeAt(t, n.s, ARCADE_FILL_CLEAR_M))) return false;
   if (across(t, n) > t.W + LINING_M + 0.5 * t.squareSize) return false;
   if (hi > n.z + headTopAt(t, n.s) + 0.5) return false;
   return lo < n.z + t.crown + LINING_M + 1;

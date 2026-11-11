@@ -559,3 +559,35 @@ test('a mountain road climbing away from its portal on the ground has no long cu
   assert.equal(tunnelGroundAt(t, 6, 200, ground(6, 200)), ground(6, 200));
   assert.equal(tunnelGroundAt(t, 6, -200, ground(6, -200)), ground(6, -200));
 });
+
+test('a bore with the open air right beside it for a long way is an arcade there: openings all along, no cover made up', () => {
+  // the spike ridge, a lake's cliff right beside the road (x > 8) along 200 m of its middle:
+  // mapped as one tunnel, in fact an avalanche gallery along that stretch
+  // (the roof near the surface there, as on a ledge: 16 m of ground over the road)
+  const ledge = (x, y) => (Math.abs(y) < 100 ? (x > 8 ? 20 : Math.min(ridge(x, y), 36)) : ridge(x, y));
+  const t = solveTunnel({ xy: road(-400, 400), half: 4 }, {
+    groundAt: ledge,
+    approaches: [{ xy: road(-400, -700) }, { xy: road(400, 700) }],
+  });
+  assert.ok(t.ok, t.reason);
+  assert.equal(t.arcades.length, 1);
+  const a = t.arcades[0];
+  assert.equal(a.side, 1, 'on the lake side (right of travel)');
+  assert.ok(a.s1 - a.s0 > 150, `the arcade runs ${Math.round(a.s1 - a.s0)} m`);
+  const open = t.windows.filter((w) => w.arcade);
+  // (an opening every 10 m, 8 m wide, a pillar between)
+  assert.ok(open.length >= 15, `${open.length} openings`);
+  for (const w of open) { assert.equal(w.kind, 'gallery'); assert.ok(Math.abs(w.y) <= 100); }
+  for (let k = 1; k < open.length; k++) assert.ok(Math.abs((open[k].s - open[k - 1].s) - 10) < 0.5, 'evenly spaced');
+  // no cover is made up over the tube there: the roof stands in the open
+  const mid = t.line.find((p) => Math.abs(p.y) < 1);
+  assert.equal(tunnelGroundAt(t, 0, 0, mid.z + 2), mid.z + 2, 'low ground over the arcade is left');
+  // ground standing in the tube along the arcade opens
+  assert.equal(tunnelHoleAt(t, 0, 0, mid.z + 1), true);
+  // the ridge with no lake beside it: no arcade
+  assert.equal(spikeTunnel().arcades.length, 0);
+  // a bore deep in the rock with a cliff face beside it: windows, a few, no arcade
+  const deep = solveTunnel({ xy: road(-400, 400), half: 4 }, { groundAt: (x, y) => (x > 8 && Math.abs(y) < 100 ? 20 : ridge(x, y)), approaches: [{ xy: road(-400, -700) }, { xy: road(400, 700) }] });
+  assert.equal(deep.arcades.length, 0);
+  assert.ok(deep.windows.length >= 1 && deep.windows.length <= 4, `${deep.windows.length} windows`);
+});
