@@ -111,8 +111,14 @@ export const useMainStore = defineStore('main', () => {
   // (also locked, with nothing drawn yet, once a drawing tool is picked: the
   // map can then be zoomed and panned to draw without the box following it)
   const backgroundPinned = ref(false);
-  const boxLocked = computed(() => backgroundActive.value || (backgroundPinned.value && advancedMode.value && !batchMode.value));
+  // (and locked by hand: the lock button on the location map, so the map can be
+  // zoomed and panned, to place a spawn point say, without the area following
+  // it. Asked for by Fizz_Mechanic. Not kept across a reload)
+  const boxPinnedByUser = ref(false);
+  const boxLockedByBackground = computed(() => backgroundActive.value || (backgroundPinned.value && advancedMode.value && !batchMode.value));
+  const boxLocked = computed(() => boxLockedByBackground.value || (boxPinnedByUser.value && !batchMode.value));
   function setBackgroundPinned(v) { backgroundPinned.value = !!v; }
+  function setBoxPinned(v) { boxPinnedByUser.value = !!v; }
 
   // --- Spawn and quicktravel points (services/spawnPoints.js; Location step) ---
   // An export setting: geographic, independent of the box, never a reason to
@@ -273,6 +279,9 @@ export const useMainStore = defineStore('main', () => {
     backgroundDrawn,
     backgroundActive,
     boxLocked,
+    boxLockedByBackground,
+    boxPinnedByUser,
+    setBoxPinned,
     backgroundPinned,
     setBackgroundPinned,
     setBackgroundMask,

@@ -19,7 +19,7 @@
     <!-- 1. Where: the place, how big and how detailed -->
     <div v-show="step === 1" class="space-y-5">
       <SettingSection v-model:open="showCoordinates" :title="t('controlPanel.ui.location')" :icon="MapPin">
-        <fieldset :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? t('backgroundAreas.lockedField') : null">
+        <fieldset :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? (store.boxLockedByBackground ? t('backgroundAreas.lockedField') : t('map.lockedField')) : null">
           <CoordinatesInput :center="center" @locationChange="handleLocationChange" />
         </fieldset>
       </SettingSection>
@@ -97,7 +97,7 @@
           </div>
         </div>
 
-        <fieldset v-else :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? t('backgroundAreas.lockedField') : null">
+        <fieldset v-else :disabled="store.boxLocked" :class="store.boxLocked ? 'opacity-60' : ''" :title="store.boxLocked ? (store.boxLockedByBackground ? t('backgroundAreas.lockedField') : t('map.lockedField')) : null">
           <ResolutionSelector
             :modelValue="resolution"
             @update:modelValue="$emit('resolutionChange', $event)"

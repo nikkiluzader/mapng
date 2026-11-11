@@ -166,7 +166,11 @@
     "keyMenu": "menú",
     "keyNudge": "mover la selección",
     "hintMhFullAt": "Lidar (~{res} m) cubre toda la zona. Para una zona tan grande se lee a ~{used} m.",
-    "hintMhDesktopFiner": "La app de escritorio lo lee a ~{res} m."
+    "hintMhDesktopFiner": "La app de escritorio lo lee a ~{res} m.",
+    "lockSelection": "Fijar el área seleccionada",
+    "unlockSelection": "Liberar el área seleccionada",
+    "lockedByBackground": "Bloqueada por las áreas de fondo",
+    "lockedField": "El área está fijada: libérala en el mapa para cambiarla"
   },
   "status": {
     "runConfigCopied": "Ajustes copiados al portapapeles (clave GPXZ oculta).",

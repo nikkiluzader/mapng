@@ -166,7 +166,11 @@
     "keyMenu": "Menü",
     "keyNudge": "Auswahl verschieben",
     "hintMhFullAt": "Lidar (~{res} m) deckt das ganze Gebiet ab. Für ein so großes Gebiet wird es mit ~{used} m gelesen.",
-    "hintMhDesktopFiner": "Die Desktop-App liest es mit ~{res} m."
+    "hintMhDesktopFiner": "Die Desktop-App liest es mit ~{res} m.",
+    "lockSelection": "Ausgewählten Bereich fixieren",
+    "unlockSelection": "Ausgewählten Bereich freigeben",
+    "lockedByBackground": "Durch Hintergrundbereiche gesperrt",
+    "lockedField": "Der Bereich ist fixiert: zum Ändern auf der Karte freigeben"
   },
   "status": {
     "runConfigCopied": "Run-Konfiguration in die Zwischenablage kopiert (GPXZ-Schlüssel maskiert).",

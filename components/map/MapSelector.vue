@@ -921,6 +921,7 @@ let centerValueEl = null;
 const showCursor = (text) => { if (cursorValueEl) cursorValueEl.textContent = text; };
 watch(currentCenter, () => { if (centerValueEl) centerValueEl.textContent = coordsText(); });
 
+let stopLockWatch = null;
 const addMapTools = (map) => {
   const ZoomBox = L.Control.extend({
     options: { position: 'topleft' },
@@ -932,8 +933,34 @@ const addMapTools = (map) => {
       a.title = t('map.zoomToSelection');
       a.setAttribute('aria-label', t('map.zoomToSelection'));
       a.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>';
+      // The lock: the selected area stays where it is while the map is zoomed
+      // and panned (store.boxPinnedByUser). Background areas lock it too; then
+      // this only shows it.
+      const lock = L.DomUtil.create('a', 'mapng-zoom-selection mapng-lock-selection', bar);
+      lock.href = '#';
+      lock.role = 'button';
+      const paintLock = () => {
+        const locked = store.boxLocked;
+        const byBackground = store.boxLockedByBackground;
+        const label = byBackground ? t('map.lockedByBackground') : locked ? t('map.unlockSelection') : t('map.lockSelection');
+        lock.title = label;
+        lock.setAttribute('aria-label', label);
+        lock.setAttribute('aria-pressed', String(locked));
+        lock.classList.toggle('mapng-lock-selection--on', locked);
+        lock.innerHTML = locked
+          ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+          : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>';
+      };
+      paintLock();
+      stopLockWatch = watch(() => [store.boxLocked, store.boxLockedByBackground, locale.value], paintLock);
       L.DomEvent.disableClickPropagation(bar);
       L.DomEvent.on(a, 'click', (e) => { L.DomEvent.preventDefault(e); zoomToSelection(); });
+      L.DomEvent.on(lock, 'click', (e) => {
+        L.DomEvent.preventDefault(e);
+        if (store.boxLockedByBackground) return;       // (theirs to unlock: the Background areas card)
+        if (!store.boxPinnedByUser) flushMove();       // (the area exactly where it is shown now)
+        store.setBoxPinned(!store.boxPinnedByUser);
+      });
       return bar;
     },
   });
@@ -1190,7 +1217,8 @@ const onMapReady = (map) => {
   mapResizeObserver.observe(map.getContainer());
 };
 let mapResizeObserver = null;
-onBeforeUnmount(() => { window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); bgLayer?.destroy(); pointLayer?.destroy(); });
+onBeforeUnmount(() => {
+  stopLockWatch?.(); window.removeEventListener('keydown', onKeydown); mapResizeObserver?.disconnect(); bgLayer?.destroy(); pointLayer?.destroy(); });
 const hotspotWhen = (dot) => {
   const days = daysSince(dot.lastDay);
   if (days === null) return '';
@@ -1240,6 +1268,8 @@ onMounted(() => {
 /* Map tools (MapSelector addMapTools): one look with Leaflet's zoom bar */
 .mapng-zoom-selection { display: flex !important; align-items: center; justify-content: center; color: #374151; }
 .mapng-zoom-selection:hover { color: var(--brand); }
+.mapng-lock-selection--on, .dark .mapng-lock-selection--on { background: var(--brand) !important; color: #fff !important; }
+.mapng-lock-selection--on:hover { color: #fff; }
 .leaflet-control-scale-line { background: rgba(255, 255, 255, 0.8); border-color: #4b5563; color: #1f2937; font-size: 10px; }
 .mapng-coords {
   background: rgba(255, 255, 255, 0.92); color: #1f2937; border-radius: 6px; padding: 3px 7px;

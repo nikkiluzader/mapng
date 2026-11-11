@@ -166,7 +166,11 @@
     "keyMenu": "menu",
     "keyNudge": "przesuń zaznaczenie",
     "hintMhFullAt": "Lidar (~{res} m) obejmuje cały obszar. Dla tak dużego obszaru jest czytany przy ~{used} m.",
-    "hintMhDesktopFiner": "Aplikacja desktopowa czyta go przy ~{res} m."
+    "hintMhDesktopFiner": "Aplikacja desktopowa czyta go przy ~{res} m.",
+    "lockSelection": "Zablokuj wybrany obszar w miejscu",
+    "unlockSelection": "Odblokuj wybrany obszar",
+    "lockedByBackground": "Zablokowane przez obszary tła",
+    "lockedField": "Obszar jest zablokowany: odblokuj go na mapie, aby go zmienić"
   },
   "status": {
     "runConfigCopied": "Konfiguracja uruchomienia skopiowana do schowka (klucz GPXZ maskowany).",

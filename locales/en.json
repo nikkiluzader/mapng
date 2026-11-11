@@ -171,7 +171,11 @@
     "keyMenu": "menu",
     "keyNudge": "nudge the selection",
     "hintMhFullAt": "Lidar (~{res} m) covers this whole area. For an area this big it's read at ~{used} m.",
-    "hintMhDesktopFiner": "The desktop app reads it at ~{res} m."
+    "hintMhDesktopFiner": "The desktop app reads it at ~{res} m.",
+    "lockSelection": "Lock the selected area in place",
+    "unlockSelection": "Unlock the selected area",
+    "lockedByBackground": "Locked by background areas",
+    "lockedField": "The area is locked: unlock it on the map to change it"
   },
   "status": {
     "runConfigCopied": "Run configuration copied to clipboard (GPXZ key masked).",

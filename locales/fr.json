@@ -166,7 +166,11 @@
     "keyMenu": "menu",
     "keyNudge": "déplacer la sélection",
     "hintMhFullAt": "Le lidar (~{res} m) couvre toute la zone. Pour une zone aussi grande, il est lu à ~{used} m.",
-    "hintMhDesktopFiner": "L'application de bureau le lit à ~{res} m."
+    "hintMhDesktopFiner": "L'application de bureau le lit à ~{res} m.",
+    "lockSelection": "Verrouiller la zone sélectionnée",
+    "unlockSelection": "Déverrouiller la zone sélectionnée",
+    "lockedByBackground": "Verrouillée par les zones d'arrière-plan",
+    "lockedField": "La zone est verrouillée : déverrouillez-la sur la carte pour la modifier"
   },
   "status": {
     "runConfigCopied": "Configuration d'exécution copiée dans le presse-papiers (clé GPXZ masquée).",

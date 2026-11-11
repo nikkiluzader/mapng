@@ -166,7 +166,11 @@
     "keyMenu": "menu",
     "keyNudge": "sposta la selezione",
     "hintMhFullAt": "Il lidar (~{res} m) copre tutta l'area. Per un'area così grande viene letto a ~{used} m.",
-    "hintMhDesktopFiner": "L'app desktop lo legge a ~{res} m."
+    "hintMhDesktopFiner": "L'app desktop lo legge a ~{res} m.",
+    "lockSelection": "Blocca l'area selezionata",
+    "unlockSelection": "Sblocca l'area selezionata",
+    "lockedByBackground": "Bloccata dalle aree di sfondo",
+    "lockedField": "L'area è bloccata: sbloccala sulla mappa per modificarla"
   },
   "status": {
     "runConfigCopied": "Configurazione di esecuzione copiata negli appunti (chiave GPXZ oscurata).",
