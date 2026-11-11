@@ -5,11 +5,16 @@
 // stands on the portal instead: its base at the headwall's top (mapng:base_z for the building builder).
 // A building already standing higher than that (on the hill over the bore) is left as it is; cut-and-cover
 // boxes are under their streets and change nothing.
+// Only a building that stands ON the portal: most of its footprint over the mouth. A big block with one
+// corner across the mouth of an underpass was lifted whole and floated 4 m over its street (Val d'Isère,
+// seen in game); it stays on its own ground, as every other building beside a tunnel does.
 // Pure: callers pass world-space geometry and lookups.
 
 const MOUTH_OUT_M = 10;    // the mouth: from this far out in front of the portal ...
 const MOUTH_IN_M = 25;     // ... to this far into the bore
 const STEP_M = 2;
+const MOUTH_SIDE_M = 6;    // ... and this far past the tube each side (the headwall's reach)
+const ON_PORTAL_SHARE = 0.5;   // of the footprint over the mouth: the building stands on the portal
 
 function inRing(x, y, ring) {
   let inside = false;
@@ -45,6 +50,12 @@ export function findPortalBuildings({ buildings = [], tunnels = [], groundAt }) 
         for (let o = -(t.W || 5); o <= (t.W || 5) + 1e-6; o += STEP_M) pts.push([p.x + nx * o, p.y + ny * o]);
       }
       if (!pts.length) continue;
+      // the mouth as a corridor, for the share of a footprint over it
+      const mouthLine = t.line.filter((p) => { const d = (p.s - portal.s) * inward; return d >= -MOUTH_OUT_M && d <= MOUTH_IN_M; });
+      const overMouth = (x, y) => mouthLine.some((p) => {
+        const dx = x - p.x; const dy = y - p.y;
+        return Math.abs(dx * -(p.ty ?? 0) + dy * (p.tx ?? 0)) <= (t.W || 5) + MOUTH_SIDE_M && Math.abs(dx * (p.tx ?? 0) + dy * (p.ty ?? 0)) <= STEP_M;
+      });
       for (const b of buildings) {
         if (taken.has(b.f)) continue;
         const ring = b.ring;
@@ -54,6 +65,15 @@ export function findPortalBuildings({ buildings = [], tunnels = [], groundAt }) 
         // (its own ground: the lowest under its corners; already over the headwall, it stands on the hill)
         const ground = Math.min(...ring.map(([x, y]) => groundAt(x, y)).filter(Number.isFinite));
         if (!(ground < top)) continue;
+        let inside = 0; let over = 0;
+        for (let y = y0 + STEP_M / 2; y < y1; y += STEP_M) {
+          for (let x = x0 + STEP_M / 2; x < x1; x += STEP_M) {
+            if (!inRing(x, y, ring)) continue;
+            inside++;
+            if (overMouth(x, y)) over++;
+          }
+        }
+        if (inside > 0 && over < ON_PORTAL_SHARE * inside) continue;
         taken.add(b.f);
         out.push({ f: b.f, baseZ: top, tunnel: t.key || null, end });
       }

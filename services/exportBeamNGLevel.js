@@ -12664,7 +12664,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
     tunnels: tunnelList,
     groundAt: (x, y) => getTerrainHeightAtWorldXY(x, y, exportTerrainData, squareSize),
   }) : [];
-  if (portalBuildings.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings over tunnel portals: ${portalBuildings.length}, raised onto the portals.`);
+  if (portalBuildings.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Buildings over tunnel portals: ${portalBuildings.length}, raised onto the portals (${portalBuildings.map((pb) => `${pb.f.id} on ${pb.tunnel}`).join(', ')}).`);
   const liftedBuildings = bridgeTowerHouses || portalBuildings.length ? new Map([...(bridgeTowerHouses || []), ...portalBuildings.map((pb) => [pb.f, { ...pb.f, tags: portalBuildingTags(pb) }])]) : null;
   for (const t of bridgeTowers) (t.deck.towers ||= []).push(t);
   if (bridgeTowers.length) console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Bridge tower houses: ${bridgeTowers.length} (${bridgeTowers.filter((t) => t.pier).length} on piers of their own).`);

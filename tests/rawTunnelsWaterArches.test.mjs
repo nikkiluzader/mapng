@@ -131,6 +131,10 @@ test('a building across a tunnel\'s mouth stands on the portal; one on the hill 
   const got = findPortalBuildings({ buildings: [vent, hilltop], tunnels: [t], groundAt });
   assert.deepEqual(got.map((g) => g.f.id), ['vent']);
   assert.equal(got[0].baseZ, 19);
+  // a big block beside the road with one corner across the mouth is no portal building:
+  // lifted whole it floated over its street (seen in game)
+  const block = { f: { id: 'block', tags: { building: 'apartments' } }, ring: [[-4, -6], [60, -6], [60, 30], [-4, 30]] };
+  assert.deepEqual(findPortalBuildings({ buildings: [block, vent], tunnels: [t], groundAt }).map((g) => g.f.id), ['vent']);
 });
 
 test('a bridge the survey saw along part of it: its runs clear of the ground pinned, not a stray reading', async () => {
