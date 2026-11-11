@@ -127,6 +127,8 @@ test('segment tags: links, sidewalks, partial rules only for whole segments', ()
   assert.equal(segmentTags(partial, NaN).bridge, undefined, 'a piece of an unknown-length segment');
   assert.equal(segmentTags(partial, 0.25).bridge, 'yes');
   assert.equal(segmentTags({ subtype: 'rail', class: 'standard_gauge' }), null);
+  // (a class Overture does not name is no street: it was drawn as highway=road)
+  assert.equal(segmentTags({ subtype: 'road', class: 'unknown' }), null);
 });
 
 test('buildings: a footprint inside two tiles\' buffers comes out once, with heights', () => {

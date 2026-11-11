@@ -325,7 +325,12 @@ export const segmentTags = (p, t = 0.5) => {
   const cls = p.class;
   const subclass = valueAt(json(p.subclass_rules), t) ?? p.subclass;
   const flags = flagsAt(json(p.road_flags), t);
-  let highway = ROAD_CLASSES.has(cls) ? cls : 'road';
+  // (a class Overture does not name, "unknown": OSM highway values that are no
+  // road at all (construction, proposed, platforms, via ferratas...). Kept as
+  // highway=road they were drawn as streets: 29 of them up a ski resort's
+  // slopes in a tester's map)
+  if (!ROAD_CLASSES.has(cls)) return null;
+  let highway = cls;
   const tags = {};
   if ((subclass === 'link' || flags.has('is_link')) && LINKABLE.has(highway)) highway = `${highway}_link`;
   if (subclass === 'sidewalk') { highway = 'footway'; tags.footway = 'sidewalk'; }
