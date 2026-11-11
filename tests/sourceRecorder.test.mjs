@@ -44,3 +44,52 @@ test('a rebuild replays recorded requests and never fetches a missing OSM reques
   assert.deepEqual(online, ['https://tiles.example/9/9/9.png']);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('a rebuild of a level made from the backup map data asks the OpenStreetMap servers again', async () => {
+  const { savedFromBackupMapData } = await import('../desktop/runner/browserShims.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mapng-sources-'));
+  const rec = fs.mkdtempSync(path.join(os.tmpdir(), 'mapng-sources-new-'));
+  const online = [];
+  // 1. the first run: Overpass down (a 504 is not OSM data), the backup's road tiles fetched
+  let overpassUp = false;
+  const fake = async (url) => {
+    online.push(String(url));
+    if (/api\/interpreter/.test(String(url))) return overpassUp ? new Response('osm', { status: 200 }) : new Response('busy', { status: 504 });
+    return new Response('tile', { status: 200 });
+  };
+  await withFetch(fake, async () => {
+    installSourceRecorder({ dir, mode: 'record' });
+    await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=q1' });
+    await (await fetch('https://tiles.overturemaps.org/2026-10-21.0/transportation.pmtiles', { headers: { range: 'bytes=0-99' } })).text();
+  });
+  assert.equal(savedFromBackupMapData(dir), true);
+  online.length = 0;
+  // 2. an update while the servers are still down: the saved answers, as before
+  await withFetch(fake, async () => {
+    const stats = installSourceRecorder({ dir, mode: 'replay', recordDir: rec, refreshOsm: 'ifBackup' });
+    assert.equal(stats.refreshOsm, true);
+    assert.equal((await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=q1' })).status, 504);
+    assert.equal(stats.refreshed, 0);
+  });
+  // 3. an update once they answer: today's map data, recorded for the next one
+  overpassUp = true;
+  await withFetch(fake, async () => {
+    const stats = installSourceRecorder({ dir, mode: 'replay', recordDir: rec, refreshOsm: 'ifBackup' });
+    assert.equal(await (await fetch('https://overpass.kumi.systems/api/interpreter', { method: 'POST', body: 'data=q1' })).text(), 'osm');
+    assert.equal(stats.refreshed, 1);
+    assert.ok(fs.readdirSync(rec).some((n) => n.endsWith('.bin')), 'recorded');
+    // other saved requests are still replayed, not fetched
+    const before = online.length;
+    await (await fetch('https://tiles.overturemaps.org/2026-10-21.0/transportation.pmtiles', { headers: { range: 'bytes=0-99' } })).text();
+    assert.equal(online.length, before);
+  });
+  // a level made from OpenStreetMap itself is never asked again
+  const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'mapng-sources-'));
+  await withFetch(fake, async () => {
+    installSourceRecorder({ dir: plain, mode: 'record' });
+    await (await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=q1' })).text();
+  });
+  assert.equal(savedFromBackupMapData(plain), false);
+  await withFetch(fake, async () => { assert.equal(installSourceRecorder({ dir: plain, mode: 'replay', refreshOsm: 'ifBackup' }).refreshOsm, false); });
+  for (const d of [dir, rec, plain]) fs.rmSync(d, { recursive: true, force: true });
+});

@@ -259,12 +259,36 @@ const linkInto = (from, to) => { try { fs.linkSync(from, to); } catch { try { fs
 // strict (the export's download guard in tests and checks: MAPNG_STRICT_NO_DOWNLOAD):
 // a request the cache can't answer fails instead of going online; otherwise it
 // goes online and is listed in stats.downloadedUrls for the log.
-export function installSourceRecorder({ dir, mode = 'record', fallback = true, recordDir = null, strict = false }) {
+// The saved map data of a level made when no OpenStreetMap server answered:
+// the backup (Overture's road tiles) among its recorded requests.
+export function savedFromBackupMapData(dir) {
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { return false; }
+  for (const name of names) {
+    if (!name.endsWith('.json') || name === 'user-osm-file.json') continue;
+    try {
+      // (the url leads each meta file: its first bytes are enough)
+      const fd = fs.openSync(path.join(dir, name), 'r');
+      const buf = Buffer.alloc(400); const n = fs.readSync(fd, buf, 0, 400, 0); fs.closeSync(fd);
+      if (/tiles\.overturemaps\.org\/[^"]*\/transportation\.pmtiles/.test(buf.toString('utf8', 0, n))) return true;
+    } catch { /* unreadable: not it */ }
+  }
+  return false;
+}
+
+// refreshOsm (replay mode): 'ifBackup' asks the OpenStreetMap servers again
+// when the saved map data is the backup (a level made while they were down
+// stayed on it through every update: two lanes for four, no bridges, however
+// good the servers were by then); true always asks; false never (the map as
+// it was saved). What they answer is recorded for the next replay; when they
+// still do not answer, the saved data is used as before.
+export function installSourceRecorder({ dir, mode = 'record', fallback = true, recordDir = null, strict = false, refreshOsm = false }) {
   fs.mkdirSync(dir, { recursive: true });
   if (recordDir) fs.mkdirSync(recordDir, { recursive: true });
+  const refresh = mode === 'replay' && (refreshOsm === true || (refreshOsm === 'ifBackup' && savedFromBackupMapData(dir)));
   // (downloaded: misses that went online; missedUrls: the first few, for the log)
   // (stats.strict may be switched on later: the export job, after its data step)
-  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [], downloadedUrls: [], strict: !!strict };
+  const stats = { recorded: 0, replayed: 0, missed: 0, downloaded: 0, missedUrls: [], downloadedUrls: [], strict: !!strict, refreshOsm: refresh, refreshed: 0 };
   // (services/terrain.js skips the GPXZ request pacing while replaying)
   if (mode === 'replay') globalThis.__mapngReplayingSources = true;
   const inner = globalThis.fetch;
@@ -302,6 +326,16 @@ export function installSourceRecorder({ dir, mode = 'record', fallback = true, r
       return live;
     }
     if (mode === 'replay') {
+      if (refresh && OSM_REQUEST.test(String(url).replace(/^https?:\/\/[^/]+(\/api\/interpreter)/, 'overpass:$1'))) {
+        try {
+          const live = await inner(input, init);
+          if (live.ok) {
+            stats.refreshed++; stats.downloaded++;
+            await save(live, path.join(recordDir || dir, `${key}.json`), path.join(recordDir || dir, `${key}.bin`), url, init);
+            return live;
+          }
+        } catch (e) { if (init?.signal?.aborted) throw e; /* still down: the saved data below */ }
+      }
       if (fs.existsSync(metaFile)) {
         stats.replayed++;
         const meta = JSON.parse(fs.readFileSync(metaFile, 'utf8'));

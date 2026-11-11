@@ -35,6 +35,8 @@ async function main() {
     dir: job.sources?.dir || path.join(dir, 'sources'),
     mode: job.sources?.mode || 'record',
     fallback: job.sources?.fallback !== false,
+    // (a level whose saved map data is the backup asks the OpenStreetMap servers again)
+    refreshOsm: job.sources?.refreshOsm ?? 'ifBackup',
     // (a replay: anything the saved sources lack is recorded here, then kept
     // with the level; the app's download cache: this generate's full set)
     recordDir: job.sources?.mode === 'replay' || job.sources?.mode === 'cache' ? path.join(dir, 'sources') : null,
@@ -51,6 +53,10 @@ async function main() {
     const keepIn = job.sources?.mode === 'replay' || job.sources?.mode === 'cache' ? path.join(dir, 'sources') : sourcesDir;
     fs.mkdirSync(keepIn, { recursive: true });
     fs.writeFileSync(path.join(keepIn, 'user-osm-file.json'), JSON.stringify({ name: osmFile.name, text: osmFile.text }));
+  }
+  if (sources.refreshOsm) {
+    console.log('[Sources] the saved map data is the backup (no OpenStreetMap server answered when this level was made): asking the servers again.');
+    send({ type: 'progress', update: 'The saved map data is backup data: asking the OpenStreetMap servers again…' });
   }
   const { fetchTerrainData } = await import('../../services/terrain.js');
   const started = Date.now();
@@ -75,6 +81,7 @@ async function main() {
   // (in the log: whether a rebuild stayed offline, and what it had to fetch)
   console.log(`[Sources] ${job.sources?.mode || 'record'}: ${sources.recorded} recorded, ${sources.replayed} from saved data, ${sources.missed} not saved (${sources.downloaded} downloaded instead)`);
   for (const u of sources.missedUrls) console.log(`[Sources]   not saved: ${u}`);
+  if (sources.refreshOsm) console.log(`[Sources] map data asked again: ${sources.refreshed} request(s) answered by the OpenStreetMap servers${sources.refreshed ? '' : ' (none: the saved backup data is used)'}; now from ${data.osmRequestInfo?.endpointUsed || 'n/a'}`);
   send({ type: 'done', seconds: (Date.now() - started) / 1000, width: data.width, height: data.height, sources });
 }
 
