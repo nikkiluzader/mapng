@@ -49,8 +49,46 @@ export function reportSummary(body, id, receivedAt) {
   };
 }
 
+// The alert emails are capped whoever sends the reports: someone pressing
+// Send over and over (or a script posting to /api/crash from many addresses)
+// must not be able to fill the developer's inbox. Reports are still stored
+// and listed on the viewer page; only the emails stop. The last email before
+// a pause says so.
+export const MAIL_PER_HOUR = 5;
+export const MAIL_PER_DAY = 20;
+// ...and the reports themselves, in all, a day (storage is not free either)
+export const REPORTS_PER_DAY = 400;
+const COUNTER_PREFIX = `${PREFIX}_counters/`;
+
+/** The day's counts { reports, mails, hours: { HH: mails } } (R2: read, add, write; a race lets a few extra through). */
+async function readCounts(env, day) {
+  try {
+    const o = await env.OSM_TILES.get(`${COUNTER_PREFIX}${day}.json`);
+    const c = o ? await o.json() : null;
+    if (c && typeof c === 'object') return { reports: Number(c.reports) || 0, mails: Number(c.mails) || 0, hours: c.hours && typeof c.hours === 'object' ? c.hours : {} };
+  } catch { /* unreadable: start again */ }
+  return { reports: 0, mails: 0, hours: {} };
+}
+const writeCounts = (env, day, counts) => env.OSM_TILES.put(`${COUNTER_PREFIX}${day}.json`, JSON.stringify(counts), { httpMetadata: { contentType: 'application/json' } });
+
+/** Whether this report's email may go, and whether it is the last before a pause: { send, note }. */
+export function mailAllowance(counts, hour) {
+  const thisHour = Number(counts.hours?.[hour]) || 0;
+  if (counts.mails >= MAIL_PER_DAY || thisHour >= MAIL_PER_HOUR) return { send: false, note: '' };
+  if (counts.mails + 1 >= MAIL_PER_DAY) return { send: true, note: `This is alert ${MAIL_PER_DAY} today: no more alert emails until tomorrow (UTC). New reports still arrive on the viewer page.` };
+  if (thisHour + 1 >= MAIL_PER_HOUR) return { send: true, note: `This is alert ${MAIL_PER_HOUR} this hour: no more alert emails until the next hour. New reports still arrive on the viewer page.` };
+  return { send: true, note: '' };
+}
+
 async function notify(env, summary, viewerUrl) {
   if (!env.CRASH_MAIL || !env.CRASH_MAIL_TO || !env.CRASH_MAIL_FROM) return;
+  const day = summary.receivedAt.slice(0, 10); const hour = summary.receivedAt.slice(11, 13);
+  const counts = await readCounts(env, day);
+  const allowance = mailAllowance(counts, hour);
+  if (!allowance.send) return;
+  counts.mails += 1; counts.hours[hour] = (Number(counts.hours[hour]) || 0) + 1;
+  // (counted before sending: a failing mail service must not lift the cap)
+  try { await writeCounts(env, day, counts); } catch { return; }
   const lines = [
     `MapNG ${summary.kind} report ${summary.id}`,
     `App: ${summary.appVersion} (${summary.build}) on ${summary.os || summary.platform}`,
@@ -59,6 +97,7 @@ async function notify(env, summary, viewerUrl) {
     summary.level ? `Level: ${summary.level}` : '',
     `Log: ${summary.hasLog ? 'yes' : 'no'}  Crash dump: ${summary.hasDump ? 'yes' : 'no'}  Export report: ${summary.hasExportReport ? 'yes' : 'no'}`,
     `View: ${viewerUrl}`,
+    allowance.note,
   ].filter(Boolean);
   try {
     await env.CRASH_MAIL.send({
@@ -107,6 +146,12 @@ export async function handleCrashReports(request, env, ctx, url, json) {
 
     const id = reportId();
     const receivedAt = new Date().toISOString();
+    // (all senders together: at most REPORTS_PER_DAY stored a day)
+    const today = receivedAt.slice(0, 10);
+    const counts = await readCounts(env, today);
+    if (counts.reports >= REPORTS_PER_DAY) return json({ error: 'Too many reports today. Please try again tomorrow, or write on Discord.' }, 429);
+    counts.reports += 1;
+    await writeCounts(env, today, counts);
     // (day / time-id: listing newest first is a key sort)
     const dir = `${PREFIX}${receivedAt.slice(0, 10)}/${receivedAt.slice(11, 19).replace(/:/g, '')}-${id}/`;
     const summary = reportSummary(body, id, receivedAt);

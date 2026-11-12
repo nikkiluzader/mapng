@@ -27,7 +27,8 @@ test('a report is stored privately with its log and dump, and read back only wit
   const r = await post(env, { kind: 'export', appVersion: '0.2.4', error: 'out of memory', log: 'a\nb', minidump: Buffer.from('MDMP').toString('base64'), area: { lat: 1, lng: 2 } }, '9.9.9.1');
   const { id } = await r.json();
   assert.match(id, /^MR-[A-Z0-9]{6}$/);
-  const keys = [...env.OSM_TILES.store.keys()];
+  // (beside the day's counter of reports and alert emails)
+  const keys = [...env.OSM_TILES.store.keys()].filter((k) => !k.includes('/_counters/'));
   assert.equal(keys.length, 3);
   assert.ok(keys.every((k) => k.startsWith('crash-reports/') && k.includes(id)));
   assert.equal(mails.length, 1);
@@ -99,4 +100,34 @@ test('a level report keeps the level\'s export report as its own file, read back
   assert.equal((await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`)).status, 401);
   const got = await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`, { headers: { Authorization: 'Bearer secret-token' } });
   assert.match(await got.text(), /Bridge decks: 30/);
+});
+
+test('alert emails are capped an hour and a day whoever sends; reports are still stored', async () => {
+  const { MAIL_PER_HOUR, MAIL_PER_DAY, mailAllowance } = await import('../worker/crashReports.js');
+  const mails = [];
+  const env = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 't', CRASH_MAIL: { send: async (m) => mails.push(m) }, CRASH_MAIL_TO: 'dev@example.com', CRASH_MAIL_FROM: 'reports@mapng.com' };
+  // 30 reports within the hour, each from another address (the per-address limit does not help here)
+  for (let i = 0; i < 30; i++) assert.equal((await post(env, { kind: 'manual', description: `spam ${i}` }, `10.0.${i}.1`)).status, 200);
+  assert.equal(mails.length, MAIL_PER_HOUR);
+  assert.match(mails[MAIL_PER_HOUR - 1].text, /no more alert emails until the next hour/);
+  assert.ok(!/no more alert emails/.test(mails[0].text));
+  const stored = [...env.OSM_TILES.store.keys()].filter((k) => k.endsWith('report.json')).length;
+  assert.equal(stored, 30);
+  // the counters are not readable as report files, and not listed as reports
+  const list = await (await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer t' } })).json();
+  assert.equal(list.total, 30);
+  // the day's cap, over the hours
+  assert.deepEqual(mailAllowance({ mails: MAIL_PER_DAY, hours: {} }, '09'), { send: false, note: '' });
+  assert.equal(mailAllowance({ mails: 0, hours: { '09': MAIL_PER_HOUR } }, '09').send, false);
+  assert.equal(mailAllowance({ mails: 3, hours: { '09': MAIL_PER_HOUR } }, '10').send, true);
+  assert.match(mailAllowance({ mails: MAIL_PER_DAY - 1, hours: {} }, '10').note, /until tomorrow/);
+});
+
+test('at most a set number of reports are stored a day in all', async () => {
+  const { REPORTS_PER_DAY } = await import('../worker/crashReports.js');
+  const env = { OSM_TILES: fakeBucket() };
+  const day = new Date().toISOString().slice(0, 10);
+  await env.OSM_TILES.put(`crash-reports/_counters/${day}.json`, JSON.stringify({ reports: REPORTS_PER_DAY - 1, mails: 0, hours: {} }));
+  assert.equal((await post(env, { kind: 'manual', description: 'last one in' }, '10.9.9.1')).status, 200);
+  assert.equal((await post(env, { kind: 'manual', description: 'one too many' }, '10.9.9.2')).status, 429);
 });
