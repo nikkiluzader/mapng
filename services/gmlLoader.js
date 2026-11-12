@@ -107,6 +107,13 @@ const detectVectorGeometryType = (node) => {
   return 'vector';
 };
 
+// A file's own "no data" heights. Japan's survey tiles write the sea and
+// unsurveyed cells as "データなし,-9999." (every coastal tile has them); kept
+// as heights they were ground 10 km down, since the grid's no-data value here
+// is another number. No real ground is under -9990 m.
+const FILE_NO_DATA_BELOW = -9990;
+const noDataOr = (value) => (value <= FILE_NO_DATA_BELOW ? GML_NO_DATA : value);
+
 const getTupleNumericValue = (chunk) => {
   if (!chunk) return GML_NO_DATA;
   const pieces = String(chunk)
@@ -116,11 +123,11 @@ const getTupleNumericValue = (chunk) => {
 
   for (let index = pieces.length - 1; index >= 0; index--) {
     const value = Number(pieces[index]);
-    if (Number.isFinite(value)) return value;
+    if (Number.isFinite(value)) return noDataOr(value);
   }
 
   const fallback = Number(String(chunk).trim());
-  return Number.isFinite(fallback) ? fallback : GML_NO_DATA;
+  return Number.isFinite(fallback) ? noDataOr(fallback) : GML_NO_DATA;
 };
 
 const looksLikeGeographicLatLng = (first, second) => (
@@ -171,7 +178,7 @@ const extractRangeValues = (rangeSet) => {
       return getNodeText(nilTupleList)
         .split(/\s+/)
         .map((token) => Number(token))
-        .map((value) => (Number.isFinite(value) ? value : GML_NO_DATA));
+        .map((value) => (Number.isFinite(value) ? noDataOr(value) : GML_NO_DATA));
     }
   }
 
@@ -188,13 +195,13 @@ const extractRangeValues = (rangeSet) => {
   if (Array.isArray(scalarList)) {
     return scalarList
       .map((value) => Number(getNodeText(value)))
-      .map((value) => (Number.isFinite(value) ? value : GML_NO_DATA));
+      .map((value) => (Number.isFinite(value) ? noDataOr(value) : GML_NO_DATA));
   }
 
   return getNodeText(scalarList)
     .split(/\s+/)
     .map((token) => Number(token))
-    .map((value) => (Number.isFinite(value) ? value : GML_NO_DATA));
+    .map((value) => (Number.isFinite(value) ? noDataOr(value) : GML_NO_DATA));
 };
 
 const parseEnvelopeBounds = (coverageNode) => {

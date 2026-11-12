@@ -140,3 +140,43 @@ test('holes in a file fitted to the map take the nearest height; none stay as gr
   fillFittedNoData(empty, 2, 2);
   assert.deepEqual([...empty], [0, 0, 0, 0]);
 });
+
+test('GML tiles in the Japanese survey\'s format: a late start, an early end and "no data" cells are all holes', async () => {
+  const { parseGmlText } = await import('../services/gmlLoader.js');
+  const W = 12; const H = 8; const startX = 3; const startY = 1; const cut = 5;
+  const want = (c, r) => 10 + c * 0.1 + r * 0.5;
+  const hole = (c, r) => c >= 6 && c < 8 && r === 4;
+  const tuples = [];
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const i = r * W + c;
+    if (i < startY * W + startX || i >= W * H - cut) continue;
+    tuples.push(hole(c, r) ? 'データなし,-9999.' : `地表面,${want(c, r).toFixed(2)}`);
+  }
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Dataset xmlns="http://fgd.gsi.go.jp/spec/2008/FGD_GMLSchema" xmlns:gml="http://www.opengis.net/gml/3.2" gml:id="Dataset1">
+<DEM gml:id="DEM001"><type>5mメッシュ（標高）</type><mesh>53394611</mesh>
+<coverage gml:id="DEM001-3">
+<gml:boundedBy><gml:Envelope srsName="fguuid:jgd2011.bl"><gml:lowerCorner>35.675 139.7625</gml:lowerCorner><gml:upperCorner>35.683333333 139.775</gml:upperCorner></gml:Envelope></gml:boundedBy>
+<gml:gridDomain><gml:Grid gml:id="DEM001-4" dimension="2"><gml:limits><gml:GridEnvelope><gml:low>0 0</gml:low><gml:high>${W - 1} ${H - 1}</gml:high></gml:GridEnvelope></gml:limits><gml:axisLabels>x y</gml:axisLabels></gml:Grid></gml:gridDomain>
+<gml:rangeSet><gml:DataBlock><gml:rangeParameters><gml:QuantityList uom="DEM構成点"/></gml:rangeParameters>
+<gml:tupleList>
+${tuples.join('\n')}
+</gml:tupleList></gml:DataBlock></gml:rangeSet>
+<gml:coverageFunction><gml:GridFunction><gml:sequenceRule order="+x-y">Linear</gml:sequenceRule><gml:startPoint>${startX} ${startY}</gml:startPoint></gml:GridFunction></gml:coverageFunction>
+</coverage></DEM></Dataset>`;
+  const m = await parseGmlText(xml);
+  assert.equal(m.sourceWidth, W);
+  assert.equal(m.sourceHeight, H);
+  assert.deepEqual(m.bounds, { north: 35.683333333, south: 35.675, east: 139.775, west: 139.7625 });
+  const nd = m.noData;
+  let holes = 0;
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+    const i = r * W + c; const v = m.raster[i];
+    const missing = i < startY * W + startX || i >= W * H - cut || hole(c, r);
+    if (missing) { assert.equal(v, nd, `cell ${c},${r} should be a hole, reads ${v}`); holes++; }
+    else assert.ok(Math.abs(v - want(c, r)) < 0.011, `cell ${c},${r}: ${v}`);
+  }
+  assert.equal(holes, startY * W + startX + cut + 2);
+  // (the tile's own no-data value is what the resampler masks)
+  assert.equal(m.gridTiles[0].noData, nd);
+});
