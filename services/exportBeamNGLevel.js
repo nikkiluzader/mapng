@@ -6539,7 +6539,11 @@ function shouldPaintCrossing(tags = {}) {
   return true;
 }
 
-/** Piers and footbridges as deck lines: [{ nodes, half, wood }]. */
+/**
+ * Piers and footbridges as deck lines: [{ nodes, half, wood }]. wood: true (a pier, a boardwalk, a
+ * wooden surface), false (a paved one), or 'overWater' for a footbridge with no surface tag: planks
+ * where it crosses water and stands alone, concrete otherwise (buildDeckRuns decides).
+ */
 function buildDeckPaths(terrainData, squareSize) {
   const out = [];
   for (const f of terrainData.osmFeatures || []) {
@@ -6553,7 +6557,7 @@ function buildDeckPaths(terrainData, squareSize) {
     for (const piece of clipGeometryToMargin(f.geometry, terrainData.bounds)) {
       const nodes = resampleGeometryToSpacing(piece, 2).map((p) => geoToWorldPoint(p.lat, p.lng, terrainData, squareSize, 0));
       const layer = Number.parseFloat(tags.layer);
-      out.push({ nodes, half, bridge: !pier, wood: !concrete && (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk' || !tags.surface), ...(Number.isFinite(layer) ? { layer } : {}) });
+      out.push({ nodes, half, bridge: !pier, wood: concrete ? false : (pier || tags.surface === 'wood' || tags.bridge === 'boardwalk') ? true : tags.surface ? false : 'overWater', ...(Number.isFinite(layer) ? { layer } : {}) });
     }
   }
   return out;

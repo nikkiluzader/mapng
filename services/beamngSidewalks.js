@@ -2643,6 +2643,12 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
     let z = raw;
     for (let pass = 0; pass < 4; pass++) z = z.map((v, i) => (i === 0 || i === z.length - 1 ? v : (z[i - 1] + 2 * v + z[i + 1]) / 4));
     const onBridge = nodes.some((q) => roadsAt(q).length);
+    // A footbridge with no surface tag: planks only where it crosses water on its own (a park's
+    // bridge over a stream, a boardwalk nobody tagged). One that meets a road bridge, or runs over
+    // dry ground among roads, is concrete: three untagged foot links up to an elevated rotary
+    // came out as 37 % wooden planks against its concrete decks.
+    const overWater = nodes.some((q, i) => !onRoad[i] && !onLand(i));
+    const wood = path.wood === 'overWater' ? (overWater && !onBridge) : !!path.wood;
     // (not over the road's own lanes: a path mapped across a deck's lanes, on
     // its layer, stood on the motorway as a slab; left out where it overlaps
     // them by more than DECK_LANE_OVERLAP_M)
@@ -2655,7 +2661,7 @@ export function buildDeckRuns(paths, bridges, { groundAt, seaZ = 0 } = {}) {
       const centre = idx.map((i) => [nodes[i][0], nodes[i][1], z[i]]);
       const flat = centre.map((q) => [q[0], q[1], q[2], 0]);
       const points = offsetLine(flat, half).map((q) => [q[0], q[1], q[2]]);
-      return { points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood: !!path.wood, ramps: [false, false], caps: [true, true], highway: 'footway' };
+      return { points, centre, half, side: -1, width: half * 2, walk: true, deck: true, onBridge, wood, ramps: [false, false], caps: [true, true], highway: 'footway' };
     });
   });
 }

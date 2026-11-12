@@ -895,3 +895,18 @@ test('a road bridge sidewalk swinging out round a tower stays at the deck height
   const pier = buildDeckRuns([{ nodes: nodes.map((q) => [q[0], -40, 0]), half: 1.2 }], [deck], { groundAt: () => 0, seaZ: 0 });
   assert.ok(Math.max(...pier.flatMap((r) => r.centre.map((q) => q[2]))) < 5);
 });
+
+test('a footbridge with no surface tag: planks over water on its own, concrete over dry ground or on a road bridge', async () => {
+  const { buildDeckRuns } = await import('../services/beamngSidewalks.js');
+  const nodes = Array.from({ length: 16 }, (_, i) => [i * 2, 0, 0]);
+  // over a stream: land at both ends, water (below the sea plane's clearance) in the middle
+  const stream = (x) => (x > 8 && x < 22 ? -2 : 3);
+  const [wet] = buildDeckRuns([{ nodes, half: 1, wood: 'overWater', bridge: true }], [], { groundAt: (x) => stream(x), seaZ: 0 });
+  assert.equal(wet.wood, true);
+  // over dry ground (a link among a flyover's ramps)
+  const [dry] = buildDeckRuns([{ nodes, half: 1, wood: 'overWater', bridge: true }], [], { groundAt: () => 3, seaZ: 0 });
+  assert.equal(dry.wood, false);
+  // tagged ones keep what they say
+  assert.equal(buildDeckRuns([{ nodes, half: 1, wood: true }], [], { groundAt: () => 3, seaZ: 0 })[0].wood, true);
+  assert.equal(buildDeckRuns([{ nodes, half: 1, wood: false }], [], { groundAt: (x) => stream(x), seaZ: 0 })[0].wood, false);
+});
