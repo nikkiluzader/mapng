@@ -97,22 +97,27 @@ export async function adminIdentity(request, env, fetchFn = fetch) {
 const CF_GRAPHQL = 'https://api.cloudflare.com/client/v4/graphql';
 const zoneQuery = (vars, body) => `query(${vars}){viewer{zones(filter:{zoneTag:$z}){rows:${body}}}}`;
 export const CF_SECTIONS = {
-  // per day, 14 days
-  traffic: { span: 'days', query: zoneQuery('$z:string,$d0:Date,$d1:Date', 'httpRequests1dGroups(limit:20,filter:{date_geq:$d0,date_leq:$d1},orderBy:[date_ASC]){dimensions{date} sum{requests cachedRequests bytes cachedBytes threats pageViews} uniq{uniques}}') },
+  // per day (at least two weeks, up to a year)
+  traffic: { span: 'days', query: zoneQuery('$z:string,$d0:Date,$d1:Date', 'httpRequests1dGroups(limit:400,filter:{date_geq:$d0,date_leq:$d1},orderBy:[date_ASC]){dimensions{date} sum{requests cachedRequests bytes cachedBytes threats pageViews} uniq{uniques}}') },
+  // (the request tables below count what visitors asked, requestSource "eyeball": without it the
+  // worker's own traffic is in there too, its cache look-ups above all, which answer 504 on every
+  // miss and 204 on every write: 430,000 a day against 320,000 real requests, and 504 the "top status")
+  // what the worker itself asked of other servers on visitors' behalf
+  upstream: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,requestSource:"edgeWorkerFetch"},orderBy:[count_DESC]){count dimensions{clientRequestHTTPHost edgeResponseStatus}}') },
   // last 24 hours
-  securityByAction: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'firewallEventsAdaptiveGroups(limit:25,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{action source}}') },
-  securityByPath: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'firewallEventsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{clientRequestPath action}}') },
-  securityByCountry: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'firewallEventsAdaptiveGroups(limit:12,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{clientCountryName}}') },
-  securityByAgent: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'firewallEventsAdaptiveGroups(limit:12,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{userAgent action}}') },
-  statusCodes: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:20,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{edgeResponseStatus}}') },
+  securityByAction: { span: 'security', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'firewallEventsAdaptiveGroups(limit:25,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{action source}}') },
+  securityByPath: { span: 'security', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'firewallEventsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{clientRequestPath action}}') },
+  securityByCountry: { span: 'security', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'firewallEventsAdaptiveGroups(limit:12,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{clientCountryName}}') },
+  securityByAgent: { span: 'security', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'firewallEventsAdaptiveGroups(limit:12,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{userAgent action}}') },
+  statusCodes: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:20,filter:{datetime_geq:$t0,datetime_leq:$t1,requestSource:"eyeball"},orderBy:[count_DESC]){count dimensions{edgeResponseStatus}}') },
   // which desktop app versions are calling in: the app names itself "MapNG-Desktop/<version>" on its
   // requests, which Cloudflare already counts with the rest of the traffic (requests, not people)
   appVersions: { span: 'week', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:30,filter:{datetime_geq:$t0,datetime_leq:$t1,userAgent_like:"MapNG-Desktop%"},orderBy:[count_DESC]){count dimensions{userAgent}}') },
   // what the less happy answers were for: not found, too many requests, and the site's own errors
-  notFoundPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,edgeResponseStatus:404},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
-  limitedPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,edgeResponseStatus:429},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
-  serverErrorPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,edgeResponseStatus_in:[500,502,503]},orderBy:[count_DESC]){count dimensions{clientRequestPath edgeResponseStatus}}') },
-  topPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
+  notFoundPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,requestSource:"eyeball",edgeResponseStatus:404},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
+  limitedPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,requestSource:"eyeball",edgeResponseStatus:429},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
+  serverErrorPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,requestSource:"eyeball",edgeResponseStatus_in:[500,502,503]},orderBy:[count_DESC]){count dimensions{clientRequestPath edgeResponseStatus}}') },
+  topPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,requestSource:"eyeball"},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
 };
 
 /**
@@ -132,29 +137,57 @@ async function securityRules(token, zone, fetchFn) {
   }
 }
 
-/** { at, sections: { name: { rows } | { error } }, rules }, or { error } when it is not set up. */
-export async function cloudflareStats(env, fetchFn = fetch, now = Date.now()) {
+// How far back Cloudflare answers on this plan (asked of its API, viewer.zones.settings, 2026-11-12):
+// daily totals 365 days; the request breakdowns 30 days in one query (kept 31); security events
+// 1 day in one query, kept 3: those are asked day by day and added up.
+export const CF_LIMITS = { trafficDays: 365, requestDays: 30, securityDays: 3 };
+const TRAFFIC_MIN_DAYS = 14;      // the per-day chart always shows at least two weeks
+
+/** The windows a chosen range of `days` gives each kind of section. */
+export function cfWindows(days) {
+  const d = Math.min(CF_LIMITS.trafficDays, Math.max(1, Math.round(Number(days) || 1)));
+  return { asked: d, trafficDays: Math.max(TRAFFIC_MIN_DAYS, d), requestDays: Math.min(CF_LIMITS.requestDays, d), securityDays: Math.min(CF_LIMITS.securityDays, d) };
+}
+
+/**
+ * { at, windows, sections: { name: { rows } | { error } }, rules }, or { error } when it is not set
+ * up. `days`: the range asked for (1 to 365); each section gets as much of it as Cloudflare keeps.
+ */
+export async function cloudflareStats(env, fetchFn = fetch, now = Date.now(), days = 1) {
   const token = env.CF_ANALYTICS_TOKEN; const zone = env.CF_ZONE_ID;
   if (!token || !zone) return { error: 'not-set-up' };
   const iso = (t) => new Date(t).toISOString().slice(0, 19) + 'Z';
-  const vars = {
-    days: { z: zone, d0: iso(now - 13 * 86400000).slice(0, 10), d1: iso(now).slice(0, 10) },
-    hours: { z: zone, t0: iso(now - 24 * 3600000), t1: iso(now) },
-    week: { z: zone, t0: iso(now - 7 * 86400000), t1: iso(now) },
+  const w = cfWindows(days);
+  const DAY = 86400000;
+  // the variable sets each section is asked with (security: one per day, newest first)
+  const varsOf = (span) => {
+    if (span === 'days') return [{ z: zone, d0: iso(now - (w.trafficDays - 1) * DAY).slice(0, 10), d1: iso(now).slice(0, 10) }];
+    if (span === 'week') return [{ z: zone, t0: iso(now - Math.max(7, w.requestDays) * DAY), t1: iso(now) }];
+    // (the oldest window starts a little inside what Cloudflare keeps: exactly 3 days back is "older than 3d" by the time it is asked)
+    if (span === 'security') return Array.from({ length: w.securityDays }, (_, i) => ({ z: zone, t0: iso(Math.max(now - (i + 1) * DAY, now - CF_LIMITS.securityDays * DAY + 10 * 60000)), t1: iso(now - i * DAY) }));
+    return [{ z: zone, t0: iso(Math.max(now - w.requestDays * DAY, now - CF_LIMITS.requestDays * DAY + 10 * 60000)), t1: iso(now) }];
+  };
+  const ask = async (query, variables) => {
+    const r = await fetchFn(CF_GRAPHQL, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables }) });
+    const d = await r.json();
+    if (d.errors?.length) throw new Error(String(d.errors[0]?.message || 'query failed'));
+    return d.data?.viewer?.zones?.[0]?.rows || [];
   };
   const names = Object.keys(CF_SECTIONS);
   const results = await Promise.all(names.map(async (name) => {
     const { span, query } = CF_SECTIONS[name];
     try {
-      const r = await fetchFn(CF_GRAPHQL, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query, variables: vars[span] }) });
-      const d = await r.json();
-      if (d.errors?.length) return { error: String(d.errors[0]?.message || 'query failed').slice(0, 300) };
-      return { rows: d.data?.viewer?.zones?.[0]?.rows || [] };
+      const parts = await Promise.all(varsOf(span).map((v) => ask(query, v)));
+      if (parts.length === 1) return { rows: parts[0] };
+      // several days of one table: the same row (its dimensions) added up, biggest first
+      const sum = new Map();
+      for (const rows of parts) for (const r of rows) { const k = JSON.stringify(r.dimensions); const e = sum.get(k); if (e) e.count += r.count; else sum.set(k, { count: r.count, dimensions: r.dimensions }); }
+      return { rows: [...sum.values()].sort((a, b) => b.count - a.count) };
     } catch (e) {
       return { error: String(e?.message || e).slice(0, 300) };
     }
   }));
-  return { at: iso(now), sections: Object.fromEntries(names.map((n, i) => [n, results[i]])), rules: await securityRules(token, zone, fetchFn) };
+  return { at: iso(now), windows: w, limits: CF_LIMITS, sections: Object.fromEntries(names.map((n, i) => [n, results[i]])), rules: await securityRules(token, zone, fetchFn) };
 }
 
 const stateKey = (dir) => `${dir}admin.json`;
@@ -209,7 +242,7 @@ export async function handleAdmin(request, env, ctx, url, json) {
   }
 
   if (sub === '/cloudflare' && request.method === 'GET') {
-    const stats = await cloudflareStats(env);
+    const stats = await cloudflareStats(env, fetch, Date.now(), url.searchParams.get('days') || 1);
     return json(stats, stats.error === 'not-set-up' ? 503 : 200, noStore);
   }
 

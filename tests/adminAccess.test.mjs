@@ -1,7 +1,7 @@
 // worker/admin.js: the Cloudflare Access token check in front of the developer's dashboard
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { adminIdentity, CF_SECTIONS, cleanState, cloudflareStats, verifyAccessToken } from '../worker/admin.js';
+import { adminIdentity, CF_SECTIONS, cfWindows, cleanState, cloudflareStats, verifyAccessToken } from '../worker/admin.js';
 
 const TEAM = 'example.cloudflareaccess.com';
 const AUD = 'aud-of-the-admin-app';
@@ -88,4 +88,28 @@ test('Cloudflare stats: each section stands alone, and nothing is asked without 
   // the windows asked for: 14 days and the last 24 hours
   assert.deepEqual(seen.find((c) => c.vars.d0).vars, { z: 'zone1', d0: '2026-10-30', d1: '2026-11-12' });
   assert.deepEqual(seen.find((c) => c.vars.t0).vars, { z: 'zone1', t0: '2026-11-11T12:00:00Z', t1: '2026-11-12T12:00:00Z' });
+});
+
+test('Cloudflare stats: a chosen range gives each table as much as Cloudflare keeps', async () => {
+  assert.deepEqual(cfWindows(1), { asked: 1, trafficDays: 14, requestDays: 1, securityDays: 1 });
+  assert.deepEqual(cfWindows(7), { asked: 7, trafficDays: 14, requestDays: 7, securityDays: 3 });
+  assert.deepEqual(cfWindows(90), { asked: 90, trafficDays: 90, requestDays: 30, securityDays: 3 });
+  assert.deepEqual(cfWindows(9999), { asked: 365, trafficDays: 365, requestDays: 30, securityDays: 3 });
+  assert.deepEqual(cfWindows('junk'), { asked: 1, trafficDays: 14, requestDays: 1, securityDays: 1 });
+  // security events are asked a day at a time (a query may span one day) and the days added up
+  const seen = [];
+  const fetchFn = async (url, init) => {
+    if (String(url).includes('/rulesets/')) return new Response(JSON.stringify({ success: true, result: { rules: [] } }));
+    const body = JSON.parse(init.body); seen.push(body);
+    const sec = body.query.includes('firewallEventsAdaptiveGroups');
+    return new Response(JSON.stringify({ data: { viewer: { zones: [{ rows: sec ? [{ count: 2, dimensions: { action: 'block' } }, { count: 1, dimensions: { action: 'skip' } }] : [{ count: 5, dimensions: {} }] }] } } }));
+  };
+  const now = Date.UTC(2026, 10, 12, 12);
+  const out = await cloudflareStats({ CF_ANALYTICS_TOKEN: 't', CF_ZONE_ID: 'z' }, fetchFn, now, 30);
+  assert.deepEqual(out.windows, { asked: 30, trafficDays: 30, requestDays: 30, securityDays: 3 });
+  assert.deepEqual(out.sections.securityByAction.rows, [{ count: 6, dimensions: { action: 'block' } }, { count: 3, dimensions: { action: 'skip' } }]);
+  const secAsks = seen.filter((b) => b.query.includes('dimensions{action source}'));
+  assert.deepEqual(secAsks.map((b) => [b.variables.t0, b.variables.t1]), [['2026-11-11T12:00:00Z', '2026-11-12T12:00:00Z'], ['2026-11-10T12:00:00Z', '2026-11-11T12:00:00Z'], ['2026-11-09T12:10:00Z', '2026-11-10T12:00:00Z']]);   // (the oldest starts 10 minutes inside the 3 days kept)
+  assert.equal(seen.find((b) => b.variables.d0).variables.d0, '2026-10-14');
+  assert.equal(seen.find((b) => b.query.includes('edgeResponseStatus:404')).variables.t0, '2026-10-13T12:10:00Z');
 });

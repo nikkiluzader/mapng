@@ -102,7 +102,7 @@
   .detail .acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
   pre.file { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 520px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.45 "Overpass Mono", ui-monospace, monospace; margin: 8px 0 0; }
   .bars { display: flex; align-items: flex-end; gap: 3px; height: 120px; }
-  .bars .b { flex: 1; min-width: 4px; background: var(--brand); border-radius: 3px 3px 0 0; position: relative; }
+  .bars .b { flex: 1; min-width: 1px; background: var(--brand); border-radius: 3px 3px 0 0; position: relative; }
   .bars .b.alt { background: var(--info); }
   .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-top: 4px; }
   .muted { color: var(--muted); }
@@ -167,15 +167,27 @@
 
     <section data-panel="traffic" hidden>
       <div class="notice" id="cf-setup" hidden></div>
+      <div class="filters range">
+        <label>Period <select class="cf-range" aria-label="Period">
+          <option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option>
+        </select></label>
+        <span class="muted cf-window"></span>
+      </div>
       <div class="grid2">
-        <div class="card"><h2>Requests per day</h2><p class="sub" id="cf-traffic-sub">Last 14 days, from Cloudflare.</p><div id="cf-traffic"></div></div>
+        <div class="card"><h2>Requests per day</h2><p class="sub" id="cf-traffic-sub">From Cloudflare.</p><div id="cf-traffic"></div></div>
         <div class="card"><h2>Visitors and data per day</h2><p class="sub">Unique visitors (bars) with pages viewed and data served.</p><div id="cf-visitors"></div></div>
       </div>
     </section>
 
     <section data-panel="security" hidden>
+      <div class="filters range">
+        <label>Period <select class="cf-range" aria-label="Period">
+          <option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="90">Last 90 days</option><option value="365">Last year</option>
+        </select></label>
+        <span class="muted cf-window"></span>
+      </div>
       <div class="grid2">
-        <div class="card"><h2>Security events, last 24 hours</h2><p class="sub">What Cloudflare challenged, blocked or let through by rule.</p><div class="scroll" id="cf-sec-action"></div></div>
+        <div class="card"><h2>Security events</h2><p class="sub">What Cloudflare challenged, blocked or let through by rule.</p><div class="scroll" id="cf-sec-action"></div></div>
         <div class="card"><h2>Where they were aimed</h2><p class="sub">Paths with the most security events.</p><div class="scroll" id="cf-sec-path"></div></div>
         <div class="card"><h2>From where</h2><p class="sub">Countries with the most security events.</p><div class="scroll" id="cf-sec-country"></div></div>
         <div class="card"><h2>By which client</h2><p class="sub">User agents with the most security events.</p><div class="scroll" id="cf-sec-agent"></div></div>
@@ -185,10 +197,11 @@
 
     <section data-panel="traffic" hidden>
       <div class="grid2">
-        <div class="card"><h2>Responses, last 24 hours</h2><p class="sub">Status codes the site answered with. A large 504 count is expected: the app asks the cache for map tiles "only if cached", and a miss answers 504.</p><div class="scroll" id="cf-status"></div></div>
-        <div class="card"><h2>Busiest paths, last 24 hours</h2><p class="sub">Requests by path.</p><div class="scroll" id="cf-paths"></div></div>
-        <div class="card"><h2>Not found (404), last 24 hours</h2><p class="sub">By part of the site, then the single paths asked for most. Elevation tiles outside a source's coverage answer 404 by design; one tile asked for hundreds of times is a client retrying.</p><div class="scroll" id="cf-404"></div></div>
-        <div class="card"><h2>Too many requests (429), last 24 hours</h2><p class="sub">Where a limit was hit: MapNG's own, or the service behind it (GPXZ keys, the address search).</p><div class="scroll" id="cf-429"></div></div>
+        <div class="card"><h2>Responses</h2><p class="sub">What visitors and apps were answered with (the site's own internal look-ups are left out).</p><div class="scroll" id="cf-status"></div></div>
+        <div class="card"><h2>Busiest paths</h2><p class="sub">Requests by path.</p><div class="scroll" id="cf-paths"></div></div>
+        <div class="card"><h2>Not found (404)</h2><p class="sub">By part of the site, then the single paths asked for most. Elevation tiles outside a source's coverage answer 404 by design; one tile asked for hundreds of times is a client retrying.</p><div class="scroll" id="cf-404"></div></div>
+        <div class="card"><h2>Too many requests (429)</h2><p class="sub">Where a limit was hit: MapNG's own, or the service behind it (GPXZ keys, the address search).</p><div class="scroll" id="cf-429"></div></div>
+        <div class="card"><h2>What MapNG asked of other servers</h2><p class="sub">Requests the site made on people's behalf, by server and answer. The public OpenStreetMap services ask to be used gently.</p><div class="scroll" id="cf-upstream"></div></div>
         <div class="card"><h2>Errors from behind the site (500, 502, 503)</h2><p class="sub">Mostly the public map servers MapNG asks on people's behalf not answering.</p><div class="scroll" id="cf-5xx"></div></div>
       </div>
     </section>
@@ -261,13 +274,13 @@
   const bars = (values, labels, { alt = false, title = (v) => fmt(v) } = {}) => {
     const max = Math.max(1, ...values);
     return el('div', {},
-      el('div', { class: 'bars', role: 'img', 'aria-label': values.map((v, i) => `${labels[i]}: ${title(v)}`).join(', ') },
+      el('div', { class: 'bars', style: values.length > 60 ? 'gap:1px' : '', role: 'img', 'aria-label': values.map((v, i) => `${labels[i]}: ${title(v)}`).join(', ') },
         values.map((v, i) => el('div', { class: `b${alt ? ' alt' : ''}`, style: `height:${Math.max(2, (v / max) * 100)}%`, title: `${labels[i]}: ${title(v)}` }))),
       el('div', { class: 'axis' }, el('span', { text: labels[0] || '' }), el('span', { text: `peak ${title(max)}` }), el('span', { text: labels[labels.length - 1] || '' })));
   };
 
   // ── state ──
-  const state = { reports: [], total: 0, selected: null, overview: null, cf: null, releases: null };
+  const state = { reports: [], total: 0, selected: null, overview: null, cf: null, releases: null, days: 1 };
 
   // ── tiles ──
   const tiles = new Map();
@@ -444,25 +457,33 @@
     try { put(id, draw(s.rows)); } catch (e) { fail(id, `Could not draw this (${e.message}).`); }
   }
   async function loadCloudflare() {
-    try { state.cf = await (await api('/cloudflare')).json(); $('cf-setup').hidden = true; need('cloudflare', null); } catch (e) {
+    try { state.cf = await (await api(`/cloudflare?days=${encodeURIComponent(state.days)}`)).json(); $('cf-setup').hidden = true; need('cloudflare', null); } catch (e) {
       state.cf = null;
       const box = $('cf-setup'); box.hidden = false;
       box.textContent = e.status === 503
         ? 'Cloudflare\'s traffic and security numbers are not connected yet. They need a read-only analytics token (the CF_ANALYTICS_TOKEN secret) and the zone id (CF_ZONE_ID).'
         : `Could not load Cloudflare's numbers (${e.message}).`;
       need('cloudflare', { info: true, mark: 'i', title: 'Cloudflare\'s numbers are not loading', text: box.textContent, action: 'Open traffic', tab: 'traffic' });
-      for (const id of ['ov-requests', 'cf-traffic', 'cf-visitors', 'cf-sec-action', 'cf-sec-path', 'cf-sec-country', 'cf-sec-agent', 'cf-status', 'cf-paths', 'cf-versions', 'cf-404', 'cf-429', 'cf-5xx', 'cf-rules']) fail(id, 'Not connected.');
+      for (const id of ['ov-requests', 'cf-upstream', 'cf-traffic', 'cf-visitors', 'cf-sec-action', 'cf-sec-path', 'cf-sec-country', 'cf-sec-agent', 'cf-status', 'cf-paths', 'cf-versions', 'cf-404', 'cf-429', 'cf-5xx', 'cf-rules']) fail(id, 'Not connected.');
       return;
+    }
+    {
+      // what the chosen period really covers: Cloudflare keeps each kind of number for a different time
+      const w = state.cf.windows || { asked: 1, trafficDays: 14, requestDays: 1, securityDays: 1 };
+      const span = (d) => (d === 1 ? 'the last 24 hours' : `the last ${d} days`);
+      const notes = [`Per-day charts: ${w.trafficDays} days.`, `Responses and paths: ${span(w.requestDays)}${w.asked > w.requestDays ? ' (Cloudflare keeps 30)' : ''}.`, `Security events: ${span(w.securityDays)}${w.asked > w.securityDays ? ' (Cloudflare keeps 3)' : ''}.`];
+      for (const n of document.querySelectorAll('.cf-window')) n.textContent = notes.join(' ');
     }
     drawSection('traffic', 'cf-traffic', (rows) => {
       const total = rows.reduce((a, r) => a + r.sum.requests, 0); const cached = rows.reduce((a, r) => a + r.sum.cachedRequests, 0);
       const last = rows[rows.length - 1];
       // (the newest whole day: today's row is still filling)
       const day = rows.length > 1 ? rows[rows.length - 2] : last; const before = rows.length > 2 ? rows[rows.length - 3] : null;
+      const recent = rows.slice(-14);
       const change = before && before.uniq.uniques ? Math.round(((day.uniq.uniques - before.uniq.uniques) / before.uniq.uniques) * 100) : null;
       tile('visitors', fmt(day.uniq.uniques), `visitors on ${day.dimensions.date.slice(5)}`, `${fmt(day.sum.requests)} requests${change === null ? '' : ` · ${change >= 0 ? 'up' : 'down'} ${Math.abs(change)}% on the day before`}`);
-      $('ov-requests-sub').textContent = `${fmt(total)} requests in ${rows.length} days. The last bar is today so far.`;
-      put('ov-requests', bars(rows.map((r) => r.sum.requests), rows.map((r) => r.dimensions.date.slice(5))));
+      $('ov-requests-sub').textContent = `${fmt(recent.reduce((a, r) => a + r.sum.requests, 0))} requests in ${recent.length} days. The last bar is today so far.`;
+      put('ov-requests', bars(recent.map((r) => r.sum.requests), recent.map((r) => r.dimensions.date.slice(5))));
       $('cf-traffic-sub').textContent = `${fmt(total)} requests in ${rows.length} days; ${Math.round((cached / Math.max(1, total)) * 100)}% served from Cloudflare's cache.`;
       return bars(rows.map((r) => r.sum.requests), rows.map((r) => r.dimensions.date.slice(5)));
     });
@@ -475,10 +496,10 @@
       const blocked = rows.filter((r) => r.dimensions.action === 'block').reduce((a, r) => a + r.count, 0);
       tile('security', fmt(stopped), 'challenged or blocked, 24 hours', `${fmt(blocked)} blocked outright`);
       return table([{ label: 'Action' }, { label: 'By' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.action, r.dimensions.source, fmt(r.count)]));
-    }, 'No security events in the last 24 hours.');
-    drawSection('securityByPath', 'cf-sec-path', (rows) => table([{ label: 'Path', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientRequestPath, r.dimensions.action, fmt(r.count)])), 'No security events in the last 24 hours.');
-    drawSection('securityByCountry', 'cf-sec-country', (rows) => table([{ label: 'Country' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientCountryName, fmt(r.count)])), 'No security events in the last 24 hours.');
-    drawSection('securityByAgent', 'cf-sec-agent', (rows) => table([{ label: 'User agent', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [String(r.dimensions.userAgent || '(none)').slice(0, 110), r.dimensions.action, fmt(r.count)])), 'No security events in the last 24 hours.');
+    }, 'No security events in this period.');
+    drawSection('securityByPath', 'cf-sec-path', (rows) => table([{ label: 'Path', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientRequestPath, r.dimensions.action, fmt(r.count)])), 'No security events in this period.');
+    drawSection('securityByCountry', 'cf-sec-country', (rows) => table([{ label: 'Country' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientCountryName, fmt(r.count)])), 'No security events in this period.');
+    drawSection('securityByAgent', 'cf-sec-agent', (rows) => table([{ label: 'User agent', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [String(r.dimensions.userAgent || '(none)').slice(0, 110), r.dimensions.action, fmt(r.count)])), 'No security events in this period.');
     drawSection('statusCodes', 'cf-status', (rows) => table([{ label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [r.dimensions.edgeResponseStatus, fmt(r.count)])));
     drawSection('topPaths', 'cf-paths', (rows) => table([{ label: 'Path', mono: true }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 90), fmt(r.count)])));
     // (a path's part of the site: its first two segments, tiles and the like counted together)
@@ -487,15 +508,20 @@
     const pathTables = (rows) => el('div', {},
       table([{ label: 'Part of the site', mono: true }, { label: 'Among the top paths', num: true }], byPart(rows).map(([k, n]) => [k, fmt(n)])),
       el('div', { style: 'margin-top:10px' }, table([{ label: 'Path', mono: true }, { label: 'Requests', num: true }], rows.slice(0, 8).map((r) => [String(r.dimensions.clientRequestPath).slice(0, 80), fmt(r.count)]))));
-    drawSection('notFoundPaths', 'cf-404', pathTables, 'No 404 answers in the last 24 hours.');
+    drawSection('upstream', 'cf-upstream', (rows) => {
+      const by = new Map();
+      for (const r of rows) { const h = r.dimensions.clientRequestHTTPHost; const e = by.get(h) || { total: 0, bad: 0 }; e.total += r.count; if (r.dimensions.edgeResponseStatus >= 400) e.bad += r.count; by.set(h, e); }
+      return table([{ label: 'Server', mono: true }, { label: 'Requests', num: true }, { label: 'Refused or failed', num: true }], [...by].sort((a, b) => b[1].total - a[1].total).map(([h, e]) => [h, fmt(e.total), e.bad ? `${fmt(e.bad)} (${Math.round((e.bad / e.total) * 100)}%)` : '0']));
+    }, 'None in this period.');
+    drawSection('notFoundPaths', 'cf-404', pathTables, 'No 404 answers in this period.');
     {
       const worst = (section('notFoundPaths')?.rows || [])[0];
       need('retry', worst && worst.count >= 500 ? { info: true, mark: '!', title: `One missing address was asked for ${fmt(worst.count)} times`, text: `${String(worst.dimensions.clientRequestPath).slice(0, 80)} answered "not found" every time: something is retrying it.`, action: 'See the 404s', tab: 'traffic' } : null);
       const down = (section('serverErrorPaths')?.rows || []).reduce((a, r) => a + r.count, 0);
       need('servers', down >= 1000 ? { info: true, mark: '!', title: `${fmt(down)} requests failed behind the site`, text: 'Mostly the public map servers not answering. People get the backup map data when that happens.', action: 'See the errors', tab: 'traffic' } : null);
     }
-    drawSection('limitedPaths', 'cf-429', pathTables, 'No 429 answers in the last 24 hours.');
-    drawSection('serverErrorPaths', 'cf-5xx', (rows) => table([{ label: 'Path', mono: true }, { label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 70), r.dimensions.edgeResponseStatus, fmt(r.count)])), 'None in the last 24 hours.');
+    drawSection('limitedPaths', 'cf-429', pathTables, 'No 429 answers in this period.');
+    drawSection('serverErrorPaths', 'cf-5xx', (rows) => table([{ label: 'Path', mono: true }, { label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 70), r.dimensions.edgeResponseStatus, fmt(r.count)])), 'None in this period.');
     const rules = state.cf.rules;
     if (!rules || rules.error) fail('cf-rules', `Cloudflare did not list the rules${rules?.error ? `: ${rules.error}` : '.'}`);
     else {
@@ -613,6 +639,18 @@
     $('updated').textContent = `Updated ${new Date().toLocaleTimeString()}${failed ? ` · ${failed} part(s) did not load` : ''}`;
   }
   $('refresh').addEventListener('click', refresh);
+  // (one period for the Traffic and Security pages: both selectors show it)
+  try { const d = Number(localStorage.getItem('mapng_admin_days')); if ([1, 7, 30, 90, 365].includes(d)) state.days = d; } catch { /* fine without */ }
+  for (const sel of document.querySelectorAll('.cf-range')) {
+    sel.value = String(state.days);
+    sel.addEventListener('change', async () => {
+      state.days = Number(sel.value) || 1;
+      for (const other of document.querySelectorAll('.cf-range')) other.value = sel.value;
+      try { localStorage.setItem('mapng_admin_days', String(state.days)); } catch { /* fine without */ }
+      for (const n of document.querySelectorAll('.cf-window')) n.textContent = 'Loading…';
+      await loadCloudflare();
+    });
+  }
 
   (async () => {
     const gate = $('gate');
