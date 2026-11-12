@@ -146,15 +146,20 @@
         <div class="card"><h2>Where they were aimed</h2><p class="sub">Paths with the most security events.</p><div class="scroll" id="cf-sec-path"></div></div>
         <div class="card"><h2>From where</h2><p class="sub">Countries with the most security events.</p><div class="scroll" id="cf-sec-country"></div></div>
         <div class="card"><h2>By which client</h2><p class="sub">User agents with the most security events.</p><div class="scroll" id="cf-sec-agent"></div></div>
-        <div class="card"><h2>Responses, last 24 hours</h2><p class="sub">Status codes the site answered with.</p><div class="scroll" id="cf-status"></div></div>
+        <div class="card"><h2>Responses, last 24 hours</h2><p class="sub">Status codes the site answered with. A large 504 count is expected: the app asks the cache for map tiles "only if cached", and a miss answers 504.</p><div class="scroll" id="cf-status"></div></div>
         <div class="card"><h2>Busiest paths, last 24 hours</h2><p class="sub">Requests by path.</p><div class="scroll" id="cf-paths"></div></div>
+        <div class="card"><h2>Not found (404), last 24 hours</h2><p class="sub">By part of the site, then the single paths asked for most. Elevation tiles outside a source's coverage answer 404 by design; one tile asked for hundreds of times is a client retrying.</p><div class="scroll" id="cf-404"></div></div>
+        <div class="card"><h2>Too many requests (429), last 24 hours</h2><p class="sub">Where a limit was hit: MapNG's own, or the service behind it (GPXZ keys, the address search).</p><div class="scroll" id="cf-429"></div></div>
+        <div class="card"><h2>Errors from behind the site (500, 502, 503)</h2><p class="sub">Mostly the public map servers MapNG asks on people's behalf not answering.</p><div class="scroll" id="cf-5xx"></div></div>
+        <div class="card"><h2>Security rules in force</h2><p class="sub">Your own rules on mapng.com, as Cloudflare has them now.</p><div class="scroll" id="cf-rules"></div></div>
       </div>
     </section>
 
     <section data-panel="app" hidden>
       <div class="grid2">
         <div class="card"><h2>Downloads by release</h2><p class="sub">From GitHub: how often each release's files were downloaded. "Update checks" counts the small file the app reads to see whether a newer version exists.</p><div class="scroll" id="gh-releases"></div></div>
-        <div class="card"><h2>Versions calling in, last 7 days</h2><p class="sub">Requests to mapng.com by desktop app version (the app names its version on its requests). Requests, not people: one busy user counts many times.</p><div class="scroll" id="cf-versions"></div></div>
+        <div class="card"><h2>The app's background requests, last 7 days</h2><p class="sub">Only the requests the app's background worker makes name its version; everything its window asks looks like an ordinary browser. So this is not a count of who runs which version (the downloads and the reports are the better guide), and "dev" is test runs.</p><div class="scroll" id="cf-versions"></div></div>
+        <div class="card"><h2>The project on GitHub</h2><p class="sub">Public numbers for the repository.</p><div id="gh-repo"></div><div class="scroll" id="gh-issues" style="margin-top:10px"></div></div>
         <div class="card"><h2>Versions in problem reports</h2><p class="sub">Among the reports loaded here.</p><div class="scroll" id="report-versions"></div></div>
       </div>
     </section>
@@ -228,7 +233,7 @@
   // ── tiles ──
   const tiles = new Map();
   const tile = (key, value, label, sub = '') => { tiles.set(key, { value, label, sub }); drawTiles(); };
-  const TILE_ORDER = ['open', 'today', 'mail', 'downloads', 'latest', 'requests', 'threats', 'exports', 'main'];
+  const TILE_ORDER = ['open', 'today', 'mail', 'downloads', 'latest', 'stars', 'requests', 'threats', 'exports', 'main'];
   function drawTiles() {
     put('tiles', el('div', { style: 'display:contents' }, TILE_ORDER.filter((k) => tiles.has(k)).map((k) => {
       const t = tiles.get(k);
@@ -378,7 +383,7 @@
       box.textContent = e.status === 503
         ? 'Cloudflare\'s traffic and security numbers are not connected yet. They need a read-only analytics token (the CF_ANALYTICS_TOKEN secret) and the zone id (CF_ZONE_ID).'
         : `Could not load Cloudflare's numbers (${e.message}).`;
-      for (const id of ['cf-traffic', 'cf-visitors', 'cf-sec-action', 'cf-sec-path', 'cf-sec-country', 'cf-sec-agent', 'cf-status', 'cf-paths', 'cf-versions']) fail(id, 'Not connected.');
+      for (const id of ['cf-traffic', 'cf-visitors', 'cf-sec-action', 'cf-sec-path', 'cf-sec-country', 'cf-sec-agent', 'cf-status', 'cf-paths', 'cf-versions', 'cf-404', 'cf-429', 'cf-5xx', 'cf-rules']) fail(id, 'Not connected.');
       return;
     }
     drawSection('traffic', 'cf-traffic', (rows) => {
@@ -399,6 +404,18 @@
     drawSection('securityByAgent', 'cf-sec-agent', (rows) => table([{ label: 'User agent', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [String(r.dimensions.userAgent || '(none)').slice(0, 110), r.dimensions.action, fmt(r.count)])), 'No security events in the last 24 hours.');
     drawSection('statusCodes', 'cf-status', (rows) => table([{ label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [r.dimensions.edgeResponseStatus, fmt(r.count)])));
     drawSection('topPaths', 'cf-paths', (rows) => table([{ label: 'Path', mono: true }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 90), fmt(r.count)])));
+    // (a path's part of the site: its first two segments, tiles and the like counted together)
+    const part = (path) => String(path).split('/').slice(0, 3).join('/') || '/';
+    const byPart = (rows) => { const m = new Map(); for (const r of rows) m.set(part(r.dimensions.clientRequestPath), (m.get(part(r.dimensions.clientRequestPath)) || 0) + r.count); return [...m].sort((a, b) => b[1] - a[1]); };
+    const pathTables = (rows) => el('div', {},
+      table([{ label: 'Part of the site', mono: true }, { label: 'Among the top paths', num: true }], byPart(rows).map(([k, n]) => [k, fmt(n)])),
+      el('div', { style: 'margin-top:10px' }, table([{ label: 'Path', mono: true }, { label: 'Requests', num: true }], rows.slice(0, 8).map((r) => [String(r.dimensions.clientRequestPath).slice(0, 80), fmt(r.count)]))));
+    drawSection('notFoundPaths', 'cf-404', pathTables, 'No 404 answers in the last 24 hours.');
+    drawSection('limitedPaths', 'cf-429', pathTables, 'No 429 answers in the last 24 hours.');
+    drawSection('serverErrorPaths', 'cf-5xx', (rows) => table([{ label: 'Path', mono: true }, { label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 70), r.dimensions.edgeResponseStatus, fmt(r.count)])), 'None in the last 24 hours.');
+    const rules = state.cf.rules;
+    if (!rules || rules.error) fail('cf-rules', `Cloudflare did not list the rules${rules?.error ? `: ${rules.error}` : '.'}`);
+    else put('cf-rules', table([{ label: 'Rule' }, { label: 'Action' }, { label: 'State' }], rules.rows.map((r) => [r.name, r.action, el('span', { class: `pill ${r.enabled ? 'ok' : 'crash'}`, text: r.enabled ? 'on' : 'OFF' })]), { empty: 'No custom rules.' }));
     drawSection('appVersions', 'cf-versions', (rows) => {
       const by = new Map();
       for (const r of rows) { const v = (/MapNG-Desktop\/([0-9][^\s;)]*)/.exec(r.dimensions.userAgent) || [])[1] || r.dimensions.userAgent; by.set(v, (by.get(v) || 0) + r.count); }
@@ -422,6 +439,14 @@
       put('gh-releases', table([{ label: 'Release' }, { label: 'Published' }, { label: 'Windows installer', num: true }, { label: 'Portable', num: true }, { label: 'Linux', num: true }, { label: 'Update checks', num: true }],
         rows.map((r) => [r.draft ? `${r.tag} (draft)` : r.tag, r.day, fmt(r.win), fmt(r.zip), fmt(r.linux), fmt(r.checks)])));
     } catch (e) { fail('gh-releases', `GitHub did not answer (${e.message}). It allows 60 questions an hour from one address.`); }
+    try {
+      const repo = await getJson(`https://api.github.com/repos/${REPO}`);
+      tile('stars', fmt(repo.stargazers_count), 'GitHub stars', `${fmt(repo.forks_count)} forks · ${fmt(repo.open_issues_count)} open issues and pull requests`);
+      put('gh-repo', el('p', {}, `${fmt(repo.stargazers_count)} stars, ${fmt(repo.forks_count)} forks, ${fmt(repo.subscribers_count)} watching. Last push ${ago(repo.pushed_at)}.`));
+      const issues = await getJson(`https://api.github.com/repos/${REPO}/issues?state=open&per_page=20`);
+      put('gh-issues', table([{ label: 'Open' }, { label: 'Title' }, { label: 'Opened' }, { label: 'Comments', num: true }],
+        issues.map((i) => [el('a', { href: i.html_url, target: '_blank', rel: 'noopener noreferrer', text: `${i.pull_request ? 'PR' : 'Issue'} #${i.number}` }), String(i.title).slice(0, 90), ago(i.created_at), fmt(i.comments)]), { empty: 'No open issues or pull requests.' }));
+    } catch (e) { fail('gh-repo', `GitHub did not answer (${e.message}).`); }
     try {
       const rows = [];
       for (const branch of ['main', 'dev']) {

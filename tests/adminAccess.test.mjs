@@ -72,6 +72,7 @@ test('Cloudflare stats: each section stands alone, and nothing is asked without 
   assert.equal(calls, 0);
   const seen = [];
   const fetchFn = async (url, init) => {
+    if (String(url).includes('/rulesets/')) return new Response(JSON.stringify({ success: true, result: { rules: [{ description: 'Dev machine pass', action: 'skip', enabled: true, expression: '(http.request.headers["x-secret"][0] eq "VALUE")' }] } }));
     const body = JSON.parse(init.body); seen.push({ url, auth: init.headers.Authorization, vars: body.variables });
     if (body.query.includes('userAgent')) return new Response(JSON.stringify({ data: null, errors: [{ message: 'unknown field userAgent' }] }));
     return new Response(JSON.stringify({ data: { viewer: { zones: [{ rows: [{ count: 3 }] }] } } }));
@@ -80,6 +81,9 @@ test('Cloudflare stats: each section stands alone, and nothing is asked without 
   assert.equal(seen.length, Object.keys(CF_SECTIONS).length);
   assert.ok(seen.every((c) => c.url === 'https://api.cloudflare.com/client/v4/graphql' && c.auth === 'Bearer tok' && c.vars.z === 'zone1'));
   assert.deepEqual(out.sections.traffic, { rows: [{ count: 3 }] });
+  // the rules by name and switch only: an expression can hold a private value
+  assert.deepEqual(out.rules, { rows: [{ name: 'Dev machine pass', action: 'skip', enabled: true }] });
+  assert.ok(!JSON.stringify(out).includes('VALUE'));
   assert.deepEqual(out.sections.securityByAgent, { error: 'unknown field userAgent' });
   // the windows asked for: 14 days and the last 24 hours
   assert.deepEqual(seen.find((c) => c.vars.d0).vars, { z: 'zone1', d0: '2026-10-30', d1: '2026-11-12' });

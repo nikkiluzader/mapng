@@ -108,10 +108,31 @@ export const CF_SECTIONS = {
   // which desktop app versions are calling in: the app names itself "MapNG-Desktop/<version>" on its
   // requests, which Cloudflare already counts with the rest of the traffic (requests, not people)
   appVersions: { span: 'week', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:30,filter:{datetime_geq:$t0,datetime_leq:$t1,userAgent_like:"MapNG-Desktop%"},orderBy:[count_DESC]){count dimensions{userAgent}}') },
+  // what the less happy answers were for: not found, too many requests, and the site's own errors
+  notFoundPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,edgeResponseStatus:404},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
+  limitedPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,edgeResponseStatus:429},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
+  serverErrorPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1,edgeResponseStatus_in:[500,502,503]},orderBy:[count_DESC]){count dimensions{clientRequestPath edgeResponseStatus}}') },
   topPaths: { span: 'hours', query: zoneQuery('$z:string,$t0:Time,$t1:Time', 'httpRequestsAdaptiveGroups(limit:15,filter:{datetime_geq:$t0,datetime_leq:$t1},orderBy:[count_DESC]){count dimensions{clientRequestPath}}') },
 };
 
-/** { at, sections: { name: { rows } | { error } } }, or { error } when it is not set up. */
+/**
+ * The site's own security rules as they stand: { rows: [{ name, action, enabled }] } | { error }.
+ * Names and switches only: a rule's expression can hold a private value (the
+ * header that lets the developer's own scripts past the bot check) and never
+ * leaves Cloudflare here.
+ */
+async function securityRules(token, zone, fetchFn) {
+  try {
+    const r = await fetchFn(`https://api.cloudflare.com/client/v4/zones/${zone}/rulesets/phases/http_request_firewall_custom/entrypoint`, { headers: { Authorization: `Bearer ${token}` } });
+    const d = await r.json();
+    if (!d.success) return { error: String(d.errors?.[0]?.message || 'not readable').slice(0, 200) };
+    return { rows: (d.result?.rules || []).map((x) => ({ name: String(x.description || x.id || '').slice(0, 120), action: String(x.action || ''), enabled: x.enabled !== false })) };
+  } catch (e) {
+    return { error: String(e?.message || e).slice(0, 200) };
+  }
+}
+
+/** { at, sections: { name: { rows } | { error } }, rules }, or { error } when it is not set up. */
 export async function cloudflareStats(env, fetchFn = fetch, now = Date.now()) {
   const token = env.CF_ANALYTICS_TOKEN; const zone = env.CF_ZONE_ID;
   if (!token || !zone) return { error: 'not-set-up' };
@@ -133,7 +154,7 @@ export async function cloudflareStats(env, fetchFn = fetch, now = Date.now()) {
       return { error: String(e?.message || e).slice(0, 300) };
     }
   }));
-  return { at: iso(now), sections: Object.fromEntries(names.map((n, i) => [n, results[i]])) };
+  return { at: iso(now), sections: Object.fromEntries(names.map((n, i) => [n, results[i]])), rules: await securityRules(token, zone, fetchFn) };
 }
 
 const stateKey = (dir) => `${dir}admin.json`;
