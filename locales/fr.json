@@ -1839,5 +1839,10 @@
       "takesIn": "Aussi planté à la place de : {kinds}"
     },
     "decalSidewalks": "trottoirs plats"
+  },
+  "backupData": {
+    "title": "Cette carte a été construite avec des données de secours.",
+    "body": "Ni la copie d'OpenStreetMap de MapNG ni les serveurs en direct n'ont pu être lus : les routes et les bâtiments viennent donc d'Overture Maps. Il n'a pas le nombre de voies (les routes larges peuvent sortir à deux voies) et ne marque les ponts qu'approximativement (certains sortent courts ou manquent). Générez à nouveau plus tard pour tout le détail.",
+    "dismiss": "Fermer"
   }
 }

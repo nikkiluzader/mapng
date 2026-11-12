@@ -255,6 +255,7 @@ import HotspotsPrivacy from './components/modals/HotspotsPrivacy.vue';
 import ReportDialog from './components/modals/ReportDialog.vue';
 import UnfinishedJobNotice from './components/ui/UnfinishedJobNotice.vue';
 import { markJobStart, markJobEnd } from './services/sessionGuard.js';
+import { heavyJobRunning } from './services/heavyJob.js';
 import { currentSessionCode } from './composables/useReportDialog.js';
 import { openReportDialog, logPathFrom } from './composables/useReportDialog.js';
 import ViewTabs from './components/ui/ViewTabs.vue';
@@ -318,6 +319,8 @@ const {
   showBatchProgress,
   savedBatchState
 } = storeToRefs(store);
+// (the 3D preview stops drawing while Generate runs: services/heavyJob.js; an export sets it itself)
+watch(isLoading, (loading) => { heavyJobRunning.value = !!loading; });
 
 const showStackInfo = ref(false);
 const showAbout = ref(false);

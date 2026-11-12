@@ -1839,5 +1839,10 @@
       "takesIn": "Piantato anche al posto di: {kinds}"
     },
     "decalSidewalks": "marciapiedi piatti"
+  },
+  "backupData": {
+    "title": "Questa mappa è stata costruita con dati di riserva.",
+    "body": "Non è stato possibile leggere né la copia di OpenStreetMap di MapNG né i server live, quindi strade ed edifici vengono da Overture Maps. Non ha il numero di corsie (le strade larghe possono uscire a due corsie) e segna i ponti solo approssimativamente (alcuni escono corti o mancano). Genera di nuovo più tardi per tutti i dettagli.",
+    "dismiss": "Chiudi"
   }
 }

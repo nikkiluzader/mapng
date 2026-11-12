@@ -26,3 +26,22 @@ test('the message says to extract the zip, and names what is missing', () => {
   assert.match(m.detail, /resources\/runner/);
   assert.match(incompleteMessage(['resources/node'], 'C:\\Games\\MapNG\\MapNG.exe').message, /files are missing/);
 });
+
+test('the app\'s own menu is worded in every language the window has', async () => {
+  const { menuText, MENU_LANGUAGES } = await import('../desktop/menuText.js');
+  const fs = await import('node:fs');
+  const locales = fs.readdirSync(new URL('../locales/', import.meta.url)).filter((f) => f.endsWith('.json')).map((f) => f.replace('.json', '')).sort();
+  assert.deepEqual([...MENU_LANGUAGES].sort(), locales);
+  const keys = Object.keys(menuText('en')).sort();
+  for (const lang of MENU_LANGUAGES) { const m = menuText(lang); assert.deepEqual(Object.keys(m).sort(), keys, lang); for (const k of keys) assert.ok(m[k] && typeof m[k] === 'string', `${lang}.${k}`); }
+  assert.equal(menuText('pl-PL').help, 'Pomoc'); assert.equal(menuText('ja').help, 'Help'); assert.equal(menuText(undefined).file, 'File');
+});
+
+test('the update dialogs are worded in every language, with the same placeholders', async () => {
+  const { updaterText, fill, MENU_LANGUAGES } = await import('../desktop/menuText.js');
+  const en = updaterText('en'); const keys = Object.keys(en).sort();
+  const holes = (t) => (t.match(/\{\w+\}/g) || []).sort().join(',');
+  for (const lang of MENU_LANGUAGES) { const u = updaterText(lang); assert.deepEqual(Object.keys(u).sort(), keys, lang); for (const k of keys) { assert.ok(u[k], `${lang}.${k}`); assert.equal(holes(u[k]), holes(en[k]), `${lang}.${k} placeholders`); } }
+  assert.equal(fill(en.available, { new: '0.3.1', have: '0.3.0' }), 'MapNG 0.3.1 is available (you have 0.3.0).');
+  assert.equal(updaterText('xx').later, 'Later');
+});

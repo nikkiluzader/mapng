@@ -1839,5 +1839,10 @@
       "takesIn": "Wird auch gepflanzt anstelle von: {kinds}"
     },
     "decalSidewalks": "flache Gehwege"
+  },
+  "backupData": {
+    "title": "Diese Karte wurde aus Ersatzdaten gebaut.",
+    "body": "Weder MapNGs eigene Kopie von OpenStreetMap noch die Live-Server konnten gelesen werden, daher stammen Straßen und Gebäude von Overture Maps. Dort fehlen Spurzahlen (breite Straßen können zweispurig herauskommen), und Brücken sind nur grob markiert (manche werden kurz oder fehlen). Generiere später erneut für alle Details.",
+    "dismiss": "Schließen"
   }
 }

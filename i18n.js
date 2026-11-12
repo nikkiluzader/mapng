@@ -52,6 +52,8 @@ export function setI18nLanguage(locale) {
   i18n.global.locale.value = resolved;
   localStorage.setItem(STORAGE_KEY, resolved);
   document.documentElement.setAttribute('lang', resolved);
+  // (the desktop app's own menu follows the window's language: desktop/menuText.js)
+  try { globalThis.window?.mapngDesktop?.setLanguage?.(resolved); } catch { /* the website: no menu */ }
 }
 
 export function getSupportedLocales() {

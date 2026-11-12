@@ -627,6 +627,7 @@ import { useBaseTexture } from '../../composables/useBaseTexture.js';
 import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
 import { currentSessionCode, currentSessionConfigValue, openReportDialog } from '../../composables/useReportDialog.js';
 import { markJobStart, markJobEnd } from '../../services/sessionGuard.js';
+import { heavyJobRunning } from '../../services/heavyJob.js';
 import { reportUsage, useUsageStats } from '../../composables/useUsageStats.js';
 import { estimateLevelWeight } from '../../services/levelWeight.js';
 import { sanitizeTreeKindsOff, sanitizeTreeModelsOff, sanitizeTreeSwaps } from '../../services/beamngTrees.js';
@@ -2060,6 +2061,8 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
   }
 
   isExportingBeamNGLevel.value = true;
+  // (the 3D preview stops drawing while the export runs in this page; the desktop app exports in its own process)
+  heavyJobRunning.value = !desktopApp;
   // (a note that an export is running, with the settings as they are: services/sessionGuard.js)
   currentSessionCode().then((code) => { if (isExportingBeamNGLevel.value) markJobStart('export', { code, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' }); }).catch(() => {});
   let exportSucceeded = false;
@@ -2301,6 +2304,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
     beamNGDesktopFailed.value = { message: error?.message || String(error) || t('export.errorBeamngLevel'), logPath: error?.logPath || null }; showExportOutcome('mapng-export-outcome-failed');
   } finally {
     markJobEnd();
+    heavyJobRunning.value = false;
     desktopExportAbort = null;
     clearInterval(elapsedTimer);
     // (done: the card runs on to 100 % before it goes)

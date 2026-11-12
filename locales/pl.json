@@ -1839,5 +1839,10 @@
       "takesIn": "Sadzone także zamiast: {kinds}"
     },
     "decalSidewalks": "płaskie chodniki"
+  },
+  "backupData": {
+    "title": "Ta mapa została zbudowana z danych zapasowych.",
+    "body": "Nie udało się odczytać ani własnej kopii OpenStreetMap w MapNG, ani serwerów na żywo, więc drogi i budynki pochodzą z Overture Maps. Nie ma tam liczby pasów (szerokie drogi mogą wyjść dwupasmowe), a mosty są oznaczone tylko w przybliżeniu (niektóre wychodzą krótkie lub ich brakuje). Wygeneruj ponownie później, aby uzyskać pełne szczegóły.",
+    "dismiss": "Zamknij"
   }
 }

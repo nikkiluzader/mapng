@@ -18,6 +18,7 @@
       <Suspense>
         <template #default>
           <TresGroup>
+            <RenderPause />
             <TresPerspectiveCamera
               :args="cameraArgs"
               :position="cameraPosition"
@@ -476,6 +477,7 @@ import SceneAtmosphere from "./SceneAtmosphere.vue";
 import { useMainStore } from "../../stores/mainStore";
 import { SELECT_SM, SELECT_XS } from "../base/controlStyles.js";
 
+import RenderPause from "./RenderPause.vue";
 const props = defineProps(["terrainData"]);
 const store = useMainStore();
 const advancedMode = computed(() => store.advancedMode);

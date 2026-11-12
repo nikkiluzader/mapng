@@ -2,6 +2,7 @@
 // process (no 4 GB tab heap), the level written straight into BeamNG's mods.
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, screen, shell } from 'electron';
 import { missingParts, incompleteMessage } from './installCheck.js';
+import { menuText, updaterText } from './menuText.js';
 import { fork } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -47,7 +48,7 @@ const modsFolder = () => readSettings().modsFolder || findModsFolder();
 
 async function chooseModsFolder(win) {
   const r = await dialog.showOpenDialog(win, {
-    title: 'Choose where MapNG saves levels (BeamNG.drive\'s mods folder)',
+    title: updaterText(readSettings().language || app.getLocale()).chooseMods,
     defaultPath: modsFolder() || app.getPath('documents'),
     properties: ['openDirectory', 'createDirectory'],
   });
@@ -1111,39 +1112,43 @@ ipcMain.handle('levels:cancel', (_event, levelName) => {
 
 const REPO = 'https://github.com/nikkiluzader/mapng';
 
+let menuUpdater = null;
 function buildMenu(updater) {
+  menuUpdater = updater;
+  // (the window's language, kept in the settings; the system's until one is chosen)
+  const m = menuText(readSettings().language || app.getLocale());
   const template = [
     {
-      label: 'File',
+      label: m.file,
       submenu: [
-        { label: 'Open Mods Folder', click: () => { const f = modsFolder(); if (f && fs.existsSync(f)) shell.openPath(f); } },
-        { label: 'Change Mods Folder…', click: () => chooseModsFolder(BrowserWindow.getFocusedWindow()) },
+        { label: m.openMods, click: () => { const f = modsFolder(); if (f && fs.existsSync(f)) shell.openPath(f); } },
+        { label: m.changeMods, click: () => chooseModsFolder(BrowserWindow.getFocusedWindow()) },
         { type: 'separator' },
         { role: 'quit' },
       ],
     },
     {
-      label: 'View',
+      label: m.view,
       submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { type: 'separator' }, { role: 'togglefullscreen' }],
     },
     {
-      label: 'Help',
+      label: m.help,
       submenu: [
-        { label: 'Check for Updates…', click: () => updater.checkNow() },
-        { label: 'Check for Updates Automatically', type: 'checkbox', checked: updater.enabled(), click: (item) => updater.setEnabled(item.checked) },
+        { label: m.checkUpdates, click: () => updater.checkNow() },
+        { label: m.autoUpdates, type: 'checkbox', checked: updater.enabled(), click: (item) => updater.setEnabled(item.checked) },
         { type: 'separator' },
-        { label: 'Export Logs Folder', click: () => { fs.mkdirSync(JOBS(), { recursive: true }); shell.openPath(JOBS()); } },
+        { label: m.logs, click: () => { fs.mkdirSync(JOBS(), { recursive: true }); shell.openPath(JOBS()); } },
         // (the report dialog in the window: what's included is shown, nothing sent without Send)
-        { label: 'Report a Problem…', click: (_item, win) => (win || BrowserWindow.getAllWindows()[0])?.webContents.send('report:open', { kind: 'manual' }) },
-        { label: 'Open an Issue on GitHub', click: () => shell.openExternal(`${REPO}/issues`) },
-        { label: 'Release Notes', click: () => shell.openExternal(`${REPO}/releases`) },
+        { label: m.report, click: (_item, win) => (win || BrowserWindow.getAllWindows()[0])?.webContents.send('report:open', { kind: 'manual' }) },
+        { label: m.issue, click: () => shell.openExternal(`${REPO}/issues`) },
+        { label: m.notes, click: () => shell.openExternal(`${REPO}/releases`) },
         { type: 'separator' },
         {
-          label: 'About MapNG',
+          label: m.about,
           click: () => dialog.showMessageBox(BrowserWindow.getFocusedWindow(), {
             type: 'info', title: 'MapNG', noLink: true,
             message: `MapNG ${app.getVersion()}`,
-            detail: `Real-world maps for BeamNG.drive.\n\nElectron ${process.versions.electron} · ${process.platform} ${process.arch}\nMods folder: ${modsFolder() || 'not set'}`,
+            detail: `${m.tagline}\n\nElectron ${process.versions.electron} · ${process.platform} ${process.arch}\n${m.modsFolder}: ${modsFolder() || m.notSet}`,
           }),
         },
       ],
@@ -1229,6 +1234,11 @@ app.whenReady().then(() => {
     busy: () => running.size > 0 || rebuilds.size > 0,
     // (the first-run welcome asks about updates itself: no check before it)
     ready: () => !!readSettings().welcomed,
+  });
+  // (the window's language: the menu follows it)
+  ipcMain.handle('desktop:setLanguage', (_event, language) => {
+    const lang = String(language || '').slice(0, 5);
+    if (lang && readSettings().language !== lang) { writeSettings({ language: lang }); if (menuUpdater) buildMenu(menuUpdater); }
   });
   ipcMain.handle('desktop:welcomeDone', (_event, { updates } = {}) => {
     writeSettings({ welcomed: true, updates: updates ? 'on' : 'off' });

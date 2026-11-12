@@ -3,6 +3,7 @@
 // downloads one (Download / Later / Skip this version) and before it
 // restarts to install it. Nothing is fetched while the answer is no.
 import fs from 'node:fs';
+import { updaterText, fill } from './menuText.js';
 import path from 'node:path';
 import { app, BrowserWindow, dialog, shell } from 'electron';
 import electronUpdater from 'electron-updater';
@@ -31,6 +32,8 @@ export function startUpdater({ settings, busy, ready = () => true }) {
   let state = 'idle';       // idle | checking | downloading | ready
 
   const window = () => BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
+  // (worded in the window's language: desktop/menuText.js)
+  const u = () => updaterText(settings.read().language || app.getLocale());
   const ask = (opts) => dialog.showMessageBox(window(), { type: 'info', title: 'MapNG', noLink: true, ...opts });
   const setProgress = (p) => { for (const w of BrowserWindow.getAllWindows()) w.setProgressBar(p); };
 
@@ -39,9 +42,9 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     if (s.updates === 'on') return true;
     if (s.updates === 'off') return false;
     const { response } = await ask({
-      message: 'Check for MapNG updates?',
-      detail: 'MapNG can look for new versions on GitHub now and then. It always asks before downloading or installing one. You can change this later in the Help menu.',
-      buttons: ['Check for updates', 'Not now'],
+      message: u().askTitle,
+      detail: u().askDetail,
+      buttons: [u().askYes, u().askNo],
       defaultId: 0,
       cancelId: 1,
     });
@@ -51,11 +54,11 @@ export function startUpdater({ settings, busy, ready = () => true }) {
 
   async function check({ byUser = false } = {}) {
     if (!supported) {
-      if (byUser) await ask({ message: 'Updates are not available in this build.', detail: process.platform === 'linux' ? 'Only the AppImage updates itself.' : 'Development builds do not update.' });
+      if (byUser) await ask({ message: u().unsupported, detail: process.platform === 'linux' ? u().onlyAppImage : u().devBuild });
       return;
     }
     if (state !== 'idle') {
-      if (byUser) await ask({ message: state === 'ready' ? 'An update is ready: restart MapNG to install it.' : 'Already checking for updates.' });
+      if (byUser) await ask({ message: state === 'ready' ? u().readyRestart : u().alreadyChecking });
       return;
     }
     if (byUser) settings.write({ updates: 'on' });
@@ -66,13 +69,13 @@ export function startUpdater({ settings, busy, ready = () => true }) {
       await autoUpdater.checkForUpdates();
     } catch (error) {
       state = 'idle';
-      if (manual) await ask({ type: 'warning', message: 'Could not check for updates.', detail: String(error?.message || error) });
+      if (manual) await ask({ type: 'warning', message: u().checkFailed, detail: String(error?.message || error) });
     }
   }
 
   autoUpdater.on('update-not-available', async () => {
     state = 'idle';
-    if (manual) await ask({ message: `MapNG ${app.getVersion()} is the latest version.` });
+    if (manual) await ask({ message: fill(u().latest, { have: app.getVersion() }) });
   });
 
   autoUpdater.on('update-available', async (info) => {
@@ -82,11 +85,11 @@ export function startUpdater({ settings, busy, ready = () => true }) {
       ? info.releaseNotes.replace(/<[^>]+>/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 1200)
       : '';
     const { response } = await ask({
-      message: `MapNG ${info.version} is available (you have ${app.getVersion()}).`,
+      message: fill(u().available, { new: info.version, have: app.getVersion() }),
       detail: portable
-        ? `${notes || 'See the release notes on GitHub.'}\n\nThis is the portable copy: it does not update itself. Download the new zip and unzip it over this folder (or beside it); your settings and levels are kept.`
-        : notes || 'See the release notes on GitHub.',
-      buttons: [portable ? 'Open the download page' : 'Download', 'Later', 'Skip this version'],
+        ? `${notes || u().seeNotes}\n\n${u().portable}`
+        : notes || u().seeNotes,
+      buttons: [portable ? u().openPage : u().download, u().later, u().skip],
       defaultId: 0,
       cancelId: 1,
     });
@@ -99,7 +102,7 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     } catch (error) {
       state = 'idle';
       setProgress(-1);
-      await ask({ type: 'warning', message: 'The update could not be downloaded.', detail: String(error?.message || error) });
+      await ask({ type: 'warning', message: u().downloadFailed, detail: String(error?.message || error) });
     }
   });
 
@@ -112,11 +115,11 @@ export function startUpdater({ settings, busy, ready = () => true }) {
     autoUpdater.autoInstallOnAppQuit = true;
     const running = busy();
     const { response } = await ask({
-      message: `MapNG ${info.version} is ready to install.`,
+      message: fill(u().ready, { new: info.version }),
       detail: running
-        ? 'An export is running: MapNG will install the update when you close it.'
-        : 'Restart now to install it, or it installs when you close MapNG.',
-      buttons: running ? ['OK'] : ['Restart now', 'When I close MapNG'],
+        ? u().readyBusy
+        : u().readyIdle,
+      buttons: running ? [u().ok] : [u().restartNow, u().onClose],
       defaultId: 0,
       cancelId: running ? 0 : 1,
     });

@@ -1839,5 +1839,10 @@
       "takesIn": "También se planta en lugar de: {kinds}"
     },
     "decalSidewalks": "aceras planas"
+  },
+  "backupData": {
+    "title": "Este mapa se construyó con datos de reserva.",
+    "body": "No se pudo leer ni la copia de OpenStreetMap de MapNG ni los servidores en vivo, así que las carreteras y los edificios vienen de Overture Maps. No tiene número de carriles (las vías anchas pueden salir con dos) y marca los puentes solo de forma aproximada (algunos salen cortos o faltan). Genera de nuevo más tarde para tener todo el detalle.",
+    "dismiss": "Cerrar"
   }
 }
