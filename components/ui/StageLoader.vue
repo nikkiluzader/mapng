@@ -79,6 +79,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import '@fontsource-variable/noto-sans/wght-italic.css';
 import { ChevronRight } from 'lucide-vue-next';
+import { useI18n } from 'vue-i18n';
+import { localizeStatus } from '../../services/statusLines.js';
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -206,7 +208,12 @@ const shownPct = computed(() => (props.finished && shown.value >= 0.999 ? 100 : 
 const shownStageFraction = computed(() => shownStage.value);
 
 // (the reports come from many places: three dots or the ellipsis character; one kind shown)
-const tidy = (text) => String(text ?? '').replace(/\.{3}/g, '…');
+// and in the app's language (services/statusLines.js: the code reports in English)
+const { t: translate, locale } = useI18n();
+const tidy = (text) => {
+  const line = String(text ?? '').replace(/\.{3}/g, '…');
+  return locale.value === 'en' ? line : localizeStatus(line, (key, values) => translate(`statusLines.${key}`, values));
+};
 
 const formatDuration = (ms) => {
   if (!Number.isFinite(ms)) return '';
