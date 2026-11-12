@@ -52,6 +52,7 @@ import { measureStructures, roadLinesFromDecals } from './structures/metrics.js'
 import { buildStructureGraph } from './structures/graph.js';
 import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
+import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { addFineGroundDetail } from './terrainDetail.js';
@@ -6115,7 +6116,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
       if (opts.lidar?.grid && opts.structureSolver === 'v2') {
         const minH = Number(terrainData.minHeight) || 0;
         const measured = lidarPins(structureGraph, opts.lidar, (x, y) => getTerrainHeightAtWorldXY(x, y, terrainData, squareSize) + minH, minH);
-        structureGraph.pins.push(...measured.pins);
+        appendAll(structureGraph.pins, measured.pins);
         opts.lidar.result = measured;
       }
       // terrain shaping switched off somewhere: the stations held on their
@@ -6127,7 +6128,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         structureGraph.fixed = plan.fixed;
         structureGraph.noCut = plan.noCut;
         // (each plain deck's span, rim to rim, pinned as today's tunnels are)
-        structureGraph.pins.push(...plan.pins);
+        appendAll(structureGraph.pins, plan.pins);
         Object.defineProperty(structureGraph, 'shaping', { value: plan, enumerable: false });
       }
       // stage C: every road's profile in one solve (shadow mode: measured with
@@ -6417,7 +6418,7 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
   })();
   cutPaintAtOtherRoads(paintDecals, carriagewayIndex, drivableRoads, ownersAtNode, junctionMarkings.zones || [], solvedHeightOf);
   const mouths = cutSurfaceAtOtherSurfaces(surfaceDecals, carriageways, carriagewayIndex, { americas: markingStyle === 'americas' });
-  if (mouths.length) getOrCreateSplineGroup('road_mouths').__items.push(...mouths);
+  if (mouths.length) appendAll(getOrCreateSplineGroup('road_mouths').__items, mouths);
   yield;
 
   const groups = Array.from(roadSplinesByName.values()).filter((g) => g.__items.length > 0);
@@ -8143,7 +8144,7 @@ function buildBeamNGExportReport({
     }
   }
 
-  if (detail) reportLines.push(...buildDetailedReportSections({ terrainData, squareSize, worldSize, ...detail }));
+  if (detail) appendAll(reportLines, buildDetailedReportSections({ terrainData, squareSize, worldSize, ...detail }));
 
   return reportLines.join('\n') + '\n';
 }
@@ -9087,7 +9088,7 @@ function buildNativeBarrierObjects(terrainData, squareSize, biome = null, { skip
 
   const ground = terrainGroundAt(terrainData, squareSize);
   const gates = [...gatePlan.gates, ...trackGates];
-  objects.push(...gateObjects(gates, ground, gateFree));
+  appendAll(objects, gateObjects(gates, ground, gateFree));
   Object.defineProperty(objects, 'gateStats', {
     value: Object.entries(gates.reduce((c, g) => { c[g.style] = (c[g.style] || 0) + 1; return c; }, {})),
     enumerable: false,
@@ -12320,8 +12321,8 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   // (a list of scene objects or spots, in place: those standing in background go)
   const keepOutOfBackground = (list) => {
     if (!bgLook || !Array.isArray(list)) return;
-    const kept = list.filter((o) => { const p = o?.position || o?.pos; return !(Array.isArray(p) && bgAtWorld(Number(p[0]), Number(p[1]))); });
-    list.length = 0; list.push(...kept);
+    // (in place, item by item: `list.push(...kept)` overflowed the stack past about 125,000 kept items)
+    keepInPlace(list, (o) => { const p = o?.position || o?.pos; return !(Array.isArray(p) && bgAtWorld(Number(p[0]), Number(p[1]))); });
   };
   if (bgLook && boundedFeatures?.length) {
     const before = boundedFeatures.length;
@@ -13518,7 +13519,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
         ]
       : []),
   ];
-  if (backdropWater) waterObjects.push(...backdropWater);
+  if (backdropWater) appendAll(waterObjects, backdropWater);
   Object.defineProperty(waterObjects, 'stats', { value: waterStats, enumerable: false });
   if (includeWater) {
     console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Water: ${waterStats.lakes.tiles ?? 0} lake tiles in ${waterStats.lakes.lakes ?? 0} lakes (${waterStats.lakes.riverAreas ?? 0} of them wide or tidal rivers), ${waterStats.rivers.pieces ?? 0} rivers; left out ${waterStats.rivers.dry ?? 0} dry washes, ${waterStats.rivers.underground ?? 0} culverts, ${waterStats.rivers.otherKinds ?? 0} drains/ditches, ${waterStats.lakes.dry ?? 0} dry lakes; ${waterStats.rivers.cutAtRoads ?? 0} cut at roads.`);
@@ -13635,7 +13636,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
           .map((f) => f.geometry.map(toW)),
         roads: groundCarriageways.map((cw) => ({ nodes: cw.nodes, half: cw.half })),
       });
-      sidewalks.meshes.push(...plazas.meshes);
+      appendAll(sidewalks.meshes, plazas.meshes);
       console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Plazas: ${plazas.count} of ${squares.length} pedestrian square(s) and courtyard(s) paved, ${plazas.triangles} triangles.`);
     }
   }
@@ -13683,7 +13684,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   keepOutOfBackground(streetFurnitureObjects);
   // floodlights over the sports fields and racetracks
   const sportsLights = sportsLightObjects(buildingReport.stats?.lightPlan, terrainGroundAt(exportTerrainData, squareSize));
-  streetFurnitureObjects.push(...sportsLights.objects);
+  appendAll(streetFurnitureObjects, sportsLights.objects);
   // hotels' signs and flags, cafés' signs (beamngBuildings.js useDetails)
   (buildingReport.stats?.props || []).forEach((p, i) => {
     const shape = PROP_SHAPES[p.shape];
@@ -14826,7 +14827,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const dae = buildFloodGlowDAE();
       if (dae) {
         zip.file(`${base}/map_assets/custom_assets/lamp_glow/${FLOOD_GLOW_SHAPE}`, await toZipBinary(dae));
-        streetFurnitureObjects.push(...floodGlows);
+        appendAll(streetFurnitureObjects, floodGlows);
       }
     }
     if (glowObjects.length || floodGlows.length) {
@@ -14837,7 +14838,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
       const glowDae = buildLampGlowDAE();
       if (glowDae) {
         zip.file(`${base}/map_assets/custom_assets/lamp_glow/${LAMP_GLOW_SHAPE}`, await toZipBinary(glowDae));
-        streetFurnitureObjects.push(...glowObjects);
+        appendAll(streetFurnitureObjects, glowObjects);
         lampGlowCount = glowObjects.length;
         console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Lamp glows: ${lampGlowCount} (night only, seen from afar)`);
       }
