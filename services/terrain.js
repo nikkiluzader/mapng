@@ -43,6 +43,26 @@ import { getBaseTextureSize, BASE_TEXTURE_SCALE_MAX_GRID } from "./baseTextureSi
 // Constants
 const TILE_SIZE = 256;
 export const TERRAIN_ZOOM = 15; // Fixed high detail zoom level for Terrain
+
+// The widest the stitched 30 m tile mosaic may be, px a side. A drawing surface has a limit: the desktop app's
+// (Skia) refuses one past about 23,170 px ("Create skia surface failed": Generate of a 106 km map at zoom 15 asked
+// for 31,700 px, problem report MR-SNPMZ7), and browsers stop at 16,384 or 32,767 depending on the machine.
+export const MAX_TERRAIN_MOSAIC_PX = 16384;
+
+/**
+ * The zoom the 30 m tiles are read at for an area: 15, or as much lower as keeps the mosaic within
+ * MAX_TERRAIN_MOSAIC_PX (a map that wide is coarser than the tiles of the lower zoom anyway: 16,384 px
+ * across it is the most any map has).
+ */
+export function terrainZoomForBounds(bounds, maxPx = MAX_TERRAIN_MOSAIC_PX) {
+  for (let z = TERRAIN_ZOOM; z > 0; z--) {
+    const nw = project(bounds.north, bounds.west, z); const se = project(bounds.south, bounds.east, z);
+    const w = (Math.floor(se.x / TILE_SIZE) - Math.floor(nw.x / TILE_SIZE) + 1) * TILE_SIZE;
+    const h = (Math.floor(se.y / TILE_SIZE) - Math.floor(nw.y / TILE_SIZE) + 1) * TILE_SIZE;
+    if (Math.abs(w) <= maxPx && h <= maxPx) return z;
+  }
+  return 1;
+}
 const SATELLITE_ZOOM = 17; // Higher detail zoom level for Satellite (approx 1.2m/px)
 const MIN_SATELLITE_ZOOM = 0;
 // Esri World Imagery serves z18/z19 (~0.6/0.3 m) over most built-up areas; a
@@ -863,8 +883,9 @@ export const fetchTerrariumMosaic = async (
   onProgress,
   globalTileConcurrency = 20,
 ) => {
-  const nw = project(bounds.north, bounds.west, TERRAIN_ZOOM);
-  const se = project(bounds.south, bounds.east, TERRAIN_ZOOM);
+  const terrainZoom = terrainZoomForBounds(bounds);
+  const nw = project(bounds.north, bounds.west, terrainZoom);
+  const se = project(bounds.south, bounds.east, terrainZoom);
 
   const minTileX = Math.floor(nw.x / TILE_SIZE);
   const minTileY = Math.floor(nw.y / TILE_SIZE);
@@ -900,9 +921,9 @@ export const fetchTerrariumMosaic = async (
 
       const drawX = (tx - minTileX) * TILE_SIZE;
       const drawY = (ty - minTileY) * TILE_SIZE;
-      const numTiles = Math.pow(2, TERRAIN_ZOOM);
+      const numTiles = Math.pow(2, terrainZoom);
       const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
-      const terrainUrl = `${TILE_API_URL}/${TERRAIN_ZOOM}/${wrappedTx}/${ty}.png`;
+      const terrainUrl = `${TILE_API_URL}/${terrainZoom}/${wrappedTx}/${ty}.png`;
 
       const img = await loadImage(terrainUrl, signal);
       if (img) {
@@ -919,7 +940,7 @@ export const fetchTerrariumMosaic = async (
 
   await repairTerrariumNoDataTiles({
     ctx: tCtx,
-    zoom: TERRAIN_ZOOM,
+    zoom: terrainZoom,
     minTileX,
     minTileY,
     tileCountX,
@@ -929,7 +950,7 @@ export const fetchTerrariumMosaic = async (
   });
   await repairTerrariumBlendedTiles({
     ctx: tCtx,
-    zoom: TERRAIN_ZOOM,
+    zoom: terrainZoom,
     minTileX,
     minTileY,
     tileCountX,
@@ -946,7 +967,7 @@ export const fetchTerrariumMosaic = async (
     pixels: terrainDataImg.data,
     width: terrainDataImg.width,
     height: terrainDataImg.height,
-    zoom: TERRAIN_ZOOM,
+    zoom: terrainZoom,
     minTileX,
     minTileY,
     tileCount: requests.length,
@@ -962,7 +983,7 @@ const createTerrariumHeightSampler = async (
   const mosaic = await fetchTerrariumMosaic(bounds, signal, onProgress, globalTileConcurrency);
 
   return (lat, lng) => {
-    const p = project(lat, lng, TERRAIN_ZOOM);
+    const p = project(lat, lng, mosaic.zoom);
     const localX = p.x - mosaic.minTileX * TILE_SIZE;
     const localY = p.y - mosaic.minTileY * TILE_SIZE;
 
@@ -2100,8 +2121,9 @@ export const fetchTerrainData = async (
   onProgress?.(`${fetchWord()} global tiles...`);
 
   // Calculate tile range covering the fetchBounds for Terrain (Z15)
-  const nw = project(fetchBounds.north, fetchBounds.west, TERRAIN_ZOOM);
-  const se = project(fetchBounds.south, fetchBounds.east, TERRAIN_ZOOM);
+  const terrainZoom = terrainZoomForBounds(fetchBounds);
+  const nw = project(fetchBounds.north, fetchBounds.west, terrainZoom);
+  const se = project(fetchBounds.south, fetchBounds.east, terrainZoom);
 
   const minTileX = Math.floor(nw.x / TILE_SIZE);
   const minTileY = Math.floor(nw.y / TILE_SIZE);
@@ -2205,10 +2227,10 @@ export const fetchTerrainData = async (
         const drawX = (tx - minTileX) * TILE_SIZE;
         const drawY = (ty - minTileY) * TILE_SIZE;
 
-        const numTiles = Math.pow(2, TERRAIN_ZOOM);
+        const numTiles = Math.pow(2, terrainZoom);
         const wrappedTx = ((tx % numTiles) + numTiles) % numTiles;
 
-        const terrainUrl = `${TILE_API_URL}/${TERRAIN_ZOOM}/${wrappedTx}/${ty}.png`;
+        const terrainUrl = `${TILE_API_URL}/${terrainZoom}/${wrappedTx}/${ty}.png`;
         const tImg = await loadImage(terrainUrl, signal);
         if (tImg) {
           terrainTilesSucceeded++;
@@ -2261,7 +2283,7 @@ export const fetchTerrainData = async (
 
   await repairTerrariumNoDataTiles({
     ctx: tCtx,
-    zoom: TERRAIN_ZOOM,
+    zoom: terrainZoom,
     minTileX,
     minTileY,
     tileCountX,
@@ -2271,7 +2293,7 @@ export const fetchTerrainData = async (
   });
   await repairTerrariumBlendedTiles({
     ctx: tCtx,
-    zoom: TERRAIN_ZOOM,
+    zoom: terrainZoom,
     minTileX,
     minTileY,
     tileCountX,
@@ -2328,12 +2350,12 @@ export const fetchTerrainData = async (
         terrariumHeights = decodeTerrariumPixels(terrainDataImg.data, terrainDataImg.width, terrainDataImg.height, NO_DATA_VALUE);
         blendTerrariumTileSeams(terrariumHeights, terrainDataImg.width, terrainDataImg.height, NO_DATA_VALUE);
       }
-      const p = project(lat, lng, TERRAIN_ZOOM);
+      const p = project(lat, lng, terrainZoom);
       return sampleTerrariumHeights(
         terrariumHeights,
         terrainDataImg.width,
         terrainDataImg.height,
-        wrapMosaicX(p.x - minTileX * TILE_SIZE, TERRAIN_ZOOM, terrainDataImg.width, TILE_SIZE),
+        wrapMosaicX(p.x - minTileX * TILE_SIZE, terrainZoom, terrainDataImg.width, TILE_SIZE),
         p.y - minTileY * TILE_SIZE,
         NO_DATA_VALUE,
       );
@@ -2362,7 +2384,7 @@ export const fetchTerrainData = async (
     pixels: terrainDataImg.data,
     width: terrainDataImg.width,
     height: terrainDataImg.height,
-    zoom: TERRAIN_ZOOM,
+    zoom: terrainZoom,
     minTileX,
     minTileY,
   } : null;
