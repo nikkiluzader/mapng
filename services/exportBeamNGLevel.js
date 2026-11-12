@@ -23,7 +23,7 @@ import { planGates, gateLeaves, splitAtCuts, isGateBarrier } from './gates.js';
 import { carveLakeBeds, carveWaterUnderDecks, fillRemnants, levelUnderDecks, lowerSeabed, planLakes, planRivers } from './beamngWater.js';
 import { tunnelDryZones, tunnelsBelow, planSeaBlocks, clipRiverNodes, clipLakeTile, splitLakeTile, hasInlandBelowSea } from './beamngWaterClip.js';
 import { placeCurveWarnings } from './curveWarningSigns.js';
-import { chooseTreeGroup, chooseTreeItem, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
+import { chooseTreeGroupAllowed, chooseTreeItem, sanitizeTreeKindsOff, treeHintFromTags, treeItemHeight, understoryGroup } from './beamngTrees.js';
 import { openWaterAtEdge, plantAllowed, WORLDCOVER_ATTRIBUTION } from './worldCover.js';
 import { TREE_MIX_CREDIT } from './treeSpecies.js';
 import { placeBoats } from './boats.js';
@@ -8023,6 +8023,7 @@ function buildBeamNGExportReport({
     `- Safe caps on content: ${options?.safeCaps === false ? 'No (everything in the map built)' : `Yes (at most ${Object.entries(SAFE_CAPS).map(([k, v]) => `${v} ${k}`).join(', ')})`}`,
     `- Include trees/bushes: ${formatBool(options?.includeTrees)}`,
     `- Forest density: ${options?.forestDensity || 'normal'} (×${forestDensityMultiplier(options?.forestDensity)} the base tree rates; woods ~${Math.round(36 * forestDensityMultiplier(options?.forestDensity))} trees/ha)`,
+    ...(sanitizeTreeKindsOff(options?.treeKindsOff).length ? [`- Tree kinds left out (Fine-tuning): ${sanitizeTreeKindsOff(options.treeKindsOff).join(', ')} (trees with a species in the map keep it)`] : []),
     `- Include rocks: ${formatBool(options?.includeRocks)}`,
     `- Street parking assumed where none is mapped: ${formatBool(options?.assumeParking !== false)}`,
     `- View distance: ${viewDistanceChoice(options?.viewDistance) === 'auto' ? 'auto (the map\'s width, 4 km at least, 16 km at most)' : `${viewDistanceChoice(options?.viewDistance)} m`} (LevelInfo visibleDistance)`,
@@ -10932,7 +10933,9 @@ const TREELESS_GOLF = new Set(['bunker', 'green', 'tee', 'fairway', 'driving_ran
 const UNDERWATER_KEEP = 30;
 const UNDERWATER_ROAD_M = 25;
 
-async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null, water = null, forestDensity = 'normal' }, biome, tick = async () => {}) {
+async function buildForestPlacements(terrainData, squareSize, { includeTrees, includeRocks, treeMix = null, water = null, forestDensity = 'normal', treeKindsOff = [] }, biome, tick = async () => {}) {
+  // (tree kinds the user leaves out in Fine-tuning: drawn again as one of the others)
+  const kindsOff = new Set(sanitizeTreeKindsOff(treeKindsOff));
   // (what the land cover left out, for the report: set when trees are planted)
   let landCover = null;
   // Buildings, water and open playing ground, for the scattered and canopy
@@ -11091,7 +11094,7 @@ async function buildForestPlacements(terrainData, squareSize, { includeTrees, in
         const type = getOwnVegetationSelector(biome, hint);
         if (type) return { type, scale: 0.85 + 0.3 * seededRandom(hashString(`${seed}:s`)) };
       }
-      const group = chooseTreeGroup({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed, mix: treeMix, elevation });
+      const group = chooseTreeGroupAllowed({ kind, tags, lat: point.lat, lon: point.lng, urban, area, seed, mix: treeMix, elevation }, kindsOff);
       // (an olive or cypress drawn from the local mix: the biome's own, if it ships one)
       if (kind === 'tree' && (group === 'olive' || group === 'cypress')) {
         const type = getOwnVegetationSelector(biome, group);
@@ -13747,7 +13750,7 @@ async function runBeamNGLevelExport(terrainData, center, options, jobLog) {
   }
   const forestPlacements = (includeTrees || includeRocks)
     ? await buildForestPlacements(exportTerrainData, squareSize, {
-      includeTrees, includeRocks, treeMix, forestDensity,
+      includeTrees, includeRocks, treeMix, forestDensity, treeKindsOff: options?.treeKindsOff,
       // (below the sea plane or a lake's water: left out, but for a sparse few seen from a road)
       water: (() => {
         const seaZ = -(Number(exportTerrainData.minHeight) || 0) + (Number(seaLevelOffset) || 0);

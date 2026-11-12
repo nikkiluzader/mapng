@@ -1358,7 +1358,8 @@
     "excludeTags": "Pominięte tagi OSM",
     "basicPreset": "Co budować",
     "viewDistance": "Zasięg widzenia",
-    "assumeParking": "Zakładaj parkowanie przy ulicy"
+    "assumeParking": "Zakładaj parkowanie przy ulicy",
+    "treeKindsOff": "Pominięte rodzaje drzew"
   },
   "usage": {
     "askTitle": "Udostępniać, jakich ustawień używasz?",
@@ -1551,7 +1552,8 @@
     "forest_dense": "Gęsty",
     "forest_veryDense": "Bardzo gęsty",
     "viewDistance": "Zasięg widzenia",
-    "assumeParking": "Zakładaj parkowanie przy ulicy"
+    "assumeParking": "Zakładaj parkowanie przy ulicy",
+    "treeKindsOff": "Pominięte rodzaje drzew"
   },
   "spawnPoints": {
     "title": "Punkty startu i Quicktravel",
@@ -1773,7 +1775,11 @@
       "group_oak": "Dęby",
       "group_eucalyptus": "Eukaliptusy",
       "group_cypress": "Cyprysy",
-      "group_olive": "Oliwki"
+      "group_olive": "Oliwki",
+      "leftOut": "pominięte",
+      "keep": "Zachowaj: {kind}",
+      "leftOutLabel": "Pominięte rodzaje drzew",
+      "switchHint": "Wyłącz rodzaj, aby go pominąć: jego drzewa zostaną posadzone jako pozostałe rodzaje."
     }
   }
 }

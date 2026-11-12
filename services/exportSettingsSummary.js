@@ -47,6 +47,8 @@ export function summarizeExportSettings(opts = {}, ctx = {}) {
     toggle('trees', !!opts.includeTrees),
     ...(opts.includeTrees && opts.forestDensity && opts.forestDensity !== 'normal'
       ? [row('forestDensity', { t: `forest_${opts.forestDensity}` })] : []),
+    // (tree kinds left out in Fine-tuning, by their ids: the page names them)
+    ...(opts.includeTrees && Array.isArray(opts.treeKindsOff) && opts.treeKindsOff.length ? [row('treeKindsOff', { text: opts.treeKindsOff.join(', '), kinds: [...opts.treeKindsOff] })] : []),
     toggle('rocks', !!opts.includeRocks),
     toggle('water', !!opts.includeWater),
     row('backdrop', opts.includeBackdrop ? { t: SOURCE_KEYS[opts.backdropElevationSource] || 'on' } : { t: 'off' }, !opts.includeBackdrop),

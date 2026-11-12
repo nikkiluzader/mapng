@@ -9,7 +9,7 @@
 // there are none, and the mountains' conifer line, as the export does.
 // Not counted: trees whose species OSM names, a biome's own signature models
 // that join a group at export, and the forest floor (ferns, bushes).
-import { chooseTreeGroup, chooseTreeItem } from './beamngTrees.js';
+import { chooseTreeGroup, chooseTreeGroupAllowed, chooseTreeItem } from './beamngTrees.js';
 
 const DEFAULT_SAMPLES = 2000;
 const MIN_SHARE = 0.005;          // kinds under half a percent are left out of the table
@@ -36,10 +36,14 @@ export function sampleElevations(heightMap, count = 256) {
  * @param {number} p.lat, p.lon      the area's centre
  * @param {object|null} p.mix        terrainData.treeSpeciesMix ({ shares, records }) or null
  * @param {number[]} [p.elevations]  ground heights to draw the trees at (none: the lowland rule)
+ * @param {string[]} [p.off]         kinds the user leaves out (beamngTrees.TREE_KIND_IDS)
  * @returns {{ source: 'records'|'climate', records: number,
  *            rows: { group: string, share: number, models: { type: string, share: number }[] }[] }}
  */
-export function treeTable({ lat, lon, mix = null, elevations = [], samples = DEFAULT_SAMPLES } = {}) {
+export function treeTable({ lat, lon, mix = null, elevations = [], samples = DEFAULT_SAMPLES, off = [] } = {}) {
+  const offSet = new Set(off || []);
+  // (the kinds the data picks before anything is left out, so a kind switched off stays in the list to switch back on)
+  const natural = new Set();
   const usable = mix && mix.shares && Object.keys(mix.shares).length ? mix : null;
   const groups = new Map();
   let total = 0;
@@ -47,7 +51,9 @@ export function treeTable({ lat, lon, mix = null, elevations = [], samples = DEF
     for (let i = 0; i < samples; i++) {
       const seed = `table:${i}`;
       const elevation = elevations.length ? elevations[i % elevations.length] : null;
-      const group = chooseTreeGroup({ kind: 'tree', lat, lon, area: true, seed, mix: usable, elevation });
+      const params = { kind: 'tree', lat, lon, area: true, seed, mix: usable, elevation };
+      if (offSet.size) natural.add(chooseTreeGroup(params));
+      const group = chooseTreeGroupAllowed(params, offSet);
       const item = chooseTreeItem(group, { lat, lon, seed });
       if (!item) continue;
       if (!groups.has(group)) groups.set(group, { n: 0, models: new Map() });
@@ -65,5 +71,7 @@ export function treeTable({ lat, lon, mix = null, elevations = [], samples = DEF
     }))
     .filter((r) => r.share >= MIN_SHARE)
     .sort((a, b) => b.share - a.share || a.group.localeCompare(b.group));
-  return { source: usable ? 'records' : 'climate', records: usable ? Number(usable.records) || 0 : 0, rows };
+  // (left out by the user, and picked by the data here: listed after the rest, with no share)
+  const leftOut = [...natural].filter((g) => offSet.has(g)).sort().map((group) => ({ group, share: 0, models: [], off: true }));
+  return { source: usable ? 'records' : 'climate', records: usable ? Number(usable.records) || 0 : 0, rows: [...rows, ...leftOut] };
 }

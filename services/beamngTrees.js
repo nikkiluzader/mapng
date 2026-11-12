@@ -234,6 +234,32 @@ export function chooseTreeGroup({ kind = 'tree', tags = {}, lat, lon, urban = fa
   return g;
 }
 
+/** The tree kinds a user can leave out (Fine-tuning's tree table): the groups an untagged tree can come out as. */
+export const TREE_KIND_IDS = ['deciduous', 'conifer', 'pine_west', 'oak_west', 'palm', 'juniper', 'tropical', 'live_oak', 'oak', 'eucalyptus', 'cypress', 'olive'];
+/** A stored list of kinds left out: known ids only, and never every kind. */
+export const sanitizeTreeKindsOff = (list) => {
+  const off = [...new Set((Array.isArray(list) ? list : []).filter((id) => TREE_KIND_IDS.includes(id)))];
+  return off.length >= TREE_KIND_IDS.length ? [] : off;
+};
+const KIND_FALLBACK = ['deciduous', 'conifer', 'oak', 'pine_west', 'juniper', 'palm'];
+
+/**
+ * chooseTreeGroup with some kinds left out (the user's choice in
+ * Fine-tuning): a tree that would be one of them is drawn again, so the
+ * kinds left keep their shares among themselves; after a few tries, the
+ * first kind still allowed. A tree whose species the map names is not
+ * redrawn: it keeps its species.
+ */
+export function chooseTreeGroupAllowed(params, off = null) {
+  const first = chooseTreeGroup(params);
+  if (!off || !off.size || !off.has(first) || (params.kind || 'tree') !== 'tree' || treeHintFromTags(params.tags || {})) return first;
+  for (let k = 1; k <= 8; k++) {
+    const again = chooseTreeGroup({ ...params, seed: `${params.seed}:alt${k}` });
+    if (!off.has(again)) return again;
+  }
+  return KIND_FALLBACK.find((g) => !off.has(g)) || TREE_KIND_IDS.find((g) => !off.has(g)) || first;
+}
+
 // ── Model choice ─────────────────────────────────────────────────────────────
 
 // groups made from the library's own (live oaks: the West Coast's broad

@@ -110,6 +110,7 @@
             v-model:lidar-decks="beamNGLidarDecks"
             v-model:safe-caps="beamNGSafeCaps"
             v-model:assume-parking="beamNGAssumeParking"
+            v-model:tree-kinds-off="beamNGTreeKindsOff"
           />
 
           <!-- Terrain: chosen once, in the elevation section (TerrainChoice); here only what this level gets -->
@@ -623,6 +624,7 @@ import { PENDING_LEVEL_NAME_KEY } from '../../services/exportSettings.js';
 import { currentSessionCode, currentSessionConfigValue, openReportDialog } from '../../composables/useReportDialog.js';
 import { reportUsage, useUsageStats } from '../../composables/useUsageStats.js';
 import { estimateLevelWeight } from '../../services/levelWeight.js';
+import { sanitizeTreeKindsOff } from '../../services/beamngTrees.js';
 import { squareCropNotice } from '../../services/squareCrop.js';
 import { CHECKBOX, SELECT_XS } from '../base/controlStyles.js';
 import { prepareCroppedTerrainData } from '../../services/cropTerrain';
@@ -846,6 +848,8 @@ const beamNGIncludeRocks = legacyOn.rocks;
 const beamNGSafeCaps = ref(storedOn('mapng_beamNGSafeCaps'));
 // (Fine-tuning: a parking lane a side on town streets with no parking tags; services/roadWidth.js)
 const beamNGAssumeParking = ref(storedOn('mapng_beamNGAssumeParking'));
+// (Fine-tuning: tree kinds left out of the area's mix; services/beamngTrees.js)
+const beamNGTreeKindsOff = ref(sanitizeTreeKindsOff((() => { try { return JSON.parse(localStorage.getItem('mapng_beamNGTreeKindsOff') || '[]'); } catch { return []; } })()));
 // Migrate legacy boolean mesh road setting if it exists
 // DecalRoads are the only road system; earlier choices (Road Architect, Mesh
 // Roads, the old "spline" name) all mean "roads on". Only 'none' stays off.
@@ -1131,7 +1135,7 @@ const exportInputs = computed(() => JSON.stringify({
   baseTexture: beamNGBaseTexture.value, pbr: beamNGPbrSource.value, roads: beamNGRoadType.value,
   backdrop: beamNGBackdropSource.value, gpxz: beamNGBackdropSource.value === 'gpxz' ? String(props.gpxzApiKey || '').length : 0,
   buildings: beamNGIncludeBuildings.value, water: beamNGIncludeWater.value, trees: beamNGIncludeTrees.value,
-  forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value, parking: beamNGAssumeParking.value,
+  forest: beamNGForestDensity.value, rocks: beamNGIncludeRocks.value, caps: beamNGSafeCaps.value, parking: beamNGAssumeParking.value, treeKinds: beamNGTreeKindsOff.value.join(','),
   view: beamNGViewDistance.value,
   bridges: beamNGIncludeBridges.value, tunnels: beamNGIncludeTunnels.value, lidar: beamNGLidarDecks.value,
   sea: beamNGSeaLevelOffset.value,
@@ -1264,6 +1268,7 @@ watch(beamNGForestDensity, (v) => localStorage.setItem('mapng_beamNGForestDensit
 watch(beamNGViewDistance, (v) => localStorage.setItem('mapng_beamNGViewDistance', String(viewDistanceChoice(v))));
 watch(beamNGSafeCaps, (v) => localStorage.setItem('mapng_beamNGSafeCaps', String(v)));
 watch(beamNGAssumeParking, (v) => localStorage.setItem('mapng_beamNGAssumeParking', String(v)));
+watch(beamNGTreeKindsOff, (v) => localStorage.setItem('mapng_beamNGTreeKindsOff', JSON.stringify(sanitizeTreeKindsOff(v))));
 watch(showExportGeo, (v) => localStorage.setItem('mapng_showExportGeo', String(v)));
 
 watch(
@@ -2103,6 +2108,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       assumeParking: !advanced || beamNGAssumeParking.value,
+      treeKindsOff: advanced ? sanitizeTreeKindsOff(beamNGTreeKindsOff.value) : [],
       ...structureOptions,
       levelName: beamNGLevelName.value.trim(),
       elevationSource: props.elevationSource,
@@ -2130,6 +2136,7 @@ const handleBeamNGLevelExport = async ({ keepCheck = false } = {}) => {
       includeRocks: effectiveIncludeRocks,
       safeCaps: !advanced || beamNGSafeCaps.value,
       assumeParking: !advanced || beamNGAssumeParking.value,
+      treeKindsOff: advanced ? sanitizeTreeKindsOff(beamNGTreeKindsOff.value) : [],
       ...structureOptions,
       roadType: effectiveRoadType,
       levelName: beamNGLevelName.value.trim(),

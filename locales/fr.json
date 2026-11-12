@@ -1358,7 +1358,8 @@
     "excludeTags": "Tags OSM exclus",
     "basicPreset": "Que construire",
     "viewDistance": "Distance d'affichage",
-    "assumeParking": "Supposer du stationnement sur rue"
+    "assumeParking": "Supposer du stationnement sur rue",
+    "treeKindsOff": "Types d'arbres écartés"
   },
   "usage": {
     "askTitle": "Partager les réglages que vous utilisez ?",
@@ -1551,7 +1552,8 @@
     "forest_dense": "Dense",
     "forest_veryDense": "Très dense",
     "viewDistance": "Distance d'affichage",
-    "assumeParking": "Supposer du stationnement sur rue"
+    "assumeParking": "Supposer du stationnement sur rue",
+    "treeKindsOff": "Types d'arbres écartés"
   },
   "spawnPoints": {
     "title": "Points de départ et Quicktravel",
@@ -1773,7 +1775,11 @@
       "group_oak": "Chênes",
       "group_eucalyptus": "Eucalyptus",
       "group_cypress": "Cyprès",
-      "group_olive": "Oliviers"
+      "group_olive": "Oliviers",
+      "leftOut": "écarté",
+      "keep": "Garder {kind}",
+      "leftOutLabel": "Types d'arbres écartés",
+      "switchHint": "Désactivez un type pour l'écarter : ses arbres sont plantés comme les autres types."
     }
   }
 }

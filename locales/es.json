@@ -1358,7 +1358,8 @@
     "excludeTags": "Etiquetas OSM excluidas",
     "basicPreset": "Qué crear",
     "viewDistance": "Distancia de visión",
-    "assumeParking": "Suponer aparcamiento en la calle"
+    "assumeParking": "Suponer aparcamiento en la calle",
+    "treeKindsOff": "Tipos de árbol omitidos"
   },
   "usage": {
     "askTitle": "¿Compartir qué ajustes usas?",
@@ -1551,7 +1552,8 @@
     "forest_dense": "Densa",
     "forest_veryDense": "Muy densa",
     "viewDistance": "Distancia de visión",
-    "assumeParking": "Suponer aparcamiento en la calle"
+    "assumeParking": "Suponer aparcamiento en la calle",
+    "treeKindsOff": "Tipos de árbol omitidos"
   },
   "spawnPoints": {
     "title": "Puntos de inicio y Quicktravel",
@@ -1773,7 +1775,11 @@
       "group_oak": "Robles",
       "group_eucalyptus": "Eucaliptos",
       "group_cypress": "Cipreses",
-      "group_olive": "Olivos"
+      "group_olive": "Olivos",
+      "leftOut": "omitido",
+      "keep": "Mantener {kind}",
+      "leftOutLabel": "Tipos de árbol omitidos",
+      "switchHint": "Desactiva un tipo para omitirlo: sus árboles se plantan como los demás tipos."
     }
   }
 }

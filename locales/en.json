@@ -1363,7 +1363,8 @@
     "excludeTags": "OSM tags left out",
     "basicPreset": "What to build",
     "viewDistance": "View distance",
-    "assumeParking": "Assume street parking"
+    "assumeParking": "Assume street parking",
+    "treeKindsOff": "Tree kinds left out"
   },
   "usage": {
     "askTitle": "Share which settings you use?",
@@ -1556,7 +1557,8 @@
     "forest_dense": "Dense",
     "forest_veryDense": "Very dense",
     "viewDistance": "View distance",
-    "assumeParking": "Assume street parking"
+    "assumeParking": "Assume street parking",
+    "treeKindsOff": "Tree kinds left out"
   },
   "spawnPoints": {
     "title": "Spawn & quicktravel points",
@@ -1778,7 +1780,11 @@
       "group_oak": "Oaks",
       "group_eucalyptus": "Eucalyptus",
       "group_cypress": "Cypresses",
-      "group_olive": "Olives"
+      "group_olive": "Olives",
+      "leftOut": "left out",
+      "keep": "Keep {kind}",
+      "leftOutLabel": "Tree kinds left out",
+      "switchHint": "Switch a kind off to leave it out: its trees are planted as the other kinds."
     }
   }
 }

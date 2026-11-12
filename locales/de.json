@@ -1358,7 +1358,8 @@
     "excludeTags": "Ausgelassene OSM-Tags",
     "basicPreset": "Was gebaut wird",
     "viewDistance": "Sichtweite",
-    "assumeParking": "Straßenparken annehmen"
+    "assumeParking": "Straßenparken annehmen",
+    "treeKindsOff": "Weggelassene Baumarten"
   },
   "usage": {
     "askTitle": "Teilen, welche Einstellungen du nutzt?",
@@ -1551,7 +1552,8 @@
     "forest_dense": "Dicht",
     "forest_veryDense": "Sehr dicht",
     "viewDistance": "Sichtweite",
-    "assumeParking": "Straßenparken annehmen"
+    "assumeParking": "Straßenparken annehmen",
+    "treeKindsOff": "Weggelassene Baumarten"
   },
   "spawnPoints": {
     "title": "Start- & Quicktravel-Punkte",
@@ -1773,7 +1775,11 @@
       "group_oak": "Eichen",
       "group_eucalyptus": "Eukalyptus",
       "group_cypress": "Zypressen",
-      "group_olive": "Olivenbäume"
+      "group_olive": "Olivenbäume",
+      "leftOut": "weggelassen",
+      "keep": "{kind} behalten",
+      "leftOutLabel": "Weggelassene Baumarten",
+      "switchHint": "Schalte eine Art aus, um sie wegzulassen: Ihre Bäume werden als die anderen Arten gepflanzt."
     }
   }
 }

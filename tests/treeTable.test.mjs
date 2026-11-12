@@ -55,3 +55,44 @@ test('model names and height samples', () => {
   assert.ok(s.length > 32 && s.length <= 64 && s.every((v) => v === 120));
   assert.deepEqual(sampleElevations(null), []);
 });
+
+test('a kind left out is drawn again as the others, which keep their shares among themselves', async () => {
+  const { chooseTreeGroupAllowed, sanitizeTreeKindsOff, TREE_KIND_IDS } = await import('../services/beamngTrees.js');
+  const mix = { shares: { broadleaf: 0.75, juniper: 0.15, conifer: 0.1 }, records: 60 };
+  const p = { lat: 40.78, lon: -87.36, mix, elevations: [200] };
+  const all = treeTable(p);
+  const cut = treeTable({ ...p, off: ['juniper'] });
+  const share = (t, g) => t.rows.find((r) => r.group === g)?.share ?? 0;
+  assert.ok(share(all, 'juniper') > 0.1);
+  // (still listed, to switch back on; no share, no models)
+  assert.deepEqual(cut.rows.at(-1), { group: 'juniper', share: 0, models: [], off: true });
+  const on = cut.rows.filter((r) => !r.off);
+  assert.ok(Math.abs(on.reduce((s, r) => s + r.share, 0) - 1) < 1e-9);
+  // deciduous : conifer stays about 0.75 : 0.10
+  assert.ok(Math.abs(share(cut, 'deciduous') / share(cut, 'conifer') - share(all, 'deciduous') / share(all, 'conifer')) < 1.5);
+  // every kind the records give left out but one: all trees are that one
+  const one = treeTable({ ...p, off: ['juniper', 'deciduous'] }).rows.filter((r) => !r.off);
+  assert.deepEqual(one.map((r) => r.group), ['conifer']);
+  // a tree whose species the map names keeps it; bushes are not touched
+  const off = new Set(['palm']);
+  assert.equal(chooseTreeGroupAllowed({ kind: 'tree', tags: { species: 'Sabal palmetto' }, lat: 29.9, lon: -81.3, seed: 'a' }, off), 'palm');
+  assert.equal(chooseTreeGroupAllowed({ kind: 'shrub', lat: 29.9, lon: -81.3, seed: 'a' }, new Set(['shrub'])), chooseTreeGroupAllowed({ kind: 'shrub', lat: 29.9, lon: -81.3, seed: 'a' }, null));
+  // the stored list: known kinds only, and never all of them
+  assert.deepEqual(sanitizeTreeKindsOff(['palm', 'nonsense', 'palm']), ['palm']);
+  assert.deepEqual(sanitizeTreeKindsOff([...TREE_KIND_IDS]), []);
+  assert.deepEqual(sanitizeTreeKindsOff('palm'), []);
+});
+
+test('tree kinds left out are saved with the level, go into codes and the summary, and are not counted in the stats', async () => {
+  const { exportSettingsFor } = await import('../services/exportSettings.js');
+  const { EXPORT_FIELDS, isCountedField } = await import('../services/sessionConfig.js');
+  const { summarizeExportSettings } = await import('../services/exportSettingsSummary.js');
+  assert.equal(exportSettingsFor({ treeKindsOff: ['juniper', 'bogus'] }).mapng_beamNGTreeKindsOff, '["juniper"]');
+  assert.equal(exportSettingsFor({}).mapng_beamNGTreeKindsOff, '[]');
+  const field = EXPORT_FIELDS.find((f) => f[1] === 'mapng_beamNGTreeKindsOff');
+  assert.ok(field);
+  assert.equal(isCountedField(field), false);
+  const rows = (o) => summarizeExportSettings(o).flatMap((g) => g.rows);
+  assert.equal(rows({ includeTrees: true, treeKindsOff: ['juniper'] }).find((r) => r.key === 'treeKindsOff')?.value.text, 'juniper');
+  assert.ok(!rows({ includeTrees: true, treeKindsOff: [] }).some((r) => r.key === 'treeKindsOff'));
+});

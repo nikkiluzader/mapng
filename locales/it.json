@@ -1358,7 +1358,8 @@
     "excludeTags": "Tag OSM esclusi",
     "basicPreset": "Cosa costruire",
     "viewDistance": "Distanza visiva",
-    "assumeParking": "Presumi parcheggio su strada"
+    "assumeParking": "Presumi parcheggio su strada",
+    "treeKindsOff": "Tipi di albero esclusi"
   },
   "usage": {
     "askTitle": "Condividere quali impostazioni usi?",
@@ -1551,7 +1552,8 @@
     "forest_dense": "Fitta",
     "forest_veryDense": "Molto fitta",
     "viewDistance": "Distanza visiva",
-    "assumeParking": "Presumi parcheggio su strada"
+    "assumeParking": "Presumi parcheggio su strada",
+    "treeKindsOff": "Tipi di albero esclusi"
   },
   "spawnPoints": {
     "title": "Punti di partenza e Quicktravel",
@@ -1773,7 +1775,11 @@
       "group_oak": "Querce",
       "group_eucalyptus": "Eucalipti",
       "group_cypress": "Cipressi",
-      "group_olive": "Ulivi"
+      "group_olive": "Ulivi",
+      "leftOut": "escluso",
+      "keep": "Mantieni {kind}",
+      "leftOutLabel": "Tipi di albero esclusi",
+      "switchHint": "Disattiva un tipo per escluderlo: i suoi alberi vengono piantati come gli altri tipi."
     }
   }
 }

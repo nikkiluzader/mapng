@@ -113,15 +113,19 @@
             {{ trees.source === 'records' ? t('build.trees.fromRecords', { count: trees.records }) : t('build.trees.fromClimate') }}
           </p>
           <ul class="rounded border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">
-            <li v-for="row in trees.rows" :key="row.group" class="px-2 py-1">
-              <div class="flex items-baseline justify-between gap-2 text-caption">
+            <li v-for="row in trees.rows" :key="row.group" class="px-2 py-1" :class="row.off ? 'opacity-60' : ''" :data-tree-kind="row.group">
+              <div class="flex items-center justify-between gap-2 text-caption">
                 <span class="font-medium text-gray-800 dark:text-gray-100">{{ treeGroupName(row.group) }}</span>
-                <span class="tabular-nums text-gray-600 dark:text-gray-300">{{ treeShare(row.share) }}</span>
+                <span class="flex items-center gap-2">
+                  <span class="tabular-nums text-gray-600 dark:text-gray-300">{{ row.off ? t('build.trees.leftOut') : treeShare(row.share) }}</span>
+                  <!-- (a kind switched off: its trees are drawn again as the others; the last kind left stays on) -->
+                  <Switch :on="!row.off" :label="t('build.trees.keep', { kind: treeGroupName(row.group) })" :disabled="!treesBuilt || (!row.off && treeKindsOn <= 1)" @toggle="toggleTreeKind(row.group)" />
+                </span>
               </div>
-              <div class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ row.models.map((m) => treeModelLabel(m.type)).join(', ') }}</div>
+              <div v-if="!row.off" class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ row.models.map((m) => treeModelLabel(m.type)).join(', ') }}</div>
             </li>
           </ul>
-          <p class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.note') }}</p>
+          <p class="text-micro leading-snug text-gray-500 dark:text-gray-400">{{ t('build.trees.switchHint') }} {{ t('build.trees.note') }}</p>
         </div>
       </section>
       <section class="space-y-1.5 pt-1" :class="roadsBuilt ? '' : 'opacity-50'">
@@ -183,8 +187,9 @@ const props = defineProps({
   lidarDecks: { type: Boolean, default: true },
   safeCaps: { type: Boolean, default: true },
   assumeParking: { type: Boolean, default: true },
+  treeKindsOff: { type: Array, default: () => [] },
 });
-defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking']);
+const emit = defineEmits(['update:forestDensity', 'update:lidarDecks', 'update:safeCaps', 'update:assumeParking', 'update:treeKindsOff']);
 const { t, te } = useI18n();
 const store = useMainStore();
 // (a feature's small hint, where it has one: asking for a missing key logs a warning)
@@ -198,10 +203,16 @@ const trees = computed(() => {
   if (!b || !props.hasOsmData) return null;
   return treeTable({
     lat: (b.north + b.south) / 2, lon: (b.east + b.west) / 2,
-    mix: td.treeSpeciesMix ?? null, elevations: sampleElevations(td.heightMap),
+    mix: td.treeSpeciesMix ?? null, elevations: sampleElevations(td.heightMap), off: props.treeKindsOff,
   });
 });
 const treeGroupName = (g) => { const k = `build.trees.group_${g}`; return te(k) || te(k, 'en') ? t(k) : g.replace(/_/g, ' '); };
+const treeKindsOn = computed(() => (trees.value?.rows || []).filter((r) => !r.off).length);
+const toggleTreeKind = (group) => {
+  const off = new Set(props.treeKindsOff);
+  if (off.has(group)) off.delete(group); else off.add(group);
+  emit('update:treeKindsOff', [...off]);
+};
 const treeShare = (s) => (s < 0.01 ? '<1%' : `${Math.round(s * 100)}%`);
 
 // A small switch (role="switch"), the panel's one on/off control here.

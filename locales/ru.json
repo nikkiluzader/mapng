@@ -1358,7 +1358,8 @@
     "excludeTags": "Исключённые теги OSM",
     "basicPreset": "Что строить",
     "viewDistance": "Дальность прорисовки",
-    "assumeParking": "Предполагать парковку у обочины"
+    "assumeParking": "Предполагать парковку у обочины",
+    "treeKindsOff": "Исключённые виды деревьев"
   },
   "usage": {
     "askTitle": "Делиться тем, какие настройки вы используете?",
@@ -1551,7 +1552,8 @@
     "forest_dense": "Густой",
     "forest_veryDense": "Очень густой",
     "viewDistance": "Дальность прорисовки",
-    "assumeParking": "Предполагать парковку у обочины"
+    "assumeParking": "Предполагать парковку у обочины",
+    "treeKindsOff": "Исключённые виды деревьев"
   },
   "spawnPoints": {
     "title": "Точки старта и Quicktravel",
@@ -1773,7 +1775,11 @@
       "group_oak": "Дубы",
       "group_eucalyptus": "Эвкалипты",
       "group_cypress": "Кипарисы",
-      "group_olive": "Оливы"
+      "group_olive": "Оливы",
+      "leftOut": "исключено",
+      "keep": "Оставить: {kind}",
+      "leftOutLabel": "Исключённые виды деревьев",
+      "switchHint": "Отключите вид, чтобы исключить его: его деревья будут посажены как остальные виды."
     }
   }
 }
