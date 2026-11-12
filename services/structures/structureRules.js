@@ -115,15 +115,19 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
   });
 
   const segments = [];
-  const stats = { byKind: {}, lengthByKind: {}, culverts: 0, openTunnels: 0, untaggedDecks: 0, carried: 0 };
+  // (untaggedBy: why each untagged deck run is one, by its strongest reason: over water, over a
+  // road, a fill that would reach a road below, or only its height over plain ground)
+  const stats = { byKind: {}, lengthByKind: {}, culverts: 0, openTunnels: 0, untaggedDecks: 0, carried: 0, untaggedBy: { water: 0, road: 0, carried: 0, height: 0 }, untaggedLengthBy: { water: 0, road: 0, carried: 0, height: 0 } };
   edges.forEach((e, k) => {
     const tags = { bridge: e.bridge, tunnel: e.tunnel };
     const kinds = new Array(e.s.length);
+    const why = new Uint8Array(e.s.length);   // 3 water, 2 road, 1 carried, 0 height / tag
     for (let i = 0; i < e.s.length; i++) {
       const h = z[k][i] - e.g[i];
       const st = { tags, h, cover: -h - ROOF_M, overRoad: !!overRoad[k][i], overWater: !!overWater[k][i] };
       kinds[i] = (rules.find((r) => matches(r, st)) || { kind: 'ground' }).kind;
-      if (kinds[i] === 'embankment' && crowded[k][i] && h >= DECK_MIN_H) { kinds[i] = 'deck'; stats.carried++; }
+      why[i] = st.overWater ? 3 : st.overRoad ? 2 : 0;
+      if (kinds[i] === 'embankment' && crowded[k][i] && h >= DECK_MIN_H) { kinds[i] = 'deck'; stats.carried++; why[i] = 1; }
       // a deck has its underside below the ground lower than this (a ramp's
       // first metres off a junction): fill there, unless over a road or water
       if (kinds[i] === 'deck' && h < DECK_MIN_H && !st.overRoad && !st.overWater) kinds[i] = h >= 0.5 ? 'embankment' : 'ground';
@@ -162,7 +166,13 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
       segments.push(seg);
       stats.byKind[run.kind] = (stats.byKind[run.kind] || 0) + 1;
       stats.lengthByKind[run.kind] = (stats.lengthByKind[run.kind] || 0) + (seg.s1 - seg.s0);
-      if (run.kind === 'deck' && !e.bridge) stats.untaggedDecks++;
+      if (run.kind === 'deck' && !e.bridge) {
+        stats.untaggedDecks++;
+        let top = 0;
+        for (let i = run.i0; i <= run.i1; i++) if (kinds[i] === 'deck' && why[i] > top) top = why[i];
+        const key = ['height', 'carried', 'road', 'water'][top];
+        stats.untaggedBy[key]++; stats.untaggedLengthBy[key] += seg.s1 - seg.s0;
+      }
     }
     if (e.bridge && !runs.some((r) => r.kind === 'deck')) {
       stats.culverts++;
@@ -171,5 +181,6 @@ export function classifyStructures(graph, { rules = STRUCTURE_RULES } = {}) {
     if (e.tunnel && !runs.some((r) => r.kind === 'boredTunnel' || r.kind === 'cutAndCover')) stats.openTunnels++;
   });
   for (const k of Object.keys(stats.lengthByKind)) stats.lengthByKind[k] = Math.round(stats.lengthByKind[k]);
+  for (const k of Object.keys(stats.untaggedLengthBy)) stats.untaggedLengthBy[k] = Math.round(stats.untaggedLengthBy[k]);
   return { segments, stats };
 }

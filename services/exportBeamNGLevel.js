@@ -7649,7 +7649,7 @@ function buildDetailedReportSections(d) {
     for (const k of ['deck', 'embankment', 'cutting', 'cutAndCover', 'boredTunnel', 'external', 'dam']) {
       if (cl.byKind[k]) lines.push(`  - ${label[k]}: ${cl.byKind[k]} stretch(es), ${formatNumber((cl.lengthByKind[k] || 0) / 1000, 2)} km`);
     }
-    lines.push(`- Bridge tags over nothing (culverts, no deck): ${cl.culverts}; approaches carried on as decks where a fill would reach a road below: ${cl.carried || 0} station(s); untagged stretches that needed a deck: ${cl.untaggedDecks}`);
+    lines.push(`- Bridge tags over nothing (culverts, no deck): ${cl.culverts}; approaches carried on as decks where a fill would reach a road below: ${cl.carried || 0} station(s); untagged stretches that needed a deck: ${cl.untaggedDecks}${cl.untaggedBy ? ` (over water ${cl.untaggedBy.water}, over a road or railway ${cl.untaggedBy.road}, a fill would reach a road below ${cl.untaggedBy.carried}, only high over plain ground ${cl.untaggedBy.height}: ${cl.untaggedLengthBy.height} m)` : ''}`);
     const r = sgr.profile.residual;
     lines.push(`- Left unmet by the solve (0 is the goal): joints ${r.joint} m, crossings ${r.crossing} m short, grades +${r.grade} over the limit, water clearance ${r.water} m short, tunnel cover ${r.cover} m short`);
     const t = sgr.terrain;
