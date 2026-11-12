@@ -21,6 +21,7 @@ files:
   - updater.js
   - levelLibrary.js
   - crashReports.js
+  - installCheck.js
   - reportScrub.js
   - package.json
 extraResources:
