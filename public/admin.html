@@ -494,7 +494,8 @@
     drawSection('securityByAction', 'cf-sec-action', (rows) => {
       const stopped = rows.filter((r) => /challenge|block/.test(r.dimensions.action)).reduce((a, r) => a + r.count, 0);
       const blocked = rows.filter((r) => r.dimensions.action === 'block').reduce((a, r) => a + r.count, 0);
-      tile('security', fmt(stopped), 'challenged or blocked, 24 hours', `${fmt(blocked)} blocked outright`);
+      const sd = state.cf.windows?.securityDays || 1;
+      tile('security', fmt(stopped), `challenged or blocked, ${sd === 1 ? '24 hours' : `${sd} days`}`, `${fmt(blocked)} blocked outright`);
       return table([{ label: 'Action' }, { label: 'By' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.action, r.dimensions.source, fmt(r.count)]));
     }, 'No security events in this period.');
     drawSection('securityByPath', 'cf-sec-path', (rows) => table([{ label: 'Path', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientRequestPath, r.dimensions.action, fmt(r.count)])), 'No security events in this period.');
