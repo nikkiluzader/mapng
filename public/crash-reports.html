@@ -78,9 +78,11 @@
     document.querySelectorAll('tr.r').forEach((tr) => tr.classList.toggle('sel', Number(tr.dataset.i) === i));
     history.replaceState(null, '', `#${x.id}`);
     $('detail').innerHTML = `<div class="detail"><h2 style="font-size:16px;margin:0 0 8px">${esc(x.id)} · ${esc(x.kind)} · MapNG ${esc(x.appVersion)}</h2>
-      <div class="bar">${x.hasLog ? '<button class="ghost" id="log">Show log</button>' : ''}${x.hasDump ? '<button class="ghost" id="dmp">Download crash dump</button>' : ''}</div>
+      <div class="bar">${x.hasExportReport ? '<button class="ghost" id="rep">Show export report</button><button class="ghost" id="repdl">Download it</button>' : ''}${x.hasLog ? '<button class="ghost" id="log">Show log</button>' : ''}${x.hasDump ? '<button class="ghost" id="dmp">Download crash dump</button>' : ''}</div>
       <pre>${esc(JSON.stringify(x, null, 2))}</pre><pre id="logtext" hidden></pre></div>`;
     $('log')?.addEventListener('click', async () => { const r = await file(`${x.key}log.txt`, 'the log'); if (r) { $('logtext').textContent = await r.text(); $('logtext').hidden = false; } });
+    $('rep')?.addEventListener('click', async () => { const r = await file(`${x.key}export_report.txt`, 'the export report'); if (r) { $('logtext').textContent = await r.text(); $('logtext').hidden = false; } });
+    $('repdl')?.addEventListener('click', async () => { const r = await file(`${x.key}export_report.txt`, 'the export report'); if (r) { const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = `${x.id}-export_report.txt`; a.click(); } });
     $('dmp')?.addEventListener('click', async () => { const r = await file(`${x.key}crash.dmp`, 'the crash dump'); if (r) { const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = `${x.id}.dmp`; a.click(); } });
   }
   $('load').addEventListener('click', load);

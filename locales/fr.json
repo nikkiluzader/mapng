@@ -1172,7 +1172,8 @@
     "historyReused": "réutilisé : {list}",
     "historyDownloaded": "{n} fichier(s) téléchargé(s) pendant l'export",
     "historyKind_rebuild": "reconstruction",
-    "historyKind_refetch": "re-téléchargé"
+    "historyKind_refetch": "re-téléchargé",
+    "sendReportHint": "Envoyer le rapport d'export de ce niveau au développeur de MapNG (vous voyez d'abord ce qu'il contient)"
   },
   "desktopWelcome": {
     "title": "Bienvenue dans MapNG Desktop",
@@ -1261,7 +1262,10 @@
     "copied": "Copié",
     "done": "Terminé",
     "sendReport": "Envoyer un rapport",
-    "incConfig": "Vos réglages, sous forme de code (il contient l'emplacement, donc il est retiré si vous le décochez)"
+    "incConfig": "Vos réglages, sous forme de code (il contient l'emplacement, donc il est retiré si vous le décochez)",
+    "introLevel": "Envoyer le rapport d'export de {name} pour aider à résoudre un problème ? Il est transmis en privé au développeur de MapNG, et rien n'est envoyé tant que vous ne choisissez pas Envoyer.",
+    "incExportReport": "Le rapport d'export de ce niveau ({kb} Ko) : ses réglages, ce qui a été construit, les vérifications et le journal de l'export. Il nomme le lieu, ses coordonnées et ses rues.",
+    "title_level": "Envoyer le rapport d'un niveau"
   },
   "config": {
     "copied": "Réglages copiés sous forme de code. Collez-le dans MapNG (Ctrl+V sur la carte) pour les utiliser.",

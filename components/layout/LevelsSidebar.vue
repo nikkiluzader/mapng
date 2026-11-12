@@ -134,6 +134,16 @@
             >
               {{ t('levels.showData') }}
             </button>
+            <!-- this level's export report, sent to the developer (asked for in nearly every bug report) -->
+            <button
+              type="button"
+              class="flex items-center gap-1 px-2 py-0.5 text-micro rounded text-gray-500 dark:text-gray-400 hover:text-brand transition-colors"
+              :title="t('levels.sendReportHint')"
+              data-testid="level-send-report"
+              @click="openReportDialog('level', { zipName: level.zipName, levelName: level.levelName, title: level.title, area: level.center ? { lat: level.center.lat, lng: level.center.lng, resolution: level.resolution, metersPerPixel: level.metersPerPixel } : null })"
+            >
+              <LifeBuoy :size="11" />{{ t('report.sendReport') }}
+            </button>
             <button
               type="button"
               class="ml-auto flex items-center gap-1 px-1.5 py-0.5 text-micro rounded text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 transition-colors"
@@ -201,7 +211,7 @@
 import { PERSONAL_STORAGE_KEYS } from '../../services/personalKeys.js';
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { ChevronDown, FolderOpen, Hammer, HardDrive, History, Library, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
+import { ChevronDown, FolderOpen, Hammer, HardDrive, History, Library, LifeBuoy, Loader2, MapPin, Mountain, PanelRightClose, RefreshCw, SlidersHorizontal, Trash2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
 import { openReportDialog } from '../../composables/useReportDialog.js';
 

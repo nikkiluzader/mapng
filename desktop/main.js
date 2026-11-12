@@ -1166,7 +1166,29 @@ ipcMain.handle('report:pending', () => {
   if (p) return { count: p.count, at: new Date(p.latest.mtime).toISOString(), error: lastWindowCrash ? windowCrashText(lastWindowCrash) : '' };
   return lastWindowCrash ? { count: 1, at: new Date(lastWindowCrash.at).toISOString(), error: windowCrashText(lastWindowCrash) } : null;
 });
-ipcMain.handle('report:prepare', (_event, kind, ctx = {}) => prepareReport(String(kind), ctx, { build: String(ctx.build || ''), settings: readSettings() }));
+// A level's own export report, for a report sent from the levels list (kind
+// 'level'): read here from the level's zip in the mods folder, so the page
+// names only the level and never hands over text of its own as "the report".
+const levelExportReport = (zipName, levelName) => {
+  const folder = modsFolder();
+  if (!folder) return null;
+  const name = path.basename(String(zipName || ''));
+  const level = listMapngLevels(folder).find((l) => l.zipName === name && l.levelName === String(levelName || ''));
+  if (!level) return null;
+  try {
+    const buf = readZipFile(path.join(folder, name), `levels/${level.levelName}/export_report.txt`);
+    return buf ? { level: level.title || level.levelName, text: Buffer.from(buf).toString('utf8') } : null;
+  } catch { return null; }
+};
+ipcMain.handle('report:prepare', (_event, kind, ctx = {}) => {
+  const { exportReport: _ignored, level: _alsoIgnored, ...rest } = ctx || {};
+  if (String(kind) === 'level') {
+    const found = levelExportReport(rest.zipName, rest.levelName);
+    if (!found) throw new Error('This level has no export report to send (it may have been made by an older MapNG, or the zip was moved).');
+    return prepareReport('level', { ...rest, level: found.level, exportReport: found.text }, { build: String(rest.build || ''), settings: readSettings() });
+  }
+  return prepareReport(String(kind), rest, { build: String(rest.build || ''), settings: readSettings() });
+});
 ipcMain.handle('report:send', async (_event, token, choices = {}) => {
   const result = await sendReport(String(token), choices, TEST_API_ORIGIN || API_ORIGIN);
   if (choices.kind === 'crash') { writeSettings({ crashSeenAt: Date.now() }); lastWindowCrash = null; }

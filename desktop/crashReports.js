@@ -11,6 +11,7 @@ import path from 'node:path';
 import { cleanOptions, scrubText } from './reportScrub.js';
 
 const MAX_LOG_CHARS = 1500 * 1024;          // the end of a job's log
+const MAX_EXPORT_REPORT_CHARS = 2 * 1024 * 1024;
 const MAX_DUMP_BYTES = 8 * 1024 * 1024;
 
 /** Before the app is ready: crash dumps kept locally, never uploaded by Electron. */
@@ -48,7 +49,7 @@ const prepared = new Map();   // token -> report
 
 /**
  * A report put together for the page to show before sending:
- * kind 'crash' | 'export' | 'generate' | 'rebuild' | 'manual'; ctx { error,
+ * kind 'crash' | 'export' | 'generate' | 'rebuild' | 'manual' | 'level'; ctx { error,
  * logPath, options, area { lat, lng, resolution, metersPerPixel }, description }.
  * Returns { token, preview } (the preview lists exactly what would be sent).
  */
@@ -67,6 +68,9 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {} } = {}
     config: typeof ctx.config === 'string' && ctx.config.startsWith('mapng:') ? ctx.config.slice(0, 8000) : '',
     memory: { totalGB: +(os.totalmem() / 2 ** 30).toFixed(1), freeGB: +(os.freemem() / 2 ** 30).toFixed(1), cpus: os.cpus().length },
     log: ctx.logPath ? scrubText(readTail(ctx.logPath, MAX_LOG_CHARS)) : '',
+    // (a level's own export_report.txt, read from its zip by the main process: kind 'level')
+    level: String(ctx.level || '').slice(0, 120),
+    exportReport: typeof ctx.exportReport === 'string' ? scrubText(ctx.exportReport).slice(0, MAX_EXPORT_REPORT_CHARS) : '',
     minidump: '',
   };
   let dump = null;
@@ -93,6 +97,8 @@ export function prepareReport(kind, ctx = {}, { build = '', settings = {} } = {}
       hasConfig: !!report.config,
       area: report.area,
       dumpBytes: report.minidump ? dump.size : 0,
+      level: report.level,
+      exportReportChars: report.exportReport.length,
     },
   };
 }
@@ -102,7 +108,8 @@ export async function sendReport(token, { includeArea = true, description = '' }
   const report = prepared.get(token);
   if (!report) throw new Error('This report is no longer available. Try again.');
   const body = { ...report, description: String(description || report.description || '').slice(0, 4000) };
-  if (!includeArea) { body.area = null; body.config = ''; body.options = cleanOptions(body.options, { keepLocation: false }); }
+  // (the export report holds the location and street names all through: it goes with the location or not at all)
+  if (!includeArea) { body.area = null; body.config = ''; body.exportReport = ''; body.options = cleanOptions(body.options, { keepLocation: false }); }
   const r = await net.fetch(`${apiOrigin}/api/crash`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

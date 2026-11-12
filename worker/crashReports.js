@@ -8,6 +8,7 @@
 const PREFIX = 'crash-reports/';
 const MAX_BODY_BYTES = 12 * 1024 * 1024;      // a report with its log and crash dump
 const MAX_LOG_CHARS = 2 * 1024 * 1024;
+const MAX_EXPORT_REPORT_CHARS = 2 * 1024 * 1024;   // a level's export_report.txt, sent from the levels list
 const LIMIT_PER_HOUR = 10;                    // per address, in this isolate's memory only
 const recent = new Map();                     // address hash -> { hour, count }
 const ID_CHARS = 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
@@ -30,7 +31,7 @@ export function reportSummary(body, id, receivedAt) {
   return {
     id,
     receivedAt,
-    kind: clip(body.kind, 40),                 // crash | export | generate | rebuild | manual
+    kind: clip(body.kind, 40),                 // crash | export | generate | rebuild | manual | level
     appVersion: clip(body.appVersion, 40),
     build: clip(body.build, 80),
     platform: clip(body.platform, 40),
@@ -43,6 +44,8 @@ export function reportSummary(body, id, receivedAt) {
     memory: body.memory && typeof body.memory === 'object' ? body.memory : null,
     hasLog: typeof body.log === 'string' && body.log.length > 0,
     hasDump: typeof body.minidump === 'string' && body.minidump.length > 0,
+    hasExportReport: typeof body.exportReport === 'string' && body.exportReport.length > 0,
+    level: clip(body.level, 120),              // the level's name, for a report sent from the levels list
   };
 }
 
@@ -53,7 +56,8 @@ async function notify(env, summary, viewerUrl) {
     `App: ${summary.appVersion} (${summary.build}) on ${summary.os || summary.platform}`,
     summary.error ? `Error: ${summary.error.slice(0, 600)}` : '',
     summary.description ? `User wrote: ${summary.description.slice(0, 600)}` : '',
-    `Log: ${summary.hasLog ? 'yes' : 'no'}  Crash dump: ${summary.hasDump ? 'yes' : 'no'}`,
+    summary.level ? `Level: ${summary.level}` : '',
+    `Log: ${summary.hasLog ? 'yes' : 'no'}  Crash dump: ${summary.hasDump ? 'yes' : 'no'}  Export report: ${summary.hasExportReport ? 'yes' : 'no'}`,
     `View: ${viewerUrl}`,
   ].filter(Boolean);
   try {
@@ -108,6 +112,7 @@ export async function handleCrashReports(request, env, ctx, url, json) {
     const summary = reportSummary(body, id, receivedAt);
     const writes = [env.OSM_TILES.put(`${dir}report.json`, JSON.stringify(summary, null, 1), { httpMetadata: { contentType: 'application/json' } })];
     if (summary.hasLog) writes.push(env.OSM_TILES.put(`${dir}log.txt`, body.log.slice(-MAX_LOG_CHARS), { httpMetadata: { contentType: 'text/plain; charset=utf-8' } }));
+    if (summary.hasExportReport) writes.push(env.OSM_TILES.put(`${dir}export_report.txt`, body.exportReport.slice(0, MAX_EXPORT_REPORT_CHARS), { httpMetadata: { contentType: 'text/plain; charset=utf-8' } }));
     if (summary.hasDump) {
       try {
         const bin = Uint8Array.from(atob(body.minidump), (c) => c.charCodeAt(0));
@@ -141,7 +146,7 @@ export async function handleCrashReports(request, env, ctx, url, json) {
 
   if (sub === '/file' && request.method === 'GET') {
     const key = url.searchParams.get('key') || '';
-    if (!new RegExp(`^${PREFIX}\\d{4}-\\d{2}-\\d{2}/\\d{6}-MR-[A-Z0-9]{6}/(report\\.json|log\\.txt|crash\\.dmp)$`).test(key)) return json({ error: 'Not found' }, 404);
+    if (!new RegExp(`^${PREFIX}\\d{4}-\\d{2}-\\d{2}/\\d{6}-MR-[A-Z0-9]{6}/(report\\.json|log\\.txt|export_report\\.txt|crash\\.dmp)$`).test(key)) return json({ error: 'Not found' }, 404);
     const o = await env.OSM_TILES.get(key);
     if (!o) return json({ error: 'Not found' }, 404);
     return new Response(o.body, { headers: { 'Content-Type': o.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'no-store' } });

@@ -1172,7 +1172,8 @@
     "historyReused": "wiederverwendet: {list}",
     "historyDownloaded": "{n} Datei(en) während des Exports heruntergeladen",
     "historyKind_rebuild": "neu gebaut",
-    "historyKind_refetch": "neu abgerufen"
+    "historyKind_refetch": "neu abgerufen",
+    "sendReportHint": "Den Exportbericht dieses Levels an den MapNG-Entwickler senden (du siehst vorher, was darin steht)"
   },
   "desktopWelcome": {
     "title": "Willkommen bei MapNG Desktop",
@@ -1261,7 +1262,10 @@
     "copied": "Kopiert",
     "done": "Fertig",
     "sendReport": "Bericht senden",
-    "incConfig": "Deine Einstellungen als Code (enthält den Ort, entfällt also, wenn du ihn abwählst)"
+    "incConfig": "Deine Einstellungen als Code (enthält den Ort, entfällt also, wenn du ihn abwählst)",
+    "introLevel": "Den Exportbericht von {name} senden, um bei einem Problem zu helfen? Er geht privat an den MapNG-Entwickler, und nichts wird gesendet, bevor du Senden wählst.",
+    "incExportReport": "Der Exportbericht dieses Levels ({kb} KB): seine Einstellungen, was gebaut wurde, die Prüfungen und das Exportprotokoll. Er nennt den Ort, seine Koordinaten und seine Straßen.",
+    "title_level": "Bericht eines Levels senden"
   },
   "config": {
     "copied": "Einstellungen als Code kopiert. In MapNG einfügen (Strg+V auf der Karte), um sie zu nutzen.",

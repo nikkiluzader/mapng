@@ -85,3 +85,18 @@ test('a report keeps a session code, and only a session code, in config', () => 
   assert.equal(reportSummary({ kind: 'export', config: 'mapng:1:abc' }, 'MR-AAAAAA', 't').config, 'mapng:1:abc');
   assert.equal(reportSummary({ kind: 'export', config: '<script>' }, 'MR-AAAAAA', 't').config, '');
 });
+
+test('a level report keeps the level\'s export report as its own file, read back only with the token', async () => {
+  const env = { OSM_TILES: fakeBucket(), CRASH_ADMIN_TOKEN: 'secret-token' };
+  const r = await post(env, { kind: 'level', appVersion: '0.2.18', level: 'Aerotie', description: 'two bridges at different heights', exportReport: 'MapNG BeamNG Level Export Report\n- Bridge decks: 30' }, '7.7.7.7');
+  const { id } = await r.json();
+  const key = [...env.OSM_TILES.store.keys()].find((k) => k.endsWith('export_report.txt'));
+  assert.ok(key && key.includes(id));
+  const list = await (await call(env, '/api/crash/list', { headers: { Authorization: 'Bearer secret-token' } })).json();
+  assert.equal(list.reports[0].hasExportReport, true);
+  assert.equal(list.reports[0].level, 'Aerotie');
+  assert.equal(list.reports[0].exportReport, undefined);          // (the text is its own file, not in the summary)
+  assert.equal((await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`)).status, 401);
+  const got = await call(env, `/api/crash/file?key=${encodeURIComponent(key)}`, { headers: { Authorization: 'Bearer secret-token' } });
+  assert.match(await got.text(), /Bridge decks: 30/);
+});

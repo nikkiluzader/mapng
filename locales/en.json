@@ -1177,7 +1177,8 @@
     "historyReused": "reused: {list}",
     "historyDownloaded": "downloaded {n} file(s) during the export",
     "historyKind_rebuild": "rebuild",
-    "historyKind_refetch": "fetched again"
+    "historyKind_refetch": "fetched again",
+    "sendReportHint": "Send this level's export report to the MapNG developer (you see what's in it first)"
   },
   "desktopWelcome": {
     "title": "Welcome to MapNG Desktop",
@@ -1266,7 +1267,10 @@
     "copied": "Copied",
     "done": "Done",
     "sendReport": "Send report",
-    "incConfig": "Your settings, as a code (it includes the location, so it goes when you untick it)"
+    "incConfig": "Your settings, as a code (it includes the location, so it goes when you untick it)",
+    "introLevel": "Send {name}'s export report to help with a problem? It goes privately to the MapNG developer, and nothing is sent unless you choose Send.",
+    "incExportReport": "This level's export report ({kb} KB): its settings, what was built, the checks and the export's log. It names the place, its coordinates and its streets.",
+    "title_level": "Send a level's report"
   },
   "config": {
     "copied": "Settings copied as a code. Paste it into MapNG (Ctrl+V on the map) to use them.",

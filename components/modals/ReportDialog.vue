@@ -21,15 +21,16 @@
           </template>
 
           <template v-else>
-            <p>{{ t('report.intro') }}</p>
+            <p>{{ request.kind === 'level' ? t('report.introLevel', { name: preview?.level || request.ctx.title || '' }) : t('report.intro') }}</p>
             <p v-if="request.ctx.error" class="p-2 rounded bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-caption [overflow-wrap:anywhere]">{{ request.ctx.error }}</p>
 
             <label class="block">
-              <span class="text-caption font-medium">{{ request.kind === 'manual' ? t('report.describeManual') : t('report.describe') }}</span>
+              <span class="text-caption font-medium">{{ request.kind === 'manual' || request.kind === 'level' ? t('report.describeManual') : t('report.describe') }}</span>
               <textarea v-model="description" rows="3" maxlength="4000" class="mt-1 w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-brand" />
             </label>
 
-            <label v-if="preview?.area" class="flex items-start gap-2 cursor-pointer select-none">
+            <!-- (a level's report holds its location all through: no unticking it; said under What's included) -->
+            <label v-if="preview?.area && request.kind !== 'level'" class="flex items-start gap-2 cursor-pointer select-none">
               <input v-model="includeArea" type="checkbox" class="mt-0.5 accent-brand" />
               <span>{{ t('report.includeArea', { lat: Number(preview.area.lat).toFixed(4), lng: Number(preview.area.lng).toFixed(4) }) }}</span>
             </label>
@@ -41,6 +42,7 @@
                 <li>{{ t('report.incApp', { version: preview.appVersion }) }}</li>
                 <li>{{ t('report.incSystem', { os: preview.os, ram: preview.memory?.totalGB, cpus: preview.memory?.cpus }) }}</li>
                 <li v-if="preview.error">{{ t('report.incError') }}</li>
+                <li v-if="preview.exportReportChars">{{ t('report.incExportReport', { kb: Math.max(1, Math.round(preview.exportReportChars / 1024)) }) }}</li>
                 <li v-if="preview.logChars">{{ t('report.incLog', { kb: Math.max(1, Math.round(preview.logChars / 1024)) }) }}</li>
                 <li v-if="preview.hasOptions">{{ t('report.incOptions') }}</li>
                 <li v-if="preview.dumpBytes">{{ t('report.incDump', { kb: Math.max(1, Math.round(preview.dumpBytes / 1024)) }) }}</li>
