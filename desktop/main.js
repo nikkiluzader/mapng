@@ -1,6 +1,7 @@
 // MapNG desktop: the web app in a window, its level export in a full Node
 // process (no 4 GB tab heap), the level written straight into BeamNG's mods.
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, screen, shell } from 'electron';
+import { missingParts, incompleteMessage } from './installCheck.js';
 import { fork } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -1209,6 +1210,18 @@ app.on('second-instance', () => {
 app.whenReady().then(() => {
   // (Windows: notifications name the app by this)
   if (process.platform === 'win32') app.setAppUserModelId('com.mapng.desktop');
+  // (started from inside the zip, or with files missing: say so now, not at the first Generate)
+  if (app.isPackaged) {
+    const missing = missingParts([
+      { path: GENERATOR, what: 'resources/runner' }, { path: NODE, what: 'resources/node' }, { path: path.join(DIST, 'index.html'), what: 'resources/dist' },
+    ]);
+    if (missing.length) {
+      const m = incompleteMessage(missing, process.execPath);
+      dialog.showMessageBoxSync({ type: 'error', title: m.title, message: m.message, detail: m.detail, buttons: ['Close'] });
+      app.exit(1);
+      return;
+    }
+  }
   clearLeftovers();
   servePage();
   const updater = startUpdater({
