@@ -32,9 +32,10 @@ export function getEffectiveRoadLayer(tags = {}) {
   if (tags.barrier === 'retaining_wall' && !bridgeLike && !tunnelLike) {
     layer += 0.5;
   }
-  if (tags.embankment === 'yes') {
-    layer += 0.5;
-  }
+  // (embankment=yes adds nothing: a road on an embankment meets and crosses other roads at grade
+  // on its top. Half a layer for it made every road crossing one near a junction a grade
+  // separation: the road on the embankment was lifted a full clearance over the ground there,
+  // a 10 m tent in the approach between two Rhine bridges at Arnhem.)
 
   return layer;
 }
