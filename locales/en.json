@@ -1138,6 +1138,15 @@
       "body": "This page is from the earlier version, and parts of it will stop working (Generate, uploads, the 3D preview). Reload to get the new one. A terrain you have generated but not exported will need generating again.",
       "reload": "Reload now",
       "later": "Later"
+    },
+    "unfinished": {
+      "title": "MapNG closed unexpectedly",
+      "generate": "A Generate was still running when MapNG closed last time.",
+      "export": "An export was still running when MapNG closed last time.",
+      "kept": "Your settings from that moment were kept in this browser. Nothing was sent anywhere.",
+      "restore": "Restore my settings",
+      "report": "Send a report",
+      "dismiss": "Dismiss"
     }
   },
   "support": {

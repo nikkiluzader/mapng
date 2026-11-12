@@ -12,12 +12,18 @@ import 'leaflet/dist/leaflet.css';
 import './style.css';
 import { installDataCache } from './services/dataCache.js';
 import { watchForUpdates } from './services/appUpdate.js';
+import { installConsoleTail } from './services/webReports.js';
+import { watchOrdinaryClose } from './services/sessionGuard.js';
 
 // map data downloads kept in the browser (services/dataCache.js): a second
 // Generate, Preview or Export of an area reads them instead of the network
 installDataCache();
 // a page left open across a deploy is told so, before its missing parts fail (services/appUpdate.js)
 watchForUpdates();
+// the page's last console lines, kept in memory for a report the person may choose to send
+// (services/webReports.js), and the note of a running job dropped on an ordinary close (services/sessionGuard.js)
+installConsoleTail();
+watchOrdinaryClose();
 
 const originalConsoleWarn = console.warn.bind(console);
 console.warn = (...args) => {

@@ -251,6 +251,26 @@ Content-Type: application/json
     <p>Crashes are recorded by Electron's built-in crash reporter, which is set to keep crash snapshots on your computer and never upload them itself.</p>
   </section>
 
+  <section id="web-reports">
+    <h2>Problem reports from the website</h2>
+    <p>The website can offer the same report when a Generate or an export fails. The rules are the same: <strong>nothing is sent unless you choose Send</strong>, and the window shows what is in it first.</p>
+    <ul>
+      <li><strong>What a website report can hold:</strong> the site's build, your browser and system in a few words (for example "Chrome 142 on Windows"), the memory and CPU threads your browser reports, the error message, the last lines the page wrote to its own log, the export settings, your control-panel settings as a session code, what you write, and the map's location and size. Untick the location and the report goes without the place, the session code and the export settings.</li>
+      <li><strong>Never included:</strong> any name, email address or account (MapNG has none and asks for none), cookies, your GPXZ key, or anything from other tabs or your computer.</li>
+      <li>It goes to the same private storage as the desktop app's reports and is kept and used the same way. The code that builds a website report is short and commented: <a href="https://github.com/nikkiluzader/mapng/blob/main/services/webReports.js"><code>services/webReports.js</code></a>.</li>
+    </ul>
+  </section>
+
+  <section id="unexpected-close">
+    <h2>If MapNG closes unexpectedly</h2>
+    <p>A browser tab that runs out of memory takes your session with it. So that you don't lose your setup, MapNG leaves itself a note <strong>in your own browser's storage</strong> when a Generate or an export starts: which of the two it was, when, the build, and your settings as a session code. The note is removed when the job ends, and when you close or reload the page in the ordinary way.</p>
+    <ul>
+      <li>If the note is still there the next time you open MapNG, the job never ended. MapNG then offers to <strong>restore your settings</strong> (you see what they are before anything is applied) and, if you want, to send a report.</li>
+      <li><strong>The note never leaves your browser.</strong> No email address is asked for, nothing is sent to mapng.com, and it is shown once and then deleted. Clearing your browser's site data removes it too.</li>
+      <li>The code: <a href="https://github.com/nikkiluzader/mapng/blob/main/services/sessionGuard.js"><code>services/sessionGuard.js</code></a>.</li>
+    </ul>
+  </section>
+
   <section id="send-codes">
     <h2>Sending a config with a code</h2>
     <p>Under <em>Share &amp; save settings</em>, <strong>Share my settings → Get a code</strong> gives you a short code like <code>K7F-29Q</code>, or a link like <code>mapng.com/#K7F-29Q</code>, to give someone. They enter it under <strong>Use someone's code</strong>.</p>
@@ -282,7 +302,7 @@ Content-Type: application/json
         <tr><td>Cloudflare Web Analytics (website only)</td><td>Counting page views on mapng.com</td><td>A page view: no cookies and no fingerprinting, by Cloudflare's design (<a href="https://www.cloudflare.com/web-analytics/">about it</a>). The desktop app doesn't load it.</td></tr>
         <tr><td>mapng.com settings stats</td><td>Knowing which settings people use</td><td>Your export settings, never the location, only if you opted in (<a href="#usage">details</a>)</td></tr>
         <tr><td>mapng.com send codes</td><td>Giving your settings to someone</td><td>Your settings, only when you click Get a code (<a href="#send-codes">details</a>)</td></tr>
-        <tr><td>mapng.com problem reports (desktop app only)</td><td>Fixing crashes and failed exports</td><td>A problem report, only when you choose Send (<a href="#reports">what's in one</a>)</td></tr>
+        <tr><td>mapng.com problem reports (desktop app and website)</td><td>Fixing crashes and failed exports</td><td>A problem report, only when you choose Send (<a href="#reports">what's in one</a>)</td></tr>
         <tr><td>GitHub (desktop app only)</td><td>Update checks</td><td>A request for the latest version, only if you allowed update checks</td></tr>
       </tbody>
     </table></div>

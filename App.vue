@@ -195,7 +195,8 @@
     <LevelsSidebar v-if="desktopApp" ref="levelsSidebar" @show-on-map="handleShowLevelOnMap" @modify="handleModifyLevel" />
     <DesktopWelcome v-if="desktopApp" />
     <HotspotsPrivacy />
-    <ReportDialog v-if="desktopApp" />
+    <ReportDialog />
+    <UnfinishedJobNotice />
   </div>
   </div>
 
@@ -252,6 +253,9 @@ import LevelsSidebar from './components/layout/LevelsSidebar.vue';
 import DesktopWelcome from './components/modals/DesktopWelcome.vue';
 import HotspotsPrivacy from './components/modals/HotspotsPrivacy.vue';
 import ReportDialog from './components/modals/ReportDialog.vue';
+import UnfinishedJobNotice from './components/ui/UnfinishedJobNotice.vue';
+import { markJobStart, markJobEnd } from './services/sessionGuard.js';
+import { currentSessionCode } from './composables/useReportDialog.js';
 import { openReportDialog, logPathFrom } from './composables/useReportDialog.js';
 import ViewTabs from './components/ui/ViewTabs.vue';
 import BackupDataNotice from './components/ui/BackupDataNotice.vue';
@@ -952,12 +956,15 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
       };
       // (the desktop app fetches and processes in a Node process: no 4 GB
       // window limit; the website does it here)
+      // (a note that a Generate is running: services/sessionGuard.js)
+      markJobStart('generate', { code: await currentSessionCode(), build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' });
       data = desktopApp
         ? await fetchTerrainDataOnDesktop(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, applyLoadingUpdate, signal, generationOptions)
         : await fetchTerrainData(center.value, resolution.value, fetchOSM, useUSGS, useGPXZ, useKRON86, gpxzApiKey, undefined, applyLoadingUpdate, signal, generationOptions);
     }
     // (the export leaves objects out of the same background areas)
     if (data && store.backgroundActive && !uploadedElevationFile.value) data.backgroundMask = JSON.parse(JSON.stringify(store.backgroundMask));
+    markJobEnd();
     terrainData.value = data;
     lastGenerationKey.value = requestKey;
     warnIfOsmUnavailable(data);
@@ -965,15 +972,17 @@ const handleGenerate = async (showPreview, fetchOSM, elevationSource = 'default'
     openPreviewAfterGenerate();
   } catch (error) {
     if (error.name === 'AbortError') {
+      markJobEnd();
       console.log("Terrain generation cancelled.");
       applyLoadingUpdate(t('app.status.cancelled'));
       return;
     }
     console.error("Failed to generate terrain:", error);
     const byodMessage = String(error?.message || '');
-    if (desktopApp?.prepareReport && !uploadedElevationFile.value) {
-      // (the desktop app: the reason, and the offer to send a report with the job's log)
+    if (!uploadedElevationFile.value) {
+      // (the reason, and the offer to send a report: with the job's log in the desktop app, the page's last lines on the website)
       const message = byodMessage.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') || t('app.error.fetchTerrain');
+      markJobEnd();
       openReportDialog('generate', {
         error: message,
         logPath: logPathFrom(message),

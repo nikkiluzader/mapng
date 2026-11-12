@@ -1133,6 +1133,15 @@
       "body": "Diese Seite stammt aus der früheren Version, und Teile davon funktionieren nicht mehr (Generieren, Uploads, 3D-Vorschau). Lade neu, um die neue zu erhalten. Ein generiertes, noch nicht exportiertes Gelände muss neu generiert werden.",
       "reload": "Jetzt neu laden",
       "later": "Später"
+    },
+    "unfinished": {
+      "title": "MapNG wurde unerwartet beendet",
+      "generate": "Beim letzten Schließen von MapNG lief noch eine Generierung.",
+      "export": "Beim letzten Schließen von MapNG lief noch ein Export.",
+      "kept": "Deine Einstellungen von diesem Moment wurden in diesem Browser aufbewahrt. Es wurde nichts gesendet.",
+      "restore": "Einstellungen wiederherstellen",
+      "report": "Bericht senden",
+      "dismiss": "Schließen"
     }
   },
   "support": {

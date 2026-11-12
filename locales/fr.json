@@ -1133,6 +1133,15 @@
       "body": "Cette page vient de la version précédente et certaines parties ne fonctionneront plus (Générer, envois, aperçu 3D). Rechargez pour obtenir la nouvelle. Un terrain généré mais pas encore exporté devra être généré à nouveau.",
       "reload": "Recharger",
       "later": "Plus tard"
+    },
+    "unfinished": {
+      "title": "MapNG s'est fermé de façon inattendue",
+      "generate": "Une génération était en cours quand MapNG s'est fermé la dernière fois.",
+      "export": "Un export était en cours quand MapNG s'est fermé la dernière fois.",
+      "kept": "Vos réglages à ce moment-là ont été conservés dans ce navigateur. Rien n'a été envoyé.",
+      "restore": "Rétablir mes réglages",
+      "report": "Envoyer un rapport",
+      "dismiss": "Ignorer"
     }
   },
   "support": {

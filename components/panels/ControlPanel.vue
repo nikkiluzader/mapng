@@ -796,6 +796,11 @@ const previewConfigText = async (text, { quiet = false } = {}) => {
   }
 };
 
+// (the notice after an unexpected close offers the settings as they were: components/ui/UnfinishedJobNotice.vue)
+const onRestoreCode = (event) => { if (typeof event?.detail === 'string') previewConfigText(event.detail, { quiet: true }); };
+onMounted(() => window.addEventListener('mapng:restore-session-code', onRestoreCode));
+onUnmounted(() => window.removeEventListener('mapng:restore-session-code', onRestoreCode));
+
 // (the export panel reads its settings when it appears: re-created after a config is applied)
 const exportPanelKey = ref(0);
 const applyPendingConfig = () => {

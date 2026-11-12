@@ -1,5 +1,5 @@
 <template>
-  <!-- Desktop app: send a crash / problem report? Shows exactly what would be
+  <!-- Send a crash / problem report? (desktop app and website) Shows exactly what would be
        sent; nothing leaves the computer unless the user chooses Send.
        (composables/useReportDialog.js, desktop/crashReports.js) -->
   <Teleport to="body">
@@ -80,10 +80,13 @@ import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { CheckCircle2, LifeBuoy, Loader2 } from 'lucide-vue-next';
 import { desktopApp } from '../../services/platform/desktop.js';
+import { webReporter } from '../../services/webReports.js';
 import { currentSessionCode, useReportDialog } from '../../composables/useReportDialog.js';
 
 const { t } = useI18n();
 const { request, closeReportDialog } = useReportDialog();
+// (the desktop app prepares and sends its own; the website's: services/webReports.js)
+const reporter = desktopApp?.prepareReport ? desktopApp : webReporter;
 const preview = ref(null);
 const token = ref(null);
 const preparing = ref(false);
@@ -98,14 +101,14 @@ watch(request, async (req) => {
   preview.value = null; token.value = null; sent.value = null; failed.value = ''; copied.value = false;
   description.value = req?.ctx?.description || '';
   includeArea.value = true;
-  if (!req || !desktopApp?.prepareReport) return;
+  if (!req) return;
   preparing.value = true;
   try {
     const config = req.ctx.config ?? await currentSessionCode();
     // (a plain copy: req.ctx sits in a ref, so its nested objects, e.g. the
     // level's area, are reactive proxies IPC can't clone)
     const ctx = JSON.parse(JSON.stringify({ ...req.ctx, config, build: typeof __BUILD_HASH__ !== 'undefined' ? __BUILD_HASH__ : '' }));
-    const r = await desktopApp.prepareReport(req.kind, ctx);
+    const r = await reporter.prepareReport(req.kind, ctx);
     token.value = r.token; preview.value = r.preview;
   } catch (error) {
     failed.value = String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
@@ -115,7 +118,7 @@ watch(request, async (req) => {
 async function send() {
   sending.value = true; failed.value = '';
   try {
-    const r = await desktopApp.sendReport(token.value, { includeArea: includeArea.value, description: description.value, kind: request.value.kind });
+    const r = await reporter.sendReport(token.value, { includeArea: includeArea.value, description: description.value, kind: request.value.kind });
     sent.value = r.id;
   } catch (error) {
     failed.value = String(error?.message || error).replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
@@ -123,7 +126,7 @@ async function send() {
 }
 
 async function dontSend() {
-  try { await desktopApp.dismissReport(request.value.kind); } catch { /* none */ }
+  try { await reporter.dismissReport(request.value.kind); } catch { /* none */ }
   close();
 }
 function close() { closeReportDialog(); }

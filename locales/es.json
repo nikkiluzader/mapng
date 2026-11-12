@@ -1133,6 +1133,15 @@
       "body": "Esta página es de la versión anterior y algunas partes dejarán de funcionar (Generar, subidas, la vista 3D). Recarga para obtener la nueva. Un terreno generado y aún no exportado tendrá que generarse de nuevo.",
       "reload": "Recargar ahora",
       "later": "Más tarde"
+    },
+    "unfinished": {
+      "title": "MapNG se cerró inesperadamente",
+      "generate": "Había una generación en curso cuando MapNG se cerró la última vez.",
+      "export": "Había una exportación en curso cuando MapNG se cerró la última vez.",
+      "kept": "Tus ajustes de ese momento se guardaron en este navegador. No se envió nada.",
+      "restore": "Restaurar mis ajustes",
+      "report": "Enviar un informe",
+      "dismiss": "Descartar"
     }
   },
   "support": {

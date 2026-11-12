@@ -1133,6 +1133,15 @@
       "body": "Ta strona pochodzi z wcześniejszej wersji i jej części przestaną działać (Generuj, przesyłanie, podgląd 3D). Odśwież, aby pobrać nową. Wygenerowany, ale niewyeksportowany teren trzeba będzie wygenerować ponownie.",
       "reload": "Odśwież teraz",
       "later": "Później"
+    },
+    "unfinished": {
+      "title": "MapNG zamknął się nieoczekiwanie",
+      "generate": "Podczas ostatniego zamknięcia MapNG trwało generowanie.",
+      "export": "Podczas ostatniego zamknięcia MapNG trwał eksport.",
+      "kept": "Twoje ustawienia z tamtej chwili zostały zachowane w tej przeglądarce. Nic nie zostało wysłane.",
+      "restore": "Przywróć moje ustawienia",
+      "report": "Wyślij raport",
+      "dismiss": "Odrzuć"
     }
   },
   "support": {
