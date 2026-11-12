@@ -14,6 +14,7 @@
 // end comes down to the road in a curb ramp. Profile numbers are
 // BeamNG.Earth's (server/sidewalks.py), measured on official US curbs.
 
+import { appendAll } from './keepInPlace.js';
 import * as THREE from 'three';
 import polygonClipping from './polyClip.js';
 import { parallelMap, parallelThreads } from './parallel.js';
@@ -3245,8 +3246,9 @@ function* mergeWalks(builder, runs, { top = 'slab', edge = 'curb', pockets = [],
         if (area >= CUT_SLIVER_M2 && (2 * area) / (perimeter(shape[0]) || 1) >= CUT_SLIVER_W_M) kept.push({ ...strip, shape, piece: true });
       }
     }
+    // (not `strips.push(...kept)`: a big city has more strips than a call takes arguments, services/keepInPlace.js)
     strips.length = 0;
-    strips.push(...kept);
+    appendAll(strips, kept);
   }
   if (!strips.length) return;
   const levelAt = makeLevelFinder(stations, CELL);
