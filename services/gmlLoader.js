@@ -805,29 +805,49 @@ export const parseGmlFile = async (file) => {
   }
 };
 
+const MAX_ZIP_DEPTH = 2;            // a zip inside the zip, as Japan's survey hands out several meshes at once
+
+// Every .gml / .xml entry of an archive, with the entries of the zips inside
+// it (the survey's download of two or more meshes is a zip of one zip per
+// mesh beside its metadata files; uploaded as it came it found "no supported
+// GML coverage files").
+const gmlEntriesOf = async (buffer, depth = 0, prefix = '') => {
+  const archive = await JSZip.loadAsync(buffer);
+  const out = [];
+  for (const entry of Object.values(archive.files)) {
+    if (entry.dir) continue;
+    if (/\.zip$/i.test(entry.name) && depth < MAX_ZIP_DEPTH) {
+      try { out.push(...await gmlEntriesOf(await entry.async('arraybuffer'), depth + 1, `${prefix}${entry.name}/`)); } catch { /* not a readable zip: left out */ }
+    } else if (isGmlLikeFilename(entry.name)) out.push({ name: `${prefix}${entry.name}`, entry });
+  }
+  return out;
+};
+
 export const parseGmlZipFile = async (file) => {
-  const archive = await JSZip.loadAsync(await file.arrayBuffer());
-  const entries = Object.values(archive.files)
-    .filter((entry) => !entry.dir && isGmlLikeFilename(entry.name));
+  const entries = await gmlEntriesOf(await file.arrayBuffer());
 
   if (!entries.length) {
     throw new Error('Unsupported ZIP: no .gml or .xml files found.');
   }
 
   const parsedSources = [];
-  for (const entry of entries) {
+  // (a file that is no elevation tile, the download's metadata sheets among
+  // them, is left out; its reason is given only when nothing at all could be read)
+  let firstProblem = null;
+  for (const { name, entry } of entries) {
     const text = await entry.async('text');
     if (!isLikelyGmlText(text)) continue;
     try {
       const parsed = await parseGmlCoverageText(text, entry._data?.uncompressedSize || 0);
       if (parsed?.sourceType !== 'grid') continue;
-      parsed.sourceName = entry.name;
+      parsed.sourceName = name;
       parsedSources.push(parsed);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`${entry.name}: ${message}`);
+      firstProblem ||= `${name}: ${message}`;
     }
   }
+  if (!parsedSources.length && firstProblem) throw new Error(firstProblem);
 
   return combineParsedGridSources(parsedSources, file.size);
 };

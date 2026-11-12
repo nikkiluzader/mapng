@@ -180,3 +180,36 @@ ${tuples.join('\n')}
   // (the tile's own no-data value is what the resampler masks)
   assert.equal(m.gridTiles[0].noData, nd);
 });
+
+test('a zip of zips, as the Japanese survey hands out several meshes, is read through; its metadata sheets are left out', async () => {
+  const JSZip = (await import('jszip')).default;
+  const { parseGmlZipFile } = await import('../services/gmlLoader.js');
+  const W = 6; const H = 4;
+  const tile = (lat0, lon0, base) => `<?xml version="1.0" encoding="UTF-8"?>
+<Dataset xmlns="http://fgd.gsi.go.jp/spec/2008/FGD_GMLSchema" xmlns:gml="http://www.opengis.net/gml/3.2" gml:id="Dataset1">
+<DEM gml:id="DEM001"><type>1mメッシュ（標高）</type>
+<coverage gml:id="DEM001-3">
+<gml:boundedBy><gml:Envelope srsName="fguuid:jgd2024.bl"><gml:lowerCorner>${lat0} ${lon0}</gml:lowerCorner><gml:upperCorner>${lat0 + 0.01} ${lon0 + 0.0125}</gml:upperCorner></gml:Envelope></gml:boundedBy>
+<gml:gridDomain><gml:Grid gml:id="DEM001-4" dimension="2"><gml:limits><gml:GridEnvelope><gml:low>0 0</gml:low><gml:high>${W - 1} ${H - 1}</gml:high></gml:GridEnvelope></gml:limits><gml:axisLabels>x y</gml:axisLabels></gml:Grid></gml:gridDomain>
+<gml:rangeSet><gml:DataBlock><gml:rangeParameters><gml:QuantityList uom="DEM構成点"/></gml:rangeParameters>
+<gml:tupleList>
+${Array.from({ length: W * H }, (_, i) => `地表面,${(base + i).toFixed(2)}`).join('\n')}
+</gml:tupleList></gml:DataBlock></gml:rangeSet>
+<gml:coverageFunction><gml:GridFunction><gml:sequenceRule order="+x-y">Linear</gml:sequenceRule><gml:startPoint>0 0</gml:startPoint></gml:GridFunction></gml:coverageFunction>
+</coverage></DEM></Dataset>`;
+  const meshA = new JSZip(); meshA.file('FG-GML-5039-64-19-DEM1A-20250609.xml', tile(33.85, 139.5625, 100));
+  const meshB = new JSZip(); meshB.file('FG-GML-5039-65-20-DEM1A-20250609.xml', tile(33.85, 139.575, 200));
+  const outer = new JSZip();
+  outer.file('FG-GML-503964-DEM1A-20250609.zip', await meshA.generateAsync({ type: 'uint8array' }));
+  outer.file('FG-GML-503965-DEM1A-20250609.zip', await meshB.generateAsync({ type: 'uint8array' }));
+  outer.file('fmdid25-3501.xml', '<?xml version="1.0" encoding="UTF-8"?><MD_Metadata xmlns:gml="http://www.opengis.net/gml/3.2"><title>metadata, no grid</title></MD_Metadata>');
+  const bytes = await outer.generateAsync({ type: 'uint8array' });
+  const m = await parseGmlZipFile({ name: 'download.zip', size: bytes.length, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) });
+  assert.equal(m.gridTiles.length, 2);
+  assert.ok(Math.abs(m.bounds.west - 139.5625) < 1e-9 && Math.abs(m.bounds.east - 139.5875) < 1e-9);
+  assert.deepEqual(m.gridTiles.map((t) => t.raster[0]).sort((a, b) => a - b), [100, 200]);
+  // nothing readable in it at all: the reason is said
+  const empty = new JSZip(); empty.file('notes.txt', 'nothing');
+  const eb = await empty.generateAsync({ type: 'uint8array' });
+  await assert.rejects(parseGmlZipFile({ name: 'e.zip', size: eb.length, arrayBuffer: async () => eb.buffer.slice(eb.byteOffset, eb.byteOffset + eb.byteLength) }), /no \.gml or \.xml files/);
+});
