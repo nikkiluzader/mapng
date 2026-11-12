@@ -6,3 +6,11 @@
 
 /crash-reports.html
   X-Robots-Tag: noindex, nofollow
+
+/admin.html
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store
+
+/admin
+  X-Robots-Tag: noindex, nofollow
+  Cache-Control: no-store

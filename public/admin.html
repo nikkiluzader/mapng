@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* The developer's own dashboard. The page holds no data: everything comes from /api/admin/*,
+     which answers only a request Cloudflare Access has signed for the developer (worker/admin.js),
+     and from the site's public endpoints. Report text is other people's: always set as text. */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+    --good: #15803d; --warn: #b45309; --bad: #b91c1c; --info: #2563eb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+      --good: #22a355; --warn: #f59e0b; --bad: #f87171; --info: #60a5fa;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    --good: #22a355; --warn: #f59e0b; --bad: #f87171; --info: #60a5fa;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; margin: 0; }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 16px 60px; }
+  header.top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 0; }
+  header.top h1 { font-size: 22px; font-style: italic; display: flex; align-items: center; gap: 8px; }
+  header.top img { width: 22px; height: 22px; }
+  header.top .who { color: var(--muted); font-size: 13px; margin-left: auto; }
+  button, select, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 6px 12px; }
+  button:hover { border-color: var(--brand); }
+  button.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 700; }
+  nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  nav.tabs button { border: 0; border-bottom: 3px solid transparent; border-radius: 0; background: none; padding: 8px 12px; font-weight: 600; color: var(--text-2); }
+  nav.tabs button[aria-selected="true"] { border-bottom-color: var(--brand); color: var(--text); }
+  .notice { background: var(--brand-tint); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+  .notice.bad { border-color: var(--bad); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .tile .v { font: 700 24px/1.15 "Overpass", sans-serif; overflow-wrap: anywhere; }
+  .tile .k { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .tile .s { color: var(--text-2); font-size: 12.5px; margin-top: 4px; overflow-wrap: anywhere; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 16px; min-width: 0; }
+  .card h2 { font-size: 17px; margin-bottom: 4px; }
+  .card .sub { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td:first-child { white-space: nowrap; }
+  tr.row { cursor: pointer; }
+  tr.row:hover td, tr.row.sel td { background: var(--surface-2); }
+  tr.handled td { color: var(--muted); }
+  .mono { font-family: "Overpass Mono", ui-monospace, monospace; font-size: 12.5px; }
+  .pill { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); white-space: nowrap; }
+  .pill.crash { color: var(--bad); border-color: var(--bad); } .pill.export, .pill.generate, .pill.rebuild { color: var(--warn); border-color: var(--warn); }
+  .pill.level, .pill.manual { color: var(--info); border-color: var(--info); } .pill.ok { color: var(--good); border-color: var(--good); }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .filters input[type=search], .filters select { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 6px 10px; }
+  .filters input[type=search] { flex: 1 1 220px; min-width: 0; }
+  .split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+  @media (max-width: 980px) { .split { grid-template-columns: minmax(0, 1fr); } }
+  .detail dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 3px 12px; margin: 8px 0; font-size: 13.5px; }
+  .detail dt { color: var(--muted); } .detail dd { margin: 0; overflow-wrap: anywhere; }
+  .detail .err { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .detail textarea { width: 100%; min-height: 64px; border: 1px solid var(--border); background: var(--bg); border-radius: 8px; padding: 8px; }
+  .detail .acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  pre.file { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 520px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.45 "Overpass Mono", ui-monospace, monospace; margin: 8px 0 0; }
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 120px; }
+  .bars .b { flex: 1; min-width: 4px; background: var(--brand); border-radius: 3px 3px 0 0; position: relative; }
+  .bars .b.alt { background: var(--info); }
+  .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+  .muted { color: var(--muted); }
+  .meter { height: 8px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; margin-top: 6px; }
+  .meter span { display: block; height: 100%; background: var(--good); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1><img src="/favicon.svg" alt="">MapNG admin</h1>
+    <button id="refresh" type="button">Refresh</button>
+    <span class="muted" id="updated"></span>
+    <span class="who" id="who"></span>
+  </header>
+
+  <div class="notice bad" id="gate" hidden></div>
+
+  <div id="app" hidden>
+    <div class="tiles" id="tiles"></div>
+
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="reports" aria-selected="true">Reports</button>
+      <button role="tab" data-tab="traffic" aria-selected="false">Traffic and security</button>
+      <button role="tab" data-tab="app" aria-selected="false">Desktop app</button>
+      <button role="tab" data-tab="usage" aria-selected="false">Exports and settings</button>
+      <button role="tab" data-tab="system" aria-selected="false">Builds and planet</button>
+    </nav>
+
+    <section data-panel="reports">
+      <div class="split">
+        <div class="card">
+          <h2>Problem reports</h2>
+          <p class="sub" id="reports-sub">Loading…</p>
+          <div class="filters">
+            <input type="search" id="f-text" placeholder="Filter by error, place, ID, version…" aria-label="Filter reports">
+            <select id="f-kind" aria-label="Kind"><option value="">All kinds</option></select>
+            <select id="f-version" aria-label="Version"><option value="">All versions</option></select>
+            <select id="f-state" aria-label="State"><option value="open">Open</option><option value="">Open and handled</option><option value="handled">Handled</option></select>
+            <label><input type="checkbox" id="f-group"> Group same errors</label>
+          </div>
+          <div class="scroll"><table>
+            <thead><tr><th>When</th><th>Kind</th><th>Version</th><th>What</th><th>Where</th></tr></thead>
+            <tbody id="report-rows"></tbody>
+          </table></div>
+        </div>
+        <div class="card detail" id="detail"><h2>Report</h2><p class="sub">Choose a report on the left.</p></div>
+      </div>
+    </section>
+
+    <section data-panel="traffic" hidden>
+      <div class="notice" id="cf-setup" hidden></div>
+      <div class="grid2">
+        <div class="card"><h2>Requests per day</h2><p class="sub" id="cf-traffic-sub">Last 14 days, from Cloudflare.</p><div id="cf-traffic"></div></div>
+        <div class="card"><h2>Visitors and data per day</h2><p class="sub">Unique visitors (bars) with pages viewed and data served.</p><div id="cf-visitors"></div></div>
+        <div class="card"><h2>Security events, last 24 hours</h2><p class="sub">What Cloudflare challenged, blocked or let through by rule.</p><div class="scroll" id="cf-sec-action"></div></div>
+        <div class="card"><h2>Where they were aimed</h2><p class="sub">Paths with the most security events.</p><div class="scroll" id="cf-sec-path"></div></div>
+        <div class="card"><h2>From where</h2><p class="sub">Countries with the most security events.</p><div class="scroll" id="cf-sec-country"></div></div>
+        <div class="card"><h2>By which client</h2><p class="sub">User agents with the most security events.</p><div class="scroll" id="cf-sec-agent"></div></div>
+        <div class="card"><h2>Responses, last 24 hours</h2><p class="sub">Status codes the site answered with.</p><div class="scroll" id="cf-status"></div></div>
+        <div class="card"><h2>Busiest paths, last 24 hours</h2><p class="sub">Requests by path.</p><div class="scroll" id="cf-paths"></div></div>
+      </div>
+    </section>
+
+    <section data-panel="app" hidden>
+      <div class="grid2">
+        <div class="card"><h2>Downloads by release</h2><p class="sub">From GitHub: how often each release's files were downloaded. "Update checks" counts the small file the app reads to see whether a newer version exists.</p><div class="scroll" id="gh-releases"></div></div>
+        <div class="card"><h2>Versions calling in, last 7 days</h2><p class="sub">Requests to mapng.com by desktop app version (the app names its version on its requests). Requests, not people: one busy user counts many times.</p><div class="scroll" id="cf-versions"></div></div>
+        <div class="card"><h2>Versions in problem reports</h2><p class="sub">Among the reports loaded here.</p><div class="scroll" id="report-versions"></div></div>
+      </div>
+    </section>
+
+    <section data-panel="usage" hidden>
+      <div class="grid2">
+        <div class="card"><h2>Export hotspots</h2><p class="sub">Opt-in counts of where levels are exported, in cells of about 5 km. The same public data as the map overlay.</p><div id="hot-summary"></div><div class="scroll" id="hot-top"></div></div>
+        <div class="card"><h2>Settings people export with</h2><p class="sub" id="usage-sub">Opt-in counts, no locations.</p><div class="filters"><input type="search" id="usage-filter" placeholder="Filter settings…" aria-label="Filter settings"></div><div class="scroll" id="usage-rows" style="max-height:520px;overflow-y:auto"></div></div>
+      </div>
+    </section>
+
+    <section data-panel="system" hidden>
+      <div class="grid2">
+        <div class="card"><h2>Branches and builds</h2><p class="sub">The newest commit on each branch and its Cloudflare build, from GitHub.</p><div class="scroll" id="gh-branches"></div></div>
+        <div class="card"><h2>Report limits</h2><p class="sub">Alert emails and stored reports are capped so nobody can flood them.</p><div id="caps"></div><div id="report-days" style="margin-top:12px"></div></div>
+        <div class="card"><h2>Planet map data</h2><p class="sub">The build and the upload. Full page: <a href="/planet.html">planet.html</a></p><div id="planet"></div></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const REPO = 'nikkiluzader/mapng';
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, props = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v);
+      else if (k === 'style') n.style.cssText = v; else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) n.append(kid);
+    return n;
+  };
+  const fmt = (n) => (Number.isFinite(Number(n)) ? Number(n).toLocaleString('en-US') : '–');
+  const bytes = (b) => { const u = ['B', 'KB', 'MB', 'GB', 'TB']; let i = 0; let v = Number(b) || 0; while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; } return `${v.toFixed(v < 10 && i ? 1 : 0)} ${u[i]}`; };
+  const gb = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.max(Math.round(mb), 0)} MB`);
+  const ago = (iso) => {
+    const min = Math.round((Date.now() - Date.parse(iso)) / 60000);
+    if (!Number.isFinite(min)) return '';
+    if (min < 1) return 'just now'; if (min < 60) return `${min} min ago`; if (min < 48 * 60) return `${Math.round(min / 60)} h ago`;
+    return `${Math.round(min / 1440)} days ago`;
+  };
+  const when = (iso) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? String(iso || '') : d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+  const api = async (path, init) => {
+    const r = await fetch(`/api/admin${path}`, { credentials: 'same-origin', cache: 'no-store', ...init });
+    if (!r.ok) { const e = new Error(`${r.status}`); e.status = r.status; try { e.body = await r.json(); } catch { /* not JSON */ } throw e; }
+    return r;
+  };
+  const getJson = async (url) => { const r = await fetch(url, { cache: 'no-store' }); if (!r.ok) throw new Error(String(r.status)); return r.json(); };
+  const table = (heads, rows, { empty = 'Nothing to show.' } = {}) => {
+    if (!rows.length) return el('p', { class: 'muted', text: empty });
+    return el('table', {},
+      el('thead', {}, el('tr', {}, heads.map((h) => el('th', { class: h.num ? 'num' : '', text: h.label })))),
+      el('tbody', {}, rows.map((r) => el('tr', {}, r.map((c, i) => el('td', { class: `${heads[i].num ? 'num' : ''} ${heads[i].mono ? 'mono' : ''}`.trim() }, c instanceof Node ? c : document.createTextNode(String(c ?? ''))))))));
+  };
+  const put = (id, node) => { const host = $(id); host.textContent = ''; host.append(node); };
+  const fail = (id, msg) => put(id, el('p', { class: 'muted', text: msg }));
+  const bars = (values, labels, { alt = false, title = (v) => fmt(v) } = {}) => {
+    const max = Math.max(1, ...values);
+    return el('div', {},
+      el('div', { class: 'bars', role: 'img', 'aria-label': values.map((v, i) => `${labels[i]}: ${title(v)}`).join(', ') },
+        values.map((v, i) => el('div', { class: `b${alt ? ' alt' : ''}`, style: `height:${Math.max(2, (v / max) * 100)}%`, title: `${labels[i]}: ${title(v)}` }))),
+      el('div', { class: 'axis' }, el('span', { text: labels[0] || '' }), el('span', { text: `peak ${title(max)}` }), el('span', { text: labels[labels.length - 1] || '' })));
+  };
+
+  // ── state ──
+  const state = { reports: [], total: 0, selected: null, overview: null, cf: null, releases: null };
+
+  // ── tiles ──
+  const tiles = new Map();
+  const tile = (key, value, label, sub = '') => { tiles.set(key, { value, label, sub }); drawTiles(); };
+  const TILE_ORDER = ['open', 'today', 'mail', 'downloads', 'latest', 'requests', 'threats', 'exports', 'main'];
+  function drawTiles() {
+    put('tiles', el('div', { style: 'display:contents' }, TILE_ORDER.filter((k) => tiles.has(k)).map((k) => {
+      const t = tiles.get(k);
+      return el('div', { class: 'tile' }, el('div', { class: 'v', text: t.value }), el('div', { class: 'k', text: t.label }), t.sub ? el('div', { class: 's', text: t.sub }) : null);
+    })));
+  }
+
+  // ── reports ──
+  const placeOf = (r) => {
+    const a = r.area; if (!a || !Number.isFinite(Number(a.lat))) return '';
+    const km = Number(a.resolution) && Number(a.metersPerPixel) ? ` · ${((a.resolution * a.metersPerPixel) / 1000).toFixed(1)} km` : '';
+    return `${Number(a.lat).toFixed(3)}, ${Number(a.lng).toFixed(3)}${km}`;
+  };
+  const whatOf = (r) => r.error || r.description || (r.level ? `Level report: ${r.level}` : '') || '(no message)';
+  // (the same error from different places and times: numbers, paths and ids taken out)
+  const errorKey = (r) => String(r.error || r.kind || '').replace(/[0-9a-f]{8,}/gi, '#').replace(/\d+(\.\d+)?/g, '#').replace(/[A-Za-z]:\\[^\s'"]+|\/[^\s'"]+/g, '<path>').slice(0, 160);
+  function fillSelect(id, values, first) {
+    const sel = $(id); const keep = sel.value;
+    sel.textContent = ''; sel.append(el('option', { value: '', text: first }), ...values.map((v) => el('option', { value: v, text: v })));
+    if ([...sel.options].some((o) => o.value === keep)) sel.value = keep;
+  }
+  function filtered() {
+    const text = $('f-text').value.trim().toLowerCase(); const kind = $('f-kind').value; const version = $('f-version').value; const st = $('f-state').value;
+    return state.reports.filter((r) => {
+      if (kind && r.kind !== kind) return false;
+      if (version && r.appVersion !== version) return false;
+      if (st === 'open' && r.admin?.handled) return false;
+      if (st === 'handled' && !r.admin?.handled) return false;
+      if (text && !`${r.id} ${r.kind} ${r.appVersion} ${r.error} ${r.description} ${r.level} ${r.os} ${placeOf(r)} ${r.admin?.note || ''}`.toLowerCase().includes(text)) return false;
+      return true;
+    });
+  }
+  function drawReports() {
+    const list = filtered();
+    const open = state.reports.filter((r) => !r.admin?.handled).length;
+    $('reports-sub').textContent = `${fmt(state.total)} stored, ${fmt(state.reports.length)} loaded (newest), ${fmt(open)} open. Showing ${fmt(list.length)}.`;
+    const body = $('report-rows'); body.textContent = '';
+    if (!list.length) { body.append(el('tr', {}, el('td', { colspan: '5', class: 'muted', text: state.reports.length ? 'No report matches the filters.' : 'No reports yet.' }))); return; }
+    const rowOf = (r, count = 0) => el('tr', { class: `row${r.admin?.handled ? ' handled' : ''}${state.selected === r.key ? ' sel' : ''}`, tabindex: '0', onclick: () => select(r.key), onkeydown: (e) => { if (e.key === 'Enter') select(r.key); } },
+      el('td', {}, el('div', { text: when(r.receivedAt) }), el('div', { class: 'muted mono', text: r.id })),
+      el('td', {}, el('span', { class: `pill ${r.kind}`, text: r.kind }), r.admin?.handled ? el('div', {}, el('span', { class: 'pill ok', text: 'handled' })) : null),
+      el('td', { text: r.appVersion || '' }),
+      el('td', {}, el('div', { text: whatOf(r).slice(0, 180) }), count > 1 ? el('div', { class: 'muted', text: `${count} reports with this error` }) : null, r.admin?.note ? el('div', { class: 'muted', text: `Note: ${r.admin.note.slice(0, 120)}` }) : null),
+      el('td', { class: 'mono', text: placeOf(r) }));
+    if ($('f-group').checked) {
+      const groups = new Map();
+      for (const r of list) { const k = errorKey(r); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+      for (const g of [...groups.values()].sort((a, b) => b.length - a.length || (a[0].receivedAt < b[0].receivedAt ? 1 : -1))) body.append(rowOf(g[0], g.length));
+    } else for (const r of list) body.append(rowOf(r));
+  }
+  async function showFile(key, name, host) {
+    host.textContent = 'Loading…';
+    try {
+      const r = await api(`/reports/file?key=${encodeURIComponent(key + name)}`);
+      const text = await r.text();
+      host.textContent = text.length > 600000 ? `${text.slice(0, 300000)}\n\n… (${fmt(text.length - 600000)} characters left out) …\n\n${text.slice(-300000)}` : text;
+    } catch (e) { host.textContent = `Could not load ${name} (${e.message}).`; }
+  }
+  function select(key) {
+    state.selected = key; drawReports();
+    const r = state.reports.find((x) => x.key === key); if (!r) return;
+    const host = $('detail'); host.textContent = '';
+    const file = el('pre', { class: 'file', hidden: true });
+    const open = (name) => { file.hidden = false; showFile(r.key, name, file); };
+    const note = el('textarea', { placeholder: 'A note to yourself: what it was, the fix, who to tell…', 'aria-label': 'Note' }); note.value = r.admin?.note || '';
+    const saved = el('span', { class: 'muted' });
+    const save = async (handled) => {
+      saved.textContent = 'Saving…';
+      try {
+        const res = await (await api('/reports/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: r.key, handled, note: note.value }) })).json();
+        r.admin = res.admin; saved.textContent = 'Saved.'; drawReports(); countOpen();
+        select(r.key);
+      } catch (e) { saved.textContent = `Could not save (${e.message}).`; }
+    };
+    const o = r.options || {};
+    const settings = Object.entries(o).filter(([k, v]) => !['sessionCode', 'points'].includes(k) && typeof v !== 'object').map(([k, v]) => `${k}: ${v}`).join('  ·  ');
+    const mapLink = r.area && Number.isFinite(Number(r.area.lat)) ? el('a', { href: `https://www.openstreetmap.org/?mlat=${encodeURIComponent(r.area.lat)}&mlon=${encodeURIComponent(r.area.lng)}#map=13/${encodeURIComponent(r.area.lat)}/${encodeURIComponent(r.area.lng)}`, target: '_blank', rel: 'noopener noreferrer', text: 'open the place on a map' }) : null;
+    host.append(...[
+      el('h2', {}, document.createTextNode(`${r.id} `), el('span', { class: `pill ${r.kind}`, text: r.kind })),
+      el('p', { class: 'sub', text: `${when(r.receivedAt)} (${ago(r.receivedAt)})` }),
+      r.error ? el('div', { class: 'err mono', text: r.error }) : null,
+      r.description ? el('p', {}, el('b', { text: 'They wrote: ' }), document.createTextNode(r.description)) : null,
+      el('dl', {},
+        el('dt', { text: 'App' }), el('dd', { text: `${r.appVersion || '?'} (${r.build || '?'}) on ${r.os || r.platform || '?'}` }),
+        r.memory ? [el('dt', { text: 'Machine' }), el('dd', { text: `${r.memory.totalGB ?? '?'} GB RAM (${r.memory.freeGB ?? '?'} free), ${r.memory.cpus ?? '?'} cores` })] : null,
+        r.level ? [el('dt', { text: 'Level' }), el('dd', { text: r.level })] : null,
+        placeOf(r) ? [el('dt', { text: 'Area' }), el('dd', {}, document.createTextNode(`${placeOf(r)}${r.area.resolution ? ` · ${r.area.resolution} px at ${r.area.metersPerPixel} m` : ''}  `), mapLink)] : null,
+        settings ? [el('dt', { text: 'Settings' }), el('dd', { class: 'mono', text: settings })] : null),
+      el('div', { class: 'acts' },
+        r.hasLog ? el('button', { type: 'button', text: 'Log', onclick: () => open('log.txt') }) : null,
+        r.hasExportReport ? el('button', { type: 'button', text: 'Export report', onclick: () => open('export_report.txt') }) : null,
+        el('button', { type: 'button', text: 'Raw report', onclick: () => open('report.json') }),
+        r.config ? el('button', { type: 'button', text: `Copy session code (${fmt(r.config.length)} characters)`, onclick: async (e) => { try { await navigator.clipboard.writeText(r.config); e.target.textContent = 'Copied'; } catch { e.target.textContent = 'Copy failed'; } } }) : null,
+        r.hasDump ? el('span', { class: 'muted', text: 'Has a crash dump (crash.dmp in storage).' }) : null),
+      r.config && r.config.length === 8000 ? el('p', { class: 'muted', text: 'This code is exactly 8,000 characters: it was cut short by an older version and will not paste back.' }) : null,
+      note,
+      el('div', { class: 'acts' },
+        r.admin?.handled
+          ? el('button', { type: 'button', text: 'Reopen', onclick: () => save(false) })
+          : el('button', { type: 'button', class: 'primary', text: 'Mark handled', onclick: () => save(true) }),
+        el('button', { type: 'button', text: 'Save note', onclick: () => save(!!r.admin?.handled) }), saved),
+      file].filter(Boolean));
+  }
+  function countOpen() {
+    const open = state.reports.filter((r) => !r.admin?.handled).length;
+    tile('open', fmt(open), 'open problem reports', state.total > state.reports.length ? `of the newest ${fmt(state.reports.length)}` : `of ${fmt(state.total)} in all`);
+  }
+  async function loadReports() {
+    const d = await (await api('/reports?limit=200')).json();
+    state.reports = d.reports || []; state.total = d.total || 0;
+    fillSelect('f-kind', [...new Set(state.reports.map((r) => r.kind).filter(Boolean))].sort(), 'All kinds');
+    fillSelect('f-version', [...new Set(state.reports.map((r) => r.appVersion).filter(Boolean))].sort().reverse(), 'All versions');
+    drawReports(); countOpen();
+    const by = new Map();
+    for (const r of state.reports) by.set(r.appVersion || '?', (by.get(r.appVersion || '?') || 0) + 1);
+    put('report-versions', table([{ label: 'Version' }, { label: 'Reports', num: true }], [...by].sort((a, b) => b[1] - a[1]).map(([v, n]) => [v, fmt(n)])));
+    if (state.selected) select(state.selected);
+  }
+
+  // ── overview: counters and caps ──
+  async function loadOverview() {
+    const o = await (await api('/overview')).json(); state.overview = o;
+    tile('today', fmt(o.today.reports), 'reports today (UTC)', `cap ${fmt(o.caps.reportsPerDay)} a day`);
+    tile('mail', `${fmt(o.today.mails)} / ${fmt(o.caps.mailPerDay)}`, 'alert emails today', o.mailOn ? `${fmt(o.today.mailsThisHour)} of ${fmt(o.caps.mailPerHour)} this hour` : 'email alerts are off');
+    const meter = (n, cap) => el('div', { class: 'meter' }, el('span', { style: `width:${Math.min(100, (n / Math.max(1, cap)) * 100)}%` }));
+    put('caps', el('div', {},
+      el('div', { text: `Alert emails today: ${fmt(o.today.mails)} of ${fmt(o.caps.mailPerDay)}` }), meter(o.today.mails, o.caps.mailPerDay),
+      el('div', { style: 'margin-top:8px', text: `Alert emails this hour: ${fmt(o.today.mailsThisHour)} of ${fmt(o.caps.mailPerHour)}` }), meter(o.today.mailsThisHour, o.caps.mailPerHour),
+      el('div', { style: 'margin-top:8px', text: `Reports stored today: ${fmt(o.today.reports)} of ${fmt(o.caps.reportsPerDay)}` }), meter(o.today.reports, o.caps.reportsPerDay)));
+    const days = [...o.days].reverse();
+    put('report-days', el('div', {}, el('div', { class: 'muted', text: 'Reports per day, last 14 days' }), bars(days.map((d) => d.reports), days.map((d) => d.day.slice(5)))));
+  }
+
+  // ── Cloudflare: traffic and security ──
+  const section = (name) => state.cf?.sections?.[name];
+  function drawSection(name, id, draw, empty) {
+    const s = section(name);
+    if (!s) return fail(id, 'Not loaded.');
+    if (s.error) return fail(id, `Cloudflare did not answer this one: ${s.error}`);
+    if (!s.rows.length) return fail(id, empty || 'Nothing in this period.');
+    try { put(id, draw(s.rows)); } catch (e) { fail(id, `Could not draw this (${e.message}).`); }
+  }
+  async function loadCloudflare() {
+    try { state.cf = await (await api('/cloudflare')).json(); $('cf-setup').hidden = true; } catch (e) {
+      state.cf = null;
+      const box = $('cf-setup'); box.hidden = false;
+      box.textContent = e.status === 503
+        ? 'Cloudflare\'s traffic and security numbers are not connected yet. They need a read-only analytics token (the CF_ANALYTICS_TOKEN secret) and the zone id (CF_ZONE_ID).'
+        : `Could not load Cloudflare's numbers (${e.message}).`;
+      for (const id of ['cf-traffic', 'cf-visitors', 'cf-sec-action', 'cf-sec-path', 'cf-sec-country', 'cf-sec-agent', 'cf-status', 'cf-paths', 'cf-versions']) fail(id, 'Not connected.');
+      return;
+    }
+    drawSection('traffic', 'cf-traffic', (rows) => {
+      const total = rows.reduce((a, r) => a + r.sum.requests, 0); const cached = rows.reduce((a, r) => a + r.sum.cachedRequests, 0);
+      const last = rows[rows.length - 1];
+      tile('requests', fmt(last.sum.requests), `requests on ${last.dimensions.date.slice(5)}`, `${fmt(total)} in ${rows.length} days`);
+      tile('threats', fmt(rows.reduce((a, r) => a + r.sum.threats, 0)), `threats stopped, ${rows.length} days`, 'as Cloudflare counts them');
+      $('cf-traffic-sub').textContent = `${fmt(total)} requests in ${rows.length} days; ${Math.round((cached / Math.max(1, total)) * 100)}% served from Cloudflare's cache.`;
+      return bars(rows.map((r) => r.sum.requests), rows.map((r) => r.dimensions.date.slice(5)));
+    });
+    drawSection('traffic', 'cf-visitors', (rows) => el('div', {},
+      bars(rows.map((r) => r.uniq.uniques), rows.map((r) => r.dimensions.date.slice(5)), { alt: true }),
+      el('div', { class: 'scroll', style: 'margin-top:10px' }, table([{ label: 'Day' }, { label: 'Visitors', num: true }, { label: 'Page views', num: true }, { label: 'Data', num: true }, { label: 'Threats', num: true }],
+        [...rows].reverse().slice(0, 7).map((r) => [r.dimensions.date, fmt(r.uniq.uniques), fmt(r.sum.pageViews), bytes(r.sum.bytes), fmt(r.sum.threats)])))));
+    drawSection('securityByAction', 'cf-sec-action', (rows) => table([{ label: 'Action' }, { label: 'By' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.action, r.dimensions.source, fmt(r.count)])), 'No security events in the last 24 hours.');
+    drawSection('securityByPath', 'cf-sec-path', (rows) => table([{ label: 'Path', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientRequestPath, r.dimensions.action, fmt(r.count)])), 'No security events in the last 24 hours.');
+    drawSection('securityByCountry', 'cf-sec-country', (rows) => table([{ label: 'Country' }, { label: 'Events', num: true }], rows.map((r) => [r.dimensions.clientCountryName, fmt(r.count)])), 'No security events in the last 24 hours.');
+    drawSection('securityByAgent', 'cf-sec-agent', (rows) => table([{ label: 'User agent', mono: true }, { label: 'Action' }, { label: 'Events', num: true }], rows.map((r) => [String(r.dimensions.userAgent || '(none)').slice(0, 110), r.dimensions.action, fmt(r.count)])), 'No security events in the last 24 hours.');
+    drawSection('statusCodes', 'cf-status', (rows) => table([{ label: 'Status' }, { label: 'Requests', num: true }], rows.map((r) => [r.dimensions.edgeResponseStatus, fmt(r.count)])));
+    drawSection('topPaths', 'cf-paths', (rows) => table([{ label: 'Path', mono: true }, { label: 'Requests', num: true }], rows.map((r) => [String(r.dimensions.clientRequestPath).slice(0, 90), fmt(r.count)])));
+    drawSection('appVersions', 'cf-versions', (rows) => {
+      const by = new Map();
+      for (const r of rows) { const v = (/MapNG-Desktop\/([0-9][^\s;)]*)/.exec(r.dimensions.userAgent) || [])[1] || r.dimensions.userAgent; by.set(v, (by.get(v) || 0) + r.count); }
+      const total = [...by.values()].reduce((a, b) => a + b, 0);
+      return table([{ label: 'Version' }, { label: 'Requests', num: true }, { label: 'Share', num: true }], [...by].sort((a, b) => b[1] - a[1]).map(([v, n]) => [v, fmt(n), `${Math.round((n / Math.max(1, total)) * 100)}%`]));
+    }, 'No desktop app requests seen in the last 7 days.');
+  }
+
+  // ── GitHub: releases and branches (public API, asked from this browser) ──
+  async function loadGitHub() {
+    try {
+      const rel = await getJson(`https://api.github.com/repos/${REPO}/releases?per_page=12`);
+      const rows = rel.map((r) => {
+        const sum = (re) => r.assets.filter((a) => re.test(a.name)).reduce((n, a) => n + a.download_count, 0);
+        return { tag: r.tag_name, day: (r.published_at || '').slice(0, 10), draft: r.draft, win: sum(/Setup.*\.exe$/i), zip: sum(/portable\.zip$/i), linux: sum(/\.AppImage$/i), checks: sum(/^latest.*\.yml$/i) };
+      });
+      const total = rows.reduce((n, r) => n + r.win + r.zip + r.linux, 0);
+      const latest = rows.find((r) => !r.draft);
+      tile('downloads', fmt(total), 'desktop downloads', `last ${rows.length} releases`);
+      if (latest) tile('latest', latest.tag, 'latest release', `${latest.day} · ${fmt(latest.win + latest.zip + latest.linux)} downloads`);
+      put('gh-releases', table([{ label: 'Release' }, { label: 'Published' }, { label: 'Windows installer', num: true }, { label: 'Portable', num: true }, { label: 'Linux', num: true }, { label: 'Update checks', num: true }],
+        rows.map((r) => [r.draft ? `${r.tag} (draft)` : r.tag, r.day, fmt(r.win), fmt(r.zip), fmt(r.linux), fmt(r.checks)])));
+    } catch (e) { fail('gh-releases', `GitHub did not answer (${e.message}). It allows 60 questions an hour from one address.`); }
+    try {
+      const rows = [];
+      for (const branch of ['main', 'dev']) {
+        const c = await getJson(`https://api.github.com/repos/${REPO}/commits/${branch}`);
+        let checks = '';
+        try {
+          const cr = await getJson(`https://api.github.com/repos/${REPO}/commits/${c.sha}/check-runs`);
+          checks = cr.check_runs.map((x) => `${x.name.replace('Workers Builds: ', '')}: ${x.status === 'completed' ? x.conclusion : x.status}`).join(', ');
+        } catch { checks = '(checks not available)'; }
+        rows.push([branch, c.sha.slice(0, 7), c.commit.message.split('\n')[0].slice(0, 90), ago(c.commit.committer.date), checks]);
+        if (branch === 'main') tile('main', c.sha.slice(0, 7), 'on main', `${ago(c.commit.committer.date)} · ${checks.includes('failure') ? 'a build FAILED' : 'builds ok'}`);
+      }
+      put('gh-branches', table([{ label: 'Branch' }, { label: 'Commit', mono: true }, { label: 'Message' }, { label: 'When' }, { label: 'Builds' }], rows));
+    } catch (e) { fail('gh-branches', `GitHub did not answer (${e.message}).`); }
+  }
+
+  // ── the site's own public numbers ──
+  async function loadUsage() {
+    try {
+      const h = await getJson('/api/hotspots');
+      const cells = h.cells || [];
+      const exports = (h.totals?.web || 0) + (h.totals?.desktop || 0);
+      tile('exports', fmt(exports), 'shared exports counted', `${fmt(h.totals?.desktop || 0)} desktop · ${fmt(h.totals?.web || 0)} web`);
+      put('hot-summary', el('p', {}, `${fmt(exports)} exports in ${fmt(cells.length)} cells: ${fmt(h.totals?.web || 0)} from the website, ${fmt(h.totals?.desktop || 0)} from the desktop app.`));
+      const top = [...cells].sort((a, b) => (b[2] + b[3]) - (a[2] + a[3])).slice(0, 15);
+      put('hot-top', table([{ label: 'Cell centre', mono: true }, { label: 'Web', num: true }, { label: 'Desktop', num: true }, { label: 'Last day' }], top.map(([y, x, web, desktop, last]) => {
+        const lat = -90 + (y + 0.5) * 0.05; const lng = -180 + (x + 0.5) * 0.05;
+        return [el('a', { href: `https://www.openstreetmap.org/#map=11/${lat.toFixed(3)}/${lng.toFixed(3)}`, target: '_blank', rel: 'noopener noreferrer', text: `${lat.toFixed(2)}, ${lng.toFixed(2)}` }), fmt(web), fmt(desktop), String(last ?? '')];
+      })));
+    } catch (e) { fail('hot-top', `Could not load the hotspots (${e.message}).`); }
+    try {
+      const u = await getJson('/api/usage');
+      const rows = u.rows || []; const totals = new Map();
+      for (const [setting, , count] of rows) totals.set(setting, (totals.get(setting) || 0) + count);
+      $('usage-sub').textContent = `Opt-in counts from ${fmt(u.exports)} exports, no locations.`;
+      const draw = () => {
+        const q = $('usage-filter').value.trim().toLowerCase();
+        const list = rows.filter(([s, v]) => !q || `${s} ${v}`.toLowerCase().includes(q)).sort((a, b) => (a[0] === b[0] ? b[2] - a[2] : a[0] < b[0] ? -1 : 1));
+        put('usage-rows', table([{ label: 'Setting' }, { label: 'Value' }, { label: 'Exports', num: true }, { label: 'Share', num: true }], list.map(([s, v, n]) => [s, String(v), fmt(n), `${Math.round((n / Math.max(1, totals.get(s))) * 100)}%`])));
+      };
+      $('usage-filter').oninput = draw; draw();
+    } catch (e) { fail('usage-rows', `Could not load the settings counts (${e.message}).`); }
+  }
+  async function loadPlanet() {
+    try {
+      const p = await getJson('/api/osm-tiles/progress');
+      const built = p.blocks.filter((b) => b[3] === 'b').length; const real = p.blocks.filter((b) => b[3] !== 'e').length;
+      const up = p.upload;
+      const sent = up ? up.groups.filter((g) => g[2] === 'u').length : 0;
+      put('planet', el('div', {},
+        el('div', { text: `Build: ${p.phase === 'done' ? 'done' : p.phase}, ${fmt(built)} of ${fmt(real)} blocks, ${gb(p.done_mb)} of ${gb(p.total_mb)} of source data.` }),
+        el('div', { class: 'meter' }, el('span', { style: `width:${Math.min(100, (p.done_mb / Math.max(1, p.total_mb)) * 100)}%` })),
+        up ? el('div', { style: 'margin-top:10px', text: `Upload: ${fmt(sent)} of ${fmt(up.groups.length)} archives, ${gb(up.done_mb)} of ${gb(up.total_mb)}.` }) : el('div', { style: 'margin-top:10px', class: 'muted', text: 'No upload reported.' }),
+        up ? el('div', { class: 'meter' }, el('span', { style: `width:${Math.min(100, (up.done_mb / Math.max(1, up.total_mb)) * 100)}%;background:var(--info)` })) : null,
+        el('div', { class: 'muted', style: 'margin-top:8px', text: `Last report ${ago(p.updated)}.` })));
+    } catch (e) { fail('planet', `Could not load the planet progress (${e.message}).`); }
+  }
+
+  // ── tabs, refresh, start ──
+  $('tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tab]'); if (!b) return;
+    for (const t of $('tabs').querySelectorAll('button')) t.setAttribute('aria-selected', String(t === b));
+    for (const p of document.querySelectorAll('[data-panel]')) p.hidden = p.dataset.panel !== b.dataset.tab;
+    try { localStorage.setItem('mapng_admin_tab', b.dataset.tab); } catch { /* fine without */ }
+  });
+  for (const id of ['f-text', 'f-kind', 'f-version', 'f-state', 'f-group']) $(id).addEventListener('input', drawReports);
+
+  async function refresh() {
+    $('updated').textContent = 'Loading…';
+    const jobs = [loadReports(), loadOverview(), loadCloudflare(), loadGitHub(), loadUsage(), loadPlanet()];
+    const results = await Promise.allSettled(jobs);
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    $('updated').textContent = `Updated ${new Date().toLocaleTimeString()}${failed ? ` · ${failed} part(s) did not load` : ''}`;
+  }
+  $('refresh').addEventListener('click', refresh);
+
+  (async () => {
+    const gate = $('gate');
+    try {
+      const me = await (await api('/me')).json();
+      $('who').textContent = `Signed in as ${me.email}`;
+      $('app').hidden = false;
+      try { const t = localStorage.getItem('mapng_admin_tab'); const b = t && $('tabs').querySelector(`button[data-tab="${CSS.escape(t)}"]`); if (b) b.click(); } catch { /* fine without */ }
+      await refresh();
+    } catch (e) {
+      gate.hidden = false;
+      gate.textContent = e.status === 503
+        ? 'The dashboard is not set up on this site yet: it needs the Cloudflare Access application and its settings (ACCESS_TEAM_DOMAIN, ACCESS_AUD) and the owner\'s address.'
+        : e.status === 401
+          ? 'You are not signed in. This page works only behind Cloudflare Access, for the developer.'
+          : `Could not reach the dashboard (${e.message}).`;
+    }
+  })();
+})();
+</script>
+</body>
+</html>

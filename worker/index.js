@@ -32,6 +32,7 @@ import {
 } from '../services/overpassQuery.js';
 import { handleHotspots, handleUsage } from './hotspots.js';
 import { handleCrashReports } from './crashReports.js';
+import { handleAdmin } from './admin.js';
 import { handleShareCodes } from './shareCodes.js';
 import { handleMapterhornTiles } from './mapterhornCache.js';
 import { LATEST_UPDATE } from './updates.js';
@@ -228,6 +229,10 @@ export default {
 
     if (url.pathname === '/api/crash' || url.pathname.startsWith('/api/crash/')) {
       return handleCrashReports(request, env, ctx, url, jsonResponse);
+    }
+
+    if (url.pathname.startsWith('/api/admin/')) {
+      return handleAdmin(request, env, ctx, url, jsonResponse);
     }
 
     if (url.pathname === '/api/usage') {

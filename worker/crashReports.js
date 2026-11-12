@@ -66,7 +66,7 @@ export const REPORTS_PER_DAY = 400;
 const COUNTER_PREFIX = `${PREFIX}_counters/`;
 
 /** The day's counts { reports, mails, hours: { HH: mails } } (R2: read, add, write; a race lets a few extra through). */
-async function readCounts(env, day) {
+export async function readCounts(env, day) {
   try {
     const o = await env.OSM_TILES.get(`${COUNTER_PREFIX}${day}.json`);
     const c = o ? await o.json() : null;
@@ -126,6 +126,35 @@ const authorized = (request, env) => {
   return diff === 0;
 };
 
+/** The newest `limit` reports with their summaries: { total, reports: [{ key, ...summary }] } (newest days first). */
+export async function listReports(env, limit = 50) {
+  const keys = [];
+  let cursor;
+  do {
+    const page = await env.OSM_TILES.list({ prefix: PREFIX, cursor, limit: 1000 });
+    for (const o of page.objects) if (o.key.endsWith('/report.json')) keys.push(o.key);
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor && keys.length < 5000);
+  keys.sort().reverse();
+  const reports = await Promise.all(keys.slice(0, limit).map(async (k) => {
+    const o = await env.OSM_TILES.get(k);
+    return o ? { key: k.slice(0, -'report.json'.length), ...(await o.json()) } : null;
+  }));
+  return { total: keys.length, reports: reports.filter(Boolean) };
+}
+
+/** A report folder's key: crash-reports/<day>/<time>-<id>/ (nothing else is ever read or written by key). */
+export const REPORT_DIR_RE = new RegExp(`^${PREFIX}\\d{4}-\\d{2}-\\d{2}/\\d{6}-MR-[A-Z0-9]{6}/$`);
+const REPORT_FILE_RE = new RegExp(`^${PREFIX}\\d{4}-\\d{2}-\\d{2}/\\d{6}-MR-[A-Z0-9]{6}/(report\\.json|log\\.txt|export_report\\.txt|crash\\.dmp)$`);
+
+/** One file of a report as a Response, or null when the key is not a report file or is missing. */
+export async function reportFile(env, key) {
+  if (!REPORT_FILE_RE.test(key)) return null;
+  const o = await env.OSM_TILES.get(key);
+  if (!o) return null;
+  return new Response(o.body, { headers: { 'Content-Type': o.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'no-store' } });
+}
+
 /** POST /api/crash (a report), GET /api/crash/list and /api/crash/file (the developer, with the token). */
 export async function handleCrashReports(request, env, ctx, url, json) {
   if (!env.OSM_TILES) return json({ error: 'Reports are not set up here' }, 503);
@@ -177,29 +206,12 @@ export async function handleCrashReports(request, env, ctx, url, json) {
   if (!authorized(request, env)) return json({ error: env.CRASH_ADMIN_TOKEN ? 'Unauthorized' : 'Report viewing is not set up' }, env.CRASH_ADMIN_TOKEN ? 401 : 503);
 
   if (sub === '/list' && request.method === 'GET') {
-    // newest days first; up to `limit` reports with their summaries
     const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit')) || 50));
-    const keys = [];
-    let cursor;
-    do {
-      const page = await env.OSM_TILES.list({ prefix: PREFIX, cursor, limit: 1000 });
-      for (const o of page.objects) if (o.key.endsWith('/report.json')) keys.push(o.key);
-      cursor = page.truncated ? page.cursor : undefined;
-    } while (cursor && keys.length < 5000);
-    keys.sort().reverse();
-    const reports = await Promise.all(keys.slice(0, limit).map(async (k) => {
-      const o = await env.OSM_TILES.get(k);
-      return o ? { key: k.slice(0, -'report.json'.length), ...(await o.json()) } : null;
-    }));
-    return json({ total: keys.length, reports: reports.filter(Boolean) }, 200, { 'Cache-Control': 'no-store' });
+    return json(await listReports(env, limit), 200, { 'Cache-Control': 'no-store' });
   }
 
   if (sub === '/file' && request.method === 'GET') {
-    const key = url.searchParams.get('key') || '';
-    if (!new RegExp(`^${PREFIX}\\d{4}-\\d{2}-\\d{2}/\\d{6}-MR-[A-Z0-9]{6}/(report\\.json|log\\.txt|export_report\\.txt|crash\\.dmp)$`).test(key)) return json({ error: 'Not found' }, 404);
-    const o = await env.OSM_TILES.get(key);
-    if (!o) return json({ error: 'Not found' }, 404);
-    return new Response(o.body, { headers: { 'Content-Type': o.httpMetadata?.contentType || 'application/octet-stream', 'Cache-Control': 'no-store' } });
+    return (await reportFile(env, url.searchParams.get('key') || '')) || json({ error: 'Not found' }, 404);
   }
 
   return json({ error: 'Not found' }, 404);

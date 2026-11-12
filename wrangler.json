@@ -43,7 +43,10 @@
         }
       ],
       "vars": {
-        "CRASH_MAIL_FROM": "reports@mapng.com"
+        "CRASH_MAIL_FROM": "reports@mapng.com",
+        "ACCESS_TEAM_DOMAIN": "mapng.cloudflareaccess.com",
+        "ACCESS_AUD": "",
+        "CF_ZONE_ID": "7aa5952a2427445baca40d6bacdd1c8a"
       }
     }
   },
@@ -75,6 +78,9 @@
     }
   ],
   "vars": {
-    "CRASH_MAIL_FROM": "reports@mapng.com"
+    "CRASH_MAIL_FROM": "reports@mapng.com",
+    "ACCESS_TEAM_DOMAIN": "mapng.cloudflareaccess.com",
+    "ACCESS_AUD": "",
+    "CF_ZONE_ID": "7aa5952a2427445baca40d6bacdd1c8a"
   }
 }
