@@ -1,3 +1,4 @@
+import { gpxzChunkGrid } from './gpxzChunks.js';
 import { attachLandCover } from './worldCover.js';
 import { attachTreeSpecies } from './treeSpecies.js';
 import { loadDataImage } from './dataCache.js';
@@ -1202,6 +1203,18 @@ function updateRateLimitFromHeaders(response) {
   }
 }
 
+/**
+ * Whether a 429 says the day's calls are used up (as against "too fast", which a
+ * short wait cures): the answer's own count of calls left is 0, or its wait is
+ * longer than any per-second limit's.
+ */
+export function gpxzDailyLimitReached(response) {
+  const left = response?.headers?.get?.('x-ratelimit-remaining');
+  if (left !== null && left !== undefined && left !== '' && Number(left) === 0) return true;
+  const wait = Number(response?.headers?.get?.('retry-after'));
+  return Number.isFinite(wait) && wait > 120;
+}
+
 /** Get the last known GPXZ rate limit info */
 export function getGPXZRateLimitInfo() {
   return gpxzRateLimitInfo;
@@ -1342,7 +1355,7 @@ const fetchGapFillSource = async ({
  *
  * @returns {{ data, smooth, rawArrayBuffers, hadChunkFailures } | null}
  */
-const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null } = {}) => {
+export const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null } = {}) => {
   try {
     signal?.throwIfAborted();
     // 1. Probe rate limits if not already known
@@ -1422,8 +1435,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null
 
     console.log(`[GPXZ] Total Requested Area: ${areaKm2.toFixed(2)} km²`);
 
-    // GPXZ Limit is 10km². We use a safe chunk size of ~9km² (3km x 3km)
-    const TARGET_CHUNK_SIDE_KM = 3;
+    // GPXZ's limit is 10 km² a request, overlap included
     const BUFFER_DEG = 0.002; // ~220m overlap to prevent seams
 
     // Calculate grid size
@@ -1433,11 +1445,13 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null
     const metersPerDegLat = 111320;
     const metersPerDegLng = 111320 * Math.cos(avgLatRad);
 
-    const chunkLatDeg = (TARGET_CHUNK_SIDE_KM * 1000) / metersPerDegLat;
-    const chunkLngDeg = (TARGET_CHUNK_SIDE_KM * 1000) / metersPerDegLng;
 
-    const rows = Math.ceil(latSpan / chunkLatDeg);
-    const cols = Math.ceil(lngSpan / chunkLngDeg);
+    // (each request is the chunk plus its overlap, and GPXZ refuses one over
+    // 10 km²: the grid is sized on what is actually asked for, services/gpxzChunks.js)
+    const { rows, cols } = gpxzChunkGrid(
+      (latSpan * metersPerDegLat) / 1000, (lngSpan * metersPerDegLng) / 1000,
+      (2 * BUFFER_DEG * metersPerDegLat) / 1000, (2 * BUFFER_DEG * metersPerDegLng) / 1000,
+    );
 
     const requests = [];
 
@@ -1490,6 +1504,9 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null
     onProgress?.(replayingSources() ? `Reading ${requests.length} saved GPXZ tiles...` : `Fetching ${requests.length} GPXZ tiles (${rateInfo?.plan || 'free'} plan, ${concurrency}x concurrent)...`);
 
     let completedChunks = 0;
+    // (the day's GPXZ calls are used up: asking again for every remaining tile,
+    // five times each, only adds refusals; the rest goes to the 30 m fill)
+    let dailyLimitReached = false;
     const results = await pMap(
       requests,
       async (reqBounds) => {
@@ -1501,6 +1518,7 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null
         const MAX_RETRIES = 5;
 
         while (retries < MAX_RETRIES) {
+          if (dailyLimitReached) return null;
           // Globally pace request starts across every concurrent tile.
           await acquireGpxzSlot(signal);
           let response = null;
@@ -1519,6 +1537,13 @@ const fetchGPXZRaw = async (bounds, apiKey, onProgress, signal, { skipBox = null
           }
 
           if (response.status === 429) {
+            updateRateLimitFromHeaders(response);
+            if (gpxzDailyLimitReached(response)) {
+              dailyLimitReached = true;
+              console.warn('[GPXZ] Daily limit reached: no more tiles asked for today.');
+              onProgress?.('GPXZ daily limit reached: the rest uses 30 m data');
+              return null;
+            }
             // Use retry-after header if available, otherwise exponential backoff
             const retryAfter = response.headers.get('retry-after');
             const waitTime = retryAfter
