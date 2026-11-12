@@ -424,7 +424,13 @@ test('terrain left as surveyed (raw): the bore runs out to where the ground meet
   const ap = g.apron?.pos || [];
   for (let k = 0; k < ap.length; k += 3) if (Math.abs(ap[k + 2] - pS.z) < 0.6 && (ap[k + 1] - pS.y) * pS.ty + (ap[k] - pS.x) * pS.tx < -1) apron++;
   assert.ok(apron >= 2, 'apron vertices out in front of the face, its own part (it takes the road decal)');
-  assert.equal(buildPortalGeometry(shaped, 'S').apron, null, 'shaped tunnels: no apron');
+  // shaped tunnels: only a short slab, as far out as a grid square opened just
+  // inside the face can reach (it left a crack across the road at the face)
+  const short = buildPortalGeometry(shaped, 'S').apron.pos;
+  const sS = shaped.line[shaped.iS];
+  let reach = 0;
+  for (let k = 0; k < short.length; k += 3) if (Math.abs(short[k + 2] - sS.z) < 0.3) reach = Math.max(reach, -((short[k + 1] - sS.y) * sS.ty + (short[k] - sS.x) * sS.tx));
+  assert.ok(Math.abs(reach - (0.75 * shaped.squareSize + 0.3)) < 0.05, `short apron reaches ${reach.toFixed(2)} m`);
 });
 
 // A low box: an underpass of a few metres under a lid (a piste, a lawn), the

@@ -122,6 +122,8 @@ const TRENCH_DONE_M = 0.25;
 const RAW_PORTAL_OPEN_M = 0.5;
 const RAW_APRON_M = 4;                  // ...and an apron slab this far out in front of the face
 const RAW_APRON_SQUARES = 4;
+const CUT_APRON_M = 0.3;                // a cutting's portal on graded ground: a floor slab out in front of the face by this ...
+const CUT_APRON_SQUARES = 0.75;         // ... and this much of a grid square (the reach of a square opened just inside the face)
 const RAW_HEAD_GROW_M = 3;              // terrain shaping off: the headwall this much taller and wider each side           // terrain shaping off: a portal where the ground is no more than this over the road            // the approach meets the ground again within this
 const APPROACH_FIT_M = [4, 40];        // approach road samples a portal's height is fitted to
 const APPROACH_MAX_GRADE = 0.25;
@@ -1921,9 +1923,15 @@ export function buildPortalGeometry(t, end) {
   // (its own object, apart from the portal's walls: the road decal clips onto
   // it as onto a deck, and a portal takes no decals; small pieces and a skirt,
   // as a dam's crest top: a flat slab with a box of no height took none)
+  // (a portal in a cutting on graded ground too, a short one: the squares
+  // opened in the mouth are whole grid squares, and one whose middle is just
+  // inside the face reaches out in front of it, past where the floor starts.
+  // Measured in game on the D 902: a crack 0.1 to 0.2 m wide and 2 m long
+  // across one wheel track at the face, 6 m deep. The slab covers that reach.)
   let apron = null;
-  if (t.raw) {
-    const L = Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize);
+  const cutPortal = t.portalKind?.[end === 'S' ? 0 : 1] === 'cut';
+  if (t.raw || cutPortal) {
+    const L = t.raw ? Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) : CUT_APRON_SQUARES * t.squareSize + CUT_APRON_M;
     // (the slab on the road's own grade out from the face, not level at the
     // face's height: its outer edge stood over a road falling away from it)
     const q = t.line[clamp(i + step * Math.max(1, Math.round(L / STEP_M)), 0, t.line.length - 1)];
