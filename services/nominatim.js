@@ -4,27 +4,40 @@ const NOMINATIM_ENDPOINTS = [
     "/api/nominatim-osm/search"
 ];
 
+// Both names end at the same server: nominatim.geocoding.ai answers with a
+// redirect to nominatim.openstreetmap.org (checked 2026-11-12). So a refusal
+// from one (429 too many requests, 503 busy) is that server asking for less,
+// and trying the other name only asks it again: REFUSED below.
 const NOMINATIM_REVERSE_ENDPOINTS = [
-    "/api/nominatim-geocode/reverse",
-    "/api/nominatim-osm/reverse"
+    "/api/nominatim-osm/reverse",
+    "/api/nominatim-geocode/reverse"
 ];
+const REFUSED = new Set([429, 503]);
 
-// Rate limiting: Nominatim requires max 1 request per second
+// OpenStreetMap's Nominatim asks for at most one request a second and no heavy
+// use (https://operations.osmfoundation.org/policies/nominatim/). One at a
+// time, a second apart: callers queue. (The earlier wait let every caller that
+// arrived together through at once.)
+const MIN_REQUEST_INTERVAL = 1100;
+let queue = Promise.resolve();
 let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 1000;
-
-const waitForRateLimit = async () => {
-    const now = Date.now();
-    const timeSinceLastRequest = now - lastRequestTime;
-    
-    if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-        await new Promise(resolve => 
-            setTimeout(resolve, MIN_REQUEST_INTERVAL - timeSinceLastRequest)
-        );
-    }
-    
-    lastRequestTime = Date.now();
+const waitForRateLimit = () => {
+    const turn = queue.then(async () => {
+        const wait = lastRequestTime + MIN_REQUEST_INTERVAL - Date.now();
+        if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        lastRequestTime = Date.now();
+    });
+    queue = turn.catch(() => {});
+    return turn;
 };
+
+// A place's name does not change while the app is open: answers are kept by
+// position, rounded to about 100 m (the name is a suggestion for a level's
+// name, not an address).
+const REVERSE_ROUND = 3;
+const reverseCache = new Map();
+const REVERSE_CACHE_MAX = 500;
+export const reverseKey = (lat, lng) => `${Number(lat).toFixed(REVERSE_ROUND)},${Number(lng).toFixed(REVERSE_ROUND)}`;
 
 export const searchLocation = async (query) => {
     if (!query || query.trim().length < 2) {
@@ -51,6 +64,7 @@ export const searchLocation = async (query) => {
 
             if (!response.ok) {
                 console.warn(`[Nominatim] Endpoint ${endpoint} returned ${response.status}`);
+                if (REFUSED.has(response.status)) break;   // (the other name is the same server)
                 continue;
             }
 
@@ -111,14 +125,25 @@ const pickReverseDisplayName = (item) => {
     );
 };
 
-export const reverseLocationName = async (lat, lng) => {
+/**
+ * A short name for the place at (lat, lng), or '' when none is found.
+ * `signal` (AbortSignal): a caller that no longer wants the answer gives up
+ * its place in the queue and its request.
+ */
+export const reverseLocationName = async (lat, lng, { signal = null } = {}) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return '';
+    const key = reverseKey(lat, lng);
+    if (reverseCache.has(key)) return reverseCache.get(key);
 
     await waitForRateLimit();
+    if (signal?.aborted) return '';
+    if (reverseCache.has(key)) return reverseCache.get(key);   // (answered while this one waited)
 
+    // (asked at the rounded position, so the same place is the same request for the site's cache too)
+    const [qLat, qLng] = key.split(',');
     const params = new URLSearchParams({
-        lat: String(lat),
-        lon: String(lng),
+        lat: qLat,
+        lon: qLng,
         format: 'json',
         addressdetails: '1',
         zoom: '16',
@@ -129,18 +154,25 @@ export const reverseLocationName = async (lat, lng) => {
             const response = await fetch(`${endpoint}?${params}`, {
                 headers: {
                     'Accept': 'application/json'
-                }
+                },
+                signal,
             });
 
             if (!response.ok) {
-                console.warn(`[Nominatim] Reverse endpoint ${endpoint} returned ${response.status}; trying fallback endpoint if available.`);
+                console.warn(`[Nominatim] Reverse endpoint ${endpoint} returned ${response.status}.`);
+                if (REFUSED.has(response.status)) break;   // (the other name is the same server)
                 continue;
             }
 
             const data = await response.json();
             const name = pickReverseDisplayName(data).trim();
-            if (name) return name;
+            if (name) {
+                if (reverseCache.size >= REVERSE_CACHE_MAX) reverseCache.delete(reverseCache.keys().next().value);
+                reverseCache.set(key, name);
+                return name;
+            }
         } catch (error) {
+            if (error?.name === 'AbortError') return '';
             console.warn(`[Nominatim] Failed reverse fetch from ${endpoint}:`, error);
         }
     }

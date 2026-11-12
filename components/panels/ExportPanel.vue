@@ -922,6 +922,7 @@ const refreshExportDataStatus = () => {
 };
 const offExportData = onExportDataChange(refreshExportDataStatus);
 onUnmounted(offExportData);
+onUnmounted(() => { clearTimeout(beamNGLevelNameTimer); beamNGLevelNameAbort?.abort(); });
 let exportDataTimer = null;
 watch(exportDataOptions, (o) => { store.exportDataOptions = o; }, { immediate: true });
 watch([() => props.terrainData, exportDataOptions], () => {
@@ -1341,16 +1342,36 @@ const applySuggestedBeamNGLevelName = (suggestedName) => {
   }
 };
 
+// The suggested name comes from OpenStreetMap's public address server, which
+// asks to be used gently. It was asked at every move of the map, from the
+// moment the page opened: about 20,000 times a day, and refused hundreds of
+// times. Now: only once there is a terrain to export (the name is for the
+// level), only while the name is still the suggestion (a name typed in is
+// kept), and only when the map has stood still for a moment.
+const LEVEL_NAME_SETTLE_MS = 1500;
+let beamNGLevelNameTimer = 0;
+let beamNGLevelNameAbort = null;
+const levelNameWanted = () => showExportBeamNG.value && !!props.terrainData
+  && !(beamNGLevelNameTouched.value && beamNGLevelName.value.trim());
+const scheduleSuggestedBeamNGLevelName = () => {
+  clearTimeout(beamNGLevelNameTimer);
+  beamNGLevelNameAbort?.abort();
+  beamNGLevelNameAbort = null;
+  if (!levelNameWanted()) return;
+  beamNGLevelNameTimer = setTimeout(updateSuggestedBeamNGLevelName, LEVEL_NAME_SETTLE_MS);
+};
+
 const updateSuggestedBeamNGLevelName = async () => {
-  if (!showExportBeamNG.value) return;
+  if (!levelNameWanted()) return;
   const requestId = ++beamNGLevelNameRequestId;
+  beamNGLevelNameAbort = typeof AbortController === 'function' ? new AbortController() : null;
   const fallbackName = buildBeamNGFallbackLevelName();
   if (!Number.isFinite(props.center?.lat) || !Number.isFinite(props.center?.lng)) {
     applySuggestedBeamNGLevelName(fallbackName);
     return;
   }
   try {
-    const suggested = await reverseLocationName(props.center.lat, props.center.lng);
+    const suggested = await reverseLocationName(props.center.lat, props.center.lng, { signal: beamNGLevelNameAbort?.signal || null });
     if (requestId !== beamNGLevelNameRequestId) return;
     applySuggestedBeamNGLevelName(suggested || fallbackName);
   } catch (error) {
@@ -1365,10 +1386,11 @@ const handleBeamNGLevelNameInput = () => {
 };
 
 watch(
-  () => [props.center.lat, props.center.lng, showExportBeamNG.value],
-  ([, , isBeamNgSectionOpen]) => {
-    if (!isBeamNgSectionOpen) return;
-    updateSuggestedBeamNGLevelName();
+  () => [props.center.lat, props.center.lng, showExportBeamNG.value, !!props.terrainData],
+  () => {
+    // (with no terrain yet the field shows the coordinate name: no lookup)
+    if (!props.terrainData && !beamNGLevelNameTouched.value) applySuggestedBeamNGLevelName(buildBeamNGFallbackLevelName());
+    scheduleSuggestedBeamNGLevelName();
   },
   { immediate: true }
 );

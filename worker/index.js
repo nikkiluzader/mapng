@@ -53,6 +53,30 @@ const OSM_MIRROR_TIMEOUT_MS = 30000;
 const OSM_MAX_MIRRORS = 3;
 const OSM_USER_AGENT = 'mapng/1.0 (+https://mapng.com; contact: nikkiluzader@gmail.com)';
 
+const NOMINATIM_CACHE_TTL_S = 7 * 24 * 3600;
+const NOMINATIM_ROUND = 3;      // a reverse lookup's position, decimals of a degree (about 100 m)
+/**
+ * The cache key of an address lookup (a Request), or null for one not worth keeping: a
+ * reverse lookup by its rounded position and zoom, a search by its query; language included.
+ */
+export function nominatimCacheKey(url, upstreamPath, acceptLanguage) {
+  const p = url.searchParams;
+  const lang = String(acceptLanguage || '').split(',')[0].trim().toLowerCase().slice(0, 12);
+  const key = new URL('https://nominatim-cache.mapng.internal/');
+  if (upstreamPath === '/reverse') {
+    const lat = Number(p.get('lat')); const lon = Number(p.get('lon'));
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    key.pathname = '/reverse';
+    key.search = new URLSearchParams({ lat: lat.toFixed(NOMINATIM_ROUND), lon: lon.toFixed(NOMINATIM_ROUND), zoom: p.get('zoom') || '', format: p.get('format') || '', addressdetails: p.get('addressdetails') || '', lang }).toString();
+  } else if (upstreamPath === '/search') {
+    const q = String(p.get('q') || '').trim().toLowerCase();
+    if (!q || q.length > 200) return null;
+    key.pathname = '/search';
+    key.search = new URLSearchParams({ q, format: p.get('format') || '', addressdetails: p.get('addressdetails') || '', limit: p.get('limit') || '', dedupe: p.get('dedupe') || '', lang }).toString();
+  } else return null;
+  return new Request(key.toString(), { method: 'GET' });
+}
+
 const jsonResponse = (body, status, extraHeaders = {}) => new Response(JSON.stringify(body), {
   status,
   headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', ...extraHeaders },
@@ -294,6 +318,22 @@ export default {
       const isNominatimOrigin = origin.includes('nominatim');
       const requestOrigin = `${url.protocol}//${url.host}`;
 
+      // An address lookup's answer is kept at the edge: OpenStreetMap's public
+      // Nominatim asks for gentle use, and the same places are asked for over
+      // and over (the app's start location by every visitor). Keyed by the
+      // query with a reverse lookup's position rounded to about 100 m, and by
+      // language; only good answers are kept.
+      const nominatimKey = isNominatimOrigin ? nominatimCacheKey(url, upstreamPath, request.headers.get('Accept-Language')) : null;
+      if (nominatimKey) {
+        const hit = await caches.default.match(nominatimKey);
+        if (hit) {
+          const headers = new Headers(hit.headers);
+          headers.set('Access-Control-Allow-Origin', '*');
+          headers.set('X-MapNG-Cache', 'hit');
+          return new Response(hit.body, { status: 200, headers });
+        }
+      }
+
       try {
         const upstream = await fetch(upstreamUrl, {
           method: 'GET',
@@ -313,6 +353,13 @@ export default {
 
         const responseHeaders = new Headers(upstream.headers);
         responseHeaders.set('Access-Control-Allow-Origin', '*');
+        if (nominatimKey && upstream.status === 200) {
+          const body = await upstream.arrayBuffer();
+          const keep = new Response(body, { status: 200, headers: { 'Content-Type': upstream.headers.get('Content-Type') || 'application/json', 'Cache-Control': `public, max-age=${NOMINATIM_CACHE_TTL_S}` } });
+          ctx.waitUntil(caches.default.put(nominatimKey, keep));
+          responseHeaders.delete('Content-Encoding'); responseHeaders.delete('Content-Length');
+          return new Response(body, { status: 200, headers: responseHeaders });
+        }
         return new Response(upstream.body, {
           status: upstream.status,
           statusText: upstream.statusText,
