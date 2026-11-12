@@ -82,7 +82,8 @@
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  td:first-child { white-space: nowrap; }
+  td.mono { overflow-wrap: anywhere; }
+  .daytable td:first-child { white-space: nowrap; }
   tr.row { cursor: pointer; }
   tr.row:hover td, tr.row.sel td { background: var(--surface-2); }
   tr.handled td { color: var(--muted); }
@@ -104,6 +105,18 @@
   .bars { display: flex; align-items: flex-end; gap: 3px; height: 120px; }
   .bars .b { flex: 1; min-width: 1px; background: var(--brand); border-radius: 3px 3px 0 0; position: relative; }
   .bars .b.alt { background: var(--info); }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: 170px; overflow: visible; }
+  .chart .hit { fill: transparent; cursor: pointer; }
+  .chart .hit:hover, .chart .hit.on { fill: color-mix(in srgb, var(--text) 9%, transparent); }
+  .chart .tip { position: absolute; top: 0; z-index: 2; pointer-events: none; background: var(--text); color: var(--bg); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; line-height: 1.4; white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .chart-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .chart-tools select { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 4px 8px; }
+  .insight { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 13.5px; }
+  .insight b { font-family: "Overpass", sans-serif; }
+  .daytable { max-height: 300px; overflow: auto; margin-top: 12px; border-top: 1px solid var(--border); }
+  .daytable thead th { position: sticky; top: 0; background: var(--surface); }
+  .daytable tr.on td { background: var(--brand-tint); }
   .axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 11.5px; margin-top: 4px; }
   .muted { color: var(--muted); }
   .meter { height: 8px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; margin-top: 6px; }
@@ -175,7 +188,7 @@
       </div>
       <div class="grid2">
         <div class="card"><h2>Requests per day</h2><p class="sub" id="cf-traffic-sub">From Cloudflare.</p><div id="cf-traffic"></div></div>
-        <div class="card"><h2>Visitors and data per day</h2><p class="sub">Unique visitors (bars) with pages viewed and data served.</p><div id="cf-visitors"></div></div>
+        <div class="card"><h2>Visitors per day</h2><p class="sub">Unique visitors, pages viewed and how many requests each visitor made.</p><div id="cf-visitors"></div></div>
       </div>
     </section>
 
@@ -278,6 +291,98 @@
         values.map((v, i) => el('div', { class: `b${alt ? ' alt' : ''}`, style: `height:${Math.max(2, (v / max) * 100)}%`, title: `${labels[i]}: ${title(v)}` }))),
       el('div', { class: 'axis' }, el('span', { text: labels[0] || '' }), el('span', { text: `peak ${title(max)}` }), el('span', { text: labels[labels.length - 1] || '' })));
   };
+
+  // ── a chart of days: bars, a line or an area; hover a day for its numbers, click it for what stands out ──
+  const CHART_TYPES = [['bars', 'Bars'], ['line', 'Line'], ['area', 'Area']];
+  const SVG = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs = {}) => { const n = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); return n; };
+  let chartType = 'bars';
+  try { const t = localStorage.getItem('mapng_admin_chart'); if (CHART_TYPES.some(([k]) => k === t)) chartType = t; } catch { /* fine without */ }
+  const charts = [];      // every day chart on the page, redrawn together when the type or the chosen day changes
+  let chosenDay = null;
+  /**
+   * rows: one per day, oldest first. metrics: [{ key, label, value(row), format(n), color }]; the first is drawn
+   * unless another is picked. tip(row): lines for the hover box. insight(row, rows): what to say about a clicked day.
+   */
+  function dayChart(hostId, rows, { metrics, tip, insight, table }) {
+    const host = $(hostId); host.textContent = '';
+    const me = { metric: metrics[0].key };
+    try { const m = localStorage.getItem(`mapng_admin_metric_${hostId}`); if (metrics.some((x) => x.key === m)) me.metric = m; } catch { /* fine without */ }
+    const tools = el('div', { class: 'chart-tools' });
+    const typeSel = el('select', { 'aria-label': 'Chart type' }, CHART_TYPES.map(([k, label]) => el('option', { value: k, text: label })));
+    const metricSel = el('select', { 'aria-label': 'What to chart' }, metrics.map((m) => el('option', { value: m.key, text: m.label })));
+    tools.append(el('label', {}, 'Show ', metricSel), el('label', {}, 'as ', typeSel));
+    const box = el('div', { class: 'chart' }); const axis = el('div', { class: 'axis' }); const note = el('div', { class: 'insight', hidden: true });
+    const tableHost = el('div', { class: 'daytable scroll' });
+    host.append(tools, box, axis, note, tableHost);
+    const W = 1000; const H = 170; const PAD = 4;
+    me.draw = () => {
+      typeSel.value = chartType; metricSel.value = me.metric;
+      const metric = metrics.find((m) => m.key === me.metric);
+      const vals = rows.map((r) => Number(metric.value(r)) || 0); const max = Math.max(1, ...vals);
+      const n = rows.length; const step = W / n; const y = (v) => H - PAD - (v / max) * (H - 2 * PAD);
+      box.textContent = '';
+      const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': `${metric.label} per day, ${rows[0]?.dimensions.date} to ${rows[n - 1]?.dimensions.date}; the table below has every day` });
+      if (chartType === 'bars') {
+        const gap = n > 60 ? 0.12 : 0.18;
+        vals.forEach((v, i) => svg.append(svgEl('rect', { x: i * step + step * gap / 2, y: y(v), width: step * (1 - gap), height: Math.max(1, H - PAD - y(v)), fill: metric.color, rx: n > 60 ? 0 : 2 })));
+      } else {
+        const pts = vals.map((v, i) => `${(i + 0.5) * step},${y(v)}`);
+        if (chartType === 'area') svg.append(svgEl('path', { d: `M${0.5 * step},${H - PAD} L${pts.join(' L')} L${(n - 0.5) * step},${H - PAD} Z`, fill: metric.color, opacity: 0.28 }));
+        svg.append(svgEl('path', { d: `M${pts.join(' L')}`, fill: 'none', stroke: metric.color, 'stroke-width': 2, 'vector-effect': 'non-scaling-stroke', 'stroke-linejoin': 'round' }));
+        if (n <= 60) vals.forEach((v, i) => svg.append(svgEl('circle', { cx: (i + 0.5) * step, cy: y(v), r: 2.5, fill: metric.color, 'vector-effect': 'non-scaling-stroke' })));
+      }
+      const tipBox = el('div', { class: 'tip', hidden: true });
+      rows.forEach((r, i) => {
+        const hit = svgEl('rect', { class: `hit${chosenDay === r.dimensions.date ? ' on' : ''}`, x: i * step, y: 0, width: step, height: H });
+        hit.addEventListener('mouseenter', () => {
+          tipBox.hidden = false; tipBox.textContent = '';
+          for (const line of tip(r)) tipBox.append(el('div', line.bold ? { style: 'font-weight:700' } : {}, line.text));
+          const left = ((i + 0.5) / n) * box.clientWidth; const half = tipBox.offsetWidth / 2;
+          tipBox.style.left = `${Math.min(Math.max(left - half, 0), Math.max(0, box.clientWidth - tipBox.offsetWidth))}px`;
+        });
+        hit.addEventListener('mouseleave', () => { tipBox.hidden = true; });
+        hit.addEventListener('click', () => { chosenDay = chosenDay === r.dimensions.date ? null : r.dimensions.date; for (const c of charts) c.draw(); });
+        svg.append(hit);
+      });
+      box.append(svg, tipBox);
+      axis.textContent = ''; axis.append(el('span', { text: rows[0]?.dimensions.date || '' }), el('span', { text: `peak ${metric.format(max)} · click a day for more` }), el('span', { text: rows[n - 1]?.dimensions.date || '' }));
+      const picked = rows.find((r) => r.dimensions.date === chosenDay);
+      note.hidden = !picked; note.textContent = '';
+      if (picked) for (const line of insight(picked, rows)) note.append(el('div', {}, line.bold ? el('b', { text: line.text }) : document.createTextNode(line.text)));
+      tableHost.textContent = '';
+      const t = table(rows);
+      tableHost.append(el('table', {},
+        el('thead', {}, el('tr', {}, t.heads.map((h, i) => el('th', { class: i ? 'num' : '', text: h })))),
+        el('tbody', {}, [...rows].reverse().map((r) => el('tr', { class: `row${r.dimensions.date === chosenDay ? ' on' : ''}`, onclick: () => { chosenDay = chosenDay === r.dimensions.date ? null : r.dimensions.date; for (const c of charts) c.draw(); } }, t.cells(r).map((c, i) => el('td', { class: i ? 'num' : '', text: c })))))));
+    };
+    typeSel.addEventListener('change', () => { chartType = typeSel.value; try { localStorage.setItem('mapng_admin_chart', chartType); } catch { /* fine without */ } for (const c of charts) c.draw(); });
+    metricSel.addEventListener('change', () => { me.metric = metricSel.value; try { localStorage.setItem(`mapng_admin_metric_${hostId}`, me.metric); } catch { /* fine without */ } me.draw(); });
+    const at = charts.findIndex((c) => c.hostId === hostId); me.hostId = hostId;
+    if (at >= 0) charts[at] = me; else charts.push(me);
+    me.draw();
+  }
+  const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = (date) => { const d = new Date(`${date}T00:00:00Z`); return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${d.toLocaleString('en', { month: 'short', timeZone: 'UTC' })} ${d.getUTCFullYear()}`; };
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+  // what stands out about one day against the rest of the period
+  function dayInsight(row, rows) {
+    const whole = rows.slice(0, -1).length ? rows.slice(0, -1) : rows;      // (today's row is still filling: left out of the averages)
+    const mean = (f) => whole.reduce((a, r) => a + f(r), 0) / Math.max(1, whole.length);
+    const rank = (f) => [...rows].sort((a, b) => f(b) - f(a)).findIndex((r) => r === row) + 1;
+    const cmp = (v, avg) => (avg ? `${v >= avg ? '+' : '−'}${Math.abs(Math.round(((v - avg) / avg) * 100))}% against the period's average of ${fmt(Math.round(avg))}` : '');
+    const req = (r) => r.sum.requests; const vis = (r) => r.uniq.uniques;
+    const isToday = row === rows[rows.length - 1];
+    const lines = [{ bold: true, text: `${dayName(row.dimensions.date)}${isToday ? ' (today so far)' : ''}` },
+      { text: `${fmt(req(row))} requests: ${cmp(req(row), mean(req))}; day ${rank(req)} of ${rows.length} by requests.` },
+      { text: `${fmt(vis(row))} visitors: ${cmp(vis(row), mean(vis))}; ${(req(row) / Math.max(1, vis(row))).toFixed(0)} requests per visitor (average ${(mean(req) / Math.max(1, mean(vis))).toFixed(0)}).` },
+      { text: `${bytes(row.sum.bytes)} served, ${pct(row.sum.cachedRequests, req(row))}% of requests from Cloudflare's cache, ${fmt(row.sum.pageViews)} pages viewed, ${fmt(row.sum.threats)} threats stopped.` }];
+    const perVisitor = req(row) / Math.max(1, vis(row)); const usual = mean(req) / Math.max(1, mean(vis));
+    if (!isToday && perVisitor > usual * 1.6) lines.push({ text: 'Far more requests per visitor than usual: a few people doing heavy work (big exports, many map tiles), or something automated.' });
+    if (!isToday && vis(row) > mean(vis) * 1.4) lines.push({ text: 'Many more visitors than usual: a release, a post or a video sending people over.' });
+    return lines;
+  }
+  const dayTip = (r) => [{ bold: true, text: dayName(r.dimensions.date) }, { text: `${fmt(r.sum.requests)} requests · ${pct(r.sum.cachedRequests, r.sum.requests)}% cached` }, { text: `${fmt(r.uniq.uniques)} visitors · ${fmt(r.sum.pageViews)} pages` }, { text: `${bytes(r.sum.bytes)} · ${fmt(r.sum.threats)} threats` }];
 
   // ── state ──
   const state = { reports: [], total: 0, selected: null, overview: null, cf: null, releases: null, days: 1 };
@@ -485,12 +590,33 @@
       $('ov-requests-sub').textContent = `${fmt(recent.reduce((a, r) => a + r.sum.requests, 0))} requests in ${recent.length} days. The last bar is today so far.`;
       put('ov-requests', bars(recent.map((r) => r.sum.requests), recent.map((r) => r.dimensions.date.slice(5))));
       $('cf-traffic-sub').textContent = `${fmt(total)} requests in ${rows.length} days; ${Math.round((cached / Math.max(1, total)) * 100)}% served from Cloudflare's cache.`;
-      return bars(rows.map((r) => r.sum.requests), rows.map((r) => r.dimensions.date.slice(5)));
+      return el('div', { id: 'cf-traffic-chart' });
     });
-    drawSection('traffic', 'cf-visitors', (rows) => el('div', {},
-      bars(rows.map((r) => r.uniq.uniques), rows.map((r) => r.dimensions.date.slice(5)), { alt: true }),
-      el('div', { class: 'scroll', style: 'margin-top:10px' }, table([{ label: 'Day' }, { label: 'Visitors', num: true }, { label: 'Page views', num: true }, { label: 'Data', num: true }, { label: 'Threats', num: true }],
-        [...rows].reverse().slice(0, 7).map((r) => [r.dimensions.date, fmt(r.uniq.uniques), fmt(r.sum.pageViews), bytes(r.sum.bytes), fmt(r.sum.threats)])))));
+    if (section('traffic')?.rows?.length) {
+      const rows = section('traffic').rows;
+      dayChart('cf-traffic-chart', rows, {
+        metrics: [
+          { key: 'requests', label: 'Requests', value: (r) => r.sum.requests, format: fmt, color: 'var(--brand)' },
+          { key: 'cached', label: 'Requests from cache', value: (r) => r.sum.cachedRequests, format: fmt, color: 'var(--good)' },
+          { key: 'data', label: 'Data served', value: (r) => r.sum.bytes, format: bytes, color: 'var(--warn)' },
+          { key: 'threats', label: 'Threats stopped', value: (r) => r.sum.threats, format: fmt, color: 'var(--bad)' },
+        ],
+        tip: dayTip, insight: dayInsight,
+        table: () => ({ heads: ['Day', 'Requests', 'From cache', 'Data', 'Threats'], cells: (r) => [r.dimensions.date, fmt(r.sum.requests), `${pct(r.sum.cachedRequests, r.sum.requests)}%`, bytes(r.sum.bytes), fmt(r.sum.threats)] }),
+      });
+    }
+    drawSection('traffic', 'cf-visitors', () => el('div', { id: 'cf-visitors-chart' }));
+    if (section('traffic')?.rows?.length) {
+      dayChart('cf-visitors-chart', section('traffic').rows, {
+        metrics: [
+          { key: 'visitors', label: 'Visitors', value: (r) => r.uniq.uniques, format: fmt, color: 'var(--info)' },
+          { key: 'pages', label: 'Pages viewed', value: (r) => r.sum.pageViews, format: fmt, color: 'var(--brand)' },
+          { key: 'perVisitor', label: 'Requests per visitor', value: (r) => Math.round(r.sum.requests / Math.max(1, r.uniq.uniques)), format: fmt, color: 'var(--warn)' },
+        ],
+        tip: dayTip, insight: dayInsight,
+        table: () => ({ heads: ['Day', 'Visitors', 'Pages viewed', 'Requests each'], cells: (r) => [r.dimensions.date, fmt(r.uniq.uniques), fmt(r.sum.pageViews), fmt(Math.round(r.sum.requests / Math.max(1, r.uniq.uniques)))] }),
+      });
+    }
     drawSection('securityByAction', 'cf-sec-action', (rows) => {
       const stopped = rows.filter((r) => /challenge|block/.test(r.dimensions.action)).reduce((a, r) => a + r.count, 0);
       const blocked = rows.filter((r) => r.dimensions.action === 'block').reduce((a, r) => a + r.count, 0);
