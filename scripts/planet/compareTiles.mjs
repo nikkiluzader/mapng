@@ -7,10 +7,7 @@
 // custom Overpass server (TRACESTRACK_API_URL), then the two sets of parsed features compared by
 // kind and by id. The tiles are a snapshot: objects edited since differ, so a few per cent either
 // way is expected; a kind missing or halved is not.
-import fs from 'node:fs'; import path from 'node:path'; import crypto from 'node:crypto';
-import { planetManifest } from './planetManifest.mjs';
-
-const env = Object.fromEntries(fs.readFileSync(path.join(process.env.HOME, '.config/mapng/mapng.env'), 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => { const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^["']|["']$/g, '')]; }));
+import { planetSource, env, stats } from './planetSource.mjs';
 const args = process.argv.slice(2);
 const localDir = args[0] === '--local' ? args.splice(0, 2)[1] : null;
 const DEFAULT = [
@@ -21,34 +18,7 @@ const DEFAULT = [
 ];
 const places = args.length ? Array.from({ length: Math.floor(args.length / 4) }, (_, i) => [args[i * 4], Number(args[i * 4 + 1]), Number(args[i * 4 + 2]), Number(args[i * 4 + 3])]) : DEFAULT;
 
-// ── the archives, by byte range ──
-const host = new URL(env.R2_ENDPOINT).host; const bucket = env.R2_BUCKET || 'mapng-osm';
-const hmac = (k, d) => crypto.createHmac('sha256', k).update(d).digest(); const sha = (d) => crypto.createHash('sha256').update(d).digest('hex');
-let bytesRead = 0; let requests = 0;
-async function s3Range(key, offset, length) {
-  const now = new Date().toISOString().replace(/[-:]|\.\d{3}/g, ''); const day = now.slice(0, 8); const pathname = `/${bucket}/${key}`;
-  const range = `bytes=${offset}-${offset + length - 1}`;
-  const canonical = ['GET', pathname, '', `host:${host}\nrange:${range}\nx-amz-content-sha256:${sha('')}\nx-amz-date:${now}\n`, 'host;range;x-amz-content-sha256;x-amz-date', sha('')].join('\n');
-  const scope = `${day}/auto/s3/aws4_request`;
-  const key4 = hmac(hmac(hmac(hmac('AWS4' + env.R2_SECRET_ACCESS_KEY, day), 'auto'), 's3'), 'aws4_request');
-  const sig = crypto.createHmac('sha256', key4).update(['AWS4-HMAC-SHA256', now, scope, sha(canonical)].join('\n')).digest('hex');
-  const r = await realFetch(`https://${host}${pathname}`, { headers: { Range: range, 'x-amz-date': now, 'x-amz-content-sha256': sha(''), Authorization: `AWS4-HMAC-SHA256 Credential=${env.R2_ACCESS_KEY_ID}/${scope}, SignedHeaders=host;range;x-amz-content-sha256;x-amz-date, Signature=${sig}` } });
-  if (r.status !== 206 && r.status !== 200) throw new Error(`${key}: ${r.status}`);
-  return r.arrayBuffer();
-}
-const realFetch = globalThis.fetch;
-const sourceFor = (key) => ({
-  getKey: () => key,
-  getBytes: async (offset, length) => {
-    requests++; bytesRead += length;
-    if (localDir) { const fd = fs.openSync(path.join(localDir, path.basename(key)), 'r'); const buf = Buffer.alloc(length); const n = fs.readSync(fd, buf, 0, length, offset); fs.closeSync(fd); return { data: buf.buffer.slice(buf.byteOffset, buf.byteOffset + n) }; }
-    return { data: await s3Range(key, offset, length) };
-  },
-});
-let names;
-if (localDir) names = fs.readdirSync(localDir);
-else { const m = JSON.parse(fs.readFileSync(new URL('./planet-archives.json', import.meta.url), 'utf8')); names = m.names; }
-const manifest = planetManifest(names, { snapshot: process.env.SNAPSHOT || '2026-11-02' });
+const { manifest, sourceFor } = planetSource({ localDir });
 
 // ── the app's reader ──
 const store = new Map([['mapng_customOverpassUrl', env.TRACESTRACK_API_URL], ['mapng_overtureBuildings', 'false']]);
@@ -63,7 +33,7 @@ let worst = 0; const rows = [];
 for (const [name, lat, lng, km] of places) {
   const dLat = km / 2 / 111.32; const dLng = dLat / Math.cos((lat * Math.PI) / 180);
   const bounds = { north: lat + dLat, south: lat - dLat, west: lng - dLng, east: lng + dLng };
-  const r0 = requests; const b0 = bytesRead; const t0 = Date.now();
+  const r0 = stats.requests; const b0 = stats.bytes; const t0 = Date.now();
   setOsmTileManifest(manifest, sourceFor);
   const tiles = await quiet(() => fetchOSMData(bounds)); const tilesFrom = getLastOSMRequestInfo()?.endpointUsed; const tilesMs = Date.now() - t0;
   setOsmTileManifest({ archives: [] });
@@ -76,7 +46,7 @@ for (const [name, lat, lng, km] of places) {
   const kinds = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
   const off = kinds.filter((k) => { const x = a[k] || 0; const y = b[k] || 0; return Math.abs(x - y) > Math.max(3, 0.1 * Math.max(x, y)); });
   const share = Math.max(onlyTiles, onlyLive) / Math.max(1, live.length); worst = Math.max(worst, share);
-  console.log(`\n${name} (${km} km): tiles ${tiles.length} features from ${tilesFrom} in ${(tilesMs / 1000).toFixed(1)} s (${requests - r0} range reads, ${((bytesRead - b0) / 2 ** 20).toFixed(1)} MB) | live ${live.length} from ${liveFrom} in ${(liveMs / 1000).toFixed(1)} s`);
+  console.log(`\n${name} (${km} km): tiles ${tiles.length} features from ${tilesFrom} in ${(tilesMs / 1000).toFixed(1)} s (${stats.requests - r0} range reads, ${((stats.bytes - b0) / 2 ** 20).toFixed(1)} MB) | live ${live.length} from ${liveFrom} in ${(liveMs / 1000).toFixed(1)} s`);
   console.log(`  only in the tiles: ${onlyTiles} · only live: ${onlyLive} (${(share * 100).toFixed(1)} % of the live set)`);
   console.log(`  ${kinds.map((k) => `${k} ${a[k] || 0}/${b[k] || 0}`).join(' · ')}`);
   if (off.length) console.log(`  KINDS MORE THAN 10 % APART: ${off.map((k) => `${k} ${a[k] || 0} vs ${b[k] || 0}`).join(', ')}`);
