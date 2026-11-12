@@ -54,6 +54,7 @@ import { findCrossings } from './structures/crossings.js';
 import { solveProfilesSteps } from './structures/profileSolve.js';
 import { appendAll, keepInPlace } from './keepInPlace.js';
 import { classifyStructures } from './structures/structureRules.js';
+import { ringPlanePins } from './structures/rings.js';
 import { composeTerrain } from './structures/terrainCompose.js';
 import { addFineGroundDetail } from './terrainDetail.js';
 import { findPortalBuildings, portalBuildingTags } from './portalBuildings.js';
@@ -6178,9 +6179,29 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
           highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
         }));
         structureGraph.previewChecks = { joints: checkJoints(lines), grades: checkGrades(lines), crossings: checkCrossings(lines) };
-        Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false });
+        Object.defineProperty(structureGraph, 'previewLines', { value: lines, enumerable: false, configurable: true });
         // stage D: what each stretch becomes
         structureGraph.classes = classifyStructures(structureGraph);
+        // an elevated ring is one slab: its stations pinned to a plane fitted to this first solve,
+        // and the roads solved once more to meet it (structures/rings.js)
+        if (includeBridges) {
+          const ringFit = ringPlanePins(structureGraph, structureGraph.profile.z);
+          if (ringFit.pins.length) {
+            structureGraph.pins = structureGraph.pins || [];
+            appendAll(structureGraph.pins, ringFit.pins);
+            structureGraph.profile = yield* solveProfilesSteps(structureGraph);
+            structureGraph.profile.ms = Math.round(performance.now() - t0);
+            const again = structureGraph.edges.map((e, k) => ({
+              nodes: Array.from(e.s, (_, i) => [e.x[i], e.y[i], structureGraph.profile.z[k][i], e.half]),
+              highway: e.highway, bridge: e.bridge, tunnel: e.tunnel, tags: { layer: String(e.layer) }, half: e.half,
+            }));
+            structureGraph.previewChecks = { joints: checkJoints(again), grades: checkGrades(again), crossings: checkCrossings(again) };
+            Object.defineProperty(structureGraph, 'previewLines', { value: again, enumerable: false, configurable: true });
+            structureGraph.classes = classifyStructures(structureGraph);
+            structureGraph.rings = ringFit.rings.map((r) => ({ length: r.length, edges: r.edges.length, tilt: Math.round(r.tilt * 1000) / 10, spread: Math.round(r.spread * 100) / 100, lift: Math.round(r.lift * 100) / 100 }));
+            console.log(`${BEAMNG_EXPORT_SERVICE_LOG} Elevated rings: ${structureGraph.rings.map((r) => `${r.length} m of ${r.edges} pieces on one plane (tilt ${r.tilt} %; its heights were ${r.spread} m off a plane)`).join('; ')}`);
+          }
+        }
         if (structureGraph.shaping) structureGraph.classes = rawDeckClasses(structureGraph, structureGraph.classes, structureGraph.shaping.rawDeck, structureGraph.shaping.span);
         // no bridges: a stretch the solve still left high is fill, never a deck
         if (!includeBridges) for (const seg of structureGraph.classes.segments) if (seg.kind === 'deck') seg.kind = 'embankment';

@@ -12,6 +12,7 @@
 // there. Pure geometry and tags; nothing here knows about any place.
 
 import { makeRoadNodeKey } from '../roadNetwork.js';
+import { isOneWayRoad } from '../roadWidth.js';
 import { isBoredTunnelTag } from '../beamngTunnels.js';
 
 export const STATION_M = 4;
@@ -204,6 +205,9 @@ export function buildStructureGraph(segments, { project, groundAt = null, halfOf
       // (the bridge's look, bridgeStyles.js: its paint, OSM bridge=* kind and wikidata)
       paint: tags.colour || tags['bridge:colour'] || '',
       bridgeKind: tags.bridge || '',
+      // (for finding rings: structures/rings.js)
+      oneway: isOneWayRoad({ ...tags, highway: seg.highway || tags.highway }) && tags.oneway !== 'no',
+      roundabout: tags.junction === 'roundabout' || tags.junction === 'circular',
       wikidata: tags.wikidata || tags['bridge:wikidata'] || '',
       length: st.s[st.s.length - 1],
       ...st,
