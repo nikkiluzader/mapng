@@ -55,17 +55,20 @@
   .stat .k { font-size: 13px; color: var(--muted); }
   .overall { margin-top: 14px; height: 10px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--border); overflow: hidden; }
   .overall span { display: block; height: 100%; width: 0; background: var(--built); transition: width .6s; }
+  #u-overall span { background: var(--live); }
+  #u-overall { margin-bottom: 14px; }
   .status { margin: 10px 0 0; font-size: 14px; color: var(--muted); }
   .status.stale { color: var(--brand-ink); font-weight: 600; }
   section { margin-top: 36px; }
   h2 { font-size: 24px; line-height: 1.25; margin: 0 0 10px; }
   p, li { color: var(--text-2); }
-  #map { height: clamp(300px, 72vw, 620px); border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); z-index: 0; }
+  #map, #upload-map { height: clamp(300px, 72vw, 620px); border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); z-index: 0; }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 10px 0 0; padding: 0; list-style: none; font-size: 14px; }
   .legend li { display: inline-flex; align-items: center; gap: 7px; color: var(--text-2); }
   .sw { width: 16px; height: 16px; border-radius: 3px; border: 2px solid; flex: none; }
   .sw.built { border-color: var(--built); background: color-mix(in srgb, var(--built) 45%, transparent); }
   .sw.running { border-color: var(--running); background: color-mix(in srgb, var(--running) 60%, transparent); }
+  .sw.uploaded { border-color: var(--live); background: color-mix(in srgb, var(--live) 45%, transparent); }
   .sw.empty { border-color: var(--built); border-style: dashed; background: color-mix(in srgb, var(--built) 12%, transparent); }
   .sw.waiting { border-color: var(--waiting); background: color-mix(in srgb, var(--waiting) 12%, transparent); }
   .sw.live { border-color: var(--live); border-style: dashed; background: transparent; }
@@ -118,6 +121,24 @@
     <p>Each rectangle is one block of the build. Blocks are small where there is a lot of map data (cities, most of Europe) and large where there is little (oceans, deserts, the far north). Tap a block for its details.</p>
   </section>
 
+  <section id="upload-section" hidden>
+    <h2>The upload</h2>
+    <p>Once built, the tiles are joined into one archive per region and uploaded to MapNG's storage. This map shows how far that has got. The new data is switched on in a later MapNG version; until then MapNG keeps using what it uses today.</p>
+    <div class="stats">
+      <div class="stat"><div class="v" id="u-pct">…</div><div class="k">of the tiles uploaded</div></div>
+      <div class="stat"><div class="v" id="u-groups">…</div><div class="k">regional archives uploaded</div></div>
+      <div class="stat"><div class="v" id="u-size">…</div><div class="k">uploaded so far</div></div>
+    </div>
+    <div class="overall" role="progressbar" aria-label="Upload progress" aria-valuemin="0" aria-valuemax="100" id="u-overall"><span id="u-overall-bar"></span></div>
+    <div id="upload-map"></div>
+    <ul class="legend">
+      <li><span class="sw uploaded"></span>Uploaded</li>
+      <li><span class="sw running"></span>Uploading now</li>
+      <li><span class="sw waiting"></span>Waiting</li>
+    </ul>
+    <p>Each rectangle is one regional archive. Tap one for its size.</p>
+  </section>
+
   <section id="order">
     <h2>Build order</h2>
     <p>Regions are built in this order. The percentage counts the amount of map data, not land area.</p>
@@ -158,6 +179,47 @@
   }).addTo(map);
   const blockLayer = L.layerGroup().addTo(map);
   const liveLayer = L.layerGroup().addTo(map);
+
+  // the upload's own map (made when the first upload report arrives)
+  let uploadMap = null; let uploadLayer = null;
+  const drawUpload = (up) => {
+    const section = document.getElementById('upload-section');
+    if (!up || !up.groups || !up.groups.length) { section.hidden = true; return; }
+    section.hidden = false;
+    if (!uploadMap) {
+      uploadMap = L.map('upload-map', { worldCopyJump: true, minZoom: 0, maxZoom: 6, zoomSnap: 0.25 });
+      uploadMap.fitBounds([[-58, -168], [74, 178]]);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors', maxZoom: 19,
+      }).addTo(uploadMap);
+      uploadLayer = L.layerGroup().addTo(uploadMap);
+    }
+    uploadLayer.clearLayers();
+    const style = {
+      w: { color: css('--waiting'), weight: 1, opacity: 0.55, fillOpacity: 0.06 },
+      r: { color: css('--running'), weight: 2, opacity: 1, fillOpacity: 0.6, className: 'blk-running' },
+      u: { color: css('--live'), weight: 1, opacity: 0.9, fillOpacity: 0.42 },
+    };
+    const names = { w: 'Waiting', r: 'Uploading now', u: 'Uploaded' };
+    const order = { w: 0, u: 1, r: 2 };
+    for (const [x, y, state, mb] of [...up.groups].filter((g) => style[g[2]]).sort((a, b) => order[a[2]] - order[b[2]])) {
+      const rect = L.rectangle(tileBounds(3, x, y), style[state]);
+      const tip = document.createElement('div');
+      const title = document.createElement('b');
+      title.textContent = names[state];
+      tip.append(title, document.createElement('br'), `Archive 3/${x}/${y}, ${gb(mb)}`);
+      rect.bindPopup(tip);
+      rect.addTo(uploadLayer);
+    }
+    const sent = up.groups.filter((g) => g[2] === 'u').length;
+    const all = sent === up.groups.length;
+    const pct = all ? 100 : Math.min(99.9, up.done_mb / Math.max(1, up.total_mb) * 100);
+    set('u-pct', `${pct.toFixed(pct < 10 ? 1 : 0)}%`);
+    set('u-groups', `${fmt(sent)} / ${fmt(up.groups.length)}`);
+    set('u-size', `${gb(up.done_mb)} of ${gb(up.total_mb)}`);
+    document.getElementById('u-overall-bar').style.width = `${pct}%`;
+    document.getElementById('u-overall').setAttribute('aria-valuenow', String(Math.round(pct)));
+  };
 
   const tileBounds = (z, x, y) => {
     const n = 2 ** z;
@@ -287,6 +349,7 @@
       if (date) set('src-date', `the snapshot of ${date}`);
       drawBlocks(doc);
       drawRegions(doc);
+      drawUpload(doc.upload);
     } catch {
       status.className = 'status stale';
       status.textContent = 'Could not load the progress right now. This page will try again in a minute.';

@@ -693,7 +693,9 @@ def progress_doc(wd):
     if older and done > older[0][1] and not cutting:
         rate = (done - older[0][1]) / (now - older[0][0])
         hours_left = round((total - done) / rate / 3600, 1)
+    upload = upload_doc(wd, st)
     return {
+        **({"upload": upload} if upload else {}),
         "updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "source": os.path.basename(st.get("planet", "")),
         "everything": bool(st.get("all")),
@@ -702,6 +704,40 @@ def progress_doc(wd):
         "total_mb": round(total), "done_mb": round(done), "hours_left": hours_left,
         "blocks": blocks,                           # [z, x, y, w(aiting) | r(unning) | b(uilt) | e(mpty), continent, MB]
     }
+
+
+def upload_doc(wd, st):
+    """The upload of the merged archives, for the progress page: one entry per
+    zoom-3 group. From the merge-and-upload run's own record
+    (<workdir>/../after/done.json: {"merged": {group: path}, "uploaded":
+    {group: name}}); None when there is none. The uploader sends the groups in
+    order, one at a time: the first merged group not uploaded is the one in
+    flight."""
+    path = os.path.join(os.path.dirname(os.path.abspath(wd)), "after", "done.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        done = json.load(open(path))
+    except Exception:
+        return None
+    merged, uploaded = done.get("merged", {}), done.get("uploaded", {})
+    built_mb = {}
+    for b in st["blocks"].values():
+        if b["state"] in ("built", "merged"):
+            g = group_of(b, START_ZOOM)
+            built_mb[bkey(*g)] = built_mb.get(bkey(*g), 0) + b.get("out_mb", 0)
+    groups, total, sent, flying = [], 0.0, 0.0, False
+    for gk in sorted(set(merged) | set(built_mb)):
+        f = merged.get(gk)
+        mb = os.path.getsize(f) / 2**20 if f and os.path.exists(f) else built_mb.get(gk, 0)
+        state = "u" if gk in uploaded else "w"
+        if state == "w" and gk in merged and not flying:
+            state, flying = "r", True
+        total += mb
+        sent += mb if state == "u" else 0
+        _, x, y = (int(v) for v in gk.split("-"))
+        groups.append([x, y, state, round(mb)])
+    return {"total_mb": round(total), "done_mb": round(sent), "groups": groups}   # [x, y at zoom 3, u(ploaded) | r(unning) | w(aiting), MB]
 
 
 def cmd_progress(args):
