@@ -91,7 +91,7 @@ import {
   liftFor, rampLength, rampLift, resample, RAMP_SHOULDER_M, RAMP_SIDE_SLOPE, PARAPET_W_M, DECK_MAX_GRADE, DECK_ROAD_CLEAR_M,
 } from './beamngBridges.js';
 import {
-  lowBoxSquareAt, solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
+  lowBoxSquareAt, solveTunnel, chainTunnelParts, absorbBranch, nearestOnTunnel, isBoredTunnelTag, isGalleryTag, tunnelRoadZ, tunnelApronLength, tunnelGroundAt, tunnelHoleAt, lowMouthHoleAt, tunnelReach,
   hitsTunnel, buildTubeGeometry, buildPortalGeometry, buildWindowGeometry, buildTunnelObjects, fitBesideRoads, LIGHT_SPACING_M, LINING_M, extraAt,
   galleryRoofHalf,
 } from './beamngTunnels.js';
@@ -6060,6 +6060,36 @@ function* decalRoadSteps(terrainData, squareSize, opts = {}) {
         const lift = e.rail ? RAIL_DEPTH_M : 0;
         for (let i = 0; i < e.s.length; i++) structureGraph.pins.push([k, i, tunnelRoadZ(t, e.x[i], e.y[i]) + lift]);
       });
+      // A bore can start before its mapped tunnel does (a ramp joining inside
+      // it moves the portal out along the main road): the open road from the
+      // mapped tunnel's end out to the face, and over the floor slab in front
+      // of it, runs on the tunnel's floor too. Left to the solve it fell away
+      // at its own grade from the mapped end, and the floor stood over the
+      // road: 0.45 m at the face, a 0.65 m step at the slab's edge (measured
+      // in game on a motorway tunnel under a city deck). Pinned as well, out
+      // from each tunnel road's ends along the roads that carry it on.
+      if (opts.structureSolver === 'v2') {
+        const pinnedAt = new Set(structureGraph.pins.map(([k, i]) => `${k}:${i}`));
+        structureGraph.edges.forEach((e, k) => {
+          const t = tunnels.bySeg.get(e.seg);
+          if (!t) return;
+          const out = tunnelApronLength(t) + 1;
+          for (const nodeId of [e.from, e.to]) {
+            for (const { edge: k2, end } of structureGraph.nodes.get(nodeId)?.edges || []) {
+              const o = structureGraph.edges[k2];
+              if (k2 === k || tunnels.bySeg.get(o.seg) || o.bridge || o.tunnel || !!o.rail !== !!e.rail) continue;
+              const n = o.s.length;
+              for (let j = 0; j < n; j++) {
+                const i = end === 0 ? j : n - 1 - j;
+                // (beside the main road too: a ramp in the bore's widening shares its floor)
+                const near = nearestOnTunnel(t, o.x[i], o.y[i], t.W + (t.maxExtra || 0) + 2);
+                if (!near || near.beyond || near.into < -out) break;
+                if (!pinnedAt.has(`${k2}:${i}`)) { pinnedAt.add(`${k2}:${i}`); structureGraph.pins.push([k2, i, near.z + (o.rail ? RAIL_DEPTH_M : 0)]); }
+              }
+            }
+          }
+        });
+      }
       // dams (services/dams.js): a road along a dam's crest rides on it,
       // pinned at the crest; the dam is its structure (no deck, no piers,
       // the terrain under it as the data has it: classes 'dam')

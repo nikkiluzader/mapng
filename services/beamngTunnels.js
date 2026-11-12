@@ -1440,6 +1440,9 @@ export function tunnelRoadZ(t, x, y) {
   return nearestOnTunnel(t, x, y)?.z ?? t.line[0].z;
 }
 
+/** How far a tunnel's floor slab reaches out in front of a portal face (buildPortalGeometry's apron). */
+export const tunnelApronLength = (t) => (t.raw ? Math.max(RAW_APRON_M, RAW_APRON_SQUARES * t.squareSize) : CUT_APRON_SQUARES * t.squareSize + CUT_APRON_M);
+
 /** The world box a tunnel's terrain edits can reach. */
 export function tunnelReach(t) {
   const pad = t.headHalf + (t.maxExtra || 0) + FACE_REACH_M + 4;
