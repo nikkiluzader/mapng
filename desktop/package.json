@@ -1,7 +1,7 @@
 {
   "name": "mapng-desktop",
   "productName": "MapNG",
-  "version": "0.2.17",
+  "version": "0.3.0",
   "private": true,
   "description": "MapNG desktop: real-world maps for BeamNG.drive, run locally",
   "author": "Nikki Luzader",

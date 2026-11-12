@@ -44,11 +44,11 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 - **Trees where trees grow:** ESA WorldCover keeps planted woods to real tree cover (no forests above the tree line), mountain trees become conifers; trees OSM maps one by one always stand
 - **Buildings** textured with BeamNG's own facades and roofs
 - **Roads:** DecalRoads with real surfaces, lane markings by country, crosswalks, stop bars, parking lanes and shoulders; roads on the 30 m source are smoothed and levelled automatically
-- **Street detail:** traffic signals per approach, road signs, street lamps that light up at night, raised sidewalks with curb returns and ramps, median islands on divided roads, hydrants, bins, benches, utility poles and power lines
+- **Street detail:** traffic signals per approach, road signs, street lamps that light up at night, sidewalks raised with curb returns and ramps (or flat as decals, with a curb height you choose), median islands on divided roads, hydrants, bins, benches, utility poles and power lines
 - **Bridges, tunnels and dams** solved as one network with the roads and terrain, from general rules that work with any terrain and OpenStreetMap data: smooth bridge ends, clearance over rivers and roads, styled bridges (trusses, arches, suspension, cable-stayed), drawbridges with their tower houses and lift spans, divided roads sharing one deck, lamps on lit bridges, lidar deck heights in the US, tunnel portals and lights (with the terrain Untouched, tunnels on lidar open only their entrances), concrete arch dams with the road and guardrails along the crest
 - **Venues:** racetracks with kerbs, walls and catch fences, sports grounds with surfaces, markings and seating, swimming pools and fountains, floodlights
 - **AI traffic** on the road network, road names on the minimap, fuel stations
-- **OpenStreetMap data** from MapNG's own copy, growing region by region toward the whole planet (fast and independent of Overpass outages), health-ranked Overpass mirrors elsewhere, or your own Overpass server; **Overture Maps** adds buildings and heights OpenStreetMap is missing, and is the backup source if every Overpass server is down
+- **OpenStreetMap data** from MapNG's own copy of the whole planet (read in a second or two anywhere, independent of the public servers; a snapshot, rebuilt regularly), or the live OpenStreetMap servers first if you prefer today's edits, with your own Overpass server if you have one; **Overture Maps** adds buildings and heights OpenStreetMap is missing, and is the last-resort source if neither MapNG's copy nor any server can be read
 - **How heavy is this level?** Before you export, a card rates the level from its size, how far its corners are from the centre (BeamNG starts to jitter past about 30 km) and its building count. It only warns; you can always export
 - **Share your setup:** a short code or link for your settings (works for 24 hours), a long code that never expires, or a file. Whoever opens it sees exactly what it changes first, and your own keys and servers never go with it
 - **A step-by-step control panel:** Location, Sources, Generate, Export (batch: Location, Sources, What you get, Run), with your setup always shown above the buttons
@@ -67,17 +67,18 @@ The Windows build isn't code-signed yet: on first run Windows SmartScreen may sa
 
 ## What's New
 
-**MapNG 0.2.17** ([update page](https://mapng.com/updates/0.2.17/)): mountain roads, galleries and a quality report
+**MapNG 0.3.0** ([update page](https://mapng.com/updates/0.3.0/)): the whole planet, ready to drive
 
-- **Quality report:** "Save quality report" under "Compare sources here" scores each elevation source out of 100 for how well its ground holds the roads at that spot, as one self-contained page
-- **Mountain roads:** hillside lanes at the width of the shelf the lidar holds; a road on its shelf leaves the hillside alone; roads reach the edge of big maps
-- **Galleries and tunnels:** avalanche galleries mapped as one tunnel are built as galleries; cleaner tunnel mouths; buildings by a portal stay on the ground
-- **Lakes:** beds without ridges, facets or pleated banks; a lake cut into pieces by the backup data is one lake
-- **Lanes and bridges:** a passing lane ends where it ends; small bridges span their stream and carry no parking lanes
-- **Map data:** updating a level made from the backup map data asks the OpenStreetMap servers again
-- **Windows:** a portable ZIP that needs no installing; the installer can ask for administrator rights and says why when a folder cannot be written to
+- **The planet:** MapNG's own copy of OpenStreetMap for the entire planet (145 GB in 63 archives). Map data for any area in a second or two, never rate limited, checked against the live servers at 23 places. A switch under Map data asks the live servers first instead
+- **Sidewalks:** as flat decals you can drive on, or raised with a curb height of your choice (15, 8 or 3 cm)
+- **What gets built:** choose and swap the trees picked for your area, switch road classes on and off, assumed street parking on or off
+- **The location map:** Height colours, Shaded relief and Slope layers; lock the selected area
+- **Elevation:** Poland's NMT now takes each sheet's 1 m lidar (it took a 5 m grid where an older year listed one); lidar half a cell off its place, fixed; GPXZ map sizes that lost their lidar, fixed; a suggested source with a warning when free lidar looks wrong; very wide maps
+- **Bridges and tunnels:** a road on an embankment is no flyover; an elevated roundabout is one slab; cleaner tunnel mouths; low tunnels without holes
+- **When things go wrong:** reports from the website (only if you choose Send), your settings offered back after an unexpected close (kept in your browser, nothing sent), the app says so when started from inside its zip
+- **In the game:** the view distance follows the map's size
 
-**Earlier updates**, each with pictures: [0.2.16](https://mapng.com/updates/0.2.16/), [0.2.15](https://mapng.com/updates/0.2.15/), [0.2.14](https://mapng.com/updates/0.2.14/), [0.2.13](https://mapng.com/updates/0.2.13/), [0.2.12](https://mapng.com/updates/0.2.12/), [0.2.11](https://mapng.com/updates/0.2.11/), [0.2.9](https://mapng.com/updates/0.2.9/), [0.2.8](https://mapng.com/updates/0.2.8/), [0.2.7](https://mapng.com/updates/0.2.7/), [0.2.6](https://mapng.com/updates/0.2.6/), [0.2.5](https://mapng.com/updates/0.2.5/). Every release with its notes is on the [releases page](https://github.com/nikkiluzader/mapng/releases).
+**Earlier updates**, each with pictures: [0.2.17](https://mapng.com/updates/0.2.17/), [0.2.16](https://mapng.com/updates/0.2.16/), [0.2.15](https://mapng.com/updates/0.2.15/), [0.2.14](https://mapng.com/updates/0.2.14/), [0.2.13](https://mapng.com/updates/0.2.13/), [0.2.12](https://mapng.com/updates/0.2.12/), [0.2.11](https://mapng.com/updates/0.2.11/), [0.2.9](https://mapng.com/updates/0.2.9/), [0.2.8](https://mapng.com/updates/0.2.8/), [0.2.7](https://mapng.com/updates/0.2.7/), [0.2.6](https://mapng.com/updates/0.2.6/), [0.2.5](https://mapng.com/updates/0.2.5/). Every release with its notes is on the [releases page](https://github.com/nikkiluzader/mapng/releases).
 
 ## Important Notes
 
@@ -122,10 +123,10 @@ This helps keep community resource hubs focused on curated, polished releases wh
 | GPXZ | Optional higher-resolution elevation, with your own API key |
 | Custom upload | Your own DEM: LAZ/LAS, GeoTIFF, ASC, GML/XML (single or multi-tile) |
 | Esri World Imagery | Satellite textures and map layers |
-| MapNG OSM tiles (Cloudflare R2) | MapNG's own OpenStreetMap copy, region by region toward the whole planet |
-| OpenStreetMap / Overpass | Roads, land use, buildings, water, vegetation, street furniture elsewhere |
+| MapNG OSM tiles (Cloudflare R2) | MapNG's own copy of OpenStreetMap for the whole planet: roads, land use, buildings, water, vegetation, street furniture |
+| OpenStreetMap / Overpass | The same from the live servers, when you choose them first or MapNG's copy can't be read |
 | Your own Overpass server | Optional map data source you set yourself |
-| Overture Maps | Extra buildings and heights; backup map data |
+| Overture Maps | Extra buildings and heights; last-resort map data |
 | ESA WorldCover (2021, 10 m, CC BY 4.0) | Land cover: where trees grow, ground on unmapped land, snow, the regional look (© ESA WorldCover project / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium) |
 | USGS 3DEP lidar | Measured bridge deck heights (USA) |
 | iNaturalist | Which tree species grow in the area |
@@ -190,7 +191,7 @@ Releases are built by `.github/workflows/desktop-release.yml` when a `vX.Y.Z` ta
 
 1. Pick a location on the map or search by name.
 2. Choose an output size, a processing scale (m/px) and an elevation source.
-3. Keep Include OSM features on for roads, buildings, vegetation and everything built from them (turn on MapNG OSM coverage in the Map layers box to see where MapNG has its own copy).
+3. Keep Include OSM features on for roads, buildings, vegetation and everything built from them (they come from MapNG's own copy of the whole planet; the note above the map says which source is in use).
 4. Generate. The 2D preview opens: check what will be built, the slope and the relief; open the 3D preview for a look round.
 5. Export the BeamNG level and put the ZIP in your BeamNG.drive `mods` folder (the desktop app saves it there for you).
 6. For larger areas, switch to Batch job mode and process a tile grid, or stitch one into a combined level.

@@ -6,10 +6,17 @@ const KRON86_OPENDATA_PROXY_PREFIX = '/api/kron86-opendata';
 const KRON86_INDEX_PATH = '/wss/service/PZGIK/NumerycznyModelTerenuEVRF2007/WFS/Skorowidze';
 const KRON86_LAYER_PREFIX = 'gugik:SkorowidzNMT';
 const KRON86_MIN_YEAR = 2018;
-const KRON86_MAX_YEAR = 2020;
+// (the index gains a layer a year: every year the service lists is asked, up to this one.
+// Held at 2020, MapNG saw only the 2018-2020 sheets: in the Beskids those are a 5 m grid,
+// while the 1 m lidar sheets of 2021, 2022, 2024 and 2025 were never looked at, and a level
+// came out "like 30 m data")
+const KRON86_MAX_YEAR = Math.max(2026, new Date().getUTCFullYear());
 const KRON86_DEFAULT_YEAR = KRON86_MAX_YEAR;
 const KRON86_MAX_REDIRECTS = 6;
 const KRON86_LOG_PREFIX = '[NMT-EVRF2007]';
+// (the geoportal's firewall answers "Request Rejected" to "Accept-Language: *", which is what
+// Node's own fetch sends when none is given: every request names one)
+const KRON86_ACCEPT_LANGUAGE = 'pl,en;q=0.8';
 
 const logInfo = (...args) => console.info(KRON86_LOG_PREFIX, ...args);
 const logWarn = (...args) => console.warn(KRON86_LOG_PREFIX, ...args);
@@ -128,6 +135,9 @@ const extractLinkCandidatesFromFeatureXml = (xmlText) => {
   const ukladPattern = /<(?:[\w.-]+:)?uklad_xy\b[^>]*>([^<]+)</i;
   const formatPattern = /<(?:[\w.-]+:)?format\b[^>]*>([^<]+)</i;
   const godloPattern = /<(?:[\w.-]+:)?godlo\b[^>]*>([^<]+)</i;
+  // (the sheet's grid spacing, "1.00 m" or "5.00 m", and its mean height error in metres)
+  const spacingPattern = /<(?:[\w.-]+:)?char_przestrz\b[^>]*>([^<]+)</i;
+  const errorPattern = /<(?:[\w.-]+:)?blad_sr_wys\b[^>]*>([^<]+)</i;
 
   const out = [];
   const seen = new Set();
@@ -137,9 +147,10 @@ const extractLinkCandidatesFromFeatureXml = (xmlText) => {
     const url = normalizeUrl(rawUrl);
     if (!/^https?:\/\//i.test(url)) continue;
     const godlo = decodeXmlEntities(member.match(godloPattern)?.[1] || '').trim();
-    const dedupeKey = godlo || url;
-    if (seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
+    // (one sheet can be listed twice in a year, as a 1 m and a 5 m grid or in two formats:
+    // all are kept, and pickBestNmtTiles chooses)
+    if (seen.has(url)) continue;
+    seen.add(url);
 
     const uklad = decodeXmlEntities(member.match(ukladPattern)?.[1] || '').trim();
     const format = decodeXmlEntities(member.match(formatPattern)?.[1] || '').trim();
@@ -148,11 +159,39 @@ const extractLinkCandidatesFromFeatureXml = (xmlText) => {
       godlo,
       uklad,
       format,
+      resolutionM: Number.parseFloat(decodeXmlEntities(member.match(spacingPattern)?.[1] || '').replace(',', '.')) || null,
+      heightErrorM: Number.parseFloat(decodeXmlEntities(member.match(errorPattern)?.[1] || '').replace(',', '.')) || null,
       epsgCode: parseEpsgFromUklad(uklad),
     });
   }
   return out;
 };
+
+// A regular grid first (what the app reads directly), then the point formats.
+const formatRank = (format) => { const f = String(format || '').toUpperCase(); return f.includes('ASCII GRID') ? 0 : f.includes('XYZ') ? 1 : 2; };
+
+/**
+ * One download per map sheet from everything the index lists for an area
+ * (candidates: [{ url, godlo, year, format, resolutionM, heightErrorM }]): the finest
+ * grid, then a regular grid over point lists, then the newest year, then the smaller
+ * height error. A sheet only ever surveyed at 5 m stays 5 m.
+ */
+export function pickBestNmtTiles(candidates) {
+  const best = new Map();
+  const better = (a, b) => {
+    const ra = a.resolutionM ?? Infinity; const rb = b.resolutionM ?? Infinity;
+    if (ra !== rb) return ra < rb;
+    if (formatRank(a.format) !== formatRank(b.format)) return formatRank(a.format) < formatRank(b.format);
+    if ((a.year || 0) !== (b.year || 0)) return (a.year || 0) > (b.year || 0);
+    return (a.heightErrorM ?? Infinity) < (b.heightErrorM ?? Infinity);
+  };
+  for (const c of candidates || []) {
+    const key = c.godlo || c.url;
+    const have = best.get(key);
+    if (!have || better(c, have)) best.set(key, c);
+  }
+  return [...best.values()];
+}
 
 const buildYearCandidates = (preferredYear) => {
   const startYear = clampKron86Year(preferredYear);
@@ -373,6 +412,7 @@ const fetchWithProxyRedirects = async (initialUrl, signal) => {
     redirect: 'follow',
     headers: {
       Accept: 'text/plain, application/octet-stream;q=0.8, */*;q=0.5',
+      'Accept-Language': KRON86_ACCEPT_LANGUAGE,
     },
   });
   logInfo('Fetch terminal response:', response.status, response.statusText, response.url || initialUrl);
@@ -459,6 +499,7 @@ export const fetchKron86GridForBounds = async (bounds, options = {}) => {
       signal,
       headers: {
         Accept: 'application/xml, text/xml;q=0.9, */*;q=0.5',
+        'Accept-Language': KRON86_ACCEPT_LANGUAGE,
       },
     });
     if (capabilitiesResponse.ok) {
@@ -482,7 +523,7 @@ export const fetchKron86GridForBounds = async (bounds, options = {}) => {
   logInfo('Year candidate order:', yearCandidates);
 
   let lastFailureReason = 'no_links';
-  const latestCandidateByTileKey = new Map();
+  const allCandidates = [];
 
   for (const activeYear of yearCandidates) {
     onProgress?.(`Querying NMT EVRF2007 WFS tile index (${activeYear})...`);
@@ -492,6 +533,7 @@ export const fetchKron86GridForBounds = async (bounds, options = {}) => {
       signal,
       headers: {
         Accept: 'application/gml+xml, text/xml;q=0.9, */*;q=0.5',
+        'Accept-Language': KRON86_ACCEPT_LANGUAGE,
       },
     });
 
@@ -516,18 +558,17 @@ export const fetchKron86GridForBounds = async (bounds, options = {}) => {
       continue;
     }
 
-    for (const candidate of candidates) {
-      const tileKey = candidate.godlo || candidate.url;
-      if (latestCandidateByTileKey.has(tileKey)) continue;
-      latestCandidateByTileKey.set(tileKey, {
-        ...candidate,
-        year: activeYear,
-      });
-    }
+    for (const candidate of candidates) allCandidates.push({ ...candidate, year: activeYear });
   }
 
-  const selectedCandidates = [...latestCandidateByTileKey.values()];
-  logInfo('Selected newest-per-tile candidates:', selectedCandidates.map((entry) => ({ year: entry.year, godlo: entry.godlo || '(no-godlo)', url: entry.url })));
+  // (the finest grid each sheet has in any year: newest-first alone took a 5 m sheet of 2019
+  // over the 1 m lidar of later years)
+  const selectedCandidates = pickBestNmtTiles(allCandidates);
+  const spacings = {};
+  for (const c of selectedCandidates) { const k = c.resolutionM ? `${c.resolutionM} m` : 'unknown'; spacings[k] = (spacings[k] || 0) + 1; }
+  const spacingText = Object.entries(spacings).map(([k, n]) => `${k} on ${n} sheet${n === 1 ? '' : 's'}`).join(', ');
+  if (selectedCandidates.length) onProgress?.(`NMT EVRF2007: ${spacingText}`);
+  logInfo('Selected finest-per-sheet candidates:', spacingText, selectedCandidates.map((entry) => ({ year: entry.year, godlo: entry.godlo || '(no-godlo)', resolutionM: entry.resolutionM, format: entry.format, url: entry.url })));
   if (selectedCandidates.length === 0) {
     return { gridMeta: null, fallbackReason: lastFailureReason, links: [] };
   }
@@ -568,6 +609,8 @@ export const fetchKron86GridForBounds = async (bounds, options = {}) => {
         },
         fallbackReason: null,
         links: usedLinks,
+        // (the grid spacing of the sheets used, for the report: { '1 m': 10, '5 m': 2 })
+        spacings,
       };
     }
   }

@@ -342,7 +342,9 @@ export default {
           method: 'GET',
           headers: {
             'Accept': request.headers.get('Accept') || 'application/json',
-            ...(request.headers.get('Accept-Language')
+            // (a real language only: "*", which Node's fetch sends, is turned away by the Polish
+            // geoportal's firewall with an HTML page, and the elevation tile was lost)
+            ...(request.headers.get('Accept-Language') && request.headers.get('Accept-Language').trim() !== '*'
               ? { 'Accept-Language': request.headers.get('Accept-Language') }
               : {}),
             ...(isNominatimOrigin

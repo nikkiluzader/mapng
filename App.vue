@@ -94,7 +94,7 @@
         <!-- the site was deployed while this page stayed open: its older parts stop working (services/appUpdate.js) -->
         <div
           v-if="appUpdated && !updateNoticeHidden" data-testid="app-updated" role="alert"
-          class="fixed left-1/2 top-3 z-[100000] flex w-[min(92vw,34rem)] -translate-x-1/2 items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-lg dark:border-amber-600 dark:bg-amber-950 dark:text-amber-50"
+          class="fixed left-1/2 top-20 z-[100000] flex w-[min(92vw,34rem)] -translate-x-1/2 items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-lg dark:border-amber-600 dark:bg-amber-950 dark:text-amber-50"
         >
           <div class="min-w-0 flex-1">
             <p class="font-semibold">{{ t('app.updated.title') }}</p>

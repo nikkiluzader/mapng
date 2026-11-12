@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MapNG 0.3.0: The Whole Planet, Ready to Drive</title>
+<meta name="description" content="MapNG 0.3.0: MapNG now carries its own copy of OpenStreetMap for the whole planet, so map data loads in a second or two anywhere and no longer depends on busy public servers. Plus sidewalks as decals, a curb height choice, tree and road class choices, new map layers, and a long list of bridge, tunnel and elevation fixes from testers.">
+<link rel="canonical" href="https://mapng.com/updates/0.3.0/">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MapNG 0.3.0: the whole planet, ready to drive">
+<meta property="og:description" content="MapNG's own copy of OpenStreetMap for the whole planet, sidewalks as decals, tree and road choices, new map layers, and bridge, tunnel and elevation fixes.">
+<meta property="og:url" content="https://mapng.com/updates/0.3.0/">
+<meta property="og:image" content="https://mapng.com/updates/0.3.0/images/planet-archives.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  /* BeamNG.drive's UI fonts, as the app (public/fonts, SIL OFL) */
+  @font-face { font-family: "Noto Sans"; src: url(/fonts/noto-sans-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass"; src: url(/fonts/overpass-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; font-display: swap; }
+  @font-face { font-family: "Overpass Mono"; src: url(/fonts/overpass-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 300 700; font-display: swap; }
+  :root {
+    --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f2f2f4; --border: #e3e3e8;
+    --text: #1d1d22; --text-2: #4a4a55; --muted: #6e6e7a;
+    --brand: #ff6600; --brand-ink: #c2410c; --brand-tint: #fff4ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+      --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+      --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111114; --surface: #1a1a1f; --surface-2: #222229; --border: #2e2e36;
+    --text: #ececf0; --text-2: #c2c2cc; --muted: #9a9aa6;
+    --brand: #ff7a1f; --brand-ink: #ffa463; --brand-tint: #2a1c12;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.65 "Noto Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  a { color: var(--brand-ink); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 16px; }
+  h1, h2, h3 { font-family: "Overpass", "Noto Sans", system-ui, sans-serif; letter-spacing: -0.01em; }
+
+  /* hero: a plain band (a small release: no in-game shot) */
+  .hero { position: relative; color: #fff; background: linear-gradient(135deg, #1b1b22 0%, #2a1c12 60%, #7a3300 100%); }
+  .hero::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.15) 45%, rgba(0,0,0,.75) 100%); }
+  .hero .wrap { position: relative; padding-top: 18px; padding-bottom: 46px; min-height: min(46vh, 360px); display: flex; flex-direction: column; }
+  .brand { display: inline-flex; align-items: center; gap: 8px; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; }
+  .brand img { width: 22px; height: 22px; }
+  .hero .spacer { flex: 1; }
+  .tag { display: inline-block; align-self: flex-start; background: var(--brand); color: #fff; font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .08em; text-transform: uppercase; padding: 7px 12px; border-radius: 4px; transform: skewX(-12deg); }
+  .tag span { display: inline-block; transform: skewX(12deg); }
+  .hero h1 { font-size: clamp(34px, 7vw, 60px); line-height: 1.05; margin: 14px 0 10px; font-style: italic; text-shadow: 0 2px 18px rgba(0,0,0,.5); }
+  .hero p { margin: 0; font-size: 18px; max-width: 640px; color: rgba(255,255,255,.92); text-shadow: 0 1px 8px rgba(0,0,0,.6); }
+  .hero .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 15px; text-decoration: none; }
+  .btn.primary { background: var(--brand); color: #fff; }
+  .btn.ghost { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35); backdrop-filter: blur(4px); }
+  .credit { position: absolute; right: 16px; top: 20px; max-width: 46%; text-align: right; font-size: 12px; line-height: 1.3; color: rgba(255,255,255,.75); text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  @media (max-width: 560px) { .credit { display: none; } }
+
+  /* quick jump chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: -20px 0 0; position: relative; }
+  .chips a { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 14px; color: var(--text); text-decoration: none; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+  .chips a:hover { border-color: var(--brand); color: var(--brand-ink); }
+
+  main { padding-bottom: 72px; }
+  section { margin-top: 64px; scroll-margin-top: 16px; }
+  .kicker { font: 700 13px/1 "Overpass", sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--brand-ink); }
+  h2 { font-size: clamp(26px, 4.4vw, 34px); line-height: 1.15; margin: 8px 0 12px; }
+  h3 { font-size: 20px; margin: 30px 0 6px; }
+  p, li { color: var(--text-2); }
+  li { margin: 4px 0; }
+  b, strong { color: var(--text); }
+  code { font-family: "Overpass Mono", ui-monospace, monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; font-size: .9em; color: var(--text); }
+
+  figure { margin: 18px 0 0; }
+  figure img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); box-shadow: 0 6px 24px rgba(0,0,0,.08); }
+  figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: center; }
+  .split.narrow-img { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); }
+  @media (max-width: 720px) { .split, .split.narrow-img { grid-template-columns: 1fr; } }
+
+  ol.callouts { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px; counter-reset: c; }
+  ol.callouts li { position: relative; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 10px 48px; margin: 0; counter-increment: c; }
+  ol.callouts li::before { content: counter(c); position: absolute; left: 12px; top: 10px; width: 26px; height: 26px; border-radius: 50%; background: var(--brand); color: #fff; font: 800 14px/26px "Overpass", sans-serif; text-align: center; }
+
+  .note { background: var(--brand-tint); border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0; padding: 12px 14px; color: var(--text); font-size: 15px; margin-top: 18px; }
+  .regions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; margin: 12px 0 0; }
+  .regions li { background: var(--surface); border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 14px; margin: 0; color: var(--text); }
+  .polish { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 14px; }
+  .polish div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; font-size: 15px; color: var(--text-2); }
+  .polish b { display: block; margin-bottom: 2px; }
+
+  .outro { margin-top: 72px; text-align: center; }
+  .outro figure img { border-radius: 14px; }
+  .outro p { max-width: 620px; margin: 18px auto 0; }
+  footer { border-top: 1px solid var(--border); margin-top: 56px; padding-top: 18px; font-size: 14px; color: var(--muted); }
+  footer p { color: var(--muted); }
+
+  /* the cliff profile (inline SVG; series colours checked for colour-blind separation in both modes) */
+  .chart { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 14px 8px; margin-top: 18px; position: relative; }
+  .chart .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; color: var(--text-2); margin: 0 0 6px 4px; }
+  .chart .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .profile { width: 100%; height: auto; display: block; --s1: #2f6fd6; --s2: #e85d00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .profile, :root:not([data-theme="light"]) .chart .legend { --s1: #5b93ea; --s2: #e2650a; } }
+  :root[data-theme="dark"] .profile, :root[data-theme="dark"] .chart .legend { --s1: #5b93ea; --s2: #e2650a; }
+  .profile .g { stroke: var(--border); stroke-width: 1; }
+  .profile .t { fill: var(--muted); font: 12px "Noto Sans", sans-serif; }
+  .profile .lab { fill: var(--text); font: 600 13px "Noto Sans", sans-serif; }
+  .profile .cliff { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 4 4; }
+  .profile .s1, .profile .s2 { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .profile .s1 { stroke: var(--s1); } .profile .s2 { stroke: var(--s2); }
+  .profile .xh { stroke: var(--muted); stroke-width: 1; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px; font-size: 13px; color: var(--text); box-shadow: 0 4px 14px rgba(0,0,0,.12); white-space: nowrap; display: none; }
+  .tip i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  table.nums { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: 15px; }
+  table.nums th, table.nums td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.nums td.n { font-variant-numeric: tabular-nums; }
+  table.nums th { color: var(--muted); font-weight: 600; }
+  .bts { font-size: 14px; color: var(--muted); }
+  /* diagrams (inline SVG): colours from the page tokens, both modes */
+  .dia { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-top: 18px; }
+  .dia svg { width: 100%; height: auto; display: block; --d1: #2f6fd6; --d2: #e85d00; --d3: #3a9a4a; --dg: #b9cf9f; --dw: #9cc3e6; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; } }
+  :root[data-theme="dark"] .dia svg { --d1: #5b93ea; --d2: #ff8a3d; --d3: #5fbf6d; --dg: #4a5a3c; --dw: #2c4a66; }
+  .dia text { fill: var(--text); font: 13px "Noto Sans", sans-serif; }
+  .dia .sm { fill: var(--muted); font-size: 12px; }
+  .dia .box { fill: var(--surface-2); stroke: var(--border); }
+  .dia .boxb { fill: var(--brand-tint); stroke: var(--brand); }
+  .dia .arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+  .refs { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .refs figcaption a { color: var(--muted); }
+  .pair2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .pair2 { grid-template-columns: 1fr; } }
+  .stat { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-top: 16px; }
+  .stat div { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+  .stat b { display: block; font: 800 26px/1.1 "Overpass", sans-serif; color: var(--brand-ink); }
+  .stat span { font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/favicon.svg" alt="">MapNG</a>
+    <div class="spacer"></div>
+    <span class="tag"><span>Update · 0.3.0</span></span>
+    <h1>The whole planet, ready to drive</h1>
+    <p>MapNG now carries its own copy of OpenStreetMap for the entire planet, so map data loads in a second or two anywhere on Earth. Around it: sidewalks as decals, more say over trees and roads, new map layers, reports from the website, and a long round of bridge, tunnel and elevation fixes from testers.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn ghost" href="/">Open mapng.com</a>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <nav class="chips" aria-label="On this page">
+    <a href="#planet">The planet</a><a href="#build">What gets built</a><a href="#sidewalks">Sidewalks</a><a href="#map">The location map</a><a href="#view">View distance</a><a href="#report">Send report</a><a href="#elevation">Elevation</a><a href="#bridges">Bridges</a><a href="#tunnels">Tunnels</a><a href="#safety">When things go wrong</a><a href="#next">Next</a>
+  </nav>
+
+  <section id="planet">
+    <div class="kicker">The headline</div>
+    <h2>🌍 MapNG's own copy of OpenStreetMap, for the whole planet</h2>
+    <p>Until now MapNG asked the public OpenStreetMap servers for every area's roads and buildings. Those servers are shared by the whole world: they are slow at busy hours, they limit how much one person may ask, and some days they do not answer at all, which is when levels came out built from backup data with roads missing their bridges.</p>
+    <p>MapNG 0.3.0 has its own copy: <b>every tagged thing in OpenStreetMap, for the entire planet</b>, cut into map tiles and stored where the app can read just the squares it needs. It took a day and a half to build and holds 145 GB in 63 archives.</p>
+    <figure><img src="images/planet-archives.jpg" alt="A grid of the world in 64 squares, each labelled with the size of its archive: central Europe is the largest at 39.6 GB, open ocean squares hold almost nothing, and one Arctic square has no data at all" loading="lazy"><figcaption>Behind the scenes: the planet as MapNG stores it, one archive per zoom-3 map tile. Central Europe alone is 39.6 GB; a square of open ocean is next to nothing.</figcaption></figure>
+    <ul>
+      <li><b>Fast, everywhere.</b> A town's map data arrives in one to two seconds, from Tokyo to Nairobi to Reykjavik, where the public servers took two to seven.</li>
+      <li><b>Never rate limited, never "down".</b> The copy lives on MapNG's own storage. A busy evening on the public servers no longer decides whether your level has its bridges.</li>
+      <li><b>The same data.</b> Checked at 23 places on six continents, through the app's own reader: the tiles and the live servers gave the same roads, bridges, tunnels, buildings and trees, differing only by edits made since the copy was taken (0 to 3 % of features).</li>
+    </ul>
+    <figure><img src="images/planet-compare.jpg" alt="Two bar charts for twelve places around the world: reading an area takes 1 to 2 seconds from MapNG tiles against 2 to 7 from the live servers, and both return almost exactly the same number of features" loading="lazy"><figcaption>Behind the scenes: twelve places, read both ways. Left, the time; right, the number of map features. A block edge (Greenwich), the date line (Fiji) and the equator are among them.</figcaption></figure>
+    <h3>It is a snapshot, and you choose</h3>
+    <p>The copy is OpenStreetMap as it was on <b>2 November 2026</b>, and it will be rebuilt regularly. If you have just edited OpenStreetMap and want today's map, there is a new switch under <b>Map data</b>: <b>MapNG's own copy of OpenStreetMap first</b>. Switch it off and the live servers are asked first, with MapNG's copy as the fallback when they do not answer.</p>
+    <figure><img src="images/planet-app.jpg" alt="MapNG with a 2D preview of Arnhem and, in the bar above the map, a small note reading MapNG OSM data next to the Location, 2D preview and 3D preview tabs" loading="lazy"><figcaption>The bar above the map now says where the map data comes from. Before a Generate it shows what will be asked first; after one, what was really used. Hover it for the snapshot's day.</figcaption></figure>
+    <p>The old "Backup map data" alarm and the banner about OpenStreetMap being down are gone: with the planet on MapNG's own storage, an outage of the public servers no longer changes what you get. Every level's export report names the source and the snapshot day.</p>
+    <p class="muted">Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, under the Open Database License. MapNG's copy holds what OpenStreetMap publishes, nothing added.</p>
+  </section>
+
+  <section id="build">
+    <div class="kicker">New</div>
+    <h2>🌳 Choose the trees, the road classes and the parking</h2>
+    <p>MapNG picks a lot for you: which trees suit the place, which roads to draw, how wide a town street is. Advanced mode now shows those choices and lets you change them. Basic mode is unchanged: one click still builds the whole place.</p>
+    <h3>The trees picked for your area</h3>
+    <p><b>Fine-tuning</b> has a table of the tree kinds MapNG will plant in your area, each with its share and the game models that stand for it, and where the choice came from: local iNaturalist records, or the climate where there are none. It is counted from 2,000 trees drawn with the export's own rules at heights sampled from your terrain, so it follows a mountain's conifer line too.</p>
+    <ul>
+      <li><b>Leave a kind out.</b> Its trees are planted as the other kinds that grow there.</li>
+      <li><b>Swap a kind for another.</b> Palms planted as live oaks, say. The row that took them in says so.</li>
+      <li><b>Switch single models off</b> within a kind.</li>
+      <li><b>Reset</b> puts everything back to what the data picked.</li>
+    </ul>
+    <figure><img src="images/tree-table.jpg" alt="The Fine-tuning panel's tree table: rows for Live oaks, Broadleaves, Junipers, Tropical trees and Conifers with their shares, a menu on each row to keep, leave out or replace the kind, a button for each tree model with one struck out, Palms shown as planted as Live oaks, and a Reset link" loading="lazy"><figcaption>The tree table for a town in Florida, with palms swapped for live oaks and one model switched off.</figcaption></figure>
+    <p class="bts">Trees mapped one by one in OpenStreetMap with their species keep that species: a swap changes what MapNG chooses, not what the map says.</p>
+    <h3>Road classes</h3>
+    <p>Under <b>Roads and markings</b> there is a switch for each class of road: motorways and trunk roads, main roads, streets, service roads, tracks. A class you switch off leaves the level with everything that belongs to it (its bridges, tunnels, paint and signs), and the 2D preview shows it faint. Useful for leaving a motorway out of a town map, or building only the main roads of a big area.</p>
+    <figure><img src="images/road-classes.jpg" alt="MapNG with the What to build panel in advanced mode: under Roads and markings, 11 of 12 switches are on and Service roads is switched off and shown faint, beside the 2D preview of a city centre" loading="lazy"><figcaption>Service roads switched off in a city centre: 297 of them leave the level, and the panel counts 11 of 12 on.</figcaption></figure>
+    <h3>Assumed street parking</h3>
+    <p>A town street with no parking tags gets a parking lane on each side, which makes an untagged residential street 10.6 m wide for 6 m of driving lanes. Fine-tuning now has <b>Assume street parking</b>, on by default. Off, only parking that is mapped gets built and those streets come out at their driving width.</p>
+  </section>
+
+  <section id="sidewalks">
+    <div class="kicker">Streets</div>
+    <h2>🚶 Sidewalks your way: decals, and a curb height</h2>
+    <p>Two new choices under <b>Fine-tuning</b> (advanced mode), both asked for in the Discord.</p>
+    <h3>Sidewalks as decals</h3>
+    <p>Switched on, no sidewalk mesh is built. A street's sidewalks become flat strips of paving beside the lanes, every footpath and cycle path is painted on the ground, and there are no curbs. You can drive over all of it, which suits park paths and cycle lanes especially.</p>
+    <figure><img src="images/sidewalks.jpg" alt="The same street corner in the game twice: on the left raised paved sidewalks with stone curbs, on the right the same paving lying flat on the ground with no curb" loading="lazy"><figcaption>One street in Arnhem, both ways. The decal version exports faster and makes a smaller level.</figcaption></figure>
+    <p>Measured on a 2 km town centre: the raised sidewalks are 731,000 triangles in 11 meshes. As decals the export took 35 seconds against 49 and the level was 64 MB against 89. One honest note: the frame rate in the game came out the same either way on our test machine, so choose decals for the look, the driving and the smaller level, not for speed.</p>
+    <h3>Curb height</h3>
+    <p>For the raised sidewalks: <b>Standard</b> (15 cm, a real curb), <b>Low</b> (8 cm) or <b>Flush</b> (3 cm). Lower curbs are kinder to low cars and easy to drive onto. Street furniture standing on a sidewalk follows the height you pick.</p>
+    <figure><img src="images/sidewalk-settings.jpg" alt="MapNG's Fine-tuning tab showing the Assume street parking switch, the Sidewalks as decals switch turned on, and the Curb height choice of Standard, Low and Flush" loading="lazy"><figcaption>Fine-tuning, with the new switch and the curb height choice. Both are saved with the level and travel in settings codes.</figcaption></figure>
+  </section>
+
+  <section id="map">
+    <div class="kicker">New</div>
+    <h2>🗺️ Read the land before you pick your square</h2>
+    <p>The location map has three new base layers, drawn in your browser from the global elevation tiles MapNG already reads. No other service is asked.</p>
+    <ul>
+      <li><b>Height colours:</b> low to high over what is on screen, with shading and the range shown, so hilltops and valleys read as clearly on a town with 40 m of relief as on a mountain range.</li>
+      <li><b>Shaded relief:</b> the land's shape alone, in grey.</li>
+      <li><b>Slope:</b> steepness in colour, with a key. Where a road can go, and where it cannot.</li>
+    </ul>
+    <p>Place and road names are drawn over them, as on the satellite layer.</p>
+    <figure><img src="images/relief-layers.jpg" alt="The same stretch of northern Arizona three times: coloured by height with a volcano standing out in white, as grey shaded relief, and coloured by slope" loading="lazy"><figcaption>Flagstaff, Arizona in the three new layers.</figcaption></figure>
+    <h3>Lock the selected area</h3>
+    <p>A new button under the recentre button locks the selected area in place. Locked, the area keeps its position and size while you zoom and pan the map, to set a spawn point up close for example. Unlocking brings the view back to the area.</p>
+  </section>
+
+  <section id="view">
+    <div class="kicker">In the game</div>
+    <h2>🔭 The view distance follows the map</h2>
+    <p>Every level used to draw 4 km. On a 20 km mountain map that meant everything past the nearest ridge was the flat water plane: an island where there are hills. The default is now <b>Auto</b>: the first of 4, 8, 12 and 16 km that covers the map's width. A small town map keeps 4 km.</p>
+    <p>Advanced mode's Level card can name a distance instead (2 to 16 km), for a weaker PC or a hazier look. The 2 km choice gets a little fog to hide the far edge. For comparison, the game's own levels draw 4.5 km (Hirochi Raceway) to 25 km (Italy).</p>
+    <figure><img src="images/view-distance.jpg" alt="The same view from a ridge of a 20 km mountain level, twice: at 4 km the land ends at the next hill and a flat grey water plane fills the rest; at Auto (16 km) the valleys, a far peak and the plain beyond are drawn to the horizon" loading="lazy"><figcaption>One 20 km mountain level from the same ridge. Left, the old 4 km: a flat water plane past the first hills. Right, Auto, which picks 16 km for a map this size.</figcaption></figure>
+  </section>
+
+  <section id="report">
+    <div class="kicker">Desktop</div>
+    <h2>📨 Send report, on every level</h2>
+    <p>When something looks wrong in a level, the most useful thing you can send is its <code>export_report.txt</code>. Until now that meant opening the level's ZIP and finding it. Each level in <b>My Levels</b> now has a <b>Send report</b> button: it shows you exactly what will be sent, you can add a note, and one click sends it.</p>
+    <ul>
+      <li><b>Nothing is sent unless you choose Send.</b> The dialog shows the full text first.</li>
+      <li><b>What a level report holds:</b> the place, its coordinates and street names, your settings, and the export's own measurements and log. No account, no email address unless you type one in the note.</li>
+      <li><b>Where it goes:</b> private storage only the developer can read. Details on the <a href="/data.html">Your data</a> page.</li>
+    </ul>
+    <div class="note"><b>Also fixed:</b> the desktop app's requests to mapng.com were sometimes stopped by the site's bot protection, which made the app quietly fall back to slower map data. The app is now let through.</div>
+  </section>
+
+  <section id="elevation">
+    <div class="kicker">Elevation</div>
+    <h2>📐 Lidar sits where it belongs</h2>
+    <p>An elevation file gives the corner of its first cell, and each value belongs to the middle of its cell. MapNG read the corner as the first value, which put GPXZ lidar and every uploaded raster half a cell north-west of its place: half a metre on 1 m lidar. Roads from OpenStreetMap then sat half a metre off the road the lidar shows.</p>
+    <p>Measured against Mapterhorn, an independent lidar source, on six areas: GPXZ was 0.36 to 0.58 m west and 0.23 to 1.03 m north of it. Now four of the six agree to within 1 cm, and the two Alpine ones to within 0.4 m.</p>
+    <figure><img src="images/lidar-offset.jpg" alt="A plot of six test areas: red dots, the old position of GPXZ lidar, cluster half a metre north-west of the centre; green dots, the new position, sit at the centre for four areas and close to it for the two Alpine ones" loading="lazy"><figcaption>Behind the scenes: where GPXZ lidar lay against Mapterhorn lidar on six test areas, before and after. The dashed square is one 1 m cell.</figcaption></figure>
+    <h3>Uploading your own elevation</h3>
+    <ul>
+      <li><b>A file with no location is placed at its real size.</b> An ASC grid with no coordinates was stretched over whatever area was selected. It is now placed at its own cell size, centred where you choose, and the panel says so.</li>
+      <li><b>"No geo metadata" no longer reads as a failure.</b> The message now says what happens: the file has no location and will be fitted to the area selected on the map.</li>
+      <li><b>Japanese survey GML:</b> a ZIP of ZIPs uploads as it is downloaded; the file's own no-data cells are holes, not ground 10 km down; and tiles no longer overlap their neighbours by a cell.</li>
+      <li><b>A square crop is announced.</b> When a level's square has to be cut from a wider upload, the panel says how much is left out.</li>
+    </ul>
+    <p>Modify also keeps a GPXZ level on its GPXZ terrain: it used to come back on the 30 m data.</p>
+    <h3>GPXZ: some map sizes lost their lidar</h3>
+    <p>GPXZ takes at most 10 km² in one request. MapNG cut a map into pieces of up to 3 km and then added a small overlap round each one, which made a 3 km piece 11.7 km², and GPXZ refused it. Maps whose pieces came out just under 3 km (about 2.75 to 3 km, 5.5 to 6 km, 8.25 to 9 km and 11 to 12 km a side) lost those pieces to the 30 m data, or GPXZ altogether. A quarter of all GPXZ terrain requests on the site were refused this way.</p>
+    <ul>
+      <li><b>The pieces are now sized with their overlap counted,</b> so none is refused. Map sizes that already worked are cut exactly as before.</li>
+      <li><b>When the day's GPXZ calls run out,</b> MapNG stops asking and uses 30 m data for the rest, instead of asking five more times for every remaining piece.</li>
+    </ul>
+    <h3>Poland's NMT: the 1 m lidar, not the 5 m grid</h3>
+    <p>Poland's elevation index lists a map sheet once for every year it was surveyed, as a 5 m grid in some years and as 1 m lidar in others. MapNG looked only at the years 2018 to 2020 and took the newest sheet whatever its grid, so in much of the mountains it built from the 5 m grid: terrain that looked, as the tester who found it put it, "like it's using 30 m". MapNG now asks every year the index has and takes <b>the finest grid each sheet has</b>. On his area in the Beskids that is 1 m lidar on all 12 sheets, where it was 5 m on all of them. The desktop app's downloads of these sheets could also be turned away by the Polish server; that is fixed too.</p>
+    <h3>Very wide maps</h3>
+    <p>A map more than about 55 to 78 km across (depending on latitude) stopped at Generate in the desktop app with "Create skia surface failed": the 30 m tiles were stitched at one fixed zoom, and the picture grew past what the drawing library takes. The zoom now follows the map's width. Found from a problem report on a 106 km map.</p>
+  </section>
+
+  <section id="source">
+    <div class="kicker">Elevation</div>
+    <h2>🧭 A suggested source, and a warning when free lidar looks wrong</h2>
+    <p><b>Compare sources here</b> already drew the same square from each elevation source. It now adds one line under the pictures: which of them to use. Usually that is the finest one. But it also runs one plain check on the free lidar, after a tester found his city came out with "random steep hills".</p>
+    <figure><img src="images/arnhem-shelf.jpg" alt="Three maps of central Arnhem: GPXZ lidar shows the city rising from the river, the free lidar shows a flat shelf at river level where the centre is, and the difference between them is up to 15 metres ending in a sharp edge" loading="lazy"><figcaption>Behind the scenes: central Arnhem. The free lidar holds a flat shelf at river level across the city centre, up to 15 m under the real streets, ending in a cliff. Streets crossing it came out at 80 %.</figcaption></figure>
+    <p>The check: lidar that lies level where the 30 m data shows a steady slope, metres away from it, over a fifth of the square. When it trips, the line suggests another source and says why. Tried on 19 test areas, it flags that shelf and nothing else.</p>
+    <figure><img src="images/source-suggestion.jpg" alt="MapNG's elevation source panel with three small hillshade pictures and, under them, the line Suggested here: Global 30 m, with the reason that the free lidar lies level where the 30 m data slopes" loading="lazy"><figcaption>The suggestion in central Arnhem. It looks only at the square in the middle of your map, so treat it as a hint, not a survey.</figcaption></figure>
+  </section>
+
+  <section id="bridges">
+    <div class="kicker">Bridges</div>
+    <h2>🌉 Bridges: an embankment is not a flyover, and a ring is one slab</h2>
+    <h3>The 10 m tent on an embankment</h3>
+    <p>A tester's Arnhem level had a deck that stopped in mid-air with the road carrying on below it. The cause was an old rule: a road tagged as running on an embankment was treated as half a level above the roads around it, so where the dike road joins it, MapNG built a flyover over a junction that is at grade. The road climbed from 12 m to 22 m and back in 180 m.</p>
+    <figure><img src="images/embankment-section.jpg" alt="Two long sections of a road between two bridges: before, the road spikes 10 metres into the air over nearly level ground; after, it follows the gently rising embankment" loading="lazy"><figcaption>Behind the scenes: the road between the two parts of Arnhem's western Rhine bridge. Dotted, the lidar ground; blue, road on the ground; red, bridge deck.</figcaption></figure>
+    <figure><img src="images/embankment.jpg" alt="The same view along a dual carriageway in the game: before, one carriageway climbs onto a walled deck while the other drops away; after, both run together along the embankment" loading="lazy"><figcaption>In the game, from the same spot. An embankment tag no longer lifts a road over its own junctions.</figcaption></figure>
+    <h3>An elevated roundabout is one slab</h3>
+    <p>A rotary on a flyover was solved piece by piece, each short stretch between two ramps taking its heights from the ramps. The ring rose and fell round its loop and each ramp met it with a step across the lane. MapNG now finds such rings, holds the whole ring on one plane, and brings the last metres of each ramp onto that plane too.</p>
+    <figure><img src="images/ring.jpg" alt="An elevated roundabout with ramps in the game, before and after: after, the ring is level and the ramp surfaces run into it without an edge, and the foot links to it are concrete where they were brown planks" loading="lazy"><figcaption>An elevated rotary with eight ramps. The brown planks in the first picture were footbridges with no surface tag: those are wooden now only where they cross water on their own.</figcaption></figure>
+    <figure><img src="images/ring-steps.jpg" alt="A bar chart of the step where four ramps meet the ring: 0.31, 0.12, 0.08 and 0.17 metres before; 0.09, 0.05, 0.04 and 0.04 metres after" loading="lazy"><figcaption>Measured in the game with raycasts, a metre at a time along each ramp into the ring.</figcaption></figure>
+  </section>
+
+  <section id="tunnels">
+    <div class="kicker">Tunnels</div>
+    <h2>🚇 Tunnels: fewer left on the ground, cleaner mouths</h2>
+    <ul>
+      <li><b>One thin stretch no longer throws out the whole tunnel.</b> One mapped tunnel often runs through bores and open ledges in turn. A stretch with too little ground over it made the whole way "left on the ground": the road drawn across the cliff at a 450 % grade. Where the road is still bedded in the ground along such a stretch, the tube now stands in the open there and the rest is built as before.</li>
+      <li><b>No holes over the middle of a low tunnel.</b> Ground just under the ceiling of a low box is raised onto the roof instead of being opened, and it never covers a sidewalk beside it.</li>
+      <li><b>No crack across the road at the face.</b> A 0.1 to 0.2 m crack across one wheel track, 6 m deep, where the tunnel's floor met the ground.</li>
+      <li><b>No step where a ramp joins inside the tunnel.</b> Where a ramp joins inside a bore, the tunnel's mouth sits further out than the mapped tunnel's end. The open road on that stretch fell away on its own while the tunnel floor stayed level: a 0.65 m step across a motorway at the mouth. The road now runs on the floor out to the face.</li>
+    </ul>
+    <figure><img src="images/tunnel-mouth-step.jpg" alt="Two line charts of the road surface through a tunnel mouth: before, the road climbs to the floor slab and jumps 0.65 m onto it; after, one smooth line through the mouth" loading="lazy"><figcaption>Behind the scenes: the road surface through a motorway tunnel mouth, measured in the game every metre.</figcaption></figure>
+  </section>
+
+  <section id="data">
+    <div class="kicker">Map data</div>
+    <h2>🧭 Backup map data keeps its bridges and tunnels</h2>
+    <p>When OpenStreetMap's servers do not answer, MapNG falls back to Overture's copy of the map. That copy cuts long roads at tile edges, and the pieces lost their bridge and tunnel marks: a level made on a bad day had roads running down into rivers. Major and minor roads now keep them. In one tester's area 109 of 112 cut roads are placed again and the bridges built went from 46 to 82 (OpenStreetMap has 70 there).</p>
+  </section>
+
+  <section id="safety">
+    <div class="kicker">Reports and recovery</div>
+    <h2>🛟 When something goes wrong</h2>
+    <p>No email address is asked for anywhere in MapNG, and none of this changes that.</p>
+    <h3>If MapNG closes unexpectedly</h3>
+    <p>A browser tab that runs out of memory takes your session with it. MapNG now leaves itself a note, <b>in your own browser's storage</b>, when a Generate or an export starts, and removes it when the job ends or you close the page normally. If the note is still there next time, MapNG offers your settings back (you see them before anything is applied) and, if you like, a report. The note is shown once and deleted. Nothing is sent.</p>
+    <figure><img src="images/unexpected-close.jpg" alt="MapNG after an unexpected close: a notice under the top bar says an export was still running when MapNG closed last time and that the settings were kept in this browser, with buttons Restore my settings, Send a report and Dismiss" loading="lazy"><figcaption>The notice after a crash. An ordinary close or reload never shows it.</figcaption></figure>
+    <h3>Reports from the website</h3>
+    <p>The <b>Send report</b> window from the desktop app now opens on the website too when a Generate or an export fails. Same rules: it shows what is in it first, and nothing is sent unless you choose Send. A failed export also stays on screen with its reason instead of vanishing behind an alert.</p>
+    <figure><img src="images/web-report.jpg" alt="The Send report window on the website, listing what is included: the build, the browser and system, the error message, the settings code, and what is never included" loading="lazy"><figcaption>What a website report holds, shown before you send it. <a href="/data.html#web-reports">The full list is on the data page</a>, with a link to the code.</figcaption></figure>
+    <ul>
+      <li><b>The portable Windows app, started from inside its zip,</b> now says "Extract the whole zip first" instead of opening and then failing at the first Generate. Found from a problem report.</li>
+      <li><b>The website says when it was updated under you.</b> A page left open while a new version went live kept asking for files that were gone, and Generate could end with no terrain and no message. The page now notices and offers a Reload.</li>
+      <li><b>Problem reports keep the whole settings code.</b> A long code copied from a report was cut short and read as invalid.</li>
+      <li><b>A very wide map no longer stops Generate</b> in the desktop app ("Create skia surface failed" on a 106 km map). Found from a problem report.</li>
+    </ul>
+  </section>
+
+  <section id="more">
+    <div class="kicker">Also</div>
+    <h2>🔧 Smaller things</h2>
+    <ul>
+      <li><b>A big city with background areas exports again.</b> A 20 km city with background areas over half the map stopped with "Maximum call stack size exceeded" just after the base texture step. Found from a problem report sent from the app: thank you to whoever sent it.</li>
+      <li><b>Italian:</b> lominsa's translation is in, for every string whose English has not changed since it was written.</li>
+      <li><b>The export report says why each guessed deck was built:</b> over water, over a road, beside a lower road, or its height alone. Handy when a level has bridges where there are none.</li>
+      <li><b>Fewer address lookups.</b> The suggested level name asked OpenStreetMap's address service every time the map stopped moving. It now asks once, when a terrain exists, and popular places are answered from MapNG's own copy.</li>
+      <li><b>Problem reports reach the developer faster</b> (an email alert, with a cap so nobody can flood it).</li>
+    </ul>
+  </section>
+
+  <section id="next">
+    <div class="kicker">Next</div>
+    <h2>🚧 Left open for the update after this one</h2>
+    <p>Things testers raised that are understood but not in 0.3.0:</p>
+    <ul>
+      <li><b>Steep foot links as stairs.</b> A footbridge that climbs from the ground to a flyover in 20 m is built as a steep ramp. It should be steps.</li>
+      <li><b>Walls where two decks part.</b> In the wedge between two ramps the walls of both decks overlap instead of meeting cleanly.</li>
+      <li><b>Signal poles in the road.</b> At junctions with wide corner curves a mast can stand in the asphalt instead of on the corner.</li>
+      <li><b>Bus lanes, bus stops and cycle paths.</b> Separate bus lanes and stops need their own look, and a cycle path should not read as a wide footpath.</li>
+      <li><b>Curbs with decal sidewalks.</b> Keeping the road's curbs as meshes while the sidewalks are decals.</li>
+      <li><b>Buildings as separate objects,</b> so one can be moved or removed in the World Editor, for maps where the count allows it.</li>
+      <li><b>Coarse 30 m elevation.</b> Where only 30 m data exists, the two sides of a divided road can come out at different heights with bridges guessed between them. A fix exists and passes 98 of 99 test cases; it waits on the last one.</li>
+      <li><b>Free lidar checked automatically.</b> The new warning is a hint under the comparison. Falling back to the 30 m data by itself where lidar is plainly wrong is the next step.</li>
+      <li><b>A fresher planet.</b> The copy is rebuilt as a whole for now. Small daily updates on top of it are planned.</li>
+      <li><b>Very large city maps on the website.</b> A 20 km city can run the browser out of memory. The desktop app has far more room, and the website now gives your settings back after such a crash.</li>
+      <li><b>A level quality choice</b> (lighter levels for 8 GB graphics cards) waits on proper measurements instead of guessed numbers.</li>
+    </ul>
+  </section>
+
+  <section id="thanks">
+    <div class="kicker">Credit</div>
+    <h2>🙏 Thanks</h2>
+    <p>This version is built from the reports, screenshots and ideas of the people testing MapNG in the Discord. Thank you:</p>
+    <ul>
+      <li><b>dutch_guy_2003</b>: sidewalks as decals, the curb height, the Arnhem levels and reports that led to the embankment fix and the lidar warning, bus lanes and cycle paths.</li>
+      <li><b>glitter_shitter</b>: the elevated roundabout and its screenshots, the 20 km city that found the export crash, Combined levels.</li>
+      <li><b>Fizz_Mechanic</b>: tunnels and gallery mouths, the area lock, the tree table.</li>
+      <li><b>lominsa</b>: elevation uploads and the lidar offset, the view distance, the Italian translation.</li>
+      <li><b>kreunz</b>: backup map data losing bridges, buildings as separate objects.</li>
+      <li><b>Wonly</b>: Poland's elevation coming out coarse, with the comparison that pinned it down.</li>
+      <li><b>SailorSunny405</b>: the height layer on the location map.</li>
+      <li><b>brokenbraincells_</b>: signal poles in the road.</li>
+      <li><b>elmarzi, imadundurr, alxti, Jevi, frivolous_racing, SPLATPLAYS, fidwix</b>: export reports, screenshots, questions and test levels along the way.</li>
+      <li><b>Everyone who pressed Send report.</b> Four fixes in this version came straight from reports sent from the app: the export crash on a big city, the very wide map, the settings code cut short, and the app started from inside its zip.</li>
+    </ul>
+    <p>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a> and the <a href="https://overturemaps.org/">Overture Maps Foundation</a>. Elevation: Mapzen / AWS Terrain Tiles, <a href="https://mapterhorn.com/attribution">Mapterhorn and its open-data sources</a>, and GPXZ where you use it. Tree choices: <a href="https://www.inaturalist.org/">iNaturalist</a> records.</p>
+  </section>
+
+  <div class="outro">
+    <p><b>Heads-up:</b> the Windows build still isn't code-signed. If SmartScreen warns you, choose <b>More info</b>, then <b>Run anyway</b>.</p>
+    <p>Found something? Use <b>Send report</b> (on a level, or when something fails), post in the <a href="https://discord.gg/j6ZvcF8rgk">MapNG Discord</a> or open a <a href="https://github.com/nikkiluzader/mapng/issues">GitHub issue</a>. 🧡</p>
+    <div class="cta" style="display:flex;gap:10px;justify-content:center;margin-top:18px;flex-wrap:wrap">
+      <a class="btn primary" href="https://github.com/nikkiluzader/mapng/releases/latest">Download MapNG Desktop</a>
+      <a class="btn" style="border:1px solid var(--border);color:var(--text)" href="/">Open mapng.com</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>MapNG is free and open source. <a href="https://github.com/nikkiluzader/mapng">GitHub</a> · <a href="/data.html">Your data</a> · <a href="/updates/0.2.17/">Previous update (0.2.17)</a> · <a href="/">mapng.com</a></p>
+  </footer>
+</main>
+</body>
+</html>
